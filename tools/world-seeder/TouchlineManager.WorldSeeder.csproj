@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TouchlineManager.Infrastructure\TouchlineManager.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TouchlineManager.Application\TouchlineManager.Application.csproj" />
+    <ProjectReference Include="..\..\src\TouchlineManager.Domain\TouchlineManager.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TouchlineManager.WorldSeeder</RootNamespace>
+    <AssemblyName>TouchlineManager.WorldSeeder</AssemblyName>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,55 @@
+# --- .NET ---
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.nupkg
+*.snupkg
+artifacts/
+TestResults/
+*.trx
+*.coverage
+coverage*.xml
+*.received.*
+project.lock.json
+project.fragment.lock.json
+
+# --- Node / Angular ---
+node_modules/
+dist/
+dist-ssr/
+tmp/
+out-tsc/
+.npm/
+*.tsbuildinfo
+.angular/
+
+# --- Environment and secrets ---
+.env
+.env.local
+.env.*.local
+*.pfx
+*.snk
+secrets.json
+appsettings.Development.local.json
+
+# --- Tooling ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+*.swp
+
+# Agent/tool working state, including learned preferences. Per-developer, not shared.
+.commandcode/
+.kilo/
+
+# --- Docker ---
+infra/docker/data/

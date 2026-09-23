@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/apps/">
+    <Project Path="apps/api/TouchlineManager.Api/TouchlineManager.Api.csproj" />
+    <Project Path="apps/worker/TouchlineManager.Worker/TouchlineManager.Worker.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/TouchlineManager.Application/TouchlineManager.Application.csproj" />
+    <Project Path="src/TouchlineManager.Contracts/TouchlineManager.Contracts.csproj" />
+    <Project Path="src/TouchlineManager.Domain/TouchlineManager.Domain.csproj" />
+    <Project Path="src/TouchlineManager.Infrastructure/TouchlineManager.Infrastructure.csproj" />
+    <Project Path="src/TouchlineManager.MatchEngine/TouchlineManager.MatchEngine.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TouchlineManager.Api.IntegrationTests/TouchlineManager.Api.IntegrationTests.csproj" />
+    <Project Path="tests/TouchlineManager.Application.Tests/TouchlineManager.Application.Tests.csproj" />
+    <Project Path="tests/TouchlineManager.ArchitectureTests/TouchlineManager.ArchitectureTests.csproj" />
+    <Project Path="tests/TouchlineManager.Domain.Tests/TouchlineManager.Domain.Tests.csproj" />
+    <Project Path="tests/TouchlineManager.Infrastructure.Tests/TouchlineManager.Infrastructure.Tests.csproj" />
+    <Project Path="tests/TouchlineManager.MatchEngine.Tests/TouchlineManager.MatchEngine.Tests.csproj" />
+    <Project Path="tests/TouchlineManager.Worker.IntegrationTests/TouchlineManager.Worker.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/simulation-benchmarks/TouchlineManager.SimulationBenchmarks.csproj" />
+    <Project Path="tools/world-seeder/TouchlineManager.WorldSeeder.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TouchlineManager.MatchEngine\TouchlineManager.MatchEngine.csproj" />
+    <ProjectReference Include="..\..\src\TouchlineManager.Domain\TouchlineManager.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TouchlineManager.SimulationBenchmarks</RootNamespace>
+    <AssemblyName>TouchlineManager.SimulationBenchmarks</AssemblyName>
+  </PropertyGroup>
+
+</Project>
