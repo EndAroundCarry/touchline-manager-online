@@ -1,0 +1,8 @@
+/*
+ * The shell relies on Tailwind utilities for layout. Component styles are kept for the few places
+ * where a utility cannot express the intent, and are always in the `tailwind-utilities` layer's
+ * shadow so a page-level utility can still win.
+ */
+:host {
+  display: block;
+}

@@ -1,0 +1,64 @@
+/*
+ * CSS layer order is a contract, not a preference.
+ *
+ *   tailwind-base        Tailwind's reset, so it can be overridden by everything below
+ *   primeng              PrimeNG component and theme styles, registered by providePrimeNG()
+ *   tailwind-utilities   Tailwind utilities last, so a utility class can beat a component style
+ *                        without !important
+ *
+ * PrimeNG is told the same order through `theme.options.cssLayer` in app.config.ts. Changing one
+ * side without the other silently changes which rules win.
+ */
+@layer tailwind-base, primeng, tailwind-utilities;
+
+@import 'tailwindcss/theme.css' layer(tailwind-base);
+@import 'tailwindcss/preflight.css' layer(tailwind-base);
+@import 'tailwindcss/utilities.css' layer(tailwind-utilities);
+
+@import 'primeicons/primeicons.css';
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  /* Safe-area insets keep content clear of notches and home indicators on installed PWAs. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/*
+ * Text selection stays enabled everywhere. Disabling it globally is a common instinct and it
+ * breaks the ability to copy fixture times, player names, and amounts out of the game. It is
+ * restricted only on drag handles and the pitch canvas, where it would interfere with interaction.
+ */
+canvas.pitch,
+.drag-handle {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* A visible focus ring is a WCAG 2.2 AA requirement, so it is set once for the whole app. */
+:focus-visible {
+  outline: 2px solid var(--p-primary-color, #2563eb);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
