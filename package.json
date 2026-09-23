@@ -1,0 +1,26 @@
+{
+  "name": "touchline-manager-online",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Root task runner. No application code lives here; see apps/ and src/.",
+  "scripts": {
+    "dev": "npm run infra:up && concurrently -k -n api,worker,web -c blue,magenta,green \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:web\"",
+    "dev:api": "dotnet run --project apps/api/TouchlineManager.Api",
+    "dev:worker": "dotnet run --project apps/worker/TouchlineManager.Worker",
+    "dev:web": "npm --prefix apps/web start",
+    "infra:up": "docker compose -f infra/compose.yaml up -d --wait",
+    "infra:down": "docker compose -f infra/compose.yaml down",
+    "infra:reset": "docker compose -f infra/compose.yaml down -v",
+    "build": "dotnet build TouchlineManager.slnx",
+    "test": "dotnet test TouchlineManager.slnx",
+    "test:web": "npm --prefix apps/web run test:ci",
+    "migrate": "dotnet dotnet-ef database update --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
+    "migration:add": "dotnet dotnet-ef migrations add --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
+    "migration:script": "dotnet dotnet-ef migrations script --idempotent --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
+    "format": "dotnet format TouchlineManager.slnx",
+    "format:check": "dotnet format TouchlineManager.slnx --verify-no-changes"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

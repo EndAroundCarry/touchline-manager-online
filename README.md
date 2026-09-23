@@ -1,1 +1,141 @@
-# touchline-manager-online
+# Touchline Manager
+
+An old-school football management game with a modern online structure: a persistent,
+server-authoritative MMO where managers prepare a club asynchronously and compete against each
+other on fixed matchdays. Every club, player, competition and badge is fictional.
+
+**Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
+kick-off. The server decides results; a client can never simulate or influence one.
+
+> **Status: Stage 1 complete — engineering foundation.** The playable game is being built in the
+> staged order defined in the master plan. Stage 1 delivers the monorepo, the durable job pipeline,
+> the API and worker composition roots, the health and observability baseline, and the Angular PWA
+> shell. Gameplay arrives from Stage 2 onward.
+
+---
+
+## Start here
+
+```bash
+npm install          # once: installs the root task runner
+npm run dev          # starts PostgreSQL + mail catcher, then API, worker and web
+```
+
+`npm run dev` is the single command for local development. It:
+
+1. starts PostgreSQL 17 and a mail catcher via Docker Compose and waits for their health checks,
+2. runs the API on `http://localhost:5080`,
+3. runs the background worker as a **separate process** (it is never hosted inside the API),
+4. runs the Angular dev server on `http://localhost:4200`, proxying `/api` to the API.
+
+Then:
+
+| Where | What |
+|---|---|
+| <http://localhost:4200> | Web client |
+| <http://localhost:5080/health> | Health, including the database check |
+| <http://localhost:4200/welcome> | Landing page |
+| <http://localhost:8025> | Mail catcher UI |
+
+PostgreSQL is published on host port **55432**, not 5432, so it cannot collide with another database
+already on your machine. Override with `POSTGRES_PORT` in a local `.env` (copy `.env.example`).
+
+First run only, create the database schema:
+
+```bash
+npm run migrate
+```
+
+Press `Ctrl+C` once to stop the three application processes. `npm run infra:down` stops the
+containers; `npm run infra:reset` also deletes the data volume.
+
+### Prerequisites
+
+- .NET SDK 10 (pinned by `global.json`)
+- Node.js 24
+- Docker (for PostgreSQL and the mail catcher, and for the integration tests)
+
+---
+
+## Verify it works
+
+```bash
+npm run build         # .NET build, warnings as errors
+npm test              # every .NET test project, including Testcontainers integration tests
+npm run test:web      # Angular unit tests
+npm run format:check  # formatting gate
+```
+
+The walking skeleton is exercised end to end by
+`tests/TouchlineManager.Worker.IntegrationTests`: a job is enqueued against a real PostgreSQL 17
+container and the worker is asserted to claim, execute and complete it without the API being
+involved. With the API running in Development you can also drive it by hand:
+
+```bash
+curl -X POST "http://localhost:5080/api/v1/ops/diagnostics/noop-job?key=demo-1"   # 202, enqueued=true
+curl -X POST "http://localhost:5080/api/v1/ops/diagnostics/noop-job?key=demo-1"   # 202, enqueued=false
+```
+
+The second call returning `enqueued=false` is the enqueue idempotency guarantee: the same business
+key never produces a second job.
+
+---
+
+## Repository layout
+
+```text
+apps/
+  api/          ASP.NET Core API — the only public writer
+  worker/       Background worker — executes every deadline
+  web/          Angular PWA
+src/
+  TouchlineManager.Domain          Aggregates and invariants. Depends on nothing.
+  TouchlineManager.Application     Use cases, ports, validators, policies
+  TouchlineManager.Infrastructure  Persistence, durable jobs, logging, providers
+  TouchlineManager.Contracts       Transport DTOs, header and error-code constants
+  TouchlineManager.MatchEngine     Pure, deterministic, versioned simulation library
+tests/          Unit, architecture, and Testcontainers integration tests
+tools/          world-seeder, simulation-benchmarks
+infra/          Docker Compose for local backing services
+docs/           Product rules, architecture, security, operations
+```
+
+Dependency direction is enforced by `tests/TouchlineManager.ArchitectureTests` and fails the build
+when crossed — the domain layer cannot reach for EF Core, and the match engine cannot reach outside
+its own inputs.
+
+---
+
+## Documentation
+
+Read [`docs/README.md`](docs/README.md) first. The two documents that matter most day to day:
+
+- **[`docs/product/game-rules.md`](docs/product/game-rules.md)** — the normative rule set. Every
+  configurable value carries a stable reference (`CAL-3`, `TRF-8`, `OCC-2`) that code comments,
+  tests, migrations and support replies cite.
+- **[`docs/architecture/modules.md`](docs/architecture/modules.md)** — the bounded modules, the
+  dependency rules, and which stage delivers each one.
+
+Also worth knowing:
+
+- [`docs/product/master-plan.md`](docs/product/master-plan.md) — the approved implementation plan.
+- [`docs/architecture/adr/`](docs/architecture/adr/README.md) — why the system is shaped this way.
+- [`docs/security/threat-model.md`](docs/security/threat-model.md) — including the review of every
+  deadline-critical workflow.
+- [`docs/testing/test-strategy.md`](docs/testing/test-strategy.md) — the test layers and gates.
+
+---
+
+## Non-negotiables
+
+These are product guarantees, not preferences. Breaking one is a release blocker.
+
+1. **The server decides everything.** There is no endpoint that simulates a match. Results come from
+   an immutable, hashed input snapshot and a versioned engine.
+2. **A matchday publishes atomically.** All nine fixtures or none.
+3. **Deadlines are durable rows, not timers.** A deploy cannot lose or repeat a job; every job has a
+   unique business key and an idempotent handler.
+4. **Money is integer minor units in an append-only ledger**, and balances are never negative.
+5. **No offline mutations.** A bid queued past its auction close is worse than a bid the manager
+   knows was never sent.
+6. **All identity is fictional.** No real club, player, competition or mark appears anywhere.

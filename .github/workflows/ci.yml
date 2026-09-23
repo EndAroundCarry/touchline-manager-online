@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  backend:
+    name: Backend (build, test, migrations)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore with lockfiles
+        # Locked mode fails the build if a dependency drifts from its lockfile, which is the point:
+        # an unreviewed dependency change must not reach production.
+        run: dotnet restore TouchlineManager.slnx --locked-mode
+
+      - name: Formatting and static analysis
+        run: dotnet format TouchlineManager.slnx --verify-no-changes --no-restore
+
+      - name: Build (warnings as errors)
+        run: dotnet build TouchlineManager.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test TouchlineManager.slnx --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: '**/TestResults/*.trx'
+          if-no-files-found: ignore
+
+      - name: Migration SQL review artifact
+        # Migrations are reviewed as SQL. The generated script is the reviewable artefact, and
+        # producing it here proves the migrations are applyable in the pipeline.
+        run: |
+          dotnet dotnet-ef migrations script \
+            --project src/TouchlineManager.Infrastructure \
+            --startup-project src/TouchlineManager.Infrastructure \
+            --idempotent \
+            --output migration-script.sql
+
+      - name: Upload migration script
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-script
+          path: migration-script.sql
+
+  frontend:
+    name: Frontend (typecheck, lint, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test -- --run
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/dist
+          if-no-files-found: warn

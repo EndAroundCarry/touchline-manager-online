@@ -1,0 +1,58 @@
+# Local backing services for development.
+#
+# Stage 1 provides exactly what the local inner loop needs: PostgreSQL and a mail catcher. The API,
+# worker, and web client run on the host through `npm run dev`, which is faster to iterate on than a
+# container build and keeps the debugger attached.
+#
+# Containerised API/worker/web images belong to the deployment stage (Stage 14), where they are
+# built, scanned and exercised for real.
+#
+# Role separation note: this compose file uses one PostgreSQL role for convenience. Production runs
+# a separate migration role and runtime role (ADR-0008, MIG-5); that separation is implemented and
+# verified in Stage 14 rather than half-built here.
+
+name: touchline-manager
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: touchline-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-touchline}
+      POSTGRES_USER: ${POSTGRES_USER:-touchline_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_dev_password_change_me}
+    ports:
+      # 55432 on the host, not 5432. A developer machine frequently already has a PostgreSQL on
+      # 5432 (a local server, or another project's container), and Docker Desktop will happily bind
+      # a second listener on the same port, after which connections land unpredictably. A port
+      # outside the standard and ephemeral ranges removes the whole class of problem.
+      - "${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-touchline_app} -d ${POSTGRES_DB:-touchline}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: touchline-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "${Mailpit__WebPort:-8025}:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+volumes:
+  postgres-data:
+    name: touchline-postgres-data
