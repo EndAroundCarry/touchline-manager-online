@@ -1,0 +1,21 @@
+{
+  "name": "touchline-manager-online",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "db:up": "docker compose -f infra/compose.yaml up -d",
+    "db:down": "docker compose -f infra/compose.yaml down",
+    "db:migrate": "dotnet tool restore && dotnet ef database update --project src/FootballManager.Infrastructure --startup-project src/FootballManager.Infrastructure",
+    "api": "dotnet run --project apps/api",
+    "worker": "dotnet run --project apps/worker",
+    "web": "npm --prefix apps/web start",
+    "dev": "npm run db:up && npm run db:migrate && concurrently -k -n api,worker,web -c cyan,magenta,green \"npm run api\" \"npm run worker\" \"npm run web\"",
+    "build": "dotnet build FootballManager.slnx && npm --prefix apps/web run build",
+    "test:dotnet": "dotnet test FootballManager.slnx",
+    "test:web": "npm --prefix apps/web run test -- --watch=false",
+    "test": "npm run test:dotnet"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

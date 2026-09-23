@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>FootballManager.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FootballManager.Application\FootballManager.Application.csproj" />
+    <ProjectReference Include="..\..\src\FootballManager.Infrastructure\FootballManager.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FootballManager.Contracts\FootballManager.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

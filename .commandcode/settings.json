@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "powershell",
+      "Shell(npx -y @angular/cli@latest new web --directory apps/web --routing --style=scss --ssr=false --skip-git --package-manager=npm --defaults)",
+      "Shell(dotnet:*)",
+      "Shell(node --version)",
+      "Shell(npx ng version)",
+      "Shell(Select-String:*)",
+      "Shell(npm:*)",
+      "Shell(npx --no-install ng add @angular/pwa --defaults --skip-confirmation)",
+      "Shell(type:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

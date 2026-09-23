@@ -1,0 +1,71 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore FootballManager.slnx
+
+      - name: Build (warnings as errors)
+        run: dotnet build FootballManager.slnx --no-restore --configuration Release
+
+      - name: Verify no pending model changes
+        run: >
+          dotnet ef migrations has-pending-model-changes
+          --project src/FootballManager.Infrastructure
+          --startup-project src/FootballManager.Infrastructure
+          --configuration Release
+
+      - name: Test
+        run: >
+          dotnet test FootballManager.slnx
+          --no-build
+          --configuration Release
+          --logger "trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: TestResults
+          if-no-files-found: ignore
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FootballManager.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FootballManager.Domain\FootballManager.Domain.csproj" />
+    <ProjectReference Include="..\FootballManager.Contracts\FootballManager.Contracts.csproj" />
+    <ProjectReference Include="..\FootballManager.MatchEngine\FootballManager.MatchEngine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+</Project>

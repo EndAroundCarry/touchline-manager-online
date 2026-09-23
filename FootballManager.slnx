@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/apps/">
+    <Project Path="apps/api/FootballManager.Api.csproj" />
+    <Project Path="apps/worker/FootballManager.Worker.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/FootballManager.Domain/FootballManager.Domain.csproj" />
+    <Project Path="src/FootballManager.Application/FootballManager.Application.csproj" />
+    <Project Path="src/FootballManager.Infrastructure/FootballManager.Infrastructure.csproj" />
+    <Project Path="src/FootballManager.Contracts/FootballManager.Contracts.csproj" />
+    <Project Path="src/FootballManager.MatchEngine/FootballManager.MatchEngine.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FootballManager.Domain.Tests/FootballManager.Domain.Tests.csproj" />
+    <Project Path="tests/FootballManager.Application.Tests/FootballManager.Application.Tests.csproj" />
+    <Project Path="tests/FootballManager.Infrastructure.Tests/FootballManager.Infrastructure.Tests.csproj" />
+    <Project Path="tests/FootballManager.Api.IntegrationTests/FootballManager.Api.IntegrationTests.csproj" />
+    <Project Path="tests/FootballManager.Worker.IntegrationTests/FootballManager.Worker.IntegrationTests.csproj" />
+    <Project Path="tests/FootballManager.MatchEngine.Tests/FootballManager.MatchEngine.Tests.csproj" />
+    <Project Path="tests/FootballManager.ArchitectureTests/FootballManager.ArchitectureTests.csproj" />
+  </Folder>
+</Solution>
+
