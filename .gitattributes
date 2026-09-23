@@ -1,0 +1,34 @@
+# Line endings are pinned to LF, in the repository and in the working tree.
+#
+# This overrides core.autocrlf, which is commonly set to `true` on Windows. Without it, a Windows
+# checkout gets CRLF in the working tree and `.editorconfig`'s `end_of_line = lf` fails the
+# `dotnet format --verify-no-changes` gate locally while passing on Linux CI — the worst kind of
+# difference, because it only shows up on one developer's machine.
+* text=auto eol=lf
+
+# Windows-only shell scripts must keep CRLF to run.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets are never normalised.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.snk binary
+*.pfx binary
+
+# Lockfiles are generated; keeping them diffable as text is useful, but a merge conflict in one
+# should be resolved by regenerating rather than by hand.
+package-lock.json text
+packages.lock.json text
