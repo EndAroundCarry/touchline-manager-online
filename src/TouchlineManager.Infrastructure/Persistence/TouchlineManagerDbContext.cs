@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TouchlineManager.Domain.Auth;
 using TouchlineManager.Infrastructure.Persistence.Entities;
 
 namespace TouchlineManager.Infrastructure.Persistence;
@@ -22,6 +23,21 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the ops module's durable job rows.</summary>
     public DbSet<OpsJob> Jobs => Set<OpsJob>();
+
+    /// <summary>Gets the ops module's append-only audit rows.</summary>
+    public DbSet<OpsAuditEntry> AuditEntries => Set<OpsAuditEntry>();
+
+    /// <summary>Gets the auth module's accounts.</summary>
+    public DbSet<User> Users => Set<User>();
+
+    /// <summary>Gets the auth module's refresh sessions.</summary>
+    public DbSet<RefreshSession> RefreshSessions => Set<RefreshSession>();
+
+    /// <summary>Gets the auth module's single-use email tokens.</summary>
+    public DbSet<EmailToken> EmailTokens => Set<EmailToken>();
+
+    /// <summary>Gets the auth module's recorded consent rows.</summary>
+    public DbSet<UserConsent> UserConsents => Set<UserConsent>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

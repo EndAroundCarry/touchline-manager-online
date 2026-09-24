@@ -2,19 +2,26 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Abstractions;
+using TouchlineManager.Application.Abstractions.Auth;
 using TouchlineManager.Application.Abstractions.Jobs;
+using TouchlineManager.Application.Abstractions.Ops;
+using TouchlineManager.Application.Abstractions.Persistence;
+using TouchlineManager.Infrastructure.Email;
 using TouchlineManager.Infrastructure.Jobs;
 using TouchlineManager.Infrastructure.Persistence;
+using TouchlineManager.Infrastructure.Persistence.Repositories;
+using TouchlineManager.Infrastructure.Security;
 using TouchlineManager.Infrastructure.Time;
 
 namespace TouchlineManager.Infrastructure;
 
 /// <summary>
-/// Composition for the infrastructure layer: persistence, jobs, time, and external providers.
+/// Composition for the infrastructure layer: persistence, jobs, time, security, email, and external
+/// providers.
 /// </summary>
 public static class DependencyInjection
 {
-    /// <summary>Registers persistence, the clock, and the durable job queue.</summary>
+    /// <summary>Registers persistence, the clock, the durable job queue, and the auth providers.</summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -32,7 +39,34 @@ public static class DependencyInjection
         services.AddScoped<IJobQueue, PostgresJobQueue>();
         services.Configure<JobQueueOptions>(configuration.GetSection(JobQueueOptions.SectionName));
 
+        AddAuthInfrastructure(services, configuration);
+
         return services;
+    }
+
+    /// <summary>
+    /// Registers the auth module's persistence and providers.
+    /// </summary>
+    /// <remarks>
+    /// The hasher, the token service, and the token issuer are singletons because they hold no
+    /// per-request state — the hasher in particular precomputes a throwaway hash once, and rebuilding
+    /// it per request would both waste that work and change its timing profile.
+    /// </remarks>
+    private static void AddAuthInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+
+        services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
+        services.AddSingleton<ISecureTokenService, SecureTokenService>();
+        services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshSessionRepository, RefreshSessionRepository>();
+        services.AddScoped<IEmailTokenRepository, EmailTokenRepository>();
+        services.AddScoped<IAuditWriter, EfAuditWriter>();
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
     }
 
     /// <summary>

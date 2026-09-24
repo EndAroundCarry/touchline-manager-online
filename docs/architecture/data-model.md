@@ -220,6 +220,11 @@ erDiagram
 |---|---|---|
 | `unique (normalized_email)` | `users` | Account identity |
 | `unique (normalized_display_name)` | `users` | Public identity uniqueness |
+| `check (status in ...)`, `check (failed_login_count >= 0)` | `users` | The lifecycle cannot leave the states the code knows |
+| `unique (token_hash)` | `refresh_sessions`, `email_tokens` | Tokens are looked up by hash; a duplicate could only mean a reused secret |
+| `unique (user_id, role)` (primary key) | `user_roles` | A role is granted to an account once |
+| `check (revoked_at is null) = (revocation_reason is null)` | `refresh_sessions` | A revoked session always says why |
+| Restrictive FKs to `users` | `user_roles`, `refresh_sessions`, `email_tokens`, `user_consents` | Session and consent history cannot outlive its account; account deletion is a status change, never a delete (ADR-0002) |
 | `unique (world_id, code)` | `countries` | Stable country identity |
 | `unique (world_id, normalized_name)`, `unique (world_id, slug)` | `clubs` | No duplicate fictional clubs |
 | **Partial unique** one `active`/`inactive` tenure per club | `club_tenures` | A club cannot have two managers |

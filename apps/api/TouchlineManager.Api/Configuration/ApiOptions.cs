@@ -45,3 +45,23 @@ public sealed class HostingOptions
     /// </summary>
     public int KnownProxies { get; set; }
 }
+
+/// <summary>
+/// Throttling for the endpoints an attacker would hammer (ADR-0002, master plan §12.1).
+/// </summary>
+/// <remarks>
+/// The limits are configurable so that load and functional tests can raise them instead of
+/// discovering a throttle as a flaky failure — a test asserting that a manager can sign in should not
+/// be measuring the rate limiter.
+/// </remarks>
+public sealed class RateLimitingOptions
+{
+    /// <summary>The configuration section name.</summary>
+    public const string SectionName = "RateLimiting";
+
+    /// <summary>Gets or sets the requests allowed per client address per window on auth endpoints.</summary>
+    public int AuthPermitLimit { get; set; } = 20;
+
+    /// <summary>Gets or sets the length of that window in seconds.</summary>
+    public int AuthWindowSeconds { get; set; } = 60;
+}

@@ -1,9 +1,13 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
+using TouchlineManager.Application.Abstractions.Auth;
 using TouchlineManager.Infrastructure.Persistence;
 
 namespace TouchlineManager.Api.IntegrationTests;
@@ -17,6 +21,16 @@ namespace TouchlineManager.Api.IntegrationTests;
 /// </remarks>
 public sealed class ApiFixture : IAsyncLifetime
 {
+    /// <summary>
+    /// The auth permit limit used by the shared host.
+    /// </summary>
+    /// <remarks>
+    /// High enough that a functional test never trips the limiter. Throttling is asserted by its own
+    /// test with a deliberately small limit, so a sign-in test is not silently also a rate-limiter
+    /// test.
+    /// </remarks>
+    public const int UnthrottledAuthPermitLimit = 1_000_000;
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("touchline")
         .WithUsername("touchline_app")
@@ -25,6 +39,9 @@ public sealed class ApiFixture : IAsyncLifetime
 
     /// <summary>Gets a factory with diagnostics enabled.</summary>
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
+
+    /// <summary>Gets the email recorder that replaces the SMTP sender in every test host.</summary>
+    public RecordingEmailSender Email { get; } = new();
 
     /// <summary>Starts the container, creates the host, and applies migrations.</summary>
     public async Task InitializeAsync()
@@ -49,13 +66,24 @@ public sealed class ApiFixture : IAsyncLifetime
     /// composition root reads configuration while <em>building</em> the service collection, and a
     /// configuration source added during <c>Build()</c> arrives too late for that read.
     /// </remarks>
-    public WebApplicationFactory<Program> CreateFactory(bool enableJobProbe)
+    public WebApplicationFactory<Program> CreateFactory(bool enableJobProbe, int? authPermitLimit = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:Database", _container.GetConnectionString());
             builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:4200");
             builder.UseSetting("Diagnostics:EnableJobProbe", enableJobProbe ? "true" : "false");
+            builder.UseSetting(
+                "RateLimiting:AuthPermitLimit",
+                (authPermitLimit ?? UnthrottledAuthPermitLimit).ToString(CultureInfo.InvariantCulture));
+
+            // Runs after the composition root's own registrations, so the SMTP sender is genuinely
+            // replaced rather than shadowed.
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IEmailSender>();
+                services.AddSingleton<IEmailSender>(Email);
+            });
         });
 
     /// <summary>Stops the host and removes the container.</summary>

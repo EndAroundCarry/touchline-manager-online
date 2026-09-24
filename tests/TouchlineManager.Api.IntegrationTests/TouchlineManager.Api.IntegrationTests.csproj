@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\apps\api\TouchlineManager.Api\TouchlineManager.Api.csproj" />
     <ProjectReference Include="..\..\src\TouchlineManager.Application\TouchlineManager.Application.csproj" />
+    <ProjectReference Include="..\..\src\TouchlineManager.Domain\TouchlineManager.Domain.csproj" />
     <ProjectReference Include="..\..\src\TouchlineManager.Infrastructure\TouchlineManager.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\TouchlineManager.Contracts\TouchlineManager.Contracts.csproj" />
   </ItemGroup>
