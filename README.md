@@ -7,10 +7,12 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 1 complete — engineering foundation.** The playable game is being built in the
-> staged order defined in the master plan. Stage 1 delivers the monorepo, the durable job pipeline,
-> the API and worker composition roots, the health and observability baseline, and the Angular PWA
-> shell. Gameplay arrives from Stage 2 onward.
+> **Status: Stage 2 complete — accounts and sign-in.** The playable game is being built in the staged
+> order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the API
+> and worker composition roots, the health and observability baseline, and the Angular PWA shell.
+> Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions with
+> reuse detection, the audit trail, the request security headers, the Angular auth and settings
+> screens, and the end-to-end journeys. Gameplay arrives from Stage 3 onward.
 
 ---
 
@@ -64,7 +66,14 @@ npm run build         # .NET build, warnings as errors
 npm test              # every .NET test project, including Testcontainers integration tests
 npm run test:web      # Angular unit tests
 npm run format:check  # formatting gate
+
+npm run e2e:install   # once: installs Playwright and its Chromium browser
+npm run test:e2e      # end-to-end journeys in a real browser
 ```
+
+`npm run test:e2e` needs Docker. It brings up PostgreSQL and the mail catcher, applies migrations,
+starts the API and the web client itself, and drives them through Chromium — so there is nothing to
+start by hand first.
 
 The walking skeleton is exercised end to end by
 `tests/TouchlineManager.Worker.IntegrationTests`: a job is enqueued against a real PostgreSQL 17
@@ -78,6 +87,39 @@ curl -X POST "http://localhost:5080/api/v1/ops/diagnostics/noop-job?key=demo-1" 
 
 The second call returning `enqueued=false` is the enqueue idempotency guarantee: the same business
 key never produces a second job.
+
+---
+
+## Accounts and sign-in
+
+Authentication follows [ADR-0002](docs/architecture/adr/0002-auth-and-session-model.md): a
+short-lived access token held in memory, and a rotating refresh token in an `HttpOnly` cookie whose
+reuse revokes the whole token family.
+
+To drive it by hand, registration and verification emails land in the mail catcher at
+<http://localhost:8025> — no mail server is needed:
+
+```bash
+curl -X POST http://localhost:5080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"me@example.com","displayName":"Manager","password":"correct-horse-battery","acceptTerms":true}'
+
+# Open the link in the mail catcher, then confirm it:
+curl -X POST http://localhost:5080/api/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"<from the response>","token":"<from the link>"}'
+
+curl -i -X POST http://localhost:5080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"me@example.com","password":"correct-horse-battery"}'
+```
+
+The whole lifecycle — register, confirm, sign in, keep the session across a reload, rename, sign out,
+and reset a forgotten password — is also driven through a real browser by `tests/web-e2e`, which
+reads the confirmation and reset links out of the mail catcher instead of being handed a token.
+
+`Auth__SigningKey` must be at least 32 bytes and is validated at startup. Development has a
+committed dev-only value; every other environment supplies its own (see `.env.example`).
 
 ---
 
@@ -95,6 +137,7 @@ src/
   TouchlineManager.Contracts       Transport DTOs, header and error-code constants
   TouchlineManager.MatchEngine     Pure, deterministic, versioned simulation library
 tests/          Unit, architecture, and Testcontainers integration tests
+  web-e2e/      Playwright journeys against the real stack
 tools/          world-seeder, simulation-benchmarks
 infra/          Docker Compose for local backing services
 docs/           Product rules, architecture, security, operations

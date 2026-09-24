@@ -69,14 +69,29 @@ skeleton that every real deadline will reuse.
 
 Signal stores, state transitions, and pure view logic. Component tests run in a DOM environment.
 
-*Today:* `ApiError` mapping from Problem Details, and the application root.
+*Today:* `ApiError` mapping from Problem Details and the application root; the session store
+(including that concurrent callers share one rotation and that a failed restore is never fatal), the
+route guards in both directions, the token interceptor (attach, rotate-and-replay exactly once,
+no retry loop, end the session when the rotation fails), and the client-before-server field-message
+precedence in `controlError`.
 
-## Layer 8 — End-to-end journeys (Playwright) — Stage 7 onward
+## Layer 8 — End-to-end journeys (Playwright)
 
-The master plan's journeys (registration → club claim, squad → team sheet → version conflict,
-matchday → highlights, seller/bidder/outbid/winner, rollover) arrive with the features they cover.
-Playwright is introduced in Stage 7 with the match viewer, not earlier: a journey test for a screen
-that does not exist tests nothing.
+A real browser against the real API and the real database. The suite owns its stack: `globalSetup`
+brings up PostgreSQL and the mail catcher and applies migrations, then the config starts the API and
+the Angular dev server. Nothing is stubbed, so a journey that passes has gone through the same code
+paths a manager will.
+
+Playwright was introduced in Stage 2, because master plan §16 makes the full auth lifecycle a Stage 2
+exit criterion and the traceability table (F-01, F-05) asks for a journey there. The remaining master
+plan journeys — squad → team sheet → version conflict, matchday → highlights,
+seller/bidder/outbid/winner, rollover — arrive with the features they cover, since a journey for a
+screen that does not exist tests nothing.
+
+*Today:* register → confirm → sign in → the session survives a reload → sign out; the unconfirmed
+account's restriction; account closure; renaming with the shell following; sign out everywhere;
+forgotten-password replacement with the old password refused and the link single-use; and the route
+guards in both directions, including that an external `returnUrl` is ignored rather than navigated to.
 
 ## Layer 9 — Match-engine validation — Stage 5
 
@@ -101,6 +116,7 @@ requires 3x projected launch headroom.
 | Release build, warnings as errors | Every pull request | Yes |
 | All .NET test projects | Every pull request | Yes |
 | Angular typecheck, build, unit tests | Every pull request | Yes |
+| End-to-end journeys (Playwright) | Every pull request | Yes |
 | Generated migration SQL | Every pull request, uploaded as an artefact | Review |
 | Bundle size budgets | Every frontend build | Yes (Angular budgets) |
 | Dependency, licence, secret, container scans | Every pull request (Stage 14 for containers) | Yes |
