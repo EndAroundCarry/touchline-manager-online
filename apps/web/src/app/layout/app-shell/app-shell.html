@@ -23,7 +23,7 @@
   }
 
   <header class="border-b border-slate-200 bg-white">
-    <div class="mx-auto flex w-full max-w-7xl items-center gap-4 px-4 py-3">
+    <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
       <a
         routerLink="/welcome"
         class="flex items-center gap-2 text-lg font-semibold tracking-tight"
@@ -37,14 +37,42 @@
         </span>
         Touchline Manager
       </a>
+
+      <div class="ml-auto flex items-center gap-3">
+        @if (isAuthenticated()) {
+          <span class="text-sm text-slate-700">
+            <span class="sr-only">Signed in as </span>{{ displayName() }}
+          </span>
+          <button
+            type="button"
+            class="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            (click)="signOut()"
+          >
+            Sign out
+          </button>
+        } @else {
+          <a
+            routerLink="/login"
+            class="rounded px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+          >
+            Sign in
+          </a>
+          <a
+            routerLink="/register"
+            class="rounded bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
+          >
+            Create account
+          </a>
+        }
+      </div>
     </div>
   </header>
 
   <div class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 md:flex-row">
-    @if (navItems.length > 0) {
+    @if (navItems().length > 0) {
       <nav aria-label="Main" class="md:w-56 md:shrink-0">
         <ul class="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
-          @for (item of navItems; track item.path) {
+          @for (item of navItems(); track item.path) {
             <li>
               <a
                 [routerLink]="item.path"

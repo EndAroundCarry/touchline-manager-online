@@ -55,7 +55,10 @@ describe('ApiError', () => {
         status: 400,
         code: 'VALIDATION_FAILED',
         detail: 'The request was not valid.',
-        errors: { displayName: ['Display name is required.', 'Display name is too long.'], other: 'not-an-array' },
+        errors: {
+          displayName: ['Display name is required.', 'Display name is too long.'],
+          other: 'not-an-array',
+        },
       },
     });
 

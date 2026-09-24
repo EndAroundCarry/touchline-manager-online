@@ -1,0 +1,82 @@
+<section class="mx-auto flex flex-col items-center py-8">
+  <div [class]="formCardClass">
+    <h1 [class]="pageHeadingClass">Confirm your email</h1>
+
+    @switch (state()) {
+      @case ('confirmed') {
+        <p [class]="statusMessageClass" role="status">{{ message() }}</p>
+        <p class="mt-4 text-sm text-slate-700">
+          Your account is active. <a routerLink="/login" [class]="linkClass">Sign in</a> to take
+          over a club.
+        </p>
+      }
+
+      @case ('failed') {
+        <p [class]="formErrorClass" role="alert">{{ message() }}</p>
+        <p class="mt-4 text-sm text-slate-700">
+          Links expire after 24 hours and only the newest one works.
+        </p>
+      }
+
+      @default {
+        @if (hasLink) {
+          <p class="mt-3 text-sm text-slate-700">
+            Confirming activates your account. This link can only be used once.
+          </p>
+          <button
+            type="button"
+            class="mt-6 inline-flex items-center justify-center rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+            [disabled]="state() === 'confirming'"
+            (click)="confirm()"
+          >
+            {{ state() === 'confirming' ? 'Confirming…' : 'Confirm my email address' }}
+          </button>
+        } @else {
+          <p [class]="formErrorClass" role="alert">
+            This link is incomplete. Open the link from the email exactly as it was sent, or request
+            a new one below.
+          </p>
+        }
+      }
+    }
+
+    @if (state() !== 'confirmed') {
+      <div class="mt-8 border-t border-slate-200 pt-6">
+        <h2 class="text-base font-semibold">Send a new link</h2>
+
+        @if (resent()) {
+          <p [class]="statusMessageClass" role="status">
+            If that address needs confirming, a new link is on its way. Any earlier link has stopped
+            working.
+          </p>
+        }
+
+        @if (resendError(); as message) {
+          <p [class]="formErrorClass" role="alert">{{ message }}</p>
+        }
+
+        <form class="mt-4 space-y-4" [formGroup]="resendForm" (ngSubmit)="resend()" novalidate>
+          <div>
+            <label class="block text-sm font-medium text-slate-800" for="resendEmail">
+              Email address
+            </label>
+            <input
+              id="resendEmail"
+              type="email"
+              formControlName="email"
+              autocomplete="email"
+              [class]="textInputClass"
+            />
+            @if (resendForm.controls.email.touched && resendForm.controls.email.invalid) {
+              <p [id]="resendErrorId" [class]="fieldErrorClass">Enter a valid email address.</p>
+            }
+          </div>
+
+          <button type="submit" [class]="primaryButtonClass" [disabled]="resendSubmitting()">
+            {{ resendSubmitting() ? 'Sending…' : 'Send a new link' }}
+          </button>
+        </form>
+      </div>
+    }
+  </div>
+</section>

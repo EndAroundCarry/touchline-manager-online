@@ -1,0 +1,176 @@
+<section class="max-w-2xl">
+  <h1 [class]="pageHeadingClass">Settings</h1>
+
+  @if (loading()) {
+    <p class="mt-4 text-sm text-slate-600" role="status">Loading your profile…</p>
+  }
+
+  @if (loadError(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    <button type="button" class="mt-4" [class]="secondaryButtonClass" (click)="reload()">
+      Try again
+    </button>
+  }
+
+  @if (user(); as profile) {
+    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+      <h2 class="text-lg font-semibold">Profile</h2>
+
+      <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+        <div>
+          <dt class="text-sm font-medium text-slate-500">Email</dt>
+          <dd class="mt-0.5 break-all text-sm text-slate-900">{{ profile.email }}</dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-slate-500">Status</dt>
+          <dd class="mt-0.5 text-sm text-slate-900">
+            {{ profile.emailVerified ? 'Active' : 'Awaiting email confirmation' }}
+          </dd>
+        </div>
+      </dl>
+
+      @if (!isVerified()) {
+        <p
+          class="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="status"
+        >
+          Confirm your email address before you can change your manager name.
+          <a routerLink="/verify-email" [class]="linkClass">Send a new link</a>.
+        </p>
+      }
+
+      @if (nameSaved()) {
+        <p [class]="statusMessageClass" role="status">Your manager name has been saved.</p>
+      }
+
+      @if (nameConflict()) {
+        <p [class]="formErrorClass" role="alert">
+          Your profile changed on another device while this form was open. The current values are
+          shown above — check the name and save again.
+        </p>
+      }
+
+      @if (nameError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      <form class="mt-6 space-y-4" [formGroup]="nameForm" (ngSubmit)="saveDisplayName()" novalidate>
+        <div>
+          <label class="block text-sm font-medium text-slate-800" for="displayName"
+            >Manager name</label
+          >
+          <p class="text-xs text-slate-500">Shown to other managers. 3 to 32 characters.</p>
+          <input
+            id="displayName"
+            type="text"
+            formControlName="displayName"
+            autocomplete="nickname"
+            [class]="textInputClass"
+            [attr.aria-invalid]="displayNameError() !== null"
+            [attr.aria-describedby]="displayNameError() !== null ? displayNameErrorId : null"
+          />
+          @if (displayNameError(); as message) {
+            <p [id]="displayNameErrorId" [class]="fieldErrorClass">{{ message }}</p>
+          }
+        </div>
+
+        <button
+          type="submit"
+          [class]="primaryButtonClass"
+          [disabled]="nameSubmitting() || !isVerified()"
+        >
+          {{ nameSubmitting() ? 'Saving…' : 'Save manager name' }}
+        </button>
+      </form>
+    </div>
+
+    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+      <h2 class="text-lg font-semibold">Sessions</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Signing out everywhere revokes every device and invalidates the access tokens already
+        issued.
+      </p>
+      <div class="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          [class]="secondaryButtonClass"
+          [disabled]="signingOut()"
+          (click)="signOut()"
+        >
+          Sign out
+        </button>
+        <button
+          type="button"
+          [class]="secondaryButtonClass"
+          [disabled]="signingOut()"
+          (click)="signOutEverywhere()"
+        >
+          Sign out everywhere
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-6 rounded border border-red-200 bg-white p-6">
+      <h2 class="text-lg font-semibold text-red-800">Close your account</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Access closes immediately and every session is revoked. Your match, transfer and financial
+        history stays, because other managers played against it.
+      </p>
+
+      @if (deleteError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      <form class="mt-4 space-y-4" [formGroup]="deleteForm" (ngSubmit)="deleteAccount()" novalidate>
+        <div>
+          <label class="block text-sm font-medium text-slate-800" for="deletePassword">
+            Confirm with your password
+          </label>
+          <input
+            id="deletePassword"
+            type="password"
+            formControlName="password"
+            autocomplete="current-password"
+            [class]="textInputClass"
+            [attr.aria-describedby]="
+              deleteForm.controls.password.touched && deleteForm.controls.password.invalid
+                ? deletePasswordErrorId
+                : null
+            "
+          />
+          @if (deleteForm.controls.password.touched && deleteForm.controls.password.invalid) {
+            <p [id]="deletePasswordErrorId" [class]="fieldErrorClass">Your password is required.</p>
+          }
+        </div>
+
+        <div class="flex items-start gap-2">
+          <input
+            id="confirmDeletion"
+            type="checkbox"
+            formControlName="confirm"
+            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-700 focus:ring-red-500"
+            [attr.aria-describedby]="
+              deleteForm.controls.confirm.touched && deleteForm.controls.confirm.invalid
+                ? idFor('confirmDeletion')
+                : null
+            "
+          />
+          <div>
+            <label class="text-sm text-slate-800" for="confirmDeletion">
+              I understand this closes my account.
+            </label>
+            @if (deleteForm.controls.confirm.touched && deleteForm.controls.confirm.invalid) {
+              <p [id]="idFor('confirmDeletion')" [class]="fieldErrorClass">
+                Tick this box to confirm.
+              </p>
+            }
+          </div>
+        </div>
+
+        <button type="submit" [class]="destructiveButtonClass" [disabled]="deleteSubmitting()">
+          {{ deleteSubmitting() ? 'Closing…' : 'Close my account' }}
+        </button>
+      </form>
+    </div>
+  }
+</section>

@@ -5,6 +5,8 @@ import { provideServiceWorker } from '@angular/service-worker';
 import Aura from '@primeuix/themes/aura';
 import { providePrimeNG } from 'primeng/config';
 import { problemDetailsInterceptor } from './core/api/problem-details.interceptor';
+import { authInterceptor } from './core/auth/auth.interceptor';
+import { provideSessionBootstrap } from './core/auth/session-bootstrap';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -13,7 +15,14 @@ export const appConfig: ApplicationConfig = {
 
     provideRouter(routes, withComponentInputBinding()),
 
-    provideHttpClient(withFetch(), withInterceptors([problemDetailsInterceptor])),
+    // Order is a contract. The auth interceptor is outermost so that it sees the `ApiError` the
+    // problem-details interceptor produces — without that, it could not tell an expired session (401)
+    // from any other failure, and would have nothing to retry on.
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor, problemDetailsInterceptor])),
+
+    // Restores the session before the first route activates, so a guard never has to guess whether the
+    // client is signed in while a refresh is still in flight.
+    provideSessionBootstrap(),
 
     providePrimeNG({
       theme: {
