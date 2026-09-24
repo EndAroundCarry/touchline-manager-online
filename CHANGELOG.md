@@ -3,6 +3,57 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 3 — World generation, six countries, clubs, and onboarding (foundation only)
+
+**This stage is not finished.** The world foundation is in: the schema, the aggregates, and the
+database constraints that make onboarding safe under concurrency. Still to come are deterministic
+generation and the seeder, the onboarding use cases, the endpoints, and the UI — so a world cannot
+actually be populated yet, and none of the stage's browser-facing exit criteria are met. It is
+recorded here because the schema, migration, and constraints are real and shipped.
+
+### Added
+
+- The versioned world rule set (`WorldRuleSet`) holding every constant from game rules §3, with its
+  version stamped onto the world and each season, so a historical season is interpreted against the
+  rules that were actually in force when it was played.
+- The `world` schema: game worlds, countries, manager profiles, clubs, club tenures, division
+  provisioning requests, and generation runs. The `competition` shell: seasons, divisions,
+  division-seasons, and club season entries. The `finance` shell: club accounts. One migration, with
+  the three schemas created by it and applied against real PostgreSQL 17 before being committed.
+- World aggregates with the rules as behaviour: `GameWorld` (freeze/resume), `Country`, `Manager`
+  (the resignation cooldown), `Club` (tier-scaled baselines and a slug derived from the name rather
+  than supplied beside it), `ClubTenure` (the whole of the ownership model), `DivisionProvisioningRequest`,
+  `GenerationRun`, and a `CountryCapacity` value object that answers "does this country have room, and
+  should it grow?" in one place instead of in an endpoint.
+- `SeasonCalendar`, a pure function from a first matchday to a season's whole window: 34 matchdays on
+  the Tuesday/Thursday/Sunday cycle at 19:00 UTC, plus the seven-day rollover. Stage 6 reuses it.
+- The competition shell aggregates, including the store for the pre-generated tie-break draw that
+  `TBL-11` requires to exist before a season starts.
+- Mappings that put the plan's constraints in the database rather than in a convention: partial unique
+  indexes for one open tenure per club and per manager (`OCC-9`), unique `(country_id, target_tier)`
+  for provisioning (`PYR-3`), unique per-world club name and slug, one club per season, and the
+  `FIN-13` checks that neither balance can go negative and reservations cannot exceed the cash behind
+  them.
+- 66 domain tests and 17 database-constraint tests.
+
+### Notes
+
+- **`game_worlds` has no JSONB feature-flags column**, although master plan §6.3 lists one. Feature
+  flags belong in `ops.feature_flags`, where they are queryable and versioned; a JSONB blob on the
+  world row is precisely the unfinished modelling the JSONB policy forbids (`JSN-5`).
+- **`club_season_entries` carries `season_id` as well as the division-season.** Without it, "one club
+  appears in exactly one division per season" is not expressible as a database constraint: a promotion
+  bug could enter one club into two divisions in the same season and every standings query would
+  double-count it.
+- **A failed provisioning request can be retried, and the retry reuses the recorded seed.**
+  `unique (country_id, target_tier)` means a second request for the same tier cannot exist, so without
+  that transition one failed run would block the tier permanently. Reusing the seed is what keeps
+  `PYR-14` true across attempts. A domain test caught the gap.
+- **Tier names are descriptive rather than evocative** — "England Top Division", "Spain Division 2" —
+  so no generated name can drift towards a real competition's branding (`WORLD-3`).
+- Tier-scaled money, stadium, and reputation baselines halve per tier. The shape matters now; the
+  calibration belongs to the multi-season simulations Stage 9 requires.
+
 ## Stage 2 — Identity and authenticated walking skeleton
 
 The auth module: the account schema, the full credential lifecycle, session rotation and reuse

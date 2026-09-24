@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Domain.Auth;
+using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.World;
 using TouchlineManager.Infrastructure.Persistence.Entities;
 
 namespace TouchlineManager.Infrastructure.Persistence;
@@ -38,6 +41,43 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the auth module's recorded consent rows.</summary>
     public DbSet<UserConsent> UserConsents => Set<UserConsent>();
+
+    /// <summary>Gets the world module's game world.</summary>
+    public DbSet<GameWorld> GameWorlds => Set<GameWorld>();
+
+    /// <summary>Gets the world module's countries.</summary>
+    public DbSet<Country> Countries => Set<Country>();
+
+    /// <summary>Gets the world module's manager profiles.</summary>
+    public DbSet<Manager> Managers => Set<Manager>();
+
+    /// <summary>Gets the world module's clubs.</summary>
+    public DbSet<Club> Clubs => Set<Club>();
+
+    /// <summary>Gets the world module's club tenures, the whole of the ownership model.</summary>
+    public DbSet<ClubTenure> ClubTenures => Set<ClubTenure>();
+
+    /// <summary>Gets the world module's division-provisioning requests.</summary>
+    public DbSet<DivisionProvisioningRequest> DivisionProvisioningRequests =>
+        Set<DivisionProvisioningRequest>();
+
+    /// <summary>Gets the world module's generation-run records.</summary>
+    public DbSet<GenerationRun> GenerationRuns => Set<GenerationRun>();
+
+    /// <summary>Gets the competition module's seasons.</summary>
+    public DbSet<Season> Seasons => Set<Season>();
+
+    /// <summary>Gets the competition module's divisions.</summary>
+    public DbSet<Division> Divisions => Set<Division>();
+
+    /// <summary>Gets the competition module's division-seasons.</summary>
+    public DbSet<DivisionSeason> DivisionSeasons => Set<DivisionSeason>();
+
+    /// <summary>Gets the competition module's immutable club season entries.</summary>
+    public DbSet<ClubSeasonEntry> ClubSeasonEntries => Set<ClubSeasonEntry>();
+
+    /// <summary>Gets the finance module's club accounts.</summary>
+    public DbSet<ClubAccount> ClubAccounts => Set<ClubAccount>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
