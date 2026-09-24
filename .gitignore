@@ -51,5 +51,13 @@ Thumbs.db
 .commandcode/
 .kilo/
 
+# --- Playwright ---
+# Traces, screenshots and videos from a failing journey, plus the HTML report. All of it is
+# regenerated locally and would otherwise be committed one failing run at a time.
+playwright-report/
+blob-report/
+test-results/
+tests/web-e2e/.artifacts/
+
 # --- Docker ---
 infra/docker/data/

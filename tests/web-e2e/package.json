@@ -1,0 +1,19 @@
+{
+  "name": "web-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end journeys driven through a real browser against the real API and database.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install:browsers": "playwright install chromium",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "packageManager": "npm@12.0.2",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "typescript": "~6.0.2"
+  }
+}
