@@ -4,6 +4,7 @@ import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
 import { SquadStore } from '../../core/squad/squad-store';
+import { TacticsStore } from '../../core/tactics/tactics-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
 
@@ -26,6 +27,7 @@ export class AppShell {
   private readonly session = inject(SessionStore);
   private readonly onboarding = inject(OnboardingStore);
   private readonly squad = inject(SquadStore);
+  private readonly tactics = inject(TacticsStore);
   private readonly router = inject(Router);
 
   /**
@@ -54,9 +56,10 @@ export class AppShell {
   protected signOut(): void {
     this.session.logout().subscribe(() => {
       // The onboarding and squad stores are dropped too, so a shared device does not keep the previous
-      // manager's club or players on screen for whoever signs in next.
+      // manager's club, players, or plan on screen for whoever signs in next.
       this.onboarding.clear();
       this.squad.clear();
+      this.tactics.clear();
 
       void this.router.navigateByUrl('/login');
     });

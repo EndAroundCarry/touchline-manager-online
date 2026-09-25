@@ -77,7 +77,12 @@ precedence in `controlError`. Stage 4 added the squad store (that a second read 
 than answering from the first, because nothing here carries a version to revalidate against), the squad
 presentation helpers (attribute and state bands, filters), and the attribute display — the last of these
 being the F-17 gate: a value renders its number *and* the word for its band, so colour is never the only
-signal (§11.3).
+signal (§11.3). The tactics milestone added the plan-draft transforms (a formation change keeps the
+lineup by slot number; a partial lineup is sent rather than dropped, so the server can refuse it), the
+tactics presentation helpers (labels, pitch geometry, and the words for every validator code), and the
+tactics store — the conditional-save contract in unit form: a save carries the version it read, a `412`
+keeps the draft and pulls the server's state, and a reapply then goes out against the version that just
+arrived (`CONC-1`, §11.2).
 
 ## Layer 8 — End-to-end journeys (Playwright)
 
@@ -107,6 +112,11 @@ tool rather than something the stack creates for itself.
 Stage 4 added the squad journey: a manager onboards, opens the squad the club was generated with, sorts
 and filters it, and opens a player profile — asserting that twenty-two players are there to inherit and
 that an attribute shows its number **and** its band word. It gives its club back too.
+
+Stage 4 also added the tactics journey: a manager shapes an eleven through the board's accessible,
+non-drag assignment table, creates the plan, and then — with the API acting as a second device that
+revises the same plan — survives a version conflict by reapplying rather than overwriting (`CONC-1`,
+§11.2). It gives its club back too.
 
 ## Layer 9 — Match-engine validation — Stage 5
 

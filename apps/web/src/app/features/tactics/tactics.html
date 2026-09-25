@@ -1,0 +1,327 @@
+@if (loading()) {
+  <p class="text-sm text-slate-600" role="status">Loading your tactics…</p>
+} @else if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  <div class="mt-4">
+    <a routerLink="/dashboard" [class]="secondaryButtonClass">Back to the dashboard</a>
+  </div>
+} @else if (tactics(); as club) {
+  @if (draft(); as plan) {
+    <section class="max-w-6xl">
+      <h1 [class]="pageHeadingClass">{{ club.clubName }} tactics</h1>
+      <p class="mt-1 text-sm text-slate-600">
+        {{ club.countryCode }} · season {{ club.seasonNumber }} · {{ plans().length }} saved
+        {{ plans().length === 1 ? 'plan' : 'plans' }} · {{ assignedCount() }} of
+        {{ plan.slots.length }} slots filled
+      </p>
+
+      <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <label class="block">
+          <span class="text-sm font-medium text-slate-700">Plan</span>
+          <select
+            [class]="textInputClass"
+            [value]="selectedPlan()?.id ?? ''"
+            (change)="onPlanChange($event)"
+          >
+            <option value="">New plan</option>
+            @for (saved of plans(); track saved.id) {
+              <option [value]="saved.id">
+                {{ saved.name }}
+                @if (saved.isDefault) {
+                  &nbsp;(default)
+                }
+              </option>
+            }
+          </select>
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-medium text-slate-700">Plan name</span>
+          <input
+            type="text"
+            [class]="textInputClass"
+            [value]="plan.name"
+            [attr.maxlength]="maxNameLength"
+            (input)="onNameInput($event)"
+          />
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-medium text-slate-700">Formation</span>
+          <select
+            [class]="textInputClass"
+            [value]="plan.formationPreset"
+            (change)="onFormationChange($event)"
+          >
+            @for (formation of formations(); track formation.code) {
+              <option [value]="formation.code">{{ formation.code }}</option>
+            }
+          </select>
+        </label>
+
+        <div class="flex items-end">
+          <button type="button" [class]="secondaryButtonClass" (click)="newPlan()">New plan</button>
+        </div>
+      </div>
+
+      @if (hasConflict()) {
+        <div
+          class="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="alert"
+        >
+          <p class="font-medium">
+            This plan changed on another device since you loaded it. Your edits are still here.
+          </p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button type="button" [class]="primaryButtonClass" (click)="reapply()">
+              Reapply my changes
+            </button>
+            <button type="button" [class]="secondaryButtonClass" (click)="discardConflict()">
+              Use the server's version
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (saveError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      @if (savedMessage(); as message) {
+        <p [class]="statusMessageClass" role="status">{{ message }}</p>
+      }
+
+      @if (validation(); as preview) {
+        @if (!preview.isValid) {
+          <div
+            class="mt-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+            role="alert"
+          >
+            <p class="font-medium">
+              This plan is not valid. Fix the highlighted slots and save again.
+            </p>
+            <ul class="mt-1 list-disc pl-5" role="list">
+              @for (message of issueMessages(); track message) {
+                <li>{{ message }}</li>
+              }
+            </ul>
+          </div>
+        }
+      }
+
+      <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">Formation</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Drag a player onto a slot to pick them, or drag a slot to move it. Selecting a slot and
+            then choosing a player on the right does the same without dragging.
+          </p>
+
+          <div
+            class="relative mt-3 aspect-[3/4] w-full max-w-sm overflow-hidden rounded-lg border-2 border-white/70 bg-emerald-700"
+            (dragover)="onPitchDragOver($event)"
+            (drop)="onPitchDrop($event)"
+          >
+            <div
+              class="pointer-events-none absolute left-0 right-0 top-1/2 border-t border-white/50"
+            ></div>
+            <div
+              class="pointer-events-none absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/50"
+            ></div>
+            <div
+              class="pointer-events-none absolute bottom-0 left-1/2 h-8 w-24 -translate-x-1/2 border-x border-t border-white/50"
+            ></div>
+
+            @for (slot of slotViews(); track slot.slotNumber) {
+              <button
+                type="button"
+                draggable="true"
+                [class]="slotClasses(slot)"
+                [style.left]="slot.style['left']"
+                [style.bottom]="slot.style['bottom']"
+                [attr.aria-pressed]="slot.isSelected"
+                [attr.aria-label]="slotLabel(slot)"
+                (click)="selectSlot(slot.slotNumber)"
+                (dragstart)="onSlotDragStart($event, slot.slotNumber)"
+                (dragover)="onSlotDragOver($event)"
+                (drop)="onSlotDrop($event, slot.slotNumber)"
+              >
+                @if (slot.player; as player) {
+                  <span aria-hidden="true">{{ player.shortName }}</span>
+                  @if (slot.isOutOfPosition) {
+                    <span class="text-[9px] font-normal" aria-hidden="true">out of position</span>
+                  } @else if (slot.isUnavailable) {
+                    <span class="text-[9px] font-normal" aria-hidden="true">unavailable</span>
+                  }
+                } @else {
+                  <span aria-hidden="true">{{ slot.slotNumber }}</span>
+                  <span class="text-[9px] font-normal" aria-hidden="true">empty</span>
+                }
+              </button>
+            }
+          </div>
+
+          @if (selectedSlot() > 0) {
+            <p class="mt-3 text-sm text-slate-600" role="status">
+              Slot {{ selectedSlot() }} is selected. Choose a player on the right, or
+              <button type="button" [class]="linkClass" (click)="clearSlot(selectedSlot())">
+                empty it</button
+              >.
+            </p>
+          }
+        </div>
+
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">Team instructions</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Every instruction has a bounded effect and a trade-off (INS-9).
+          </p>
+
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            @for (field of instructionFields; track field.key) {
+              <label class="block">
+                <span class="text-sm font-medium text-slate-700">{{ field.label }}</span>
+                <select
+                  [class]="textInputClass"
+                  [value]="plan.instructions[field.key]"
+                  (change)="onInstructionChange(field.key, $event)"
+                >
+                  @for (option of field.options; track option.value) {
+                    <option [value]="option.value">{{ option.label }}</option>
+                  }
+                </select>
+              </label>
+            }
+          </div>
+
+          <h2 class="mt-8 text-lg font-semibold text-slate-900">Players</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Drag a chip onto a slot, or select a slot and press a player.
+          </p>
+
+          <ul class="mt-3 flex flex-wrap gap-2" role="list">
+            @for (group of playerGroups(); track group.family) {
+              @for (player of group.players; track player.id) {
+                <li>
+                  <button
+                    type="button"
+                    draggable="true"
+                    class="rounded border border-slate-300 bg-white px-2 py-1 text-left text-xs text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    [disabled]="player.isUnavailable || selectedSlot() === 0"
+                    (click)="assignToSelected(player.id)"
+                    (dragstart)="onPlayerDragStart($event, player.id)"
+                  >
+                    {{ player.shortName }}
+                    <span class="block text-[10px] font-normal text-slate-500">
+                      {{ position(player.primaryPosition) }}
+                      @if (player.isUnavailable) {
+                        &nbsp;· unavailable
+                      }
+                    </span>
+                  </button>
+                </li>
+              }
+            }
+          </ul>
+        </div>
+      </div>
+
+      <section class="mt-10">
+        <h2 class="text-lg font-semibold text-slate-900">Assign players</h2>
+        <p class="mt-1 text-sm text-slate-600">
+          An alternative to dragging: pick a role and a player for each slot (TAC-8, INS-10).
+        </p>
+
+        <table class="mt-3 w-full border-collapse text-left text-sm">
+          <caption class="sr-only">
+            Assign a role and a player to each of the eleven slots
+          </caption>
+          <thead>
+            <tr class="border-b border-slate-300">
+              <th scope="col" class="py-1 pr-4 font-semibold">Slot</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Position</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Role</th>
+              <th scope="col" class="py-1 font-semibold">Player</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (slot of slotViews(); track slot.slotNumber) {
+              <tr class="border-b border-slate-200" [class.bg-red-50]="slot.issueCount > 0">
+                <th scope="row" class="py-1 pr-4 text-left font-medium text-slate-900">
+                  {{ slot.slotNumber }}
+                </th>
+                <td class="py-1 pr-4">{{ family(slot.positionFamily) }}</td>
+                <td class="py-1 pr-4">
+                  <select
+                    [class]="textInputClass"
+                    [attr.aria-label]="'Role for slot ' + slot.slotNumber"
+                    [value]="slot.role"
+                    (change)="onRoleChange(slot.slotNumber, $event)"
+                  >
+                    @for (option of roleOptions(slot.positionFamily); track option.value) {
+                      <option [value]="option.value">{{ option.label }}</option>
+                    }
+                  </select>
+                </td>
+                <td class="py-1">
+                  <select
+                    [class]="textInputClass"
+                    [attr.aria-label]="'Player for slot ' + slot.slotNumber"
+                    [value]="slot.player?.id ?? ''"
+                    (change)="onPlayerChange(slot.slotNumber, $event)"
+                  >
+                    <option value="">Empty</option>
+                    @for (group of playerGroups(); track group.family) {
+                      <optgroup [label]="group.label">
+                        @for (player of group.players; track player.id) {
+                          <option [value]="player.id" [disabled]="player.isUnavailable">
+                            {{ player.fullName }} — {{ position(player.primaryPosition) }}
+                            @if (player.isUnavailable) {
+                              &nbsp;(unavailable)
+                            }
+                          </option>
+                        }
+                      </optgroup>
+                    }
+                  </select>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          [class]="primaryButtonClass"
+          [disabled]="saving() || !isDirty()"
+          (click)="save()"
+        >
+          {{ selectedPlan() === null ? 'Create plan' : 'Save plan' }}
+        </button>
+
+        @if (selectedPlan(); as saved) {
+          @if (!saved.isDefault) {
+            <button
+              type="button"
+              [class]="secondaryButtonClass"
+              [disabled]="saving()"
+              (click)="makeDefault(saved.id)"
+            >
+              Make default
+            </button>
+          } @else {
+            <span class="text-sm font-medium text-emerald-800">Default plan</span>
+          }
+        }
+
+        @if (isDirty()) {
+          <span class="text-sm text-slate-600">Unsaved changes</span>
+        }
+
+        <a routerLink="/squad" [class]="linkClass">Back to the squad</a>
+      </div>
+    </section>
+  }
+}

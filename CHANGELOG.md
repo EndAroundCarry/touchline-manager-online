@@ -190,6 +190,69 @@ API. The `/tactics` screen — the drag-and-drop board and its keyboard alternat
   alternative, and the `412` reapply UX) closes this milestone; the training endpoints and the
   deterministic daily progression job follow; then the contract renewal quote.
 
+### The tactics board
+
+A side you can see and shape. The `/tactics` screen draws the eleven slots at their normalized
+positions, lets a manager drag a player onto one, move a slot, pick a role and the eight team
+instructions, and save the plan under the version that stops two devices overwriting each other. This
+closes the tactics milestone of Stage 4: the model, the validator, the API, and now the screen.
+
+#### Added
+
+- **The board** (master plan §11.1, `TAC-9`): the eleven slots rendered at the coordinates the engine
+  will hash — depth on the vertical axis, width across it — so what a manager sees is the stored layout
+  rather than a second, display-only copy. A slot is a focusable button with an accessible name, so the
+  pitch itself is keyboard- and screen-reader-reachable.
+- **The accessible, non-drag alternative** (§11.3, `TAC-8`): an assignment table of eleven rows, each with
+  a role picker constrained to its family's roles and a player picker grouped by position family. This is
+  the path a keyboard, a screen reader, or a touch screen uses to set a side; dragging is a convenience on
+  top of it, not the only way in.
+- **Drag-and-drop**: a player chip dragged onto a slot assigns them, and a slot dragged onto the pitch
+  moves it, with the drop position converted back to a normalized coordinate and clamped to the pitch
+  (`TAC-7`, `TAC-9`).
+- **Formation presets that keep the lineup** (`TAC-1`…`TAC-6`): choosing a formation re-lays the eleven
+  slots from the server's own arrangement, and a player stays in their slot number — the right back picked
+  in a 4-4-2 is still slot 2 in a 4-3-3.
+- **The plan lifecycle**: the plan chooser (the default first), a rename, a new plan, and the eight
+  instruction pickers (`INS-1`…`INS-8`). Creating the club's first plan makes it the default, and any
+  plan can be promoted with `make-default` (`INS-11`).
+- **The ETag save and its conflict UX** (`CONC-1`, ADR-0009, §11.2): every save sends the version the
+  client last read in `If-Match`. A `412` keeps the manager's edits, pulls the server's state, and offers
+  an explicit *Reapply my changes* or *Use the server's version* — never a silent overwrite.
+- **The validation preview, drawn on the board** (§10.4): a refused save returns the validator's issues as
+  stable codes; the screen lists them in words, names the slot or the player, and tints the slots they
+  concern. The role picker offers only a slot's own family's roles, so a `ROLE_FAMILY_MISMATCH` is
+  unpickable rather than merely reported.
+- 29 new frontend tests (106 total) over the plan-draft transforms (a formation change keeps the picks, an
+  ordered request, a partial lineup sent rather than dropped), the presentation helpers (labels, pitch
+  geometry, the wording for every validator code), and the store (the conditional save, the `412` reapply,
+  the default promotion); and 2 Playwright journeys (16 total) — the board, its accessible assignment, and
+  a version conflict survived by reapplying, plus the guard for a visitor with no session.
+
+#### Notes
+
+- **The save always sends the whole layout, and the lineup only when somebody is picked.** Sending the
+  slots means a manager's dragged positions are what is stored, not the preset they started from. Omitting
+  the lineup when the sheet is empty is how a legal template is saved; sending a *partial* one is
+  deliberate, because the server refuses it with `SELECTION_INCOMPLETE` (`SQ-4`) and omitting it would
+  silently save a plan with nobody in it — the manager would believe their picks were kept.
+- **Out-of-position is a warning, not a refusal** (`INS-10`): a makeshift side is a legitimate choice, so
+  the board marks it and the engine penalises it, exactly as the validator intends.
+- **A formation change moves the slot, not the player.** Slot numbers are stable across presets, which is
+  what keeps a team sheet prepared against a plan version referring to the same eleven positions
+  (`data-model.md` §3.2).
+- **Dragging uses the browser's native drag-and-drop.** A mouse drives it; the assignment table is the
+  touch and keyboard path, so a phone can set a side today. Pointer-driven dragging for touch is Stage 13's
+  responsive work, where it is tested at mobile breakpoints.
+- **Tactical zones are still not modelled**, so a dragged slot is bounded by the pitch but not confined to
+  its preset's region — the same gap the API milestone recorded, waiting for the zone geometry that gives
+  it a consumer.
+- **The dirty check compares the request, not the object graph.** "There is something to save" is exactly
+  "the request the save would send differs from the last one", so a re-built or re-ordered draft does not
+  read as a change and a save is never sent needlessly.
+- **`GET /tactics` is one read for the whole screen** — the plans, the squad, and every preset's
+  arrangement — so the board renders a first, empty plan without reproducing eighteen coordinates in the
+  client, and the same numbers reach the renderer and the snapshot hash.
 
 ## Stage 3 — World generation, six countries, clubs, and onboarding
 
