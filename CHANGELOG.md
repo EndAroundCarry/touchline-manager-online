@@ -121,10 +121,75 @@ of the stage writes and reads.
   idempotent, so it reports the world and stops. An environment carrying a `world-gen-v1` world needs a
   fresh database (or a reset) before the squad screens have anything to show; the end-to-end suite in this
   change was verified against a freshly seeded one.
-- **Deferred to the rest of Stage 4:** the tactics presets, slots, validator, and ETag contract; the
-  training endpoints and the deterministic daily progression job behind a feature flag; and the contract
-  renewal quote. **Deferred beyond it:** fixtures, match effects, full finances, transfers, and the public
-  scouting surface.
+- **Deferred to the rest of Stage 4:** the tactics presets, slots, validator, and ETag contract (delivered
+  in the next milestone, below); the training endpoints and the deterministic daily progression job behind
+  a feature flag; and the contract renewal quote. **Deferred beyond it:** fixtures, match effects, full
+  finances, transfers, and the public scouting surface.
+
+### Tactics
+
+A club you can shape. A manager now saves a formation, a slot layout, the roles, the eight team
+instructions, and the default eleven, on a plan whose `version` is the contract that stops two devices
+overwriting each other. This is the second of the stage's milestones: the model, the validator, and the
+API. The `/tactics` screen — the drag-and-drop board and its keyboard alternative — is the rest of it.
+
+#### Added
+
+- **The formation presets as data** (`TAC-1`…`TAC-6`): `FormationLayouts` holds each preset's eleven slots
+  — family, role, and normalized coordinates — and checks its own table the first time it is used, so a
+  preset that names not-eleven slots, repeats a number, puts a role in the wrong family, or strays off the
+  pitch fails by name rather than deep inside a save. Slot 1 is the goalkeeper in every preset.
+- **The tactics validator** (`TAC-7`…`TAC-10`, `INS-10`, `INS-12`): one pure function over plain slot
+  values and two sets of facts — who is selectable and who is unavailable. It refuses the wrong slot
+  count, duplicate slot numbers, coordinates off the pitch, two slots on the same point, a role that
+  disagrees with its family, a repeated player, a player who is not a selectable member of the club, an
+  unavailable player, and a half-filled lineup. An out-of-position player is deliberately **not** an
+  issue: `INS-10` makes familiarity a penalty the engine applies, not a reason to refuse a side.
+- **The tactics API** (master plan §10.4): `GET /tactics` — the club's plans, the squad they are picked
+  from, and every preset's own arrangement — plus `POST /tactics`, `PUT /tactics/{planId}`, and
+  `POST /tactics/{planId}/make-default`. The first plan a club saves becomes its default (`INS-11`), and
+  making one default demotes the previous one in a single transaction with the demotion committed first,
+  because the partial unique index is checked per statement.
+- **The ETag contract** (`CONC-1`, ADR-0009): a plan's `version` is its strong entity tag. `GET` returns
+  it in the body, both writes require it in `If-Match` (answered `428` without it), and a stale one is
+  answered `412`. `squad.tactical_plans.version` is now a concurrency token, so a raced save is refused by
+  the database and not only by the use case's own comparison — an empty migration records the token in the
+  model snapshot.
+- **The validation preview**: a refused plan answers `400 PLAN_VALIDATION_FAILED` with the issues as
+  stable codes, each naming its slot and player, so the screen can draw them on the pitch rather than
+  render a field message.
+- 15 new domain tests (249 total) for the preset layouts and every validator rule; 2 new infrastructure
+  tests (89 total), one of which is the only place the concurrency token itself can be observed; and 9 new
+  API integration tests (57 total) covering the create/revise/default lifecycle, the `412`/`428`/`404`
+  refusals, and the validation preview.
+
+#### Notes
+
+- **The preset layouts are the server's, not the client's.** `GET /tactics` returns every preset's default
+  arrangement, so the screen renders a formation without reproducing eighteen coordinates, and the same
+  numbers reach the renderer, the input snapshot hash, and — in Stage 5 — the engine (`TAC-9`).
+- **Tactical zones are not modelled yet.** `TAC-7` speaks of dragging "within validated tactical zones";
+  this milestone enforces the bounds and the unambiguous half of the overlap rule — two slots on one point
+  — but there is no zone map, so a dragged slot is not constrained to its preset's region. Zone geometry
+  arrives with the pitch model that gives it a consumer.
+- **The lineup is all-or-nothing, and the domain decides it.** A request's lineup may name any number of
+  slots; whether the eleven are full is `TAC-10`, and the domain answers it with `SELECTION_INCOMPLETE`, so
+  the pitch's rules live in one place instead of being split between a field validator and the domain.
+- **`TacticalSlot.Reshape` was added** so a formation change re-lays a plan's existing slots in place
+  rather than deleting and reinserting them. Slot numbers stay stable, which is what keeps a team sheet
+  prepared against a plan version referring to the same eleven positions (`data-model.md` §3.2).
+- **`CurrentSeasonQuery` was extracted from the squad queries.** The tactics read resolves the same "season
+  in progress", and a second copy would be where the two answers quietly diverged.
+- **The migration is deliberately empty.** Marking the plan version a concurrency token changes the model,
+  not the schema; the migration exists to record it in the model snapshot, and its `Up` says as much.
+- **The API tests are tolerant of a re-used club.** The world is seeded once for the whole API collection
+  and a released club keeps the plans its previous manager saved, so the create test reads whether a
+  default already exists rather than assuming the club is fresh. The alternative was a test that passed
+  only on its first run.
+- **Deferred:** the `/tactics` screen (the board, the role and instruction pickers, the keyboard
+  alternative, and the `412` reapply UX) closes this milestone; the training endpoints and the
+  deterministic daily progression job follow; then the contract renewal quote.
+
 
 ## Stage 3 — World generation, six countries, clubs, and onboarding
 

@@ -23,4 +23,10 @@ public static class SquadErrorCodes
 
     /// <summary>No contract exists with the requested identity.</summary>
     public const string ContractNotFound = "CONTRACT_NOT_FOUND";
+
+    /// <summary>No tactical plan exists with the requested identity, or it is not the caller's.</summary>
+    public const string PlanNotFound = "PLAN_NOT_FOUND";
+
+    /// <summary>The submitted plan breaks a tactics rule; the response carries the issues (`TAC-7`…`TAC-9`, `SQ-4`).</summary>
+    public const string PlanValidationFailed = "PLAN_VALIDATION_FAILED";
 }

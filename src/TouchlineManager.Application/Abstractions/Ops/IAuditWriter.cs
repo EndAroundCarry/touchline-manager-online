@@ -114,4 +114,7 @@ public static class AuditTargetTypes
 
     /// <summary>A world and the generation run that produced it.</summary>
     public const string GameWorld = "game_world";
+
+    /// <summary>A tactical plan (`INS-11`).</summary>
+    public const string TacticalPlan = "tactical_plan";
 }

@@ -495,7 +495,10 @@ internal sealed class TacticalPlanConfiguration : IEntityTypeConfiguration<Tacti
         builder.Property(plan => plan.IsDefault).HasColumnName("is_default").IsRequired();
         builder.Property(plan => plan.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(plan => plan.UpdatedAt).HasColumnName("updated_at").IsRequired();
-        builder.Property(plan => plan.Version).HasColumnName("version").IsRequired();
+        // The plan's version is the strong entity tag a manager's save carries back in If-Match, so it is
+        // also the concurrency token: a save that raced another is refused with 0 rows affected rather
+        // than silently overwriting the winner (CONC-1, ADR-0009).
+        builder.Property(plan => plan.Version).HasColumnName("version").IsRequired().IsConcurrencyToken();
 
         // The default-plan lookup is the one that matters and the filter is exactly its predicate, so the
         // filtered index is the only one on club_id.

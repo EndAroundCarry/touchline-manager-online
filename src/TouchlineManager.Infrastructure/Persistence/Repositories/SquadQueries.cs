@@ -30,7 +30,7 @@ internal sealed class SquadQueries : ISquadQueries
     /// <inheritdoc />
     public async Task<SquadSnapshot?> GetSquadAsync(Guid clubId, CancellationToken cancellationToken)
     {
-        var season = await ResolveCurrentSeasonAsync(cancellationToken);
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
 
         if (season is null)
         {
@@ -96,15 +96,15 @@ internal sealed class SquadQueries : ISquadQueries
             club.Club.Name,
             club.Club.ShortName,
             club.Country.Code,
-            season.Value.SequenceNumber,
-            season.Value.GameYear,
+            season.SequenceNumber,
+            season.GameYear,
             players);
     }
 
     /// <inheritdoc />
     public async Task<PlayerSnapshot?> GetPlayerAsync(Guid playerId, CancellationToken cancellationToken)
     {
-        var season = await ResolveCurrentSeasonAsync(cancellationToken);
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
 
         if (season is null)
         {
@@ -175,14 +175,14 @@ internal sealed class SquadQueries : ISquadQueries
                 row.Contract.Status),
             registration,
             availability.GetValueOrDefault(playerId, []),
-            season.Value.SequenceNumber,
-            season.Value.GameYear);
+            season.SequenceNumber,
+            season.GameYear);
     }
 
     /// <inheritdoc />
     public async Task<ContractsSnapshot?> GetContractsAsync(Guid clubId, CancellationToken cancellationToken)
     {
-        var season = await ResolveCurrentSeasonAsync(cancellationToken);
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
 
         if (season is null)
         {
@@ -222,8 +222,8 @@ internal sealed class SquadQueries : ISquadQueries
         return new ContractsSnapshot(
             clubId,
             club.Name,
-            season.Value.SequenceNumber,
-            season.Value.GameYear,
+            season.SequenceNumber,
+            season.GameYear,
             contracts);
     }
 
@@ -261,37 +261,5 @@ internal sealed class SquadQueries : ISquadQueries
             .ToDictionary(
                 group => group.Key,
                 group => (IReadOnlyList<SquadAvailabilityRow>)[.. group.Select(record => record.Row)]);
-    }
-
-    /// <summary>
-    /// Resolves the season in progress, so ages and remaining contract terms are measured against the
-    /// season actually being played.
-    /// </summary>
-    /// <remarks>
-    /// Filtering on the world's current season number rather than on the latest season keeps the answer
-    /// stable during the rollover window, when next season's rows already exist (`CON-8`, `CAL-6`).
-    /// </remarks>
-    private async Task<(Guid SeasonId, int SequenceNumber, int GameYear)?> ResolveCurrentSeasonAsync(
-        CancellationToken cancellationToken)
-    {
-        var world = await _dbContext.GameWorlds
-            .OrderBy(candidate => candidate.CreatedAt)
-            .Select(candidate => new { candidate.Id, candidate.CurrentSeasonNumber })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (world is null)
-        {
-            return null;
-        }
-
-        var season = await _dbContext.Seasons
-            .Where(candidate => candidate.WorldId == world.Id
-                && candidate.SequenceNumber == world.CurrentSeasonNumber)
-            .Select(candidate => new { candidate.Id, candidate.SequenceNumber, candidate.GameYear })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return season is null
-            ? null
-            : (season.Id, season.SequenceNumber, season.GameYear);
     }
 }

@@ -182,6 +182,7 @@ first difference deciding:
 | TAC-7 | Managers may drag slots within validated tactical zones but cannot create overlapping or out-of-bounds positions. |
 | TAC-8 | Every slot has a position family and a role. |
 | TAC-9 | Slot coordinates are stored as scaled integers normalized to 0–10,000. |
+| TAC-10 | A plan names exactly eleven slots. Its default lineup names either nobody or all eleven: a plan with some but not all of its slots filled is refused, so a saved side is never short (see `SQ-4`). The client's `If-Match` version is required to save. |
 
 ### 9.2 Team instructions
 

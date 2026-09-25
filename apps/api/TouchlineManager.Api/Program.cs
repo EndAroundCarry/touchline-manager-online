@@ -219,6 +219,7 @@ moduleGroups["auth"].MapAuthEndpoints();
 app.MapAccountEndpoints();
 app.MapWorldEndpoints();
 app.MapSquadEndpoints();
+app.MapTacticsEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;
 

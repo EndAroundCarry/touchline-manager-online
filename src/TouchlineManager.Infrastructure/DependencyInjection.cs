@@ -104,6 +104,8 @@ public static class DependencyInjection
     {
         services.AddScoped<ISquadRepository, SquadRepository>();
         services.AddScoped<ISquadQueries, SquadQueries>();
+        services.AddScoped<ITacticsRepository, TacticsRepository>();
+        services.AddScoped<ITacticsQueries, TacticsQueries>();
     }
 
     /// <summary>

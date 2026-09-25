@@ -147,6 +147,38 @@ public sealed class TacticalSlot
         Touch(now);
     }
 
+    /// <summary>
+    /// Replaces the slot's whole shape, as a formation change does (`TAC-7`…`TAC-9`).
+    /// </summary>
+    /// <remarks>
+    /// Switching formation moves the slot to a new part of the pitch and, usually, a new family: a
+    /// four-four-two's wide midfielder becomes a four-three-three's winger. Reshaping in place keeps the
+    /// slot number stable so a team sheet prepared against a plan version still refers to the same eleven
+    /// positions (`data-model.md` §3.2).
+    /// </remarks>
+    /// <param name="positionFamily">The family the slot asks for.</param>
+    /// <param name="role">The role the slot asks for.</param>
+    /// <param name="normalizedX">The normalized x coordinate, 0–10,000.</param>
+    /// <param name="normalizedY">The normalized y coordinate, 0–10,000.</param>
+    /// <param name="now">The current instant.</param>
+    public void Reshape(
+        PositionFamily positionFamily,
+        PlayerRole role,
+        int normalizedX,
+        int normalizedY,
+        DateTimeOffset now)
+    {
+        EnsureCoordinate(normalizedX, nameof(normalizedX));
+        EnsureCoordinate(normalizedY, nameof(normalizedY));
+
+        PositionFamily = positionFamily;
+        Role = role;
+        NormalizedX = normalizedX;
+        NormalizedY = normalizedY;
+
+        Touch(now);
+    }
+
     private static void EnsureCoordinate(int value, string parameterName)
     {
         if (value is < WorldRuleSet.SlotCoordinateMin or > WorldRuleSet.SlotCoordinateMax)

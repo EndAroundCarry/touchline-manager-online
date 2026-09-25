@@ -118,9 +118,10 @@ internal static class SquadEndpoints
     /// The three authorization refusals are deliberately distinct. A client that receives
     /// <c>CLUB_NOT_MANAGED</c> knows its view is stale and can refresh; one that receives <c>NO_CLUB</c>
     /// knows the manager has nothing to look at and can send them to onboarding. Collapsing them into one
-    /// forbidden response would leave the client guessing.
+    /// forbidden response would leave the client guessing. Shared with the tactics reads, which refuse for
+    /// the same reasons.
     /// </remarks>
-    private static IResult Refusal(SquadReadOutcome outcome) => outcome switch
+    internal static IResult Refusal(SquadReadOutcome outcome) => outcome switch
     {
         SquadReadOutcome.NoClub => ProblemResults.Code(
             StatusCodes.Status403Forbidden,

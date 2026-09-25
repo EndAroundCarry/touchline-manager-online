@@ -5,9 +5,11 @@ using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
 using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.Squad;
+using TouchlineManager.Application.Squad.Validation;
 using TouchlineManager.Application.World;
 using TouchlineManager.Application.World.Validation;
 using TouchlineManager.Contracts.Auth;
+using TouchlineManager.Contracts.Squad;
 using TouchlineManager.Contracts.World;
 
 namespace TouchlineManager.Application;
@@ -98,12 +100,12 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Registers the squad module's read use cases.
+    /// Registers the squad module's read and tactics use cases.
     /// </summary>
     /// <remarks>
     /// <see cref="ResolveOwnedClub"/> is registered beside them rather than in the world module even though
-    /// it reads world tables: it exists so the three squad reads decide ownership once and refuse with the
-    /// same codes, and it has no caller outside them.
+    /// it reads world tables: it exists so the squad and tactics commands decide ownership once and refuse
+    /// with the same codes, and it has no caller outside them.
     /// </remarks>
     private static void AddSquadUseCases(IServiceCollection services)
     {
@@ -111,5 +113,10 @@ public static class DependencyInjection
         services.AddScoped<GetSquad>();
         services.AddScoped<GetPlayer>();
         services.AddScoped<ListContracts>();
+        services.AddScoped<GetTactics>();
+        services.AddScoped<SaveTacticalPlan>();
+        services.AddScoped<MakeTacticalPlanDefault>();
+
+        services.AddScoped<IValidator<SaveTacticalPlanRequest>, SaveTacticalPlanRequestValidator>();
     }
 }

@@ -385,6 +385,7 @@ erDiagram
 | **Partial unique** one `active` registration per player | `player_registrations` | `SQ-6` |
 | `unique (division_season_id, player_id, club_id)` | `player_season_stats` | One stat line per player per club per season |
 | **Partial unique** one `is_default` plan per club | `tactical_plans` | `INS-11` |
+| `version` exposed as a strong ETag and enforced as a concurrency token | `tactical_plans` | `CONC-1` (ADR-0009) |
 | `unique (plan_id, slot_number)`, `unique (plan_id, assigned_player_id)` | `tactical_slots` | No duplicate shirt slots or players |
 | `check (normalized_x between 0 and 10000)` etc. | `tactical_slots` | `TAC-9` |
 | `unique (fixture_id, club_id)` | `fixture_team_sheets` | One sheet per club per fixture |
