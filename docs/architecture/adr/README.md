@@ -29,6 +29,7 @@ the system is shaped the way it is.
 | [0010](0010-club-takeover-serialisation.md) | Club takeover serialises with an advisory lock, not with `SERIALIZABLE` | Accepted |
 | [0011](0011-squad-schema-and-hidden-player-values.md) | Squad schema: hidden player values are server-only columns, and contract/registration agreement is an application invariant | Accepted |
 | [0012](0012-daily-progression-materialised-job.md) | The daily progression is a materialised, feature-gated world job | Accepted |
+| [0013](0013-engine-arithmetic-and-scoreline-effect.md) | Integer basis-point arithmetic and a bounded scoreline effect in the engine | Accepted |
 
 ## Rules for changing an ADR
 

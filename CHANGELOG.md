@@ -3,6 +3,122 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 5 — The pure match engine
+
+A match you can replay. `MatchSimulator.Simulate` takes one frozen snapshot and returns one result, and the
+same snapshot always returns the same result down to the byte — not because the engine is careful, but
+because there is nothing in it that could vary. It reads no clock, database, network, filesystem, culture,
+or `Random.Shared`, and it names itself in the result so a scoreline can always be explained by the rules
+that produced it. Version 1 is `engine-v1` / `engine-rules-v1`, and its formulas, constants, and measured
+distributions are specified in [`docs/product/match-engine.md`](docs/product/match-engine.md).
+
+### Added
+
+- **The engine's own `Pcg32`** (`Randomness/Pcg32.cs`), a pinned XSH-RR implementation with its golden
+  sequence asserted, plus `MatchSeed`, which derives the secret seed by HMAC-SHA256 over the world secret,
+  the fixture, the snapshot's content hash, and the engine version (`MAT-9`, master plan §8.2). The content
+  hash deliberately excludes the seed, because hashing a seed into its own derivation is circular; the
+  full input hash — facts plus seed — is what gets stored. `CommitmentOf` produces the publishable
+  commitment, so the raw seed can stay protected and still be verified later (`MAT-10`, `MAT-11`).
+- **`EngineRulesV1`**: every tunable the engine has, as one validated, versioned, immutable record. Its
+  canonical description is derived by reflection over its own properties rather than written out by hand,
+  so a new constant cannot be silently omitted from the hash a result records — the failure mode of a
+  hand-maintained list is that two genuinely different configurations claim the same provenance.
+  `EngineConfiguration.HashOf` is what a snapshot is frozen against, and the engine refuses to simulate a
+  snapshot whose configuration hash does not match the rules supplied.
+- **The input and output contracts** (master plan §8.3): `MatchInputV1` with `MatchSideV1`,
+  `MatchParticipantV1`, `MatchSlotV1`, and `MatchInstructionsV1`; `EngineEventV1` as a flat, ordered,
+  fact-only event; `MatchResultV1` with statistics, player lines, and both hashes. `Validate` refuses a
+  snapshot by name — a lineup of ten, a slot at an off-pitch or duplicated coordinate, a role that
+  disagrees with its family, a side fielding two recognised goalkeepers, a participant from another club,
+  and a dozen more — because a malformed snapshot that simulated anyway would produce a plausible result
+  indistinguishable from a real one.
+- **`CanonicalMatchSerializer`**, and with it the three digests: content (the facts, seed excluded), input
+  (the facts and the seed), and output (the result, bound to its input hash). Collections are sorted,
+  numbers are formatted invariantly, and every field is labelled on its own line, so a value cannot change
+  position unnoticed and two adjacent numbers cannot be read as one.
+- **The rating model** (master plan §8.4): `UnitRatingWeights` with a versioned table per unit that checks
+  itself the first time it is read; `UnitRatingCalculator` over nine units; `TacticalModifiers`; and
+  `LineupResolver`, which resolves each slot's occupant and their role familiarity once at kickoff.
+  `INS-10`'s out-of-position penalty is a single definition, so a makeshift side is priced consistently by
+  the ratings and by cohesion.
+- **The simulation**: a possession-based model in a documented phase order — the defending side's foul,
+  then progression out of build-up, then creation, then the chance. Goals come only out of resolved chances
+  (`MAT-4`), the shooter is drawn by the attribute the chance asks for, and the penalty taker is the best
+  finisher on the pitch rather than a draw. `DisciplineSimulator`, `InjurySimulator`, and
+  `SubstitutionPlanner` cover the rest, and `MatchResultBuilder` derives every statistic from the event
+  stream so `MAT-5`'s reconciliation holds by construction.
+- **Commentary tokens** (`commentary-v1`): a template key, the facts, a variant key, and the English text.
+  The key and parameters are the durable part, which is what makes the same match narratable in another
+  language later without re-simulating it. Three variants per template are chosen by event sequence, so a
+  long match does not read as one sentence repeated and a change to a sentence cannot change a result.
+- **Semantic highlights** (`highlights-v1`): every goal and every penalty always shown, then the best
+  chances by the goal probability they were resolved against. 22 player entities plus the ball, one track
+  per entity holding normalized keyframes, a 5–8 second duration, and an accessible narration. Two caps —
+  a count and a 750 KB payload budget — shed the lowest-quality highlights first and never a goal.
+- **`docs/product/match-engine.md`**: the executable specification for version 1 — the two arithmetic
+  scales, the draw-order contract, every formula, every constant with its value, the measured
+  distributions, and a map of which test suite pins what.
+- **ADR-0013**, on integer basis-point arithmetic and the bounded scoreline effect.
+- **The simulation laboratory** (`tools/simulation-benchmarks`), which was a `Hello, World!` stub: one
+  match with its hashes, a distribution table over any number of matches with target bands, and a timing
+  run reporting p50/p95/p99, allocation per match, throughput, and the hardware it ran on.
+- 521 engine tests, up from zero, covering the pinned PRNG sequence, all 10,935 instruction combinations,
+  the golden output hash, twenty named input refusals, the statistical distributions, and the engine's
+  purity by reflection.
+
+### Notes
+
+- **There is no floating-point number anywhere in the engine** (ADR-0013). A rating scale of 0–100 — one
+  attribute point is five units — and a basis-point scale of 0–10,000 carry every formula, and two
+  probabilities compose exactly as `a * b / 10_000` in integer arithmetic. Floating-point is reproducible
+  on one binary, but .NET makes no cross-platform guarantee for the transcendental functions, and an
+  engine whose value is that a result is re-derivable anywhere cannot rest on that.
+- **The score distribution needed a mechanism, not a coefficient.** With independent goals the model is
+  close to Poisson, and the measurements said so: a mean of 3.15 and **4.2%** of matches with seven or more
+  goals, against football's roughly 2.5%. Lowering the mean to 2.84 fixed most of it; a bounded,
+  score-derived creation modifier — a side three goals up stops chasing a fourth — fixed the rest, and the
+  measured tail is now 2.59%. `GameStateModifier` is a pure function of the score that consumes no draw, so
+  it cannot drift, and it is capped so a rout stays a rout.
+- **The bounded modifier alone was not enough, and the first attempt at it barely moved anything.** It
+  shifted creation between the sides without reducing the total, which is what the measurement showed the
+  moment it was run. The honest summary is that the mean sets the tail and the modifier shapes it; both
+  were needed and the proportions were measured rather than reasoned about.
+- **A shot event carries the goal probability it was resolved against.** Without a quality signal a save
+  from three yards and a save from thirty are identical in the event stream, and "notable saves above a
+  configured threshold" is not expressible. It is a fact about a shot, derived from attributes the owning
+  manager can already see — emphatically not a hidden player value — but it is also not something a
+  player-facing response may carry (`MAT-11`), so the commentary tests hold an allowlist of parameter names
+  and the contracts assembly keeps its data-classification guard.
+- **The validation caught two real bugs while the engine was being built.** Home advantage was written as
+  1,030 basis points rather than 10,300 — a 3% multiplier entered as a 0.103 one — and a subtractive
+  cohesion penalty was filed among the multipliers. Both were refused at startup by the rules' own
+  validator, which is the argument for validating a configuration rather than trusting it.
+- **`FoulShareOfTurnoverBasisPoints` and `AggressiveTacklingCardMultiplierBasisPoints` were removed or
+  wired up before the stage closed.** The first was superseded by rolling fouls independently of
+  progression and nothing read it; the second existed but the booking chance was using the *foul*
+  multiplier. Bookings now scale separately from fouls, because committing more fouls is not the same as
+  committing worse ones, and the aggressive setting is a genuine disciplinary risk rather than merely a
+  busier one.
+- **The engine defines its own vocabulary rather than reusing the domain's enums.** The numeric values
+  mirror `AttributeName`, `PlayerPosition`, `PlayerRole`, and the eight instructions deliberately, and the
+  application layer will map between them by value — but the engine may not depend on `Domain` (`DEP-2`,
+  ADR-0004), because a generated world's reproducibility and a played match's reproducibility are separate
+  versioned contracts.
+- **A side whose goalkeeper is sent off has no player in the Goalkeeping unit**, so every shot against them
+  is close to a formality. That is the correct shape rather than a gap: `MAT-6` has no mechanism for naming
+  a new goalkeeper mid-match, and a side that loses theirs is in trouble.
+- **The most aggressive possible instructions are tested over every seed**, because the degraded paths are
+  the ones nobody exercises: aggressive tackling maximises sendings-off, a high press maximises injuries,
+  and a side can end up with a goalkeeper outfield and a rating built from an empty band.
+- **Performance is not a problem yet, and the budget is recorded rather than targeted.** p95 is 3.5 ms per
+  match against a 100 ms budget, at ~2.1 MB allocated and ~834 matches a second single-threaded, so a
+  nine-fixture division matchday is about 11 ms of simulation. Throughput will come from running
+  independent fixtures concurrently; one match is always single-threaded (ADR-0004).
+- **Deferred to Stage 6:** the fixture calendar, the lock and snapshot workflow, atomic nine-fixture
+  publication, and the matchday worker — everything that turns this library into a season. Nothing in
+  Stage 6 should need an engine change, which is the point of having built it as a pure library first.
+
 ## Stage 4 — Squads, contracts, tactics, and training foundations
 
 A world you inherit a squad from. Every seeded club now owns a legal twenty-two-player senior squad,

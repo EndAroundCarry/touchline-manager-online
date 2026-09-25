@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 4 delivered — squads, tactics, and training.** The playable game is being built in the
+> **Status: Stage 5 delivered — the pure match engine.** The playable game is being built in the
 > staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the
 > API and worker composition roots, the health and observability baseline, and the Angular PWA shell. Stage
 > 2 added the account schema, the full credential lifecycle, rotating refresh sessions with reuse
@@ -15,9 +15,11 @@ kick-off. The server decides results; a client can never simulate or influence o
 > end-to-end journeys. Stage 3 added deterministic world generation, six fictional national pyramids,
 > atomic club takeover with pyramid expansion, and the onboarding screens. Stage 4 added the `squad`
 > schema, a legal twenty-two-player squad per club, the squad, player and contract screens, the tactics
-> board and its ETag contract, and the training screen with its deterministic daily progression job. The
-> contract renewal quote waits for the playing-time data Stage 6 introduces; the next stage is the pure
-> match engine.
+> board and its ETag contract, and the training screen with its deterministic daily progression job. Stage
+> 5 added the match engine itself: a pure, versioned, hash-pinned simulation of one fixture from a frozen
+> snapshot, with commentary tokens, semantic highlights, and a simulation laboratory for tuning. The
+> contract renewal quote waits for the playing-time data Stage 6 introduces; the next stage is the season
+> schedule, fixture preparation, and the durable matchday worker.
 
 ---
 
