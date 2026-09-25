@@ -59,11 +59,13 @@ public static class DependencyInjection
     /// </summary>
     /// <remarks>
     /// A port of its own because the competition module owns its tables (`MOD-1`); the world seeder stages
-    /// the first season's schedule through it as a cross-module write (`MOD-2`).
+    /// the first season's schedule through it as a cross-module write (`MOD-2`). The read port is separate
+    /// so a screen can change without widening what a command can reach (`MOD-3`).
     /// </remarks>
     private static void AddCompetitionInfrastructure(IServiceCollection services)
     {
         services.AddScoped<ICompetitionRepository, CompetitionRepository>();
+        services.AddScoped<ICompetitionQueries, CompetitionQueries>();
     }
 
     /// <summary>
@@ -142,6 +144,8 @@ public static class DependencyInjection
         services.AddScoped<ITacticsQueries, TacticsQueries>();
         services.AddScoped<ITrainingRepository, TrainingRepository>();
         services.AddScoped<ITrainingQueries, TrainingQueries>();
+        services.AddScoped<ITeamSheetRepository, TeamSheetRepository>();
+        services.AddScoped<ITeamSheetQueries, TeamSheetQueries>();
     }
 
     /// <summary>

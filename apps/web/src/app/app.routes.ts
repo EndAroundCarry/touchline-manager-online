@@ -111,6 +111,19 @@ export const routes: Routes = [
         title: 'Training — Touchline Manager',
       },
       {
+        path: 'fixtures',
+        loadComponent: () => import('./features/fixtures/fixtures').then((m) => m.Fixtures),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Fixtures — Touchline Manager',
+      },
+      {
+        // A detail route for one fixture, where a manager prepares a side (`SQ-4`).
+        path: 'fixtures/:fixtureId/prepare',
+        loadComponent: () => import('./features/prepare/prepare').then((m) => m.Prepare),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Prepare — Touchline Manager',
+      },
+      {
         // A detail route rather than a navigation destination, so it is not in `nav-items.ts`.
         path: 'players/:id',
         loadComponent: () => import('./features/player/player').then((m) => m.PlayerProfile),

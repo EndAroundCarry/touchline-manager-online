@@ -3,12 +3,14 @@ using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
+using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.Squad.Validation;
 using TouchlineManager.Application.World;
 using TouchlineManager.Application.World.Validation;
 using TouchlineManager.Contracts.Auth;
+using TouchlineManager.Contracts.Competition;
 using TouchlineManager.Contracts.Squad;
 using TouchlineManager.Contracts.World;
 
@@ -39,6 +41,7 @@ public static class DependencyInjection
         AddAuthUseCases(services);
         AddWorldUseCases(services);
         AddSquadUseCases(services);
+        AddCompetitionUseCases(services);
 
         return services;
     }
@@ -121,9 +124,26 @@ public static class DependencyInjection
         services.AddScoped<SaveTrainingPlan>();
         services.AddScoped<SetPlayerTrainingFocus>();
         services.AddScoped<RunDailyProgression>();
+        services.AddScoped<GetFixtureTeamSheet>();
+        services.AddScoped<SaveFixtureTeamSheet>();
 
         services.AddScoped<IValidator<SaveTacticalPlanRequest>, SaveTacticalPlanRequestValidator>();
         services.AddScoped<IValidator<SaveTrainingRequest>, SaveTrainingRequestValidator>();
         services.AddScoped<IValidator<SetPlayerTrainingFocusRequest>, SetPlayerTrainingFocusRequestValidator>();
+        services.AddScoped<IValidator<SaveFixtureTeamSheetRequest>, SaveFixtureTeamSheetRequestValidator>();
+    }
+
+    /// <summary>
+    /// Registers the competition module's fixture reads (master plan §10.5).
+    /// </summary>
+    /// <remarks>
+    /// Reads only for now: the transitions that change a fixture — lock, stage, publish — belong to the
+    /// matchday worker, which drives them through its own use cases rather than an HTTP command.
+    /// </remarks>
+    private static void AddCompetitionUseCases(IServiceCollection services)
+    {
+        services.AddScoped<ListDivisionFixtures>();
+        services.AddScoped<GetMyFixtures>();
+        services.AddScoped<GetFixture>();
     }
 }

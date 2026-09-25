@@ -30,4 +30,7 @@ public static class SquadAuditActions
 
     /// <summary>A player's individual training focus was cleared (`TRN-2`).</summary>
     public const string PlayerTrainingFocusCleared = "squad.player_training_focus.cleared";
+
+    /// <summary>A club prepared or replaced its side for a fixture (`SQ-4`, `CAL-3`).</summary>
+    public const string FixtureTeamSheetSaved = "squad.fixture_team_sheet.saved";
 }

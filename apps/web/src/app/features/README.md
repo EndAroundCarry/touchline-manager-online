@@ -13,7 +13,8 @@ lands, and its route is added to `app.routes.ts` at the same time, so no unreach
 | `tactics/` | `/tactics` | 4 |
 | `training/` | `/training` | 4 |
 | `competitions/` | `/competitions/:divisionId/table`, `/competitions/:divisionId/fixtures` | 6 |
-| `fixtures/` | `/fixtures/:fixtureId/prepare` | 6 |
+| `fixtures/` | `/fixtures` | 6 |
+| `prepare/` | `/fixtures/:fixtureId/prepare` | 6 |
 | `match-viewer/` | `/matches/:matchId` plus the framework-neutral Canvas renderer | 7 |
 | `scouting/` | `/scouting` | 10 |
 | `transfers/` | `/transfers` | 10 |
@@ -23,8 +24,9 @@ lands, and its route is added to `app.routes.ts` at the same time, so no unreach
 | `admin/` | `/admin`, lazy-loaded and role protected | 14 |
 
 Present today: `welcome/`, `not-found/`, the `auth/` screens, `settings/`, the `onboarding/` screens,
-`dashboard/`, and — as of Stage 4 — `squad/` and `player/`. A folder and its route land together, so the
-table above doubles as the record of what is reachable.
+`dashboard/`, and — as of Stage 4 — `squad/`, `player/`, `tactics/` and `training/`, with `fixtures/` and
+`prepare/` arriving in Stage 6. A folder and its route land together, so the table above doubles as the
+record of what is reachable.
 
 ## Conventions
 

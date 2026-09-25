@@ -209,17 +209,18 @@ public sealed class SquadPersistenceTests
     [Fact]
     public async Task A_team_sheet_round_trips_with_its_entries()
     {
-        // The two tables with no foreign key to a fixture yet (ADR-0011) still have to work end to end, and
-        // the nullable role override has to survive a write and a read.
+        // The sheet now references a real fixture, so the foreign key added with the prepare-match screen is
+        // exercised here rather than assumed (ADR-0011, MIG-7), and the nullable role override has to
+        // survive a write and a read.
         await using var scope = _fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
 
         var (clubId, playerId) = await ArrangeSquadPlayerAsync(scope);
+        var fixtureId = await ArrangeFixtureAsync(db, clubId);
 
         var plan = Plan(clubId, "Shape", isDefault: true);
         db.TacticalPlans.Add(plan);
 
-        var fixtureId = Guid.CreateVersion7();
         var sheet = FixtureTeamSheet.Draft(
             Guid.CreateVersion7(), fixtureId, clubId, plan.Id, plan.Version, _fixture.Clock.UtcNow);
 
@@ -248,6 +249,33 @@ public sealed class SquadPersistenceTests
 
         var assigned = await db.TacticalSlots.CountAsync(slot => slot.AssignedPlayerId == playerId);
         assigned.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_team_sheet_must_reference_a_real_fixture()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var (clubId, _) = await ArrangeSquadPlayerAsync(scope);
+
+        var plan = Plan(clubId, "Shape", isDefault: true);
+        db.TacticalPlans.Add(plan);
+
+        db.FixtureTeamSheets.Add(FixtureTeamSheet.Draft(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            clubId,
+            plan.Id,
+            plan.Version,
+            _fixture.Clock.UtcNow));
+
+        var act = async () => await db.SaveChangesAsync();
+        var exception = await act.Should().ThrowAsync<DbUpdateException>();
+
+        ConstraintOf(exception).Should().Be(
+            "FK_fixture_team_sheets_fixtures_fixture_id",
+            "a prepared side belongs to a fixture that exists");
     }
 
     /// <summary>Reads the constraint name out of a failed write.</summary>
@@ -284,6 +312,57 @@ public sealed class SquadPersistenceTests
         1_000,
         assignedPlayerId,
         DateTimeOffset.UnixEpoch);
+
+    /// <summary>
+    /// Creates a division, a season instance, a matchday, a second club, and one fixture between the given
+    /// club and it, so a team sheet has a real fixture to reference.
+    /// </summary>
+    private async Task<Guid> ArrangeFixtureAsync(TouchlineManagerDbContext db, Guid homeClubId)
+    {
+        var now = _fixture.Clock.UtcNow;
+
+        var club = await db.Clubs.SingleAsync(candidate => candidate.Id == homeClubId);
+        var world = await db.GameWorlds.SingleAsync(candidate => candidate.Id == club.WorldId);
+        var season = await db.Seasons.FirstAsync(candidate => candidate.WorldId == world.Id);
+
+        var divisionId = Guid.CreateVersion7();
+        var division = Division.Provision(divisionId, club.CountryId, tierNumber: 1, "Testland", season.Id, now);
+        division.Activate(now);
+        db.Divisions.Add(division);
+
+        var divisionSeasonId = Guid.CreateVersion7();
+        var divisionSeason = DivisionSeason.Create(
+            divisionSeasonId,
+            divisionId,
+            season.Id,
+            $"schedule-{divisionSeasonId:N}",
+            $"tie-draw-{divisionSeasonId:N}",
+            $"tie-hash-{divisionSeasonId:N}",
+            now);
+        divisionSeason.Activate(now);
+        db.DivisionSeasons.Add(divisionSeason);
+
+        var awayClubId = Guid.CreateVersion7();
+        db.Clubs.Add(Club.Generate(
+            awayClubId,
+            world.Id,
+            club.CountryId,
+            new ClubIdentity($"Rival {Guid.NewGuid():N}", "RIV", "Rival", "Rival", $"rival-{awayClubId:N}"),
+            tier: 1,
+            foundingGameYear: season.GameYear,
+            now));
+
+        var kickoff = now.AddDays(3);
+        var matchdayId = Guid.CreateVersion7();
+        db.Matchdays.Add(Matchday.Schedule(matchdayId, divisionSeasonId, roundNumber: 1, kickoff, now));
+
+        var fixtureId = Guid.CreateVersion7();
+        db.Fixtures.Add(Fixture.Schedule(fixtureId, matchdayId, homeClubId, awayClubId, kickoff, now));
+
+        await db.SaveChangesAsync();
+
+        return fixtureId;
+    }
 
     /// <summary>Creates a world, country, season, club, and one player with all four satellite rows.</summary>
     private async Task<(Guid ClubId, Guid PlayerId)> ArrangeSquadPlayerAsync(AsyncServiceScope scope)

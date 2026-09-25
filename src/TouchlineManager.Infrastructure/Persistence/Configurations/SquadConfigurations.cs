@@ -346,8 +346,9 @@ internal sealed class PlayerRegistrationConfiguration : IEntityTypeConfiguration
 /// (`TRN-12`, `DIS-5`).
 /// </summary>
 /// <remarks>
-/// <c>source_fixture_id</c> carries no foreign key yet: `competition.fixtures` arrives in Stage 6, which
-/// adds it (ADR-0011).
+/// <c>source_fixture_id</c> carries its foreign key to <c>competition.fixtures</c> now that the fixture
+/// table exists. It is nullable, because an absence can also come from training rather than from a match
+/// (`TRN-12`), so a check constraint and not a not-null is what keeps the reference honest.
 /// </remarks>
 internal sealed class PlayerUnavailabilityConfiguration : IEntityTypeConfiguration<PlayerUnavailability>
 {
@@ -405,6 +406,10 @@ internal sealed class PlayerUnavailabilityConfiguration : IEntityTypeConfigurati
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(record => record.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Fixture>()
+            .WithMany()
+            .HasForeignKey(record => record.SourceFixtureId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -670,8 +675,10 @@ internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguratio
 /// Maps <c>squad.fixture_team_sheets</c>: a club's selection for one fixture.
 /// </summary>
 /// <remarks>
-/// <c>fixture_id</c> carries no foreign key yet: `competition.fixtures` arrives in Stage 6, which adds it.
-/// Stage 4 ships the shell so fixture-independent editing has somewhere to land (ADR-0011).
+/// <c>fixture_id</c> carries its foreign key now that <c>competition.fixtures</c> exists, and the sheet's
+/// <c>version</c> is a concurrency token, because it is the strong entity tag a prepared side is saved
+/// against — a save that raced another is refused by the database and not only by the use case's own
+/// comparison (`CONC-1`, ADR-0009).
 /// </remarks>
 internal sealed class FixtureTeamSheetConfiguration : IEntityTypeConfiguration<FixtureTeamSheet>
 {
@@ -704,7 +711,10 @@ internal sealed class FixtureTeamSheetConfiguration : IEntityTypeConfiguration<F
         builder.Property(sheet => sheet.LockedAt).HasColumnName("locked_at");
         builder.Property(sheet => sheet.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(sheet => sheet.UpdatedAt).HasColumnName("updated_at").IsRequired();
-        builder.Property(sheet => sheet.Version).HasColumnName("version").IsRequired();
+        // The sheet's version is the strong entity tag a prepared side is saved against, so it is also the
+        // concurrency token: a save that raced another is refused with 0 rows affected rather than silently
+        // overwriting the winner (CONC-1, ADR-0009).
+        builder.Property(sheet => sheet.Version).HasColumnName("version").IsRequired().IsConcurrencyToken();
 
         builder.HasIndex(sheet => new { sheet.FixtureId, sheet.ClubId })
             .IsUnique()
@@ -715,6 +725,10 @@ internal sealed class FixtureTeamSheetConfiguration : IEntityTypeConfiguration<F
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(sheet => sheet.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Fixture>()
+            .WithMany()
+            .HasForeignKey(sheet => sheet.FixtureId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TacticalPlan>()
             .WithMany()

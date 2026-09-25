@@ -85,10 +85,120 @@ staged simulation, and atomic publication follow.
   generation-time check, exactly as master plan §6.4 allows ("generation validation plus database support
   where practical").
 - **Deferred to the rest of Stage 6:** the fixture and matchday reads with the next-fixture dashboard and
-  the prepare-match screen, the durable job queue's full lock/snapshot workflow, the immutable snapshot and
-  the seeded commitment hash, the staged simulation and atomic nine-fixture publication, the standings and
-  statistics projections, and the compressed test clock. **Deferred beyond it:** rollover, lower-tier
-  provisioning, and the match viewer.
+  the prepare-match screen (both delivered in the next milestone, below), the durable job queue's full
+  lock/snapshot workflow, the immutable snapshot and the seeded commitment hash, the staged simulation and
+  atomic nine-fixture publication, the standings and statistics projections, and the compressed test clock.
+  **Deferred beyond it:** rollover, lower-tier provisioning, and the match viewer.
+
+### The fixture list and the prepare-match screen
+
+A season you can read and a side you can prepare. `GET /fixtures/mine` answers the dashboard and the
+fixtures screen with the club's thirty-four fixtures and the next one named, `GET /divisions/{id}/fixtures`
+answers the division's whole calendar in thirty-four rounds, and the prepare-match screen reads one fixture
+in full and saves a club's selection for it under the sheet's version. This is the second milestone of
+Stage 6; the lock-and-snapshot workflow, the durable matchday worker, the staged simulation and atomic
+publication, and the projections follow.
+
+#### Added
+
+- **The fixture reads** (master plan §10.5, §11.1): `GET /divisions/{divisionId}/fixtures` — a division's
+  whole calendar, the 306 fixtures of a season grouped into the 34 matchdays that lock and publish as a unit
+  (`CAL-10`), with its eighteen clubs carried once so the fixtures reference them by identity — plus
+  `GET /fixtures/mine`, the manager's own club's season with `NextFixtureId` named, and
+  `GET /fixtures/{fixtureId}`, one fixture in full with `ManagedClubId` and `ManagedSide` resolving the
+  caller's end. Fixtures are public game data, so none of the three is gated on holding a club; what the
+  tenure adds is which side is theirs.
+- **A score is public only once its matchday has published** (`MAT-7`, `CAL-10`). A staged fixture's row
+  already carries the score and the match — that is what staging means — but the mapping publishes both only
+  from `published`, so a half-resolved round cannot leak one of its nine results through a read.
+- **`IsLocked`, from the deadline and the status together** (`CAL-3`, `SQ-7`). A fixture's sheet is closed
+  when its status has moved past `scheduled` *or* when its lock instant has passed, because the deadline is a
+  rule and the status is bookkeeping: a delayed lock job must not leave a sheet editable a minute after it
+  was due.
+- **The fixture team sheet** (master plan §10.4): `GET /fixtures/{fixtureId}/team-sheet` — the opponent and
+  the deadline, the plan the side is prepared from, all eighteen slots filled or empty, and the squad it may
+  pick from, in one response — plus `PUT`, which replaces the whole selection. The club, the fixture, the
+  plan version the sheet references, and the deadline all come from the server, and none of them is taken
+  from the request (`INT-1`).
+- **`FixtureTeamSheetValidator`** (`SQ-4`, `SQ-9`, `TRN-12`): one pure rule over the submitted selection and
+  the club's selectable and unavailable players, refusing a slot number outside 1–18, a repeated slot, a
+  repeated player, a player who is not selectable, an unavailable player, and a starting eleven that is not
+  all picked. It is the same rule the Stage 8 snapshot builder will repair a locked sheet through
+  (`INS-12`), and it is shared with the screen as a validation preview of stable codes rather than a field
+  message.
+- **The sheet's version is its strong entity tag** (`CONC-1`, ADR-0009). A replace requires `If-Match` —
+  answered `428` without it — and a stale one is answered `412`, so a side prepared on one device cannot be
+  silently overwritten on another. The first save for a fixture carries no tag, because there is nothing to
+  be conditional against yet, and `squad.fixture_team_sheets.version` is now a concurrency token, so a raced
+  save is refused by the database and not only by the use case's own comparison.
+- **The two foreign keys Stage 4 shipped without** (ADR-0011): `squad.fixture_team_sheets.fixture_id` and
+  `squad.player_unavailability.source_fixture_id` both now reference `competition.fixtures`, in one
+  migration applied against real PostgreSQL 17. Stage 4 recorded that Stage 6 would add them once a write
+  path produced a team sheet for a real fixture; the prepare-match screen is that write path. The second is
+  nullable on purpose, because an absence can come from training rather than from a match (`TRN-12`).
+- **The `/fixtures` screen and the prepare-match screen** (§11.1): the club's season split into what is still
+  to play and what has been played, with the next fixture called out and a countdown to its deadline on a
+  slow interval rather than a one-off render; and the prepare screen, where the eleven starting slots take
+  their family and role from the club's plan and the bench is seven more places. Every slot is a labelled
+  select rather than a drag, so the screen is reachable from a keyboard and a screen reader (§11.3), and a
+  refused save lists the validator's issues against the slots they concern. When the fixture has locked the
+  controls are disabled and the screen says so; when the club has no default plan it points at the tactics
+  screen instead.
+- **The dashboard's next-fixture card**, with the opponent, the kickoff, the deadline, and the countdown, and
+  the `/fixtures` navigation destination flipped to available. A failure to read the fixtures leaves the rest
+  of the dashboard intact rather than blanking it, because the card is a second read of a different resource.
+- 9 new domain tests (305 total) for the team-sheet validator; 6 new API integration tests (68 total)
+  covering the calendar and the club's list, the prepare screen's read, the create/replace lifecycle with its
+  `428`/`412` refusals, the validation preview, and the other-club and no-club refusals; a new infrastructure
+  test over real PostgreSQL for the foreign key by name (`MIG-7`), beside the team-sheet round trip, which
+  now arranges a real fixture instead of a random one; 21 new frontend tests (145 total) over the
+  presentation helpers and the store's concurrency contract; and 2 new Playwright journeys (20 total) —
+  the prepare screen with its version conflict survived by reapplying, and the guard for a visitor with no
+  session.
+
+#### Notes
+
+- **The idempotency of publication is enforced in the mapping, not in the query.** A staged row genuinely
+  holds its score; what keeps it private is that `FixtureMapping.Visible` publishes the score, the match, and
+  the outcome only from `published`. That is one place to read when the question is "can a manager see this
+  yet", and it is the same predicate the Stage 7 viewer will need.
+- **The reapply path had to read before it wrote, and the browser journey is what found it.** A `412`
+  reloads the sheet asynchronously, and the first version of the store reapplied against whatever version it
+  happened to hold — so a manager who clicked *Reapply my changes* the moment the conflict appeared re-sent
+  the version that had just been refused and was refused again, with no way out but a page reload. Reapply
+  now reads the sheet and conditions the save on what that read returns. The store's unit tests did not
+  catch it because they ran the reload to completion first; the journey clicked when a person would.
+- **A fixture's own row carries its kickoff as well as its matchday's.** It was written once from the
+  matchday when the schedule was generated, and it is what the club's list reads; the matchday's own instant
+  is still what a round-level read reports.
+- **The season a read is measured against is the world's current one**, resolved once by
+  `CurrentSeasonQuery`, so a read during the rollover window keeps answering for the season being played
+  rather than for the next one whose rows already exist (`CAL-6`).
+- **A replacement selection is a delete and an insert, not a set of edits.** Swapping two players between two
+  slots cannot be expressed as single-slot updates without passing through a state that violates one of the
+  sheet's unique indexes, so the use case removes the previous entries and adds the new ones and the two
+  commit in one transaction. The API test that replaces a whole side with a different one is what proves the
+  ordering is safe against real PostgreSQL.
+- **The plan a sheet is described by is the sheet's own when one exists, and the club's default otherwise.**
+  A stored selection is always described by the shape it was prepared against, and a fresh screen shows the
+  shape a new save would use; a save rebases the sheet onto the current default's version, which is what
+  `FixtureTeamSheet.Rebase` was added for in Stage 4.
+- **The bench's size needs no rule of its own.** `SQ-4` asks for "up to seven substitutes" and nothing about
+  which numbers they take, and slots 12–18 are exactly seven, so a set of distinct slot numbers cannot name
+  more. The validator deliberately adds no contiguity rule: it would refuse a legal side for a reason the
+  rules do not give.
+- **`GET /divisions/{divisionId}/table` is not in this milestone.** §10.5 lists it, but the standings
+  projection is the rest of Stage 6; a table read with nothing behind it would be an empty screen pretending
+  to be a feature.
+- **The match viewer, `GET /matches/{id}`, is likewise not here.** A fixture names its match once a result is
+  staged, and nothing produces one yet: simulation and publication are the next milestone.
+- **The fixtures screen polls nothing and the countdown is the only thing that moves.** A calendar changes
+  once a matchday publishes, and that is a moment the manager is already on the screen for; a 30-second
+  interval re-renders the countdown only.
+- **Deferred to the rest of Stage 6:** the durable job queue's materialiser and lock/snapshot workflow, the
+  immutable input snapshot with its seed commitment hash, the staged simulation and atomic nine-fixture
+  publication, the standings and statistics projections, and the compressed test clock. **Deferred beyond
+  it:** rollover, lower-tier provisioning, and the match viewer.
 
 ## Stage 5 — The pure match engine
 

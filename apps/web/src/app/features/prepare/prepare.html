@@ -1,0 +1,166 @@
+@if (loading()) {
+  <p class="text-sm text-slate-600" role="status">Loading the fixture…</p>
+} @else if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+} @else if (teamSheet(); as sheet) {
+  <section aria-labelledby="prepare-heading">
+    <h1 id="prepare-heading" [class]="pageHeadingClass">
+      {{ venue(sheet.venue) }} v {{ sheet.opponentName }}
+    </h1>
+    <p class="mt-1 text-sm text-slate-600">
+      {{ sheet.divisionName }} · {{ round(sheet.roundNumber) }} · {{ status(sheet.fixtureStatus) }}
+    </p>
+    <p class="mt-1 text-sm text-slate-700">
+      Kick-off {{ instant(sheet.kickoffAt) }} · deadline {{ instant(sheet.lockAt) }}
+    </p>
+
+    @if (sheet.isLocked) {
+      <p [class]="statusMessageClass" role="status">
+        Team sheets are locked for this fixture. This selection can no longer be changed.
+      </p>
+    } @else {
+      <p class="mt-2 text-sm font-medium text-slate-800" role="status">
+        {{ countdown(sheet.lockAt) }} — you have until the deadline to change this side.
+      </p>
+    }
+
+    @if (hasConflict()) {
+      <div class="mt-4 rounded border border-amber-300 bg-amber-50 p-4" role="alert">
+        <p class="text-sm font-medium text-amber-900">
+          This side changed on another device. Your picks are kept below; reapply them, or take the
+          server's version.
+        </p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" [class]="primaryButtonClass" (click)="reapply()">
+            Reapply my changes
+          </button>
+          <button type="button" [class]="secondaryButtonClass" (click)="discardConflict()">
+            Use the server's version
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (saveError(); as message) {
+      <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    }
+
+    @if (savedMessage(); as message) {
+      <p [class]="statusMessageClass" role="status">{{ message }}</p>
+    }
+
+    @if (validation(); as preview) {
+      @if (!preview.isValid) {
+        <div class="mt-4 rounded border border-red-300 bg-red-50 p-4" role="alert">
+          <p class="text-sm font-medium text-red-800">That side was not saved.</p>
+          <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
+            @for (issue of preview.issues; track issue.code + '-' + issue.slotNumber) {
+              <li>{{ issueMessage(issue) }}</li>
+            }
+          </ul>
+        </div>
+      }
+    }
+
+    @if (sheet.planId === null) {
+      <div class="mt-6 rounded border border-dashed border-slate-300 bg-white p-4">
+        <p class="text-sm text-slate-700">
+          This club has no default tactic yet, so there is no shape to prepare a side from.
+        </p>
+        <div class="mt-3">
+          <a routerLink="/tactics" [class]="primaryButtonClass">Set a tactic</a>
+        </div>
+      </div>
+    } @else {
+      <p class="mt-6 text-sm text-slate-600">
+        Preparing from <span class="font-medium">{{ sheet.planName }}</span> ({{
+          sheet.formationPreset
+        }}). {{ selectedStarterCount() }} of 11 starters picked.
+      </p>
+
+      <form class="mt-4" (submit)="$event.preventDefault()">
+        <fieldset [disabled]="isLocked()">
+          <legend class="text-lg font-semibold">Starting eleven</legend>
+          <ul class="mt-2 grid gap-3 sm:grid-cols-2">
+            @for (slot of starterSlots(); track slot.slotNumber) {
+              <li class="rounded border border-slate-200 bg-white p-3">
+                <label
+                  class="block text-sm font-medium text-slate-700"
+                  [attr.for]="'slot-' + slot.slotNumber"
+                >
+                  Slot {{ slot.slotNumber }} · {{ family(slot.positionFamily) }} ·
+                  {{ role(slot.role) }}
+                </label>
+                <select
+                  class="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-base"
+                  [id]="'slot-' + slot.slotNumber"
+                  [value]="selected(slot.slotNumber)"
+                  (change)="onSelect(slot.slotNumber, $event)"
+                >
+                  <option value="">— nobody —</option>
+                  @for (player of selectable(); track player.id) {
+                    <option [value]="player.id" [disabled]="player.isUnavailable">
+                      {{ player.fullName }} ({{ position(player.primaryPosition) }}){{
+                        player.isUnavailable ? ' — unavailable' : ''
+                      }}
+                    </option>
+                  }
+                </select>
+                @if (issueFor(slot.slotNumber); as issue) {
+                  <p class="mt-1 text-sm text-red-700">{{ issueMessage(issue) }}</p>
+                }
+              </li>
+            }
+          </ul>
+        </fieldset>
+
+        <fieldset class="mt-8" [disabled]="isLocked()">
+          <legend class="text-lg font-semibold">Bench</legend>
+          <p class="mt-1 text-sm text-slate-600">Up to seven substitutes.</p>
+          <ul class="mt-2 grid gap-3 sm:grid-cols-2">
+            @for (slot of substituteSlots(); track slot.slotNumber) {
+              <li class="rounded border border-slate-200 bg-white p-3">
+                <label
+                  class="block text-sm font-medium text-slate-700"
+                  [attr.for]="'slot-' + slot.slotNumber"
+                >
+                  {{ benchLabel(slot) }}
+                </label>
+                <select
+                  class="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-base"
+                  [id]="'slot-' + slot.slotNumber"
+                  [value]="selected(slot.slotNumber)"
+                  (change)="onSelect(slot.slotNumber, $event)"
+                >
+                  <option value="">— nobody —</option>
+                  @for (player of selectable(); track player.id) {
+                    <option [value]="player.id" [disabled]="player.isUnavailable">
+                      {{ player.fullName }} ({{ position(player.primaryPosition) }}){{
+                        player.isUnavailable ? ' — unavailable' : ''
+                      }}
+                    </option>
+                  }
+                </select>
+                @if (issueFor(slot.slotNumber); as issue) {
+                  <p class="mt-1 text-sm text-red-700">{{ issueMessage(issue) }}</p>
+                }
+              </li>
+            }
+          </ul>
+        </fieldset>
+
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            [class]="primaryButtonClass"
+            [disabled]="isLocked() || saving() || !isDirty()"
+            (click)="save()"
+          >
+            {{ saving() ? 'Saving…' : 'Save your side' }}
+          </button>
+          <a routerLink="/fixtures" [class]="secondaryButtonClass">Back to fixtures</a>
+        </div>
+      </form>
+    }
+  </section>
+}

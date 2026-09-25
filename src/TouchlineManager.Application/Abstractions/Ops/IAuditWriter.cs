@@ -123,4 +123,7 @@ public static class AuditTargetTypes
 
     /// <summary>A player's individual training focus (`TRN-2`).</summary>
     public const string PlayerTrainingFocus = "player_training_focus";
+
+    /// <summary>A club's prepared side for one fixture (`SQ-4`).</summary>
+    public const string FixtureTeamSheet = "fixture_team_sheet";
 }

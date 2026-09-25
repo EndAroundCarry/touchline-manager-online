@@ -51,10 +51,9 @@ public static class TeamSheetStatuses
 /// (`data-model.md` §3.2).
 /// </para>
 /// <para>
-/// <see cref="FixtureId"/> carries no foreign key yet: `competition.fixtures` does not exist until
-/// Stage 6, which adds it. Stage 4 ships the shell so the fixture-independent editing work has
-/// somewhere to land, exactly as Stage 3 shipped the competition and finance shells ahead of their
-/// stages (ADR-0011).
+/// <see cref="FixtureId"/> references <c>competition.fixtures</c>, which Stage 4 shipped without and Stage 6
+/// connected once a write path produced sheets for real fixtures. Stage 4's shell is why the
+/// fixture-independent editing work had somewhere to land (ADR-0011).
 /// </para>
 /// </remarks>
 public sealed class FixtureTeamSheet
