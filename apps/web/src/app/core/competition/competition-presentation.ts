@@ -56,6 +56,16 @@ export function roundLabel(roundNumber: number): string {
   return `Round ${roundNumber}`;
 }
 
+/**
+ * Formats a goal difference, always signed (`TBL-3`).
+ *
+ * A positive difference reads `+7` rather than `7`, because the sign is the message. It is text rather
+ * than a colour, so the column does not rely on a tint to be read (§11.3).
+ */
+export function goalDifferenceLabel(goalDifference: number): string {
+  return goalDifference > 0 ? `+${goalDifference}` : `${goalDifference}`;
+}
+
 /** Words for one team-sheet validator issue, naming the slot it concerns when it concerns one. */
 export function teamSheetIssueMessage(issue: {
   readonly code: string;

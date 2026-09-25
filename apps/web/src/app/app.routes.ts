@@ -111,6 +111,23 @@ export const routes: Routes = [
         title: 'Training — Touchline Manager',
       },
       {
+        // One division's table by identity, for a shared or bookmarked link (§11.1).
+        path: 'competitions/:divisionId/table',
+        loadComponent: () =>
+          import('./features/competitions/table').then((m) => m.CompetitionTable),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Table — Touchline Manager',
+      },
+      {
+        // The manager's own division's table. The division is named by their club, so the navigation
+        // destination needs no parameter.
+        path: 'competitions',
+        loadComponent: () =>
+          import('./features/competitions/table').then((m) => m.CompetitionTable),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Table — Touchline Manager',
+      },
+      {
         path: 'fixtures',
         loadComponent: () => import('./features/fixtures/fixtures').then((m) => m.Fixtures),
         canActivate: [requireAuthentication, requireVerifiedEmail],

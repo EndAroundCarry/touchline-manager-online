@@ -1,5 +1,6 @@
 import {
   fixtureStatusLabel,
+  goalDifferenceLabel,
   isUpcoming,
   lockCountdown,
   outcomeLabel,
@@ -93,5 +94,16 @@ describe('isUpcoming', () => {
     expect(isUpcoming('staged')).toBe(true);
     expect(isUpcoming('published')).toBe(false);
     expect(isUpcoming('void')).toBe(false);
+  });
+});
+
+describe('goalDifferenceLabel', () => {
+  it('signs a positive difference, so the sign is what is read', () => {
+    expect(goalDifferenceLabel(7)).toBe('+7');
+  });
+
+  it('leaves a negative difference and zero as the number they are', () => {
+    expect(goalDifferenceLabel(-3)).toBe('-3');
+    expect(goalDifferenceLabel(0)).toBe('0');
   });
 });

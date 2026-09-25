@@ -57,6 +57,43 @@ export interface DivisionFixtures {
   readonly serverTime: string;
 }
 
+/** One club's line in a division's table (`TBL-1`…`TBL-10`). */
+export interface DivisionTableRow {
+  readonly rank: number;
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly clubShortName: string;
+  readonly played: number;
+  readonly won: number;
+  readonly drawn: number;
+  readonly lost: number;
+  readonly goalsFor: number;
+  readonly goalsAgainst: number;
+  readonly goalDifference: number;
+  readonly points: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
+}
+
+/**
+ * A division's table for the season in progress (§10.5).
+ *
+ * `rows` arrives in the order the server ranked it, so the screen renders that order rather than
+ * recomputing a single tie-break rule (`TBL-1`…`TBL-11`).
+ */
+export interface DivisionTable {
+  readonly divisionId: string;
+  readonly divisionName: string;
+  readonly tierNumber: number;
+  readonly countryId: string;
+  readonly countryCode: string;
+  readonly countryName: string;
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly rows: readonly DivisionTableRow[];
+  readonly serverTime: string;
+}
+
 /** One of the manager's club's fixtures, from that club's point of view. */
 export interface ClubFixture {
   readonly id: string;

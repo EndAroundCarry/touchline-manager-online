@@ -335,6 +335,63 @@ client to influence any of it.
   (`DIS-7`'s report needs the inbox to exist), the highlight table (Stage 7's viewer is its first consumer),
   and rollover, lower-tier provisioning, and the match viewer.
 
+### The division table on screen
+
+A table you can read. `/competitions` shows the manager's own division — eighteen clubs in the order the
+server ranked them, with their own row marked — and `/competitions/{divisionId}/table` reads any division
+by identity, which is what a shared link uses. This is the read the Stage 6 table endpoint was waiting
+for; the compressed test clock is all that remains of the stage.
+
+#### Added
+
+- **The `DivisionTable` transport shapes** (`competition.models.ts`): `DivisionTableRow` — rank, club
+  identity, played/won/drawn/lost, goals for and against, goal difference, points, and the two card counts
+  — and `DivisionTable`, which carries the division, the country and tier it sits in, the season, the rows,
+  and the instant the server answered (`TIME-5`). The mirror of `TableResponses.cs`, like the rest of the
+  module's shapes.
+- **`CompetitionApi.divisionTable`**, the read of `GET /divisions/{divisionId}/table` (§10.5).
+- **The two table reads in `CompetitionStore`.** `loadMyDivisionTable` reads the manager's own division;
+  `loadDivisionTable` reads a named one. Both hold one loading state and one error and blank the previous
+  table first, so a failed read cannot leave the last division's rows on screen.
+- **`ManagedClubId` on the store**, named by the manager's own read. The club's division is on no
+  competition read, so it is taken from the fixture list the club already has — the same read the dashboard
+  makes for the next fixture — and that read also names the club. The named-division read deliberately
+  marks nothing, because the caller may hold a club elsewhere or none at all.
+- **`goalDifferenceLabel`** (`TBL-3`): a difference is signed as text — `+7`, `-3`, `0` — so the column is
+  read rather than tinted (§11.3).
+- **The `/competitions` screen** (master plan §11.1) and the route `/competitions/:divisionId/table`. The
+  table is a real `<table>` with an `sr-only` caption, `scope="col"` headers whose abbreviations carry
+  their full words, and a `scope="row"` header per club, so assistive technology reads it as tabular data.
+  The manager's own row is marked with words ("your club") as well as weight, never by a colour alone. The
+  rows arrive already ranked, so the screen sorts nothing and reimplements no tie-break rule (`TBL-11`). A
+  division whose matchdays are all still to play says so, because the seeded table is eighteen nil-nils and
+  that is a fact about the season rather than an empty screen.
+- **The `Competitions` navigation destination** flipped to available, so the shell links to the table.
+- 5 new web unit tests (150 total) over `goalDifferenceLabel` and the two table reads — the own-division
+  read naming the club, the named read marking nothing, the refusal, and the clear — and a new Playwright
+  journey file (22 total): the table reached from the navigation with the manager's row marked, and the
+  guard for a visitor with no session.
+
+#### Notes
+
+- **The manager's division is resolved from their fixtures, and that is a gap in the reads rather than a
+  choice.** `GET /fixtures/mine` is the only read that names a club's division; the tenure and the
+  onboarding state do not carry it. Reusing it costs one round trip on a screen that is opened rarely, and
+  it is the same read the dashboard already makes for the next fixture. A dedicated "my division" read
+  belongs with the country and division browser a later navigation will need.
+- **Nothing is sorted in the client.** The projection stored the order and the server ranked it
+  (`TBL-1`…`TBL-11`), so a screen that re-sorted would be a second, drifting definition of the table.
+- **The card columns are carried but not shown.** They arrive because `TBL-8`/`TBL-9` break ties by them
+  and the response is one document, but the discipline view that gives them a column is Stage 8's.
+- **A wide table on a narrow screen scrolls rather than collapsing.** Ten columns is what a league table
+  is, and hiding half of them on a phone is the "squeezed desktop table" §11.3 warns about; the wrapper
+  scrolls horizontally and the club column stays the row's subject.
+- **The named route is declared before the bare one.** `/competitions/:divisionId/table` and
+  `/competitions` share one component, and the longer path is listed first so the two-segment navigation
+  destination and the three-segment deep link cannot be confused for one another.
+- **Deferred to the rest of Stage 6:** the compressed test clock. **Deferred beyond it:** rollover,
+  lower-tier provisioning, and the match viewer.
+
 ## Stage 5 — The pure match engine
 
 A match you can replay. `MatchSimulator.Simulate` takes one frozen snapshot and returns one result, and the

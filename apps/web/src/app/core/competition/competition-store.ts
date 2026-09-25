@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import {
+  DivisionTable,
   FixtureTeamSheet,
   MyFixtures,
   SaveTeamSheetRequest,
@@ -29,6 +30,11 @@ export class CompetitionStore {
   private readonly fixturesLoadingSignal = signal(false);
   private readonly fixturesErrorSignal = signal<string | null>(null);
 
+  private readonly divisionTableSignal = signal<DivisionTable | null>(null);
+  private readonly tableLoadingSignal = signal(false);
+  private readonly tableErrorSignal = signal<string | null>(null);
+  private readonly managedClubIdSignal = signal<string | null>(null);
+
   private readonly teamSheetSignal = signal<FixtureTeamSheet | null>(null);
   private readonly selectionSignal = signal<ReadonlyMap<number, string>>(new Map());
   private readonly loadingSignal = signal(false);
@@ -47,6 +53,22 @@ export class CompetitionStore {
 
   /** Why the fixture list could not be read. */
   readonly fixturesError = this.fixturesErrorSignal.asReadonly();
+
+  /** The division table last read. */
+  readonly divisionTable = this.divisionTableSignal.asReadonly();
+
+  /** Whether a division table is being read. */
+  readonly tableLoading = this.tableLoadingSignal.asReadonly();
+
+  /** Why the division table could not be read. */
+  readonly tableError = this.tableErrorSignal.asReadonly();
+
+  /**
+   * The club the caller holds, named by the manager's own table read so its row can be marked (`§11.1`).
+   *
+   * Null for a named-division read, which is a plain view of a division rather than the caller's own.
+   */
+  readonly managedClubId = this.managedClubIdSignal.asReadonly();
 
   /** The prepared side last read. */
   readonly teamSheet = this.teamSheetSignal.asReadonly();
@@ -135,6 +157,39 @@ export class CompetitionStore {
         );
       },
     });
+  }
+
+  /**
+   * Reads the table of the division the manager's club plays in (`§11.1`).
+   *
+   * The club's own division is not on any competition read, so it is named by the fixture list the
+   * manager's club already has — the same read the dashboard uses to find the next fixture. That read
+   * also names the club, which is what marks the manager's own row.
+   */
+  loadMyDivisionTable(): void {
+    this.beginTableRead();
+    this.managedClubIdSignal.set(null);
+
+    this.api.mine().subscribe({
+      next: (fixtures) => {
+        this.managedClubIdSignal.set(fixtures.clubId);
+        this.readTable(fixtures.divisionId);
+      },
+      error: (error: unknown) => this.failTableRead(error),
+    });
+  }
+
+  /**
+   * Reads one division's table, as a shareable view of a division rather than the caller's own (`§10.5`).
+   *
+   * Nothing here names the caller's club, so no row is marked: the caller may hold a club in another
+   * division, or none at all.
+   */
+  loadDivisionTable(divisionId: string): void {
+    this.beginTableRead();
+    this.managedClubIdSignal.set(null);
+
+    this.readTable(divisionId);
   }
 
   /** Reads the club's prepared side for a fixture and starts editing it. */
@@ -267,6 +322,10 @@ export class CompetitionStore {
     this.fixturesSignal.set(null);
     this.fixturesLoadingSignal.set(false);
     this.fixturesErrorSignal.set(null);
+    this.divisionTableSignal.set(null);
+    this.tableLoadingSignal.set(false);
+    this.tableErrorSignal.set(null);
+    this.managedClubIdSignal.set(null);
     this.teamSheetSignal.set(null);
     this.selectionSignal.set(new Map());
     this.loadingSignal.set(false);
@@ -276,6 +335,31 @@ export class CompetitionStore {
 
   private slots(designation: string): readonly TeamSheetSlot[] {
     return (this.teamSheetSignal()?.slots ?? []).filter((slot) => slot.designation === designation);
+  }
+
+  /** Puts the table read into its loading state, dropping whatever the last one answered. */
+  private beginTableRead(): void {
+    this.tableLoadingSignal.set(true);
+    this.tableErrorSignal.set(null);
+    this.divisionTableSignal.set(null);
+  }
+
+  /** Reads one division's table. */
+  private readTable(divisionId: string): void {
+    this.api.divisionTable(divisionId).subscribe({
+      next: (table) => {
+        this.divisionTableSignal.set(table);
+        this.tableLoadingSignal.set(false);
+      },
+      error: (error: unknown) => this.failTableRead(error),
+    });
+  }
+
+  private failTableRead(error: unknown): void {
+    this.tableLoadingSignal.set(false);
+    this.tableErrorSignal.set(
+      error instanceof ApiError ? error.detail : 'The table could not be loaded.',
+    );
   }
 
   private edit(selection: ReadonlyMap<number, string>): void {
