@@ -38,6 +38,10 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Real time, unless a non-production environment has opted into a compressed clock, so a seeded world is
+// stamped with the same instant the API and worker will read (TIME-6).
+var clockOptions = builder.Services.AddGameClock(builder.Configuration, builder.Environment);
+
 using var host = builder.Build();
 using var scope = host.Services.CreateScope();
 
@@ -49,6 +53,15 @@ Console.WriteLine(
         CultureInfo.InvariantCulture,
         $"Seeding from {(options.Seed is null ? "the configured default seed" : $"seed '{options.Seed}'")} "
         + $"at {clock.UtcNow:u}."));
+
+if (clockOptions.IsCompressed)
+{
+    Console.WriteLine(
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Compressed clock in force: game time runs {clockOptions.Rate}x from "
+            + $"{clockOptions.RealAnchorUtc:u} (TIME-6)."));
+}
 
 var result = await seeder.ExecuteAsync(
     new SeedWorldRequest(options.Seed, options.FirstMatchday),

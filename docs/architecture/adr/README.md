@@ -31,6 +31,7 @@ the system is shaped the way it is.
 | [0012](0012-daily-progression-materialised-job.md) | The daily progression is a materialised, feature-gated world job | Accepted |
 | [0013](0013-engine-arithmetic-and-scoreline-effect.md) | Integer basis-point arithmetic and a bounded scoreline effect in the engine | Accepted |
 | [0014](0014-matchday-lock-resolution-and-publication.md) | A matchday is locked, resolved, and published by three jobs, and its snapshot is a stored document | Accepted |
+| [0015](0015-compressed-test-clock.md) | A compressed test clock is chosen at composition and refused in Production | Accepted |
 
 ## Rules for changing an ADR
 

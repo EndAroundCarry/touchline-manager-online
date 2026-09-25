@@ -76,6 +76,11 @@ builder.Services
 // ---------------------------------------------------------------------------------------------
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Real time, unless a non-production environment has opted into a compressed clock. This throws rather
+// than falls back in Production, so a compressed configuration can never reach a live world (TIME-6).
+var clock = builder.Services.AddGameClock(builder.Configuration, builder.Environment);
+
 builder.Services.AddTouchlineTelemetry(builder.Configuration, "touchline-api");
 
 // ---------------------------------------------------------------------------------------------
@@ -230,6 +235,16 @@ var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>(
 if (diagnostics.EnableJobProbe)
 {
     moduleGroups["ops"].MapJobProbe();
+}
+
+if (clock.IsCompressed)
+{
+    app.Logger.LogWarning(
+        "A compressed clock is in force: game time runs {Rate}x from {Anchor}, in {Environment}. "
+        + "Real-time deadlines are deliberately accelerated; a browser's own countdowns are not (TIME-6).",
+        clock.Rate,
+        clock.RealAnchorUtc,
+        builder.Environment.EnvironmentName);
 }
 
 await app.RunAsync();

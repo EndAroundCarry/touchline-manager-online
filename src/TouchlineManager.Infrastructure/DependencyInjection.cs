@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
 using TouchlineManager.Application.Abstractions.Competition;
@@ -47,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IJobQueue, PostgresJobQueue>();
         services.Configure<JobQueueOptions>(configuration.GetSection(JobQueueOptions.SectionName));
 
+        AddClockInfrastructure(services, configuration);
         AddAuthInfrastructure(services, configuration);
         AddWorldInfrastructure(services, configuration);
         AddCompetitionInfrastructure(services);
@@ -56,6 +59,77 @@ public static class DependencyInjection
         AddMatchdayInfrastructure(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Binds the clock configuration, then replaces the real clock with a compressed one when a
+    /// non-production environment has opted in (ADR-0009, `TIME-6`).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Called by the composition roots, which are the only places that know the environment. The clock
+    /// itself is chosen here rather than in each root so the rule lives in one place: real time by
+    /// default, compressed only where the configuration asks for it and the environment allows it.
+    /// </para>
+    /// <para>
+    /// A production host that asks for compression does not silently fall back to real time — it fails to
+    /// start, by name. A quiet fallback would leave an operator believing a season was accelerated when it
+    /// was not, which is exactly the accident this guard exists to prevent (`TIME-6`).
+    /// </para>
+    /// </remarks>
+    /// <returns>The clock configuration in force, so a root can report a compressed clock in its logs.</returns>
+    public static ClockOptions AddGameClock(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+
+        var options = configuration.GetSection(ClockOptions.SectionName).Get<ClockOptions>()
+            ?? new ClockOptions();
+
+        if (!options.IsCompressed)
+        {
+            return options;
+        }
+
+        if (environment.IsProduction())
+        {
+            throw new InvalidOperationException(
+                "A compressed clock is never permitted in Production (ADR-0009, TIME-6). "
+                + "Remove Clock:Mode=Compressed, or run this configuration in a non-production environment.");
+        }
+
+        // Last registration wins, so this replaces the SystemClock AddInfrastructure registered. The clock
+        // reads the validated options, so an unsound rate or a missing anchor fails when it is resolved.
+        services.AddSingleton<IClock>(provider =>
+            new CompressedClock(provider.GetRequiredService<IOptions<ClockOptions>>().Value));
+
+        return options;
+    }
+
+    /// <summary>
+    /// Registers and validates the clock configuration in every host, before anything chooses a clock.
+    /// </summary>
+    /// <remarks>
+    /// The anchor and rate are only meaningful when compressed, so the checks are conditional; an operator
+    /// who is not compressing is not asked to supply them. Validated at startup like the world and auth
+    /// options, so a half-written compressed configuration fails immediately rather than at the first job.
+    /// </remarks>
+    private static void AddClockInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<ClockOptions>()
+            .Bind(configuration.GetSection(ClockOptions.SectionName))
+            .Validate(
+                options => !options.IsCompressed || options.RealAnchorUtc is not null,
+                "Clock:RealAnchorUtc must be set when Clock:Mode is Compressed (TIME-6).")
+            .Validate(
+                options => !options.IsCompressed || options.Rate is >= 2 and <= 100_000,
+                "Clock:Rate must be between 2 and 100000 when Clock:Mode is Compressed (TIME-6).")
+            .ValidateOnStart();
     }
 
     /// <summary>

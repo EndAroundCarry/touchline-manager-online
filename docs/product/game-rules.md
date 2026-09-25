@@ -367,6 +367,7 @@ produced in Stage 5 alongside engine version 1.
 | TIME-3 | **Game seasons and game years are not real time.** Player aging, contract years, and progression advance at season rollover. |
 | TIME-4 | Deadlines, kickoffs, auction windows, and inactivity are real UTC time. |
 | TIME-5 | Responses return absolute deadlines plus server current time so client clock drift cannot mislead a manager. |
+| TIME-6 | A compressed test clock is permitted only in non-production environments; a Production host refuses to start with one configured. |
 | ID-1 | Identifiers are server-generated UUIDv7. Clients never propose identifiers for new aggregates. |
 | ID-2 | Database names are `snake_case`, C# names are `PascalCase`. |
 | CONC-1 | Mutable aggregates carry `version bigint`, exposed as a strong ETag, with `If-Match` required for conflicting updates. |

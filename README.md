@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 5 delivered — the pure match engine.** The playable game is being built in the
+> **Status: Stage 6 delivered — the season plays itself.** The playable game is being built in the
 > staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the
 > API and worker composition roots, the health and observability baseline, and the Angular PWA shell. Stage
 > 2 added the account schema, the full credential lifecycle, rotating refresh sessions with reuse
@@ -16,10 +16,12 @@ kick-off. The server decides results; a client can never simulate or influence o
 > atomic club takeover with pyramid expansion, and the onboarding screens. Stage 4 added the `squad`
 > schema, a legal twenty-two-player squad per club, the squad, player and contract screens, the tactics
 > board and its ETag contract, and the training screen with its deterministic daily progression job. Stage
-> 5 added the match engine itself: a pure, versioned, hash-pinned simulation of one fixture from a frozen
-> snapshot, with commentary tokens, semantic highlights, and a simulation laboratory for tuning. The
-> contract renewal quote waits for the playing-time data Stage 6 introduces; the next stage is the season
-> schedule, fixture preparation, and the durable matchday worker.
+> 5 added the match engine: a pure, versioned, hash-pinned simulation of one fixture from a frozen
+> snapshot, with commentary tokens, semantic highlights, and a simulation laboratory for tuning. Stage 6
+> turned that engine into a season: a 34-round fixture calendar, the fixture and prepare-match screens, the
+> durable matchday worker that locks a round's team sheets, simulates its nine fixtures from frozen
+> snapshots, and publishes results and table together, the division table screen, and a compressed test
+> clock for non-production environments. The next stage is the match center and its 2D highlights.
 
 ---
 
@@ -172,6 +174,39 @@ curl -X POST http://localhost:5080/api/v1/club-claims \
 A country whose lowest tier is full answers `409 CAPACITY_PROVISIONING` and queues the next tier's
 generation; that generation is Stage 11, so a full country stays full until then. Why a takeover
 serialises the way it does is in [ADR-0010](docs/architecture/adr/0010-club-takeover-serialisation.md).
+
+---
+
+## Watching a season without waiting for it
+
+A season is thirty-four matchdays on Tuesdays, Thursdays and Sundays, so the real thing is about eleven
+weeks. A non-production environment can compress that clock so the same deadlines arrive in minutes, which
+is how staging and the end-to-end suite reach a rollover. It is real-time by default and is refused in
+Production — a production host that asks for it fails to start rather than quietly running at normal speed
+(`TIME-6`, [ADR-0015](docs/architecture/adr/0015-compressed-test-clock.md)).
+
+Game time is `VirtualAnchorUtc + (realNow − RealAnchorUtc) × Rate`. Set it in the API's and the worker's
+configuration (they must agree, so give them the same values), or export it:
+
+```bash
+export Clock__Mode=Compressed
+export Clock__Rate=1800                              # one real hour is about a game week
+export Clock__RealAnchorUtc=2026-09-25T12:00:00Z     # the real instant the map is anchored at
+export Clock__VirtualAnchorUtc=2026-10-06T18:25:00Z  # the game instant it maps to (optional)
+npm run seed -- --first-matchday 2026-10-06
+npm run dev
+```
+
+Leaving `VirtualAnchorUtc` unset is a pure speed-up: game time equals real time at `RealAnchorUtc` and runs
+ahead of it afterwards. Setting it additionally offsets the world, so pinning a fresh world just before its
+first kickoff is a matter of setting both anchors to the moments you want. Both the API and the worker log a
+warning when a compressed clock is in force, so an accelerated world is never a surprise.
+
+Two things to expect. The world's stored instants — kickoffs, deadlines, `created_at` — are game time, so
+they read years ahead of the wall clock. And a browser computes countdowns from its own clock, so on a
+compressed world a countdown says days where the server says minutes; the server still decides whether a
+sheet is locked, so the controls are correct and only the phrasing misleads. That gap is `TIME-5` work the
+fixture reads do not yet do, and ADR-0015 records it rather than half-building it.
 
 ---
 

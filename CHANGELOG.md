@@ -392,6 +392,57 @@ for; the compressed test clock is all that remains of the stage.
 - **Deferred to the rest of Stage 6:** the compressed test clock. **Deferred beyond it:** rollover,
   lower-tier provisioning, and the match viewer.
 
+### The compressed test clock
+
+A season you can watch without waiting for one. A non-production environment may compress the clock the
+season is read against, so the matchdays that are days apart arrive in minutes and the worker's own
+deadlines drive the acceleration. Real time is the default, it is off unless configured, and a production
+host refuses to start with it on (`TIME-6`).
+
+#### Added
+
+- **`ClockOptions` and `CompressedClock`** (ADR-0015, `TIME-6`): game time is
+  `VirtualAnchorUtc + (realNow − RealAnchorUtc) × Rate`. Both anchors are configuration rather than process
+  state, which is the point — the API computes "server now" and the worker computes "is this job due" from
+  the same real instant and the same settings, so the two cannot disagree about whether a deadline has
+  passed. With no virtual anchor the mapping is a pure speed-up; setting one also offsets the world so a
+  season can be pinned just before its first kickoff. The arithmetic is clamped to a thousand years of game
+  time so an over-long run degrades rather than overflowing, and the clock is built from validated options,
+  so a rate or an anchor that cannot mean anything fails when it is resolved.
+- **`AddGameClock`**, the choice at composition (ADR-0015): the API, the worker, and the world seeder call
+  it, and it replaces the real clock only when the configuration asks for compression *and* the environment
+  is not Production. A production host that asks for it throws by name instead of silently running at real
+  speed — an operator who believed a season was accelerated is exactly the accident the rule prevents. Both
+  roots log a warning when a compressed clock is in force.
+- **The clock configuration is validated at startup**, like the world and auth options: `Rate` between 2 and
+  100,000 and a required `RealAnchorUtc` when `Mode` is `Compressed`, so a half-written compressed
+  configuration fails immediately in every host rather than at the first job.
+- 10 new infrastructure tests (116 total) for the clock: the scale and both anchors, the default virtual
+  anchor, the UTC contract, the bounded extreme, the two constructor refusals, and — the safety property —
+  that Production cannot build a compressed clock while a non-production environment gets one and the
+  default is left untouched.
+
+#### Notes
+
+- **There is no HTTP control surface.** Enabling compression is a configuration change and a restart; no
+  endpoint moves time. A runtime-writable "now" is a deadline-critical write surface §10 does not define,
+  and §17.12 keeps unreachable features out of the API rather than half-built (ADR-0015).
+- **Nothing about a played match depends on the clock.** A seed comes from the world secret and the frozen
+  snapshot and the engine reads no time at all (`MAT-9`), so a compressed clock changes *when* a deadline is
+  reached and never *what happens* when it is. That is what makes it safe to accelerate a world and still
+  expect reproducible results.
+- **A browser's countdowns are real time, so on a compressed world they disagree with the server's clock.**
+  The server's `IsLocked` answer is authoritative and the client is refused after the lock, so the control
+  state is right; only the countdown phrase misleads. Closing the gap means the fixture and team-sheet reads
+  carrying a server instant for the client to measure against — the `TIME-5` work those reads do not yet do —
+  and it is recorded as deferred rather than half-built (ADR-0015).
+- **The clock was already the only source of time.** The queue reads `IClock` for every enqueue, claim,
+  completion, and retry delay, and both schedulers read it for their horizons, so no component needed to be
+  taught about compression — the clock is the only thing that changed (`TIME-2`).
+- **A compressed world cannot be re-anchored without a restart**, and all countries share the one accelerated
+  cadence. Both are accepted: it is a test tool whose natural lifetime is a run, and the MVP already gives
+  every country one season cadence (§3.4).
+
 ## Stage 5 — The pure match engine
 
 A match you can replay. `MatchSimulator.Simulate` takes one frozen snapshot and returns one result, and the
