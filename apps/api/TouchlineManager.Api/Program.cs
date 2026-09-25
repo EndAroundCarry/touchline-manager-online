@@ -10,6 +10,7 @@ using TouchlineManager.Api.Endpoints;
 using TouchlineManager.Api.Health;
 using TouchlineManager.Api.Http;
 using TouchlineManager.Api.Middleware;
+using TouchlineManager.Api.Squad;
 using TouchlineManager.Api.Telemetry;
 using TouchlineManager.Api.World;
 using TouchlineManager.Application;
@@ -217,6 +218,7 @@ var moduleGroups = app.MapModuleGroups();
 moduleGroups["auth"].MapAuthEndpoints();
 app.MapAccountEndpoints();
 app.MapWorldEndpoints();
+app.MapSquadEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;
 

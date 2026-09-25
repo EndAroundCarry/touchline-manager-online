@@ -97,11 +97,13 @@ public static class DependencyInjection
     /// <remarks>
     /// A port of its own rather than another world repository: the squad module owns its tables
     /// (`MOD-1`), and the seeded world stages them through a use case like any other cross-module write
-    /// (`MOD-2`).
+    /// (`MOD-2`). The read port is separate from the write port for the same reason onboarding splits
+    /// them — a screen can change without widening what a command can reach (`MOD-3`).
     /// </remarks>
     private static void AddSquadInfrastructure(IServiceCollection services)
     {
         services.AddScoped<ISquadRepository, SquadRepository>();
+        services.AddScoped<ISquadQueries, SquadQueries>();
     }
 
     /// <summary>

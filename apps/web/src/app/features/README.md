@@ -22,7 +22,9 @@ lands, and its route is added to `app.routes.ts` at the same time, so no unreach
 | `settings/` | `/settings` | 13 |
 | `admin/` | `/admin`, lazy-loaded and role protected | 14 |
 
-Present today: `welcome/` and `not-found/`.
+Present today: `welcome/`, `not-found/`, the `auth/` screens, `settings/`, the `onboarding/` screens,
+`dashboard/`, and — as of Stage 4 — `squad/` and `player/`. A folder and its route land together, so the
+table above doubles as the record of what is reachable.
 
 ## Conventions
 

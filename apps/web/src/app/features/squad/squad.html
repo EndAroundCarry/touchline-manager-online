@@ -1,0 +1,199 @@
+@if (loading()) {
+  <p class="text-sm text-slate-600" role="status">Loading your squad…</p>
+} @else if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+} @else if (squad(); as inherited) {
+  <section class="max-w-6xl">
+    <h1 [class]="pageHeadingClass">{{ inherited.clubName }} squad</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      {{ inherited.countryCode }} · season {{ inherited.seasonNumber }} ·
+      {{ inherited.summary.playerCount }} players · {{ inherited.summary.goalkeepers }} goalkeepers ·
+      {{ funds(inherited.summary.weeklyWageTotalMinor) }} weekly wages
+    </p>
+
+    @if (!inherited.summary.meetsMinimum || !inherited.summary.hasMinimumGoalkeepers) {
+      <p [class]="formErrorClass" role="alert">
+        This squad is below the minimum a club must field — {{ inherited.summary.playerCount }} players
+        and {{ inherited.summary.goalkeepers }} goalkeepers. It must be repaired before the next team
+        sheet locks (SQ-2, SQ-9).
+      </p>
+    }
+
+    <h2 class="sr-only">Squad filters</h2>
+
+    <div class="mt-6 grid gap-3 sm:grid-cols-3">
+      <label class="block">
+        <span class="text-sm font-medium text-slate-700">Search by name</span>
+        <input
+          type="search"
+          [class]="textInputClass"
+          [value]="nameFilter()"
+          (input)="onNameInput($event)"
+        />
+      </label>
+
+      <label class="block">
+        <span class="text-sm font-medium text-slate-700">Position</span>
+        <select
+          [class]="textInputClass"
+          [value]="positionFilter()"
+          (change)="onPositionChange($event)"
+        >
+          @for (option of familyOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="flex items-center gap-2 pt-6">
+        <input
+          type="checkbox"
+          [class]="checkboxClass"
+          [checked]="availableOnly()"
+          (change)="onAvailableChange($event)"
+        />
+        <span class="text-sm font-medium text-slate-700">Available only</span>
+      </label>
+    </div>
+
+    @if (filtersActive()) {
+      <p class="mt-2 text-sm text-slate-600" role="status">
+        Showing {{ players().length }} of {{ inherited.summary.playerCount }} players.
+        <button type="button" [class]="linkClass" (click)="clearFilters()">Clear filters</button>
+      </p>
+    }
+
+    <div class="mt-4">
+      <p-table [value]="players()" [tableStyle]="{ 'min-width': '52rem' }">
+        <ng-template #header>
+          <tr>
+            <th scope="col" pSortableColumn="fullName">
+              Player <p-sort-icon field="fullName" />
+            </th>
+            <th scope="col" pSortableColumn="primaryPosition">
+              Position <p-sort-icon field="primaryPosition" />
+            </th>
+            <th scope="col" pSortableColumn="age">Age <p-sort-icon field="age" /></th>
+            <th scope="col" pSortableColumn="state.condition">
+              Condition <p-sort-icon field="state.condition" />
+            </th>
+            <th scope="col" pSortableColumn="state.fatigue">
+              Fatigue <p-sort-icon field="state.fatigue" />
+            </th>
+            <th scope="col" pSortableColumn="contract.endSeasonNumber">
+              Contract <p-sort-icon field="contract.endSeasonNumber" />
+            </th>
+            <th scope="col">Status</th>
+            <th scope="col"><span class="sr-only">Player profile</span></th>
+          </tr>
+        </ng-template>
+
+        <ng-template #body let-player>
+          <tr>
+            <th scope="row" class="text-left font-medium text-slate-900">
+              {{ player.fullName }}
+              <span class="block text-xs font-normal text-slate-500">
+                {{ player.shortName }} · {{ player.nationalityCode }}
+              </span>
+            </th>
+            <td>{{ position(player.primaryPosition) }}</td>
+            <td>{{ player.age }}</td>
+            <td>
+              <span [class]="conditionClass(player.state.condition)">
+                {{ player.state.condition }}
+              </span>
+              <span class="text-xs" [class]="conditionClass(player.state.condition)">
+                {{ conditionWord(player.state.condition) }}
+              </span>
+            </td>
+            <td>
+              <span [class]="fatigueClass(player.state.fatigue)">{{ player.state.fatigue }}</span>
+              <span class="text-xs" [class]="fatigueClass(player.state.fatigue)">
+                {{ fatigueWord(player.state.fatigue) }}
+              </span>
+            </td>
+            <td>
+              @if (player.contract; as contract) {
+                <span class="block">to season {{ contract.endSeasonNumber }}</span>
+                <span class="block text-xs text-slate-500">
+                  {{ contract.seasonsRemaining }} left · {{ squadStatus(contract.squadStatus) }}
+                </span>
+              } @else {
+                <span class="text-slate-500">No contract</span>
+              }
+            </td>
+            <td>
+              @if (player.availability.length === 0) {
+                <span class="text-xs font-medium text-emerald-800">Available</span>
+              } @else {
+                @for (record of player.availability; track record.id) {
+                  <span class="block text-xs font-medium text-red-700">
+                    {{ availability(record.type, record.remainingFixtures) }}
+                  </span>
+                }
+              }
+            </td>
+            <td>
+              <a [routerLink]="['/players', player.id]" [attr.aria-label]="'Open ' + player.fullName">
+                View
+              </a>
+            </td>
+          </tr>
+        </ng-template>
+
+        <ng-template #emptymessage>
+          <tr>
+            <td colspan="8" class="text-sm text-slate-600">
+              No player matches the filter.
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </div>
+
+    @if (contracts(); as payroll) {
+      <section class="mt-10">
+        <h2 class="text-lg font-semibold text-slate-900">Contracts</h2>
+        <p class="mt-1 text-sm text-slate-600">
+          {{ payroll.contracts.length }} contracts · {{ funds(payroll.weeklyWageTotalMinor) }} committed
+          each week, charged after the Sunday matchday (CON-2).
+        </p>
+
+        <table class="mt-3 w-full border-collapse text-left text-sm">
+          <caption class="sr-only">
+            Contracts, closest to expiring first
+          </caption>
+          <thead>
+            <tr class="border-b border-slate-300">
+              <th scope="col" class="py-1 pr-4 font-semibold">Player</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Position</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Age</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Seasons</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Standing</th>
+              <th scope="col" class="py-1 font-semibold">Weekly wage</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (contract of payroll.contracts; track contract.id) {
+              <tr class="border-b border-slate-200">
+                <th scope="row" class="py-1 pr-4 text-left font-medium text-slate-900">
+                  {{ contract.playerName }}
+                </th>
+                <td class="py-1 pr-4">{{ position(contract.primaryPosition) }}</td>
+                <td class="py-1 pr-4">{{ contract.age }}</td>
+                <td class="py-1 pr-4">
+                  {{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }}
+                  ({{ contract.seasonsRemaining }} left)
+                </td>
+                <td class="py-1 pr-4">{{ squadStatus(contract.squadStatus) }}</td>
+                <td class="py-1">{{ funds(contract.weeklyWageMinor) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    }
+  </section>
+} @else {
+  <p class="text-sm text-slate-600" role="status">Loading your squad…</p>
+}

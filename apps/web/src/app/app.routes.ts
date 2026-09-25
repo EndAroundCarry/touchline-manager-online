@@ -92,6 +92,19 @@ export const routes: Routes = [
         canActivate: [requireAuthentication, requireVerifiedEmail],
         title: 'Dashboard — Touchline Manager',
       },
+      {
+        path: 'squad',
+        loadComponent: () => import('./features/squad/squad').then((m) => m.Squad),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Squad — Touchline Manager',
+      },
+      {
+        // A detail route rather than a navigation destination, so it is not in `nav-items.ts`.
+        path: 'players/:id',
+        loadComponent: () => import('./features/player/player').then((m) => m.PlayerProfile),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Player — Touchline Manager',
+      },
     ],
   },
 

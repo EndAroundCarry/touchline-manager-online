@@ -47,6 +47,27 @@ of the stage writes and reads.
   constraints, the team-sheet round trip, and the seeded squads.
 - **ADR-0011**, on hidden player values as server-only columns rather than a restricted table, and on
   contract/registration agreement as an application invariant rather than a database constraint.
+- **The squad, player, and contract reads** (second milestone; master plan §10.3): `GET
+  /clubs/{clubId}/squad`, `GET /players/{playerId}`, and `GET /contracts`, each answering only for the
+  club the caller actually holds. The squad response carries the state and contract each row needs and a
+  legality summary, so the screen can warn about a squad below the minimum without recomputing `SQ-2`.
+- **The ownership refusal, by name** (master plan §10.9, §15.4): `CLUB_NOT_MANAGED` for another club and
+  `NO_CLUB` for an account that holds none, because "your view is stale" and "you have nothing yet" send a
+  manager to two different screens and one forbidden response would leave the client guessing.
+- **The `/squad` and `/players/:id` screens.** The squad table is PrimeNG's, the app's first PrimeNG
+  component, lazy-loaded on its route; sorting is the table's own and announces its direction through
+  `aria-sort`, and filtering is client-side over a response already bounded to 25. The player profile
+  renders all twenty-eight attributes grouped by family beside the state, contract, and registration.
+- **Attribute display with non-colour indicators** (F-17, master plan §11.3): an `AttributeValue`
+  component renders every attribute as its number *and* the word for its band, and state values are shown
+  on the 0–100 scale the API converts to (`TRN-8`). A unit test asserts both halves render, so a band that
+  only changed the colour would fail.
+- **The C2 guard `data-classification.md` §2.1 asks for**, now that a player response exists: a
+  reflection test over the contracts assembly that fails if a squad DTO ever grows a `Potential` or
+  `Reputation`, or exposes a basis-point field, plus an API test that reads the player payload as raw JSON
+  and asserts neither hidden value crossed the wire.
+- 8 new API integration tests (48 total), 3 data-classification tests, 20 new frontend tests (77 total),
+  and 2 Playwright journeys (14 total) covering the squad screens and their refusals.
 
 ### Notes
 
@@ -72,13 +93,38 @@ of the stage writes and reads.
 - **The player generator reuses `Pcg32` and `DeterministicDigest` rather than a third copy.** The FNV-1a
   seeding that was private to `ClubIdentityGenerator` moved onto `DeterministicDigest` as `SeedOf`, and
   the Stage 3 golden name tests are what prove the extraction changed nothing.
-- **The C2 test `data-classification.md` §2.1 requires cannot exist yet.** It fails when a hidden value
-  reaches a manager-facing response, and Stage 4's first milestone adds no player response. It lands with
-  the squad reads, and is recorded in ADR-0011 so it is not silently skipped.
-- **Deferred to the rest of Stage 4:** the squad, player, contract, tactics, and training APIs and
-  screens; the tactical validator and the ETag contract; the training persistence endpoints and the
-  deterministic daily progression job behind a feature flag; and the contract renewal quote. **Deferred
-  beyond it:** fixtures, match effects, full finances, and transfers.
+- **The C2 test landed with the squad reads, as ADR-0011 predicted.** It cannot pass vacuously — a third
+  assertion fails if the squad contracts are renamed or made internal — and it is scoped to the squad
+  namespace rather than the whole assembly, because a club's public reputation is a legitimate
+  `Reputation` property on a world DTO and is C0.
+- **The squad reads are own-club only.** The squad list carries condition and the contract list carries
+  wages, both C1 ("readable where the viewer is authorized — for example own club"), and §10.9 asks
+  resource policies to enforce club ownership. The public, unattached player profile is Stage 10's
+  scouting surface (`SCT-1`), which is why `GET /players/{playerId}` is scoped to the owner here.
+- **State comes back on the user-facing scale, not in basis points** (`TRN-8`: the API converts; the
+  database is authoritative). The conversion lives once, in the application mapper, and the response has
+  no basis-point field — a rule the data-classification test now enforces across every squad DTO.
+- **A squad row does not carry the attribute grid.** The table is about readiness — who is available,
+  tired, or expiring — and the grid is the player profile's job. Attribute-based sorting is the Stage 10
+  search surface, which will need indexed queries anyway.
+- **The squad table needed PrimeNG's template-reference API, not `pTemplate`.** PrimeNG 22 reads its
+  slots through `contentChild('header')` and friends, so an `ng-template pTemplate="header"` compiles and
+  then renders nothing — a silent empty table. The header, body, and empty-message templates are declared
+  as `#header`, `#body`, and `#emptymessage`. Worth knowing before the next dense screen.
+- **The initial bundle budget moved from 500 kB to 550 kB.** Using PrimeNG puts its table styling into the
+  global stylesheet, which is part of the initial payload; the table's JavaScript stays in the lazy
+  `/squad` chunk. The initial total is 524 kB (123 kB transferred), so the new threshold is a deliberate
+  26 kB of headroom rather than a blanket relaxation, and `maximumError` is unchanged at 1 MB.
+- **`GET /clubs/{clubId}` is deliberately not in this milestone.** §10.3 lists it, but no screen needs it:
+  the dashboard already composes the club, country, division, season, and finances.
+- **A world seeded by an earlier generator has no players, and the seeder will not add any.** It is
+  idempotent, so it reports the world and stops. An environment carrying a `world-gen-v1` world needs a
+  fresh database (or a reset) before the squad screens have anything to show; the end-to-end suite in this
+  change was verified against a freshly seeded one.
+- **Deferred to the rest of Stage 4:** the tactics presets, slots, validator, and ETag contract; the
+  training endpoints and the deterministic daily progression job behind a feature flag; and the contract
+  renewal quote. **Deferred beyond it:** fixtures, match effects, full finances, transfers, and the public
+  scouting surface.
 
 ## Stage 3 — World generation, six countries, clubs, and onboarding
 

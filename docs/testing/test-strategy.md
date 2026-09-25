@@ -73,7 +73,11 @@ Signal stores, state transitions, and pure view logic. Component tests run in a 
 (including that concurrent callers share one rotation and that a failed restore is never fatal), the
 route guards in both directions, the token interceptor (attach, rotate-and-replay exactly once,
 no retry loop, end the session when the rotation fails), and the client-before-server field-message
-precedence in `controlError`.
+precedence in `controlError`. Stage 4 added the squad store (that a second read reaches the server rather
+than answering from the first, because nothing here carries a version to revalidate against), the squad
+presentation helpers (attribute and state bands, filters), and the attribute display — the last of these
+being the F-17 gate: a value renders its number *and* the word for its band, so colour is never the only
+signal (§11.3).
 
 ## Layer 8 — End-to-end journeys (Playwright)
 
@@ -99,6 +103,10 @@ country that fills with humans waits for the next tier to be generated, so a jou
 would exhaust the world after eighteen runs and start failing for a reason that is not a defect. The
 seeder runs in `globalSetup` for the same reason: onboarding needs a world, and the world is an operator
 tool rather than something the stack creates for itself.
+
+Stage 4 added the squad journey: a manager onboards, opens the squad the club was generated with, sorts
+and filters it, and opens a player profile — asserting that twenty-two players are there to inherit and
+that an attribute shows its number **and** its band word. It gives its club back too.
 
 ## Layer 9 — Match-engine validation — Stage 5
 

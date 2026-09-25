@@ -1,0 +1,137 @@
+@if (loading()) {
+  <p class="text-sm text-slate-600" role="status">Loading the player…</p>
+} @else if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  <div class="mt-4">
+    <a routerLink="/squad" [class]="secondaryButtonClass">Back to the squad</a>
+  </div>
+} @else if (player(); as profile) {
+  <section class="max-w-4xl">
+    <p class="text-sm">
+      <a routerLink="/squad" [class]="linkClass">Back to the squad</a>
+    </p>
+
+    <h1 [class]="pageHeadingClass">{{ profile.fullName }}</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      {{ position(profile.primaryPosition) }}
+      @if (profile.secondaryPositions.length > 0) {
+        · also {{ profile.secondaryPositions.length }} other position(s)
+      }
+      · {{ profile.age }} years · {{ foot(profile.preferredFoot) }} foot ·
+      {{ profile.heightCm }} cm · {{ profile.weightKg }} kg · {{ profile.nationalityCode }}
+    </p>
+
+    @if (profile.availability.length > 0) {
+      <ul class="mt-4 space-y-1" role="list">
+        @for (record of profile.availability; track record.id) {
+          <li class="text-sm font-medium text-red-700">
+            {{ availability(record.type, record.remainingFixtures) }} — since
+            {{ instant(record.startedAt) }}
+          </li>
+        }
+      </ul>
+    }
+
+    <h2 class="mt-8 text-lg font-semibold text-slate-900">State</h2>
+    <p class="mt-1 text-sm text-slate-600">
+      Condition and fatigue move with match minutes; morale reacts to playing time, results, and
+      contracts (TRN-11, TRN-13).
+    </p>
+
+    <dl class="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      @for (measure of stateMeasures(); track measure.label) {
+        <div class="rounded border border-slate-200 bg-white p-3">
+          <dt class="text-sm font-medium text-slate-500">{{ measure.label }}</dt>
+          <dd class="mt-1 flex items-baseline gap-2">
+            <span class="text-xl font-semibold" [class]="measure.band.className">
+              {{ measure.value }}
+            </span>
+            <span class="text-xs font-medium" [class]="measure.band.className">
+              {{ measure.band.label }}@if (!measure.higherIsBetter) {&nbsp;is good}
+            </span>
+          </dd>
+        </div>
+      }
+    </dl>
+
+    <h2 class="mt-8 text-lg font-semibold text-slate-900">Attributes</h2>
+    <p class="mt-1 text-sm text-slate-600">
+      Displayed on a 1&ndash;20 scale. Every value is shown with the word for its band, so the colour is
+      never the only signal (TRN-4).
+    </p>
+
+    <div class="mt-3 grid gap-6 sm:grid-cols-2">
+      @for (family of attributeFamilies(); track family.key) {
+        <section class="rounded border border-slate-200 bg-white p-4">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            {{ family.label }}
+          </h3>
+          <div class="mt-2">
+            @for (row of family.rows; track row.label) {
+              <app-attribute-value [label]="row.label" [value]="row.value" />
+            }
+          </div>
+        </section>
+      }
+    </div>
+
+    <div class="mt-8 grid gap-6 sm:grid-cols-2">
+      <section class="rounded border border-slate-200 bg-white p-4">
+        <h2 class="text-lg font-semibold text-slate-900">Contract</h2>
+        @if (profile.contract; as contract) {
+          <dl class="mt-2 space-y-1 text-sm">
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Seasons</dt>
+              <dd>{{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Remaining</dt>
+              <dd>{{ contract.seasonsRemaining }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Status</dt>
+              <dd>{{ squadStatus(contract.squadStatus) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Weekly wage</dt>
+              <dd>{{ funds(contract.weeklyWageMinor) }}</dd>
+            </div>
+          </dl>
+          <p class="mt-2 text-xs text-slate-500">
+            Contract years advance at season rollover, never on an anniversary (CON-8).
+          </p>
+        } @else {
+          <p class="mt-2 text-sm text-slate-600">This player holds no active contract.</p>
+        }
+      </section>
+
+      <section class="rounded border border-slate-200 bg-white p-4">
+        <h2 class="text-lg font-semibold text-slate-900">Registration</h2>
+        @if (profile.registration; as registration) {
+          <dl class="mt-2 space-y-1 text-sm">
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Status</dt>
+              <dd>{{ registration.status }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Eligible from round</dt>
+              <dd>{{ registration.effectiveFixtureBoundaryRound }}</dd>
+            </div>
+          </dl>
+          <p class="mt-2 text-xs text-slate-500">
+            A registration follows a fixture boundary, so a player signed after a snapshot locks plays
+            in later fixtures only (SQ-7).
+          </p>
+        } @else {
+          <p class="mt-2 text-sm text-slate-600">This player holds no active registration.</p>
+        }
+      </section>
+    </div>
+
+    <p class="mt-8 text-sm text-slate-600">
+      Appearances, goals, and season history arrive with the stages that play matches.
+    </p>
+  </section>
+} @else {
+  <p class="text-sm text-slate-600" role="status">Loading the player…</p>
+}

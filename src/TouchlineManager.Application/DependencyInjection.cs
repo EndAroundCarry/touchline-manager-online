@@ -4,6 +4,7 @@ using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.World;
 using TouchlineManager.Application.World.Validation;
 using TouchlineManager.Contracts.Auth;
@@ -34,6 +35,7 @@ public static class DependencyInjection
 
         AddAuthUseCases(services);
         AddWorldUseCases(services);
+        AddSquadUseCases(services);
 
         return services;
     }
@@ -93,5 +95,21 @@ public static class DependencyInjection
 
         services.AddScoped<IValidator<CreateManagerProfileRequest>, CreateManagerProfileRequestValidator>();
         services.AddScoped<IValidator<ClaimClubRequest>, ClaimClubRequestValidator>();
+    }
+
+    /// <summary>
+    /// Registers the squad module's read use cases.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ResolveOwnedClub"/> is registered beside them rather than in the world module even though
+    /// it reads world tables: it exists so the three squad reads decide ownership once and refuse with the
+    /// same codes, and it has no caller outside them.
+    /// </remarks>
+    private static void AddSquadUseCases(IServiceCollection services)
+    {
+        services.AddScoped<ResolveOwnedClub>();
+        services.AddScoped<GetSquad>();
+        services.AddScoped<GetPlayer>();
+        services.AddScoped<ListContracts>();
     }
 }
