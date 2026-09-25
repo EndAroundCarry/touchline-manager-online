@@ -13,15 +13,16 @@ namespace TouchlineManager.Domain.Rules;
 /// <para>
 /// Constants arrive with the stage that needs them, never earlier, because adding a rule before it is
 /// specified is inventing behaviour. Stage 3 contributed the world, occupancy, calendar, and finance
-/// values; Stage 4 contributes the squad, contract, tactics, and training values below. Bumping
-/// <see cref="Version"/> is what makes that a rule change rather than a silent constant tweak
-/// (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
+/// values; Stage 4 the squad, contract, tactics, and training values; Stage 6 the schedule-streak bound
+/// the fixture generator validates against. Bumping <see cref="Version"/> is what makes that a rule
+/// change rather than a silent constant tweak (`RULE-3`); a world already stamped with an earlier version
+/// keeps being read against it.
 /// </para>
 /// </remarks>
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v3";
+    public const string Version = "world-rules-v4";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -38,6 +39,19 @@ public static class WorldRuleSet
 
     /// <summary>Team sheets lock this many minutes before kickoff (`CAL-3`).</summary>
     public const int TeamSheetLockMinutes = 30;
+
+    /// <summary>
+    /// The longest run of consecutive home or consecutive away fixtures a generated schedule may contain
+    /// (`CAL-9`).
+    /// </summary>
+    /// <remarks>
+    /// A bound rather than a target, and it is four rather than three because four is what the generator's
+    /// schedule actually produces: mirroring a round-robin half always leaves some runs, and a four-match
+    /// home stand is a normal feature of a real fixture list rather than something to engineer away. The
+    /// property tests assert this bound across every plausible division size and fifty seeds, so it is the
+    /// schedule's demonstrated contract rather than an aspiration.
+    /// </remarks>
+    public const int MaxConsecutiveHomeOrAway = 4;
 
     /// <summary>The rollover period between seasons, in days (`CAL-6`).</summary>
     public const int RolloverDays = 7;

@@ -1,24 +1,26 @@
 namespace TouchlineManager.Domain.World.Generation;
 
 /// <summary>
-/// The version of the whole world bootstrap: club identity plus the squads generated for those clubs.
+/// The version of the whole world bootstrap: club identity, the squads generated for those clubs, and the
+/// first season's fixture list.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <see cref="ClubIdentityGenerator.Version"/> and <c>PlayerGenerator.Version</c> version their own
-/// algorithms, but a generation run produces both, and the field a run records has to describe the run.
-/// This is that version, and it is what <c>GenerationRun.GeneratorVersion</c> is stamped with
+/// algorithms, but a generation run produces all of it, and the field a run records has to describe the
+/// run. This is that version, and it is what <c>GenerationRun.GeneratorVersion</c> is stamped with
 /// (`FIC-8`, `PYR-14`).
 /// </para>
 /// <para>
-/// It is <c>world-gen-v2</c> because it succeeds the Stage 3 bootstrap, which stamped
-/// <c>ClubIdentityGenerator.Version</c> (<c>world-gen-v1</c>) and produced no players. The sub-generator
-/// versions are folded into the run's input hash as well, so a change to either is visible even if this
-/// constant were left alone.
+/// It is <c>world-gen-v3</c> because it succeeds the Stage 4 bootstrap (<c>world-gen-v2</c>, clubs and
+/// squads), which in turn succeeded the Stage 3 bootstrap that stamped <c>ClubIdentityGenerator.Version</c>
+/// (<c>world-gen-v1</c>) and produced no players. Stage 6 adds the fixture list, so the run that produces
+/// it records v3. The sub-generator versions are folded into the run's input hash as well, so a change to
+/// any of them is visible even if this constant were left alone.
 /// </para>
 /// </remarks>
 public static class WorldBootstrapGenerator
 {
     /// <summary>The version stamped onto every world-bootstrap generation run.</summary>
-    public const string Version = "world-gen-v2";
+    public const string Version = "world-gen-v3";
 }

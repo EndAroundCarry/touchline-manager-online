@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TouchlineManager.Application.Abstractions;
+using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
@@ -77,6 +78,7 @@ public sealed partial class SeedWorld
     private readonly IClubRepository _clubs;
     private readonly ISquadRepository _squad;
     private readonly IClubAccountRepository _accounts;
+    private readonly ICompetitionRepository _competition;
     private readonly IGenerationRunRepository _generationRuns;
     private readonly IUnitOfWork _unitOfWork;
     private readonly WorldOptions _options;
@@ -89,6 +91,7 @@ public sealed partial class SeedWorld
         IClubRepository clubs,
         ISquadRepository squad,
         IClubAccountRepository accounts,
+        ICompetitionRepository competition,
         IGenerationRunRepository generationRuns,
         IUnitOfWork unitOfWork,
         IOptions<WorldOptions> options,
@@ -101,6 +104,7 @@ public sealed partial class SeedWorld
         _clubs = clubs;
         _squad = squad;
         _accounts = accounts;
+        _competition = competition;
         _generationRuns = generationRuns;
         _unitOfWork = unitOfWork;
         _options = options.Value;
@@ -234,6 +238,11 @@ public sealed partial class SeedWorld
         var players = 0;
         var accounts = 0;
 
+        // The club ids are collected in the order their identities were generated, which is the *only*
+        // stable order for the schedule to be reproducible from: ids are UUIDv7 and differ per run, so the
+        // fixture list is keyed on this order plus the stored schedule seed (CAL-8).
+        var clubIds = new List<Guid>(identities.Count);
+
         foreach (var identity in identities)
         {
             var clubId = Guid.CreateVersion7();
@@ -263,11 +272,76 @@ public sealed partial class SeedWorld
 
             players += AddSquad(seed, definition, worldId, clubId, clubs, season, now);
 
+            clubIds.Add(clubId);
+
             clubs++;
             accounts++;
         }
 
+        AddSchedule(divisionSeason, clubIds, season, now);
+
         return (clubs, players, accounts);
+    }
+
+    /// <summary>
+    /// Generates and stages a division's whole fixture list: its matchdays and the fixtures within them
+    /// (`CAL-8`, `CAL-9`).
+    /// </summary>
+    /// <param name="divisionSeason">The division-season the schedule belongs to.</param>
+    /// <param name="clubIds">The clubs, in a stable order (identity-generation order).</param>
+    /// <param name="season">The season, whose window supplies the matchday dates.</param>
+    /// <param name="now">The current instant.</param>
+    /// <remarks>
+    /// The schedule is validated before it is written, because a fixture list that broke a rule would be a
+    /// season that could not be played correctly and would be far harder to notice once it was in the
+    /// database than a failed generation (CAL-9, §17.9).
+    /// </remarks>
+    private void AddSchedule(
+        DivisionSeason divisionSeason,
+        IReadOnlyList<Guid> clubIds,
+        Season season,
+        DateTimeOffset now)
+    {
+        var schedule = RoundRobinSchedule.Generate(
+            clubIds,
+            DeterministicDigest.SeedOf(divisionSeason.ScheduleSeed));
+
+        var issues = ScheduleValidator.Validate(clubIds, schedule);
+
+        if (issues.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"The generated schedule for division-season {divisionSeason.Id} is invalid: "
+                + string.Join("; ", issues.Select(issue => issue.Detail)));
+        }
+
+        var dates = SeasonCalendar.MatchdayDates(
+            DateOnly.FromDateTime(season.StartsAt.UtcDateTime),
+            WorldRuleSet.MatchdaysPerSeason);
+
+        foreach (var round in schedule)
+        {
+            var kickoff = SeasonCalendar.KickoffAt(dates[round.RoundNumber - 1]);
+            var matchdayId = Guid.CreateVersion7();
+
+            _competition.AddMatchday(Matchday.Schedule(
+                matchdayId,
+                divisionSeason.Id,
+                round.RoundNumber,
+                kickoff,
+                now));
+
+            foreach (var pairing in round.Pairings)
+            {
+                _competition.AddFixture(Fixture.Schedule(
+                    Guid.CreateVersion7(),
+                    matchdayId,
+                    pairing.HomeClubId,
+                    pairing.AwayClubId,
+                    kickoff,
+                    now));
+            }
+        }
     }
 
     /// <summary>
@@ -332,6 +406,7 @@ public sealed partial class SeedWorld
             PlayerGenerator.Version,
             PlayerNamePools.Version,
             PlayerAttributeProfiles.Version,
+            RoundRobinSchedule.Version,
             WorldRuleSet.Version,
             WorldRuleSet.ClubsPerDivision.ToString(System.Globalization.CultureInfo.InvariantCulture),
             WorldRuleSet.GeneratorSquadTarget.ToString(System.Globalization.CultureInfo.InvariantCulture),

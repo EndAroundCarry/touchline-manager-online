@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
+using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Abstractions.Ops;
@@ -46,10 +47,23 @@ public static class DependencyInjection
 
         AddAuthInfrastructure(services, configuration);
         AddWorldInfrastructure(services, configuration);
+        AddCompetitionInfrastructure(services);
         AddSquadInfrastructure(services);
         AddTrainingInfrastructure(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the competition module's persistence.
+    /// </summary>
+    /// <remarks>
+    /// A port of its own because the competition module owns its tables (`MOD-1`); the world seeder stages
+    /// the first season's schedule through it as a cross-module write (`MOD-2`).
+    /// </remarks>
+    private static void AddCompetitionInfrastructure(IServiceCollection services)
+    {
+        services.AddScoped<ICompetitionRepository, CompetitionRepository>();
     }
 
     /// <summary>

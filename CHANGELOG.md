@@ -3,6 +3,93 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 6 — Season schedule, fixtures, and the matchday worker
+
+A season you can see the shape of. Seeding the world now generates each division's full fixture list: the
+nine matches of round one through the nine of round thirty-four, played on Tuesdays, Thursdays, and
+Sundays, with the team-sheet lock derived from each kickoff. The first milestone of the stage is the
+calendar and the two tables it lives in; the lock-and-snapshot workflow, the durable matchday worker, the
+staged simulation, and atomic publication follow.
+
+### Added
+
+- **`competition.matchdays` and `competition.fixtures`.** A matchday is one round of one division's season
+  — the nine fixtures that lock, resolve, and publish as a unit (`CAL-10`, `MAT-7`) — and a fixture is one
+  match with the score it publishes. The database carries the rules rather than a convention: the round
+  number is bounded to 34 (`CAL-1`), the lock must precede the kickoff it is derived from (`CAL-3`), a club
+  cannot play itself, a score together with its match exists *exactly* in the `staged` and `published`
+  states so a half-resolved fixture is impossible, and `published_at` agrees with the published status. A
+  club appears once per matchday as host and once as visitor through two matchday-scoped unique indexes,
+  and the round number is unique per division-season.
+- **The `Matchday` and `Fixture` aggregates with their lifecycles as behaviour.** Five fixture states —
+  scheduled, locked, simulating, staged, published — plus `void` for an operator removal (`MAT-10`). Every
+  transition guards itself and every repeat of a transition that has already happened is a no-op, because
+  the workflow that drives them runs from a durable job that may be retried at any boundary (§7.4,
+  ADR-0003). A matchday marks itself staged once every fixture has, and publishes only from staged.
+- **`RoundRobinSchedule`**: the fixture list generator (`CAL-8`). The circle (Berger) method builds one
+  single round-robin — every club meets every other exactly once, and plays exactly once a round — and the
+  second half replays it with the venues swapped, which makes "each pair meets once home and once away" and
+  a club's seventeen home and seventeen away fixtures true by construction rather than by a correction
+  pass. The clubs are shuffled by a `Pcg32` stream seeded from the division-season's stored schedule seed,
+  so the same seed reproduces the same list. Home and away are decided round by round, alternating a club's
+  venue wherever the pairing allows; the second half is emitted in *reverse* round order, so the last
+  first-half round and the first second-half round are the same pairing with opposite venues and a run
+  never crosses the halfway point.
+- **`ScheduleValidator`**: the `CAL-9` properties checked by name before a schedule is written — round
+  count, one fixture per club per round, each ordered pairing once, each pair reciprocated, equal home and
+  away counts, and a bounded run of games at one venue. The generator is built so they hold; this is what
+  turns "by construction" into evidence, and a malformed schedule fails generation instead of becoming a
+  season that quietly cannot be played correctly.
+- **The seeder generates the schedule.** Running `npm run seed` now creates 34 matchdays and 306 fixtures
+  per division — 1,836 matches across the six countries — with each matchday's lock thirty minutes before
+  its kickoff and every fixture still `scheduled`. The clubs are passed in identity-generation order, the
+  only stable order there is: ids are UUIDv7 and differ per run, so the fixture list is keyed on that order
+  plus the recorded seed.
+- **`WorldRuleSet.MaxConsecutiveHomeOrAway`** (`CAL-9`), and the rule set is now `world-rules-v4`, as a
+  stage's constants arrive with that stage (`RULE-1`). A world stamped with an earlier version keeps being
+  read against it.
+- 35 new domain tests (296 total): the schedule's properties across every plausible division size and
+  fifty seeds, its determinism and seed-sensitivity, its refusals, and every fixture and matchday
+  transition including the idempotent repeats; and 6 new infrastructure tests over real PostgreSQL,
+  including two that force a malformed row and assert the check constraint by name (`MIG-7`).
+
+### Notes
+
+- **The run of games at one venue is four, not three, and the constant is fitted to the schedule rather
+  than the schedule to the constant.** The first attempt alternated venues by round and position parity and
+  left four-game runs; alternating on the previous round's venue and emitting the second half in reverse
+  cut the maximum to three for small divisions but still produced four at 18 and 20 clubs. Four is a normal
+  home stand in a real fixture list, so `CAL-9`'s "acceptable" is met at four, and the property tests
+  demonstrate the bound holds rather than aspiring to it.
+- **The second half is the first half reversed, and the reversal is doing real work.** Mirroring in the
+  same order lets a run straddle the halfway point; mirroring in reverse order makes round 17 and round 18
+  the same pairing at opposite venues, so the boundary always alternates and a run inside the first half
+  maps to an identical run inside the second. The maximum run over the whole season is therefore the first
+  half's, which is what makes the bound provable rather than measured.
+- **A fixture's kickoff is denormalized from its matchday.** The fixture list and the countdown both read
+  it, and a list query wants it on the fixture's own row. It is written once, from the matchday, and never
+  moved — `CAL-11` forbids shifting a scheduled kickoff because simulation was late.
+- **The `squad.fixture_team_sheets.fixture_id` foreign key is deliberately still absent.** Stage 4 shipped
+  the shell without it, noting that "Stage 6 adds it", and Stage 6 does — but only once a write path
+  produces team sheets for real fixtures, which is the prepare-match milestone. Adding it now would force
+  an unrelated squad test to arrange a fixture in the same commit, which §17.15 forbids.
+- **`WorldBootstrapGenerator.Version` records `world-gen-v3`.** The bootstrap now produces clubs, squads,
+  *and* the fixture list, so the run that emits them names the version that covers all three (`FIC-8`,
+  `PYR-14`).
+- **The schedule generator versions itself separately** (`schedule-gen-v1`) and its version is folded into
+  a world run's input hash, because changing how a fixture list is drawn is a reproducibility fact
+  independent of how clubs or players are generated.
+- **The database's share of `CAL-9` is smaller than the rule.** "One fixture per club per matchday" cannot
+  be expressed across two columns, so the two matchday-scoped unique indexes catch a club hosting twice or
+  visiting twice, and the full property — one match per club per round, each pair once each way — remains a
+  generation-time check, exactly as master plan §6.4 allows ("generation validation plus database support
+  where practical").
+- **Deferred to the rest of Stage 6:** the fixture and matchday reads with the next-fixture dashboard and
+  the prepare-match screen, the durable job queue's full lock/snapshot workflow, the immutable snapshot and
+  the seeded commitment hash, the staged simulation and atomic nine-fixture publication, the standings and
+  statistics projections, and the compressed test clock. **Deferred beyond it:** rollover, lower-tier
+  provisioning, and the match viewer.
+
 ## Stage 5 — The pure match engine
 
 A match you can replay. `MatchSimulator.Simulate` takes one frozen snapshot and returns one result, and the

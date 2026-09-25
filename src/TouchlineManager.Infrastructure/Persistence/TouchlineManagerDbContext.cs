@@ -77,6 +77,12 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the competition module's immutable club season entries.</summary>
     public DbSet<ClubSeasonEntry> ClubSeasonEntries => Set<ClubSeasonEntry>();
 
+    /// <summary>Gets the competition module's matchdays (rounds).</summary>
+    public DbSet<Matchday> Matchdays => Set<Matchday>();
+
+    /// <summary>Gets the competition module's fixtures.</summary>
+    public DbSet<Fixture> Fixtures => Set<Fixture>();
+
     /// <summary>Gets the finance module's club accounts.</summary>
     public DbSet<ClubAccount> ClubAccounts => Set<ClubAccount>();
 

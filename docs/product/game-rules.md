@@ -388,6 +388,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `kickoff_utc` | 19:00 | CAL-2 |
 | `kickoff_weekdays` | Tue, Thu, Sun | CAL-2 |
 | `team_sheet_lock_minutes` | 30 | CAL-3 |
+| `max_consecutive_home_or_away` | 4 | CAL-9 |
 | `rollover_days` | 7 | CAL-6 |
 | `points_win` / `points_draw` / `points_loss` | 3 / 1 / 0 | TBL-1 |
 | `promoted_per_tier` / `relegated_per_tier` | 3 / 3 | PR-1 |
@@ -412,9 +413,10 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `inactivity_close_days` | 21 | OCC-3 |
 | `resignation_cooldown_days` | 7 | OCC-4 |
 | `provisioning_poll_seconds` | 30 | PYR-10 |
-| `generator_version` | `world-gen-v2` (the bootstrap: clubs and squads) | FIC-8, PYR-14 |
+| `generator_version` | `world-gen-v3` (the bootstrap: clubs, squads, and fixtures) | FIC-8, PYR-14 |
 | `club_generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
 | `player_generator_version` | `player-gen-v1` | FIC-8, PYR-14 |
+| `schedule_generator_version` | `schedule-gen-v1` | CAL-8, PYR-14 |
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
 | `training_progression_version` | `training-v1` | TRN-9 (FIC-8) |
