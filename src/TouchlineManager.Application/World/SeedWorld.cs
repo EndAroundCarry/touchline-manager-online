@@ -4,10 +4,12 @@ using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
+using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Rules;
+using TouchlineManager.Domain.Squad.Generation;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Domain.World.Generation;
 
@@ -29,6 +31,7 @@ public enum SeedWorldOutcome
 /// <param name="Seed">The generation seed the world was built from (`PYR-14`).</param>
 /// <param name="CountriesCreated">How many countries were created.</param>
 /// <param name="ClubsCreated">How many clubs were created.</param>
+/// <param name="PlayersCreated">How many players were created (`SQ-1`).</param>
 /// <param name="AccountsCreated">How many club accounts were opened.</param>
 public sealed record SeedWorldResult(
     SeedWorldOutcome Outcome,
@@ -36,6 +39,7 @@ public sealed record SeedWorldResult(
     string Seed,
     int CountriesCreated,
     int ClubsCreated,
+    int PlayersCreated,
     int AccountsCreated);
 
 /// <summary>A seed request. Both parts are optional; the configuration supplies the defaults.</summary>
@@ -44,21 +48,21 @@ public sealed record SeedWorldResult(
 public sealed record SeedWorldRequest(string? Seed = null, DateOnly? FirstMatchday = null);
 
 /// <summary>
-/// Creates the initial world: six countries, one tier of 18 clubs each, the first season, and a funded
-/// account per club (`WORLD-2`, `WORLD-5`, `FIC-7`).
+/// Creates the initial world: six countries, one tier of 18 clubs each, a legal senior squad per club,
+/// the first season, and a funded account per club (`WORLD-2`, `WORLD-5`, `FIC-7`, `SQ-1`).
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the only place clubs are created as fiction rather than as a consequence of play. It is
-/// idempotent by checking for an existing world rather than by a unique constraint, because "there is
-/// exactly one world" is a product rule (`WORLD-1`) rather than a row identity, and a second world would
-/// be a mistake worth reporting rather than a conflict worth resolving.
+/// This is the only place clubs and players are created as fiction rather than as a consequence of play.
+/// It is idempotent by checking for an existing world rather than by a unique constraint, because "there
+/// is exactly one world" is a product rule (`WORLD-1`) rather than a row identity, and a second world
+/// would be a mistake worth reporting rather than a conflict worth resolving.
 /// </para>
 /// <para>
 /// Everything the run creates is derived from one seed, and the run is recorded in
 /// <c>world.generation_runs</c> with the seed, the generator version, and a digest of the non-seed
 /// inputs. Re-running with the same seed therefore reproduces the same logical world, which is the
-/// property the Stage 3 exit criteria test.
+/// property the Stage 3 exit criteria test and which Stage 4 extends to the squads.
 /// </para>
 /// <para>
 /// Generation is deliberately synchronous here. It happens once, before launch, from an operator-run
@@ -71,6 +75,7 @@ public sealed partial class SeedWorld
     private readonly IClock _clock;
     private readonly IWorldRepository _world;
     private readonly IClubRepository _clubs;
+    private readonly ISquadRepository _squad;
     private readonly IClubAccountRepository _accounts;
     private readonly IGenerationRunRepository _generationRuns;
     private readonly IUnitOfWork _unitOfWork;
@@ -82,6 +87,7 @@ public sealed partial class SeedWorld
         IClock clock,
         IWorldRepository world,
         IClubRepository clubs,
+        ISquadRepository squad,
         IClubAccountRepository accounts,
         IGenerationRunRepository generationRuns,
         IUnitOfWork unitOfWork,
@@ -93,6 +99,7 @@ public sealed partial class SeedWorld
         _clock = clock;
         _world = world;
         _clubs = clubs;
+        _squad = squad;
         _accounts = accounts;
         _generationRuns = generationRuns;
         _unitOfWork = unitOfWork;
@@ -115,7 +122,7 @@ public sealed partial class SeedWorld
         {
             LogAlreadySeeded(existing.Id);
 
-            return new SeedWorldResult(SeedWorldOutcome.AlreadySeeded, existing.Id, string.Empty, 0, 0, 0);
+            return new SeedWorldResult(SeedWorldOutcome.AlreadySeeded, existing.Id, string.Empty, 0, 0, 0, 0);
         }
 
         var seed = string.IsNullOrWhiteSpace(request.Seed) ? _options.GenerationSeed : request.Seed.Trim();
@@ -142,35 +149,44 @@ public sealed partial class SeedWorld
             Guid.CreateVersion7(),
             GenerationRunKind.WorldBootstrap,
             seed,
-            ClubIdentityGenerator.Version,
+            WorldBootstrapGenerator.Version,
             InputHashFor(seed),
             now);
 
         var countries = 0;
         var clubsCreated = 0;
+        var playersCreated = 0;
         var accountsCreated = 0;
 
         foreach (var definition in LaunchCountries.All)
         {
-            var (clubs, accounts) = AddCountry(seed, definition, worldId, season, now);
+            var (clubs, players, accounts) = AddCountry(seed, definition, worldId, season, now);
 
             countries++;
             clubsCreated += clubs;
+            playersCreated += players;
             accountsCreated += accounts;
         }
 
-        run.Succeed(new GenerationRunCounts(countries, clubsCreated, Players: 0, accountsCreated), now);
+        run.Succeed(new GenerationRunCounts(countries, clubsCreated, playersCreated, accountsCreated), now);
         _generationRuns.Add(run);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        LogSeeded(worldId, seed, countries, clubsCreated);
+        LogSeeded(worldId, seed, countries, clubsCreated, playersCreated);
 
-        return new SeedWorldResult(SeedWorldOutcome.Seeded, worldId, seed, countries, clubsCreated, accountsCreated);
+        return new SeedWorldResult(
+            SeedWorldOutcome.Seeded,
+            worldId,
+            seed,
+            countries,
+            clubsCreated,
+            playersCreated,
+            accountsCreated);
     }
 
-    /// <summary>Creates one country, its tier-1 division, its clubs, and their accounts.</summary>
-    private (int Clubs, int Accounts) AddCountry(
+    /// <summary>Creates one country, its tier-1 division, its clubs, their squads, and their accounts.</summary>
+    private (int Clubs, int Players, int Accounts) AddCountry(
         string seed,
         LaunchCountry definition,
         Guid worldId,
@@ -215,6 +231,7 @@ public sealed partial class SeedWorld
             WorldRuleSet.ClubsPerDivision);
 
         var clubs = 0;
+        var players = 0;
         var accounts = 0;
 
         foreach (var identity in identities)
@@ -244,11 +261,60 @@ public sealed partial class SeedWorld
                 WorldRuleSet.OpeningCashMinorForTier(1),
                 now));
 
+            players += AddSquad(seed, definition, worldId, clubId, clubs, season, now);
+
             clubs++;
             accounts++;
         }
 
-        return (clubs, accounts);
+        return (clubs, players, accounts);
+    }
+
+    /// <summary>
+    /// Generates and stages one club's squad (`SQ-1`).
+    /// </summary>
+    /// <param name="seed">The world seed.</param>
+    /// <param name="definition">The country the club belongs to.</param>
+    /// <param name="worldId">The owning world.</param>
+    /// <param name="clubId">The club the squad belongs to.</param>
+    /// <param name="clubOrdinalInCountry">
+    /// The club's ordinal within its country, which is what makes the squad reproducible: ids are UUIDv7
+    /// and differ per run, so nothing may key generation on a club id.
+    /// </param>
+    /// <param name="season">The season the players are registered in.</param>
+    /// <param name="now">The current instant.</param>
+    private int AddSquad(
+        string seed,
+        LaunchCountry definition,
+        Guid worldId,
+        Guid clubId,
+        int clubOrdinalInCountry,
+        Season season,
+        DateTimeOffset now)
+    {
+        var squad = PlayerGenerator.GenerateSquad(new SquadGenerationRequest(
+            seed,
+            definition.NamePoolKey,
+            definition.Code,
+            worldId,
+            clubId,
+            clubOrdinalInCountry,
+            Tier: 1,
+            season.Id,
+            season.SequenceNumber,
+            season.GameYear,
+            now));
+
+        foreach (var member in squad)
+        {
+            _squad.AddPlayer(member.Player);
+            _squad.AddPlayerAttributes(member.Attributes);
+            _squad.AddPlayerState(member.State);
+            _squad.AddPlayerContract(member.Contract);
+            _squad.AddPlayerRegistration(member.Registration);
+        }
+
+        return squad.Count;
     }
 
     /// <summary>
@@ -260,10 +326,19 @@ public sealed partial class SeedWorld
         var parts = new List<string>
         {
             seed,
+            WorldBootstrapGenerator.Version,
             ClubIdentityGenerator.Version,
             ClubNamePools.Version,
+            PlayerGenerator.Version,
+            PlayerNamePools.Version,
+            PlayerAttributeProfiles.Version,
             WorldRuleSet.Version,
             WorldRuleSet.ClubsPerDivision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            WorldRuleSet.GeneratorSquadTarget.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            WorldRuleSet.GeneratedGoalkeepers.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            WorldRuleSet.GeneratedDefenders.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            WorldRuleSet.GeneratedMidfielders.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            WorldRuleSet.GeneratedAttackers.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
 
         parts.AddRange(LaunchCountries.All.Select(country => country.Code));
@@ -293,6 +368,6 @@ public sealed partial class SeedWorld
     [LoggerMessage(
         EventId = 5001,
         Level = LogLevel.Information,
-        Message = "Seeded world {WorldId} from seed {Seed}: {Countries} countries, {Clubs} clubs.")]
-    private partial void LogSeeded(Guid worldId, string seed, int countries, int clubs);
+        Message = "Seeded world {WorldId} from seed {Seed}: {Countries} countries, {Clubs} clubs, {Players} players.")]
+    private partial void LogSeeded(Guid worldId, string seed, int countries, int clubs, int players);
 }

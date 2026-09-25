@@ -69,7 +69,7 @@ Console.WriteLine(
         CultureInfo.InvariantCulture,
         $"Created world {result.WorldId} from seed '{result.Seed}': "
         + $"{result.CountriesCreated} countries, {result.ClubsCreated} clubs, "
-        + $"{result.AccountsCreated} club accounts."));
+        + $"{result.PlayersCreated} players, {result.AccountsCreated} club accounts."));
 
 return 0;
 

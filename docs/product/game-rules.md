@@ -400,6 +400,8 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `attribute_min` / `attribute_max` | 1 / 20 | TRN-4 |
 | `state_basis_points` | 0–10,000 | TRN-5..7 |
 | `daily_progression_utc` | 02:00 | TRN-3 |
+| `slot_coordinate_scale` | 0–10,000 | TAC-9 |
+| `team_instructions` | 8 enumerated | INS-1..INS-8 |
 | `injury_absence_fixtures` | 1–6 | DIS-1 |
 | `yellow_suspension_threshold` | 5 | DIS-2 |
 | `red_suspension_matches` | 1 | DIS-4 |
@@ -409,9 +411,18 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `inactivity_close_days` | 21 | OCC-3 |
 | `resignation_cooldown_days` | 7 | OCC-4 |
 | `provisioning_poll_seconds` | 30 | PYR-10 |
-| `generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
+| `generator_version` | `world-gen-v2` (the bootstrap: clubs and squads) | FIC-8, PYR-14 |
+| `club_generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
+| `player_generator_version` | `player-gen-v1` | FIC-8, PYR-14 |
+| `player_attr_version` | `player-attr-v1` | FIC-8 |
+| `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
 | `name_pools_version` | `name-pools-v1` | FIC-8 |
 | `club_name_capacity_per_pool` | 1,980 (220 × 9) | FIC-4, PYR-11 |
+| `squad_composition` | 3 GK / 7 defenders / 7 midfielders / 5 attackers | SQ-1 (balancing) |
+| `player_age_range` | 17–34 game years | SQ-1 (balancing) |
+| `ability_mean_tier1` | 13 / 20 | TRN-4 (balancing) |
+| `ability_drop_per_tier` | 2 | TRN-4 (balancing) |
+| `weekly_wage_minor_per_ability_squared` | 300 minor units | CON-2 (balancing) |
 | `tier_scaling_factor` | 2^(tier − 1) | WORLD-4 (balancing) |
 | `opening_cash_minor_tier1` | 50,000,000 minor units | FIN-1 (balancing) |
 | `opening_stadium_baseline_tier1` | 25,000,000 minor units | FIN-3 (balancing) |

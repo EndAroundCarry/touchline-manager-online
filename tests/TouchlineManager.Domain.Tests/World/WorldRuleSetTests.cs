@@ -25,6 +25,66 @@ public sealed class WorldRuleSetTests
     }
 
     [Fact]
+    public void The_generated_squad_composition_sums_to_the_squad_target()
+    {
+        // SQ-1: the four positional quotas are the target split, so they must never drift apart from it.
+        (WorldRuleSet.GeneratedGoalkeepers
+            + WorldRuleSet.GeneratedDefenders
+            + WorldRuleSet.GeneratedMidfielders
+            + WorldRuleSet.GeneratedAttackers).Should().Be(WorldRuleSet.GeneratorSquadTarget);
+
+        WorldRuleSet.GeneratedGoalkeepers.Should()
+            .BeGreaterThanOrEqualTo(WorldRuleSet.MinimumGoalkeepers, "SQ-2");
+    }
+
+    [Fact]
+    public void The_squad_and_attribute_bounds_match_the_rule_set()
+    {
+        // SQ-2, SQ-3, SQ-4, TRN-4
+        WorldRuleSet.SquadMinimumRegistered.Should().Be(18);
+        WorldRuleSet.MinimumGoalkeepers.Should().Be(2);
+        WorldRuleSet.SquadMaximumRegistered.Should().Be(25);
+        WorldRuleSet.SquadMinimumRegistered.Should().BeLessThan(WorldRuleSet.SquadMaximumRegistered);
+        WorldRuleSet.GeneratorSquadTarget.Should().BeInRange(
+            WorldRuleSet.SquadMinimumRegistered,
+            WorldRuleSet.SquadMaximumRegistered);
+        WorldRuleSet.TeamSheetStarters.Should().Be(11);
+        WorldRuleSet.TeamSheetSubstitutes.Should().Be(7);
+        WorldRuleSet.AttributeMin.Should().Be(1);
+        WorldRuleSet.AttributeMax.Should().Be(20);
+        WorldRuleSet.StateBasisPointsMin.Should().Be(0);
+        WorldRuleSet.StateBasisPointsMax.Should().Be(10_000, "TRN-5..TRN-7");
+    }
+
+    [Fact]
+    public void The_player_state_and_slot_coordinate_scales_are_the_documented_ones()
+    {
+        WorldRuleSet.SlotCoordinateMin.Should().Be(0, "TAC-9");
+        WorldRuleSet.SlotCoordinateMax.Should().Be(10_000, "TAC-9");
+        WorldRuleSet.ContractMinSeasons.Should().Be(1, "CON-1");
+        WorldRuleSet.ContractMaxSeasons.Should().Be(3, "CON-1");
+        WorldRuleSet.PlayerMinimumAge.Should().BeLessThan(WorldRuleSet.PlayerMaximumAge);
+    }
+
+    [Fact]
+    public void Squad_ability_falls_with_depth_without_collapsing_to_the_floor()
+    {
+        WorldRuleSet.GeneratedAbilityMeanForTier(1).Should().Be(WorldRuleSet.GeneratedAbilityMeanTier1);
+        WorldRuleSet.GeneratedAbilityMeanForTier(2).Should()
+            .BeLessThan(WorldRuleSet.GeneratedAbilityMeanForTier(1));
+        WorldRuleSet.GeneratedAbilityMeanForTier(6).Should()
+            .BeGreaterThanOrEqualTo(WorldRuleSet.AttributeMin);
+    }
+
+    [Fact]
+    public void A_tier_below_one_is_a_programming_error_for_squad_ability_too()
+    {
+        var act = () => WorldRuleSet.GeneratedAbilityMeanForTier(0);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
     public void Matchdays_fall_on_tuesday_thursday_and_sunday()
     {
         WorldRuleSet.KickoffWeekdays.Should().Equal(

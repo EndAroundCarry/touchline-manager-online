@@ -5,6 +5,8 @@ using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Application.World;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
+using TouchlineManager.Domain.Squad;
+using TouchlineManager.Domain.Squad.Generation;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Domain.World.Generation;
 using TouchlineManager.Infrastructure.Persistence;
@@ -210,11 +212,137 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         run.Kind.Should().Be(GenerationRunKind.WorldBootstrap);
         run.Status.Should().Be(GenerationRunStatus.Succeeded);
-        run.GeneratorVersion.Should().Be(ClubIdentityGenerator.Version);
+        run.GeneratorVersion.Should().Be(
+            WorldBootstrapGenerator.Version,
+            "the bootstrap produces clubs and players, so the run records the version that covers both (FIC-8)");
         run.CountriesCreated.Should().Be(6);
         run.ClubsCreated.Should().Be(108);
+        run.PlayersCreated.Should().Be(108 * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
         run.AccountsCreated.Should().Be(108);
         run.InputHash.Should().HaveLength(64);
         run.CompletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Every_club_has_a_legal_twenty_two_player_squad()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var squadSizes = await db.PlayerContracts
+            .Where(contract => contract.Status == ContractStatus.Active)
+            .GroupBy(contract => contract.ClubId)
+            .Select(group => new { ClubId = group.Key, Count = group.Count() })
+            .ToListAsync();
+
+        squadSizes.Should().HaveCount(108);
+        squadSizes.Should().OnlyContain(club => club.Count == WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+    }
+
+    [Fact]
+    public async Task Every_club_registers_at_least_two_goalkeepers()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var clubs = await db.Clubs
+            .Where(club => club.WorldId == Fixture.WorldId)
+            .Select(club => club.Id)
+            .ToListAsync();
+
+        foreach (var clubId in clubs)
+        {
+            var keepers = await db.PlayerContracts
+                .Where(contract => contract.ClubId == clubId && contract.Status == ContractStatus.Active)
+                .Join(
+                    db.Players,
+                    contract => contract.PlayerId,
+                    player => player.Id,
+                    (_, player) => player.PrimaryPosition)
+                .CountAsync(position => position == PlayerPosition.Goalkeeper);
+
+            keepers.Should().BeGreaterThanOrEqualTo(WorldRuleSet.MinimumGoalkeepers, "SQ-2");
+        }
+    }
+
+    [Fact]
+    public async Task Every_player_has_attributes_state_one_active_contract_and_one_active_registration()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var playerCount = await db.Players.CountAsync(player => player.WorldId == Fixture.WorldId);
+
+        playerCount.Should().Be(108 * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+
+        (await db.PlayerAttributes.CountAsync()).Should().Be(playerCount);
+        (await db.PlayerStates.CountAsync()).Should().Be(playerCount);
+        (await db.PlayerContracts.CountAsync(contract => contract.Status == ContractStatus.Active))
+            .Should().Be(playerCount, "SQ-6: one active contract per player");
+        (await db.PlayerRegistrations.CountAsync(registration => registration.Status == RegistrationStatus.Active))
+            .Should().Be(playerCount, "SQ-6: one active registration per player");
+
+        var attributes = await db.PlayerAttributes.ToListAsync();
+
+        attributes.Should().OnlyContain(row => row.ToSet().IsWithinScale, "TRN-4");
+        attributes.Should().OnlyContain(row => row.ChecksumMatches(), "an attribute row is written with its checksum");
+
+        var states = await db.PlayerStates.ToListAsync();
+
+        states.Should().OnlyContain(row => row.ConditionBp <= WorldRuleSet.StateBasisPointsMax, "TRN-5");
+        states.Should().OnlyContain(row => row.DevelopmentRemainder == 0, "TRN-10");
+    }
+
+    [Fact]
+    public async Task Every_seeded_squad_is_exactly_what_the_generator_produces()
+    {
+        // The reproducibility contract for players (FIC-7, PYR-14): re-running the generator with the
+        // recorded ordinal must reproduce the names and attributes that are in the database.
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var country = Fixture.Countries[0];
+        var season = await db.Seasons.SingleAsync(candidate => candidate.WorldId == Fixture.WorldId);
+
+        var identities = ClubIdentityGenerator.GenerateDivision(
+            WorldFixture.Seed, country.NamePoolKey, country.Code, tierNumber: 1, WorldRuleSet.ClubsPerDivision);
+
+        const int ordinal = 3;
+        var clubId = await db.Clubs
+            .Where(club => club.CountryId == country.Id && club.Name == identities[ordinal].Name)
+            .Select(club => club.Id)
+            .SingleAsync();
+
+        var persisted = await db.PlayerContracts
+            .Where(contract => contract.ClubId == clubId && contract.Status == ContractStatus.Active)
+            .Join(
+                db.Players,
+                contract => contract.PlayerId,
+                player => player.Id,
+                (_, player) => player)
+            .Join(
+                db.PlayerAttributes,
+                player => player.Id,
+                attributes => attributes.PlayerId,
+                (player, attributes) => new { player.FullName, Attributes = attributes.ToSet() })
+            .ToListAsync();
+
+        var regenerated = PlayerGenerator
+            .GenerateSquad(new SquadGenerationRequest(
+                WorldFixture.Seed,
+                country.NamePoolKey,
+                country.Code,
+                Fixture.WorldId,
+                clubId,
+                ordinal,
+                Tier: 1,
+                season.Id,
+                season.SequenceNumber,
+                season.GameYear,
+                Fixture.Clock.UtcNow))
+            .Select(member => new { member.Player.FullName, Attributes = member.Attributes.ToSet() })
+            .ToList();
+
+        persisted.Should().BeEquivalentTo(regenerated, "the seeded squad must be exactly what the seed generates");
     }
 }

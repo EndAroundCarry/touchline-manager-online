@@ -7,14 +7,15 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 3 complete — a world you can onboard into.** The playable game is being built in the
+> **Status: Stage 4 in progress — squads a manager inherits.** The playable game is being built in the
 > staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the
 > API and worker composition roots, the health and observability baseline, and the Angular PWA shell.
 > Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions with reuse
 > detection, the audit trail, the request security headers, the Angular auth and settings screens, and
 > the end-to-end journeys. Stage 3 added deterministic world generation, six fictional national
-> pyramids, atomic club takeover with pyramid expansion, and the onboarding screens. Squads, tactics,
-> and matchdays arrive from Stage 4 onward.
+> pyramids, atomic club takeover with pyramid expansion, and the onboarding screens. Stage 4's first
+> milestone added the `squad` schema and generated a legal twenty-two-player squad per club, so a
+> takeover now inherits players; the squad, tactics, and training screens arrive later in the stage.
 
 ---
 
@@ -130,7 +131,7 @@ committed dev-only value; every other environment supplies its own (see `.env.ex
 A new database has no world in it, so create one before anyone can register a club:
 
 ```bash
-npm run seed          # six countries, one 18-club tier each, the first season, funded accounts
+npm run seed          # six countries, one 18-club tier each, 22 players per club, funded accounts
 ```
 
 The seeder is idempotent, so running it again reports the world it already found and writes nothing.
@@ -141,7 +142,7 @@ default seed from the environment:
 npm run seed -- --seed my-world-1 --first-matchday 2026-10-06
 ```
 
-The same seed and generator version reproduce the same pyramid, which is what
+The same seed and generator version reproduce the same pyramid and the same squads, which is what
 [`world.generation_runs`](docs/architecture/data-model.md) records and what the tests assert.
 
 Then onboard by hand, or use the screens at `/onboarding/manager`, `/onboarding/country`, and

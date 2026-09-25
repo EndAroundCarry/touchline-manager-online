@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Domain.Auth;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Infrastructure.Persistence.Entities;
 
@@ -78,6 +79,42 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the finance module's club accounts.</summary>
     public DbSet<ClubAccount> ClubAccounts => Set<ClubAccount>();
+
+    /// <summary>Gets the squad module's players.</summary>
+    public DbSet<Player> Players => Set<Player>();
+
+    /// <summary>Gets the squad module's player attributes.</summary>
+    public DbSet<PlayerAttributes> PlayerAttributes => Set<PlayerAttributes>();
+
+    /// <summary>Gets the squad module's player state rows.</summary>
+    public DbSet<PlayerState> PlayerStates => Set<PlayerState>();
+
+    /// <summary>Gets the squad module's player contracts.</summary>
+    public DbSet<PlayerContract> PlayerContracts => Set<PlayerContract>();
+
+    /// <summary>Gets the squad module's player registrations.</summary>
+    public DbSet<PlayerRegistration> PlayerRegistrations => Set<PlayerRegistration>();
+
+    /// <summary>Gets the squad module's player unavailability records.</summary>
+    public DbSet<PlayerUnavailability> PlayerUnavailabilities => Set<PlayerUnavailability>();
+
+    /// <summary>Gets the squad module's tactical plans.</summary>
+    public DbSet<TacticalPlan> TacticalPlans => Set<TacticalPlan>();
+
+    /// <summary>Gets the squad module's tactical slots.</summary>
+    public DbSet<TacticalSlot> TacticalSlots => Set<TacticalSlot>();
+
+    /// <summary>Gets the squad module's club training plans.</summary>
+    public DbSet<TrainingPlan> TrainingPlans => Set<TrainingPlan>();
+
+    /// <summary>Gets the squad module's per-player training focuses.</summary>
+    public DbSet<PlayerTrainingFocus> PlayerTrainingFocuses => Set<PlayerTrainingFocus>();
+
+    /// <summary>Gets the squad module's fixture team sheets.</summary>
+    public DbSet<FixtureTeamSheet> FixtureTeamSheets => Set<FixtureTeamSheet>();
+
+    /// <summary>Gets the squad module's team-sheet entries.</summary>
+    public DbSet<TeamSheetEntry> TeamSheetEntries => Set<TeamSheetEntry>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

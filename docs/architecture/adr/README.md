@@ -27,6 +27,7 @@ the system is shaped the way it is.
 | [0008](0008-deployment-topology.md) | MVP deployment topology | Accepted |
 | [0009](0009-time-identity-and-concurrency.md) | Time, identity, and concurrency conventions | Accepted |
 | [0010](0010-club-takeover-serialisation.md) | Club takeover serialises with an advisory lock, not with `SERIALIZABLE` | Accepted |
+| [0011](0011-squad-schema-and-hidden-player-values.md) | Squad schema: hidden player values are server-only columns, and contract/registration agreement is an application invariant | Accepted |
 
 ## Rules for changing an ADR
 

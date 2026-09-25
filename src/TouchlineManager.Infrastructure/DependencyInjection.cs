@@ -7,6 +7,7 @@ using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
+using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Infrastructure.Email;
 using TouchlineManager.Infrastructure.Jobs;
@@ -44,6 +45,7 @@ public static class DependencyInjection
 
         AddAuthInfrastructure(services, configuration);
         AddWorldInfrastructure(services, configuration);
+        AddSquadInfrastructure(services);
 
         return services;
     }
@@ -87,6 +89,19 @@ public static class DependencyInjection
         // operator tools. The API registers its own implementation over this one, so a manager's actions
         // are attributed to their request.
         services.AddScoped<IRequestContext, ServiceRequestContext>();
+    }
+
+    /// <summary>
+    /// Registers the squad module's persistence.
+    /// </summary>
+    /// <remarks>
+    /// A port of its own rather than another world repository: the squad module owns its tables
+    /// (`MOD-1`), and the seeded world stages them through a use case like any other cross-module write
+    /// (`MOD-2`).
+    /// </remarks>
+    private static void AddSquadInfrastructure(IServiceCollection services)
+    {
+        services.AddScoped<ISquadRepository, SquadRepository>();
     }
 
     /// <summary>

@@ -3,6 +3,83 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 4 — Squads, contracts, tactics, and training foundations
+
+A world you inherit a squad from. Every seeded club now owns a legal twenty-two-player senior squad,
+generated from the same world seed as its identity, so a manager who takes a club over inherits players
+rather than a name. This is the first of the stage's milestones: the schema and the generation the rest
+of the stage writes and reads.
+
+### Added
+
+- **The `squad` schema** (shipped first, ahead of the rest of the stage): `players`, `player_attributes`,
+  `player_state`, `player_contracts`, `player_registrations`, `player_unavailability`, `tactical_plans`,
+  `tactical_slots`, `training_plans`, `player_training_focus`, `fixture_team_sheets`, and
+  `team_sheet_entries`, in one migration applied against real PostgreSQL 17 before being committed. The
+  range checks (`TRN-4` on all twenty-eight attributes, `TRN-5`…`TRN-7` on state, `TAC-9` on slot
+  coordinates), the partial unique indexes (`SQ-6` one active contract and one active registration per
+  player, `INS-11` one default plan per club), and the slot and team-sheet uniqueness constraints are all
+  in the database rather than in a convention.
+- **The player aggregates with the rules as behaviour**: `Player` (identity, physique, positions, and
+  the two hidden C2 values), `PlayerAttributes` over a twenty-eight-attribute set with a canonical order
+  and a checksum that makes an out-of-band edit visible, `PlayerState` (condition, fatigue, morale,
+  sharpness in basis points, and the carried development remainder), `PlayerContract` (a 1–3 season term,
+  `CON-1`), `PlayerRegistration` (eligibility from a fixture boundary, `SQ-7`), `PlayerUnavailability`
+  (measured in fixtures, not days, `TRN-12`), and the tactics and training rows the later milestones
+  write into: `TacticalPlan` with the six presets and the eight instructions, `TacticalSlot`,
+  `FixtureTeamSheet`, `TeamSheetEntry`, `TrainingPlan`, `PlayerTrainingFocus`, and `SquadLegality`.
+- **Deterministic squad generation.** `PlayerGenerator` and versioned `PlayerNamePools` and
+  `PlayerAttributeProfiles`: three goalkeepers, seven defenders, seven midfielders, and five attackers
+  per club, an age spread, per-position attribute emphasis, state, a wage, and one active contract and
+  registration each. Every value is a pure function of the seed, the club's ordinal within its country,
+  its tier, and the season's game year — keyed on the ordinal rather than the club id, because ids are
+  UUIDv7 and differ per run while the logical squad must not.
+- **Names that cannot duplicate themselves inside a squad**, by construction rather than by retry: the
+  given-name and surname pools are coprime and larger than a squad, so a club's consecutive ordinals
+  visit distinct pairs — the same argument the club name pools already make. A name that collides with
+  the fictional-data blocklist advances deterministically to the next candidate for the same seed
+  (`FIC-6`), which today's pools do not trigger.
+- **The seeder generates the squads.** Running `npm run seed` now creates 2,376 players for the 108
+  clubs, and `world.generation_runs` records the count alongside the clubs and accounts (`SQ-1`).
+- 59 new domain tests (234 total) covering generation determinism, the golden squad, squad legality and
+  composition, the attribute, state, contract, position, and tactics invariants, and the name pools'
+  blocklist and injectivity; and 14 new infrastructure tests over real PostgreSQL covering the squad
+  constraints, the team-sheet round trip, and the seeded squads.
+- **ADR-0011**, on hidden player values as server-only columns rather than a restricted table, and on
+  contract/registration agreement as an application invariant rather than a database constraint.
+
+### Notes
+
+- **The squad constants went into `WorldRuleSet`, and its version is now `world-rules-v2`.** `RULE-1`
+  asks for one versioned rule set, and the file's own documentation says a stage's constants arrive with
+  that stage. A world already stamped `world-rules-v1` keeps being read against v1, which is the
+  versioning model working rather than a migration.
+- **A `GenerationRun` records `world-gen-v2`.** The bootstrap now produces clubs *and* squads, so the
+  version it records is the bootstrap's, and the sub-generators' versions are folded into the input hash.
+  The Stage 3 test that pinned the club generator's version moved with it.
+- **Shortlists are not here.** `modules.md` gives `market.shortlists` to the market module, and search
+  and shortlisting land in Stage 10, so the squad schema is twelve tables rather than thirteen.
+- **The team-sheet tables ship before fixtures do.** `competition.fixtures` arrives in Stage 6, so
+  `fixture_team_sheets.fixture_id` and `player_unavailability.source_fixture_id` carry no foreign key
+  yet. Stage 3 set the precedent by shipping the competition and finance shells with their stage, and the
+  fixture-independent lineup work needs somewhere to land. ADR-0011 records it.
+- **`training_plans` is one current row per club**, updated in place with a bumped version. The
+  data-model phrase "partial unique … latest plan wins" is read as "one row per club", matching the
+  entity definition, which has no supersede column; plan history is a Stage 12 concern.
+- **No club is given a tactical or training plan yet.** A default plan appears when a manager first sets
+  one (the tactics milestone) or when the AI does (Stage 8); Stage 12 requires "a default tactic" only
+  when it rolls seasons.
+- **The player generator reuses `Pcg32` and `DeterministicDigest` rather than a third copy.** The FNV-1a
+  seeding that was private to `ClubIdentityGenerator` moved onto `DeterministicDigest` as `SeedOf`, and
+  the Stage 3 golden name tests are what prove the extraction changed nothing.
+- **The C2 test `data-classification.md` §2.1 requires cannot exist yet.** It fails when a hidden value
+  reaches a manager-facing response, and Stage 4's first milestone adds no player response. It lands with
+  the squad reads, and is recorded in ADR-0011 so it is not silently skipped.
+- **Deferred to the rest of Stage 4:** the squad, player, contract, tactics, and training APIs and
+  screens; the tactical validator and the ETag contract; the training persistence endpoints and the
+  deterministic daily progression job behind a feature flag; and the contract renewal quote. **Deferred
+  beyond it:** fixtures, match effects, full finances, and transfers.
+
 ## Stage 3 — World generation, six countries, clubs, and onboarding
 
 A world you can onboard into. Six fictional national pyramids are generated from one seed, a manager

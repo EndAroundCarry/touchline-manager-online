@@ -201,27 +201,7 @@ public static class ClubIdentityGenerator
     }
 
     /// <summary>Builds the seed for a country's name choice from the world seed and the pool key.</summary>
-    private static ulong SeedFrom(string seed, string poolKey)
-    {
-        const ulong Offset = 14695981039346656037UL;
-        const ulong Prime = 1099511628211UL;
-
-        var hash = Offset;
-
-        foreach (var value in new[] { seed, poolKey })
-        {
-            foreach (var character in value)
-            {
-                unchecked
-                {
-                    hash ^= character;
-                    hash *= Prime;
-                }
-            }
-        }
-
-        return hash;
-    }
+    private static ulong SeedFrom(string seed, string poolKey) => DeterministicDigest.SeedOf(seed, poolKey);
 
     /// <summary>Renders a small positive integer as a roman numeral, for cycle disambiguation.</summary>
     private static string ToRoman(int value)
