@@ -1,0 +1,174 @@
+@if (loading()) {
+  <p class="text-sm text-slate-600" role="status">Loading your training…</p>
+} @else if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  <div class="mt-4">
+    <a routerLink="/dashboard" [class]="secondaryButtonClass">Back to the dashboard</a>
+  </div>
+} @else if (training(); as club) {
+  @if (draft(); as plan) {
+    <section class="max-w-6xl">
+      <h1 [class]="pageHeadingClass">{{ club.clubName }} training</h1>
+      <p class="mt-1 text-sm text-slate-600">
+        {{ club.countryCode }} · season {{ club.seasonNumber }} ·
+        @if (club.isConfigured) {
+          in force since {{ effective(club.effectiveDate) }}
+        } @else {
+          no plan set yet — the club trains {{ focusLabel(club.teamFocus) }} at
+          {{ intensityName(club.intensity) }} by default
+        }
+      </p>
+
+      <h2 class="mt-8 text-lg font-semibold text-slate-900">Team plan</h2>
+      <p class="mt-1 text-sm text-slate-600">
+        What the whole club trains for. A plan takes effect from the day you save it (TRN-1);
+        intensity buys development and costs condition and freshness, so every choice has a
+        trade-off (TRN-3).
+      </p>
+
+      <div class="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <label class="block">
+          <span class="text-sm font-medium text-slate-700">Team focus</span>
+          <select
+            [class]="textInputClass"
+            [value]="plan.teamFocus"
+            (change)="onTeamFocusChange($event)"
+          >
+            @for (option of teamFocusOptions(); track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-medium text-slate-700">Intensity</span>
+          <select
+            [class]="textInputClass"
+            [value]="plan.intensity"
+            (change)="onIntensityChange($event)"
+          >
+            @for (option of intensityOptions(); track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      @if (hasConflict()) {
+        <div
+          class="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="alert"
+        >
+          <p class="font-medium">
+            This plan changed on another device since you loaded it. Your choices are still here.
+          </p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button type="button" [class]="primaryButtonClass" (click)="reapply()">
+              Reapply my changes
+            </button>
+            <button type="button" [class]="secondaryButtonClass" (click)="discardConflict()">
+              Use the server's version
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (saveError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      @if (savedMessage(); as message) {
+        <p [class]="statusMessageClass" role="status">{{ message }}</p>
+      }
+
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          [class]="primaryButtonClass"
+          [disabled]="saving() || !isDirty()"
+          (click)="save()"
+        >
+          {{ club.isConfigured ? 'Save plan' : 'Set plan' }}
+        </button>
+
+        @if (isDirty()) {
+          <span class="text-sm text-slate-600">Unsaved changes</span>
+        }
+
+        <a routerLink="/squad" [class]="linkClass">Back to the squad</a>
+      </div>
+
+      <section class="mt-10">
+        <h2 class="text-lg font-semibold text-slate-900">Individual focus</h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Point a player at one attribute family to steer their development, or leave them on the
+          team plan (TRN-2). Training never lowers an attribute and never pushes one past the
+          player's own ceiling (TRN-9).
+        </p>
+
+        @if (focusError(); as message) {
+          <p [class]="formErrorClass" role="alert">{{ message }}</p>
+        }
+
+        <table class="mt-3 w-full border-collapse text-left text-sm">
+          <caption class="sr-only">
+            The squad, with each player's individual training focus
+          </caption>
+          <thead>
+            <tr class="border-b border-slate-300">
+              <th scope="col" class="py-1 pr-4 font-semibold">Player</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Position</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Age</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Condition</th>
+              <th scope="col" class="py-1 pr-4 font-semibold">Fatigue</th>
+              <th scope="col" class="py-1 font-semibold">Focus</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (player of players(); track player.id) {
+              <tr class="border-b border-slate-200">
+                <th scope="row" class="py-1 pr-4 text-left font-medium text-slate-900">
+                  {{ player.fullName }}
+                  <span class="block text-xs font-normal text-slate-500">{{
+                    player.shortName
+                  }}</span>
+                </th>
+                <td class="py-1 pr-4">{{ position(player.primaryPosition) }}</td>
+                <td class="py-1 pr-4">{{ player.age }}</td>
+                <td class="py-1 pr-4">
+                  <span [class]="conditionClass(player.state.condition)">
+                    {{ player.state.condition }}
+                  </span>
+                  <span class="text-xs" [class]="conditionClass(player.state.condition)">
+                    {{ conditionWord(player.state.condition) }}
+                  </span>
+                </td>
+                <td class="py-1 pr-4">
+                  <span [class]="fatigueClass(player.state.fatigue)">{{
+                    player.state.fatigue
+                  }}</span>
+                  <span class="text-xs" [class]="fatigueClass(player.state.fatigue)">
+                    {{ fatigueWord(player.state.fatigue) }}
+                  </span>
+                </td>
+                <td class="py-1">
+                  <select
+                    [class]="textInputClass"
+                    [attr.aria-label]="'Individual focus for ' + player.fullName"
+                    [value]="player.focusFamily ?? ''"
+                    [disabled]="savingFocusPlayerId() === player.id"
+                    (change)="onFocusChange(player.id, $event)"
+                  >
+                    @for (option of focusOptions(); track option.value) {
+                      <option [value]="option.value">{{ option.label }}</option>
+                    }
+                  </select>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    </section>
+  }
+}

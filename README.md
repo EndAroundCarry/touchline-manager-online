@@ -7,15 +7,17 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 4 in progress — squads a manager inherits and can read.** The playable game is being
-> built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
-> pipeline, the API and worker composition roots, the health and observability baseline, and the Angular
-> PWA shell. Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions
-> with reuse detection, the audit trail, the request security headers, the Angular auth and settings
-> screens, and the end-to-end journeys. Stage 3 added deterministic world generation, six fictional
-> national pyramids, atomic club takeover with pyramid expansion, and the onboarding screens. Stage 4 has
-> added the `squad` schema, generated a legal twenty-two-player squad per club, and given a manager the
-> squad, player, and contract screens; tactics and training arrive later in the stage.
+> **Status: Stage 4 delivered — squads, tactics, and training.** The playable game is being built in the
+> staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the
+> API and worker composition roots, the health and observability baseline, and the Angular PWA shell. Stage
+> 2 added the account schema, the full credential lifecycle, rotating refresh sessions with reuse
+> detection, the audit trail, the request security headers, the Angular auth and settings screens, and the
+> end-to-end journeys. Stage 3 added deterministic world generation, six fictional national pyramids,
+> atomic club takeover with pyramid expansion, and the onboarding screens. Stage 4 added the `squad`
+> schema, a legal twenty-two-player squad per club, the squad, player and contract screens, the tactics
+> board and its ETag contract, and the training screen with its deterministic daily progression job. The
+> contract renewal quote waits for the playing-time data Stage 6 introduces; the next stage is the pure
+> match engine.
 
 ---
 

@@ -339,6 +339,52 @@ training endpoints, and the daily progression. The `/training` screen follows as
   quote (whose `CON-3` inputs include playing time, which does not exist until Stage 6's fixtures),
   fixtures, match effects, full finances, transfers, and the public scouting surface.
 
+### The training screen
+
+A club you can develop, on screen. The `/training` screen sets the club's team focus and intensity, and
+points any player at one attribute family — or returns them to the team plan — on the plan's version and
+each focus's own. This closes the last open deliverable of Stage 4: the model, the API, the daily
+progression job, and now the screen.
+
+#### Added
+
+- **The training screen** (master plan §11.1, F-20): the plan's two choices are labelled selects and the
+  roster is a table, each row carrying the condition and fatigue a manager weighs when setting a load and a
+  per-player focus picker (`TRN-1`, `TRN-2`). Every focus control is a labelled select rather than a drag,
+  so the screen is reachable from a keyboard and a screen reader, and condition and fatigue carry their band
+  word beside the number so colour is decoration rather than the message (§11.3).
+- **The plan's ETag contract** (`CONC-1`, ADR-0009, §11.2): a first plan is sent without `If-Match`, because
+  there is nothing to be conditional against, and a revise sends the version the client last read. A `412`
+  keeps the manager's choices, pulls the server's state, and offers an explicit *Reapply my changes* or
+  *Use the server's version* — never a silent overwrite.
+- **The per-player focus contract**: setting a new focus carries no tag, while changing or clearing a set one
+  sends the focus's own version. A stale one is refused rather than overwriting a change made elsewhere, and
+  the roster is refreshed with the refusal explained.
+- **The option lists come from the server.** `GET /training` already returns every focus, intensity, and
+  attribute-family code, so the screen renders them without reproducing the enumerations, and the empty
+  value of the focus select is the clear that returns a player to the team plan.
+- 17 new frontend tests (123 total) over the presentation helpers (a label for every code the server can
+  send, the team plan first, the effective-date formatting) and the store (the create-without-tag, the
+  revise-under-version, the `412` reapply, the new/set/cleared focus, and the stale-focus refresh); and a
+  new Playwright journey (18 total) — the plan, a version conflict survived by reapplying, an individual
+  focus set and cleared, plus the guard for a visitor with no session.
+
+#### Notes
+
+- **The screen reads one response.** `TrainingResponse` carries the plan, the club, the option lists, and
+  the squad with each player's focus, so the screen makes one round trip and the same numbers reach the
+  controls that the progression job reads (`TRN-3`).
+- **A plan equal to the implicit defaults is not dirty.** When a club has not set a plan it is already
+  training `balanced`/`normal`, so the save button stays disabled until a manager actually changes a choice
+  rather than creating a row that says what the job already assumes.
+- **The roster's order is the server's** — goalkeepers first, then by name — the order a manager reads a
+  squad in, so the client does not re-sort it.
+- **The individual focus is written straight into the read model**, not drafted: each is a single value on a
+  single player, and a document to stage around it would be the tactics draft's machinery without its
+  reason.
+- **Tactical zones, drag-and-drop, and pointer input are not here**, exactly as the tactics and training API
+  milestones recorded: they belong to the pitch model and the Stage 13 responsive work.
+
 ## Stage 3 — World generation, six countries, clubs, and onboarding
 
 A world you can onboard into. Six fictional national pyramids are generated from one seed, a manager

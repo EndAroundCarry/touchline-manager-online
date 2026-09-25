@@ -24,7 +24,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: 'pi pi-home', available: true },
   { path: '/squad', label: 'Squad', icon: 'pi pi-users', available: true },
   { path: '/tactics', label: 'Tactics', icon: 'pi pi-sitemap', available: true },
-  { path: '/training', label: 'Training', icon: 'pi pi-chart-line', available: false },
+  { path: '/training', label: 'Training', icon: 'pi pi-chart-line', available: true },
   { path: '/competitions', label: 'Competitions', icon: 'pi pi-list', available: false },
   { path: '/fixtures', label: 'Fixtures', icon: 'pi pi-calendar', available: false },
   { path: '/scouting', label: 'Scouting', icon: 'pi pi-search', available: false },

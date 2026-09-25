@@ -105,6 +105,12 @@ export const routes: Routes = [
         title: 'Tactics — Touchline Manager',
       },
       {
+        path: 'training',
+        loadComponent: () => import('./features/training/training').then((m) => m.Training),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Training — Touchline Manager',
+      },
+      {
         // A detail route rather than a navigation destination, so it is not in `nav-items.ts`.
         path: 'players/:id',
         loadComponent: () => import('./features/player/player').then((m) => m.PlayerProfile),
