@@ -1,0 +1,121 @@
+@if (loading()) {
+  <p class="text-sm text-slate-600" role="status">Loading your dashboard…</p>
+} @else if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+} @else if (state(); as position) {
+  @if (position.manager === null) {
+    <section class="max-w-2xl">
+      <h1 [class]="pageHeadingClass">Welcome</h1>
+      <p class="mt-2 text-slate-700">
+        Your account is ready. Create your manager profile to take over a club — it carries your
+        reputation and the time zone your deadlines are shown in.
+      </p>
+      <div class="mt-6">
+        <a routerLink="/onboarding/manager" [class]="primaryButtonClass">
+          Create your manager profile
+        </a>
+      </div>
+    </section>
+  } @else if (position.tenure === null) {
+    <section class="max-w-2xl">
+      <h1 [class]="pageHeadingClass">Choose a club</h1>
+      <p class="mt-2 text-slate-700">
+        Your manager profile is ready. Pick a country, then a club. You join the lowest division
+        that country is running, and you inherit the club exactly as it stands.
+      </p>
+
+      @if (resignError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      @if (position.manager.takeoverCooldownUntil; as until) {
+        <p [class]="statusMessageClass" role="status">
+          You resigned recently. You can take over another club from {{ instant(until) }}.
+        </p>
+      }
+
+      <div class="mt-6">
+        <a routerLink="/onboarding/country" [class]="primaryButtonClass">Choose your country</a>
+      </div>
+    </section>
+  } @else if (club(); as inherited) {
+    <section class="max-w-4xl">
+      <h1 [class]="pageHeadingClass">{{ inherited.club.name }}</h1>
+      <p class="mt-1 text-sm text-slate-600">
+        {{ inherited.country.displayName }} · {{ inherited.division.displayName }} · tier
+        {{ inherited.division.tierNumber }} · {{ inherited.season.displayLabel }}
+      </p>
+
+      @if (resignError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="rounded border border-slate-200 bg-white p-4">
+          <dt class="text-sm font-medium text-slate-500">Club funds</dt>
+          <dd class="mt-1 text-xl font-semibold">{{ funds(inherited.finances.cashMinor) }}</dd>
+          <dd class="text-sm text-slate-600">
+            {{ funds(inherited.finances.availableMinor) }} available to commit
+          </dd>
+        </div>
+
+        <div class="rounded border border-slate-200 bg-white p-4">
+          <dt class="text-sm font-medium text-slate-500">Reputation</dt>
+          <dd class="mt-1 text-xl font-semibold">{{ inherited.club.reputation }} / 100</dd>
+          <dd class="text-sm text-slate-600">Set by the tier you play in.</dd>
+        </div>
+
+        <div class="rounded border border-slate-200 bg-white p-4">
+          <dt class="text-sm font-medium text-slate-500">Stadium baseline</dt>
+          <dd class="mt-1 text-xl font-semibold">{{ funds(inherited.club.stadiumBaseline) }}</dd>
+          <dd class="text-sm text-slate-600">Gate revenue is scaled from this.</dd>
+        </div>
+
+        <div class="rounded border border-slate-200 bg-white p-4">
+          <dt class="text-sm font-medium text-slate-500">Control</dt>
+          <dd class="mt-1 text-xl font-semibold">
+            {{ inherited.control.status === 'active' ? 'Yours' : 'AI-assisted' }}
+          </dd>
+          <dd class="text-sm text-slate-600">
+            Since {{ instant(inherited.control.startedAt ?? inherited.serverTime) }}
+          </dd>
+        </div>
+
+        <div class="rounded border border-slate-200 bg-white p-4">
+          <dt class="text-sm font-medium text-slate-500">Season window</dt>
+          <dd class="mt-1 text-base font-semibold">{{ inherited.season.displayLabel }}</dd>
+          <dd class="text-sm text-slate-600">
+            {{ instant(inherited.season.startsAt) }} &ndash; {{ instant(inherited.season.endsAt) }}
+          </dd>
+        </div>
+
+        <div class="rounded border border-slate-200 bg-white p-4">
+          <dt class="text-sm font-medium text-slate-500">Home city</dt>
+          <dd class="mt-1 text-base font-semibold">{{ inherited.club.city }}</dd>
+          <dd class="text-sm text-slate-600">{{ inherited.club.region }}</dd>
+        </div>
+      </dl>
+
+      <p
+        class="mt-6 rounded border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-700"
+      >
+        Squad, tactics, fixtures and results arrive with the stages that build them. Your club is
+        already running: it has a squad under contract and a place in the table, and none of it
+        resets when you take over.
+      </p>
+
+      <div class="mt-6">
+        <button
+          type="button"
+          [class]="destructiveButtonClass"
+          [disabled]="resigning()"
+          (click)="resign()"
+        >
+          {{ resigning() ? 'Resigning…' : 'Resign from this club' }}
+        </button>
+      </div>
+    </section>
+  }
+} @else {
+  <p class="text-sm text-slate-600" role="status">Loading your dashboard…</p>
+}

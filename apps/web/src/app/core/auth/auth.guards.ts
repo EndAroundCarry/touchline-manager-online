@@ -22,6 +22,20 @@ export const requireAuthentication: CanActivateFn = (_route, state) => {
 };
 
 /**
+ * The screens that require a confirmed email address.
+ *
+ * Both onboarding and the club dashboard do, because the claim endpoint enforces verification on the
+ * server (ADR-0002). Sending an unconfirmed manager to a screen whose only button the server will refuse
+ * would be a worse experience than telling them where to confirm.
+ */
+export const requireVerifiedEmail: CanActivateFn = () => {
+  const store = inject(SessionStore);
+  const router = inject(Router);
+
+  return store.isVerified() ? true : router.createUrlTree(['/settings']);
+};
+
+/**
  * The signed-out screens.
  *
  * A signed-in manager sent to sign-in again should be moved on rather than shown a form that would

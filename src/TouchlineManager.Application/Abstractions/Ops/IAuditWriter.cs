@@ -99,4 +99,19 @@ public static class AuditTargetTypes
 
     /// <summary>A refresh session.</summary>
     public const string RefreshSession = "refresh_session";
+
+    /// <summary>A manager profile (`WORLD-7`).</summary>
+    public const string Manager = "manager";
+
+    /// <summary>A club.</summary>
+    public const string Club = "club";
+
+    /// <summary>A club tenure.</summary>
+    public const string ClubTenure = "club_tenure";
+
+    /// <summary>A division-provisioning request.</summary>
+    public const string DivisionProvisioningRequest = "division_provisioning_request";
+
+    /// <summary>A world and the generation run that produced it.</summary>
+    public const string GameWorld = "game_world";
 }

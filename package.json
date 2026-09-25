@@ -17,6 +17,7 @@
     "test:e2e": "npm --prefix tests/web-e2e test",
     "e2e:install": "npm --prefix tests/web-e2e ci && npm --prefix tests/web-e2e run install:browsers",
     "migrate": "dotnet dotnet-ef database update --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
+    "seed": "dotnet run --project tools/world-seeder",
     "migration:add": "dotnet dotnet-ef migrations add --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
     "migration:script": "dotnet dotnet-ef migrations script --idempotent --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
     "format": "dotnet format TouchlineManager.slnx",

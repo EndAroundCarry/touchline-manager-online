@@ -90,8 +90,15 @@ screen that does not exist tests nothing.
 
 *Today:* register → confirm → sign in → the session survives a reload → sign out; the unconfirmed
 account's restriction; account closure; renaming with the shell following; sign out everywhere;
-forgotten-password replacement with the old password refused and the link single-use; and the route
-guards in both directions, including that an external `returnUrl` is ignored rather than navigated to.
+forgotten-password replacement with the old password refused and the link single-use; the route guards
+in both directions, including that an external `returnUrl` is ignored rather than navigated to; and
+onboarding — manager profile → country → club → the inherited dashboard → resignation.
+
+The onboarding journey **gives its club back** by resigning at the end. A world holds 108 clubs and a
+country that fills with humans waits for the next tier to be generated, so a journey that kept its club
+would exhaust the world after eighteen runs and start failing for a reason that is not a defect. The
+seeder runs in `globalSetup` for the same reason: onboarding needs a world, and the world is an operator
+tool rather than something the stack creates for itself.
 
 ## Layer 9 — Match-engine validation — Stage 5
 

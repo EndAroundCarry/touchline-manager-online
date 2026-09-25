@@ -3,56 +3,141 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
-## Stage 3 — World generation, six countries, clubs, and onboarding (foundation only)
+## Stage 3 — World generation, six countries, clubs, and onboarding
 
-**This stage is not finished.** The world foundation is in: the schema, the aggregates, and the
-database constraints that make onboarding safe under concurrency. Still to come are deterministic
-generation and the seeder, the onboarding use cases, the endpoints, and the UI — so a world cannot
-actually be populated yet, and none of the stage's browser-facing exit criteria are met. It is
-recorded here because the schema, migration, and constraints are real and shipped.
+A world you can onboard into. Six fictional national pyramids are generated from one seed, a manager
+creates a profile, chooses a country, takes over an AI club in its lowest active tier, and inherits it
+exactly as it stands. A country that fills with humans queues the generation of the next tier underneath
+it.
 
 ### Added
 
-- The versioned world rule set (`WorldRuleSet`) holding every constant from game rules §3, with its
-  version stamped onto the world and each season, so a historical season is interpreted against the
-  rules that were actually in force when it was played.
-- The `world` schema: game worlds, countries, manager profiles, clubs, club tenures, division
-  provisioning requests, and generation runs. The `competition` shell: seasons, divisions,
-  division-seasons, and club season entries. The `finance` shell: club accounts. One migration, with
-  the three schemas created by it and applied against real PostgreSQL 17 before being committed.
-- World aggregates with the rules as behaviour: `GameWorld` (freeze/resume), `Country`, `Manager`
-  (the resignation cooldown), `Club` (tier-scaled baselines and a slug derived from the name rather
-  than supplied beside it), `ClubTenure` (the whole of the ownership model), `DivisionProvisioningRequest`,
-  `GenerationRun`, and a `CountryCapacity` value object that answers "does this country have room, and
-  should it grow?" in one place instead of in an endpoint.
-- `SeasonCalendar`, a pure function from a first matchday to a season's whole window: 34 matchdays on
-  the Tuesday/Thursday/Sunday cycle at 19:00 UTC, plus the seven-day rollover. Stage 6 reuses it.
-- The competition shell aggregates, including the store for the pre-generated tie-break draw that
-  `TBL-11` requires to exist before a season starts.
-- Mappings that put the plan's constraints in the database rather than in a convention: partial unique
-  indexes for one open tenure per club and per manager (`OCC-9`), unique `(country_id, target_tier)`
-  for provisioning (`PYR-3`), unique per-world club name and slug, one club per season, and the
-  `FIN-13` checks that neither balance can go negative and reservations cannot exceed the cash behind
-  them.
-- 66 domain tests and 17 database-constraint tests.
+- **The schema the rest of the stage writes into** (shipped first, in its own commit): the `world` schema
+  (game worlds, countries, manager profiles, clubs, club tenures, division provisioning requests,
+  generation runs), the `competition` shell (seasons, divisions, division-seasons, club season entries),
+  and the `finance` shell (club accounts), in one migration applied against real PostgreSQL 17 before
+  being committed. The versioned `WorldRuleSet` holds every constant from game rules §3, and its version is
+  stamped onto the world and each season, so a historical season is interpreted against the rules that were
+  actually in force when it was played.
+- **The world aggregates with the rules as behaviour**: `GameWorld` (freeze/resume), `Country`, `Manager`
+  (the resignation cooldown), `Club` (tier-scaled baselines and a slug derived from the name rather than
+  supplied beside it), `ClubTenure` (the whole of the ownership model), `DivisionProvisioningRequest`,
+  `GenerationRun`, `SeasonCalendar` (a pure function from a first matchday to a season's whole window),
+  and a `CountryCapacity` value object that answers "does this country have room, and should it grow?" in
+  one place instead of in an endpoint.
+- **Mappings that put the plan's constraints in the database rather than in a convention**: partial unique
+  indexes for one open tenure per club and per manager (`OCC-9`), unique `(country_id, target_tier)` for
+  provisioning (`PYR-3`), unique per-world club name and slug, one club per season, and the `FIN-13`
+  checks that neither balance can go negative and reservations cannot exceed the cash behind them.
+- **Deterministic world generation.** `Pcg32`, a pinned, explicitly tested PRNG, plus versioned fictional
+  name pools for all six locales (`england`, `spain`, `germany`, `italy`, `france`, `romania`), a curated
+  blocklist of real football identities, and `ClubIdentityGenerator`. Every generated value is a pure
+  function of the seed, the country's pool, and the club's ordinal within its country, so the same seed
+  reproduces the same pyramid and different seeds produce visibly different ones.
+- **Club names that cannot collide, without a retry loop.** Places and suffixes are woven by ordinal rather
+  than multiplied, so a division alternates both instead of naming eighteen clubs after one place; the
+  combination cycle is their least common multiple, which makes the pairing injective and the names unique
+  by construction. Past the cycle the generator adds a qualifier and then a numeral, so a deep pyramid runs
+  out of names only by running out of integers (`PYR-11`).
+- **The world seeder**, as a use case and as `tools/world-seeder`. `--seed` and `--first-matchday` override
+  the configuration; everything else comes from `World:*`. It is idempotent — running it against an
+  existing world reports that world and writes nothing (`WORLD-1`) — and it records the seed, generator
+  version, and a digest of the non-seed inputs in `world.generation_runs` (`PYR-14`).
+- **The onboarding commands**: `CreateManagerProfile`, `ClaimClub`, and `ResignClub`. The takeover validates
+  the club is an active, AI-controlled member of the country's lowest active tier, disables a manager who
+  already holds a club or is serving the resignation cooldown, and returns the inherited club.
+- **`CapacityEvaluator`**, which answers "should this country grow?" in one place. It runs after every
+  successful takeover and after every resignation, and creates the next tier's
+  `DivisionProvisioningRequest` exactly once (`PYR-1`, `PYR-2`).
+- **Advisory locks**: `IAdvisoryLock` and `AdvisoryLockKey`, implemented over
+  `pg_advisory_xact_lock`. A takeover takes the manager's lock and then the country's, always in that
+  order, which is what keeps the pair deadlock-free (`PYR-3`).
+- **Explicit transactions** on `IUnitOfWork` (`BeginTransactionAsync`, `IDatabaseTransaction`,
+  `TransactionIsolation`), so a workflow that must hold a lock across more than one save can.
+- **The onboarding reads**: world, countries, per-country capacity, available clubs, onboarding state, and
+  the inherited-club dashboard, each one query shaped for one screen.
+- **The API** from master plan §10.2, plus `GET /clubs/{clubId}/dashboard`. Claim refusals carry the stable
+  codes §7.6 requires — `CLUB_ALREADY_CLAIMED`, `MANAGER_HAS_ACTIVE_CLUB`, `MANAGER_PROFILE_REQUIRED`,
+  `MANAGER_IN_COOLDOWN`, and `CAPACITY_PROVISIONING` — and the last two carry the moment the cooldown
+  lapses and the provisioning request's state and polling hint (`PYR-10`).
+- **The Angular onboarding screens** (`/onboarding/manager`, `/onboarding/country`, `/onboarding/club`) and
+  a dashboard that routes on state: no profile, no club, or a club. `OnboardingStore` holds the reference
+  data and the claim's idempotency key; `requireVerifiedEmail` keeps a manager who cannot claim away from
+  the screen that would ask them to.
+- 109 new domain tests (175 total) covering the PRNG's pinned sequences, the generator's determinism,
+  uniqueness, deep-pyramid behaviour, and the blocklist; 38 world infrastructure tests over real
+  PostgreSQL, including the concurrent-takeover and fill-a-tier races; 5 API onboarding tests; 14 new web
+  tests (57 total); and a Playwright onboarding journey.
+- **ADR-0010**, on why a takeover serialises with an advisory lock rather than with `SERIALIZABLE`.
+
+### Fixed
+
+- **The worker's composition root could not resolve `IRequestContext`.** The API registered an HTTP-backed
+  implementation and nothing registered a default, so any use case that writes an audit row would have
+  failed the moment the worker ran one. `ServiceRequestContext` is now the default, and the API's own
+  registration overrides it — which is the arrangement `IRequestContext`'s own documentation described and
+  nothing implemented.
 
 ### Notes
 
-- **`game_worlds` has no JSONB feature-flags column**, although master plan §6.3 lists one. Feature
-  flags belong in `ops.feature_flags`, where they are queryable and versioned; a JSONB blob on the
-  world row is precisely the unfinished modelling the JSONB policy forbids (`JSN-5`).
+- **The onboarding endpoints sit at the version root, not under `/api/v1/world`.** Master plan §10.2
+  addresses them as resources (`/countries`, `/club-claims`, `/club-tenure`), and the committed path is the
+  contract. It is the same reasoning that puts `/me` at the root.
+- **A takeover holds an advisory lock in a read-committed transaction rather than a serializable one.**
+  §7.6 asks for serializable, but a snapshot-isolation transaction fixes its snapshot at its first
+  statement — which in this workflow is the lock request — so it would still be reading pre-lock state
+  after the lock was granted, and the losing manager would get a constraint violation instead of the
+  documented refusal. ADR-0010 records the decision; the partial unique indexes are untouched and remain
+  the backstop.
+- **The deterministic PRNG in `Domain` will not be the match engine's.** The engine ships its own
+  `Pcg32` in Stage 5, and that is deliberate: a generated world's reproducibility and a played match's
+  reproducibility are separate versioned contracts, and the engine's output hashes are pinned per engine
+  version (ADR-0004). The dependency rules settle the question anyway — `Domain` depends on nothing (DEP-1)
+  and the engine may not depend on it (DEP-2).
+- **Ordinals are per country and never restart per tier.** Tier 1 takes 0–17, tier 2 takes 18–35. If each
+  tier restarted at zero, every provisioned tier would propose the same eighteen names and the unique name
+  index would reject the second one. A test generates twelve tiers and asserts the names never repeat.
+- **Name pools use invented places only, and never a real club's home town.** Generation is where licensed
+  identity would enter the product, so the pools are the primary defence and the blocklist is the backstop
+  (`FIC-5`). A test runs the blocklist check across every pool and every generated name.
+- **A club's founding game year is the first season's game year.** A plausible older founding date would
+  have to be invented from the seed, and inventing history is not what a reproducibility rule should be
+  doing with its randomness.
+- **The tier-1 money, stadium, and reputation baselines are provisional.** They halve per tier, which is the
+  shape Stage 9 needs, and they are recorded in `game-rules.md` as balancing values rather than as rules.
+  Calibrating them is Stage 9's multi-season simulation work, not a guess made now.
+- **Provisioning is requested, not executed.** The takeover creates the `DivisionProvisioningRequest` and
+  returns `CAPACITY_PROVISIONING` with its state; generating the tier, its squads, and its backfilled
+  results is Stage 11. Until then a full country stays full, on purpose: a half-built tier that a manager
+  could claim would be worse than a wait.
+- **Only a club claim requires a verified address.** Master plan §12.1 lists club claims, bidding, listing,
+  and display-name changes; creating a manager profile and resigning are authenticated but not
+  verification-gated, because an unverified account can reach neither a club nor a bid.
+- **The dashboard shows only what exists yet.** Identity, competition placement, control, and money. Squad,
+  contracts, fixtures, and history join the response in the stages that create them rather than appearing
+  now as permanently-empty fields.
+- **The Playwright journey gives its club back.** It resigns at the end, which exercises the resignation
+  path and returns the club to the pool. Without that, each run would consume one of the 108 clubs and the
+  suite would start failing after eighteen runs for a reason that is not a defect.
+- **`appsettings.json` had to travel with the seeder tool.** The generic host does not copy it the way the
+  web SDK does, so the project declares it explicitly and the tool sets its content root to the binary's
+  directory rather than the process's working directory.
+- **`game_worlds` has no JSONB feature-flags column**, although master plan §6.3 lists one. Feature flags
+  belong in `ops.feature_flags`, where they are queryable and versioned; a JSONB blob on the world row is
+  precisely the unfinished modelling the JSONB policy forbids (`JSN-5`).
 - **`club_season_entries` carries `season_id` as well as the division-season.** Without it, "one club
-  appears in exactly one division per season" is not expressible as a database constraint: a promotion
-  bug could enter one club into two divisions in the same season and every standings query would
-  double-count it.
+  appears in exactly one division per season" is not expressible as a database constraint: a promotion bug
+  could enter one club into two divisions in the same season and every standings query would double-count
+  it.
 - **A failed provisioning request can be retried, and the retry reuses the recorded seed.**
-  `unique (country_id, target_tier)` means a second request for the same tier cannot exist, so without
-  that transition one failed run would block the tier permanently. Reusing the seed is what keeps
-  `PYR-14` true across attempts. A domain test caught the gap.
-- **Tier names are descriptive rather than evocative** — "England Top Division", "Spain Division 2" —
-  so no generated name can drift towards a real competition's branding (`WORLD-3`).
-- Tier-scaled money, stadium, and reputation baselines halve per tier. The shape matters now; the
-  calibration belongs to the multi-season simulations Stage 9 requires.
+  `unique (country_id, target_tier)` means a second request for the same tier cannot exist, so without that
+  transition one failed run would block the tier permanently. Reusing the seed is what keeps `PYR-14` true
+  across attempts. A domain test caught the gap.
+- **Tier names are descriptive rather than evocative** — "England Top Division", "Spain Division 2" — so no
+  generated name can drift towards a real competition's branding (`WORLD-3`).
+- **A seeded division starts active and a provisioned one does not.** Stage 11's tier stays in
+  `provisioning` until its generation, validation, and backfill all complete (`PYR-8`); the tier the seeder
+  creates is claimable the moment it exists, because there is nothing left to backfill.
 
 ## Stage 2 — Identity and authenticated walking skeleton
 

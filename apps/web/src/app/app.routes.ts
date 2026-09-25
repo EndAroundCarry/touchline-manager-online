@@ -1,5 +1,9 @@
 import { Routes } from '@angular/router';
-import { requireAnonymous, requireAuthentication } from './core/auth/auth.guards';
+import {
+  requireAnonymous,
+  requireAuthentication,
+  requireVerifiedEmail,
+} from './core/auth/auth.guards';
 
 /**
  * Route table.
@@ -61,6 +65,32 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
         canActivate: [requireAuthentication],
         title: 'Settings — Touchline Manager',
+      },
+      {
+        path: 'onboarding/manager',
+        loadComponent: () =>
+          import('./features/onboarding/manager/manager').then((m) => m.ManagerProfile),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Your manager profile — Touchline Manager',
+      },
+      {
+        path: 'onboarding/country',
+        loadComponent: () =>
+          import('./features/onboarding/country/country').then((m) => m.CountryChoice),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Choose your country — Touchline Manager',
+      },
+      {
+        path: 'onboarding/club',
+        loadComponent: () => import('./features/onboarding/club/club').then((m) => m.ClubChoice),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Choose your club — Touchline Manager',
+      },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Dashboard — Touchline Manager',
       },
     ],
   },

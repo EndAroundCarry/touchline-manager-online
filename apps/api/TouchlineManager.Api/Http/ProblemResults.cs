@@ -25,14 +25,43 @@ internal static class ProblemResults
 
     /// <summary>Returns the given status with a code, title, and detail.</summary>
     public static IResult Code(int statusCode, string code, string title, string detail) =>
-        Results.Problem(
+        Code(statusCode, code, title, detail, extensions: null);
+
+    /// <summary>
+    /// Returns the given status with a code, title, detail, and machine-readable extensions.
+    /// </summary>
+    /// <remarks>
+    /// Some refusals carry a payload the client acts on rather than merely displays. Master plan §7.6 and
+    /// PYR-10 require the out-of-capacity answer to include the provisioning request's state and a polling
+    /// hint, and the cooldown refusal to include when it lapses: without them the client can only tell the
+    /// manager to try again, which is not advice.
+    /// </remarks>
+    public static IResult Code(
+        int statusCode,
+        string code,
+        string title,
+        string detail,
+        IDictionary<string, object?>? extensions)
+    {
+        var payload = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["code"] = code,
+        };
+
+        if (extensions is not null)
+        {
+            foreach (var extension in extensions)
+            {
+                payload[extension.Key] = extension.Value;
+            }
+        }
+
+        return Results.Problem(
             statusCode: statusCode,
             title: title,
             detail: detail,
-            extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["code"] = code,
-            });
+            extensions: payload);
+    }
 
     /// <summary>Returns <c>401</c> with the unauthenticated code.</summary>
     public static IResult Unauthenticated(string detail) =>

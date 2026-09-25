@@ -7,12 +7,14 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 2 complete — accounts and sign-in.** The playable game is being built in the staged
-> order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the API
-> and worker composition roots, the health and observability baseline, and the Angular PWA shell.
-> Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions with
-> reuse detection, the audit trail, the request security headers, the Angular auth and settings
-> screens, and the end-to-end journeys. Gameplay arrives from Stage 3 onward.
+> **Status: Stage 3 complete — a world you can onboard into.** The playable game is being built in the
+> staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the
+> API and worker composition roots, the health and observability baseline, and the Angular PWA shell.
+> Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions with reuse
+> detection, the audit trail, the request security headers, the Angular auth and settings screens, and
+> the end-to-end journeys. Stage 3 added deterministic world generation, six fictional national
+> pyramids, atomic club takeover with pyramid expansion, and the onboarding screens. Squads, tactics,
+> and matchdays arrive from Stage 4 onward.
 
 ---
 
@@ -120,6 +122,51 @@ reads the confirmation and reset links out of the mail catcher instead of being 
 
 `Auth__SigningKey` must be at least 32 bytes and is validated at startup. Development has a
 committed dev-only value; every other environment supplies its own (see `.env.example`).
+
+---
+
+## The world and onboarding
+
+A new database has no world in it, so create one before anyone can register a club:
+
+```bash
+npm run seed          # six countries, one 18-club tier each, the first season, funded accounts
+```
+
+The seeder is idempotent, so running it again reports the world it already found and writes nothing.
+`--seed` and `--first-matchday` override the configuration, and `World__GenerationSeed` overrides the
+default seed from the environment:
+
+```bash
+npm run seed -- --seed my-world-1 --first-matchday 2026-10-06
+```
+
+The same seed and generator version reproduce the same pyramid, which is what
+[`world.generation_runs`](docs/architecture/data-model.md) records and what the tests assert.
+
+Then onboard by hand, or use the screens at `/onboarding/manager`, `/onboarding/country`, and
+`/onboarding/club`:
+
+```bash
+# Sign in first and keep the access token from the response.
+curl -s http://localhost:5080/api/v1/world -H "Authorization: Bearer $TOKEN"
+curl -s http://localhost:5080/api/v1/countries -H "Authorization: Bearer $TOKEN"
+
+curl -X POST http://localhost:5080/api/v1/manager-profile \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"locale":"en-GB","timeZone":"Europe/London"}'
+
+# Pick a club from the country's available-clubs response, then claim it. The idempotency key is
+# required: repeating it returns the first outcome rather than creating a second tenure.
+curl -X POST http://localhost:5080/api/v1/club-claims \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 2f0c1a9e-6a5f-4c3a-9f7e-1d2b3c4d5e6f" \
+  -d '{"clubId":"<from available-clubs>"}'
+```
+
+A country whose lowest tier is full answers `409 CAPACITY_PROVISIONING` and queues the next tier's
+generation; that generation is Stage 11, so a full country stays full until then. Why a takeover
+serialises the way it does is in [ADR-0010](docs/architecture/adr/0010-club-takeover-serialisation.md).
 
 ---
 

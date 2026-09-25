@@ -1,0 +1,95 @@
+<section class="max-w-3xl">
+  <h1 [class]="pageHeadingClass">Choose your club</h1>
+
+  @if (loading()) {
+    <p class="mt-6 text-sm text-slate-600" role="status">Loading the clubs…</p>
+  } @else if (loadError(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  } @else if (listing(); as clubs) {
+    <p class="mt-2 text-sm text-slate-600">
+      {{ clubs.divisionName }} · tier {{ clubs.tierNumber }}. You take the club over exactly as it
+      is: its squad, contracts, cash, table position, and history are inherited unchanged.
+    </p>
+
+    @if (claimError(); as message) {
+      <div class="mt-4" role="alert">
+        <p [class]="formErrorClass">{{ message }}</p>
+
+        @if (provisioning(); as pending) {
+          <p [class]="statusMessageClass" role="status">
+            Tier {{ pending.targetTier }} is being generated. Check again in about
+            {{ pending.pollAfterSeconds }} seconds, or choose another country.
+          </p>
+        }
+
+        @if (cooldownUntil(); as until) {
+          <p class="mt-3 text-sm text-slate-700">
+            You can take over another club from
+            <strong>{{ until }}</strong
+            >.
+          </p>
+        }
+
+        <div class="mt-3 flex flex-wrap gap-3">
+          <button type="button" [class]="secondaryButtonClass" (click)="refresh()">
+            Check again
+          </button>
+          <a routerLink="/onboarding/country" [class]="linkClass">Choose another country</a>
+        </div>
+      </div>
+    }
+
+    <table class="mt-6 w-full border-collapse text-sm">
+      <caption class="sr-only">
+        Clubs in
+        {{
+          clubs.divisionName
+        }}, with availability
+      </caption>
+      <thead>
+        <tr class="border-b border-slate-200 text-left">
+          <th scope="col" class="py-2 pr-3 font-semibold">Club</th>
+          <th scope="col" class="py-2 pr-3 font-semibold">City</th>
+          <th scope="col" class="py-2 pr-3 font-semibold">Reputation</th>
+          <th scope="col" class="py-2 font-semibold">Status</th>
+          <th scope="col" class="py-2"><span class="sr-only">Action</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (club of clubs.clubs; track club.id) {
+          <tr class="border-b border-slate-100">
+            <th scope="row" class="py-2 pr-3 text-left font-medium">{{ club.name }}</th>
+            <td class="py-2 pr-3 text-slate-700">{{ club.city }}, {{ club.region }}</td>
+            <td class="py-2 pr-3 text-slate-700">{{ club.reputation }} / 100</td>
+            <td class="py-2 pr-3">
+              @if (club.isAvailable) {
+                <span
+                  class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900"
+                >
+                  Available
+                </span>
+              } @else {
+                <span class="rounded bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-800">
+                  Has a manager
+                </span>
+              }
+            </td>
+            <td class="py-2 text-right">
+              @if (club.isAvailable) {
+                <button
+                  type="button"
+                  [class]="primaryButtonClass"
+                  [disabled]="claimingClubId() !== null"
+                  [attr.aria-label]="'Take over ' + club.name"
+                  (click)="claim(club)"
+                >
+                  {{ claimingClubId() === club.id ? 'Taking over…' : 'Take over' }}
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

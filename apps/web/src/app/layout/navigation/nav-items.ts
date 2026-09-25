@@ -21,7 +21,7 @@ export interface NavItem {
 
 /** Planned shell navigation, in product order. */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { path: '/dashboard', label: 'Dashboard', icon: 'pi pi-home', available: false },
+  { path: '/dashboard', label: 'Dashboard', icon: 'pi pi-home', available: true },
   { path: '/squad', label: 'Squad', icon: 'pi pi-users', available: false },
   { path: '/tactics', label: 'Tactics', icon: 'pi pi-sitemap', available: false },
   { path: '/training', label: 'Training', icon: 'pi pi-chart-line', available: false },

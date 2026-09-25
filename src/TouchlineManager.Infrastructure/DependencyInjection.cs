@@ -3,13 +3,16 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
+using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
+using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Infrastructure.Email;
 using TouchlineManager.Infrastructure.Jobs;
 using TouchlineManager.Infrastructure.Persistence;
 using TouchlineManager.Infrastructure.Persistence.Repositories;
+using TouchlineManager.Infrastructure.Requests;
 using TouchlineManager.Infrastructure.Security;
 using TouchlineManager.Infrastructure.Time;
 
@@ -40,8 +43,50 @@ public static class DependencyInjection
         services.Configure<JobQueueOptions>(configuration.GetSection(JobQueueOptions.SectionName));
 
         AddAuthInfrastructure(services, configuration);
+        AddWorldInfrastructure(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the world module's persistence and the advisory locks its deadlines and claims depend on.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="WorldOptions"/> is validated at startup like the auth options, so an operator who has not
+    /// configured a world name or a first-season date learns that from a failed start rather than from an
+    /// odd-looking world.
+    /// </remarks>
+    private static void AddWorldInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<WorldOptions>()
+            .Bind(configuration.GetSection(WorldOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.Name),
+                "World:Name must be set.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.GenerationSeed)
+                    && options.GenerationSeed.Length <= 64,
+                "World:GenerationSeed must be set and at most 64 characters (PYR-14).")
+            .Validate(
+                options => options.ProvisioningPollSeconds is >= 5 and <= 3600,
+                "World:ProvisioningPollSeconds must be between 5 and 3600.")
+            .ValidateOnStart();
+
+        services.AddScoped<IWorldRepository, WorldRepository>();
+        services.AddScoped<IClubRepository, ClubRepository>();
+        services.AddScoped<IManagerRepository, ManagerRepository>();
+        services.AddScoped<IClubTenureRepository, ClubTenureRepository>();
+        services.AddScoped<IDivisionProvisioningRequestRepository, DivisionProvisioningRequestRepository>();
+        services.AddScoped<IGenerationRunRepository, GenerationRunRepository>();
+        services.AddScoped<IClubAccountRepository, ClubAccountRepository>();
+        services.AddScoped<IOnboardingQueries, OnboardingQueries>();
+        services.AddScoped<IAdvisoryLock, PostgresAdvisoryLock>();
+
+        // The default request context, for work with no HTTP request behind it: worker jobs and the
+        // operator tools. The API registers its own implementation over this one, so a manager's actions
+        // are attributed to their request.
+        services.AddScoped<IRequestContext, ServiceRequestContext>();
     }
 
     /// <summary>

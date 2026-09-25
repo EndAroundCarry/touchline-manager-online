@@ -1,0 +1,85 @@
+<section class="mx-auto flex flex-col items-center py-8">
+  <div [class]="formCardClass">
+    <h1 [class]="pageHeadingClass">Your manager profile</h1>
+
+    @if (loading()) {
+      <p class="mt-3 text-sm text-slate-600" role="status">Loading your profile…</p>
+    } @else if (loadError(); as message) {
+      <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    } @else if (profile(); as created) {
+      <p class="mt-3 text-sm text-slate-700">
+        Your manager profile is ready. Deadlines are shown in the time zone below.
+      </p>
+
+      <dl class="mt-4 grid gap-2 text-sm">
+        <div class="flex justify-between gap-4">
+          <dt class="text-slate-500">Locale</dt>
+          <dd class="font-medium">{{ created.locale }}</dd>
+        </div>
+        <div class="flex justify-between gap-4">
+          <dt class="text-slate-500">Time zone</dt>
+          <dd class="font-medium">{{ created.timeZone }}</dd>
+        </div>
+      </dl>
+
+      <div class="mt-6">
+        <button type="button" [class]="primaryButtonClass" (click)="continueToCountry()">
+          Choose your country
+        </button>
+      </div>
+    } @else {
+      <p class="mt-2 text-sm text-slate-600">
+        One profile per account. It carries your reputation and the time zone your deadlines are
+        shown in, and it stays with you across clubs.
+      </p>
+
+      @if (formError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      <form class="mt-6 space-y-4" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div>
+          <label class="block text-sm font-medium text-slate-800" for="locale">Locale</label>
+          <p class="text-xs text-slate-500">Used for numbers and dates, such as en-GB.</p>
+          <input
+            id="locale"
+            type="text"
+            formControlName="locale"
+            autocomplete="language"
+            [class]="textInputClass"
+            [attr.aria-invalid]="errorFor('locale', 'Locale') !== null"
+            [attr.aria-describedby]="errorFor('locale', 'Locale') !== null ? idFor('locale') : null"
+          />
+          @if (errorFor('locale', 'Locale'); as message) {
+            <p [id]="idFor('locale')" [class]="fieldErrorClass">{{ message }}</p>
+          }
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-800" for="timeZone">Time zone</label>
+          <p class="text-xs text-slate-500">
+            An IANA zone such as Europe/London. Deadlines are stored in UTC and shown here.
+          </p>
+          <input
+            id="timeZone"
+            type="text"
+            formControlName="timeZone"
+            autocomplete="off"
+            [class]="textInputClass"
+            [attr.aria-invalid]="errorFor('timeZone', 'TimeZone') !== null"
+            [attr.aria-describedby]="
+              errorFor('timeZone', 'TimeZone') !== null ? idFor('timeZone') : null
+            "
+          />
+          @if (errorFor('timeZone', 'TimeZone'); as message) {
+            <p [id]="idFor('timeZone')" [class]="fieldErrorClass">{{ message }}</p>
+          }
+        </div>
+
+        <button type="submit" [class]="primaryButtonClass" [disabled]="submitting()">
+          {{ submitting() ? 'Creating…' : 'Create my profile' }}
+        </button>
+      </form>
+    }
+  </div>
+</section>

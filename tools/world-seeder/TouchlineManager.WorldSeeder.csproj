@@ -1,9 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\TouchlineManager.Infrastructure\TouchlineManager.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\TouchlineManager.Application\TouchlineManager.Application.csproj" />
     <ProjectReference Include="..\..\src\TouchlineManager.Domain\TouchlineManager.Domain.csproj" />
+  </ItemGroup>
+
+  <!--
+    The tool reads its configuration from a file beside the binary, so the file has to travel with it.
+    The generic host does not copy appsettings.json on its own; only the web SDK does.
+  -->
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

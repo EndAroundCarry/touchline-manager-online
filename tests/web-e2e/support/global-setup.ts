@@ -30,6 +30,10 @@ export default function globalSetup(): void {
     '--startup-project',
     'src/TouchlineManager.Infrastructure',
   ]);
+
+  // Onboarding needs a world to onboard into, and the world is created by the operator tool rather than
+  // by the stack. The seeder is idempotent, so this is a no-op against a world that already exists.
+  run('dotnet', ['run', '--project', 'tools/world-seeder']);
 }
 
 function run(command: string, args: readonly string[]): void {

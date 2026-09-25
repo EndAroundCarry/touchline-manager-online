@@ -4,7 +4,10 @@ using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Application.World;
+using TouchlineManager.Application.World.Validation;
 using TouchlineManager.Contracts.Auth;
+using TouchlineManager.Contracts.World;
 
 namespace TouchlineManager.Application;
 
@@ -30,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<EnqueueNoOpJob>();
 
         AddAuthUseCases(services);
+        AddWorldUseCases(services);
 
         return services;
     }
@@ -62,5 +66,32 @@ public static class DependencyInjection
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
         services.AddScoped<IValidator<UpdateProfileRequest>, UpdateProfileRequestValidator>();
         services.AddScoped<IValidator<DeleteAccountRequest>, DeleteAccountRequestValidator>();
+    }
+
+    /// <summary>
+    /// Registers the world and onboarding use cases.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="CapacityEvaluator"/> is registered here rather than beside the seed use case because it
+    /// is shared: the takeover and resignation commands both run it, and Stage 11's provisioning worker
+    /// will be its third caller.
+    /// </remarks>
+    private static void AddWorldUseCases(IServiceCollection services)
+    {
+        services.AddScoped<CapacityEvaluator>();
+
+        services.AddScoped<SeedWorld>();
+        services.AddScoped<CreateManagerProfile>();
+        services.AddScoped<ClaimClub>();
+        services.AddScoped<ResignClub>();
+        services.AddScoped<GetWorld>();
+        services.AddScoped<ListCountries>();
+        services.AddScoped<GetCountryCapacity>();
+        services.AddScoped<GetAvailableClubs>();
+        services.AddScoped<GetClubDashboard>();
+        services.AddScoped<GetOnboardingState>();
+
+        services.AddScoped<IValidator<CreateManagerProfileRequest>, CreateManagerProfileRequestValidator>();
+        services.AddScoped<IValidator<ClaimClubRequest>, ClaimClubRequestValidator>();
     }
 }

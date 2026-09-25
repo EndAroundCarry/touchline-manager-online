@@ -14,6 +14,7 @@ export class ApiError extends Error {
     readonly detail: string,
     readonly correlationId: string | null,
     readonly fieldErrors: ReadonlyMap<string, string[]>,
+    readonly extensions: ReadonlyMap<string, unknown> = new Map(),
   ) {
     super(detail);
     this.name = 'ApiError';
@@ -27,6 +28,20 @@ export class ApiError extends Error {
   /** True when the request never reached the server, so retrying is safe. */
   get isOffline(): boolean {
     return this.status === 0;
+  }
+
+  /**
+   * Reads one machine-readable Problem Details extension.
+   *
+   * Some refusals carry a payload the screen acts on rather than only displays: the out-of-capacity answer
+   * includes the next tier's generation state and a polling hint (`PYR-10`), and the cooldown refusal
+   * includes when it lapses. The extension's own shape is the endpoint's contract, so it is narrowed here
+   * rather than in the component.
+   */
+  extension<T>(key: string): T | null {
+    const value = this.extensions.get(key);
+
+    return value === undefined || value === null ? null : (value as T);
   }
 
   static fromResponse(response: HttpErrorResponse): ApiError {
@@ -55,8 +70,34 @@ export class ApiError extends Error {
           : 'The request could not be completed.',
       correlationId,
       readFieldErrors(problem),
+      readExtensions(problem),
     );
   }
+}
+
+/** The members RFC 9457 reserves, which are carried by the typed properties instead. */
+const RESERVED_PROBLEM_MEMBERS = new Set([
+  'type',
+  'title',
+  'status',
+  'detail',
+  'instance',
+  'code',
+  'errors',
+  'correlationId',
+  'traceId',
+]);
+
+function readExtensions(problem: Record<string, unknown>): ReadonlyMap<string, unknown> {
+  const extensions = new Map<string, unknown>();
+
+  for (const [key, value] of Object.entries(problem)) {
+    if (!RESERVED_PROBLEM_MEMBERS.has(key) && value !== null && value !== undefined) {
+      extensions.set(key, value);
+    }
+  }
+
+  return extensions;
 }
 
 function readExtension(response: HttpErrorResponse, key: string): string | null {

@@ -408,6 +408,14 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `inactivity_ai_days` | 14 | OCC-2 |
 | `inactivity_close_days` | 21 | OCC-3 |
 | `resignation_cooldown_days` | 7 | OCC-4 |
+| `provisioning_poll_seconds` | 30 | PYR-10 |
+| `generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
+| `name_pools_version` | `name-pools-v1` | FIC-8 |
+| `club_name_capacity_per_pool` | 1,980 (220 × 9) | FIC-4, PYR-11 |
+| `tier_scaling_factor` | 2^(tier − 1) | WORLD-4 (balancing) |
+| `opening_cash_minor_tier1` | 50,000,000 minor units | FIN-1 (balancing) |
+| `opening_stadium_baseline_tier1` | 25,000,000 minor units | FIN-3 (balancing) |
+| `opening_reputation_tier1` | 70 / 100 | WORLD-3 (balancing) |
 | `listing_min_exposure_hours` | 48 | TRF-2 |
 | `auction_blackout_hours_before_kickoff` | 6 | TRF-3 |
 | `refresh_token_lifetime_minutes` | 15 (access) | ADR-0002 |
@@ -433,6 +441,7 @@ These are recorded so they are not silently invented later:
 
 | Item | Deferred to |
 |---|---|
+| Calibration of the opening cash, stadium, and reputation baselines and the per-tier scaling | Stage 9 (balancing) |
 | Exact gate-revenue, sponsorship, award, and wage formula constants | Stage 9 (balancing), recorded in rule set |
 | Exact AI valuation and bidding bands | Stage 10 |
 | Exact training development curve constants and age curve | Stage 4/5 |

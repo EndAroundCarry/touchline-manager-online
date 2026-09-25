@@ -26,6 +26,7 @@ the system is shaped the way it is.
 | [0007](0007-pwa-first-delivery.md) | PWA-first client delivery | Accepted |
 | [0008](0008-deployment-topology.md) | MVP deployment topology | Accepted |
 | [0009](0009-time-identity-and-concurrency.md) | Time, identity, and concurrency conventions | Accepted |
+| [0010](0010-club-takeover-serialisation.md) | Club takeover serialises with an advisory lock, not with `SERIALIZABLE` | Accepted |
 
 ## Rules for changing an ADR
 

@@ -1,0 +1,59 @@
+<section class="max-w-3xl">
+  <h1 [class]="pageHeadingClass">Choose your country</h1>
+  <p class="mt-2 text-sm text-slate-600">
+    You start in the lowest division of the country you pick. Every division holds 18 clubs, and you
+    take over one that is currently run by the game.
+  </p>
+
+  @if (loading()) {
+    <p class="mt-6 text-sm text-slate-600" role="status">Checking where there is room…</p>
+  } @else if (loadError(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  } @else if (capacities().length === 0) {
+    <p
+      class="mt-6 rounded border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-700"
+    >
+      No country is available yet. The world has not been created, or no division is open.
+    </p>
+  } @else {
+    <ul class="mt-6 space-y-3">
+      @for (capacity of capacities(); track capacity.countryId) {
+        <li class="rounded border border-slate-200 bg-white p-4">
+          @if (countryName(capacity.countryId); as name) {
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="text-base font-semibold">{{ name }}</h2>
+                <p class="text-sm text-slate-600">
+                  {{ capacity.lowestActiveTierName }} · 18 clubs,
+                  {{ capacity.availableClubs }} available
+                </p>
+              </div>
+
+              @if (capacity.availableClubs > 0) {
+                <button
+                  type="button"
+                  [class]="primaryButtonClass"
+                  (click)="choose(capacity.countryId)"
+                >
+                  See the clubs
+                </button>
+              } @else {
+                <p class="rounded bg-slate-100 px-3 py-2 text-sm text-slate-700" role="status">
+                  Full — tier {{ capacity.targetTierForExpansion }} is being generated.
+                  @if (capacity.provisioning) {
+                    Check again in about {{ capacity.provisioning.pollAfterSeconds }} seconds.
+                  }
+                </p>
+              }
+            </div>
+          }
+        </li>
+      }
+    </ul>
+
+    <p class="mt-6 text-sm text-slate-600">
+      A country that is full is not closed: the game adds a new division underneath it, and managers
+      join there once it is ready.
+    </p>
+  }
+</section>
