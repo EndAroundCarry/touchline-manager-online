@@ -18,4 +18,6 @@ internal sealed class CompetitionRepository : ICompetitionRepository
 
     /// <inheritdoc />
     public void AddFixture(Fixture fixture) => _dbContext.Fixtures.Add(fixture);
+
+    public void AddStanding(Standing standing) => _dbContext.Standings.Add(standing);
 }

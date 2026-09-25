@@ -279,8 +279,33 @@ public sealed partial class SeedWorld
         }
 
         AddSchedule(divisionSeason, clubIds, season, now);
+        AddTable(divisionSeason, clubIds, now);
 
         return (clubs, players, accounts);
+    }
+
+    /// <summary>
+    /// Opens a division's table at nil-nil, ranked by the draw the division recorded before the season
+    /// (`TBL-10`, `TBL-11`).
+    /// </summary>
+    /// <remarks>
+    /// The table exists from the moment the season does, so a manager who opens the game before the first
+    /// ball is kicked sees eighteen clubs on nought points rather than an empty screen — and sees them in
+    /// the order the season already committed to. Publication rebuilds these rows in place; the initial
+    /// order is not a placeholder but the same rule applied to no results, which is what makes the first
+    /// matchday's table a continuation rather than a surprise.
+    /// </remarks>
+    private void AddTable(DivisionSeason divisionSeason, IReadOnlyList<Guid> clubIds, DateTimeOffset now)
+    {
+        var lines = StandingsCalculator.Rank(
+            clubIds,
+            [],
+            clubId => StandingsCalculator.DrawKeyOf(divisionSeason.TieDrawSeed, clubId));
+
+        foreach (var line in lines)
+        {
+            _competition.AddStanding(Standing.Create(Guid.CreateVersion7(), divisionSeason.Id, line, now));
+        }
     }
 
     /// <summary>

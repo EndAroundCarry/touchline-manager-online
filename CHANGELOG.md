@@ -200,6 +200,141 @@ publication, and the projections follow.
   publication, the standings and statistics projections, and the compressed test clock. **Deferred beyond
   it:** rollover, lower-tier provisioning, and the match viewer.
 
+### The durable matchday worker, the frozen snapshot, and the table
+
+A matchday that plays itself. The calendar's deadlines become durable jobs, each round freezes both clubs
+into one immutable input before it kicks off, the engine simulates it from that input alone, and the nine
+results become public together with the table they move. Three jobs, three business keys, and no way for a
+client to influence any of it.
+
+#### Added
+
+- **The `match` module's four tables** (`MAT-1`, `MAT-9`, master plan §6.6): `match.input_snapshots` (one
+  per fixture, immutable), `match.matches` (one per fixture, carrying both hashes and the versioned
+  statistics document), `match.events` (the durable narrative, `unique (match_id, sequence)`), and
+  `match.simulation_attempts` (every attempt, successful or not, `unique (fixture_id, attempt_number)`). The
+  constraints carry the rules: a fixture is frozen once, simulated once, and an attempt number happens once,
+  so at-least-once delivery cannot produce a second row of any of them.
+- **`InputSnapshot`, `SimulatedMatch`, `SimulationAttempt`, and `MatchEvent`**: the match module's
+  aggregates, each with a factory that validates and no mutator at all, because a frozen input and a played
+  result are history (ADR-0014). `MatchEventType` mirrors the engine's event vocabulary by value, with the
+  stable codes the domain needed and the engine did not, and two of them — "a second yellow is a sending-off,
+  not a second yellow" and "a penalty goal is a goal" — are the definitions the table's card columns and the
+  score reconciliation read.
+- **`MatchSnapshotBuilder`**: a pure function from two prepared sides to one frozen input, with the
+  deterministic repair `DIS-6` asks for. A club's sheet is honoured slot by slot; a slot it left empty, or
+  filled with somebody who cannot play in it, is decided by position suitability, then condition, then
+  ability, then the player's identity. The eleven must contain exactly one recognised goalkeeper, which is
+  why a goalkeeper is never placed outfield and an outfield player is never placed in goal; the bench is
+  filled to seven with at most one goalkeeper, so an untended club's match is a match. Every decision is
+  recorded with its club, its slot, the player who was dropped, and why (`DIS-7`).
+- **A club with no saved plan takes the field in the default formation with the neutral instructions.** The
+  seed world still ships no tactical plans for its AI clubs, and this is what makes the game playable before
+  a single manager has opened the tactics screen — and what `TeamInstructionSet.Neutral` exists for, since
+  the enums' zero values are the extremes rather than the middle. The full AI lineup and tactic policy is
+  Stage 8's, and it will replace this one selection rule without touching the workflow.
+- **`MatchSnapshotDocument` and `MatchStatisticsDocument`** (`match-snapshot-v1`,
+  `match-statistics-v1`): the stored documents, each with a schema discriminator that reading refuses to do
+  without (§4.5). The snapshot document holds the engine's input *and* the repairs, because §6.6 requires
+  both and the engine's contract has nowhere to put a repair; its attributes round-trip through the engine's
+  own validating factory, so an edited document is refused rather than simulated.
+- **`MatchSnapshotFactory`**: the one place a snapshot is built — content hash, seed derived by HMAC from
+  `World:MatchSeedSecret`, commitment, document, input hash — and the one place it is read back.
+  `ReadVerified` re-checks the seed, the commitment, and the input hash before returning the input, so a
+  result can only be produced from a snapshot that is provably still what it was (`MAT-9`).
+- **The three matchday jobs** (`competition.lock-matchday`, `competition.resolve-matchday`,
+  `competition.publish-matchday`) with business keys derived from the matchday's identity, and
+  `MatchdayScheduleScheduler`: the materialiser §7.2 calls `EnsureScheduleJobs`, which turns the calendar
+  into work. It is worker-only, holds no deadline of its own, and re-derives everything from the clock on
+  every pass, so a restart, a redeploy, and a scale-down all produce the same rows (ADR-0003).
+- **`LockMatchday`**: one transaction and one matchday-scoped advisory lock for the whole round. It freezes
+  each fixture's input, freezes the club's prepared sheet, and marks the fixture locked, so the round is
+  either frozen or untouched — a half-locked round would leave some managers able to edit a side and others
+  not, for no reason the rules give.
+- **`ResolveMatchday`**: per-fixture transactions, so a worker killed after six of nine leaves six staged
+  results that a retry finds and leaves alone. Each fixture is marked simulating before the engine is
+  called, so a run that dies mid-simulation is visible as one that started. A fixture whose lock never ran
+  has its snapshot taken here rather than being simulated from live tables (§7.3), and the fixture's lock
+  state and its snapshot commit together. When all nine are staged, the round marks itself staged and
+  enqueues publication in the same transaction.
+- **`PublishMatchday`**: one serializable transaction that publishes the nine fixtures, rebuilds the
+  division's table from its published results, and marks the round published. A round that is not fully
+  staged publishes nothing and moves nothing (`MAT-7`), and the repair path for a table is the same code as
+  the live one (`TBL-13`).
+- **`StandingsCalculator` and `Standing`**: the ordering rules of `TBL-1`–`TBL-12` as one pure function
+  over published results, plus the projection row the table is stored in. The last tie-break is the draw key
+  derived from the seed the division recorded before the season (`TBL-10`, `TBL-11`), and a club identity is
+  compared beyond it only so the order is total. Cards come from the match's events, which is why
+  `TBL-8`/`TBL-9` need no second accumulator.
+- **The seeded world opens with a table**: eighteen rows per division, at nil-nil, ordered by the same draw
+  the season committed to, so a manager who signs in before the first ball is kicked sees a table rather
+  than an empty screen — and sees the same order the first publication will keep.
+- **`GET /divisions/{divisionId}/table`** (§10.5): the division's table for the season in progress, public
+  game data like the calendar, in the order the projection stored, with the server's own instant so a client
+  with a wrong clock cannot mislead a manager about when it was read (`TIME-5`).
+- 24 new domain tests (329 total): the table's ordering rules with every criterion tested by a construction
+  that leaves all the earlier ones level — including the head-to-head group rule and the case where goal
+  difference and goals scored disagree — and the match aggregates' guards, codes, and immutability.
+- 29 new application tests (52 total) for the snapshot builder and the documents: the repair order and each
+  repair reason, the one-goalkeeper rule, the bench, determinism across builds, the refusal of a club with
+  no goalkeeper, the round trip that reproduces the input hash, and the vocabulary mapping that keeps the
+  two enums' values equal.
+- 7 new infrastructure tests over a seeded world in their own container (106 total): the lock's freezing and
+  its idempotency, the resolution's staging and re-run, a round interrupted mid-simulation resuming without
+  a lost or duplicated result, a re-simulation from the stored snapshot reproducing the output hash, a
+  partial round publishing nothing, and a published round moving the table to exactly the ranking the
+  published results compute.
+- 2 new API integration tests (70 total) for the table read, its public access, and its unknown-division
+  refusal; and 1 new worker integration test (4 total) that runs a whole matchday through the real
+  composition: the scheduler materialises it, the queue claims it, the handlers lock, simulate, and publish,
+  and all three jobs reach a terminal state.
+
+#### Notes
+
+- **The lock and the resolution serialise on a matchday-scoped advisory lock, and the test that found it is
+  the one that made both due at once.** They are thirty minutes apart in normal operation and never meet;
+  they meet when the worker was down across both deadlines and comes back to two overdue jobs. The
+  integration test arranged exactly that and the two raced: the resolver takes the snapshot itself when the
+  lock job has not run, so both tried to freeze the same fixture and one died on the snapshot table's unique
+  index. ADR-0003 names one division-matchday publication as a genuine singleton, so the fix was the lock
+  the ADR already called for rather than a new mechanism.
+- **The resolver's snapshot and the fixture's lock state commit together, and that is a fix to a bug the
+  first version had.** A retried resolution that found an existing snapshot skipped the fixture's
+  `Lock` transition, and a crash between the two writes would then have left a fixture that was still
+  `scheduled` with a frozen input — which `Stage` refuses. The ensure step now locks the fixture whenever it
+  is still scheduled, so the pair is written or neither is.
+- **The bench's slot numbers were burning a shirt number per passed-over goalkeeper.** The first version
+  iterated the free slot numbers from the same enumerator that decided whether to add a candidate, so
+  skipping a second goalkeeper consumed a number without recording a repair — and the integration test's
+  repair count came back as 34 or 35 per fixture instead of 36. The count is now asserted exactly, which is
+  what caught it.
+- **`MatchEventTypes.MaxCodeLength` was sixteen and `second_yellow_card` is eighteen.** The column was
+  sized from the constant, so the first staging attempt failed with `value too long for type character
+  varying(16)` — a reminder that a "longest code" constant is a claim about the data and belongs in a test
+  that walks the enum, which `Every_stored_code_round_trips` does.
+- **The standings are rebuilt rather than incremented, and the publication reads its own writes.** The
+  transaction publishes the nine fixtures, commits, reads the division's published results back, and ranks
+  them from scratch, so the projection cannot drift from the fixtures it summarises. It costs a few
+  milliseconds three times a week.
+- **A snapshot's repairs carry their club.** The first version did not, and a repair list for one fixture
+  holding two sides is ambiguous at slot level: "slot 5 was repaired" names two different players. The
+  document carries the club for the same reason, and so does the inbox item `DIS-7` will eventually send.
+- **A club with no available goalkeeper refuses its round by name.** Locking is all-or-nothing, the job
+  dead-letters with the club's identity, and the round does not happen until an operator repairs it. That is
+  deliberate: a forfeit would decide a competitive outcome by a rule the game does not have, and Stage 5
+  already recorded that the engine has no mechanism for a makeshift keeper.
+- **Nothing here is reachable from a command.** There is no endpoint that locks, simulates, or publishes:
+  the three use cases are driven by jobs, and the only public surface this milestone adds is a read
+  (`MAT-2`).
+- **Deferred to the rest of Stage 6:** the compressed test clock, and the web table screen that reads the
+  new endpoint. **Deferred to other stages, with reasons:** player and club season statistics (the engine's
+  player line has no assists and no rating, so the projection would publish columns that could never be
+  filled — Stage 7 completes that contract), discipline records and suspensions, injuries, condition and
+  morale (all need the engine to return state deltas or a rule that decides them, which is Stage 8's subject
+  — ADR-0012 made the same call for training injuries), gate receipts (Stage 9 owns the ledger), the inbox
+  (`DIS-7`'s report needs the inbox to exist), the highlight table (Stage 7's viewer is its first consumer),
+  and rollover, lower-tier provisioning, and the match viewer.
+
 ## Stage 5 — The pure match engine
 
 A match you can replay. `MatchSimulator.Simulate` takes one frozen snapshot and returns one result, and the

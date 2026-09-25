@@ -34,6 +34,53 @@ public static class FixtureMapping
         _ => CompetitionReadOutcome.ClubNotFound,
     };
 
+    /// <summary>Projects a division's stored table.</summary>
+    /// <param name="snapshot">The stored table.</param>
+    /// <param name="serverTime">When the response was produced.</param>
+    public static DivisionTableResponse ToResponse(
+        this DivisionTableSnapshot snapshot,
+        DateTimeOffset serverTime)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return new DivisionTableResponse(
+            snapshot.DivisionId,
+            snapshot.DivisionName,
+            snapshot.TierNumber,
+            snapshot.CountryId,
+            snapshot.CountryCode,
+            snapshot.CountryName,
+            snapshot.SeasonNumber,
+            snapshot.SeasonLabel,
+            [.. snapshot.Rows.Select(ToResponse)],
+            serverTime);
+    }
+
+    /// <summary>Projects one table row.</summary>
+    /// <param name="row">The row.</param>
+    public static DivisionTableRowResponse ToResponse(this DivisionTableRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        return new DivisionTableRowResponse(
+            row.Rank,
+            row.ClubId,
+            row.ClubName,
+            row.ClubShortName,
+            row.Played,
+            row.Won,
+            row.Drawn,
+            row.Lost,
+            row.GoalsFor,
+            row.GoalsAgainst,
+            // Derived here rather than stored, so a row cannot disagree with the two columns it is a
+            // function of, and the client does not have to know the rule (TBL-3).
+            row.GoalsFor - row.GoalsAgainst,
+            row.Points,
+            row.YellowCards,
+            row.RedCards);
+    }
+
     /// <summary>Projects a division's whole fixture calendar.</summary>
     /// <param name="snapshot">The stored calendar.</param>
     /// <param name="serverTime">When the response was produced.</param>

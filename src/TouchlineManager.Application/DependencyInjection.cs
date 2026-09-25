@@ -5,6 +5,7 @@ using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Application.Match;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.Squad.Validation;
 using TouchlineManager.Application.World;
@@ -35,6 +36,9 @@ public static class DependencyInjection
 
         services.AddScoped<IJobHandler, NoOpJobHandler>();
         services.AddScoped<IJobHandler, DailyPlayerProgressionJobHandler>();
+        services.AddScoped<IJobHandler, LockMatchdayJobHandler>();
+        services.AddScoped<IJobHandler, ResolveMatchdayJobHandler>();
+        services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -134,16 +138,29 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Registers the competition module's fixture reads (master plan §10.5).
+    /// Registers the competition module's reads and its matchday workflow (master plan §10.5).
     /// </summary>
     /// <remarks>
-    /// Reads only for now: the transitions that change a fixture — lock, stage, publish — belong to the
-    /// matchday worker, which drives them through its own use cases rather than an HTTP command.
+    /// <para>
+    /// The transitions that change a fixture — lock, stage, publish — have no use case an HTTP command can
+    /// reach: they are driven by the matchday worker through its own three use cases, which is what makes
+    /// "there is no public command that simulates or influences a match" true by construction (`MAT-2`).
+    /// </para>
+    /// <para>
+    /// <see cref="MatchSnapshotFactory"/> is registered here rather than beside a single caller because two
+    /// workflows freeze snapshots: the lock job, and a resolution that finds the lock never ran.
+    /// </para>
     /// </remarks>
     private static void AddCompetitionUseCases(IServiceCollection services)
     {
         services.AddScoped<ListDivisionFixtures>();
         services.AddScoped<GetMyFixtures>();
         services.AddScoped<GetFixture>();
+        services.AddScoped<GetDivisionTable>();
+
+        services.AddScoped<MatchSnapshotFactory>();
+        services.AddScoped<LockMatchday>();
+        services.AddScoped<ResolveMatchday>();
+        services.AddScoped<PublishMatchday>();
     }
 }

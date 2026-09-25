@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Domain.Auth;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.Match;
 using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Infrastructure.Persistence.Entities;
@@ -82,6 +83,21 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the competition module's fixtures.</summary>
     public DbSet<Fixture> Fixtures => Set<Fixture>();
+
+    /// <summary>Gets the competition module's stored league tables, one row per club per division-season.</summary>
+    public DbSet<Standing> Standings => Set<Standing>();
+
+    /// <summary>Gets the match module's frozen input snapshots, one per fixture.</summary>
+    public DbSet<InputSnapshot> InputSnapshots => Set<InputSnapshot>();
+
+    /// <summary>Gets the match module's simulated results, one per fixture.</summary>
+    public DbSet<SimulatedMatch> Matches => Set<SimulatedMatch>();
+
+    /// <summary>Gets the match module's stored event streams.</summary>
+    public DbSet<MatchEvent> MatchEvents => Set<MatchEvent>();
+
+    /// <summary>Gets the match module's simulation attempts, successful and failed.</summary>
+    public DbSet<SimulationAttempt> SimulationAttempts => Set<SimulationAttempt>();
 
     /// <summary>Gets the finance module's club accounts.</summary>
     public DbSet<ClubAccount> ClubAccounts => Set<ClubAccount>();

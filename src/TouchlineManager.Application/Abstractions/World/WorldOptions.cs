@@ -42,4 +42,25 @@ public sealed class WorldOptions
     /// </summary>
     [Range(5, 3600)]
     public int ProvisioningPollSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the world secret every match seed is derived from (master plan §8.2, ADR-0004).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The seed is not chosen, it is derived: HMAC-SHA256 keyed by this value, over the fixture, the frozen
+    /// snapshot's content hash, and the engine version. That is what stops anybody — a manager, a client, an
+    /// operator reading the API — from influencing which way a match's random draws fall, and it binds the
+    /// result to the exact input it was produced from.
+    /// </para>
+    /// <para>
+    /// It is a deployment secret and a production deployment must set it: the default exists so a fresh
+    /// clone and the test suite can freeze and simulate matches without configuration, and changing it
+    /// changes every seed derived afterwards. Matches already simulated keep the commitment they published,
+    /// so a rotated secret does not make a played result unverifiable (`MAT-10`).
+    /// </para>
+    /// </remarks>
+    [Required]
+    [MinLength(16)]
+    public string SeedSecret { get; set; } = "touchline-world-secret-1";
 }

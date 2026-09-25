@@ -27,6 +27,77 @@ internal sealed class CompetitionQueries : ICompetitionQueries
     public CompetitionQueries(TouchlineManagerDbContext dbContext) => _dbContext = dbContext;
 
     /// <inheritdoc />
+    public async Task<DivisionTableSnapshot?> GetDivisionTableAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var header = await (
+            from divisionSeason in _dbContext.DivisionSeasons
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join country in _dbContext.Countries on division.CountryId equals country.Id
+            join seasonRow in _dbContext.Seasons on divisionSeason.SeasonId equals seasonRow.Id
+            where divisionSeason.DivisionId == divisionId && divisionSeason.SeasonId == season.SeasonId
+            select new
+            {
+                DivisionSeasonId = divisionSeason.Id,
+                division.DisplayName,
+                division.TierNumber,
+                CountryId = country.Id,
+                country.Code,
+                CountryName = country.DisplayName,
+                SeasonNumber = seasonRow.SequenceNumber,
+                SeasonLabel = seasonRow.DisplayLabel,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (header is null)
+        {
+            return null;
+        }
+
+        // One query for the table and its clubs: the projection stored the rank, so the read never sorts and
+        // never needs a tie-break rule (TBL-12, TBL-13).
+        var rows = await (
+            from standing in _dbContext.Standings
+            join club in _dbContext.Clubs on standing.ClubId equals club.Id
+            where standing.DivisionSeasonId == header.DivisionSeasonId
+            orderby standing.Rank
+            select new DivisionTableRow(
+                standing.Rank,
+                club.Id,
+                club.Name,
+                club.ShortName,
+                standing.Played,
+                standing.Won,
+                standing.Drawn,
+                standing.Lost,
+                standing.GoalsFor,
+                standing.GoalsAgainst,
+                standing.Points,
+                standing.YellowCards,
+                standing.RedCards))
+            .ToListAsync(cancellationToken);
+
+        return new DivisionTableSnapshot(
+            divisionId,
+            header.DisplayName,
+            header.TierNumber,
+            header.CountryId,
+            header.Code,
+            header.CountryName,
+            header.SeasonNumber,
+            header.SeasonLabel,
+            rows);
+    }
+
+    /// <inheritdoc />
     public async Task<DivisionFixturesSnapshot?> GetDivisionFixturesAsync(
         Guid divisionId,
         CancellationToken cancellationToken)

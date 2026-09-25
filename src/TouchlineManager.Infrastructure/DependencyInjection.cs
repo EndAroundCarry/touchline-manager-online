@@ -6,10 +6,12 @@ using TouchlineManager.Application.Abstractions.Auth;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Jobs;
+using TouchlineManager.Application.Abstractions.Match;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Infrastructure.Competition;
 using TouchlineManager.Infrastructure.Email;
 using TouchlineManager.Infrastructure.Jobs;
 using TouchlineManager.Infrastructure.Persistence;
@@ -48,10 +50,48 @@ public static class DependencyInjection
         AddAuthInfrastructure(services, configuration);
         AddWorldInfrastructure(services, configuration);
         AddCompetitionInfrastructure(services);
+        AddMatchInfrastructure(services);
         AddSquadInfrastructure(services);
         AddTrainingInfrastructure(services, configuration);
+        AddMatchdayInfrastructure(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the match module's persistence (master plan §6.6).
+    /// </summary>
+    /// <remarks>
+    /// A module of its own with a port of its own (`MOD-1`). Nothing outside the matchday workflow reads
+    /// these tables yet; the match viewer's own reads arrive with the viewer in Stage 7, which is why this
+    /// port is the write-and-lookup side only.
+    /// </remarks>
+    private static void AddMatchInfrastructure(IServiceCollection services)
+    {
+        services.AddScoped<IMatchRepository, MatchRepository>();
+    }
+
+    /// <summary>
+    /// Registers the matchday workflow's persistence and the scheduler that materialises its deadlines.
+    /// </summary>
+    /// <remarks>
+    /// The options are bound here rather than in <see cref="AddJobQueueWorker"/> so a misconfigured interval
+    /// fails at startup in every host, and the scheduler is registered there rather than here for the same
+    /// reason the queue poller is: the API must never advance a matchday (ADR-0001, ADR-0008).
+    /// </remarks>
+    private static void AddMatchdayInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IMatchdayRepository, MatchdayRepository>();
+
+        services
+            .AddOptions<MatchdayOptions>()
+            .Bind(configuration.GetSection(MatchdayOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Matchday:CheckIntervalSeconds must be between 30 and 86400.")
+            .Validate(
+                options => options.MaterializeHorizonDays is >= 1 and <= 120,
+                "Matchday:MaterializeHorizonDays must be between 1 and 120.");
     }
 
     /// <summary>
@@ -191,6 +231,10 @@ public static class DependencyInjection
         // deadline (`TRN-3`). Worker-only for the same reason the poller is: the API must never advance
         // a player's training.
         services.AddHostedService<DailyProgressionScheduler>();
+
+        // The same arrangement for the season: this service turns the calendar into lock, resolution, and
+        // publication jobs, and the rows it inserts are the deadlines (§7.2, ADR-0003).
+        services.AddHostedService<MatchdayScheduleScheduler>();
 
         return services;
     }

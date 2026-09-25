@@ -159,8 +159,58 @@ public sealed record FixtureDetailSnapshot(
     int? AwayScore,
     Guid? MatchId);
 
+/// <summary>One row of a division's table, in the order the division is ranked (`TBL-10`).</summary>
+/// <param name="Rank">The 1-based position.</param>
+/// <param name="ClubId">The club.</param>
+/// <param name="ClubName">The club's generated name.</param>
+/// <param name="ClubShortName">The club's abbreviation.</param>
+/// <param name="Played">Fixtures played.</param>
+/// <param name="Won">Fixtures won.</param>
+/// <param name="Drawn">Fixtures drawn.</param>
+/// <param name="Lost">Fixtures lost.</param>
+/// <param name="GoalsFor">Goals scored.</param>
+/// <param name="GoalsAgainst">Goals conceded.</param>
+/// <param name="Points">Points: three a win, one a draw (`TBL-1`).</param>
+/// <param name="YellowCards">Yellow cards accumulated (`TBL-9`).</param>
+/// <param name="RedCards">Red cards accumulated (`TBL-8`).</param>
+public sealed record DivisionTableRow(
+    int Rank,
+    Guid ClubId,
+    string ClubName,
+    string ClubShortName,
+    int Played,
+    int Won,
+    int Drawn,
+    int Lost,
+    int GoalsFor,
+    int GoalsAgainst,
+    int Points,
+    int YellowCards,
+    int RedCards);
+
+/// <summary>A division's table for the season in progress.</summary>
+/// <param name="DivisionId">The division.</param>
+/// <param name="DivisionName">The division's generated name.</param>
+/// <param name="TierNumber">The tier.</param>
+/// <param name="CountryId">The country.</param>
+/// <param name="CountryCode">The country's code.</param>
+/// <param name="CountryName">The country's name.</param>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="Rows">Every club's line, best first.</param>
+public sealed record DivisionTableSnapshot(
+    Guid DivisionId,
+    string DivisionName,
+    int TierNumber,
+    Guid CountryId,
+    string CountryCode,
+    string CountryName,
+    int SeasonNumber,
+    string SeasonLabel,
+    IReadOnlyList<DivisionTableRow> Rows);
+
 /// <summary>
-/// The read side of the competition module's fixture calendar (master plan §10.5, §11.1).
+/// The read side of the competition module's fixture calendar and tables (master plan §10.5, §11.1).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -176,10 +226,24 @@ public sealed record FixtureDetailSnapshot(
 /// </remarks>
 public interface ICompetitionQueries
 {
-    /// <summary>Reads a division's whole fixture calendar, or null if the division is unknown.</summary>
-    /// <param name="divisionId">The division to read.</param>
+    /// <summary>Reads a division's whole calendar, or null if the division is unknown.</summary>
+    /// <param name="divisionId">The division.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<DivisionFixturesSnapshot?> GetDivisionFixturesAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads a division's stored table for the season in progress, or null if the division is unknown.
+    /// </summary>
+    /// <remarks>
+    /// The table is read as the projection it is rather than recomputed per request: it is written once per
+    /// published matchday, inside the same transaction that publishes the round, so a read can never see a
+    /// table that has the round's results only half applied (`MAT-7`, `TBL-13`).
+    /// </remarks>
+    /// <param name="divisionId">The division.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<DivisionTableSnapshot?> GetDivisionTableAsync(
         Guid divisionId,
         CancellationToken cancellationToken);
 

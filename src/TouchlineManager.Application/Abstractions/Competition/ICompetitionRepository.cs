@@ -26,4 +26,7 @@ public interface ICompetitionRepository
 
     /// <summary>Stages a fixture.</summary>
     void AddFixture(Fixture fixture);
+
+    /// <summary>Stages a club's line in a division's table.</summary>
+    void AddStanding(Standing standing);
 }

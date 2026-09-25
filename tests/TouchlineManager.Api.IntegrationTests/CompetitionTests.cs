@@ -85,6 +85,58 @@ public sealed class CompetitionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_division_opens_with_a_table_of_eighteen_clubs_on_nought_points()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var my = (await client.GetFromJsonAsync<MyFixturesResponse>("/api/v1/fixtures/mine"))!;
+        var table = (await client.GetFromJsonAsync<DivisionTableResponse>(
+            $"/api/v1/divisions/{my.DivisionId}/table"))!;
+
+        table.Rows.Should().HaveCount(WorldRuleSet.ClubsPerDivision, "TBL-10: one line per club");
+        table.Rows.Select(row => row.Rank).Should().Equal(Enumerable.Range(1, WorldRuleSet.ClubsPerDivision));
+        table.Rows.Should().OnlyContain(row => row.Played == 0 && row.Points == 0 && row.GoalDifference == 0);
+        table.Rows.Should().OnlyContain(row => !string.IsNullOrEmpty(row.ClubName));
+        table.SeasonLabel.Should().NotBeEmpty();
+        table.ServerTime.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2), "TIME-5");
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task The_table_is_public_and_a_division_that_does_not_exist_is_not_found()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        // No club, no manager profile: a table is the same thing to everybody who can sign in.
+        await client.PostAsJsonAsync(
+            "/api/v1/manager-profile",
+            new { locale = "en-GB", timeZone = "Europe/London" });
+
+        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var divisionId = await db.Divisions.OrderBy(division => division.CreatedAt).Select(division => division.Id).FirstAsync();
+
+        var table = await client.GetFromJsonAsync<DivisionTableResponse>($"/api/v1/divisions/{divisionId}/table");
+
+        table.Should().NotBeNull();
+        table!.Rows.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
+
+        var unknown = await client.GetAsync($"/api/v1/divisions/{Guid.CreateVersion7()}/table");
+
+        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await CodeAsync(unknown)).Should().Be(CompetitionErrorCodes.DivisionNotFound);
+    }
+
+    [Fact]
     public async Task A_manager_reads_a_fixture_from_their_own_side()
     {
         using var client = CreateClient();

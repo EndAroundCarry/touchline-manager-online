@@ -22,6 +22,18 @@ public readonly record struct AdvisoryLockKey(string Scope, Guid Target)
     /// <summary>A manager-scoped lock, used for club claims.</summary>
     public static AdvisoryLockKey Manager(Guid managerId) => new("manager", managerId);
 
+    /// <summary>
+    /// A matchday-scoped lock, used by the workflows that freeze and resolve one round.
+    /// </summary>
+    /// <remarks>
+    /// The lock and the resolution are separate jobs with separate deadlines — half an hour apart in normal
+    /// operation — so they only ever meet when the worker was down across both and comes back to two overdue
+    /// jobs at once. Serialising them is what stops that recovery from being two writers racing to freeze the
+    /// same fixture, which the snapshot table would refuse as a uniqueness violation and the queue would
+    /// retry. ADR-0003 names one division-matchday publication as a genuine singleton; this is its key.
+    /// </remarks>
+    public static AdvisoryLockKey Matchday(Guid matchdayId) => new("matchday", matchdayId);
+
     /// <summary>Renders the lock for diagnostics. Never contains anything sensitive.</summary>
     public override string ToString() => $"{Scope}:{Target}";
 }

@@ -119,6 +119,28 @@ public enum TimeWasting
 /// </remarks>
 public sealed record TeamInstructionSet
 {
+    /// <summary>
+    /// Gets the neutral instruction set a side takes the field with when its club has saved no plan.
+    /// </summary>
+    /// <remarks>
+    /// Every value is the one that neither instructs nor inhibits, which is what makes it a fair starting
+    /// point rather than a tactic: a club whose manager has never opened the tactics screen fields a side
+    /// that is penalised for nothing and rewarded for nothing. It is deliberately explicit rather than a
+    /// default-constructed record, because the enums' zero values are <c>Defensive</c>, <c>Low</c>, and
+    /// <c>Narrow</c> — the extremes, not the middle.
+    /// </remarks>
+    public static TeamInstructionSet Neutral { get; } = new()
+    {
+        Mentality = Mentality.Balanced,
+        Tempo = Tempo.Normal,
+        Passing = PassingStyle.MixedPassing,
+        Width = Width.Normal,
+        Pressing = Pressing.MidBlock,
+        DefensiveLine = DefensiveLine.Normal,
+        Tackling = TacklingStyle.Normal,
+        TimeWasting = TimeWasting.Off,
+    };
+
     /// <summary>Gets the overall approach.</summary>
     public Mentality Mentality { get; init; }
 
