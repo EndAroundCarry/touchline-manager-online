@@ -32,7 +32,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-17 | Player profiles and attributes | squad, web | 4 | Attribute display with non-colour indicators |
 | F-18 | Lineup and team sheet | squad | 4 (default), 6 (fixture) | Validator accepts all presets, rejects invalid |
 | F-19 | Tactics: formations, roles, instructions | squad | 4 | Validation + ETag conflict tests |
-| F-20 | Training | squad | 4 (persistence), 6 (effects) | Deterministic progression test |
+| F-20 | Training | squad | 4 (plan, focus, daily progression), 6 (match effects) | Deterministic progression test |
 | F-21 | Availability: injuries and suspensions | squad, competition | 6 (apply), 8 (full) | Effect-on-correct-future-fixture-exactly-once test |
 | F-22 | Contracts | squad | 4 (list/quote), 9 (full) | Renewal determinism and rollover-expiry tests |
 | F-23 | Finance workflows (cash, wages, income) | finance | 9 | Ledger replay reconstructs balances exactly |

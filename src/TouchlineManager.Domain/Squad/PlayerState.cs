@@ -111,6 +111,50 @@ public sealed class PlayerState
         };
     }
 
+    /// <summary>
+    /// Applies one day of training progression (`TRN-9`, `TRN-10`).
+    /// </summary>
+    /// <remarks>
+    /// The values are the ones the pure <c>DailyProgression</c> calculator produced; this method only
+    /// checks them and records the day, so the rules that decide development live in the calculator and
+    /// the aggregate stays the sole place a stored value is written.
+    /// </remarks>
+    /// <param name="conditionBp">The new condition in basis points.</param>
+    /// <param name="fatigueBp">The new fatigue in basis points.</param>
+    /// <param name="moraleBp">The new morale in basis points.</param>
+    /// <param name="matchSharpnessBp">The new match sharpness in basis points.</param>
+    /// <param name="developmentRemainder">The partial development carried into the next day (`TRN-10`).</param>
+    /// <param name="day">The day the progression was run for.</param>
+    public void ApplyProgression(
+        int conditionBp,
+        int fatigueBp,
+        int moraleBp,
+        int matchSharpnessBp,
+        int developmentRemainder,
+        DateOnly day)
+    {
+        EnsureBasisPoints(conditionBp, nameof(conditionBp));
+        EnsureBasisPoints(fatigueBp, nameof(fatigueBp));
+        EnsureBasisPoints(moraleBp, nameof(moraleBp));
+        EnsureBasisPoints(matchSharpnessBp, nameof(matchSharpnessBp));
+
+        if (developmentRemainder < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(developmentRemainder),
+                developmentRemainder,
+                "A development remainder is never negative (TRN-10).");
+        }
+
+        ConditionBp = conditionBp;
+        FatigueBp = fatigueBp;
+        MoraleBp = moraleBp;
+        MatchSharpnessBp = matchSharpnessBp;
+        DevelopmentRemainder = developmentRemainder;
+        LastProgressionDate = day;
+        Version++;
+    }
+
     private static void EnsureBasisPoints(int value, string parameterName)
     {
         if (value is < WorldRuleSet.StateBasisPointsMin or > WorldRuleSet.StateBasisPointsMax)

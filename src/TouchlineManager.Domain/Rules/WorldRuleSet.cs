@@ -21,7 +21,7 @@ namespace TouchlineManager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v2";
+    public const string Version = "world-rules-v3";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -152,6 +152,16 @@ public static class WorldRuleSet
 
     /// <summary>The highest value of a basis-point player-state measure (`TRN-5`…`TRN-7`).</summary>
     public const int StateBasisPointsMax = 10_000;
+
+    /// <summary>
+    /// The UTC time the daily training progression runs (`TRN-3`).
+    /// </summary>
+    /// <remarks>
+    /// A rule rather than an implementation detail, because it decides which day a manager's training
+    /// choice is applied on. The materializer that enqueues the day's job reads it; the worker executes the
+    /// row whenever it is claimed, so a delayed run is late rather than skipped (ADR-0003).
+    /// </remarks>
+    public static readonly TimeOnly DailyProgressionUtc = new(2, 0);
 
     /// <summary>The youngest game age a generated player may have.</summary>
     public const int PlayerMinimumAge = 17;

@@ -220,6 +220,7 @@ app.MapAccountEndpoints();
 app.MapWorldEndpoints();
 app.MapSquadEndpoints();
 app.MapTacticsEndpoints();
+app.MapTrainingEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;
 

@@ -16,6 +16,7 @@ using TouchlineManager.Infrastructure.Persistence.Repositories;
 using TouchlineManager.Infrastructure.Requests;
 using TouchlineManager.Infrastructure.Security;
 using TouchlineManager.Infrastructure.Time;
+using TouchlineManager.Infrastructure.Training;
 
 namespace TouchlineManager.Infrastructure;
 
@@ -46,8 +47,27 @@ public static class DependencyInjection
         AddAuthInfrastructure(services, configuration);
         AddWorldInfrastructure(services, configuration);
         AddSquadInfrastructure(services);
+        AddTrainingInfrastructure(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the daily training progression's configuration (`TRN-3`).
+    /// </summary>
+    /// <remarks>
+    /// The options are bound here rather than in <see cref="AddJobQueueWorker"/> so the validator that
+    /// guards the interval runs in every host, and so a misconfiguration fails at startup rather than the
+    /// first time the scheduler ticks.
+    /// </remarks>
+    private static void AddTrainingInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<TrainingOptions>()
+            .Bind(configuration.GetSection(TrainingOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Training:CheckIntervalSeconds must be between 30 and 86400.");
     }
 
     /// <summary>
@@ -106,6 +126,8 @@ public static class DependencyInjection
         services.AddScoped<ISquadQueries, SquadQueries>();
         services.AddScoped<ITacticsRepository, TacticsRepository>();
         services.AddScoped<ITacticsQueries, TacticsQueries>();
+        services.AddScoped<ITrainingRepository, TrainingRepository>();
+        services.AddScoped<ITrainingQueries, TrainingQueries>();
     }
 
     /// <summary>
@@ -146,6 +168,11 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddHostedService<JobQueueWorker>();
+
+        // The materializer that makes the daily progression row exist, and the row that becomes the
+        // deadline (`TRN-3`). Worker-only for the same reason the poller is: the API must never advance
+        // a player's training.
+        services.AddHostedService<DailyProgressionScheduler>();
 
         return services;
     }

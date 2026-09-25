@@ -254,6 +254,91 @@ closes the tactics milestone of Stage 4: the model, the validator, the API, and 
   arrangement — so the board renders a first, empty plan without reproducing eighteen coordinates in the
   client, and the same numbers reach the renderer and the snapshot hash.
 
+### Training
+
+A club you can develop. A manager sets the team's focus and intensity, points any individual at one
+attribute family, and a deterministic daily job advances every player in the world by a day of training —
+recovery, bounded development against their hidden potential, and a fraction carried forward so nobody
+loses a day to rounding. This closes the last two deliverables of Stage 4 that were still open: the
+training endpoints, and the daily progression. The `/training` screen follows as its own milestone.
+
+#### Added
+
+- **The deterministic progression calculator** (`TRN-1`, `TRN-2`, `TRN-9`, `TRN-10`): `DailyProgression`
+  is a pure function of the player, the day, the plan in force, the age curve, and the hidden potential,
+  seeded from the player identity and the day and versioned (`training-v1`). It reads no clock, database, or
+  global random source, so a replay reproduces the same day; it produces recovery (condition, fatigue,
+  sharpness, and a bounded morale drift) and development (a fraction per emphasised attribute, carried
+  forward and spent one point at a time). Intensity buys development and costs condition and fatigue;
+  recovery focus buys freshness and develops nobody. An individual focus steers growth to its own family
+  rather than adding to the team's, which is what makes `TRN-2` a decision.
+- **Two aggregate mutations**, the first that move a stored player value outside generation:
+  `PlayerState.ApplyProgression` (basis points, the development remainder, and the day) and
+  `PlayerAttributes.Apply` (re-validates the 1–20 scale and restamps the checksum). Training never lowers an
+  attribute and never pushes one past the player's potential or the scale (`TRN-4`, `TRN-9`).
+- **The training API** (master plan §10.4): `GET /training` — the plan, the squad it applies to, and the
+  option lists so the client never reproduces the enumerations — plus `PUT /training` and
+  `PUT /players/{playerId}/training-focus`. The plan's `version` is its strong entity tag: a change to a set
+  plan requires `If-Match` (answered `428` without it, `412` when stale), and an individual focus that
+  exists carries the same contract (`CONC-1`, ADR-0009).
+- **The daily progression job** (`TRN-3`, master plan §7.2): `RunDailyProgression` loads every club's
+  roster — human and AI alike, with the implicit `balanced`/`normal` default for a club that has set no
+  plan — advances the players whose day it has not already done, and commits once.
+  `DailyPlayerProgressionJobHandler` is a thin shell over it, and `DailyProgressionScheduler`, a worker-only
+  hosted service, materialises the day's date-keyed row so the row is the deadline and a late run is late
+  rather than lost (ADR-0012). The run is idempotent for a day, so at-least-once delivery cannot develop a
+  player twice.
+- **`WorldRuleSet.DailyProgressionUtc`** (02:00 UTC, `TRN-3`), and the rule set is now `world-rules-v3`, as
+  a stage's constants arrive with that stage (`RULE-1`). A world stamped `world-rules-v2` keeps being read
+  against it.
+- **The training persistence**: `ITrainingRepository`/`TrainingRepository` (the plan and focus as tracked
+  aggregates, and the whole-world roster in four flat queries rather than one graph) and
+  `ITrainingQueries`/`TrainingQueries` (the plan, the club, and the squad with each player's focus in one
+  round trip).
+- **`Training:EnableDailyProgression`, off by default.** The switch is configuration rather than an
+  `ops.feature_flags` row because that table does not exist yet, and the scheduler and handler both honour
+  it (master plan §17.12). The player-facing endpoints are complete, so they are not gated.
+- **ADR-0012**, on the materialised world job, the configuration-gated switch, the pure deterministic
+  calculator, and the deliberate deferral of training injuries to Stage 8.
+- 12 new domain tests (261 total) covering determinism, the scale and basis-point bounds over a year, that
+  training never lowers an attribute, that a focus develops only its family, the relative cost of intensity,
+  the age limit, and the potential ceiling; 3 new infrastructure tests (92 total), the important one being
+  the run over a real seeded world — 108 clubs and 2,376 players advanced once, the repeat a no-op, the next
+  day everyone again; and 5 new API integration tests (62 total) covering the read, the create/revise with
+  `428`/`412`, setting and clearing a focus, and the other-club and no-club refusals.
+
+#### Notes
+
+- **The scheduler is `EnsureScheduleJobs`' first form.** Master plan §7.2 names a materialiser for future
+  lock and matchday jobs, but its real subject — fixtures — arrives in Stage 6. Rather than a second
+  mechanism later, the worker service that ensures the daily row is written so the fixture calendar can
+  join it (ADR-0012).
+- **Training injuries are not in this milestone.** `TRN-12` requires them, but the band-to-fixture mapping
+  is the discipline rule `PlayerUnavailability`'s own documentation gives to Stage 8; a calculator that
+  invented one would be a competing definition of injury severity. The development and recovery paths are
+  complete without it.
+- **The facilities baseline is a constant.** `TRN-9` lists it as an input, and facilities are a post-MVP
+  feature (§2.3); it becomes a real input when there is a facility to read (ADR-0012).
+- **Development can leave one attribute behind for a season.** Each day's whole points are spread in a draw
+  order seeded from the player and the day, so over a long run the family develops as a group but a single
+  attribute is not guaranteed a point every season. That is the intended shape — some attributes come on
+  faster — and the tests assert the family-level contract rather than per-attribute growth, which would be
+  a coin flip.
+- **The individual focus overrides the team's family selection, not adds to it.** Team focus still governs
+  load and recovery, so a `fitness` plan with a `technical` individual focus means the player trains hard
+  and develops on the ball. That is the reading of `TRN-2` that makes the optional instruction matter.
+- **The plan takes effect from the day it is saved.** A future-dated plan would need the job to honour
+  several at once for no MVP benefit; the effective date is still stored, because the row records when the
+  choice was made.
+- **A player may be pulled off individual focus and returned to the team plan** with a null family, which
+  deletes the row. The clear is idempotent, so a retried clear is not a conflict.
+- **`Player.Potential` is read by the job, not by a DTO.** The development ceiling is class C2 and the
+  progression repository is an application-layer port, not a manager-facing projection; the
+  data-classification test that guards the contracts assembly is untouched and still passes.
+- **Deferred to the rest of Stage 4:** the `/training` screen. **Deferred beyond it:** the contract renewal
+  quote (whose `CON-3` inputs include playing time, which does not exist until Stage 6's fixtures),
+  fixtures, match effects, full finances, transfers, and the public scouting surface.
+
 ## Stage 3 — World generation, six countries, clubs, and onboarding
 
 A world you can onboard into. Six fictional national pyramids are generated from one seed, a manager

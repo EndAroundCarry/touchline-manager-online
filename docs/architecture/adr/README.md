@@ -28,6 +28,7 @@ the system is shaped the way it is.
 | [0009](0009-time-identity-and-concurrency.md) | Time, identity, and concurrency conventions | Accepted |
 | [0010](0010-club-takeover-serialisation.md) | Club takeover serialises with an advisory lock, not with `SERIALIZABLE` | Accepted |
 | [0011](0011-squad-schema-and-hidden-player-values.md) | Squad schema: hidden player values are server-only columns, and contract/registration agreement is an application invariant | Accepted |
+| [0012](0012-daily-progression-materialised-job.md) | The daily progression is a materialised, feature-gated world job | Accepted |
 
 ## Rules for changing an ADR
 

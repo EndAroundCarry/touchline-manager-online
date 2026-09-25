@@ -417,6 +417,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `player_generator_version` | `player-gen-v1` | FIC-8, PYR-14 |
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
+| `training_progression_version` | `training-v1` | TRN-9 (FIC-8) |
 | `name_pools_version` | `name-pools-v1` | FIC-8 |
 | `club_name_capacity_per_pool` | 1,980 (220 × 9) | FIC-4, PYR-11 |
 | `squad_composition` | 3 GK / 7 defenders / 7 midfielders / 5 attackers | SQ-1 (balancing) |

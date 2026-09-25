@@ -18,4 +18,16 @@ public static class SquadAuditActions
 
     /// <summary>A tactical plan became the club's default.</summary>
     public const string TacticalPlanMadeDefault = "squad.tactical_plan.made_default";
+
+    /// <summary>A club's training plan was set for the first time.</summary>
+    public const string TrainingPlanCreated = "squad.training_plan.created";
+
+    /// <summary>A club's training plan was revised.</summary>
+    public const string TrainingPlanUpdated = "squad.training_plan.updated";
+
+    /// <summary>A player's individual training focus was set (`TRN-2`).</summary>
+    public const string PlayerTrainingFocusSet = "squad.player_training_focus.set";
+
+    /// <summary>A player's individual training focus was cleared (`TRN-2`).</summary>
+    public const string PlayerTrainingFocusCleared = "squad.player_training_focus.cleared";
 }

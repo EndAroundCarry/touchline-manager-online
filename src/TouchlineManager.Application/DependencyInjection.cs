@@ -32,6 +32,7 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddScoped<IJobHandler, NoOpJobHandler>();
+        services.AddScoped<IJobHandler, DailyPlayerProgressionJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -116,7 +117,13 @@ public static class DependencyInjection
         services.AddScoped<GetTactics>();
         services.AddScoped<SaveTacticalPlan>();
         services.AddScoped<MakeTacticalPlanDefault>();
+        services.AddScoped<GetTraining>();
+        services.AddScoped<SaveTrainingPlan>();
+        services.AddScoped<SetPlayerTrainingFocus>();
+        services.AddScoped<RunDailyProgression>();
 
         services.AddScoped<IValidator<SaveTacticalPlanRequest>, SaveTacticalPlanRequestValidator>();
+        services.AddScoped<IValidator<SaveTrainingRequest>, SaveTrainingRequestValidator>();
+        services.AddScoped<IValidator<SetPlayerTrainingFocusRequest>, SetPlayerTrainingFocusRequestValidator>();
     }
 }

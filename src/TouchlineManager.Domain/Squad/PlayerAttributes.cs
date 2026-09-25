@@ -473,6 +473,57 @@ public sealed class PlayerAttributes
         AerialAbility = AerialAbility,
     };
 
+    /// <summary>
+    /// Writes a developed attribute set back over the row, restamping the checksum (`TRN-4`).
+    /// </summary>
+    /// <remarks>
+    /// The only way an attribute moves. It re-validates the scale and recomputes the checksum, so an
+    /// out-of-range value or a stale digest cannot be stored by a caller that skipped the rule
+    /// (<see cref="Create"/> makes the same promise for a new row).
+    /// </remarks>
+    /// <param name="attributes">The new attribute set. Every value must be on the 1–20 scale (`TRN-4`).</param>
+    public void Apply(PlayerAttributeSet attributes)
+    {
+        ArgumentNullException.ThrowIfNull(attributes);
+
+        if (!attributes.IsWithinScale)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(attributes),
+                "Every attribute is between 1 and 20 (TRN-4).");
+        }
+
+        Finishing = attributes.Finishing;
+        Passing = attributes.Passing;
+        Crossing = attributes.Crossing;
+        Dribbling = attributes.Dribbling;
+        FirstTouch = attributes.FirstTouch;
+        Tackling = attributes.Tackling;
+        Marking = attributes.Marking;
+        Heading = attributes.Heading;
+        Technique = attributes.Technique;
+        SetPieces = attributes.SetPieces;
+        Decisions = attributes.Decisions;
+        Vision = attributes.Vision;
+        Positioning = attributes.Positioning;
+        Composure = attributes.Composure;
+        Anticipation = attributes.Anticipation;
+        WorkRate = attributes.WorkRate;
+        Aggression = attributes.Aggression;
+        Leadership = attributes.Leadership;
+        Pace = attributes.Pace;
+        Acceleration = attributes.Acceleration;
+        Stamina = attributes.Stamina;
+        Strength = attributes.Strength;
+        Agility = attributes.Agility;
+        JumpingReach = attributes.JumpingReach;
+        Handling = attributes.Handling;
+        Reflexes = attributes.Reflexes;
+        OneOnOnes = attributes.OneOnOnes;
+        AerialAbility = attributes.AerialAbility;
+        Checksum = ChecksumOf(attributes);
+    }
+
     /// <summary>Gets whether the stored checksum still matches the stored values.</summary>
     public bool ChecksumMatches() => string.Equals(Checksum, ChecksumOf(ToSet()), StringComparison.Ordinal);
 

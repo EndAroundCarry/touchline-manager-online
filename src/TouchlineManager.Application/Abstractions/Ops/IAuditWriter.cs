@@ -117,4 +117,10 @@ public static class AuditTargetTypes
 
     /// <summary>A tactical plan (`INS-11`).</summary>
     public const string TacticalPlan = "tactical_plan";
+
+    /// <summary>A club training plan (`TRN-1`).</summary>
+    public const string TrainingPlan = "training_plan";
+
+    /// <summary>A player's individual training focus (`TRN-2`).</summary>
+    public const string PlayerTrainingFocus = "player_training_focus";
 }
