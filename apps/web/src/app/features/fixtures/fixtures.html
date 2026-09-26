@@ -77,6 +77,17 @@
               <span class="font-semibold">{{ score(fixture) }}</span>
               <span class="ml-2">{{ outcome(fixture) }}</span>
             </div>
+            @if (fixture.matchId; as matchId) {
+              <a
+                routerLink="/matches/{{ matchId }}"
+                [class]="linkClass"
+                [attr.aria-label]="
+                  'Watch the highlights of the match against ' + fixture.opponentName
+                "
+              >
+                Watch
+              </a>
+            }
           </li>
         }
       </ul>

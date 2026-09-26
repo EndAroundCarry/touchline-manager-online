@@ -136,13 +136,14 @@ public static class DependencyInjection
     /// Registers the match module's persistence (master plan §6.6).
     /// </summary>
     /// <remarks>
-    /// A module of its own with a port of its own (`MOD-1`). Nothing outside the matchday workflow reads
-    /// these tables yet; the match viewer's own reads arrive with the viewer in Stage 7, which is why this
-    /// port is the write-and-lookup side only.
+    /// A module of its own with ports of its own (`MOD-1`). The write-and-lookup port serves the matchday
+    /// workflow; the read port serves the match center, and keeping them apart means the viewer cannot reach
+    /// a command's surface (`MOD-3`).
     /// </remarks>
     private static void AddMatchInfrastructure(IServiceCollection services)
     {
         services.AddScoped<IMatchRepository, MatchRepository>();
+        services.AddScoped<IMatchQueries, MatchQueries>();
     }
 
     /// <summary>

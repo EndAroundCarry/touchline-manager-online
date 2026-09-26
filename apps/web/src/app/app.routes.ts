@@ -141,6 +141,15 @@ export const routes: Routes = [
         title: 'Prepare — Touchline Manager',
       },
       {
+        // A detail route rather than a navigation destination: a match is reached from its fixture, not
+        // from the sidebar.
+        path: 'matches/:matchId',
+        loadComponent: () =>
+          import('./features/match-viewer/match-viewer').then((m) => m.MatchViewer),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Match — Touchline Manager',
+      },
+      {
         // A detail route rather than a navigation destination, so it is not in `nav-items.ts`.
         path: 'players/:id',
         loadComponent: () => import('./features/player/player').then((m) => m.PlayerProfile),

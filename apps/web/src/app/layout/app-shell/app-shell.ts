@@ -3,6 +3,8 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
+import { CompetitionStore } from '../../core/competition/competition-store';
+import { MatchStore } from '../../core/match/match-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
@@ -28,6 +30,8 @@ export class AppShell {
   private readonly onboarding = inject(OnboardingStore);
   private readonly squad = inject(SquadStore);
   private readonly tactics = inject(TacticsStore);
+  private readonly competition = inject(CompetitionStore);
+  private readonly match = inject(MatchStore);
   private readonly router = inject(Router);
 
   /**
@@ -56,10 +60,12 @@ export class AppShell {
   protected signOut(): void {
     this.session.logout().subscribe(() => {
       // The onboarding and squad stores are dropped too, so a shared device does not keep the previous
-      // manager's club, players, or plan on screen for whoever signs in next.
+      // manager's club, players, plan, fixtures, or last match on screen for whoever signs in next.
       this.onboarding.clear();
       this.squad.clear();
       this.tactics.clear();
+      this.competition.clear();
+      this.match.clear();
 
       void this.router.navigateByUrl('/login');
     });

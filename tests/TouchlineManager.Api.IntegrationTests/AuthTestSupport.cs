@@ -130,21 +130,33 @@ public static class AuthScenario
     public const string Password = "correct-horse-battery";
 
     /// <summary>Registers, verifies, and signs in a manager.</summary>
-    public static async Task<RegisteredManager> CreateVerifiedManagerAsync(
-        ApiFixture fixture,
-        HttpClient client)
+    public static Task<RegisteredManager> CreateVerifiedManagerAsync(ApiFixture fixture, HttpClient client)
     {
         ArgumentNullException.ThrowIfNull(fixture);
+
+        return CreateVerifiedManagerAsync(fixture.Email, client);
+    }
+
+    /// <summary>Registers, verifies, and signs in a manager against any host's recorder.</summary>
+    /// <remarks>
+    /// The fixture is only ever consulted for its captured email, so a host with its own database — the
+    /// match reads' isolated collection — can use the same honest flow without sharing a fixture type.
+    /// </remarks>
+    public static async Task<RegisteredManager> CreateVerifiedManagerAsync(
+        RecordingEmailSender email,
+        HttpClient client)
+    {
+        ArgumentNullException.ThrowIfNull(email);
         ArgumentNullException.ThrowIfNull(client);
 
-        fixture.Email.Clear();
+        email.Clear();
 
-        var email = $"manager-{Guid.NewGuid():N}@example.com";
+        var address = $"manager-{Guid.NewGuid():N}@example.com";
         var displayName = $"Mgr{Guid.NewGuid():N}"[..13];
 
-        var registration = await RegisterAsync(client, email, displayName);
+        var registration = await RegisterAsync(client, address, displayName);
 
-        var verificationEmail = fixture.Email.Messages.Single(message => message.To == email);
+        var verificationEmail = email.Messages.Single(message => message.To == address);
         var token = AuthTestHelpers.ExtractToken(verificationEmail.TextBody);
 
         var verifyResponse = await client.PostAsJsonAsync(
@@ -155,7 +167,7 @@ public static class AuthScenario
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/v1/auth/login",
-            new { email, password = Password });
+            new { email = address, password = Password });
 
         loginResponse.EnsureSuccessStatusCode();
 
@@ -164,7 +176,7 @@ public static class AuthScenario
 
         return new RegisteredManager(
             registration.UserId,
-            email,
+            address,
             displayName,
             Password,
             session!.AccessToken,

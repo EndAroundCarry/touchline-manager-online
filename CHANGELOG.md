@@ -3,6 +3,120 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 7 — Text match center and 2D highlights
+
+A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and
+`GET /matches/{id}/presentation` answers with the commentary timeline and the keyframe highlights — an
+immutable representation, tagged with the result's own hash and cached accordingly. The `/matches/:matchId`
+screen plays that replay: a Canvas interpolating the server's keyframes at the display's refresh rate, a
+commentary timeline that doubles as event navigation, and the playback controls the plan asks for — 1x, 2x,
+4x, pause, skip, replay, and seek. This is the first milestone of the stage; the end-to-end watch journey is
+the rest of it.
+
+### Added
+
+- **The match reads** (master plan §9.5, §10.5): `GET /matches/{matchId}` — the score, both sides'
+  statistics, and where the match was played — and `GET /matches/{matchId}/presentation` — one line of
+  commentary per narrated event and the highlights in event order. Both are public game data, like the
+  calendar and the table, so neither is gated on holding a club.
+- **Only a published match is readable** (`MAT-7`). The visibility rule lives in the read itself rather
+  than in a check a caller might forget: a fixture that is `staged` already has a match id in the database,
+  and the query answers nothing for it rather than leaving it to the mapping to hide.
+- **`IMatchQueries`/`MatchQueries`**: the match viewer's own read port, separate from the write-and-lookup
+  side the matchday workflow uses (`MOD-3`). It is measured against the match's own season rather than the
+  world's current one, so a result stays readable across a rollover — a played match is history.
+- **`GetMatch` and `GetMatchPresentation`**: the two use cases. The summary reads the stored statistics
+  document, so a read cannot disagree with what was published; the replay is re-derived from the frozen
+  snapshot, and the re-derived output hash is compared with the stored one before anything is returned, so
+  a replay of a different match is impossible (`MAT-9`).
+- **The immutable replay's cache contract** (§9.5): the presentation is a strong entity tag — the output
+  hash of the result it was derived from — and answers `If-None-Match` with `304 Not Modified`, with a
+  long-lived `immutable` cache directive. The `EntityTagHeader` gained the opaque-token form and the
+  `If-None-Match` comparison (RFC 9110 §13.1.2, weak) alongside the concurrency versions it already had.
+- **The match center screen** (`/matches/:matchId`, master plan §9.5, §11.1) and a **Watch** link on each
+  published result in the fixtures list. The screen shows the scoreline, the statistics as a `<table>` with
+  a caption and row headers, the commentary timeline, and the highlight player.
+- **`MatchPlayback`**: the replay's state machine, framework-neutral and timer-free. It is advanced by
+  whatever drives the animation with the real elapsed milliseconds, and a speed scales that time before it
+  is applied to the playhead — so the animation and the match clock are always at the same point of the
+  same highlight. Highlights play in event order and are never reordered, so two chances in the same minute
+  are two queued entries (`§9.4`).
+- **The framework-neutral Canvas renderer** (`features/match-viewer/renderer/`): `pitch-layout` keeps the
+  pitch in its real proportions and maps normalized coordinates onto it; `keyframe-interpolator` lerps
+  between the keyframes that bracket a moment and holds at the ends rather than extrapolating; `render-loop`
+  is a `requestAnimationFrame` wrapper whose point is to be stoppable; and `canvas-match-renderer` draws the
+  pitch, both sides, the ball, its trail, and the shirt numbers, scaling to the device pixel ratio without
+  touching normalized geometry (`§9.1`, `§9.3`, `§9.4`).
+- **The animation is off the change-detection path.** The loop draws every frame, but signals are written
+  only when something discrete changes — the highlight, the play state, the speed — so a 60 Hz animation
+  does not re-evaluate the commentary list 60 times a second (`§9.4`). The loop is stopped on pause, on the
+  tab going hidden, and on destruction (`§9.4`).
+- **Accessibility** (§9.4, §11.3): the highlight's narration is outside the Canvas and announced politely;
+  the Canvas is a labelled image rather than the only way to follow the replay; every control is a labelled
+  button (the speed and text-only controls are `aria-pressed`); the timeline offers a *Watch* action only
+  for lines that have a highlight behind them; and the home side is drawn as circles and the away side as
+  squares, so the teams are never told apart by colour alone.
+- **Reduced motion and a text-only mode** (§9.4): `prefers-reduced-motion` is read and re-read on change,
+  and a *Text only* control hides the diagram entirely and keeps the narration and the timeline. The viewer
+  never starts animating by itself.
+- **The service worker's presentation cache** (§11.4): a `dataGroups` entry for
+  `/api/v1/matches/*/presentation`, network-first with the last answer kept for seven days, so a recently
+  viewed replay can be read offline while a mutation is never queued (`ADR-0007`).
+- **The match reads' own API host.** A second collection fixture with its own PostgreSQL container and its
+  own seeded world, because publishing a matchday moves a division's table and puts scores on its fixtures
+  — which is exactly what the other API tests assert is not yet true.
+- 7 new API integration tests (77 total) that play a round through the real workflow and then read it over
+  HTTP: the score agreeing with the goal events, possession complementary, every goal linked to a highlight
+  and reconciling with the scoreline, every highlight a 23-entity keyframe payload within the 750 KB budget,
+  the ETag and `304` with a stale tag answered in full, neither payload carrying a seed or a hash or a shot
+  quality, an unpublished result not found with a stable code, and an unauthenticated visitor refused.
+- 36 new web unit tests (186 total): the playback state machine's speed scaling, long-frame walking,
+  same-minute queueing, skipping, replaying, and seeking; the presentation helpers' clock, outcomes, and
+  statistics rows; the store's paired read and its failure; and the renderer's interpolation and pitch
+  geometry.
+- 2 new Playwright cases (24 total): the guard for a visitor with no session, and the not-found state a
+  manager gets for a match that has never been played.
+
+### Notes
+
+- **The presentation is re-derived, not stored, and that is a deliberate reading of §6.6.** The plan lists
+  a `match.highlights` table; this milestone does not add one. The engine is pure and the snapshot is
+  frozen and verified, so the commentary and the highlights are a function of data the world already keeps,
+  and re-deriving them means they can never drift from the result they describe — a stored second copy is
+  exactly what a later change leaves behind. The cost is one deterministic simulation per presentation read
+  (p95 3.5 ms) behind an immutable cache, and the guarantee it buys is that the replay always matches the
+  published result, which the use case asserts by hash.
+- **The replay carries no server instant, unlike the mutable reads.** `TIME-5` asks responses to carry the
+  server's time so a wrong client clock cannot mislead a manager, but an immutable, cached representation
+  with a timestamp on it would be a stale clock dressed as a fresh one. The summary carries it; the
+  presentation deliberately does not.
+- **The read is measured against the match's own season.** The world's current season resolves most reads
+  (`CAL-6`), and using it here would have made last season's results unreadable the moment the rollover
+  window opened — which is the opposite of what "immutable" is for.
+- **A separate API fixture was cheaper than a weaker assertion.** The other API tests read a freshly seeded
+  calendar and assert that no score is public yet; a test that publishes a round in that world would have
+  made them fail for a reason that is not a defect. The match reads therefore run against their own
+  container, the same argument the matchday workflow's infrastructure fixture already makes.
+- **`AuthScenario.CreateVerifiedManagerAsync` gained an overload over the email recorder.** It only ever
+  consulted the fixture for captured mail, so a host with its own database can use the same honest flow
+  without the shared fixture type.
+- **The playback clock is the active highlight's minute, and that is the honest reading of §9.4's "the
+  presentation clock pauses while a normal-speed highlight plays".** The clock is tied to the playhead, so
+  it moves when the replay moves to the next event and holds while one is being shown, rather than ticking
+  against a wall clock that has nothing to do with what is on screen.
+- **The animation is stepped from the frame delta the browser gives, not from a stored start time.** A
+  backgrounded tab that returns, or a slow frame, is applied as an elapsed amount rather than skipped, and
+  the player walks forward across as many highlights as the elapsed time covers rather than assuming it
+  landed inside the current one.
+- **The e2e stack cannot yet watch a full match, and the journey says so.** Playwright's `webServer` starts
+  the API and the web client but not the worker, and a real-time matchday is days away; so the browser
+  journey asserts the route, the guard, and the not-found state, and the full "prepare and watch a complete
+  fixture" journey is deferred rather than faked with a stub. The replay's contract is proven instead by the
+  API integration tests, which drive a real round through the real workflow first.
+- **The initial bundle is 531.0 kB, still under the 550 kB warning.** It grew because the shell now drops
+  the previous manager's fixture and match state on sign-out, which pulls both feature stores into the
+  eager chunk; the viewer itself — the renderer included — is a 18.6 kB lazy chunk (`ADR-0007`).
+
 ## Stage 6 — Season schedule, fixtures, and the matchday worker
 
 A season you can see the shape of. Seeding the world now generates each division's full fixture list: the

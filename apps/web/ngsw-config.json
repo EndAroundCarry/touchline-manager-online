@@ -26,5 +26,18 @@
         ]
       }
     }
+  ],
+  "dataGroups": [
+    {
+      "name": "match-presentations",
+      "description": "Recently viewed match replays. A published presentation is immutable, so the network is preferred but the last answer is kept for reading offline (ADR-0007, §11.4).",
+      "urls": ["/api/v1/matches/*/presentation"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 50,
+        "maxAge": "7d",
+        "timeout": "5s"
+      }
+    }
   ]
 }

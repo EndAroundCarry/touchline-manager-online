@@ -46,8 +46,23 @@ public static class DependencyInjection
         AddWorldUseCases(services);
         AddSquadUseCases(services);
         AddCompetitionUseCases(services);
+        AddMatchUseCases(services);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the match center's reads (master plan §9.5, §10.5).
+    /// </summary>
+    /// <remarks>
+    /// Reads only, and both public game data. Nothing here produces or changes a result: the matchday worker
+    /// owns that (`MAT-2`), and the replay is re-derived from the frozen snapshot the worker already wrote
+    /// rather than stored a second time (`MAT-8`, `MAT-9`).
+    /// </remarks>
+    private static void AddMatchUseCases(IServiceCollection services)
+    {
+        services.AddScoped<GetMatch>();
+        services.AddScoped<GetMatchPresentation>();
     }
 
     private static void AddAuthUseCases(IServiceCollection services)
