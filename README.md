@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 6 delivered — the season plays itself.** The playable game is being built in the
+> **Status: Stage 8 in progress — the squad feels the result.** The playable game is being built in the
 > staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the
 > API and worker composition roots, the health and observability baseline, and the Angular PWA shell. Stage
 > 2 added the account schema, the full credential lifecycle, rotating refresh sessions with reuse
@@ -21,7 +21,14 @@ kick-off. The server decides results; a client can never simulate or influence o
 > turned that engine into a season: a 34-round fixture calendar, the fixture and prepare-match screens, the
 > durable matchday worker that locks a round's team sheets, simulates its nine fixtures from frozen
 > snapshots, and publishes results and table together, the division table screen, and a compressed test
-> clock for non-production environments. The next stage is the match center and its 2D highlights.
+> clock for non-production environments. Stage 7 added the match center: the score, statistics and
+> commentary over HTTP, a deterministic replay re-derived from the frozen snapshot behind an immutable
+> cache, and a Canvas viewer that plays the keyframe highlights — proven end to end by a journey that
+> prepares a side, plays a real round through the worker, and watches the replay. Stage 8 has begun with
+> discipline and injuries: publication now turns a round's cards and injuries into each player's season
+> accumulation and into suspensions and absences measured in fixtures, which the next round's frozen side
+> cannot name. The rest of the stage — season statistics, condition and morale, the AI's own selection
+> policy, the inbox, and the discipline screens — is what follows.
 
 ---
 

@@ -1,4 +1,5 @@
 using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.Match;
 using TouchlineManager.Domain.Squad;
 
 namespace TouchlineManager.Application.Abstractions.Competition;
@@ -115,6 +116,28 @@ public sealed record DivisionTableSource(
     IReadOnlyList<MatchOutcome> Outcomes);
 
 /// <summary>
+/// One event of a matchday whose published result changes a player's availability (`DIS-1`, `DIS-2`,
+/// `DIS-4`).
+/// </summary>
+/// <remarks>
+/// Only the events that have an effect are carried — a booking, a sending-off, an injury — and only those
+/// that name a participant, because the rest describe the match rather than a player. The events are the
+/// durable narrative, so the effects are re-derived from them rather than stored a second time, the same
+/// reading that makes the table's card columns a count over events (`MAT-5`).
+/// </remarks>
+/// <param name="FixtureId">The fixture the effect happened in.</param>
+/// <param name="ClubId">The club the affected player played for.</param>
+/// <param name="Type">What happened.</param>
+/// <param name="PlayerId">The affected player.</param>
+/// <param name="AbsenceFixtures">The fixtures an injury rules the player out for, or zero.</param>
+public sealed record MatchEffectEvent(
+    Guid FixtureId,
+    Guid ClubId,
+    MatchEventType Type,
+    Guid PlayerId,
+    int AbsenceFixtures);
+
+/// <summary>
 /// The competition module's port for the matchday workflow (master plan §7.3, §7.4).
 /// </summary>
 /// <remarks>
@@ -160,6 +183,27 @@ public interface IMatchdayRepository
     /// <summary>Stages a club's line in a division's table.</summary>
     /// <param name="standing">The line.</param>
     void AddStanding(Standing standing);
+
+    /// <summary>
+    /// Loads the card and injury events of every fixture in a matchday, in fixture and sequence order
+    /// (`DIS-1`, `DIS-2`, `DIS-4`).
+    /// </summary>
+    /// <param name="matchdayId">The matchday.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<MatchEffectEvent>> LoadMatchEffectsAsync(Guid matchdayId, CancellationToken cancellationToken);
+
+    /// <summary>Loads the card accumulations of a division-season for the given players (`DIS-2`).</summary>
+    /// <param name="divisionSeasonId">The division-season.</param>
+    /// <param name="playerIds">The players the round touched.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<DisciplineRecord>> LoadDisciplineAsync(
+        Guid divisionSeasonId,
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>Stages a player's season card accumulation.</summary>
+    /// <param name="record">The record.</param>
+    void AddDisciplineRecord(DisciplineRecord record);
 }
 
 /// <summary>A matchday with the aggregates its workflow mutates.</summary>

@@ -406,7 +406,9 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `slot_coordinate_scale` | 0–10,000 | TAC-9 |
 | `team_instructions` | 8 enumerated | INS-1..INS-8 |
 | `injury_absence_fixtures` | 1–6 | DIS-1 |
+| `injury_severity_bands` | minor 1–2, moderate 3–4, major 5–6 | DIS-1 |
 | `yellow_suspension_threshold` | 5 | DIS-2 |
+| `yellow_suspension_matches` | 1 | DIS-2 |
 | `red_suspension_matches` | 1 | DIS-4 |
 | `contract_seasons_min` / `_max` | 1 / 3 | CON-1 |
 | `inactivity_warning_days` | 10 | OCC-1 |

@@ -3,6 +3,85 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 8 — Competition depth, discipline, injuries, and AI match management
+
+A result that costs you players. A publication no longer only moves the table: the cards and injuries its
+events describe become a discipline record for each player and an absence for each injury, and every club
+that played serves one fixture against the absences it already had. The suspension a sending-off earns is
+therefore a player the next round's frozen side cannot name — which is `DIS-5` and `DIS-1` as behaviour
+rather than as a table. This is the first milestone of the stage; the season statistics, the AI's own
+lineup policy, the inbox that reports all of it, and the discipline screens are the rest.
+
+### Added
+
+- **The discipline and injury rules** (game rules §11, `DIS-1`, `DIS-2`, `DIS-4`): five league yellows earn
+  a one-fixture suspension, a sending-off earns one, and an injury's fixture absence maps to the band that
+  describes it — minor at one or two, moderate at three or four, major at five or six. The rule set is now
+  `world-rules-v5`, as a stage's constants arrive with that stage (`RULE-1`); a world stamped with an
+  earlier version keeps being read against it.
+- **`competition.discipline_records`** (master plan §6.4): one row per player per division-season, advanced
+  by publication. Its `unique (division_season_id, player_id)` makes the accumulation a lookup rather than a
+  search, and its `check` keeps the counts from going negative. It is the season's accumulation only —
+  whether a booking is the fifth is a question asked of a running total (`YellowSuspensionsEarned`), and the
+  suspension itself is not stored twice.
+- **`DisciplineRecord`**: the aggregate with the accumulation as behaviour. It counts bookings and
+  sendings-off, and it answers "does this match's card cross the threshold" by comparing the total divided
+  by the threshold before and after — which is how the fifth booking and the tenth each earn a ban without
+  the count ever being reset away from the rollover `DIS-3` names.
+- **`MatchEffectsCalculator`**: a pure function from a matchday's card and injury events to one effect per
+  player. It mirrors the engine's own reconciliation rule (`MAT-5`) — a second yellow is both the booking it
+  was and the sending-off it became — so the discipline a manager reads agrees with the match statistics,
+  and it decides no threshold of its own, because "how many yellows is a ban" belongs to the rules.
+- **Publication is where a result reaches the squad** (`DIS-1`, `DIS-4`, `DIS-5`). Each club that played
+  serves one fixture against every open absence it had, and then the round's own cards and injuries are
+  applied. The order is the rule: an absence is never served by the match that caused it, so a player sent
+  off in round ten misses round eleven, and a three-fixture injury keeps them out of three.
+- **`IAvailabilityRepository`**, the squad module's staging port for absences: it loads the open records of
+  the clubs that played, tracked, so the publication serves them through
+  `PlayerUnavailability.ServeFixture` rather than by editing a count. The matchday repository gained the
+  effects read, the discipline lookup, and the discipline stage.
+- **The absence already reached the frozen side, and this milestone is what fills it.** Stage 6's snapshot
+  builder already excluded an unavailable player and recorded the repair (`DIS-6`, `DIS-7`); nothing
+  produced an absence until now. A suspended player is therefore repaired out of the next side by the same
+  code that repairs an empty slot, with no new selection rule.
+- 11 new domain tests (340 total) for the accumulation, the threshold arithmetic including the tenth
+  booking, the record's refusals, and every injury band; 6 new application tests (58 total) for the effect
+  calculator; and 2 new infrastructure tests over a real seeded world (118 total) that play a round with an
+  injected sending-off and injury, assert the discipline record and the absence, freeze the next round and
+  assert neither player is named in it, and assert the absence is served exactly once.
+
+### Notes
+
+- **The discipline record carries no `pending_suspension_fixtures` column, deliberately.** Master plan §6.4
+  lists one, but an outstanding suspension is already a `PlayerUnavailability` of type `suspension` — the
+  record the snapshot builder reads and the publication serves. A second "how many matches are left" on the
+  discipline row would be two answers to one question and the first thing to drift.
+- **A second yellow books the player and sends them off.** The engine emits one `second_yellow_card` event
+  rather than a card and a red, and both the match statistics and this calculator read it as both. That is
+  the reading the standings' tie-break columns already record for the other direction (a second yellow
+  counts there as a red and not as a second yellow), and a test in the engine's own suite pins the two
+  vocabularies together.
+- **A sending-off and a yellow accumulation in the same match are summed into one absence.** They are two
+  rules that both fired, not two things for a player to serve twice over the same span, and one record with
+  a longer count is what `ServeFixture` was built to advance.
+- **The effects are applied by publication and not by simulation.** A result is private until its round
+  publishes (`MAT-7`), and an absence is the same: one applied at staging would be visible to the next lock
+  before its cause was public. Applying them in the publication's own serializable transaction means the
+  result, the table, and the absence become public together or not at all.
+- **An absence is served once per published fixture, which is once per matchday per club.** A club plays
+  exactly one league fixture a round (`CAL-9`), so a three-fixture injury is three rounds, and the
+  mismatching fixture is not a case the calendar can produce.
+- **The injury's severity is derived at application, not drawn by the engine.** The engine draws an absence
+  of one to six fixtures and records it on the injury event; which band that is describes the player to a
+  manager and is game-rules vocabulary, so `WorldRuleSet.InjurySeverityFor` owns the mapping and the
+  engine is left knowing only fixtures.
+- **Deferred to the rest of Stage 8:** player and club season statistics and the stats/tie-break views;
+  condition, fatigue, and morale deltas from a match (`TRN-11`, `TRN-13`); the deterministic AI lineup,
+  tactics, substitutions, training, and renewal policy (`INS-12`); the `comms` inbox and news module that
+  `DIS-7` reports repairs through; the projection rebuild and reconciliation tools; and the discipline and
+  competition screens. **Deferred beyond it:** the discipline accumulation's reset at rollover (`DIS-3`) and
+  an unserved suspension carrying into the next season (`DIS-8`), both of which belong to Stage 12.
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

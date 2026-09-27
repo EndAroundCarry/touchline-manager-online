@@ -87,6 +87,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the competition module's stored league tables, one row per club per division-season.</summary>
     public DbSet<Standing> Standings => Set<Standing>();
 
+    /// <summary>Gets the competition module's card accumulations, one row per player per division-season.</summary>
+    public DbSet<DisciplineRecord> DisciplineRecords => Set<DisciplineRecord>();
+
     /// <summary>Gets the match module's frozen input snapshots, one per fixture.</summary>
     public DbSet<InputSnapshot> InputSnapshots => Set<InputSnapshot>();
 

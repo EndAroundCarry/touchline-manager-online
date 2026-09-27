@@ -205,6 +205,43 @@ internal sealed class MatchdayRepository : IMatchdayRepository
     /// <inheritdoc />
     public void AddStanding(Standing standing) => _dbContext.Standings.Add(standing);
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<MatchEffectEvent>> LoadMatchEffectsAsync(
+        Guid matchdayId,
+        CancellationToken cancellationToken) =>
+        await (
+            from matchEvent in _dbContext.MatchEvents
+            join fixture in _dbContext.Fixtures on matchEvent.MatchId equals fixture.MatchId
+            where fixture.MatchdayId == matchdayId
+                && matchEvent.ParticipantId != null
+                && (matchEvent.Type == MatchEventType.YellowCard
+                    || matchEvent.Type == MatchEventType.SecondYellowCard
+                    || matchEvent.Type == MatchEventType.RedCard
+                    || matchEvent.Type == MatchEventType.Injury)
+            orderby fixture.Id, matchEvent.Sequence
+            select new MatchEffectEvent(
+                fixture.Id,
+                matchEvent.ClubId,
+                matchEvent.Type,
+                matchEvent.ParticipantId!.Value,
+                matchEvent.AbsenceFixtures ?? 0))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DisciplineRecord>> LoadDisciplineAsync(
+        Guid divisionSeasonId,
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken) =>
+        playerIds.Count == 0
+            ? []
+            : await _dbContext.DisciplineRecords
+                .Where(record => record.DivisionSeasonId == divisionSeasonId
+                    && playerIds.Contains(record.PlayerId))
+                .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public void AddDisciplineRecord(DisciplineRecord record) => _dbContext.DisciplineRecords.Add(record);
+
     private static DisciplineCounts CountsFor(
         Dictionary<(Guid MatchId, Guid ClubId), DisciplineCounts> discipline,
         Guid matchId,

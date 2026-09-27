@@ -1,3 +1,5 @@
+using TouchlineManager.Domain.Squad;
+
 namespace TouchlineManager.Domain.Rules;
 
 /// <summary>
@@ -14,15 +16,15 @@ namespace TouchlineManager.Domain.Rules;
 /// Constants arrive with the stage that needs them, never earlier, because adding a rule before it is
 /// specified is inventing behaviour. Stage 3 contributed the world, occupancy, calendar, and finance
 /// values; Stage 4 the squad, contract, tactics, and training values; Stage 6 the schedule-streak bound
-/// the fixture generator validates against. Bumping <see cref="Version"/> is what makes that a rule
-/// change rather than a silent constant tweak (`RULE-3`); a world already stamped with an earlier version
-/// keeps being read against it.
+/// the fixture generator validates against; Stage 8 the injury and suspension bands the match effects
+/// apply. Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
+/// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
 /// </remarks>
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v4";
+    public const string Version = "world-rules-v5";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -176,6 +178,49 @@ public static class WorldRuleSet
     /// row whenever it is claimed, so a delayed run is late rather than skipped (ADR-0003).
     /// </remarks>
     public static readonly TimeOnly DailyProgressionUtc = new(2, 0);
+
+    /// <summary>The league yellow cards that trigger a one-match suspension (`DIS-2`).</summary>
+    public const int YellowSuspensionThreshold = 5;
+
+    /// <summary>The fixtures a yellow-accumulation suspension costs (`DIS-2`).</summary>
+    public const int YellowSuspensionFixtures = 1;
+
+    /// <summary>The fixtures a sending-off costs in MVP rules (`DIS-4`).</summary>
+    public const int RedCardSuspensionFixtures = 1;
+
+    /// <summary>The shortest absence an injury causes, in eligible fixtures (`DIS-1`).</summary>
+    public const int MinInjuryAbsenceFixtures = 1;
+
+    /// <summary>The longest absence an injury causes, in eligible fixtures (`DIS-1`).</summary>
+    public const int MaxInjuryAbsenceFixtures = 6;
+
+    /// <summary>The longest absence a minor injury causes, in eligible fixtures (`DIS-1`).</summary>
+    public const int MinorInjuryMaxAbsenceFixtures = 2;
+
+    /// <summary>The longest absence a moderate injury causes, in eligible fixtures (`DIS-1`).</summary>
+    public const int ModerateInjuryMaxAbsenceFixtures = 4;
+
+    /// <summary>
+    /// Maps an injury's fixture absence to the band that describes it (`DIS-1`).
+    /// </summary>
+    /// <remarks>
+    /// The rule set owns the bands rather than the engine: the engine draws an absence between one and six
+    /// fixtures, and what those numbers mean to a manager — a knock, a spell out, a long lay-off — is
+    /// game-rules vocabulary that belongs here, where the discipline and injury stages read it.
+    /// </remarks>
+    /// <param name="absenceFixtures">The absence the injury causes, in eligible fixtures.</param>
+    /// <returns>The severity band the absence falls in.</returns>
+    public static InjurySeverity InjurySeverityFor(int absenceFixtures)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(absenceFixtures, MinInjuryAbsenceFixtures);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(absenceFixtures, MaxInjuryAbsenceFixtures);
+
+        return absenceFixtures <= MinorInjuryMaxAbsenceFixtures
+            ? InjurySeverity.Minor
+            : absenceFixtures <= ModerateInjuryMaxAbsenceFixtures
+                ? InjurySeverity.Moderate
+                : InjurySeverity.Major;
+    }
 
     /// <summary>The youngest game age a generated player may have.</summary>
     public const int PlayerMinimumAge = 17;

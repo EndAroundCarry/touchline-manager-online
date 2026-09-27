@@ -488,6 +488,14 @@ erDiagram
         smallint current_rank
         bigint version
     }
+    discipline_records {
+        uuid id PK
+        uuid division_season_id FK
+        uuid player_id FK
+        int yellow_cards
+        int red_cards
+        bigint version
+    }
     input_snapshots {
         uuid id PK
         uuid fixture_id FK
@@ -587,6 +595,7 @@ erDiagram
 | `unique (country_id, tier_number)`, `check (tier_number >= 1)` | `divisions` | `WORLD-4`, no tier 0 |
 | `unique (division_id, season_id)` | `division_seasons` | One instance per division per season |
 | `unique (division_season_id, club_id)` | `club_season_entries`, `standings` | One entry and one standing per club |
+| `unique (division_season_id, player_id)`, `check (yellow_cards >= 0 and red_cards >= 0)` | `discipline_records` | One accumulation per player per season (`DIS-2`) |
 | `unique (division_season_id, round_number)` | `matchdays` | 34 rounds |
 | `check (home_club_id <> away_club_id)` | `fixtures` | A club cannot play itself |
 | `check (home_score >= 0 and away_score >= 0)` | `fixtures` | Nonnegative scores |

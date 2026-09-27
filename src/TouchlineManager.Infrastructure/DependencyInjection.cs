@@ -261,6 +261,7 @@ public static class DependencyInjection
         services.AddScoped<ITrainingQueries, TrainingQueries>();
         services.AddScoped<ITeamSheetRepository, TeamSheetRepository>();
         services.AddScoped<ITeamSheetQueries, TeamSheetQueries>();
+        services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
     }
 
     /// <summary>

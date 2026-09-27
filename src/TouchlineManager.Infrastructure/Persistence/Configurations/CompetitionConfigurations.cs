@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
+using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Infrastructure.Persistence.Configurations;
@@ -400,6 +401,54 @@ internal sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(fixture => fixture.AwayClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>competition.discipline_records</c>: a player's card accumulation for one division-season
+/// (`DIS-2`, `DIS-4`, master plan §6.4).
+/// </summary>
+/// <remarks>
+/// One row per player per division-season, so the accumulation is a lookup and the database refuses a
+/// second copy. The counts are non-negative by check, and the club is deliberately absent: the record is
+/// the season's accumulation rather than a club fact, and the suspension it earns is a
+/// <c>PlayerUnavailability</c> row that names the club. A transfer mid-season therefore starts a fresh
+/// record in the new division rather than moving the old one.
+/// </remarks>
+internal sealed class DisciplineRecordConfiguration : IEntityTypeConfiguration<DisciplineRecord>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<DisciplineRecord> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("discipline_records", "competition", table => table.HasCheckConstraint(
+            "ck_discipline_records_cards",
+            "yellow_cards >= 0 and red_cards >= 0"));
+
+        builder.HasKey(record => record.Id);
+        builder.Property(record => record.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(record => record.DivisionSeasonId).HasColumnName("division_season_id").IsRequired();
+        builder.Property(record => record.PlayerId).HasColumnName("player_id").IsRequired();
+        builder.Property(record => record.YellowCards).HasColumnName("yellow_cards").IsRequired();
+        builder.Property(record => record.RedCards).HasColumnName("red_cards").IsRequired();
+        builder.Property(record => record.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(record => record.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(record => record.Version).HasColumnName("version").IsRequired();
+
+        builder.HasIndex(record => new { record.DivisionSeasonId, record.PlayerId })
+            .IsUnique()
+            .HasDatabaseName("ux_discipline_records_division_season_id_player_id");
+
+        builder.HasOne<DivisionSeason>()
+            .WithMany()
+            .HasForeignKey(record => record.DivisionSeasonId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Player>()
+            .WithMany()
+            .HasForeignKey(record => record.PlayerId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

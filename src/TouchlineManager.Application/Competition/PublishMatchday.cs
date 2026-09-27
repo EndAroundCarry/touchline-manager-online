@@ -1,7 +1,11 @@
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Persistence;
+using TouchlineManager.Application.Abstractions.Squad;
+using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.Rules;
+using TouchlineManager.Domain.Squad;
 
 namespace TouchlineManager.Application.Competition;
 
@@ -43,6 +47,13 @@ public sealed record PublishMatchdayResult(PublishMatchdayOutcome Outcome, int P
 /// operator repairing a projection runs the same code path the live publication does (`TBL-13`).
 /// </para>
 /// <para>
+/// Publication is where a result reaches the squad, too: the round's cards and injuries become discipline
+/// records and absences, and each club's open absences are served one fixture (`DIS-1`, `DIS-2`, `DIS-4`,
+/// `DIS-5`). It is the publication's transaction and not the simulation's because an effect must not be
+/// visible until its result is: a suspension nobody can see yet would still be repaired away by the next
+/// lock, while one applied and published together is the fact the rules describe.
+/// </para>
+/// <para>
 /// Publication is serializable. It reads a whole division's results and rewrites its table, and the
 /// concurrency rule names matchday publication explicitly: two transactions that both read the table and
 /// wrote it in turn would give the second one a table missing the first one's round (`CONC-2`). A
@@ -52,16 +63,19 @@ public sealed record PublishMatchdayResult(PublishMatchdayOutcome Outcome, int P
 public sealed class PublishMatchday
 {
     private readonly IMatchdayRepository _matchdays;
+    private readonly IAvailabilityRepository _availability;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
 
     /// <summary>Initializes the use case.</summary>
     public PublishMatchday(
         IMatchdayRepository matchdays,
+        IAvailabilityRepository availability,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
         _matchdays = matchdays;
+        _availability = availability;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -97,12 +111,12 @@ public sealed class PublishMatchday
             TransactionIsolation.Serializable,
             cancellationToken);
 
-        var published = 0;
+        var published = new List<Fixture>();
 
         foreach (var fixture in workload.Fixtures.Where(fixture => fixture.Status == FixtureStatus.Staged))
         {
             fixture.Publish(now);
-            published++;
+            published.Add(fixture);
         }
 
         // Committed before the table is read, so the results this round just published are part of what the
@@ -111,13 +125,124 @@ public sealed class PublishMatchday
 
         var tableRows = await RebuildTableAsync(workload.Matchday.DivisionSeasonId, now, cancellationToken);
 
+        await ApplyEffectsAsync(workload, published, now, cancellationToken);
+
         workload.Matchday.Publish(now);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 
-        return new PublishMatchdayResult(PublishMatchdayOutcome.Published, published, tableRows);
+        return new PublishMatchdayResult(PublishMatchdayOutcome.Published, published.Count, tableRows);
+    }
+
+    /// <summary>
+    /// Serves each club's open absences one fixture and opens the ones this round created (`DIS-1`,
+    /// `DIS-2`, `DIS-4`, `DIS-5`).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Serving happens before the round's own cards and injuries are applied, so an absence is never served
+    /// by the match that caused it: a player sent off in this round misses the next one, and a three-fixture
+    /// injury keeps them out of the next three.
+    /// </para>
+    /// <para>
+    /// A sending-off and a yellow accumulation each earn a suspension, and both are summed into one record,
+    /// because they are two rules that both fired rather than two things for the player to serve twice over
+    /// the same span. A second yellow is both the booking it was and the red it became, exactly as the match
+    /// statistics count it (`MAT-5`), so a player can reach the threshold and be sent off in one match.
+    /// </para>
+    /// </remarks>
+    private async Task ApplyEffectsAsync(
+        MatchdayWorkload workload,
+        List<Fixture> published,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (published.Count == 0)
+        {
+            return;
+        }
+
+        var clubIds = published
+            .SelectMany(fixture => new[] { fixture.HomeClubId, fixture.AwayClubId })
+            .Distinct()
+            .ToList();
+
+        // Every club that played has one fixture served against each open absence, which is what "measured
+        // in fixtures, not days" means (DIS-5, TRN-12).
+        foreach (var absence in await _availability.LoadOpenAsync(clubIds, cancellationToken))
+        {
+            absence.ServeFixture(now);
+        }
+
+        var effects = MatchEffectsCalculator.Calculate(
+            await _matchdays.LoadMatchEffectsAsync(workload.Matchday.Id, cancellationToken));
+
+        if (effects.Count == 0)
+        {
+            return;
+        }
+
+        var playerIds = effects.Select(effect => effect.PlayerId).Distinct().ToList();
+
+        var records = (await _matchdays.LoadDisciplineAsync(
+                workload.Matchday.DivisionSeasonId,
+                playerIds,
+                cancellationToken))
+            .ToDictionary(record => record.PlayerId);
+
+        foreach (var effect in effects)
+        {
+            if (effect.YellowCards > 0 || effect.RedCards > 0)
+            {
+                if (!records.TryGetValue(effect.PlayerId, out var record))
+                {
+                    record = DisciplineRecord.Open(
+                        Guid.CreateVersion7(),
+                        workload.Matchday.DivisionSeasonId,
+                        effect.PlayerId,
+                        now);
+
+                    _matchdays.AddDisciplineRecord(record);
+                    records[effect.PlayerId] = record;
+                }
+
+                var suspensions = (record.YellowSuspensionsEarned(
+                        effect.YellowCards,
+                        WorldRuleSet.YellowSuspensionThreshold)
+                    * WorldRuleSet.YellowSuspensionFixtures)
+                    + (effect.RedCards > 0 ? WorldRuleSet.RedCardSuspensionFixtures : 0);
+
+                record.AddCards(effect.YellowCards, effect.RedCards, now);
+
+                if (suspensions > 0)
+                {
+                    _availability.Add(PlayerUnavailability.Open(
+                        Guid.CreateVersion7(),
+                        effect.PlayerId,
+                        effect.ClubId,
+                        UnavailabilityType.Suspension,
+                        InjurySeverity.Minor,
+                        suspensions,
+                        effect.FixtureId,
+                        now));
+                }
+            }
+
+            if (effect.AbsenceFixtures > 0)
+            {
+                _availability.Add(PlayerUnavailability.Open(
+                    Guid.CreateVersion7(),
+                    effect.PlayerId,
+                    effect.ClubId,
+                    UnavailabilityType.Injury,
+                    WorldRuleSet.InjurySeverityFor(effect.AbsenceFixtures),
+                    effect.AbsenceFixtures,
+                    effect.FixtureId,
+                    now));
+            }
+        }
     }
 
     /// <summary>
