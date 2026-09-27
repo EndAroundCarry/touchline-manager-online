@@ -163,22 +163,22 @@ public sealed class MatchDocumentTests
         string displayName,
         int shirtNumber,
         MatchPosition position) => new()
-    {
-        ParticipantId = playerId,
-        PlayerId = playerId,
-        ClubId = clubId,
-        DisplayName = displayName,
-        ShirtNumber = shirtNumber,
-        Position = position,
-        Attributes = PlayerAttributesV1.From([.. Enumerable.Repeat(12, MatchAttributeNames.Count)]),
-        State = new PlayerMatchStateV1
         {
-            ConditionBasisPoints = 9_000,
-            FatigueBasisPoints = 100,
-            MoraleBasisPoints = PlayerState.NeutralBasisPoints,
-            SharpnessBasisPoints = PlayerState.NeutralBasisPoints,
-        },
-    };
+            ParticipantId = playerId,
+            PlayerId = playerId,
+            ClubId = clubId,
+            DisplayName = displayName,
+            ShirtNumber = shirtNumber,
+            Position = position,
+            Attributes = PlayerAttributesV1.From([.. Enumerable.Repeat(12, MatchAttributeNames.Count)]),
+            State = new PlayerMatchStateV1
+            {
+                ConditionBasisPoints = 9_000,
+                FatigueBasisPoints = 100,
+                MoraleBasisPoints = PlayerState.NeutralBasisPoints,
+                SharpnessBasisPoints = PlayerState.NeutralBasisPoints,
+            },
+        };
 
     private static MatchResultV1 SimulatedMatch(ulong seed) => new()
     {
