@@ -195,6 +195,7 @@ public static class DependencyInjection
         services.AddScoped<GetFixture>();
         services.AddScoped<GetDivisionTable>();
         services.AddScoped<GetDivisionStatistics>();
+        services.AddScoped<GetDivisionRules>();
 
         services.AddScoped<MatchSnapshotFactory>();
         services.AddScoped<LockMatchday>();

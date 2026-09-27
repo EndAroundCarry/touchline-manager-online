@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import {
+  DivisionRules,
   DivisionStatistics,
   DivisionTable,
   FixtureTeamSheet,
@@ -39,6 +40,10 @@ export class CompetitionStore {
   private readonly divisionStatisticsSignal = signal<DivisionStatistics | null>(null);
   private readonly statisticsLoadingSignal = signal(false);
   private readonly statisticsErrorSignal = signal<string | null>(null);
+
+  private readonly divisionRulesSignal = signal<DivisionRules | null>(null);
+  private readonly rulesLoadingSignal = signal(false);
+  private readonly rulesErrorSignal = signal<string | null>(null);
 
   private readonly teamSheetSignal = signal<FixtureTeamSheet | null>(null);
   private readonly selectionSignal = signal<ReadonlyMap<number, string>>(new Map());
@@ -83,6 +88,15 @@ export class CompetitionStore {
 
   /** Why a division's player statistics could not be read. */
   readonly statisticsError = this.statisticsErrorSignal.asReadonly();
+
+  /** A division's competition rules last read. */
+  readonly divisionRules = this.divisionRulesSignal.asReadonly();
+
+  /** Whether a division's competition rules are being read. */
+  readonly rulesLoading = this.rulesLoadingSignal.asReadonly();
+
+  /** Why a division's competition rules could not be read. */
+  readonly rulesError = this.rulesErrorSignal.asReadonly();
 
   /** The prepared side last read. */
   readonly teamSheet = this.teamSheetSignal.asReadonly();
@@ -231,6 +245,31 @@ export class CompetitionStore {
     });
   }
 
+  /**
+   * Reads a division's competition rules for the season in progress (`§10.5`, `TBL-11`).
+   *
+   * Public game data like the table, so it is read by division identity and nothing here names the
+   * caller's club.
+   */
+  loadDivisionRules(divisionId: string): void {
+    this.rulesLoadingSignal.set(true);
+    this.rulesErrorSignal.set(null);
+    this.divisionRulesSignal.set(null);
+
+    this.api.divisionRules(divisionId).subscribe({
+      next: (rules) => {
+        this.divisionRulesSignal.set(rules);
+        this.rulesLoadingSignal.set(false);
+      },
+      error: (error: unknown) => {
+        this.rulesLoadingSignal.set(false);
+        this.rulesErrorSignal.set(
+          error instanceof ApiError ? error.detail : 'The competition rules could not be loaded.',
+        );
+      },
+    });
+  }
+
   /** Reads the club's prepared side for a fixture and starts editing it. */
   loadTeamSheet(fixtureId: string): void {
     this.loadingSignal.set(true);
@@ -368,6 +407,9 @@ export class CompetitionStore {
     this.divisionStatisticsSignal.set(null);
     this.statisticsLoadingSignal.set(false);
     this.statisticsErrorSignal.set(null);
+    this.divisionRulesSignal.set(null);
+    this.rulesLoadingSignal.set(false);
+    this.rulesErrorSignal.set(null);
     this.teamSheetSignal.set(null);
     this.selectionSignal.set(new Map());
     this.loadingSignal.set(false);

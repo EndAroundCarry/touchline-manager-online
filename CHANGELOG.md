@@ -532,6 +532,72 @@ screens are what is left of Stage 8.
 - **Deferred to the rest of Stage 8:** the discipline and competition screens, including the tie-break view
   and the competition-rules page that shows the stored draw key (`TBL-11`).
 
+### The competition's rules and its draw
+
+A rule you can read. `GET /divisions/{divisionId}/rules` answers with the points a result is worth, the
+table's tie-break criteria in the order they are applied, and the draw the season committed to before it
+began — the stored seed, its published hash, and every club's derived key. `/competitions/:divisionId/rules`
+is the screen, reached from the table. It closes `TBL-11`: "the final draw key is generated before the
+season, stored, and visible in competition rules" is now a page a manager can open rather than a claim in a
+document.
+
+#### Added
+
+- **`TieBreakers`** (`TBL-2`…`TBL-10`): the table's ordering as one ordered list of stable codes, so the
+  rules view and the calculator describe one order rather than two. `StandingsCalculator` gained
+  `PointsForLoss` beside the two point values it already carried, so the points a page shows are the points
+  the table awards rather than a second copy of `TBL-1`.
+- **The rules read** (master plan §10.5): `GET /divisions/{divisionId}/rules`, `GetDivisionRules`, and
+  `ICompetitionQueries.GetDivisionRulesAsync`. It returns the division and its season, the points, the
+  ordered criteria, the stored tie-draw seed and hash, and one key per club. The keys are derived from the
+  stored seed with `StandingsCalculator.DrawKeyOf` rather than stored, so a key cannot disagree with the draw
+  it came from, and the hash is carried because it is what makes the draw checkable.
+- **The mapping reads the domain.** `FixtureMapping.ToResponse` takes the points and the ordering from
+  `StandingsCalculator` and `TieBreakers` rather than from the read, so a page cannot describe an order the
+  table does not follow.
+- **The `/competitions/:divisionId/rules` screen** (§11.1): the criteria in words as an ordered list, the
+  seed and its hash, and a table of every club's draw key. The club table is a real `<table>` with a caption
+  and a row header, so assistive technology reads it as tabular data (§11.3), and the table screen links to
+  it beside the statistics link.
+- **ADR-0021**, on the ordering as one domain definition, the tie-draw seed and its hash being public while
+  the match seed stays protected, the per-club keys derived rather than stored, and the read being public
+  game data.
+- 1 new domain test (371 total) pinning the order as the rules' literal codes and that no criterion is
+  listed twice; 1 new application test (95 total) for the projection over the domain's own points and order;
+  2 new infrastructure tests (135 total) over a real seeded world — the read returns the division-season's
+  stored seed and hash, the hash is the digest of the seed, every club's key is distinct and derived from the
+  stored seed, and an unknown division answers nothing; 3 new API integration tests (91 total) that read a
+  division's rules over HTTP and check the unknown-division and unauthenticated refusals; and 4 new web tests
+  (210 total) for the criterion wording and the store's rules read, its failure, and its clearing.
+
+#### Notes
+
+- **The draw is shown, and that is `TBL-11` rather than a disclosure decision.** An ordering whose last
+  criterion is a draw is only meaningful if a manager can see the draw the season committed to before it was
+  played — a stored secret would be indistinguishable from one chosen after the fact. The protected value is
+  the match seed (`MAT-9`); the tie-draw seed is not it, and it decides only the order of two clubs that no
+  result separated.
+- **The hash sits beside the seed because verification needs both.** `tie_draw_hash` is a digest of
+  `tie_draw_seed` (`SeedWorld`), so showing the pair lets a reader confirm the seed has not been edited since
+  the season began. The integration test asserts the relationship, so a seeder change that broke it fails a
+  fast test rather than quietly making the page's evidence worthless.
+- **The ordering is the server's and the words are the client's.** The response carries stable codes
+  (`points`, `draw_key`, …) and the web maps them to English, the split the commentary tokens and the inbox
+  templates already use (§8.6), so a criterion added to the rule set reaches the page without a second
+  ordering being maintained in TypeScript.
+- **Nothing is sorted in the client.** The criteria arrive in the order the table applies them and the clubs
+  by name, so the screen renders the sequence it is given rather than reimplementing a rule — the principle
+  the table's stored rank already follows (`TBL-12`).
+- **A surface the plan did not route is still a screen the rules asked for.** §10.5 lists the division reads
+  it knows about and `TBL-11` asks for "competition rules"; the route is
+  `/competitions/:divisionId/rules`, reached from the table whose division it describes, so it is a detail
+  route rather than a navigation destination like the statistics screen beside it.
+- **Deferred to the rest of Stage 8:** a division's discipline as its own view — its bookings and its
+  outstanding suspensions — which the statistics screen half covers (each player's card counts are already
+  public) but which has no page for the suspensions themselves; the `club_season_stats` aggregate, still
+  without a reader; and the player profile's own season line, which is the squad module's read to widen
+  rather than the competition module's to bolt on.
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

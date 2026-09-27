@@ -130,6 +130,13 @@ first difference deciding:
 | TBL-13 | Standings are a transactional projection of published fixtures and must be exactly rebuildable from them. |
 | TBL-14 | A division's table is reconciled by a rebuild that recomputes it from its published fixtures; the rebuild must reproduce the live projection exactly, correct only what has drifted, and leave nothing behind. |
 
+The ordering is shown to managers rather than described: `GET /divisions/{divisionId}/rules` returns the
+points, this sequence as stable codes, and the season's stored draw — the seed, its published hash, and each
+club's derived key — so `TBL-11`'s "visible in competition rules" is a page anyone who can sign in can open.
+The criteria arrive as codes and the wording is the client's, the same split the commentary and inbox
+templates use; the codes are the ones `StandingsCalculator` ranks with, so the page describes the order the
+table actually follows.
+
 ---
 
 ## 7. Promotion and relegation

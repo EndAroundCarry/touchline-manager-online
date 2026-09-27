@@ -31,6 +31,24 @@ const TEAM_SHEET_ISSUE_MESSAGES: Record<string, string> = {
   TEAM_SHEET_TOO_MANY_SUBSTITUTES: 'Name at most seven substitutes.',
 };
 
+/**
+ * Words for the table's tie-break criteria, in the order the server lists them (`TBL-2`…`TBL-10`).
+ *
+ * The ordering is the server's; only the English is here, so the screen renders the sequence it is given
+ * rather than a second, drifting copy of the rule.
+ */
+const TIE_BREAKER_LABELS: Record<string, string> = {
+  points: 'Points',
+  goal_difference: 'Goal difference',
+  goals_scored: 'Goals scored',
+  wins: 'Wins',
+  head_to_head_points: 'Head-to-head points among the tied clubs',
+  head_to_head_goal_difference: 'Head-to-head goal difference among the tied clubs',
+  fewer_red_cards: 'Fewer red cards',
+  fewer_yellow_cards: 'Fewer yellow cards',
+  draw_key: 'The season draw, stored before the season began',
+};
+
 /** Names a fixture's lifecycle state, falling back to the code. */
 export function fixtureStatusLabel(code: string): string {
   return FIXTURE_STATUS_LABELS[code] ?? code;
@@ -73,6 +91,11 @@ export function goalDifferenceLabel(goalDifference: number): string {
  */
 export function averageRatingLabel(rating: number | null): string {
   return rating === null ? '\u2014' : rating.toFixed(1);
+}
+
+/** Names one of the table's tie-break criteria, falling back to the code (`TBL-2`…`TBL-10`). */
+export function tieBreakerLabel(code: string): string {
+  return TIE_BREAKER_LABELS[code] ?? code;
 }
 
 /** Words for one team-sheet validator issue, naming the slot it concerns when it concerns one. */

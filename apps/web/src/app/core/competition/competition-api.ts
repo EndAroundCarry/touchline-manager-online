@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
   DivisionFixtures,
+  DivisionRules,
   DivisionStatistics,
   DivisionTable,
   FixtureDetail,
@@ -47,6 +48,11 @@ export class CompetitionApi {
   /** Reads a division's player season statistics for the season in progress. */
   divisionStatistics(divisionId: string): Observable<DivisionStatistics> {
     return this.api.get<DivisionStatistics>(`/divisions/${divisionId}/statistics`);
+  }
+
+  /** Reads a division's competition rules, its tie-break order, and its stored draw. */
+  divisionRules(divisionId: string): Observable<DivisionRules> {
+    return this.api.get<DivisionRules>(`/divisions/${divisionId}/rules`);
   }
 
   /** Reads the caller's club's side for a fixture, prepared or not. */

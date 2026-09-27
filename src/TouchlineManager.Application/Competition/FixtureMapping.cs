@@ -132,6 +132,54 @@ public static class FixtureMapping
                 : Math.Round(row.AverageRatingBasisPoints.Value / 1000m, 1, MidpointRounding.AwayFromZero));
     }
 
+    /// <summary>Projects a division's competition rules for the season in progress.</summary>
+    /// <remarks>
+    /// The points and the ordering are taken from the domain rather than from the response, so a screen
+    /// cannot describe an order the table does not follow: <see cref="StandingsCalculator"/> ranks with
+    /// exactly these values and <see cref="TieBreakers.Ordered"/> is the sequence it applies (`TBL-1`…
+    /// `TBL-11`).
+    /// </remarks>
+    /// <param name="snapshot">The stored rules and draw.</param>
+    /// <param name="serverTime">When the response was produced.</param>
+    public static DivisionRulesResponse ToResponse(
+        this DivisionRulesSnapshot snapshot,
+        DateTimeOffset serverTime)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return new DivisionRulesResponse(
+            snapshot.DivisionId,
+            snapshot.DivisionName,
+            snapshot.TierNumber,
+            snapshot.CountryId,
+            snapshot.CountryCode,
+            snapshot.CountryName,
+            snapshot.SeasonNumber,
+            snapshot.SeasonLabel,
+            new LeaguePointsResponse(
+                StandingsCalculator.PointsForWin,
+                StandingsCalculator.PointsForDraw,
+                StandingsCalculator.PointsForLoss),
+            [.. TieBreakers.Ordered.Select(code => new TieBreakerResponse(code))],
+            snapshot.TieDrawSeed,
+            snapshot.TieDrawHash,
+            [.. snapshot.Clubs.Select(ToResponse)],
+            serverTime);
+    }
+
+    /// <summary>Projects one club's place in the season's tie-break draw.</summary>
+    /// <param name="row">The club and its draw key.</param>
+    public static DivisionRulesClubResponse ToResponse(this DivisionRulesClubRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        return new DivisionRulesClubResponse(
+            row.ClubId,
+            row.ClubName,
+            row.ClubShortName,
+            row.DrawKey);
+    }
+
     /// <summary>Projects a division's whole fixture calendar.</summary>
     /// <param name="snapshot">The stored calendar.</param>
     /// <param name="serverTime">When the response was produced.</param>

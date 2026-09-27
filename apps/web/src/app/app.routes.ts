@@ -127,6 +127,14 @@ export const routes: Routes = [
         title: 'Statistics — Touchline Manager',
       },
       {
+        // One division's competition rules and its stored tie-break draw (TBL-11).
+        path: 'competitions/:divisionId/rules',
+        loadComponent: () =>
+          import('./features/competitions/rules').then((m) => m.CompetitionRules),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Competition rules — Touchline Manager',
+      },
+      {
         // The manager's own division's table. The division is named by their club, so the navigation
         // destination needs no parameter.
         path: 'competitions',

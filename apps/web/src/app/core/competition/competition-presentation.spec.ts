@@ -8,6 +8,7 @@ import {
   roundLabel,
   scoreLabel,
   teamSheetIssueMessage,
+  tieBreakerLabel,
   venueLabel,
 } from './competition-presentation';
 
@@ -117,5 +118,16 @@ describe('goalDifferenceLabel', () => {
   it('leaves a negative difference and zero as the number they are', () => {
     expect(goalDifferenceLabel(-3)).toBe('-3');
     expect(goalDifferenceLabel(0)).toBe('0');
+  });
+});
+
+describe('tieBreakerLabel', () => {
+  it('names the criteria the server lists', () => {
+    expect(tieBreakerLabel('points')).toBe('Points');
+    expect(tieBreakerLabel('draw_key')).toBe('The season draw, stored before the season began');
+  });
+
+  it('falls back to the raw code for a criterion it does not know', () => {
+    expect(tieBreakerLabel('coin_toss')).toBe('coin_toss');
   });
 });

@@ -37,6 +37,7 @@ the system is shaped the way it is.
 | [0018](0018-ai-club-policy.md) | A club nobody manages is set up by a pure, versioned policy run by the worker | Accepted |
 | [0019](0019-engine-v2-and-season-statistics.md) | The player line carries assists and a rating, and season statistics are a projection of published results | Accepted |
 | [0020](0020-projection-rebuild-and-reconciliation.md) | Projections are reconciled and rebuilt by recomputing them from published results | Accepted |
+| [0021](0021-competition-rules-and-visible-draw.md) | The tie-break order and the season's draw are public, and the criteria have one definition | Accepted |
 
 ## Rules for changing an ADR
 

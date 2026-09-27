@@ -90,6 +90,9 @@ public static class StandingsCalculator
     /// <summary>Points awarded for a draw (`TBL-1`).</summary>
     public const int PointsForDraw = 1;
 
+    /// <summary>Points awarded for a defeat (`TBL-1`).</summary>
+    public const int PointsForLoss = 0;
+
     /// <summary>Ranks every club in a division from its published results.</summary>
     /// <param name="clubIds">Every club in the division, including those that have not played yet.</param>
     /// <param name="outcomes">The division's published results.</param>

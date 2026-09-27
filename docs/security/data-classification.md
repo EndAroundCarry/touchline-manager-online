@@ -39,6 +39,20 @@ Data in class C2 lives in one of two places, never both:
 **Rule:** if a value is C2, there is a test that fails when it appears in a manager-facing
 response. Relying on a mapper being correct is not sufficient.
 
+### 2.2 Seed material
+
+Two different values are both called a seed, and they are not the same class.
+
+- **The match seed** — derived by HMAC from the world seed secret, frozen per fixture, and stored only as a
+  commitment beside a protected value (`MAT-9`) — is C2. "RNG seed material" in §1 and §4 means this value:
+  it decides a simulated result, so revealing it before the match is played would let the result be
+  predicted.
+- **A tie-break draw seed** (`division_seasons.tie_draw_seed`) is **C0**. It decides only the order of two
+  clubs that no published result separated, it is generated per country and season when the world is seeded,
+  and game rules `TBL-11` require the draw to be *visible* in competition rules. It is served publicly by
+  `GET /divisions/{divisionId}/rules`, with the published digest of the seed beside it (ADR-0021); the world
+  seed secret and the match seed are never served.
+
 ---
 
 ## 3. Retention

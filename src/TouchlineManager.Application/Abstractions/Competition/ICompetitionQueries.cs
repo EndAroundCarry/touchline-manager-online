@@ -265,6 +265,42 @@ public sealed record DivisionStatisticsSnapshot(
     string SeasonLabel,
     IReadOnlyList<DivisionPlayerStatRow> Rows);
 
+/// <summary>One club's place in a season's tie-break draw (`TBL-10`, `TBL-11`).</summary>
+/// <param name="ClubId">The club.</param>
+/// <param name="ClubName">The club's generated name.</param>
+/// <param name="ClubShortName">The club's abbreviation.</param>
+/// <param name="DrawKey">The key the final tie-breaker compares, derived from the stored seed.</param>
+public sealed record DivisionRulesClubRow(
+    Guid ClubId,
+    string ClubName,
+    string ClubShortName,
+    string DrawKey);
+
+/// <summary>A division's competition rules for the season in progress (`TBL-1`…`TBL-11`).</summary>
+/// <param name="DivisionId">The division.</param>
+/// <param name="DivisionName">The division's generated name.</param>
+/// <param name="TierNumber">The tier.</param>
+/// <param name="CountryId">The country.</param>
+/// <param name="CountryCode">The country's stable code.</param>
+/// <param name="CountryName">The country's display name.</param>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="TieDrawSeed">The stored seed the season's final tie-break draw derives from (`TBL-11`).</param>
+/// <param name="TieDrawHash">The published digest of that seed (`TBL-11`).</param>
+/// <param name="Clubs">Every club in the division, with its draw key.</param>
+public sealed record DivisionRulesSnapshot(
+    Guid DivisionId,
+    string DivisionName,
+    int TierNumber,
+    Guid CountryId,
+    string CountryCode,
+    string CountryName,
+    int SeasonNumber,
+    string SeasonLabel,
+    string TieDrawSeed,
+    string TieDrawHash,
+    IReadOnlyList<DivisionRulesClubRow> Clubs);
+
 /// <summary>
 /// The read side of the competition module's fixture calendar and tables (master plan §10.5, §11.1).
 /// </summary>
@@ -315,6 +351,22 @@ public interface ICompetitionQueries
     /// <param name="divisionId">The division.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<DivisionStatisticsSnapshot?> GetDivisionStatisticsAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads a division's competition rules for the season in progress, or null if the division is unknown.
+    /// </summary>
+    /// <remarks>
+    /// The points and the ordering are the server's, but the stored draw is the reason this read exists: a
+    /// season commits to a tie-break draw before it is played, and a manager must be able to see it, because
+    /// an ordering whose final criterion cannot be inspected is indistinguishable from one chosen after the
+    /// fact (`TBL-11`). The per-club keys are derived from the stored seed here rather than stored, so they
+    /// cannot disagree with it.
+    /// </remarks>
+    /// <param name="divisionId">The division.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<DivisionRulesSnapshot?> GetDivisionRulesAsync(
         Guid divisionId,
         CancellationToken cancellationToken);
 

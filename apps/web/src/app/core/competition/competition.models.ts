@@ -135,6 +135,51 @@ export interface DivisionStatistics {
   readonly serverTime: string;
 }
 
+/** How many points a result is worth (`TBL-1`). */
+export interface LeaguePoints {
+  readonly win: number;
+  readonly draw: number;
+  readonly loss: number;
+}
+
+/** One tie-breaker, as the stable code of the criterion (`TBL-2`…`TBL-10`). */
+export interface TieBreaker {
+  readonly code: string;
+}
+
+/** One club's place in the season's tie-break draw (`TBL-10`, `TBL-11`). */
+export interface DivisionRulesClub {
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly clubShortName: string;
+
+  /** The key the final tie-breaker compares, derived from the stored seed. */
+  readonly drawKey: string;
+}
+
+/**
+ * A division's competition rules for the season in progress (§10.5, `TBL-1`…`TBL-11`).
+ *
+ * The ordering arrives as the server's sequence of stable codes, so the screen renders the order the table
+ * applies rather than inventing one, and the stored draw it commits to is visible beside it (`TBL-11`).
+ */
+export interface DivisionRules {
+  readonly divisionId: string;
+  readonly divisionName: string;
+  readonly tierNumber: number;
+  readonly countryId: string;
+  readonly countryCode: string;
+  readonly countryName: string;
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly points: LeaguePoints;
+  readonly tieBreakers: readonly TieBreaker[];
+  readonly tieDrawSeed: string;
+  readonly tieDrawHash: string;
+  readonly clubs: readonly DivisionRulesClub[];
+  readonly serverTime: string;
+}
+
 /** One of the manager's club's fixtures, from that club's point of view. */
 export interface ClubFixture {
   readonly id: string;

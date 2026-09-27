@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Application.Abstractions.Competition;
+using TouchlineManager.Domain.Competition;
 
 namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 
@@ -173,6 +174,77 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             header.CountryName,
             header.SeasonNumber,
             header.SeasonLabel,
+            rows);
+    }
+
+    /// <inheritdoc />
+    public async Task<DivisionRulesSnapshot?> GetDivisionRulesAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var header = await (
+            from divisionSeason in _dbContext.DivisionSeasons
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join country in _dbContext.Countries on division.CountryId equals country.Id
+            join seasonRow in _dbContext.Seasons on divisionSeason.SeasonId equals seasonRow.Id
+            where divisionSeason.DivisionId == divisionId && divisionSeason.SeasonId == season.SeasonId
+            select new
+            {
+                DivisionSeasonId = divisionSeason.Id,
+                divisionSeason.TieDrawSeed,
+                divisionSeason.TieDrawHash,
+                division.DisplayName,
+                division.TierNumber,
+                CountryId = country.Id,
+                country.Code,
+                CountryName = country.DisplayName,
+                SeasonNumber = seasonRow.SequenceNumber,
+                SeasonLabel = seasonRow.DisplayLabel,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (header is null)
+        {
+            return null;
+        }
+
+        // The clubs are ordered by name so the draw list is stable between reads (TBL-12's principle), and
+        // each key is derived from the stored seed rather than stored, so a key cannot disagree with the
+        // draw the season committed to before it was played (TBL-11).
+        var clubs = await (
+            from entry in _dbContext.ClubSeasonEntries
+            join club in _dbContext.Clubs on entry.ClubId equals club.Id
+            where entry.DivisionSeasonId == header.DivisionSeasonId
+            orderby club.Name
+            select new { club.Id, club.Name, club.ShortName })
+            .ToListAsync(cancellationToken);
+
+        var rows = clubs
+            .Select(club => new DivisionRulesClubRow(
+                club.Id,
+                club.Name,
+                club.ShortName,
+                StandingsCalculator.DrawKeyOf(header.TieDrawSeed, club.Id)))
+            .ToList();
+
+        return new DivisionRulesSnapshot(
+            divisionId,
+            header.DisplayName,
+            header.TierNumber,
+            header.CountryId,
+            header.Code,
+            header.CountryName,
+            header.SeasonNumber,
+            header.SeasonLabel,
+            header.TieDrawSeed,
+            header.TieDrawHash,
             rows);
     }
 
