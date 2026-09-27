@@ -30,7 +30,7 @@ public static class UnitRatingCalculator
         IReadOnlyList<ActiveSlot> activeSlots,
         MatchInstructionsV1 instructions,
         bool isHome,
-        EngineRulesV1 rules)
+        EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(activeSlots);
         ArgumentNullException.ThrowIfNull(instructions);
@@ -59,7 +59,7 @@ public static class UnitRatingCalculator
     /// slot instead, so it measures fit rather than quality, and it takes no tactical modifier because no
     /// instruction changes how well a player suits a job.
     /// </remarks>
-    private static int Cohesion(IReadOnlyList<ActiveSlot> slots, bool isHome, EngineRulesV1 rules)
+    private static int Cohesion(IReadOnlyList<ActiveSlot> slots, bool isHome, EngineRulesV2 rules)
     {
         if (slots.Count == 0)
         {
@@ -82,11 +82,11 @@ public static class UnitRatingCalculator
         var average = (int)(familiarityTotal / slots.Count);
 
         average -= makeshift * rules.OutOfPositionCohesionPenaltyBasisPoints;
-        average = int.Clamp(average, 0, EngineRulesV1.Certain);
+        average = int.Clamp(average, 0, EngineRulesV2.Certain);
 
         // Put onto the rating scale so cohesion can be compared with the other units: a side where everyone
         // fits is worth a maximum-attribute player, and a side of misfits is worth correspondingly less.
-        var rating = average * (rules.AttributeRatingFactor * MatchAttributeNames.Max) / EngineRulesV1.Certain;
+        var rating = average * (rules.AttributeRatingFactor * MatchAttributeNames.Max) / EngineRulesV2.Certain;
 
         return int.Clamp(ApplySideContext(rating, slots.Count, isHome, rules), 0, rules.MaxUnitRating);
     }
@@ -96,7 +96,7 @@ public static class UnitRatingCalculator
         MatchUnit unit,
         MatchInstructionsV1 instructions,
         bool isHome,
-        EngineRulesV1 rules)
+        EngineRulesV2 rules)
     {
         var weighting = UnitRatingWeights.Of(unit);
         var attributeTotal = weighting.TotalAttributeWeight;
@@ -126,8 +126,8 @@ public static class UnitRatingCalculator
             attributeMean /= attributeTotal;
 
             // Then how well they suit the slot, and how fresh they are.
-            var effective = attributeMean * slot.FamiliarityBasisPoints / EngineRulesV1.Certain;
-            effective = effective * StateMultiplier(slot.Condition, rules) / EngineRulesV1.Certain;
+            var effective = attributeMean * slot.FamiliarityBasisPoints / EngineRulesV2.Certain;
+            effective = effective * StateMultiplier(slot.Condition, rules) / EngineRulesV2.Certain;
 
             contributions += familyWeight * effective;
             familyTotal += familyWeight;
@@ -137,7 +137,7 @@ public static class UnitRatingCalculator
             ? 0
             : (int)(contributions / familyTotal);
 
-        rating = rating * TacticalModifiers.For(unit, instructions, rules) / EngineRulesV1.Certain;
+        rating = rating * TacticalModifiers.For(unit, instructions, rules) / EngineRulesV2.Certain;
 
         return int.Clamp(ApplySideContext(rating, slots.Count, isHome, rules), 0, rules.MaxUnitRating);
     }
@@ -146,18 +146,18 @@ public static class UnitRatingCalculator
     /// Applies the things that apply to a whole side rather than to one player: home advantage and being a
     /// player down.
     /// </summary>
-    private static int ApplySideContext(int rating, int playersOnPitch, bool isHome, EngineRulesV1 rules)
+    private static int ApplySideContext(int rating, int playersOnPitch, bool isHome, EngineRulesV2 rules)
     {
         if (isHome)
         {
-            rating = rating * rules.HomeAdvantageBasisPoints / EngineRulesV1.Certain;
+            rating = rating * rules.HomeAdvantageBasisPoints / EngineRulesV2.Certain;
         }
 
         // A side with ten men is worse than the average of the ten men who remain: the shape is broken and
         // somebody has to cover a job nobody is left to do. One multiplicative step per missing player.
         for (var missing = MatchInputV1.StartersOnPitch - playersOnPitch; missing > 0; missing--)
         {
-            rating = rating * rules.ShortHandedPenaltyBasisPoints / EngineRulesV1.Certain;
+            rating = rating * rules.ShortHandedPenaltyBasisPoints / EngineRulesV2.Certain;
         }
 
         return rating;
@@ -173,7 +173,7 @@ public static class UnitRatingCalculator
     /// quarter less, which is roughly five attribute points — enough to prefer a fresh substitute, not
     /// enough to make a good player bad.
     /// </remarks>
-    private static int StateMultiplier(PlayerCondition condition, EngineRulesV1 rules)
+    private static int StateMultiplier(PlayerCondition condition, EngineRulesV2 rules)
     {
         var multiplier = Interpolate(
             rules.ConditionFactorFloorBasisPoints,
@@ -183,25 +183,25 @@ public static class UnitRatingCalculator
         multiplier = multiplier * Interpolate(
             rules.FatigueFactorFloorBasisPoints,
             rules.FatigueFactorCeilingBasisPoints,
-            EngineRulesV1.Certain - condition.FatigueBasisPoints) / EngineRulesV1.Certain;
+            EngineRulesV2.Certain - condition.FatigueBasisPoints) / EngineRulesV2.Certain;
 
         multiplier = multiplier * Interpolate(
             rules.MoraleFactorFloorBasisPoints,
             rules.MoraleFactorCeilingBasisPoints,
-            condition.MoraleBasisPoints) / EngineRulesV1.Certain;
+            condition.MoraleBasisPoints) / EngineRulesV2.Certain;
 
         multiplier = multiplier * Interpolate(
             rules.SharpnessFactorFloorBasisPoints,
             rules.SharpnessFactorCeilingBasisPoints,
-            condition.SharpnessBasisPoints) / EngineRulesV1.Certain;
+            condition.SharpnessBasisPoints) / EngineRulesV2.Certain;
 
         return multiplier;
     }
 
     private static int Interpolate(int floor, int ceiling, int valueBasisPoints)
     {
-        var bounded = int.Clamp(valueBasisPoints, 0, EngineRulesV1.Certain);
+        var bounded = int.Clamp(valueBasisPoints, 0, EngineRulesV2.Certain);
 
-        return floor + (int)(((long)(ceiling - floor) * bounded) / EngineRulesV1.Certain);
+        return floor + (int)(((long)(ceiling - floor) * bounded) / EngineRulesV2.Certain);
     }
 }

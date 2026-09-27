@@ -16,7 +16,7 @@ namespace TouchlineManager.MatchEngine.Tests;
 internal static class TestMatchFactory
 {
     /// <summary>The rules every test snapshot is frozen against unless it says otherwise.</summary>
-    public static EngineRulesV1 Rules { get; } = EngineRulesV1.Default;
+    public static EngineRulesV2 Rules { get; } = EngineRulesV2.Default;
 
     /// <summary>The configuration hash a valid snapshot must carry.</summary>
     public static string ConfigurationHash { get; } = EngineConfiguration.HashOf(Rules);

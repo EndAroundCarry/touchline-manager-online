@@ -119,6 +119,14 @@ export const routes: Routes = [
         title: 'Table — Touchline Manager',
       },
       {
+        // One division's player statistics by identity, reached from its table screen (§11.1).
+        path: 'competitions/:divisionId/statistics',
+        loadComponent: () =>
+          import('./features/competitions/statistics').then((m) => m.CompetitionStatistics),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Statistics — Touchline Manager',
+      },
+      {
         // The manager's own division's table. The division is named by their club, so the navigation
         // destination needs no parameter.
         path: 'competitions',

@@ -32,12 +32,12 @@ public static class TacticalModifiers
     /// <param name="instructions">The team instructions.</param>
     /// <param name="rules">The rules in force, which supply the bounds.</param>
     /// <returns>The multiplier in basis points, clamped to the rules' bounds.</returns>
-    public static int For(MatchUnit unit, MatchInstructionsV1 instructions, EngineRulesV1 rules)
+    public static int For(MatchUnit unit, MatchInstructionsV1 instructions, EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(instructions);
         ArgumentNullException.ThrowIfNull(rules);
 
-        var modifier = EngineRulesV1.Certain + Deltas(unit, instructions);
+        var modifier = EngineRulesV2.Certain + Deltas(unit, instructions);
 
         return int.Clamp(
             modifier,

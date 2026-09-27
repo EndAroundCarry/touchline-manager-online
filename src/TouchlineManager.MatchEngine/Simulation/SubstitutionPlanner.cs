@@ -147,7 +147,7 @@ internal static class SubstitutionPlanner
         MatchState state,
         SideRuntime side,
         MatchSlotV1 slot,
-        EngineRulesV1 rules)
+        EngineRulesV2 rules)
     {
         MatchParticipantV1? best = null;
         long bestScore = -1;
@@ -179,7 +179,7 @@ internal static class SubstitutionPlanner
         ActiveSlot outgoing,
         MatchParticipantV1 replacement,
         MatchSubstitutionReason reason,
-        EngineRulesV1 rules)
+        EngineRulesV2 rules)
     {
         var slotNumber = outgoing.Slot.SlotNumber;
 

@@ -1,4 +1,5 @@
 import {
+  averageRatingLabel,
   fixtureStatusLabel,
   goalDifferenceLabel,
   isUpcoming,
@@ -94,6 +95,17 @@ describe('isUpcoming', () => {
     expect(isUpcoming('staged')).toBe(true);
     expect(isUpcoming('published')).toBe(false);
     expect(isUpcoming('void')).toBe(false);
+  });
+});
+
+describe('averageRatingLabel', () => {
+  it('reads a rating to one decimal', () => {
+    expect(averageRatingLabel(7.5)).toBe('7.5');
+    expect(averageRatingLabel(6)).toBe('6.0');
+  });
+
+  it('shows a dash before a player has been rated', () => {
+    expect(averageRatingLabel(null)).toBe('\u2014');
   });
 });
 

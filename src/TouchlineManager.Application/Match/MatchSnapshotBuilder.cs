@@ -150,7 +150,7 @@ public static class MatchSnapshotBuilder
     /// <returns>The input, which carries no seed yet, and every repair the builder made.</returns>
     /// <exception cref="UnplayableSquadException">When a club cannot field a legal side.</exception>
     /// <exception cref="InvalidMatchInputException">When the built input would not simulate.</exception>
-    public static BuiltSnapshot Build(FixtureSidesSnapshot sides, EngineRulesV1 rules)
+    public static BuiltSnapshot Build(FixtureSidesSnapshot sides, EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(sides);
         ArgumentNullException.ThrowIfNull(rules);

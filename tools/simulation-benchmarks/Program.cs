@@ -21,7 +21,7 @@ var seed = args.Length > 2 && ulong.TryParse(args[2], CultureInfo.InvariantCultu
     ? parsedSeed
     : 20_260_925UL;
 
-var rules = EngineRulesV1.Default;
+var rules = EngineRulesV2.Default;
 rules.Validate();
 
 Console.WriteLine($"Engine {EngineVersions.EngineLabel}, rules {EngineVersions.RuleSetLabel}");

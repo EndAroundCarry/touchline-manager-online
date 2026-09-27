@@ -19,7 +19,7 @@ public static class EngineConfiguration
     /// <summary>Computes the canonical hash of a rules instance.</summary>
     /// <param name="rules">The rules.</param>
     /// <returns>The lowercase hexadecimal hash.</returns>
-    public static string HashOf(EngineRulesV1 rules)
+    public static string HashOf(EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
 
@@ -31,7 +31,7 @@ public static class EngineConfiguration
 
     /// <summary>Describes a rules instance as text, for diagnosing a hash mismatch.</summary>
     /// <param name="rules">The rules.</param>
-    public static string Describe(EngineRulesV1 rules)
+    public static string Describe(EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
 

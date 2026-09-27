@@ -195,7 +195,7 @@ public sealed class MatchdayWorkflowTests
         var stored = await db.Matches.SingleAsync(match => match.FixtureId == interrupted.Id);
 
         MatchSimulator
-            .Simulate(MatchSnapshotFactory.ReadVerified(snapshot), EngineRulesV1.Default)
+            .Simulate(MatchSnapshotFactory.ReadVerified(snapshot), EngineRulesV2.Default)
             .OutputHash.Should()
             .Be(stored.OutputHash);
 
@@ -224,7 +224,7 @@ public sealed class MatchdayWorkflowTests
         // The snapshot round-trips to the hash it was stored with, which is the check the workflow itself
         // makes before it simulates anything.
         var input = MatchSnapshotFactory.ReadVerified(snapshot);
-        var reSimulated = MatchSimulator.Simulate(input, EngineRulesV1.Default);
+        var reSimulated = MatchSimulator.Simulate(input, EngineRulesV2.Default);
 
         reSimulated.OutputHash
             .Should()

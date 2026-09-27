@@ -118,8 +118,8 @@ public sealed class DeterminismTests
     {
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
-        EngineConfiguration.HashOf(EngineRulesV1.Default)
-            .Should().Be("b41a2dab4c63892c468883c36745347798089c6f0f94238b17eebdb500e24335");
+        EngineConfiguration.HashOf(EngineRulesV2.Default)
+            .Should().Be("c471017e2e1d414e26fcf67e9a869a0fd3de0034c391384a789f804ab77969b7");
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public sealed class DeterminismTests
     [Fact]
     public void A_deliberately_supplied_rules_instance_is_honoured()
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var input = TestMatchFactory.Even();
 
         var act = () => MatchSimulator.Simulate(input, rules);
@@ -151,7 +151,7 @@ public sealed class DeterminismTests
     [Fact]
     public void Rules_that_do_not_match_the_snapshot_are_refused()
     {
-        var altered = EngineRulesV1.Default with { BaseFoulBasisPoints = 1_234 };
+        var altered = EngineRulesV2.Default with { BaseFoulBasisPoints = 1_234 };
 
         var act = () => MatchSimulator.Simulate(TestMatchFactory.Even(), altered);
 
@@ -159,8 +159,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "39fcddce72b319fab36508d71804a06c042f513da327daaa7bae167e9539c8fa";
+        "a75dec66195ef7f73e9f9d03f58db0722aaa8778e614bcafb59bdd3f74549a03";
 
     private const string GoldenOutputHash =
-        "a40f50ef9bd2aa087afb27f177c285d8dcab652d451de8af75000cf20004c16d";
+        "7193e49ab86ecd2521378d763ac0811689fc0452bb6da194aafd6a331d5ff54d";
 }

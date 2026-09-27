@@ -66,6 +66,15 @@ export function goalDifferenceLabel(goalDifference: number): string {
   return goalDifference > 0 ? `+${goalDifference}` : `${goalDifference}`;
 }
 
+/**
+ * Formats an average match rating to one decimal (`TRN-8`), or a dash before the player has one.
+ *
+ * A rating is read to a tenth of a point, so the number is fixed rather than left to the locale.
+ */
+export function averageRatingLabel(rating: number | null): string {
+  return rating === null ? '\u2014' : rating.toFixed(1);
+}
+
 /** Words for one team-sheet validator issue, naming the slot it concerns when it concerns one. */
 export function teamSheetIssueMessage(issue: {
   readonly code: string;

@@ -54,7 +54,7 @@ public sealed class GetMatchPresentation
         }
 
         var input = MatchSnapshotFactory.ReadVerified(snapshot.Snapshot);
-        var result = MatchSimulator.Simulate(input, EngineRulesV1.Default);
+        var result = MatchSimulator.Simulate(input, EngineRulesV2.Default);
 
         if (!string.Equals(result.OutputHash, snapshot.OutputHash, StringComparison.Ordinal))
         {

@@ -81,7 +81,7 @@ internal static class InjurySimulator
     /// </summary>
     private static int AverageFatigueMultiplier(
         List<(SideRuntime Side, MatchSide Which, ActiveSlot Slot)> candidates,
-        EngineRulesV1 rules)
+        EngineRulesV2 rules)
     {
         long total = 0;
 
@@ -100,17 +100,17 @@ internal static class InjurySimulator
     /// Never zero: a fresh player can still pull up, so the floor keeps a fit squad exposed to the ordinary
     /// risk rather than making injury purely a fatigue mechanic.
     /// </remarks>
-    private static int InjuryWeight(ActiveSlot slot, EngineRulesV1 rules) => FatigueMultiplier(slot, rules);
+    private static int InjuryWeight(ActiveSlot slot, EngineRulesV2 rules) => FatigueMultiplier(slot, rules);
 
     /// <summary>
     /// How much a player's fatigue multiplies the injury chance: one when fresh, the rules' ceiling at full
     /// fatigue.
     /// </summary>
-    private static int FatigueMultiplier(ActiveSlot slot, EngineRulesV1 rules)
+    private static int FatigueMultiplier(ActiveSlot slot, EngineRulesV2 rules)
     {
-        var range = rules.FatigueInjuryMultiplierBasisPoints - EngineRulesV1.Certain;
+        var range = rules.FatigueInjuryMultiplierBasisPoints - EngineRulesV2.Certain;
 
-        return EngineRulesV1.Certain
-            + (int)(((long)range * slot.Condition.FatigueBasisPoints) / EngineRulesV1.Certain);
+        return EngineRulesV2.Certain
+            + (int)(((long)range * slot.Condition.FatigueBasisPoints) / EngineRulesV2.Certain);
     }
 }

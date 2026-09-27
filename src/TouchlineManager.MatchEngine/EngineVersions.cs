@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 1;
+    public const int Engine = 2;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,13 +30,19 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 1;
+    public const int RuleSet = 2;
 
-    /// <summary>The stable label for engine version 1, used in hashes and diagnostics.</summary>
-    public const string EngineLabel = "engine-v1";
+    /// <summary>The stable label for engine version 2, used in hashes and diagnostics.</summary>
+    /// <remarks>
+    /// Version 2 adds the assists and the per-player match rating to a result's player lines, so a
+    /// player's season statistics can be projected from the stored result. It changes the output
+    /// contract and the new rating constants, so it is a new engine version and a new rules version —
+    /// the play model itself is unchanged, which is why the scoreline distribution bands did not move.
+    /// </remarks>
+    public const string EngineLabel = "engine-v2";
 
-    /// <summary>The stable label for engine rules version 1.</summary>
-    public const string RuleSetLabel = "engine-rules-v1";
+    /// <summary>The stable label for engine rules version 2.</summary>
+    public const string RuleSetLabel = "engine-rules-v2";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v1";

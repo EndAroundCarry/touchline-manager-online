@@ -2,7 +2,7 @@
 
 > **Status:** Settled for the public MVP. This document is the normative rule source; the
 > master plan [`master-plan.md`](master-plan.md) explains intent, this file defines behaviour.
-> **Applies to:** rule set version `1`, engine version `1`.
+> **Applies to:** rule set version `2`, engine version `2`.
 > **Change control:** see [§19](#19-change-control).
 
 Every rule carries a stable reference (`WORLD-4`, `CAL-2`, …) so that migrations, tests,
@@ -369,8 +369,23 @@ and length-limited (`SCT-3`).
 | MAT-11 | Hidden attributes, the raw seed, internal valuations, and engine diagnostics never appear in player-facing responses. |
 
 Detailed engine formulas (unit ratings, possession and chance resolution, bounded tactical
-modifiers, and all versioned constants) live in `docs/product/match-engine.md`, which is
-produced in Stage 5 alongside engine version 1.
+modifiers, and all versioned constants) live in `docs/product/match-engine.md`, which covers
+engine version 2.
+
+### 15.1 Player statistics
+
+A published match carries each participant's assists and a match rating (`engine-v2`), and the matchday
+publication advances a player's season totals from the result and its events (master plan §6.4). The line
+is a projection of published results, like the table, and is read from the stored result rather than
+re-simulated.
+
+| Ref | Rule |
+|---|---|
+| STA-1 | A player's season statistics are advanced by the matchday publication, in the same transaction that publishes the round (`MAT-7`). A republished round advances no line twice. |
+| STA-2 | The line is appearances, starts, minutes, goals, assists, shots, shots on target, saves, yellow cards, red cards, and average rating, keyed on `(division-season, player, club)`. |
+| STA-3 | Goals, assists, minutes, cards, and the match rating are the engine's player line; shots and saves are counted from the match's events. The match rating is the engine's own and is never recomputed by the projection. |
+| STA-4 | A player who did not take the pitch produces no line. A penalty has no assister; every other goal has exactly one. |
+| STA-5 | A match rating is stored in basis points (0–10,000) and exposed on a 0.0–10.0 scale (`TRN-8`). A player who did not appear is given no rating. |
 
 ---
 
@@ -460,7 +475,14 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `training_progression_version` | `training-v1` | TRN-9 (FIC-8) |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
-| `match_statistics_schema` | `match-statistics-v2` (carries the player lines) | JSN-1, TRN-11 |
+| `match_statistics_schema` | `match-statistics-v3` (carries the player lines, the assists, and the rating) | JSN-1, TRN-11 |
+| `season_stats_version` | `season-stats-v1` | STA-1 (FIC-8) |
+| `match_rating_scale` | 0–10,000 basis points (displayed 0.0–10.0) | TRN-8, STA-2 |
+| `match_rating_base_bp` | 6,000 | STA-5 (balancing) |
+| `match_rating_win_bp` / `_draw_bp` / `_loss_bp` | 600 / 120 / 350 | STA-5 (balancing) |
+| `match_rating_goal_bp` / `_assist_bp` | 1,000 / 450 | STA-5 (balancing) |
+| `match_rating_save_bp` (cap 400) | 60 | STA-5 (balancing) |
+| `match_rating_yellow_bp` / `_red_bp` | 350 / 1,400 | STA-5 (balancing) |
 | `match_condition_cost_per_minute_bp` | 10 | TRN-11 (balancing) |
 | `match_fatigue_gain_per_minute_bp` | 7 | TRN-11 (balancing) |
 | `match_stamina_factor_bp` | 12,000 (stamina 1) → 8,000 (stamina 20) | TRN-11 (balancing) |

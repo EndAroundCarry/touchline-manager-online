@@ -98,6 +98,85 @@ internal sealed class CompetitionQueries : ICompetitionQueries
     }
 
     /// <inheritdoc />
+    public async Task<DivisionStatisticsSnapshot?> GetDivisionStatisticsAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var header = await (
+            from divisionSeason in _dbContext.DivisionSeasons
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join country in _dbContext.Countries on division.CountryId equals country.Id
+            join seasonRow in _dbContext.Seasons on divisionSeason.SeasonId equals seasonRow.Id
+            where divisionSeason.DivisionId == divisionId && divisionSeason.SeasonId == season.SeasonId
+            select new
+            {
+                DivisionSeasonId = divisionSeason.Id,
+                division.DisplayName,
+                division.TierNumber,
+                CountryId = country.Id,
+                country.Code,
+                CountryName = country.DisplayName,
+                SeasonNumber = seasonRow.SequenceNumber,
+                SeasonLabel = seasonRow.DisplayLabel,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (header is null)
+        {
+            return null;
+        }
+
+        // The projection stored the totals and the order the leaderboard is read in: goals, then assists,
+        // then the player's name, so a screen never sorts and two reads never disagree (TBL-12's principle).
+        // The average is computed from the stored sum and count, because it is a function of two columns
+        // beside it and storing it would let a row disagree with itself.
+        var rows = await (
+            from stat in _dbContext.PlayerSeasonStats
+            join player in _dbContext.Players on stat.PlayerId equals player.Id
+            join club in _dbContext.Clubs on stat.ClubId equals club.Id
+            where stat.DivisionSeasonId == header.DivisionSeasonId
+            orderby stat.Goals descending, stat.Assists descending, player.FullName
+            select new DivisionPlayerStatRow(
+                player.Id,
+                player.FullName,
+                club.Id,
+                club.Name,
+                club.ShortName,
+                stat.Appearances,
+                stat.Starts,
+                stat.MinutesPlayed,
+                stat.Goals,
+                stat.Assists,
+                stat.Shots,
+                stat.ShotsOnTarget,
+                stat.Saves,
+                stat.YellowCards,
+                stat.RedCards,
+                stat.RatedAppearances == 0
+                    ? null
+                    : (int?)(stat.RatingBasisPointsTotal / stat.RatedAppearances)))
+            .ToListAsync(cancellationToken);
+
+        return new DivisionStatisticsSnapshot(
+            divisionId,
+            header.DisplayName,
+            header.TierNumber,
+            header.CountryId,
+            header.Code,
+            header.CountryName,
+            header.SeasonNumber,
+            header.SeasonLabel,
+            rows);
+    }
+
+    /// <inheritdoc />
     public async Task<DivisionFixturesSnapshot?> GetDivisionFixturesAsync(
         Guid divisionId,
         CancellationToken cancellationToken)

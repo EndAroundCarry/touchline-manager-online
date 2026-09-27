@@ -11,7 +11,7 @@ public sealed class EngineRulesTests
     [Fact]
     public void The_default_rules_are_valid()
     {
-        var act = EngineRulesV1.Default.Validate;
+        var act = EngineRulesV2.Default.Validate;
 
         act.Should().NotThrow();
     }
@@ -22,32 +22,32 @@ public sealed class EngineRulesTests
         // A constant that is not in the hash means two genuinely different configurations can claim the same
         // provenance. The canonical description is built by reflection for exactly this reason, so this test is
         // what keeps that honest when somebody adds a field.
-        var described = EngineRulesV1.Default.ToCanonicalParts();
+        var described = EngineRulesV2.Default.ToCanonicalParts();
 
         described.Should().Contain(part => part.StartsWith("BaseShotGoalBasisPoints=", StringComparison.Ordinal));
         described.Should().Contain(part => part.StartsWith("HomeAdvantageBasisPoints=", StringComparison.Ordinal));
         described.Should().Contain(part => part.StartsWith("SubstitutionWindows=", StringComparison.Ordinal));
-        described[0].Should().Be(EngineRulesV1.Version);
+        described[0].Should().Be(EngineRulesV2.Version);
 
         described.Count.Should().Be(
-            EngineRulesV1.Default.GetType().GetProperties().Length + 1,
+            EngineRulesV2.Default.GetType().GetProperties().Length + 1,
             "every property is described, plus the version label");
     }
 
     [Fact]
     public void Changing_a_constant_changes_the_hash()
     {
-        var changed = EngineRulesV1.Default with { BaseShotGoalBasisPoints = 999 };
+        var changed = EngineRulesV2.Default with { BaseShotGoalBasisPoints = 999 };
 
-        EngineConfiguration.HashOf(changed).Should().NotBe(EngineConfiguration.HashOf(EngineRulesV1.Default));
+        EngineConfiguration.HashOf(changed).Should().NotBe(EngineConfiguration.HashOf(EngineRulesV2.Default));
     }
 
     [Fact]
     public void The_hash_is_stable_for_equal_configurations()
     {
         // Built twice rather than reused, so a hash that depended on instance identity would fail here.
-        var first = new EngineRulesV1();
-        var second = new EngineRulesV1();
+        var first = new EngineRulesV2();
+        var second = new EngineRulesV2();
 
         EngineConfiguration.HashOf(first).Should().Be(EngineConfiguration.HashOf(second));
     }
@@ -55,7 +55,7 @@ public sealed class EngineRulesTests
     [Fact]
     public void A_probability_beyond_certainty_is_refused()
     {
-        var rules = EngineRulesV1.Default with { BaseFoulBasisPoints = 10_001 };
+        var rules = EngineRulesV2.Default with { BaseFoulBasisPoints = 10_001 };
 
         var act = rules.Validate;
 
@@ -67,7 +67,7 @@ public sealed class EngineRulesTests
     {
         // Home advantage is above certainty by design — it multiplies ratings rather than rolling against them.
         // A validator that conflated the two would refuse the shipped rules, which is how this was found.
-        var rules = EngineRulesV1.Default with { HomeAdvantageBasisPoints = 10_300 };
+        var rules = EngineRulesV2.Default with { HomeAdvantageBasisPoints = 10_300 };
 
         var act = rules.Validate;
 
@@ -77,7 +77,7 @@ public sealed class EngineRulesTests
     [Fact]
     public void A_multiplier_outside_its_band_is_refused()
     {
-        var rules = EngineRulesV1.Default with { HomeAdvantageBasisPoints = 900 };
+        var rules = EngineRulesV2.Default with { HomeAdvantageBasisPoints = 900 };
 
         var act = rules.Validate;
 
@@ -87,7 +87,7 @@ public sealed class EngineRulesTests
     [Fact]
     public void A_subtractive_penalty_is_not_judged_as_a_multiplier()
     {
-        var rules = EngineRulesV1.Default with { OutOfPositionCohesionPenaltyBasisPoints = 1_400 };
+        var rules = EngineRulesV2.Default with { OutOfPositionCohesionPenaltyBasisPoints = 1_400 };
 
         var act = rules.Validate;
 
@@ -97,7 +97,7 @@ public sealed class EngineRulesTests
     [Fact]
     public void Inverted_bounds_are_refused()
     {
-        var rules = EngineRulesV1.Default with { MinProgressBasisPoints = 9_000, MaxProgressBasisPoints = 1_000 };
+        var rules = EngineRulesV2.Default with { MinProgressBasisPoints = 9_000, MaxProgressBasisPoints = 1_000 };
 
         var act = rules.Validate;
 
@@ -107,7 +107,7 @@ public sealed class EngineRulesTests
     [Fact]
     public void A_substitution_window_outside_the_match_is_refused()
     {
-        var rules = EngineRulesV1.Default with { SubstitutionWindows = [46, 120] };
+        var rules = EngineRulesV2.Default with { SubstitutionWindows = [46, 120] };
 
         var act = rules.Validate;
 
@@ -117,7 +117,7 @@ public sealed class EngineRulesTests
     [Fact]
     public void A_rating_scale_that_cannot_hold_a_maximum_player_is_refused()
     {
-        var rules = EngineRulesV1.Default with { MaxUnitRating = 500 };
+        var rules = EngineRulesV2.Default with { MaxUnitRating = 500 };
 
         var act = rules.Validate;
 
@@ -127,9 +127,9 @@ public sealed class EngineRulesTests
     [Fact]
     public void The_engine_and_rules_versions_are_labelled()
     {
-        EngineVersions.EngineLabel.Should().Be("engine-v1");
-        EngineVersions.RuleSetLabel.Should().Be("engine-rules-v1");
-        EngineVersions.Engine.Should().Be(1);
-        EngineVersions.RuleSet.Should().Be(1);
+        EngineVersions.EngineLabel.Should().Be("engine-v2");
+        EngineVersions.RuleSetLabel.Should().Be("engine-rules-v2");
+        EngineVersions.Engine.Should().Be(2);
+        EngineVersions.RuleSet.Should().Be(2);
     }
 }

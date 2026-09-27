@@ -4,6 +4,7 @@ import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import { CompetitionStore } from './competition-store';
 import {
+  DivisionStatistics,
   DivisionTable,
   FixtureTeamSheet,
   MyFixtures,
@@ -138,12 +139,47 @@ function table(): DivisionTable {
   };
 }
 
+function statistics(): DivisionStatistics {
+  return {
+    divisionId: 'd1',
+    divisionName: 'England Top Division',
+    tierNumber: 1,
+    countryId: 'co1',
+    countryCode: 'england',
+    countryName: 'England',
+    seasonNumber: 1,
+    seasonLabel: '2026/27',
+    rows: [
+      {
+        playerId: 'p1',
+        playerName: 'Alex Keeper',
+        clubId: 'c1',
+        clubName: 'Ashvale United',
+        clubShortName: 'ASH',
+        appearances: 3,
+        starts: 3,
+        minutesPlayed: 270,
+        goals: 2,
+        assists: 1,
+        shots: 5,
+        shotsOnTarget: 3,
+        saves: 0,
+        yellowCards: 0,
+        redCards: 0,
+        averageRating: 7.5,
+      },
+    ],
+    serverTime: '2026-09-25T00:00:00Z',
+  };
+}
+
 function createApiStub() {
   return {
     mine: vi.fn(),
     fixture: vi.fn(),
     divisionFixtures: vi.fn(),
     divisionTable: vi.fn(),
+    divisionStatistics: vi.fn(),
     teamSheet: vi.fn(),
     saveTeamSheet: vi.fn(),
   };
@@ -320,18 +356,46 @@ describe('CompetitionStore', () => {
     expect(store.tableLoading()).toBe(false);
   });
 
+  it('reads a division player statistics by identity', () => {
+    api.divisionStatistics.mockReturnValue(of(statistics()));
+
+    store.loadDivisionStatistics('d9');
+
+    expect(api.divisionStatistics).toHaveBeenCalledWith('d9');
+    expect(store.divisionStatistics()?.rows[0].playerName).toBe('Alex Keeper');
+    expect(store.divisionStatistics()?.rows[0].averageRating).toBe(7.5);
+    expect(store.statisticsLoading()).toBe(false);
+  });
+
+  it('reports statistics it could not read', () => {
+    api.divisionStatistics.mockReturnValue(
+      throwError(
+        () => new ApiError(404, 'DIVISION_NOT_FOUND', 'no such division', null, new Map()),
+      ),
+    );
+
+    store.loadDivisionStatistics('d9');
+
+    expect(store.divisionStatistics()).toBeNull();
+    expect(store.statisticsError()).toBe('no such division');
+    expect(store.statisticsLoading()).toBe(false);
+  });
+
   it('forgets everything when the session ends', () => {
     api.mine.mockReturnValue(of(fixtures()));
     api.divisionTable.mockReturnValue(of(table()));
+    api.divisionStatistics.mockReturnValue(of(statistics()));
     api.teamSheet.mockReturnValue(of(teamSheet()));
 
     store.loadMyDivisionTable();
+    store.loadDivisionStatistics('d1');
     store.loadTeamSheet('f1');
     store.clear();
 
     expect(store.teamSheet()).toBeNull();
     expect(store.selection().size).toBe(0);
     expect(store.divisionTable()).toBeNull();
+    expect(store.divisionStatistics()).toBeNull();
     expect(store.managedClubId()).toBeNull();
   });
 });

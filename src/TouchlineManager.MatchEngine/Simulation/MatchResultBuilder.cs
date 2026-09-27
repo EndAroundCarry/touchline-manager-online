@@ -88,6 +88,7 @@ internal static class MatchResultBuilder
     private static List<MatchPlayerLineV1> PlayerLines(MatchState state)
     {
         var lines = new List<MatchPlayerLineV1>();
+        var saves = SavesByParticipant(state);
 
         foreach (var side in new[] { MatchSide.Home, MatchSide.Away })
         {
@@ -95,6 +96,11 @@ internal static class MatchResultBuilder
             var starters = runtime.Lineup.Slots
                 .Select(slot => slot.Participant.ParticipantId)
                 .ToHashSet();
+
+            var goalsFor = state.GoalsOf(side);
+            var goalsAgainst = state.GoalsOf(side == MatchSide.Home ? MatchSide.Away : MatchSide.Home);
+            var won = goalsFor > goalsAgainst;
+            var drew = goalsFor == goalsAgainst;
 
             foreach (var participant in state.Input.SideOf(side).Squad)
             {
@@ -117,22 +123,65 @@ internal static class MatchResultBuilder
                     ? wentOff
                     : state.TotalMinutesPlayed;
 
+                var minutes = entered is int fromMinute ? Math.Max(0, left - fromMinute) : 0;
+                var goals = runtime.Goals.TryGetValue(id, out var scored) ? scored : 0;
+                var assists = runtime.Assists.TryGetValue(id, out var setUp) ? setUp : 0;
+                var yellows = runtime.Yellows.TryGetValue(id, out var bookings) ? bookings : 0;
+                var sentOff = runtime.SentOff.Contains(id);
+
                 lines.Add(new MatchPlayerLineV1
                 {
                     ParticipantId = id,
                     ClubId = participant.ClubId,
                     Side = side,
                     Started = started,
-                    MinutesPlayed = entered is int fromMinute ? Math.Max(0, left - fromMinute) : 0,
-                    Goals = runtime.Goals.TryGetValue(id, out var goals) ? goals : 0,
-                    YellowCards = runtime.Yellows.TryGetValue(id, out var yellows) ? yellows : 0,
-                    SentOff = runtime.SentOff.Contains(id),
+                    MinutesPlayed = minutes,
+                    Goals = goals,
+                    Assists = assists,
+                    YellowCards = yellows,
+                    SentOff = sentOff,
                     AbsenceFixtures = runtime.AbsenceFixtures.TryGetValue(id, out var absence) ? absence : 0,
+                    RatingBasisPoints = PlayerRatingCalculator.Calculate(
+                        state.Rules,
+                        new PlayerMatchFacts(
+                            minutes,
+                            goals,
+                            assists,
+                            yellows,
+                            sentOff,
+                            saves.TryGetValue(id, out var made) ? made : 0,
+                            won,
+                            drew)),
                 });
             }
         }
 
         // One fixed order, so the canonical output hash does not depend on the order the squads arrived in.
         return [.. lines.OrderBy(line => line.ClubId).ThenBy(line => line.ParticipantId)];
+    }
+
+    /// <summary>
+    /// Counts each goalkeeper's saves from the event stream.
+    /// </summary>
+    /// <remarks>
+    /// A save is emitted on the shooting side's event, with the keeper who stopped it as the secondary
+    /// participant, so the count is keyed on that participant rather than on the event's own side.
+    /// </remarks>
+    private static Dictionary<Guid, int> SavesByParticipant(MatchState state)
+    {
+        var saves = new Dictionary<Guid, int>();
+
+        foreach (var matchEvent in state.Events)
+        {
+            if (matchEvent.Type != EngineEventType.ShotSaved || matchEvent.SecondaryParticipantId is not Guid keeper)
+            {
+                continue;
+            }
+
+            saves.TryGetValue(keeper, out var count);
+            saves[keeper] = count + 1;
+        }
+
+        return saves;
     }
 }

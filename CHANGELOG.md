@@ -355,6 +355,99 @@ competition screens are the rest of the stage.
 - **Nothing here is reachable from a command.** The plans are written by the worker's evaluator alone, and the
   only surface this milestone adds is a job type and a scheduler — `MAT-2`'s principle, applied to the squad.
 
+### The season's statistics
+
+A season you can measure. A result now says who set a goal up and how well each player played, and the
+matchday publication grows a player's season totals from the result and its events: appearances, starts,
+minutes, goals, assists, shots, shots on target, saves, cards, and an average match rating. `GET
+/divisions/{divisionId}/statistics` reads a division's leaderboard, and `/competitions/:id/statistics` is
+the screen. This is the fourth milestone of the stage; the projection rebuild tools and the discipline
+screens are the rest.
+
+#### Added
+
+- **The engine gains assists and a match rating** (`engine-v2`, `engine-rules-v2`, ADR-0019). A goal from
+  open play or a corner credits one teammate with the assist, and every player who took the pitch gets a
+  rating in basis points on the 0–10,000 scale the API converts to a 0–10.0 figure (`TRN-8`). Both live on
+  the player line, so a season's totals are read from the stored result rather than re-simulated, and the
+  result document is bumped to `match-statistics-v3` to carry them.
+- **The play model is unchanged, and that is deliberate.** The assist is drawn from a stream derived from
+  the match seed and the goal's own sequence number, never from the play stream, and the rating is
+  arithmetic over facts the match already records. Adding a draw to the play stream would have shifted
+  every later decision and moved the scoreline distributions the engine was calibrated against; instead the
+  measured bands did not move, and the 82 new engine tests pin the assist and rating contracts beside the
+  existing ones.
+- **`competition.player_season_stats`** (master plan §6.4): one row per player per club per division-season,
+  keyed to include the club because a player may move mid-season. Its checks are the ones a manager would
+  believe: nothing negative, a start is a subset of an appearance, shots on target a subset of shots, and
+  the stored average inside the scale. The average is computed from the stored total and count rather than
+  stored, for the same reason a table's goal difference is (`TBL-3`).
+- **`PlayerSeasonStat`**: the projection aggregate with the accumulation as behaviour, following
+  `Standing` and `DisciplineRecord`. `Accumulate` takes one match's line and refuses one that cannot be
+  true, so a projection cannot be advanced by a malformed fact.
+- **`SeasonStatisticsCalculator`** (`season-stats-v1`): a pure function from a round's stored results and
+  shot and save events to one line per player who appeared. Goals, assists, minutes, cards, and the rating
+  come from the engine's line; the shots and saves are counted from the same events the score is derived
+  from (`MAT-5`). A player who stayed on the bench produces no line.
+- **Publication advances the statistics** (`STA-1`): `PublishMatchday` computes the round's lines and
+  applies them in the same serializable transaction that publishes the nine fixtures, moves the table, and
+  applies the cards, injuries, and load — so the totals and the results they summarise become public
+  together. The round's results are read once and feed both the load and the statistics.
+- **`GET /divisions/{divisionId}/statistics`** (§10.5): the division's player rows most goals first, then
+  assists, then name, with the average rating on its display scale. Public game data, like the table.
+- **The `/competitions/:divisionId/statistics` screen** (§11.1) and a link from the table screen. A real
+  `<table>` with a caption, column headers, and a player row header, so assistive technology reads it as
+  tabular data, and the rating column reads `—` before a player has one.
+- **ADR-0019**, on the additive engine change with a derived assist stream, the rating as engine output,
+  the projection and its key, and the deliberate deferral of `club_season_stats` and of retaining the
+  previous engine version pre-launch.
+- `docs/product/game-rules.md` §15.1 (`STA-1`…`STA-4`) and the `season-stats-v1` and rating constants;
+  `docs/product/match-engine.md` updated for version 2.
+- 82 new engine tests (603 total) for the assist attribution, the per-goal assist reconciliation, the
+  rating's bounds and its absence for a player who did not appear, and the rating's movement with a goal;
+  9 new domain tests (364 total) for the accumulation, its refusals, and the computed average; 5 new
+  application tests (91 total) for the calculator over a stored result and its events; 2 new infrastructure
+  tests (128 total) over a real seeded world that publish a round and assert a line per player who appeared
+  and no double count on a republish; 3 new API integration tests (88 total) that read a played division's
+  leaderboard, reconcile its goals with the fixtures' scores, and check the unknown-division and
+  unauthenticated refusals; and 4 new web tests (206 total) for the rating label and the statistics read.
+
+#### Notes
+
+- **A penalty has no assister, and the assist is not in the event stream.** A goal event names the scorer
+  and the goalkeeper it beat and nothing else, so the player who made the chance is chosen when the goal is
+  scored and kept on the line beside the goals. That is why the line carries it rather than the event.
+- **The assist consumes no draw of the play.** Crediting one from the play stream would advance every
+  subsequent decision, so the same seed would no longer produce the scoreline the engine was tuned to. The
+  derived stream is seeded from the match seed and the goal's sequence number, so assist attribution varies
+  per goal, is reproducible, and touches nothing else about the match.
+- **The rating is the engine's, not the projection's.** It is produced once with the result so a season's
+  average has one definition, and it is derived only from facts the match already records — minutes, goals,
+  assists, saves, cards, and the result — so it carries no hidden value (`MAT-11`). The projection reads it
+  rather than recomputing it.
+- **`club_season_stats` is deliberately not in this milestone.** §6.4 lists a club-level aggregate "not
+  represented in standings", but a club's competitive row is already the standings projection and a club's
+  shooting or possession aggregate has no read and no screen; building the table now would ship a row
+  nothing shows (`§17.12`). It belongs with the screens that would consume it.
+- **A previous engine version is not retained, and that is the same call the statistics document made.**
+  ADR-0004 says a released engine version is never altered in place; there is no production world, so the
+  cost is that a database seeded before this change must be reseeded for an old snapshot or result to be
+  readable, and the migration and the document schema say so. Retaining a compiled previous version becomes
+  required before launch, and ADR-0019 records it as a pre-launch item rather than pretending it is done.
+- **The average is truncated, not rounded, from the stored total and count.** It is a function of two
+  columns beside it, and the response rounds it to the tenth of a point a rating is read in — one definition
+  of the average, converted once at the edge (`TRN-8`).
+- **The statistics screen sorts nothing.** The projection stored the order — goals, then assists, then name
+  — so a screen that re-sorted would be a second, drifting definition of the leaderboard, exactly as the
+  table's rank is the server's (`TBL-12`).
+- **The tie-break view is not here.** §16 Stage 8 lists "tie-break views"; the table screen already reads
+  the order the projection stored and reimplements no rule, and the competition-rules page that would show
+  the ordering and the stored draw key (`TBL-11`) belongs with the rest of the Stage 8 competition screens.
+- **The player profile does not yet carry the player's own season line.** §11.1 lists "season stats" on
+  `/players/:id`, and the read that would add it is the same projection this milestone fills; it is the
+  squad module's read to widen and belongs with the screen work that follows, rather than being bolted onto
+  the competition milestone's commit.
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

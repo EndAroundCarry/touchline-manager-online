@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import {
+  DivisionStatistics,
   DivisionTable,
   FixtureTeamSheet,
   MyFixtures,
@@ -34,6 +35,10 @@ export class CompetitionStore {
   private readonly tableLoadingSignal = signal(false);
   private readonly tableErrorSignal = signal<string | null>(null);
   private readonly managedClubIdSignal = signal<string | null>(null);
+
+  private readonly divisionStatisticsSignal = signal<DivisionStatistics | null>(null);
+  private readonly statisticsLoadingSignal = signal(false);
+  private readonly statisticsErrorSignal = signal<string | null>(null);
 
   private readonly teamSheetSignal = signal<FixtureTeamSheet | null>(null);
   private readonly selectionSignal = signal<ReadonlyMap<number, string>>(new Map());
@@ -69,6 +74,15 @@ export class CompetitionStore {
    * Null for a named-division read, which is a plain view of a division rather than the caller's own.
    */
   readonly managedClubId = this.managedClubIdSignal.asReadonly();
+
+  /** The division's player statistics last read. */
+  readonly divisionStatistics = this.divisionStatisticsSignal.asReadonly();
+
+  /** Whether a division's player statistics are being read. */
+  readonly statisticsLoading = this.statisticsLoadingSignal.asReadonly();
+
+  /** Why a division's player statistics could not be read. */
+  readonly statisticsError = this.statisticsErrorSignal.asReadonly();
 
   /** The prepared side last read. */
   readonly teamSheet = this.teamSheetSignal.asReadonly();
@@ -190,6 +204,31 @@ export class CompetitionStore {
     this.managedClubIdSignal.set(null);
 
     this.readTable(divisionId);
+  }
+
+  /**
+   * Reads a division's player season statistics (`§10.5`).
+   *
+   * Public game data like the table, so it is read by division identity and nothing here names the
+   * caller's club.
+   */
+  loadDivisionStatistics(divisionId: string): void {
+    this.statisticsLoadingSignal.set(true);
+    this.statisticsErrorSignal.set(null);
+    this.divisionStatisticsSignal.set(null);
+
+    this.api.divisionStatistics(divisionId).subscribe({
+      next: (statistics) => {
+        this.divisionStatisticsSignal.set(statistics);
+        this.statisticsLoadingSignal.set(false);
+      },
+      error: (error: unknown) => {
+        this.statisticsLoadingSignal.set(false);
+        this.statisticsErrorSignal.set(
+          error instanceof ApiError ? error.detail : 'The statistics could not be loaded.',
+        );
+      },
+    });
   }
 
   /** Reads the club's prepared side for a fixture and starts editing it. */
@@ -326,6 +365,9 @@ export class CompetitionStore {
     this.tableLoadingSignal.set(false);
     this.tableErrorSignal.set(null);
     this.managedClubIdSignal.set(null);
+    this.divisionStatisticsSignal.set(null);
+    this.statisticsLoadingSignal.set(false);
+    this.statisticsErrorSignal.set(null);
     this.teamSheetSignal.set(null);
     this.selectionSignal.set(new Map());
     this.loadingSignal.set(false);

@@ -8,7 +8,7 @@ namespace TouchlineManager.MatchEngine.Simulation;
 /// <remarks>
 /// Kept in one place because every probability in the simulation has the same shape: a baseline, moved by
 /// a rating differential, clamped into the band its own formula allows. Writing that shape once is what
-/// makes the constants in <c>EngineRulesV1</c> mean the same thing wherever they are used, and it is
+/// makes the constants in <c>EngineRulesV2</c> mean the same thing wherever they are used, and it is
 /// integer arithmetic throughout so a decision is identical on every platform.
 /// </remarks>
 internal static class Probability
@@ -36,7 +36,7 @@ internal static class Probability
     /// <param name="value">The value.</param>
     /// <param name="multiplierBasisPoints">The multiplier, where 10_000 is unchanged.</param>
     public static int Apply(int value, int multiplierBasisPoints) =>
-        (int)(((long)value * multiplierBasisPoints) / EngineRulesV1.Certain);
+        (int)(((long)value * multiplierBasisPoints) / EngineRulesV2.Certain);
 
     /// <summary>Clamps a probability into a band.</summary>
     /// <param name="value">The probability.</param>

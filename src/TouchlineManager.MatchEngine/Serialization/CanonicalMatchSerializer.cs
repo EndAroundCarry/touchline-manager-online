@@ -169,7 +169,7 @@ public static class CanonicalMatchSerializer
     {
         var lines = new List<string>
         {
-            "match-result-v1",
+            "match-result-v2",
             Field("engineVersion", result.EngineVersion),
             Field("ruleSetVersion", result.RuleSetVersion),
             Field("inputHash", result.InputHash),
@@ -208,9 +208,11 @@ public static class CanonicalMatchSerializer
             lines.Add(Field($"{prefix}.started", line.Started));
             lines.Add(Field($"{prefix}.minutesPlayed", line.MinutesPlayed));
             lines.Add(Field($"{prefix}.goals", line.Goals));
+            lines.Add(Field($"{prefix}.assists", line.Assists));
             lines.Add(Field($"{prefix}.yellowCards", line.YellowCards));
             lines.Add(Field($"{prefix}.sentOff", line.SentOff));
             lines.Add(Field($"{prefix}.absenceFixtures", line.AbsenceFixtures));
+            lines.Add(Field($"{prefix}.ratingBasisPoints", line.RatingBasisPoints));
         }
 
         return string.Join('\n', lines);

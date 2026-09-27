@@ -16,7 +16,7 @@ public sealed class UnitRatingTests
     {
         // Exhaustive over every combination of the eight instructions, for every unit. This is the check that
         // makes "bound tactical modifiers so attributes remain dominant" a property rather than an intention.
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
 
         var mentalities = Enum.GetValues<MatchMentality>();
         var tempos = Enum.GetValues<MatchTempo>();
@@ -83,7 +83,7 @@ public sealed class UnitRatingTests
     {
         // The whole point of the bounds: the best possible instructions must not overturn a substantial
         // difference in ability. Three attribute points is roughly a division's worth of quality.
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
 
         var better = RatingsFor(ability: 16, new MatchInstructionsV1());
         var worse = RatingsFor(ability: 9, new MatchInstructionsV1());
@@ -129,7 +129,7 @@ public sealed class UnitRatingTests
     [Fact]
     public void Home_advantage_raises_every_rating()
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var instructions = new MatchInstructionsV1();
 
         var away = UnitRatingCalculator.Calculate(RatingsLineup(13), instructions, isHome: false, rules);
@@ -143,7 +143,7 @@ public sealed class UnitRatingTests
     [Fact]
     public void A_tired_player_rates_lower_than_a_fresh_one()
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var instructions = new MatchInstructionsV1();
 
         var fresh = RatingsLineup(13);
@@ -164,7 +164,7 @@ public sealed class UnitRatingTests
     [Fact]
     public void A_side_with_ten_men_rates_lower_than_one_with_eleven()
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var instructions = new MatchInstructionsV1();
 
         var eleven = RatingsLineup(13);
@@ -181,7 +181,7 @@ public sealed class UnitRatingTests
     public void A_side_with_no_goalkeeper_has_no_goalkeeping_rating()
     {
         // The consequence of a sending-off in goal. It is deliberately not a crash and not a free pass.
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var outfield = RatingsLineup(13).Skip(1).ToList();
 
         var ratings = UnitRatingCalculator.Calculate(outfield, new MatchInstructionsV1(), isHome: false, rules);
@@ -192,7 +192,7 @@ public sealed class UnitRatingTests
     [Fact]
     public void An_out_of_position_player_costs_ratings_and_cohesion()
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var instructions = new MatchInstructionsV1();
 
         var inPosition = RatingsLineup(13);
@@ -214,7 +214,7 @@ public sealed class UnitRatingTests
     public void A_winger_in_a_wing_back_slot_keeps_full_familiarity()
     {
         // Secondary positions are there to be used: a winger covering wing back is familiar, not out of position.
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var side = TestMatchFactory.Side(7, "Wing Town", 13, new MatchInstructionsV1());
 
         var winger = side.Squad.First(participant => participant.Position == MatchPosition.LeftWinger);
@@ -235,7 +235,7 @@ public sealed class UnitRatingTests
     [Fact]
     public void A_striker_slotted_into_central_midfield_is_out_of_position()
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var side = TestMatchFactory.Side(7, "Wing Town", 13, new MatchInstructionsV1());
 
         var striker = side.Squad.First(participant => participant.Position == MatchPosition.Striker);
@@ -248,7 +248,7 @@ public sealed class UnitRatingTests
     [Fact]
     public void Ratings_never_exceed_the_configured_ceiling()
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var maximum = PlayerAttributesV1.Uniform(MatchAttributeNames.Max);
 
         var slots = RatingsLineup(13)
@@ -265,10 +265,10 @@ public sealed class UnitRatingTests
 
     private static IReadOnlyList<ActiveSlot> RatingsLineup(int ability) =>
         [.. LineupResolver
-            .Resolve(TestMatchFactory.Side(11, "Rating Town", ability, new MatchInstructionsV1()), MatchSide.Home, EngineRulesV1.Default)
+            .Resolve(TestMatchFactory.Side(11, "Rating Town", ability, new MatchInstructionsV1()), MatchSide.Home, EngineRulesV2.Default)
             .Slots
             .Select(ActiveSlot.From)];
 
     private static MatchUnitRatings RatingsFor(int ability, MatchInstructionsV1 instructions) =>
-        UnitRatingCalculator.Calculate(RatingsLineup(ability), instructions, isHome: false, EngineRulesV1.Default);
+        UnitRatingCalculator.Calculate(RatingsLineup(ability), instructions, isHome: false, EngineRulesV2.Default);
 }

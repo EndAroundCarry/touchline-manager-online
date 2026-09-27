@@ -91,6 +91,14 @@ public sealed record MatchPlayerLineV1
     /// <summary>Gets goals scored.</summary>
     public required int Goals { get; init; }
 
+    /// <summary>Gets goals this player set up.</summary>
+    /// <remarks>
+    /// Attributed at the goal rather than re-derived from the event stream, because the scorer is the only
+    /// participant a goal event names: an assister is a fact the engine decided, so it lives on the line
+    /// beside the goals (`engine-v2`).
+    /// </remarks>
+    public required int Assists { get; init; }
+
     /// <summary>Gets yellow cards received.</summary>
     public required int YellowCards { get; init; }
 
@@ -99,6 +107,17 @@ public sealed record MatchPlayerLineV1
 
     /// <summary>Gets how many fixtures an injury rules the player out for, or zero when uninjured.</summary>
     public required int AbsenceFixtures { get; init; }
+
+    /// <summary>
+    /// Gets the player's match rating in basis points, or zero when they did not appear.
+    /// </summary>
+    /// <remarks>
+    /// The engine's own summary of a player's match, on the 0–10,000 scale the API converts to a 0–10.0
+    /// figure (`TRN-8`). It is derived from facts the match already records — minutes, goals, assists,
+    /// cards, saves, and the result — so it carries no hidden value, and it is produced once with the
+    /// result rather than re-derived by the season-statistics projection.
+    /// </remarks>
+    public required int RatingBasisPoints { get; init; }
 }
 
 /// <summary>

@@ -1,11 +1,14 @@
-# Match engine version 1
+# Match engine version 2
 
-> **Status:** Executable specification for `engine-v1` / `engine-rules-v1`, implemented in
+> **Status:** Executable specification for `engine-v2` / `engine-rules-v2`, implemented in
 > `src/TouchlineManager.MatchEngine`.
-> **Applies to:** engine version `1`, engine rules version `1`, rating weights `engine-ratings-v1`,
+> **Applies to:** engine version `2`, engine rules version `2`, rating weights `engine-ratings-v1`,
 > tactical modifiers `engine-tactical-v1`.
+> **Version 2** adds the assists and the per-player match rating to a result's player lines (§8.1). The
+> play model — every formula and every draw — is unchanged from version 1, which is why the measured
+> distributions in §12 did not move; only the output contract and the rating constants are new.
 > **Behavioural rules:** [`game-rules.md`](game-rules.md) §15 (`MAT-*`) is normative for *what* a match
-> must be. This document is normative for *how* version 1 computes it.
+> must be. This document is normative for *how* version 2 computes it.
 > **Decisions:** [ADR-0004](../architecture/adr/0004-deterministic-match-engine.md) (purity, versioning,
 > reproducibility), [ADR-0013](../architecture/adr/0013-engine-arithmetic-and-scoreline-effect.md)
 > (integer arithmetic, the scoreline effect).
@@ -352,6 +355,25 @@ construction rather than by discipline. `Shots = on target + off target + blocke
 to contract renewal (`CON-3`) and the discipline and injury stages apply suspensions and absences from
 these lines, so the line is part of the output contract rather than a convenience.
 
+### 8.1 Assists and the match rating (version 2)
+
+Two facts a season's statistics read from the stored result.
+
+**Assists.** A goal from open play or a corner credits exactly one teammate with the assist, drawn from the
+outfield players on the pitch in slot order excluding the scorer, weighted by vision, passing, technique,
+crossing, and dribbling. A penalty has no assister. The choice is drawn from a stream derived from the match
+seed and the goal's own sequence number, **never from the play stream**: a draw taken from the play stream
+would advance every decision after it and move the scoreline distributions the engine was calibrated
+against. Crediting an assist therefore changes a player line and the output hash, and nothing else about the
+match.
+
+**The match rating** is arithmetic over facts the result already carries — minutes, goals, assists, saves,
+cards, and the result — on the 0–10,000 basis-point scale (`TRN-8`), clamped to the rules' bounds. A player
+who did not take the pitch is given no rating rather than a low one. The result's contribution is weighted
+by playing time; every other term is absolute. The rating is a display value derived from public facts, not
+a hidden player value (`MAT-11`), and it is produced once with the result so a season's average has one
+definition.
+
 Events carry **facts, never prose**. A shot event carries its `QualityBasisPoints` — the goal probability
 it was resolved against — so highlight selection can tell a good chance from a bad one. That is a fact
 about a shot, derived from attributes the owning manager can already see, and emphatically not a hidden
@@ -496,6 +518,12 @@ be ordered, and a rating scale must be able to hold a maximum-attribute player.
 | `OutOfPositionCohesionPenaltyBasisPoints` | 1_400 | Subtracted from cohesion, not a multiplier. |
 | `ShortHandedPenaltyBasisPoints` | 8_600 | Per player below eleven. |
 | `HomeAdvantageBasisPoints` | 10_300 | A 3% multiplier on the home side's ratings. |
+| `RatingBaseBasisPoints` | 6_000 | Where a player's match rating starts. |
+| `RatingWinBonusBasisPoints` / `RatingDrawBonusBasisPoints` / `RatingLossPenaltyBasisPoints` | 600 / 120 / 350 | The result's contribution, weighted by minutes. |
+| `RatingGoalBonusBasisPoints` / `RatingAssistBonusBasisPoints` | 1_000 / 450 | Per goal and per assist. |
+| `RatingSaveBonusBasisPoints` / `RatingMaxSaveBonusBasisPoints` | 60 / 400 | Per save and its cap. |
+| `RatingYellowPenaltyBasisPoints` / `RatingRedPenaltyBasisPoints` | 350 / 1_400 | Per booking and per sending-off. |
+| `RatingMinBasisPoints` / `RatingMaxBasisPoints` | 1_000 / 10_000 | The clamp on a rating. |
 
 Two constants are deliberately **not** fields on the rules, because they are contract values rather than
 balance values: `Certain` (10_000) and `SlotCoordinateScale` (10_000, `TAC-9`).

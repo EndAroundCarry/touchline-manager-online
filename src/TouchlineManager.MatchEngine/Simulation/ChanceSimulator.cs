@@ -120,7 +120,11 @@ internal static class ChanceSimulator
         if (state.Random.RollBasisPoints(goalChance))
         {
             Score(state, side, shooter);
-            state.Emit(side, EngineEventType.Goal, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+            var goal = state.Emit(side, EngineEventType.Goal, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+
+            // The assister is the last thing a goal decides, and it is decided from a stream of its own so
+            // that crediting one cannot move a single draw of the play (see AssistPlanner).
+            AssistPlanner.Credit(state, side, shooterId, goal.Sequence);
 
             return;
         }
@@ -236,7 +240,7 @@ internal static class ChanceSimulator
     /// mechanism for naming a new goalkeeper mid-match, so a side that loses theirs is in trouble.
     /// </para>
     /// </remarks>
-    private static int KeeperQuality(SideRuntime defender, EngineRulesV1 rules) =>
+    private static int KeeperQuality(SideRuntime defender, EngineRulesV2 rules) =>
         defender.Ratings.Goalkeeping / rules.AttributeRatingFactor;
 
     /// <summary>Chooses where the shot came from, weighted towards the middle of the pitch.</summary>

@@ -3,7 +3,7 @@ using System.Globalization;
 namespace TouchlineManager.MatchEngine.Configuration;
 
 /// <summary>
-/// Every tunable constant of the match engine, versioned as rules set 1.
+/// Every tunable constant of the match engine, versioned as rules set 2.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -33,7 +33,7 @@ namespace TouchlineManager.MatchEngine.Configuration;
 /// rounding behaviour of any intermediate representation.
 /// </para>
 /// </remarks>
-public sealed record EngineRulesV1
+public sealed record EngineRulesV2
 {
     /// <summary>The version label recorded alongside a result produced under these rules.</summary>
     public const string Version = EngineVersions.RuleSetLabel;
@@ -54,7 +54,7 @@ public sealed record EngineRulesV1
     public const int MaxMultiplier = 25_000;
 
     /// <summary>The engine's rules set 1.</summary>
-    public static EngineRulesV1 Default { get; } = new();
+    public static EngineRulesV2 Default { get; } = new();
 
     // ---- Clock -----------------------------------------------------------------------------------
 
@@ -365,6 +365,52 @@ public sealed record EngineRulesV1
     /// <summary>The largest a whole unit rating can reach after its modifiers are applied.</summary>
     public int MaxUnitRating { get; init; } = 1_150;
 
+    // ---- Player match rating ---------------------------------------------------------------------
+
+    /// <summary>
+    /// What a player's match rating starts at, in basis points, before anything they did is counted.
+    /// </summary>
+    /// <remarks>
+    /// The rating is the engine's own summary of a player's match, produced with the result so a season's
+    /// statistics need no second definition of "how well did they play". It is a display value on the
+    /// 0–10,000 basis-point scale the API converts to a 0–10.0 figure (`TRN-8`), not a hidden player value,
+    /// and every term is derived from a fact the match already records.
+    /// </remarks>
+    public int RatingBaseBasisPoints { get; init; } = 6_000;
+
+    /// <summary>What a win adds to every player who appeared, weighted by how much they played.</summary>
+    public int RatingWinBonusBasisPoints { get; init; } = 600;
+
+    /// <summary>What a draw adds to every player who appeared, weighted by how much they played.</summary>
+    public int RatingDrawBonusBasisPoints { get; init; } = 120;
+
+    /// <summary>What a defeat takes from every player who appeared, weighted by how much they played.</summary>
+    public int RatingLossPenaltyBasisPoints { get; init; } = 350;
+
+    /// <summary>What each goal a player scored adds.</summary>
+    public int RatingGoalBonusBasisPoints { get; init; } = 1_000;
+
+    /// <summary>What each goal a player set up adds.</summary>
+    public int RatingAssistBonusBasisPoints { get; init; } = 450;
+
+    /// <summary>What each save a goalkeeper made adds.</summary>
+    public int RatingSaveBonusBasisPoints { get; init; } = 60;
+
+    /// <summary>The most the saves a player made can add, so a busy afternoon stays good rather than perfect.</summary>
+    public int RatingMaxSaveBonusBasisPoints { get; init; } = 400;
+
+    /// <summary>What each booking takes from a player.</summary>
+    public int RatingYellowPenaltyBasisPoints { get; init; } = 350;
+
+    /// <summary>What a sending-off takes from a player.</summary>
+    public int RatingRedPenaltyBasisPoints { get; init; } = 1_400;
+
+    /// <summary>The lowest match rating a player who appeared can be given.</summary>
+    public int RatingMinBasisPoints { get; init; } = 1_000;
+
+    /// <summary>The highest match rating a player who appeared can be given.</summary>
+    public int RatingMaxBasisPoints { get; init; } = 10_000;
+
     /// <summary>
     /// The rating difference at which a swing is applied in full, so the probability formulas can express
     /// "how much a difference of this size moves the chance" rather than a raw per-point coefficient.
@@ -517,6 +563,27 @@ public sealed record EngineRulesV1
             }
         }
 
+        foreach (var (name, value) in RatingConstants())
+        {
+            if (value is < 0 or > Certain)
+            {
+                problems.Add($"{name} must be a basis-point amount in 0..{Certain}, was {value}.");
+            }
+        }
+
+        if (RatingMinBasisPoints > RatingMaxBasisPoints)
+        {
+            problems.Add(
+                $"The rating bounds are inverted: {RatingMinBasisPoints}..{RatingMaxBasisPoints}.");
+        }
+
+        if (RatingBaseBasisPoints < RatingMinBasisPoints || RatingBaseBasisPoints > RatingMaxBasisPoints)
+        {
+            problems.Add(
+                $"RatingBaseBasisPoints ({RatingBaseBasisPoints}) must fall between the rating bounds "
+                + $"{RatingMinBasisPoints}..{RatingMaxBasisPoints}.");
+        }
+
         if (AttributeRatingFactor < 1)
         {
             problems.Add($"AttributeRatingFactor must be positive, was {AttributeRatingFactor}.");
@@ -663,6 +730,22 @@ public sealed record EngineRulesV1
         yield return (nameof(UnfamiliarRolePenaltyBasisPoints), UnfamiliarRolePenaltyBasisPoints);
         yield return (nameof(ShortHandedPenaltyBasisPoints), ShortHandedPenaltyBasisPoints);
         yield return (nameof(HomeAdvantageBasisPoints), HomeAdvantageBasisPoints);
+    }
+
+    private IEnumerable<(string Name, int Value)> RatingConstants()
+    {
+        yield return (nameof(RatingBaseBasisPoints), RatingBaseBasisPoints);
+        yield return (nameof(RatingWinBonusBasisPoints), RatingWinBonusBasisPoints);
+        yield return (nameof(RatingDrawBonusBasisPoints), RatingDrawBonusBasisPoints);
+        yield return (nameof(RatingLossPenaltyBasisPoints), RatingLossPenaltyBasisPoints);
+        yield return (nameof(RatingGoalBonusBasisPoints), RatingGoalBonusBasisPoints);
+        yield return (nameof(RatingAssistBonusBasisPoints), RatingAssistBonusBasisPoints);
+        yield return (nameof(RatingSaveBonusBasisPoints), RatingSaveBonusBasisPoints);
+        yield return (nameof(RatingMaxSaveBonusBasisPoints), RatingMaxSaveBonusBasisPoints);
+        yield return (nameof(RatingYellowPenaltyBasisPoints), RatingYellowPenaltyBasisPoints);
+        yield return (nameof(RatingRedPenaltyBasisPoints), RatingRedPenaltyBasisPoints);
+        yield return (nameof(RatingMinBasisPoints), RatingMinBasisPoints);
+        yield return (nameof(RatingMaxBasisPoints), RatingMaxBasisPoints);
     }
 
     private IEnumerable<(string Name, int Min, int Max)> OrderedTriples()

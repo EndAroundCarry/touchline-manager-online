@@ -261,6 +261,44 @@ internal sealed class MatchdayRepository : IMatchdayRepository
                 match.StatisticsJson))
             .ToListAsync(cancellationToken);
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<MatchStatEvent>> LoadMatchStatEventsAsync(
+        Guid matchdayId,
+        CancellationToken cancellationToken) =>
+        await (
+            from matchEvent in _dbContext.MatchEvents
+            join fixture in _dbContext.Fixtures on matchEvent.MatchId equals fixture.MatchId
+            where fixture.MatchdayId == matchdayId
+                && (matchEvent.Type == MatchEventType.Goal
+                    || matchEvent.Type == MatchEventType.PenaltyGoal
+                    || matchEvent.Type == MatchEventType.PenaltyMissed
+                    || matchEvent.Type == MatchEventType.ShotSaved
+                    || matchEvent.Type == MatchEventType.ShotBlocked
+                    || matchEvent.Type == MatchEventType.ShotOffTarget
+                    || matchEvent.Type == MatchEventType.Woodwork)
+            orderby fixture.Id, matchEvent.Sequence
+            select new MatchStatEvent(
+                fixture.Id,
+                matchEvent.Type,
+                matchEvent.ParticipantId,
+                matchEvent.SecondaryParticipantId))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PlayerSeasonStat>> LoadPlayerSeasonStatsAsync(
+        Guid divisionSeasonId,
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken) =>
+        playerIds.Count == 0
+            ? []
+            : await _dbContext.PlayerSeasonStats
+                .Where(stat => stat.DivisionSeasonId == divisionSeasonId
+                    && playerIds.Contains(stat.PlayerId))
+                .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public void AddPlayerSeasonStat(PlayerSeasonStat stat) => _dbContext.PlayerSeasonStats.Add(stat);
+
     private static DisciplineCounts CountsFor(
         Dictionary<(Guid MatchId, Guid ClubId), DisciplineCounts> discipline,
         Guid matchId,

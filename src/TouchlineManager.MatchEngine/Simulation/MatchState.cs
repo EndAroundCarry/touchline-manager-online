@@ -26,7 +26,7 @@ internal sealed class MatchState
     /// <param name="away">The away side's runtime state.</param>
     public MatchState(
         MatchInputV1 input,
-        EngineRulesV1 rules,
+        EngineRulesV2 rules,
         Pcg32 random,
         SideRuntime home,
         SideRuntime away)
@@ -42,7 +42,7 @@ internal sealed class MatchState
     public MatchInputV1 Input { get; }
 
     /// <summary>Gets the rules in force.</summary>
-    public EngineRulesV1 Rules { get; }
+    public EngineRulesV2 Rules { get; }
 
     /// <summary>Gets the seeded generator, the only source of randomness in the engine.</summary>
     public Pcg32 Random { get; }

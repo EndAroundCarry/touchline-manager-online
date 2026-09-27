@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
   DivisionFixtures,
+  DivisionStatistics,
   DivisionTable,
   FixtureDetail,
   FixtureTeamSheet,
@@ -41,6 +42,11 @@ export class CompetitionApi {
   /** Reads a division's league table for the season in progress. */
   divisionTable(divisionId: string): Observable<DivisionTable> {
     return this.api.get<DivisionTable>(`/divisions/${divisionId}/table`);
+  }
+
+  /** Reads a division's player season statistics for the season in progress. */
+  divisionStatistics(divisionId: string): Observable<DivisionStatistics> {
+    return this.api.get<DivisionStatistics>(`/divisions/${divisionId}/statistics`);
   }
 
   /** Reads the caller's club's side for a fixture, prepared or not. */

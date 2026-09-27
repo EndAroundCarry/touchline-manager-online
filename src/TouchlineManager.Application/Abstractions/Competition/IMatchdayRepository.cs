@@ -138,6 +138,25 @@ public sealed record MatchEffectEvent(
     int AbsenceFixtures);
 
 /// <summary>
+/// One shot or save event of a matchday, as the season-statistics rule counts them (`STA-*`).
+/// </summary>
+/// <remarks>
+/// The engine's player line carries the attacking and disciplinary summary, and the event stream is where
+/// the shots and the saves are: a shot names its taker as the principal participant, and a save names the
+/// goalkeeper who made it as the secondary one. Counting them from the same events the score is derived
+/// from is what keeps a player's shots and their side's shots one answer (`MAT-5`).
+/// </remarks>
+/// <param name="FixtureId">The fixture the event happened in.</param>
+/// <param name="Type">The event's type.</param>
+/// <param name="ParticipantId">The shooter or scorer, when the event names one.</param>
+/// <param name="SecondaryParticipantId">The goalkeeper a shot was taken against or saved by, when any.</param>
+public sealed record MatchStatEvent(
+    Guid FixtureId,
+    MatchEventType Type,
+    Guid? ParticipantId,
+    Guid? SecondaryParticipantId);
+
+/// <summary>
 /// One published fixture of a matchday, as the match-load rule reads it (`TRN-11`, `TRN-13`).
 /// </summary>
 /// <remarks>
@@ -226,6 +245,33 @@ public interface IMatchdayRepository
     /// <summary>Stages a player's season card accumulation.</summary>
     /// <param name="record">The record.</param>
     void AddDisciplineRecord(DisciplineRecord record);
+
+    /// <summary>
+    /// Loads the shot and save events of a matchday's fixtures, so publication can count each player's
+    /// shots and saves into their season statistics (`STA-*`).
+    /// </summary>
+    /// <param name="matchdayId">The matchday.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One row per shot or save event, in fixture and sequence order.</returns>
+    Task<IReadOnlyList<MatchStatEvent>> LoadMatchStatEventsAsync(
+        Guid matchdayId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads the season statistics of the given players for a division-season, for advancing in place
+    /// (`TBL-13`, applied to players).
+    /// </summary>
+    /// <param name="divisionSeasonId">The division-season.</param>
+    /// <param name="playerIds">The players the round touched.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<PlayerSeasonStat>> LoadPlayerSeasonStatsAsync(
+        Guid divisionSeasonId,
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>Stages a player's season statistics line.</summary>
+    /// <param name="stat">The line.</param>
+    void AddPlayerSeasonStat(PlayerSeasonStat stat);
 
     /// <summary>
     /// Loads the frozen snapshot and stored result of every published fixture in a matchday, so publication

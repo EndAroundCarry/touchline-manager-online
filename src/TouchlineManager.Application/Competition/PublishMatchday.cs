@@ -221,9 +221,81 @@ public sealed class PublishMatchday
             ? await ApplyDisciplineAsync(workload, effects, now, cancellationToken)
             : [];
 
-        await ApplyMatchLoadAsync(workload.Matchday.Id, cancellationToken);
+        // The round's results are read once and feed both the load and the season statistics: the load
+        // wants the minutes and the snapshot, and the statistics want the minutes, the goals, the assists,
+        // and the rating. Two reads of the same nine documents would be two chances to disagree.
+        var played = await _matchdays.LoadMatchLoadsAsync(workload.Matchday.Id, cancellationToken);
+
+        await ApplyMatchLoadAsync(played, cancellationToken);
+        await ApplySeasonStatisticsAsync(workload.Matchday, played, now, cancellationToken);
 
         return facts;
+    }
+
+    /// <summary>
+    /// Advances every player who appeared in the round into their season statistics (`STA-1`…`STA-4`).
+    /// </summary>
+    /// <remarks>
+    /// The deltas are the pure <see cref="SeasonStatisticsCalculator"/>'s, read from each fixture's stored
+    /// result and its shot and save events, and they are applied in the publication's serializable
+    /// transaction so the totals and the results they summarise become public together. A round that is not
+    /// fully staged never reaches here (`MAT-7`), and a republished round returns before it does, so a
+    /// player's totals cannot be counted twice.
+    /// </remarks>
+    private async Task ApplySeasonStatisticsAsync(
+        Matchday matchday,
+        IReadOnlyList<FixtureMatchLoadRow> played,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (played.Count == 0)
+        {
+            return;
+        }
+
+        var lines = SeasonStatisticsCalculator.Calculate(
+            played,
+            await _matchdays.LoadMatchStatEventsAsync(matchday.Id, cancellationToken));
+
+        if (lines.Count == 0)
+        {
+            return;
+        }
+
+        var playerIds = lines
+            .Select(line => line.PlayerId)
+            .Distinct()
+            .ToList();
+
+        var stored = (await _matchdays.LoadPlayerSeasonStatsAsync(
+                matchday.DivisionSeasonId,
+                playerIds,
+                cancellationToken))
+            .ToDictionary(stat => (stat.PlayerId, stat.ClubId));
+
+        foreach (var line in lines)
+        {
+            if (stored.TryGetValue((line.PlayerId, line.ClubId), out var stat))
+            {
+                stat.Accumulate(line, now);
+
+                continue;
+            }
+
+            // Opened and advanced in one go: a new line is created with the match that first produced it, so
+            // the create and the accumulate are the same transaction and cannot leave an empty row behind.
+            stat = PlayerSeasonStat.Open(
+                Guid.CreateVersion7(),
+                matchday.DivisionSeasonId,
+                line.PlayerId,
+                line.ClubId,
+                now);
+
+            stat.Accumulate(line, now);
+
+            _matchdays.AddPlayerSeasonStat(stat);
+            stored[(line.PlayerId, line.ClubId)] = stat;
+        }
     }
 
     /// <summary>
@@ -328,10 +400,10 @@ public sealed class PublishMatchday
     /// state the snapshot froze: the daily progression job writes the same row, so a match that wrote the
     /// snapshot's own arithmetic as an absolute value would erase whatever training happened since the lock.
     /// </remarks>
-    private async Task ApplyMatchLoadAsync(Guid matchdayId, CancellationToken cancellationToken)
+    private async Task ApplyMatchLoadAsync(
+        IReadOnlyList<FixtureMatchLoadRow> rows,
+        CancellationToken cancellationToken)
     {
-        var rows = await _matchdays.LoadMatchLoadsAsync(matchdayId, cancellationToken);
-
         if (rows.Count == 0)
         {
             return;

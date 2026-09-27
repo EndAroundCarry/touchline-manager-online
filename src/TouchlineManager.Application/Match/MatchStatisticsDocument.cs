@@ -39,11 +39,12 @@ public static class MatchStatisticsDocument
 {
     /// <summary>The document's schema discriminator.</summary>
     /// <remarks>
-    /// Version 2 added the player lines. The version is bumped because a version-1 document has no
-    /// participants, and a reader that accepted it would apply no match load to anybody rather than
-    /// refusing a shape it cannot honour (`JSN-5`).
+    /// Version 2 added the player lines; version 3 adds the assists and the match rating those lines now
+    /// carry (`engine-v2`), which the season-statistics projection reads. The version is bumped rather than
+    /// read leniently for the same reason each time: a document of an older shape would be accepted with a
+    /// field missing, so a reader that cannot honour it refuses it by name instead (`JSN-5`).
     /// </remarks>
-    public const string Schema = "match-statistics-v2";
+    public const string Schema = "match-statistics-v3";
 
     /// <summary>Writes a result's statistics.</summary>
     /// <param name="result">The engine's result.</param>

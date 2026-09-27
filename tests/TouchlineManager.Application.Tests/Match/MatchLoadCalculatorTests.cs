@@ -262,8 +262,10 @@ public sealed class MatchLoadCalculatorTests
             Started = minutes > 0,
             MinutesPlayed = minutes,
             Goals = 0,
+            Assists = 0,
             YellowCards = 0,
             SentOff = false,
             AbsenceFixtures = 0,
+            RatingBasisPoints = 0,
         };
 }

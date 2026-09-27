@@ -94,6 +94,47 @@ export interface DivisionTable {
   readonly serverTime: string;
 }
 
+/** One player's season statistics in a division (§10.5, §6.4). */
+export interface DivisionPlayerStat {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly clubShortName: string;
+  readonly appearances: number;
+  readonly starts: number;
+  readonly minutesPlayed: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly shotsOnTarget: number;
+  readonly saves: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
+
+  /** The average match rating on a 0.0–10.0 scale, or null before the player is rated (`TRN-8`). */
+  readonly averageRating: number | null;
+}
+
+/**
+ * A division's player statistics for the season in progress (§10.5).
+ *
+ * `rows` arrives in the order the server ranked it — goals, then assists, then name — so the screen
+ * renders that order rather than sorting.
+ */
+export interface DivisionStatistics {
+  readonly divisionId: string;
+  readonly divisionName: string;
+  readonly tierNumber: number;
+  readonly countryId: string;
+  readonly countryCode: string;
+  readonly countryName: string;
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly rows: readonly DivisionPlayerStat[];
+  readonly serverTime: string;
+}
+
 /** One of the manager's club's fixtures, from that club's point of view. */
 export interface ClubFixture {
   readonly id: string;

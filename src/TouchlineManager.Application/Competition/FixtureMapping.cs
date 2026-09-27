@@ -81,6 +81,57 @@ public static class FixtureMapping
             row.RedCards);
     }
 
+    /// <summary>Projects a division's player season statistics.</summary>
+    /// <param name="snapshot">The stored statistics.</param>
+    /// <param name="serverTime">When the response was produced.</param>
+    public static DivisionStatisticsResponse ToResponse(
+        this DivisionStatisticsSnapshot snapshot,
+        DateTimeOffset serverTime)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return new DivisionStatisticsResponse(
+            snapshot.DivisionId,
+            snapshot.DivisionName,
+            snapshot.TierNumber,
+            snapshot.CountryId,
+            snapshot.CountryCode,
+            snapshot.CountryName,
+            snapshot.SeasonNumber,
+            snapshot.SeasonLabel,
+            [.. snapshot.Rows.Select(ToResponse)],
+            serverTime);
+    }
+
+    /// <summary>Projects one player's season statistics row.</summary>
+    /// <param name="row">The row.</param>
+    public static DivisionPlayerStatRowResponse ToResponse(this DivisionPlayerStatRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        return new DivisionPlayerStatRowResponse(
+            row.PlayerId,
+            row.PlayerName,
+            row.ClubId,
+            row.ClubName,
+            row.ClubShortName,
+            row.Appearances,
+            row.Starts,
+            row.MinutesPlayed,
+            row.Goals,
+            row.Assists,
+            row.Shots,
+            row.ShotsOnTarget,
+            row.Saves,
+            row.YellowCards,
+            row.RedCards,
+            // Converted here and nowhere else, so the basis points the row is stored in never reach a client
+            // (TRN-8), and rounded to the tenth of a point a rating is read in.
+            row.AverageRatingBasisPoints is null
+                ? null
+                : Math.Round(row.AverageRatingBasisPoints.Value / 1000m, 1, MidpointRounding.AwayFromZero));
+    }
+
     /// <summary>Projects a division's whole fixture calendar.</summary>
     /// <param name="snapshot">The stored calendar.</param>
     /// <param name="serverTime">When the response was produced.</param>

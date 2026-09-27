@@ -78,7 +78,7 @@ public sealed class MatchSnapshotFactory
             return new FrozenMatchSnapshot(existing, [], false);
         }
 
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var built = MatchSnapshotBuilder.Build(sides, rules);
 
         // Two hashes, deliberately: the content hash covers the facts and derives the seed, and the input

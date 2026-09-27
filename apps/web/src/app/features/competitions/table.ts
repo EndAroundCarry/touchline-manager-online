@@ -1,5 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { goalDifferenceLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { formatInstant } from '../../core/world/presentation';
@@ -19,6 +19,7 @@ import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/con
  */
 @Component({
   selector: 'app-competition-table',
+  imports: [RouterLink],
   templateUrl: './table.html',
 })
 export class CompetitionTable {

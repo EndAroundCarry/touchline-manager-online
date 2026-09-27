@@ -85,7 +85,7 @@ internal static class DisciplineSimulator
         MatchSide defendingSide,
         SideRuntime defender,
         ActiveSlot fouler,
-        EngineRulesV1 rules)
+        EngineRulesV2 rules)
     {
         var booking = Probability.Apply(
             rules.YellowCardPerFoulBasisPoints,
@@ -126,7 +126,7 @@ internal static class DisciplineSimulator
         MatchSide side,
         SideRuntime defender,
         ActiveSlot player,
-        EngineRulesV1 rules,
+        EngineRulesV2 rules,
         bool secondBooking)
     {
         var participantId = player.Participant.ParticipantId;
@@ -151,11 +151,11 @@ internal static class DisciplineSimulator
     /// <summary>Gets how a tackling style scales the foul rate.</summary>
     /// <param name="style">The tackling style.</param>
     /// <param name="rules">The rules in force.</param>
-    private static int TacklingMultiplier(MatchTacklingStyle style, EngineRulesV1 rules) => style switch
+    private static int TacklingMultiplier(MatchTacklingStyle style, EngineRulesV2 rules) => style switch
     {
         MatchTacklingStyle.Aggressive => rules.AggressiveTacklingFoulMultiplierBasisPoints,
         MatchTacklingStyle.StayOnFeet => rules.StayOnFeetFoulMultiplierBasisPoints,
-        _ => EngineRulesV1.Certain,
+        _ => EngineRulesV2.Certain,
     };
 
     /// <summary>
@@ -169,9 +169,9 @@ internal static class DisciplineSimulator
     /// </remarks>
     /// <param name="style">The tackling style.</param>
     /// <param name="rules">The rules in force.</param>
-    private static int TacklingCardMultiplier(MatchTacklingStyle style, EngineRulesV1 rules) => style switch
+    private static int TacklingCardMultiplier(MatchTacklingStyle style, EngineRulesV2 rules) => style switch
     {
         MatchTacklingStyle.Aggressive => rules.AggressiveTacklingCardMultiplierBasisPoints,
-        _ => EngineRulesV1.Certain,
+        _ => EngineRulesV2.Certain,
     };
 }

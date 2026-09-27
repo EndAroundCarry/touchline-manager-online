@@ -306,8 +306,8 @@ public sealed class MatchSnapshotBuilderTests
         built.Input.FixtureId.Should().Be(FixtureId);
         built.Input.WorldId.Should().Be(WorldId);
         built.Input.SeasonId.Should().Be(SeasonId);
-        built.Input.HomeAdvantageBasisPoints.Should().Be(EngineRulesV1.Default.HomeAdvantageBasisPoints);
-        built.Input.FormulaConfigurationHash.Should().Be(EngineConfiguration.HashOf(EngineRulesV1.Default));
+        built.Input.HomeAdvantageBasisPoints.Should().Be(EngineRulesV2.Default.HomeAdvantageBasisPoints);
+        built.Input.FormulaConfigurationHash.Should().Be(EngineConfiguration.HashOf(EngineRulesV2.Default));
         built.Input.Seed.Should().Be(0, "the seed is derived from the built snapshot, so it cannot be part of it");
     }
 
@@ -317,7 +317,7 @@ public sealed class MatchSnapshotBuilderTests
     private static BuiltSnapshot Build(ClubSideSource home, ClubSideSource away) =>
         MatchSnapshotBuilder.Build(
             new FixtureSidesSnapshot(FixtureId, SeasonId, WorldId, home, away, []),
-            EngineRulesV1.Default);
+            EngineRulesV2.Default);
 
     /// <summary>An opponent with a full squad and nothing prepared.</summary>
     private static ClubSideSource Away() =>

@@ -43,6 +43,13 @@ internal sealed class SideRuntime
     /// <summary>Gets the goals each participant has scored.</summary>
     public Dictionary<Guid, int> Goals { get; } = [];
 
+    /// <summary>Gets the goals each participant has set up.</summary>
+    /// <remarks>
+    /// Kept beside the goals rather than read back from the event stream, which names only the scorer: an
+    /// assist is a decision the simulation made when the goal was scored, so it is recorded there.
+    /// </remarks>
+    public Dictionary<Guid, int> Assists { get; } = [];
+
     /// <summary>
     /// Gets each participant's morale at kickoff, which is the baseline the scoreline's drift is measured
     /// from. Without it, "morale may only drift so far" has nothing to be a drift from, and a heavy defeat
@@ -87,7 +94,7 @@ internal sealed class SideRuntime
 
     /// <summary>Recalculates the side's ratings from its current occupancy and condition.</summary>
     /// <param name="rules">The rules in force.</param>
-    public void RecalculateRatings(EngineRulesV1 rules) =>
+    public void RecalculateRatings(EngineRulesV2 rules) =>
         Ratings = UnitRatingCalculator.Calculate(
             Active,
             Instructions,
@@ -99,7 +106,7 @@ internal sealed class SideRuntime
     /// <param name="replacement">The player coming on.</param>
     /// <param name="minute">The minute the change happens.</param>
     /// <param name="rules">The rules in force.</param>
-    public void ReplaceOccupant(int slotNumber, MatchParticipantV1 replacement, int minute, EngineRulesV1 rules)
+    public void ReplaceOccupant(int slotNumber, MatchParticipantV1 replacement, int minute, EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(replacement);
 
@@ -138,7 +145,7 @@ internal sealed class SideRuntime
     /// <param name="minute">The minute it happens.</param>
     /// <param name="rules">The rules in force.</param>
     /// <returns>Whether the player was on the pitch.</returns>
-    public bool RemoveParticipant(Guid participantId, int minute, EngineRulesV1 rules)
+    public bool RemoveParticipant(Guid participantId, int minute, EngineRulesV2 rules)
     {
         var index = Active.FindIndex(slot => slot.Participant.ParticipantId == participantId);
 
@@ -206,7 +213,7 @@ internal sealed class SideRuntime
     /// than pick the same eleven every week.
     /// </remarks>
     /// <param name="rules">The rules in force.</param>
-    public void ApplyLoad(EngineRulesV1 rules)
+    public void ApplyLoad(EngineRulesV2 rules)
     {
         var conditionLoss = rules.ConditionLossPerPossessionBasisPoints;
 
@@ -244,7 +251,7 @@ internal sealed class SideRuntime
 
     /// <summary>Applies the half-time recovery to every player on the pitch.</summary>
     /// <param name="rules">The rules in force.</param>
-    public void ApplyHalfTimeRecovery(EngineRulesV1 rules)
+    public void ApplyHalfTimeRecovery(EngineRulesV2 rules)
     {
         for (var index = 0; index < Active.Count; index++)
         {

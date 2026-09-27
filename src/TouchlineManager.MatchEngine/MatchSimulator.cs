@@ -29,7 +29,7 @@ public static class MatchSimulator
     /// <param name="input">The frozen snapshot.</param>
     /// <returns>The result, including both hashes.</returns>
     /// <exception cref="InvalidMatchInputException">When the snapshot cannot be simulated.</exception>
-    public static MatchResultV1 Simulate(MatchInputV1 input) => Simulate(input, EngineRulesV1.Default);
+    public static MatchResultV1 Simulate(MatchInputV1 input) => Simulate(input, EngineRulesV2.Default);
 
     /// <summary>Simulates a match under an explicitly supplied rules set.</summary>
     /// <param name="input">The frozen snapshot.</param>
@@ -38,7 +38,7 @@ public static class MatchSimulator
     /// <exception cref="InvalidMatchInputException">
     /// When the snapshot cannot be simulated, or was frozen against a different engine or rules version.
     /// </exception>
-    public static MatchResultV1 Simulate(MatchInputV1 input, EngineRulesV1 rules)
+    public static MatchResultV1 Simulate(MatchInputV1 input, EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(rules);
@@ -68,7 +68,7 @@ public static class MatchSimulator
     /// or declines. Simulating anyway would produce a plausible result whose stored hashes claim a
     /// provenance it does not have, which is worse than a refusal because it is not detectable later.
     /// </remarks>
-    private static void VerifyVersionAgreement(MatchInputV1 input, EngineRulesV1 rules)
+    private static void VerifyVersionAgreement(MatchInputV1 input, EngineRulesV2 rules)
     {
         if (!string.Equals(input.EngineVersion, EngineVersions.EngineLabel, StringComparison.Ordinal))
         {
@@ -94,7 +94,7 @@ public static class MatchSimulator
         }
     }
 
-    private static SideRuntime BuildSide(MatchSideV1 side, MatchSide which, EngineRulesV1 rules)
+    private static SideRuntime BuildSide(MatchSideV1 side, MatchSide which, EngineRulesV2 rules)
     {
         var lineup = LineupResolver.Resolve(side, which, rules);
 

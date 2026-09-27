@@ -94,7 +94,7 @@ public sealed record UnitWeighting(
 /// </summary>
 /// <remarks>
 /// <para>
-/// The one part of the rules too structured to be a scalar on <c>EngineRulesV1</c>. It is still a versioned
+/// The one part of the rules too structured to be a scalar on <c>EngineRulesV2</c>. It is still a versioned
 /// rule set rather than inline magic numbers (RULE-1): changing a weight is a rules change, and the label
 /// below is what a result's provenance refers to.
 /// </para>

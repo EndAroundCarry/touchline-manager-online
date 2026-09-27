@@ -63,7 +63,7 @@ public static class LineupResolver
     /// <param name="which">Which end the side plays.</param>
     /// <param name="rules">The rules in force, which supply the familiarity penalties.</param>
     /// <returns>The resolved lineup.</returns>
-    public static MatchLineup Resolve(MatchSideV1 side, MatchSide which, EngineRulesV1 rules)
+    public static MatchLineup Resolve(MatchSideV1 side, MatchSide which, EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(side);
         ArgumentNullException.ThrowIfNull(rules);
@@ -120,7 +120,7 @@ public static class LineupResolver
     public static int FamiliarityOf(
         MatchParticipantV1 participant,
         MatchSlotV1 slot,
-        EngineRulesV1 rules)
+        EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(slot);
@@ -129,7 +129,7 @@ public static class LineupResolver
         if (participant.Position.FamilyOf() == slot.Family)
         {
             return NaturalPositionsOf(slot.Role).Contains(participant.Position)
-                ? EngineRulesV1.Certain
+                ? EngineRulesV2.Certain
                 : rules.UnfamiliarRolePenaltyBasisPoints;
         }
 

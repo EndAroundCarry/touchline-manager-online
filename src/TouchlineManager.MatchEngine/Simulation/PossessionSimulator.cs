@@ -226,7 +226,7 @@ internal static class PossessionSimulator
 
         if (Math.Abs(margin) < rules.GameStateMarginThresholdGoals)
         {
-            return EngineRulesV1.Certain;
+            return EngineRulesV2.Certain;
         }
 
         var steps = Math.Abs(margin) - rules.GameStateMarginThresholdGoals + 1;
@@ -237,14 +237,14 @@ internal static class PossessionSimulator
                 rules.MaxGameStateModifierBasisPoints,
                 rules.LeadingCreationStepBasisPoints * steps);
 
-            return EngineRulesV1.Certain - reduction;
+            return EngineRulesV2.Certain - reduction;
         }
 
         var increase = Math.Min(
             rules.MaxGameStateModifierBasisPoints,
             rules.TrailingCreationStepBasisPoints * steps);
 
-        return EngineRulesV1.Certain + increase;
+        return EngineRulesV2.Certain + increase;
     }
 
     /// <summary>
@@ -266,7 +266,7 @@ internal static class PossessionSimulator
         {
             MatchTempo.High => rules.HighTempoPossessionSecondsMultiplierBasisPoints,
             MatchTempo.Low => rules.LowTempoPossessionSecondsMultiplierBasisPoints,
-            _ => EngineRulesV1.Certain,
+            _ => EngineRulesV2.Certain,
         };
 
         return Math.Max(rules.MinEffectivePossessionSeconds, Probability.Apply(seconds, multiplier));

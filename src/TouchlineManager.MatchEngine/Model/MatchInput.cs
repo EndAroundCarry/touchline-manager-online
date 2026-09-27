@@ -316,12 +316,12 @@ public sealed record MatchInputV1
 
         // Home advantage is a multiplier on the home side's ratings, not a probability, so it is bounded by
         // the multiplier band rather than by certainty.
-        if (HomeAdvantageBasisPoints is < Configuration.EngineRulesV1.MinMultiplier
-            or > Configuration.EngineRulesV1.MaxMultiplier)
+        if (HomeAdvantageBasisPoints is < Configuration.EngineRulesV2.MinMultiplier
+            or > Configuration.EngineRulesV2.MaxMultiplier)
         {
             throw new InvalidMatchInputException(
                 $"Home advantage is {HomeAdvantageBasisPoints} basis points, outside "
-                + $"{Configuration.EngineRulesV1.MinMultiplier}..{Configuration.EngineRulesV1.MaxMultiplier}.");
+                + $"{Configuration.EngineRulesV2.MinMultiplier}..{Configuration.EngineRulesV2.MaxMultiplier}.");
         }
 
         if (Home.ClubId == Away.ClubId)
@@ -406,8 +406,8 @@ public sealed record MatchInputV1
                     $"{label}'s slot {slot.SlotNumber} asks for {slot.Role}, which is not a {slot.Family} role (TAC-8).");
             }
 
-            if (slot.X is < 0 or > Configuration.EngineRulesV1.SlotCoordinateScale
-                || slot.Y is < 0 or > Configuration.EngineRulesV1.SlotCoordinateScale)
+            if (slot.X is < 0 or > Configuration.EngineRulesV2.SlotCoordinateScale
+                || slot.Y is < 0 or > Configuration.EngineRulesV2.SlotCoordinateScale)
             {
                 throw new InvalidMatchInputException(
                     $"{label}'s slot {slot.SlotNumber} is at ({slot.X},{slot.Y}), outside the pitch (TAC-9).");

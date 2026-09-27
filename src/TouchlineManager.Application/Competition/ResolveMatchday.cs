@@ -208,7 +208,7 @@ public sealed class ResolveMatchday
         Guid? jobId,
         CancellationToken cancellationToken)
     {
-        var rules = EngineRulesV1.Default;
+        var rules = EngineRulesV2.Default;
         var input = MatchSnapshotFactory.ReadVerified(snapshot);
         var startedAt = _clock.UtcNow;
 

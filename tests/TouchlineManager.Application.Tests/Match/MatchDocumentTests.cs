@@ -114,7 +114,7 @@ public sealed class MatchDocumentTests
     {
         var json = MatchStatisticsDocument
             .Write(SimulatedMatch(seed: 5UL))
-            .Replace(MatchStatisticsDocument.Schema, "match-statistics-v3", StringComparison.Ordinal);
+            .Replace(MatchStatisticsDocument.Schema, "match-statistics-v2", StringComparison.Ordinal);
 
         var act = () => MatchStatisticsDocument.Read(json);
 
@@ -202,9 +202,11 @@ public sealed class MatchDocumentTests
                 Started = true,
                 MinutesPlayed = 90,
                 Goals = 2,
+                Assists = 1,
                 YellowCards = 0,
                 SentOff = false,
                 AbsenceFixtures = 0,
+                RatingBasisPoints = 8_500,
             },
         ],
         TotalMinutesPlayed = 94,

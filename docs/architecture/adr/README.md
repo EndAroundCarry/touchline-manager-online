@@ -35,6 +35,7 @@ the system is shaped the way it is.
 | [0016](0016-non-production-matchday-trigger.md) | A non-production matchday trigger for the end-to-end watch journey | Accepted |
 | [0017](0017-match-load-at-publication.md) | A match's load on the squad is derived from the stored result and applied at publication | Accepted |
 | [0018](0018-ai-club-policy.md) | A club nobody manages is set up by a pure, versioned policy run by the worker | Accepted |
+| [0019](0019-engine-v2-and-season-statistics.md) | The player line carries assists and a rating, and season statistics are a projection of published results | Accepted |
 
 ## Rules for changing an ADR
 

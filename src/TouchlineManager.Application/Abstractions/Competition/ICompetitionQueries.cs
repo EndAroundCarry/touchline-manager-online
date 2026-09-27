@@ -209,6 +209,62 @@ public sealed record DivisionTableSnapshot(
     string SeasonLabel,
     IReadOnlyList<DivisionTableRow> Rows);
 
+/// <summary>One player's season statistics in a division, most goals first (`STA-1`…`STA-4`).</summary>
+/// <param name="PlayerId">The player.</param>
+/// <param name="PlayerName">The player's generated name.</param>
+/// <param name="ClubId">The club the player appeared for.</param>
+/// <param name="ClubName">The club's generated name.</param>
+/// <param name="ClubShortName">The club's abbreviation.</param>
+/// <param name="Appearances">Matches the player took the pitch in.</param>
+/// <param name="Starts">Matches the player started.</param>
+/// <param name="MinutesPlayed">Total minutes played.</param>
+/// <param name="Goals">Goals scored.</param>
+/// <param name="Assists">Goals set up.</param>
+/// <param name="Shots">Shots taken.</param>
+/// <param name="ShotsOnTarget">Shots on target.</param>
+/// <param name="Saves">Saves made.</param>
+/// <param name="YellowCards">Bookings accumulated.</param>
+/// <param name="RedCards">Sendings-off accumulated.</param>
+/// <param name="AverageRatingBasisPoints">The average match rating, or null before the player is rated.</param>
+public sealed record DivisionPlayerStatRow(
+    Guid PlayerId,
+    string PlayerName,
+    Guid ClubId,
+    string ClubName,
+    string ClubShortName,
+    int Appearances,
+    int Starts,
+    int MinutesPlayed,
+    int Goals,
+    int Assists,
+    int Shots,
+    int ShotsOnTarget,
+    int Saves,
+    int YellowCards,
+    int RedCards,
+    int? AverageRatingBasisPoints);
+
+/// <summary>A division's player statistics for the season in progress (master plan §10.5).</summary>
+/// <param name="DivisionId">The division.</param>
+/// <param name="DivisionName">The division's generated name.</param>
+/// <param name="TierNumber">The tier.</param>
+/// <param name="CountryId">The country.</param>
+/// <param name="CountryCode">The country's code.</param>
+/// <param name="CountryName">The country's name.</param>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="Rows">Every player with an appearance, most goals first.</param>
+public sealed record DivisionStatisticsSnapshot(
+    Guid DivisionId,
+    string DivisionName,
+    int TierNumber,
+    Guid CountryId,
+    string CountryCode,
+    string CountryName,
+    int SeasonNumber,
+    string SeasonLabel,
+    IReadOnlyList<DivisionPlayerStatRow> Rows);
+
 /// <summary>
 /// The read side of the competition module's fixture calendar and tables (master plan §10.5, §11.1).
 /// </summary>
@@ -244,6 +300,21 @@ public interface ICompetitionQueries
     /// <param name="divisionId">The division.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<DivisionTableSnapshot?> GetDivisionTableAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads a division's player season statistics for the season in progress, or null if the division is
+    /// unknown.
+    /// </summary>
+    /// <remarks>
+    /// Like the table, the rows are read as the projection they are rather than recomputed per request:
+    /// they are advanced once per published matchday, inside the same transaction that publishes the round,
+    /// so a read can never see totals with the round's results only half applied (`MAT-7`).
+    /// </remarks>
+    /// <param name="divisionId">The division.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<DivisionStatisticsSnapshot?> GetDivisionStatisticsAsync(
         Guid divisionId,
         CancellationToken cancellationToken);
 
