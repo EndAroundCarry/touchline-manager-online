@@ -277,6 +277,84 @@ the discipline and competition screens are the rest.
   recipient and never on the current season (`CAL-6` is about the world's calendar, which this does not
   read).
 
+### The AI club's own management
+
+A side nobody picked. Every club no human holds now has a real default plan — a formation, its eight team
+instructions, and a full eleven — and a training plan, written by a deterministic policy and accepted by the
+same validator a manager's save goes through. Until now an untended club fielded the builder's neutral
+four-four-two and trained at an implicit default, which is a repair rather than a manager; `INS-12` asks for
+the AI's own decisions, and this is them. The season statistics, the projection tools, and the discipline and
+competition screens are the rest of the stage.
+
+#### Added
+
+- **`AiClubPolicy`** (`ai-policy-v1`, `INS-12`): a pure, versioned function from a club's identity and its
+  squad to its tactics, its default eleven, and its training. Every draw comes from a `Pcg32` stream seeded
+  from the club identity and the policy label, so the same club always decides the same way and two clubs
+  differ — and changing the draw order or the formation list is a named policy version rather than a silent
+  constant, exactly as `training-v1` and `match-load-v1` version themselves. It reads no clock, database,
+  culture, or global random source.
+- **The tactics vary and the training does not.** The formation and the eight instructions are drawn per
+  club, because a division of eighteen identical sides is not a league and every choice is one the engine
+  already bounds (`INS-9`). Training is the neutral `balanced`/`normal` for every AI club, because a training
+  focus is a persistent development path rather than a match-to-match lever, and a club permanently dealt a
+  random focus would be a fairness problem dressed as variety.
+- **The eleven is chosen by the rule the builder already repairs with** (`DIS-6`): position suitability,
+  then condition, then ability, then stable player ID, with exactly one recognised goalkeeper and only
+  available players. A squad that cannot field a legal eleven yields the plan's shape with no lineup, which
+  `TAC-10` allows and the snapshot builder fills at the lock.
+- **`EvaluateAiClubs`** (master plan §7.2): the use case that gives every AI-controlled club the plans it
+  is missing. It builds the policy's decision into `TacticalSlotDefinition`s, passes them through the same
+  `TacticalPlanValidator` a human's save calls, and writes only what fails nothing. A plan a previous run or
+  a manager wrote is left exactly as it is, so a repeat run writes nothing and a resignation does not reset a
+  club (`WORLD-9`, `OCC-5`).
+- **`world.evaluate-ai-clubs`**, the durable job, and **`AiClubScheduler`**, which materialises one row per
+  UTC day so the row is the deadline and a worker that was down when the day opened runs late rather than
+  skipping (`ADR-0003`). Registered only by `AddJobQueueWorker`, so an API process can never write a squad
+  plan; `AiClubs:EnableEvaluation` is on by default, because the work is idempotent and a world without it is
+  not the stage. The job handler is a thin shell and reports the counts.
+- **`IAiClubRepository`**/**`AiClubRepository`**: the evaluation's read — every club with no open tenure,
+  with its squad, its condition, its availability, and which of its plans already exist — in a fixed handful
+  of queries however deep the pyramid gets. "Open" spans active and inactive (`OCC-8`), so an away manager's
+  club is not the AI's to set up; making safe decisions for them is the inactivity ladder's work (`OCC-2`),
+  which Stage 11 owns.
+- **ADR-0018**, on the pure versioned policy, the gap-filling evaluation, the worker-only daily job, and the
+  neutral training choice.
+- `docs/product/game-rules.md` §9 and §18 gained the policy's behaviour and the `ai_policy_version` constant.
+- 8 new domain tests (355 total) pinning determinism, the variety across clubs, the validator's acceptance,
+  the one-goalkeeper rule, availability, the no-goalkeeper case, and the neutral training; 5 new application
+  tests (86 total) over the orchestration — a club with no plans gets both, a club with one keeps it and gets
+  the other, a complete club is left alone, an eleven-less squad still gets a legal plan, and every plan
+  written passes the validator; and 3 new infrastructure tests (126 total) over a real seeded world that
+  evaluate every AI club, assert each stored plan is valid against its own squad, run twice, and assert a
+  club a human holds is never loaded.
+
+#### Notes
+
+- **The validator caught the first version's bug, which is the point of routing through it.** The empty-lineup
+  case was building each slot's occupant with `dictionary.GetValueOrDefault(slot)`, which for a `Guid`
+  dictionary returns `Guid.Empty` rather than null — an eleven of slots pointing at a player who does not
+  exist. `TacticalPlanValidator` refused it as `PLAYER_NOT_ELIGIBLE`, and the domain test failed before the
+  application test could hide it. A policy that wrote its own plan straight to the tables would have shipped
+  an illegal side that the builder then silently repaired at every lock.
+- **A record's collection member is compared by reference, so the determinism test compares field by field.**
+  Two calls do build equal decisions, but not the same slot-list instance; the test asserts the formation,
+  instructions, slots, and training are equal rather than that the two records are.
+- **The evaluation re-picks nothing.** A club's plan is fixed until a manager changes it: the AI does not
+  rebuild its eleven as injuries and transfers move the squad, because the snapshot builder already repairs
+  an unavailable or ineligible pick at the lock (`DIS-6`), and re-picking on every evaluation would rewrite a
+  manager's plan the moment they resigned. A state-reactive AI lineup is a later feature if balance needs it.
+- **A held club keeps its plan, and that is the deliberate reading of "left alone".** The evaluation is
+  measured against the clubs with no open tenure, so a club that is taken over simply stops being considered;
+  the side it already has — the AI's or the previous manager's — is what the new manager inherits (`WORLD-9`).
+- **The AI's training plan is a stored row equal to the implicit default, and that is on purpose.** The
+  progression job already assumes `balanced`/`normal` for a club with no plan (`TRN-1`), so the row changes
+  no behaviour today; it makes the AI's choice explicit and inspectable, and it is what a future
+  state-reactive policy would replace in one place. The alternative — writing no row and leaving the default
+  implicit — would leave the AI's training decision with no home to grow into.
+- **Nothing here is reachable from a command.** The plans are written by the worker's evaluator alone, and the
+  only surface this milestone adds is a job type and a scheduler — `MAT-2`'s principle, applied to the squad.
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

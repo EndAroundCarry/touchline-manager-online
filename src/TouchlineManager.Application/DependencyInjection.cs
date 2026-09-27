@@ -37,6 +37,7 @@ public static class DependencyInjection
 
         services.AddScoped<IJobHandler, NoOpJobHandler>();
         services.AddScoped<IJobHandler, DailyPlayerProgressionJobHandler>();
+        services.AddScoped<IJobHandler, EvaluateAiClubsJobHandler>();
         services.AddScoped<IJobHandler, LockMatchdayJobHandler>();
         services.AddScoped<IJobHandler, ResolveMatchdayJobHandler>();
         services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
@@ -162,6 +163,7 @@ public static class DependencyInjection
         services.AddScoped<SaveTrainingPlan>();
         services.AddScoped<SetPlayerTrainingFocus>();
         services.AddScoped<RunDailyProgression>();
+        services.AddScoped<EvaluateAiClubs>();
         services.AddScoped<GetFixtureTeamSheet>();
         services.AddScoped<SaveFixtureTeamSheet>();
 

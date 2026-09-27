@@ -204,6 +204,15 @@ first difference deciding:
 | INS-11 | A club has exactly one default tactical plan; a fixture may have its own draft team sheet referencing a plan version. |
 | INS-12 | Humans and AI are validated by the identical validator. AI receives no bypasses. |
 
+An AI-controlled club — one no manager holds — is set up by a pure, versioned policy (`ai-policy-v1`) run
+by the worker's daily evaluation job. The policy draws a formation and the eight instructions from the
+club's identity, picks its default eleven by position suitability, condition, ability, and stable player
+ID — the same ordering `DIS-6` repairs a side with — and trains at the neutral `balanced`/`normal`. Every
+plan it produces is accepted by the same `TacticalPlanValidator` a manager's save goes through, so `INS-12`
+is enforced by the code path rather than by intention. It fills only a missing plan: a side or training
+plan a manager or an earlier pass set is left exactly as it is, and a club a manager holds — active or
+merely inactive (`OCC-8`) — is never considered.
+
 ---
 
 ## 10. Training and player state
@@ -450,6 +459,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
 | `training_progression_version` | `training-v1` | TRN-9 (FIC-8) |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
+| `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
 | `match_statistics_schema` | `match-statistics-v2` (carries the player lines) | JSN-1, TRN-11 |
 | `match_condition_cost_per_minute_bp` | 10 | TRN-11 (balancing) |
 | `match_fatigue_gain_per_minute_bp` | 7 | TRN-11 (balancing) |

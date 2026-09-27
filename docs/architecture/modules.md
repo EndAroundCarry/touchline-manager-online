@@ -89,6 +89,7 @@ flowchart TD
 | world → competition | read/write via use case | Provisioning creates division-season entries and fixtures |
 | world → finance | write via use case | Takeover ensures a club account exists; provisioning funds a new club |
 | squad → world | read | Player registration and contracts reference a club |
+| world → squad | write via use case | The AI evaluation gives a club no manager holds a side and a training plan |
 | competition → squad | write via use case | Publication applies cards, injuries, fatigue, morale |
 | competition → finance | write via use case | Publication posts gate revenue; rollover settles awards |
 | match → squad | read at lock time | Freeze lineups, attributes, and state into a snapshot |

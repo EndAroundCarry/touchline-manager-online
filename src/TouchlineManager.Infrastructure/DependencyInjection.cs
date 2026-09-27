@@ -23,6 +23,7 @@ using TouchlineManager.Infrastructure.Requests;
 using TouchlineManager.Infrastructure.Security;
 using TouchlineManager.Infrastructure.Time;
 using TouchlineManager.Infrastructure.Training;
+using TouchlineManager.Infrastructure.World;
 
 namespace TouchlineManager.Infrastructure;
 
@@ -58,6 +59,7 @@ public static class DependencyInjection
         AddCommsInfrastructure(services);
         AddSquadInfrastructure(services);
         AddTrainingInfrastructure(services, configuration);
+        AddAiClubInfrastructure(services, configuration);
         AddMatchdayInfrastructure(services, configuration);
 
         return services;
@@ -218,6 +220,24 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// Registers the AI club evaluation's configuration (`INS-12`).
+    /// </summary>
+    /// <remarks>
+    /// Bound here rather than in <see cref="AddJobQueueWorker"/> so the validator that guards the interval
+    /// runs in every host, and a misconfiguration fails at startup rather than the first time the scheduler
+    /// ticks.
+    /// </remarks>
+    private static void AddAiClubInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<AiClubOptions>()
+            .Bind(configuration.GetSection(AiClubOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "AiClubs:CheckIntervalSeconds must be between 30 and 86400.");
+    }
+
+    /// <summary>
     /// Registers the world module's persistence and the advisory locks its deadlines and claims depend on.
     /// </summary>
     /// <remarks>
@@ -279,6 +299,7 @@ public static class DependencyInjection
         services.AddScoped<ITeamSheetQueries, TeamSheetQueries>();
         services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
         services.AddScoped<IPlayerStateRepository, PlayerStateRepository>();
+        services.AddScoped<IAiClubRepository, AiClubRepository>();
     }
 
     /// <summary>
@@ -328,6 +349,10 @@ public static class DependencyInjection
         // The same arrangement for the season: this service turns the calendar into lock, resolution, and
         // publication jobs, and the rows it inserts are the deadlines (§7.2, ADR-0003).
         services.AddHostedService<MatchdayScheduleScheduler>();
+
+        // And the same for the AI: this service places the day's evaluation row, and the row is what gives
+        // every club nobody holds a side and a training plan (INS-12).
+        services.AddHostedService<AiClubScheduler>();
 
         return services;
     }
