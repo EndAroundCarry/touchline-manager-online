@@ -448,6 +448,90 @@ screens are the rest.
   squad module's read to widen and belongs with the screen work that follows, rather than being bolted onto
   the competition milestone's commit.
 
+### The projections a repair can rebuild
+
+A projection you can trust. A division's table and its players' season statistics are caches of facts the
+world already stores — the published fixtures and the results and events they were played from — and this is
+the tool that proves it: `RebuildDivisionProjections` recomputes both from those facts, reports exactly what
+has drifted, and, when asked to, sets it back. Left alone it is the reconciliation an operator inspects;
+applied it is the repair `TBL-13` promises, done with the same arithmetic the live publication runs. This is
+the projection rebuild and reconciliation tool §7.2 calls `RebuildProjection`; the discipline and competition
+screens are what is left of Stage 8.
+
+#### Added
+
+- **`PlayerSeasonStatLine`, and `PlayerSeasonStat.Create` / `Rebuild`** (`STA-1`, `TBL-13`): a whole season's
+  line as one value, and the two operations that write one. `Create` opens a fresh projection already holding
+  a season's totals; `Rebuild` replaces a stored line's totals with a recomputed one rather than adding to
+  them — the operation the aggregate lacked, because until now a line could only be opened empty and
+  accumulated match by match, so a drifted row had no way back. Its checks mirror the aggregate's and the
+  database's: an appearance is required, a start is a subset of an appearance, shots on target a subset of
+  shots, and a season's rating total is at most ten thousand basis points per rated appearance.
+- **`SeasonStatisticsCalculator.Aggregate`** (`STA-2`): the same arithmetic the live publication performs
+  match by match, applied in one pass over every published result of a division-season. It sums stored match
+  facts rather than re-simulating, so the totals cannot disagree with the results they summarise, and the
+  average rating stays a total and a count on the aggregate because that is where its one definition lives.
+- **`RebuildDivisionProjections`** (`TBL-13`, `TBL-14`, master plan §7.2): the reconciliation and the repair
+  in one use case, chosen apart by an `apply` flag. It recomputes the table with `StandingsCalculator.Rank`
+  over the division's published outcomes and the statistics with `SeasonStatisticsCalculator` over its
+  published results, and reports each row or line that differs, is missing, or has no source. The dry run
+  writes nothing; the apply reads and writes inside one serializable transaction — the isolation and the
+  read-inside shape the publication uses — so a peer publication cannot interleave between the recomputation
+  and the correction. A stored line no published result supports is removed, so the repair leaves the
+  projection equal to its source rather than merely close to it.
+- **`IMatchdayRepository` gains the division-wide loads** the rebuild reads: every published fixture's
+  match-load row, every shot and save event, and every stored season line of a division-season, plus the
+  removal stage. They are the whole-division forms of the per-matchday reads the publication already uses, so
+  the rebuild and the live path parse one shape in one place.
+- **`competition.rebuild-division-projections`** (§7.2): the durable job, keyed on the division-season so a
+  repeated enqueue is a no-op, and its handler — a thin shell that refuses a payload with no division-season,
+  or one the world does not have, as a permanent failure, because retrying cannot produce the missing row.
+  It is worker-only and has no public command, like every other writer of a projection (`MAT-2`).
+- **ADR-0020**, on the one-use-case-two-modes tool, the recompute-and-rewrite domain operations, the
+  read-inside-the-transaction repair, the removal of an unsupported line, and the deliberate deferral of the
+  discipline accumulation.
+- `docs/product/game-rules.md` §6 (`TBL-14`) and §15.1 (`STA-6`) gained the reconciliation rule;
+  `docs/architecture/data-model.md` §5 now names the job and records why `discipline_records` is not rebuilt.
+- 6 new domain tests (370 total) for `Create` and `Rebuild` — that a rebuild replaces rather than sums, and
+  its refusals; 3 new application tests (94 total) for the aggregation — the sum across a player's matches,
+  the two clubs a transfer leaves, and the unrated appearance that is not a zero; and 5 new infrastructure
+  tests (133 total) over a real seeded world that publish a real round and then reconcile it: a published
+  division reconciles with no drift, a corrupted table row and a corrupted player line are each reported by a
+  dry run and corrected by an apply, the repaired projections equal a fresh computation, a stored line no
+  result supports is removed, and an unknown division-season is refused.
+
+#### Notes
+
+- **The two tools are one use case separated by a flag, and that is deliberate.** `apply: false` is the
+  reconciliation read and `apply: true` is the repair, and both run the same recomputation. A separate
+  "check" path would be a second definition of what the projections should be — exactly the drift the tool
+  exists to find.
+- **The apply reads inside its transaction, and the first version did not.** It computed the drift from
+  reads taken before `BeginTransactionAsync` and then wrote, which would have let a publication commit a
+  round between the recomputation and the correction and left the repair writing a stale answer. The
+  publication guards itself by reading and writing in one serializable transaction; a repair that recomputes
+  a whole division is the same shape, and it was moved inside for the same reason.
+- **A repair removes a line nothing supports.** `player_season_stats` has a unique key and no other delete
+  path, so a line written for a result that a later repair voided would sit beside the totals forever. A
+  projection is a cache (master plan §5), so the rebuild deletes a line whose player and club no published
+  result names — which is what "equal to the live projection" requires, and the fixture's own test asserts a
+  removed row.
+- **The discipline accumulation is not rebuilt, and the reason is its consequence.**
+  `docs/architecture/data-model.md` §5 lists `discipline_records` among the rebuildable projections, and its
+  card counts are derivable from the same events — but the record's whole purpose is a suspension already
+  served against specific fixtures, and replaying the accumulation without replaying the service would leave
+  a player's bookings and their absences disagreeing. That reconciliation needs the rollover that owns the
+  accumulation's reset (`DIS-3`), and it is recorded as deferred rather than half-built (`§17.12`).
+- **There is no HTTP surface.** The repair is a durable job with a business key, enqueued the way the plan's
+  operator workflow will; the admin module that would give it a button, a reason, and an audit entry is
+  Stage 14's. A diagnostic trigger now would be the feature-incomplete route `§17.12` keeps out, so the tool
+  is proven by its own integration tests rather than by an endpoint.
+- **The tests play in their own division-season.** The other workflow tests use the first division-season and
+  the seeded-table test reads the last, so a rebuild test that corrupts a row cannot disturb either; it plays
+  in the third, which nothing else touches, and names it by country code rather than by creation order.
+- **Deferred to the rest of Stage 8:** the discipline and competition screens, including the tie-break view
+  and the competition-rules page that shows the stored draw key (`TBL-11`).
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

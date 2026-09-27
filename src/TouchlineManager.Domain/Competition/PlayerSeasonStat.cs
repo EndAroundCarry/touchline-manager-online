@@ -49,6 +49,61 @@ public sealed record PlayerMatchStatLine
 }
 
 /// <summary>
+/// A player's whole season for one club, as a rebuild computes it (`STA-1`, `TBL-13`).
+/// </summary>
+/// <remarks>
+/// The aggregate twin of <see cref="PlayerMatchStatLine"/>: a match line is one fixture's contribution and
+/// always carries exactly one appearance, while this is the sum over a division-season's published results.
+/// It exists so a projection can be rewritten from what it should hold rather than only advanced by what
+/// just happened, which is what makes the statistics exactly rebuildable (`TBL-13`) rather than merely
+/// plausible.
+/// </remarks>
+public sealed record PlayerSeasonStatLine
+{
+    /// <summary>Gets the player.</summary>
+    public required Guid PlayerId { get; init; }
+
+    /// <summary>Gets the club the player appeared for.</summary>
+    public required Guid ClubId { get; init; }
+
+    /// <summary>Gets how many matches the player appeared in.</summary>
+    public required int Appearances { get; init; }
+
+    /// <summary>Gets how many of those the player started.</summary>
+    public required int Starts { get; init; }
+
+    /// <summary>Gets the minutes played.</summary>
+    public required int MinutesPlayed { get; init; }
+
+    /// <summary>Gets the goals scored.</summary>
+    public required int Goals { get; init; }
+
+    /// <summary>Gets the goals set up.</summary>
+    public required int Assists { get; init; }
+
+    /// <summary>Gets the shots taken.</summary>
+    public required int Shots { get; init; }
+
+    /// <summary>Gets the shots on target.</summary>
+    public required int ShotsOnTarget { get; init; }
+
+    /// <summary>Gets the saves made.</summary>
+    public required int Saves { get; init; }
+
+    /// <summary>Gets the league bookings accumulated.</summary>
+    public required int YellowCards { get; init; }
+
+    /// <summary>Gets the sendings-off accumulated.</summary>
+    public required int RedCards { get; init; }
+
+    /// <summary>Gets the sum of the player's match ratings, in basis points.</summary>
+    public required long RatingBasisPointsTotal { get; init; }
+
+    /// <summary>Gets how many appearances carried a rating, which the average divides by.</summary>
+    public required int RatedAppearances { get; init; }
+}
+
+/// <summary>
 /// A player's season statistics for one club in one division-season (master plan §6.4).
 /// </summary>
 /// <remarks>
@@ -176,6 +231,74 @@ public sealed class PlayerSeasonStat
         };
     }
 
+    /// <summary>Creates a player's season statistics already holding a whole season's totals (`TBL-13`).</summary>
+    /// <param name="id">A server-generated identity.</param>
+    /// <param name="divisionSeasonId">The division-season the statistics belong to.</param>
+    /// <param name="line">The computed season line.</param>
+    /// <param name="now">The current instant.</param>
+    public static PlayerSeasonStat Create(
+        Guid id,
+        Guid divisionSeasonId,
+        PlayerSeasonStatLine line,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+
+        if (divisionSeasonId == Guid.Empty)
+        {
+            throw new ArgumentException("Season statistics belong to a division-season.", nameof(divisionSeasonId));
+        }
+
+        if (line.PlayerId == Guid.Empty)
+        {
+            throw new ArgumentException("Season statistics belong to a player.", nameof(line));
+        }
+
+        if (line.ClubId == Guid.Empty)
+        {
+            throw new ArgumentException("Season statistics belong to a club.", nameof(line));
+        }
+
+        var stat = new PlayerSeasonStat
+        {
+            Id = id,
+            DivisionSeasonId = divisionSeasonId,
+            PlayerId = line.PlayerId,
+            ClubId = line.ClubId,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+
+        stat.Assign(line, now);
+
+        return stat;
+    }
+
+    /// <summary>
+    /// Rewrites the totals from a computed season line (`TBL-13`).
+    /// </summary>
+    /// <remarks>
+    /// The counterpart of <see cref="Accumulate"/> for a rebuild: it replaces rather than adds, so a
+    /// projection that has drifted is set back to the value the published results compute. It takes a whole
+    /// season's line, so there is no way to correct one column and leave the rest behind.
+    /// </remarks>
+    /// <param name="line">The computed season line.</param>
+    /// <param name="now">The current instant.</param>
+    /// <exception cref="ArgumentException">When the line is not this player's, or its counts cannot be true.</exception>
+    public void Rebuild(PlayerSeasonStatLine line, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+
+        if (line.PlayerId != PlayerId || line.ClubId != ClubId)
+        {
+            throw new ArgumentException(
+                "A season statistic is rebuilt only from its own player's line for its own club.",
+                nameof(line));
+        }
+
+        Assign(line, now);
+    }
+
     /// <summary>Advances the season totals by one match.</summary>
     /// <param name="line">The player's contribution, from the pure calculator.</param>
     /// <param name="now">The current instant.</param>
@@ -213,6 +336,88 @@ public sealed class PlayerSeasonStat
 
         UpdatedAt = now;
         Version++;
+    }
+
+    private void Assign(PlayerSeasonStatLine line, DateTimeOffset now)
+    {
+        EnsureAggregateNonNegative(line);
+        EnsureAggregateCountsAgree(line);
+
+        Appearances = line.Appearances;
+        Starts = line.Starts;
+        MinutesPlayed = line.MinutesPlayed;
+        Goals = line.Goals;
+        Assists = line.Assists;
+        Shots = line.Shots;
+        ShotsOnTarget = line.ShotsOnTarget;
+        Saves = line.Saves;
+        YellowCards = line.YellowCards;
+        RedCards = line.RedCards;
+        RatingBasisPointsTotal = line.RatingBasisPointsTotal;
+        RatedAppearances = line.RatedAppearances;
+
+        UpdatedAt = now;
+        Version++;
+    }
+
+    private static void EnsureAggregateNonNegative(PlayerSeasonStatLine line)
+    {
+        var counts = new (string Name, long Value)[]
+        {
+            (nameof(line.Appearances), line.Appearances),
+            (nameof(line.Starts), line.Starts),
+            (nameof(line.MinutesPlayed), line.MinutesPlayed),
+            (nameof(line.Goals), line.Goals),
+            (nameof(line.Assists), line.Assists),
+            (nameof(line.Shots), line.Shots),
+            (nameof(line.ShotsOnTarget), line.ShotsOnTarget),
+            (nameof(line.Saves), line.Saves),
+            (nameof(line.YellowCards), line.YellowCards),
+            (nameof(line.RedCards), line.RedCards),
+            (nameof(line.RatingBasisPointsTotal), line.RatingBasisPointsTotal),
+            (nameof(line.RatedAppearances), line.RatedAppearances),
+        };
+
+        foreach (var (name, value) in counts)
+        {
+            if (value < 0)
+            {
+                throw new ArgumentException($"A season statistic is never negative: {name} was {value}.", nameof(line));
+            }
+        }
+    }
+
+    private static void EnsureAggregateCountsAgree(PlayerSeasonStatLine line)
+    {
+        // A season line exists only for a player who appeared, so it always covers at least one match.
+        if (line.Appearances < 1)
+        {
+            throw new ArgumentException(
+                $"A season line covers at least one appearance: appearances was {line.Appearances}.",
+                nameof(line));
+        }
+
+        if (line.Starts > line.Appearances)
+        {
+            throw new ArgumentException("A player cannot start a match they did not appear in.", nameof(line));
+        }
+
+        if (line.ShotsOnTarget > line.Shots)
+        {
+            throw new ArgumentException("Shots on target are a subset of shots.", nameof(line));
+        }
+
+        if (line.RatedAppearances > line.Appearances)
+        {
+            throw new ArgumentException("A rating belongs to an appearance.", nameof(line));
+        }
+
+        if (line.RatingBasisPointsTotal > (long)line.RatedAppearances * 10_000)
+        {
+            throw new ArgumentException(
+                "A season's rating total is at most 10,000 basis points per rated appearance.",
+                nameof(line));
+        }
     }
 
     private static void EnsureNonNegative(PlayerMatchStatLine line)

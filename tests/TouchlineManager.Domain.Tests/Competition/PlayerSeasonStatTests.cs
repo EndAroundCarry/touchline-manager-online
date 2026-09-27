@@ -119,6 +119,79 @@ public sealed class PlayerSeasonStatTests
         stat.AverageRatingBasisPoints.Should().Be(8_000);
     }
 
+    [Fact]
+    public void Create_opens_a_line_already_holding_the_seasons_totals()
+    {
+        var stat = PlayerSeasonStat.Create(Guid.CreateVersion7(), DivisionSeasonId, SeasonLine(), Now);
+
+        stat.Appearances.Should().Be(10);
+        stat.Starts.Should().Be(9);
+        stat.Goals.Should().Be(4);
+        stat.Assists.Should().Be(3);
+        stat.AverageRatingBasisPoints.Should().Be(7_000);
+        stat.Version.Should().Be(1, "a created line is at its first version");
+    }
+
+    [Fact]
+    public void Rebuild_replaces_the_totals_rather_than_adding_to_them()
+    {
+        var stat = Open();
+
+        stat.Accumulate(
+            Line() with { Appearances = 1, Starts = 1, MinutesPlayed = 90, Goals = 5, RatingBasisPoints = 9_000 },
+            Now);
+
+        stat.Rebuild(SeasonLine(), Now);
+
+        stat.Appearances.Should().Be(10);
+        stat.Goals.Should().Be(4, "a rebuild sets the totals instead of summing them");
+        stat.Assists.Should().Be(3);
+        stat.MinutesPlayed.Should().Be(900);
+        stat.RatingBasisPointsTotal.Should().Be(70_000);
+        stat.RatedAppearances.Should().Be(10);
+        stat.AverageRatingBasisPoints.Should().Be(7_000);
+    }
+
+    [Fact]
+    public void Rebuild_refuses_another_players_line()
+    {
+        var stat = Open();
+
+        var act = () => stat.Rebuild(SeasonLine() with { PlayerId = Guid.CreateVersion7() }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void A_rebuilt_line_with_no_appearances_is_refused()
+    {
+        var stat = Open();
+
+        var act = () => stat.Rebuild(SeasonLine() with { Appearances = 0, Starts = 0 }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void A_rebuilt_line_with_more_starts_than_appearances_is_refused()
+    {
+        var stat = Open();
+
+        var act = () => stat.Rebuild(SeasonLine() with { Appearances = 3, Starts = 4 }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void A_rebuilt_line_whose_rating_total_exceeds_its_rated_appearances_is_refused()
+    {
+        var stat = Open();
+
+        var act = () => stat.Rebuild(SeasonLine() with { RatedAppearances = 2, RatingBasisPointsTotal = 25_000 }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
     private static PlayerSeasonStat Open() =>
         PlayerSeasonStat.Open(Guid.CreateVersion7(), DivisionSeasonId, PlayerId, ClubId, Now);
 
@@ -137,5 +210,23 @@ public sealed class PlayerSeasonStatTests
         YellowCards = 0,
         RedCards = 0,
         RatingBasisPoints = 7_000,
+    };
+
+    private static PlayerSeasonStatLine SeasonLine() => new()
+    {
+        PlayerId = PlayerId,
+        ClubId = ClubId,
+        Appearances = 10,
+        Starts = 9,
+        MinutesPlayed = 900,
+        Goals = 4,
+        Assists = 3,
+        Shots = 20,
+        ShotsOnTarget = 10,
+        Saves = 0,
+        YellowCards = 2,
+        RedCards = 0,
+        RatingBasisPointsTotal = 70_000,
+        RatedAppearances = 10,
     };
 }

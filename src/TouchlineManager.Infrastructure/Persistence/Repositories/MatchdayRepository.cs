@@ -299,6 +299,62 @@ internal sealed class MatchdayRepository : IMatchdayRepository
     /// <inheritdoc />
     public void AddPlayerSeasonStat(PlayerSeasonStat stat) => _dbContext.PlayerSeasonStats.Add(stat);
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<FixtureMatchLoadRow>> LoadDivisionMatchLoadsAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken) =>
+        await (
+            from match in _dbContext.Matches
+            join fixture in _dbContext.Fixtures on match.FixtureId equals fixture.Id
+            join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
+            join snapshot in _dbContext.InputSnapshots on fixture.Id equals snapshot.FixtureId
+            where matchday.DivisionSeasonId == divisionSeasonId
+                && fixture.Status == FixtureStatus.Published
+            orderby fixture.Id
+            select new FixtureMatchLoadRow(
+                fixture.Id,
+                fixture.HomeScore ?? 0,
+                fixture.AwayScore ?? 0,
+                snapshot.SnapshotJson,
+                match.StatisticsJson))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<MatchStatEvent>> LoadDivisionStatEventsAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken) =>
+        await (
+            from matchEvent in _dbContext.MatchEvents
+            join fixture in _dbContext.Fixtures on matchEvent.MatchId equals fixture.MatchId
+            join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
+            where matchday.DivisionSeasonId == divisionSeasonId
+                && fixture.Status == FixtureStatus.Published
+                && (matchEvent.Type == MatchEventType.Goal
+                    || matchEvent.Type == MatchEventType.PenaltyGoal
+                    || matchEvent.Type == MatchEventType.PenaltyMissed
+                    || matchEvent.Type == MatchEventType.ShotSaved
+                    || matchEvent.Type == MatchEventType.ShotBlocked
+                    || matchEvent.Type == MatchEventType.ShotOffTarget
+                    || matchEvent.Type == MatchEventType.Woodwork)
+            orderby fixture.Id, matchEvent.Sequence
+            select new MatchStatEvent(
+                fixture.Id,
+                matchEvent.Type,
+                matchEvent.ParticipantId,
+                matchEvent.SecondaryParticipantId))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PlayerSeasonStat>> LoadDivisionPlayerSeasonStatsAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.PlayerSeasonStats
+            .Where(stat => stat.DivisionSeasonId == divisionSeasonId)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public void RemovePlayerSeasonStat(PlayerSeasonStat stat) => _dbContext.PlayerSeasonStats.Remove(stat);
+
     private static DisciplineCounts CountsFor(
         Dictionary<(Guid MatchId, Guid ClubId), DisciplineCounts> discipline,
         Guid matchId,

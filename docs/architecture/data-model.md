@@ -766,9 +766,9 @@ Binding rules:
 
 | Projection | Source of truth | Rebuild path |
 |---|---|---|
-| `competition.standings` | Published fixtures | `RebuildProjection` job, then assert equality with the live projection (`TBL-13`) |
-| `competition.player_season_stats` | Published match events and lineups | Same job |
-| `competition.discipline_records` | Published cards and suspension service | Same job |
+| `competition.standings` | Published fixtures | `competition.rebuild-division-projections`, which recomputes it and asserts equality with the live projection (`TBL-13`, `TBL-14`) |
+| `competition.player_season_stats` | Published match results and events | The same job, which recomputes every line and removes one no result supports (`STA-6`) |
+| `competition.discipline_records` | Published cards and suspension service | Deferred to the rollover that owns the accumulation's reset (`DIS-3`): its consequence is a suspension already served, so replaying the count alone would create a new inconsistency |
 | `finance.club_accounts.cash_minor` / `reserved_minor` | Append-only `finance.ledger_entries` | Ledger replay must reproduce both balances exactly (`FIN-18`) |
 | `squad.player_state` | Published match participation plus daily progression | Replay of progression inputs for a bounded window |
 

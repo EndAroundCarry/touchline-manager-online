@@ -283,6 +283,43 @@ public interface IMatchdayRepository
     Task<IReadOnlyList<FixtureMatchLoadRow>> LoadMatchLoadsAsync(
         Guid matchdayId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads every published fixture of a division-season as the match-load row the statistics rule reads
+    /// (`STA-1`, `TBL-13`), so a rebuild can recompute a whole season at once.
+    /// </summary>
+    /// <param name="divisionSeasonId">The division-season.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One row per published fixture, in fixture order.</returns>
+    Task<IReadOnlyList<FixtureMatchLoadRow>> LoadDivisionMatchLoadsAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads every shot and save event of a division-season's published fixtures (`STA-3`, `TBL-13`).
+    /// </summary>
+    /// <param name="divisionSeasonId">The division-season.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One row per shot or save event, in fixture and sequence order.</returns>
+    Task<IReadOnlyList<MatchStatEvent>> LoadDivisionStatEventsAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads every stored season-statistics line of a division-season, for reconciliation (`TBL-13`).
+    /// </summary>
+    /// <param name="divisionSeasonId">The division-season.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<PlayerSeasonStat>> LoadDivisionPlayerSeasonStatsAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Stages the removal of a season-statistics line that no published result supports, so a rebuild can
+    /// leave the projection equal to what the results compute (`TBL-13`).
+    /// </summary>
+    /// <param name="stat">The line to remove.</param>
+    void RemovePlayerSeasonStat(PlayerSeasonStat stat);
 }
 
 /// <summary>A matchday with the aggregates its workflow mutates.</summary>

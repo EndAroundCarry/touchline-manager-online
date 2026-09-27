@@ -96,6 +96,48 @@ public static class SeasonStatisticsCalculator
         ];
     }
 
+    /// <summary>
+    /// Folds a season's worth of match lines into one line per player per club (`STA-2`, `TBL-13`).
+    /// </summary>
+    /// <remarks>
+    /// The same arithmetic the live publication performs match by match, applied in one pass over every
+    /// published fixture instead. It is what makes the season statistics exactly rebuildable: a projection
+    /// that has drifted is set back to whatever this returns, and because it is a sum of stored match facts
+    /// rather than a second simulation, it cannot disagree with the results it summarises. The average
+    /// rating is left as a total and a count, so one definition of it stays on the aggregate.
+    /// </remarks>
+    /// <param name="lines">The match lines of a division-season's published results.</param>
+    /// <returns>One line per player and club, in a stable order.</returns>
+    public static IReadOnlyList<PlayerSeasonStatLine> Aggregate(IEnumerable<PlayerMatchStatLine> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+
+        return
+        [
+            .. lines
+                .GroupBy(line => (line.PlayerId, line.ClubId))
+                .Select(group => new PlayerSeasonStatLine
+                {
+                    PlayerId = group.Key.PlayerId,
+                    ClubId = group.Key.ClubId,
+                    Appearances = group.Sum(line => line.Appearances),
+                    Starts = group.Sum(line => line.Starts),
+                    MinutesPlayed = group.Sum(line => line.MinutesPlayed),
+                    Goals = group.Sum(line => line.Goals),
+                    Assists = group.Sum(line => line.Assists),
+                    Shots = group.Sum(line => line.Shots),
+                    ShotsOnTarget = group.Sum(line => line.ShotsOnTarget),
+                    Saves = group.Sum(line => line.Saves),
+                    YellowCards = group.Sum(line => line.YellowCards),
+                    RedCards = group.Sum(line => line.RedCards),
+                    RatingBasisPointsTotal = group.Sum(line => (long)line.RatingBasisPoints),
+                    RatedAppearances = group.Count(line => line.RatingBasisPoints > 0),
+                })
+                .OrderBy(line => line.ClubId)
+                .ThenBy(line => line.PlayerId),
+        ];
+    }
+
     /// <summary>Counts each player's shots, shots on target, and saves from one fixture's events.</summary>
     private static void CountShots(
         IEnumerable<MatchStatEvent> events,

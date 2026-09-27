@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, LockMatchdayJobHandler>();
         services.AddScoped<IJobHandler, ResolveMatchdayJobHandler>();
         services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
+        services.AddScoped<IJobHandler, RebuildDivisionProjectionsJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -199,6 +200,9 @@ public static class DependencyInjection
         services.AddScoped<LockMatchday>();
         services.AddScoped<ResolveMatchday>();
         services.AddScoped<PublishMatchday>();
+
+        // Driven by the worker's repair job; it has no public command (TBL-13, §7.2).
+        services.AddScoped<RebuildDivisionProjections>();
 
         // Reachable only from the non-production diagnostics trigger (§17.12).
         services.AddScoped<TriggerMatchday>();

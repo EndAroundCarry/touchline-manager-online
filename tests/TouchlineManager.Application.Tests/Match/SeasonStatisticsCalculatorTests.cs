@@ -1,6 +1,7 @@
 using FluentAssertions;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Match;
+using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Match;
 using TouchlineManager.MatchEngine;
 using TouchlineManager.MatchEngine.Model;
@@ -89,6 +90,74 @@ public sealed class SeasonStatisticsCalculatorTests
         lines.Select(line => line.PlayerId)
             .Should().BeInAscendingOrder();
     }
+
+    [Fact]
+    public void Aggregate_sums_a_players_matches_into_one_season_line()
+    {
+        var lines = SeasonStatisticsCalculator.Aggregate(
+        [
+            MatchLine(Striker, ClubId, minutes: 90, goals: 1, rating: 7_000),
+            MatchLine(Striker, ClubId, minutes: 60, goals: 2, rating: 8_000),
+        ]);
+
+        lines.Should().HaveCount(1);
+
+        var season = lines[0];
+
+        season.PlayerId.Should().Be(Striker);
+        season.Appearances.Should().Be(2);
+        season.MinutesPlayed.Should().Be(150);
+        season.Goals.Should().Be(3);
+        season.RatingBasisPointsTotal.Should().Be(15_000);
+        season.RatedAppearances.Should().Be(2);
+    }
+
+    [Fact]
+    public void Aggregate_keeps_a_transferred_players_two_clubs_apart()
+    {
+        var otherClub = Guid.CreateVersion7();
+
+        var lines = SeasonStatisticsCalculator.Aggregate(
+        [
+            MatchLine(Striker, ClubId, minutes: 90, goals: 1, rating: 7_000),
+            MatchLine(Striker, otherClub, minutes: 90, goals: 2, rating: 8_000),
+        ]);
+
+        lines.Should().HaveCount(2, "a player who moved clubs has a line for each");
+        lines.Should().OnlyContain(line => line.PlayerId == Striker);
+    }
+
+    [Fact]
+    public void Aggregate_counts_only_rated_appearances()
+    {
+        var lines = SeasonStatisticsCalculator.Aggregate(
+        [
+            MatchLine(Striker, ClubId, minutes: 90, goals: 1, rating: 7_000),
+            MatchLine(Striker, ClubId, minutes: 90, goals: 0, rating: 0),
+        ]);
+
+        lines[0].Appearances.Should().Be(2);
+        lines[0].RatedAppearances.Should().Be(1);
+        lines[0].RatingBasisPointsTotal.Should().Be(7_000);
+    }
+
+    /// <summary>One player's contribution to one match, as the calculator would produce it.</summary>
+    private static PlayerMatchStatLine MatchLine(Guid playerId, Guid clubId, int minutes, int goals, int rating) => new()
+    {
+        PlayerId = playerId,
+        ClubId = clubId,
+        Appearances = 1,
+        Starts = 1,
+        MinutesPlayed = minutes,
+        Goals = goals,
+        Assists = 0,
+        Shots = 0,
+        ShotsOnTarget = 0,
+        Saves = 0,
+        YellowCards = 0,
+        RedCards = 0,
+        RatingBasisPoints = rating,
+    };
 
     /// <summary>A stored result with a striker and a keeper on the pitch and one unused substitute.</summary>
     private static FixtureMatchLoadRow Row()

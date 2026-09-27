@@ -128,6 +128,7 @@ first difference deciding:
 | TBL-11 | The final draw key is generated **before** the season, stored, and visible in competition rules. |
 | TBL-12 | Database row order or insertion order is never a tie-breaker. |
 | TBL-13 | Standings are a transactional projection of published fixtures and must be exactly rebuildable from them. |
+| TBL-14 | A division's table is reconciled by a rebuild that recomputes it from its published fixtures; the rebuild must reproduce the live projection exactly, correct only what has drifted, and leave nothing behind. |
 
 ---
 
@@ -386,6 +387,7 @@ re-simulated.
 | STA-3 | Goals, assists, minutes, cards, and the match rating are the engine's player line; shots and saves are counted from the match's events. The match rating is the engine's own and is never recomputed by the projection. |
 | STA-4 | A player who did not take the pitch produces no line. A penalty has no assister; every other goal has exactly one. |
 | STA-5 | A match rating is stored in basis points (0–10,000) and exposed on a 0.0–10.0 scale (`TRN-8`). A player who did not appear is given no rating. |
+| STA-6 | A player's season statistics are reconciled by the same rebuild as the table, which recomputes every line from the division-season's published results and removes a line no published result supports. |
 
 ---
 
