@@ -33,6 +33,7 @@ the system is shaped the way it is.
 | [0014](0014-matchday-lock-resolution-and-publication.md) | A matchday is locked, resolved, and published by three jobs, and its snapshot is a stored document | Accepted |
 | [0015](0015-compressed-test-clock.md) | A compressed test clock is chosen at composition and refused in Production | Accepted |
 | [0016](0016-non-production-matchday-trigger.md) | A non-production matchday trigger for the end-to-end watch journey | Accepted |
+| [0017](0017-match-load-at-publication.md) | A match's load on the squad is derived from the stored result and applied at publication | Accepted |
 
 ## Rules for changing an ADR
 

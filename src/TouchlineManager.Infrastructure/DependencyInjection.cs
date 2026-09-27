@@ -262,6 +262,7 @@ public static class DependencyInjection
         services.AddScoped<ITeamSheetRepository, TeamSheetRepository>();
         services.AddScoped<ITeamSheetQueries, TeamSheetQueries>();
         services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
+        services.AddScoped<IPlayerStateRepository, PlayerStateRepository>();
     }
 
     /// <summary>

@@ -104,6 +104,9 @@ public sealed class MatchDocumentTests
         content.Home.Should().Be(result.Home);
         content.Away.Should().Be(result.Away);
         content.TotalMinutesPlayed.Should().Be(result.TotalMinutesPlayed);
+        content.PlayerLines.Should().Equal(
+            result.PlayerLines,
+            "publication reads the minutes a result's player lines carry (TRN-11)");
     }
 
     [Fact]
@@ -111,7 +114,7 @@ public sealed class MatchDocumentTests
     {
         var json = MatchStatisticsDocument
             .Write(SimulatedMatch(seed: 5UL))
-            .Replace(MatchStatisticsDocument.Schema, "match-statistics-v2", StringComparison.Ordinal);
+            .Replace(MatchStatisticsDocument.Schema, "match-statistics-v3", StringComparison.Ordinal);
 
         var act = () => MatchStatisticsDocument.Read(json);
 
@@ -189,7 +192,21 @@ public sealed class MatchDocumentTests
         Home = Statistics(goals: 2),
         Away = Statistics(goals: 1),
         Events = [],
-        PlayerLines = [],
+        PlayerLines =
+        [
+            new MatchPlayerLineV1
+            {
+                ParticipantId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                ClubId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Side = MatchSide.Home,
+                Started = true,
+                MinutesPlayed = 90,
+                Goals = 2,
+                YellowCards = 0,
+                SentOff = false,
+                AbsenceFixtures = 0,
+            },
+        ],
         TotalMinutesPlayed = 94,
         InputHash = CanonicalMatchSerializer.InputHash(Snapshot(seed)),
         OutputHash = "output-hash",

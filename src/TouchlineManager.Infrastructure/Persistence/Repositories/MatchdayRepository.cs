@@ -242,6 +242,25 @@ internal sealed class MatchdayRepository : IMatchdayRepository
     /// <inheritdoc />
     public void AddDisciplineRecord(DisciplineRecord record) => _dbContext.DisciplineRecords.Add(record);
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<FixtureMatchLoadRow>> LoadMatchLoadsAsync(
+        Guid matchdayId,
+        CancellationToken cancellationToken) =>
+        await (
+            from match in _dbContext.Matches
+            join fixture in _dbContext.Fixtures on match.FixtureId equals fixture.Id
+            join snapshot in _dbContext.InputSnapshots on fixture.Id equals snapshot.FixtureId
+            where fixture.MatchdayId == matchdayId
+                && fixture.Status == FixtureStatus.Published
+            orderby fixture.Id
+            select new FixtureMatchLoadRow(
+                fixture.Id,
+                fixture.HomeScore ?? 0,
+                fixture.AwayScore ?? 0,
+                snapshot.SnapshotJson,
+                match.StatisticsJson))
+            .ToListAsync(cancellationToken);
+
     private static DisciplineCounts CountsFor(
         Dictionary<(Guid MatchId, Guid ClubId), DisciplineCounts> discipline,
         Guid matchId,

@@ -747,7 +747,7 @@ permitted **only** for:
 | Notification/news template parameters | `comms.inbox_messages.parameters`, `comms.news_items.parameters` | template key |
 | Audit before/after metadata where relational querying is not needed | `ops.audit_log.before_metadata`, `.after_metadata` | — |
 | Job payloads | `ops.jobs.payload` | `job_type` |
-| Aggregate match statistics | `match.matches.aggregate_statistics` | `engine_version` |
+| Aggregate match statistics and the player lines | `match.matches.aggregate_statistics` | `match-statistics-v2`, `engine_version` |
 
 Binding rules:
 

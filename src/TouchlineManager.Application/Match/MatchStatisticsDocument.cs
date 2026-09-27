@@ -3,14 +3,16 @@ using TouchlineManager.MatchEngine.Model;
 
 namespace TouchlineManager.Application.Match;
 
-/// <summary>A match's stored statistics: both sides, and how long was played.</summary>
+/// <summary>A match's stored statistics: both sides, how long was played, and who played it.</summary>
 /// <param name="Home">The home side's statistics.</param>
 /// <param name="Away">The away side's statistics.</param>
 /// <param name="TotalMinutesPlayed">Regulation plus stoppage, as the engine played it.</param>
+/// <param name="PlayerLines">Every participant's line, which carries the minutes they played.</param>
 public sealed record MatchStatisticsContent(
     MatchStatisticsV1 Home,
     MatchStatisticsV1 Away,
-    int TotalMinutesPlayed);
+    int TotalMinutesPlayed,
+    IReadOnlyList<MatchPlayerLineV1> PlayerLines);
 
 /// <summary>
 /// Writes and reads the versioned statistics document a stored match holds (`MAT-5`, §4.5, §6.6).
@@ -25,11 +27,23 @@ public sealed record MatchStatisticsContent(
 /// only reader is the match viewer, which shows all of them at once. Anything the world does query — a
 /// scoreline, a card, a table row — is a column somewhere else.
 /// </para>
+/// <para>
+/// The player lines are stored beside the team statistics because publication applies a match's effects on
+/// the squad — condition consumed, fatigue accumulated, morale moved (`TRN-11`, `TRN-13`) — and those are
+/// decided from the minutes each player actually played. Storing them means a delayed publication reads the
+/// facts the result was made from rather than re-simulating under whatever engine build has since shipped,
+/// which is the same argument that keeps the statistics document rather than re-deriving the summary.
+/// </para>
 /// </remarks>
 public static class MatchStatisticsDocument
 {
     /// <summary>The document's schema discriminator.</summary>
-    public const string Schema = "match-statistics-v1";
+    /// <remarks>
+    /// Version 2 added the player lines. The version is bumped because a version-1 document has no
+    /// participants, and a reader that accepted it would apply no match load to anybody rather than
+    /// refusing a shape it cannot honour (`JSN-5`).
+    /// </remarks>
+    public const string Schema = "match-statistics-v2";
 
     /// <summary>Writes a result's statistics.</summary>
     /// <param name="result">The engine's result.</param>
@@ -41,7 +55,8 @@ public static class MatchStatisticsDocument
             Schema,
             result.Home,
             result.Away,
-            result.TotalMinutesPlayed);
+            result.TotalMinutesPlayed,
+            result.PlayerLines);
 
         return JsonSerializer.Serialize(document, MatchJson.Options);
     }
@@ -75,7 +90,11 @@ public static class MatchStatisticsDocument
             throw new InvalidMatchInputException("The stored match statistics carry only one side.");
         }
 
-        return new MatchStatisticsContent(document.Home, document.Away, document.TotalMinutesPlayed);
+        return new MatchStatisticsContent(
+            document.Home,
+            document.Away,
+            document.TotalMinutesPlayed,
+            document.PlayerLines ?? []);
     }
 
     /// <summary>The stored document's shape.</summary>
@@ -83,5 +102,6 @@ public static class MatchStatisticsDocument
         string Schema,
         MatchStatisticsV1? Home,
         MatchStatisticsV1? Away,
-        int TotalMinutesPlayed);
+        int TotalMinutesPlayed,
+        IReadOnlyList<MatchPlayerLineV1>? PlayerLines);
 }

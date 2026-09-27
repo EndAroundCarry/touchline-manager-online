@@ -224,6 +224,13 @@ first difference deciding:
 | TRN-12 | Training injuries and match injuries create explicit unavailability records measured in **fixtures**, not wall-clock days. | — |
 | TRN-13 | Morale reacts to playing time, results, contracts, and transfers with bounded changes. | — |
 
+Match load is a pure, versioned rule (`match-load-v1`) over the frozen facts of a result — each player's
+minutes, their stamina, their side's instructions, and the scoreline — and it is applied by the matchday
+publication in the same transaction that publishes the results, alongside cards and injuries (ADR-0017).
+Condition and fatigue are additive costs the daily recovery is measured against; morale moves with the
+result in proportion to the minutes a player contributed, so a player who did not appear carries none of it.
+Contracts and transfers are the remaining `TRN-13` inputs and arrive with the stages that own them.
+
 ---
 
 ## 11. Injuries and discipline
@@ -423,6 +430,13 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
 | `training_progression_version` | `training-v1` | TRN-9 (FIC-8) |
+| `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
+| `match_statistics_schema` | `match-statistics-v2` (carries the player lines) | JSN-1, TRN-11 |
+| `match_condition_cost_per_minute_bp` | 10 | TRN-11 (balancing) |
+| `match_fatigue_gain_per_minute_bp` | 7 | TRN-11 (balancing) |
+| `match_stamina_factor_bp` | 12,000 (stamina 1) → 8,000 (stamina 20) | TRN-11 (balancing) |
+| `match_intensity_bp` | 10,000 neutral, bounded 6,000–16,000 | INS-9 (balancing) |
+| `match_morale_win_bp` / `_draw_bp` / `_loss_bp` | 350 / 40 / 350 | TRN-13 (balancing) |
 | `name_pools_version` | `name-pools-v1` | FIC-8 |
 | `club_name_capacity_per_pool` | 1,980 (220 × 9) | FIC-4, PYR-11 |
 | `squad_composition` | 3 GK / 7 defenders / 7 midfielders / 5 attackers | SQ-1 (balancing) |

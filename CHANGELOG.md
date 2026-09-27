@@ -82,6 +82,94 @@ lineup policy, the inbox that reports all of it, and the discipline screens are 
   competition screens. **Deferred beyond it:** the discipline accumulation's reset at rollover (`DIS-3`) and
   an unserved suspension carrying into the next season (`DIS-8`), both of which belong to Stage 12.
 
+### The load a match leaves on the squad
+
+A result that costs you energy. Publishing a round no longer only moves the table and books its players:
+every player who appeared carries the match's load, so condition is consumed, fatigue accumulates, and morale
+moves with the result and with how much they contributed. The rule is measured against the daily recovery
+job, so the two together are what decide whether a squad can sustain a Tuesday-Thursday-Sunday season. This
+is the second milestone of the stage; the season statistics, the AI's own lineup policy, the inbox, and the
+discipline screens are the rest.
+
+#### Added
+
+- **`MatchLoadCalculator`** (`match-load-v1`, `TRN-11`, `TRN-13`): a pure function from the frozen facts of a
+  match — each participant's minutes, their stamina, their side's instructions, and the scoreline — to one
+  signed delta per player. It reads no clock, database, culture, or random source and produces no draw at
+  all, because the load is arithmetic rather than chance. Condition is consumed in proportion to minutes and
+  costs more for a less fit player and a side that plays harder; fatigue accumulates on the same inputs at
+  its own scale, because fatigue is the multi-match load while condition is the short-term freshness. Every
+  coefficient is versioned with the calculator, exactly as the training constants are with `training-v1`, so
+  a balancing change is a named rule change.
+- **Morale is weighted by playing time** (`TRN-13`): a win, a draw, or a defeat moves a player by a bounded
+  amount scaled by the minutes they were on the pitch. A full match carries the result whole, a late cameo
+  carries it in proportion, and a player who never left the bench carries none of it — the rule names
+  playing time as an input, so the absence of it is not an input. Contracts and transfers, the other inputs
+  the rule names, belong to the stages that own them.
+- **`PlayerState.ApplyMatchLoad`**: the first *additive* mutation of a stored player state. It adds the
+  computed deltas to the value the player actually holds and clamps every result to the stored scale
+  (`TRN-5`…`TRN-7`), rather than writing the snapshot's own arithmetic as an absolute value. That is what
+  stops a match from erasing whatever training happened between the lock and the publication — the daily
+  progression job writes the same row.
+- **The stored result document carries the player lines** (`match-statistics-v2`). It already held the two
+  sides' statistics; it now holds the engine's per-participant lines beside them, which is where publication
+  reads the minutes each player played. It is the engine's own output, written once when a fixture is staged,
+  so this is one copy rather than a second source of truth — but a delayed publication reads the facts the
+  result was made from rather than re-simulating under whatever engine build has since shipped (ADR-0017).
+  A version-1 document is refused rather than read, because a reader that accepted it would apply no load to
+  anybody.
+- **Publication applies the load** (`TRN-11`, `TRN-13`). `PublishMatchday` loads the round's match loads and
+  the tracked state of the players who appeared, and applies the deltas in the same transaction that
+  publishes the nine fixtures, rebuilds the table, and applies the cards and injuries. A result is private
+  until its round publishes (`MAT-7`), and a load is the same: one applied at staging would be visible to
+  the next lock before its cause was public. A round that is not fully staged loads nobody, and a
+  republished round loads nobody twice.
+- **`IMatchdayRepository.LoadMatchLoadsAsync`** carries the frozen snapshot and the stored result of each
+  published fixture as their versioned documents, the same shapes the match read already carries; and
+  **`IPlayerStateRepository`** is the squad module's staging port for a player's state, beside the
+  availability port the discipline milestone added.
+- **ADR-0017**, on deriving the load from the stored result rather than from a re-simulation or an engine
+  output change, and on applying it at publication.
+- 2 new domain tests (342 total) for the additive match-load mutation and its clamping; 10 new application
+  tests (68 total) for the calculator — the exact cost of a neutral full match, the fitness and intensity
+  factors, the morale of a win, a draw, a defeat, and a cameo, the bench, and the ordering; and 2 new
+  infrastructure tests (120 total) over a real seeded world that publish a round and assert the players who
+  appeared were loaded and the ones who did not were not, and that publishing the same round twice loads
+  nobody twice.
+
+#### Notes
+
+- **The bench is not loaded, and that is the rule rather than an omission.** `TRN-13` makes playing time an
+  input to morale, and `TRN-11` makes minutes the basis of condition and fatigue; a player with none of
+  either is not something a match has evidence about. A future "unhappy at not playing" rule would be a
+  different rule with a different input.
+- **The player lines are stored, not re-derived, and that is the decision ADR-0017 records.** The
+  presentation read re-derives its commentary and highlights from the frozen snapshot, and publication could
+  have done the same for the minutes — but a round published after an engine release would then no longer be
+  able to reproduce an older result, which is the opposite of what a stored, hashed result is for. Storing
+  the lines keeps publication's cost independent of the engine and the result complete.
+- **The coefficients are balancing values and the two scales are deliberately different.** A neutral
+  maximum-stamina ninety minutes costs about 720 basis points of condition and adds about 504 of fatigue,
+  measured against a daily recovery of a few hundred of each; the tests pin the arithmetic and the directions
+  rather than claiming any particular week is optimal. Calibrating a whole season is the multi-season
+  simulation work the plan assigns to Stage 9.
+- **Aggression now has a cost that is not a card.** The intensity mapping raises a side's load for an
+  attacking mentality, a high tempo, a high press, and a high line, and lowers it for the conservative
+  values — and running the clock down is the one instruction that buys freshness. That is `INS-9`'s
+  "no tactic multiplies strength without a counter-cost" expressed in the players' legs.
+- **A version-1 result document is no longer readable.** No production world exists, so the cost is only
+  that a database seeded before this change must be reseeded for a played match to be readable; the schema
+  was bumped rather than read leniently because a document with no participants would silently load nobody.
+- **The load is applied to the live state, not to the snapshot's.** The snapshot froze each player's
+  condition and fatigue at the lock, and reading the base from there would have been simpler — but the
+  daily progression job may have run between the lock and the publication, and a match that overwrote that
+  would erase a trained day. The delta is the match's contribution; the base is the player's own.
+- **Deferred to the rest of Stage 8:** player and club season statistics and the stats/tie-break views; the
+  deterministic AI lineup, tactics, substitutions, training, and renewal policy (`INS-12`); the `comms`
+  inbox and news module; the projection rebuild and reconciliation tools; and the discipline and competition
+  screens. The morale effects of contracts and transfers wait for the stages that own them (Stage 9 and
+  Stage 10).
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

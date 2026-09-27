@@ -48,10 +48,11 @@ public sealed record PublishMatchdayResult(PublishMatchdayOutcome Outcome, int P
 /// </para>
 /// <para>
 /// Publication is where a result reaches the squad, too: the round's cards and injuries become discipline
-/// records and absences, and each club's open absences are served one fixture (`DIS-1`, `DIS-2`, `DIS-4`,
-/// `DIS-5`). It is the publication's transaction and not the simulation's because an effect must not be
-/// visible until its result is: a suspension nobody can see yet would still be repaired away by the next
-/// lock, while one applied and published together is the fact the rules describe.
+/// records and absences, each club's open absences are served one fixture (`DIS-1`, `DIS-2`, `DIS-4`,
+/// `DIS-5`), and every player who appeared carries the match's load in condition, fatigue, and morale
+/// (`TRN-11`, `TRN-13`). It is the publication's transaction and not the simulation's because an effect must
+/// not be visible until its result is: a suspension nobody can see yet would still be repaired away by the
+/// next lock, while one applied and published together is the fact the rules describe.
 /// </para>
 /// <para>
 /// Publication is serializable. It reads a whole division's results and rewrites its table, and the
@@ -64,6 +65,7 @@ public sealed class PublishMatchday
 {
     private readonly IMatchdayRepository _matchdays;
     private readonly IAvailabilityRepository _availability;
+    private readonly IPlayerStateRepository _playerStates;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
 
@@ -71,11 +73,13 @@ public sealed class PublishMatchday
     public PublishMatchday(
         IMatchdayRepository matchdays,
         IAvailabilityRepository availability,
+        IPlayerStateRepository playerStates,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
         _matchdays = matchdays;
         _availability = availability;
+        _playerStates = playerStates;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -179,11 +183,23 @@ public sealed class PublishMatchday
         var effects = MatchEffectsCalculator.Calculate(
             await _matchdays.LoadMatchEffectsAsync(workload.Matchday.Id, cancellationToken));
 
-        if (effects.Count == 0)
+        if (effects.Count > 0)
         {
-            return;
+            await ApplyDisciplineAsync(workload, effects, now, cancellationToken);
         }
 
+        await ApplyMatchLoadAsync(workload.Matchday.Id, cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies a round's cards and injuries as discipline records and absences (`DIS-1`, `DIS-2`, `DIS-4`).
+    /// </summary>
+    private async Task ApplyDisciplineAsync(
+        MatchdayWorkload workload,
+        IReadOnlyList<MatchPlayerEffect> effects,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
         var playerIds = effects.Select(effect => effect.PlayerId).Distinct().ToList();
 
         var records = (await _matchdays.LoadDisciplineAsync(
@@ -242,6 +258,49 @@ public sealed class PublishMatchday
                     effect.FixtureId,
                     now));
             }
+        }
+    }
+
+    /// <summary>
+    /// Applies the round's load to every player who appeared: condition consumed, fatigue accumulated, and
+    /// morale moved by the result and their minutes (`TRN-11`, `TRN-13`).
+    /// </summary>
+    /// <remarks>
+    /// The deltas are the pure <see cref="MatchLoadCalculator"/>'s, derived from each fixture's frozen
+    /// snapshot and stored result. They are added to the state the player actually holds rather than to the
+    /// state the snapshot froze: the daily progression job writes the same row, so a match that wrote the
+    /// snapshot's own arithmetic as an absolute value would erase whatever training happened since the lock.
+    /// </remarks>
+    private async Task ApplyMatchLoadAsync(Guid matchdayId, CancellationToken cancellationToken)
+    {
+        var rows = await _matchdays.LoadMatchLoadsAsync(matchdayId, cancellationToken);
+
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        var loads = MatchLoadCalculator.Calculate(
+            rows.Select(row => new MatchLoadInput(
+                row.FixtureId,
+                row.HomeGoals,
+                row.AwayGoals,
+                MatchSnapshotDocument.Read(row.SnapshotJson).Input,
+                MatchStatisticsDocument.Read(row.StatisticsJson).PlayerLines)));
+
+        var states = (await _playerStates.LoadAsync(
+                [.. loads.Select(load => load.PlayerId).Distinct()],
+                cancellationToken))
+            .ToDictionary(state => state.PlayerId);
+
+        // A participant always has a state row, because the generator opens one per player and the snapshot
+        // is built from contracted players. A missing one is a defect worth refusing, not a case to skip.
+        foreach (var load in loads)
+        {
+            states[load.PlayerId].ApplyMatchLoad(
+                load.ConditionDeltaBp,
+                load.FatigueDeltaBp,
+                load.MoraleDeltaBp);
         }
     }
 

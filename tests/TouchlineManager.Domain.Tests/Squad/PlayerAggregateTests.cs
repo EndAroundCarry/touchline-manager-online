@@ -146,6 +146,31 @@ public sealed class PlayerAggregateTests
     }
 
     [Fact]
+    public void A_match_load_moves_condition_fatigue_and_morale_by_its_deltas()
+    {
+        var state = PlayerState.Create(Guid.CreateVersion7(), 9_000, 200, 5_000, 5_000, 0, null);
+
+        state.ApplyMatchLoad(conditionDeltaBp: -900, fatigueDeltaBp: 600, moraleDeltaBp: 350);
+
+        state.ConditionBp.Should().Be(8_100, "a match consumes condition (TRN-11)");
+        state.FatigueBp.Should().Be(800, "a match adds fatigue (TRN-11)");
+        state.MoraleBp.Should().Be(5_350, "the result moves morale (TRN-13)");
+        state.Version.Should().Be(2, "the row this writes is a new version of the aggregate (CONC-1)");
+    }
+
+    [Fact]
+    public void A_match_load_never_pushes_a_state_value_off_its_scale()
+    {
+        var state = PlayerState.Create(Guid.CreateVersion7(), 100, 9_900, 9_900, 5_000, 0, null);
+
+        state.ApplyMatchLoad(conditionDeltaBp: -5_000, fatigueDeltaBp: 5_000, moraleDeltaBp: 5_000);
+
+        state.ConditionBp.Should().Be(WorldRuleSet.StateBasisPointsMin);
+        state.FatigueBp.Should().Be(WorldRuleSet.StateBasisPointsMax);
+        state.MoraleBp.Should().Be(WorldRuleSet.StateBasisPointsMax);
+    }
+
+    [Fact]
     public void A_state_value_outside_its_scale_is_rejected()
     {
         var act = () => PlayerState.Create(Guid.CreateVersion7(), 10_001, 0, 0, 0, 0, null);

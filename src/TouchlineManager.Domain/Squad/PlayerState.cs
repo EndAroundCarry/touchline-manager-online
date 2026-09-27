@@ -155,6 +155,35 @@ public sealed class PlayerState
         Version++;
     }
 
+    /// <summary>
+    /// Applies the load a played match left on the player (`TRN-11`, `TRN-13`).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Additive rather than absolute, unlike <see cref="ApplyProgression"/>: the deltas are decided by the
+    /// pure <c>MatchLoadCalculator</c> from the match's frozen facts, and the value they are applied to is
+    /// the player's own current state, which the daily progression job also writes. Reading the base here
+    /// rather than in the calculator is what stops a match effect from overwriting a training day.
+    /// </para>
+    /// <para>
+    /// Every resulting value is clamped to the stored scale (`TRN-5`…`TRN-7`), so a tired player who is
+    /// already at the floor cannot be pushed below it and a morale swing cannot leave the range.
+    /// </para>
+    /// </remarks>
+    /// <param name="conditionDeltaBp">The condition consumed by the match, as a signed delta.</param>
+    /// <param name="fatigueDeltaBp">The fatigue accumulated by the match, as a signed delta.</param>
+    /// <param name="moraleDeltaBp">The morale movement from the result and playing time, as a signed delta.</param>
+    public void ApplyMatchLoad(int conditionDeltaBp, int fatigueDeltaBp, int moraleDeltaBp)
+    {
+        ConditionBp = Clamp(ConditionBp + conditionDeltaBp);
+        FatigueBp = Clamp(FatigueBp + fatigueDeltaBp);
+        MoraleBp = Clamp(MoraleBp + moraleDeltaBp);
+        Version++;
+    }
+
+    private static int Clamp(int value) =>
+        Math.Clamp(value, WorldRuleSet.StateBasisPointsMin, WorldRuleSet.StateBasisPointsMax);
+
     private static void EnsureBasisPoints(int value, string parameterName)
     {
         if (value is < WorldRuleSet.StateBasisPointsMin or > WorldRuleSet.StateBasisPointsMax)

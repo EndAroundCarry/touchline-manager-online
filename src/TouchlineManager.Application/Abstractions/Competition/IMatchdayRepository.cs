@@ -138,6 +138,28 @@ public sealed record MatchEffectEvent(
     int AbsenceFixtures);
 
 /// <summary>
+/// One published fixture of a matchday, as the match-load rule reads it (`TRN-11`, `TRN-13`).
+/// </summary>
+/// <remarks>
+/// The frozen snapshot and the stored result are carried as their versioned documents, the same way the
+/// match read carries them, so the application layer parses one shape in one place rather than the
+/// repository reaching into engine types. The rule reads the snapshot for each player's stamina and side
+/// instructions and the result for the minutes played and the scoreline — the facts the match was played
+/// from, not whatever the live tables now hold (`MAT-1`).
+/// </remarks>
+/// <param name="FixtureId">The fixture that was played.</param>
+/// <param name="HomeGoals">The host's goals.</param>
+/// <param name="AwayGoals">The visitor's goals.</param>
+/// <param name="SnapshotJson">The stored input snapshot document.</param>
+/// <param name="StatisticsJson">The stored result document, which carries the player lines.</param>
+public sealed record FixtureMatchLoadRow(
+    Guid FixtureId,
+    int HomeGoals,
+    int AwayGoals,
+    string SnapshotJson,
+    string StatisticsJson);
+
+/// <summary>
 /// The competition module's port for the matchday workflow (master plan §7.3, §7.4).
 /// </summary>
 /// <remarks>
@@ -204,6 +226,17 @@ public interface IMatchdayRepository
     /// <summary>Stages a player's season card accumulation.</summary>
     /// <param name="record">The record.</param>
     void AddDisciplineRecord(DisciplineRecord record);
+
+    /// <summary>
+    /// Loads the frozen snapshot and stored result of every published fixture in a matchday, so publication
+    /// can apply the load the match placed on the players who appeared (`TRN-11`, `TRN-13`).
+    /// </summary>
+    /// <param name="matchdayId">The matchday.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One row per published fixture, in fixture order.</returns>
+    Task<IReadOnlyList<FixtureMatchLoadRow>> LoadMatchLoadsAsync(
+        Guid matchdayId,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>A matchday with the aggregates its workflow mutates.</summary>
