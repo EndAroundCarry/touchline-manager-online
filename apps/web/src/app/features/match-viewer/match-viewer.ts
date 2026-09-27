@@ -19,7 +19,7 @@ import {
   outcomeLabel,
   scoreLine,
 } from '../../core/match/match-presentation';
-import { CommentaryLine } from '../../core/match/match.models';
+import { CommentaryLine, MatchPresentation } from '../../core/match/match.models';
 import { MatchStore } from '../../core/match/match-store';
 import { formatInstant } from '../../core/world/presentation';
 import {
@@ -56,6 +56,10 @@ export class MatchViewer implements OnDestroy {
 
   private playback = new MatchPlayback([]);
   private renderer: CanvasMatchRenderer | null = null;
+
+  /** The presentation the current playback was built from, so a load rebuilds it exactly once. */
+  private builtFrom: MatchPresentation | null = null;
+
   private readonly loop = new RenderLoop((delta) => this.onFrame(delta));
   private readonly motionQuery = mediaQuery('(prefers-reduced-motion: reduce)');
   private readonly motionListener = (event: MediaQueryListEvent) => this.reduced.set(event.matches);
@@ -126,6 +130,23 @@ export class MatchViewer implements OnDestroy {
     }
 
     this.motionQuery?.addEventListener('change', this.motionListener);
+
+    // The replay is built from the presentation once it loads; before that it is an empty player with
+    // nothing to start. It is rebuilt only when the presentation itself changes, so a frame never resets a
+    // replay that is in progress.
+    effect(() => {
+      const presentation = this.presentation();
+
+      if (presentation === this.builtFrom) {
+        return;
+      }
+
+      this.builtFrom = presentation;
+      this.playback = new MatchPlayback(presentation?.highlights ?? []);
+      this.activeIndex.set(0);
+      this.state.set(this.playback.currentState);
+      this.loop.stop();
+    });
 
     // The renderer is (re)built when the highlight, the canvas, or the presentation mode changes — not on
     // every frame, which is what keeps the animation off the change-detection path.

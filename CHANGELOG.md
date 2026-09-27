@@ -117,6 +117,62 @@ the rest of it.
   the previous manager's fixture and match state on sign-out, which pulls both feature stores into the
   eager chunk; the viewer itself — the renderer included — is a 18.6 kB lazy chunk (`ADR-0007`).
 
+### The end-to-end watch journey
+
+A fixture you can prepare, play, and watch. The stage's last exit criterion: a manager prepares a side for
+their next fixture, a real round plays through the real worker — locked, simulated from a frozen snapshot,
+and published — and the match center replays it in the browser. The only thing the harness asks for is that
+the round play now rather than in a few days; the worker does every part of the work (ADR-0016).
+
+#### Added
+
+- **`TriggerMatchday`**: the use case behind the trigger. It enqueues a round's lock and resolution jobs with
+  the same business keys and payload the scheduler builds, due now — and nothing else. Publication is
+  enqueued by the resolution in its own transaction, exactly as on the calendar, so a triggered round is
+  indistinguishable from a materialised one and a repeat inserts nothing (ADR-0003, ADR-0016).
+- **A non-production diagnostics endpoint** (`POST /api/v1/ops/diagnostics/play-matchday`), mapped only when
+  `Diagnostics:EnableMatchdayTrigger` is set and off everywhere by default, so it has no production surface
+  (§17.12). Like the Stage 1 job probe it is unauthenticated; the gate is configuration.
+- **The matchday end-to-end stack** (`tests/web-e2e/playwright.matchday.config.ts`): the API, the web client,
+  and — for the first time in the suite — the **worker**, which has no HTTP surface and so is started without
+  a readiness gate. It runs against a throwaway database reset and reseeded every run
+  (`support/matchday-global-setup.ts`), so the journey's played round never touches the shared world the other
+  journeys use. `npm run test:e2e:matchday` runs it on its own.
+- **The journey** (`tests/web-e2e/matchday/matchday.spec.ts`): onboard, prepare a side through the prepare
+  screen, ask the trigger to play the round, wait for the worker to publish it, then watch the replay —
+  asserting the scoreline the server published, the commentary timeline, the statistics table, and, when a
+  highlight exists, that Play starts the animation (master plan §16, §15.5 journey 3).
+- **The viewer now starts its replay from the presentation it was given.** The component built its playback
+  once with an empty highlight list and never rebuilt it when the presentation loaded, so every control
+  rendered and the Play button did nothing. The state machine and the renderer were each tested on their own
+  and the seam between them was not; a load now rebuilds the player exactly once, and a component test pins
+  it so the next omission fails a fast test rather than a browser run.
+- 4 new API integration tests (81 total) for the trigger: it enqueues a round's lock and resolution rows and
+  only those; a repeat inserts nothing; an unknown round answers `MATCHDAY_NOT_FOUND`; and the endpoint is
+  `404` when the flag is off. 1 new frontend test (187 total) for the viewer's replay seam. 1 new Playwright
+  journey (25 across both stacks).
+
+#### Notes
+
+- **The compressed clock was the wrong tool for this journey, and ADR-0015 is untouched.** Compression
+  multiplies the real gap between its anchor and the moment the test acts — thirty to sixty seconds of API and
+  dev-server boot — by the rate, so at a season-compressing rate the round publishes before the manager
+  prepares, or the season ends mid-suite. ADR-0016 records the trigger instead; the clock remains the mechanism
+  for a human watching a season and for the rollover journey.
+- **The trigger does nothing the scheduler does not.** It is the same materialisation, off the worker only for
+  a non-production diagnostic, and the queue's unique business key makes a repeated call free. That is what
+  keeps the journey honest: the API enqueues, and the worker — the only thing that may advance a matchday —
+  executes.
+- **The worker's `webServer` entry has no `url` and no `port`, deliberately.** Playwright waits for a
+  readiness it can observe only when it is given one; with neither it starts the process and moves on, and the
+  journey polls for the published result rather than assuming a ready worker.
+- **The matchday stack shares the main stack's ports.** The two suites never run at once — separate CI steps,
+  one at a time locally — and sharing the ports keeps the dev-server proxy and CORS settings valid. The cost is
+  that a `npm run dev` stack must be stopped first; `reuseExistingServer: false` makes that a loud failure
+  rather than a silent test of the wrong database.
+- **The matchday journey does not give its club back.** The shared-world journeys resign at the end so the
+  108-club pool is not exhausted; this one owns its whole world and discards it with the run.
+
 ## Stage 6 — Season schedule, fixtures, and the matchday worker
 
 A season you can see the shape of. Seeding the world now generates each division's full fixture list: the

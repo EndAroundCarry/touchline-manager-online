@@ -118,6 +118,14 @@ non-drag assignment table, creates the plan, and then — with the API acting as
 revises the same plan — survives a version conflict by reapplying rather than overwriting (`CONC-1`,
 §11.2). It gives its club back too.
 
+Stage 7 added the matchday journey, on a stack of its own (`playwright.matchday.config.ts`,
+`npm run test:e2e:matchday`). It is separate for two reasons: it starts the **worker**, because only the
+worker advances a matchday (ADR-0001), and it points at a **throwaway database** reset and reseeded every
+run, because it plays a round and a played round permanently advances a season. A manager onboards,
+prepares a side for the next fixture through the prepare screen, asks a non-production trigger to play the
+round (ADR-0016), waits for the worker to lock, simulate, and publish it, and watches the replay on the
+match center. The main journeys keep their persistent shared world and their worker-free stack.
+
 ## Layer 9 — Match-engine validation — Stage 5
 
 Golden output hashes per engine version, byte-identical repetition across supported platforms,

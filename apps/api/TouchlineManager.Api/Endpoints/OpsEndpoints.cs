@@ -1,4 +1,7 @@
+using TouchlineManager.Api.Http;
+using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Contracts.Competition;
 
 namespace TouchlineManager.Api.Endpoints;
 
@@ -29,6 +32,56 @@ internal static class OpsEndpoints
         return group;
     }
 
+    /// <summary>Maps the Stage 7 matchday trigger onto the ops module group.</summary>
+    /// <remarks>
+    /// It exists so the end-to-end journey can watch a real round play without waiting for its calendar
+    /// deadline. It enqueues the round's real lock and resolution jobs; the worker still does all of the
+    /// work (ADR-0016). Like the job probe it is mapped only when the diagnostics flag is on.
+    /// </remarks>
+    public static RouteGroupBuilder MapMatchdayTrigger(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapPost("/diagnostics/play-matchday", PlayMatchdayAsync)
+            .WithName("PlayMatchdayProbe")
+            .WithSummary("Enqueues a round's real lock and resolution jobs, due now, so a matchday can be watched.")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker locks, simulates, and publishes the "
+                + "round exactly as it would on the calendar; this only does what the worker-only scheduler "
+                + "normally does, and a repeated call is a no-op.")
+            .Produces<MatchdayTriggerResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        return group;
+    }
+
+    private static async Task<IResult> PlayMatchdayAsync(
+        PlayMatchdayRequest request,
+        TriggerMatchday trigger,
+        CancellationToken cancellationToken)
+    {
+        var result = await trigger.ExecuteAsync(request.MatchdayId, cancellationToken);
+
+        if (result.Outcome == TriggerMatchdayOutcome.MatchdayNotFound)
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                CompetitionErrorCodes.MatchdayNotFound,
+                "No matchday was found.",
+                "The requested matchday does not exist.");
+        }
+
+        return Results.Json(
+            new MatchdayTriggerResponse(
+                result.MatchdayId,
+                result.LockKey,
+                result.ResolveKey,
+                result.LockEnqueued,
+                result.ResolveEnqueued),
+            statusCode: StatusCodes.Status202Accepted);
+    }
+
     private static async Task<IResult> EnqueueNoOpJobAsync(
         EnqueueNoOpJob useCase,
         CancellationToken cancellationToken,
@@ -53,3 +106,20 @@ internal static class OpsEndpoints
 /// same business key already existed and the enqueue was a no-op.
 /// </param>
 internal sealed record NoOpJobProbeResponse(string BusinessKey, bool Enqueued);
+
+/// <summary>The body of the matchday trigger.</summary>
+/// <param name="MatchdayId">The round to play.</param>
+internal sealed record PlayMatchdayRequest(Guid MatchdayId);
+
+/// <summary>Response of the matchday trigger.</summary>
+/// <param name="MatchdayId">The round that was triggered.</param>
+/// <param name="LockKey">The business key of the enqueued lock job.</param>
+/// <param name="ResolveKey">The business key of the enqueued resolution job.</param>
+/// <param name="LockEnqueued"><see langword="true"/> when the lock row was newly inserted.</param>
+/// <param name="ResolveEnqueued"><see langword="true"/> when the resolution row was newly inserted.</param>
+internal sealed record MatchdayTriggerResponse(
+    Guid MatchdayId,
+    string LockKey,
+    string ResolveKey,
+    bool LockEnqueued,
+    bool ResolveEnqueued);

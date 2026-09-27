@@ -45,22 +45,7 @@ public sealed class MatchApiFixture : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.UseSetting("ConnectionStrings:Database", _container.GetConnectionString());
-            builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:4200");
-            builder.UseSetting("Diagnostics:EnableJobProbe", "true");
-            builder.UseSetting(
-                "RateLimiting:AuthPermitLimit",
-                ApiFixture.UnthrottledAuthPermitLimit.ToString(CultureInfo.InvariantCulture));
-
-            builder.ConfigureTestServices(services =>
-            {
-                services.RemoveAll<IEmailSender>();
-                services.AddSingleton<IEmailSender>(Email);
-            });
-        });
+        Factory = CreateFactory(enableMatchdayTrigger: true);
 
         await using var scope = Factory.Services.CreateAsyncScope();
 
@@ -73,6 +58,36 @@ public sealed class MatchApiFixture : IAsyncLifetime
             .GetRequiredService<SeedWorld>()
             .ExecuteAsync(new SeedWorldRequest(WorldSeed), CancellationToken.None);
     }
+
+    /// <summary>
+    /// Creates an additional host over the same database, so a test can vary configuration the way a
+    /// different deployment would.
+    /// </summary>
+    /// <remarks>
+    /// Values are supplied with <c>UseSetting</c> rather than <c>ConfigureAppConfiguration</c>: the
+    /// composition root reads configuration while building the service collection, and a source added
+    /// during <c>Build()</c> arrives too late for that read.
+    /// </remarks>
+    public WebApplicationFactory<Program> CreateFactory(bool enableMatchdayTrigger)
+        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Development");
+            builder.UseSetting("ConnectionStrings:Database", _container.GetConnectionString());
+            builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:4200");
+            builder.UseSetting("Diagnostics:EnableJobProbe", "true");
+            builder.UseSetting(
+                "Diagnostics:EnableMatchdayTrigger",
+                enableMatchdayTrigger ? "true" : "false");
+            builder.UseSetting(
+                "RateLimiting:AuthPermitLimit",
+                ApiFixture.UnthrottledAuthPermitLimit.ToString(CultureInfo.InvariantCulture));
+
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IEmailSender>();
+                services.AddSingleton<IEmailSender>(Email);
+            });
+        });
 
     /// <summary>Stops the host and removes the container.</summary>
     public async Task DisposeAsync()

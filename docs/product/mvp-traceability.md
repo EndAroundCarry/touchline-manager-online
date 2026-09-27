@@ -47,7 +47,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-32 | Server-authoritative publication | competition, ops | 6 | Never 5-of-9 test |
 | F-33 | Recovery from worker failure | ops | 6 | Kill/restart at lock, simulate, publish boundaries |
 | F-34 | Text commentary | match, web | 5 (tokens), 7 (UI) | Variation and no-leakage tests |
-| F-35 | Deterministic, replayable 2D highlights | match, web | 5 (director), 7 (viewer) | Payload budgets; replay determinism |
+| F-35 | Deterministic, replayable 2D highlights | match, web | 5 (director), 7 (viewer) | Payload budgets; replay determinism; the prepare-and-watch browser journey |
 | F-36 | Search and scouting | market | 10 | Indexed search plan test; cursor pagination |
 | F-37 | Shortlists | market | 10 | Private-visibility policy test |
 | F-38 | Transfer listings | market | 10 | Eligibility and minimum-exposure tests |

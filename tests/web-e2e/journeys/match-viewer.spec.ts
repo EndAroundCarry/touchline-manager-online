@@ -3,17 +3,16 @@ import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
 
 /**
- * The match center's route and its reachable states (`§9.5`, `§11.1`).
+ * The match center's route and its reachable states in the main suite (`§9.5`, `§11.1`).
  *
- * The viewer draws a replay from a published result, and the end-to-end stack seeds a world whose
- * calendar has not been played — the worker is not part of `webServer`, and its matchdays are days apart
- * in real time. So what a browser journey can honestly assert here is the route itself: the guard that
- * keeps a visitor out, and the not-found state a manager gets for a match that has never been played.
+ * The main stack seeds a world whose calendar has not been played and does not start the worker, so a
+ * browser journey here can honestly assert the route itself: the guard that keeps a visitor out, and the
+ * not-found state a manager gets for a match that has never been played.
  *
- * Watching a complete fixture end to end needs a played round, which the harness does not yet produce;
- * it is recorded as deferred rather than faked with a stubbed endpoint. The replay's own contract is
- * covered by the API integration tests (a published round driven through the real workflow) and by the
- * playback and renderer unit tests.
+ * Watching a complete fixture end to end — prepare, play, replay — is the matchday journey's job
+ * (`matchday/matchday.spec.ts`, run by `playwright.matchday.config.ts`), which starts the worker and plays
+ * a real round on its own throwaway database (ADR-0016). The replay's contract is also pinned by the API
+ * integration tests and by the playback and renderer unit tests.
  */
 
 test.describe('match center', () => {

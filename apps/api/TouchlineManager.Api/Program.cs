@@ -239,6 +239,11 @@ if (diagnostics.EnableJobProbe)
     moduleGroups["ops"].MapJobProbe();
 }
 
+if (diagnostics.EnableMatchdayTrigger)
+{
+    moduleGroups["ops"].MapMatchdayTrigger();
+}
+
 if (clock.IsCompressed)
 {
     app.Logger.LogWarning(

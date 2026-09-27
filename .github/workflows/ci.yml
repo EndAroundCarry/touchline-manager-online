@@ -168,12 +168,21 @@ jobs:
         working-directory: tests/web-e2e
         run: npx playwright test
 
+      - name: Run the matchday journey
+        # A second, isolated stack: its own throwaway database (reset and reseeded each run) and the
+        # worker, so a real matchday can be prepared and watched end to end (ADR-0016). It reuses the
+        # same ports, so it runs after the main suite rather than beside it.
+        working-directory: tests/web-e2e
+        run: npx playwright test -c playwright.matchday.config.ts
+
       - name: Upload the report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: tests/web-e2e/playwright-report
+          path: |
+            tests/web-e2e/playwright-report
+            tests/web-e2e/playwright-report-matchday
           if-no-files-found: ignore
 
       - name: Stop backing services

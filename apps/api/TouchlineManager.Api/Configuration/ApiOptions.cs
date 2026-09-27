@@ -29,6 +29,18 @@ public sealed class DiagnosticsOptions
     /// API → database → worker pipeline and is removed once real deadline jobs exist.
     /// </summary>
     public bool EnableJobProbe { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the Stage 7 matchday trigger is reachable.
+    /// </summary>
+    /// <remarks>
+    /// The trigger enqueues a round's real lock and resolution jobs, due now, so the end-to-end journey
+    /// can watch a real matchday play without waiting for its calendar deadline. The worker still does
+    /// every part of the work; the endpoint only does what the worker-only scheduler normally does
+    /// (ADR-0016). It is off by default and is never set outside a test environment, so it has no
+    /// production surface (master plan §17.12).
+    /// </remarks>
+    public bool EnableMatchdayTrigger { get; set; }
 }
 
 /// <summary>

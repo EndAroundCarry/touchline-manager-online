@@ -177,5 +177,8 @@ public static class DependencyInjection
         services.AddScoped<LockMatchday>();
         services.AddScoped<ResolveMatchday>();
         services.AddScoped<PublishMatchday>();
+
+        // Reachable only from the non-production diagnostics trigger (§17.12).
+        services.AddScoped<TriggerMatchday>();
     }
 }

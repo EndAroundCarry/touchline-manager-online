@@ -17,6 +17,9 @@ public static class CompetitionErrorCodes
     /// <summary>No division exists with the requested identity.</summary>
     public const string DivisionNotFound = "DIVISION_NOT_FOUND";
 
+    /// <summary>No matchday exists with the requested identity.</summary>
+    public const string MatchdayNotFound = "MATCHDAY_NOT_FOUND";
+
     /// <summary>The caller holds a club, but not one of the two playing the fixture.</summary>
     public const string FixtureNotYours = "FIXTURE_NOT_YOURS";
 
