@@ -623,16 +623,15 @@ erDiagram
 
     inbox_messages {
         uuid id PK
-        uuid manager_id FK
+        uuid recipient_manager_id FK
         text category
-        text title_template_key
-        text body_template_key
+        text template_key
         jsonb parameters
-        text related_entity_type
         uuid related_entity_id
         timestamptz created_at
         timestamptz read_at
-        timestamptz archived_at
+        timestamptz updated_at
+        bigint version
     }
     news_items {
         uuid id PK
@@ -727,7 +726,9 @@ erDiagram
 | Index `(status, due_at, priority)` | `jobs` | Ready-job claim path |
 | Index `(status, due_at)` on unpublished outbox | `outbox_messages` | Dispatch path |
 | `unique (user_id, operation, idempotency_key)` | `idempotency_records` | Reject key reuse with a different request hash |
-| Index unread messages by manager | `inbox_messages` | Inbox and unread counter |
+| `check (category in (...))`, `check (length(template_key) > 0)` | `inbox_messages` | A stored shelf and template are codes, not ordinals |
+| Partial index `recipient_manager_id where read_at is null` | `inbox_messages` | Unread badge and sync counter |
+| Index `(recipient_manager_id, created_at, id)` | `inbox_messages` | Keyset page order, newest first |
 | Append-only, restricted access | `audit_log` | Tamper evidence |
 
 ---

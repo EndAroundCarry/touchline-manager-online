@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Domain.Auth;
+using TouchlineManager.Domain.Comms;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Match;
@@ -104,6 +105,9 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the finance module's club accounts.</summary>
     public DbSet<ClubAccount> ClubAccounts => Set<ClubAccount>();
+
+    /// <summary>Gets the comms module's inbox messages.</summary>
+    public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     /// <summary>Gets the squad module's players.</summary>
     public DbSet<Player> Players => Set<Player>();

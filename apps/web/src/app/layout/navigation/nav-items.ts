@@ -30,7 +30,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/scouting', label: 'Scouting', icon: 'pi pi-search', available: false },
   { path: '/transfers', label: 'Transfers', icon: 'pi pi-exchange', available: false },
   { path: '/finances', label: 'Finances', icon: 'pi pi-wallet', available: false },
-  { path: '/inbox', label: 'Inbox', icon: 'pi pi-inbox', available: false },
+  { path: '/inbox', label: 'Inbox', icon: 'pi pi-inbox', available: true },
   { path: '/settings', label: 'Settings', icon: 'pi pi-cog', available: true },
 ];
 

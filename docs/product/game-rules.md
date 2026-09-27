@@ -3,7 +3,7 @@
 > **Status:** Settled for the public MVP. This document is the normative rule source; the
 > master plan [`master-plan.md`](master-plan.md) explains intent, this file defines behaviour.
 > **Applies to:** rule set version `1`, engine version `1`.
-> **Change control:** see [§16](#16-change-control).
+> **Change control:** see [§19](#19-change-control).
 
 Every rule carries a stable reference (`WORLD-4`, `CAL-2`, …) so that migrations, tests,
 operator runbooks, and support answers can cite the exact rule they implement.
@@ -365,7 +365,26 @@ produced in Stage 5 alongside engine version 1.
 
 ---
 
-## 16. Time, identity, and concurrency rules
+## 16. Communications
+
+What the game tells a manager, and how (master plan §6.9, §10.7, F-41).
+
+| Ref | Rule |
+|---|---|
+| COM-1 | A message is addressed to the manager who held the club when the event it describes happened. An AI-controlled club is told nothing; a message outlives the tenure that received it. |
+| COM-2 | A message carries a stable template key and its parameters, never stored prose. The English a manager reads is derived from those two, so a message can be re-rendered in another language without being rewritten (`MAT-8`). |
+| COM-3 | A message's content is public game data — a result, a league position, a card, an injury, or a repaired side — and never a hidden value (`MAT-11`). |
+| COM-4 | A message is written in the same transaction as the event it describes, so a result and the news of it become public together (`MAT-7`). |
+| COM-5 | The inbox is per manager and paged by a keyset cursor, newest first. Reading is the only mutation of a message, and reading one that is already read is a no-op. |
+
+The events that produce a message in the MVP are the ones the matchday workflows already
+decide: a club's result, its changed league position, a player's suspension, a player's injury,
+and a repaired side (`DIS-7`). Deadline reminders and the division-scoped news feed arrive with
+Stage 11; a message that is written but never shown is not built early.
+
+---
+
+## 17. Time, identity, and concurrency rules
 
 | Ref | Rule |
 |---|---|
@@ -384,7 +403,7 @@ produced in Stage 5 alongside engine version 1.
 
 ---
 
-## 17. Consolidated constant reference
+## 18. Consolidated constant reference
 
 Values referenced by more than one rule. Changing any value here is a rule change (RULE-3).
 
@@ -457,7 +476,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 
 ---
 
-## 18. Change control
+## 19. Change control
 
 1. A rule change requires an ADR **and** an update to this file in the same change set.
 2. Changing anything that affects results, money, fairness, deadlines, or persistent history

@@ -2,6 +2,7 @@ using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Competition;
 
@@ -53,6 +54,7 @@ public sealed class LockMatchday
 {
     private readonly IMatchdayRepository _matchdays;
     private readonly MatchSnapshotFactory _snapshots;
+    private readonly MatchdayNotifications _notifications;
     private readonly IAdvisoryLock _locks;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
@@ -61,12 +63,14 @@ public sealed class LockMatchday
     public LockMatchday(
         IMatchdayRepository matchdays,
         MatchSnapshotFactory snapshots,
+        MatchdayNotifications notifications,
         IAdvisoryLock locks,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
         _matchdays = matchdays;
         _snapshots = snapshots;
+        _notifications = notifications;
         _locks = locks;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -97,6 +101,8 @@ public sealed class LockMatchday
 
         await _locks.AcquireAsync(AdvisoryLockKey.Matchday(matchdayId), cancellationToken);
 
+        var repairedSides = new List<RepairedSideFact>();
+
         foreach (var fixture in workload.Fixtures.Where(fixture => fixture.Status == FixtureStatus.Scheduled))
         {
             var sides = await _matchdays.LoadFixtureSidesAsync(fixture.Id, cancellationToken);
@@ -115,6 +121,21 @@ public sealed class LockMatchday
 
             repairs += snapshot.Repairs.Count;
 
+            // What the builder decided rather than the clubs, grouped by the side it was about, so each club
+            // is told about its own side and not its opponent's (`DIS-7`).
+            foreach (var side in snapshot.Repairs.GroupBy(repair => repair.ClubId))
+            {
+                repairedSides.Add(new RepairedSideFact(
+                    side.Key,
+                    fixture.Id,
+                    [.. side
+                        .OrderBy(repair => repair.SlotNumber)
+                        .Select(repair => new RepairLineFact(
+                            repair.SlotNumber,
+                            repair.Reason.ToCode(),
+                            repair.ReplacementPlayerId))]));
+            }
+
             foreach (var sheet in sides.Sheets.Where(sheet => sheet.IsEditable))
             {
                 sheet.Lock(now);
@@ -122,6 +143,12 @@ public sealed class LockMatchday
 
             fixture.Lock(now);
         }
+
+        await _notifications.NotifyRepairedSidesAsync(
+            workload.Matchday.RoundNumber,
+            repairedSides,
+            now,
+            cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

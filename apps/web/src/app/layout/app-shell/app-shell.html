@@ -81,6 +81,14 @@
               >
                 <i [class]="item.icon" aria-hidden="true"></i>
                 {{ item.label }}
+                @if (item.path === '/inbox' && unreadInboxCount() > 0) {
+                  <span
+                    class="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-slate-900"
+                    [attr.aria-label]="unreadInboxCount() + ' unread messages'"
+                  >
+                    {{ unreadInboxCount() }}
+                  </span>
+                }
               </a>
             </li>
           }

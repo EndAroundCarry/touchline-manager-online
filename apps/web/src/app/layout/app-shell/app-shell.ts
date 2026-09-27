@@ -1,11 +1,13 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnDestroy, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { InboxStore } from '../../core/inbox/inbox-store';
 import { MatchStore } from '../../core/match/match-store';
 import { SquadStore } from '../../core/squad/squad-store';
+import { SyncStore } from '../../core/sync/sync-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
@@ -23,7 +25,7 @@ import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.css',
 })
-export class AppShell {
+export class AppShell implements OnDestroy {
   private readonly connectivity = inject(ConnectivityStore);
   private readonly correlation = inject(CorrelationStore);
   private readonly session = inject(SessionStore);
@@ -31,8 +33,16 @@ export class AppShell {
   private readonly squad = inject(SquadStore);
   private readonly tactics = inject(TacticsStore);
   private readonly competition = inject(CompetitionStore);
+  private readonly inbox = inject(InboxStore);
   private readonly match = inject(MatchStore);
+  private readonly sync = inject(SyncStore);
   private readonly router = inject(Router);
+
+  constructor() {
+    // The poll starts with the shell and stops with it, so the badge is fresh on every screen and no timer
+    // outlives the shell that owns it (§11.2).
+    this.sync.start();
+  }
 
   /**
    * Navigable destinations.
@@ -56,16 +66,27 @@ export class AppShell {
   /** The signed-in manager's name, or null. */
   protected readonly displayName = this.session.displayName;
 
+  /** How many inbox messages are unread, for the navigation badge (`F-41`). */
+  protected readonly unreadInboxCount = this.sync.unreadInboxCount;
+
+  /** Stops the synchronization poll when the shell goes away. */
+  ngOnDestroy(): void {
+    this.sync.stop();
+  }
+
   /** Ends the session on this device. */
   protected signOut(): void {
     this.session.logout().subscribe(() => {
       // The onboarding and squad stores are dropped too, so a shared device does not keep the previous
-      // manager's club, players, plan, fixtures, or last match on screen for whoever signs in next.
+      // manager's club, players, plan, fixtures, or last match on screen for whoever signs in next. The
+      // sync count is dropped for the same reason: the badge must not outlive the session that produced it.
       this.onboarding.clear();
       this.squad.clear();
       this.tactics.clear();
       this.competition.clear();
+      this.inbox.clear();
       this.match.clear();
+      this.sync.clear();
 
       void this.router.navigateByUrl('/login');
     });

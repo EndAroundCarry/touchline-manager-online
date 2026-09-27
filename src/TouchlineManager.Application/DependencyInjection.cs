@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
+using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.Match;
@@ -47,8 +48,26 @@ public static class DependencyInjection
         AddSquadUseCases(services);
         AddCompetitionUseCases(services);
         AddMatchUseCases(services);
+        AddCommsUseCases(services);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the comms module's inbox reads and commands, and the composer the matchday workflows use
+    /// (master plan §10.7, F-41).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="MatchdayNotifications"/> is registered here rather than beside one caller because two
+    /// workflows compose messages from their own facts: the lock reports a repaired side (`DIS-7`) and the
+    /// publication reports results, cards, injuries, and table movement.
+    /// </remarks>
+    private static void AddCommsUseCases(IServiceCollection services)
+    {
+        services.AddScoped<MatchdayNotifications>();
+        services.AddScoped<GetInbox>();
+        services.AddScoped<MarkInboxMessagesRead>();
+        services.AddScoped<GetSync>();
     }
 
     /// <summary>

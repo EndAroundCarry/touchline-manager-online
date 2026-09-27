@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
+using TouchlineManager.Application.Abstractions.Comms;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Jobs;
@@ -54,6 +55,7 @@ public static class DependencyInjection
         AddWorldInfrastructure(services, configuration);
         AddCompetitionInfrastructure(services);
         AddMatchInfrastructure(services);
+        AddCommsInfrastructure(services);
         AddSquadInfrastructure(services);
         AddTrainingInfrastructure(services, configuration);
         AddMatchdayInfrastructure(services, configuration);
@@ -144,6 +146,20 @@ public static class DependencyInjection
     {
         services.AddScoped<IMatchRepository, MatchRepository>();
         services.AddScoped<IMatchQueries, MatchQueries>();
+    }
+
+    /// <summary>
+    /// Registers the comms module's persistence (master plan §6.9).
+    /// </summary>
+    /// <remarks>
+    /// A module of its own with ports of its own (`MOD-1`). The write port both stages a message and reads
+    /// the club targets a message is addressed to, because the two are one concern; the read port serves the
+    /// inbox, separate so a screen can change without widening what a command can reach (`MOD-3`).
+    /// </remarks>
+    private static void AddCommsInfrastructure(IServiceCollection services)
+    {
+        services.AddScoped<IInboxRepository, InboxRepository>();
+        services.AddScoped<IInboxQueries, InboxQueries>();
     }
 
     /// <summary>

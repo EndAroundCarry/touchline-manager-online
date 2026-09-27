@@ -170,6 +170,113 @@ discipline screens are the rest.
   screens. The morale effects of contracts and transfers wait for the stages that own them (Stage 9 and
   Stage 10).
 
+### The inbox that reports the round
+
+A result you are told about. The `comms` module arrives: publishing a round now writes each club's manager a
+message about the result, its new league position, a booking's suspension, and an injury, and locking a round
+reports the side the game had to repair — `DIS-7` at last has somewhere to send its report. `GET /inbox`
+reads them by cursor with the unread count, `POST /inbox/{id}/read` and `/inbox/read-all` mark them, `GET
+/sync` is the one lightweight poll the shell runs for its badge, and `/inbox` is the screen. This is the
+third milestone of the stage; the season statistics, the AI's own lineup policy, the projection tools, and
+the discipline and competition screens are the rest.
+
+#### Added
+
+- **`comms.inbox_messages`** (master plan §6.9): one row per message, addressed to a manager, carrying a
+  stable category, a template key, and the parameters that fill it. Its `check` puts the category among the
+  known codes rather than an ordinal, so a reordered enum cannot move a message between shelves, and its
+  partial index on the unread rows is what the count and the badge are read against.
+- **`InboxMessage` and `InboxCategory`** (`COM-1`, `COM-5`): the aggregate with reading as its only mutation.
+  Reading twice is a no-op, so a retried command cannot advance a version or move a timestamp, and there is
+  no archive or delete because the MVP offers neither — a half-built shelf with no way to reach it is the
+  surface §17.12 keeps out.
+- **The templates and their renderer** (`COM-2`): `InboxTemplates` owns every stable key and the parameter
+  document that goes with it, and `InboxMessageText` turns a stored key and document back into English. That
+  is master plan §8.6's commentary contract applied to the inbox — durable tokens, derived prose — so a
+  message written today can be rendered in another language later without rewriting history. A key the build
+  does not know is refused by name rather than shown as a vague placeholder, because writer and reader share
+  one set of constants and an unknown key is a defect worth seeing.
+- **`MatchdayNotifications`**: one composer that turns a round's facts into the messages its managers read,
+  so a result, a table move, a card, an injury, and a repaired side all address their manager the same way
+  and resolve a name once. It stages messages and never saves, so they commit inside the transaction that
+  publishes or locks the round.
+- **Publication reports the result, the table, the cards, and the injuries** (`COM-4`). Every club that
+  played is told its score and its new position, and only a position that changed produces its own message;
+  a booking's accumulation and a sending-off each earn a suspension message, and an injury one — written in
+  the publication's own serializable transaction, so a result and the news of it become public together.
+- **Locking reports the repaired side** (`DIS-7`): the decisions the snapshot builder made are grouped by the
+  club whose side it was and sent to that club's manager. `DIS-7` said "reported to the affected manager"
+  before there was an inbox to report it through.
+- **The inbox reads and marks** (master plan §10.7): `GET /inbox` — a keyset page newest-first with the
+  unread count — plus `POST /inbox/{messageId}/read` and `POST /inbox/read-all`. The recipient comes from the
+  account and is never named by the request, so a manager can only read their own mail (`INT-1`, §10.9), and
+  a cursor this build did not produce is refused by name (`INVALID_CURSOR`).
+- **`GET /sync`** (§10.7, §11.2, ADR-0007): the unread inbox count and the server's instant, the one
+  lightweight read the shell repeats. It is deliberately lenient — an account with no manager profile gets a
+  count of zero rather than a refusal — because a background poll that refused would surface as an error for
+  a manager who simply has nothing yet.
+- **The `/inbox` screen** (§11.1, F-41) and the navigation destination flipped to available. The shelf name
+  is text, an unread message says so in words, and each line links to the match, player, or fixture it is
+  about, so the list is reachable by a keyboard and a screen reader rather than only by eye (§11.3). "Load
+  older" walks the cursor, and the two marks carry their own pending and failure states.
+- **The shell's unread badge and its poll** (`SyncStore`): one read a minute while the tab is visible and the
+  browser is online, suspended in a hidden or offline tab, and dropped when the session ends — so the badge
+  is fresh without a burst of requests when a laptop wakes up. A mark on the inbox asks the poll to read
+  again at once, so the badge agrees with the screen the manager is looking at instead of lagging a tick.
+- **The `comms` error codes and DTOs** (`CommsErrorCodes`, `InboxResponse`, `SyncResponse`), the module's
+  write and read ports, and its two providers, following the module map's `comms` entry rather than a new
+  shape.
+- 5 new domain tests (347 total) for the message's factory and its read contract; 13 new application tests
+  (81 total) for every template's English, the unknown-key refusal, the cursor round trip, and the
+  composition — which clubs are told what, that an AI club is told nothing, and that a result names its
+  opponent; 3 new infrastructure tests (123 total) over a real seeded world that play a round and read it
+  back, walk the keyset page across thirty same-instant messages without a skip or a repeat, and mark read;
+  and 4 new API integration tests (85 total) that claim a club, play its round, read the result over HTTP,
+  watch the unread count fall as they read and mark all, and check the no-profile, bad-cursor, and
+  unauthenticated refusals.
+- 15 new web unit tests (202 total): the category names and destinations, the store's cursor walk, its two
+  marks and their refusal paths, and the sync poll's cadence and its three quiet cases — signed out, offline,
+  and hidden. 2 new Playwright cases (27 across both stacks): the inbox reached from the navigation with its
+  empty state, and the guard for a visitor with no session.
+
+#### Notes
+
+- **A message's wording is not stored.** The row holds a key and a parameter document, and the English is
+  rendered on the way out, so changing a sentence is not a migration and the same message can be re-rendered
+  in another language. The cost is one small render per message on the read, which the page's own limit
+  bounds.
+- **A message goes to whoever held the club when the event happened, not to the club.** §6.9 addresses a
+  manager, and that is the right reading: a result is something a person is told, and a takeover the next day
+  should not hand the previous manager's mail to their successor.
+- **An AI club is told nothing, and that is the whole addressing rule.** The targets read joins clubs to
+  their open tenures, so a club nobody holds has no recipient and produces no message. Nothing special-cases
+  the AI.
+- **The table move is its own message, and only on a change.** Every club that played already hears its new
+  position in its result, so a second message on every round would be noise; one that fires only when the
+  position actually moved is a fact worth a line.
+- **The messages commit with the round.** They are staged in the publication's serializable transaction and
+  the lock's own, the same argument the absences and the match load make: a message about a result nobody can
+  read yet would be the same defect as a leaked score (`MAT-7`).
+- **`news_items` is not in this milestone, deliberately.** §6.9 lists a world/country/division-scoped news
+  table, and §16 Stage 8 asks for "news/inbox templates". There is no read that returns a news item, so
+  building the table now would ship a row nothing shows — the header above records why. The division-scoped
+  round summary that would use it belongs with Stage 11's full inbox center.
+- **No deadline-reminder message yet, and that is also deliberate.** §16 lists "deadlines" among the
+  templates, but a reminder is a scheduled job rather than a fact of a played round, and Stage 11 owns it
+  alongside the notification preferences it needs to know whether a manager wants one. The `COM-*` rules
+  record the deferral.
+- **`/sync` carries only the unread count.** §11.2 describes "lightweight changed-resource hints", and a hint
+  with no consumer is a field nobody reads; the inbox badge is the first thing that needed the poll, and the
+  next module that needs a hint adds it beside the count.
+- **`recipient_manager_id` is the column, not the data model's `manager_id`.** The document now matches the
+  executable schema, along with one `template_key` rather than a title/body pair (one template renders both)
+  and no `related_entity_type` (the category decides what the related id is) or `archived_at` (nothing
+  archives). `docs/architecture/data-model.md` §3.4 and §3's constraint table were updated with the code.
+- **The read is measured against the manager, not the match's season.** A played result stays readable across
+  a rollover, and the inbox is a manager's mail rather than a season's — so the messages are keyed on the
+  recipient and never on the current season (`CAL-6` is about the world's calendar, which this does not
+  read).
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

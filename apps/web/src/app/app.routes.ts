@@ -134,6 +134,12 @@ export const routes: Routes = [
         title: 'Fixtures — Touchline Manager',
       },
       {
+        path: 'inbox',
+        loadComponent: () => import('./features/inbox/inbox').then((m) => m.Inbox),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Inbox — Touchline Manager',
+      },
+      {
         // A detail route for one fixture, where a manager prepares a side (`SQ-4`).
         path: 'fixtures/:fixtureId/prepare',
         loadComponent: () => import('./features/prepare/prepare').then((m) => m.Prepare),

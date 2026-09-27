@@ -2,6 +2,7 @@ using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.Squad;
+using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
@@ -55,6 +56,12 @@ public sealed record PublishMatchdayResult(PublishMatchdayOutcome Outcome, int P
 /// next lock, while one applied and published together is the fact the rules describe.
 /// </para>
 /// <para>
+/// It is also where a manager hears about it (`F-41`): the result, the club's new position, a booking's
+/// suspension, and an injury each become an inbox message, written in this same transaction so the result
+/// and the news of it become public together. An AI club has no manager, so it is told nothing — which is
+/// the whole of the addressing rule.
+/// </para>
+/// <para>
 /// Publication is serializable. It reads a whole division's results and rewrites its table, and the
 /// concurrency rule names matchday publication explicitly: two transactions that both read the table and
 /// wrote it in turn would give the second one a table missing the first one's round (`CONC-2`). A
@@ -66,6 +73,7 @@ public sealed class PublishMatchday
     private readonly IMatchdayRepository _matchdays;
     private readonly IAvailabilityRepository _availability;
     private readonly IPlayerStateRepository _playerStates;
+    private readonly MatchdayNotifications _notifications;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
 
@@ -74,12 +82,14 @@ public sealed class PublishMatchday
         IMatchdayRepository matchdays,
         IAvailabilityRepository availability,
         IPlayerStateRepository playerStates,
+        MatchdayNotifications notifications,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
         _matchdays = matchdays;
         _availability = availability;
         _playerStates = playerStates;
+        _notifications = notifications;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -127,9 +137,19 @@ public sealed class PublishMatchday
         // rebuild sees. Reading the table's inputs before that would rank a division missing its own round.
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var tableRows = await RebuildTableAsync(workload.Matchday.DivisionSeasonId, now, cancellationToken);
+        var positions = await RebuildTableAsync(workload.Matchday.DivisionSeasonId, now, cancellationToken);
 
-        await ApplyEffectsAsync(workload, published, now, cancellationToken);
+        var effects = await ApplyEffectsAsync(workload, published, now, cancellationToken);
+
+        // Written in the same transaction as the results, so the round and the news of it become public
+        // together: a message about a result nobody can read yet would be the same defect as a leaked score.
+        await _notifications.NotifyPublishedAsync(
+            workload.Matchday.RoundNumber,
+            PlayedFacts(published),
+            positions,
+            effects,
+            now,
+            cancellationToken);
 
         workload.Matchday.Publish(now);
 
@@ -137,13 +157,27 @@ public sealed class PublishMatchday
 
         await transaction.CommitAsync(cancellationToken);
 
-        return new PublishMatchdayResult(PublishMatchdayOutcome.Published, published.Count, tableRows);
+        return new PublishMatchdayResult(PublishMatchdayOutcome.Published, published.Count, positions.Count);
     }
+
+    private static IReadOnlyList<PlayedFixtureFact> PlayedFacts(IReadOnlyList<Fixture> published) =>
+    [
+        .. published
+            .OrderBy(fixture => fixture.Id)
+            .Select(fixture => new PlayedFixtureFact(
+                fixture.Id,
+                fixture.MatchId!.Value,
+                fixture.HomeClubId,
+                fixture.AwayClubId,
+                fixture.HomeScore!.Value,
+                fixture.AwayScore!.Value)),
+    ];
 
     /// <summary>
     /// Serves each club's open absences one fixture and opens the ones this round created (`DIS-1`,
     /// `DIS-2`, `DIS-4`, `DIS-5`).
     /// </summary>
+    /// <returns>What the round did to each booked, sent-off, or injured player (`F-41`).</returns>
     /// <remarks>
     /// <para>
     /// Serving happens before the round's own cards and injuries are applied, so an absence is never served
@@ -157,7 +191,7 @@ public sealed class PublishMatchday
     /// statistics count it (`MAT-5`), so a player can reach the threshold and be sent off in one match.
     /// </para>
     /// </remarks>
-    private async Task ApplyEffectsAsync(
+    private async Task<IReadOnlyList<PlayerEffectFact>> ApplyEffectsAsync(
         MatchdayWorkload workload,
         List<Fixture> published,
         DateTimeOffset now,
@@ -165,7 +199,7 @@ public sealed class PublishMatchday
     {
         if (published.Count == 0)
         {
-            return;
+            return [];
         }
 
         var clubIds = published
@@ -183,18 +217,20 @@ public sealed class PublishMatchday
         var effects = MatchEffectsCalculator.Calculate(
             await _matchdays.LoadMatchEffectsAsync(workload.Matchday.Id, cancellationToken));
 
-        if (effects.Count > 0)
-        {
-            await ApplyDisciplineAsync(workload, effects, now, cancellationToken);
-        }
+        var facts = effects.Count > 0
+            ? await ApplyDisciplineAsync(workload, effects, now, cancellationToken)
+            : [];
 
         await ApplyMatchLoadAsync(workload.Matchday.Id, cancellationToken);
+
+        return facts;
     }
 
     /// <summary>
     /// Applies a round's cards and injuries as discipline records and absences (`DIS-1`, `DIS-2`, `DIS-4`).
     /// </summary>
-    private async Task ApplyDisciplineAsync(
+    /// <returns>One fact per affected player, naming the suspension and injury the round produced.</returns>
+    private async Task<IReadOnlyList<PlayerEffectFact>> ApplyDisciplineAsync(
         MatchdayWorkload workload,
         IReadOnlyList<MatchPlayerEffect> effects,
         DateTimeOffset now,
@@ -208,8 +244,13 @@ public sealed class PublishMatchday
                 cancellationToken))
             .ToDictionary(record => record.PlayerId);
 
+        var facts = new List<PlayerEffectFact>(effects.Count);
+
         foreach (var effect in effects)
         {
+            var suspensionFixtures = 0;
+            var fromBookings = false;
+
             if (effect.YellowCards > 0 || effect.RedCards > 0)
             {
                 if (!records.TryGetValue(effect.PlayerId, out var record))
@@ -224,15 +265,21 @@ public sealed class PublishMatchday
                     records[effect.PlayerId] = record;
                 }
 
-                var suspensions = (record.YellowSuspensionsEarned(
-                        effect.YellowCards,
-                        WorldRuleSet.YellowSuspensionThreshold)
-                    * WorldRuleSet.YellowSuspensionFixtures)
-                    + (effect.RedCards > 0 ? WorldRuleSet.RedCardSuspensionFixtures : 0);
+                // Asked before the count advances, because "is this booking the fifth" is a question about
+                // the accumulation the record held until now (DIS-2).
+                fromBookings = record.YellowSuspensionsEarned(
+                    effect.YellowCards,
+                    WorldRuleSet.YellowSuspensionThreshold) > 0;
+
+                var fromRedCard = effect.RedCards > 0;
+
+                suspensionFixtures =
+                    (fromBookings ? WorldRuleSet.YellowSuspensionFixtures : 0)
+                    + (fromRedCard ? WorldRuleSet.RedCardSuspensionFixtures : 0);
 
                 record.AddCards(effect.YellowCards, effect.RedCards, now);
 
-                if (suspensions > 0)
+                if (suspensionFixtures > 0)
                 {
                     _availability.Add(PlayerUnavailability.Open(
                         Guid.CreateVersion7(),
@@ -240,7 +287,7 @@ public sealed class PublishMatchday
                         effect.ClubId,
                         UnavailabilityType.Suspension,
                         InjurySeverity.Minor,
-                        suspensions,
+                        suspensionFixtures,
                         effect.FixtureId,
                         now));
                 }
@@ -258,7 +305,17 @@ public sealed class PublishMatchday
                     effect.FixtureId,
                     now));
             }
+
+            facts.Add(new PlayerEffectFact(
+                effect.ClubId,
+                effect.PlayerId,
+                suspensionFixtures,
+                fromBookings,
+                effect.RedCards > 0,
+                effect.AbsenceFixtures));
         }
+
+        return facts;
     }
 
     /// <summary>
@@ -307,8 +364,8 @@ public sealed class PublishMatchday
     /// <summary>
     /// Recomputes the division's table from its published results and writes it back (`TBL-13`).
     /// </summary>
-    /// <returns>How many rows the table carries.</returns>
-    private async Task<int> RebuildTableAsync(
+    /// <returns>Every club's position and the position it held before the round (`F-41`).</returns>
+    private async Task<IReadOnlyList<ClubPositionFact>> RebuildTableAsync(
         Guid divisionSeasonId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
@@ -317,16 +374,20 @@ public sealed class PublishMatchday
 
         if (source is null)
         {
-            return 0;
+            return [];
         }
+
+        var stored = (await _matchdays.LoadStandingsAsync(divisionSeasonId, cancellationToken))
+            .ToDictionary(standing => standing.ClubId);
+
+        // Captured before the rebuild, because Rebuild rewrites the rank in place: the previous rank is the
+        // one the table held going into this round, which is what "the table moved" compares against.
+        var before = stored.ToDictionary(entry => entry.Key, entry => entry.Value.Rank);
 
         var lines = StandingsCalculator.Rank(
             source.ClubIds,
             source.Outcomes,
             clubId => StandingsCalculator.DrawKeyOf(source.TieDrawSeed, clubId));
-
-        var stored = (await _matchdays.LoadStandingsAsync(divisionSeasonId, cancellationToken))
-            .ToDictionary(standing => standing.ClubId);
 
         foreach (var line in lines)
         {
@@ -340,6 +401,14 @@ public sealed class PublishMatchday
             _matchdays.AddStanding(Standing.Create(Guid.CreateVersion7(), divisionSeasonId, line, now));
         }
 
-        return lines.Count;
+        return
+        [
+            .. lines
+                .OrderBy(line => line.ClubId)
+                .Select(line => new ClubPositionFact(
+                    line.ClubId,
+                    line.Rank,
+                    before.TryGetValue(line.ClubId, out var previous) ? previous : line.Rank)),
+        ];
     }
 }

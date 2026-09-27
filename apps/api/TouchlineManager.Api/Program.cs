@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using TouchlineManager.Api.Auth;
+using TouchlineManager.Api.Comms;
 using TouchlineManager.Api.Competition;
 using TouchlineManager.Api.Configuration;
 using TouchlineManager.Api.Endpoints;
@@ -231,6 +232,7 @@ app.MapTrainingEndpoints();
 app.MapCompetitionEndpoints();
 app.MapTeamSheetEndpoints();
 app.MapMatchEndpoints();
+app.MapCommsEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;
 
