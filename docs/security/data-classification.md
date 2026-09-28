@@ -39,6 +39,11 @@ Data in class C2 lives in one of two places, never both:
 **Rule:** if a value is C2, there is a test that fails when it appears in a manager-facing
 response. Relying on a mapper being correct is not sufficient.
 
+**The AI valuation** (`player-valuation-v1`) is C2 and is neither stored nor serialized: it is computed
+from hidden potential and the wage scale, and it is an input to the AI's market decisions and the basis of
+a listing's asking price. The asking price a manager sees is a transfer term derived from the value; the
+value itself never appears in a response.
+
 ### 2.2 Seed material
 
 Two different values are both called a seed, and they are not the same class.

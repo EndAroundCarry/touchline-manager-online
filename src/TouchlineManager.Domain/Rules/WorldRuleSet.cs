@@ -18,7 +18,9 @@ namespace TouchlineManager.Domain.Rules;
 /// values; Stage 4 the squad, contract, tactics, and training values; Stage 6 the schedule-streak bound
 /// the fixture generator validates against; Stage 8 the injury and suspension bands the match effects
 /// apply; Stage 9 the gate, sponsorship, operating-cost, award, and payroll-risk values the finance runs
-/// settle; Stage 10 the auction windows, blackout, and minimum bid increment the transfer market runs on.
+/// settle; Stage 10 the auction windows, blackout, and minimum bid increment the transfer market runs on,
+/// and — its AI-market milestone — the player valuation and bidding bands the AI's own market decisions
+/// use (`TRF-12`).
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -26,7 +28,7 @@ namespace TouchlineManager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v7";
+    public const string Version = "world-rules-v8";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -520,4 +522,100 @@ public static class WorldRuleSet
 
     /// <summary>The most characters a private shortlist note may hold (`SCT-3`).</summary>
     public const int ShortlistNotesMaxLength = 280;
+
+    /// <summary>
+    /// The number of weeks of a player's wage their transfer value is worth (`TRF-12`). A balancing value.
+    /// </summary>
+    /// <remarks>
+    /// The valuation is deliberately derived from the wage scale the generator and the renewal quote
+    /// already use rather than from a second, disconnected money scale: a squad, a renewal, and a fee are
+    /// then priced by one family of rules, and the AI's asking price and bid ceiling cannot drift away from
+    /// what a player actually costs to keep.
+    /// </remarks>
+    public const long PlayerValuationWeeksOfWage = 60;
+
+    /// <summary>How a player's age shapes their transfer value, in basis points (`TRF-12`).</summary>
+    /// <remarks>
+    /// Younger players carry resale and development value, the peak years are the premium, and a veteran is
+    /// cheap. Bounded, like every other factor, so no age can multiply a value into a number the wage scale
+    /// does not support.
+    /// </remarks>
+    /// <param name="age">The player's age in game years.</param>
+    public static int PlayerValuationAgeFactorBp(int age)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(age);
+
+        return age switch
+        {
+            <= 21 => 13_000,
+            <= 24 => 12_000,
+            <= 28 => 10_500,
+            <= 31 => 8_500,
+            _ => 6_000,
+        };
+    }
+
+    /// <summary>How a player's hidden potential shapes their transfer value, in basis points (`TRF-12`).</summary>
+    /// <remarks>
+    /// A higher ceiling commands more, bounded between 9,000 and 12,000 basis points so potential moves a
+    /// value without dominating the ability it is measured beside.
+    /// </remarks>
+    /// <param name="potential">The hidden development ceiling, on the 1–20 scale (`TRN-9`).</param>
+    public static int PlayerValuationPotentialFactorBp(int potential)
+    {
+        if (potential is < AttributeMin or > AttributeMax)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(potential),
+                potential,
+                $"Potential is between {AttributeMin} and {AttributeMax} (TRN-4).");
+        }
+
+        return 9_000 + (potential * 150);
+    }
+
+    /// <summary>
+    /// The registration count a club's position family is expected to hold (`SQ-1`), which is where the AI
+    /// market reads "surplus" from (`TRF-12`).
+    /// </summary>
+    /// <remarks>
+    /// The generator's own quotas, reused rather than restated: a club above a family's quota is holding
+    /// more of that position than a balanced squad needs, so that family is where a surplus player may be
+    /// found. Using the same numbers the generator builds to keeps "surplus" a fact about the squad's shape
+    /// rather than a second opinion about it.
+    /// </remarks>
+    /// <param name="family">The position family.</param>
+    public static int AiMarketFamilyCap(PositionFamily family) => family switch
+    {
+        PositionFamily.Goalkeeper => GeneratedGoalkeepers,
+        PositionFamily.Defence => GeneratedDefenders,
+        PositionFamily.Midfield => GeneratedMidfielders,
+        PositionFamily.Attack => GeneratedAttackers,
+        _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown position family."),
+    };
+
+    /// <summary>
+    /// The squad size an AI club trims toward when it lists a surplus player (`TRF-12`).
+    /// </summary>
+    /// <remarks>
+    /// One below the generator's target, so a generated squad of twenty-two has exactly one player the AI
+    /// would move on and stays a manageable size without ever approaching the minimum `SQ-2` requires.
+    /// </remarks>
+    public const int AiMarketTargetSquadSize = 21;
+
+    /// <summary>The most players an AI club lists in one evaluation, so a pass cannot flood the market (`TRF-12`).</summary>
+    public const int AiMarketMaxListingsPerClub = 3;
+
+    /// <summary>The most listings an AI club bids on in one evaluation, so a pass cannot over-commit it (`TRF-12`).</summary>
+    public const int AiMarketMaxBidsPerClub = 3;
+
+    /// <summary>
+    /// The share of its available cash an AI club will commit to a single bid, in basis points (`TRF-12`).
+    /// </summary>
+    /// <remarks>
+    /// A bid is also capped by the player's valuation, which usually binds first for a solvent club; this
+    /// floor is what stops a cash-poor AI club from spending money it needs for the next wage run. A
+    /// balancing value, tuned from the market-health measurements this milestone requires.
+    /// </remarks>
+    public const int AiMarketBidBudgetFractionBp = 5_000;
 }

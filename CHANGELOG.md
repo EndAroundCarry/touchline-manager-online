@@ -56,6 +56,116 @@ milestone of the stage.
 - The market's two infrastructure suites run against their own seeded world, because a resolution moves a player
   between clubs and would otherwise break the world-seeding assertions that check every club's squad.
 
+### The AI transfer market
+
+A market that trades without you. Every club no human holds now lists its surplus and bids for the players
+that improve it, through the same listing and bid writers a manager's command uses — within the same ledger
+and the same squad rules, so `INS-12`'s "the AI receives no bypass" is a property of the code path rather
+than an intention. `EvaluateAiMarket` runs on the worker's daily schedule, records every decision in
+`market.ai_market_decisions`, and is idempotent per day, so the queue's at-least-once delivery cannot list a
+second player or reserve a second time. This closes Stage 10's last exit criterion, *"AI uses no privileged
+finance and produces a healthy measured market"*, and the missing journey with it.
+
+#### Added
+
+- **The `market` AI tables and the shared cores.** `market.ai_market_decisions` (master plan §6.7) records
+  one append-only row per decision: the club, the instant, the action, the player, the listing or bid it
+  produced, the digest of the inputs the policy read, and the policy version. Its checks make the row
+  self-describing — an action is a known code and names exactly the listing or the bid, never both — and
+  `length(inputs_hash) = 64` keeps the digest a digest.
+- **`PlayerValuation`** (`player-valuation-v1`, `TRF-12`): a pure, versioned value derived from the wage
+  scale the generator and the renewal quote already use, moved by bounded age and potential factors. A
+  squad, a renewal, and a fee are priced by one family of rules rather than by a second, disconnected money
+  scale, and the value is class C2 — an input to the AI and the basis of a listing's asking price, never a
+  field in a response (`MAT-11`).
+- **`AiMarketPolicy`** (`ai-market-v1`): a pure, deterministic function from a club's shape and the open
+  market to its listings and bids. Supply is a squad above `AiMarketTargetSquadSize` or a family above its
+  generator quota, ranked by weakness; demand is a positional need **or** a listed player better than the
+  club's weakest in that family; neither ever takes the club below `SQ-2`, above `SQ-3`, above a player's
+  valuation, or above a bounded share of its spendable cash (`FIN-10`), and both are bounded per pass. The
+  upgrade clause is what gives the market a first buyer: a need alone would require a sale to have happened,
+  and nothing sells until a transfer settles.
+- **`ListingWriter`/`BidWriter`, and their `IListingWriter`/`IBidWriter` ports.** The listing and bid cores
+  a manager's command ran are extracted into writers that stage the row, its ledger postings, its
+  notification, and its audit row and never save. `CreateListing`/`PlaceBid` now resolve the caller's club
+  and call them as a user actor; `EvaluateAiMarket` calls them as a service actor, so an AI listing or bid
+  is refused by the same eligibility, legality, and affordability rules a human's is.
+- **`EvaluateAiMarket`** (master plan §7.2, `TRF-12`): the worker-only evaluation. It reads every club no
+  human holds with its squad and spendable cash and the listings open before the day began, decides in club
+  identity order, carries each decision out through the shared writers, and commits the whole pass in one
+  transaction. Each decision's deterministic daily key (`ai-l:{club}:{player}:{yyyyMMdd}`,
+  `ai-b:{club}:{listing}:{yyyyMMdd}`) makes a retried pass a replay rather than a second listing or bid.
+- **`market.evaluate-ai`**, the durable job, and **`AiMarketScheduler`**, which materialises one row per UTC
+  day so the row is the deadline and a worker that was down when the day opened runs the evaluation late
+  rather than skipping it (ADR-0003). Registered only by `AddJobQueueWorker`, so an API process can never
+  list or bid; `AiMarket:EnableEvaluation` is on by default, because a world where the AI neither buys nor
+  sells is not the stage.
+- **`IAiMarketRepository`**/**`AiMarketRepository`**: the evaluation's read — the AI clubs with their squads,
+  placements, and spendable cash, and the market open before the day — in a fixed handful of queries however
+  deep the pyramid gets, carrying the hidden potential the valuation reads.
+- **The rule set becomes `world-rules-v8`** (`RULE-1`): the valuation's weeks-of-wage and its age and
+  potential factors, the AI market's target squad size, its per-pass caps, and its bid budget fraction. A
+  world stamped with an earlier version keeps being read against it.
+- **The market end-to-end journey** (`tests/web-e2e/playwright.market.config.ts`, `market/market.spec.ts`,
+  master plan §15.5 journey 4): three managers on three browser contexts list a player, bid, and outbid
+  through the real transfers screen, the harness resolves the auction through the non-production trigger,
+  and the journey asserts the seller's leading amount and bidder count, the completed transfer in the public
+  history, the winner's bid `won`, and the displaced bidder's `outbid`. Its own throwaway database and the
+  worker, with the AI market and the auction scheduler switched off so neither competes with the managers.
+- **ADR-0025**, on the pure versioned policy, the valuation derived from the wage scale, the AI routed
+  through the human write path, the day-scoped market that makes a retry idempotent, and the decision
+  record.
+- `docs/product/game-rules.md` §14.3 and §18 gained the AI market's behaviour and its constants; the
+  deferred "exact AI valuation and bidding bands" item is now specified.
+- 19 new domain tests for the valuation's monotonicity and refusals and the policy's determinism, its
+  surplus and need rules, its guards, and its caps; 4 new application tests for the orchestration — the
+  service actor, the deterministic daily keys, a refused decision counted rather than thrown, the decision
+  record, and the pass that commits nothing; 7 new infrastructure tests over a real seeded world that list
+  and bid, replay a retry without duplicating, settle a transfer, keep every club legal and every balance
+  replayable, release the displaced reservation when a second club outbids, and assert the decision table's
+  checks by name against the schema (`MIG-7`); and 1 new Playwright journey driven across three signed-in
+  contexts.
+
+#### Fixed
+
+- **Outbidding released the displaced reservation off the wrong account.** `PlaceBid` posted the displaced
+  leader's `ReservationRelease` against the **caller's** account rather than the leader's, so a club that
+  outbid another drove its own reserved balance negative and `ClubAccount.Post` refused the whole command.
+  The path had never run: every existing market test placed a single bid, and the outbid case was exactly
+  the journey this milestone adds. The release now comes off the account that holds the reservation, and
+  `MarketOutbidTests` pins both accounts, both bid statuses, and the ledger replay. The AI market makes this
+  reachable in ordinary play — two AI clubs bidding on one listing *is* an outbid — so it is a
+  competitive-integrity fix, not a journey convenience.
+
+#### Notes
+
+- **The valuation is a multiple of the wage, and that is the point.** A separate fee scale would let a
+  player's price, their wage, and their renewal drift apart; deriving the value from the wage the rule set
+  already prices keeps one family of rules across all three, and makes the asking price a term a manager can
+  read beside the wage they would pay.
+- **The AI reaches the market through the human path because the alternative is a second money path.** The
+  writers are the same code a manager's command runs; only the actor and the idempotency key differ. A
+  parallel AI writer would be a second place `FIN-10` is enforced and a second place `TRF-14` and `SQ-2`
+  live — the drift `INS-12` and ADR-0022 exist to prevent.
+- **The market needs two passes to start, and that is honest rather than a defect.** A freshly generated
+  world has balanced squads at the generator quotas, so no club has a positional need; the first pass lists
+  its surplus, and the second buys where a listing improves the squad. The measured market therefore shows
+  supply on day one and bidding on day two.
+- **A pass bids only on what existed before the day began.** Without that bound a same-day retry would bid
+  on the listings the first pass had just created, so the job would not be idempotent. Bounding the market
+  to the day makes a pass a function of the day rather than of the instant it happens to run.
+- **A club trims one player and waits.** It lists nobody while it already has a listing open, so one pass
+  cannot flood the market and a repeated pass lists nothing new. The cost is that a bloated squad clears
+  slowly; the benefit is a market that grows rather than a wall of listings.
+- **The whole pass commits once.** Every listing, bid, ledger posting, and decision row for a whole
+  evaluation is one unit of work, so a transient failure leaves nothing behind and the retry re-derives the
+  same decisions.
+- **Deferred to Stage 14, with reasons:** the collusion review signals (`INT-4`) and the market's admin
+  trace views. Neither is a Stage 10 exit criterion, and both need an operator surface that does not exist
+  yet; the decision rows and the ledger correlation keys this milestone writes are what those views will
+  read. **Deferred to Stage 12:** free-agent signing (`CON-7`), which waits on rollover producing free
+  agents (`CON-6`), as ADR-0024 already records.
+
 ## Stage 9 — Contracts and basic club finances
 
 The ledger every balance is rebuilt from. A club's money becomes an append-only record: an account no longer

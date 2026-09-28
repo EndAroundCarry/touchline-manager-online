@@ -1,12 +1,8 @@
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
-using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Market;
-using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
-using TouchlineManager.Application.Finance;
 using TouchlineManager.Application.Squad;
-using TouchlineManager.Domain.Market;
 
 namespace TouchlineManager.Application.Market;
 
@@ -15,10 +11,9 @@ namespace TouchlineManager.Application.Market;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A club has at most one active bid per listing and raises it rather than adding a second (`TRF-6`), and a
-/// bid is only accepted when it clears the minimum fee or the minimum raise (`TRF-5`) and the club holds the
-/// cash after its existing reservations (`FIN-10`). The amount is reserved through the ledger the moment the
-/// bid leads (`TRF-7`); the club it displaces has its reservation released in the same transaction.
+/// The manager's command: it resolves the caller's club, then hands the write to the shared
+/// <see cref="BidWriter"/> the AI's evaluation also uses (`INS-12`), and reads the listing back for the
+/// response.
 /// </para>
 /// <para>
 /// Nothing about the request is authoritative but the amount and the listing: the seller, the floor, and the
@@ -28,43 +23,25 @@ namespace TouchlineManager.Application.Market;
 public sealed class PlaceBid
 {
     private readonly ResolveOwnedClub _access;
-    private readonly IListingRepository _listings;
-    private readonly IBidRepository _bids;
-    private readonly IClubAccountRepository _accounts;
-    private readonly ILedgerRepository _ledger;
+    private readonly IBidWriter _writer;
     private readonly IMarketQueries _queries;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IAuditWriter _audit;
-    private readonly MarketNotifications _notifications;
-    private readonly IClock _clock;
     private readonly IRequestContext _requestContext;
     private readonly ISecureTokenService _secureTokens;
 
     /// <summary>Initializes the use case.</summary>
     public PlaceBid(
         ResolveOwnedClub access,
-        IListingRepository listings,
-        IBidRepository bids,
-        IClubAccountRepository accounts,
-        ILedgerRepository ledger,
+        IBidWriter writer,
         IMarketQueries queries,
         IUnitOfWork unitOfWork,
-        IAuditWriter audit,
-        MarketNotifications notifications,
-        IClock clock,
         IRequestContext requestContext,
         ISecureTokenService secureTokens)
     {
         _access = access;
-        _listings = listings;
-        _bids = bids;
-        _accounts = accounts;
-        _ledger = ledger;
+        _writer = writer;
         _queries = queries;
         _unitOfWork = unitOfWork;
-        _audit = audit;
-        _notifications = notifications;
-        _clock = clock;
         _requestContext = requestContext;
         _secureTokens = secureTokens;
     }
@@ -89,134 +66,28 @@ public sealed class PlaceBid
             return new ListingResult(access.Outcome.FromAccess(), null);
         }
 
-        var listing = await _listings.FindAsync(listingId, cancellationToken);
+        var actor = MarketActor.ForUser(userId, _requestContext, _secureTokens);
 
-        if (listing is null)
+        var write = await _writer.BidAsync(
+            access.ClubId,
+            actor,
+            listingId,
+            amountMinor,
+            idempotencyKey,
+            cancellationToken);
+
+        if (write.Outcome != MarketOutcome.Found)
         {
-            return new ListingResult(MarketOutcome.NotFound, null);
+            return new ListingResult(write.Outcome, null);
         }
 
-        if (!listing.IsOpen)
+        if (write.Created)
         {
-            return new ListingResult(MarketOutcome.NotOpen, null);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
-
-        if (listing.SellerClubId == access.ClubId)
-        {
-            return new ListingResult(MarketOutcome.CannotBidOnOwnPlayer, null);
-        }
-
-        if (!string.IsNullOrWhiteSpace(idempotencyKey))
-        {
-            var replayed = await _bids.FindByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
-
-            if (replayed is not null)
-            {
-                var identical = replayed.ListingId == listing.Id
-                    && replayed.BidderClubId == access.ClubId
-                    && replayed.AmountMinor == amountMinor;
-
-                return identical
-                    ? new ListingResult(
-                        MarketOutcome.Found,
-                        await _queries.GetListingAsync(listing.Id, access.ClubId, cancellationToken))
-                    : new ListingResult(MarketOutcome.IdempotencyKeyReused, null);
-            }
-        }
-
-        var leading = await _bids.FindLeadingBidAsync(listing.Id, cancellationToken);
-        var mine = leading is not null && leading.BidderClubId == access.ClubId ? leading : null;
-
-        if (!AuctionRules.IsAcceptableBid(listing.MinimumFeeMinor, leading?.AmountMinor, amountMinor))
-        {
-            return new ListingResult(MarketOutcome.BidTooLow, null);
-        }
-
-        var account = await _accounts.FindByClubAsync(access.ClubId, cancellationToken);
-
-        if (account is null)
-        {
-            return new ListingResult(MarketOutcome.Conflict, null);
-        }
-
-        // Raising replaces this club's own reservation: the amount already reserved for its leading bid is
-        // free to count against the new one (TRF-7).
-        var spendable = account.AvailableMinor + (mine?.AmountMinor ?? 0);
-
-        if (amountMinor > spendable)
-        {
-            return new ListingResult(MarketOutcome.InsufficientFunds, null);
-        }
-
-        var now = _clock.UtcNow;
-        Guid bidId;
-
-        if (leading is not null)
-        {
-            // Release the displaced reservation before reserving the new one, so the account never has to hold
-            // both at once (FIN-10).
-            _ledger.Add(account.Post(
-                LedgerPostings.ReservationRelease(
-                    Guid.CreateVersion7(),
-                    leading.BidderClubId,
-                    leading.Id,
-                    leading.AmountMinor),
-                now));
-        }
-
-        if (mine is not null)
-        {
-            mine.Raise(amountMinor, idempotencyKey, now);
-            bidId = mine.Id;
-        }
-        else
-        {
-            bidId = Guid.CreateVersion7();
-
-            if (leading is not null)
-            {
-                leading.Outbid(now);
-            }
-
-            _bids.Add(TransferBid.Place(
-                bidId,
-                listing.Id,
-                access.ClubId,
-                amountMinor,
-                LedgerPostings.ReservationCorrelationId(bidId, amountMinor),
-                idempotencyKey,
-                now));
-        }
-
-        _ledger.Add(account.Post(
-            LedgerPostings.BidReservation(Guid.CreateVersion7(), access.ClubId, bidId, amountMinor),
-            now));
-
-        _audit.Record(new AuditEntry(
-            mine is null ? MarketAuditActions.BidPlaced : MarketAuditActions.BidRaised,
-            AuditActorTypes.User,
-            userId,
-            AuditTargetTypes.TransferBid,
-            bidId,
-            _requestContext.CorrelationId,
-            _secureTokens.HashClientValue(_requestContext.IpAddress),
-            Reason: null));
-
-        if (leading is not null && mine is null)
-        {
-            await _notifications.NotifyOutbidAsync(
-                leading.BidderClubId,
-                listing.PlayerId,
-                amountMinor,
-                listing.Id,
-                now,
-                cancellationToken);
-        }
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ListingResult(
             MarketOutcome.Found,
-            await _queries.GetListingAsync(listing.Id, access.ClubId, cancellationToken));
+            await _queries.GetListingAsync(write.ListingId, access.ClubId, cancellationToken));
     }
 }

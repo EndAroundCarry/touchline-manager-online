@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, RebuildDivisionProjectionsJobHandler>();
         services.AddScoped<IJobHandler, WeeklyFinanceRunJobHandler>();
         services.AddScoped<IJobHandler, ResolveAuctionJobHandler>();
+        services.AddScoped<IJobHandler, EvaluateAiMarketJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -76,6 +77,11 @@ public static class DependencyInjection
     {
         services.AddScoped<MarketNotifications>();
 
+        // The listing and bid cores are shared by a manager's command and the AI's market evaluation
+        // (INS-12, TRF-12), so they are registered once rather than per caller.
+        services.AddScoped<IListingWriter, ListingWriter>();
+        services.AddScoped<IBidWriter, BidWriter>();
+
         services.AddScoped<SearchPlayers>();
         services.AddScoped<Shortlists>();
         services.AddScoped<ListListings>();
@@ -83,6 +89,10 @@ public static class DependencyInjection
         services.AddScoped<CancelListing>();
         services.AddScoped<PlaceBid>();
         services.AddScoped<ResolveListing>();
+
+        // The AI market evaluation: a worker-only writer of listings and bids via the shared cores above
+        // (TRF-12, INS-12).
+        services.AddScoped<EvaluateAiMarket>();
 
         // Reachable only from the non-production diagnostics trigger (§17.12).
         services.AddScoped<TriggerAuctions>();

@@ -87,6 +87,8 @@ public static class DependencyInjection
         services.AddScoped<ITransferOutcomeRepository, TransferOutcomeRepository>();
         services.AddScoped<IMarketQueries, MarketQueries>();
         services.AddScoped<IRosterQueries, RosterQueries>();
+        services.AddScoped<IAiMarketRepository, AiMarketRepository>();
+        services.AddScoped<IAiMarketDecisionRepository, AiMarketDecisionRepository>();
 
         services
             .AddOptions<MarketOptions>()
@@ -94,6 +96,13 @@ public static class DependencyInjection
             .Validate(
                 options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
                 "Auctions:CheckIntervalSeconds must be between 30 and 86400.");
+
+        services
+            .AddOptions<AiMarketOptions>()
+            .Bind(configuration.GetSection(AiMarketOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "AiMarket:CheckIntervalSeconds must be between 30 and 86400.");
     }
 
     /// <summary>
@@ -412,6 +421,10 @@ public static class DependencyInjection
         // And the same for the market: this service places a resolution row for every due listing, and the row
         // is what settles the winning bid (TRF-2, TRF-9).
         services.AddHostedService<AuctionScheduler>();
+
+        // And the same for the AI's market: this service places the day's evaluation row, and the row is what
+        // has every club nobody holds list its surplus and bid within its budget (TRF-12).
+        services.AddHostedService<AiMarketScheduler>();
 
         return services;
     }

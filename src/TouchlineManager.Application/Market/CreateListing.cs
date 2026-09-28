@@ -1,12 +1,8 @@
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
 using TouchlineManager.Application.Abstractions.Market;
-using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Squad;
-using TouchlineManager.Domain.Market;
-using TouchlineManager.Domain.Rules;
-using TouchlineManager.Domain.Squad;
 
 namespace TouchlineManager.Application.Market;
 
@@ -16,47 +12,38 @@ namespace TouchlineManager.Application.Market;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The seller names a player and a minimum fee; the server derives everything else. The buyer's wage and
-/// contract length are priced from the same quote a renewal is (`CON-3`), so the terms a bidder will sign are
-/// displayed before they bid (`CON-5`), and the resolution only has to revalidate, not reprice.
+/// The manager's command: it resolves the caller's club, then hands the write to the shared
+/// <see cref="ListingWriter"/> the AI's evaluation also uses (`INS-12`), and reads the listing back for the
+/// response.
 /// </para>
 /// <para>
-/// The listing is refused when the sale would take the seller below the minimum squad or its two goalkeepers
-/// (`SQ-2`), because a manager cannot sell a squad into illegality. The resolution revalidates the same rule
-/// (`TRF-9`) in case a bid or an injury changes the picture while the auction runs.
+/// The seller names a player and a minimum fee; the server derives everything else. The listing is refused
+/// when the sale would take the seller below the minimum squad or its two goalkeepers (`SQ-2`), because a
+/// manager cannot sell a squad into illegality.
 /// </para>
 /// </remarks>
 public sealed class CreateListing
 {
     private readonly ResolveOwnedClub _access;
-    private readonly IRosterQueries _roster;
-    private readonly IListingRepository _listings;
+    private readonly IListingWriter _writer;
     private readonly IMarketQueries _queries;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IAuditWriter _audit;
-    private readonly IClock _clock;
     private readonly IRequestContext _requestContext;
     private readonly ISecureTokenService _secureTokens;
 
     /// <summary>Initializes the use case.</summary>
     public CreateListing(
         ResolveOwnedClub access,
-        IRosterQueries roster,
-        IListingRepository listings,
+        IListingWriter writer,
         IMarketQueries queries,
         IUnitOfWork unitOfWork,
-        IAuditWriter audit,
-        IClock clock,
         IRequestContext requestContext,
         ISecureTokenService secureTokens)
     {
         _access = access;
-        _roster = roster;
-        _listings = listings;
+        _writer = writer;
         _queries = queries;
         _unitOfWork = unitOfWork;
-        _audit = audit;
-        _clock = clock;
         _requestContext = requestContext;
         _secureTokens = secureTokens;
     }
@@ -83,98 +70,29 @@ public sealed class CreateListing
             return new ListingResult(access.Outcome.FromAccess(), null);
         }
 
-        // A retried create returns the listing it already opened rather than opening a second (T-4).
-        if (!string.IsNullOrWhiteSpace(idempotencyKey))
-        {
-            var replayed = await _listings.FindByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
+        var actor = MarketActor.ForUser(userId, _requestContext, _secureTokens);
 
-            if (replayed is not null)
-            {
-                if (replayed.PlayerId != playerId
-                    || replayed.MinimumFeeMinor != minimumFeeMinor
-                    || replayed.GeneratedContractSeasons != seasons)
-                {
-                    return new ListingResult(MarketOutcome.IdempotencyKeyReused, null);
-                }
-
-                return new ListingResult(
-                    MarketOutcome.Found,
-                    await _queries.GetListingAsync(replayed.Id, access.ClubId, cancellationToken));
-            }
-        }
-
-        var eligibility = await _roster.GetListingEligibilityAsync(playerId, cancellationToken);
-
-        if (eligibility is null)
-        {
-            return new ListingResult(MarketOutcome.NotFound, null);
-        }
-
-        if (eligibility.ClubId != access.ClubId || !eligibility.HasActiveRegistration)
-        {
-            return new ListingResult(MarketOutcome.NotEligible, null);
-        }
-
-        if (eligibility.IsListed)
-        {
-            return new ListingResult(MarketOutcome.AlreadyListed, null);
-        }
-
-        // The sale must leave the seller legal: at least the minimum squad, and still two goalkeepers (SQ-2).
-        var remainingSquad = eligibility.RegisteredCount - 1;
-        var remainingGoalkeepers = eligibility.GoalkeeperCount
-            - (eligibility.PrimaryPosition == PlayerPosition.Goalkeeper ? 1 : 0);
-
-        if (!SquadLegality.MeetsMinimum(remainingSquad)
-            || remainingGoalkeepers < WorldRuleSet.MinimumGoalkeepers)
-        {
-            return new ListingResult(MarketOutcome.NotEligible, null);
-        }
-
-        var remainingSeasons = Math.Max(
-            0,
-            eligibility.ContractEndSeasonNumber - eligibility.CurrentSeasonNumber);
-
-        var terms = ContractRenewalQuote.Calculate(
-            new ContractRenewalInput(
-                eligibility.Ability,
-                eligibility.Potential,
-                eligibility.Age,
-                eligibility.Appearances,
-                eligibility.MoraleBp,
-                eligibility.TierNumber,
-                remainingSeasons),
-            seasons);
-
-        var now = _clock.UtcNow;
-        var listing = TransferListing.Open(
-            Guid.CreateVersion7(),
-            playerId,
+        var write = await _writer.ListAsync(
             access.ClubId,
+            actor,
+            playerId,
             minimumFeeMinor,
-            terms.WeeklyWageMinor,
-            terms.Seasons,
-            now,
-            AuctionWindows.EndsAtFor(now),
+            seasons,
             idempotencyKey,
-            now);
+            cancellationToken);
 
-        _listings.Add(listing);
+        if (write.Outcome != MarketOutcome.Found)
+        {
+            return new ListingResult(write.Outcome, null);
+        }
 
-        _audit.Record(new AuditEntry(
-            MarketAuditActions.ListingOpened,
-            AuditActorTypes.User,
-            userId,
-            AuditTargetTypes.TransferListing,
-            listing.Id,
-            _requestContext.CorrelationId,
-            _secureTokens.HashClientValue(_requestContext.IpAddress),
-            Reason: null));
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        if (write.Created)
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         return new ListingResult(
             MarketOutcome.Found,
-            await _queries.GetListingAsync(listing.Id, access.ClubId, cancellationToken));
+            await _queries.GetListingAsync(write.ListingId, access.ClubId, cancellationToken));
     }
 }

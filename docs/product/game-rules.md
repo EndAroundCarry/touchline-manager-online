@@ -384,7 +384,35 @@ and length-limited (`SCT-3`).
 | TRF-14 | A player with an active listing cannot be listed again. | — |
 | TRF-15 | Cancelling a listing releases all active reservations and invalidates its bids with an audited reason. | — |
 
-### 14.3 Integrity controls
+### 14.3 The AI market
+
+`TRF-12` is implemented as a pure, versioned policy (`ai-market-v1`) run by the worker's daily evaluation.
+An AI-controlled club — one no manager holds, active or inactive (`OCC-8`) — reads its own squad and the
+listings that were already open before the day began, and decides:
+
+- **What to list.** It trims a squad that is above `ai_market_target_squad_size`, or a family above its
+  generator quota (`SQ-1`), choosing the least valuable players first — a lower squad standing, then lower
+  ability, then the shorter remaining term. It never lists a player whose sale would take it below `SQ-2`,
+  and it lists nobody while it already has a listing open, so one pass cannot flood the market. The asking
+  price is the player's value, varied by a factor stable to the club.
+- **What to bid.** It buys where it has a positional need — a family below its quota — or where the listed
+  player improves on the weakest it already holds in that family; never on its own player or its own
+  leading bid, never above the player's valuation, never above a bounded share of its spendable cash
+  (`FIN-10`), and never once its squad is at the maximum (`SQ-3`). Each pass is bounded to a handful of
+  listings and bids per club.
+
+A player's **value** is a versioned number of weeks of the wage they command (`TRF-12`), moved by bounded
+age and potential factors, so a squad, a renewal, and a fee are priced by one family of rules. The value is
+class C2 and never reaches a manager-facing response (`MAT-11`); the asking price a listing shows is the
+only figure derived from it that a manager sees.
+
+The policy reads no clock, database, culture, or global random source, and every choice it makes is carried
+out through the same listing and bid writers a manager's command uses, so `INS-12` holds by the code path:
+an AI club is refused by the same eligibility, squad-legality, and affordability rules a human is. Every
+decision is recorded in `market.ai_market_decisions` with the digest of the inputs it read and the policy
+version. The value and band constants are in §18.
+
+### 14.4 Integrity controls
 
 | Ref | Rule |
 |---|---|
@@ -563,6 +591,15 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `auction_blackout_hours_before_kickoff` | 6 | TRF-3 |
 | `auction_resolution_utc` | 12:00 UTC daily | TRF-2 |
 | `minimum_bid_increment_minor` | 250,000 minor units | TRF-5 (balancing) |
+| `player_valuation_version` | `player-valuation-v1` | TRF-12 (FIC-8) |
+| `player_valuation_weeks_of_wage` | 60 weeks of the player's wage | TRF-12 (balancing) |
+| `player_valuation_age_factor_bp` | 13,000 (≤21) → 6,000 (32+) | TRF-12 (balancing) |
+| `player_valuation_potential_factor_bp` | 9,000 + 150 × potential (9,150–12,000) | TRF-12 (balancing) |
+| `ai_market_policy_version` | `ai-market-v1` | TRF-12 (FIC-8) |
+| `ai_market_target_squad_size` | 21 | TRF-12 (balancing) |
+| `ai_market_max_listings_per_club` | 3 per pass | TRF-12 (balancing) |
+| `ai_market_max_bids_per_club` | 3 per pass | TRF-12 (balancing) |
+| `ai_market_bid_budget_fraction_bp` | 5,000 (half of available cash) | TRF-12 (balancing) |
 | `refresh_token_lifetime_minutes` | 15 (access) | ADR-0002 |
 | `highlight_target_seconds` | 5–8 | ADR-0006 |
 | `match_presentation_payload_budget_kb` | 750 | ADR-0006 |
@@ -588,7 +625,8 @@ These are recorded so they are not silently invented later:
 |---|---|
 | Calibration of the opening cash, stadium, and reputation baselines and the per-tier scaling | Stage 9 (balancing) |
 | Exact gate-revenue, sponsorship, award, and wage formula constants | Stage 9 (balancing), recorded in rule set |
-| Exact AI valuation and bidding bands | Stage 10 (AI market milestone) |
+| Exact AI valuation and bidding bands | Specified in §14.3 and §18 (Stage 10, AI market milestone) |
+| Collusion review signals (`INT-4`) and market trace views | Stage 14, with the operator surface that would read them |
 | Exact training development curve constants and age curve | Stage 4/5 |
 | Retirement rule specifics (age cap vs deterministic rollover retirements) | Stage 12 |
 | Whether free-agent signing is enabled during MVP | Stage 10, decided by market-health measurement |

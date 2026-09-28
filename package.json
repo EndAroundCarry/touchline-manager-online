@@ -16,6 +16,7 @@
     "test:web": "npm --prefix apps/web run test:ci",
     "test:e2e": "npm --prefix tests/web-e2e test",
     "test:e2e:matchday": "npm --prefix tests/web-e2e run test:matchday",
+    "test:e2e:market": "npm --prefix tests/web-e2e run test:market",
     "e2e:install": "npm --prefix tests/web-e2e ci && npm --prefix tests/web-e2e run install:browsers",
     "migrate": "dotnet dotnet-ef database update --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
     "seed": "dotnet run --project tools/world-seeder",

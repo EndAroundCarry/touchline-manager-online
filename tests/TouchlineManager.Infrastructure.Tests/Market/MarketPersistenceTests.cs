@@ -104,6 +104,95 @@ public sealed class MarketPersistenceTests : WorldTestBase
         bid.BidSequence.Should().BeGreaterThanOrEqualTo(1, "TRF-8: the sequence is database-assigned");
     }
 
+    [Fact]
+    public async Task A_well_formed_ai_market_decision_is_recorded()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var (sellerClubId, playerId, _) = await PickAsync(db);
+        var now = Fixture.Clock.UtcNow;
+
+        var listing = Listing(sellerClubId, playerId);
+        db.TransferListings.Add(listing);
+        await db.SaveChangesAsync();
+
+        db.AiMarketDecisions.Add(AiMarketDecision.Record(
+            Guid.CreateVersion7(),
+            sellerClubId,
+            now,
+            AiMarketAction.Listed,
+            playerId,
+            listingId: listing.Id,
+            bidId: null,
+            inputsHash: new string('a', 64),
+            policyVersion: "ai-market-v1",
+            now));
+
+        await db.SaveChangesAsync();
+
+        (await db.AiMarketDecisions.CountAsync()).Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task An_ai_market_decision_requires_a_full_input_digest()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var (sellerClubId, playerId, _) = await PickAsync(db);
+        var now = Fixture.Clock.UtcNow;
+
+        var listing = Listing(sellerClubId, playerId);
+        db.TransferListings.Add(listing);
+        await db.SaveChangesAsync();
+
+        // The aggregate only refuses an empty digest; the column check is what makes it a SHA-256 hex string.
+        db.AiMarketDecisions.Add(AiMarketDecision.Record(
+            Guid.CreateVersion7(),
+            sellerClubId,
+            now,
+            AiMarketAction.Listed,
+            playerId,
+            listingId: listing.Id,
+            bidId: null,
+            inputsHash: "not-a-digest",
+            policyVersion: "ai-market-v1",
+            now));
+
+        var act = async () => await db.SaveChangesAsync();
+
+        ConstraintOf(await act.Should().ThrowAsync<DbUpdateException>())
+            .Should().Be("ck_ai_market_decisions_inputs_hash", "TRF-12: the digest is a SHA-256 hex string");
+    }
+
+    [Fact]
+    public async Task An_ai_market_decision_must_name_the_entity_its_action_produced()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var (sellerClubId, playerId, _) = await PickAsync(db);
+        var now = Fixture.Clock.UtcNow;
+
+        // The aggregate refuses a mismatched row, so this goes in raw to let the check speak.
+        var act = async () => await db.Database.ExecuteSqlRawAsync(
+            "insert into market.ai_market_decisions "
+            + "(id, club_id, evaluated_at, action, player_id, listing_id, bid_id, inputs_hash, policy_version, created_at) "
+            + "values ({0}, {1}, {2}, {3}, {4}, null, null, {5}, {6}, {7})",
+            Guid.CreateVersion7(),
+            sellerClubId,
+            now,
+            "listed",
+            playerId,
+            new string('c', 64),
+            "ai-market-v1",
+            now);
+
+        var thrown = await act.Should().ThrowAsync<Exception>();
+        var postgres = thrown.Which as PostgresException ?? thrown.Which.InnerException as PostgresException;
+
+        postgres.Should().NotBeNull();
+        postgres!.ConstraintName.Should().Be("ck_ai_market_decisions_resulting_entity", "TRF-12");
+    }
+
     private TransferListing Listing(Guid sellerClubId, Guid playerId)
     {
         var now = Fixture.Clock.UtcNow;

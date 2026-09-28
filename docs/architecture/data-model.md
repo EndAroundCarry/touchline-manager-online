@@ -611,6 +611,7 @@ erDiagram
 | **Partial unique** one active bid per listing per club | `transfer_bids` | `TRF-6` |
 | Index `(listing_id, status, amount_minor, bid_sequence)` | `transfer_bids` | `TRF-8` ordering |
 | `unique (listing_id)` | `transfer_outcomes` | Resolution happens once |
+| `check` the action is a known code and names exactly one of the listing or the bid; `check (length(inputs_hash) = 64)`; index `(club_id, evaluated_at)` | `ai_market_decisions` | `TRF-12`: a decision always states what it produced and what it read |
 | `check (cash_minor >= 0 and reserved_minor >= 0)` | `club_accounts` | `FIN-13` |
 | `unique (club_id, sequence)`, `unique (correlation_id, category)`, `check (resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor)` | `ledger_entries` | `FIN-11`, `FIN-13`, `FIN-17` |
 

@@ -248,3 +248,83 @@ internal sealed class TransferOutcomeConfiguration : IEntityTypeConfiguration<Tr
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary>
+/// Maps <c>market.ai_market_decisions</c>, the append-only record of what the AI market decided (`TRF-12`,
+/// master plan §6.7).
+/// </summary>
+/// <remarks>
+/// The checks carry the shape: an action is one of the known codes, and it names exactly the listing or the
+/// bid it produced — a listing decision carries no bid and a bid decision no listing — so a row can never
+/// be half-described. The hash is exactly a SHA-256 digest and the policy version is never blank, so a
+/// decision always states what it read and which policy read it.
+/// </remarks>
+internal sealed class AiMarketDecisionConfiguration : IEntityTypeConfiguration<AiMarketDecision>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<AiMarketDecision> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("ai_market_decisions", "market", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_ai_market_decisions_action_value",
+                "action in ('listed', 'bid')");
+            table.HasCheckConstraint(
+                "ck_ai_market_decisions_resulting_entity",
+                "(action = 'listed' and listing_id is not null and bid_id is null) "
+                + "or (action = 'bid' and bid_id is not null and listing_id is null)");
+            table.HasCheckConstraint(
+                "ck_ai_market_decisions_policy_version",
+                "length(policy_version) > 0");
+            table.HasCheckConstraint(
+                "ck_ai_market_decisions_inputs_hash",
+                "length(inputs_hash) = 64");
+        });
+
+        builder.HasKey(decision => decision.Id);
+        builder.Property(decision => decision.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(decision => decision.ClubId).HasColumnName("club_id").IsRequired();
+        builder.Property(decision => decision.EvaluatedAt).HasColumnName("evaluated_at").IsRequired();
+        builder.Property(decision => decision.Action)
+            .HasColumnName("action")
+            .HasMaxLength(AiMarketActions.MaxCodeLength)
+            .HasConversion(action => action.ToCode(), code => AiMarketActions.FromCode(code))
+            .IsRequired();
+        builder.Property(decision => decision.PlayerId).HasColumnName("player_id").IsRequired();
+        builder.Property(decision => decision.ListingId).HasColumnName("listing_id");
+        builder.Property(decision => decision.BidId).HasColumnName("bid_id");
+        builder.Property(decision => decision.InputsHash)
+            .HasColumnName("inputs_hash")
+            .HasMaxLength(64)
+            .IsRequired();
+        builder.Property(decision => decision.PolicyVersion)
+            .HasColumnName("policy_version")
+            .HasMaxLength(32)
+            .IsRequired();
+        builder.Property(decision => decision.CreatedAt).HasColumnName("created_at").IsRequired();
+
+        builder.HasIndex(decision => new { decision.ClubId, decision.EvaluatedAt })
+            .HasDatabaseName("ix_ai_market_decisions_club_evaluated_at");
+        builder.HasIndex(decision => decision.PlayerId)
+            .HasDatabaseName("ix_ai_market_decisions_player_id");
+
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(decision => decision.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Player>()
+            .WithMany()
+            .HasForeignKey(decision => decision.PlayerId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<TransferListing>()
+            .WithMany()
+            .HasForeignKey(decision => decision.ListingId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<TransferBid>()
+            .WithMany()
+            .HasForeignKey(decision => decision.BidId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

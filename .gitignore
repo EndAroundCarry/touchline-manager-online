@@ -56,10 +56,12 @@ Thumbs.db
 # regenerated locally and would otherwise be committed one failing run at a time.
 playwright-report/
 playwright-report-matchday/
+playwright-report-market/
 blob-report/
 test-results/
 tests/web-e2e/.artifacts/
 tests/web-e2e/.artifacts-matchday/
+tests/web-e2e/.artifacts-market/
 
 # --- Docker ---
 infra/docker/data/

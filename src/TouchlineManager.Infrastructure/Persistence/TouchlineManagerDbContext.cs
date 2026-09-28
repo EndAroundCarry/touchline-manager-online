@@ -3,8 +3,8 @@ using TouchlineManager.Domain.Auth;
 using TouchlineManager.Domain.Comms;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
-using TouchlineManager.Domain.Match;
 using TouchlineManager.Domain.Market;
+using TouchlineManager.Domain.Match;
 using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Infrastructure.Persistence.Entities;
@@ -127,6 +127,9 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the market module's resolved transfer outcomes.</summary>
     public DbSet<TransferOutcome> TransferOutcomes => Set<TransferOutcome>();
+
+    /// <summary>Gets the market module's append-only AI market decisions (`TRF-12`).</summary>
+    public DbSet<AiMarketDecision> AiMarketDecisions => Set<AiMarketDecision>();
 
     /// <summary>Gets the squad module's players.</summary>
     public DbSet<Player> Players => Set<Player>();
