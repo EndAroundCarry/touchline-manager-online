@@ -174,6 +174,8 @@ public sealed class SquadTests : IAsyncLifetime
         player.Attributes.Physical.Should().NotBeNull();
         player.Attributes.Goalkeeping.Should().NotBeNull();
         player.Registration.Should().NotBeNull("SQ-6");
+        player.SeasonStats.Should().BeNull(
+            "no round has been played in this world, so a player has no season line yet (STA-2)");
 
         // Every attribute is on the displayed scale, and the state values are the converted ones (TRN-4,
         // TRN-8).

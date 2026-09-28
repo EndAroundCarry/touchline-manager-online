@@ -96,6 +96,30 @@ public static class SquadMapping
             availability.StartedAt);
     }
 
+    /// <summary>Projects a player's own season line (`STA-2`).</summary>
+    /// <param name="stat">The stored season line.</param>
+    public static PlayerSeasonStatsResponse ToResponse(this SquadSeasonStatRow stat)
+    {
+        ArgumentNullException.ThrowIfNull(stat);
+
+        return new PlayerSeasonStatsResponse(
+            stat.Appearances,
+            stat.Starts,
+            stat.MinutesPlayed,
+            stat.Goals,
+            stat.Assists,
+            stat.Shots,
+            stat.ShotsOnTarget,
+            stat.Saves,
+            stat.YellowCards,
+            stat.RedCards,
+            // Converted here and nowhere else, so the basis points the line is stored in never reach a
+            // client (TRN-8), and rounded to the tenth of a point a rating is read in.
+            stat.AverageRatingBasisPoints is null
+                ? null
+                : Math.Round(stat.AverageRatingBasisPoints.Value / 1000m, 1, MidpointRounding.AwayFromZero));
+    }
+
     /// <summary>Projects a contract as a squad row shows it.</summary>
     /// <param name="contract">The stored contract.</param>
     /// <param name="currentSeasonNumber">The season the remaining term is counted from.</param>
@@ -226,6 +250,7 @@ public static class SquadMapping
             player.Contract?.ToSummary(player.SeasonNumber),
             player.Registration?.ToResponse(),
             [.. player.Availability.Select(record => record.ToResponse())],
+            player.SeasonStat?.ToResponse(),
             serverTime);
     }
 

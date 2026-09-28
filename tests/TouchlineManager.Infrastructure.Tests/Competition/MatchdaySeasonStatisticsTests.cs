@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Competition;
@@ -103,6 +104,50 @@ public sealed class MatchdaySeasonStatisticsTests
         afterSecond.Should().BeEquivalentTo(
             afterFirst,
             "a republished round must not count a player's statistics twice");
+    }
+
+    [Fact]
+    public async Task A_player_who_appeared_reads_their_own_season_line_from_the_profile()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var round = await ClaimRoundAsync(scope);
+
+        await LockAndResolveAsync(scope, round);
+
+        var fixture = await FirstStagedFixtureAsync(db, round);
+        var divisionSeasonId = await DivisionSeasonOfAsync(db, round);
+        var lines = await LoadLinesAsync(db, fixture.Id);
+
+        var published = await scope.ServiceProvider.GetRequiredService<PublishMatchday>()
+            .ExecuteAsync(round, CancellationToken.None);
+
+        published.Outcome.Should().Be(PublishMatchdayOutcome.Published);
+
+        var appeared = lines.First(line => line.MinutesPlayed > 0);
+
+        await using var readScope = Fixture.CreateScope();
+        var profile = await readScope.ServiceProvider.GetRequiredService<ISquadQueries>()
+            .GetPlayerAsync(appeared.ParticipantId, CancellationToken.None);
+
+        profile.Should().NotBeNull();
+        profile!.SeasonStat.Should().NotBeNull("STA-2: a player who took the pitch has a season line");
+        profile.SeasonStat!.Appearances.Should().BeGreaterThanOrEqualTo(1);
+        profile.SeasonStat.Starts.Should().BeLessThanOrEqualTo(profile.SeasonStat.Appearances);
+
+        // The profile's line is the same projection the division leaderboard reads, so the two agree: this
+        // is a read of the stored row rather than a second computation of it.
+        await using var checkScope = Fixture.CreateScope();
+        var stored = await checkScope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>()
+            .PlayerSeasonStats
+            .SingleAsync(stat => stat.DivisionSeasonId == divisionSeasonId
+                && stat.PlayerId == appeared.ParticipantId
+                && stat.ClubId == appeared.ClubId);
+
+        profile.SeasonStat.Appearances.Should().Be(stored.Appearances);
+        profile.SeasonStat.Goals.Should().Be(stored.Goals);
+        profile.SeasonStat.MinutesPlayed.Should().Be(stored.MinutesPlayed);
+        profile.SeasonStat.AverageRatingBasisPoints.Should().Be(stored.AverageRatingBasisPoints);
     }
 
     /// <summary>Reads the primitive statistics values, so a later mutation of a tracked row cannot rewrite them.</summary>

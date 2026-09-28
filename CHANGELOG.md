@@ -598,6 +598,81 @@ document.
   without a reader; and the player profile's own season line, which is the squad module's read to widen
   rather than the competition module's to bolt on.
 
+### The season on the screens that read it
+
+A season you can inspect player by player and card by card. A player's profile now carries their own line
+of the season's statistics — appearances, minutes, goals, assists, cards, and the average match rating —
+read with the profile from the projection the division leaderboard already shows, so the two can never
+disagree. And a division gains a discipline view: every player the season's cards have touched, with the
+suspension they still owe, in one read beside the table, the statistics, and the rules. This closes the
+discipline and competition screens, the last of Stage 8's deliverables.
+
+#### Added
+
+- **The player profile's own season line** (`STA-2`, master plan §11.1, F-17): `GET /players/{playerId}`
+  now carries `SeasonStats` — the goals, minutes, cards, and rating the division leaderboard shows for that
+  player — alongside the attribute grid, state, contract, and registration. It is the same stored row the
+  leaderboard reads, narrowed to one player, so the profile and the leaderboard cannot disagree about a
+  player's season; a player who has not taken the pitch has no line at all, and the screen says so rather
+  than showing a row of zeros (`STA-4`). The squad module's read was widened to carry it rather than a
+  second read being bolted on, because the profile is a squad screen.
+- **A division's discipline** (`DIS-9`, master plan §10.5): `GET /divisions/{divisionId}/discipline`,
+  `GetDivisionDiscipline`, and `ICompetitionQueries.GetDivisionDisciplineAsync` answer with every player the
+  season's cards have touched — their bookings, their sendings-off, and the fixtures they still miss through
+  suspension — read from the season's stored accumulation (`DIS-2`, `DIS-4`) and the open absences the
+  publication serves (`DIS-5`), so the page and the side a manager may actually name cannot disagree about
+  who is suspended. Public game data, like the table it sits beside, in the order the server ranked it —
+  most sendings-off, then most bookings, then name.
+- **The `/competitions/:divisionId/discipline` screen** (§11.1) and links from the table and statistics
+  screens. It is a real `<table>` with a caption, column headers, and a player row header, so assistive
+  technology reads it as tabular data (§11.3); the suspension column reads the fixtures a player still
+  misses, and a dash when they owe none, because a suspension is measured in fixtures and never in days
+  (`TRN-12`). `suspensionRemainingLabel` is the one place that phrase is built.
+- **The profile's season summary** (`seasonStatRows`): the player's line as labelled values, built once so
+  the rating is read to the tenth of a point its one definition uses (`TRN-8`) and so a test pins both the
+  labels and the order.
+- 3 new application tests (98 total) for the two projections — the discipline crossing in the order it was
+  ranked, and the season line's rating converted to its display scale with an unrated player given no
+  average; 3 new infrastructure tests (138 total) over a real seeded world that publish a round and read the
+  profile's season line back, and inject a sending-off and a booking and read the division's discipline, its
+  suspension, and its order; 4 new API integration tests (95 total) that play a round and read the two
+  screens over HTTP, reconcile the profile's line with the leaderboard's row, and check the unknown-division
+  and unauthenticated refusals, plus the assertion in the squad profile test that a fresh world gives a
+  player no season line; and 6 new web tests (216 total) for the suspension phrase, the season summary, and
+  the discipline store's read, its failure, and its clearing.
+
+#### Notes
+
+- **The profile's line is the leaderboard's row, not a second computation.** `GetPlayerAsync` reads
+  `competition.player_season_stats` for the player's club in the season being played and hands it to the
+  same mapper the leaderboard's rows go through, so there is one definition of a player's season and the two
+  screens are two views of it. The cost is that the squad read reaches a competition table; the alternative
+  — a second read and a second mapping — is exactly the drift the projection exists to prevent.
+- **The discipline view derives its suspension figure from the open absence rather than storing it.** Master
+  plan §6.4's `discipline_records` has no `pending_suspension_fixtures` column and deliberately keeps none:
+  an outstanding suspension is already a `PlayerUnavailability` the publication serves and the snapshot
+  builder reads (`DIS-6`), so the page reads the same record the side is repaired against. When a player
+  holds more than one open ban they run concurrently rather than in sequence, so the read reports the
+  greatest remaining count rather than their sum, which is what "fixtures still to miss" actually means.
+- **The club on a discipline row is resolved through the player's active contract.** The accumulation is
+  keyed on the division-season and the player, so the row has no club of its own; the club comes from the
+  same active-contract join the squad read makes (`SQ-6`). A player with no active contract would not appear
+  — which today cannot happen, because the seeder gives every player one and nothing closes one yet.
+- **Nothing here is a command.** Both surfaces are reads: the profile is the owning manager's read and the
+  discipline is public game data, and neither produces or changes a card, an absence, or a statistic
+  (`MAT-2`). The projections they read are written by the matchday publication alone.
+- **The two screens' ordering is the server's, and neither sorts.** The discipline rows arrive in the order
+  the read ranked them, and the season summary in the order the product reads it, so a screen reimplements
+  no rule — the principle the table's stored rank and the statistics leaderboard already follow (`TBL-12`).
+- **Touching `squad-presentation.ts`, its spec, and `player.html` reflowed a few pre-existing lines to the
+  pinned Prettier's 100-column width.** The formatting is whitespace only; no behaviour changed. The web
+  job's `prettier --check` is not in CI (the frontend job runs build and unit tests only), and three files
+  this change does not otherwise touch — `squad.html` and the two `attribute-value` files — already exceed
+  the limit on `main`, so they were deliberately left alone rather than swept into this change (`§17.15`).
+- **Deferred to Stage 9 and beyond:** the `club_season_stats` aggregate, still without a reader; a
+  division's results history as its own read; and the discipline view's per-club filter, which has no
+  consumer until the competition screens grow one.
+
 ## Stage 7 — Text match center and 2D highlights
 
 A result you can watch. `GET /matches/{id}` answers with the score and the statistics, and

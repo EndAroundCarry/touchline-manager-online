@@ -9,9 +9,12 @@
       {{ competition.countryName }} · tier {{ competition.tierNumber }} ·
       {{ competition.seasonLabel }}
     </p>
-    <p class="mt-1 text-sm">
+    <p class="mt-1 flex gap-4 text-sm">
       <a class="underline" [routerLink]="['/competitions', competition.divisionId, 'table']">
         Back to the table
+      </a>
+      <a class="underline" [routerLink]="['/competitions', competition.divisionId, 'discipline']">
+        Discipline
       </a>
     </p>
 

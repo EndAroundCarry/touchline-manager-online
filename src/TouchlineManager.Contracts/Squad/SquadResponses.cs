@@ -170,6 +170,10 @@ public sealed record PlayerRegistrationResponse(
 /// <param name="Contract">The active contract, or null if the player has none.</param>
 /// <param name="Registration">The active registration, or null if the player has none.</param>
 /// <param name="Availability">Every open injury and suspension, if any.</param>
+/// <param name="SeasonStats">
+/// The player's own season statistics for the club they play for, or null before they have appeared
+/// (`STA-2`). Read from the publication's projection, so it agrees with the division leaderboard.
+/// </param>
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record PlayerResponse(
     Guid Id,
@@ -190,7 +194,43 @@ public sealed record PlayerResponse(
     PlayerContractSummaryResponse? Contract,
     PlayerRegistrationResponse? Registration,
     IReadOnlyList<PlayerAvailabilityResponse> Availability,
+    PlayerSeasonStatsResponse? SeasonStats,
     DateTimeOffset ServerTime);
+
+/// <summary>
+/// A player's own season statistics for the season in progress (`STA-2`, master plan §11.1).
+/// </summary>
+/// <remarks>
+/// The player's line of the same projection the division leaderboard reads, narrowed to one player: goals,
+/// assists, minutes, cards, and the average match rating. A player who has not taken the pitch has no line
+/// at all, so the profile shows a message rather than a row of zeros.
+/// </remarks>
+/// <param name="Appearances">Matches the player took the pitch in.</param>
+/// <param name="Starts">Matches the player started.</param>
+/// <param name="MinutesPlayed">Total minutes played.</param>
+/// <param name="Goals">Goals scored.</param>
+/// <param name="Assists">Goals set up.</param>
+/// <param name="Shots">Shots taken.</param>
+/// <param name="ShotsOnTarget">Shots on target.</param>
+/// <param name="Saves">Saves made.</param>
+/// <param name="YellowCards">Bookings accumulated (`DIS-2`).</param>
+/// <param name="RedCards">Sendings-off accumulated (`DIS-4`).</param>
+/// <param name="AverageRating">
+/// The average match rating on a 0.0–10.0 scale, or null before the player has been rated. Converted from
+/// the stored basis points in one place (`TRN-8`), so no storage unit reaches a client.
+/// </param>
+public sealed record PlayerSeasonStatsResponse(
+    int Appearances,
+    int Starts,
+    int MinutesPlayed,
+    int Goals,
+    int Assists,
+    int Shots,
+    int ShotsOnTarget,
+    int Saves,
+    int YellowCards,
+    int RedCards,
+    decimal? AverageRating);
 
 /// <summary>
 /// The player's twenty-eight displayed attributes, grouped into their four families (`TRN-4`).

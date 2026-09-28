@@ -52,6 +52,39 @@ public sealed record SquadAvailabilityRow(
     int RemainingFixtures,
     DateTimeOffset StartedAt);
 
+/// <summary>
+/// A player's own season statistics for the club they play for, as the profile reads them (`STA-2`).
+/// </summary>
+/// <remarks>
+/// The player's line is the same projection the division leaderboard reads, narrowed to one player: it is
+/// advanced by the matchday publication and never recomputed by the read, so the profile and the leaderboard
+/// cannot disagree about a player's season. The average is a function of the stored sum and count, exactly
+/// as the division row's is, so the storage unit is converted in one place on the way out (`TRN-8`).
+/// </remarks>
+/// <param name="Appearances">Matches the player took the pitch in.</param>
+/// <param name="Starts">Matches the player started.</param>
+/// <param name="MinutesPlayed">Total minutes played.</param>
+/// <param name="Goals">Goals scored.</param>
+/// <param name="Assists">Goals set up.</param>
+/// <param name="Shots">Shots taken.</param>
+/// <param name="ShotsOnTarget">Shots on target.</param>
+/// <param name="Saves">Saves made.</param>
+/// <param name="YellowCards">Bookings accumulated (`DIS-2`).</param>
+/// <param name="RedCards">Sendings-off accumulated (`DIS-4`).</param>
+/// <param name="AverageRatingBasisPoints">The average match rating in basis points, or null before the player is rated (`STA-5`).</param>
+public sealed record SquadSeasonStatRow(
+    int Appearances,
+    int Starts,
+    int MinutesPlayed,
+    int Goals,
+    int Assists,
+    int Shots,
+    int ShotsOnTarget,
+    int Saves,
+    int YellowCards,
+    int RedCards,
+    int? AverageRatingBasisPoints);
+
 /// <summary>One player in a club's squad, as stored.</summary>
 /// <remarks>
 /// Carries domain values rather than transport shapes — positions as <see cref="PlayerPosition"/>,
@@ -156,6 +189,7 @@ public sealed record ContractsSnapshot(
 /// <param name="Contract">The player's active contract, if any.</param>
 /// <param name="Registration">The player's active registration, if any.</param>
 /// <param name="Availability">Every open injury and suspension.</param>
+/// <param name="SeasonStat">The player's own season line for the club they play for, or null before they have appeared (`STA-2`).</param>
 /// <param name="SeasonNumber">The season the player is read against.</param>
 /// <param name="GameYear">The season's game year, which is what fixes the player's age.</param>
 public sealed record PlayerSnapshot(
@@ -177,6 +211,7 @@ public sealed record PlayerSnapshot(
     SquadContractRow? Contract,
     SquadRegistrationRow? Registration,
     IReadOnlyList<SquadAvailabilityRow> Availability,
+    SquadSeasonStatRow? SeasonStat,
     int SeasonNumber,
     int GameYear);
 

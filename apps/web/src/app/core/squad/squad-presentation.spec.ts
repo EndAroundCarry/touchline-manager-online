@@ -8,11 +8,12 @@ import {
   footLabel,
   positionFamilyOf,
   positionLabel,
+  seasonStatRows,
   squadStatusLabel,
   stateBand,
   stateRows,
 } from './squad-presentation';
-import { PlayerAttributes, PlayerState, SquadPlayer } from './squad.models';
+import { PlayerAttributes, PlayerSeasonStats, PlayerState, SquadPlayer } from './squad.models';
 
 /**
  * The squad presentation helpers.
@@ -67,7 +68,14 @@ const attributes: PlayerAttributes = {
     aggression: 8,
     leadership: 7,
   },
-  physical: { pace: 16, acceleration: 15, stamina: 14, strength: 13, agility: 12, jumpingReach: 11 },
+  physical: {
+    pace: 16,
+    acceleration: 15,
+    stamina: 14,
+    strength: 13,
+    agility: 12,
+    jumpingReach: 11,
+  },
   goalkeeping: { handling: 1, reflexes: 2, oneOnOnes: 3, aerialAbility: 4 },
 };
 
@@ -210,6 +218,49 @@ describe('squad presentation', () => {
       // Low fatigue is good, so it bands as strong while a high value reads as weak.
       expect(rows[1].band.band).toBe('strong');
       expect(stateBand(95, false).band).toBe('low');
+    });
+  });
+
+  describe('seasonStatRows', () => {
+    const stats: PlayerSeasonStats = {
+      appearances: 3,
+      starts: 2,
+      minutesPlayed: 200,
+      goals: 2,
+      assists: 1,
+      shots: 6,
+      shotsOnTarget: 3,
+      saves: 0,
+      yellowCards: 1,
+      redCards: 0,
+      averageRating: 7.5,
+    };
+
+    it('summarises the season as labelled values, in the order a manager reads them (STA-2)', () => {
+      const rows = seasonStatRows(stats);
+
+      expect(rows.map((row) => row.label)).toEqual([
+        'Appearances',
+        'Starts',
+        'Minutes',
+        'Goals',
+        'Assists',
+        'Shots',
+        'Shots on target',
+        'Saves',
+        'Yellow cards',
+        'Red cards',
+        'Average rating',
+      ]);
+      expect(rows.find((row) => row.label === 'Goals')?.value).toBe('2');
+      expect(rows.find((row) => row.label === 'Minutes')?.value).toBe('200');
+      expect(rows.find((row) => row.label === 'Average rating')?.value).toBe('7.5');
+    });
+
+    it('shows a dash for the rating before the player has been rated (TRN-8)', () => {
+      const unrated = seasonStatRows({ ...stats, averageRating: null });
+
+      expect(unrated.find((row) => row.label === 'Average rating')?.value).toBe('\u2014');
     });
   });
 });

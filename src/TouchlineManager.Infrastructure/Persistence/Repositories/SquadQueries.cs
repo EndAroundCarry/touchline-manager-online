@@ -146,6 +146,32 @@ internal sealed class SquadQueries : ISquadQueries
 
         var availability = await OpenAvailabilityAsync([playerId], cancellationToken);
 
+        // The player's own season line for this club in the season being played. It is read from the
+        // publication's own projection rather than recomputed, so the profile agrees with the division
+        // leaderboard, and the season is the world's current one, so a read during the rollover window keeps
+        // answering for the season being played (STA-2, CAL-6). A player who has not appeared has none.
+        var seasonStat = await (
+            from stat in _dbContext.PlayerSeasonStats
+            join divisionSeason in _dbContext.DivisionSeasons on stat.DivisionSeasonId equals divisionSeason.Id
+            where stat.PlayerId == playerId
+                && stat.ClubId == row.Contract.ClubId
+                && divisionSeason.SeasonId == season.SeasonId
+            select new SquadSeasonStatRow(
+                stat.Appearances,
+                stat.Starts,
+                stat.MinutesPlayed,
+                stat.Goals,
+                stat.Assists,
+                stat.Shots,
+                stat.ShotsOnTarget,
+                stat.Saves,
+                stat.YellowCards,
+                stat.RedCards,
+                stat.RatedAppearances == 0
+                    ? null
+                    : (int?)(stat.RatingBasisPointsTotal / stat.RatedAppearances)))
+            .FirstOrDefaultAsync(cancellationToken);
+
         return new PlayerSnapshot(
             row.Player.Id,
             row.Contract.ClubId,
@@ -175,6 +201,7 @@ internal sealed class SquadQueries : ISquadQueries
                 row.Contract.Status),
             registration,
             availability.GetValueOrDefault(playerId, []),
+            seasonStat,
             season.SequenceNumber,
             season.GameYear);
     }

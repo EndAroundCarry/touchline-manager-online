@@ -7,7 +7,8 @@
  * it announceable.
  */
 
-import type { PlayerAttributes, PlayerState, SquadPlayer } from './squad.models';
+import { averageRatingLabel } from '../competition/competition-presentation';
+import type { PlayerAttributes, PlayerSeasonStats, PlayerState, SquadPlayer } from './squad.models';
 
 /** How strong a value reads: the band is what gives colour-free meaning to an attribute or a state value. */
 export type PerformanceBand = 'low' | 'average' | 'strong';
@@ -270,15 +271,62 @@ export interface StateRow {
 /** Builds the four state rows for a profile, in the order a manager reads them. */
 export function stateRows(state: PlayerState): readonly StateRow[] {
   return [
-    { label: 'Condition', value: state.condition, band: stateBand(state.condition, true), higherIsBetter: true },
-    { label: 'Fatigue', value: state.fatigue, band: stateBand(state.fatigue, false), higherIsBetter: false },
-    { label: 'Morale', value: state.morale, band: stateBand(state.morale, true), higherIsBetter: true },
+    {
+      label: 'Condition',
+      value: state.condition,
+      band: stateBand(state.condition, true),
+      higherIsBetter: true,
+    },
+    {
+      label: 'Fatigue',
+      value: state.fatigue,
+      band: stateBand(state.fatigue, false),
+      higherIsBetter: false,
+    },
+    {
+      label: 'Morale',
+      value: state.morale,
+      band: stateBand(state.morale, true),
+      higherIsBetter: true,
+    },
     {
       label: 'Match sharpness',
       value: state.matchSharpness,
       band: stateBand(state.matchSharpness, true),
       higherIsBetter: true,
     },
+  ];
+}
+
+/** One label-and-value line of a player's season summary. */
+export interface SeasonStatRow {
+  /** The statistic's name. */
+  readonly label: string;
+
+  /** The value, already formatted for display. */
+  readonly value: string;
+}
+
+/**
+ * Builds the player profile's season summary (`STA-2`).
+ *
+ * The order is the product's — how much they played, then what they did, then what it cost them — and the
+ * numbers are formatted here so the screen renders text and the rating is read to the tenth of a point its
+ * one definition uses (`TRN-8`).
+ */
+export function seasonStatRows(stats: PlayerSeasonStats): readonly SeasonStatRow[] {
+  return [
+    { label: 'Appearances', value: `${stats.appearances}` },
+    { label: 'Starts', value: `${stats.starts}` },
+    { label: 'Minutes', value: `${stats.minutesPlayed}` },
+    { label: 'Goals', value: `${stats.goals}` },
+    { label: 'Assists', value: `${stats.assists}` },
+    { label: 'Shots', value: `${stats.shots}` },
+    { label: 'Shots on target', value: `${stats.shotsOnTarget}` },
+    { label: 'Saves', value: `${stats.saves}` },
+    { label: 'Yellow cards', value: `${stats.yellowCards}` },
+    { label: 'Red cards', value: `${stats.redCards}` },
+    { label: 'Average rating', value: averageRatingLabel(stats.averageRating) },
   ];
 }
 

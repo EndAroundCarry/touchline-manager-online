@@ -265,6 +265,54 @@ public sealed record DivisionStatisticsSnapshot(
     string SeasonLabel,
     IReadOnlyList<DivisionPlayerStatRow> Rows);
 
+/// <summary>
+/// One player's discipline in a division-season: the cards they have been shown and any suspension they
+/// still owe (`DIS-2`, `DIS-4`, `DIS-5`).
+/// </summary>
+/// <param name="PlayerId">The player.</param>
+/// <param name="PlayerName">The player's generated name.</param>
+/// <param name="ClubId">The club the player plays for.</param>
+/// <param name="ClubName">The club's generated name.</param>
+/// <param name="ClubShortName">The club's abbreviation.</param>
+/// <param name="YellowCards">Bookings accumulated (`DIS-2`).</param>
+/// <param name="RedCards">Sendings-off accumulated (`DIS-4`).</param>
+/// <param name="SuspensionFixturesRemaining">
+/// How many fixtures the player still misses through suspension, or zero when they owe none (`DIS-5`).
+/// </param>
+public sealed record DivisionDisciplineRow(
+    Guid PlayerId,
+    string PlayerName,
+    Guid ClubId,
+    string ClubName,
+    string ClubShortName,
+    int YellowCards,
+    int RedCards,
+    int SuspensionFixturesRemaining);
+
+/// <summary>
+/// A division's discipline for the season in progress: every player carrying a card, and any suspension
+/// they still owe (master plan §6.4, `DIS-2`…`DIS-5`).
+/// </summary>
+/// <param name="DivisionId">The division.</param>
+/// <param name="DivisionName">The division's generated name.</param>
+/// <param name="TierNumber">The tier.</param>
+/// <param name="CountryId">The country.</param>
+/// <param name="CountryCode">The country's code.</param>
+/// <param name="CountryName">The country's name.</param>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="Rows">Every player with a card this season, most sendings-off first.</param>
+public sealed record DivisionDisciplineSnapshot(
+    Guid DivisionId,
+    string DivisionName,
+    int TierNumber,
+    Guid CountryId,
+    string CountryCode,
+    string CountryName,
+    int SeasonNumber,
+    string SeasonLabel,
+    IReadOnlyList<DivisionDisciplineRow> Rows);
+
 /// <summary>One club's place in a season's tie-break draw (`TBL-10`, `TBL-11`).</summary>
 /// <param name="ClubId">The club.</param>
 /// <param name="ClubName">The club's generated name.</param>
@@ -367,6 +415,22 @@ public interface ICompetitionQueries
     /// <param name="divisionId">The division.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<DivisionRulesSnapshot?> GetDivisionRulesAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads a division's discipline for the season in progress, or null if the division is unknown.
+    /// </summary>
+    /// <remarks>
+    /// Every player the season's cards have touched, with what they still owe. The card counts are the
+    /// season's accumulation (`DIS-2`, `DIS-4`) and the suspension figure is read from the open absences the
+    /// publication serves (`DIS-5`), so the page and the side a manager may actually name cannot disagree
+    /// about who is suspended. It is public game data, like the table and the statistics: a card is shown in
+    /// front of everybody.
+    /// </remarks>
+    /// <param name="divisionId">The division.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<DivisionDisciplineSnapshot?> GetDivisionDisciplineAsync(
         Guid divisionId,
         CancellationToken cancellationToken);
 

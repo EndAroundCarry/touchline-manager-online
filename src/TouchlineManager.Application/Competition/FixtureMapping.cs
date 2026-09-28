@@ -132,6 +132,45 @@ public static class FixtureMapping
                 : Math.Round(row.AverageRatingBasisPoints.Value / 1000m, 1, MidpointRounding.AwayFromZero));
     }
 
+    /// <summary>Projects a division's discipline for the season in progress.</summary>
+    /// <param name="snapshot">The stored cards and suspensions.</param>
+    /// <param name="serverTime">When the response was produced.</param>
+    public static DivisionDisciplineResponse ToResponse(
+        this DivisionDisciplineSnapshot snapshot,
+        DateTimeOffset serverTime)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return new DivisionDisciplineResponse(
+            snapshot.DivisionId,
+            snapshot.DivisionName,
+            snapshot.TierNumber,
+            snapshot.CountryId,
+            snapshot.CountryCode,
+            snapshot.CountryName,
+            snapshot.SeasonNumber,
+            snapshot.SeasonLabel,
+            [.. snapshot.Rows.Select(ToResponse)],
+            serverTime);
+    }
+
+    /// <summary>Projects one player's discipline row.</summary>
+    /// <param name="row">The row.</param>
+    public static DivisionDisciplineRowResponse ToResponse(this DivisionDisciplineRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        return new DivisionDisciplineRowResponse(
+            row.PlayerId,
+            row.PlayerName,
+            row.ClubId,
+            row.ClubName,
+            row.ClubShortName,
+            row.YellowCards,
+            row.RedCards,
+            row.SuspensionFixturesRemaining);
+    }
+
     /// <summary>Projects a division's competition rules for the season in progress.</summary>
     /// <remarks>
     /// The points and the ordering are taken from the domain rather than from the response, so a screen

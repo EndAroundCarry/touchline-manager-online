@@ -262,6 +262,13 @@ Contracts and transfers are the remaining `TRN-13` inputs and arrive with the st
 | DIS-6 | If a locked team sheet contains a player who became ineligible, the snapshot builder repairs it deterministically from the bench, then from reserves, using position suitability, condition, ability, and stable player ID tie-breaking. | — |
 | DIS-7 | Every repair is recorded and reported to the affected manager in the inbox. | — |
 | DIS-8 | An outstanding suspension that was not served by season end carries into the next season. | — |
+| DIS-9 | A division's discipline — every player the season's cards have touched, with the suspension they still owe — is public game data, read from the stored accumulation and the open absences rather than kept a second time. The rows are ranked most sendings-off first, then most bookings, then name. | — |
+
+The division's discipline is the detail behind the table's card columns (`TBL-8`, `TBL-9`), which break
+ties but name nobody: a book is the season's accumulation (`DIS-2`, `DIS-4`) and the suspension figure is
+read from the same open absence the publication serves (`DIS-5`), so the page cannot disagree with the side
+a manager may actually name. It is read beside the table, the statistics, and the competition rules, and
+neither the ordering nor the counts are stored a second time.
 
 ---
 
@@ -395,6 +402,12 @@ re-simulated.
 | STA-4 | A player who did not take the pitch produces no line. A penalty has no assister; every other goal has exactly one. |
 | STA-5 | A match rating is stored in basis points (0–10,000) and exposed on a 0.0–10.0 scale (`TRN-8`). A player who did not appear is given no rating. |
 | STA-6 | A player's season statistics are reconciled by the same rebuild as the table, which recomputes every line from the division-season's published results and removes a line no published result supports. |
+
+A player's profile carries their own line of the same projection (master plan §11.1): the goals, minutes,
+cards, and rating the division leaderboard shows for them, read from the stored row rather than recomputed,
+so the profile and the leaderboard cannot disagree about a player's season. A player who has not appeared
+has no line, and the profile says so rather than showing a row of zeros (`STA-4`). Like the leaderboard and
+the table, it is the owning manager's read — the public, unattached profile is a scouting feature.
 
 ---
 

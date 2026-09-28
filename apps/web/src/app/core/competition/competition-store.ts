@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import {
+  DivisionDiscipline,
   DivisionRules,
   DivisionStatistics,
   DivisionTable,
@@ -44,6 +45,10 @@ export class CompetitionStore {
   private readonly divisionRulesSignal = signal<DivisionRules | null>(null);
   private readonly rulesLoadingSignal = signal(false);
   private readonly rulesErrorSignal = signal<string | null>(null);
+
+  private readonly divisionDisciplineSignal = signal<DivisionDiscipline | null>(null);
+  private readonly disciplineLoadingSignal = signal(false);
+  private readonly disciplineErrorSignal = signal<string | null>(null);
 
   private readonly teamSheetSignal = signal<FixtureTeamSheet | null>(null);
   private readonly selectionSignal = signal<ReadonlyMap<number, string>>(new Map());
@@ -97,6 +102,15 @@ export class CompetitionStore {
 
   /** Why a division's competition rules could not be read. */
   readonly rulesError = this.rulesErrorSignal.asReadonly();
+
+  /** A division's discipline last read. */
+  readonly divisionDiscipline = this.divisionDisciplineSignal.asReadonly();
+
+  /** Whether a division's discipline is being read. */
+  readonly disciplineLoading = this.disciplineLoadingSignal.asReadonly();
+
+  /** Why a division's discipline could not be read. */
+  readonly disciplineError = this.disciplineErrorSignal.asReadonly();
 
   /** The prepared side last read. */
   readonly teamSheet = this.teamSheetSignal.asReadonly();
@@ -270,6 +284,31 @@ export class CompetitionStore {
     });
   }
 
+  /**
+   * Reads a division's discipline for the season in progress (`§10.5`, `DIS-2`…`DIS-5`).
+   *
+   * Public game data like the table, so it is read by division identity and nothing here names the
+   * caller's club. The rows arrive in the order the server ranked them, so the screen sorts nothing.
+   */
+  loadDivisionDiscipline(divisionId: string): void {
+    this.disciplineLoadingSignal.set(true);
+    this.disciplineErrorSignal.set(null);
+    this.divisionDisciplineSignal.set(null);
+
+    this.api.divisionDiscipline(divisionId).subscribe({
+      next: (discipline) => {
+        this.divisionDisciplineSignal.set(discipline);
+        this.disciplineLoadingSignal.set(false);
+      },
+      error: (error: unknown) => {
+        this.disciplineLoadingSignal.set(false);
+        this.disciplineErrorSignal.set(
+          error instanceof ApiError ? error.detail : 'The discipline could not be loaded.',
+        );
+      },
+    });
+  }
+
   /** Reads the club's prepared side for a fixture and starts editing it. */
   loadTeamSheet(fixtureId: string): void {
     this.loadingSignal.set(true);
@@ -410,6 +449,9 @@ export class CompetitionStore {
     this.divisionRulesSignal.set(null);
     this.rulesLoadingSignal.set(false);
     this.rulesErrorSignal.set(null);
+    this.divisionDisciplineSignal.set(null);
+    this.disciplineLoadingSignal.set(false);
+    this.disciplineErrorSignal.set(null);
     this.teamSheetSignal.set(null);
     this.selectionSignal.set(new Map());
     this.loadingSignal.set(false);

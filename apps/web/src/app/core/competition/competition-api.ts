@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
+  DivisionDiscipline,
   DivisionFixtures,
   DivisionRules,
   DivisionStatistics,
@@ -53,6 +54,11 @@ export class CompetitionApi {
   /** Reads a division's competition rules, its tie-break order, and its stored draw. */
   divisionRules(divisionId: string): Observable<DivisionRules> {
     return this.api.get<DivisionRules>(`/divisions/${divisionId}/rules`);
+  }
+
+  /** Reads a division's discipline: its cards and its outstanding suspensions. */
+  divisionDiscipline(divisionId: string): Observable<DivisionDiscipline> {
+    return this.api.get<DivisionDiscipline>(`/divisions/${divisionId}/discipline`);
   }
 
   /** Reads the caller's club's side for a fixture, prepared or not. */

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.Squad;
 
 namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 
@@ -245,6 +246,111 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             header.SeasonLabel,
             header.TieDrawSeed,
             header.TieDrawHash,
+            rows);
+    }
+
+    /// <inheritdoc />
+    public async Task<DivisionDisciplineSnapshot?> GetDivisionDisciplineAsync(
+        Guid divisionId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var header = await (
+            from divisionSeason in _dbContext.DivisionSeasons
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join country in _dbContext.Countries on division.CountryId equals country.Id
+            join seasonRow in _dbContext.Seasons on divisionSeason.SeasonId equals seasonRow.Id
+            where divisionSeason.DivisionId == divisionId && divisionSeason.SeasonId == season.SeasonId
+            select new
+            {
+                DivisionSeasonId = divisionSeason.Id,
+                division.DisplayName,
+                division.TierNumber,
+                CountryId = country.Id,
+                country.Code,
+                CountryName = country.DisplayName,
+                SeasonNumber = seasonRow.SequenceNumber,
+                SeasonLabel = seasonRow.DisplayLabel,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (header is null)
+        {
+            return null;
+        }
+
+        // Every player the season's cards have touched, with the club they now play for. The record is keyed
+        // on the division-season and the player, so the club is resolved through the player's active
+        // contract — the same resolution the squad read makes (SQ-6).
+        var recorded = await (
+            from record in _dbContext.DisciplineRecords
+            join player in _dbContext.Players on record.PlayerId equals player.Id
+            join contract in _dbContext.PlayerContracts on record.PlayerId equals contract.PlayerId
+            join club in _dbContext.Clubs on contract.ClubId equals club.Id
+            where record.DivisionSeasonId == header.DivisionSeasonId
+                && contract.Status == ContractStatus.Active
+            select new
+            {
+                PlayerId = player.Id,
+                PlayerName = player.FullName,
+                ClubId = club.Id,
+                ClubName = club.Name,
+                club.ShortName,
+                record.YellowCards,
+                record.RedCards,
+            })
+            .ToListAsync(cancellationToken);
+
+        // What a player still owes is the open suspension the publication serves (DIS-5). Several open bans
+        // of one player run concurrently rather than in sequence, so the honest number of fixtures left is
+        // the greatest of them, not their sum.
+        var playerIds = recorded.Select(candidate => candidate.PlayerId).ToList();
+
+        var suspensions = await _dbContext.PlayerUnavailabilities
+            .Where(record => playerIds.Contains(record.PlayerId)
+                && record.Type == UnavailabilityType.Suspension
+                && record.ResolvedAt == null)
+            .GroupBy(record => record.PlayerId)
+            .Select(group => new { PlayerId = group.Key, Remaining = group.Max(record => record.RemainingFixtures) })
+            .ToListAsync(cancellationToken);
+
+        var remaining = suspensions.ToDictionary(
+            suspension => suspension.PlayerId,
+            suspension => suspension.Remaining);
+
+        // The leaderboard order is the server's — most sendings-off, then most bookings, then name — so the
+        // screen sorts nothing and two reads never disagree (TBL-12's principle). It is applied in memory
+        // because the suspension count is joined here, and a division holds at most a few hundred players.
+        var rows = recorded
+            .Select(row => new DivisionDisciplineRow(
+                row.PlayerId,
+                row.PlayerName,
+                row.ClubId,
+                row.ClubName,
+                row.ShortName,
+                row.YellowCards,
+                row.RedCards,
+                remaining.GetValueOrDefault(row.PlayerId)))
+            .OrderByDescending(row => row.RedCards)
+            .ThenByDescending(row => row.YellowCards)
+            .ThenBy(row => row.PlayerName, StringComparer.Ordinal)
+            .ToList();
+
+        return new DivisionDisciplineSnapshot(
+            divisionId,
+            header.DisplayName,
+            header.TierNumber,
+            header.CountryId,
+            header.Code,
+            header.CountryName,
+            header.SeasonNumber,
+            header.SeasonLabel,
             rows);
     }
 

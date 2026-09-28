@@ -135,6 +135,39 @@ export interface DivisionStatistics {
   readonly serverTime: string;
 }
 
+/** One player's discipline in a division-season (`DIS-2`…`DIS-5`). */
+export interface DivisionDisciplineRow {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly clubShortName: string;
+  readonly yellowCards: number;
+  readonly redCards: number;
+
+  /** How many fixtures the player still misses through suspension. Zero when they owe none (`DIS-5`). */
+  readonly suspensionFixturesRemaining: number;
+}
+
+/**
+ * A division's discipline for the season in progress (§10.5).
+ *
+ * `rows` arrives in the order the server ranked it — most sendings-off, then most bookings, then name — so
+ * the screen renders that order rather than sorting.
+ */
+export interface DivisionDiscipline {
+  readonly divisionId: string;
+  readonly divisionName: string;
+  readonly tierNumber: number;
+  readonly countryId: string;
+  readonly countryCode: string;
+  readonly countryName: string;
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly rows: readonly DivisionDisciplineRow[];
+  readonly serverTime: string;
+}
+
 /** How many points a result is worth (`TBL-1`). */
 export interface LeaguePoints {
   readonly win: number;

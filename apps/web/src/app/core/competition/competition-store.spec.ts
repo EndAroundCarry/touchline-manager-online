@@ -4,6 +4,7 @@ import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import { CompetitionStore } from './competition-store';
 import {
+  DivisionDiscipline,
   DivisionRules,
   DivisionStatistics,
   DivisionTable,
@@ -196,6 +197,32 @@ function rules(): DivisionRules {
   };
 }
 
+function discipline(): DivisionDiscipline {
+  return {
+    divisionId: 'd1',
+    divisionName: 'England Top Division',
+    tierNumber: 1,
+    countryId: 'co1',
+    countryCode: 'england',
+    countryName: 'England',
+    seasonNumber: 1,
+    seasonLabel: '2026/27',
+    rows: [
+      {
+        playerId: 'p1',
+        playerName: 'Alex Keeper',
+        clubId: 'c1',
+        clubName: 'Ashvale United',
+        clubShortName: 'ASH',
+        yellowCards: 4,
+        redCards: 1,
+        suspensionFixturesRemaining: 1,
+      },
+    ],
+    serverTime: '2026-09-25T00:00:00Z',
+  };
+}
+
 function createApiStub() {
   return {
     mine: vi.fn(),
@@ -204,6 +231,7 @@ function createApiStub() {
     divisionTable: vi.fn(),
     divisionStatistics: vi.fn(),
     divisionRules: vi.fn(),
+    divisionDiscipline: vi.fn(),
     teamSheet: vi.fn(),
     saveTeamSheet: vi.fn(),
   };
@@ -432,16 +460,44 @@ describe('CompetitionStore', () => {
     expect(store.rulesLoading()).toBe(false);
   });
 
+  it('reads a division discipline by identity', () => {
+    api.divisionDiscipline.mockReturnValue(of(discipline()));
+
+    store.loadDivisionDiscipline('d9');
+
+    expect(api.divisionDiscipline).toHaveBeenCalledWith('d9');
+    expect(store.divisionDiscipline()?.rows[0].playerName).toBe('Alex Keeper');
+    expect(store.divisionDiscipline()?.rows[0].suspensionFixturesRemaining).toBe(1);
+    expect(store.disciplineError()).toBeNull();
+    expect(store.disciplineLoading()).toBe(false);
+  });
+
+  it('reports a discipline it could not read', () => {
+    api.divisionDiscipline.mockReturnValue(
+      throwError(
+        () => new ApiError(404, 'DIVISION_NOT_FOUND', 'no such division', null, new Map()),
+      ),
+    );
+
+    store.loadDivisionDiscipline('d9');
+
+    expect(store.divisionDiscipline()).toBeNull();
+    expect(store.disciplineError()).toBe('no such division');
+    expect(store.disciplineLoading()).toBe(false);
+  });
+
   it('forgets everything when the session ends', () => {
     api.mine.mockReturnValue(of(fixtures()));
     api.divisionTable.mockReturnValue(of(table()));
     api.divisionStatistics.mockReturnValue(of(statistics()));
     api.divisionRules.mockReturnValue(of(rules()));
+    api.divisionDiscipline.mockReturnValue(of(discipline()));
     api.teamSheet.mockReturnValue(of(teamSheet()));
 
     store.loadMyDivisionTable();
     store.loadDivisionStatistics('d1');
     store.loadDivisionRules('d1');
+    store.loadDivisionDiscipline('d1');
     store.loadTeamSheet('f1');
     store.clear();
 
@@ -450,6 +506,7 @@ describe('CompetitionStore', () => {
     expect(store.divisionTable()).toBeNull();
     expect(store.divisionStatistics()).toBeNull();
     expect(store.divisionRules()).toBeNull();
+    expect(store.divisionDiscipline()).toBeNull();
     expect(store.managedClubId()).toBeNull();
   });
 });

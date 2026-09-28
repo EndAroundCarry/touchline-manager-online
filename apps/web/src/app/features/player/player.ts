@@ -6,13 +6,20 @@ import {
   availabilityLabel,
   footLabel,
   positionLabel,
+  seasonStatRows,
   squadStatusLabel,
   stateRows,
 } from '../../core/squad/squad-presentation';
 import { SquadStore } from '../../core/squad/squad-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
-import { FORM_ERROR, LINK, PAGE_HEADING, SECONDARY_BUTTON } from '../../shared/forms/control-styles';
+import {
+  FORM_ERROR,
+  LINK,
+  PAGE_HEADING,
+  SECONDARY_BUTTON,
+  STATUS_MESSAGE,
+} from '../../shared/forms/control-styles';
 
 /**
  * The player profile (master plan §11.1, F-17).
@@ -21,9 +28,9 @@ import { FORM_ERROR, LINK, PAGE_HEADING, SECONDARY_BUTTON } from '../../shared/f
  * every attribute carries its number *and* the word for its band — §11.3 forbids a colour being the only
  * signal, and a test asserts both halves render.
  *
- * History and season statistics are §11.1's other two items and are absent on purpose: neither exists
- * before a match has been played, and the stages that produce them add their cards here rather than
- * showing permanently-empty tables now.
+ * The season summary is the player's line of the division leaderboard's projection (`STA-2`), read with
+ * the profile rather than recomputed; a player who has not taken the pitch has none, and the screen says so
+ * rather than showing a row of zeros.
  */
 @Component({
   selector: 'app-player',
@@ -54,9 +61,17 @@ export class PlayerProfile implements OnInit {
     return player === null ? [] : stateRows(player.state);
   });
 
+  /** This season's summary lines, or an empty list before the player has appeared (`STA-2`). */
+  protected readonly seasonStats = computed(() => {
+    const stats = this.player()?.seasonStats;
+
+    return stats === null || stats === undefined ? [] : seasonStatRows(stats);
+  });
+
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
+  protected readonly statusMessageClass = STATUS_MESSAGE;
   protected readonly linkClass = LINK;
 
   /** Reads the profile for the player the route names. */

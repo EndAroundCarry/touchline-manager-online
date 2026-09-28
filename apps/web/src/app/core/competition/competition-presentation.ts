@@ -93,6 +93,19 @@ export function averageRatingLabel(rating: number | null): string {
   return rating === null ? '\u2014' : rating.toFixed(1);
 }
 
+/**
+ * How many fixtures a player still misses through suspension, or a dash when they owe none (`DIS-5`).
+ *
+ * A suspension is measured in fixtures, never days (`TRN-12`), so the phrase names the unit and the
+ * plural, and the dash is deliberate: "0 fixtures" would read like a measured absence rather than the
+ * absence of one.
+ */
+export function suspensionRemainingLabel(remainingFixtures: number): string {
+  return remainingFixtures <= 0
+    ? '\u2014'
+    : `${remainingFixtures} ${remainingFixtures === 1 ? 'fixture' : 'fixtures'}`;
+}
+
 /** Names one of the table's tie-break criteria, falling back to the code (`TBL-2`…`TBL-10`). */
 export function tieBreakerLabel(code: string): string {
   return TIE_BREAKER_LABELS[code] ?? code;

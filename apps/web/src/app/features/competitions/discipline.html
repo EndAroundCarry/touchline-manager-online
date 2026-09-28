@@ -1,0 +1,73 @@
+@if (loading()) {
+  <p class="text-sm text-slate-600" role="status">Loading the discipline…</p>
+} @else if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+} @else if (discipline(); as competition) {
+  <section aria-labelledby="discipline-heading">
+    <h1 id="discipline-heading" [class]="pageHeadingClass">{{ competition.divisionName }}</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      {{ competition.countryName }} · tier {{ competition.tierNumber }} ·
+      {{ competition.seasonLabel }}
+    </p>
+    <p class="mt-1 flex gap-4 text-sm">
+      <a class="underline" [routerLink]="['/competitions', competition.divisionId, 'table']">
+        Back to the table
+      </a>
+      <a class="underline" [routerLink]="['/competitions', competition.divisionId, 'statistics']">
+        Player statistics
+      </a>
+    </p>
+
+    <p class="mt-4 text-sm text-slate-700">
+      Every player the season's cards have touched, most sendings-off first. Five league bookings
+      earn a one-fixture suspension and a sending-off earns one, served against the club's next
+      fixtures (DIS-2, DIS-4, DIS-5).
+    </p>
+
+    @if (competition.rows.length === 0) {
+      <p [class]="statusMessageClass" role="status">No player has been booked yet this season.</p>
+    } @else {
+      <div class="mt-6 overflow-x-auto rounded border border-slate-200 bg-white">
+        <table class="min-w-full border-collapse text-sm">
+          <caption class="sr-only">
+            {{
+              caption()
+            }}
+          </caption>
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-600">
+              <th scope="col" class="px-3 py-2 text-left font-medium">Player</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium">Club</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">
+                <abbr title="Yellow cards">Yel</abbr>
+              </th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">
+                <abbr title="Red cards">Red</abbr>
+              </th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">
+                <abbr title="Fixtures still to miss through suspension">Suspended</abbr>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of competition.rows; track row.playerId) {
+              <tr class="border-b border-slate-100 last:border-b-0">
+                <th scope="row" class="px-3 py-2 text-left font-medium">{{ row.playerName }}</th>
+                <td class="px-3 py-2 text-left">
+                  <abbr [title]="row.clubName">{{ row.clubShortName }}</abbr>
+                </td>
+                <td class="px-3 py-2 text-right tabular-nums">{{ row.yellowCards }}</td>
+                <td class="px-3 py-2 text-right font-semibold tabular-nums">{{ row.redCards }}</td>
+                <td class="px-3 py-2 text-right tabular-nums">
+                  {{ suspension(row.suspensionFixturesRemaining) }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <p class="mt-3 text-xs text-slate-500">As of {{ instant(competition.serverTime) }}.</p>
+    }
+  </section>
+}

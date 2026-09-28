@@ -135,6 +135,14 @@ export const routes: Routes = [
         title: 'Competition rules — Touchline Manager',
       },
       {
+        // One division's cards and outstanding suspensions, reached from its table (DIS-2, DIS-4, DIS-5).
+        path: 'competitions/:divisionId/discipline',
+        loadComponent: () =>
+          import('./features/competitions/discipline').then((m) => m.CompetitionDiscipline),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Discipline — Touchline Manager',
+      },
+      {
         // The manager's own division's table. The division is named by their club, so the navigation
         // destination needs no parameter.
         path: 'competitions',

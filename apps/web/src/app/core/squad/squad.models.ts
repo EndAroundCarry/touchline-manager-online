@@ -133,6 +133,28 @@ export interface PlayerRegistrationSummary {
   readonly effectiveFixtureBoundaryRound: number;
 }
 
+/**
+ * A player's own season statistics for the club they play for (`STA-2`).
+ *
+ * Read from the publication's projection, so it agrees with the division leaderboard. Null on the profile
+ * before the player has taken the pitch; there is no line of zeros.
+ */
+export interface PlayerSeasonStats {
+  readonly appearances: number;
+  readonly starts: number;
+  readonly minutesPlayed: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly shotsOnTarget: number;
+  readonly saves: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
+
+  /** The average match rating on a 0.0–10.0 scale, or null before the player is rated (`TRN-8`). */
+  readonly averageRating: number | null;
+}
+
 /** A player's full profile: the attribute grid plus the state and contract around it. */
 export interface Player {
   readonly id: string;
@@ -153,6 +175,7 @@ export interface Player {
   readonly contract: PlayerContractSummary | null;
   readonly registration: PlayerRegistrationSummary | null;
   readonly availability: readonly PlayerAvailability[];
+  readonly seasonStats: PlayerSeasonStats | null;
   readonly serverTime: string;
 }
 

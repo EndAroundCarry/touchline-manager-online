@@ -7,6 +7,7 @@ import {
   outcomeLabel,
   roundLabel,
   scoreLabel,
+  suspensionRemainingLabel,
   teamSheetIssueMessage,
   tieBreakerLabel,
   venueLabel,
@@ -118,6 +119,17 @@ describe('goalDifferenceLabel', () => {
   it('leaves a negative difference and zero as the number they are', () => {
     expect(goalDifferenceLabel(-3)).toBe('-3');
     expect(goalDifferenceLabel(0)).toBe('0');
+  });
+});
+
+describe('suspensionRemainingLabel', () => {
+  it('names the fixtures a suspended player still misses, with the right plural (DIS-5)', () => {
+    expect(suspensionRemainingLabel(1)).toBe('1 fixture');
+    expect(suspensionRemainingLabel(3)).toBe('3 fixtures');
+  });
+
+  it('shows a dash when a player owes no suspension, rather than a measured zero', () => {
+    expect(suspensionRemainingLabel(0)).toBe('\u2014');
   });
 });
 
