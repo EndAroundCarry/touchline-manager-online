@@ -195,6 +195,32 @@ export interface PlayerContractRow {
   readonly status: string;
 }
 
+/** The deterministic terms the server offers for a renewal (`CON-3`). */
+export interface RenewalQuote {
+  readonly contractId: string;
+  readonly playerId: string;
+  readonly seasons: number;
+  readonly startSeasonNumber: number;
+  readonly endSeasonNumber: number;
+  readonly weeklyWageMinor: number;
+
+  /** The contract's version at the moment it was quoted, sent back as `If-Match` when signing. */
+  readonly contractVersion: number;
+  readonly serverTime: string;
+}
+
+/** The contract a renewal signed a player to (`CON-4`). */
+export interface ContractRenewal {
+  readonly contractId: string;
+  readonly playerId: string;
+  readonly seasons: number;
+  readonly startSeasonNumber: number;
+  readonly endSeasonNumber: number;
+  readonly weeklyWageMinor: number;
+  readonly version: number;
+  readonly serverTime: string;
+}
+
 /** A club's contract list. */
 export interface ContractList {
   readonly clubId: string;

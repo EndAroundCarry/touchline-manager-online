@@ -117,6 +117,9 @@ public static class PlayerContractCloseReasons
     /// <summary>The player was sold, and the buyer's contract replaced this one (`CON-5`).</summary>
     public const string Transferred = "transferred";
 
+    /// <summary>The club re-signed the player, and the new contract replaced this one (`CON-3`, `CON-4`).</summary>
+    public const string Renewed = "renewed";
+
     /// <summary>The club released the player.</summary>
     public const string Released = "released";
 
@@ -126,7 +129,7 @@ public static class PlayerContractCloseReasons
     /// <summary>Whether a reason is one the contract aggregate recognises.</summary>
     /// <param name="reason">The reason code.</param>
     public static bool IsKnown(string reason) =>
-        reason is Expired or Transferred or Released or Retired;
+        reason is Expired or Transferred or Renewed or Released or Retired;
 }
 
 /// <summary>

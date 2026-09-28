@@ -29,7 +29,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/fixtures', label: 'Fixtures', icon: 'pi pi-calendar', available: true },
   { path: '/scouting', label: 'Scouting', icon: 'pi pi-search', available: false },
   { path: '/transfers', label: 'Transfers', icon: 'pi pi-exchange', available: false },
-  { path: '/finances', label: 'Finances', icon: 'pi pi-wallet', available: false },
+  { path: '/finances', label: 'Finances', icon: 'pi pi-wallet', available: true },
   { path: '/inbox', label: 'Inbox', icon: 'pi pi-inbox', available: true },
   { path: '/settings', label: 'Settings', icon: 'pi pi-cog', available: true },
 ];

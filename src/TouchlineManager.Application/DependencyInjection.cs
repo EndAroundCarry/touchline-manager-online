@@ -5,6 +5,7 @@ using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
 using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Competition;
+using TouchlineManager.Application.Finance;
 using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Application.Squad;
@@ -42,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, ResolveMatchdayJobHandler>();
         services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
         services.AddScoped<IJobHandler, RebuildDivisionProjectionsJobHandler>();
+        services.AddScoped<IJobHandler, WeeklyFinanceRunJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -51,8 +53,25 @@ public static class DependencyInjection
         AddCompetitionUseCases(services);
         AddMatchUseCases(services);
         AddCommsUseCases(services);
+        AddFinanceUseCases(services);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the finance module's collaborator and use cases (master plan §16 Stage 9; `FIN-3`…`FIN-9`).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="MatchdayFinances"/> is registered here rather than beside a single caller because it is
+    /// the publication's money step: the matchday workflow composes it the way it composes
+    /// <c>MatchdayNotifications</c>, and both commit inside the publication's transaction.
+    /// </remarks>
+    private static void AddFinanceUseCases(IServiceCollection services)
+    {
+        services.AddScoped<MatchdayFinances>();
+        services.AddScoped<RunWeeklyFinance>();
+        services.AddScoped<GetFinanceSummary>();
+        services.AddScoped<GetFinanceLedger>();
     }
 
     /// <summary>
@@ -167,11 +186,15 @@ public static class DependencyInjection
         services.AddScoped<EvaluateAiClubs>();
         services.AddScoped<GetFixtureTeamSheet>();
         services.AddScoped<SaveFixtureTeamSheet>();
+        services.AddScoped<RequestRenewalQuote>();
+        services.AddScoped<RenewContract>();
 
         services.AddScoped<IValidator<SaveTacticalPlanRequest>, SaveTacticalPlanRequestValidator>();
         services.AddScoped<IValidator<SaveTrainingRequest>, SaveTrainingRequestValidator>();
         services.AddScoped<IValidator<SetPlayerTrainingFocusRequest>, SetPlayerTrainingFocusRequestValidator>();
         services.AddScoped<IValidator<SaveFixtureTeamSheetRequest>, SaveFixtureTeamSheetRequestValidator>();
+        services.AddScoped<IValidator<RenewalQuoteRequest>, RenewalQuoteRequestValidator>();
+        services.AddScoped<IValidator<RenewContractRequest>, RenewContractRequestValidator>();
     }
 
     /// <summary>

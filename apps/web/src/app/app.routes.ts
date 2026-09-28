@@ -111,6 +111,12 @@ export const routes: Routes = [
         title: 'Training — Touchline Manager',
       },
       {
+        path: 'finances',
+        loadComponent: () => import('./features/finances/finances').then((m) => m.Finances),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Finances — Touchline Manager',
+      },
+      {
         // One division's table by identity, for a shared or bookmarked link (§11.1).
         path: 'competitions/:divisionId/table',
         loadComponent: () =>

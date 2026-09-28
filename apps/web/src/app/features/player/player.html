@@ -103,6 +103,65 @@
           <p class="mt-2 text-xs text-slate-500">
             Contract years advance at season rollover, never on an anniversary (CON-8).
           </p>
+
+          <div class="mt-4 border-t border-slate-200 pt-4">
+            <h3 class="text-sm font-medium text-slate-700">Renew</h3>
+
+            @if (renewalError(); as message) {
+              <p [class]="formErrorClass" role="alert">{{ message }}</p>
+            }
+
+            @if (renewalMessage(); as message) {
+              <p [class]="statusMessageClass" role="status">{{ message }}</p>
+            }
+
+            <label class="mt-2 block text-sm text-slate-600" for="renewal-seasons">
+              Length of the new deal
+            </label>
+            <select
+              id="renewal-seasons"
+              [class]="inputClass"
+              [value]="renewalSeasons()"
+              (change)="setSeasons(+$any($event.target).value)"
+            >
+              @for (term of termOptions; track term) {
+                <option [value]="term">
+                  {{ term }} season{{ term === 1 ? '' : 's' }}
+                </option>
+              }
+            </select>
+
+            <div class="mt-3">
+              <button
+                type="button"
+                [class]="secondaryButtonClass"
+                [disabled]="quoting()"
+                (click)="quoteRenewal()"
+              >
+                {{ quoting() ? 'Quoting…' : 'Get a quote' }}
+              </button>
+            </div>
+
+            @if (renewalQuote(); as quote) {
+              <div class="mt-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                <p class="text-slate-700" role="status">
+                  {{ quote.seasons }} season{{ quote.seasons === 1 ? '' : 's' }} at
+                  <strong>{{ funds(quote.weeklyWageMinor) }}</strong> a week, from season
+                  {{ quote.startSeasonNumber }} to {{ quote.endSeasonNumber }}.
+                </p>
+                <div class="mt-2">
+                  <button
+                    type="button"
+                    [class]="primaryButtonClass"
+                    [disabled]="signing()"
+                    (click)="signRenewal()"
+                  >
+                    {{ signing() ? 'Signing…' : 'Sign the renewal' }}
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
         } @else {
           <p class="mt-2 text-sm text-slate-600">This player holds no active contract.</p>
         }

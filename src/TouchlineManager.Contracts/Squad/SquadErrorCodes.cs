@@ -29,4 +29,7 @@ public static class SquadErrorCodes
 
     /// <summary>The submitted plan breaks a tactics rule; the response carries the issues (`TAC-7`…`TAC-9`, `SQ-4`).</summary>
     public const string PlanValidationFailed = "PLAN_VALIDATION_FAILED";
+
+    /// <summary>The requested contract length is not one to three game seasons (`CON-1`).</summary>
+    public const string InvalidContractTerm = "INVALID_CONTRACT_TERM";
 }

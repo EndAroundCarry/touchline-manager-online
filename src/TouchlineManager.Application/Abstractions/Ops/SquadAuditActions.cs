@@ -33,4 +33,7 @@ public static class SquadAuditActions
 
     /// <summary>A club prepared or replaced its side for a fixture (`SQ-4`, `CAL-3`).</summary>
     public const string FixtureTeamSheetSaved = "squad.fixture_team_sheet.saved";
+
+    /// <summary>A player was re-signed, closing the old contract and opening a new one (`CON-3`, `CON-4`).</summary>
+    public const string ContractRenewed = "squad.contract.renewed";
 }

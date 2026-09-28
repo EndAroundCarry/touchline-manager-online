@@ -16,6 +16,7 @@ using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Infrastructure.Competition;
 using TouchlineManager.Infrastructure.Email;
+using TouchlineManager.Infrastructure.Finance;
 using TouchlineManager.Infrastructure.Jobs;
 using TouchlineManager.Infrastructure.Persistence;
 using TouchlineManager.Infrastructure.Persistence.Repositories;
@@ -61,8 +62,27 @@ public static class DependencyInjection
         AddTrainingInfrastructure(services, configuration);
         AddAiClubInfrastructure(services, configuration);
         AddMatchdayInfrastructure(services, configuration);
+        AddFinanceInfrastructure(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the weekly finance settlement's configuration (`CON-2`, `FIN-4`, `FIN-7`, `FIN-9`).
+    /// </summary>
+    /// <remarks>
+    /// The options are bound here rather than in <see cref="AddJobQueueWorker"/> so the validator that guards
+    /// the interval runs in every host, and a misconfiguration fails at startup rather than the first time the
+    /// scheduler ticks.
+    /// </remarks>
+    private static void AddFinanceInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<FinanceOptions>()
+            .Bind(configuration.GetSection(FinanceOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Finance:CheckIntervalSeconds must be between 30 and 86400.");
     }
 
     /// <summary>
@@ -270,6 +290,7 @@ public static class DependencyInjection
         services.AddScoped<IGenerationRunRepository, GenerationRunRepository>();
         services.AddScoped<IClubAccountRepository, ClubAccountRepository>();
         services.AddScoped<ILedgerRepository, LedgerRepository>();
+        services.AddScoped<IFinanceQueries, FinanceQueries>();
         services.AddScoped<IOnboardingQueries, OnboardingQueries>();
         services.AddScoped<IAdvisoryLock, PostgresAdvisoryLock>();
 
@@ -354,6 +375,10 @@ public static class DependencyInjection
         // And the same for the AI: this service places the day's evaluation row, and the row is what gives
         // every club nobody holds a side and a training plan (INS-12).
         services.AddHostedService<AiClubScheduler>();
+
+        // And the same for money: this service places the week's settlement row, and the row is what charges
+        // every club its wages after the Sunday matchday (CON-2, FIN-7).
+        services.AddHostedService<WeeklyFinanceScheduler>();
 
         return services;
     }

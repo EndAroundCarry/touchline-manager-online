@@ -226,7 +226,7 @@ internal sealed class PlayerContractConfiguration : IEntityTypeConfiguration<Pla
                 "squad_status in ('key_player', 'first_team', 'rotation', 'prospect')");
             table.HasCheckConstraint(
                 "ck_player_contracts_closed_reason",
-                "closed_reason is null or closed_reason in ('expired', 'transferred', 'released', 'retired')");
+                "closed_reason is null or closed_reason in ('expired', 'transferred', 'renewed', 'released', 'retired')");
             table.HasCheckConstraint(
                 "ck_player_contracts_term",
                 "end_season_number >= start_season_number");

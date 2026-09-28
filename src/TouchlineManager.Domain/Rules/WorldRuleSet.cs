@@ -17,14 +17,15 @@ namespace TouchlineManager.Domain.Rules;
 /// specified is inventing behaviour. Stage 3 contributed the world, occupancy, calendar, and finance
 /// values; Stage 4 the squad, contract, tactics, and training values; Stage 6 the schedule-streak bound
 /// the fixture generator validates against; Stage 8 the injury and suspension bands the match effects
-/// apply. Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
+/// apply; Stage 9 the gate, sponsorship, operating-cost, award, and payroll-risk values the finance runs
+/// settle. Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
 /// </remarks>
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v5";
+    public const string Version = "world-rules-v6";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -124,6 +125,197 @@ public static class WorldRuleSet
     /// <summary>Opening reputation for a club in the given tier.</summary>
     public static int OpeningReputationForTier(int tier) =>
         Math.Max(1, OpeningReputationTier1 / (int)TierScalingFactor(tier));
+
+    /// <summary>
+    /// The weekly finance boundary: Sunday evening, after the Sunday matchday has been played (`CON-2`).
+    /// </summary>
+    /// <remarks>
+    /// Wages are charged weekly, "after the Sunday matchday" (`CON-2`), so the run is anchored to Sunday at
+    /// 23:00 UTC — the last of the three kickoff days, and late enough that the round it follows has
+    /// published. A rule rather than an implementation detail, because it decides which day a club is paid
+    /// and therefore what a manager sees in the ledger. The materialiser that enqueues the run reads it; the
+    /// worker executes the row whenever it is claimed, so a delayed run is late rather than skipped
+    /// (ADR-0003).
+    /// </remarks>
+    public static readonly TimeOnly WeeklyFinanceUtc = new(23, 0);
+
+    /// <summary>
+    /// The fraction of the stadium baseline a full house yields, in basis points (`FIN-3`).
+    /// </summary>
+    /// <remarks>
+    /// Gate revenue is a share of the club's own fixed stadium baseline rather than an invented attendance
+    /// figure, so it scales with tier the same way the baseline does. The value is provisional and is
+    /// calibrated by the multi-season simulations this stage requires, like the other baselines.
+    /// </remarks>
+    public const int GateRevenueBaseFractionBp = 2_000;
+
+    /// <summary>How much one place in the table moves the gate factor, in basis points (`FIN-3`).</summary>
+    /// <remarks>Above and below the middle place the factor rises and falls, and both ends clamp.</remarks>
+    private const int GateRevenueFormFactorStepPerRankBp = 300;
+
+    /// <summary>
+    /// The attendance factor a league position applies to gate revenue, in basis points (`FIN-3`).
+    /// </summary>
+    /// <param name="formRank">The club's league position, 1 (top) to 18 (bottom).</param>
+    /// <returns>A factor bounded between 8,000 and 12,000 basis points, pivoting on ninth place.</returns>
+    public static int GateRevenueFormFactorBpFor(int formRank)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(formRank, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(formRank, ClubsPerDivision);
+
+        return Math.Clamp(10_000 + ((9 - formRank) * GateRevenueFormFactorStepPerRankBp), 8_000, 12_000);
+    }
+
+    /// <summary>The gate revenue a home fixture yields, in minor units (`FIN-3`).</summary>
+    /// <param name="stadiumBaseline">The club's fixed stadium baseline, already scaled to its tier.</param>
+    /// <param name="formRank">The club's league position, 1–18.</param>
+    public static long GateRevenueMinorFor(long stadiumBaseline, int formRank)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(stadiumBaseline);
+
+        // Divided in two steps so the intermediate product stays well inside long, and so the factor and the
+        // fraction each truncate on their own rather than blending into one rounding.
+        return stadiumBaseline
+            * GateRevenueBaseFractionBp / 10_000
+            * GateRevenueFormFactorBpFor(formRank) / 10_000;
+    }
+
+    /// <summary>The weekly sponsorship credit for a tier-1 club, in minor units. A balancing value (`FIN-4`).</summary>
+    public const long WeeklySponsorshipMinorTier1 = 3_000_000;
+
+    /// <summary>The weekly sponsorship credit for a club in the given tier, in minor units (`FIN-4`).</summary>
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long WeeklySponsorshipMinorForTier(int tier) =>
+        WeeklySponsorshipMinorTier1 / TierScalingFactor(tier);
+
+    /// <summary>The small fixed weekly operating cost for a tier-1 club, in minor units (`FIN-9`).</summary>
+    public const long WeeklyOperatingCostMinorTier1 = 1_000_000;
+
+    /// <summary>The small fixed weekly operating cost for a club in the given tier, in minor units (`FIN-9`).</summary>
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long WeeklyOperatingCostMinorForTier(int tier) =>
+        WeeklyOperatingCostMinorTier1 / TierScalingFactor(tier);
+
+    /// <summary>The final-position award for the champion of a tier-1 division, in minor units (`FIN-5`).</summary>
+    public const long PositionAwardMinorTier1Winner = 40_000_000;
+
+    /// <summary>The award a club earns for finishing at a rank in a tier, in minor units (`FIN-5`).</summary>
+    /// <remarks>
+    /// The award decays linearly with position — the champion takes the full amount, the bottom club a
+    /// minimum share — and the whole scale halves per tier like the other baselines. Settled at rollover.
+    /// </remarks>
+    /// <param name="tier">The tier number, starting at 1.</param>
+    /// <param name="rank">The club's final position, 1–18.</param>
+    public static long PositionAwardMinorFor(int tier, int rank)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(tier, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(rank, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(rank, ClubsPerDivision);
+
+        var baseAward = PositionAwardMinorTier1Winner / TierScalingFactor(tier);
+        var share = ClubsPerDivision - (rank - 1);
+
+        return baseAward * share / ClubsPerDivision;
+    }
+
+    /// <summary>
+    /// How many weeks of its wage bill a club must hold in cash before payroll is not a risk (`FIN-16`).
+    /// </summary>
+    /// <remarks>
+    /// The threshold the dashboards warn on and the safety job watches: a club with less than this many
+    /// weeks of wages in cash is one bad week away from failing to pay, which is the condition the emergency
+    /// grant exists to prevent. A balancing value, tuned out through the multi-season simulations.
+    /// </remarks>
+    public const int PayrollRiskWeeks = 4;
+
+    /// <summary>
+    /// How a player's age shapes a renewal quote, in basis points (`CON-3`).
+    /// </summary>
+    /// <remarks>
+    /// Young players are cheaper to tie down and old ones cheaper still, with the peak years the middle.
+    /// Bounded by construction, so no age can multiply a wage into a number the base does not support. A
+    /// balancing value, like the other finance baselines.
+    /// </remarks>
+    /// <param name="age">The player's age in game years.</param>
+    public static int RenewalAgeFactorBp(int age)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(age);
+
+        return age switch
+        {
+            <= 23 => 11_500,
+            <= 28 => 10_500,
+            <= 31 => 9_500,
+            _ => 8_500,
+        };
+    }
+
+    /// <summary>How many appearances a player has made this season shapes their renewal quote (`CON-3`).</summary>
+    /// <param name="appearances">Matches played this season.</param>
+    public static int RenewalAppearancesFactorBp(int appearances)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(appearances);
+
+        return appearances switch
+        {
+            >= 20 => 11_000,
+            >= 10 => 10_500,
+            >= 1 => 10_000,
+            _ => 9_500,
+        };
+    }
+
+    /// <summary>How morale shapes a renewal quote, in basis points (`CON-3`).</summary>
+    /// <param name="moraleBp">The player's morale in basis points (`TRN-7`).</param>
+    public static int RenewalMoraleFactorBp(int moraleBp)
+    {
+        if (moraleBp is < StateBasisPointsMin or > StateBasisPointsMax)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(moraleBp),
+                moraleBp,
+                $"Morale is between {StateBasisPointsMin} and {StateBasisPointsMax} basis points (TRN-7).");
+        }
+
+        // 9,000 at rock bottom, 10,000 at the ceiling: an unhappy player needs the sweeter offer.
+        return 9_000 + (moraleBp / 10);
+    }
+
+    /// <summary>How the length of the new deal shapes a renewal quote, in basis points (`CON-3`).</summary>
+    /// <param name="seasons">The new contract's length, 1–3 seasons (`CON-1`).</param>
+    public static int RenewalTermFactorBp(int seasons)
+    {
+        if (seasons is < ContractMinSeasons or > ContractMaxSeasons)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(seasons),
+                seasons,
+                $"A contract is between {ContractMinSeasons} and {ContractMaxSeasons} game seasons (CON-1).");
+        }
+
+        // A longer commitment buys a slightly lower weekly wage.
+        return seasons switch
+        {
+            1 => 10_500,
+            2 => 10_000,
+            _ => 9_500,
+        };
+    }
+
+    /// <summary>How much of the current term is left shapes a renewal quote (`CON-3`).</summary>
+    /// <param name="remainingSeasons">Full seasons left after the current one.</param>
+    public static int RenewalRemainingTermFactorBp(int remainingSeasons)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(remainingSeasons);
+
+        // A player whose deal is running out holds the stronger hand, so the expiring year costs the most.
+        return remainingSeasons switch
+        {
+            0 => 11_000,
+            1 => 10_500,
+            _ => 10_000,
+        };
+    }
 
     /// <summary>The number of goalkeepers the generator gives each club (`SQ-1`).</summary>
     /// <remarks>

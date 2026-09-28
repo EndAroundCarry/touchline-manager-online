@@ -146,4 +146,57 @@ public sealed class WorldRuleSetTests
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
+
+    [Fact]
+    public void The_gate_factor_is_bounded_and_pivots_on_ninth_place()
+    {
+        // FIN-3: form moves the gate, but only within a fifth either side of a neutral gate.
+        WorldRuleSet.GateRevenueFormFactorBpFor(1).Should().Be(12_000, "the top of the table clamps at the ceiling");
+        WorldRuleSet.GateRevenueFormFactorBpFor(9).Should().Be(10_000, "ninth place is the neutral gate");
+        WorldRuleSet.GateRevenueFormFactorBpFor(18).Should().Be(8_000, "the bottom of the table clamps at the floor");
+
+        var top = WorldRuleSet.GateRevenueMinorFor(WorldRuleSet.OpeningStadiumBaselineTier1, formRank: 1);
+        var bottom = WorldRuleSet.GateRevenueMinorFor(WorldRuleSet.OpeningStadiumBaselineTier1, formRank: 18);
+
+        top.Should().BeGreaterThan(bottom, "a club near the top draws the fuller ground");
+        bottom.Should().BeGreaterThan(0, "even the bottom club draws a gate");
+        WorldRuleSet.GateRevenueMinorFor(WorldRuleSet.OpeningStadiumBaselineTier1, formRank: 9).Should()
+            .Be(WorldRuleSet.OpeningStadiumBaselineTier1 * WorldRuleSet.GateRevenueBaseFractionBp / 10_000);
+    }
+
+    [Fact]
+    public void A_position_outside_the_division_is_a_programming_error_for_the_gate()
+    {
+        var below = () => WorldRuleSet.GateRevenueFormFactorBpFor(0);
+        var above = () => WorldRuleSet.GateRevenueFormFactorBpFor(WorldRuleSet.ClubsPerDivision + 1);
+
+        below.Should().Throw<ArgumentOutOfRangeException>();
+        above.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void The_weekly_run_values_scale_with_tier_and_the_award_decays_with_position()
+    {
+        WorldRuleSet.WeeklyFinanceUtc.Should().Be(new TimeOnly(23, 0), "CON-2 charges wages after Sunday");
+
+        WorldRuleSet.WeeklySponsorshipMinorForTier(1).Should()
+            .BeGreaterThan(WorldRuleSet.WeeklySponsorshipMinorForTier(2), "FIN-4 halves per tier");
+        WorldRuleSet.WeeklyOperatingCostMinorForTier(1).Should()
+            .BeGreaterThan(WorldRuleSet.WeeklyOperatingCostMinorForTier(3), "FIN-9 halves per tier");
+
+        WorldRuleSet.PositionAwardMinorFor(1, 1).Should()
+            .BeGreaterThan(WorldRuleSet.PositionAwardMinorFor(1, WorldRuleSet.ClubsPerDivision), "FIN-5 decays with rank");
+        WorldRuleSet.PositionAwardMinorFor(2, 1).Should()
+            .BeLessThan(WorldRuleSet.PositionAwardMinorFor(1, 1), "a deeper tier pays less for the same place");
+
+        WorldRuleSet.PayrollRiskWeeks.Should().BeGreaterThan(0, "a club holds weeks of wages before payroll is a risk (FIN-16)");
+    }
+
+    [Fact]
+    public void A_position_outside_the_division_is_a_programming_error_for_the_award()
+    {
+        var act = () => WorldRuleSet.PositionAwardMinorFor(tier: 1, rank: WorldRuleSet.ClubsPerDivision + 1);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
 }

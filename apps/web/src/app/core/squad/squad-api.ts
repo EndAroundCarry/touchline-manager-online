@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
-import { ContractList, Player, Squad } from './squad.models';
+import { ContractList, ContractRenewal, Player, RenewalQuote, Squad } from './squad.models';
 
 /**
  * The squad module's HTTP surface (master plan §10.3).
@@ -28,5 +28,27 @@ export class SquadApi {
   /** Reads the contracts of the club the caller holds. */
   contracts(): Observable<ContractList> {
     return this.api.get<ContractList>('/contracts');
+  }
+
+  /** Asks the server for the deterministic renewal quote for a contract and a term (`CON-3`). */
+  renewalQuote(contractId: string, seasons: number): Observable<RenewalQuote> {
+    return this.api.post<RenewalQuote, { seasons: number }>(
+      `/contracts/${contractId}/renewal-quote`,
+      { seasons },
+    );
+  }
+
+  /**
+   * Accepts a renewal (`CON-4`).
+   *
+   * The quote's contract version is sent as `If-Match`, so a renewal agreed against a stale read is refused
+   * with `412` rather than signing over a change made elsewhere.
+   */
+  renew(contractId: string, seasons: number, version: number): Observable<ContractRenewal> {
+    return this.api.post<ContractRenewal, { seasons: number }>(
+      `/contracts/${contractId}/renew`,
+      { seasons },
+      { etag: `"${version}"` },
+    );
   }
 }

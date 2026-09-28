@@ -24,4 +24,22 @@ public interface IClubAccountRepository
 
     /// <summary>Finds a club's account, or null when none has been opened.</summary>
     Task<ClubAccount?> FindByClubAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads several clubs' accounts at once, tracked, so a run that touches a whole division or every club
+    /// reads them in one round trip (`FIN-3`, `FIN-7`).
+    /// </summary>
+    /// <param name="clubIds">The clubs whose accounts are wanted.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The accounts that exist, in no particular order.</returns>
+    Task<IReadOnlyList<ClubAccount>> LoadAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads every club's account, tracked, so a world-wide run settles all of them in one transaction
+    /// (`FIN-7`, `FIN-9`).
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<ClubAccount>> LoadAllAsync(CancellationToken cancellationToken);
 }

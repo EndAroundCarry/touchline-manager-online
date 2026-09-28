@@ -126,4 +126,7 @@ public static class AuditTargetTypes
 
     /// <summary>A club's prepared side for one fixture (`SQ-4`).</summary>
     public const string FixtureTeamSheet = "fixture_team_sheet";
+
+    /// <summary>A player's contract (`CON-3`, `CON-4`).</summary>
+    public const string PlayerContract = "player_contract";
 }

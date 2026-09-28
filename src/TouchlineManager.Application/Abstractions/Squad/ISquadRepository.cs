@@ -33,4 +33,12 @@ public interface ISquadRepository
 
     /// <summary>Stages a generated player's active registration (`SQ-6`).</summary>
     void AddPlayerRegistration(PlayerRegistration registration);
+
+    /// <summary>
+    /// Finds one contract, tracked, so a renewal can close it and stage its replacement in one unit of work
+    /// (`CON-3`, `CON-4`).
+    /// </summary>
+    /// <param name="contractId">The contract to find.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<PlayerContract?> FindContractAsync(Guid contractId, CancellationToken cancellationToken);
 }

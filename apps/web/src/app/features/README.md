@@ -25,8 +25,8 @@ lands, and its route is added to `app.routes.ts` at the same time, so no unreach
 
 Present today: `welcome/`, `not-found/`, the `auth/` screens, `settings/`, the `onboarding/` screens,
 `dashboard/`, and — as of Stage 4 — `squad/`, `player/`, `tactics/` and `training/`, with `fixtures/`,
-`prepare/` and `match-viewer/` arriving in Stage 6 and 7. A folder and its route land together, so the
-table above doubles as the record of what is reachable.
+`prepare/` and `match-viewer/` arriving in Stage 6 and 7, and `finances/` in Stage 9. A folder and its route
+land together, so the table above doubles as the record of what is reachable.
 
 ## Conventions
 

@@ -9,6 +9,7 @@ using TouchlineManager.Api.Comms;
 using TouchlineManager.Api.Competition;
 using TouchlineManager.Api.Configuration;
 using TouchlineManager.Api.Endpoints;
+using TouchlineManager.Api.Finance;
 using TouchlineManager.Api.Health;
 using TouchlineManager.Api.Http;
 using TouchlineManager.Api.Match;
@@ -233,6 +234,7 @@ app.MapCompetitionEndpoints();
 app.MapTeamSheetEndpoints();
 app.MapMatchEndpoints();
 app.MapCommsEndpoints();
+app.MapFinanceEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;
 

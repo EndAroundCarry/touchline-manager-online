@@ -5,6 +5,7 @@ using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Match;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Infrastructure.Persistence;
@@ -334,6 +335,78 @@ public sealed class MatchdayWorkflowTests
             divisionSeasonId))
             .Should()
             .BeEquivalentTo(after);
+    }
+
+    [Fact]
+    public async Task Publishing_a_round_posts_a_gate_receipt_for_every_host_club_and_the_ledger_replays()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var matchdayId = await ClaimRoundAsync(scope);
+        var divisionSeasonId = await DivisionSeasonOfAsync(db, matchdayId);
+
+        await scope.ServiceProvider.GetRequiredService<LockMatchday>().ExecuteAsync(matchdayId, CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<ResolveMatchday>()
+            .ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
+
+        var published = await scope.ServiceProvider.GetRequiredService<PublishMatchday>()
+            .ExecuteAsync(matchdayId, CancellationToken.None);
+
+        published.Outcome.Should().Be(PublishMatchdayOutcome.Published);
+
+        var fixtureIds = (await FixturesOfAsync(db, matchdayId)).Select(fixture => fixture.Id).ToList();
+
+        // A separate scope so the assertions read committed rows rather than the tracked instances this
+        // publication just changed.
+        await using var readScope = Fixture.CreateScope();
+        var readDb = readScope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var gates = await readDb.LedgerEntries
+            .Where(entry => entry.Category == LedgerCategory.GateReceipt
+                && entry.SourceId != null
+                && fixtureIds.Contains(entry.SourceId.Value))
+            .ToListAsync();
+
+        gates.Should().HaveCount(9, "a round has nine home fixtures (FIN-3)");
+        gates.Select(gate => gate.SourceId).Should().OnlyHaveUniqueItems("the fixture keys the gate (FIN-17)");
+        gates.Select(gate => gate.SourceType).Should().OnlyContain(source => source == LedgerSourceType.Matchday);
+        gates.Should().OnlyContain(
+            gate => gate.CashDeltaMinor > 0 && gate.ReservedDeltaMinor == 0,
+            "the gate is a credit");
+
+        var homeClubIds = (await FixturesOfAsync(readDb, matchdayId))
+            .Select(fixture => fixture.HomeClubId)
+            .Distinct()
+            .ToList();
+
+        gates.Select(gate => gate.ClubId).Should().BeEquivalentTo(homeClubIds);
+
+        var clubs = await readDb.Clubs
+            .Where(club => homeClubIds.Contains(club.Id))
+            .ToDictionaryAsync(club => club.Id);
+        var ranks = await readDb.Standings
+            .Where(standing => standing.DivisionSeasonId == divisionSeasonId)
+            .ToDictionaryAsync(standing => standing.ClubId, standing => standing.Rank);
+
+        // The gate is the stadium baseline shaped by the position the round produced (FIN-3).
+        foreach (var gate in gates)
+        {
+            gate.CashDeltaMinor.Should().Be(
+                WorldRuleSet.GateRevenueMinorFor(clubs[gate.ClubId].StadiumBaseline, ranks[gate.ClubId]));
+        }
+
+        // The account is the running total of the ledger, so the gate sits inside the balance it produced
+        // (FIN-18).
+        foreach (var clubId in homeClubIds)
+        {
+            var entries = await readDb.LedgerEntries
+                .Where(entry => entry.ClubId == clubId)
+                .ToListAsync();
+            var account = await readDb.ClubAccounts.SingleAsync(candidate => candidate.ClubId == clubId);
+
+            entries.Sum(entry => entry.CashDeltaMinor).Should().Be(account.CashMinor);
+            entries.Sum(entry => entry.ReservedDeltaMinor).Should().Be(account.ReservedMinor);
+        }
     }
 
     /// <summary>

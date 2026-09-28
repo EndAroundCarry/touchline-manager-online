@@ -24,4 +24,19 @@ public interface ILedgerRepository
     /// <summary>Stages one ledger entry.</summary>
     /// <param name="entry">The entry.</param>
     void Add(LedgerEntry entry);
+
+    /// <summary>
+    /// Reports which of the given correlation keys already have an entry, so a retried operation can skip the
+    /// work it already did instead of colliding with its own rows (`FIN-17`).
+    /// </summary>
+    /// <remarks>
+    /// The unique index is still the guarantee against a concurrent double-write; this read is what makes a
+    /// sequential retry a clean no-op rather than a failed insert.
+    /// </remarks>
+    /// <param name="correlationIds">The operation keys to look for.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The subset of the keys that already appear in the ledger.</returns>
+    Task<IReadOnlySet<string>> FindExistingCorrelationIdsAsync(
+        IReadOnlyCollection<string> correlationIds,
+        CancellationToken cancellationToken);
 }

@@ -20,4 +20,16 @@ internal sealed class ClubAccountRepository : IClubAccountRepository
     /// <inheritdoc />
     public Task<ClubAccount?> FindByClubAsync(Guid clubId, CancellationToken cancellationToken) =>
         _dbContext.ClubAccounts.SingleOrDefaultAsync(account => account.ClubId == clubId, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubAccount>> LoadAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken) =>
+        await _dbContext.ClubAccounts
+            .Where(account => clubIds.Contains(account.ClubId))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubAccount>> LoadAllAsync(CancellationToken cancellationToken) =>
+        await _dbContext.ClubAccounts.ToListAsync(cancellationToken);
 }

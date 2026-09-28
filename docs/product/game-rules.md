@@ -334,6 +334,25 @@ correlation key and category and collides with its first entry rather than posti
 record the income and expense sources above, the awards, and the market's reservations are added to, each
 milestone contributing its own category as it lands.
 
+### 13.4 The income and expense formulas
+
+Each of the sources above is a named value in the rule set (`RULE-1`), so a balancing change is a version bump
+rather than a hunt for a constant. The study of the six leagues staying viable over several seasons is what
+calibrates the baselines; the shapes below are fixed from this version on.
+
+- **Gate revenue (`FIN-3`)** is the club's fixed stadium baseline (already scaled to its tier) times a base
+  fraction of 20%, times an attendance factor of 8000–12000 basis points that rises with league position and
+  clamps at both ends. It is posted for the host club of every published fixture, inside the publication
+  transaction, priced against the table that round produced.
+- **Weekly sponsorship (`FIN-4`)** is a fixed tier-1 credit halved per tier below the first.
+- **Weekly player wages (`FIN-7`)** are the sum of the club's active contracts' weekly wages, charged after the
+  Sunday matchday.
+- **The weekly operating cost (`FIN-9`)** is a small fixed tier-1 cost halved per tier below the first.
+- **The promotion and position award (`FIN-5`)** is a tier-1 champion's award decayed linearly by final
+  position and halved per tier, settled at rollover.
+- **The emergency grant (`FIN-16`)** is not a formula: it is the exact shortfall the safety step computes when a
+  club cannot cover its next wage run, recorded as its own category and source so it is visible in the ledger.
+
 ---
 
 ## 14. Scouting and transfers
@@ -532,6 +551,14 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `opening_cash_minor_tier1` | 50,000,000 minor units | FIN-1 (balancing) |
 | `opening_stadium_baseline_tier1` | 25,000,000 minor units | FIN-3 (balancing) |
 | `opening_reputation_tier1` | 70 / 100 | WORLD-3 (balancing) |
+| `gate_revenue_base_fraction_bp` | 2,000 (20% of stadium baseline) | FIN-3 (balancing) |
+| `gate_revenue_form_factor_bp` | 8,000–12,000, pivoting on ninth place | FIN-3 (balancing) |
+| `gate_revenue_form_factor_step_bp` | 300 per place | FIN-3 (balancing) |
+| `weekly_sponsorship_minor_tier1` | 3,000,000 minor units | FIN-4 (balancing) |
+| `weekly_operating_cost_minor_tier1` | 1,000,000 minor units | FIN-9 (balancing) |
+| `position_award_minor_tier1_winner` | 40,000,000 minor units | FIN-5 (balancing) |
+| `weekly_finance_utc` | Sunday 23:00 UTC | CON-2 |
+| `payroll_risk_weeks` | 4 | FIN-16 (balancing) |
 | `listing_min_exposure_hours` | 48 | TRF-2 |
 | `auction_blackout_hours_before_kickoff` | 6 | TRF-3 |
 | `refresh_token_lifetime_minutes` | 15 (access) | ADR-0002 |

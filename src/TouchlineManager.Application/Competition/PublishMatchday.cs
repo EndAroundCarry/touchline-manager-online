@@ -3,6 +3,7 @@ using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Comms;
+using TouchlineManager.Application.Finance;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
@@ -74,6 +75,7 @@ public sealed class PublishMatchday
     private readonly IAvailabilityRepository _availability;
     private readonly IPlayerStateRepository _playerStates;
     private readonly MatchdayNotifications _notifications;
+    private readonly MatchdayFinances _finances;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
 
@@ -83,6 +85,7 @@ public sealed class PublishMatchday
         IAvailabilityRepository availability,
         IPlayerStateRepository playerStates,
         MatchdayNotifications notifications,
+        MatchdayFinances finances,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
@@ -90,6 +93,7 @@ public sealed class PublishMatchday
         _availability = availability;
         _playerStates = playerStates;
         _notifications = notifications;
+        _finances = finances;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -138,6 +142,15 @@ public sealed class PublishMatchday
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var positions = await RebuildTableAsync(workload.Matchday.DivisionSeasonId, now, cancellationToken);
+
+        // The gate is drawn against the table the round just produced, and staged in this transaction so
+        // the result and the money it earned become public together (FIN-3, §7.4.7).
+        await _finances.PostGateReceiptsAsync(
+            workload.Matchday.Id,
+            published,
+            positions,
+            now,
+            cancellationToken);
 
         var effects = await ApplyEffectsAsync(workload, published, now, cancellationToken);
 

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Domain.Squad;
 
@@ -33,4 +34,10 @@ internal sealed class SquadRepository : ISquadRepository
     /// <inheritdoc />
     public void AddPlayerRegistration(PlayerRegistration registration) =>
         _dbContext.PlayerRegistrations.Add(registration);
+
+    /// <inheritdoc />
+    public Task<PlayerContract?> FindContractAsync(Guid contractId, CancellationToken cancellationToken) =>
+        _dbContext.PlayerContracts.SingleOrDefaultAsync(
+            contract => contract.Id == contractId,
+            cancellationToken);
 }

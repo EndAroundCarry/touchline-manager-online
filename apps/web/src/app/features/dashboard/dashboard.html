@@ -78,6 +78,20 @@
         </p>
       }
 
+      @if (warnings().length > 0) {
+        <section class="mt-6 rounded border border-amber-300 bg-amber-50 p-4" aria-labelledby="finance-warnings">
+          <h2 id="finance-warnings" class="text-sm font-medium text-amber-900">Worth your attention</h2>
+          <ul class="mt-2 list-disc pl-5 text-sm text-amber-900">
+            @for (warning of warnings(); track warning.code) {
+              <li>{{ warning.message }}</li>
+            }
+          </ul>
+          <p class="mt-2 text-sm">
+            <a routerLink="/finances" [class]="linkClass">Open your finances</a>
+          </p>
+        </section>
+      }
+
       <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div class="rounded border border-slate-200 bg-white p-4">
           <dt class="text-sm font-medium text-slate-500">Club funds</dt>

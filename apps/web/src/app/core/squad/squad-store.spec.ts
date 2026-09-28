@@ -17,11 +17,26 @@ const otherSquad = { clubId: 'club-2', clubName: 'Vale Rovers', players: [] } as
 const player = { id: 'player-1', fullName: 'Alaric Alderwick' } as unknown as Player;
 const contracts = { clubId: 'club-1', contracts: [] } as unknown as ContractList;
 
+const quote = {
+  contractId: 'contract-1',
+  playerId: 'player-1',
+  seasons: 3,
+  startSeasonNumber: 1,
+  endSeasonNumber: 3,
+  weeklyWageMinor: 1_200_000,
+  contractVersion: 4,
+  serverTime: '2026-09-28T00:00:00Z',
+};
+
+const renewedPlayer = { id: 'player-1', fullName: 'Alaric Alderwick', contract: { id: 'contract-2' } } as unknown as Player;
+
 function createSquadApiStub() {
   return {
     squad: vi.fn(),
     player: vi.fn(),
     contracts: vi.fn(),
+    renewalQuote: vi.fn(),
+    renew: vi.fn(),
   };
 }
 
@@ -73,6 +88,33 @@ describe('SquadStore', () => {
 
     await expect(firstValueFrom(store.loadSquad('club-2'))).rejects.toThrow('CLUB_NOT_MANAGED');
     expect(store.squad()).toBeNull();
+  });
+
+  it('publishes the renewal quote it read, and forgets it on demand', async () => {
+    api.renewalQuote.mockReturnValue(of(quote));
+
+    await firstValueFrom(store.quoteRenewal('contract-1', 3));
+
+    expect(api.renewalQuote).toHaveBeenCalledWith('contract-1', 3);
+    expect(store.renewalQuote()).toBe(quote);
+
+    store.clearRenewalQuote();
+
+    expect(store.renewalQuote()).toBeNull();
+  });
+
+  it('re-signs under the quoted version and re-reads the profile the server now holds', async () => {
+    api.renewalQuote.mockReturnValue(of(quote));
+    api.renew.mockReturnValue(of({ ...quote, contractId: 'contract-2', version: 1 }));
+    api.player.mockReturnValue(of(renewedPlayer));
+
+    await firstValueFrom(store.quoteRenewal('contract-1', 3));
+    await firstValueFrom(store.renewContract('contract-1', 'player-1', 3, quote.contractVersion));
+
+    // The quote's version is the If-Match the command carries, so a stale quote is refused (CONC-1).
+    expect(api.renew).toHaveBeenCalledWith('contract-1', 3, quote.contractVersion);
+    expect(store.player()).toBe(renewedPlayer);
+    expect(store.renewalQuote()).toBeNull();
   });
 
   it('forgets everything on clear, so one manager never sees the previous squad', async () => {

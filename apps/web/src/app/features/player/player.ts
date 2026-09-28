@@ -17,8 +17,10 @@ import {
   FORM_ERROR,
   LINK,
   PAGE_HEADING,
+  PRIMARY_BUTTON,
   SECONDARY_BUTTON,
   STATUS_MESSAGE,
+  TEXT_INPUT,
 } from '../../shared/forms/control-styles';
 
 /**
@@ -68,10 +70,26 @@ export class PlayerProfile implements OnInit {
     return stats === null || stats === undefined ? [] : seasonStatRows(stats);
   });
 
+  /** The renewal quote last requested, or null (`CON-3`). */
+  protected readonly renewalQuote = this.store.renewalQuote;
+
+  /** The term the manager is asking for, in seasons (`CON-1`). */
+  protected readonly renewalSeasons = signal(3);
+
+  /** The lengths a manager may offer. */
+  protected readonly termOptions = [1, 2, 3];
+
+  protected readonly quoting = signal(false);
+  protected readonly signing = signal(false);
+  protected readonly renewalError = signal<string | null>(null);
+  protected readonly renewalMessage = signal<string | null>(null);
+
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly primaryButtonClass = PRIMARY_BUTTON;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
+  protected readonly inputClass = TEXT_INPUT;
   protected readonly linkClass = LINK;
 
   /** Reads the profile for the player the route names. */
@@ -120,5 +138,71 @@ export class PlayerProfile implements OnInit {
   /** Describes an injury or suspension in fixtures. */
   protected availability(type: string, remainingFixtures: number): string {
     return availabilityLabel(type, remainingFixtures);
+  }
+
+  /** Changes the offered term and forgets any quote for the old one. */
+  protected setSeasons(value: number): void {
+    this.renewalSeasons.set(value);
+    this.store.clearRenewalQuote();
+    this.renewalError.set(null);
+    this.renewalMessage.set(null);
+  }
+
+  /** Asks the server for the deterministic quote for the chosen term (`CON-3`). */
+  protected quoteRenewal(): void {
+    const contract = this.player()?.contract;
+
+    if (contract === null || contract === undefined || this.quoting()) {
+      return;
+    }
+
+    this.quoting.set(true);
+    this.renewalError.set(null);
+    this.renewalMessage.set(null);
+
+    this.store.quoteRenewal(contract.id, this.renewalSeasons()).subscribe({
+      next: () => this.quoting.set(false),
+      error: (error: unknown) => {
+        this.quoting.set(false);
+        this.renewalError.set(
+          error instanceof ApiError ? error.detail : 'A renewal quote could not be requested.',
+        );
+      },
+    });
+  }
+
+  /** Accepts the quoted renewal (`CON-4`), conditional on the version the quote carried. */
+  protected signRenewal(): void {
+    const player = this.player();
+    const quote = this.renewalQuote();
+
+    if (player === null || player.contract === null || quote === null || this.signing()) {
+      return;
+    }
+
+    this.signing.set(true);
+    this.renewalError.set(null);
+    this.renewalMessage.set(null);
+
+    this.store
+      .renewContract(player.contract.id, player.id, this.renewalSeasons(), quote.contractVersion)
+      .subscribe({
+        next: () => {
+          this.signing.set(false);
+          this.renewalMessage.set(`${player.fullName} has been re-signed.`);
+        },
+        error: (error: unknown) => {
+          this.signing.set(false);
+
+          // A stale quote is dropped rather than shown, so the manager asks again against current state.
+          if (error instanceof ApiError && error.isPreconditionFailed) {
+            this.store.clearRenewalQuote();
+          }
+
+          this.renewalError.set(
+            error instanceof ApiError ? error.detail : 'The renewal could not be signed.',
+          );
+        },
+      });
   }
 }

@@ -216,6 +216,42 @@ public sealed record PlayerSnapshot(
     int GameYear);
 
 /// <summary>
+/// Everything a renewal quote is derived from, gathered server-side (`CON-3`).
+/// </summary>
+/// <remarks>
+/// A dedicated projection rather than reusing the player profile, because the profile deliberately omits the
+/// hidden potential the quote needs: this read is server-only and never crosses the wire. The contract's
+/// version rides along so the renewal can be conditional without a second read.
+/// </remarks>
+/// <param name="ContractId">The contract being renewed.</param>
+/// <param name="PlayerId">The contracted player.</param>
+/// <param name="ClubId">The club the contract binds the player to, which ownership is checked against.</param>
+/// <param name="ContractVersion">The contract's optimistic-concurrency version.</param>
+/// <param name="SquadStatus">The player's standing in the squad, which the new contract keeps.</param>
+/// <param name="Ability">The player's current ability, the mean of their attributes.</param>
+/// <param name="Potential">The hidden development ceiling. Class C2: server-only.</param>
+/// <param name="Age">The player's age in game years.</param>
+/// <param name="Appearances">Matches played this season.</param>
+/// <param name="MoraleBp">The player's morale in basis points (`TRN-7`).</param>
+/// <param name="TierNumber">The tier the club plays in.</param>
+/// <param name="CurrentSeasonNumber">The season the new contract would begin in.</param>
+/// <param name="RemainingSeasons">Full seasons left on the current contract after the current one.</param>
+public sealed record ContractRenewalContext(
+    Guid ContractId,
+    Guid PlayerId,
+    Guid ClubId,
+    long ContractVersion,
+    SquadStatus SquadStatus,
+    int Ability,
+    int Potential,
+    int Age,
+    int Appearances,
+    int MoraleBp,
+    int TierNumber,
+    int CurrentSeasonNumber,
+    int RemainingSeasons);
+
+/// <summary>
 /// The read side of the squad module.
 /// </summary>
 /// <remarks>
@@ -246,4 +282,14 @@ public interface ISquadQueries
     /// <param name="clubId">The club to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<ContractsSnapshot?> GetContractsAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the server-only context a renewal quote is derived from, or null when the contract is unknown or
+    /// no longer active (`CON-3`).
+    /// </summary>
+    /// <param name="contractId">The contract to quote.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<ContractRenewalContext?> GetRenewalContextAsync(
+        Guid contractId,
+        CancellationToken cancellationToken);
 }

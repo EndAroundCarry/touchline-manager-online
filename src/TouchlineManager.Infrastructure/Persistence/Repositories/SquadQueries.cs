@@ -254,6 +254,100 @@ internal sealed class SquadQueries : ISquadQueries
             contracts);
     }
 
+    /// <inheritdoc />
+    public async Task<ContractRenewalContext?> GetRenewalContextAsync(
+        Guid contractId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var contract = await _dbContext.PlayerContracts
+            .Where(candidate => candidate.Id == contractId && candidate.Status == ContractStatus.Active)
+            .Select(candidate => new
+            {
+                candidate.Id,
+                candidate.PlayerId,
+                candidate.ClubId,
+                candidate.Version,
+                candidate.SquadStatus,
+                candidate.EndSeasonNumber,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (contract is null)
+        {
+            return null;
+        }
+
+        var player = await _dbContext.Players
+            .Where(candidate => candidate.Id == contract.PlayerId)
+            .Select(candidate => new { candidate.BirthGameYear, candidate.Potential })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Read as the entity rather than projected: the attribute set's values are a computed accessor over
+        // the row's columns, so the mean is taken in memory rather than re-parsed in SQL.
+        var attributes = await _dbContext.PlayerAttributes
+            .FirstOrDefaultAsync(candidate => candidate.PlayerId == contract.PlayerId, cancellationToken);
+
+        if (player is null || attributes is null)
+        {
+            return null;
+        }
+
+        var moraleBp = await _dbContext.PlayerStates
+            .Where(candidate => candidate.PlayerId == contract.PlayerId)
+            .Select(candidate => (int?)candidate.MoraleBp)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var placement = await (
+            from entry in _dbContext.ClubSeasonEntries
+            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            where entry.ClubId == contract.ClubId && divisionSeason.SeasonId == season.SeasonId
+            select new { divisionSeason.Id, division.TierNumber })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (placement is null)
+        {
+            return null;
+        }
+
+        var appearances = await _dbContext.PlayerSeasonStats
+            .Where(stat => stat.DivisionSeasonId == placement.Id
+                && stat.PlayerId == contract.PlayerId
+                && stat.ClubId == contract.ClubId)
+            .Select(stat => (int?)stat.Appearances)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var values = attributes.ToSet().Values;
+
+        // The mean of the twenty-eight attributes: the same ability signal the AI policy uses, and no
+        // authority beyond what it needs to be (it is an input to a wage, not a published "overall").
+        var ability = values.Count == 0
+            ? WorldRuleSet.AttributeMin
+            : (int)Math.Round(values.Average(), MidpointRounding.AwayFromZero);
+
+        return new ContractRenewalContext(
+            contract.Id,
+            contract.PlayerId,
+            contract.ClubId,
+            contract.Version,
+            contract.SquadStatus,
+            ability,
+            player.Potential,
+            season.GameYear - player.BirthGameYear,
+            appearances ?? 0,
+            moraleBp ?? 0,
+            placement.TierNumber,
+            season.SequenceNumber,
+            Math.Max(0, contract.EndSeasonNumber - season.SequenceNumber));
+    }
+
     /// <summary>Reads every open injury and suspension for the given players, keyed by player.</summary>
     /// <remarks>
     /// A player can hold more than one open record — an injury and a suspension overlap — so the result is

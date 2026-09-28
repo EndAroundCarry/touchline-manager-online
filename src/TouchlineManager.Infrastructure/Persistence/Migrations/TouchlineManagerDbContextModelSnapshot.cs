@@ -1904,7 +1904,7 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("player_contracts", "squad", t =>
                         {
-                            t.HasCheckConstraint("ck_player_contracts_closed_reason", "closed_reason is null or closed_reason in ('expired', 'transferred', 'released', 'retired')");
+                            t.HasCheckConstraint("ck_player_contracts_closed_reason", "closed_reason is null or closed_reason in ('expired', 'transferred', 'renewed', 'released', 'retired')");
 
                             t.HasCheckConstraint("ck_player_contracts_squad_status", "squad_status in ('key_player', 'first_team', 'rotation', 'prospect')");
 

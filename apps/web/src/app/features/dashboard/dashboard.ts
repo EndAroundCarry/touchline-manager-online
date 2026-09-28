@@ -8,6 +8,7 @@ import {
   venueLabel,
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { FinanceStore } from '../../core/finance/finance-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { ClubDashboard } from '../../core/world/world.models';
@@ -40,6 +41,7 @@ import {
 export class Dashboard {
   private readonly store = inject(OnboardingStore);
   private readonly competition = inject(CompetitionStore);
+  private readonly finance = inject(FinanceStore);
 
   protected readonly state = this.store.state;
   protected readonly club = signal<ClubDashboard | null>(null);
@@ -50,6 +52,9 @@ export class Dashboard {
 
   /** The club's fixture list, read once a club is held so the next fixture can be shown. */
   protected readonly fixtures = this.competition.fixtures;
+
+  /** The risks the club is running: expiring contracts, payroll risk, a squad below the minimum (`FIN-16`). */
+  protected readonly warnings = computed(() => this.finance.summary()?.warnings ?? []);
 
   /** The next fixture still to be played, or null once the season is done (§11.1). */
   protected readonly nextFixture = computed<ClubFixture | null>(() => {
@@ -93,9 +98,11 @@ export class Dashboard {
             this.club.set(dashboard);
             this.loading.set(false);
 
-            // The next fixture is a second read because it is a different resource; a failure here leaves
-            // the rest of the dashboard intact rather than blanking the screen.
+            // The next fixture and the finance warnings are separate reads because they are different
+            // resources; a failure in either leaves the rest of the dashboard intact rather than blanking
+            // the screen.
             this.competition.loadFixtures();
+            this.finance.loadSummary();
           },
           error: (error: unknown) => {
             this.loading.set(false);
