@@ -53,4 +53,14 @@ public interface IInboxRepository
     Task<IReadOnlyDictionary<Guid, string>> FindPlayerNamesAsync(
         IReadOnlyCollection<Guid> playerIds,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the account address of each manager a notification email may be sent to, so the writers that go
+    /// beyond the inbox can address their mail in one query (`COM-4`).
+    /// </summary>
+    /// <param name="managerIds">The managers.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyDictionary<Guid, string>> FindManagerEmailsAsync(
+        IReadOnlyCollection<Guid> managerIds,
+        CancellationToken cancellationToken);
 }

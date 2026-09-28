@@ -202,6 +202,26 @@ public sealed class OutboxMessage
         Touch(now);
     }
 
+    /// <summary>Dead-letters a message that can never succeed, without spending its retry budget.</summary>
+    /// <param name="error">What went wrong.</param>
+    /// <param name="now">The current instant.</param>
+    /// <remarks>
+    /// Reserved for defects rather than transport faults: a message kind no dispatcher understands, or a
+    /// payload it cannot read, will not become dispatchable on the next attempt, so retrying it would only
+    /// delay a worker that could be sending a manager's mail. A transport fault goes through
+    /// <see cref="RecordFailure"/> instead and keeps its budget.
+    /// </remarks>
+    public void DeadLetter(string error, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(error);
+
+        AttemptCount++;
+        LastError = error.Length > 2000 ? error[..2000] : error;
+        Status = OutboxMessageStatus.DeadLettered;
+
+        Touch(now);
+    }
+
     private void Touch(DateTimeOffset now)
     {
         UpdatedAt = now;

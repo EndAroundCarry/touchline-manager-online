@@ -214,6 +214,18 @@ public interface IMatchdayRepository
         Guid divisionSeasonId,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Lists the rounds whose team sheets lock between two instants and are not yet played, earliest first, so
+    /// the reminder materialiser knows which deadlines are coming (`COM-3`).
+    /// </summary>
+    /// <param name="after">The exclusive lower bound on the lock instant, usually now.</param>
+    /// <param name="before">The inclusive upper bound on the lock instant, usually the reminder horizon.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<Matchday>> ListPendingLockingBetweenAsync(
+        DateTimeOffset after,
+        DateTimeOffset before,
+        CancellationToken cancellationToken);
+
     /// <summary>Loads both clubs of a fixture with everything their sides are built from.</summary>
     /// <param name="fixtureId">The fixture.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -337,12 +349,14 @@ public interface IMatchdayRepository
 /// <param name="Fixtures">The round's fixtures, tracked.</param>
 /// <param name="SeasonId">The season being played.</param>
 /// <param name="WorldId">The world.</param>
+/// <param name="DivisionId">The division the round belongs to, which scopes its news (`COM-1`).</param>
 /// <param name="TieDrawSeed">The division-season's stored tie-break seed.</param>
 public sealed record MatchdayWorkload(
     Matchday Matchday,
     IReadOnlyList<Fixture> Fixtures,
     Guid SeasonId,
     Guid WorldId,
+    Guid DivisionId,
     string TieDrawSeed)
 {
     /// <summary>Gets whether every fixture in the round has a result staged or published.</summary>

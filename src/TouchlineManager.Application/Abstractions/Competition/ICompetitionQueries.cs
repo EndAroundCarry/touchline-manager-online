@@ -17,6 +17,7 @@ public sealed record FixtureClubRow(Guid Id, string Name, string ShortName);
 /// <param name="HomeScore">The home score, once a result exists.</param>
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
+/// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
 public sealed record FixtureRow(
     Guid Id,
     Guid HomeClubId,
@@ -25,7 +26,8 @@ public sealed record FixtureRow(
     FixtureStatus Status,
     int? HomeScore,
     int? AwayScore,
-    Guid? MatchId);
+    Guid? MatchId,
+    bool IsBootstrap);
 
 /// <summary>One round of a division's season, with the fixtures it comprises (`CAL-10`).</summary>
 /// <param name="Id">The matchday identity.</param>
@@ -78,6 +80,7 @@ public sealed record DivisionFixturesSnapshot(
 /// <param name="HomeScore">The home score, once a result exists.</param>
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
+/// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
 public sealed record ClubFixtureRow(
     Guid Id,
     int RoundNumber,
@@ -90,7 +93,8 @@ public sealed record ClubFixtureRow(
     FixtureStatus Status,
     int? HomeScore,
     int? AwayScore,
-    Guid? MatchId);
+    Guid? MatchId,
+    bool IsBootstrap);
 
 /// <summary>A club's season fixture list (master plan §11.1).</summary>
 /// <param name="ClubId">The managed club.</param>
@@ -142,6 +146,7 @@ public sealed record FixtureSideRow(
 /// <param name="HomeScore">The home score, once a result exists.</param>
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
+/// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
 public sealed record FixtureDetailSnapshot(
     Guid Id,
     Guid MatchdayId,
@@ -157,7 +162,8 @@ public sealed record FixtureDetailSnapshot(
     FixtureSideRow Away,
     int? HomeScore,
     int? AwayScore,
-    Guid? MatchId);
+    Guid? MatchId,
+    bool IsBootstrap);
 
 /// <summary>One row of a division's table, in the order the division is ranked (`TBL-10`).</summary>
 /// <param name="Rank">The 1-based position.</param>

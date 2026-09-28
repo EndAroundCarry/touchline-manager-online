@@ -280,7 +280,8 @@ public static class FixtureMapping
             fixture.Status.ToCode(),
             home,
             away,
-            matchId);
+            matchId,
+            fixture.IsBootstrap);
     }
 
     /// <summary>Projects a club's own fixture list, naming its next fixture.</summary>
@@ -334,7 +335,8 @@ public static class FixtureMapping
             home,
             away,
             matchId,
-            Outcome(fixture));
+            Outcome(fixture),
+            fixture.IsBootstrap);
     }
 
     /// <summary>Projects a fixture in full, resolving the caller's side when they hold one of the clubs.</summary>
@@ -387,6 +389,7 @@ public static class FixtureMapping
             home,
             away,
             matchId,
+            snapshot.IsBootstrap,
             serverTime);
     }
 

@@ -158,6 +158,8 @@ public sealed class PublishMatchday
         // together: a message about a result nobody can read yet would be the same defect as a leaked score.
         await _notifications.NotifyPublishedAsync(
             workload.Matchday.RoundNumber,
+            workload.WorldId,
+            workload.DivisionId,
             PlayedFacts(published),
             positions,
             effects,

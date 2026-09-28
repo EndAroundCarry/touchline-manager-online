@@ -1,10 +1,13 @@
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
+using TouchlineManager.Application.Abstractions.Comms;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Application.Comms;
 using TouchlineManager.Contracts.World;
 using TouchlineManager.Domain.Auth;
+using TouchlineManager.Domain.Comms;
 using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.World;
@@ -94,6 +97,7 @@ public sealed class ClaimClub
     private readonly IOnboardingQueries _queries;
     private readonly IAdvisoryLock _locks;
     private readonly CapacityEvaluator _capacity;
+    private readonly IInboxRepository _inbox;
     private readonly IAuditWriter _audit;
     private readonly ISecureTokenService _secureTokens;
     private readonly IRequestContext _requestContext;
@@ -110,6 +114,7 @@ public sealed class ClaimClub
         IOnboardingQueries queries,
         IAdvisoryLock locks,
         CapacityEvaluator capacity,
+        IInboxRepository inbox,
         IAuditWriter audit,
         ISecureTokenService secureTokens,
         IRequestContext requestContext,
@@ -124,6 +129,7 @@ public sealed class ClaimClub
         _queries = queries;
         _locks = locks;
         _capacity = capacity;
+        _inbox = inbox;
         _audit = audit;
         _secureTokens = secureTokens;
         _requestContext = requestContext;
@@ -284,6 +290,19 @@ public sealed class ClaimClub
 
         _tenures.Add(tenure);
         manager.ClearTakeoverCooldown(now);
+
+        // The welcome is the first thing a new manager reads, written in the takeover's own transaction so an
+        // inbox with a club always has it (COM-1).
+        var welcome = InboxTemplates.Welcome(club.Name, capacity.DivisionName);
+
+        _inbox.Add(InboxMessage.Record(
+            Guid.CreateVersion7(),
+            manager.Id,
+            welcome.Category,
+            welcome.TemplateKey,
+            welcome.ParametersJson,
+            welcome.RelatedEntityId,
+            now));
 
         Record(WorldAuditActions.ClubClaimed, userId, AuditTargetTypes.ClubTenure, tenure.Id, reason: null);
 

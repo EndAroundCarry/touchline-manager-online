@@ -2,8 +2,10 @@ using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
+using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Contracts.Auth;
 using TouchlineManager.Domain.Auth;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.Auth;
 
@@ -56,6 +58,8 @@ public sealed class Login
     private readonly IAuditWriter _audit;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IManagerRepository _managers;
+    private readonly IClubTenureRepository _tenures;
 
     /// <summary>Initializes the use case.</summary>
     public Login(
@@ -66,7 +70,9 @@ public sealed class Login
         ISecureTokenService secureTokens,
         IAuditWriter audit,
         IRequestContext requestContext,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IManagerRepository managers,
+        IClubTenureRepository tenures)
     {
         _clock = clock;
         _users = users;
@@ -76,6 +82,8 @@ public sealed class Login
         _audit = audit;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
+        _managers = managers;
+        _tenures = tenures;
     }
 
     /// <summary>Authenticates the account.</summary>
@@ -139,6 +147,11 @@ public sealed class Login
 
         user.RecordSuccessfulLogin(now);
 
+        // OCC-2, OCC-5: a login is the manager returning, so any lapse ends here. An inactive tenure resumes
+        // full control; an active one only has its activity stamp moved. It is recorded in the same unit of
+        // work as the session, so "seen" and "signed in" are one fact.
+        await RecordReturnAsync(user.Id, now, cancellationToken);
+
         var session = await _sessionIssuer.IssueAsync(
             user,
             Guid.CreateVersion7(),
@@ -159,6 +172,41 @@ public sealed class Login
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new LoginResult(LoginOutcome.Succeeded, session, LockedUntil: null);
+    }
+
+    /// <summary>
+    /// Marks the manager as back, resuming an inactive tenure and clearing any pending warning (`OCC-2`,
+    /// `OCC-5`).
+    /// </summary>
+    /// <remarks>
+    /// A manager who never completed onboarding has no profile, and a manager with no club has no tenure; both
+    /// are ordinary, so neither is a failure. The write joins the login's own save, which is why it stages
+    /// rather than saves.
+    /// </remarks>
+    private async Task RecordReturnAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var manager = await _managers.FindByUserIdAsync(userId, cancellationToken);
+
+        if (manager is null)
+        {
+            return;
+        }
+
+        var tenure = await _tenures.FindOpenByManagerAsync(manager.Id, cancellationToken);
+
+        if (tenure is null)
+        {
+            return;
+        }
+
+        if (tenure.ControlStatus == ClubTenureControlStatus.Inactive)
+        {
+            tenure.Resume(now);
+
+            return;
+        }
+
+        tenure.RecordActivity(now);
     }
 
     private void RecordFailure(string? ipHash, Guid? actorUserId, string reason)

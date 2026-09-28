@@ -507,7 +507,8 @@ internal sealed class CompetitionQueries : ICompetitionQueries
                     row.Fixture.Status,
                     row.Fixture.HomeScore,
                     row.Fixture.AwayScore,
-                    row.Fixture.MatchId);
+                    row.Fixture.MatchId,
+                    row.Fixture.IsBootstrap);
             })
             .ToList();
 
@@ -578,7 +579,8 @@ internal sealed class CompetitionQueries : ICompetitionQueries
                 row.Away.Region),
             row.Fixture.HomeScore,
             row.Fixture.AwayScore,
-            row.Fixture.MatchId);
+            row.Fixture.MatchId,
+            row.Fixture.IsBootstrap);
     }
 
     private static FixtureRow ToRow(Domain.Competition.Fixture fixture) =>
@@ -590,5 +592,6 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             fixture.Status,
             fixture.HomeScore,
             fixture.AwayScore,
-            fixture.MatchId);
+            fixture.MatchId,
+            fixture.IsBootstrap);
 }

@@ -2,8 +2,10 @@ using TouchlineManager.Api.Http;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.Market;
+using TouchlineManager.Application.World;
 using TouchlineManager.Contracts.Competition;
 using TouchlineManager.Contracts.Market;
+using TouchlineManager.Contracts.World;
 
 namespace TouchlineManager.Api.Endpoints;
 
@@ -80,6 +82,95 @@ internal static class OpsEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         return group;
+    }
+
+    /// <summary>Maps the Stage 11 provisioning trigger onto the ops module group.</summary>
+    /// <remarks>
+    /// It exists so a journey can grow the pyramid without filling a tier by hand. It creates the request and
+    /// enqueues the worker's real provisioning job, due now; the worker still generates, backfills, validates,
+    /// and activates the tier (§17.12, ADR-0016's pattern).
+    /// </remarks>
+    public static RouteGroupBuilder MapProvisioningTrigger(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapPost("/diagnostics/provision-division", ProvisionDivisionAsync)
+            .WithName("ProvisionDivisionProbe")
+            .WithSummary("Creates a tier's provisioning request and enqueues its job, due now.")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker generates, backfills, validates, and "
+                + "activates the tier exactly as it would when a takeover fills one; this only does what the "
+                + "worker-only scheduler normally does, and a repeated call is a no-op.")
+            .Produces<ProvisioningTriggerResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        return group;
+    }
+
+    /// <summary>Maps the Stage 11 inactivity trigger onto the ops module group.</summary>
+    /// <remarks>
+    /// It enqueues the worker's real daily ladder job, due now, so a journey can watch the ladder warn,
+    /// inactivate, and close tenures without waiting for the day's schedule (§17.12).
+    /// </remarks>
+    public static RouteGroupBuilder MapInactivityTrigger(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapPost("/diagnostics/run-inactivity", RunInactivityAsync)
+            .WithName("RunInactivityProbe")
+            .WithSummary("Enqueues today's inactivity-ladder job, due now.")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker runs the ladder exactly as it would on "
+                + "its daily tick, and a repeated call on the same day is a no-op.")
+            .Produces<InactivityTriggerResponse>(StatusCodes.Status202Accepted);
+
+        return group;
+    }
+
+    private static async Task<IResult> ProvisionDivisionAsync(
+        ProvisionDivisionRequest request,
+        TriggerProvisioning trigger,
+        CancellationToken cancellationToken)
+    {
+        var result = await trigger.ExecuteAsync(request.CountryId, request.TargetTier, cancellationToken);
+
+        return result.Outcome switch
+        {
+            TriggerProvisioningOutcome.Enqueued => Results.Json(
+                new ProvisioningTriggerResponse(
+                    result.CountryId,
+                    result.TargetTier,
+                    result.RequestId,
+                    result.BusinessKey,
+                    result.Enqueued),
+                statusCode: StatusCodes.Status202Accepted),
+
+            TriggerProvisioningOutcome.InvalidTier or TriggerProvisioningOutcome.NoSeason => ProblemResults.Code(
+                StatusCodes.Status400BadRequest,
+                WorldErrorCodes.ProvisioningTargetInvalid,
+                "The target tier cannot be provisioned.",
+                "Tier 1 is seeded; ask for a tier of 2 or above in a world that has a running season."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                WorldErrorCodes.CountryNotFound,
+                "No country was found.",
+                "The requested country does not exist."),
+        };
+    }
+
+    private static async Task<IResult> RunInactivityAsync(
+        TriggerInactivity trigger,
+        CancellationToken cancellationToken)
+    {
+        var result = await trigger.ExecuteAsync(cancellationToken);
+
+        return Results.Json(
+            new InactivityTriggerResponse(result.BusinessKey, result.Enqueued),
+            statusCode: StatusCodes.Status202Accepted);
     }
 
     private static async Task<IResult> PlayAuctionAsync(
@@ -180,3 +271,26 @@ internal sealed record PlayAuctionRequest(Guid ListingId);
 /// <param name="ResolveKey">The business key of the enqueued resolution job.</param>
 /// <param name="Enqueued"><see langword="true"/> when the resolution row was newly inserted.</param>
 internal sealed record AuctionTriggerResponse(Guid ListingId, string ResolveKey, bool Enqueued);
+
+/// <summary>The body of the provisioning trigger.</summary>
+/// <param name="CountryId">The country whose pyramid grows.</param>
+/// <param name="TargetTier">The tier to create, at least 2.</param>
+internal sealed record ProvisionDivisionRequest(Guid CountryId, int TargetTier);
+
+/// <summary>Response of the provisioning trigger.</summary>
+/// <param name="CountryId">The country that was triggered.</param>
+/// <param name="TargetTier">The tier that was requested.</param>
+/// <param name="RequestId">The provisioning request, once it exists.</param>
+/// <param name="BusinessKey">The business key of the enqueued job.</param>
+/// <param name="Enqueued"><see langword="true"/> when the provisioning row was newly inserted.</param>
+internal sealed record ProvisioningTriggerResponse(
+    Guid CountryId,
+    int TargetTier,
+    Guid? RequestId,
+    string BusinessKey,
+    bool Enqueued);
+
+/// <summary>Response of the inactivity trigger.</summary>
+/// <param name="BusinessKey">The business key of the enqueued job.</param>
+/// <param name="Enqueued"><see langword="true"/> when the ladder row was newly inserted.</param>
+internal sealed record InactivityTriggerResponse(string BusinessKey, bool Enqueued);

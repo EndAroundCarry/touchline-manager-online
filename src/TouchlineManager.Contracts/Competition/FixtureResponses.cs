@@ -17,6 +17,7 @@ public sealed record FixtureClubResponse(Guid Id, string Name, string ShortName)
 /// <param name="HomeScore">The home score, present only once the result is staged or published (`MAT-7`).</param>
 /// <param name="AwayScore">The away score, present only once the result is staged or published.</param>
 /// <param name="MatchId">The simulated match, present once a result is staged.</param>
+/// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
 public sealed record FixtureSummaryResponse(
     Guid Id,
     Guid MatchdayId,
@@ -27,7 +28,8 @@ public sealed record FixtureSummaryResponse(
     string Status,
     int? HomeScore,
     int? AwayScore,
-    Guid? MatchId);
+    Guid? MatchId,
+    bool IsBootstrap);
 
 /// <summary>One round of a division's season, with the nine fixtures it comprises (`CAL-10`).</summary>
 /// <param name="Id">The matchday identity.</param>
@@ -97,6 +99,7 @@ public sealed record DivisionFixturesResponse(
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
 /// <param name="Outcome">For a published fixture, the managed club's result: <c>win</c>, <c>draw</c>, or <c>loss</c>. Null otherwise.</param>
+/// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
 public sealed record ClubFixtureResponse(
     Guid Id,
     int RoundNumber,
@@ -110,7 +113,8 @@ public sealed record ClubFixtureResponse(
     int? HomeScore,
     int? AwayScore,
     Guid? MatchId,
-    string? Outcome);
+    string? Outcome,
+    bool IsBootstrap);
 
 /// <summary>
 /// A managed club's season fixture list, with its next fixture called out (master plan §11.1).
@@ -183,6 +187,7 @@ public sealed record FixtureSideResponse(
 /// <param name="HomeScore">The home score, once a result exists.</param>
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
+/// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record FixtureDetailResponse(
     Guid Id,
@@ -203,4 +208,5 @@ public sealed record FixtureDetailResponse(
     int? HomeScore,
     int? AwayScore,
     Guid? MatchId,
+    bool IsBootstrap,
     DateTimeOffset ServerTime);

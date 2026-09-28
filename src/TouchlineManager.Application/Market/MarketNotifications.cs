@@ -15,9 +15,14 @@ namespace TouchlineManager.Application.Market;
 public sealed class MarketNotifications
 {
     private readonly IInboxRepository _inbox;
+    private readonly INewsRepository _news;
 
     /// <summary>Initializes the composer.</summary>
-    public MarketNotifications(IInboxRepository inbox) => _inbox = inbox;
+    public MarketNotifications(IInboxRepository inbox, INewsRepository news)
+    {
+        _inbox = inbox;
+        _news = news;
+    }
 
     /// <summary>Tells a club its leading bid was beaten (`TRF-7`).</summary>
     /// <param name="clubId">The outbid club.</param>
@@ -51,6 +56,7 @@ public sealed class MarketNotifications
     }
 
     /// <summary>Tells the buyer and the seller a transfer completed (`TRF-10`).</summary>
+    /// <param name="worldId">The world, which scopes the transfer's news.</param>
     /// <param name="buyerClubId">The buying club.</param>
     /// <param name="sellerClubId">The selling club.</param>
     /// <param name="playerId">The player who moved.</param>
@@ -58,6 +64,7 @@ public sealed class MarketNotifications
     /// <param name="now">The current instant.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task NotifyTransferAsync(
+        Guid? worldId,
         Guid buyerClubId,
         Guid sellerClubId,
         Guid playerId,
@@ -70,10 +77,11 @@ public sealed class MarketNotifications
         var names = await _inbox.FindPlayerNamesAsync([playerId], cancellationToken);
         var playerName = names.TryGetValue(playerId, out var name) ? name : "a player";
 
+        var buyerName = targets.TryGetValue(buyerClubId, out var buyerTarget) ? buyerTarget.Name : "a club";
+        var sellerName = targets.TryGetValue(sellerClubId, out var sellerTarget) ? sellerTarget.Name : "a club";
+
         if (Target(targets, buyerClubId) is { } buyer)
         {
-            var sellerName = targets.TryGetValue(sellerClubId, out var seller) ? seller.Name : "a rival club";
-
             _inbox.Add(Message(
                 buyer,
                 MarketInboxTemplates.BidWonMessage(playerName, feeMinor, sellerName, playerId),
@@ -82,13 +90,27 @@ public sealed class MarketNotifications
 
         if (Target(targets, sellerClubId) is { } sellerManager)
         {
-            var buyerName = targets.TryGetValue(buyerClubId, out var buyerTarget)
-                ? buyerTarget.Name
-                : "a rival club";
-
             _inbox.Add(Message(
                 sellerManager,
                 MarketInboxTemplates.PlayerSoldMessage(playerName, feeMinor, buyerName, playerId),
+                now));
+        }
+
+        // The feed is public: a transfer is news whether or not either club has a human manager (COM-1).
+        if (worldId is { } world)
+        {
+            var draft = NewsTemplates.Transfer(playerName, feeMinor, buyerName, sellerName);
+
+            _news.Add(NewsItem.Publish(
+                Guid.CreateVersion7(),
+                world,
+                draft.CountryId,
+                draft.DivisionId,
+                draft.Category,
+                draft.TemplateKey,
+                draft.ParametersJson,
+                publishedAt: now,
+                expiresAt: null,
                 now));
         }
     }

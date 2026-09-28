@@ -4,6 +4,7 @@ using TouchlineManager.Api.Http;
 using TouchlineManager.Application.Comms;
 using TouchlineManager.Contracts.Auth;
 using TouchlineManager.Contracts.Comms;
+using TouchlineManager.Contracts.Http;
 using TouchlineManager.Contracts.World;
 
 namespace TouchlineManager.Api.Comms;
@@ -58,6 +59,27 @@ internal static class CommsEndpoints
             .WithName("GetSync")
             .WithSummary("Reads the unread inbox count the shell polls.")
             .Produces<SyncResponse>(StatusCodes.Status200OK);
+
+        group.MapGet("/news", GetNewsAsync)
+            .WithName("GetNews")
+            .WithSummary("Reads a page of the division news feed (`COM-1`).")
+            .Produces<NewsResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/settings/notifications", GetNotificationPreferencesAsync)
+            .WithName("GetNotificationPreferences")
+            .WithSummary("Reads the manager's notification preferences (`COM-4`).")
+            .Produces<NotificationPreferencesResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPut("/settings/notifications", UpdateNotificationPreferencesAsync)
+            .WithName("UpdateNotificationPreferences")
+            .WithSummary("Changes the manager's notification preferences (`COM-4`, `CONC-1`).")
+            .Produces<NotificationPreferencesResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
 
         return endpoints;
     }
@@ -126,6 +148,98 @@ internal static class CommsEndpoints
 
         return Results.Ok(result.Sync);
     }
+
+    private static async Task<IResult> GetNewsAsync(
+        string? cursor,
+        Guid? divisionId,
+        Guid? countryId,
+        GetNews query,
+        CancellationToken cancellationToken)
+    {
+        // The feed is public game data, but it needs no manager profile; a client that is signed in simply
+        // reads it, exactly like the division table (`COM-1`).
+        var result = await query.ExecuteAsync(divisionId, countryId, cursor, cancellationToken);
+
+        return result.Outcome == CommsOutcome.Ok
+            ? Results.Ok(result.News)
+            : Refusal(result.Outcome);
+    }
+
+    private static async Task<IResult> GetNotificationPreferencesAsync(
+        HttpContext httpContext,
+        GetNotificationPreferences query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, cancellationToken);
+
+        if (result.Outcome != NotificationPreferencesOutcome.Ok || result.Preferences is null)
+        {
+            return PreferencesRefusal(result.Outcome);
+        }
+
+        httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Preferences.Version);
+
+        return Results.Ok(result.Preferences);
+    }
+
+    private static async Task<IResult> UpdateNotificationPreferencesAsync(
+        HttpContext httpContext,
+        UpdateNotificationPreferencesRequest request,
+        UpdateNotificationPreferences useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        // The version is read before the body: a change without If-Match cannot be conditional, and saying so
+        // is more useful than applying a change that may overwrite another device's (CONC-1).
+        var expectedVersion = EntityTagHeader.ParseIfMatch(httpContext.Request.Headers.IfMatch.ToString());
+
+        if (expectedVersion is null)
+        {
+            return PreconditionRequired();
+        }
+
+        var result = await useCase.ExecuteAsync(userId, request, expectedVersion.Value, cancellationToken);
+
+        if (result.Outcome != NotificationPreferencesOutcome.Ok || result.Preferences is null)
+        {
+            return PreferencesRefusal(result.Outcome);
+        }
+
+        httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Preferences.Version);
+
+        return Results.Ok(result.Preferences);
+    }
+
+    /// <summary>Turns a notification-preferences refusal into a status and a stable code.</summary>
+    private static IResult PreferencesRefusal(NotificationPreferencesOutcome outcome) => outcome switch
+    {
+        NotificationPreferencesOutcome.PreconditionFailed => ProblemResults.Code(
+            StatusCodes.Status412PreconditionFailed,
+            ApiErrorCodes.PreconditionFailed,
+            "The preferences changed.",
+            "Reload your notification settings and reapply the change."),
+
+        _ => ProblemResults.Code(
+            StatusCodes.Status403Forbidden,
+            WorldErrorCodes.ManagerProfileRequired,
+            "No manager profile.",
+            "Create your manager profile before changing your notifications."),
+    };
+
+    private static IResult PreconditionRequired() => ProblemResults.Code(
+        StatusCodes.Status428PreconditionRequired,
+        ApiErrorCodes.PreconditionRequired,
+        "A version is required.",
+        "Send the preferences' current entity tag in If-Match so a concurrent change is not overwritten.");
 
     /// <summary>Turns a comms refusal into a status and a stable code.</summary>
     private static IResult Refusal(CommsOutcome outcome) => outcome switch

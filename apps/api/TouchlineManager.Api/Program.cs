@@ -265,6 +265,16 @@ if (diagnostics.EnableMatchdayTrigger)
     moduleGroups["ops"].MapAuctionTrigger();
 }
 
+if (diagnostics.EnableProvisioningTrigger)
+{
+    moduleGroups["ops"].MapProvisioningTrigger();
+}
+
+if (diagnostics.EnableInactivityTrigger)
+{
+    moduleGroups["ops"].MapInactivityTrigger();
+}
+
 if (clock.IsCompressed)
 {
     app.Logger.LogWarning(

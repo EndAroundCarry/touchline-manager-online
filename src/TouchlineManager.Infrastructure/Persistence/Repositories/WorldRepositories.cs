@@ -176,6 +176,23 @@ internal sealed class ClubTenureRepository : IClubTenureRepository
 
     /// <inheritdoc />
     public void Add(ClubTenure tenure) => _dbContext.ClubTenures.Add(tenure);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// One join rather than a graph walk per tenure, so the ladder reads the whole membership in a fixed number
+    /// of round trips. The order is oldest activity first, so a caller that stops early has still seen the most
+    /// idle tenures.
+    /// </remarks>
+    public async Task<IReadOnlyList<OpenTenureRow>> ListOpenAsync(CancellationToken cancellationToken) =>
+        await (
+            from tenure in _dbContext.ClubTenures
+            join club in _dbContext.Clubs on tenure.ClubId equals club.Id
+            join manager in _dbContext.Managers on tenure.ManagerId equals manager.Id
+            join user in _dbContext.Users on manager.UserId equals user.Id
+            where tenure.ControlStatus != ClubTenureControlStatus.Closed
+            orderby tenure.LastActiveAt, tenure.Id
+            select new OpenTenureRow(tenure, club, manager, user))
+            .ToListAsync(cancellationToken);
 }
 
 /// <summary>Pyramid-expansion request persistence.</summary>

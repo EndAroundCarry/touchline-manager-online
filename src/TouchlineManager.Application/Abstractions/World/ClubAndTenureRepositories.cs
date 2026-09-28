@@ -1,3 +1,4 @@
+using TouchlineManager.Domain.Auth;
 using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.Abstractions.World;
@@ -56,7 +57,28 @@ public interface IClubTenureRepository
 
     /// <summary>Stages a new tenure.</summary>
     void Add(ClubTenure tenure);
+
+    /// <summary>
+    /// Lists every open tenure with the club, manager, and account it belongs to, oldest activity first, so
+    /// the inactivity ladder can walk the whole membership in one pass (`OCC-1`–`OCC-3`).
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<OpenTenureRow>> ListOpenAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// One open tenure with the context the inactivity ladder decides from (`OCC-1`–`OCC-3`).
+/// </summary>
+/// <remarks>
+/// The account travels with the tenure because the ladder needs the manager's address for the warning email
+/// and the account's status: a suspended account keeps its club (`OCC-5`) but is not aged as an absence,
+/// because it did not choose to be away.
+/// </remarks>
+/// <param name="Tenure">The open tenure.</param>
+/// <param name="Club">The club it controls.</param>
+/// <param name="Manager">The manager who holds it.</param>
+/// <param name="User">The account behind the manager.</param>
+public sealed record OpenTenureRow(ClubTenure Tenure, Club Club, Manager Manager, User User);
 
 /// <summary>Persistence for pyramid-expansion requests (`PYR-2`, `PYR-3`).</summary>
 public interface IDivisionProvisioningRequestRepository

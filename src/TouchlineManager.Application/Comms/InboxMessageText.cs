@@ -1,6 +1,7 @@
 using System.Globalization;
 using TouchlineManager.Application.Market;
 using TouchlineManager.Application.Match;
+using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad;
 
 namespace TouchlineManager.Application.Comms;
@@ -49,6 +50,14 @@ public static class InboxMessageText
                 InboxTemplates.Read<InboxTemplates.InjuryParameters>(parametersJson)),
             InboxTemplates.TeamSheetRepaired => RepairedSide(
                 InboxTemplates.Read<InboxTemplates.TeamSheetParameters>(parametersJson)),
+            InboxTemplates.OnboardingWelcome => Welcome(
+                InboxTemplates.Read<InboxTemplates.WelcomeParameters>(parametersJson)),
+            InboxTemplates.InactivityWarning => Warned(
+                InboxTemplates.Read<InboxTemplates.InactivityParameters>(parametersJson)),
+            InboxTemplates.InactivityClosed => ClosedForInactivity(
+                InboxTemplates.Read<InboxTemplates.InactivityParameters>(parametersJson)),
+            InboxTemplates.TeamSheetReminder => Reminder(
+                InboxTemplates.Read<InboxTemplates.ReminderParameters>(parametersJson)),
             MarketInboxTemplates.Outbid => Outbid(
                 MarketInboxTemplates.Read<MarketInboxTemplates.OutbidParameters>(parametersJson)),
             MarketInboxTemplates.BidWon => BidWon(
@@ -159,6 +168,42 @@ public static class InboxMessageText
         InboxTemplates.RedCardReason => "a sending-off",
         _ => "accumulating bookings",
     };
+
+    private static InboxText Welcome(InboxTemplates.WelcomeParameters parameters) =>
+        new(
+            $"Welcome to {parameters.ClubName}",
+            $"You are now the manager of {parameters.ClubName} in {parameters.DivisionName}. "
+            + "Set your tactics and team sheet before the first round.");
+
+    private static InboxText Warned(InboxTemplates.InactivityParameters parameters) =>
+        new(
+            "We have not seen you in a while",
+            $"You have been away for {Days(parameters.DaysInactive)}. Log in to keep full control of your "
+            + $"club: after {(int)WorldRuleSet.InactivityAiAssistanceAfter.TotalDays} days the AI steps in, "
+            + $"and after {(int)WorldRuleSet.InactivityCloseAfter.TotalDays} days you lose the club.");
+
+    private static InboxText ClosedForInactivity(InboxTemplates.InactivityParameters parameters) =>
+        new(
+            "Your club has returned to the AI",
+            $"After {Days(parameters.DaysInactive)} away from the game, your tenure has ended and your club is "
+            + "AI-controlled again. Its squad, finances, and history are unchanged.");
+
+    private static InboxText Reminder(InboxTemplates.ReminderParameters parameters)
+    {
+        var venue = parameters.IsHome
+            ? $"At home to {parameters.OpponentName}"
+            : $"Away to {parameters.OpponentName}";
+
+        return new InboxText(
+            $"Round {parameters.RoundNumber}: submit your team sheet",
+            $"{venue}. Your team sheet locks at {Moment(parameters.LockAt)}.");
+    }
+
+    private static string Days(int count) =>
+        string.Create(CultureInfo.InvariantCulture, $"{count} day{(count == 1 ? string.Empty : "s")}");
+
+    private static string Moment(DateTimeOffset instant) =>
+        instant.UtcDateTime.ToString("ddd d MMM yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture);
 
     private static string Severity(InjurySeverity severity) => severity switch
     {

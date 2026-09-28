@@ -72,12 +72,19 @@ public sealed record RepairedSideFact(Guid ClubId, Guid FixtureId, IReadOnlyList
 public sealed class MatchdayNotifications
 {
     private readonly IInboxRepository _inbox;
+    private readonly INewsRepository _news;
 
     /// <summary>Initializes the composer.</summary>
-    public MatchdayNotifications(IInboxRepository inbox) => _inbox = inbox;
+    public MatchdayNotifications(IInboxRepository inbox, INewsRepository news)
+    {
+        _inbox = inbox;
+        _news = news;
+    }
 
     /// <summary>Writes the messages one published round produces.</summary>
     /// <param name="roundNumber">The round, 1–34.</param>
+    /// <param name="worldId">The world, which scopes the round's news.</param>
+    /// <param name="divisionId">The division, which scopes the round's news.</param>
     /// <param name="played">The fixtures the round played.</param>
     /// <param name="positions">Every club's position after the round.</param>
     /// <param name="effects">What the round did to each booked, sent-off, or injured player.</param>
@@ -85,6 +92,8 @@ public sealed class MatchdayNotifications
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task NotifyPublishedAsync(
         int roundNumber,
+        Guid worldId,
+        Guid divisionId,
         IReadOnlyList<PlayedFixtureFact> played,
         IReadOnlyList<ClubPositionFact> positions,
         IReadOnlyList<PlayerEffectFact> effects,
@@ -122,6 +131,9 @@ public sealed class MatchdayNotifications
         {
             NotifyResult(fixture, fixture.HomeClubId, fixture.AwayClubId, fixture.HomeGoals, fixture.AwayGoals);
             NotifyResult(fixture, fixture.AwayClubId, fixture.HomeClubId, fixture.AwayGoals, fixture.HomeGoals);
+
+            // The news feed is public, so it carries the result for everyone, managers or not (COM-1).
+            PostResult(fixture, worldId, divisionId, roundNumber, targets, now);
         }
 
         foreach (var position in positions.OrderBy(position => position.ClubId))
@@ -302,4 +314,36 @@ public sealed class MatchdayNotifications
             draft.ParametersJson,
             draft.RelatedEntityId,
             now);
+
+    private void PostResult(
+        PlayedFixtureFact fixture,
+        Guid worldId,
+        Guid divisionId,
+        int roundNumber,
+        Dictionary<Guid, ClubInboxTarget> targets,
+        DateTimeOffset now)
+    {
+        var homeName = targets.TryGetValue(fixture.HomeClubId, out var home) ? home.Name : "Home";
+        var awayName = targets.TryGetValue(fixture.AwayClubId, out var away) ? away.Name : "Away";
+
+        var draft = NewsTemplates.Round(
+            roundNumber,
+            homeName,
+            fixture.HomeGoals,
+            awayName,
+            fixture.AwayGoals,
+            divisionId);
+
+        _news.Add(NewsItem.Publish(
+            Guid.CreateVersion7(),
+            worldId,
+            draft.CountryId,
+            draft.DivisionId,
+            draft.Category,
+            draft.TemplateKey,
+            draft.ParametersJson,
+            publishedAt: now,
+            expiresAt: null,
+            now));
+    }
 }

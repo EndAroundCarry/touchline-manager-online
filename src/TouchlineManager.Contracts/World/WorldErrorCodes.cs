@@ -58,4 +58,8 @@ public static class WorldErrorCodes
 
     /// <summary>The world is frozen, so onboarding is closed while play continues.</summary>
     public const string WorldNotAcceptingClaims = "WORLD_NOT_ACCEPTING_CLAIMS";
+
+    /// <summary>The requested provisioning target is not one that can be generated: tier 1 is seeded, and a
+    /// season must exist to attach a new tier to (`PYR-2`).</summary>
+    public const string ProvisioningTargetInvalid = "PROVISIONING_TARGET_INVALID";
 }

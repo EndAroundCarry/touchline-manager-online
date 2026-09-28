@@ -48,6 +48,18 @@ public static class InboxTemplates
     /// <summary>The club's frozen side needed a repair.</summary>
     public const string TeamSheetRepaired = "inbox.team_sheet.repaired";
 
+    /// <summary>A manager took over a club and is welcomed to it.</summary>
+    public const string OnboardingWelcome = "inbox.onboarding.welcome";
+
+    /// <summary>A lapse in activity earned a warning (`OCC-1`).</summary>
+    public const string InactivityWarning = "inbox.occupancy.inactivity_warning";
+
+    /// <summary>A tenure closed after a long lapse (`OCC-3`).</summary>
+    public const string InactivityClosed = "inbox.occupancy.inactivity_closed";
+
+    /// <summary>A matchday's team sheet locks soon.</summary>
+    public const string TeamSheetReminder = "inbox.deadline.team_sheet";
+
     /// <summary>The suspension reason for an accumulation of bookings.</summary>
     public const string BookingsReason = "bookings";
 
@@ -148,6 +160,46 @@ public static class InboxTemplates
     /// <param name="ReplacementName">The player who took the slot, or null when it was left empty.</param>
     public sealed record RepairParameter(int SlotNumber, string Reason, string? ReplacementName);
 
+    /// <summary>Builds the welcome a manager receives when they take over a club.</summary>
+    /// <param name="clubName">The club they now control.</param>
+    /// <param name="divisionName">The tier the club plays in.</param>
+    public static InboxDraft Welcome(string clubName, string divisionName) =>
+        Write(
+            InboxCategory.System,
+            OnboardingWelcome,
+            new WelcomeParameters(clubName, divisionName),
+            relatedEntityId: null);
+
+    /// <summary>Builds the warning a lapse in activity produces (`OCC-1`).</summary>
+    /// <param name="daysInactive">How many whole days the manager has been away.</param>
+    public static InboxDraft Warned(int daysInactive) =>
+        Write(
+            InboxCategory.Occupancy,
+            InactivityWarning,
+            new InactivityParameters(daysInactive),
+            relatedEntityId: null);
+
+    /// <summary>Builds the notice that a tenure closed for inactivity (`OCC-3`).</summary>
+    /// <param name="daysInactive">How many whole days the manager was away.</param>
+    public static InboxDraft ClosedForInactivity(int daysInactive) =>
+        Write(
+            InboxCategory.Occupancy,
+            InactivityClosed,
+            new InactivityParameters(daysInactive),
+            relatedEntityId: null);
+
+    /// <summary>Builds the reminder that a matchday's team sheet locks soon.</summary>
+    /// <param name="roundNumber">The round about to lock.</param>
+    /// <param name="opponentName">The opponent's generated name.</param>
+    /// <param name="isHome">Whether the club hosts.</param>
+    /// <param name="lockAt">When the team sheet locks.</param>
+    public static InboxDraft Reminder(int roundNumber, string opponentName, bool isHome, DateTimeOffset lockAt) =>
+        Write(
+            InboxCategory.Reminder,
+            TeamSheetReminder,
+            new ReminderParameters(roundNumber, opponentName, isHome, lockAt),
+            relatedEntityId: null);
+
     private static InboxDraft Write<TParameters>(
         InboxCategory category,
         string templateKey,
@@ -176,4 +228,10 @@ public static class InboxTemplates
     internal sealed record InjuryParameters(string PlayerName, int Fixtures, string Severity);
 
     internal sealed record TeamSheetParameters(int RoundNumber, IReadOnlyList<RepairParameter> Repairs);
+
+    internal sealed record WelcomeParameters(string ClubName, string DivisionName);
+
+    internal sealed record InactivityParameters(int DaysInactive);
+
+    internal sealed record ReminderParameters(int RoundNumber, string OpponentName, bool IsHome, DateTimeOffset LockAt);
 }

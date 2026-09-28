@@ -17,8 +17,8 @@ public sealed record EvaluateAiClubsResult(
     int Skipped);
 
 /// <summary>
-/// Gives every club no human holds the tactics, side, and training a manager would have set (`INS-12`,
-/// master plan §7.2).
+/// Gives every club with no active tenure the tactics, side, and training a manager would have set (`INS-12`,
+/// master plan §7.2; `OCC-2`).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,10 +34,10 @@ public sealed record EvaluateAiClubsResult(
 /// makes the job safe to run at least once: the second pass for the same world writes nothing.
 /// </para>
 /// <para>
-/// Only clubs with no open tenure are considered. An <em>inactive</em> tenure still occupies its club
-/// (`OCC-8`), and making safe decisions on a manager's behalf while they are away is the inactivity
-/// ladder's own work (`OCC-2`), which Stage 11 owns — leaving it here would silently overwrite a manager
-/// who is merely on holiday.
+/// A club with no <em>active</em> tenure is considered: an AI club, and one whose manager is away and whose
+/// tenure the inactivity ladder has marked inactive (`OCC-2`). Because the evaluation only fills gaps, an
+/// away manager keeps every choice they already made and the AI supplies only what is missing, so this is
+/// the safe half of `OCC-2`'s assistance — the market, which commits money, is left to the human.
 /// </para>
 /// </remarks>
 public sealed class EvaluateAiClubs

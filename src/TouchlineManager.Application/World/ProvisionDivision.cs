@@ -6,6 +6,7 @@ using TouchlineManager.Application.Abstractions.Market;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.World.Generation;
@@ -78,6 +79,7 @@ public sealed partial class ProvisionDivision
     private readonly IRosterQueries _roster;
     private readonly IAdvisoryLock _locks;
     private readonly CapacityEvaluator _capacity;
+    private readonly PostNews _news;
     private readonly IAuditWriter _audit;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
@@ -100,6 +102,7 @@ public sealed partial class ProvisionDivision
         IRosterQueries roster,
         IAdvisoryLock locks,
         CapacityEvaluator capacity,
+        PostNews news,
         IAuditWriter audit,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork,
@@ -120,6 +123,7 @@ public sealed partial class ProvisionDivision
         _roster = roster;
         _locks = locks;
         _capacity = capacity;
+        _news = news;
         _audit = audit;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
@@ -304,6 +308,21 @@ public sealed partial class ProvisionDivision
 
             division.Activate(now);
             request.Complete(now);
+
+            // The activation is news for the whole world, not one club: a new tier exists (COM-1).
+            var newsCountry = await _world.FindCountryAsync(countryId, cancellationToken);
+            var newsWorld = await _world.FindWorldAsync(cancellationToken);
+
+            if (newsCountry is not null && newsWorld is not null)
+            {
+                _news.DivisionActivated(
+                    newsWorld.Id,
+                    countryId,
+                    division.Id,
+                    newsCountry.DisplayName,
+                    targetTier,
+                    division.DisplayName);
+            }
 
             _audit.Record(new AuditEntry(
                 WorldAuditActions.ProvisioningCompleted,

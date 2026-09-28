@@ -4,6 +4,7 @@ using TouchlineManager.Application.Abstractions.Market;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.Squad;
+using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Application.Finance;
 using TouchlineManager.Domain.Market;
 using TouchlineManager.Domain.Rules;
@@ -39,6 +40,7 @@ public sealed class ResolveListing
     private readonly ISquadRepository _squad;
     private readonly ISquadQueries _squadQueries;
     private readonly IRosterQueries _roster;
+    private readonly IWorldRepository _world;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditWriter _audit;
     private readonly MarketNotifications _notifications;
@@ -54,6 +56,7 @@ public sealed class ResolveListing
         ISquadRepository squad,
         ISquadQueries squadQueries,
         IRosterQueries roster,
+        IWorldRepository world,
         IUnitOfWork unitOfWork,
         IAuditWriter audit,
         MarketNotifications notifications,
@@ -67,6 +70,7 @@ public sealed class ResolveListing
         _squad = squad;
         _squadQueries = squadQueries;
         _roster = roster;
+        _world = world;
         _unitOfWork = unitOfWork;
         _audit = audit;
         _notifications = notifications;
@@ -277,6 +281,7 @@ public sealed class ResolveListing
             Reason: null));
 
         await _notifications.NotifyTransferAsync(
+            (await _world.FindWorldAsync(cancellationToken))?.Id,
             leading.BidderClubId,
             listing.SellerClubId,
             listing.PlayerId,

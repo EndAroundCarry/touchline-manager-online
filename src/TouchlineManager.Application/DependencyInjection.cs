@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using TouchlineManager.Application.Abstractions.Comms;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
@@ -51,6 +52,9 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, ResolveAuctionJobHandler>();
         services.AddScoped<IJobHandler, EvaluateAiMarketJobHandler>();
         services.AddScoped<IJobHandler, ProvisionDivisionJobHandler>();
+        services.AddScoped<IJobHandler, EvaluateInactivityJobHandler>();
+        services.AddScoped<IJobHandler, SendDeadlineRemindersJobHandler>();
+        services.AddScoped<IJobHandler, DispatchOutboxJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -135,6 +139,20 @@ public static class DependencyInjection
         services.AddScoped<GetInbox>();
         services.AddScoped<MarkInboxMessagesRead>();
         services.AddScoped<GetSync>();
+
+        // The news feed (COM-1): the writer the provisioning, market, and matchday workflows compose, and the
+        // read the client's screen uses.
+        services.AddScoped<PostNews>();
+        services.AddScoped<GetNews>();
+
+        // Notification preferences (COM-4) and the deadline reminder (COM-3).
+        services.AddScoped<GetNotificationPreferences>();
+        services.AddScoped<UpdateNotificationPreferences>();
+        services.AddScoped<SendDeadlineReminders>();
+
+        // The outbox (MOD-4): the writer that stages an intention, and the dispatcher the worker drives.
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<DispatchOutbox>();
     }
 
     /// <summary>
@@ -199,6 +217,7 @@ public static class DependencyInjection
 
         services.AddScoped<SeedWorld>();
         services.AddScoped<ProvisionDivision>();
+        services.AddScoped<EvaluateInactivity>();
         services.AddScoped<CreateManagerProfile>();
         services.AddScoped<ClaimClub>();
         services.AddScoped<ResignClub>();
@@ -208,6 +227,10 @@ public static class DependencyInjection
         services.AddScoped<GetAvailableClubs>();
         services.AddScoped<GetClubDashboard>();
         services.AddScoped<GetOnboardingState>();
+
+        // Reachable only from the non-production diagnostics triggers (§17.12).
+        services.AddScoped<TriggerProvisioning>();
+        services.AddScoped<TriggerInactivity>();
 
         services.AddScoped<IValidator<CreateManagerProfileRequest>, CreateManagerProfileRequestValidator>();
         services.AddScoped<IValidator<ClaimClubRequest>, ClaimClubRequestValidator>();

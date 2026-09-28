@@ -41,6 +41,28 @@ public sealed class DiagnosticsOptions
     /// production surface (master plan §17.12).
     /// </remarks>
     public bool EnableMatchdayTrigger { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the Stage 11 provisioning trigger is reachable.
+    /// </summary>
+    /// <remarks>
+    /// The trigger creates a tier's provisioning request and enqueues its real job, due now, so a journey can
+    /// grow the pyramid without filling a tier by hand. The worker still generates, backfills, validates, and
+    /// activates the tier; the endpoint only does what the worker-only scheduler normally does. Off by default
+    /// and never set outside a test environment, so it has no production surface (master plan §17.12).
+    /// </remarks>
+    public bool EnableProvisioningTrigger { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the Stage 11 inactivity trigger is reachable.
+    /// </summary>
+    /// <remarks>
+    /// The trigger enqueues today's real inactivity-ladder job, due now, so a journey can watch the ladder
+    /// warn, inactivate, and close tenures without waiting for the day's schedule. The worker still runs the
+    /// ladder; the endpoint only does what the worker-only scheduler normally does. Off by default and never
+    /// set outside a test environment, so it has no production surface (master plan §17.12).
+    /// </remarks>
+    public bool EnableInactivityTrigger { get; set; }
 }
 
 /// <summary>

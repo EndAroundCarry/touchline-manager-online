@@ -147,7 +147,7 @@ public sealed class CapacityEvaluator
     /// so a retried provisioning run reuses the same seed. That is what keeps two attempts at the same
     /// tier attempts at the same tier — the property <c>DivisionProvisioningRequest.Retry</c> depends on.
     /// </remarks>
-    private static string GenerationSeedFor(Guid worldId, string countryCode, int targetTier) =>
+    internal static string GenerationSeedFor(Guid worldId, string countryCode, int targetTier) =>
         DeterministicDigest.Of(
             worldId.ToString(),
             countryCode,

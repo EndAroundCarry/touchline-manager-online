@@ -82,4 +82,22 @@ internal sealed class InboxRepository : IInboxRepository
             .Select(player => new { player.Id, player.FullName })
             .ToDictionaryAsync(player => player.Id, player => player.FullName, cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, string>> FindManagerEmailsAsync(
+        IReadOnlyCollection<Guid> managerIds,
+        CancellationToken cancellationToken)
+    {
+        if (managerIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await (
+            from manager in _dbContext.Managers
+            join user in _dbContext.Users on manager.UserId equals user.Id
+            where managerIds.Contains(manager.Id)
+            select new { manager.Id, user.Email })
+            .ToDictionaryAsync(row => row.Id, row => row.Email, cancellationToken);
+    }
 }

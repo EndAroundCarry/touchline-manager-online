@@ -15,6 +15,7 @@ using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Infrastructure.Comms;
 using TouchlineManager.Infrastructure.Competition;
 using TouchlineManager.Infrastructure.Email;
 using TouchlineManager.Infrastructure.Finance;
@@ -59,7 +60,7 @@ public static class DependencyInjection
         AddWorldInfrastructure(services, configuration);
         AddCompetitionInfrastructure(services);
         AddMatchInfrastructure(services);
-        AddCommsInfrastructure(services);
+        AddCommsInfrastructure(services, configuration);
         AddSquadInfrastructure(services);
         AddTrainingInfrastructure(services, configuration);
         AddAiClubInfrastructure(services, configuration);
@@ -216,10 +217,33 @@ public static class DependencyInjection
     /// the club targets a message is addressed to, because the two are one concern; the read port serves the
     /// inbox, separate so a screen can change without widening what a command can reach (`MOD-3`).
     /// </remarks>
-    private static void AddCommsInfrastructure(IServiceCollection services)
+    private static void AddCommsInfrastructure(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IInboxRepository, InboxRepository>();
         services.AddScoped<IInboxQueries, InboxQueries>();
+        services.AddScoped<INewsRepository, NewsRepository>();
+        services.AddScoped<INotificationPreferencesRepository, NotificationPreferencesRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
+
+        // Bound here rather than in AddJobQueueWorker so a misconfigured interval fails at startup in every
+        // host, and the schedulers that read them are registered there for the same reason the queue poller
+        // is: the API must never send mail, age a tenure, or grow the pyramid (ADR-0001, ADR-0008).
+        services
+            .AddOptions<ReminderOptions>()
+            .Bind(configuration.GetSection(ReminderOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Reminders:CheckIntervalSeconds must be between 30 and 86400.");
+
+        services
+            .AddOptions<OutboxOptions>()
+            .Bind(configuration.GetSection(OutboxOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Outbox:CheckIntervalSeconds must be between 30 and 86400.")
+            .Validate(
+                options => options.BatchSize is >= 1 and <= 500,
+                "Outbox:BatchSize must be between 1 and 500.");
     }
 
     /// <summary>
@@ -327,6 +351,13 @@ public static class DependencyInjection
                 options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
                 "Provisioning:CheckIntervalSeconds must be between 30 and 86400.");
 
+        services
+            .AddOptions<InactivityOptions>()
+            .Bind(configuration.GetSection(InactivityOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Inactivity:CheckIntervalSeconds must be between 30 and 86400.");
+
         services.AddScoped<IWorldRepository, WorldRepository>();
         services.AddScoped<IClubRepository, ClubRepository>();
         services.AddScoped<IManagerRepository, ManagerRepository>();
@@ -432,6 +463,18 @@ public static class DependencyInjection
         // And the same for the pyramid: this service places a provisioning row for every pending tier request,
         // and the row is what generates, backfills, and activates the next tier (PYR-4).
         services.AddHostedService<ProvisioningScheduler>();
+
+        // And the same for tenure activity: this service places one ladder row a day, and the row is what
+        // warns, hands routine decisions to the AI, and finally frees a club (OCC-1..OCC-3).
+        services.AddHostedService<InactivityScheduler>();
+
+        // And the same for the calendar's notifications: this service places a reminder row for every round
+        // about to lock, and the row is what tells the managers holding its clubs (COM-3).
+        services.AddHostedService<ReminderScheduler>();
+
+        // And the same for the outbox: this service places a dispatch row every minute, and the row is what
+        // sends the notifications the game has already committed to sending (MOD-4).
+        services.AddHostedService<OutboxScheduler>();
 
         return services;
     }

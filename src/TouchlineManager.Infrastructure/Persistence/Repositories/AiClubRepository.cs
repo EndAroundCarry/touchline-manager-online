@@ -16,8 +16,10 @@ namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 /// however deep the pyramid gets.
 /// </para>
 /// <para>
-/// "AI-controlled" is the absence of an open tenure, and open spans <c>active</c> and <c>inactive</c>
-/// (`OCC-8`): an inactive tenure still occupies its club, so the club is not the AI's to set up.
+/// A club is the AI's to set up when it has no *active* tenure: an AI club, or one whose manager is away and
+/// whose tenure the inactivity ladder has marked inactive (`OCC-2`). The AI only fills gaps, so it can never
+/// overwrite a present manager's choices (`INS-12`); an inactive tenure is exactly the case `OCC-2` names,
+/// where the AI steps in while the manager may still return.
 /// </para>
 /// </remarks>
 internal sealed class AiClubRepository : IAiClubRepository
@@ -33,7 +35,7 @@ internal sealed class AiClubRepository : IAiClubRepository
         var clubIds = await _dbContext.Clubs
             .Where(club => club.Status == ClubStatus.Active
                 && !_dbContext.ClubTenures.Any(tenure => tenure.ClubId == club.Id
-                    && tenure.ControlStatus != ClubTenureControlStatus.Closed))
+                    && tenure.ControlStatus == ClubTenureControlStatus.Active))
             .OrderBy(club => club.Id)
             .Select(club => club.Id)
             .ToListAsync(cancellationToken);

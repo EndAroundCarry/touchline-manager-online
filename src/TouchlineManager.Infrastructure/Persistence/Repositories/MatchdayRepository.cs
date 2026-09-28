@@ -65,7 +65,13 @@ internal sealed class MatchdayRepository : IMatchdayRepository
             .OrderBy(fixture => fixture.Id)
             .ToListAsync(cancellationToken);
 
-        return new MatchdayWorkload(matchday, fixtures, season.Id, season.WorldId, divisionSeason!.TieDrawSeed);
+        return new MatchdayWorkload(
+            matchday,
+            fixtures,
+            season.Id,
+            season.WorldId,
+            divisionSeason!.DivisionId,
+            divisionSeason.TieDrawSeed);
     }
 
     /// <inheritdoc />
@@ -76,6 +82,20 @@ internal sealed class MatchdayRepository : IMatchdayRepository
             .AsNoTracking()
             .Where(matchday => matchday.DivisionSeasonId == divisionSeasonId)
             .OrderBy(matchday => matchday.RoundNumber)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Matchday>> ListPendingLockingBetweenAsync(
+        DateTimeOffset after,
+        DateTimeOffset before,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Matchdays
+            .AsNoTracking()
+            .Where(matchday => matchday.PublicationStatus == MatchdayPublicationStatus.Pending
+                && matchday.LockAt > after
+                && matchday.LockAt <= before)
+            .OrderBy(matchday => matchday.LockAt)
+            .ThenBy(matchday => matchday.Id)
             .ToListAsync(cancellationToken);
 
     /// <inheritdoc />

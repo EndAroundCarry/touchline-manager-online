@@ -16,6 +16,10 @@ namespace TouchlineManager.Application.Tests.Comms;
 public sealed class MatchdayNotificationsTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 6, 19, 0, 0, TimeSpan.Zero);
+    private static readonly Guid WorldId = Guid.CreateVersion7();
+    private static readonly Guid DivisionId = Guid.CreateVersion7();
+
+    private static MatchdayNotifications Compose(FakeInbox inbox) => new(inbox, new FakeNews());
 
     [Fact]
     public async Task Both_sides_hear_their_result_and_nobody_hears_an_unmoved_table()
@@ -29,8 +33,10 @@ public sealed class MatchdayNotificationsTests
             .WithClub(host, Guid.CreateVersion7(), "Host FC")
             .WithClub(away, Guid.CreateVersion7(), "Away FC");
 
-        await new MatchdayNotifications(inbox).NotifyPublishedAsync(
+        await Compose(inbox).NotifyPublishedAsync(
             roundNumber: 4,
+            WorldId,
+            DivisionId,
             [
                 new PlayedFixtureFact(fixtureId, matchId, host, away, HomeGoals: 2, AwayGoals: 1),
             ],
@@ -63,8 +69,10 @@ public sealed class MatchdayNotificationsTests
             .WithClub(club, status, "Only FC")
             .WithClub(opponent, Guid.CreateVersion7(), "Opponent FC");
 
-        await new MatchdayNotifications(inbox).NotifyPublishedAsync(
+        await Compose(inbox).NotifyPublishedAsync(
             roundNumber: 9,
+            WorldId,
+            DivisionId,
             [
                 new PlayedFixtureFact(Guid.CreateVersion7(), Guid.CreateVersion7(), club, opponent, 0, 0),
             ],
@@ -95,8 +103,10 @@ public sealed class MatchdayNotificationsTests
             .WithPlayer(booked, "Ion Popescu")
             .WithPlayer(hurt, "Ana Ionescu");
 
-        await new MatchdayNotifications(inbox).NotifyPublishedAsync(
+        await Compose(inbox).NotifyPublishedAsync(
             roundNumber: 3,
+            WorldId,
+            DivisionId,
             played: [],
             positions: [],
             [
@@ -138,8 +148,10 @@ public sealed class MatchdayNotificationsTests
             .WithClub(managed, Guid.CreateVersion7(), "Managed FC")
             .WithClub(ai, managerId: null, "AI FC");
 
-        await new MatchdayNotifications(inbox).NotifyPublishedAsync(
+        await Compose(inbox).NotifyPublishedAsync(
             roundNumber: 1,
+            WorldId,
+            DivisionId,
             [new PlayedFixtureFact(Guid.CreateVersion7(), Guid.CreateVersion7(), managed, ai, 1, 1)],
             positions: [],
             effects: [],
@@ -162,7 +174,7 @@ public sealed class MatchdayNotificationsTests
             .WithClub(club, manager, "Only FC")
             .WithPlayer(replacement, "Dan Marin");
 
-        await new MatchdayNotifications(inbox).NotifyRepairedSidesAsync(
+        await Compose(inbox).NotifyRepairedSidesAsync(
             roundNumber: 7,
             [
                 new RepairedSideFact(
@@ -226,6 +238,12 @@ public sealed class MatchdayNotificationsTests
             Task.FromResult<IReadOnlyDictionary<Guid, string>>(
                 playerIds.Where(_players.ContainsKey).ToDictionary(playerId => playerId, playerId => _players[playerId]));
 
+        public Task<IReadOnlyDictionary<Guid, string>> FindManagerEmailsAsync(
+            IReadOnlyCollection<Guid> managerIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, string>>(
+                managerIds.ToDictionary(managerId => managerId, _ => "manager@example.test"));
+
         /// <summary>Renders every message staged for one club's manager, as the English a manager reads.</summary>
         /// <param name="clubId">The club whose manager is read.</param>
         public List<InboxText> TextsFor(Guid clubId)
@@ -240,5 +258,18 @@ public sealed class MatchdayNotificationsTests
                     .Select(message => InboxMessageText.Render(message.TemplateKey, message.ParametersJson)),
             ];
         }
+    }
+
+    /// <summary>A news write port that records what was staged.</summary>
+    private sealed class FakeNews : INewsRepository
+    {
+        public List<NewsItem> Added { get; } = [];
+
+        public void Add(NewsItem item) => Added.Add(item);
+
+        public Task<IReadOnlyList<NewsItem>> LoadAsync(
+            NewsPageQuery query,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

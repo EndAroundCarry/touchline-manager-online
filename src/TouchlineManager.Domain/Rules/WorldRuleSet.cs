@@ -80,6 +80,15 @@ public static class WorldRuleSet
     /// <summary>The cooldown after a voluntary resignation before another takeover (`OCC-4`).</summary>
     public static readonly TimeSpan ResignationCooldown = TimeSpan.FromDays(7);
 
+    /// <summary>
+    /// How long before a matchday's team-sheet lock the deadline reminder is sent (`COM-3`).
+    /// </summary>
+    /// <remarks>
+    /// A non-balancing notification constant: it decides when a manager is reminded, not what happens in a
+    /// match, so adding it does not bump <see cref="Version"/> (ADR-0029).
+    /// </remarks>
+    public static readonly TimeSpan DeadlineReminderLead = TimeSpan.FromHours(24);
+
     /// <summary>The number of senior players the generator aims for per club (`SQ-1`).</summary>
     public const int GeneratorSquadTarget = 22;
 
