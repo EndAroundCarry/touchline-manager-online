@@ -52,7 +52,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-37 | Shortlists | market | 10 | Private-visibility policy test |
 | F-38 | Transfer listings | market | 10 | Eligibility and minimum-exposure tests |
 | F-39 | Server-resolved timed auctions | market, finance | 10 | Deterministic winner with exact money movement |
-| F-40 | AI market participation | market | 10 | AI uses no privileged finance; healthy market metrics |
+| F-40 | AI market participation | market | 10 (deferred to the AI-market milestone) | AI uses no privileged finance; healthy market metrics |
 | F-41 | Inbox / news notifications | comms | 6 (results), 8 (rollout), 11 (full) | Template + unread-sync tests |
 | F-42 | Inactivity handling | world, comms, ops | 11 | Threshold, temporary AI, closure, resume tests |
 | F-43 | Safe return-to-AI control | world, squad | 11 | Commitments preserved through abandonment |

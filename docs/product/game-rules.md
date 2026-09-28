@@ -561,6 +561,8 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `payroll_risk_weeks` | 4 | FIN-16 (balancing) |
 | `listing_min_exposure_hours` | 48 | TRF-2 |
 | `auction_blackout_hours_before_kickoff` | 6 | TRF-3 |
+| `auction_resolution_utc` | 12:00 UTC daily | TRF-2 |
+| `minimum_bid_increment_minor` | 250,000 minor units | TRF-5 (balancing) |
 | `refresh_token_lifetime_minutes` | 15 (access) | ADR-0002 |
 | `highlight_target_seconds` | 5–8 | ADR-0006 |
 | `match_presentation_payload_budget_kb` | 750 | ADR-0006 |
@@ -586,8 +588,7 @@ These are recorded so they are not silently invented later:
 |---|---|
 | Calibration of the opening cash, stadium, and reputation baselines and the per-tier scaling | Stage 9 (balancing) |
 | Exact gate-revenue, sponsorship, award, and wage formula constants | Stage 9 (balancing), recorded in rule set |
-| Exact AI valuation and bidding bands | Stage 10 |
+| Exact AI valuation and bidding bands | Stage 10 (AI market milestone) |
 | Exact training development curve constants and age curve | Stage 4/5 |
 | Retirement rule specifics (age cap vs deterministic rollover retirements) | Stage 12 |
 | Whether free-agent signing is enabled during MVP | Stage 10, decided by market-health measurement |
-| Minimum bid increment value | Stage 10 (config value) |

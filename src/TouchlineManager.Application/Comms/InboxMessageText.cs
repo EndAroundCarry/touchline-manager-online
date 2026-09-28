@@ -1,4 +1,5 @@
 using System.Globalization;
+using TouchlineManager.Application.Market;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Squad;
 
@@ -48,9 +49,35 @@ public static class InboxMessageText
                 InboxTemplates.Read<InboxTemplates.InjuryParameters>(parametersJson)),
             InboxTemplates.TeamSheetRepaired => RepairedSide(
                 InboxTemplates.Read<InboxTemplates.TeamSheetParameters>(parametersJson)),
+            MarketInboxTemplates.Outbid => Outbid(
+                MarketInboxTemplates.Read<MarketInboxTemplates.OutbidParameters>(parametersJson)),
+            MarketInboxTemplates.BidWon => BidWon(
+                MarketInboxTemplates.Read<MarketInboxTemplates.BidWonParameters>(parametersJson)),
+            MarketInboxTemplates.PlayerSold => PlayerSold(
+                MarketInboxTemplates.Read<MarketInboxTemplates.PlayerSoldParameters>(parametersJson)),
             _ => throw new InvalidOperationException($"'{templateKey}' is not an inbox template this build renders."),
         };
     }
+
+    private static InboxText Outbid(MarketInboxTemplates.OutbidParameters parameters) =>
+        new(
+            "You were outbid",
+            $"Your bid for {parameters.PlayerName} was beaten by a higher offer of "
+            + $"{Money(parameters.NewAmountMinor)}.");
+
+    private static InboxText BidWon(MarketInboxTemplates.BidWonParameters parameters) =>
+        new(
+            "Transfer completed",
+            $"You signed {parameters.PlayerName} from {parameters.SellerClubName} for "
+            + $"{Money(parameters.FeeMinor)}.");
+
+    private static InboxText PlayerSold(MarketInboxTemplates.PlayerSoldParameters parameters) =>
+        new(
+            "Player sold",
+            $"{parameters.PlayerName} has joined {parameters.BuyerClubName} for {Money(parameters.FeeMinor)}.");
+
+    private static string Money(long minorUnits) =>
+        minorUnits.ToString("N0", CultureInfo.InvariantCulture);
 
     private static InboxText Result(InboxTemplates.ResultParameters parameters)
     {

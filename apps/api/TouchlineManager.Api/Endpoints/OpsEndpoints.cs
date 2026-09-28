@@ -1,7 +1,9 @@
 using TouchlineManager.Api.Http;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Application.Market;
 using TouchlineManager.Contracts.Competition;
+using TouchlineManager.Contracts.Market;
 
 namespace TouchlineManager.Api.Endpoints;
 
@@ -54,6 +56,51 @@ internal static class OpsEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         return group;
+    }
+
+    /// <summary>Maps the market's non-production auction trigger onto the ops module group.</summary>
+    /// <remarks>
+    /// The market counterpart of the matchday trigger: it enqueues a listing's real resolution job due now, so
+    /// a journey can watch an auction settle without waiting for its window. The worker still resolves the
+    /// listing exactly as it would on the calendar (ADR-0016). Mapped only when the diagnostics flag is on.
+    /// </remarks>
+    public static RouteGroupBuilder MapAuctionTrigger(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapPost("/diagnostics/play-auction", PlayAuctionAsync)
+            .WithName("PlayAuctionProbe")
+            .WithSummary("Enqueues a listing's resolution job, due now, so an auction can be watched.")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker resolves the listing exactly as it "
+                + "would at its window; this only does what the worker-only scheduler normally does, and a "
+                + "repeated call is a no-op.")
+            .Produces<AuctionTriggerResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        return group;
+    }
+
+    private static async Task<IResult> PlayAuctionAsync(
+        PlayAuctionRequest request,
+        TriggerAuctions trigger,
+        CancellationToken cancellationToken)
+    {
+        var result = await trigger.ExecuteAsync(request.ListingId, cancellationToken);
+
+        if (result.Outcome == MarketOutcome.NotFound)
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                MarketErrorCodes.ListingNotFound,
+                "No listing was found.",
+                "The requested listing does not exist.");
+        }
+
+        return Results.Json(
+            new AuctionTriggerResponse(result.ListingId, result.ResolveKey, result.Enqueued),
+            statusCode: StatusCodes.Status202Accepted);
     }
 
     private static async Task<IResult> PlayMatchdayAsync(
@@ -123,3 +170,13 @@ internal sealed record MatchdayTriggerResponse(
     string ResolveKey,
     bool LockEnqueued,
     bool ResolveEnqueued);
+
+/// <summary>The body of the auction trigger.</summary>
+/// <param name="ListingId">The listing to resolve.</param>
+internal sealed record PlayAuctionRequest(Guid ListingId);
+
+/// <summary>Response of the auction trigger.</summary>
+/// <param name="ListingId">The listing that was triggered.</param>
+/// <param name="ResolveKey">The business key of the enqueued resolution job.</param>
+/// <param name="Enqueued"><see langword="true"/> when the resolution row was newly inserted.</param>
+internal sealed record AuctionTriggerResponse(Guid ListingId, string ResolveKey, bool Enqueued);

@@ -3,6 +3,59 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 10 — Scouting and timed auctions
+
+The transfer market's core loop: a manager searches every player in the world, keeps private shortlists, lists a
+player with a minimum fee, and bids against rivals on a fixed daily window. A bid reserves its funds through the
+existing ledger the moment it leads, and the resolution settles the winner — payment, credit, and the player's
+contract and registration — in one serializable transaction. The AI transfer market (`TRF-12`) is the next
+milestone of the stage.
+
+### Added
+
+- **The `market` module** (master plan §6.7; ADR-0024): `market.shortlists`, `market.transfer_listings`,
+  `market.transfer_bids`, and `market.transfer_outcomes`, with the partial unique indexes that make the rules
+  structural — one open listing per player (`TRF-14`), one leading bid per listing per club (`TRF-6`), and one
+  outcome per listing ("resolution happens once", `TRF-9`). `bid_sequence` is a database-assigned identity, so a
+  tie between equal amounts resolves to the earliest committed bid rather than to arrival time (`TRF-8`, `T-5`).
+- **Scouting** (`SCT-1`): a server-side, keyset-paged search over every club's players with exact public
+  attributes, position and age filters, and a bounded page (`D-2`). Nothing hidden — no potential, reputation,
+  or internal valuation — reaches a client (`I-1`).
+- **Private shortlists** (`SCT-3`): a manager's own watch list, with a length-bounded note, keyed by the manager
+  profile rather than the club so it survives a change of club.
+- **Transfer listings** (`TRF-1`, `TRF-2`, `TRF-14`): a seller lists an eligible player with a minimum fee and
+  the buyer's precomputed wage and contract length (`CON-5`). The listing resolves at the next daily window at
+  least 48 hours away, and never within the six-hour pre-kickoff blackout (`TRF-3`).
+- **Bids** (`TRF-4`…`TRF-7`): ascending bids with a configured minimum increment, one active bid per club per
+  listing that may be raised. The leading bid reserves its funds through `LedgerPostings.BidReservation`, and
+  the displaced leader's reservation is released in the same transaction (`FIN-10`).
+- **Auction resolution** (`TRF-8`…`TRF-11`): the durable job `market.resolve-auction`, materialised per listing
+  with the business key `listing:{id}:resolve`. It runs `SERIALIZABLE`, revalidates the winning bid against both
+  clubs' accounts and squads and the player's registration, and settles the transfer atomically — the buyer pays
+  (`TransferPayment`), the seller is credited (`TransferProceeds`), the seller's contract closes as `transferred`,
+  its registration ends, and the buyer's contract and registration are created. A retried job is a no-op.
+- **Market reads and history** (`INT-6`): a club's own listings and bids, and the public history of completed
+  transfers, behind the same keyset cursor the rest of the product uses.
+- **Market notifications** (`F-41`): an outbid bidder and both sides of a completed transfer are told through the
+  inbox, using the durable template-and-parameters contract the other messages use (`MAT-8`).
+- **The scouting and transfers screens**, and a `world-rules-v7` rule set carrying the auction window, the
+  blackout, the minimum bid increment, and the shortlist note bound (`RULE-1`, `RULE-3`).
+
+### Changed
+
+- **The ledger gains four categories' worth of use**: `finance.bid_reservation`, `finance.reservation_release`,
+  `finance.transfer_payment`, and `finance.transfer_proceeds` are now written, resolved through
+  `LedgerEntryText` like every other line.
+- **`ISquadRepository` grows two read methods** — the active contract and registration of a player — so a
+  transfer can close the old pair and stage the new one in a single unit of work (`MOD-2`).
+
+### Notes
+
+- The AI transfer market (`TRF-12`), collusion signals (`INT-4`), and admin trace views are the next Stage 10
+  milestone; free-agent signing (`CON-7`) waits on rollover producing free agents (`CON-6`, Stage 12).
+- The market's two infrastructure suites run against their own seeded world, because a resolution moves a player
+  between clubs and would otherwise break the world-seeding assertions that check every club's squad.
+
 ## Stage 9 — Contracts and basic club finances
 
 The ledger every balance is rebuilt from. A club's money becomes an append-only record: an account no longer

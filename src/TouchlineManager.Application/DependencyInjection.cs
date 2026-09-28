@@ -7,6 +7,8 @@ using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Finance;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Application.Market;
+using TouchlineManager.Application.Market.Validation;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.Squad.Validation;
@@ -14,6 +16,7 @@ using TouchlineManager.Application.World;
 using TouchlineManager.Application.World.Validation;
 using TouchlineManager.Contracts.Auth;
 using TouchlineManager.Contracts.Competition;
+using TouchlineManager.Contracts.Market;
 using TouchlineManager.Contracts.Squad;
 using TouchlineManager.Contracts.World;
 
@@ -44,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
         services.AddScoped<IJobHandler, RebuildDivisionProjectionsJobHandler>();
         services.AddScoped<IJobHandler, WeeklyFinanceRunJobHandler>();
+        services.AddScoped<IJobHandler, ResolveAuctionJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -54,8 +58,38 @@ public static class DependencyInjection
         AddMatchUseCases(services);
         AddCommsUseCases(services);
         AddFinanceUseCases(services);
+        AddMarketUseCases(services);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the market module's reads and commands (master plan §16 Stage 10; `SCT-*`, `TRF-*`).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ResolveListing"/> has no public command — the worker drives it through the resolution job
+    /// (`TRF-9`), the same way the matchday transitions are driven. <see cref="MarketNotifications"/> is
+    /// registered here rather than beside one caller because a bid, a cancellation, and a resolution each
+    /// report their own event.
+    /// </remarks>
+    private static void AddMarketUseCases(IServiceCollection services)
+    {
+        services.AddScoped<MarketNotifications>();
+
+        services.AddScoped<SearchPlayers>();
+        services.AddScoped<Shortlists>();
+        services.AddScoped<ListListings>();
+        services.AddScoped<CreateListing>();
+        services.AddScoped<CancelListing>();
+        services.AddScoped<PlaceBid>();
+        services.AddScoped<ResolveListing>();
+
+        // Reachable only from the non-production diagnostics trigger (§17.12).
+        services.AddScoped<TriggerAuctions>();
+
+        services.AddScoped<IValidator<CreateListingRequest>, CreateListingRequestValidator>();
+        services.AddScoped<IValidator<PlaceBidRequest>, PlaceBidRequestValidator>();
+        services.AddScoped<IValidator<ShortlistRequest>, ShortlistRequestValidator>();
     }
 
     /// <summary>

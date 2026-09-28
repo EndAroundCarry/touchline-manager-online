@@ -48,6 +48,18 @@ public static class LedgerPostings
     /// <summary>The template that describes a compensating entry (`FIN-12`).</summary>
     public const string CompensationTemplate = "finance.compensation";
 
+    /// <summary>The template that describes a leading bid's reservation (`FIN-10`, `TRF-7`).</summary>
+    public const string BidReservationTemplate = "finance.bid_reservation";
+
+    /// <summary>The template that describes the release of a bid's reservation (`TRF-7`, `TRF-15`).</summary>
+    public const string ReservationReleaseTemplate = "finance.reservation_release";
+
+    /// <summary>The template that describes a buyer paying a transfer fee (`FIN-8`, `TRF-10`).</summary>
+    public const string TransferPaymentTemplate = "finance.transfer_payment";
+
+    /// <summary>The template that describes a seller receiving transfer income (`FIN-6`, `TRF-10`).</summary>
+    public const string TransferProceedsTemplate = "finance.transfer_proceeds";
+
     /// <summary>
     /// Builds the posting that funds a newly generated club's account.
     /// </summary>
@@ -269,6 +281,134 @@ public static class LedgerPostings
             CompensationTemplate,
             Parameters(("amountMinor", cashDeltaMinor)));
     }
+
+    /// <summary>
+    /// Builds the posting that reserves a leading bid's funds without moving cash (`FIN-10`, `TRF-7`).
+    /// </summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The bidding club.</param>
+    /// <param name="bidId">The bid holding the reservation, which the correlation key names.</param>
+    /// <param name="amountMinor">The amount reserved, in minor units.</param>
+    /// <remarks>
+    /// Reserving raises <c>reserved_minor</c> and leaves cash untouched, so the money is committed but not
+    /// spent (`FIN-10`). The correlation key names the bid, so a retried placement collides with its first
+    /// reservation rather than reserving twice (`FIN-17`).
+    /// </remarks>
+    public static LedgerPosting BidReservation(Guid entryId, Guid clubId, Guid bidId, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.BidReservation,
+            CashDeltaMinor: 0,
+            ReservedDeltaMinor: amountMinor,
+            LedgerSourceType.Transfer,
+            SourceId: bidId,
+            ReservationCorrelationId(bidId, amountMinor),
+            BidReservationTemplate,
+            Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>
+    /// Builds the posting that releases a bid's reservation without moving cash (`TRF-7`, `TRF-15`).
+    /// </summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club whose reservation is released.</param>
+    /// <param name="bidId">The bid whose reservation is released.</param>
+    /// <param name="amountMinor">The amount released, in minor units.</param>
+    public static LedgerPosting ReservationRelease(Guid entryId, Guid clubId, Guid bidId, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.ReservationRelease,
+            CashDeltaMinor: 0,
+            ReservedDeltaMinor: -amountMinor,
+            LedgerSourceType.Transfer,
+            SourceId: bidId,
+            ReleaseCorrelationId(bidId, amountMinor),
+            ReservationReleaseTemplate,
+            Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>
+    /// Builds the posting a buyer makes when its winning bid settles: the fee leaves cash and its reservation
+    /// at once (`FIN-8`, `TRF-10`).
+    /// </summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The buying club.</param>
+    /// <param name="listingId">The listing that settled, which the correlation key names.</param>
+    /// <param name="amountMinor">The fee, in minor units.</param>
+    /// <remarks>
+    /// Both deltas are negative because the money was reserved when the bid led and is paid when it wins: a
+    /// payment that moved only cash would leave a stale reservation behind (`FIN-10`).
+    /// </remarks>
+    public static LedgerPosting TransferPayment(Guid entryId, Guid clubId, Guid listingId, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.TransferPayment,
+            CashDeltaMinor: -amountMinor,
+            ReservedDeltaMinor: -amountMinor,
+            LedgerSourceType.Transfer,
+            SourceId: listingId,
+            TransferCorrelationId(listingId),
+            TransferPaymentTemplate,
+            Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>
+    /// Builds the posting a seller receives when a listing settles (`FIN-6`, `TRF-10`).
+    /// </summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The selling club.</param>
+    /// <param name="listingId">The listing that settled, which the correlation key names.</param>
+    /// <param name="amountMinor">The fee received, in minor units.</param>
+    public static LedgerPosting TransferProceeds(Guid entryId, Guid clubId, Guid listingId, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.TransferProceeds,
+            CashDeltaMinor: amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Transfer,
+            SourceId: listingId,
+            TransferCorrelationId(listingId),
+            TransferProceedsTemplate,
+            Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>The correlation key of a bid's reservation (`FIN-17`, `TRF-7`).</summary>
+    /// <param name="bidId">The bid.</param>
+    /// <param name="amountMinor">The amount reserved, which makes each reservation event its own key.</param>
+    /// <remarks>
+    /// The amount is part of the key because a raise reserves again: the earlier reservation keeps its own key
+    /// and the raise posts a distinct entry rather than colliding with it, while a retry of either is still a
+    /// no-op (`FIN-17`).
+    /// </remarks>
+    public static string ReservationCorrelationId(Guid bidId, long amountMinor) =>
+        $"bid:{bidId:D}:reserve:{amountMinor}";
+
+    /// <summary>The correlation key of the release of a bid's reservation (`FIN-17`, `TRF-7`).</summary>
+    /// <param name="bidId">The bid.</param>
+    /// <param name="amountMinor">The amount released, which makes each release event its own key.</param>
+    public static string ReleaseCorrelationId(Guid bidId, long amountMinor) =>
+        $"bid:{bidId:D}:release:{amountMinor}";
+
+    /// <summary>The correlation key a settled listing's payment and proceeds share (`FIN-17`, `TRF-10`).</summary>
+    /// <param name="listingId">The listing.</param>
+    /// <remarks>
+    /// The two entries share the key and differ by category, so a retried resolution collides with both
+    /// rather than paying or crediting a second time.
+    /// </remarks>
+    public static string TransferCorrelationId(Guid listingId) =>
+        $"transfer:{listingId:D}";
 
     /// <summary>The correlation key a week's postings for one club share (`CON-2`, `FIN-17`).</summary>
     /// <remarks>

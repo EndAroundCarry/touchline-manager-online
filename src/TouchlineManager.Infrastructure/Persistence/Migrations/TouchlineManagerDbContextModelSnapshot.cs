@@ -1198,6 +1198,296 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TouchlineManager.Domain.Market.ShortlistEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manager_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId")
+                        .HasDatabaseName("ix_shortlists_player_id");
+
+                    b.HasIndex("ManagerId", "PlayerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shortlists_manager_player");
+
+                    b.ToTable("shortlists", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_shortlists_notes_length", "length(notes) <= 280");
+                        });
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.Market.TransferBid", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<long>("BidSequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("bid_sequence");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("BidSequence"));
+
+                    b.Property<Guid>("BidderClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bidder_club_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("listing_id");
+
+                    b.Property<DateTimeOffset>("PlacedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("placed_at");
+
+                    b.Property<string>("ReservationCorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("reservation_correlation_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BidderClubId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transfer_bids_idempotency_key")
+                        .HasFilter("idempotency_key is not null");
+
+                    b.HasIndex("ListingId", "BidderClubId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transfer_bids_leading_listing_club")
+                        .HasFilter("status = 'leading'");
+
+                    b.HasIndex("ListingId", "Status", "AmountMinor", "BidSequence")
+                        .HasDatabaseName("ix_transfer_bids_listing_status_amount_sequence");
+
+                    b.ToTable("transfer_bids", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_transfer_bids_amount", "amount_minor > 0");
+
+                            t.HasCheckConstraint("ck_transfer_bids_sequence", "bid_sequence >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.Market.TransferListing", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<long>("GeneratedBuyerWageMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("generated_buyer_wage_minor");
+
+                    b.Property<int>("GeneratedContractSeasons")
+                        .HasColumnType("integer")
+                        .HasColumnName("generated_contract_seasons");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<long>("MinimumFeeMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("minimum_fee_minor");
+
+                    b.Property<DateTimeOffset>("OpensAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opens_at");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_id");
+
+                    b.Property<Guid>("SellerClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seller_club_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transfer_listings_idempotency_key")
+                        .HasFilter("idempotency_key is not null");
+
+                    b.HasIndex("PlayerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transfer_listings_open_player")
+                        .HasFilter("status = 'open'");
+
+                    b.HasIndex("SellerClubId");
+
+                    b.HasIndex("Status", "EndsAt")
+                        .HasDatabaseName("ix_transfer_listings_status_ends_at");
+
+                    b.ToTable("transfer_listings", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_transfer_listings_buyer_wage", "generated_buyer_wage_minor >= 0");
+
+                            t.HasCheckConstraint("ck_transfer_listings_minimum_fee", "minimum_fee_minor > 0");
+
+                            t.HasCheckConstraint("ck_transfer_listings_seasons", "generated_contract_seasons between 1 and 3");
+
+                            t.HasCheckConstraint("ck_transfer_listings_window", "ends_at > opens_at");
+                        });
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.Market.TransferOutcome", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BuyerClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("buyer_club_id");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<long>("FeeMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fee_minor");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("listing_id");
+
+                    b.Property<Guid>("NewContractId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_contract_id");
+
+                    b.Property<Guid>("OldContractId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("old_contract_id");
+
+                    b.Property<string>("OutcomeReason")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome_reason");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_id");
+
+                    b.Property<DateTimeOffset>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<Guid>("SellerClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seller_club_id");
+
+                    b.Property<Guid>("WinningBidId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("winning_bid_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuyerClubId");
+
+                    b.HasIndex("ListingId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transfer_outcomes_listing");
+
+                    b.HasIndex("ResolvedAt")
+                        .HasDatabaseName("ix_transfer_outcomes_resolved_at");
+
+                    b.HasIndex("SellerClubId");
+
+                    b.ToTable("transfer_outcomes", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_transfer_outcomes_distinct_clubs", "seller_club_id <> buyer_club_id");
+
+                            t.HasCheckConstraint("ck_transfer_outcomes_fee", "fee_minor > 0");
+                        });
+                });
+
             modelBuilder.Entity("TouchlineManager.Domain.Match.InputSnapshot", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3354,6 +3644,72 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                     b.HasOne("TouchlineManager.Domain.World.Club", null)
                         .WithMany()
                         .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.Market.ShortlistEntry", b =>
+                {
+                    b.HasOne("TouchlineManager.Domain.World.Manager", null)
+                        .WithMany()
+                        .HasForeignKey("ManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TouchlineManager.Domain.Squad.Player", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.Market.TransferBid", b =>
+                {
+                    b.HasOne("TouchlineManager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("BidderClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TouchlineManager.Domain.Market.TransferListing", null)
+                        .WithMany()
+                        .HasForeignKey("ListingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.Market.TransferListing", b =>
+                {
+                    b.HasOne("TouchlineManager.Domain.Squad.Player", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TouchlineManager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("SellerClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.Market.TransferOutcome", b =>
+                {
+                    b.HasOne("TouchlineManager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("BuyerClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TouchlineManager.Domain.Market.TransferListing", null)
+                        .WithMany()
+                        .HasForeignKey("ListingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TouchlineManager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("SellerClubId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

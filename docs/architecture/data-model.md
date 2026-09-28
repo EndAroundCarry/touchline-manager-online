@@ -614,6 +614,11 @@ erDiagram
 | `check (cash_minor >= 0 and reserved_minor >= 0)` | `club_accounts` | `FIN-13` |
 | `unique (club_id, sequence)`, `unique (correlation_id, category)`, `check (resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor)` | `ledger_entries` | `FIN-11`, `FIN-13`, `FIN-17` |
 
+> **Stage 10 status.** The market tables are implemented as specified above, with one tidy-up:
+> `transfer_listings` has no `resolution_job_id` column, because the resolution job's business key
+> `listing:{id}:resolve` already identifies it durably, and a column naming it would be a second
+> statement of the same fact (ADR-0003, ADR-0024). `shortlists` is owned by the `market` module, per §7.
+
 ### 3.4 Communications and operations
 
 ```mermaid

@@ -48,6 +48,10 @@ public static class LedgerEntryText
                     $"Final position award (tier {Number(parameters, "tier")}, rank {Number(parameters, "rank")})"),
             LedgerPostings.EmergencyGrantTemplate => "Emergency grant",
             LedgerPostings.CompensationTemplate => "Compensating entry",
+            LedgerPostings.BidReservationTemplate => "Bid funds reserved",
+            LedgerPostings.ReservationReleaseTemplate => "Bid funds released",
+            LedgerPostings.TransferPaymentTemplate => "Transfer fee paid",
+            LedgerPostings.TransferProceedsTemplate => "Transfer fee received",
             _ => throw new InvalidOperationException(
                 $"'{templateKey}' is not a ledger template this build renders."),
         };

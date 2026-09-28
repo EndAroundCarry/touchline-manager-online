@@ -40,4 +40,19 @@ internal sealed class SquadRepository : ISquadRepository
         _dbContext.PlayerContracts.SingleOrDefaultAsync(
             contract => contract.Id == contractId,
             cancellationToken);
+
+    /// <inheritdoc />
+    public Task<PlayerContract?> FindActiveContractAsync(Guid playerId, CancellationToken cancellationToken) =>
+        _dbContext.PlayerContracts.SingleOrDefaultAsync(
+            contract => contract.PlayerId == playerId && contract.Status == ContractStatus.Active,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<PlayerRegistration?> FindActiveRegistrationAsync(
+        Guid playerId,
+        CancellationToken cancellationToken) =>
+        _dbContext.PlayerRegistrations.SingleOrDefaultAsync(
+            registration => registration.PlayerId == playerId
+                && registration.Status == RegistrationStatus.Active,
+            cancellationToken);
 }

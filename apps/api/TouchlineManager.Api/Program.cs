@@ -12,6 +12,7 @@ using TouchlineManager.Api.Endpoints;
 using TouchlineManager.Api.Finance;
 using TouchlineManager.Api.Health;
 using TouchlineManager.Api.Http;
+using TouchlineManager.Api.Market;
 using TouchlineManager.Api.Match;
 using TouchlineManager.Api.Middleware;
 using TouchlineManager.Api.Squad;
@@ -235,6 +236,7 @@ app.MapTeamSheetEndpoints();
 app.MapMatchEndpoints();
 app.MapCommsEndpoints();
 app.MapFinanceEndpoints();
+app.MapMarketEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;
 
@@ -246,6 +248,7 @@ if (diagnostics.EnableJobProbe)
 if (diagnostics.EnableMatchdayTrigger)
 {
     moduleGroups["ops"].MapMatchdayTrigger();
+    moduleGroups["ops"].MapAuctionTrigger();
 }
 
 if (clock.IsCompressed)

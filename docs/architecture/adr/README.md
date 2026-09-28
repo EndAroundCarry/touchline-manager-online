@@ -40,6 +40,7 @@ the system is shaped the way it is.
 | [0021](0021-competition-rules-and-visible-draw.md) | The tie-break order and the season's draw are public, and the criteria have one definition | Accepted |
 | [0022](0022-append-only-club-ledger.md) | The club ledger is append-only, and its balances are a projection of it | Accepted |
 | [0023](0023-income-expenses-and-gate-revenue.md) | Income and expenses are postings made by the workflow that causes them, and the gate is drawn inside publication | Accepted |
+| [0024](0024-market-scouting-and-timed-auctions.md) | The market is a `market` module, and auctions resolve at a daily window under a reservation held in the ledger | Accepted |
 
 ## Rules for changing an ADR
 

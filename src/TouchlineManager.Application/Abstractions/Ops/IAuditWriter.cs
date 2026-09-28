@@ -129,4 +129,13 @@ public static class AuditTargetTypes
 
     /// <summary>A player's contract (`CON-3`, `CON-4`).</summary>
     public const string PlayerContract = "player_contract";
+
+    /// <summary>A transfer listing (`TRF-1`, `TRF-15`).</summary>
+    public const string TransferListing = "transfer_listing";
+
+    /// <summary>A transfer bid (`TRF-4`, `TRF-7`).</summary>
+    public const string TransferBid = "transfer_bid";
+
+    /// <summary>A resolved transfer (`TRF-10`, `TRF-11`).</summary>
+    public const string TransferOutcome = "transfer_outcome";
 }

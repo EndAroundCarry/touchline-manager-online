@@ -41,4 +41,20 @@ public interface ISquadRepository
     /// <param name="contractId">The contract to find.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<PlayerContract?> FindContractAsync(Guid contractId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Finds a player's active contract, tracked, so a transfer can close it and stage the buyer's in one unit
+    /// of work (`CON-5`, `TRF-10`).
+    /// </summary>
+    /// <param name="playerId">The player.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<PlayerContract?> FindActiveContractAsync(Guid playerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Finds a player's active registration, tracked, so a transfer can end it and stage the buyer's in one
+    /// unit of work (`SQ-6`, `CON-5`).
+    /// </summary>
+    /// <param name="playerId">The player.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<PlayerRegistration?> FindActiveRegistrationAsync(Guid playerId, CancellationToken cancellationToken);
 }

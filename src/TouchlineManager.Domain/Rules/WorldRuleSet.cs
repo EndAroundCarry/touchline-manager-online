@@ -18,14 +18,15 @@ namespace TouchlineManager.Domain.Rules;
 /// values; Stage 4 the squad, contract, tactics, and training values; Stage 6 the schedule-streak bound
 /// the fixture generator validates against; Stage 8 the injury and suspension bands the match effects
 /// apply; Stage 9 the gate, sponsorship, operating-cost, award, and payroll-risk values the finance runs
-/// settle. Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
+/// settle; Stage 10 the auction windows, blackout, and minimum bid increment the transfer market runs on.
+/// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
 /// </remarks>
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v6";
+    public const string Version = "world-rules-v7";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -485,4 +486,38 @@ public static class WorldRuleSet
             AttributeMin,
             AttributeMax);
     }
+
+    /// <summary>
+    /// The UTC time the daily transfer-auction resolution window opens (`TRF-2`, `TRF-3`).
+    /// </summary>
+    /// <remarks>
+    /// One fixed window a day, at midday, which sits outside the 13:00–19:00 UTC blackout
+    /// <see cref="AuctionBlackoutHoursBeforeKickoff"/> creates around the standard 19:00 kickoff. A rule
+    /// rather than an implementation detail, because it decides when a manager's bid becomes a transfer. The
+    /// materialiser that enqueues a listing's resolution job reads it; the worker executes the row whenever it
+    /// is claimed, so a delayed resolution is late rather than skipped (ADR-0003).
+    /// </remarks>
+    public static readonly TimeOnly AuctionResolutionUtc = new(12, 0);
+
+    /// <summary>The least time a listing must be open before it may resolve, in hours (`TRF-2`).</summary>
+    public const int ListingMinimumExposureHours = 48;
+
+    /// <summary>How long before a matchday kickoff auction resolution is blacked out, in hours (`TRF-3`).</summary>
+    /// <remarks>
+    /// With the standard 19:00 UTC kickoff this is the 13:00–19:00 UTC window on the three kickoff days, so a
+    /// transfer never lands in the hours a manager is finalising a team sheet for the round.
+    /// </remarks>
+    public const int AuctionBlackoutHoursBeforeKickoff = 6;
+
+    /// <summary>
+    /// The least a bid must exceed the current leading bid by, in minor units (`TRF-5`). A balancing value.
+    /// </summary>
+    /// <remarks>
+    /// A flat increment rather than a percentage: it guarantees every raise makes progress, and its absolute
+    /// level is tuned from the market-health measurements this stage requires like the other baselines.
+    /// </remarks>
+    public const long MinimumBidIncrementMinor = 250_000;
+
+    /// <summary>The most characters a private shortlist note may hold (`SCT-3`).</summary>
+    public const int ShortlistNotesMaxLength = 280;
 }

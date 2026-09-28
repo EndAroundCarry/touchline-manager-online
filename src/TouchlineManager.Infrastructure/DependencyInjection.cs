@@ -9,6 +9,7 @@ using TouchlineManager.Application.Abstractions.Comms;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Jobs;
+using TouchlineManager.Application.Abstractions.Market;
 using TouchlineManager.Application.Abstractions.Match;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
@@ -18,6 +19,7 @@ using TouchlineManager.Infrastructure.Competition;
 using TouchlineManager.Infrastructure.Email;
 using TouchlineManager.Infrastructure.Finance;
 using TouchlineManager.Infrastructure.Jobs;
+using TouchlineManager.Infrastructure.Market;
 using TouchlineManager.Infrastructure.Persistence;
 using TouchlineManager.Infrastructure.Persistence.Repositories;
 using TouchlineManager.Infrastructure.Requests;
@@ -63,8 +65,35 @@ public static class DependencyInjection
         AddAiClubInfrastructure(services, configuration);
         AddMatchdayInfrastructure(services, configuration);
         AddFinanceInfrastructure(services, configuration);
+        AddMarketInfrastructure(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the market module's persistence and the transfer-auction resolver's configuration
+    /// (master plan §6.7; `TRF-1`…`TRF-15`).
+    /// </summary>
+    /// <remarks>
+    /// The options are bound here rather than in <see cref="AddJobQueueWorker"/> so a misconfigured interval
+    /// fails at startup in every host, and the scheduler is registered there rather than here for the same
+    /// reason the queue poller is: the API must never settle a transfer (ADR-0001, ADR-0008).
+    /// </remarks>
+    private static void AddMarketInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IShortlistRepository, ShortlistRepository>();
+        services.AddScoped<IListingRepository, ListingRepository>();
+        services.AddScoped<IBidRepository, BidRepository>();
+        services.AddScoped<ITransferOutcomeRepository, TransferOutcomeRepository>();
+        services.AddScoped<IMarketQueries, MarketQueries>();
+        services.AddScoped<IRosterQueries, RosterQueries>();
+
+        services
+            .AddOptions<MarketOptions>()
+            .Bind(configuration.GetSection(MarketOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Auctions:CheckIntervalSeconds must be between 30 and 86400.");
     }
 
     /// <summary>
@@ -379,6 +408,10 @@ public static class DependencyInjection
         // And the same for money: this service places the week's settlement row, and the row is what charges
         // every club its wages after the Sunday matchday (CON-2, FIN-7).
         services.AddHostedService<WeeklyFinanceScheduler>();
+
+        // And the same for the market: this service places a resolution row for every due listing, and the row
+        // is what settles the winning bid (TRF-2, TRF-9).
+        services.AddHostedService<AuctionScheduler>();
 
         return services;
     }

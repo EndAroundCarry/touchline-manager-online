@@ -32,18 +32,35 @@ namespace TouchlineManager.Infrastructure.Tests.World;
 /// is what makes the concurrency assertions meaningful: they race against real rows in a real pyramid.
 /// </para>
 /// </remarks>
-public sealed class WorldFixture : IAsyncLifetime, IDisposable
+public class WorldFixture : IAsyncLifetime, IDisposable
 {
     /// <summary>The seed the fixture's world is generated from.</summary>
     public const string Seed = "infrastructure-world-1";
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("touchline_world")
-        .WithUsername("touchline_app")
-        .WithPassword("integration_test_password")
-        .Build();
+    private readonly PostgreSqlContainer _container;
 
     private ServiceProvider? _serviceProvider;
+
+    /// <summary>Creates the fixture against its own database.</summary>
+    public WorldFixture()
+        : this("touchline_world")
+    {
+    }
+
+    /// <summary>Creates the fixture against a named database, for a subclass with its own world.</summary>
+    /// <param name="databaseName">The database the container is created with.</param>
+    /// <remarks>
+    /// A subclass points at its own database so a suite that mutates the world — a transfer moves a player
+    /// between clubs — cannot break a world-seeding assertion in another suite that shares the collection.
+    /// </remarks>
+    protected WorldFixture(string databaseName)
+    {
+        _container = new PostgreSqlBuilder("postgres:17-alpine")
+            .WithDatabase(databaseName)
+            .WithUsername("touchline_app")
+            .WithPassword("integration_test_password")
+            .Build();
+    }
 
     /// <summary>Gets the clock every use case in this fixture reads.</summary>
     public FakeClock Clock { get; } = new();
@@ -120,7 +137,12 @@ public sealed class WorldFixture : IAsyncLifetime, IDisposable
     }
 
     /// <inheritdoc />
-    public void Dispose() => _serviceProvider?.Dispose();
+    public void Dispose()
+    {
+        _serviceProvider?.Dispose();
+
+        GC.SuppressFinalize(this);
+    }
 }
 
 /// <summary>Shares one seeded world across the world test classes.</summary>

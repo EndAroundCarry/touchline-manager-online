@@ -117,6 +117,18 @@ export const routes: Routes = [
         title: 'Finances — Touchline Manager',
       },
       {
+        path: 'scouting',
+        loadComponent: () => import('./features/scouting/scouting').then((m) => m.Scouting),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Scouting — Touchline Manager',
+      },
+      {
+        path: 'transfers',
+        loadComponent: () => import('./features/transfers/transfers').then((m) => m.Transfers),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Transfers — Touchline Manager',
+      },
+      {
         // One division's table by identity, for a shared or bookmarked link (§11.1).
         path: 'competitions/:divisionId/table',
         loadComponent: () =>
