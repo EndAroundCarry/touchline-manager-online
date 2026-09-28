@@ -30,4 +30,25 @@ public static class WorldAuditActions
 
     /// <summary>A next tier was requested because a country's lowest tier filled with humans.</summary>
     public const string ProvisioningRequested = "world.division_provisioning.requested";
+
+    /// <summary>A worker began generating a requested tier.</summary>
+    public const string ProvisioningStarted = "world.division_provisioning.started";
+
+    /// <summary>A tier was generated, validated, backfilled, and activated (`PYR-8`).</summary>
+    public const string ProvisioningCompleted = "world.division_provisioning.completed";
+
+    /// <summary>A provisioning run failed validation or generation and needs an operator (`PYR-14`).</summary>
+    public const string ProvisioningFailed = "world.division_provisioning.failed";
+
+    /// <summary>An inactivity warning was sent to a manager (`OCC-1`).</summary>
+    public const string InactivityWarningSent = "world.club_tenure.inactivity_warned";
+
+    /// <summary>A tenure was marked inactive and the AI began assisting (`OCC-2`).</summary>
+    public const string TenureBecameInactive = "world.club_tenure.became_inactive";
+
+    /// <summary>A tenure was closed because the manager stayed away (`OCC-3`).</summary>
+    public const string TenureClosedForInactivity = "world.club_tenure.closed_inactivity";
+
+    /// <summary>A manager's notification preferences changed (Stage 11).</summary>
+    public const string NotificationPreferencesChanged = "world.manager_profile.notifications_changed";
 }

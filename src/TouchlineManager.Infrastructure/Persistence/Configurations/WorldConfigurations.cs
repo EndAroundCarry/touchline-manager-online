@@ -228,6 +228,7 @@ internal sealed class ClubTenureConfiguration : IEntityTypeConfiguration<ClubTen
         builder.Property(tenure => tenure.EndedAt).HasColumnName("ended_at");
         builder.Property(tenure => tenure.EndReason).HasColumnName("end_reason").HasMaxLength(32);
         builder.Property(tenure => tenure.LastActiveAt).HasColumnName("last_active_at").IsRequired();
+        builder.Property(tenure => tenure.InactivityWarningAt).HasColumnName("inactivity_warning_at");
         builder.Property(tenure => tenure.ControlStatus)
             .HasColumnName("control_status")
             .HasMaxLength(16)

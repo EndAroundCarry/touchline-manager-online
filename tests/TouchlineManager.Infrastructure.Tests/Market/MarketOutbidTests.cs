@@ -92,6 +92,12 @@ public sealed class MarketOutbidTests : IAsyncLifetime, IDisposable
         var writer = scope.ServiceProvider.GetRequiredService<IBidWriter>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
+        // Bids take a transaction-scoped listing lock, so the writer is called inside a transaction
+        // (ADR-0026).
+        await using var transaction = await unitOfWork.BeginTransactionAsync(
+            TransactionIsolation.ReadCommitted,
+            CancellationToken.None);
+
         var write = await writer.BidAsync(
             bidderClubId,
             MarketActor.Service(OutbidIdempotencyKey),
@@ -103,6 +109,7 @@ public sealed class MarketOutbidTests : IAsyncLifetime, IDisposable
         write.Created.Should().BeTrue("the bid is the first this club makes on the listing");
 
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
+        await transaction.CommitAsync(CancellationToken.None);
     }
 
     private async Task<Arrangement> ArrangeAsync()

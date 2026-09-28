@@ -5,6 +5,7 @@ using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Market;
 using TouchlineManager.Domain.Match;
+using TouchlineManager.Domain.Ops;
 using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Infrastructure.Persistence.Entities;
@@ -33,6 +34,9 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the ops module's append-only audit rows.</summary>
     public DbSet<OpsAuditEntry> AuditEntries => Set<OpsAuditEntry>();
+
+    /// <summary>Gets the ops module's outbox dispatch intents (`MOD-4`).</summary>
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     /// <summary>Gets the auth module's accounts.</summary>
     public DbSet<User> Users => Set<User>();
@@ -115,6 +119,12 @@ public sealed class TouchlineManagerDbContext : DbContext
 
     /// <summary>Gets the comms module's inbox messages.</summary>
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
+
+    /// <summary>Gets the comms module's public news feed items.</summary>
+    public DbSet<NewsItem> NewsItems => Set<NewsItem>();
+
+    /// <summary>Gets managers' notification email preferences.</summary>
+    public DbSet<NotificationPreferences> NotificationPreferences => Set<NotificationPreferences>();
 
     /// <summary>Gets the market module's private shortlists.</summary>
     public DbSet<ShortlistEntry> ShortlistEntries => Set<ShortlistEntry>();

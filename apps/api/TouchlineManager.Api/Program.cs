@@ -21,6 +21,7 @@ using TouchlineManager.Api.World;
 using TouchlineManager.Application;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
+using TouchlineManager.Contracts.Auth;
 using TouchlineManager.Contracts.Http;
 using TouchlineManager.Infrastructure;
 using TouchlineManager.Infrastructure.Logging;
@@ -133,6 +134,17 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true,
             }));
+
+    // Listing and bidding are commands a manager repeats, so they are throttled per manager rather than
+    // per address (`INT-5`). These policies run after authentication, so the subject claim is available; an
+    // anonymous caller — which these endpoints do not accept — falls back to its address.
+    options.AddPolicy(
+        RateLimitPolicies.MarketListing,
+        httpContext => MarketLimit(httpContext, rateLimits, rateLimits.MarketListingPermitLimit));
+
+    options.AddPolicy(
+        RateLimitPolicies.MarketBid,
+        httpContext => MarketLimit(httpContext, rateLimits, rateLimits.MarketBidPermitLimit));
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -187,11 +199,13 @@ if (!app.Environment.IsDevelopment())
 
 // Routing is explicit so the rate limiter and the authentication middleware below both see endpoint
 // metadata — the limiter is attached to specific routes, and authorization policies come from route
-// metadata, so both must run after matching.
+// metadata, so both must run after matching. Authentication runs before the limiter so a market policy can
+// partition by manager (`INT-5`); the auth policy is unaffected, since an anonymous caller still
+// partitions by address.
 app.UseRouting();
 app.UseCors();
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
@@ -269,6 +283,29 @@ await app.RunAsync();
 /// </summary>
 static string ClientPartitionKey(HttpContext context) =>
     context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+/// <summary>
+/// Partitions a market command by the authenticated manager, falling back to the address when the caller is
+/// anonymous. Authentication runs before the limiter, so the subject claim is populated for a real caller
+/// (`INT-5`).
+/// </summary>
+static string AuthenticatedPartitionKey(HttpContext context) =>
+    context.User.FindFirst(AuthClaimNames.Subject)?.Value ?? ClientPartitionKey(context);
+
+/// <summary>Builds a market command's fixed-window partition, one per manager.</summary>
+static RateLimitPartition<string> MarketLimit(
+    HttpContext context,
+    RateLimitingOptions rateLimits,
+    int permitLimit) =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: AuthenticatedPartitionKey(context),
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromSeconds(rateLimits.MarketWindowSeconds),
+            QueueLimit = 0,
+            AutoReplenishment = true,
+        });
 
 /// <summary>Exposed so integration tests can drive the real composition root.</summary>
 public partial class Program;

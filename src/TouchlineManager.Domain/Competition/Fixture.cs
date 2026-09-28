@@ -55,6 +55,18 @@ public sealed class Fixture
     /// <summary>Gets when the result became public.</summary>
     public DateTimeOffset? PublishedAt { get; private set; }
 
+    /// <summary>
+    /// Gets a value indicating whether this fixture's result is generated history rather than played
+    /// history (`PYR-7`).
+    /// </summary>
+    /// <remarks>
+    /// Set on the fixtures a newly provisioned division backfills for the matchdays already passed this
+    /// season. It marks the result as bootstrap so tooling can tell a simulated foundation for a new tier
+    /// from a match a manager was present for; it never appears in a human manager's own history as a match
+    /// they played.
+    /// </remarks>
+    public bool IsBootstrap { get; private set; }
+
     /// <summary>Gets when the row was created.</summary>
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -71,13 +83,18 @@ public sealed class Fixture
     /// <param name="awayClubId">The away club, which must differ from the home club.</param>
     /// <param name="kickoffAt">The kickoff, in UTC; the matchday's own kickoff (`CAL-2`).</param>
     /// <param name="now">The current instant.</param>
+    /// <param name="isBootstrap">
+    /// Whether the fixture's result is generated history (`PYR-7`). True only for the passed matchdays a
+    /// newly provisioned division backfills.
+    /// </param>
     public static Fixture Schedule(
         Guid id,
         Guid matchdayId,
         Guid homeClubId,
         Guid awayClubId,
         DateTimeOffset kickoffAt,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool isBootstrap = false)
     {
         if (homeClubId == awayClubId)
         {
@@ -92,6 +109,7 @@ public sealed class Fixture
             AwayClubId = awayClubId,
             KickoffAt = kickoffAt,
             Status = FixtureStatus.Scheduled,
+            IsBootstrap = isBootstrap,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,

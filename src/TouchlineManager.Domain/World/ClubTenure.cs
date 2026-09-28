@@ -43,6 +43,16 @@ public sealed class ClubTenure
     /// <summary>Gets when the manager was last seen. Drives the inactivity ladder (`OCC-1`–`OCC-3`).</summary>
     public DateTimeOffset LastActiveAt { get; private set; }
 
+    /// <summary>
+    /// Gets when the last inactivity warning was sent, or null when none has been sent since the manager was
+    /// last seen (`OCC-1`).
+    /// </summary>
+    /// <remarks>
+    /// Recorded so the warning is sent once per lapse rather than on every evaluation the ladder runs. It is
+    /// cleared whenever the manager is seen, so a later lapse warns again.
+    /// </remarks>
+    public DateTimeOffset? InactivityWarningAt { get; private set; }
+
     /// <summary>Gets the control state.</summary>
     public ClubTenureControlStatus ControlStatus { get; private set; }
 
@@ -107,6 +117,22 @@ public sealed class ClubTenure
         }
 
         LastActiveAt = now;
+        InactivityWarningAt = null;
+
+        Touch(now);
+    }
+
+    /// <summary>Records that the inactivity warning was sent (`OCC-1`).</summary>
+    /// <param name="now">The current instant.</param>
+    /// <remarks>Idempotent: warning a tenure that is already warned just moves the stamp.</remarks>
+    public void Warn(DateTimeOffset now)
+    {
+        if (!IsOpen)
+        {
+            return;
+        }
+
+        InactivityWarningAt = now;
 
         Touch(now);
     }
@@ -139,6 +165,7 @@ public sealed class ClubTenure
 
         ControlStatus = ClubTenureControlStatus.Active;
         LastActiveAt = now;
+        InactivityWarningAt = null;
 
         Touch(now);
     }

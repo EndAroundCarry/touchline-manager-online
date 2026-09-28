@@ -24,6 +24,15 @@ public enum InboxCategory
 
     /// <summary>The club's own side needed a repair (`DIS-7`).</summary>
     Squad = 4,
+
+    /// <summary>The manager's tenure changed state, e.g. an inactivity warning (`OCC-1`) or its return (`OCC-2`).</summary>
+    Occupancy = 5,
+
+    /// <summary>A deadline is approaching, e.g. the team-sheet lock (`CAL-3`, Stage 11).</summary>
+    Reminder = 6,
+
+    /// <summary>A welcome or account-level message that names no club event (Stage 11).</summary>
+    System = 7,
 }
 
 /// <summary>Stable codes and parsing for <see cref="InboxCategory"/>.</summary>
@@ -44,6 +53,9 @@ public static class InboxCategories
         InboxCategory.Discipline => "discipline",
         InboxCategory.Injury => "injury",
         InboxCategory.Squad => "squad",
+        InboxCategory.Occupancy => "occupancy",
+        InboxCategory.Reminder => "reminder",
+        InboxCategory.System => "system",
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown inbox category."),
     };
 
@@ -56,6 +68,9 @@ public static class InboxCategories
         "discipline" => InboxCategory.Discipline,
         "injury" => InboxCategory.Injury,
         "squad" => InboxCategory.Squad,
+        "occupancy" => InboxCategory.Occupancy,
+        "reminder" => InboxCategory.Reminder,
+        "system" => InboxCategory.System,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown inbox category code."),
     };
 }

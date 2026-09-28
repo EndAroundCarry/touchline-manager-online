@@ -166,6 +166,53 @@ finance and produces a healthy measured market"*, and the missing journey with i
   read. **Deferred to Stage 12:** free-agent signing (`CON-7`), which waits on rollover producing free
   agents (`CON-6`), as ADR-0024 already records.
 
+### Hardening the market's guarantees
+
+Stage 10's exit criteria ask for concurrent bids and resolutions to have a deterministic winner and exact
+money movement, for a locked fixture snapshot to survive a transfer, and for listing and bidding to be
+rate-limited per manager (`INT-5`). These follow the AI market milestone so the stage closes on its own
+terms rather than on the core loop alone.
+
+#### Added
+
+- **Concurrency tests over real PostgreSQL 17** (`MarketConcurrencyTests`): two resolutions racing one
+  listing settle it exactly once — one outcome, the buyer charged once, the seller credited once, the
+  reservation consumed once — and two clubs bidding at once leave exactly one leader and exactly one
+  reservation, with every affected account's ledger replaying to its balances (`TRF-6`, `TRF-9`, `FIN-10`,
+  `FIN-18`). The losing transaction's serialization or uniqueness refusal is tolerated rather than asserted
+  away, because the winner is whoever commits and the loser's retry is a no-op.
+- **The frozen-snapshot test** (`MarketSnapshotLockTests`): a player transferred after a fixture's snapshot
+  locked still appears in that side, the snapshot is byte-identical afterwards, and only the player's live
+  contract and registration move (`SQ-7`, `MAT-1`).
+- **Per-manager rate limits on the market's commands** (`INT-5`, master plan §7.7):
+  `POST /transfers/listings` and its cancellation are throttled by `RateLimitPolicies.MarketListing`, and
+  `POST /transfers/listings/{id}/bids` by `RateLimitPolicies.MarketBid`. The limiter now runs after
+  authentication, so a market command partitions by the authenticated manager rather than by address; the
+  auth policy is unchanged, still partitioning its anonymous callers by address.
+- **`RateLimiting:Market*` configuration** and an integration test that pins the refusals, plus the
+  `ADR-0025` index row that the previous milestone had left out.
+- **ADR-0026**, on serialising the bids on one listing with a transaction-scoped advisory lock.
+
+#### Fixed
+
+- **Two clubs could both hold the lead on one listing.** The bid writer read the current leading bid and
+  then wrote without a lock, and the database's only guard was the per-club partial unique index (`TRF-6`),
+  which does not stop two *different* clubs from each inserting a leading bid. Under a race both
+  reservations stood, the listing could settle only one of them, and the other club's funds stayed reserved
+  with no path that released them (`TRF-7`, `FIN-10`). Bids on a listing are now serialised with a
+  transaction-scoped advisory lock (`AdvisoryLockKey.Listing`), and `PlaceBid` and the AI pass each run
+  their bid writes in one explicit transaction (`ADR-0026`); the second arrival now reads the first's
+  committed leading bid and outbids it properly. The concurrency test above is what caught it — it was the
+  first test to place two bids on one listing at the same instant.
+
+#### Notes
+
+- **The limiter's position in the pipeline is the design.** Authentication runs before it so the subject
+  claim is populated and a market command can be bucketed per manager, which is what `INT-5` asks for; the
+  auth endpoints are anonymous at that point and keep their address partition.
+- **Deferred still:** the collusion review signals (`INT-4`) and the market's admin trace views remain
+  Stage 14, as the previous milestone's notes record.
+
 ## Stage 9 — Contracts and basic club finances
 
 The ledger every balance is rebuilt from. A club's money becomes an append-only record: an account no longer

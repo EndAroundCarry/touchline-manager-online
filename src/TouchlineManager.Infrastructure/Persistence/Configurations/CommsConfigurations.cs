@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TouchlineManager.Domain.Comms;
+using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Infrastructure.Persistence.Configurations;
@@ -71,5 +72,110 @@ internal sealed class InboxMessageConfiguration : IEntityTypeConfiguration<Inbox
         // restrictive reference rather than a cascade: deleting an account does not silently delete its mail.
         builder.HasOne<Manager>().WithMany()
             .HasForeignKey(message => message.RecipientManagerId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>comms.news_items</c>: the public feed a division or country shows (master plan §6.9, Stage 11).
+/// </summary>
+/// <remarks>
+/// The feed is read newest-first within a scope, so the paging indexes are keyed on the scope and the
+/// publication instant. The parameters are JSONB for the same reason the inbox's are: a versioned document
+/// whose members are never filtered on.
+/// </remarks>
+internal sealed class NewsItemConfiguration : IEntityTypeConfiguration<NewsItem>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<NewsItem> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        var categories = string.Join(", ", NewsCategories.All.Select(category => $"'{category.ToCode()}'"));
+
+        builder.ToTable("news_items", "comms", table =>
+        {
+            table.HasCheckConstraint("ck_news_items_category", $"category in ({categories})");
+            table.HasCheckConstraint("ck_news_items_template_key", "length(template_key) > 0");
+            table.HasCheckConstraint("ck_news_items_version", "version >= 1");
+            table.HasCheckConstraint(
+                "ck_news_items_expiry",
+                "expires_at is null or expires_at > published_at");
+        });
+
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(item => item.WorldId).HasColumnName("world_id").IsRequired();
+        builder.Property(item => item.CountryId).HasColumnName("country_id");
+        builder.Property(item => item.DivisionId).HasColumnName("division_id");
+        builder.Property(item => item.Category)
+            .HasColumnName("category")
+            .HasMaxLength(NewsCategories.MaxCodeLength)
+            .HasConversion(category => category.ToCode(), code => NewsCategories.FromCode(code))
+            .IsRequired();
+        builder.Property(item => item.TemplateKey).HasColumnName("template_key").HasMaxLength(64).IsRequired();
+        builder.Property(item => item.ParametersJson).HasColumnName("parameters").HasColumnType("jsonb").IsRequired();
+        builder.Property(item => item.PublishedAt).HasColumnName("published_at").IsRequired();
+        builder.Property(item => item.ExpiresAt).HasColumnName("expires_at");
+        builder.Property(item => item.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(item => item.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(item => item.Version).HasColumnName("version").IsRequired();
+
+        builder.HasIndex(item => new { item.DivisionId, item.PublishedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_news_items_division_id_published_at");
+
+        builder.HasIndex(item => new { item.CountryId, item.PublishedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_news_items_country_id_published_at");
+
+        builder.HasIndex(item => item.PublishedAt).HasDatabaseName("ix_news_items_published_at");
+
+        builder.HasOne<GameWorld>().WithMany()
+            .HasForeignKey(item => item.WorldId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Country>().WithMany()
+            .HasForeignKey(item => item.CountryId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Division>().WithMany()
+            .HasForeignKey(item => item.DivisionId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>comms.notification_preferences</c>: which notification emails a manager receives (Stage 11).
+/// </summary>
+/// <remarks>
+/// One row per manager, enforced by a unique index. A missing row means the defaults, so a manager who never
+/// changes a preference costs no write.
+/// </remarks>
+internal sealed class NotificationPreferencesConfiguration : IEntityTypeConfiguration<NotificationPreferences>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<NotificationPreferences> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("notification_preferences", "comms", table =>
+            table.HasCheckConstraint("ck_notification_preferences_version", "version >= 1"));
+
+        builder.HasKey(preferences => preferences.Id);
+        builder.Property(preferences => preferences.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(preferences => preferences.ManagerId).HasColumnName("manager_id").IsRequired();
+        builder.Property(preferences => preferences.EmailDeadlineReminders)
+            .HasColumnName("email_deadline_reminders").IsRequired();
+        builder.Property(preferences => preferences.EmailInactivityWarnings)
+            .HasColumnName("email_inactivity_warnings").IsRequired();
+        builder.Property(preferences => preferences.EmailMarketMessages)
+            .HasColumnName("email_market_messages").IsRequired();
+        builder.Property(preferences => preferences.EmailNewsDigest)
+            .HasColumnName("email_news_digest").IsRequired();
+        builder.Property(preferences => preferences.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(preferences => preferences.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(preferences => preferences.Version).HasColumnName("version").IsRequired();
+
+        builder.HasIndex(preferences => preferences.ManagerId)
+            .IsUnique()
+            .HasDatabaseName("ux_notification_preferences_manager_id");
+
+        builder.HasOne<Manager>().WithMany()
+            .HasForeignKey(preferences => preferences.ManagerId).OnDelete(DeleteBehavior.Restrict);
     }
 }

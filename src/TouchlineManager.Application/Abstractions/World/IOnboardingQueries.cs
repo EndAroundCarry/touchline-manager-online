@@ -34,6 +34,19 @@ public readonly record struct AdvisoryLockKey(string Scope, Guid Target)
     /// </remarks>
     public static AdvisoryLockKey Matchday(Guid matchdayId) => new("matchday", matchdayId);
 
+    /// <summary>
+    /// A listing-scoped lock, used by the bid workflow.
+    /// </summary>
+    /// <remarks>
+    /// Bids ascend and only the leader holds a reservation (`TRF-7`), so the decision "who leads now" is a
+    /// read-then-write across two rows: two clubs bidding on one listing at once can each read no leader and
+    /// each insert a leading bid, leaving two reservations standing and a resolution that can only settle
+    /// one of them. Serialising the bids on a listing means the second arrival reads the first's leading bid
+    /// and outbids it properly. The lock is per listing rather than per country or per manager, so bids on
+    /// different listings still run in parallel.
+    /// </remarks>
+    public static AdvisoryLockKey Listing(Guid listingId) => new("listing", listingId);
+
     /// <summary>Renders the lock for diagnostics. Never contains anything sensitive.</summary>
     public override string ToString() => $"{Scope}:{Target}";
 }

@@ -84,6 +84,12 @@ public sealed class EvaluateAiMarket
         var bids = 0;
         var skipped = 0;
 
+        // One pass is one transaction. The bids it places take a listing-scoped lock that must live until the
+        // pass commits (ADR-0026), and the whole pass already committed as one unit of work.
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(
+            TransactionIsolation.ReadCommitted,
+            cancellationToken);
+
         // Club identity order makes the pass reproducible when two clubs decide in one evaluation.
         foreach (var club in clubs.OrderBy(club => club.ClubId))
         {
@@ -165,6 +171,8 @@ public sealed class EvaluateAiMarket
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         return new EvaluateAiMarketResult(clubs.Count, listed, bids, skipped);
     }

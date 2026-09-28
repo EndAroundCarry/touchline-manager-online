@@ -76,4 +76,16 @@ public sealed class RateLimitingOptions
 
     /// <summary>Gets or sets the length of that window in seconds.</summary>
     public int AuthWindowSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Gets or sets the listings, cancellations, and other listing writes one manager may make per window
+    /// (`INT-5`).
+    /// </summary>
+    public int MarketListingPermitLimit { get; set; } = 10;
+
+    /// <summary>Gets or sets the bids one manager may place per window (`INT-5`).</summary>
+    public int MarketBidPermitLimit { get; set; } = 30;
+
+    /// <summary>Gets or sets the length of the market rate-limit window in seconds.</summary>
+    public int MarketWindowSeconds { get; set; } = 60;
 }

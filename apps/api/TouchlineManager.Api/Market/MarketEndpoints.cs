@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.RateLimiting;
 using TouchlineManager.Api.Auth;
 using TouchlineManager.Api.Http;
 using TouchlineManager.Application.Abstractions;
@@ -84,6 +85,7 @@ internal static class MarketEndpoints
         group.MapPost("/transfers/listings", CreateListingAsync)
             .WithName("CreateTransferListing")
             .RequireAuthorization(AuthorizationPolicies.VerifiedManager)
+            .RequireRateLimiting(RateLimitPolicies.MarketListing)
             .WithSummary("Lists an eligible player for sale.")
             .Produces<TransferListingResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -101,6 +103,7 @@ internal static class MarketEndpoints
         group.MapDelete("/transfers/listings/{listingId:guid}", CancelListingAsync)
             .WithName("CancelTransferListing")
             .RequireAuthorization(AuthorizationPolicies.VerifiedManager)
+            .RequireRateLimiting(RateLimitPolicies.MarketListing)
             .WithSummary("Withdraws a listing, releasing its reservations.")
             .Produces<TransferListingResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -110,6 +113,7 @@ internal static class MarketEndpoints
         group.MapPost("/transfers/listings/{listingId:guid}/bids", PlaceBidAsync)
             .WithName("PlaceTransferBid")
             .RequireAuthorization(AuthorizationPolicies.VerifiedManager)
+            .RequireRateLimiting(RateLimitPolicies.MarketBid)
             .WithSummary("Places or raises a bid, reserving its funds.")
             .Produces<TransferListingResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)

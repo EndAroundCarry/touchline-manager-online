@@ -72,6 +72,15 @@ internal sealed class WorldRepository : IWorldRepository
         _dbContext.Divisions.SingleOrDefaultAsync(division => division.Id == divisionId, cancellationToken);
 
     /// <inheritdoc />
+    public Task<Division?> FindDivisionByTierAsync(
+        Guid countryId,
+        int tierNumber,
+        CancellationToken cancellationToken) =>
+        _dbContext.Divisions.SingleOrDefaultAsync(
+            division => division.CountryId == countryId && division.TierNumber == tierNumber,
+            cancellationToken);
+
+    /// <inheritdoc />
     public void AddDivision(Division division) => _dbContext.Divisions.Add(division);
 
     /// <inheritdoc />
@@ -185,6 +194,20 @@ internal sealed class DivisionProvisioningRequestRepository : IDivisionProvision
         _dbContext.DivisionProvisioningRequests.SingleOrDefaultAsync(
             request => request.CountryId == countryId && request.TargetTier == targetTier,
             cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DivisionProvisioningRequest?> FindByIdAsync(Guid requestId, CancellationToken cancellationToken) =>
+        _dbContext.DivisionProvisioningRequests.SingleOrDefaultAsync(
+            request => request.Id == requestId,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DivisionProvisioningRequest>> ListPendingAsync(
+        CancellationToken cancellationToken) =>
+        await _dbContext.DivisionProvisioningRequests
+            .Where(request => request.Status == ProvisioningRequestStatus.Requested)
+            .OrderBy(request => request.RequestedAt)
+            .ToListAsync(cancellationToken);
 
     /// <inheritdoc />
     public void Add(DivisionProvisioningRequest request) => _dbContext.DivisionProvisioningRequests.Add(request);

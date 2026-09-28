@@ -59,6 +59,18 @@ public interface IWorldRepository
     /// <summary>Finds a division by identity.</summary>
     Task<Division?> FindDivisionAsync(Guid divisionId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Finds a country's division at a tier, if it exists.
+    /// </summary>
+    /// <remarks>
+    /// The provisioning worker's idempotency check: a retried run finds the tier the first attempt generated
+    /// and resumes rather than generating a second (`PYR-3`, ADR-0003).
+    /// </remarks>
+    /// <param name="countryId">The country.</param>
+    /// <param name="tierNumber">The tier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<Division?> FindDivisionByTierAsync(Guid countryId, int tierNumber, CancellationToken cancellationToken);
+
     /// <summary>Stages a new division.</summary>
     void AddDivision(Division division);
 

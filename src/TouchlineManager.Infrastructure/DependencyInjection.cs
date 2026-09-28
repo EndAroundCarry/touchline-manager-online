@@ -320,6 +320,13 @@ public static class DependencyInjection
                 "World:ProvisioningPollSeconds must be between 5 and 3600.")
             .ValidateOnStart();
 
+        services
+            .AddOptions<ProvisioningOptions>()
+            .Bind(configuration.GetSection(ProvisioningOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Provisioning:CheckIntervalSeconds must be between 30 and 86400.");
+
         services.AddScoped<IWorldRepository, WorldRepository>();
         services.AddScoped<IClubRepository, ClubRepository>();
         services.AddScoped<IManagerRepository, ManagerRepository>();
@@ -422,9 +429,9 @@ public static class DependencyInjection
         // is what settles the winning bid (TRF-2, TRF-9).
         services.AddHostedService<AuctionScheduler>();
 
-        // And the same for the AI's market: this service places the day's evaluation row, and the row is what
-        // has every club nobody holds list its surplus and bid within its budget (TRF-12).
-        services.AddHostedService<AiMarketScheduler>();
+        // And the same for the pyramid: this service places a provisioning row for every pending tier request,
+        // and the row is what generates, backfills, and activates the next tier (PYR-4).
+        services.AddHostedService<ProvisioningScheduler>();
 
         return services;
     }

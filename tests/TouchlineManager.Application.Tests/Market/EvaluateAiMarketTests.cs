@@ -281,7 +281,16 @@ public sealed class EvaluateAiMarketTests
         public Task<IDatabaseTransaction> BeginTransactionAsync(
             TransactionIsolation isolation,
             CancellationToken cancellationToken) =>
-            throw new NotSupportedException("The AI market evaluation commits one unit of work.");
+            Task.FromResult<IDatabaseTransaction>(new NoOpTransaction());
+    }
+
+    private sealed class NoOpTransaction : IDatabaseTransaction
+    {
+        public Task CommitAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task RollbackAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class FixedClock : IClock

@@ -373,6 +373,7 @@ internal sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
         builder.Property(fixture => fixture.AwayScore).HasColumnName("away_score");
         builder.Property(fixture => fixture.MatchId).HasColumnName("match_id");
         builder.Property(fixture => fixture.PublishedAt).HasColumnName("published_at");
+        builder.Property(fixture => fixture.IsBootstrap).HasColumnName("is_bootstrap").HasDefaultValue(false).IsRequired();
         builder.Property(fixture => fixture.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(fixture => fixture.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(fixture => fixture.Version).HasColumnName("version").IsRequired();

@@ -31,6 +31,12 @@ public sealed class ApiFixture : IAsyncLifetime
     /// </remarks>
     public const int UnthrottledAuthPermitLimit = 1_000_000;
 
+    /// <summary>
+    /// The market permit limit used by the shared host, for the same reason as the auth limit: a test that
+    /// places a bid is asserting the bid, not the limiter (`INT-5`).
+    /// </summary>
+    public const int UnthrottledMarketPermitLimit = 1_000_000;
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("touchline")
         .WithUsername("touchline_app")
@@ -66,7 +72,11 @@ public sealed class ApiFixture : IAsyncLifetime
     /// composition root reads configuration while <em>building</em> the service collection, and a
     /// configuration source added during <c>Build()</c> arrives too late for that read.
     /// </remarks>
-    public WebApplicationFactory<Program> CreateFactory(bool enableJobProbe, int? authPermitLimit = null)
+    public WebApplicationFactory<Program> CreateFactory(
+        bool enableJobProbe,
+        int? authPermitLimit = null,
+        int? marketListingPermitLimit = null,
+        int? marketBidPermitLimit = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
@@ -76,6 +86,12 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting(
                 "RateLimiting:AuthPermitLimit",
                 (authPermitLimit ?? UnthrottledAuthPermitLimit).ToString(CultureInfo.InvariantCulture));
+            builder.UseSetting(
+                "RateLimiting:MarketListingPermitLimit",
+                (marketListingPermitLimit ?? UnthrottledMarketPermitLimit).ToString(CultureInfo.InvariantCulture));
+            builder.UseSetting(
+                "RateLimiting:MarketBidPermitLimit",
+                (marketBidPermitLimit ?? UnthrottledMarketPermitLimit).ToString(CultureInfo.InvariantCulture));
 
             // Runs after the composition root's own registrations, so the SMTP sender is genuinely
             // replaced rather than shadowed.

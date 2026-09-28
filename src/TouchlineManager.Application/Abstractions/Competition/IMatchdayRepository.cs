@@ -204,6 +204,16 @@ public interface IMatchdayRepository
     /// <returns>The workload, or null when the matchday is unknown.</returns>
     Task<MatchdayWorkload?> LoadMatchdayAsync(Guid matchdayId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Loads a division-season's rounds in round order, so the provisioning worker can backfill the ones
+    /// already passed in sequence (`PYR-6`).
+    /// </summary>
+    /// <param name="divisionSeasonId">The division-season.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<Matchday>> LoadDivisionMatchdaysAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken);
+
     /// <summary>Loads both clubs of a fixture with everything their sides are built from.</summary>
     /// <param name="fixtureId">The fixture.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

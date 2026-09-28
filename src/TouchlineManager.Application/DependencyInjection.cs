@@ -13,6 +13,7 @@ using TouchlineManager.Application.Match;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.Squad.Validation;
 using TouchlineManager.Application.World;
+using TouchlineManager.Application.World.Generation;
 using TouchlineManager.Application.World.Validation;
 using TouchlineManager.Contracts.Auth;
 using TouchlineManager.Contracts.Competition;
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, WeeklyFinanceRunJobHandler>();
         services.AddScoped<IJobHandler, ResolveAuctionJobHandler>();
         services.AddScoped<IJobHandler, EvaluateAiMarketJobHandler>();
+        services.AddScoped<IJobHandler, ProvisionDivisionJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -191,7 +193,12 @@ public static class DependencyInjection
     {
         services.AddScoped<CapacityEvaluator>();
 
+        // One generation path, shared by the seeder and the provisioning worker, so a provisioned tier cannot
+        // drift from a seeded one (§16 Stage 11; PYR-14).
+        services.AddScoped<WorldGenerator>();
+
         services.AddScoped<SeedWorld>();
+        services.AddScoped<ProvisionDivision>();
         services.AddScoped<CreateManagerProfile>();
         services.AddScoped<ClaimClub>();
         services.AddScoped<ResignClub>();

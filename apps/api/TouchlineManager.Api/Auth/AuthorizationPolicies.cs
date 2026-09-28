@@ -31,4 +31,17 @@ internal static class RateLimitPolicies
     /// verification mail (ADR-0002, master plan §12.1).
     /// </summary>
     public const string AuthSensitive = "auth-sensitive";
+
+    /// <summary>
+    /// Applied to listing commands — opening or cancelling a listing — so one manager cannot flood the
+    /// market (`INT-5`, master plan §7.7). Partitioned by manager rather than by address, because the risk
+    /// is a manager acting, not an address connecting.
+    /// </summary>
+    public const string MarketListing = "market-listing";
+
+    /// <summary>
+    /// Applied to bid commands, so one manager cannot hammer the resolution and reservation path (`INT-5`).
+    /// Partitioned by manager, like <see cref="MarketListing"/>.
+    /// </summary>
+    public const string MarketBid = "market-bid";
 }

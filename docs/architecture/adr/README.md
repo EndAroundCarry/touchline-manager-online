@@ -41,6 +41,8 @@ the system is shaped the way it is.
 | [0022](0022-append-only-club-ledger.md) | The club ledger is append-only, and its balances are a projection of it | Accepted |
 | [0023](0023-income-expenses-and-gate-revenue.md) | Income and expenses are postings made by the workflow that causes them, and the gate is drawn inside publication | Accepted |
 | [0024](0024-market-scouting-and-timed-auctions.md) | The market is a `market` module, and auctions resolve at a daily window under a reservation held in the ledger | Accepted |
+| [0025](0025-ai-transfer-market.md) | The AI transfer market is a pure, versioned policy routed through the human write path | Accepted |
+| [0026](0026-bid-serialisation.md) | Bids on one listing are serialised with a transaction-scoped advisory lock | Accepted |
 
 ## Rules for changing an ADR
 

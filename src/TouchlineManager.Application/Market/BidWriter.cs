@@ -2,6 +2,7 @@ using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Market;
 using TouchlineManager.Application.Abstractions.Ops;
+using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Application.Finance;
 using TouchlineManager.Domain.Market;
 
@@ -48,6 +49,11 @@ public interface IBidWriter
 /// after its existing reservations (`FIN-10`). The amount is reserved through the ledger the moment the bid
 /// leads, and the club it displaces has its reservation released in the same unit of work (`TRF-7`).
 /// </para>
+/// <para>
+/// Bids on one listing are serialised with a transaction-scoped advisory lock, so the leader a bid displaces
+/// is read under that lock rather than concurrently by two clubs. The caller must have begun a transaction,
+/// which is what makes the lock live until the bid is committed (`ADR-0026`).
+/// </para>
 /// </remarks>
 public sealed class BidWriter : IBidWriter
 {
@@ -57,6 +63,7 @@ public sealed class BidWriter : IBidWriter
     private readonly ILedgerRepository _ledger;
     private readonly IAuditWriter _audit;
     private readonly MarketNotifications _notifications;
+    private readonly IAdvisoryLock _locks;
     private readonly IClock _clock;
 
     /// <summary>Initializes the writer.</summary>
@@ -67,6 +74,7 @@ public sealed class BidWriter : IBidWriter
         ILedgerRepository ledger,
         IAuditWriter audit,
         MarketNotifications notifications,
+        IAdvisoryLock locks,
         IClock clock)
     {
         _listings = listings;
@@ -75,6 +83,7 @@ public sealed class BidWriter : IBidWriter
         _ledger = ledger;
         _audit = audit;
         _notifications = notifications;
+        _locks = locks;
         _clock = clock;
     }
 
@@ -111,6 +120,11 @@ public sealed class BidWriter : IBidWriter
         {
             return Refused(MarketOutcome.CannotBidOnOwnPlayer);
         }
+
+        // Serialise the bids on this listing, so "who leads now" is decided under the lock rather than read
+        // concurrently by two clubs (TRF-7, ADR-0026). The lock is transaction-scoped: the caller must have
+        // begun a transaction, which PlaceBid and the AI pass both do.
+        await _locks.AcquireAsync(AdvisoryLockKey.Listing(listing.Id), cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {

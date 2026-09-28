@@ -68,6 +68,13 @@ public sealed class PlaceBid
 
         var actor = MarketActor.ForUser(userId, _requestContext, _secureTokens);
 
+        // The bid writer serialises bids on a listing with a transaction-scoped lock, so the whole bid — the
+        // leader it reads, the reservation it posts, and the bid it stages — is one transaction (ADR-0026).
+        // A refusal leaves it uncommitted and the lock is released when the scope ends.
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(
+            TransactionIsolation.ReadCommitted,
+            cancellationToken);
+
         var write = await _writer.BidAsync(
             access.ClubId,
             actor,
@@ -85,6 +92,8 @@ public sealed class PlaceBid
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         return new ListingResult(
             MarketOutcome.Found,

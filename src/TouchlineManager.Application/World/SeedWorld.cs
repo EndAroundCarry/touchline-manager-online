@@ -1,15 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TouchlineManager.Application.Abstractions;
-using TouchlineManager.Application.Abstractions.Competition;
-using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
-using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
-using TouchlineManager.Application.Finance;
+using TouchlineManager.Application.World.Generation;
 using TouchlineManager.Domain.Competition;
-using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad.Generation;
 using TouchlineManager.Domain.World;
@@ -76,11 +72,7 @@ public sealed partial class SeedWorld
 {
     private readonly IClock _clock;
     private readonly IWorldRepository _world;
-    private readonly IClubRepository _clubs;
-    private readonly ISquadRepository _squad;
-    private readonly IClubAccountRepository _accounts;
-    private readonly ILedgerRepository _ledger;
-    private readonly ICompetitionRepository _competition;
+    private readonly WorldGenerator _generator;
     private readonly IGenerationRunRepository _generationRuns;
     private readonly IUnitOfWork _unitOfWork;
     private readonly WorldOptions _options;
@@ -90,11 +82,7 @@ public sealed partial class SeedWorld
     public SeedWorld(
         IClock clock,
         IWorldRepository world,
-        IClubRepository clubs,
-        ISquadRepository squad,
-        IClubAccountRepository accounts,
-        ILedgerRepository ledger,
-        ICompetitionRepository competition,
+        WorldGenerator generator,
         IGenerationRunRepository generationRuns,
         IUnitOfWork unitOfWork,
         IOptions<WorldOptions> options,
@@ -104,11 +92,7 @@ public sealed partial class SeedWorld
 
         _clock = clock;
         _world = world;
-        _clubs = clubs;
-        _squad = squad;
-        _accounts = accounts;
-        _ledger = ledger;
-        _competition = competition;
+        _generator = generator;
         _generationRuns = generationRuns;
         _unitOfWork = unitOfWork;
         _options = options.Value;
@@ -168,12 +152,27 @@ public sealed partial class SeedWorld
 
         foreach (var definition in LaunchCountries.All)
         {
-            var (clubs, players, accounts) = AddCountry(seed, definition, worldId, season, now);
+            var countryId = Guid.CreateVersion7();
+            var country = Country.Create(countryId, worldId, definition, now);
+
+            _world.AddCountry(country);
+
+            // The one generation path, shared with the provisioning worker. Tier 1 is claimable the moment
+            // it exists; a provisioned tier stays in provisioning until its backfill completes (PYR-8).
+            var tier = _generator.BuildTier(
+                new TierGenerationRequest(
+                    Seed: seed,
+                    Country: country,
+                    Tier: 1,
+                    Season: season,
+                    Activate: true,
+                    BootstrapCutoff: null),
+                now);
 
             countries++;
-            clubsCreated += clubs;
-            playersCreated += players;
-            accountsCreated += accounts;
+            clubsCreated += tier.Clubs;
+            playersCreated += tier.Players;
+            accountsCreated += tier.Accounts;
         }
 
         run.Succeed(new GenerationRunCounts(countries, clubsCreated, playersCreated, accountsCreated), now);
@@ -191,239 +190,6 @@ public sealed partial class SeedWorld
             clubsCreated,
             playersCreated,
             accountsCreated);
-    }
-
-    /// <summary>Creates one country, its tier-1 division, its clubs, their squads, and their accounts.</summary>
-    private (int Clubs, int Players, int Accounts) AddCountry(
-        string seed,
-        LaunchCountry definition,
-        Guid worldId,
-        Season season,
-        DateTimeOffset now)
-    {
-        var countryId = Guid.CreateVersion7();
-        _world.AddCountry(Country.Create(countryId, worldId, definition, now));
-
-        var divisionId = Guid.CreateVersion7();
-        var division = Division.Provision(
-            divisionId,
-            countryId,
-            tierNumber: 1,
-            definition.DisplayName,
-            season.Id,
-            now);
-
-        // A seeded tier is immediately claimable, unlike a provisioned one, which stays in
-        // provisioning until its generation, validation, and backfill all complete (PYR-8).
-        division.Activate(now);
-        _world.AddDivision(division);
-
-        var divisionSeasonId = Guid.CreateVersion7();
-        var divisionSeason = DivisionSeason.Create(
-            divisionSeasonId,
-            divisionId,
-            season.Id,
-            ScheduleSeedFor(seed, definition),
-            TieDrawSeedFor(seed, definition),
-            TieDrawHashFor(seed, definition),
-            now);
-
-        divisionSeason.Activate(now);
-        _world.AddDivisionSeason(divisionSeason);
-
-        var identities = ClubIdentityGenerator.GenerateDivision(
-            seed,
-            definition.NamePoolKey,
-            definition.Code,
-            tierNumber: 1,
-            WorldRuleSet.ClubsPerDivision);
-
-        var clubs = 0;
-        var players = 0;
-        var accounts = 0;
-
-        // The club ids are collected in the order their identities were generated, which is the *only*
-        // stable order for the schedule to be reproducible from: ids are UUIDv7 and differ per run, so the
-        // fixture list is keyed on this order plus the stored schedule seed (CAL-8).
-        var clubIds = new List<Guid>(identities.Count);
-
-        foreach (var identity in identities)
-        {
-            var clubId = Guid.CreateVersion7();
-
-            _clubs.Add(Club.Generate(
-                clubId,
-                worldId,
-                countryId,
-                identity,
-                tier: 1,
-                foundingGameYear: season.GameYear,
-                now));
-
-            _world.AddClubSeasonEntry(ClubSeasonEntry.Enter(
-                Guid.CreateVersion7(),
-                divisionSeasonId,
-                season.Id,
-                clubId,
-                ClubControlType.Ai,
-                now));
-
-            var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, now);
-
-            // The account opens empty and is funded by its first ledger entry, so the ledger — not the row —
-            // is where a club's money comes from, and the balance is one a replay reproduces (FIN-18).
-            _accounts.Add(account);
-            _ledger.Add(account.Post(
-                LedgerPostings.OpeningBalance(
-                    Guid.CreateVersion7(),
-                    clubId,
-                    WorldRuleSet.OpeningCashMinorForTier(1)),
-                now));
-
-            players += AddSquad(seed, definition, worldId, clubId, clubs, season, now);
-
-            clubIds.Add(clubId);
-
-            clubs++;
-            accounts++;
-        }
-
-        AddSchedule(divisionSeason, clubIds, season, now);
-        AddTable(divisionSeason, clubIds, now);
-
-        return (clubs, players, accounts);
-    }
-
-    /// <summary>
-    /// Opens a division's table at nil-nil, ranked by the draw the division recorded before the season
-    /// (`TBL-10`, `TBL-11`).
-    /// </summary>
-    /// <remarks>
-    /// The table exists from the moment the season does, so a manager who opens the game before the first
-    /// ball is kicked sees eighteen clubs on nought points rather than an empty screen — and sees them in
-    /// the order the season already committed to. Publication rebuilds these rows in place; the initial
-    /// order is not a placeholder but the same rule applied to no results, which is what makes the first
-    /// matchday's table a continuation rather than a surprise.
-    /// </remarks>
-    private void AddTable(DivisionSeason divisionSeason, IReadOnlyList<Guid> clubIds, DateTimeOffset now)
-    {
-        var lines = StandingsCalculator.Rank(
-            clubIds,
-            [],
-            clubId => StandingsCalculator.DrawKeyOf(divisionSeason.TieDrawSeed, clubId));
-
-        foreach (var line in lines)
-        {
-            _competition.AddStanding(Standing.Create(Guid.CreateVersion7(), divisionSeason.Id, line, now));
-        }
-    }
-
-    /// <summary>
-    /// Generates and stages a division's whole fixture list: its matchdays and the fixtures within them
-    /// (`CAL-8`, `CAL-9`).
-    /// </summary>
-    /// <param name="divisionSeason">The division-season the schedule belongs to.</param>
-    /// <param name="clubIds">The clubs, in a stable order (identity-generation order).</param>
-    /// <param name="season">The season, whose window supplies the matchday dates.</param>
-    /// <param name="now">The current instant.</param>
-    /// <remarks>
-    /// The schedule is validated before it is written, because a fixture list that broke a rule would be a
-    /// season that could not be played correctly and would be far harder to notice once it was in the
-    /// database than a failed generation (CAL-9, §17.9).
-    /// </remarks>
-    private void AddSchedule(
-        DivisionSeason divisionSeason,
-        IReadOnlyList<Guid> clubIds,
-        Season season,
-        DateTimeOffset now)
-    {
-        var schedule = RoundRobinSchedule.Generate(
-            clubIds,
-            DeterministicDigest.SeedOf(divisionSeason.ScheduleSeed));
-
-        var issues = ScheduleValidator.Validate(clubIds, schedule);
-
-        if (issues.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"The generated schedule for division-season {divisionSeason.Id} is invalid: "
-                + string.Join("; ", issues.Select(issue => issue.Detail)));
-        }
-
-        var dates = SeasonCalendar.MatchdayDates(
-            DateOnly.FromDateTime(season.StartsAt.UtcDateTime),
-            WorldRuleSet.MatchdaysPerSeason);
-
-        foreach (var round in schedule)
-        {
-            var kickoff = SeasonCalendar.KickoffAt(dates[round.RoundNumber - 1]);
-            var matchdayId = Guid.CreateVersion7();
-
-            _competition.AddMatchday(Matchday.Schedule(
-                matchdayId,
-                divisionSeason.Id,
-                round.RoundNumber,
-                kickoff,
-                now));
-
-            foreach (var pairing in round.Pairings)
-            {
-                _competition.AddFixture(Fixture.Schedule(
-                    Guid.CreateVersion7(),
-                    matchdayId,
-                    pairing.HomeClubId,
-                    pairing.AwayClubId,
-                    kickoff,
-                    now));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Generates and stages one club's squad (`SQ-1`).
-    /// </summary>
-    /// <param name="seed">The world seed.</param>
-    /// <param name="definition">The country the club belongs to.</param>
-    /// <param name="worldId">The owning world.</param>
-    /// <param name="clubId">The club the squad belongs to.</param>
-    /// <param name="clubOrdinalInCountry">
-    /// The club's ordinal within its country, which is what makes the squad reproducible: ids are UUIDv7
-    /// and differ per run, so nothing may key generation on a club id.
-    /// </param>
-    /// <param name="season">The season the players are registered in.</param>
-    /// <param name="now">The current instant.</param>
-    private int AddSquad(
-        string seed,
-        LaunchCountry definition,
-        Guid worldId,
-        Guid clubId,
-        int clubOrdinalInCountry,
-        Season season,
-        DateTimeOffset now)
-    {
-        var squad = PlayerGenerator.GenerateSquad(new SquadGenerationRequest(
-            seed,
-            definition.NamePoolKey,
-            definition.Code,
-            worldId,
-            clubId,
-            clubOrdinalInCountry,
-            Tier: 1,
-            season.Id,
-            season.SequenceNumber,
-            season.GameYear,
-            now));
-
-        foreach (var member in squad)
-        {
-            _squad.AddPlayer(member.Player);
-            _squad.AddPlayerAttributes(member.Attributes);
-            _squad.AddPlayerState(member.State);
-            _squad.AddPlayerContract(member.Contract);
-            _squad.AddPlayerRegistration(member.Registration);
-        }
-
-        return squad.Count;
     }
 
     /// <summary>
@@ -455,19 +221,6 @@ public sealed partial class SeedWorld
 
         return DeterministicDigest.Of([.. parts]);
     }
-
-    private static string ScheduleSeedFor(string seed, LaunchCountry country) =>
-        DeterministicDigest.Of(seed, country.Code, "1", "schedule");
-
-    private static string TieDrawSeedFor(string seed, LaunchCountry country) =>
-        DeterministicDigest.Of(seed, country.Code, "1", "tie-draw");
-
-    /// <summary>
-    /// Digests the tie-break draw seed, so the draw a season was ordered by cannot be changed unnoticed
-    /// (`TBL-11`). Stage 6 generates the draw itself; what is stored here is the commitment to its seed.
-    /// </summary>
-    private static string TieDrawHashFor(string seed, LaunchCountry country) =>
-        DeterministicDigest.Of(TieDrawSeedFor(seed, country));
 
     [LoggerMessage(
         EventId = 5000,

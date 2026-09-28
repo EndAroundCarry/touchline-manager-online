@@ -69,6 +69,16 @@ internal sealed class MatchdayRepository : IMatchdayRepository
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Matchday>> LoadDivisionMatchdaysAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Matchdays
+            .AsNoTracking()
+            .Where(matchday => matchday.DivisionSeasonId == divisionSeasonId)
+            .OrderBy(matchday => matchday.RoundNumber)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
     public async Task<FixtureSidesSnapshot?> LoadFixtureSidesAsync(
         Guid fixtureId,
         CancellationToken cancellationToken)

@@ -67,6 +67,18 @@ public interface IDivisionProvisioningRequestRepository
         int targetTier,
         CancellationToken cancellationToken);
 
+    /// <summary>Finds a request by identity, tracked, so the provisioning worker can advance it.</summary>
+    /// <param name="requestId">The request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<DivisionProvisioningRequest?> FindByIdAsync(Guid requestId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists the requests a worker still has to act on, oldest first, so the provisioning scheduler can
+    /// enqueue one job per pending tier (`PYR-4`).
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<DivisionProvisioningRequest>> ListPendingAsync(CancellationToken cancellationToken);
+
     /// <summary>Stages a new request.</summary>
     void Add(DivisionProvisioningRequest request);
 }
