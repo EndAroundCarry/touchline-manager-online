@@ -612,7 +612,7 @@ erDiagram
 | Index `(listing_id, status, amount_minor, bid_sequence)` | `transfer_bids` | `TRF-8` ordering |
 | `unique (listing_id)` | `transfer_outcomes` | Resolution happens once |
 | `check (cash_minor >= 0 and reserved_minor >= 0)` | `club_accounts` | `FIN-13` |
-| `unique (club_id, sequence)`, unique `(correlation_id, category)` where idempotency requires | `ledger_entries` | `FIN-11`, `FIN-17` |
+| `unique (club_id, sequence)`, `unique (correlation_id, category)`, `check (resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor)` | `ledger_entries` | `FIN-11`, `FIN-13`, `FIN-17` |
 
 ### 3.4 Communications and operations
 

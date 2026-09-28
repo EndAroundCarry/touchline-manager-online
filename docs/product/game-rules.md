@@ -323,6 +323,17 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 | FIN-17 | Every financial operation is idempotent under retry and carries a correlation key. |
 | FIN-18 | Ledger replay must exactly reconstruct cash and reserved balances. |
 
+A club's money is an append-only ledger. Every balance change is a `finance.ledger_entries` row that records
+the move — a cash delta and a reserved delta, either of which may be zero — beside the balances it produced,
+its category, its source, and the correlation key of the operation it belongs to (`FIN-11`, `FIN-17`).
+`finance.club_accounts` is the projection those rows sum to, so opening a club's account records its `FIN-1`
+opening balance as the first entry rather than writing a starting value onto the row, and no path moves a
+balance without an entry (`FIN-12`, `FIN-18`). A posting is refused where it would take cash or reserved funds
+below zero, or reserve more than the cash behind it (`FIN-10`, `FIN-13`); a retried operation carries the same
+correlation key and category and collides with its first entry rather than posting a second time. This is the
+record the income and expense sources above, the awards, and the market's reservations are added to, each
+milestone contributing its own category as it lands.
+
 ---
 
 ## 14. Scouting and transfers

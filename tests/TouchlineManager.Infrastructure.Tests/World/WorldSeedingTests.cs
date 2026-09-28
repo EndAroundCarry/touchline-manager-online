@@ -78,6 +78,9 @@ public sealed class WorldSeedingTests : WorldTestBase
         accounts.Should().HaveCount(108);
         accounts.Should().OnlyContain(account => account.CashMinor == WorldRuleSet.OpeningCashMinorTier1);
         accounts.Should().OnlyContain(account => account.ReservedMinor == 0);
+        accounts.Should().OnlyContain(
+            account => account.LastLedgerSequence == 1,
+            "the balance is one opening ledger entry, not a value written onto the row (FIN-18)");
 
         var entries = await db.ClubSeasonEntries
             .Where(entry => clubIds.Contains(entry.ClubId))

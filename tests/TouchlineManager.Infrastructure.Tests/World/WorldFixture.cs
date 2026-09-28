@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 using TouchlineManager.Application;
 using TouchlineManager.Application.Abstractions;
+using TouchlineManager.Application.Finance;
 using TouchlineManager.Application.World;
 using TouchlineManager.Domain.Auth;
 using TouchlineManager.Domain.Competition;
@@ -318,10 +319,14 @@ public abstract class WorldTestBase
                 ClubControlType.Ai,
                 now));
 
-            db.ClubAccounts.Add(ClubAccount.Open(
-                Guid.CreateVersion7(),
-                clubId,
-                WorldRuleSet.OpeningCashMinorForTier(tierNumber),
+            var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, now);
+
+            db.ClubAccounts.Add(account);
+            db.LedgerEntries.Add(account.Post(
+                LedgerPostings.OpeningBalance(
+                    Guid.CreateVersion7(),
+                    clubId,
+                    WorldRuleSet.OpeningCashMinorForTier(tierNumber)),
                 now));
         }
 

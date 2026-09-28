@@ -3,6 +3,82 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 9 — Contracts and basic club finances
+
+The ledger every balance is rebuilt from. A club's money becomes an append-only record: an account no longer
+opens with a starting balance written onto its row but with a first entry, and `FIN-18`'s "replay must exactly
+reconstruct cash and reserved balances" is now a property the seeded world is checked against rather than a
+claim in a document. This is the first milestone of the stage; the income and expense runs, the renewals, the
+warnings, the emergency path, and the finance screens are the rest.
+
+### Added
+
+- **`finance.ledger_entries`** (master plan §6.8): one immutable row per balance change, carrying the cash
+  and reserved deltas it applied, the balances those produced, its category, its source, and the correlation
+  key of the operation it belongs to. `unique (club_id, sequence)` is the ordered walk `FIN-11` needs, and
+  `unique (correlation_id, category)` is `FIN-17` made structural — a retried operation collides with its
+  first entry rather than posting a second. The checks bound what an entry may claim: a sequence starts at
+  one, a category and a source are one of the known codes, the resulting balances are never negative and
+  never reserve more than the cash behind them (`FIN-13`), and an entry moves something.
+- **`LedgerEntry`, `LedgerPosting`, `LedgerCategory`, and `LedgerSourceType`**: the entry as an immutable
+  value carrying the balances it produced; the intent a workflow proposes before an account decides it can
+  afford it; and the two stable vocabularies — what a move is (`FIN-3`…`FIN-9`, the reservations `FIN-10`
+  makes, the emergency grant `FIN-16`, and the compensating correction `FIN-12`) and which workflow wrote it.
+  Both walk by code so a column holds every value and a reordered enum cannot move an entry between accounts.
+- **`ClubAccount.Post` is the only path a balance changes** (`FIN-11`, `FIN-12`). It applies a posting's cash
+  and reserved deltas, refuses one that would leave either negative or leave reserved funds above the cash
+  behind them (`FIN-10`, `FIN-13`), advances the account's sequence, and records the entry — so a wage, a gate
+  receipt, an award, a reservation, and a release all pass through one guard rather than restating it.
+- **The opening balance is a posting.** `ClubAccount.Open` now opens at zero and the seeder funds the club
+  with a `LedgerCategory.OpeningBalance` entry (`FIN-1`), so there is no balance in the database a replay
+  cannot reproduce. The account's balances are the running total of its ledger, and `club_accounts` is the
+  projection the entries sum to (`FIN-18`).
+- **`LedgerPostings`** builds the postings the game makes, starting with the opening balance; the description
+  is a stable template key and a stored parameter document, the contract the commentary and the inbox already
+  use (`MAT-8`, master plan §8.6), so a ledger line can be rendered in another language later without being
+  rewritten.
+- **`ILedgerRepository`** and its implementation: the append-only write, staging an entry so the workflow that
+  moves money commits it beside the state it changes.
+- **ADR-0022**, on the append-only ledger, the balances as its projection, the opening balance as the first
+  entry, the two deltas on one posting, and idempotency as a unique index rather than a lock.
+- `docs/product/game-rules.md` §13 now describes the ledger the rules are applied to; the data model's
+  constraint row for `ledger_entries` names the indexes and checks as built.
+- 18 new domain tests (389 total) for the postings — opening, a debit, a reservation and its release, and the
+  refusals (negative cash, a reservation beyond the available cash, a debit that would spend reserved money,
+  a release below zero, a posting that moves nothing) — and the entry's own guards and code vocabularies;
+  3 new application tests (101 total) for the opening posting's fields, its parameter document, and a negative
+  opening amount; and 5 new infrastructure tests (143 total) over a real seeded world that assert every
+  account is opened by exactly one entry stating its balance, that the ledger replays to the stored balances,
+  and that the sequence, idempotency, and balance constraints are enforced by name. The world-seeding test now
+  also asserts an account carries one ledger entry.
+
+### Notes
+
+- **The account is a projection, and the opening balance had to move to the ledger for that to be true.**
+  `club_accounts.cash_minor` and `reserved_minor` are the running total of the entries behind them
+  (`FIN-18`), so a starting value written onto the row at generation would be the one fact a replay could not
+  reproduce. Opening at zero and posting the balance is what makes the two agree from the first club onward,
+  and it is ADR-0022's central decision.
+- **An entry stores the balances it produced, not only the deltas.** The deltas are what moved; the resulting
+  balances are what the club held, and storing them lets a replay be checked against the state the account
+  actually reached rather than only against today's sum — and lets the database refuse an entry that claims a
+  negative balance at insert.
+- **A reservation is a reserved delta on an ordinary entry.** Cash and reserved funds move independently, so
+  one posting carries both deltas and the account guards both: `FIN-10`'s affordability and `FIN-13`'s
+  non-negativity are the same check in the same place, and a bid in Stage 10 will express itself as a
+  `BidReservation` against it rather than reaching for a second balance path.
+- **Idempotency is an index, not a lock.** `unique (correlation_id, category)` refuses a duplicate write
+  whether a retry is sequential or concurrent, which is the guarantee `FIN-17` needs and the reason the
+  correlation key is required rather than optional on every posting.
+- **Deliberately deferred to the rest of Stage 9:** the income and expense postings themselves — gate revenue
+  (`FIN-3`), the weekly sponsorship credit, wages, and the operating cost (`FIN-4`, `FIN-7`, `FIN-9`) as a
+  durable run, and the awards (`FIN-5`) at rollover; `finance.club_season_finances` and the finance reporting
+  read with its `/finances` screen; the deterministic renewal quote and accept/decline (`CON-3`, `CON-4`) with
+  the rollover expiry; the dashboard's expiring-contract, payroll, and minimum-squad warnings; the emergency
+  grant and replacement path with its operations alert (`FIN-16`); and finance administration with
+  compensating entries only (`FIN-12`). The `ledger_entries` description columns are written now and rendered
+  by the reporting screen when it lands, because the table arrives with the stage's first milestone.
+
 ## Stage 8 — Competition depth, discipline, injuries, and AI match management
 
 A result that costs you players. A publication no longer only moves the table: the cards and injuries its

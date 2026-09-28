@@ -7,6 +7,7 @@ using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Application.Finance;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Rules;
@@ -78,6 +79,7 @@ public sealed partial class SeedWorld
     private readonly IClubRepository _clubs;
     private readonly ISquadRepository _squad;
     private readonly IClubAccountRepository _accounts;
+    private readonly ILedgerRepository _ledger;
     private readonly ICompetitionRepository _competition;
     private readonly IGenerationRunRepository _generationRuns;
     private readonly IUnitOfWork _unitOfWork;
@@ -91,6 +93,7 @@ public sealed partial class SeedWorld
         IClubRepository clubs,
         ISquadRepository squad,
         IClubAccountRepository accounts,
+        ILedgerRepository ledger,
         ICompetitionRepository competition,
         IGenerationRunRepository generationRuns,
         IUnitOfWork unitOfWork,
@@ -104,6 +107,7 @@ public sealed partial class SeedWorld
         _clubs = clubs;
         _squad = squad;
         _accounts = accounts;
+        _ledger = ledger;
         _competition = competition;
         _generationRuns = generationRuns;
         _unitOfWork = unitOfWork;
@@ -264,10 +268,16 @@ public sealed partial class SeedWorld
                 ClubControlType.Ai,
                 now));
 
-            _accounts.Add(ClubAccount.Open(
-                Guid.CreateVersion7(),
-                clubId,
-                WorldRuleSet.OpeningCashMinorForTier(1),
+            var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, now);
+
+            // The account opens empty and is funded by its first ledger entry, so the ledger — not the row —
+            // is where a club's money comes from, and the balance is one a replay reproduces (FIN-18).
+            _accounts.Add(account);
+            _ledger.Add(account.Post(
+                LedgerPostings.OpeningBalance(
+                    Guid.CreateVersion7(),
+                    clubId,
+                    WorldRuleSet.OpeningCashMinorForTier(1)),
                 now));
 
             players += AddSquad(seed, definition, worldId, clubId, clubs, season, now);

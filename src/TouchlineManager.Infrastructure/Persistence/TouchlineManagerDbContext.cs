@@ -109,6 +109,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the finance module's club accounts.</summary>
     public DbSet<ClubAccount> ClubAccounts => Set<ClubAccount>();
 
+    /// <summary>Gets the finance module's append-only ledger entries.</summary>
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+
     /// <summary>Gets the comms module's inbox messages.</summary>
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 

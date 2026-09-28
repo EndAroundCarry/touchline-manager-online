@@ -269,6 +269,7 @@ public static class DependencyInjection
         services.AddScoped<IDivisionProvisioningRequestRepository, DivisionProvisioningRequestRepository>();
         services.AddScoped<IGenerationRunRepository, GenerationRunRepository>();
         services.AddScoped<IClubAccountRepository, ClubAccountRepository>();
+        services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IOnboardingQueries, OnboardingQueries>();
         services.AddScoped<IAdvisoryLock, PostgresAdvisoryLock>();
 

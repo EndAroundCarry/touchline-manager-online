@@ -7,28 +7,32 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 8 in progress — the squad feels the result.** The playable game is being built in the
-> staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job pipeline, the
-> API and worker composition roots, the health and observability baseline, and the Angular PWA shell. Stage
-> 2 added the account schema, the full credential lifecycle, rotating refresh sessions with reuse
-> detection, the audit trail, the request security headers, the Angular auth and settings screens, and the
-> end-to-end journeys. Stage 3 added deterministic world generation, six fictional national pyramids,
-> atomic club takeover with pyramid expansion, and the onboarding screens. Stage 4 added the `squad`
-> schema, a legal twenty-two-player squad per club, the squad, player and contract screens, the tactics
-> board and its ETag contract, and the training screen with its deterministic daily progression job. Stage
-> 5 added the match engine: a pure, versioned, hash-pinned simulation of one fixture from a frozen
-> snapshot, with commentary tokens, semantic highlights, and a simulation laboratory for tuning. Stage 6
-> turned that engine into a season: a 34-round fixture calendar, the fixture and prepare-match screens, the
-> durable matchday worker that locks a round's team sheets, simulates its nine fixtures from frozen
-> snapshots, and publishes results and table together, the division table screen, and a compressed test
-> clock for non-production environments. Stage 7 added the match center: the score, statistics and
+> **Status: Stage 9 in progress — the ledger every balance is rebuilt from.** The playable game is being
+> built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
+> pipeline, the API and worker composition roots, the health and observability baseline, and the Angular
+> PWA shell. Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions
+> with reuse detection, the audit trail, the request security headers, the Angular auth and settings
+> screens, and the end-to-end journeys. Stage 3 added deterministic world generation, six fictional
+> national pyramids, atomic club takeover with pyramid expansion, and the onboarding screens. Stage 4 added
+> the `squad` schema, a legal twenty-two-player squad per club, the squad, player and contract screens, the
+> tactics board and its ETag contract, and the training screen with its deterministic daily progression
+> job. Stage 5 added the match engine: a pure, versioned, hash-pinned simulation of one fixture from a
+> frozen snapshot, with commentary tokens, semantic highlights, and a simulation laboratory for tuning.
+> Stage 6 turned that engine into a season: a 34-round fixture calendar, the fixture and prepare-match
+> screens, the durable matchday worker that locks a round's team sheets, simulates its nine fixtures from
+> frozen snapshots, and publishes results and table together, the division table screen, and a compressed
+> test clock for non-production environments. Stage 7 added the match center: the score, statistics and
 > commentary over HTTP, a deterministic replay re-derived from the frozen snapshot behind an immutable
-> cache, and a Canvas viewer that plays the keyframe highlights — proven end to end by a journey that
-> prepares a side, plays a real round through the worker, and watches the replay. Stage 8 has begun with
-> discipline and injuries: publication now turns a round's cards and injuries into each player's season
-> accumulation and into suspensions and absences measured in fixtures, which the next round's frozen side
-> cannot name. The rest of the stage — season statistics, condition and morale, the AI's own selection
-> policy, the inbox, and the discipline screens — is what follows.
+> cache, and a Canvas viewer that plays the keyframe highlights. Stage 8 gave a result its consequences:
+> publication turns a round's cards and injuries into each player's season accumulation and into
+> suspensions and absences measured in fixtures, loads every participant's condition, fatigue, and morale,
+> advances the season's statistics, and writes each manager an inbox report; a club no manager holds is set
+> up by a deterministic policy, and a division's projections can be reconciled and its rules, statistics,
+> and discipline read. Stage 9 has begun with the append-only club ledger: every balance change is a
+> `finance.ledger_entries` row, an account is the projection those rows sum to, and a club's opening
+> balance is its first entry — so a replay reproduces its cash and reserved funds exactly (`FIN-18`). The
+> income and expense runs, the contract renewals, the warnings, the emergency path, and the finance screens
+> are what follows.
 
 ---
 

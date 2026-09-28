@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using TouchlineManager.Application.Finance;
 using TouchlineManager.Domain.Auth;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
@@ -404,8 +405,11 @@ public sealed class WorldPersistenceTests
 
         var (_, clubId) = await ArrangeClubAsync(scope);
 
-        var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, openingCashMinor: 1_000, _fixture.Clock.UtcNow);
+        var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, _fixture.Clock.UtcNow);
         db.ClubAccounts.Add(account);
+        db.LedgerEntries.Add(account.Post(
+            LedgerPostings.OpeningBalance(Guid.CreateVersion7(), clubId, 1_000),
+            _fixture.Clock.UtcNow));
         await db.SaveChangesAsync();
 
         var act = () => db.Database.ExecuteSqlRawAsync(
@@ -425,8 +429,11 @@ public sealed class WorldPersistenceTests
 
         var (_, clubId) = await ArrangeClubAsync(scope);
 
-        var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, openingCashMinor: 500, _fixture.Clock.UtcNow);
+        var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, _fixture.Clock.UtcNow);
         db.ClubAccounts.Add(account);
+        db.LedgerEntries.Add(account.Post(
+            LedgerPostings.OpeningBalance(Guid.CreateVersion7(), clubId, 500),
+            _fixture.Clock.UtcNow));
         await db.SaveChangesAsync();
 
         var act = () => db.Database.ExecuteSqlRawAsync(
