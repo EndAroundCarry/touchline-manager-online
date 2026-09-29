@@ -64,6 +64,32 @@ export function outcomeLabel(outcome: string | null): string {
   return outcome === null ? '' : (OUTCOME_LABELS[outcome] ?? outcome);
 }
 
+/** Words for how a club arrived in a season (`PR-4`). */
+const MOVEMENT_LABELS: Record<string, string> = {
+  promoted: 'Promoted',
+  relegated: 'Relegated',
+  none: '',
+};
+
+/** Names a next-season movement from its stable code, falling back to the code. */
+export function movementLabel(movement: string): string {
+  return MOVEMENT_LABELS[movement] ?? movement;
+}
+
+/**
+ * Names a finished season's movement from its flags, or an empty string when the club stayed put.
+ *
+ * A word rather than a colour: the history reads it as text, so promotion and relegation are never a tint
+ * alone (§11.3).
+ */
+export function seasonMovementLabel(promoted: boolean, relegated: boolean): string {
+  return promoted
+    ? MOVEMENT_LABELS['promoted']
+    : relegated
+      ? MOVEMENT_LABELS['relegated']
+      : MOVEMENT_LABELS['none'];
+}
+
 /** Formats a published scoreline, or an empty string while there is no result (`MAT-7`). */
 export function scoreLabel(home: number | null, away: number | null): string {
   return home === null || away === null ? '' : `${home}\u2013${away}`;

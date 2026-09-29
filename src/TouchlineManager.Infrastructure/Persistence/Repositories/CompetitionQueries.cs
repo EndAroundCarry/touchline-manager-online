@@ -583,6 +583,113 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             row.Fixture.IsBootstrap);
     }
 
+    /// <inheritdoc />
+    public async Task<ClubSeasonHistorySnapshot?> GetClubSeasonHistoryAsync(
+        Guid clubId,
+        CancellationToken cancellationToken)
+    {
+        var club = await _dbContext.Clubs
+            .Where(candidate => candidate.Id == clubId)
+            .Select(candidate => new { candidate.Id, candidate.WorldId, candidate.Name, candidate.ShortName })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (club is null)
+        {
+            return null;
+        }
+
+        // Only closed entries: an entry acquires its final rank when the rollover closes it, so a season still
+        // in progress has no line here (PR-4, PR-6). The figures are the ones the close wrote and never
+        // rewrote, so the history is the same however long after the season it is read.
+        var seasons = await (
+            from entry in _dbContext.ClubSeasonEntries
+            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join seasonRow in _dbContext.Seasons on divisionSeason.SeasonId equals seasonRow.Id
+            where entry.ClubId == clubId && entry.FinalRank >= 1
+            orderby seasonRow.SequenceNumber descending
+            select new ClubSeasonHistoryRow(
+                seasonRow.SequenceNumber,
+                seasonRow.DisplayLabel,
+                division.TierNumber,
+                division.DisplayName,
+                entry.FinalRank ?? 0,
+                entry.IsPromoted,
+                entry.IsRelegated,
+                entry.ClosingCashMinor ?? 0,
+                entry.ClosingReputation ?? 0))
+            .ToListAsync(cancellationToken);
+
+        var nextSeason = await ResolveNextSeasonAsync(club.Id, club.WorldId, seasons, cancellationToken);
+
+        return new ClubSeasonHistorySnapshot(club.Id, club.Name, club.ShortName, seasons, nextSeason);
+    }
+
+    /// <summary>
+    /// Reads the club's placement in the world's next season, when that season already exists.
+    /// </summary>
+    /// <remarks>
+    /// The next season is created by the rollover's move phase and the world pointer advances at complete, so
+    /// it is non-null only between the two — exactly the window in which a manager wants to know where their
+    /// club is going. The movement is read from the closing season's entry, which finalize closed with its
+    /// promotion/relegation flags (`PR-4`).
+    /// </remarks>
+    private async Task<NextSeasonSummary?> ResolveNextSeasonAsync(
+        Guid clubId,
+        Guid worldId,
+        IReadOnlyList<ClubSeasonHistoryRow> seasons,
+        CancellationToken cancellationToken)
+    {
+        var current = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (current is null)
+        {
+            return null;
+        }
+
+        var next = await _dbContext.Seasons
+            .Where(season => season.WorldId == worldId && season.SequenceNumber == current.SequenceNumber + 1)
+            .Select(season => new { season.Id, season.SequenceNumber, season.DisplayLabel, season.StartsAt })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (next is null)
+        {
+            return null;
+        }
+
+        var placement = await (
+            from entry in _dbContext.ClubSeasonEntries
+            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            where entry.ClubId == clubId && divisionSeason.SeasonId == next.Id
+            select new { division.TierNumber, division.DisplayName })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // A season created but not yet populated (a rollover interrupted between move and its entries) has no
+        // placement to show, so the club's next season is not yet known rather than half known.
+        if (placement is null)
+        {
+            return null;
+        }
+
+        var closing = seasons.FirstOrDefault(row => row.SeasonNumber == current.SequenceNumber);
+
+        var movement = closing switch
+        {
+            { Promoted: true } => SeasonMovements.Promoted,
+            { Relegated: true } => SeasonMovements.Relegated,
+            _ => SeasonMovements.None,
+        };
+
+        return new NextSeasonSummary(
+            next.SequenceNumber,
+            next.DisplayLabel,
+            next.StartsAt,
+            placement.DisplayName,
+            placement.TierNumber,
+            movement);
+    }
+
     private static FixtureRow ToRow(Domain.Competition.Fixture fixture) =>
         new(
             fixture.Id,

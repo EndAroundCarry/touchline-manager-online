@@ -347,3 +347,43 @@ export interface TeamSheetValidation {
   readonly substituteCount: number;
   readonly issues: readonly TeamSheetIssue[];
 }
+
+/** One season a club has finished (`PR-4`, `PR-6`). */
+export interface ClubSeasonHistoryEntry {
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly tierNumber: number;
+  readonly divisionName: string;
+  readonly finalRank: number;
+  readonly promoted: boolean;
+  readonly relegated: boolean;
+  readonly closingCashMinor: number;
+  readonly closingReputation: number;
+}
+
+/**
+ * The next season a club is already placed in (`PR-5`).
+ *
+ * Null outside the rollover window: the next season exists only between the rollover's move phase and the
+ * world pointer advancing, which is when a manager wants to see where their club is going.
+ */
+export interface NextSeasonSummary {
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly startsAt: string;
+  readonly divisionName: string;
+  readonly tierNumber: number;
+
+  /** How the club arrived: `promoted`, `relegated`, or `none`. */
+  readonly movement: string;
+}
+
+/** A club's finished seasons, newest first, with the next season when one is already known (§11.1). */
+export interface ClubSeasonHistory {
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly clubShortName: string;
+  readonly seasons: readonly ClubSeasonHistoryEntry[];
+  readonly nextSeason: NextSeasonSummary | null;
+  readonly serverTime: string;
+}

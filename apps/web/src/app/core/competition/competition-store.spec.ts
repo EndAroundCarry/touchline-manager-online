@@ -4,6 +4,7 @@ import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import { CompetitionStore } from './competition-store';
 import {
+  ClubSeasonHistory,
   DivisionDiscipline,
   DivisionRules,
   DivisionStatistics,
@@ -223,6 +224,36 @@ function discipline(): DivisionDiscipline {
   };
 }
 
+function history(): ClubSeasonHistory {
+  return {
+    clubId: 'c1',
+    clubName: 'Ashvale United',
+    clubShortName: 'ASH',
+    seasons: [
+      {
+        seasonNumber: 1,
+        seasonLabel: '2026/27',
+        tierNumber: 2,
+        divisionName: 'England Second Division',
+        finalRank: 2,
+        promoted: true,
+        relegated: false,
+        closingCashMinor: 1_000_000,
+        closingReputation: 62,
+      },
+    ],
+    nextSeason: {
+      seasonNumber: 2,
+      seasonLabel: '2027/28',
+      startsAt: '2027-10-05T19:00:00Z',
+      divisionName: 'England Top Division',
+      tierNumber: 1,
+      movement: 'promoted',
+    },
+    serverTime: '2026-09-25T00:00:00Z',
+  };
+}
+
 function createApiStub() {
   return {
     mine: vi.fn(),
@@ -232,6 +263,7 @@ function createApiStub() {
     divisionStatistics: vi.fn(),
     divisionRules: vi.fn(),
     divisionDiscipline: vi.fn(),
+    clubHistory: vi.fn(),
     teamSheet: vi.fn(),
     saveTeamSheet: vi.fn(),
   };
@@ -486,18 +518,54 @@ describe('CompetitionStore', () => {
     expect(store.disciplineLoading()).toBe(false);
   });
 
+  it('reads the manager club season history by resolving their club', () => {
+    api.mine.mockReturnValue(of(fixtures()));
+    api.clubHistory.mockReturnValue(of(history()));
+
+    store.loadMyClubHistory();
+
+    expect(api.clubHistory).toHaveBeenCalledWith('c1');
+    expect(store.clubHistory()?.seasons[0].finalRank).toBe(2);
+    expect(store.clubHistory()?.nextSeason?.movement).toBe('promoted');
+    expect(store.historyLoading()).toBe(false);
+  });
+
+  it('reads one club season history by identity without naming the manager club', () => {
+    api.clubHistory.mockReturnValue(of(history()));
+
+    store.loadClubHistory('c9');
+
+    expect(api.clubHistory).toHaveBeenCalledWith('c9');
+    expect(api.mine).not.toHaveBeenCalled();
+    expect(store.clubHistory()).not.toBeNull();
+  });
+
+  it('reports a season history it could not read', () => {
+    api.clubHistory.mockReturnValue(
+      throwError(() => new ApiError(404, 'CLUB_NOT_FOUND', 'no such club', null, new Map())),
+    );
+
+    store.loadClubHistory('c9');
+
+    expect(store.clubHistory()).toBeNull();
+    expect(store.historyError()).toBe('no such club');
+    expect(store.historyLoading()).toBe(false);
+  });
+
   it('forgets everything when the session ends', () => {
     api.mine.mockReturnValue(of(fixtures()));
     api.divisionTable.mockReturnValue(of(table()));
     api.divisionStatistics.mockReturnValue(of(statistics()));
     api.divisionRules.mockReturnValue(of(rules()));
     api.divisionDiscipline.mockReturnValue(of(discipline()));
+    api.clubHistory.mockReturnValue(of(history()));
     api.teamSheet.mockReturnValue(of(teamSheet()));
 
     store.loadMyDivisionTable();
     store.loadDivisionStatistics('d1');
     store.loadDivisionRules('d1');
     store.loadDivisionDiscipline('d1');
+    store.loadClubHistory('c1');
     store.loadTeamSheet('f1');
     store.clear();
 
@@ -507,6 +575,7 @@ describe('CompetitionStore', () => {
     expect(store.divisionStatistics()).toBeNull();
     expect(store.divisionRules()).toBeNull();
     expect(store.divisionDiscipline()).toBeNull();
+    expect(store.clubHistory()).toBeNull();
     expect(store.managedClubId()).toBeNull();
   });
 });

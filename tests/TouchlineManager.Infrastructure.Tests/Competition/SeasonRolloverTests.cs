@@ -225,6 +225,26 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             nextTierTwoClubs.Should().Contain(expectedRelegated);
             nextTierTwoClubs.Should().NotContain(expectedPromoted);
 
+            // A club's season history reads the entry the rollover closed and never rewrote (PR-4, PR-6). The
+            // promoted club's line names the season, the tier it left, its final rank, and its movement.
+            var promotedClubId = expectedPromoted[0];
+            var history = await scope.ServiceProvider.GetRequiredService<GetClubSeasonHistory>()
+                .ExecuteAsync(promotedClubId, CancellationToken.None);
+
+            history.Outcome.Should().Be(CompetitionReadOutcome.Found);
+            history.History!.ClubId.Should().Be(promotedClubId);
+            history.History.Seasons.Should().HaveCount(1, "only the closing season has finished");
+
+            var finished = history.History.Seasons[0];
+            finished.SeasonNumber.Should().Be(1);
+            finished.TierNumber.Should().Be(2, "the club played the closing season in the second tier");
+            finished.FinalRank.Should().BeInRange(1, 3, "it was promoted from the top three");
+            finished.Promoted.Should().BeTrue();
+            finished.ClosingReputation.Should().BeGreaterThan(0);
+            finished.ClosingCashMinor.Should().BeGreaterThan(0);
+            history.History.NextSeason.Should().BeNull(
+                "the world pointer has advanced, so no next season exists yet to be placed in (PR-5)");
+
             // The closing season's own schedule is untouched history (PR-6).
             var closingMatchdayIds = await db.Matchdays
                 .Where(matchday => matchday.DivisionSeasonId ==

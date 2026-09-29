@@ -66,6 +66,12 @@ internal static class CompetitionEndpoints
             .Produces<DivisionDisciplineResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/clubs/{clubId:guid}/history", GetClubSeasonHistoryAsync)
+            .WithName("GetClubSeasonHistory")
+            .WithSummary("Reads a club's finished seasons and, when it is already known, its next season.")
+            .Produces<ClubSeasonHistoryResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/fixtures/mine", GetMyFixturesAsync)
             .WithName("GetMyFixtures")
             .WithSummary("Reads the fixtures of the club the manager holds, with the next one named.")
@@ -151,6 +157,21 @@ internal static class CompetitionEndpoints
 
         return result.Outcome == CompetitionReadOutcome.Found
             ? Results.Ok(result.Discipline)
+            : CompetitionRefusals.Read(
+                result.Outcome,
+                SquadErrorCodes.ClubNotManaged,
+                "You do not manage that club.");
+    }
+
+    private static async Task<IResult> GetClubSeasonHistoryAsync(
+        Guid clubId,
+        GetClubSeasonHistory query,
+        CancellationToken cancellationToken)
+    {
+        var result = await query.ExecuteAsync(clubId, cancellationToken);
+
+        return result.Outcome == CompetitionReadOutcome.Found
+            ? Results.Ok(result.History)
             : CompetitionRefusals.Read(
                 result.Outcome,
                 SquadErrorCodes.ClubNotManaged,

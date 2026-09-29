@@ -4,9 +4,11 @@ import {
   goalDifferenceLabel,
   isUpcoming,
   lockCountdown,
+  movementLabel,
   outcomeLabel,
   roundLabel,
   scoreLabel,
+  seasonMovementLabel,
   suspensionRemainingLabel,
   teamSheetIssueMessage,
   tieBreakerLabel,
@@ -141,5 +143,28 @@ describe('tieBreakerLabel', () => {
 
   it('falls back to the raw code for a criterion it does not know', () => {
     expect(tieBreakerLabel('coin_toss')).toBe('coin_toss');
+  });
+});
+
+describe('seasonMovementLabel', () => {
+  it('names a promotion or relegation from the finished season flags (PR-4)', () => {
+    expect(seasonMovementLabel(true, false)).toBe('Promoted');
+    expect(seasonMovementLabel(false, true)).toBe('Relegated');
+  });
+
+  it('says nothing when the club stayed in the same tier', () => {
+    expect(seasonMovementLabel(false, false)).toBe('');
+  });
+});
+
+describe('movementLabel', () => {
+  it('names a next-season movement code, and says nothing for none (PR-5)', () => {
+    expect(movementLabel('promoted')).toBe('Promoted');
+    expect(movementLabel('relegated')).toBe('Relegated');
+    expect(movementLabel('none')).toBe('');
+  });
+
+  it('falls back to the raw code for a movement it does not know', () => {
+    expect(movementLabel('expelled')).toBe('expelled');
   });
 });

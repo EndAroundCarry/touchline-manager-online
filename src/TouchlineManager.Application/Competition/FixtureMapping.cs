@@ -171,6 +171,57 @@ public static class FixtureMapping
             row.SuspensionFixturesRemaining);
     }
 
+    /// <summary>Projects a club's season history.</summary>
+    /// <param name="snapshot">The stored history and next-season placement.</param>
+    /// <param name="serverTime">When the response was produced.</param>
+    public static ClubSeasonHistoryResponse ToResponse(
+        this ClubSeasonHistorySnapshot snapshot,
+        DateTimeOffset serverTime)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return new ClubSeasonHistoryResponse(
+            snapshot.ClubId,
+            snapshot.ClubName,
+            snapshot.ClubShortName,
+            [.. snapshot.Seasons.Select(ToResponse)],
+            snapshot.NextSeason?.ToResponse(),
+            serverTime);
+    }
+
+    /// <summary>Projects one finished season.</summary>
+    /// <param name="row">The stored season.</param>
+    public static ClubSeasonHistoryEntryResponse ToResponse(this ClubSeasonHistoryRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        return new ClubSeasonHistoryEntryResponse(
+            row.SeasonNumber,
+            row.SeasonLabel,
+            row.TierNumber,
+            row.DivisionName,
+            row.FinalRank,
+            row.Promoted,
+            row.Relegated,
+            row.ClosingCashMinor,
+            row.ClosingReputation);
+    }
+
+    /// <summary>Projects the club's next-season placement.</summary>
+    /// <param name="summary">The stored placement.</param>
+    public static NextSeasonSummaryResponse ToResponse(this NextSeasonSummary summary)
+    {
+        ArgumentNullException.ThrowIfNull(summary);
+
+        return new NextSeasonSummaryResponse(
+            summary.SeasonNumber,
+            summary.SeasonLabel,
+            summary.StartsAt,
+            summary.DivisionName,
+            summary.TierNumber,
+            summary.Movement);
+    }
+
     /// <summary>Projects a division's competition rules for the season in progress.</summary>
     /// <remarks>
     /// The points and the ordering are taken from the domain rather than from the response, so a screen

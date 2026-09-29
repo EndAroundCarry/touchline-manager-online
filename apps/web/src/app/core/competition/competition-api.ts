@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
+  ClubSeasonHistory,
   DivisionDiscipline,
   DivisionFixtures,
   DivisionRules,
@@ -59,6 +60,11 @@ export class CompetitionApi {
   /** Reads a division's discipline: its cards and its outstanding suspensions. */
   divisionDiscipline(divisionId: string): Observable<DivisionDiscipline> {
     return this.api.get<DivisionDiscipline>(`/divisions/${divisionId}/discipline`);
+  }
+
+  /** Reads a club's finished seasons and, when it is already known, its next season. */
+  clubHistory(clubId: string): Observable<ClubSeasonHistory> {
+    return this.api.get<ClubSeasonHistory>(`/clubs/${clubId}/history`);
   }
 
   /** Reads the caller's club's side for a fixture, prepared or not. */

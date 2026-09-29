@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
 import { CompetitionApi } from './competition-api';
 import {
+  ClubSeasonHistory,
   DivisionDiscipline,
   DivisionRules,
   DivisionStatistics,
@@ -49,6 +50,10 @@ export class CompetitionStore {
   private readonly divisionDisciplineSignal = signal<DivisionDiscipline | null>(null);
   private readonly disciplineLoadingSignal = signal(false);
   private readonly disciplineErrorSignal = signal<string | null>(null);
+
+  private readonly clubHistorySignal = signal<ClubSeasonHistory | null>(null);
+  private readonly historyLoadingSignal = signal(false);
+  private readonly historyErrorSignal = signal<string | null>(null);
 
   private readonly teamSheetSignal = signal<FixtureTeamSheet | null>(null);
   private readonly selectionSignal = signal<ReadonlyMap<number, string>>(new Map());
@@ -111,6 +116,15 @@ export class CompetitionStore {
 
   /** Why a division's discipline could not be read. */
   readonly disciplineError = this.disciplineErrorSignal.asReadonly();
+
+  /** The manager's club's season history last read. */
+  readonly clubHistory = this.clubHistorySignal.asReadonly();
+
+  /** Whether the club's season history is being read. */
+  readonly historyLoading = this.historyLoadingSignal.asReadonly();
+
+  /** Why the club's season history could not be read. */
+  readonly historyError = this.historyErrorSignal.asReadonly();
 
   /** The prepared side last read. */
   readonly teamSheet = this.teamSheetSignal.asReadonly();
@@ -309,6 +323,27 @@ export class CompetitionStore {
     });
   }
 
+  /**
+   * Reads the season history of the manager's own club (§11.1).
+   *
+   * The club is named by the fixture list the manager's club already has — the same read the dashboard and
+   * the table screen use — because no competition read names the caller's own club.
+   */
+  loadMyClubHistory(): void {
+    this.beginHistoryRead();
+
+    this.api.mine().subscribe({
+      next: (fixtures) => this.readClubHistory(fixtures.clubId),
+      error: (error: unknown) => this.failHistoryRead(error),
+    });
+  }
+
+  /** Reads one club's season history by identity, for a shareable view (§10.5). */
+  loadClubHistory(clubId: string): void {
+    this.beginHistoryRead();
+    this.readClubHistory(clubId);
+  }
+
   /** Reads the club's prepared side for a fixture and starts editing it. */
   loadTeamSheet(fixtureId: string): void {
     this.loadingSignal.set(true);
@@ -452,6 +487,9 @@ export class CompetitionStore {
     this.divisionDisciplineSignal.set(null);
     this.disciplineLoadingSignal.set(false);
     this.disciplineErrorSignal.set(null);
+    this.clubHistorySignal.set(null);
+    this.historyLoadingSignal.set(false);
+    this.historyErrorSignal.set(null);
     this.teamSheetSignal.set(null);
     this.selectionSignal.set(new Map());
     this.loadingSignal.set(false);
@@ -485,6 +523,31 @@ export class CompetitionStore {
     this.tableLoadingSignal.set(false);
     this.tableErrorSignal.set(
       error instanceof ApiError ? error.detail : 'The table could not be loaded.',
+    );
+  }
+
+  /** Puts the history read into its loading state, dropping whatever the last one answered. */
+  private beginHistoryRead(): void {
+    this.historyLoadingSignal.set(true);
+    this.historyErrorSignal.set(null);
+    this.clubHistorySignal.set(null);
+  }
+
+  /** Reads one club's history. */
+  private readClubHistory(clubId: string): void {
+    this.api.clubHistory(clubId).subscribe({
+      next: (history) => {
+        this.clubHistorySignal.set(history);
+        this.historyLoadingSignal.set(false);
+      },
+      error: (error: unknown) => this.failHistoryRead(error),
+    });
+  }
+
+  private failHistoryRead(error: unknown): void {
+    this.historyLoadingSignal.set(false);
+    this.historyErrorSignal.set(
+      error instanceof ApiError ? error.detail : 'The season history could not be loaded.',
     );
   }
 

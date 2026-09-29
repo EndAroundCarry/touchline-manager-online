@@ -170,6 +170,13 @@ export const routes: Routes = [
         title: 'Table — Touchline Manager',
       },
       {
+        // The manager's own club's season history, resolved from their fixture list like the table.
+        path: 'history',
+        loadComponent: () => import('./features/history/history').then((m) => m.SeasonHistory),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Seasons — Touchline Manager',
+      },
+      {
         path: 'fixtures',
         loadComponent: () => import('./features/fixtures/fixtures').then((m) => m.Fixtures),
         canActivate: [requireAuthentication, requireVerifiedEmail],

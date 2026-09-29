@@ -355,6 +355,68 @@ public sealed record DivisionRulesSnapshot(
     string TieDrawHash,
     IReadOnlyList<DivisionRulesClubRow> Clubs);
 
+/// <summary>How a club arrived in a season: the stable codes a history read reports (`PR-4`).</summary>
+public static class SeasonMovements
+{
+    /// <summary>The club was promoted into the season.</summary>
+    public const string Promoted = "promoted";
+
+    /// <summary>The club was relegated into the season.</summary>
+    public const string Relegated = "relegated";
+
+    /// <summary>The club stayed in the same tier.</summary>
+    public const string None = "none";
+}
+
+/// <summary>One season a club has finished (`PR-4`, master plan §11.1).</summary>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="TierNumber">The tier the club played in.</param>
+/// <param name="DivisionName">The tier's generated name.</param>
+/// <param name="FinalRank">The club's final position, 1–18.</param>
+/// <param name="Promoted">Whether the club was promoted at that rollover.</param>
+/// <param name="Relegated">Whether the club was relegated at that rollover.</param>
+/// <param name="ClosingCashMinor">The club's cash at the season's end, in minor units.</param>
+/// <param name="ClosingReputation">The club's reputation at the season's end, on the 1–100 scale.</param>
+public sealed record ClubSeasonHistoryRow(
+    int SeasonNumber,
+    string SeasonLabel,
+    int TierNumber,
+    string DivisionName,
+    int FinalRank,
+    bool Promoted,
+    bool Relegated,
+    long ClosingCashMinor,
+    int ClosingReputation);
+
+/// <summary>The next season a club is already placed in (`PR-5`).</summary>
+/// <param name="SeasonNumber">The next season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The next season's display label.</param>
+/// <param name="StartsAt">When the next season's first matchday is.</param>
+/// <param name="DivisionName">The tier the club is placed in.</param>
+/// <param name="TierNumber">The tier number.</param>
+/// <param name="Movement">How the club arrived: <c>promoted</c>, <c>relegated</c>, or <c>none</c>.</param>
+public sealed record NextSeasonSummary(
+    int SeasonNumber,
+    string SeasonLabel,
+    DateTimeOffset StartsAt,
+    string DivisionName,
+    int TierNumber,
+    string Movement);
+
+/// <summary>A club's finished seasons, newest first, with the next season when one is known.</summary>
+/// <param name="ClubId">The club.</param>
+/// <param name="ClubName">The club's generated name.</param>
+/// <param name="ClubShortName">The club's abbreviation.</param>
+/// <param name="Seasons">Every season the club has finished, most recent first.</param>
+/// <param name="NextSeason">Where the club is going next, or null when no next season exists yet.</param>
+public sealed record ClubSeasonHistorySnapshot(
+    Guid ClubId,
+    string ClubName,
+    string ClubShortName,
+    IReadOnlyList<ClubSeasonHistoryRow> Seasons,
+    NextSeasonSummary? NextSeason);
+
 /// <summary>
 /// The read side of the competition module's fixture calendar and tables (master plan §10.5, §11.1).
 /// </summary>
@@ -449,4 +511,20 @@ public interface ICompetitionQueries
     /// <param name="fixtureId">The fixture to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<FixtureDetailSnapshot?> GetFixtureAsync(Guid fixtureId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads a club's finished seasons and, when it is already known, the next season it is placed in, or
+    /// null if the club is unknown.
+    /// </summary>
+    /// <remarks>
+    /// History, read from the entries the rollover closed and never rewrote (`PR-6`), so it is the same
+    /// figure however long after the season it is read. The next season is the world's current season plus
+    /// one: it exists only in the window between the rollover's move phase and the pointer advancing, which
+    /// is exactly when a manager wants to see where their club is going.
+    /// </remarks>
+    /// <param name="clubId">The club to read.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<ClubSeasonHistorySnapshot?> GetClubSeasonHistoryAsync(
+        Guid clubId,
+        CancellationToken cancellationToken);
 }
