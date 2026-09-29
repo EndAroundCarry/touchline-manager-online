@@ -58,7 +58,7 @@ public static class DependencyInjection
         AddClockInfrastructure(services, configuration);
         AddAuthInfrastructure(services, configuration);
         AddWorldInfrastructure(services, configuration);
-        AddCompetitionInfrastructure(services);
+        AddCompetitionInfrastructure(services, configuration);
         AddMatchInfrastructure(services);
         AddCommsInfrastructure(services, configuration);
         AddSquadInfrastructure(services);
@@ -275,12 +275,22 @@ public static class DependencyInjection
     /// <remarks>
     /// A port of its own because the competition module owns its tables (`MOD-1`); the world seeder stages
     /// the first season's schedule through it as a cross-module write (`MOD-2`). The read port is separate
-    /// so a screen can change without widening what a command can reach (`MOD-3`).
+    /// so a screen can change without widening what a command can reach (`MOD-3`). The rollover's options are
+    /// bound here, and the scheduler that reads them is registered in <see cref="AddJobQueueWorker"/> so the
+    /// API never closes a season (ADR-0001, ADR-0008).
     /// </remarks>
-    private static void AddCompetitionInfrastructure(IServiceCollection services)
+    private static void AddCompetitionInfrastructure(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<ICompetitionRepository, CompetitionRepository>();
         services.AddScoped<ICompetitionQueries, CompetitionQueries>();
+        services.AddScoped<ISeasonRolloverRepository, SeasonRolloverRepository>();
+
+        services
+            .AddOptions<SeasonRolloverOptions>()
+            .Bind(configuration.GetSection(SeasonRolloverOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Rollover:CheckIntervalSeconds must be between 30 and 86400.");
     }
 
     /// <summary>
@@ -475,6 +485,10 @@ public static class DependencyInjection
         // And the same for the outbox: this service places a dispatch row every minute, and the row is what
         // sends the notifications the game has already committed to sending (MOD-4).
         services.AddHostedService<OutboxScheduler>();
+
+        // And the same for the season: this service places a rollover row once the current season's deadline
+        // has passed, and the row is what closes the season and opens the next one (PR-4, ADR-0031).
+        services.AddHostedService<SeasonRolloverScheduler>();
 
         return services;
     }

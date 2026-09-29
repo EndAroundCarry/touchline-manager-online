@@ -85,4 +85,30 @@ public interface IWorldRepository
 
     /// <summary>Stages a club's membership of a division-season. Immutable history (`PR-6`).</summary>
     void AddClubSeasonEntry(ClubSeasonEntry entry);
+
+    /// <summary>
+    /// Lists a country's active divisions, ascending by tier, which is the order movement walks them in
+    /// (`PR-1`, `PR-5`).
+    /// </summary>
+    /// <param name="countryId">The country.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<Division>> ListActiveDivisionsAsync(Guid countryId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists every division-season of a season, across all countries, so the rollover can find each tier's
+    /// instance for the season it is closing and for the season it opens (`PR-5`).
+    /// </summary>
+    /// <param name="seasonId">The season.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<DivisionSeason>> ListDivisionSeasonsAsync(Guid seasonId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists a division-season's club entries, ordered by club, so the rollover can close them with their
+    /// final rank (`PR-4`) and re-enter the clubs into the next season (`PR-5`).
+    /// </summary>
+    /// <param name="divisionSeasonId">The division-season.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<ClubSeasonEntry>> ListClubSeasonEntriesAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken);
 }

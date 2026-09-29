@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, EvaluateInactivityJobHandler>();
         services.AddScoped<IJobHandler, SendDeadlineRemindersJobHandler>();
         services.AddScoped<IJobHandler, DispatchOutboxJobHandler>();
+        services.AddScoped<IJobHandler, RunSeasonRolloverJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -215,6 +216,10 @@ public static class DependencyInjection
         // drift from a seeded one (§16 Stage 11; PYR-14).
         services.AddScoped<WorldGenerator>();
 
+        // The schedule and opening-table generation, shared by the seeder, the provisioning worker, and the
+        // season rollover, so a new season's fixture list cannot drift from the first one (CAL-8, CAL-9).
+        services.AddScoped<DivisionScheduleGenerator>();
+
         services.AddScoped<SeedWorld>();
         services.AddScoped<ProvisionDivision>();
         services.AddScoped<EvaluateInactivity>();
@@ -302,6 +307,9 @@ public static class DependencyInjection
 
         // Driven by the worker's repair job; it has no public command (TBL-13, §7.2).
         services.AddScoped<RebuildDivisionProjections>();
+
+        // Driven by the worker's rollover job; it has no public command (PR-4, §7.2, ADR-0031).
+        services.AddScoped<RunSeasonRollover>();
 
         // Reachable only from the non-production diagnostics trigger (§17.12).
         services.AddScoped<TriggerMatchday>();

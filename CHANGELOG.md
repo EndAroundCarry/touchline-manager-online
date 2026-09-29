@@ -3,6 +3,100 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 12 — Season rollover, promotion/relegation, and continuity
+
+A season that ends and a next one that begins. The closing season is frozen, its standings are finalized, its
+entries are closed with their final rank, three clubs go up and three come down between every adjacent pair of
+active tiers, and the next season is opened with fresh entries, a fresh 34-fixture schedule, and an opening
+table — all of it a resumable state machine under a world-scoped lock, so an interrupted rollover resumes at
+the checkpoint it reached and a redelivered one moves nothing twice. This is the first milestone of the stage;
+the continuity work — contract expiry, retirement, position awards, and the season finance summary — is the
+rest.
+
+### Added
+
+- **`competition.season_rollovers`** (master plan §6.4, ADR-0031): the checkpoint row of one season's
+  rollover. `unique (world_id, season_id)` makes the rollover a singleton for a closing season however many
+  times the materialiser runs, and the `phase` column (`started|frozen|finalized|moved|completed|failed`) is
+  the resume point master plan §7.5 asks for.
+- **`SeasonRollover` and `SeasonRolloverPhase`**: the state machine as an aggregate with guarded, idempotent
+  transitions. A repeat of a step that already happened is a no-op — the queue is at-least-once — and an
+  out-of-order step is refused. `Retry` returns a failed rollover to the top, which is safe because every
+  phase is a find-or-create.
+- **`PromotionRelegation`** (`promotion-relegation-v1`, `PR-1`–`PR-10`): a pure function from each active
+  tier's finalized ordering to one movement per club. Three up and three down between every adjacent pair of
+  active tiers, so the top tier promotes nobody and the lowest relegates nobody as consequences of there being
+  no adjacent tier rather than as special cases. It reads no clock or database, so a finished season's
+  movement is reproducible from its stored standings.
+- **`RunSeasonRollover`** (master plan §7.5): the orchestrator. Each phase commits its own work together with
+  the phase it reached, under one world-scoped advisory lock: preflight refuses a season that is not fully
+  played (a *transient* failure the queue retries, without freezing) and a season whose projections do not
+  reconcile (a *defect* it marks failed and dead-letters for an operator); freeze runs `Season.BeginRollover`;
+  finalize completes every `DivisionSeason`, closes every `ClubSeasonEntry` with its final rank, movement
+  flags, closing reputation, and closing cash (`PR-4`); move creates the next season and places every club
+  into it with a schedule (`PR-5`); complete advances the world's season pointer, seals the closing season,
+  and activates the next (`PR-6`, `TIME-3`).
+- **`GameWorld.AdvanceToNextSeason`**: the one place the game season pointer moves, and `Season.Create`
+  for the next season at the first configured matchday after the rollover window (`CAL-6`).
+- **`DivisionScheduleGenerator`**: the fixture-list and opening-table generation extracted from
+  `WorldGenerator` so the seeder, the provisioning worker, and the rollover cannot drift — the rationale
+  ADR-0030 used for `BuildTier`. `SeedsFor` derives a season-scoped schedule and tie-draw seed from the
+  world's identity, the country code, the season number, and the tier, so each season's calendar is different
+  and still reproducible (`CAL-8`, `TBL-11`).
+- **`competition.season-rollover`**, the durable job, and **`SeasonRolloverScheduler`**, which materialises it
+  once the current season's `ends_at` has passed. Registered only by `AddJobQueueWorker`, gated by
+  `Rollover:EnableRollover`, so an API process can never close a season (ADR-0001, ADR-0008).
+- **`ISeasonRolloverRepository`** and its persistence, plus the reads the rollover needs on
+  `IWorldRepository` (`ListActiveDivisionsAsync`, `ListDivisionSeasonsAsync`, `ListClubSeasonEntriesAsync`),
+  `IClubRepository` (a batch load for closing reputations), and `IClubTenureRepository` (the open clubs, so a
+  next-season entry records who controlled the club at its start).
+- **ADR-0031**, on the one world-scoped job with a checkpoint row, the world lock, country-scoped movement,
+  the shared generation path, and the transient-versus-defect failure classification.
+- `docs/product/game-rules.md` §7 gained the movement rule's version (`promotion-relegation-v1`) and §18 the
+  constant; `docs/architecture/data-model.md` carries `competition.season_rollovers` and the note that
+  `club_season_entries` is now closed at rollover; modules and traceability were updated.
+
+### Tests
+
+- 22 new domain tests: the movement rules across one, two, and three active tiers (three-up/three-down,
+  lowest tier relegates nobody, top tier promotes nobody, order-independence, the refusals), the rollover
+  state machine's phase guards and idempotent repeats, and the world's season pointer.
+- A new real-PostgreSQL rollover suite over a seeded world with a provisioned second tier: preflight refuses
+  an unplayed season and leaves the season unfrozen; a finished season rolls over, moving exactly the three
+  promoted and three relegated clubs, opening a next season with a full schedule in every tier, and leaving
+  the closing season's results immutable; a redelivered rollover is a no-op that moves nothing twice.
+- A new worker integration test: the scheduler materialises the rollover once the season's deadline passes,
+  the queue claims it, and the handler alone closes the season and opens the next.
+
+### Notes
+
+- **The plan's three job names are one job and a checkpoint row.** Master plan §7.2 names
+  `PrepareSeasonRollover`, `ExecuteCountryRollover`, and `FinalizeSeasonRollover`, but a job that
+  dead-letters cannot be resumed, so the resumable unit is the checkpoint row and the three names are its
+  phase groups (§7.5's requirement is the checkpoint, not the job count). ADR-0031 records the decision.
+- **A season that is not finished is retried; a season that does not reconcile is stopped.** Unpublished
+  matchdays are a race with a late publication, so the job fails transiently and the row is untouched; drifted
+  projections mean deterministic generation or publication did not reproduce, so the rollover is marked
+  failed, audited, and dead-lettered rather than hot-looped.
+- **Movement is by club, and the closing season is never rewritten.** A manager travels with their club
+  (`PR-3`); the next season is new entries, new division-seasons, and a new schedule, so the finished season's
+  membership, results, and table stay the record of what happened (`PR-6`).
+- **Deferred to the rest of Stage 12:** contract expiry into free agency (`CON-6`) with a deterministic
+  rollover renewal for AI/unmanaged clubs and audited emergency replacements as the residual safety net
+  (`SQ-8`); the announce-then-play **retirement** mechanism (a player has a 30% chance to announce at 32, rising
+  15 percentage points a season, forced by 37 for outfielders and by 39 for goalkeepers, gated by ability and
+  fitness so only very good, very fit players reach the cap and the rest retire around 32–35 and 33–36); the
+  position awards (`FIN-5`, the `LedgerPostings.PositionAward` factory already exists with no caller); the
+  `finance.club_season_finances` summary; and promotion/relegation news. Also `PYR-9`: a provisioning request
+  made while the rollover holds the country lock should target the **next** season, and `CapacityEvaluator`
+  still resolves the current one — the guard Stage 11 left in place for this stage to change.
+- **Deferred beyond it:** the operator dry-run/resume preview and the "five consecutive automated staging
+  seasons" run (Stage 12's later milestones), and the season-history and next-season screens. Resumability is
+  proven here by the state machine's phase guards, the transient-then-success path (an unplayed season refuses
+  and is then rolled over once it is played), and a redelivered rollover moving nothing twice; the exhaustive
+  kill-after-every-checkpoint harness belongs with the staging-season run, where a compressed clock drives
+  several seasons end to end.
+
 ## Stage 11 — Automatic pyramid growth, AI vacancies, inbox, and inactivity
 
 A pyramid that grows by itself and a club that comes back when you stop playing. A full tier now provisions

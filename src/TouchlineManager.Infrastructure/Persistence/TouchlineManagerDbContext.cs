@@ -99,6 +99,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the competition module's player season statistics, one row per player per club per season.</summary>
     public DbSet<PlayerSeasonStat> PlayerSeasonStats => Set<PlayerSeasonStat>();
 
+    /// <summary>Gets the competition module's season-rollover checkpoints (`PR-4`, ADR-0031).</summary>
+    public DbSet<SeasonRollover> SeasonRollovers => Set<SeasonRollover>();
+
     /// <summary>Gets the match module's frozen input snapshots, one per fixture.</summary>
     public DbSet<InputSnapshot> InputSnapshots => Set<InputSnapshot>();
 

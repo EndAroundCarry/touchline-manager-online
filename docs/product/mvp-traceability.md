@@ -40,8 +40,8 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-25 | League tables | competition | 6, 8 | All nine tie-break paths covered |
 | F-26 | Results | competition, match, web | 6, 7 | Published matchday projection reconciliation |
 | F-27 | Player and team statistics | competition, match | 8 | Rebuild equals live projection |
-| F-28 | Promotion and relegation | competition, world | 12 | Three-up/three-down at every adjacent tier |
-| F-29 | Season rollover | competition, finance, squad, world | 12 | Failure injection at every checkpoint resumes cleanly |
+| F-28 | Promotion and relegation | competition, world | 12 | Three-up/three-down at every adjacent tier; `PromotionRelegation.Compute` (`promotion-relegation-v1`) plus the movement assertions in `SeasonRolloverTests` (ADR-0031) |
+| F-29 | Season rollover | competition, finance, squad, world | 12 | Resumable checkpoint machine under the world advisory lock (`RunSeasonRollover`, ADR-0031): a redelivered rollover is a no-op and an interrupted one resumes from its phase. Contract expiry, position awards, and retirement are the rest of Stage 12 |
 | F-30 | Server-authoritative locking | ops, match | 6 | No public simulate endpoint; write-after-lock test |
 | F-31 | Server-authoritative simulation | match, ops | 5, 6 | Golden hash determinism; publication atomicity |
 | F-32 | Server-authoritative publication | competition, ops | 6 | Never 5-of-9 test |
@@ -93,7 +93,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | Basic finances | 9 | finance | `FIN-1`…`FIN-18` |
 | Inbox/news | 6, 8, 11 | comms | Master plan §6.9 |
 | Inactivity handling | 11 | world, comms | `OCC-1`…`OCC-9` |
-| Promotion/relegation/season rollover | 12 | competition, world, finance | `PR-*`, master plan §7.5 |
+| Promotion/relegation/season rollover | 12 | competition, world, finance | `PR-*`, master plan §7.5, ADR-0031 |
 | Responsive installable PWA | 1, 7, 13 | web | ADR-0007 |
 | Fully fictional data | 3, 4 | world, squad | §1 of content policy, `FIC-1`…`FIC-10` |
 | Android and iOS after MVP | 20, 21 | web (Capacitor) | ADR-0007 |

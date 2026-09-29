@@ -97,6 +97,32 @@ internal sealed class WorldRepository : IWorldRepository
 
     /// <inheritdoc />
     public void AddClubSeasonEntry(ClubSeasonEntry entry) => _dbContext.ClubSeasonEntries.Add(entry);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Division>> ListActiveDivisionsAsync(
+        Guid countryId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Divisions
+            .Where(division => division.CountryId == countryId && division.Status == DivisionStatus.Active)
+            .OrderBy(division => division.TierNumber)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DivisionSeason>> ListDivisionSeasonsAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.DivisionSeasons
+            .Where(divisionSeason => divisionSeason.SeasonId == seasonId)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubSeasonEntry>> ListClubSeasonEntriesAsync(
+        Guid divisionSeasonId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.ClubSeasonEntries
+            .Where(entry => entry.DivisionSeasonId == divisionSeasonId)
+            .OrderBy(entry => entry.ClubId)
+            .ToListAsync(cancellationToken);
 }
 
 /// <summary>Club and manager persistence.</summary>
@@ -110,6 +136,14 @@ internal sealed class ClubRepository : IClubRepository
     /// <inheritdoc />
     public Task<Club?> FindAsync(Guid clubId, CancellationToken cancellationToken) =>
         _dbContext.Clubs.SingleOrDefaultAsync(club => club.Id == clubId, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Club>> LoadAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Clubs
+            .Where(club => clubIds.Contains(club.Id))
+            .ToListAsync(cancellationToken);
 
     /// <inheritdoc />
     public void Add(Club club) => _dbContext.Clubs.Add(club);
@@ -192,6 +226,14 @@ internal sealed class ClubTenureRepository : IClubTenureRepository
             where tenure.ControlStatus != ClubTenureControlStatus.Closed
             orderby tenure.LastActiveAt, tenure.Id
             select new OpenTenureRow(tenure, club, manager, user))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyCollection<Guid>> ListOpenClubIdsAsync(CancellationToken cancellationToken) =>
+        await _dbContext.ClubTenures
+            .Where(tenure => tenure.ControlStatus != ClubTenureControlStatus.Closed)
+            .Select(tenure => tenure.ClubId)
+            .Distinct()
             .ToListAsync(cancellationToken);
 }
 

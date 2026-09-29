@@ -51,4 +51,13 @@ public static class WorldAuditActions
 
     /// <summary>A manager's notification preferences changed (Stage 11).</summary>
     public const string NotificationPreferencesChanged = "world.manager_profile.notifications_changed";
+
+    /// <summary>A season was frozen for rollover and passed preflight (`PR-4`).</summary>
+    public const string RolloverStarted = "world.season_rollover.started";
+
+    /// <summary>A season rollover failed and awaits an operator (`PR-4`, ADR-0031).</summary>
+    public const string RolloverFailed = "world.season_rollover.failed";
+
+    /// <summary>A season rolled over: the closing season is sealed and the next one is active (`PR-4`, `PR-6`).</summary>
+    public const string RolloverCompleted = "world.season_rollover.completed";
 }

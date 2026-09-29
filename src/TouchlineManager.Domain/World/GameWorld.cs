@@ -112,6 +112,34 @@ public sealed class GameWorld
         Touch(now);
     }
 
+    /// <summary>
+    /// Advances the world to the next season at rollover (`TIME-3`, master plan §7.5).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The season number is stored rather than derived from a date, and this is the only place it moves: the
+    /// rollover increments it once, after the closing season is sealed and before the next season is
+    /// activated, so every read that resolves "the current season" switches exactly when the rollover
+    /// switches it and never in between.
+    /// </para>
+    /// <para>
+    /// Refused only on a retired world. A frozen world is a maintenance state that still closes its season —
+    /// the freeze is about onboarding, not about the calendar.
+    /// </para>
+    /// </remarks>
+    /// <param name="now">The current instant.</param>
+    public void AdvanceToNextSeason(DateTimeOffset now)
+    {
+        if (Status == GameWorldStatus.Retired)
+        {
+            throw new InvalidOperationException("A retired world cannot advance to another season.");
+        }
+
+        CurrentSeasonNumber++;
+
+        Touch(now);
+    }
+
     private void Touch(DateTimeOffset now)
     {
         UpdatedAt = now;

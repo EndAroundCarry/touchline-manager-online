@@ -69,6 +69,7 @@ flowchart LR
         player_season_stats
         club_season_stats
         discipline_records
+        season_rollovers
     end
     subgraph match[match]
         input_snapshots
@@ -407,6 +408,7 @@ erDiagram
     division_seasons ||--o{ club_season_entries : "contains"
     division_seasons ||--o{ matchdays : "schedules"
     division_seasons ||--o{ standings : "tabulates"
+    seasons ||--o{ season_rollovers : "closed by"
     matchdays ||--|{ fixtures : "comprises"
     fixtures ||--o| input_snapshots : "freezes"
     fixtures ||--o| matches : "produces"
@@ -496,6 +498,17 @@ erDiagram
         uuid player_id FK
         int yellow_cards
         int red_cards
+        bigint version
+    }
+    season_rollovers {
+        uuid id PK
+        uuid world_id FK
+        uuid season_id FK
+        uuid next_season_id FK
+        text phase "started|frozen|finalized|moved|completed|failed"
+        text failure_reason
+        timestamptz started_at
+        timestamptz completed_at
         bigint version
     }
     input_snapshots {
@@ -594,6 +607,7 @@ erDiagram
 | Constraint | Table | Why |
 |---|---|---|
 | `unique (world_id, sequence_number)` | `seasons` | One season number per world |
+| `unique (world_id, season_id)`, `check (phase in (...))` | `season_rollovers` | One rollover per closing season, and its checkpoint is a known phase (`PR-4`, ADR-0031) |
 | `unique (country_id, tier_number)`, `check (tier_number >= 1)` | `divisions` | `WORLD-4`, no tier 0 |
 | `unique (division_id, season_id)` | `division_seasons` | One instance per division per season |
 | `unique (division_season_id, club_id)` | `club_season_entries`, `standings` | One entry and one standing per club |
@@ -621,6 +635,14 @@ erDiagram
 > `transfer_listings` has no `resolution_job_id` column, because the resolution job's business key
 > `listing:{id}:resolve` already identifies it durably, and a column naming it would be a second
 > statement of the same fact (ADR-0003, ADR-0024). `shortlists` is owned by the `market` module, per §7.
+
+> **Stage 12 status (rollover).** `competition.season_rollovers` is the checkpoint row for the season
+> rollover state machine (ADR-0031): one row per closing season, guarded by a world-scoped advisory lock,
+> advanced `started → frozen → finalized → moved → completed`. `club_season_entries.final_rank`,
+> `is_promoted`, `is_relegated`, `closing_reputation`, and `closing_cash_minor` are now written once, at
+> rollover (`PR-4`), and never rewritten; the next season's entries, division-seasons, schedule, and opening
+> table are new rows, so prior seasons remain immutable (`PR-6`). Contract expiry, retirement, position
+> awards, and the season finance summary remain the rest of Stage 12.
 
 ### 3.4 Communications and operations
 

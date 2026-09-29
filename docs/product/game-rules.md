@@ -154,6 +154,14 @@ table actually follows.
 | PR-9 | There is no promotion out of the **top active tier** of a country; there is no higher division to promote into. | — |
 | PR-10 | A country with only one active tier therefore has neither promotion nor relegation in that tier until a lower tier exists. | — |
 
+Movement is computed by a pure, versioned rule (`promotion-relegation-v1`) from each active tier's finalized
+ordering. Three up and three down between every adjacent pair of active tiers means the top tier promotes
+nobody and the lowest relegates nobody as consequences of there being no adjacent tier rather than as special
+cases, and a club moves at most one tier. It is applied once, at rollover, by the world-scoped resumable state
+machine in [ADR-0031](../architecture/adr/0031-season-rollover-state-machine.md): the season it closes and the
+season it opens are distinct rows, so a finished season's membership, results, and table are never rewritten
+(`PR-6`), and the movement a finished season earned is reproducible from its stored standings.
+
 ---
 
 ## 8. Squad and registration
@@ -529,6 +537,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `rollover_days` | 7 | CAL-6 |
 | `points_win` / `points_draw` / `points_loss` | 3 / 1 / 0 | TBL-1 |
 | `promoted_per_tier` / `relegated_per_tier` | 3 / 3 | PR-1 |
+| `promotion_relegation_version` | `promotion-relegation-v1` | PR-1 (FIC-8) |
 | `squad_target` | 22 | SQ-1 |
 | `squad_min` | 18 | SQ-2 |
 | `squad_min_goalkeepers` | 2 | SQ-2 |
@@ -638,5 +647,5 @@ These are recorded so they are not silently invented later:
 | Exact AI valuation and bidding bands | Specified in §14.3 and §18 (Stage 10, AI market milestone) |
 | Collusion review signals (`INT-4`) and market trace views | Stage 14, with the operator surface that would read them |
 | Exact training development curve constants and age curve | Stage 4/5 |
-| Retirement rule specifics (age cap vs deterministic rollover retirements) | Stage 12 |
+| Retirement rule specifics: an **announce-then-play** mechanism — a player has a 30% chance to announce a retirement at 32, rising 15 percentage points each season, forced by the rollover entering 37 (outfield) or 39 (goalkeepers); an announce plays one final season; gated by ability and fitness so only very good, very fit players reach the cap and the rest retire around 32–35 (outfield) and 33–36 (goalkeepers) | Stage 12 (rest of the stage) |
 | Whether free-agent signing is enabled during MVP | Stage 10, decided by market-health measurement |

@@ -47,6 +47,16 @@ public readonly record struct AdvisoryLockKey(string Scope, Guid Target)
     /// </remarks>
     public static AdvisoryLockKey Listing(Guid listingId) => new("listing", listingId);
 
+    /// <summary>
+    /// A world-scoped lock, used by the season rollover.
+    /// </summary>
+    /// <remarks>
+    /// The plan calls one season rollover per world a genuine singleton (ADR-0003): movement, awards, and the
+    /// game-year increment must not interleave with a peer rollover, and a half-applied rollover is a corrupt
+    /// world. The materialiser and the worker both take this key so only one rollover is in flight at a time.
+    /// </remarks>
+    public static AdvisoryLockKey SeasonRollover(Guid worldId) => new("season-rollover", worldId);
+
     /// <summary>Renders the lock for diagnostics. Never contains anything sensitive.</summary>
     public override string ToString() => $"{Scope}:{Target}";
 }

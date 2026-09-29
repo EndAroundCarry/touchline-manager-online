@@ -1,4 +1,3 @@
-using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Abstractions.World;
@@ -71,7 +70,7 @@ public sealed class WorldGenerator
     private readonly ISquadRepository _squad;
     private readonly IClubAccountRepository _accounts;
     private readonly ILedgerRepository _ledger;
-    private readonly ICompetitionRepository _competition;
+    private readonly DivisionScheduleGenerator _schedules;
 
     /// <summary>Initializes the generator.</summary>
     public WorldGenerator(
@@ -80,14 +79,14 @@ public sealed class WorldGenerator
         ISquadRepository squad,
         IClubAccountRepository accounts,
         ILedgerRepository ledger,
-        ICompetitionRepository competition)
+        DivisionScheduleGenerator schedules)
     {
         _world = world;
         _clubs = clubs;
         _squad = squad;
         _accounts = accounts;
         _ledger = ledger;
-        _competition = competition;
+        _schedules = schedules;
     }
 
     /// <summary>Generates one tier and stages it into the current unit of work.</summary>
@@ -193,8 +192,7 @@ public sealed class WorldGenerator
             accounts++;
         }
 
-        AddSchedule(divisionSeason, clubIds, season, now, request.BootstrapCutoff);
-        AddTable(divisionSeason, clubIds, now);
+        _schedules.Generate(divisionSeason, clubIds, season, now, request.BootstrapCutoff);
 
         return new GeneratedTier(
             division.Id,
@@ -203,87 +201,6 @@ public sealed class WorldGenerator
             clubIds.Count,
             players,
             accounts);
-    }
-
-    /// <summary>
-    /// Opens a division's table at nil-nil, ranked by the draw the division recorded before the season
-    /// (`TBL-10`, `TBL-11`).
-    /// </summary>
-    private void AddTable(DivisionSeason divisionSeason, IReadOnlyList<Guid> clubIds, DateTimeOffset now)
-    {
-        var lines = StandingsCalculator.Rank(
-            clubIds,
-            [],
-            clubId => StandingsCalculator.DrawKeyOf(divisionSeason.TieDrawSeed, clubId));
-
-        foreach (var line in lines)
-        {
-            _competition.AddStanding(Standing.Create(Guid.CreateVersion7(), divisionSeason.Id, line, now));
-        }
-    }
-
-    /// <summary>
-    /// Generates and stages a division's whole fixture list: its matchdays and the fixtures within them
-    /// (`CAL-8`, `CAL-9`).
-    /// </summary>
-    /// <param name="divisionSeason">The division-season the schedule belongs to.</param>
-    /// <param name="clubIds">The clubs, in a stable order (identity-generation order).</param>
-    /// <param name="season">The season, whose window supplies the matchday dates.</param>
-    /// <param name="now">The current instant.</param>
-    /// <param name="bootstrapCutoff">
-    /// When set, a fixture whose kickoff is at or before it is marked bootstrap (a passed matchday a new tier
-    /// is backfilling, `PYR-7`).
-    /// </param>
-    private void AddSchedule(
-        DivisionSeason divisionSeason,
-        IReadOnlyList<Guid> clubIds,
-        Season season,
-        DateTimeOffset now,
-        DateTimeOffset? bootstrapCutoff)
-    {
-        var schedule = RoundRobinSchedule.Generate(
-            clubIds,
-            DeterministicDigest.SeedOf(divisionSeason.ScheduleSeed));
-
-        var issues = ScheduleValidator.Validate(clubIds, schedule);
-
-        if (issues.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"The generated schedule for division-season {divisionSeason.Id} is invalid: "
-                + string.Join("; ", issues.Select(issue => issue.Detail)));
-        }
-
-        var dates = SeasonCalendar.MatchdayDates(
-            DateOnly.FromDateTime(season.StartsAt.UtcDateTime),
-            WorldRuleSet.MatchdaysPerSeason);
-
-        foreach (var round in schedule)
-        {
-            var kickoff = SeasonCalendar.KickoffAt(dates[round.RoundNumber - 1]);
-            var matchdayId = Guid.CreateVersion7();
-
-            _competition.AddMatchday(Matchday.Schedule(
-                matchdayId,
-                divisionSeason.Id,
-                round.RoundNumber,
-                kickoff,
-                now));
-
-            var isBootstrap = bootstrapCutoff is not null && kickoff <= bootstrapCutoff;
-
-            foreach (var pairing in round.Pairings)
-            {
-                _competition.AddFixture(Fixture.Schedule(
-                    Guid.CreateVersion7(),
-                    matchdayId,
-                    pairing.HomeClubId,
-                    pairing.AwayClubId,
-                    kickoff,
-                    now,
-                    isBootstrap));
-            }
-        }
     }
 
     /// <summary>Generates and stages one club's squad (`SQ-1`).</summary>

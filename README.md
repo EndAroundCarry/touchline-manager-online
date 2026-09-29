@@ -7,8 +7,8 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 9 in progress — the ledger every balance is rebuilt from.** The playable game is being
-> built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
+> **Status: Stage 12 in progress — season rollover, promotion/relegation, and continuity.** The playable
+> game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
 > pipeline, the API and worker composition roots, the health and observability baseline, and the Angular
 > PWA shell. Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions
 > with reuse detection, the audit trail, the request security headers, the Angular auth and settings
@@ -28,11 +28,22 @@ kick-off. The server decides results; a client can never simulate or influence o
 > suspensions and absences measured in fixtures, loads every participant's condition, fatigue, and morale,
 > advances the season's statistics, and writes each manager an inbox report; a club no manager holds is set
 > up by a deterministic policy, and a division's projections can be reconciled and its rules, statistics,
-> and discipline read. Stage 9 has begun with the append-only club ledger: every balance change is a
+> and discipline read. Stage 9 made a club's money an append-only ledger: every balance change is a
 > `finance.ledger_entries` row, an account is the projection those rows sum to, and a club's opening
-> balance is its first entry — so a replay reproduces its cash and reserved funds exactly (`FIN-18`). The
-> income and expense runs, the contract renewals, the warnings, the emergency path, and the finance screens
-> are what follows.
+> balance is its first entry — so a replay reproduces its cash and reserved funds exactly (`FIN-18`), and
+> the weekly run charges wages, pays sponsorship, and grants an emergency shortfall when a club cannot pay.
+> Stage 10 added the transfer market: server-side scouting and private shortlists, listings that resolve at
+> a daily window under a reservation held in the ledger, and an AI market that trades through the same
+> writers and affordability rules a manager's command uses. Stage 11 made the pyramid grow by itself — a
+> full tier provisions the next through the worker, generated, backfilled with deterministic bootstrap
+> results, validated, and activated before it is claimable — and completed the comms module with the news
+> feed, notification preferences, deadline reminders, and an outbox that carries email off the request
+> path; a tenure that goes quiet now warns, hands routine decisions to the AI, and finally closes and
+> returns the club. Stage 12 is the season's end and the next season's beginning: a world-scoped, resumable
+> rollover state machine that freezes the season, finalizes its standings, closes its entries, applies
+> three-up/three-down between every adjacent active tier, and generates the next season's entries, fixtures,
+> and opening table — all or nothing, and resumable after every checkpoint (`PR-1`–`PR-6`, ADR-0031). Its
+> continuity work — contract expiry, retirement, position awards, and the season finance summary — follows.
 
 ---
 

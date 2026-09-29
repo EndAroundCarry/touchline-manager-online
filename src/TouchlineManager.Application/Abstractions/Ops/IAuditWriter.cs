@@ -138,4 +138,7 @@ public static class AuditTargetTypes
 
     /// <summary>A resolved transfer (`TRF-10`, `TRF-11`).</summary>
     public const string TransferOutcome = "transfer_outcome";
+
+    /// <summary>A season rollover and the season it closed (`PR-4`, ADR-0031).</summary>
+    public const string SeasonRollover = "season_rollover";
 }

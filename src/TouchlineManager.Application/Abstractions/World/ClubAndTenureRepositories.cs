@@ -16,6 +16,14 @@ public interface IClubRepository
     /// <summary>Finds a club by identity.</summary>
     Task<Club?> FindAsync(Guid clubId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Loads several clubs at once, tracked, so the rollover can read every closing club's reputation in one
+    /// round trip rather than one query per club (`PR-4`).
+    /// </summary>
+    /// <param name="clubIds">The clubs wanted.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<Club>> LoadAsync(IReadOnlyCollection<Guid> clubIds, CancellationToken cancellationToken);
+
     /// <summary>Stages a newly generated club.</summary>
     void Add(Club club);
 }
@@ -64,6 +72,13 @@ public interface IClubTenureRepository
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<IReadOnlyList<OpenTenureRow>> ListOpenAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists the clubs that hold an open tenure, so the rollover can record who controlled a club at the
+    /// start of the next season (`PR-3`). "Open" spans active and inactive, as everywhere else (`OCC-8`).
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyCollection<Guid>> ListOpenClubIdsAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>
