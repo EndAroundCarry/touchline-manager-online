@@ -488,6 +488,11 @@ so the profile and the leaderboard cannot disagree about a player's season. A pl
 has no line, and the profile says so rather than showing a row of zeros (`STA-4`). Like the leaderboard and
 the table, it is the owning manager's read — the public, unattached profile is a scouting feature.
 
+The same lines, summed across every season a player has appeared for, are the player's **career**, shown on
+the profile beside the season (`STA-2`). A career is derived from the season rows — which survive rollover —
+rather than stored, and its average rating is recomputed from the summed basis points and rated appearances,
+so a season with more rated games carries the weight it should.
+
 ---
 
 ## 16. Communications
@@ -509,7 +514,8 @@ What the game tells a manager, and how (master plan §6.9, §10.7, F-41).
 The events that produce an inbox message are the ones the matchday, market, occupancy, and
 reminder workflows decide: a club's result, its changed league position, a player's suspension,
 a player's injury, a repaired side (`DIS-7`), an outbid or completed transfer, an inactivity
-warning, a return-to-AI notice, a welcome, and a deadline reminder. The news feed carries the
+warning, a return-to-AI notice, a welcome, a deadline reminder, and a club's promotion or
+relegation at rollover. The news feed carries the
 division-provisioned, transfer-completed, and result-published events. A message that is written
 but never shown is not built early.
 

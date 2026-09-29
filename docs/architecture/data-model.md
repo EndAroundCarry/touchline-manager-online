@@ -666,6 +666,12 @@ erDiagram
 > replacements (`SQ-8`); the finalize phase posts the position award (`FIN-5`) and writes a season finance
 > summary (`FIN-19`). The retirement and contract-continuity policies are pure and versioned
 > (`retirement-v1`, `ai-contract-v1`), and the rule set advanced to `world-rules-v9`.
+>
+> **Stage 12 status (season history).** No schema change: the closed entries are read back as a club's
+> season history and next-season placement (`PR-4`, `PR-6`), and the retained `player_season_stats` rows are
+> aggregated across seasons as a player's career (`STA-2`). The club-identity seed fix (ADR-0033) changes
+> which names a provisioned tier generates, not the shape of any table; it advances the provisioning
+> generator to `division-gen-v2`.
 
 ### 3.4 Communications and operations
 

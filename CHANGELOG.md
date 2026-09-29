@@ -3,6 +3,59 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 12 — Season history, career stats, and the provisioning seed fix
+
+The season's records become readable, and a latent generation defect is fixed. A club's finished seasons
+are read back from the entries the rollover closed, a player's career is aggregated from the season
+statistics, the manager whose club moved is told where it went, and a provisioned tier is now named from the
+world seed so it cannot collide with the tier above it. This is the third Stage 12 milestone; the operator
+dry-run/resume preview, the five-season staging run, and Stage 13's PWA hardening are the later ones.
+
+### Added
+
+- **Club season history** (`PR-4`, `PR-6`): `GET /api/v1/clubs/{clubId}/history` projects each finished
+  season's tier, final rank, promotion/relegation, and closing cash and reputation, newest first, plus the
+  next season the club is already placed in when the rollover has created it (`PR-5`). Public game data, like
+  the table; the closing cash comes from the entry, which the season finance summary agrees with by
+  construction (ADR-0032).
+- **Player career stats** (`STA-2`): the player profile now carries the whole career — the totals across
+  every season and each season's line — aggregated from the retained `competition.player_season_stats` rows.
+  Nothing new is stored, and the career average rating is recomputed from the summed basis points and rated
+  appearances, so a season with more rated games carries the weight it should.
+- **Promotion/relegation message** (`PR-1`, `COM-1`): the rollover's move phase posts one inbox message to
+  each attended club whose tier changed, inside the move transaction, next to the placement it announces. AI
+  clubs are told nothing, and a redelivery posts nothing twice.
+- **A "Seasons" screen** (`/history`) showing the manager's own club's history and, when known, the next
+  season; and a Career section on the player profile.
+
+### Fixed
+
+- **Club identity is seeded from the world seed, never the per-tier provisioning seed** (`PYR-11`,
+  ADR-0033). A provisioned tier drew its name offset from the provisioning request's seed, which folds the
+  target tier in, while the seeded tier above drew from the raw world seed; the two eighteen-slot windows
+  could overlap on the shared name cycle (~16%), which the unique name index rejected with 23505 and which
+  would dead-letter a provisioning job in production. `TierGenerationRequest` now carries the world seed
+  separately from the tier-scoped request seed, and the provisioning generator is bumped to
+  `division-gen-v2`.
+
+### Notes
+
+- **No migration.** The new reads use existing tables and columns; the movement message reuses the inbox's
+  `table` category rather than widening its check constraint.
+- **A career is derived, never stored.** The season statistics survive rollover, so a career is the same
+  projection the leaderboard reads, summed; a player who has never appeared has no career rather than a row
+  of zeroes.
+
+### Tests
+
+- New domain and application tests: the club-identity invariant across tiers, the season-history mapping,
+  and the movement message's factory and renderer.
+- New real-PostgreSQL tests: a provisioned tier's names come from the world seed and cannot collide, a
+  club's history and next-season placement read after a real rollover, and a player's career sums two
+  seasons. The rollover suite now also asserts the movement message reaches the club's manager.
+- The provisioning flake is gone: `ProvisioningTests` is deterministic, so the Infrastructure suite is
+  168/168.
+
 ## Stage 12 — Rollover continuity: contracts, retirement, awards, and summaries
 
 A season no longer just moves clubs; it settles the people and the money. The rollover gains a **`squads`**
