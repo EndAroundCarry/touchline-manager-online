@@ -175,6 +175,7 @@ erDiagram
         timestamptz ended_at
         text end_reason
         timestamptz last_active_at
+        timestamptz inactivity_warning_at
         text control_status "active|inactive|closed"
         text takeover_idempotency_key
     }
@@ -470,6 +471,7 @@ erDiagram
         smallint away_score
         uuid match_id FK
         timestamptz published_at
+        boolean is_bootstrap "generated history (PYR-7)"
         bigint version
     }
     standings {
@@ -625,6 +627,7 @@ erDiagram
 ```mermaid
 erDiagram
     managers ||--o{ inbox_messages : "receives"
+    managers ||--o| notification_preferences : "sets"
     jobs ||--o{ simulation_attempts : "drives"
 
     inbox_messages {
@@ -649,6 +652,15 @@ erDiagram
         jsonb parameters
         timestamptz published_at
         timestamptz expires_at
+    }
+    notification_preferences {
+        uuid id PK
+        uuid manager_id FK UK
+        boolean email_deadline_reminders
+        boolean email_inactivity_warnings
+        boolean email_market_messages
+        boolean email_news_digest
+        bigint version
     }
     jobs {
         uuid id PK
@@ -731,6 +743,10 @@ erDiagram
 | `unique (job_type, business_key)` | `jobs` | Enqueue idempotency (`ADR-0003`) |
 | Index `(status, due_at, priority)` | `jobs` | Ready-job claim path |
 | Index `(status, due_at)` on unpublished outbox | `outbox_messages` | Dispatch path |
+| `check (status in ('pending','published','dead_letter'))`, `check (attempt_count >= 0 and max_attempts >= 1)` | `outbox_messages` | An outbox row is in a known state with a real attempt budget (`MOD-4`) |
+| Index `(division_id, published_at desc)` and `(country_id, published_at desc)` | `news_items` | The feed's two scopes, newest first (`COM-1`) |
+| `check (expires_at is null or expires_at > published_at)` | `news_items` | A news item cannot expire before it is published |
+| `unique (manager_id)` | `notification_preferences` | One preferences row per manager (`COM-8`) |
 | `unique (user_id, operation, idempotency_key)` | `idempotency_records` | Reject key reuse with a different request hash |
 | `check (category in (...))`, `check (length(template_key) > 0)` | `inbox_messages` | A stored shelf and template are codes, not ordinals |
 | Partial index `recipient_manager_id where read_at is null` | `inbox_messages` | Unread badge and sync counter |

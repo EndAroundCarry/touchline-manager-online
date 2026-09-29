@@ -20,13 +20,15 @@ lands, and its route is added to `app.routes.ts` at the same time, so no unreach
 | `transfers/` | `/transfers` | 10 |
 | `finances/` | `/finances` | 9 |
 | `inbox/` | `/inbox` | 11 |
+| `news/` | `/news` | 11 |
 | `settings/` | `/settings` | 13 |
 | `admin/` | `/admin`, lazy-loaded and role protected | 14 |
 
 Present today: `welcome/`, `not-found/`, the `auth/` screens, `settings/`, the `onboarding/` screens,
 `dashboard/`, and — as of Stage 4 — `squad/`, `player/`, `tactics/` and `training/`, with `fixtures/`,
-`prepare/` and `match-viewer/` arriving in Stage 6 and 7, and `finances/` in Stage 9. A folder and its route
-land together, so the table above doubles as the record of what is reachable.
+`prepare/` and `match-viewer/` arriving in Stage 6 and 7, `finances/` in Stage 9, and `inbox/` and `news/`
+in Stage 11. A folder and its route land together, so the table above doubles as the record of what is
+reachable.
 
 ## Conventions
 

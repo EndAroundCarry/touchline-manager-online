@@ -25,7 +25,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-10 | Atomic takeover of an AI club | world | 3 | Concurrent-claim test: exactly one winner |
 | F-11 | One persistent world, six national pyramids | world | 3 | Seeder test: 6 countries, 108 unique clubs |
 | F-12 | One initial 18-club top division per country | world | 3 | Seeder validation |
-| F-13 | Automatic lower-tier creation at 18/18 humans | world, competition, match | 3 (request), 11 (full) | Fill-tier-1 test creates exactly one tier 2; generic path test for tier 3 |
+| F-13 | Automatic lower-tier creation at 18/18 humans | world, competition, match | 3 (request), 11 (full) | Fill-tier-1 test creates exactly one tier 2; generic path test for tier 3 (`ProvisioningTests`, ADR-0030) |
 | F-14 | AI control for vacant clubs | world, squad | 3, 8 | AI legal-side test with no privileged data |
 | F-15 | Three weekly matchdays (Tue/Thu/Sun) | competition, ops | 6 | Schedule property tests; real-clock staging run |
 | F-16 | Squad workflows | squad | 4 | Squad screen + legal-squad tests |
@@ -53,9 +53,9 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-38 | Transfer listings | market | 10 | Eligibility and minimum-exposure tests |
 | F-39 | Server-resolved timed auctions | market, finance | 10 | Deterministic winner with exact money movement |
 | F-40 | AI market participation | market | 10 (deferred to the AI-market milestone) | AI uses no privileged finance; healthy market metrics |
-| F-41 | Inbox / news notifications | comms | 6 (results), 8 (rollout), 11 (full) | Template + unread-sync tests |
-| F-42 | Inactivity handling | world, comms, ops | 11 | Threshold, temporary AI, closure, resume tests |
-| F-43 | Safe return-to-AI control | world, squad | 11 | Commitments preserved through abandonment |
+| F-41 | Inbox / news notifications | comms | 6 (results), 8 (rollout), 11 (full) | Template + unread-sync tests; Stage 11 adds the news feed, notification preferences, deadline reminders, and outbox dispatch (ADR-0028, ADR-0029) |
+| F-42 | Inactivity handling | world, comms, ops | 11 | Ladder tests: warn at 10 days, AI-assisted at 14, closed at 21; a suspended account is skipped (ADR-0027) |
+| F-43 | Safe return-to-AI control | world, squad | 11 | A closure keeps every commitment; the freed club re-runs the capacity evaluation (ADR-0027) |
 | F-44 | Responsive desktop/mobile/tablet UI | web | 1 (shell), 13 (complete) | Breakpoint E2E suite |
 | F-45 | Installable PWA | web | 1 (shell), 7, 13 | Install/update/offline-read tests |
 | F-46 | Administration (jobs, matchdays, users, repairs) | ops, web | 14 | Operator can diagnose and resume each workflow |

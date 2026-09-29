@@ -92,6 +92,22 @@
         </section>
       }
 
+      @if (inherited.control.status === 'inactive') {
+        <section
+          class="mt-6 rounded border border-amber-300 bg-amber-50 p-4"
+          aria-labelledby="ai-assisted"
+        >
+          <h2 id="ai-assisted" class="text-sm font-medium text-amber-900">
+            The AI is covering for you
+          </h2>
+          <p class="mt-2 text-sm text-amber-900">
+            You have been away for a while, so the AI is making routine decisions with your club.
+            Keep playing to take back full control; a long enough absence ends the tenure and returns
+            the club to the AI.
+          </p>
+        </section>
+      }
+
       <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div class="rounded border border-slate-200 bg-white p-4">
           <dt class="text-sm font-medium text-slate-500">Club funds</dt>

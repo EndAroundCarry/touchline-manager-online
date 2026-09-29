@@ -3,6 +3,87 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 11 — Automatic pyramid growth, AI vacancies, inbox, and inactivity
+
+A pyramid that grows by itself and a club that comes back when you stop playing. A full tier now provisions
+the next one through the worker — generated, backfilled with deterministic AI-vs-AI bootstrap results,
+validated, and activated before it is claimable — and a tenure that goes quiet warns, hands its routine
+decisions to the AI, and finally closes and returns the club, all against real UTC time. The comms module
+completes: a division news feed, per-manager notification preferences, deadline reminders, and the outbox
+that carries notification email off the request path. Part A hardens Stage 10 first, as the plan requires.
+
+### Provisioning and backfill
+
+- **The generic provisioning path** (`PYR-4`–`PYR-8`, ADR-0030). `ProvisionDivision` runs from
+  `world.provision-division`, materialised by the worker-only `ProvisioningScheduler`. It generates the tier
+  with the **same code the seeder uses** (`WorldGenerator.BuildTier`, extracted so the two cannot drift,
+  `PYR-14`), backfills the matchdays already passed this season by running the ordinary lock → resolve →
+  publish workflow once per round **in round order**, validates, and only then activates. A validation
+  failure dead-letters for an operator rather than hot-looping a deterministic defect.
+- **Bootstrap provenance** (`PYR-7`). A backfilled fixture carries `is_bootstrap`, surfaced on the fixture
+  DTOs, so a generated result is never mistaken for one a manager played.
+- **A tier is claimable only after validation** (`PYR-8`): 18 clubs, 18 legal squads (≥2 goalkeepers), 34
+  matchdays / 306 fixtures passing `ScheduleValidator`, 18 standings, and a projection rebuild that
+  reconciles (`TBL-13`).
+- **Growth continues generically** (`PYR-11`): activation re-runs `CapacityEvaluator` under the country lock,
+  so a full tier-2 requests tier 3 by the same path.
+
+### Inactivity
+
+- **The inactivity ladder** (`OCC-1`–`OCC-3`, `OCC-8`, ADR-0027). `EvaluateInactivity` runs once a day from
+  the worker and advances every open tenure against real UTC time: warn at 10 days, hand routine decisions to
+  the AI at 14, close and free the club at 21. A suspended account is skipped — it keeps its club but is not
+  an absence.
+- **A login is the return** (`OCC-2`, `OCC-5`): `Login` resumes an inactive tenure (and clears the pending
+  warning) in the same unit of work as the session.
+- **The AI fills the tenure's gaps** (`OCC-2`, `INS-12`): the AI club evaluation now includes clubs whose open
+  tenure is inactive, and it only fills gaps, so a present manager's plan is never overwritten. The market is
+  deliberately left to the human, because it commits money.
+- **A freed club grows the pyramid** (`PYR-1`): a closure re-runs `CapacityEvaluator` for its country.
+
+### Inbox, news, and notifications
+
+- **The division news feed** (`COM-1`, ADR-0029): `comms.news_items`, `PostNews`/`GetNews` over the same
+  factory-and-renderer contract as the inbox, and `GET /news`. Posted inside the transaction that produces the
+  event — tier activation, transfer completion, and round publication.
+- **Notification preferences** (`COM-8`, ADR-0029): `comms.notification_preferences`, `GET`/`PUT
+  /settings/notifications` with `ETag`/`If-Match` (`CONC-1`). Every switch defaults on and absence means the
+  defaults.
+- **Deadline reminders** (`COM-7`): `SendDeadlineReminders` writes one reminder per human club when a round's
+  team sheet locks within `reminder_lead_hours` (24h), materialised by the worker.
+- **The outbox** (`COM-9`, `MOD-4`, ADR-0028): `OutboxWriter` stages an intention in the caller's
+  transaction; `DispatchOutbox` drains it and sends notification email at-least-once, rescheduling transport
+  faults and dead-lettering defects. Worker-only, minute-bucketed.
+- **New inbox templates**: `inbox.onboarding.welcome`, `inbox.occupancy.inactivity_warning`,
+  `inbox.occupancy.inactivity_closed`, and `inbox.deadline.team_sheet`.
+
+### Added
+
+- **Four ADRs**: ADR-0027 (the inactivity ladder), ADR-0028 (the outbox), ADR-0029 (news and preferences),
+  and ADR-0030 (provisioning execution and bootstrap provenance), all indexed.
+- **Non-production diagnostics triggers** for provisioning and inactivity, gated by `Diagnostics` flags and
+  never mapped in production (§17.12), so the stage's journeys can drive the real worker.
+- **The `Provisioning`, `Inactivity`, `Reminders`, and `Outbox` configuration sections**, with their
+  schedulers registered only by `AddJobQueueWorker` — the API must never provision, age a tenure, or send
+  mail (ADR-0001, ADR-0008).
+- `docs/product/game-rules.md` §16 gained `COM-6`–`COM-9` and §18 the `provisioning_generator_version`,
+  `reminder_lead_hours`, notification-preference defaults, and outbox bucket; `docs/architecture/data-model.md`
+  carries `comms.notification_preferences`, the two new comms indexes, and the `is_bootstrap` /
+  `inactivity_warning_at` columns; modules, traceability, and the README were updated.
+
+### Notes
+
+- **Suspension stays automatic-only, by decision.** No new admin endpoints: the §10.8 admin surface, the
+  suspend/restore/assign-AI commands, and `INT-4` collusion signals remain Stage 14. A suspended account keeps
+  its club and is skipped by the ladder.
+- **Auth transactional email stays inline.** Moving verification and reset mail onto the outbox would widen
+  this change into the account lifecycle; the deferral is recorded in ADR-0028 rather than half-done.
+- **`PYR-9` next-season targeting is Stage 12.** `CapacityEvaluator` still targets the current season, guarded
+  by a comment where the rollover will change it, and the provisioning job does not mutate a closing season.
+- **A mid-season provision simulates up to ~34 AI-vs-AI rounds in one job** under the country lock. It is
+  bounded by the season length and observable through the job log; the work is deliberately in-job because a
+  terminal job cannot be resumed per round.
+
 ## Stage 10 — Scouting and timed auctions
 
 The transfer market's core loop: a manager searches every player in the world, keeps private shortlists, lists a

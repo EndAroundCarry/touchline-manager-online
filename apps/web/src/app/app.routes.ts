@@ -182,6 +182,13 @@ export const routes: Routes = [
         title: 'Inbox — Touchline Manager',
       },
       {
+        // The public division news feed (`COM-1`), beside the inbox it shares its message shape with.
+        path: 'news',
+        loadComponent: () => import('./features/news/news').then((m) => m.News),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'News — Touchline Manager',
+      },
+      {
         // A detail route for one fixture, where a manager prepares a side (`SQ-4`).
         path: 'fixtures/:fixtureId/prepare',
         loadComponent: () => import('./features/prepare/prepare').then((m) => m.Prepare),

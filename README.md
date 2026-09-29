@@ -183,8 +183,10 @@ curl -X POST http://localhost:5080/api/v1/club-claims \
 ```
 
 A country whose lowest tier is full answers `409 CAPACITY_PROVISIONING` and queues the next tier's
-generation; that generation is Stage 11, so a full country stays full until then. Why a takeover
-serialises the way it does is in [ADR-0010](docs/architecture/adr/0010-club-takeover-serialisation.md).
+generation. The worker then generates, backfills, validates, and activates that tier, so the country grows
+by the same generic path for every tier above the first. Why a takeover serialises the way it does is in
+[ADR-0010](docs/architecture/adr/0010-club-takeover-serialisation.md); how the tier is built is in
+[ADR-0030](docs/architecture/adr/0030-provisioning-execution-and-bootstrap-provenance.md).
 
 ---
 

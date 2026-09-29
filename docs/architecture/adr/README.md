@@ -43,6 +43,10 @@ the system is shaped the way it is.
 | [0024](0024-market-scouting-and-timed-auctions.md) | The market is a `market` module, and auctions resolve at a daily window under a reservation held in the ledger | Accepted |
 | [0025](0025-ai-transfer-market.md) | The AI transfer market is a pure, versioned policy routed through the human write path | Accepted |
 | [0026](0026-bid-serialisation.md) | Bids on one listing are serialised with a transaction-scoped advisory lock | Accepted |
+| [0027](0027-inactivity-ladder.md) | The inactivity ladder is one scheduled pass over real time, and a login is the return | Accepted |
+| [0028](0028-outbox-notifications.md) | Outbound notifications are written to an outbox and dispatched asynchronously | Accepted |
+| [0029](0029-news-and-notification-preferences.md) | The division news feed and notification preferences are comms-module data | Accepted |
+| [0030](0030-provisioning-execution-and-bootstrap-provenance.md) | Provisioning execution is a worker job under the country lock, and a backfilled round is generated history | Accepted |
 
 ## Rules for changing an ADR
 

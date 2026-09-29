@@ -130,7 +130,7 @@ flowchart TD
 | 8 | competition, squad, comms | Discipline, injuries, AI match management |
 | 9 | finance, squad | Ledger, wages, renewals, awards |
 | 10 | market, finance, squad | Timed auctions, AI market |
-| 11 | world, comms, competition | Pyramid growth, inbox, inactivity |
+| 11 | world, comms, competition | Pyramid growth, inbox, inactivity — *delivered: generic provisioning execution + backfill (`PYR-4`–`PYR-8`), the inactivity ladder (`OCC-1`–`OCC-3`), and the comms completion (news feed, preferences, deadline reminders, outbox)* |
 | 12 | competition, finance, squad, world | Rollover and continuity |
 | 13 | web (all features) | Feature-complete PWA |
 | 14 | ops, security | Hardened live operations |

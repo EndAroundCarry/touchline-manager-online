@@ -131,6 +131,59 @@ public sealed class InboxMessageTextTests
     }
 
     [Fact]
+    public void A_welcome_names_the_club_and_its_division()
+    {
+        var draft = InboxTemplates.Welcome("Vale Athletic", "England Division 2");
+
+        var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Title.Should().Be("Welcome to Vale Athletic");
+        text.Body.Should().Contain("Vale Athletic").And.Contain("England Division 2");
+    }
+
+    [Fact]
+    public void An_inactivity_warning_names_the_lapse_and_a_closure_names_the_return()
+    {
+        var warning = InboxTemplates.Warned(11);
+        var closed = InboxTemplates.ClosedForInactivity(22);
+
+        var warningText = InboxMessageText.Render(warning.TemplateKey, warning.ParametersJson);
+
+        warningText.Title.Should().Be("We have not seen you in a while");
+        warningText.Body.Should().Contain("11 days");
+
+        var closedText = InboxMessageText.Render(closed.TemplateKey, closed.ParametersJson);
+
+        closedText.Title.Should().Be("Your club has returned to the AI");
+        closedText.Body.Should().Contain("22 days");
+    }
+
+    [Fact]
+    public void A_single_day_lapse_reads_in_the_singular()
+    {
+        var draft = InboxTemplates.Warned(1);
+
+        var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Body.Should().Contain("away for 1 day.").And.NotContain("away for 1 days.");
+    }
+
+    [Fact]
+    public void A_deadline_reminder_names_the_round_the_venue_and_the_lock()
+    {
+        var draft = InboxTemplates.Reminder(
+            roundNumber: 8,
+            opponentName: "Northfield",
+            isHome: true,
+            lockAt: new DateTimeOffset(2026, 10, 6, 18, 30, 0, TimeSpan.Zero));
+
+        var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Title.Should().Be("Round 8: submit your team sheet");
+        text.Body.Should().Contain("At home to Northfield").And.Contain("18:30");
+    }
+
+    [Fact]
     public void A_cursor_round_trips_and_refuses_a_value_it_did_not_produce()
     {
         var position = new Abstractions.Comms.InboxCursorPosition(

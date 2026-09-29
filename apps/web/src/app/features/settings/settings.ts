@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import {
   AbstractControl,
   FormBuilder,
@@ -9,7 +9,13 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
 import { SessionStore } from '../../core/auth/session-store';
+import { NotificationPreferencesStore } from '../../core/notifications/notification-preferences-store';
 import {
+  NOTIFICATION_SWITCHES,
+  UpdateNotificationPreferencesRequest,
+} from '../../core/notifications/notification-preferences.models';
+import {
+  CHECKBOX_INPUT,
   DESTRUCTIVE_BUTTON,
   FIELD_ERROR,
   FORM_ERROR,
@@ -42,6 +48,7 @@ function mustBeAccepted(control: AbstractControl): ValidationErrors | null {
 export class Settings {
   private readonly store = inject(SessionStore);
   private readonly router = inject(Router);
+  private readonly notificationsStore = inject(NotificationPreferencesStore);
 
   /** The signed-in account. */
   protected readonly user = this.store.user;
@@ -88,6 +95,24 @@ export class Settings {
   protected readonly fieldErrorClass = FIELD_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
   protected readonly linkClass = LINK;
+  protected readonly checkboxClass = CHECKBOX_INPUT;
+
+  /** The notification switches the screen shows, in order (`COM-4`). */
+  protected readonly notificationSwitches = NOTIFICATION_SWITCHES;
+
+  protected readonly notificationsLoading = this.notificationsStore.loading;
+  protected readonly notificationsSaving = this.notificationsStore.saving;
+  protected readonly notificationsSaved = this.notificationsStore.saved;
+  protected readonly notificationsError = this.notificationsStore.error;
+  protected readonly notificationsConflict = this.notificationsStore.conflict;
+
+  /** The manager's in-progress switches, seeded from the server's state when it loads. */
+  protected readonly notifyDraft = signal<UpdateNotificationPreferencesRequest>({
+    emailDeadlineReminders: true,
+    emailInactivityWarnings: true,
+    emailMarketMessages: true,
+    emailNewsDigest: true,
+  });
 
   /** The element id the display-name error will carry. */
   protected readonly displayNameErrorId = errorId('displayName');
@@ -97,6 +122,45 @@ export class Settings {
 
   constructor() {
     this.reload();
+    this.notificationsStore.load();
+
+    // Seed the draft from the loaded preferences, and re-seed it after a conflict reloads them, so the
+    // save always starts from what is actually stored (`CONC-1`).
+    effect(() => {
+      const stored = this.notificationsStore.preferences();
+
+      if (stored !== null) {
+        this.notifyDraft.set({
+          emailDeadlineReminders: stored.emailDeadlineReminders,
+          emailInactivityWarnings: stored.emailInactivityWarnings,
+          emailMarketMessages: stored.emailMarketMessages,
+          emailNewsDigest: stored.emailNewsDigest,
+        });
+      }
+    });
+  }
+
+  /** The current value of a notification switch. */
+  protected notificationValue(field: keyof UpdateNotificationPreferencesRequest): boolean {
+    return this.notifyDraft()[field];
+  }
+
+  /** Changes a switch in the draft. */
+  protected setNotification(
+    field: keyof UpdateNotificationPreferencesRequest,
+    value: boolean,
+  ): void {
+    this.notifyDraft.update((draft) => ({ ...draft, [field]: value }));
+  }
+
+  /** Saves the notification switches. */
+  protected saveNotifications(): void {
+    this.notificationsStore.save(this.notifyDraft());
+  }
+
+  /** Re-reads the notification switches after a failure. */
+  protected reloadNotifications(): void {
+    this.notificationsStore.load();
   }
 
   /** Reloads the profile and the entity tag the next write must carry. */

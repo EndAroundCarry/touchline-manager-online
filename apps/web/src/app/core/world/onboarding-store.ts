@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, forkJoin, map, of, switchMap, tap } from 'rxjs';
+import { ConnectivityStore } from '../connectivity/connectivity-store';
 import { WorldApi } from './world-api';
 import {
   AvailableClubs,
@@ -21,12 +22,17 @@ import {
 @Injectable({ providedIn: 'root' })
 export class OnboardingStore {
   private readonly api = inject(WorldApi);
+  private readonly connectivity = inject(ConnectivityStore);
 
   private readonly stateSignal = signal<OnboardingState | null>(null);
   private readonly worldSignal = signal<WorldSummary | null>(null);
   private readonly countriesSignal = signal<readonly CountrySummary[]>([]);
   private readonly capacitiesSignal = signal<readonly CountryCapacity[]>([]);
   private readonly availableClubsSignal = signal<AvailableClubs | null>(null);
+  private readonly provisioningSettledSignal = signal(0);
+
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private pollCountryId: string | null = null;
 
   /**
    * The idempotency key per club being claimed.
@@ -51,6 +57,98 @@ export class OnboardingStore {
 
   /** The clubs of the country last opened. */
   readonly availableClubs = this.availableClubsSignal.asReadonly();
+
+  /**
+   * Increments each time a polled country's next tier finishes generating, so a screen waiting on it can
+   * reload the clubs that just became claimable (`PYR-10`).
+   */
+  readonly provisioningSettled = this.provisioningSettledSignal.asReadonly();
+
+  /**
+   * Begins polling a country's capacity until its next tier is generated.
+   *
+   * The cadence is the server's own hint (`PYR-10`), re-read on every tick, and the poll is skipped while
+   * the tab is hidden or the browser is offline — the same gating the shell's sync poll uses. It is one
+   * target at a time, because a manager waits on one country.
+   */
+  startProvisioningPoll(countryId: string): void {
+    this.stopProvisioningPoll();
+    this.pollCountryId = countryId;
+    this.scheduleProvisioningPoll();
+  }
+
+  /** Stops polling. */
+  stopProvisioningPoll(): void {
+    this.pollCountryId = null;
+
+    if (this.pollTimer !== null) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  private scheduleProvisioningPoll(): void {
+    if (this.pollCountryId === null || this.pollTimer !== null) {
+      return;
+    }
+
+    const seconds = Math.max(5, this.capacityFor(this.pollCountryId)?.provisioning?.pollAfterSeconds ?? 30);
+
+    this.pollTimer = setTimeout(() => {
+      this.pollTimer = null;
+      this.pollProvisioningOnce();
+    }, seconds * 1000);
+  }
+
+  private pollProvisioningOnce(): void {
+    const countryId = this.pollCountryId;
+
+    if (countryId === null) {
+      return;
+    }
+
+    if (!this.connectivity.isOnline() || !this.isVisible()) {
+      this.scheduleProvisioningPoll();
+
+      return;
+    }
+
+    this.api.capacity(countryId).subscribe({
+      next: (capacity) => {
+        this.capacitiesSignal.update((list) => {
+          const index = list.findIndex((entry) => entry.countryId === capacity.countryId);
+
+          if (index < 0) {
+            return [...list, capacity];
+          }
+
+          const next = [...list];
+          next[index] = capacity;
+
+          return next;
+        });
+
+        const pending = capacity.provisioning;
+
+        if (pending === null || pending.status === 'completed') {
+          this.stopProvisioningPoll();
+          this.provisioningSettledSignal.update((count) => count + 1);
+
+          return;
+        }
+
+        this.scheduleProvisioningPoll();
+      },
+      error: () => {
+        // A failed tick is not worth a message; the next one retries.
+        this.scheduleProvisioningPoll();
+      },
+    });
+  }
+
+  private isVisible(): boolean {
+    return globalThis.document?.visibilityState !== 'hidden';
+  }
 
   /** Reads the account's onboarding position. */
   loadState(): Observable<OnboardingState> {
@@ -126,6 +224,7 @@ export class OnboardingStore {
 
   /** Forgets the cached reference data. Called when the session ends. */
   clear(): void {
+    this.stopProvisioningPoll();
     this.stateSignal.set(null);
     this.worldSignal.set(null);
     this.countriesSignal.set([]);

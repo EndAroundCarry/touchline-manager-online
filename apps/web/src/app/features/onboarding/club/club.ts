@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnDestroy, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError } from '../../../core/api/api-error';
 import { OnboardingStore } from '../../../core/world/onboarding-store';
@@ -26,10 +26,13 @@ import {
   imports: [RouterLink],
   templateUrl: './club.html',
 })
-export class ClubChoice {
+export class ClubChoice implements OnDestroy {
   private readonly store = inject(OnboardingStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  /** The country whose tier the manager is choosing from. */
+  private readonly countryId = this.route.snapshot.queryParamMap.get('countryId');
 
   protected readonly listing = this.store.availableClubs;
   protected readonly loading = signal(true);
@@ -47,7 +50,7 @@ export class ClubChoice {
   protected readonly linkClass = LINK;
 
   constructor() {
-    const countryId = this.route.snapshot.queryParamMap.get('countryId');
+    const countryId = this.countryId;
 
     if (countryId === null) {
       this.loading.set(false);
@@ -55,6 +58,14 @@ export class ClubChoice {
 
       return;
     }
+
+    // When the country's next tier finishes generating, the clubs that just became claimable are read
+    // again, so the screen moves on by itself rather than waiting for another click (`PYR-10`).
+    effect(() => {
+      if (this.store.provisioningSettled() > 0) {
+        this.refresh();
+      }
+    });
 
     this.store.loadAvailableClubs(countryId).subscribe({
       next: () => this.loading.set(false),
@@ -65,6 +76,11 @@ export class ClubChoice {
         );
       },
     });
+  }
+
+  /** Stops any provisioning poll when the screen is left. */
+  ngOnDestroy(): void {
+    this.store.stopProvisioningPoll();
   }
 
   /** Claims a club, then opens the dashboard it arrived with. */
@@ -93,15 +109,24 @@ export class ClubChoice {
 
         // The server names the reason; the screen only decides what else to show with it.
         this.claimError.set(error.detail);
-        this.provisioning.set(error.extension<ProvisioningStatus>('provisioning'));
+
+        const pending = error.extension<ProvisioningStatus>('provisioning');
+
+        this.provisioning.set(pending);
         this.cooldownUntil.set(error.extension<string>('cooldownUntil'));
+
+        // The country is full and a tier is coming, so poll until it arrives rather than making the
+        // manager guess when to look again (`PYR-10`).
+        if (pending !== null && this.countryId !== null) {
+          this.store.startProvisioningPoll(this.countryId);
+        }
       },
     });
   }
 
   /** Re-reads the club list, after a claim that failed because somebody else took the club. */
   protected refresh(): void {
-    const countryId = this.route.snapshot.queryParamMap.get('countryId');
+    const countryId = this.countryId;
 
     if (countryId === null) {
       return;

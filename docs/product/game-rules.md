@@ -480,11 +480,17 @@ What the game tells a manager, and how (master plan §6.9, §10.7, F-41).
 | COM-3 | A message's content is public game data — a result, a league position, a card, an injury, or a repaired side — and never a hidden value (`MAT-11`). |
 | COM-4 | A message is written in the same transaction as the event it describes, so a result and the news of it become public together (`MAT-7`). |
 | COM-5 | The inbox is per manager and paged by a keyset cursor, newest first. Reading is the only mutation of a message, and reading one that is already read is a no-op. |
+| COM-6 | The division news feed is public game data. An item is scoped to a world and optionally to a country and a division, carries a stable template key and parameters like an inbox message, and is paged by a keyset cursor, newest first. It is written in the same transaction as the event it reports. |
+| COM-7 | A deadline reminder is sent **once per round**, to every club a human holds in it, when the round's team-sheet lock falls within `reminder_lead_hours` of now. A round that has already locked or published is never reminded. |
+| COM-8 | Notification preferences are per manager and govern **email only**. Every switch defaults on, and a manager who has never set one has no row and is treated as all-on. An email is written to the outbox only when the matching preference is on; the inbox message is never suppressed. |
+| COM-9 | An email leaves the game asynchronously: the workflow records the intention in `ops.outbox_messages` inside the transaction that produced the event, and the worker's dispatcher sends it later, at least once (`MOD-4`). A transport fault is rescheduled; an unknown message kind, an unreadable payload, or an exhausted attempt budget is dead-lettered and alerted. Auth transactional email is the one exception and stays on the request path. |
 
-The events that produce a message in the MVP are the ones the matchday workflows already
-decide: a club's result, its changed league position, a player's suspension, a player's injury,
-and a repaired side (`DIS-7`). Deadline reminders and the division-scoped news feed arrive with
-Stage 11; a message that is written but never shown is not built early.
+The events that produce an inbox message are the ones the matchday, market, occupancy, and
+reminder workflows decide: a club's result, its changed league position, a player's suspension,
+a player's injury, a repaired side (`DIS-7`), an outbid or completed transfer, an inactivity
+warning, a return-to-AI notice, a welcome, and a deadline reminder. The news feed carries the
+division-provisioned, transfer-completed, and result-published events. A message that is written
+but never shown is not built early.
 
 ---
 
@@ -546,6 +552,10 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `inactivity_close_days` | 21 | OCC-3 |
 | `resignation_cooldown_days` | 7 | OCC-4 |
 | `provisioning_poll_seconds` | 30 | PYR-10 |
+| `provisioning_generator_version` | `division-gen-v1` | PYR-14 |
+| `reminder_lead_hours` | 24 | COM-7 |
+| `notification_preferences_default` | all on: deadline reminders, inactivity warnings, market messages, news digest | COM-8 |
+| `outbox_dispatch_bucket` | 1 minute | COM-9, `MOD-4` |
 | `generator_version` | `world-gen-v3` (the bootstrap: clubs, squads, and fixtures) | FIC-8, PYR-14 |
 | `club_generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
 | `player_generator_version` | `player-gen-v1` | FIC-8, PYR-14 |

@@ -12,6 +12,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   discipline: 'Discipline',
   injury: 'Injuries',
   squad: 'Your squad',
+  occupancy: 'Your club',
+  reminder: 'Reminders',
+  system: 'Messages',
 };
 
 /** Names the shelf a message sits on, falling back to the code. */

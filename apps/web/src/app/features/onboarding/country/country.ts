@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnDestroy, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApiError } from '../../../core/api/api-error';
 import { OnboardingStore } from '../../../core/world/onboarding-store';
@@ -20,7 +20,7 @@ import {
   selector: 'app-country-choice',
   templateUrl: './country.html',
 })
-export class CountryChoice {
+export class CountryChoice implements OnDestroy {
   private readonly store = inject(OnboardingStore);
   private readonly router = inject(Router);
 
@@ -35,8 +35,31 @@ export class CountryChoice {
   protected readonly statusMessageClass = STATUS_MESSAGE;
 
   constructor() {
+    // A country's generation finishing is a change to a country on this screen, so the capacities are
+    // read again and a waiting country's state clears without a click (`PYR-10`).
+    effect(() => {
+      if (this.store.provisioningSettled() > 0) {
+        this.reloadCapacities();
+      }
+    });
+
+    this.reloadCapacities();
+  }
+
+  /** Stops any provisioning poll when the screen is left. */
+  ngOnDestroy(): void {
+    this.store.stopProvisioningPoll();
+  }
+
+  /** Reads every country's capacity, then polls the one whose next tier is being generated. */
+  private reloadCapacities(): void {
+    this.loading.set(true);
+
     this.store.loadCapacities().subscribe({
-      next: () => this.loading.set(false),
+      next: () => {
+        this.loading.set(false);
+        this.pollGeneratingCountry();
+      },
       error: (error: unknown) => {
         this.loading.set(false);
         this.loadError.set(
@@ -44,6 +67,15 @@ export class CountryChoice {
         );
       },
     });
+  }
+
+  /** Begins polling the country the manager is waiting on, if there is one. */
+  private pollGeneratingCountry(): void {
+    const generating = this.capacities().find((capacity) => capacity.provisioning !== null);
+
+    if (generating !== undefined) {
+      this.store.startProvisioningPoll(generating.countryId);
+    }
   }
 
   /** The display name of the country a capacity row belongs to. */

@@ -13,6 +13,9 @@ describe('inbox presentation', () => {
     expect(categoryLabel('discipline')).toBe('Discipline');
     expect(categoryLabel('injury')).toBe('Injuries');
     expect(categoryLabel('squad')).toBe('Your squad');
+    expect(categoryLabel('occupancy')).toBe('Your club');
+    expect(categoryLabel('reminder')).toBe('Reminders');
+    expect(categoryLabel('system')).toBe('Messages');
     expect(categoryLabel('future')).toBe('future');
   });
 

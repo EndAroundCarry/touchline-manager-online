@@ -85,6 +85,67 @@
     </div>
 
     <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+      <h2 class="text-lg font-semibold">Notifications</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Which emails the game sends you. Inbox messages always arrive; these switches govern email
+        only.
+      </p>
+
+      @if (notificationsLoading()) {
+        <p class="mt-4 text-sm text-slate-600" role="status">Loading your notification settings…</p>
+      } @else {
+        @if (notificationsSaved()) {
+          <p [class]="statusMessageClass" role="status">Your notification settings have been saved.</p>
+        }
+
+        @if (notificationsConflict()) {
+          <p [class]="formErrorClass" role="alert">
+            Your notification settings changed on another device while this screen was open. The
+            current values are shown below — check them and save again.
+          </p>
+        }
+
+        @if (notificationsError(); as message) {
+          <p [class]="formErrorClass" role="alert">{{ message }}</p>
+          <button type="button" class="mt-2" [class]="secondaryButtonClass" (click)="reloadNotifications()">
+            Try again
+          </button>
+        }
+
+        <fieldset class="mt-4 space-y-3">
+          <legend class="sr-only">Email notifications</legend>
+          @for (option of notificationSwitches; track option.field) {
+            <div class="flex items-start gap-2">
+              <input
+                [id]="option.field"
+                type="checkbox"
+                [class]="checkboxClass"
+                [checked]="notificationValue(option.field)"
+                (change)="setNotification(option.field, $any($event.target).checked)"
+              />
+              <div>
+                <label class="text-sm font-medium text-slate-800" [for]="option.field">
+                  {{ option.label }}
+                </label>
+                <p class="text-xs text-slate-500">{{ option.description }}</p>
+              </div>
+            </div>
+          }
+        </fieldset>
+
+        <button
+          type="button"
+          class="mt-4"
+          [class]="primaryButtonClass"
+          [disabled]="notificationsSaving()"
+          (click)="saveNotifications()"
+        >
+          {{ notificationsSaving() ? 'Saving…' : 'Save notification settings' }}
+        </button>
+      }
+    </div>
+
+    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
       <h2 class="text-lg font-semibold">Sessions</h2>
       <p class="mt-2 text-sm text-slate-600">
         Signing out everywhere revokes every device and invalidates the access tokens already

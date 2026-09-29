@@ -6,6 +6,8 @@ import { SessionStore } from '../../core/auth/session-store';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
 import { MatchStore } from '../../core/match/match-store';
+import { NewsStore } from '../../core/news/news-store';
+import { NotificationPreferencesStore } from '../../core/notifications/notification-preferences-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
@@ -34,6 +36,8 @@ export class AppShell implements OnDestroy {
   private readonly tactics = inject(TacticsStore);
   private readonly competition = inject(CompetitionStore);
   private readonly inbox = inject(InboxStore);
+  private readonly news = inject(NewsStore);
+  private readonly notifications = inject(NotificationPreferencesStore);
   private readonly match = inject(MatchStore);
   private readonly sync = inject(SyncStore);
   private readonly router = inject(Router);
@@ -85,6 +89,8 @@ export class AppShell implements OnDestroy {
       this.tactics.clear();
       this.competition.clear();
       this.inbox.clear();
+      this.news.clear();
+      this.notifications.clear();
       this.match.clear();
       this.sync.clear();
 
