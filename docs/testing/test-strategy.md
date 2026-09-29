@@ -65,6 +65,13 @@ The worker's own composition over a real database, asserting that a job enqueued
 claimed, executed, and completed by another **without API involvement**. This is the walking
 skeleton that every real deadline will reuse.
 
+*Today:* the no-op walking skeleton, the matchday worker's lock/simulate/publish chain, and the season
+rollover driven by the calendar's scheduler. Stage 12 added the **five-season staging run**:
+`StagingSeasonRunTests` plays five consecutive seasons over a seeded, two-tier world with a human/AI mix,
+the worker rolls each one over, and the test asserts every season reconciles and opens a complete next
+season (squad legality, ledger replay, movement totals, and history immutability at the end) — Stage 12's
+"at least five consecutive automated staging seasons" gate ([ADR-0035](../architecture/adr/0035-five-season-staging-run.md)).
+
 ## Layer 7 — Frontend unit tests (`apps/web`, Vitest)
 
 Signal stores, state transitions, and pure view logic. Component tests run in a DOM environment.

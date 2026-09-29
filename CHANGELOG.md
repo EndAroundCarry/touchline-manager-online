@@ -3,6 +3,73 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 12 — The five-season staging run
+
+Stage 12's last exit criterion is met: **at least five consecutive automated staging seasons reconcile
+cleanly**. A new worker integration test seeds a world, provisions an adjacent tier, attaches a human/AI
+mix, and then plays five seasons end to end — the worker locks nothing, but its queue and the real
+resumable rollover machine do every part of each season's close — asserting after each that the closing
+season reconciled and the next one opened complete, and at the end that squads, money, movement, and
+history are all still sound. A latent defect the run exposed is fixed: the AI transfer market's daily job
+could never be produced, because its scheduler was written but never registered.
+
+### Added
+
+- **`StagingSeasonRunTests`** (`PR-1`–`PR-6`, `TBL-13`, master plan §16 Stage 12, ADR-0035): a seeded world
+  plus one provisioned second tier for a single country, and two human tenures in that pair, driven through
+  five consecutive seasons. Each season's fixtures are published deterministically
+  (`DeterministicDigest`-derived scores) and the projections rebuilt with the same tool live publication
+  uses, exactly as the single-season rollover suite does; the season's real `competition.season-rollover`
+  job is then enqueued and executed by the worker. After every rollover the test asserts the world's season
+  pointer advanced once, the closing season completed and the next is active and starts on a legal
+  matchday, every active tier has eighteen clubs, thirty-four matchdays, three hundred and six fixtures,
+  and an opening table, every closing division reconciles with `RebuildDivisionProjections(apply: false)`,
+  movement is three up and three down, and the season's finance summary and position awards were written.
+- **The run's end-state assertions**: six seasons and five completed rollovers; every club's squad still
+  legal (`SQ-2`); every account's balances replay exactly from its ledger (`FIN-18`) and none went
+  negative; both contract outcomes of the human/AI mix occurred (an unmanaged club renewed, a present
+  manager's unrenewed player expired, `CON-6`); every club with no active tenure still has the default side
+  the AI supplied (`INS-12`); and no rollover job was dead-lettered.
+- **A redelivery case** (`ADR-0031`): a season rolled over twice in the run returns `AlreadyCompleted`,
+  creates no third season, and leaves its three promotions exactly once.
+- **`AiMarketSchedulerTests`**: a worker integration test that starts the worker's composition with only
+  the AI-market scheduler enabled and asserts the day's `market.evaluate-ai` row appears. It is the
+  regression guard for the registration fix below.
+
+### Fixed
+
+- **The AI transfer market's scheduler was never registered.** `AiMarketScheduler` (`TRF-12`, ADR-0025),
+  its options, its handler, and its job type all existed, but `AddJobQueueWorker` never added the hosted
+  service, so nothing placed the daily evaluation row and the AI clubs never traded. It is now registered
+  beside the other materialisers; `AiMarketSchedulerTests` fails without it.
+
+### Notes
+
+- **No migration and no production surface.** The run is a test over existing tables; it adds no HTTP
+  route, CLI, or configuration an operator must reason about. The production admin surface remains
+  Stage 14's.
+- **The seasons are fabricated, not simulated.** The run's subject is continuity across seasons, not the
+  match engine, so each season's results are deterministic and the projections are rebuilt from them, as
+  the one-season rollover suite already does; the engine and the matchday pipeline are pinned by their own
+  suites. The rollover scheduler is present, as on a staging worker, and the run-now trigger (the
+  scheduler's own materialisation under the same business key, ADR-0034) makes each job due immediately
+  rather than waiting out the materialiser's poll.
+- **The "default tactic" criterion is read as the AI clubs' side.** The seeder creates no tactical plan and
+  a human-held club that never saved one is repaired by the snapshot builder at the lock (`TAC-10`), so
+  the run asserts a side for every club with no active tenure rather than a tactic a human never set
+  (`INS-12`); ADR-0035 records the reading.
+- **ADR-0035** records the decisions: a CI gate rather than a runnable surface, the real durable pipeline
+  with deterministic fabricated play, the seeded two-tier world with a human/AI mix, the enforced exit
+  criteria and the one that is read carefully, and the scheduler registration as a defect the run exposed.
+  `docs/product/mvp-traceability.md` F-29 and Layer 6 of `docs/testing/test-strategy.md` were updated, and
+  `.env.example` gained the previously undocumented `Diagnostics__EnableRolloverTrigger`.
+
+### Tests
+
+- A new worker integration suite (`StagingSeasonRunTests`): the five-season run and the mid-run redelivery
+  no-op, both over a real PostgreSQL 17 container. A second new worker test (`AiMarketSchedulerTests`)
+  pins the scheduler materialisation.
+
 ## Stage 12 — Operator preview and resume for the season rollover
 
 The rollover becomes operable. An operator can now see exactly what a rollover would move and pay before it

@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 12 in progress — season rollover, promotion/relegation, and continuity.** The playable
+> **Status: Stage 12 complete — season rollover, promotion/relegation, and continuity.** The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
 > pipeline, the API and worker composition roots, the health and observability baseline, and the Angular
 > PWA shell. Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions
@@ -45,7 +45,10 @@ kick-off. The server decides results; a client can never simulate or influence o
 > and opening table — all or nothing, and resumable after every checkpoint (`PR-1`–`PR-6`, ADR-0031). Its
 > continuity work — contract expiry, retirement, position awards, and the season finance summary — landed
 > next, and the operator controls now give a non-production operator a dry-run preview of what a rollover
-> would do, a run-now trigger, and an audited resume of a failed rollover (`PR-4`, ADR-0034).
+> would do, a run-now trigger, and an audited resume of a failed rollover (`PR-4`, ADR-0034). The stage
+> closes with a five-season staging run: five consecutive seasons rolled over by the worker alone, each
+> reconciles and opens a complete next season, over a seeded two-tier world with a human/AI mix
+> (`StagingSeasonRunTests`, ADR-0035).
 
 ---
 

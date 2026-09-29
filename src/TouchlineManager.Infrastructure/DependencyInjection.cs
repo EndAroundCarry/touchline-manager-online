@@ -472,6 +472,11 @@ public static class DependencyInjection
         // is what settles the winning bid (TRF-2, TRF-9).
         services.AddHostedService<AuctionScheduler>();
 
+        // And the same for the AI's own trading: this service places the day's evaluation row, and the row is
+        // what lists a surplus player and bids for a better one through the same writers a manager's command
+        // uses (TRF-12, ADR-0025).
+        services.AddHostedService<AiMarketScheduler>();
+
         // And the same for the pyramid: this service places a provisioning row for every pending tier request,
         // and the row is what generates, backfills, and activates the next tier (PYR-4).
         services.AddHostedService<ProvisioningScheduler>();
