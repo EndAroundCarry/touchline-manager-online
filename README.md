@@ -43,7 +43,9 @@ kick-off. The server decides results; a client can never simulate or influence o
 > rollover state machine that freezes the season, finalizes its standings, closes its entries, applies
 > three-up/three-down between every adjacent active tier, and generates the next season's entries, fixtures,
 > and opening table — all or nothing, and resumable after every checkpoint (`PR-1`–`PR-6`, ADR-0031). Its
-> continuity work — contract expiry, retirement, position awards, and the season finance summary — follows.
+> continuity work — contract expiry, retirement, position awards, and the season finance summary — landed
+> next, and the operator controls now give a non-production operator a dry-run preview of what a rollover
+> would do, a run-now trigger, and an audited resume of a failed rollover (`PR-4`, ADR-0034).
 
 ---
 

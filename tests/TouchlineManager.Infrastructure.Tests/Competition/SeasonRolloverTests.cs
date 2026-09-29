@@ -2,14 +2,18 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Abstractions.Competition;
+using TouchlineManager.Application.Abstractions.Jobs;
+using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Competition;
+using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.World;
 using TouchlineManager.Domain.Auth;
 using TouchlineManager.Domain.Comms;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Domain.World.Generation;
@@ -324,6 +328,159 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                 .Be(1, "the movement was not announced twice");
         }
     }
+
+    [Fact]
+    public async Task A_preview_reports_not_ready_until_the_season_is_finished_then_the_movement_and_awards()
+    {
+        Guid seasonId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            seasonId = await db.Seasons
+                .Where(candidate => candidate.WorldId == _fixture.WorldId)
+                .Select(candidate => candidate.Id)
+                .SingleAsync();
+
+            var before = await scope.ServiceProvider.GetRequiredService<PreviewSeasonRollover>()
+                .ExecuteAsync(seasonId, CancellationToken.None);
+
+            before.Should().NotBeNull();
+            before!.Ready.Should().BeFalse("PR-4: an unplayed season cannot roll over");
+            before.Preflight.UnpublishedMatchdays.Should().BeGreaterThan(0);
+            before.RolloverPhase.Should().BeNull("no rollover has started");
+        }
+
+        await PublishSeasonAsync(seasonId);
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var preview = await scope.ServiceProvider.GetRequiredService<PreviewSeasonRollover>()
+                .ExecuteAsync(seasonId, CancellationToken.None);
+
+            preview.Should().NotBeNull();
+            preview!.Ready.Should().BeTrue();
+            preview.Preflight.UnpublishedMatchdays.Should().Be(0);
+            preview.Preflight.Reconciles.Should().BeTrue();
+            preview.NextSeasonExists.Should().BeFalse();
+            preview.Totals.Countries.Should().Be(6);
+            preview.Totals.Clubs.Should().Be(126, "six seeded tiers plus the provisioned second tier");
+            preview.Totals.Promotions.Should().Be(3, "PR-1: three up between the two adjacent tiers");
+            preview.Totals.Relegations.Should().Be(3, "PR-1: three down");
+
+            // Every rank in every active tier earns a position award (FIN-5), and the preview totals them
+            // without paying them.
+            var expectedAwards = (6 * SumPositionAwards(tier: 1)) + SumPositionAwards(tier: 2);
+            preview.Totals.PositionAwardsMinor.Should().Be(expectedAwards);
+
+            // The preview is a read (ADR-0020): no rollover row and no award was written.
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            (await db.SeasonRollovers.CountAsync()).Should().Be(0);
+            (await db.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.PositionAward))
+                .Should()
+                .Be(0);
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_rollover_is_resumed_after_reconciliation_and_moves_each_club_once()
+    {
+        Guid seasonId;
+        Guid divisionSeasonId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            seasonId = await db.Seasons
+                .Where(candidate => candidate.WorldId == _fixture.WorldId)
+                .Select(candidate => candidate.Id)
+                .SingleAsync();
+            divisionSeasonId = await db.DivisionSeasons
+                .Where(divisionSeason => divisionSeason.SeasonId == seasonId)
+                .OrderBy(divisionSeason => divisionSeason.Id)
+                .Select(divisionSeason => divisionSeason.Id)
+                .FirstAsync();
+        }
+
+        await PublishSeasonAsync(seasonId);
+
+        // Corrupt one table row so the projections no longer reconcile — the defect that fails a rollover
+        // and dead-letters its job (TBL-13, ADR-0031).
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            await db.Database.ExecuteSqlRawAsync(
+                "update competition.standings set yellow_cards = yellow_cards + 1 "
+                + "where division_season_id = {0}",
+                divisionSeasonId);
+
+            await FluentActions
+                .Awaiting(() => scope.ServiceProvider.GetRequiredService<RunSeasonRollover>()
+                    .ExecuteAsync(seasonId, CancellationToken.None))
+                .Should()
+                .ThrowAsync<PermanentJobFailureException>("a projection drift is a defect, not a transient fault");
+
+            db.ChangeTracker.Clear();
+
+            var row = await db.SeasonRollovers.SingleAsync(candidate => candidate.SeasonId == seasonId);
+            row.Phase.Should().Be(SeasonRolloverPhase.Failed);
+            row.FailureReason.Should().NotBeNullOrWhiteSpace();
+        }
+
+        // An operator repairs the projection, then resumes the rollover.
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            var rebuilt = await scope.ServiceProvider.GetRequiredService<RebuildDivisionProjections>()
+                .ExecuteAsync(divisionSeasonId, apply: true, CancellationToken.None);
+            rebuilt.Outcome.Should().Be(ProjectionRebuildOutcome.Rebuilt);
+
+            var resume = await scope.ServiceProvider.GetRequiredService<ResumeSeasonRollover>()
+                .ExecuteAsync(seasonId, "reconciled the corrupted table row", CancellationToken.None);
+
+            resume.Outcome.Should().Be(ResumeSeasonRolloverOutcome.Resumed);
+            resume.Requeued.Should().BeFalse("the rollover was run directly, so no job row was dead-lettered");
+            resume.BusinessKey.Should().Be(SeasonRolloverJobTypes.RolloverKey(seasonId));
+
+            // The fallback enqueued the job the worker would claim, and the resume is audited with its reason.
+            (await db.Jobs.SingleAsync(job => job.BusinessKey == resume.BusinessKey)).Status.Should().Be("pending");
+
+            var audited = await db.AuditEntries
+                .SingleAsync(entry => entry.Action == WorldAuditActions.RolloverResumed);
+            audited.Reason.Should().Be("reconciled the corrupted table row");
+        }
+
+        // The worker runs the resumed job, and the rollover completes exactly once.
+        await using (var scope = _fixture.CreateScope())
+        {
+            var resumed = await scope.ServiceProvider.GetRequiredService<RunSeasonRollover>()
+                .ExecuteAsync(seasonId, CancellationToken.None);
+
+            resumed.Outcome.Should().Be(SeasonRolloverOutcome.Completed);
+        }
+
+        await using (var final = _fixture.CreateScope())
+        {
+            var db = final.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (await db.GameWorlds.SingleAsync()).CurrentSeasonNumber.Should().Be(2, "the year advanced once");
+            (await db.Seasons.CountAsync(candidate => candidate.WorldId == _fixture.WorldId)).Should().Be(2);
+            (await db.SeasonRollovers.CountAsync(candidate => candidate.SeasonId == seasonId)).Should().Be(1);
+            (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == seasonId && entry.IsPromoted))
+                .Should()
+                .Be(3, "no club was promoted twice");
+            (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == seasonId && entry.IsRelegated))
+                .Should()
+                .Be(3);
+        }
+    }
+
+    /// <summary>The total position awards every rank of a tier earns (`FIN-5`).</summary>
+    private static long SumPositionAwards(int tier) =>
+        Enumerable.Range(1, WorldRuleSet.ClubsPerDivision)
+            .Sum(rank => WorldRuleSet.PositionAwardMinorFor(tier, rank));
 
     /// <summary>
     /// Attaches a fresh manager to a club, so the rollover has someone to notify about its movement (`PR-1`).

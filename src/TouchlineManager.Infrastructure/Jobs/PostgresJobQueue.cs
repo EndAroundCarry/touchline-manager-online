@@ -98,6 +98,19 @@ internal sealed partial class PostgresJobQueue : IJobQueue
         where id = @id and status = 'leased';
         """;
 
+    private const string RequeueSql = """
+        update ops.jobs
+        set status = 'pending',
+            due_at = @now,
+            attempt_count = 0,
+            last_error = null,
+            lease_owner = null,
+            lease_until = null,
+            updated_at = @now,
+            version = version + 1
+        where job_type = @job_type and business_key = @business_key and status = 'dead_letter';
+        """;
+
     private readonly TouchlineManagerDbContext _dbContext;
     private readonly IClock _clock;
     private readonly ILogger<PostgresJobQueue> _logger;
@@ -140,6 +153,34 @@ internal sealed partial class PostgresJobQueue : IJobQueue
         }
 
         return inserted > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RequeueAsync(
+        string jobType,
+        string businessKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(businessKey);
+
+        var now = UtcNow();
+        var connection = await GetOpenConnectionAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = RequeueSql;
+        AddParameter(command, "@job_type", jobType);
+        AddParameter(command, "@business_key", businessKey);
+        AddParameter(command, "@now", now);
+
+        var reset = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (reset == 0)
+        {
+            LogNotRequeueable(jobType, businessKey);
+        }
+
+        return reset > 0;
     }
 
     /// <inheritdoc />
@@ -293,6 +334,12 @@ internal sealed partial class PostgresJobQueue : IJobQueue
         Level = LogLevel.Warning,
         Message = "Job {JobId} failed on attempt {AttemptCount} of {MaxAttempts}; retrying at {NextDue}.")]
     private partial void LogRetryScheduled(Guid jobId, int attemptCount, int maxAttempts, DateTimeOffset nextDue);
+
+    [LoggerMessage(
+        EventId = 2003,
+        Level = LogLevel.Debug,
+        Message = "Job {JobType}/{BusinessKey} has no dead-lettered row to requeue; the operator resume is a no-op.")]
+    private partial void LogNotRequeueable(string jobType, string businessKey);
 
     /// <summary>
     /// Returns the context's connection in an open state. The connection is deliberately not

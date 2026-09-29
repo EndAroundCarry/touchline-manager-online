@@ -63,6 +63,18 @@ public sealed class DiagnosticsOptions
     /// set outside a test environment, so it has no production surface (master plan §17.12).
     /// </remarks>
     public bool EnableInactivityTrigger { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the Stage 12 operator rollover controls are reachable.
+    /// </summary>
+    /// <remarks>
+    /// The controls are a read-only preview of what a rollover would do, a run-now enqueue of the season's
+    /// real rollover job, and an audited resume of a failed rollover. The worker still runs the state
+    /// machine, so the rollover itself stays worker-only (ADR-0031 §7); these only do what the worker-only
+    /// scheduler and an operator decision do. Off by default and never set outside a test environment, so
+    /// they have no production surface (master plan §17.12, ADR-0034).
+    /// </remarks>
+    public bool EnableRolloverTrigger { get; set; }
 }
 
 /// <summary>

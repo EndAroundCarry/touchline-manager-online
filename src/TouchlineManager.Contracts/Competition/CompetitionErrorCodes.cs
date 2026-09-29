@@ -31,4 +31,13 @@ public static class CompetitionErrorCodes
 
     /// <summary>The submitted selection breaks a team-sheet rule; the response carries the issues (`SQ-4`).</summary>
     public const string TeamSheetValidationFailed = "TEAM_SHEET_VALIDATION_FAILED";
+
+    /// <summary>No season, or no rollover for the season, exists with the requested identity (ADR-0034).</summary>
+    public const string RolloverNotFound = "ROLLOVER_NOT_FOUND";
+
+    /// <summary>The rollover is not failed, so there is nothing to resume (ADR-0031, ADR-0034).</summary>
+    public const string RolloverNotResumable = "ROLLOVER_NOT_RESUMABLE";
+
+    /// <summary>An operator resume was sent without the reason the audit trail requires (ADR-0034).</summary>
+    public const string RolloverResumeReasonRequired = "ROLLOVER_RESUME_REASON_REQUIRED";
 }

@@ -115,5 +115,8 @@ public sealed class JobHandlerRegistryTests
 
         public Task FailAsync(Guid jobId, string errorMessage, Domain.Ops.JobFailureKind kind, CancellationToken cancellationToken)
             => Task.CompletedTask;
+
+        public Task<bool> RequeueAsync(string jobType, string businessKey, CancellationToken cancellationToken)
+            => Task.FromResult(false);
     }
 }

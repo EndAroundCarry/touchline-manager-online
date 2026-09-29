@@ -74,6 +74,7 @@ public sealed class ApiFixture : IAsyncLifetime
     /// </remarks>
     public WebApplicationFactory<Program> CreateFactory(
         bool enableJobProbe,
+        bool enableRolloverTrigger = false,
         int? authPermitLimit = null,
         int? marketListingPermitLimit = null,
         int? marketBidPermitLimit = null)
@@ -83,6 +84,9 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Database", _container.GetConnectionString());
             builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:4200");
             builder.UseSetting("Diagnostics:EnableJobProbe", enableJobProbe ? "true" : "false");
+            builder.UseSetting(
+                "Diagnostics:EnableRolloverTrigger",
+                enableRolloverTrigger ? "true" : "false");
             builder.UseSetting(
                 "RateLimiting:AuthPermitLimit",
                 (authPermitLimit ?? UnthrottledAuthPermitLimit).ToString(CultureInfo.InvariantCulture));

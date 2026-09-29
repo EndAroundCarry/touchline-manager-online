@@ -79,9 +79,8 @@ public sealed partial class RunSeasonRollover
     private readonly IClubRepository _clubs;
     private readonly IClubTenureRepository _tenures;
     private readonly IClubAccountRepository _accounts;
-    private readonly IMatchdayRepository _matchdays;
     private readonly DivisionScheduleGenerator _schedules;
-    private readonly RebuildDivisionProjections _rebuild;
+    private readonly SeasonRolloverPlanLoader _plans;
     private readonly SettleSeasonFinances _finances;
     private readonly SettleSquadContinuity _continuity;
     private readonly IInboxRepository _inbox;
@@ -99,9 +98,8 @@ public sealed partial class RunSeasonRollover
         IClubRepository clubs,
         IClubTenureRepository tenures,
         IClubAccountRepository accounts,
-        IMatchdayRepository matchdays,
         DivisionScheduleGenerator schedules,
-        RebuildDivisionProjections rebuild,
+        SeasonRolloverPlanLoader plans,
         SettleSeasonFinances finances,
         SettleSquadContinuity continuity,
         IInboxRepository inbox,
@@ -117,9 +115,8 @@ public sealed partial class RunSeasonRollover
         _clubs = clubs;
         _tenures = tenures;
         _accounts = accounts;
-        _matchdays = matchdays;
         _schedules = schedules;
-        _rebuild = rebuild;
+        _plans = plans;
         _finances = finances;
         _continuity = continuity;
         _inbox = inbox;
@@ -172,10 +169,10 @@ public sealed partial class RunSeasonRollover
         await CompleteAsync(world, season, nextSeasonId, now, cancellationToken);
 
         var promotions = movePlan.Countries
-            .SelectMany(country => PromotionRelegation.Compute(ToTiers(country)))
+            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
             .Count(movement => movement.IsPromoted);
         var relegations = movePlan.Countries
-            .SelectMany(country => PromotionRelegation.Compute(ToTiers(country)))
+            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
             .Count(movement => movement.IsRelegated);
 
         LogRolledOver(world.Id, season.Id, nextSeasonId, movePlan.Countries.Count, promotions, relegations);
@@ -266,7 +263,7 @@ public sealed partial class RunSeasonRollover
 
         var plan = await LoadPlanAsync(world, season, cancellationToken);
 
-        var unpublished = await CountUnpublishedAsync(plan, cancellationToken);
+        var unpublished = await _plans.CountUnpublishedAsync(plan, cancellationToken);
 
         if (unpublished > 0)
         {
@@ -278,7 +275,7 @@ public sealed partial class RunSeasonRollover
                 $"Season {season.Id} still has {unpublished} unplayed matchdays; the rollover will retry (PR-4).");
         }
 
-        var drift = await DetectDriftAsync(plan, cancellationToken);
+        var drift = await _plans.DetectDriftAsync(plan, cancellationToken);
 
         if (drift.Count > 0)
         {
@@ -315,7 +312,7 @@ public sealed partial class RunSeasonRollover
     private async Task FinalizeAsync(
         GameWorld world,
         Season season,
-        RolloverPlan plan,
+        SeasonRolloverPlan plan,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -335,7 +332,7 @@ public sealed partial class RunSeasonRollover
 
         foreach (var country in plan.Countries)
         {
-            var movements = PromotionRelegation.Compute(ToTiers(country))
+            var movements = PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country))
                 .ToDictionary(movement => movement.ClubId);
 
             foreach (var tier in country.Tiers)
@@ -436,7 +433,7 @@ public sealed partial class RunSeasonRollover
     private async Task<Guid> MoveAsync(
         GameWorld world,
         Season season,
-        RolloverPlan plan,
+        SeasonRolloverPlan plan,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -462,7 +459,7 @@ public sealed partial class RunSeasonRollover
 
         foreach (var country in plan.Countries)
         {
-            var movements = PromotionRelegation.Compute(ToTiers(country));
+            var movements = PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country));
 
             var byDestination = movements
                 .GroupBy(movement => movement.ToTier)
@@ -711,91 +708,28 @@ public sealed partial class RunSeasonRollover
         await _rollovers.FindBySeasonAsync(world.Id, season.Id, cancellationToken)
         ?? throw new PermanentJobFailureException($"The rollover of season {season.Id} vanished (ADR-0031).");
 
-    /// <summary>Reads the closing season's shape: every active tier with its entries and final ordering.</summary>
-    private async Task<RolloverPlan> LoadPlanAsync(
+    /// <summary>
+    /// Reads the closing season's shape through the shared loader, dead-lettering the job when an active
+    /// division has no instance in the season (`PR-5`).
+    /// </summary>
+    /// <remarks>
+    /// The shape is a defect rather than a race with a late publication, so it fails the job for an operator
+    /// rather than retrying (ADR-0031).
+    /// </remarks>
+    private async Task<SeasonRolloverPlan> LoadPlanAsync(
         GameWorld world,
         Season season,
         CancellationToken cancellationToken)
     {
-        var countries = await _world.ListCountriesAsync(world.Id, cancellationToken);
-
-        // Every division-season of the closing season, keyed by their durable division, so each tier's
-        // instance is one lookup rather than a query per tier.
-        var divisionSeasons = (await _world.ListDivisionSeasonsAsync(season.Id, cancellationToken))
-            .ToDictionary(divisionSeason => divisionSeason.DivisionId);
-
-        var plan = new List<RolloverCountry>(countries.Count);
-
-        foreach (var country in countries)
+        try
         {
-            var divisions = await _world.ListActiveDivisionsAsync(country.Id, cancellationToken);
-            var tiers = new List<RolloverTier>(divisions.Count);
-
-            foreach (var division in divisions)
-            {
-                if (!divisionSeasons.TryGetValue(division.Id, out var divisionSeason))
-                {
-                    throw new PermanentJobFailureException(
-                        $"Active division {division.Id} has no instance in season {season.Id} (PR-5).");
-                }
-
-                var ranked = (await _matchdays.LoadStandingsAsync(divisionSeason.Id, cancellationToken))
-                    .OrderBy(standing => standing.Rank)
-                    .Select(standing => standing.ClubId)
-                    .ToList();
-
-                var entries = await _world.ListClubSeasonEntriesAsync(divisionSeason.Id, cancellationToken);
-
-                tiers.Add(new RolloverTier(
-                    division.TierNumber,
-                    division.Id,
-                    division.DisplayName,
-                    divisionSeason,
-                    ranked,
-                    entries));
-            }
-
-            plan.Add(new RolloverCountry(country.Id, country.Code, country.DisplayName, tiers));
+            return await _plans.LoadAsync(world, season, cancellationToken);
         }
-
-        return new RolloverPlan(plan);
-    }
-
-    private async Task<int> CountUnpublishedAsync(RolloverPlan plan, CancellationToken cancellationToken)
-    {
-        var count = 0;
-
-        foreach (var tier in plan.Countries.SelectMany(country => country.Tiers))
+        catch (InvalidOperationException exception)
         {
-            var matchdays = await _matchdays.LoadDivisionMatchdaysAsync(tier.DivisionSeason.Id, cancellationToken);
-
-            count += matchdays.Count(matchday => matchday.PublicationStatus != MatchdayPublicationStatus.Published);
+            throw new PermanentJobFailureException(exception.Message);
         }
-
-        return count;
     }
-
-    private async Task<List<string>> DetectDriftAsync(RolloverPlan plan, CancellationToken cancellationToken)
-    {
-        var drift = new List<string>();
-
-        foreach (var tier in plan.Countries.SelectMany(country => country.Tiers))
-        {
-            var reconciliation = await _rebuild.ExecuteAsync(tier.DivisionSeason.Id, apply: false, cancellationToken);
-
-            if (reconciliation.Outcome != ProjectionRebuildOutcome.Reconciled)
-            {
-                drift.Add($"division-season {tier.DivisionSeason.Id} did not reconcile ({reconciliation.Outcome})");
-            }
-        }
-
-        return drift;
-    }
-
-    private static List<TierStandings> ToTiers(RolloverCountry country) =>
-        country.Tiers
-            .Select(tier => new TierStandings(tier.TierNumber, tier.RankedClubIds))
-            .ToList();
 
     private void RecordAudit(string action, Guid rolloverId, string reason) =>
         _audit.Record(new AuditEntry(
@@ -857,35 +791,4 @@ public sealed partial class RunSeasonRollover
         int countries,
         int promotions,
         int relegations);
-
-    private sealed record RolloverTier(
-        int TierNumber,
-        Guid DivisionId,
-        string DivisionDisplayName,
-        DivisionSeason DivisionSeason,
-        IReadOnlyList<Guid> RankedClubIds,
-        IReadOnlyList<ClubSeasonEntry> Entries)
-    {
-        /// <summary>The 1-based final position of a club, from the row the projection stored (`TBL-12`).</summary>
-        public int RankOf(Guid clubId)
-        {
-            for (var index = 0; index < RankedClubIds.Count; index++)
-            {
-                if (RankedClubIds[index] == clubId)
-                {
-                    return index + 1;
-                }
-            }
-
-            return 0;
-        }
-    }
-
-    private sealed record RolloverCountry(
-        Guid CountryId,
-        string Code,
-        string DisplayName,
-        IReadOnlyList<RolloverTier> Tiers);
-
-    private sealed record RolloverPlan(IReadOnlyList<RolloverCountry> Countries);
 }

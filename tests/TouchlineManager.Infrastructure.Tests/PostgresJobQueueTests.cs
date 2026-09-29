@@ -237,6 +237,72 @@ public sealed class PostgresJobQueueTests
     }
 
     [Fact]
+    public async Task Requeueing_a_dead_lettered_job_resets_it_with_a_fresh_budget()
+    {
+        var businessKey = NewKey("requeue");
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+
+            await queue.EnqueueAsync(Request(businessKey) with { MaxAttempts = 1 }, CancellationToken.None);
+
+            var job = (await queue.ClaimAsync("worker-a", maxJobs: 100, LeaseDuration, CancellationToken.None))
+                .Single(candidate => candidate.BusinessKey == businessKey);
+
+            await queue.FailAsync(job.Id, "a projection drifted", JobFailureKind.Permanent, CancellationToken.None);
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            (await db.Jobs.SingleAsync(j => j.BusinessKey == businessKey)).Status.Should().Be("dead_letter");
+
+            var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+
+            (await queue.RequeueAsync("ops.test", businessKey, CancellationToken.None))
+                .Should()
+                .BeTrue("an operator-forced retry puts the dead-lettered work back on the queue (ADR-0031)");
+
+            db.ChangeTracker.Clear();
+            var row = await db.Jobs.SingleAsync(j => j.BusinessKey == businessKey);
+
+            row.Status.Should().Be("pending");
+            row.AttemptCount.Should().Be(0, "the resumed attempt gets a clean budget");
+            row.LastError.Should().BeNull();
+            row.DueAt.Should().Be(_fixture.Clock.UtcNow);
+            row.LeaseOwner.Should().BeNull();
+            row.LeaseUntil.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public async Task Requeueing_a_job_that_is_not_dead_lettered_is_a_no_op()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+        var businessKey = NewKey("requeue-pending");
+
+        await queue.EnqueueAsync(Request(businessKey), CancellationToken.None);
+
+        (await queue.RequeueAsync("ops.test", businessKey, CancellationToken.None))
+            .Should()
+            .BeFalse("a pending job is the queue's to run, not an operator's to reset");
+
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        (await db.Jobs.SingleAsync(j => j.BusinessKey == businessKey)).Status.Should().Be("pending");
+    }
+
+    [Fact]
+    public async Task Requeueing_an_unknown_job_reports_nothing_to_do()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+
+        (await queue.RequeueAsync("ops.test", NewKey("missing"), CancellationToken.None)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Claimed_jobs_are_returned_in_priority_then_due_order()
     {
         await using var scope = _fixture.CreateScope();

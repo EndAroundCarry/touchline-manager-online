@@ -3,6 +3,55 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 12 — Operator preview and resume for the season rollover
+
+The rollover becomes operable. An operator can now see exactly what a rollover would move and pay before it
+runs, close a season on demand in a non-production environment, and resume a failed rollover instead of being
+stuck with a dead-lettered job. This is the fourth Stage 12 milestone (ADR-0034); the five-season compressed
+staging run and Stage 13's PWA hardening are the later ones.
+
+### Added
+
+- **A read-only rollover preview** (`PR-4`, `TBL-13`, ADR-0034): `POST /api/v1/ops/diagnostics/preview-rollover`
+  reports preflight (unpublished matchdays and each division's reconciliation), the promotion/relegation plan
+  and its totals for every country, the position awards the finalize phase would pay, and whether the rollover
+  is ready — all without writing anything or taking a lock (`ADR-0020`).
+- **A run-now trigger** (`PR-4`): `POST /api/v1/ops/diagnostics/run-rollover` enqueues the season's real
+  `competition.season-rollover` job, due now, under the scheduler's own business key, exactly as the calendar
+  deadline would. The worker still runs the resumable machine (ADR-0016's pattern).
+- **An audited resume control** (`PR-4`, ADR-0031, ADR-0034): `POST /api/v1/ops/diagnostics/resume-rollover`
+  retries a `Failed` rollover from `Started`, records `world.season_rollover.resumed` with the operator's
+  reason, and returns its dead-lettered job to the queue.
+- **`IJobQueue.RequeueAsync`** (ADR-0003): resets a `dead_letter` job to `pending` with a fresh attempt budget
+  on an operator's authority, and reports whether it acted. It is the only way to run a job the queue has
+  stopped retrying, and Stage 14's admin tools will reuse it.
+- **`SeasonRolloverPlanLoader`**: the closing season's shape, extracted from `RunSeasonRollover` and shared
+  with the preview, so a dry run and the run it previews read one plan and cannot drift (ADR-0031 decision 5).
+- A `Diagnostics:EnableRolloverTrigger` switch. Off by default and never set outside a test environment, so
+  the controls have no production surface (master plan §17.12); the rollover itself stays worker-only
+  (ADR-0031 §7).
+
+### Notes
+
+- **No migration.** The preview reads existing tables and columns; `RequeueAsync` updates `ops.jobs`; the
+  audit action reuses `ops.audit_entries`.
+- **The production operator surface is Stage 14's.** These are non-production diagnostics controls, not the
+  admin UI, MFA, or runbooks the hardening stage owns.
+- **ADR-0034** records the decisions: a read-only preview reusing the machine's plan, a trigger that only
+  enqueues, an audited resume on a new queue operation, and the non-production gate.
+
+### Tests
+
+- New application tests (over fakes): the resume retries, audits with the reason, and requeues (falling back
+  to an enqueue when no dead-lettered row survives); it is a no-op when the rollover has completed, has not
+  failed, or does not exist, and refuses a blank reason; the trigger enqueues the real job due now.
+- New real-PostgreSQL tests: `RequeueAsync` resets a dead-lettered job with a fresh budget, and leaves a
+  pending or unknown one alone; a preview reports not-ready before the season is played, then three-up/
+  three-down, the tier awards, and writes nothing; a rollover forced `Failed` by a corrupted table row is
+  reconciled, resumed, and completes with each club moved exactly once.
+- New API tests: the three controls are `404` when the flag is off; with it on, the preview reads the current
+  season, the run enqueues under `season:{id}:rollover`, and a resume without a reason is a `400`.
+
 ## Stage 12 — Season history, career stats, and the provisioning seed fix
 
 The season's records become readable, and a latent generation defect is fixed. A club's finished seasons

@@ -314,6 +314,16 @@ public static class DependencyInjection
         // Driven by the worker's rollover job; it has no public command (PR-4, §7.2, ADR-0031).
         services.AddScoped<RunSeasonRollover>();
 
+        // The closing season's shape, shared by the rollover machine and its operator preview so a dry run and
+        // the run it previews read the same plan (ADR-0031, ADR-0034).
+        services.AddScoped<SeasonRolloverPlanLoader>();
+
+        // Reachable only from the non-production diagnostics controls (§17.12, ADR-0034): a read-only preview,
+        // a run-now enqueue of the real job, and an audited resume of a failed rollover.
+        services.AddScoped<PreviewSeasonRollover>();
+        services.AddScoped<TriggerSeasonRollover>();
+        services.AddScoped<ResumeSeasonRollover>();
+
         // Reachable only from the non-production diagnostics trigger (§17.12).
         services.AddScoped<TriggerMatchday>();
     }

@@ -49,6 +49,8 @@ the system is shaped the way it is.
 | [0030](0030-provisioning-execution-and-bootstrap-provenance.md) | Provisioning execution is a worker job under the country lock, and a backfilled round is generated history | Accepted |
 | [0031](0031-season-rollover-state-machine.md) | Season rollover is one world-scoped resumable job with a checkpoint row | Accepted |
 | [0032](0032-rollover-continuity.md) | Rollover continuity — contract expiry, retirement, awards, and season finance summaries | Accepted |
+| [0033](0033-club-identity-seeded-from-the-world-seed.md) | Club identity is seeded from the world seed, never from the per-tier provisioning seed | Accepted |
+| [0034](0034-operator-rollover-preview-and-resume.md) | Operator preview and resume for the season rollover | Accepted |
 
 ## Rules for changing an ADR
 

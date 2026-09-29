@@ -25,6 +25,21 @@ public interface IJobQueue
     Task<bool> EnqueueAsync(JobEnqueueRequest request, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Returns a dead-lettered job to the queue for another attempt, on an operator's authority.
+    /// </summary>
+    /// <remarks>
+    /// Only a <c>dead_letter</c> row is acted on, and the attempt budget is reset, so an operator-forced
+    /// retry is a clean attempt rather than a continuation of the exhausted one. A leased, pending, or
+    /// completed job is left untouched — the queue already owns it, or it is already done (ADR-0003,
+    /// ADR-0031).
+    /// </remarks>
+    /// <param name="jobType">The job type.</param>
+    /// <param name="businessKey">The job's business key.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when a dead-lettered row was reset; <see langword="false"/> otherwise.</returns>
+    Task<bool> RequeueAsync(string jobType, string businessKey, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Claims up to <paramref name="maxJobs"/> ready jobs, including jobs whose lease has
     /// expired, using <c>FOR UPDATE SKIP LOCKED</c> so concurrent workers never block on each
     /// other.

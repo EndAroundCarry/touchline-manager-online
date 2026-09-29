@@ -275,6 +275,11 @@ if (diagnostics.EnableInactivityTrigger)
     moduleGroups["ops"].MapInactivityTrigger();
 }
 
+if (diagnostics.EnableRolloverTrigger)
+{
+    moduleGroups["ops"].MapRolloverControls();
+}
+
 if (clock.IsCompressed)
 {
     app.Logger.LogWarning(

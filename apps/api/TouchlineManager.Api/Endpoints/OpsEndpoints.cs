@@ -130,6 +130,54 @@ internal static class OpsEndpoints
         return group;
     }
 
+    /// <summary>Maps the Stage 12 operator rollover controls onto the ops module group.</summary>
+    /// <remarks>
+    /// Three non-production controls for the season rollover (ADR-0034): a read-only preview of what a
+    /// rollover would move, pay, and refuse; a run-now enqueue of the season's real rollover job; and an
+    /// audited resume of a failed rollover. The worker still runs the state machine, so the rollover itself
+    /// stays worker-only (ADR-0031 §7), and the whole group is mapped only when the diagnostics flag is on.
+    /// </remarks>
+    public static RouteGroupBuilder MapRolloverControls(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapPost("/diagnostics/preview-rollover", PreviewRolloverAsync)
+            .WithName("PreviewSeasonRollover")
+            .WithSummary("Reads what a season rollover would do, without writing anything (ADR-0034).")
+            .WithDescription(
+                "Development and staging diagnostics only. Reports preflight, the promotion/relegation plan "
+                + "for every country, and the position awards the finalize phase would pay. It takes no lock "
+                + "and writes nothing.")
+            .Produces<RolloverPreviewResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group
+            .MapPost("/diagnostics/run-rollover", RunRolloverAsync)
+            .WithName("RunSeasonRollover")
+            .WithSummary("Enqueues a season's real rollover job, due now, so a season can be closed on demand.")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker runs the resumable state machine exactly "
+                + "as it would when the calendar deadline passes; this only does what the worker-only "
+                + "scheduler normally does, and a repeated call is a no-op.")
+            .Produces<RolloverTriggerResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group
+            .MapPost("/diagnostics/resume-rollover", ResumeRolloverAsync)
+            .WithName("ResumeSeasonRollover")
+            .WithSummary("Retries a failed rollover and returns its dead-lettered job to the queue.")
+            .WithDescription(
+                "Development and staging diagnostics only. Requires a reason, recorded in the audit trail. "
+                + "The rollover resumes from its checkpoint; the worker still does all of the work.")
+            .Produces<RolloverResumeResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        return group;
+    }
+
     private static async Task<IResult> ProvisionDivisionAsync(
         ProvisionDivisionRequest request,
         TriggerProvisioning trigger,
@@ -171,6 +219,89 @@ internal static class OpsEndpoints
         return Results.Json(
             new InactivityTriggerResponse(result.BusinessKey, result.Enqueued),
             statusCode: StatusCodes.Status202Accepted);
+    }
+
+    private static async Task<IResult> PreviewRolloverAsync(
+        RolloverPreviewRequest? request,
+        PreviewSeasonRollover preview,
+        CancellationToken cancellationToken)
+    {
+        var result = await preview.ExecuteAsync(request?.SeasonId, cancellationToken);
+
+        if (result is null)
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                CompetitionErrorCodes.RolloverNotFound,
+                "No season was found.",
+                "The world or the requested season does not exist.");
+        }
+
+        return Results.Json(RolloverPreviewResponse.From(result), statusCode: StatusCodes.Status200OK);
+    }
+
+    private static async Task<IResult> RunRolloverAsync(
+        RolloverTriggerRequest? request,
+        TriggerSeasonRollover trigger,
+        CancellationToken cancellationToken)
+    {
+        var result = await trigger.ExecuteAsync(request?.SeasonId, cancellationToken);
+
+        if (result.Outcome == TriggerSeasonRolloverOutcome.SeasonNotFound)
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                CompetitionErrorCodes.RolloverNotFound,
+                "No season was found.",
+                "The world or the requested season does not exist.");
+        }
+
+        return Results.Json(
+            new RolloverTriggerResponse(result.SeasonId, result.BusinessKey, result.Enqueued),
+            statusCode: StatusCodes.Status202Accepted);
+    }
+
+    private static async Task<IResult> ResumeRolloverAsync(
+        RolloverResumeRequest request,
+        ResumeSeasonRollover resume,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason)
+            || request.Reason.Length > ResumeSeasonRollover.ReasonMaxLength)
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status400BadRequest,
+                CompetitionErrorCodes.RolloverResumeReasonRequired,
+                "A reason is required to resume a rollover.",
+                "Send why the rollover is being resumed, of at most "
+                + $"{ResumeSeasonRollover.ReasonMaxLength} characters.");
+        }
+
+        var result = await resume.ExecuteAsync(request.SeasonId, request.Reason, cancellationToken);
+
+        return result.Outcome switch
+        {
+            ResumeSeasonRolloverOutcome.Resumed => Results.Json(
+                new RolloverResumeResponse(
+                    result.SeasonId,
+                    result.RolloverId!.Value,
+                    result.BusinessKey,
+                    result.Requeued,
+                    ResumeSeasonRolloverOutcome.Resumed.ToString()),
+                statusCode: StatusCodes.Status202Accepted),
+
+            ResumeSeasonRolloverOutcome.NotFound => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                CompetitionErrorCodes.RolloverNotFound,
+                "No rollover was found.",
+                "The requested season has no rollover to resume."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                CompetitionErrorCodes.RolloverNotResumable,
+                "The rollover cannot be resumed.",
+                "Only a failed rollover can be resumed; this one has already completed or is in progress."),
+        };
     }
 
     private static async Task<IResult> PlayAuctionAsync(
@@ -294,3 +425,171 @@ internal sealed record ProvisioningTriggerResponse(
 /// <param name="BusinessKey">The business key of the enqueued job.</param>
 /// <param name="Enqueued"><see langword="true"/> when the ladder row was newly inserted.</param>
 internal sealed record InactivityTriggerResponse(string BusinessKey, bool Enqueued);
+
+/// <summary>The body of the rollover preview request.</summary>
+/// <param name="SeasonId">The season to preview, or null for the world's current season.</param>
+internal sealed record RolloverPreviewRequest(Guid? SeasonId);
+
+/// <summary>The body of the rollover trigger request.</summary>
+/// <param name="SeasonId">The season to close, or null for the world's current season.</param>
+internal sealed record RolloverTriggerRequest(Guid? SeasonId);
+
+/// <summary>Response of the rollover trigger.</summary>
+/// <param name="SeasonId">The season that will close.</param>
+/// <param name="BusinessKey">The business key of the enqueued job.</param>
+/// <param name="Enqueued"><see langword="true"/> when a new job row was inserted.</param>
+internal sealed record RolloverTriggerResponse(Guid SeasonId, string BusinessKey, bool Enqueued);
+
+/// <summary>The body of the rollover resume request.</summary>
+/// <param name="SeasonId">The season whose failed rollover is resumed.</param>
+/// <param name="Reason">Why the operator is resuming it. Required, and stored in the audit trail.</param>
+internal sealed record RolloverResumeRequest(Guid SeasonId, string? Reason);
+
+/// <summary>Response of the rollover resume.</summary>
+/// <param name="SeasonId">The season whose rollover was resumed.</param>
+/// <param name="RolloverId">The rollover row.</param>
+/// <param name="BusinessKey">The business key of the requeued job.</param>
+/// <param name="Requeued"><see langword="true"/> when a dead-lettered job row was reset.</param>
+/// <param name="Outcome">The resume outcome, as a stable code.</param>
+internal sealed record RolloverResumeResponse(
+    Guid SeasonId,
+    Guid RolloverId,
+    string BusinessKey,
+    bool Requeued,
+    string Outcome);
+
+/// <summary>One club's movement in a previewed rollover.</summary>
+/// <param name="ClubId">The club.</param>
+/// <param name="FromTier">The tier it played in.</param>
+/// <param name="ToTier">The tier it would play in next.</param>
+/// <param name="IsPromoted">Whether it would go up.</param>
+/// <param name="IsRelegated">Whether it would go down.</param>
+internal sealed record RolloverMovementResponse(
+    Guid ClubId,
+    int FromTier,
+    int ToTier,
+    bool IsPromoted,
+    bool IsRelegated);
+
+/// <summary>One country's movements in a previewed rollover.</summary>
+/// <param name="CountryId">The country.</param>
+/// <param name="Code">The country's code.</param>
+/// <param name="DisplayName">The country's name.</param>
+/// <param name="Movements">One movement per club.</param>
+internal sealed record RolloverCountryResponse(
+    Guid CountryId,
+    string Code,
+    string DisplayName,
+    IReadOnlyList<RolloverMovementResponse> Movements);
+
+/// <summary>One division-season's preflight reconciliation.</summary>
+/// <param name="DivisionSeasonId">The division-season.</param>
+/// <param name="TierNumber">The tier.</param>
+/// <param name="Outcome">The reconciliation outcome, as a stable code.</param>
+/// <param name="StandingsDrifted">How many table rows differed.</param>
+/// <param name="PlayerStatsDrifted">How many player lines differed or had no source.</param>
+internal sealed record RolloverDivisionResponse(
+    Guid DivisionSeasonId,
+    int TierNumber,
+    string Outcome,
+    int StandingsDrifted,
+    int PlayerStatsDrifted);
+
+/// <summary>The preflight a rollover would run.</summary>
+/// <param name="UnpublishedMatchdays">Rounds of the closing season not yet published.</param>
+/// <param name="Reconciles">Whether every division-season reconciles with its published results.</param>
+/// <param name="Problem">Why the plan could not be read at all, when it could not.</param>
+/// <param name="Divisions">The per-division reconciliation reads.</param>
+internal sealed record RolloverPreflightResponse(
+    int UnpublishedMatchdays,
+    bool Reconciles,
+    string? Problem,
+    IReadOnlyList<RolloverDivisionResponse> Divisions);
+
+/// <summary>The totals a previewed rollover would produce.</summary>
+/// <param name="Countries">How many countries would move.</param>
+/// <param name="Clubs">How many clubs would be placed.</param>
+/// <param name="Promotions">How many clubs would go up.</param>
+/// <param name="Relegations">How many clubs would go down.</param>
+/// <param name="PositionAwardsMinor">The position awards the finalize phase would pay, in minor units.</param>
+internal sealed record RolloverTotalsResponse(
+    int Countries,
+    int Clubs,
+    int Promotions,
+    int Relegations,
+    long PositionAwardsMinor);
+
+/// <summary>What a rollover would do, read without writing anything.</summary>
+/// <param name="WorldId">The world.</param>
+/// <param name="SeasonId">The season that would close.</param>
+/// <param name="SeasonLabel">The season's label.</param>
+/// <param name="SeasonStatus">The season's lifecycle state, as a stable code.</param>
+/// <param name="RolloverPhase">The rollover's checkpoint, or null when none has started.</param>
+/// <param name="FailureReason">Why a failed rollover stopped, when it did.</param>
+/// <param name="Preflight">The preflight checks the run would perform.</param>
+/// <param name="NextSeasonExists">Whether the next season already exists.</param>
+/// <param name="Countries">The movement plan per country.</param>
+/// <param name="Totals">The plan's totals.</param>
+/// <param name="Ready">Whether preflight passes and the rollover is not already completed.</param>
+internal sealed record RolloverPreviewResponse(
+    Guid WorldId,
+    Guid SeasonId,
+    string SeasonLabel,
+    string SeasonStatus,
+    string? RolloverPhase,
+    string? FailureReason,
+    RolloverPreflightResponse Preflight,
+    bool NextSeasonExists,
+    IReadOnlyList<RolloverCountryResponse> Countries,
+    RolloverTotalsResponse Totals,
+    bool Ready)
+{
+    /// <summary>Projects the application preview onto the transport shape.</summary>
+    /// <param name="preview">The preview to project.</param>
+    public static RolloverPreviewResponse From(SeasonRolloverPreview preview)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+
+        return new RolloverPreviewResponse(
+            preview.WorldId,
+            preview.SeasonId,
+            preview.SeasonLabel,
+            preview.SeasonStatus,
+            preview.RolloverPhase,
+            preview.FailureReason,
+            new RolloverPreflightResponse(
+                preview.Preflight.UnpublishedMatchdays,
+                preview.Preflight.Reconciles,
+                preview.Preflight.Problem,
+                preview.Preflight.Divisions
+                    .Select(division => new RolloverDivisionResponse(
+                        division.DivisionSeasonId,
+                        division.TierNumber,
+                        division.Outcome,
+                        division.StandingsDrifted,
+                        division.PlayerStatsDrifted))
+                    .ToList()),
+            preview.NextSeasonExists,
+            preview.Countries
+                .Select(country => new RolloverCountryResponse(
+                    country.CountryId,
+                    country.Code,
+                    country.DisplayName,
+                    country.Movements
+                        .Select(movement => new RolloverMovementResponse(
+                            movement.ClubId,
+                            movement.FromTier,
+                            movement.ToTier,
+                            movement.IsPromoted,
+                            movement.IsRelegated))
+                        .ToList()))
+                .ToList(),
+            new RolloverTotalsResponse(
+                preview.Totals.Countries,
+                preview.Totals.Clubs,
+                preview.Totals.Promotions,
+                preview.Totals.Relegations,
+                preview.Totals.PositionAwardsMinor),
+            preview.Ready);
+    }
+}

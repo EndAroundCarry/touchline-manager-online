@@ -63,4 +63,7 @@ public static class WorldAuditActions
 
     /// <summary>The closing season's contracts were resolved at rollover (`CON-6`, `CON-8`).</summary>
     public const string SquadsSettled = "world.season_rollover.squads_settled";
+
+    /// <summary>An operator resumed a failed rollover, with a reason (ADR-0031, ADR-0034).</summary>
+    public const string RolloverResumed = "world.season_rollover.resumed";
 }
