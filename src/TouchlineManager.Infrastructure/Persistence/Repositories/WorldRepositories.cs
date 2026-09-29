@@ -282,4 +282,16 @@ internal sealed class GenerationRunRepository : IGenerationRunRepository
 
     /// <inheritdoc />
     public void Add(GenerationRun run) => _dbContext.GenerationRuns.Add(run);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The plan keeps one world (`WORLD-1`), so the bootstrap run is a singleton; ordering by creation makes
+    /// an accidental second one answer deterministically rather than by row order.
+    /// </remarks>
+    public Task<string?> FindWorldSeedAsync(CancellationToken cancellationToken) =>
+        _dbContext.GenerationRuns
+            .Where(run => run.Kind == GenerationRunKind.WorldBootstrap)
+            .OrderBy(run => run.StartedAt)
+            .Select(run => run.Seed)
+            .FirstOrDefaultAsync(cancellationToken);
 }

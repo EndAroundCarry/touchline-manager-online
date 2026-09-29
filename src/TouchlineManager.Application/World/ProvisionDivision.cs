@@ -185,9 +185,17 @@ public sealed partial class ProvisionDivision
 
             if (existing is null)
             {
+                // Club identity is seeded from the world seed, not from the per-tier request seed, so a
+                // provisioned tier's names continue the tier above rather than landing independently on the
+                // name cycle (PYR-11, ADR-0033).
+                var worldSeed = await _generationRuns.FindWorldSeedAsync(cancellationToken)
+                    ?? throw new PermanentJobFailureException(
+                        "The world's generation seed is missing, so a provisioned tier cannot be named (ADR-0033).");
+
                 var generated = _generator.BuildTier(
                     new TierGenerationRequest(
                         Seed: request.GenerationSeed,
+                        WorldSeed: worldSeed,
                         Country: country,
                         Tier: targetTier,
                         Season: season,
@@ -204,6 +212,7 @@ public sealed partial class ProvisionDivision
                     DivisionProvisioningGenerator.Version,
                     DivisionProvisioningGenerator.InputHashFor(
                         request.GenerationSeed,
+                        worldSeed,
                         country.Code,
                         targetTier,
                         WorldRuleSet.ClubsPerDivision),

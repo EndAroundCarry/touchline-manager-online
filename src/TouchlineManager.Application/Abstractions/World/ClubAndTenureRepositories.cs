@@ -128,4 +128,16 @@ public interface IGenerationRunRepository
 {
     /// <summary>Stages a generation-run record.</summary>
     void Add(GenerationRun run);
+
+    /// <summary>
+    /// Reads the seed the world was bootstrapped from, or null when no world has been seeded.
+    /// </summary>
+    /// <remarks>
+    /// The provisioning worker reads this so a provisioned tier's clubs are named from the same seed as the
+    /// seeded tier above them. Club identity is a property of the world, not of the tier being generated, so
+    /// deriving it from the per-tier provisioning seed would let two tiers of one country propose the same
+    /// names (`PYR-11`, `PYR-14`).
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<string?> FindWorldSeedAsync(CancellationToken cancellationToken);
 }

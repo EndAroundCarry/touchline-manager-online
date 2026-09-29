@@ -162,6 +162,7 @@ public sealed partial class SeedWorld
             var tier = _generator.BuildTier(
                 new TierGenerationRequest(
                     Seed: seed,
+                    WorldSeed: seed,
                     Country: country,
                     Tier: 1,
                     Season: season,

@@ -90,10 +90,14 @@ public sealed class ClubIdentityGeneratorTests
     }
 
     [Fact]
-    public void Ordinals_do_not_restart_per_tier_so_generated_tiers_never_collide()
+    public void Every_tier_of_a_country_is_named_from_one_seed_so_generated_tiers_never_collide()
     {
-        // The bug this guards: if each tier restarted at ordinal zero, every provisioned tier would
-        // propose the same 18 names and the unique name index would reject the second tier (PYR-11).
+        // The bug this guards is twofold. If each tier restarted at ordinal zero, every provisioned tier
+        // would propose the same 18 names; and even with the ordinals folded in, the tiers collide unless
+        // every tier of a country is handed the *same* seed, because the offset is a function of the seed.
+        // The world seeder and the provisioning worker therefore both pass the world seed (ADR-0033), and
+        // this asserts the property that contract buys: every tier's names, over one shared seed, are
+        // disjoint (PYR-11).
         var names = new List<string>();
 
         for (var tier = 1; tier <= 12; tier++)

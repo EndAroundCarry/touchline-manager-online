@@ -7,6 +7,7 @@ using TouchlineManager.Application.World;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
+using TouchlineManager.Domain.World.Generation;
 using TouchlineManager.Infrastructure.Persistence;
 using TouchlineManager.Infrastructure.Tests.World;
 
@@ -125,6 +126,71 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
 
             (await db.Divisions.CountAsync(candidate => candidate.CountryId == countryId && candidate.TierNumber == 2))
                 .Should().Be(1, "PYR-3: one tier is created once");
+        }
+    }
+
+    [Fact]
+    public async Task Provisioning_names_a_new_tier_from_the_world_seed_so_it_cannot_collide()
+    {
+        // ADR-0033: club identity is seeded from the world seed, not from the per-tier provisioning request
+        // seed. The request seed folds the target tier in, so using it would place tier 2's eighteen-slot
+        // window independently on the shared name cycle and could overlap tier 1's — which the unique name
+        // index rejects with 23505. This test names the tier's clubs deterministically from the world seed.
+        Guid countryId;
+        string poolKey;
+        string code;
+        Guid requestId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            var world = await db.GameWorlds.SingleAsync();
+            var season = await db.Seasons.SingleAsync(candidate => candidate.WorldId == world.Id);
+            var country = await db.Countries.OrderBy(candidate => candidate.SortOrder).FirstAsync();
+
+            countryId = country.Id;
+            poolKey = country.NamePoolKey;
+            code = country.Code;
+
+            requestId = await CreateRequestAsync(scope, countryId, targetTier: 2, season.Id);
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProvisionDivision>()
+                .ExecuteAsync(requestId, CancellationToken.None);
+        }
+
+        await using (var verify = _fixture.CreateScope())
+        {
+            var db = verify.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            var allNames = await db.Clubs
+                .Where(club => club.CountryId == countryId)
+                .Select(club => club.NormalizedName)
+                .ToListAsync();
+
+            allNames.Should().HaveCount(36, "PYR-11: two tiers of eighteen clubs");
+            allNames.Should().OnlyHaveUniqueItems(
+                "ADR-0033: a provisioned tier must continue the name cycle of the tier above it");
+
+            var tierTwoNames = await (
+                from entry in db.ClubSeasonEntries
+                join divisionSeason in db.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+                join division in db.Divisions on divisionSeason.DivisionId equals division.Id
+                join club in db.Clubs on entry.ClubId equals club.Id
+                where division.CountryId == countryId && division.TierNumber == 2
+                select club.Name)
+                .ToListAsync();
+
+            var expected = ClubIdentityGenerator
+                .GenerateDivision(WorldFixture.Seed, poolKey, code, tierNumber: 2, clubCount: 18)
+                .Select(identity => identity.Name)
+                .ToList();
+
+            tierTwoNames.Should().BeEquivalentTo(
+                expected,
+                "ADR-0033: the worker names a tier's clubs from the world seed, not the request seed");
         }
     }
 

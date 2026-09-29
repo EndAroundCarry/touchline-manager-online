@@ -574,7 +574,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `inactivity_close_days` | 21 | OCC-3 |
 | `resignation_cooldown_days` | 7 | OCC-4 |
 | `provisioning_poll_seconds` | 30 | PYR-10 |
-| `provisioning_generator_version` | `division-gen-v1` | PYR-14 |
+| `provisioning_generator_version` | `division-gen-v2` | PYR-14 |
 | `reminder_lead_hours` | 24 | COM-7 |
 | `notification_preferences_default` | all on: deadline reminders, inactivity warnings, market messages, news digest | COM-8 |
 | `outbox_dispatch_bucket` | 1 minute | COM-9, `MOD-4` |

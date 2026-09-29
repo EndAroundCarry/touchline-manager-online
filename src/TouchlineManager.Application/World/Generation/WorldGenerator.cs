@@ -13,6 +13,12 @@ namespace TouchlineManager.Application.World.Generation;
 
 /// <summary>What to generate for one tier.</summary>
 /// <param name="Seed">The generation seed (`PYR-14`).</param>
+/// <param name="WorldSeed">
+/// The world's own generation seed, used only for club identity. It is deliberately separate from
+/// <paramref name="Seed"/>: a provisioned tier's <paramref name="Seed"/> is per-tier (so a retried request
+/// reproduces the same tier), but club identity must come from one seed for every tier of a country, or two
+/// tiers would be placed independently on the name cycle and could collide (`PYR-11`, ADR-0033).
+/// </param>
 /// <param name="Country">The country the tier belongs to; supplies its code, name pool, and display name.</param>
 /// <param name="Tier">The tier number, starting at 1.</param>
 /// <param name="Season">The season the tier plays in.</param>
@@ -26,6 +32,7 @@ namespace TouchlineManager.Application.World.Generation;
 /// </param>
 public sealed record TierGenerationRequest(
     string Seed,
+    string WorldSeed,
     Country Country,
     int Tier,
     Season Season,
@@ -130,8 +137,11 @@ public sealed class WorldGenerator
         divisionSeason.Activate(now);
         _world.AddDivisionSeason(divisionSeason);
 
+        // Club identity is seeded from the world seed, never from the per-tier request seed: the ordinals
+        // that keep a tier's names disjoint from the tier above only do so when every tier of a country draws
+        // the same offset, and the offset is a function of the seed it is handed (PYR-11, ADR-0033).
         var identities = ClubIdentityGenerator.GenerateDivision(
-            seed,
+            request.WorldSeed,
             country.NamePoolKey,
             country.Code,
             tier,

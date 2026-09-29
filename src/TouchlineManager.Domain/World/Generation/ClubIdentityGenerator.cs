@@ -19,6 +19,13 @@ namespace TouchlineManager.Domain.World.Generation;
 /// name index would reject the second one (`PYR-11`).
 /// </para>
 /// <para>
+/// The ordinal folding makes that sufficient only when every tier of a country is handed the <em>same</em>
+/// seed, because the offset is a function of that seed. The seed here is therefore always the world's
+/// generation seed — never a per-tier or per-request seed — so a provisioned tier lands on the same name
+/// cycle as the tier above it (`PYR-11`, ADR-0033). Passing a tier-dependent seed would place each tier's
+/// eighteen-slot window independently and could collide; that was the defect ADR-0033 fixed.
+/// </para>
+/// <para>
 /// Names are unique by construction rather than by retry. Each ordinal maps to a distinct
 /// <c>(cycle, place, suffix)</c> triple, and the cycle contributes a distinct qualifier or numeral, so
 /// two ordinals can never produce the same name — including at the far end of a very deep pyramid, where
