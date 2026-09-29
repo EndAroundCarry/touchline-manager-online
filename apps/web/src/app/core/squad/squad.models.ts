@@ -155,6 +155,27 @@ export interface PlayerSeasonStats {
   readonly averageRating: number | null;
 }
 
+/** One season of a player's career (`STA-2`). */
+export interface PlayerCareerSeason {
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly stats: PlayerSeasonStats;
+}
+
+/**
+ * A player's whole career across seasons (`STA-2`).
+ *
+ * A read-only aggregation over the season statistics, which survive rollover, so it is derived rather than
+ * stored. Null on the profile before the player has ever appeared.
+ */
+export interface PlayerCareerStats {
+  readonly totals: PlayerSeasonStats;
+  readonly seasonsPlayed: number;
+  readonly seasons: readonly PlayerCareerSeason[];
+}
+
 /** A player's full profile: the attribute grid plus the state and contract around it. */
 export interface Player {
   readonly id: string;
@@ -176,6 +197,7 @@ export interface Player {
   readonly registration: PlayerRegistrationSummary | null;
   readonly availability: readonly PlayerAvailability[];
   readonly seasonStats: PlayerSeasonStats | null;
+  readonly careerStats: PlayerCareerStats | null;
   readonly serverTime: string;
 }
 

@@ -9,6 +9,7 @@ import {
   positionFamilyOf,
   positionLabel,
   seasonStatRows,
+  seasonsPlayedLabel,
   squadStatusLabel,
   stateBand,
   stateRows,
@@ -261,6 +262,13 @@ describe('squad presentation', () => {
       const unrated = seasonStatRows({ ...stats, averageRating: null });
 
       expect(unrated.find((row) => row.label === 'Average rating')?.value).toBe('\u2014');
+    });
+  });
+
+  describe('seasonsPlayedLabel', () => {
+    it('names the seasons a player has appeared in, with the right plural (STA-2)', () => {
+      expect(seasonsPlayedLabel(1)).toBe('1 season');
+      expect(seasonsPlayedLabel(4)).toBe('4 seasons');
     });
   });
 });

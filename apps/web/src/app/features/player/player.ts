@@ -1,12 +1,14 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
+import { averageRatingLabel } from '../../core/competition/competition-presentation';
 import {
   attributeGroups,
   availabilityLabel,
   footLabel,
   positionLabel,
   seasonStatRows,
+  seasonsPlayedLabel,
   squadStatusLabel,
   stateRows,
 } from '../../core/squad/squad-presentation';
@@ -68,6 +70,23 @@ export class PlayerProfile implements OnInit {
     const stats = this.player()?.seasonStats;
 
     return stats === null || stats === undefined ? [] : seasonStatRows(stats);
+  });
+
+  /** The player's career totals as summary lines, or an empty list before they have ever appeared (`STA-2`). */
+  protected readonly careerTotals = computed(() => {
+    const career = this.player()?.careerStats;
+
+    return career === null || career === undefined ? [] : seasonStatRows(career.totals);
+  });
+
+  /** The player's seasons, most recent first, or an empty list (`STA-2`). */
+  protected readonly careerSeasons = computed(() => this.player()?.careerStats?.seasons ?? []);
+
+  /** How many seasons the player has appeared in, as a phrase (`STA-2`). */
+  protected readonly seasonsPlayed = computed(() => {
+    const career = this.player()?.careerStats;
+
+    return career === null || career === undefined ? '' : seasonsPlayedLabel(career.seasonsPlayed);
   });
 
   /** The renewal quote last requested, or null (`CON-3`). */
@@ -133,6 +152,11 @@ export class PlayerProfile implements OnInit {
   /** Names a preferred foot. */
   protected foot(code: string): string {
     return footLabel(code);
+  }
+
+  /** Formats a career season's average rating to one decimal, or a dash before there is one (`TRN-8`). */
+  protected rating(value: number | null): string {
+    return averageRatingLabel(value);
   }
 
   /** Describes an injury or suspension in fixtures. */

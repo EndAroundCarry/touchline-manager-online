@@ -85,6 +85,36 @@ public sealed record SquadSeasonStatRow(
     int RedCards,
     int? AverageRatingBasisPoints);
 
+/// <summary>One season of a player's career, as the profile's career section reads it (`STA-2`).</summary>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="ClubId">The club the player appeared for that season.</param>
+/// <param name="ClubName">The club's generated name.</param>
+/// <param name="Stats">The player's line for that season at that club.</param>
+public sealed record SquadCareerSeasonRow(
+    int SeasonNumber,
+    string SeasonLabel,
+    Guid ClubId,
+    string ClubName,
+    SquadSeasonStatRow Stats);
+
+/// <summary>
+/// A player's whole career: the totals across every season and each season's own line.
+/// </summary>
+/// <remarks>
+/// A pure aggregation over <c>competition.player_season_stats</c>, whose rows survive rollover, so a career is
+/// nothing more than the same projection the leaderboard reads, summed. The rating is recomputed from the
+/// summed basis points and rated appearances rather than averaged from the season averages, so a season with
+/// more rated games carries the weight it should (`TRN-8`).
+/// </remarks>
+/// <param name="Totals">The summed totals across every season the player has appeared in.</param>
+/// <param name="SeasonsPlayed">How many distinct seasons the player has appeared in.</param>
+/// <param name="Seasons">Each season's line, most recent first.</param>
+public sealed record SquadCareer(
+    SquadSeasonStatRow Totals,
+    int SeasonsPlayed,
+    IReadOnlyList<SquadCareerSeasonRow> Seasons);
+
 /// <summary>One player in a club's squad, as stored.</summary>
 /// <remarks>
 /// Carries domain values rather than transport shapes — positions as <see cref="PlayerPosition"/>,
@@ -190,6 +220,7 @@ public sealed record ContractsSnapshot(
 /// <param name="Registration">The player's active registration, if any.</param>
 /// <param name="Availability">Every open injury and suspension.</param>
 /// <param name="SeasonStat">The player's own season line for the club they play for, or null before they have appeared (`STA-2`).</param>
+/// <param name="Career">The player's whole career across seasons, or null before they have ever appeared (`STA-2`).</param>
 /// <param name="SeasonNumber">The season the player is read against.</param>
 /// <param name="GameYear">The season's game year, which is what fixes the player's age.</param>
 public sealed record PlayerSnapshot(
@@ -212,6 +243,7 @@ public sealed record PlayerSnapshot(
     SquadRegistrationRow? Registration,
     IReadOnlyList<SquadAvailabilityRow> Availability,
     SquadSeasonStatRow? SeasonStat,
+    SquadCareer? Career,
     int SeasonNumber,
     int GameYear);
 

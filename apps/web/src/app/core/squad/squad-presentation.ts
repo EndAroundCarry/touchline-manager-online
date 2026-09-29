@@ -330,6 +330,16 @@ export function seasonStatRows(stats: PlayerSeasonStats): readonly SeasonStatRow
   ];
 }
 
+/**
+ * The number of seasons a player has appeared in, as a label (`STA-2`).
+ *
+ * The career totals are otherwise rendered with the same `seasonStatRows` the season summary uses, so the
+ * two cannot format a number differently.
+ */
+export function seasonsPlayedLabel(seasonsPlayed: number): string {
+  return `${seasonsPlayed} ${seasonsPlayed === 1 ? 'season' : 'seasons'}`;
+}
+
 /** What the squad table is currently showing, applied on the client (`SQ-3` bounds it to 25 rows). */
 export interface SquadFilter {
   /** Free text matched against the player's name, case-insensitively. */

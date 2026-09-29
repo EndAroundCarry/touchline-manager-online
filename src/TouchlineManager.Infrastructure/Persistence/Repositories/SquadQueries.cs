@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Application.Abstractions.Squad;
+using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad;
 
@@ -172,6 +173,63 @@ internal sealed class SquadQueries : ISquadQueries
                     : (int?)(stat.RatingBasisPointsTotal / stat.RatedAppearances)))
             .FirstOrDefaultAsync(cancellationToken);
 
+        // The player's whole career: every season line they have, newest first, and the totals summed across
+        // them. Rows survive rollover, so a career is the same projection the leaderboard reads, aggregated,
+        // not a second source of truth; a player who has never appeared has no career rather than a row of
+        // zeroes (STA-2). The rating is recomputed from the summed basis points and rated appearances, so a
+        // season with more rated games carries the weight it should (TRN-8).
+        var careerLines = await (
+            from stat in _dbContext.PlayerSeasonStats
+            join divisionSeason in _dbContext.DivisionSeasons on stat.DivisionSeasonId equals divisionSeason.Id
+            join seasonRow in _dbContext.Seasons on divisionSeason.SeasonId equals seasonRow.Id
+            join club in _dbContext.Clubs on stat.ClubId equals club.Id
+            where stat.PlayerId == playerId
+            orderby seasonRow.SequenceNumber descending
+            select new
+            {
+                seasonRow.SequenceNumber,
+                seasonRow.DisplayLabel,
+                ClubId = club.Id,
+                ClubName = club.Name,
+                Stat = stat,
+            })
+            .ToListAsync(cancellationToken);
+
+        SquadCareer? career = null;
+
+        if (careerLines.Count > 0)
+        {
+            var seasons = careerLines
+                .Select(line => new SquadCareerSeasonRow(
+                    line.SequenceNumber,
+                    line.DisplayLabel,
+                    line.ClubId,
+                    line.ClubName,
+                    ToSeasonStat(line.Stat)))
+                .ToList();
+
+            var ratedAppearances = careerLines.Sum(line => line.Stat.RatedAppearances);
+            var ratingBasisPoints = careerLines.Sum(line => line.Stat.RatingBasisPointsTotal);
+
+            var totals = new SquadSeasonStatRow(
+                careerLines.Sum(line => line.Stat.Appearances),
+                careerLines.Sum(line => line.Stat.Starts),
+                careerLines.Sum(line => line.Stat.MinutesPlayed),
+                careerLines.Sum(line => line.Stat.Goals),
+                careerLines.Sum(line => line.Stat.Assists),
+                careerLines.Sum(line => line.Stat.Shots),
+                careerLines.Sum(line => line.Stat.ShotsOnTarget),
+                careerLines.Sum(line => line.Stat.Saves),
+                careerLines.Sum(line => line.Stat.YellowCards),
+                careerLines.Sum(line => line.Stat.RedCards),
+                ratedAppearances == 0 ? null : (int?)(ratingBasisPoints / ratedAppearances));
+
+            career = new SquadCareer(
+                totals,
+                careerLines.Select(line => line.SequenceNumber).Distinct().Count(),
+                seasons);
+        }
+
         return new PlayerSnapshot(
             row.Player.Id,
             row.Contract.ClubId,
@@ -202,9 +260,27 @@ internal sealed class SquadQueries : ISquadQueries
             registration,
             availability.GetValueOrDefault(playerId, []),
             seasonStat,
+            career,
             season.SequenceNumber,
             season.GameYear);
     }
+
+    /// <summary>Projects one stored season line into the read shape, converting the rating's storage unit.</summary>
+    private static SquadSeasonStatRow ToSeasonStat(PlayerSeasonStat stat) =>
+        new(
+            stat.Appearances,
+            stat.Starts,
+            stat.MinutesPlayed,
+            stat.Goals,
+            stat.Assists,
+            stat.Shots,
+            stat.ShotsOnTarget,
+            stat.Saves,
+            stat.YellowCards,
+            stat.RedCards,
+            stat.RatedAppearances == 0
+                ? null
+                : (int?)(stat.RatingBasisPointsTotal / stat.RatedAppearances));
 
     /// <inheritdoc />
     public async Task<ContractsSnapshot?> GetContractsAsync(Guid clubId, CancellationToken cancellationToken)

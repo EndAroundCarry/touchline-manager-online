@@ -120,6 +120,32 @@ public static class SquadMapping
                 : Math.Round(stat.AverageRatingBasisPoints.Value / 1000m, 1, MidpointRounding.AwayFromZero));
     }
 
+    /// <summary>Projects a player's whole career (`STA-2`).</summary>
+    /// <param name="career">The stored career.</param>
+    public static PlayerCareerStatsResponse ToResponse(this SquadCareer career)
+    {
+        ArgumentNullException.ThrowIfNull(career);
+
+        return new PlayerCareerStatsResponse(
+            career.Totals.ToResponse(),
+            career.SeasonsPlayed,
+            [.. career.Seasons.Select(ToResponse)]);
+    }
+
+    /// <summary>Projects one season of a player's career (`STA-2`).</summary>
+    /// <param name="season">The stored season line.</param>
+    public static PlayerCareerSeasonResponse ToResponse(this SquadCareerSeasonRow season)
+    {
+        ArgumentNullException.ThrowIfNull(season);
+
+        return new PlayerCareerSeasonResponse(
+            season.SeasonNumber,
+            season.SeasonLabel,
+            season.ClubId,
+            season.ClubName,
+            season.Stats.ToResponse());
+    }
+
     /// <summary>Projects a contract as a squad row shows it.</summary>
     /// <param name="contract">The stored contract.</param>
     /// <param name="currentSeasonNumber">The season the remaining term is counted from.</param>
@@ -251,6 +277,7 @@ public static class SquadMapping
             player.Registration?.ToResponse(),
             [.. player.Availability.Select(record => record.ToResponse())],
             player.SeasonStat?.ToResponse(),
+            player.Career?.ToResponse(),
             serverTime);
     }
 

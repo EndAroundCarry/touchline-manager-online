@@ -174,6 +174,10 @@ public sealed record PlayerRegistrationResponse(
 /// The player's own season statistics for the club they play for, or null before they have appeared
 /// (`STA-2`). Read from the publication's projection, so it agrees with the division leaderboard.
 /// </param>
+/// <param name="CareerStats">
+/// The player's whole career across seasons, or null before they have ever appeared (`STA-2`). Derived by
+/// aggregating the season statistics, which survive rollover.
+/// </param>
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record PlayerResponse(
     Guid Id,
@@ -195,6 +199,7 @@ public sealed record PlayerResponse(
     PlayerRegistrationResponse? Registration,
     IReadOnlyList<PlayerAvailabilityResponse> Availability,
     PlayerSeasonStatsResponse? SeasonStats,
+    PlayerCareerStatsResponse? CareerStats,
     DateTimeOffset ServerTime);
 
 /// <summary>
@@ -231,6 +236,34 @@ public sealed record PlayerSeasonStatsResponse(
     int YellowCards,
     int RedCards,
     decimal? AverageRating);
+
+/// <summary>One season of a player's career (`STA-2`, master plan §11.1).</summary>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="ClubId">The club the player appeared for that season.</param>
+/// <param name="ClubName">The club's generated name.</param>
+/// <param name="Stats">The player's line for that season.</param>
+public sealed record PlayerCareerSeasonResponse(
+    int SeasonNumber,
+    string SeasonLabel,
+    Guid ClubId,
+    string ClubName,
+    PlayerSeasonStatsResponse Stats);
+
+/// <summary>
+/// A player's whole career: the totals across every season and each season's own line (`STA-2`).
+/// </summary>
+/// <remarks>
+/// A read-only aggregation over the season statistics, whose rows survive rollover, so it is derived rather
+/// than stored. Null until the player has appeared at least once.
+/// </remarks>
+/// <param name="Totals">The summed totals across every season the player has appeared in.</param>
+/// <param name="SeasonsPlayed">How many distinct seasons the player has appeared in.</param>
+/// <param name="Seasons">Each season's line, most recent first.</param>
+public sealed record PlayerCareerStatsResponse(
+    PlayerSeasonStatsResponse Totals,
+    int SeasonsPlayed,
+    IReadOnlyList<PlayerCareerSeasonResponse> Seasons);
 
 /// <summary>
 /// The player's twenty-eight displayed attributes, grouped into their four families (`TRN-4`).
