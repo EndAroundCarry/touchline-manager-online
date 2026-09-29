@@ -6,6 +6,8 @@ using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Application.Finance;
+using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.World.Generation;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
@@ -77,6 +79,8 @@ public sealed partial class RunSeasonRollover
     private readonly IMatchdayRepository _matchdays;
     private readonly DivisionScheduleGenerator _schedules;
     private readonly RebuildDivisionProjections _rebuild;
+    private readonly SettleSeasonFinances _finances;
+    private readonly SettleSquadContinuity _continuity;
     private readonly IAdvisoryLock _locks;
     private readonly IAuditWriter _audit;
     private readonly IRequestContext _requestContext;
@@ -94,6 +98,8 @@ public sealed partial class RunSeasonRollover
         IMatchdayRepository matchdays,
         DivisionScheduleGenerator schedules,
         RebuildDivisionProjections rebuild,
+        SettleSeasonFinances finances,
+        SettleSquadContinuity continuity,
         IAdvisoryLock locks,
         IAuditWriter audit,
         IRequestContext requestContext,
@@ -109,6 +115,8 @@ public sealed partial class RunSeasonRollover
         _matchdays = matchdays;
         _schedules = schedules;
         _rebuild = rebuild;
+        _finances = finances;
+        _continuity = continuity;
         _locks = locks;
         _audit = audit;
         _requestContext = requestContext;
@@ -152,6 +160,7 @@ public sealed partial class RunSeasonRollover
         await FinalizeAsync(world, season, finalizePlan, now, cancellationToken);
 
         var movePlan = await LoadPlanAsync(world, season, cancellationToken);
+        await SquadsAsync(world, season, now, cancellationToken);
         var nextSeasonId = await MoveAsync(world, season, movePlan, now, cancellationToken);
 
         await CompleteAsync(world, season, nextSeasonId, now, cancellationToken);
@@ -354,12 +363,64 @@ public sealed partial class RunSeasonRollover
             }
         }
 
+        var settlement = plan.Countries
+            .SelectMany(country => country.Tiers)
+            .SelectMany(tier => tier.Entries.Select(entry => new SeasonSettlementClub(
+                entry.ClubId,
+                tier.TierNumber,
+                tier.RankOf(entry.ClubId))))
+            .Where(club => club.FinalRank >= 1)
+            .ToList();
+
+        await _finances.SettleAsync(world.Id, season, settlement, now, cancellationToken);
+
         rollover.Finalize(now);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         LogFinalized(season.Id);
+    }
+
+    /// <summary>
+    /// Resolves the closing season's contracts: retirements, expiries, unmanaged-club renewals, and the
+    /// emergency replacements that keep every club legal (`CON-6`, `CON-8`, `SQ-8`).
+    /// </summary>
+    /// <remarks>
+    /// It ensures the next season exists first, because an emergency replacement's registration names the
+    /// season it is effective in; the move phase then finds the season already created rather than making a
+    /// second one.
+    /// </remarks>
+    private async Task SquadsAsync(
+        GameWorld world,
+        Season season,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(
+            TransactionIsolation.ReadCommitted,
+            cancellationToken);
+        await _locks.AcquireAsync(AdvisoryLockKey.SeasonRollover(world.Id), cancellationToken);
+
+        var rollover = await RequireRolloverAsync(world, season, cancellationToken);
+
+        if (SeasonRolloverPhaseRules.IsAtLeast(rollover.Phase, SeasonRolloverPhase.Squads))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+
+            return;
+        }
+
+        var nextSeason = await EnsureNextSeasonAsync(world, season, now, cancellationToken);
+
+        var result = await _continuity.ExecuteAsync(world, season, nextSeason, now, cancellationToken);
+
+        rollover.SettleSquads(now);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        LogSquadsSettled(season.Id, result.Retired, result.Announced, result.Renewed, result.Released, result.Replacements);
     }
 
     /// <summary>
@@ -675,6 +736,19 @@ public sealed partial class RunSeasonRollover
         Level = LogLevel.Information,
         Message = "Finalized standings and closed entries for season {SeasonId} (PR-4).")]
     private partial void LogFinalized(Guid seasonId);
+
+    [LoggerMessage(
+        EventId = 5205,
+        Level = LogLevel.Information,
+        Message = "Settled contracts for season {SeasonId}: {Retired} retired, {Announced} announced, "
+            + "{Renewed} renewed, {Released} released, {Replacements} replacements (CON-6).")]
+    private partial void LogSquadsSettled(
+        Guid seasonId,
+        int retired,
+        int announced,
+        int renewed,
+        int released,
+        int replacements);
 
     [LoggerMessage(
         EventId = 5202,

@@ -377,6 +377,7 @@ public static class DependencyInjection
         services.AddScoped<IClubAccountRepository, ClubAccountRepository>();
         services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IFinanceQueries, FinanceQueries>();
+        services.AddScoped<IClubSeasonFinanceRepository, ClubSeasonFinanceRepository>();
         services.AddScoped<IOnboardingQueries, OnboardingQueries>();
         services.AddScoped<IAdvisoryLock, PostgresAdvisoryLock>();
 
@@ -399,6 +400,7 @@ public static class DependencyInjection
     {
         services.AddScoped<ISquadRepository, SquadRepository>();
         services.AddScoped<ISquadQueries, SquadQueries>();
+        services.AddScoped<IContractContinuityQueries, ContractContinuityQueries>();
         services.AddScoped<ITacticsRepository, TacticsRepository>();
         services.AddScoped<ITacticsQueries, TacticsQueries>();
         services.AddScoped<ITrainingRepository, TrainingRepository>();

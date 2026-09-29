@@ -23,7 +23,7 @@ internal sealed class SeasonRolloverConfiguration : IEntityTypeConfiguration<Sea
 
         builder.ToTable("season_rollovers", "competition", table => table.HasCheckConstraint(
             "ck_season_rollovers_phase",
-            "phase in ('started', 'frozen', 'finalized', 'moved', 'completed', 'failed')"));
+            "phase in ('started', 'frozen', 'finalized', 'squads', 'moved', 'completed', 'failed')"));
 
         builder.HasKey(rollover => rollover.Id);
         builder.Property(rollover => rollover.Id).HasColumnName("id").ValueGeneratedNever();

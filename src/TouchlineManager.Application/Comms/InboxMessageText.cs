@@ -48,6 +48,8 @@ public static class InboxMessageText
                 InboxTemplates.Read<InboxTemplates.SuspensionParameters>(parametersJson)),
             InboxTemplates.InjuryReported => Injury(
                 InboxTemplates.Read<InboxTemplates.InjuryParameters>(parametersJson)),
+            InboxTemplates.RetirementAnnounced => Retirement(
+                InboxTemplates.Read<InboxTemplates.RetirementParameters>(parametersJson)),
             InboxTemplates.TeamSheetRepaired => RepairedSide(
                 InboxTemplates.Read<InboxTemplates.TeamSheetParameters>(parametersJson)),
             InboxTemplates.OnboardingWelcome => Welcome(
@@ -135,6 +137,11 @@ public static class InboxMessageText
             $"{parameters.PlayerName} is injured",
             $"{parameters.PlayerName} is out for {Fixtures(parameters.Fixtures)} with a "
             + $"{Severity(Unavailabilities.SeverityFromCode(parameters.Severity))} injury.");
+
+    private static InboxText Retirement(InboxTemplates.RetirementParameters parameters) =>
+        new(
+            $"{parameters.PlayerName} will retire",
+            $"{parameters.PlayerName} has announced that this will be their final season.");
 
     private static InboxText RepairedSide(InboxTemplates.TeamSheetParameters parameters)
     {

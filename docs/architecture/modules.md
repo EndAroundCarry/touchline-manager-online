@@ -131,7 +131,7 @@ flowchart TD
 | 9 | finance, squad | Ledger, wages, renewals, awards |
 | 10 | market, finance, squad | Timed auctions, AI market |
 | 11 | world, comms, competition | Pyramid growth, inbox, inactivity — *delivered: generic provisioning execution + backfill (`PYR-4`–`PYR-8`), the inactivity ladder (`OCC-1`–`OCC-3`), and the comms completion (news feed, preferences, deadline reminders, outbox)* |
-| 12 | competition, finance, squad, world | Rollover and continuity — *delivered: the world-scoped resumable rollover state machine, promotion/relegation (`PR-1`–`PR-6`), and next-season generation (ADR-0031); contract expiry, retirement, awards, and season summaries are the rest* |
+| 12 | competition, finance, squad, world | Rollover and continuity — *delivered: the world-scoped resumable rollover state machine, promotion/relegation (`PR-1`–`PR-6`), and next-season generation (ADR-0031), plus the continuity work — contract expiry and AI renewal (`CON-6`, `CON-9`), announce-then-play retirement (`CON-10`), emergency replacements (`SQ-8`), the position award (`FIN-5`), the season finance summary (`FIN-19`), and the `PYR-9` next-season provisioning target (ADR-0032)* |
 | 13 | web (all features) | Feature-complete PWA |
 | 14 | ops, security | Hardened live operations |
 | 15–16 | — | Closed beta, public MVP |

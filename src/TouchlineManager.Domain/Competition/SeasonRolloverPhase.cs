@@ -27,14 +27,17 @@ public enum SeasonRolloverPhase
     /// <summary>Standings are final and the closing season's entries carry their closing figures.</summary>
     Finalized = 2,
 
+    /// <summary>Contracts are resolved: expired players released, unmanaged clubs renewed, retirements applied.</summary>
+    Squads = 3,
+
     /// <summary>The next season exists and every club has been placed into it with a schedule.</summary>
-    Moved = 3,
+    Moved = 4,
 
     /// <summary>The closing season is sealed and the next one is active. Terminal.</summary>
-    Completed = 4,
+    Completed = 5,
 
     /// <summary>Preflight or generation found something an operator must look at. Terminal until retried.</summary>
-    Failed = 5,
+    Failed = 6,
 }
 
 /// <summary>The questions asked about <see cref="SeasonRolloverPhase"/>.</summary>
@@ -56,6 +59,7 @@ public static class SeasonRolloverPhaseRules
         SeasonRolloverPhase.Started => SeasonRolloverPhases.StartedCode,
         SeasonRolloverPhase.Frozen => SeasonRolloverPhases.FrozenCode,
         SeasonRolloverPhase.Finalized => SeasonRolloverPhases.FinalizedCode,
+        SeasonRolloverPhase.Squads => SeasonRolloverPhases.SquadsCode,
         SeasonRolloverPhase.Moved => SeasonRolloverPhases.MovedCode,
         SeasonRolloverPhase.Completed => SeasonRolloverPhases.CompletedCode,
         SeasonRolloverPhase.Failed => SeasonRolloverPhases.FailedCode,
@@ -68,6 +72,7 @@ public static class SeasonRolloverPhaseRules
         SeasonRolloverPhases.StartedCode => SeasonRolloverPhase.Started,
         SeasonRolloverPhases.FrozenCode => SeasonRolloverPhase.Frozen,
         SeasonRolloverPhases.FinalizedCode => SeasonRolloverPhase.Finalized,
+        SeasonRolloverPhases.SquadsCode => SeasonRolloverPhase.Squads,
         SeasonRolloverPhases.MovedCode => SeasonRolloverPhase.Moved,
         SeasonRolloverPhases.CompletedCode => SeasonRolloverPhase.Completed,
         SeasonRolloverPhases.FailedCode => SeasonRolloverPhase.Failed,
@@ -86,6 +91,9 @@ public static class SeasonRolloverPhases
 
     /// <summary>The code for <see cref="SeasonRolloverPhase.Finalized"/>.</summary>
     public const string FinalizedCode = "finalized";
+
+    /// <summary>The code for <see cref="SeasonRolloverPhase.Squads"/>.</summary>
+    public const string SquadsCode = "squads";
 
     /// <summary>The code for <see cref="SeasonRolloverPhase.Moved"/>.</summary>
     public const string MovedCode = "moved";

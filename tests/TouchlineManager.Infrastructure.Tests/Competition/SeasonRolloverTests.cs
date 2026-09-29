@@ -6,6 +6,8 @@ using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.World;
 using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Domain.World.Generation;
 using TouchlineManager.Infrastructure.Persistence;
@@ -234,6 +236,22 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                 && fixture.Status == FixtureStatus.Published))
                 .Should()
                 .Be(306, "the played season's results are the record of what happened");
+
+            // The rollover settles the closing season's money (FIN-5, master plan §6.8): one final-position
+            // award and one finance summary for every closing club.
+            (await db.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.PositionAward))
+                .Should()
+                .Be(126, "every closing club earns a final-position award");
+            (await db.ClubSeasonFinances.CountAsync(summary => summary.SeasonId == seasonId))
+                .Should()
+                .Be(126, "every closing club has a season finance summary");
+
+            // The clubs are unmanaged, so the AI renewed their expiring contracts (CON-6).
+            (await db.PlayerContracts.CountAsync(contract =>
+                contract.Status == ContractStatus.Closed
+                && contract.ClosedReason == PlayerContractCloseReasons.Renewed))
+                .Should()
+                .BeGreaterThan(0, "an unmanaged club renews its expiring players");
         }
 
         // A redelivered rollover is a no-op: the next season stays the second one and nothing moves twice.

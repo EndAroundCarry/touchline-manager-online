@@ -43,6 +43,9 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
             table.HasCheckConstraint(
                 "ck_players_hidden_values_range",
                 "potential between 1 and 20 and reputation between 1 and 20");
+            table.HasCheckConstraint(
+                "ck_players_retirement_announced",
+                "retirement_announced_season_number is null or retirement_announced_season_number >= 1");
         });
 
         builder.HasKey(player => player.Id);
@@ -80,6 +83,8 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
             .IsRequired();
         builder.Property(player => player.Potential).HasColumnName("potential").HasColumnType("smallint").IsRequired();
         builder.Property(player => player.Reputation).HasColumnName("reputation").HasColumnType("smallint").IsRequired();
+        builder.Property(player => player.RetirementAnnouncedSeasonNumber)
+            .HasColumnName("retirement_announced_season_number");
         builder.Property(player => player.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(player => player.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(player => player.Version).HasColumnName("version").IsRequired();

@@ -48,6 +48,9 @@ public static class InboxTemplates
     /// <summary>The club's frozen side needed a repair.</summary>
     public const string TeamSheetRepaired = "inbox.team_sheet.repaired";
 
+    /// <summary>A player announced that the coming season is their last (`CON-6`).</summary>
+    public const string RetirementAnnounced = "inbox.squad.retirement_announced";
+
     /// <summary>A manager took over a club and is welcomed to it.</summary>
     public const string OnboardingWelcome = "inbox.onboarding.welcome";
 
@@ -140,6 +143,16 @@ public static class InboxTemplates
             new InjuryParameters(playerName, fixtures, severity.ToCode()),
             playerId);
 
+    /// <summary>Builds the message a player's retirement announcement produces (`CON-6`).</summary>
+    /// <param name="playerName">The player who announced.</param>
+    /// <param name="playerId">The player, which the message links to.</param>
+    public static InboxDraft Retirement(string playerName, Guid playerId) =>
+        Write(
+            InboxCategory.Squad,
+            RetirementAnnounced,
+            new RetirementParameters(playerName),
+            playerId);
+
     /// <summary>Builds the message a repaired side produces (`DIS-7`).</summary>
     /// <param name="roundNumber">The round the side was frozen for.</param>
     /// <param name="repairs">The decisions the builder made, in slot order.</param>
@@ -226,6 +239,8 @@ public static class InboxTemplates
     internal sealed record SuspensionParameters(string PlayerName, IReadOnlyList<string> Reasons, int Fixtures);
 
     internal sealed record InjuryParameters(string PlayerName, int Fixtures, string Severity);
+
+    internal sealed record RetirementParameters(string PlayerName);
 
     internal sealed record TeamSheetParameters(int RoundNumber, IReadOnlyList<RepairParameter> Repairs);
 

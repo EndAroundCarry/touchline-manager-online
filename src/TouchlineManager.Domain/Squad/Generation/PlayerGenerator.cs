@@ -151,7 +151,9 @@ public static class PlayerGenerator
 
         for (var index = 0; index < Composition.Length; index++)
         {
-            drafts.Add(Draft(request, pool, rng, Composition[index], index));
+            var nameOrdinal = (request.ClubOrdinalInCountry * WorldRuleSet.GeneratorSquadTarget) + index;
+
+            drafts.Add(Draft(request, pool, rng, Composition[index], nameOrdinal));
         }
 
         var statuses = SquadStatuses(drafts);
@@ -187,14 +189,116 @@ public static class PlayerGenerator
         return squad;
     }
 
+    /// <summary>
+    /// Generates one emergency replacement player on a minimum contract (`SQ-8`).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The safety net the rules describe: when expiry or a repair would leave a club below the minimum
+    /// registered squad, a replacement is generated rather than the club being left illegal. It is
+    /// deliberately a one-season contract on the generated wage, because it is a repair and not a way to
+    /// build a squad.
+    /// </para>
+    /// <para>
+    /// Deterministic like the squad generator, but on its own seed stream tagged <c>replacement</c> and keyed
+    /// by the replacement ordinal, so a repair reproduces exactly and cannot collide with the club's own
+    /// generated squad.
+    /// </para>
+    /// </remarks>
+    /// <param name="seed">The world's generation seed (`PYR-14`).</param>
+    /// <param name="namePoolKey">The club's country name pool key.</param>
+    /// <param name="countryCode">The club's country code, which is the player's nationality at MVP.</param>
+    /// <param name="worldId">The owning world. Identity only.</param>
+    /// <param name="clubId">The club the replacement joins.</param>
+    /// <param name="tier">The tier the club plays in, which scales the wage.</param>
+    /// <param name="seasonId">The season the replacement is registered in.</param>
+    /// <param name="seasonNumber">The season number the contract is signed for.</param>
+    /// <param name="gameYear">The season's game year, which fixes the player's age.</param>
+    /// <param name="position">The position to generate, which the club is short of.</param>
+    /// <param name="replacementOrdinal">The ordinal of this replacement within the world's rollover.</param>
+    /// <param name="now">The current instant.</param>
+    public static GeneratedSquadMember GenerateEmergencyReplacement(
+        string seed,
+        string namePoolKey,
+        string countryCode,
+        Guid worldId,
+        Guid clubId,
+        int tier,
+        Guid seasonId,
+        int seasonNumber,
+        int gameYear,
+        PlayerPosition position,
+        int replacementOrdinal,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(seed);
+        ArgumentException.ThrowIfNullOrWhiteSpace(countryCode);
+        ArgumentOutOfRangeException.ThrowIfNegative(replacementOrdinal);
+        ArgumentOutOfRangeException.ThrowIfLessThan(tier, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(seasonNumber, 1);
+
+        var request = new SquadGenerationRequest(
+            seed,
+            namePoolKey,
+            countryCode,
+            worldId,
+            clubId,
+            replacementOrdinal,
+            tier,
+            seasonId,
+            seasonNumber,
+            gameYear,
+            now);
+
+        var pool = PlayerNamePools.For(namePoolKey);
+
+        var rng = new Pcg32(DeterministicDigest.SeedOf(
+            seed,
+            countryCode,
+            "replacement",
+            replacementOrdinal.ToString(CultureInfo.InvariantCulture)));
+
+        // A name ordinal distinct from any generated squad's, derived from the club and the ordinal so a
+        // repair does not reuse a squad member's name.
+        var nameOrdinal = (int)(DeterministicDigest.SeedOf(
+            seed,
+            countryCode,
+            "replacement-name",
+            clubId.ToString("D"),
+            replacementOrdinal.ToString(CultureInfo.InvariantCulture)) % 100_000);
+
+        var draft = Draft(request, pool, rng, position, nameOrdinal);
+        var playerId = Guid.CreateVersion7();
+
+        return new GeneratedSquadMember(
+            Player.Generate(playerId, worldId, draft.Identity, now),
+            PlayerAttributes.Create(playerId, draft.Attributes),
+            PlayerState.Open(playerId),
+            PlayerContract.Sign(
+                Guid.CreateVersion7(),
+                playerId,
+                clubId,
+                seasonNumber,
+                seasonNumber,
+                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean, tier),
+                SquadStatus.Prospect,
+                now),
+            PlayerRegistration.Register(
+                Guid.CreateVersion7(),
+                playerId,
+                clubId,
+                seasonId,
+                effectiveFixtureBoundaryRound: 0,
+                now));
+    }
+
     private static SquadDraft Draft(
         SquadGenerationRequest request,
         PlayerNamePool pool,
         Pcg32 rng,
         PlayerPosition position,
-        int index)
+        int nameOrdinal)
     {
-        var ordinal = (request.ClubOrdinalInCountry * WorldRuleSet.GeneratorSquadTarget) + index;
         var ageSpan = WorldRuleSet.PlayerMaximumAge - WorldRuleSet.PlayerMinimumAge + 1;
         var age = WorldRuleSet.PlayerMinimumAge + ((rng.NextInt(ageSpan) + rng.NextInt(ageSpan)) / 2);
 
@@ -247,7 +351,7 @@ public static class PlayerGenerator
         var contractSeasons = WorldRuleSet.ContractMinSeasons
             + rng.NextInt(WorldRuleSet.ContractMaxSeasons - WorldRuleSet.ContractMinSeasons + 1);
 
-        var (fullName, shortName, nameSeed) = NameFor(request, pool, ordinal);
+        var (fullName, shortName, nameSeed) = NameFor(request, pool, nameOrdinal);
 
         return new SquadDraft(
             new PlayerIdentity(

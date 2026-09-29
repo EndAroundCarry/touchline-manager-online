@@ -265,6 +265,7 @@ erDiagram
         text primary_position
         text secondary_positions
         text status "active|retired|free_agent|anonymized"
+        int retirement_announced_season_number "null until announced (CON-10)"
     }
     player_attributes {
         uuid player_id PK
@@ -422,6 +423,7 @@ erDiagram
     clubs ||--|| club_accounts : "banked"
     club_accounts ||--o{ ledger_entries : "records"
     clubs ||--o{ club_season_finances : "summarised"
+    club_season_finances ||--|{ club_season_finance_lines : "totals"
 
     seasons {
         uuid id PK
@@ -600,6 +602,21 @@ erDiagram
         jsonb description_parameters
         timestamptz created_at
     }
+    club_season_finances {
+        uuid id PK
+        uuid club_id FK
+        uuid season_id FK
+        bigint opening_cash_minor
+        bigint closing_cash_minor
+        bigint version
+    }
+    club_season_finance_lines {
+        uuid id PK
+        uuid club_season_finance_id FK
+        text category
+        bigint cash_delta_minor
+        bigint version
+    }
 ```
 
 **Critical indexes and constraints**
@@ -630,6 +647,8 @@ erDiagram
 | `check` the action is a known code and names exactly one of the listing or the bid; `check (length(inputs_hash) = 64)`; index `(club_id, evaluated_at)` | `ai_market_decisions` | `TRF-12`: a decision always states what it produced and what it read |
 | `check (cash_minor >= 0 and reserved_minor >= 0)` | `club_accounts` | `FIN-13` |
 | `unique (club_id, sequence)`, `unique (correlation_id, category)`, `check (resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor)` | `ledger_entries` | `FIN-11`, `FIN-13`, `FIN-17` |
+| `unique (club_id, season_id)` | `club_season_finances` | One finance summary per club per season (`FIN-19`) |
+| `unique (club_season_finance_id, category)`, `check (category in (...))` | `club_season_finance_lines` | One total per category, and a known category (`FIN-19`) |
 
 > **Stage 10 status.** The market tables are implemented as specified above, with one tidy-up:
 > `transfer_listings` has no `resolution_job_id` column, because the resolution job's business key
@@ -638,11 +657,15 @@ erDiagram
 
 > **Stage 12 status (rollover).** `competition.season_rollovers` is the checkpoint row for the season
 > rollover state machine (ADR-0031): one row per closing season, guarded by a world-scoped advisory lock,
-> advanced `started → frozen → finalized → moved → completed`. `club_season_entries.final_rank`,
+> advanced `started → frozen → finalized → squads → moved → completed`. `club_season_entries.final_rank`,
 > `is_promoted`, `is_relegated`, `closing_reputation`, and `closing_cash_minor` are now written once, at
 > rollover (`PR-4`), and never rewritten; the next season's entries, division-seasons, schedule, and opening
-> table are new rows, so prior seasons remain immutable (`PR-6`). Contract expiry, retirement, position
-> awards, and the season finance summary remain the rest of Stage 12.
+> table are new rows, so prior seasons remain immutable (`PR-6`). The rollover's continuity work landed too
+> (ADR-0032): a `squads` phase between `finalized` and `moved` resolves contracts (`CON-6`, `CON-9`),
+> retirements (`CON-10`, announced on `players.retirement_announced_season_number`), and emergency
+> replacements (`SQ-8`); the finalize phase posts the position award (`FIN-5`) and writes a season finance
+> summary (`FIN-19`). The retirement and contract-continuity policies are pure and versioned
+> (`retirement-v1`, `ai-contract-v1`), and the rule set advanced to `world-rules-v9`.
 
 ### 3.4 Communications and operations
 

@@ -3,6 +3,79 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 12 — Rollover continuity: contracts, retirement, awards, and summaries
+
+A season no longer just moves clubs; it settles the people and the money. The rollover gains a **`squads`**
+phase between `finalized` and `moved` that expires unrenewed contracts into free agency, renews the squads of
+clubs nobody manages, retires players through a hidden announce-then-play rule, and repairs any club left
+below the minimum. The finalize phase posts the season's **position awards** and writes a **season finance
+summary** per club. This is the second Stage 12 milestone (ADR-0032); the operator dry-run/resume preview, the
+five-season staging run, and the season-history screens are the later ones.
+
+### Added
+
+- **The `squads` rollover phase** (`SeasonRolloverPhase.Squads`, ADR-0032). It runs before the move phase —
+  the plan's §7.5 order (resolve contracts, then move clubs) — and find-or-creates the next season first,
+  because an emergency replacement's registration names `effective_season_id`. `Move`'s guard moves from
+  `Finalized` to `Squads`; `Complete` is unchanged. The phase is resumable and idempotent like the rest.
+- **`SettleSquadContinuity`** (`CON-6`, `CON-9`, `SQ-8`): retirements first, then expiry/renewal, then repair,
+  all staged into the phase's transaction. A present manager's unrenewed player closes `expired`, ends their
+  registration, and becomes a `free_agent`; a club nobody manages renews; a club left below the minimum is
+  repaired with audited emergency replacements.
+- **`AiContractPolicy`** (`ai-contract-v1`): a pure, versioned policy that renews an unmanaged club's best
+  expiring players up to `AiContractTargetSquadSize` and then only as far as `SQ-2` legality requires, and
+  releases the rest. "Unmanaged" is no tenure **or** an inactive one (`OCC-2`).
+- **`RetirementPolicy`** (`retirement-v1`, `CON-10`): announce-then-play. From 32 a player may announce that
+  the coming season is their last, with a chance that rises each season and is gated by ability and condition;
+  forced announcement and forced retirement ages (36/38 and 37/39, outfield/goalkeeper) cap it. An
+  announcement is stored on `squad.players.retirement_announced_season_number`, delivered to the manager as an
+  **inbox message** (`InboxTemplates.RetirementAnnounced`), and the announced player is kept for one final
+  season. The numbers are hidden — named rule-set values, never serialized.
+- **Emergency replacements** (`SQ-8`): `PlayerGenerator.GenerateEmergencyReplacement` generates one player on a
+  one-season contract per gap, on its own seed stream, so a repair is reproducible and never collides with a
+  club's generated squad. Each repaired club is audited (`SquadAuditActions.EmergencyReplacement`) and logged
+  as an operations alert.
+- **Position awards** (`FIN-5`): `LedgerPostings.PositionAward` finally has its caller. Each closing club is
+  paid `WorldRuleSet.PositionAwardMinorFor` inside the finalize transaction, after the entry close has read
+  the season-end cash, so `ClubSeasonEntry.ClosingCashMinor` is unchanged and the award is the next season's
+  first money. Idempotent by the phase checkpoint and the ledger's correlation key (`FIN-17`).
+- **`finance.club_season_finances`** and **`finance.club_season_finance_lines`** (`FIN-19`, master plan §6.8):
+  one summary per club per season — opening cash, closing cash, and one signed total per ledger category —
+  written once at rollover over the season's own window and never edited. Record only: no read surface yet.
+- **`PYR-9`**: `CapacityEvaluator` and the diagnostics trigger now target the next season when the current one
+  is rolling over, and defer if it does not exist yet, so the closing season is never mutated.
+- **ADR-0032**, on the `squads` phase and its ordering, the expiry and AI-renewal rules, the retirement rule
+  and its gating, the award's placement, the season-summary window, and the `PYR-9` target. `game-rules.md`
+  gained `CON-9`, `CON-10`, and `FIN-19` plus their constants; `data-model.md` gained the two finance tables
+  and the `players.retirement_announced_season_number` column; modules and traceability were updated. The rule
+  set advanced to `world-rules-v9`.
+
+### Tests
+
+- New domain tests: the retirement rule (start age, forced caps, the ability and fitness gate, determinism, and
+  that a weak squad announces more than a strong one), the AI contract policy (best-first, the legal floor,
+  the surplus, terms by age, order independence), the season finance aggregate, and `Player.AnnounceRetirement`.
+- New application tests: the finance settlement (award per club, summary as opening plus categories, the empty
+  case) and contract continuity over fakes (retirement, release versus renew, goalkeepers-first repair, and an
+  announcing player kept for a final season). The inbox retirement template is pinned by renderer tests.
+- The real-PostgreSQL rollover suite now also asserts 126 position awards, 126 season summaries, and that
+  unmanaged clubs' expiring contracts were renewed; the domain rollover suite covers the new phase's
+  transitions and order.
+
+### Notes
+
+- **Settlement awards sit outside the closing season's summary.** The summary's window is the season's own
+  (`starts_at` to `rollover_ends_at`); the award is posted after it, so `closing_cash_minor` in both the entry
+  and the summary is the season-end figure and the two agree (ADR-0032).
+- **A present manager's lapse is theirs.** Expiry follows `CON-6` literally, and free-agent signing is still
+  post-MVP, so an unrenewed player leaves the world's squads; the emergency path restores a club only to the
+  minimum. That is the rule, not an oversight.
+- **The retirement announcement is the only thing a manager sees.** The chance, its growth, and the gate live
+  in `WorldRuleSet` and are never serialized; only "this is my last season" reaches the inbox.
+- **The award correlation key uses the compact GUID form.** The readable `rollover:{D}:{D}` form is 82
+  characters and the ledger caps a correlation key at 80; the quiet factory had never met the limit before it
+  had a caller.
+
 ## Stage 12 — Season rollover, promotion/relegation, and continuity
 
 A season that ends and a next one that begins. The closing season is frozen, its standings are finalized, its

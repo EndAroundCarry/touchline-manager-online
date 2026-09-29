@@ -48,6 +48,7 @@ the system is shaped the way it is.
 | [0029](0029-news-and-notification-preferences.md) | The division news feed and notification preferences are comms-module data | Accepted |
 | [0030](0030-provisioning-execution-and-bootstrap-provenance.md) | Provisioning execution is a worker job under the country lock, and a backfilled round is generated history | Accepted |
 | [0031](0031-season-rollover-state-machine.md) | Season rollover is one world-scoped resumable job with a checkpoint row | Accepted |
+| [0032](0032-rollover-continuity.md) | Rollover continuity — contract expiry, retirement, awards, and season finance summaries | Accepted |
 
 ## Rules for changing an ADR
 

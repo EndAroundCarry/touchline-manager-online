@@ -21,6 +21,8 @@ namespace TouchlineManager.Domain.Rules;
 /// settle; Stage 10 the auction windows, blackout, and minimum bid increment the transfer market runs on,
 /// and — its AI-market milestone — the player valuation and bidding bands the AI's own market decisions
 /// use (`TRF-12`).
+/// Stage 12 added the rollover-continuity values: the contract-continuity AI's target squad size, and the
+/// retirement rule's start age, growth, forced caps, and ability and fitness gate (`CON-6`, `CON-8`).
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -28,7 +30,7 @@ namespace TouchlineManager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v8";
+    public const string Version = "world-rules-v9";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -329,6 +331,103 @@ public static class WorldRuleSet
         };
     }
 
+    /// <summary>The age at which a player may first announce a retirement (`CON-6`, `CON-8`).</summary>
+    /// <remarks>
+    /// A hidden mechanic: a manager knows that from this age a player <em>may</em> announce that the coming
+    /// season is their last, and that the chance grows with age, but never by how much. Only the announcement
+    /// itself — a fact about the coming season — is ever surfaced.
+    /// </remarks>
+    public const int RetirementAnnouncementStartAge = 32;
+
+    /// <summary>The chance a player of the start age announces a retirement, in per-mille (`CON-6`).</summary>
+    public const int RetirementAnnouncementBaseChancePerMille = 300;
+
+    /// <summary>How much each season past the start age adds to the announcement chance, in per-mille.</summary>
+    public const int RetirementAnnouncementStepPerSeasonPerMille = 150;
+
+    /// <summary>The chance ceiling in per-mille, so age alone can never force a random announcement.</summary>
+    public const int RetirementAnnouncementCeilingPerMille = 900;
+
+    /// <summary>The entry age at which an outfielder is forced to announce a retirement (`CON-6`).</summary>
+    public const int RetirementForcedAnnouncementAgeOutfield = 36;
+
+    /// <summary>The entry age at which a goalkeeper is forced to announce a retirement (`CON-6`).</summary>
+    public const int RetirementForcedAnnouncementAgeGoalkeeper = 38;
+
+    /// <summary>The entry age at which an outfielder is forced out of the game (`CON-6`).</summary>
+    public const int RetirementForcedAgeOutfield = 37;
+
+    /// <summary>The entry age at which a goalkeeper is forced out of the game (`CON-6`).</summary>
+    public const int RetirementForcedAgeGoalkeeper = 39;
+
+    /// <summary>How a player's ability shapes the announcement chance, in basis points (`CON-6`).</summary>
+    /// <remarks>
+    /// A better player is less likely to announce, which is what lets only very good players reach the forced
+    /// cap while the rest retire in their early thirties. Bounded, like every other factor.
+    /// </remarks>
+    /// <param name="ability">The player's ability on the 1–20 scale.</param>
+    public static int RetirementAbilityFactorBp(int ability)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(ability, AttributeMin);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(ability, AttributeMax);
+
+        return ability switch
+        {
+            >= 16 => 6_500,
+            >= 14 => 8_000,
+            >= 12 => 10_000,
+            >= 10 => 12_000,
+            _ => 14_000,
+        };
+    }
+
+    /// <summary>How a player's condition shapes the announcement chance, in basis points (`CON-6`).</summary>
+    /// <remarks>
+    /// "Fitness" is read as the player's current condition; a fresh player is less likely to announce, so a
+    /// very fit one reaches the cap. Bounded, like every other factor.
+    /// </remarks>
+    /// <param name="conditionBp">The player's condition in basis points (`TRN-5`).</param>
+    public static int RetirementConditionFactorBp(int conditionBp)
+    {
+        if (conditionBp is < StateBasisPointsMin or > StateBasisPointsMax)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(conditionBp),
+                conditionBp,
+                $"Condition is between {StateBasisPointsMin} and {StateBasisPointsMax} basis points (TRN-5).");
+        }
+
+        return conditionBp switch
+        {
+            >= 8_000 => 8_500,
+            >= 5_000 => 10_000,
+            _ => 12_000,
+        };
+    }
+
+    /// <summary>The chance a player announces a retirement this rollover, in per-mille (`CON-6`).</summary>
+    /// <param name="age">The age the player would enter the coming season at.</param>
+    /// <param name="ability">The player's ability on the 1–20 scale.</param>
+    /// <param name="conditionBp">The player's condition in basis points.</param>
+    public static int RetirementAnnouncementChancePerMille(int age, int ability, int conditionBp)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(age);
+
+        if (age < RetirementAnnouncementStartAge)
+        {
+            return 0;
+        }
+
+        var baseChance = RetirementAnnouncementBaseChancePerMille
+            + ((age - RetirementAnnouncementStartAge) * RetirementAnnouncementStepPerSeasonPerMille);
+
+        var gated = baseChance
+            * RetirementAbilityFactorBp(ability) / 10_000
+            * RetirementConditionFactorBp(conditionBp) / 10_000;
+
+        return Math.Clamp(gated, 0, RetirementAnnouncementCeilingPerMille);
+    }
+
     /// <summary>The number of goalkeepers the generator gives each club (`SQ-1`).</summary>
     /// <remarks>
     /// Three rather than the two `SQ-2` requires: a generated squad must survive a season of injuries and
@@ -611,6 +710,16 @@ public static class WorldRuleSet
     /// would move on and stays a manageable size without ever approaching the minimum `SQ-2` requires.
     /// </remarks>
     public const int AiMarketTargetSquadSize = 21;
+
+    /// <summary>
+    /// The squad size a club nobody manages renews toward at rollover (`CON-6`, `CON-8`).
+    /// </summary>
+    /// <remarks>
+    /// The same target the AI market trims toward, so an unmanaged club neither grows past what the market
+    /// would sell nor falls toward the minimum: it renews its best players up to this size and lets the
+    /// surplus go to free agency, keeping a legal squad without hoarding.
+    /// </remarks>
+    public const int AiContractTargetSquadSize = 21;
 
     /// <summary>The most players an AI club lists in one evaluation, so a pass cannot flood the market (`TRF-12`).</summary>
     public const int AiMarketMaxListingsPerClub = 3;

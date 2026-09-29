@@ -34,14 +34,14 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-19 | Tactics: formations, roles, instructions | squad | 4 | Validation + ETag conflict tests |
 | F-20 | Training | squad | 4 (plan, focus, daily progression), 6 (match effects) | Deterministic progression test |
 | F-21 | Availability: injuries and suspensions | squad, competition | 6 (apply), 8 (full) | Effect-on-correct-future-fixture-exactly-once test |
-| F-22 | Contracts | squad | 4 (list/quote), 9 (full) | Renewal determinism and rollover-expiry tests |
+| F-22 | Contracts | squad | 4 (list/quote), 9 (full), 12 (rollover expiry) | Renewal determinism and rollover-expiry tests; the `squads` phase expires unrenewed contracts to free agency, renews unmanaged clubs (`AiContractPolicy`, `ai-contract-v1`), and repairs below-minimum clubs (`SQ-8`, ADR-0032) |
 | F-23 | Finance workflows (cash, wages, income) | finance | 9 | Ledger replay reconstructs balances exactly |
 | F-24 | League fixtures | competition | 6 | 34-fixture, one-home-one-away property tests |
 | F-25 | League tables | competition | 6, 8 | All nine tie-break paths covered |
 | F-26 | Results | competition, match, web | 6, 7 | Published matchday projection reconciliation |
 | F-27 | Player and team statistics | competition, match | 8 | Rebuild equals live projection |
 | F-28 | Promotion and relegation | competition, world | 12 | Three-up/three-down at every adjacent tier; `PromotionRelegation.Compute` (`promotion-relegation-v1`) plus the movement assertions in `SeasonRolloverTests` (ADR-0031) |
-| F-29 | Season rollover | competition, finance, squad, world | 12 | Resumable checkpoint machine under the world advisory lock (`RunSeasonRollover`, ADR-0031): a redelivered rollover is a no-op and an interrupted one resumes from its phase. Contract expiry, position awards, and retirement are the rest of Stage 12 |
+| F-29 | Season rollover | competition, finance, squad, world | 12 | Resumable checkpoint machine under the world advisory lock (`RunSeasonRollover`, ADR-0031, ADR-0032): a redelivered rollover is a no-op and an interrupted one resumes from its phase. The `squads` phase expires and renews contracts, retires announced players, and repairs below-minimum clubs (`CON-6`, `CON-9`, `CON-10`, `SQ-8`); finalize posts the position award (`FIN-5`) and writes season finance summaries (`FIN-19`); the real-PostgreSQL rollover test asserts each |
 | F-30 | Server-authoritative locking | ops, match | 6 | No public simulate endpoint; write-after-lock test |
 | F-31 | Server-authoritative simulation | match, ops | 5, 6 | Golden hash determinism; publication atomicity |
 | F-32 | Server-authoritative publication | competition, ops | 6 | Never 5-of-9 test |

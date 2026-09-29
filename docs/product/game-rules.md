@@ -292,6 +292,14 @@ neither the ordering nor the counts are stored a second time.
 | CON-6 | Expired players become free agents at rollover unless renewed. | — |
 | CON-7 | Free-agent signing beyond emergency replacements is post-MVP, unless it proves necessary to keep the transfer market healthy. If enabled it uses the same timed-auction mechanism with a zero seller fee and an explicit signing wage. | — |
 | CON-8 | Contract years advance at **season rollover**, never on the real-world anniversary. | — |
+| CON-9 | At rollover, a club nobody manages (no tenure, or an inactive one) renews its best expiring players up to the AI target and releases the rest; a present manager's unrenewed contracts expire to free agency (`CON-6`). | — |
+| CON-10 | **Announce-then-play retirement**: from **32** a player may announce that the coming season is their last; the chance rises each season and is gated by ability and fitness, with a forced announcement age and a forced retirement age capping it. An announced player plays one final season. | — |
+
+The retirement rule's numbers are a hidden mechanic: a manager knows an announcement is possible from the
+start age and that the chance grows with age, but never by how much. Only the announcement itself — a fact
+about the coming season, delivered as an inbox message — is ever surfaced. The start age, the per-season
+growth, the ability and fitness gate, and the forced caps are all named rule-set values (`§18`), never
+serialized to a client.
 
 ---
 
@@ -330,6 +338,7 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 | FIN-16 | A safety job detects clubs that cannot field a legal squad or pay the next wage run and applies a **logged emergency grant** only when required to preserve competition integrity. It emits an operations alert and is tuned out through balancing. |
 | FIN-17 | Every financial operation is idempotent under retry and carries a correlation key. |
 | FIN-18 | Ledger replay must exactly reconstruct cash and reserved balances. |
+| FIN-19 | A season's finance summary — opening and closing cash plus one total per ledger category — is written once, at rollover, and never edited. |
 
 A club's money is an append-only ledger. Every balance change is a `finance.ledger_entries` row that records
 the move — a cash delta and a reserved delta, either of which may be zero — beside the balances it produced,
@@ -360,6 +369,10 @@ calibrates the baselines; the shapes below are fixed from this version on.
   position and halved per tier, settled at rollover.
 - **The emergency grant (`FIN-16`)** is not a formula: it is the exact shortfall the safety step computes when a
   club cannot cover its next wage run, recorded as its own category and source so it is visible in the ledger.
+- **The season finance summary (`FIN-19`)** is the season's ledger movement grouped by category over the
+  season's own window, with opening cash read from before the season and closing cash as opening plus the
+  category totals. It is written once, at rollover, for reporting; the settlement award (`FIN-5`) is the next
+  season's first money and lies outside the window.
 
 ---
 
@@ -619,6 +632,16 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `ai_market_max_listings_per_club` | 3 per pass | TRF-12 (balancing) |
 | `ai_market_max_bids_per_club` | 3 per pass | TRF-12 (balancing) |
 | `ai_market_bid_budget_fraction_bp` | 5,000 (half of available cash) | TRF-12 (balancing) |
+| `ai_contract_policy_version` | `ai-contract-v1` | CON-9 (FIC-8) |
+| `ai_contract_target_squad_size` | 21 | CON-9 (balancing) |
+| `retirement_policy_version` | `retirement-v1` | CON-10 (FIC-8) |
+| `retirement_announcement_start_age` | 32 | CON-10 (balancing) |
+| `retirement_announcement_base_chance_per_mille` | 300 | CON-10 (balancing) |
+| `retirement_announcement_step_per_season_per_mille` | 150 | CON-10 (balancing) |
+| `retirement_ability_factor_bp` | 6,500 (ability ≥ 16) → 14,000 (ability ≤ 9) | CON-10 (balancing) |
+| `retirement_condition_factor_bp` | 8,500 (condition ≥ 8,000) → 12,000 (condition < 5,000) | CON-10 (balancing) |
+| `retirement_forced_announcement_age` | 36 outfield / 38 goalkeeper | CON-10 (balancing) |
+| `retirement_forced_age` | 37 outfield / 39 goalkeeper | CON-10 (balancing) |
 | `refresh_token_lifetime_minutes` | 15 (access) | ADR-0002 |
 | `highlight_target_seconds` | 5–8 | ADR-0006 |
 | `match_presentation_payload_budget_kb` | 750 | ADR-0006 |
@@ -647,5 +670,4 @@ These are recorded so they are not silently invented later:
 | Exact AI valuation and bidding bands | Specified in §14.3 and §18 (Stage 10, AI market milestone) |
 | Collusion review signals (`INT-4`) and market trace views | Stage 14, with the operator surface that would read them |
 | Exact training development curve constants and age curve | Stage 4/5 |
-| Retirement rule specifics: an **announce-then-play** mechanism — a player has a 30% chance to announce a retirement at 32, rising 15 percentage points each season, forced by the rollover entering 37 (outfield) or 39 (goalkeepers); an announce plays one final season; gated by ability and fitness so only very good, very fit players reach the cap and the rest retire around 32–35 (outfield) and 33–36 (goalkeepers) | Stage 12 (rest of the stage) |
 | Whether free-agent signing is enabled during MVP | Stage 10, decided by market-health measurement |

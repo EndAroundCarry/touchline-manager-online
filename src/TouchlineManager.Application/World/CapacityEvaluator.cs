@@ -3,6 +3,7 @@ using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Contracts.World;
+using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Domain.World.Generation;
@@ -105,9 +106,9 @@ public sealed class CapacityEvaluator
             return null;
         }
 
-        // The current season is the target. PYR-9 makes this the *next* season when rollover holds the
-        // country lock, which is a Stage 12 refinement of this one line.
-        var season = await _world.FindSeasonAsync(world.Id, world.CurrentSeasonNumber, cancellationToken);
+        // The current season is the target, unless it is rolling over — then the request targets the next
+        // season so the closing one is never mutated (`PYR-5`, `PYR-9`).
+        var season = await ResolveTargetSeasonAsync(world, cancellationToken);
 
         if (season is null)
         {
@@ -137,6 +138,29 @@ public sealed class CapacityEvaluator
             Reason: $"{country.Code} tier {targetTier}"));
 
         return request.ToProvisioningResponse(_options.ProvisioningPollSeconds);
+    }
+
+    /// <summary>
+    /// Resolves the season a provisioning request targets (`PYR-5`, `PYR-9`).
+    /// </summary>
+    /// <remarks>
+    /// The current season when it is being played, or the next one while it is rolling over, so a request made
+    /// during the rollover window never mutates the closing season. If the next season does not exist yet — the
+    /// rollover has not reached its move phase — the request is deferred, and the next capacity evaluation
+    /// retries it.
+    /// </remarks>
+    private async Task<Season?> ResolveTargetSeasonAsync(GameWorld world, CancellationToken cancellationToken)
+    {
+        var current = await _world.FindSeasonAsync(world.Id, world.CurrentSeasonNumber, cancellationToken);
+
+        if (current is null)
+        {
+            return null;
+        }
+
+        return current.Status == SeasonStatus.Active
+            ? current
+            : await _world.FindSeasonAsync(world.Id, world.CurrentSeasonNumber + 1, cancellationToken);
     }
 
     /// <summary>

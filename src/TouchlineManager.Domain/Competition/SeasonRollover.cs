@@ -124,6 +124,26 @@ public sealed class SeasonRollover
         Touch(now);
     }
 
+    /// <summary>
+    /// Records that the closing season's contracts are resolved: expiries, renewals, retirements, and any
+    /// emergency replacements (`CON-6`, `CON-8`).
+    /// </summary>
+    /// <remarks>A repeat once the rollover has already settled squads or gone further is a no-op.</remarks>
+    /// <param name="now">The current instant.</param>
+    public void SettleSquads(DateTimeOffset now)
+    {
+        if (SeasonRolloverPhaseRules.IsAtLeast(Phase, SeasonRolloverPhase.Squads))
+        {
+            return;
+        }
+
+        RequirePhase(SeasonRolloverPhase.Finalized, nameof(SettleSquads));
+
+        Phase = SeasonRolloverPhase.Squads;
+
+        Touch(now);
+    }
+
     /// <summary>Records that the next season exists and every club has been placed into it.</summary>
     /// <param name="nextSeasonId">The next season that was created.</param>
     /// <param name="now">The current instant.</param>
@@ -139,7 +159,7 @@ public sealed class SeasonRollover
             return;
         }
 
-        RequirePhase(SeasonRolloverPhase.Finalized, nameof(Move));
+        RequirePhase(SeasonRolloverPhase.Squads, nameof(Move));
 
         NextSeasonId = nextSeasonId;
         Phase = SeasonRolloverPhase.Moved;

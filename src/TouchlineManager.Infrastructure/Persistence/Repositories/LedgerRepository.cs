@@ -30,4 +30,36 @@ internal sealed class LedgerRepository : ILedgerRepository
 
         return found.ToHashSet(StringComparer.Ordinal);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubCategoryTotal>> LoadCategoryTotalsAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        CancellationToken cancellationToken) =>
+        await _dbContext.LedgerEntries
+            .Where(entry => clubIds.Contains(entry.ClubId)
+                && entry.CreatedAt >= fromInclusive
+                && entry.CreatedAt < toExclusive)
+            .GroupBy(entry => new { entry.ClubId, entry.Category })
+            .Select(group => new ClubCategoryTotal(
+                group.Key.ClubId,
+                group.Key.Category,
+                group.Sum(entry => entry.CashDeltaMinor)))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, long>> LoadCashBalanceBeforeAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        DateTimeOffset instant,
+        CancellationToken cancellationToken)
+    {
+        var balances = await _dbContext.LedgerEntries
+            .Where(entry => clubIds.Contains(entry.ClubId) && entry.CreatedAt < instant)
+            .GroupBy(entry => entry.ClubId)
+            .Select(group => new { ClubId = group.Key, Cash = group.Sum(entry => entry.CashDeltaMinor) })
+            .ToListAsync(cancellationToken);
+
+        return balances.ToDictionary(balance => balance.ClubId, balance => balance.Cash);
+    }
 }

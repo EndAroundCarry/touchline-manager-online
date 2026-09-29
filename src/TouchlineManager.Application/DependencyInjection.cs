@@ -121,6 +121,7 @@ public static class DependencyInjection
     {
         services.AddScoped<MatchdayFinances>();
         services.AddScoped<RunWeeklyFinance>();
+        services.AddScoped<SettleSeasonFinances>();
         services.AddScoped<GetFinanceSummary>();
         services.AddScoped<GetFinanceLedger>();
     }
@@ -263,6 +264,7 @@ public static class DependencyInjection
         services.AddScoped<SetPlayerTrainingFocus>();
         services.AddScoped<RunDailyProgression>();
         services.AddScoped<EvaluateAiClubs>();
+        services.AddScoped<SettleSquadContinuity>();
         services.AddScoped<GetFixtureTeamSheet>();
         services.AddScoped<SaveFixtureTeamSheet>();
         services.AddScoped<RequestRenewalQuote>();

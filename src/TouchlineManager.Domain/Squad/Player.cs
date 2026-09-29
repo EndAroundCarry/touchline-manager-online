@@ -79,6 +79,19 @@ public sealed class Player
     public PlayerStatus Status { get; private set; }
 
     /// <summary>
+    /// Gets the season number a retirement was announced for, or null when none was (`CON-6`).
+    /// </summary>
+    /// <remarks>
+    /// A player may announce, at most once, that the coming season is their last; they retire at the
+    /// rollover that closes it. The number records which season the announcement was made for, so the
+    /// decision is auditable without inferring it from an age.
+    /// </remarks>
+    public int? RetirementAnnouncedSeasonNumber { get; private set; }
+
+    /// <summary>Gets whether the player has announced that the coming season is their last (`CON-6`).</summary>
+    public bool IsRetirementAnnounced => RetirementAnnouncedSeasonNumber is not null;
+
+    /// <summary>
     /// Gets the hidden development ceiling (`TRN-9`). Class C2: never serialized to a manager.
     /// </summary>
     public int Potential { get; private set; }
@@ -153,6 +166,30 @@ public sealed class Player
     public bool PlaysIn(PositionFamily family) =>
         PlayerPositions.FamilyOf(PrimaryPosition) == family
         || SecondaryPositions.Any(position => PlayerPositions.FamilyOf(position) == family);
+
+    /// <summary>
+    /// Records that the player has announced the coming season as their last (`CON-6`).
+    /// </summary>
+    /// <remarks>
+    /// Idempotent: a second announcement for an already-announced player is a no-op rather than an error,
+    /// because the rollover that makes the decision is at-least-once. The player keeps playing — the
+    /// announcement only schedules their retirement for the next rollover.
+    /// </remarks>
+    /// <param name="seasonNumber">The season the announcement is for, which is the player's final one.</param>
+    /// <param name="now">The current instant.</param>
+    public void AnnounceRetirement(int seasonNumber, DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(seasonNumber, 1);
+
+        if (IsRetirementAnnounced)
+        {
+            return;
+        }
+
+        RetirementAnnouncedSeasonNumber = seasonNumber;
+
+        Touch(now);
+    }
 
     /// <summary>Retires the player, keeping the record readable.</summary>
     /// <param name="now">The current instant.</param>

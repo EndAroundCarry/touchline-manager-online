@@ -215,7 +215,7 @@ public static class LedgerPostings
             ReservedDeltaMinor: 0,
             LedgerSourceType.SeasonRollover,
             SourceId: seasonId,
-            $"rollover:{seasonId:D}:{clubId:D}",
+            $"rollover:{seasonId:N}:{clubId:N}",
             PositionAwardTemplate,
             Parameters(("amountMinor", amountMinor), ("tier", tier), ("rank", rank)));
     }

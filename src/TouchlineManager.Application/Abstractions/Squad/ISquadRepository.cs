@@ -57,4 +57,34 @@ public interface ISquadRepository
     /// <param name="playerId">The player.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<PlayerRegistration?> FindActiveRegistrationAsync(Guid playerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads several players, tracked, so the rollover can retire or release them in one unit of work
+    /// (`CON-6`).
+    /// </summary>
+    /// <param name="playerIds">The players.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<Player>> LoadPlayersAsync(
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads the active contracts of several clubs, tracked, so the rollover can close and re-sign them in
+    /// one unit of work (`CON-6`, `CON-8`).
+    /// </summary>
+    /// <param name="clubIds">The clubs.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<PlayerContract>> LoadActiveContractsForClubsAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads the active registrations of several players, tracked, so the rollover can end them in one unit
+    /// of work (`SQ-6`, `CON-6`).
+    /// </summary>
+    /// <param name="playerIds">The players.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<PlayerRegistration>> LoadActiveRegistrationsForPlayersAsync(
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken);
 }

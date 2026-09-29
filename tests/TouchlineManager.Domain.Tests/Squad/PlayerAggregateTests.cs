@@ -94,6 +94,36 @@ public sealed class PlayerAggregateTests
     }
 
     [Fact]
+    public void A_retirement_announcement_is_recorded_once_and_only_once()
+    {
+        var player = GeneratedPlayer();
+
+        player.IsRetirementAnnounced.Should().BeFalse();
+        player.RetirementAnnouncedSeasonNumber.Should().BeNull();
+
+        player.AnnounceRetirement(3, Now.AddDays(1));
+
+        player.IsRetirementAnnounced.Should().BeTrue();
+        player.RetirementAnnouncedSeasonNumber.Should().Be(3);
+        player.Status.Should().Be(PlayerStatus.Active, "an announcement is not a retirement");
+
+        var version = player.Version;
+
+        player.AnnounceRetirement(4, Now.AddDays(2));
+
+        player.RetirementAnnouncedSeasonNumber.Should().Be(3, "the first announcement stands");
+        player.Version.Should().Be(version, "a repeat is a no-op (CON-6)");
+    }
+
+    [Fact]
+    public void Announcing_a_retirement_for_an_impossible_season_is_a_programming_error()
+    {
+        var act = () => GeneratedPlayer().AnnounceRetirement(0, Now);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
     public void Attributes_are_checksummed_over_their_canonical_order()
     {
         var attributes = PlayerAttributes.Create(Guid.CreateVersion7(), Attributes());

@@ -120,6 +120,12 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the finance module's append-only ledger entries.</summary>
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
 
+    /// <summary>Gets the finance module's per-club season finance summaries.</summary>
+    public DbSet<ClubSeasonFinance> ClubSeasonFinances => Set<ClubSeasonFinance>();
+
+    /// <summary>Gets the finance module's season summary category totals.</summary>
+    public DbSet<ClubSeasonFinanceLine> ClubSeasonFinanceLines => Set<ClubSeasonFinanceLine>();
+
     /// <summary>Gets the comms module's inbox messages.</summary>
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 

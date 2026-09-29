@@ -3,6 +3,7 @@ using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.World;
@@ -100,7 +101,7 @@ public sealed class TriggerProvisioning
 
         if (request is null)
         {
-            var season = await _world.FindSeasonAsync(world.Id, world.CurrentSeasonNumber, cancellationToken);
+            var season = await ResolveTargetSeasonAsync(world, cancellationToken);
 
             if (season is null)
             {
@@ -140,5 +141,22 @@ public sealed class TriggerProvisioning
             request.Id,
             key,
             enqueued);
+    }
+
+    /// <summary>
+    /// Resolves the season a triggered request targets, mirroring <see cref="CapacityEvaluator"/> (`PYR-9`).
+    /// </summary>
+    private async Task<Season?> ResolveTargetSeasonAsync(GameWorld world, CancellationToken cancellationToken)
+    {
+        var current = await _world.FindSeasonAsync(world.Id, world.CurrentSeasonNumber, cancellationToken);
+
+        if (current is null)
+        {
+            return null;
+        }
+
+        return current.Status == SeasonStatus.Active
+            ? current
+            : await _world.FindSeasonAsync(world.Id, world.CurrentSeasonNumber + 1, cancellationToken);
     }
 }

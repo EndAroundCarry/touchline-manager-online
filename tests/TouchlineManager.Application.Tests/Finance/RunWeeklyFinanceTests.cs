@@ -222,6 +222,19 @@ public sealed class RunWeeklyFinanceTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlySet<string>>(
                 Existing.Where(correlationIds.Contains).ToHashSet(StringComparer.Ordinal));
+
+        public Task<IReadOnlyList<ClubCategoryTotal>> LoadCategoryTotalsAsync(
+            IReadOnlyCollection<Guid> clubIds,
+            DateTimeOffset fromInclusive,
+            DateTimeOffset toExclusive,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ClubCategoryTotal>>([]);
+
+        public Task<IReadOnlyDictionary<Guid, long>> LoadCashBalanceBeforeAsync(
+            IReadOnlyCollection<Guid> clubIds,
+            DateTimeOffset instant,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, long>>(new Dictionary<Guid, long>());
     }
 
     private sealed class RecordingAuditWriter : IAuditWriter

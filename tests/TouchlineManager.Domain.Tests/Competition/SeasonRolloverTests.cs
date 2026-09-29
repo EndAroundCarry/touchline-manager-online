@@ -37,6 +37,9 @@ public sealed class SeasonRolloverTests
         rollover.Finalize(Now.AddMinutes(2));
         rollover.Phase.Should().Be(SeasonRolloverPhase.Finalized);
 
+        rollover.SettleSquads(Now.AddMinutes(2.5));
+        rollover.Phase.Should().Be(SeasonRolloverPhase.Squads);
+
         rollover.Move(nextSeasonId, Now.AddMinutes(3));
         rollover.Phase.Should().Be(SeasonRolloverPhase.Moved);
         rollover.NextSeasonId.Should().Be(nextSeasonId);
@@ -60,6 +63,8 @@ public sealed class SeasonRolloverTests
         rollover.Finalize(Now.AddMinutes(3));
         rollover.Finalize(Now.AddMinutes(4));
         var nextSeasonId = Guid.CreateVersion7();
+        rollover.SettleSquads(Now.AddMinutes(4.5));
+        rollover.SettleSquads(Now.AddMinutes(4.75));
         rollover.Move(nextSeasonId, Now.AddMinutes(5));
         rollover.Move(Guid.CreateVersion7(), Now.AddMinutes(6));
         rollover.Complete(Now.AddMinutes(7));
@@ -76,12 +81,21 @@ public sealed class SeasonRolloverTests
         var rollover = Start();
 
         var finalizeFromStart = () => rollover.Finalize(Now);
+        var settleSquadsFromStart = () => rollover.SettleSquads(Now);
         var moveFromStart = () => rollover.Move(Guid.CreateVersion7(), Now);
         var completeFromStart = () => rollover.Complete(Now);
 
         finalizeFromStart.Should().Throw<InvalidOperationException>();
+        settleSquadsFromStart.Should().Throw<InvalidOperationException>();
         moveFromStart.Should().Throw<InvalidOperationException>();
         completeFromStart.Should().Throw<InvalidOperationException>();
+
+        // The move phase runs after contracts are settled, so moving straight from finalized is refused too.
+        rollover.Freeze(Now);
+        rollover.Finalize(Now);
+
+        var moveBeforeSquads = () => rollover.Move(Guid.CreateVersion7(), Now);
+        moveBeforeSquads.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -118,6 +132,7 @@ public sealed class SeasonRolloverTests
 
         rollover.Freeze(Now.AddMinutes(5));
         rollover.Finalize(Now.AddMinutes(6));
+        rollover.SettleSquads(Now.AddMinutes(6.5));
         rollover.Move(Guid.CreateVersion7(), Now.AddMinutes(7));
         rollover.Complete(Now.AddMinutes(8));
 
@@ -131,6 +146,7 @@ public sealed class SeasonRolloverTests
         var completed = Start();
         completed.Freeze(Now);
         completed.Finalize(Now);
+        completed.SettleSquads(Now);
         completed.Move(Guid.CreateVersion7(), Now);
         completed.Complete(Now);
 
@@ -167,6 +183,7 @@ public sealed class SeasonRolloverTests
         SeasonRolloverPhase.Started.ToCode().Should().Be("started");
         SeasonRolloverPhase.Frozen.ToCode().Should().Be("frozen");
         SeasonRolloverPhase.Finalized.ToCode().Should().Be("finalized");
+        SeasonRolloverPhase.Squads.ToCode().Should().Be("squads");
         SeasonRolloverPhase.Moved.ToCode().Should().Be("moved");
         SeasonRolloverPhase.Completed.ToCode().Should().Be("completed");
         SeasonRolloverPhase.Failed.ToCode().Should().Be("failed");
@@ -183,7 +200,8 @@ public sealed class SeasonRolloverTests
     {
         ((int)SeasonRolloverPhase.Started).Should().BeLessThan((int)SeasonRolloverPhase.Frozen);
         ((int)SeasonRolloverPhase.Frozen).Should().BeLessThan((int)SeasonRolloverPhase.Finalized);
-        ((int)SeasonRolloverPhase.Finalized).Should().BeLessThan((int)SeasonRolloverPhase.Moved);
+        ((int)SeasonRolloverPhase.Finalized).Should().BeLessThan((int)SeasonRolloverPhase.Squads);
+        ((int)SeasonRolloverPhase.Squads).Should().BeLessThan((int)SeasonRolloverPhase.Moved);
         ((int)SeasonRolloverPhase.Moved).Should().BeLessThan((int)SeasonRolloverPhase.Completed);
     }
 
@@ -195,6 +213,7 @@ public sealed class SeasonRolloverTests
         var rollover = Start();
         rollover.Freeze(Now);
         rollover.Finalize(Now);
+        rollover.SettleSquads(Now);
         rollover.Move(Guid.CreateVersion7(), Now);
         rollover.Complete(Now);
 

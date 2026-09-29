@@ -98,6 +98,19 @@ public sealed class InboxMessageTextTests
     }
 
     [Fact]
+    public void A_retirement_announcement_marks_the_final_season()
+    {
+        var draft = InboxTemplates.Retirement("Corin Alderwick", Guid.CreateVersion7());
+
+        draft.TemplateKey.Should().Be(InboxTemplates.RetirementAnnounced);
+
+        var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Title.Should().Be("Corin Alderwick will retire");
+        text.Body.Should().Be("Corin Alderwick has announced that this will be their final season.");
+    }
+
+    [Fact]
     public void A_repaired_side_lists_the_decisions_and_the_replacements()
     {
         var draft = InboxTemplates.Repair(

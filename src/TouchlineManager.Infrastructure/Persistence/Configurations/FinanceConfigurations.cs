@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.World;
 
@@ -147,6 +148,92 @@ internal sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<Ledger
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(entry => entry.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>finance.club_season_finances</c>: one club's opening and closing cash for a season
+/// (master plan §6.8).
+/// </summary>
+/// <remarks>
+/// The unique index on <c>(club_id, season_id)</c> is what makes the rollover's summary idempotent: a
+/// redelivered settlement cannot write a second summary for a club in the same season.
+/// </remarks>
+internal sealed class ClubSeasonFinanceConfiguration : IEntityTypeConfiguration<ClubSeasonFinance>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<ClubSeasonFinance> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("club_season_finances", "finance", table => table.HasCheckConstraint(
+            "ck_club_season_finances_cash",
+            "opening_cash_minor >= 0 and closing_cash_minor >= 0"));
+
+        builder.HasKey(summary => summary.Id);
+        builder.Property(summary => summary.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(summary => summary.ClubId).HasColumnName("club_id").IsRequired();
+        builder.Property(summary => summary.SeasonId).HasColumnName("season_id").IsRequired();
+        builder.Property(summary => summary.OpeningCashMinor).HasColumnName("opening_cash_minor").IsRequired();
+        builder.Property(summary => summary.ClosingCashMinor).HasColumnName("closing_cash_minor").IsRequired();
+        builder.Property(summary => summary.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(summary => summary.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(summary => summary.Version).HasColumnName("version").IsRequired();
+
+        builder.HasIndex(summary => new { summary.ClubId, summary.SeasonId })
+            .IsUnique()
+            .HasDatabaseName("ux_club_season_finances_club_id_season_id");
+
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(summary => summary.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Season>()
+            .WithMany()
+            .HasForeignKey(summary => summary.SeasonId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>finance.club_season_finance_lines</c>: one category's total within a season summary
+/// (master plan §6.8).
+/// </summary>
+internal sealed class ClubSeasonFinanceLineConfiguration : IEntityTypeConfiguration<ClubSeasonFinanceLine>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<ClubSeasonFinanceLine> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("club_season_finance_lines", "finance", table => table.HasCheckConstraint(
+            "ck_club_season_finance_lines_category",
+            "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', "
+            + "'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', "
+            + "'reservation_release', 'emergency_grant', 'compensation')"));
+
+        builder.HasKey(line => line.Id);
+        builder.Property(line => line.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(line => line.ClubSeasonFinanceId).HasColumnName("club_season_finance_id").IsRequired();
+        builder.Property(line => line.Category)
+            .HasColumnName("category")
+            .HasMaxLength(LedgerCategories.MaxCodeLength)
+            .HasConversion(category => category.ToCode(), code => LedgerCategories.FromCode(code))
+            .IsRequired();
+        builder.Property(line => line.CashDeltaMinor).HasColumnName("cash_delta_minor").IsRequired();
+        builder.Property(line => line.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(line => line.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(line => line.Version).HasColumnName("version").IsRequired();
+
+        builder.HasIndex(line => new { line.ClubSeasonFinanceId, line.Category })
+            .IsUnique()
+            .HasDatabaseName("ux_club_season_finance_lines_summary_category");
+
+        builder.HasOne<ClubSeasonFinance>()
+            .WithMany()
+            .HasForeignKey(line => line.ClubSeasonFinanceId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

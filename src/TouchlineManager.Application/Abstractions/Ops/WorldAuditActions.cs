@@ -60,4 +60,7 @@ public static class WorldAuditActions
 
     /// <summary>A season rolled over: the closing season is sealed and the next one is active (`PR-4`, `PR-6`).</summary>
     public const string RolloverCompleted = "world.season_rollover.completed";
+
+    /// <summary>The closing season's contracts were resolved at rollover (`CON-6`, `CON-8`).</summary>
+    public const string SquadsSettled = "world.season_rollover.squads_settled";
 }

@@ -109,7 +109,7 @@ public sealed class LedgerPostingsTests
         posting.Category.Should().Be(LedgerCategory.PositionAward);
         posting.SourceType.Should().Be(LedgerSourceType.SeasonRollover);
         posting.SourceId.Should().Be(seasonId);
-        posting.CorrelationId.Should().Be($"rollover:{seasonId:D}:{clubId:D}");
+        posting.CorrelationId.Should().Be($"rollover:{seasonId:N}:{clubId:N}");
 
         using var document = JsonDocument.Parse(posting.DescriptionParametersJson);
 

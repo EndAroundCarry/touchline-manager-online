@@ -36,4 +36,10 @@ public static class SquadAuditActions
 
     /// <summary>A player was re-signed, closing the old contract and opening a new one (`CON-3`, `CON-4`).</summary>
     public const string ContractRenewed = "squad.contract.renewed";
+
+    /// <summary>
+    /// An emergency replacement was created because a club fell below the minimum squad (`SQ-8`).
+    /// </summary>
+    /// <remarks>The safety net is audited because it is a repair rather than a normal way to build a squad.</remarks>
+    public const string EmergencyReplacement = "squad.emergency_replacement.created";
 }

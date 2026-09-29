@@ -55,4 +55,29 @@ internal sealed class SquadRepository : ISquadRepository
             registration => registration.PlayerId == playerId
                 && registration.Status == RegistrationStatus.Active,
             cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Player>> LoadPlayersAsync(
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Players
+            .Where(player => playerIds.Contains(player.Id))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PlayerContract>> LoadActiveContractsForClubsAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken) =>
+        await _dbContext.PlayerContracts
+            .Where(contract => clubIds.Contains(contract.ClubId) && contract.Status == ContractStatus.Active)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PlayerRegistration>> LoadActiveRegistrationsForPlayersAsync(
+        IReadOnlyCollection<Guid> playerIds,
+        CancellationToken cancellationToken) =>
+        await _dbContext.PlayerRegistrations
+            .Where(registration => playerIds.Contains(registration.PlayerId)
+                && registration.Status == RegistrationStatus.Active)
+            .ToListAsync(cancellationToken);
 }
