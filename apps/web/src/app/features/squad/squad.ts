@@ -17,8 +17,9 @@ import { formatFunds } from '../../core/world/presentation';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import {
   CHECKBOX_INPUT,
+  CHECKBOX_ROW,
   FORM_ERROR,
-  LINK,
+  LINK_ACTION,
   PAGE_HEADING,
   SECONDARY_BUTTON,
   TEXT_INPUT,
@@ -78,9 +79,10 @@ export class Squad {
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
-  protected readonly linkClass = LINK;
+  protected readonly linkClass = LINK_ACTION;
   protected readonly textInputClass = TEXT_INPUT;
   protected readonly checkboxClass = CHECKBOX_INPUT;
+  protected readonly checkboxRowClass = CHECKBOX_ROW;
 
   constructor() {
     this.load();

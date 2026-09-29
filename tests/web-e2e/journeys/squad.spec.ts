@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
+import { isCompact, navigateTo } from '../support/navigation';
 
 /**
  * The Stage 4 exit criteria for the squad screens (F-16, F-17).
@@ -32,46 +33,54 @@ test.describe('squad', () => {
     await expect(page).toHaveURL(/\/dashboard$/);
 
     // The shell now offers the squad, which is how a manager reaches it.
-    await page.getByRole('link', { name: 'Squad' }).click();
+    await navigateTo(page, 'Squad');
 
     await expect(page).toHaveURL(/\/squad$/);
     await expect(page.getByRole('heading', { name: /squad$/ })).toBeVisible();
 
-    const table = page.locator('table.p-datatable-table');
+    // Below `md` the squad is a card list, not the table, with the same twenty-two players (`F-44`),
+    // so every assertion is scoped to the layout this breakpoint is showing.
+    const compact = isCompact(page);
+    const roster = compact ? page.getByTestId('squad-cards') : page.getByTestId('squad-table');
+    const rows = compact ? roster.locator('li') : roster.locator('tbody tr');
 
-    await expect(table).toBeVisible();
+    await expect(roster).toBeVisible();
 
     // The inherited squad is the generated one: twenty-two players, each with a profile to open (SQ-1).
-    await expect(table.locator('tbody tr')).toHaveCount(22);
-    await expect(page.getByRole('link', { name: /^Open / })).toHaveCount(22);
+    await expect(rows).toHaveCount(22);
+    await expect(roster.getByRole('link', { name: /^Open / })).toHaveCount(22);
     await expect(page.getByText(/22 players/)).toBeVisible();
 
     // Sorting is the table's own, and it announces the direction rather than only tinting the header
-    // (master plan §11.1, §11.3). Scoped to the squad table, because the contract list below it also has
+    // (master plan §11.1, §11.3). The compact card list filters but does not sort, so this is the
+    // table's contract to prove. Scoped to the squad table, because the contract list below it also has
     // an "Age" column.
-    const age = table.getByRole('columnheader', { name: /^Age/ });
+    if (!compact) {
+      const age = roster.getByRole('columnheader', { name: /^Age/ });
 
-    await age.click();
-    await expect(age).toHaveAttribute('aria-sort', 'ascending');
+      await age.click();
+      await expect(age).toHaveAttribute('aria-sort', 'ascending');
 
-    await age.click();
-    await expect(age).toHaveAttribute('aria-sort', 'descending');
+      await age.click();
+      await expect(age).toHaveAttribute('aria-sort', 'descending');
+    }
 
-    // Filtering is client-side over the bounded response (§10.3).
-    const firstRow = table.locator('tbody tr').first();
-    const firstRowName = (await firstRow.locator('th').first().innerText()).split('\n')[0].trim();
+    // Filtering is client-side over the bounded response (§10.3), and applies to both layouts.
+    const firstRowName = compact
+      ? (await rows.first().locator('h3').first().innerText()).trim()
+      : (await rows.first().locator('th').first().innerText()).split('\n')[0].trim();
     const surname = firstRowName.slice(firstRowName.lastIndexOf(' ') + 1);
 
     await page.getByLabel('Search by name').fill(surname);
 
     await expect(page.getByText(/Showing \d+ of 22 players/)).toBeVisible();
-    await expect(table.locator('tbody tr').first()).toContainText(surname);
+    await expect(rows.first()).toContainText(surname);
 
     await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect(table.locator('tbody tr')).toHaveCount(22);
+    await expect(rows).toHaveCount(22);
 
     // The player profile is where the attribute grid lives (F-17).
-    await page.getByRole('link', { name: /^Open / }).first().click();
+    await roster.getByRole('link', { name: /^Open / }).first().click();
 
     await expect(page).toHaveURL(/\/players\//);
     await expect(page.getByRole('heading', { name: 'Attributes', level: 2 })).toBeVisible();

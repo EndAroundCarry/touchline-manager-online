@@ -1,4 +1,4 @@
-import { Component, OnDestroy, computed, inject } from '@angular/core';
+import { Component, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
@@ -70,6 +70,31 @@ export class AppShell implements OnDestroy {
 
   /** How many inbox messages are unread, for the navigation badge (`F-41`). */
   protected readonly unreadInboxCount = this.sync.unreadInboxCount;
+
+  /**
+   * Whether the mobile navigation panel is open.
+   *
+   * Below `md` the sidebar is replaced by a disclosure in the header; the panel is a plain vertical
+   * list of the same destinations (`F-44`, master plan §11.3). It is a disclosure rather than a
+   * drag drawer so it needs no focus trap and closes on Escape and on the link that is chosen.
+   */
+  protected readonly mobileNavOpen = signal(false);
+
+  /** Opens or closes the mobile navigation panel. */
+  protected toggleMobileNav(): void {
+    this.mobileNavOpen.update((open) => !open);
+  }
+
+  /** Closes the mobile navigation panel, e.g. after a destination is chosen. */
+  protected closeMobileNav(): void {
+    this.mobileNavOpen.set(false);
+  }
+
+  /** Closes the mobile navigation panel on Escape, the expected dismissal for a disclosure. */
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.closeMobileNav();
+  }
 
   /** Stops the synchronization poll when the shell goes away. */
   ngOnDestroy(): void {

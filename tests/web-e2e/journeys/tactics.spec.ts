@@ -1,6 +1,7 @@
 import { APIRequestContext, Page, expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
+import { navigateTo } from '../support/navigation';
 
 /**
  * The Stage 4 exit criteria for the tactics screen (F-19).
@@ -141,7 +142,7 @@ test.describe('tactics', () => {
     await expect(page).toHaveURL(/\/dashboard$/);
 
     // The shell offers the tactics board, which is how a manager reaches it.
-    await page.getByRole('link', { name: 'Tactics' }).click();
+    await navigateTo(page, 'Tactics');
     await expect(page).toHaveURL(/\/tactics$/);
     await expect(page.getByRole('heading', { name: /tactics$/ })).toBeVisible();
 

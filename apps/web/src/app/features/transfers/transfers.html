@@ -55,7 +55,9 @@
           </div>
 
           <div class="sm:col-span-2 lg:col-span-4">
-            <button type="submit" [class]="primaryButtonClass" [disabled]="!canMutate()">List for sale</button>
+            <button type="submit" [class]="primaryButtonClass" [disabled]="!canMutate()">
+              List for sale
+            </button>
           </div>
         </form>
       }
@@ -70,7 +72,7 @@
     } @else if (listings().length === 0) {
       <p class="mt-2 text-sm text-slate-600" role="status">No players are listed right now.</p>
     } @else {
-      <div class="mt-2 overflow-x-auto">
+      <div class="mt-2 hidden overflow-x-auto md:block" data-testid="listings-table">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
           <caption class="sr-only">
             Open transfer listings
@@ -116,7 +118,9 @@
                       [value]="listing.minimumAcceptableBidMinor"
                       [class]="textInputClass"
                     />
-                    <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">Bid</button>
+                    <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">
+                      Bid
+                    </button>
                   </form>
                 </td>
               </tr>
@@ -124,6 +128,60 @@
           </tbody>
         </table>
       </div>
+
+      <!--
+        The same listings as cards below `md`. The bid control is in the seventh column of the
+        table, so on a phone it lives behind a sideways scroll; here it sits under the player
+        (`F-44`).
+      -->
+      <ul class="mt-2 flex flex-col gap-3 md:hidden" data-testid="listings-cards">
+        @for (listing of listings(); track listing.listingId) {
+          <li class="rounded border border-slate-200 bg-white p-3">
+            <h3 class="text-sm font-semibold text-slate-900">{{ listing.playerName }}</h3>
+            <p class="text-sm text-slate-600">{{ listing.sellerClubName }}</p>
+            <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+              <div class="flex justify-between gap-2">
+                <dt class="text-slate-500">Minimum</dt>
+                <dd class="text-slate-800">{{ funds(listing.minimumFeeMinor) }}</dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-slate-500">Leading</dt>
+                <dd class="text-slate-800">
+                  @if (listing.leadingAmountMinor; as leading) {
+                    {{ funds(leading) }}
+                  } @else {
+                    No bids
+                  }
+                </dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-slate-500">Bids</dt>
+                <dd class="text-slate-800">{{ listing.bidderCount }}</dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-slate-500">Closes</dt>
+                <dd class="text-slate-800">{{ instant(listing.endsAt) }}</dd>
+              </div>
+            </dl>
+            <form class="mt-2 flex items-center gap-2" (submit)="onBid($event, listing.listingId)">
+              <label class="sr-only" [attr.for]="'bid-mobile-' + listing.listingId"
+                >Bid amount</label
+              >
+              <input
+                [id]="'bid-mobile-' + listing.listingId"
+                name="amount"
+                type="number"
+                min="1"
+                [value]="listing.minimumAcceptableBidMinor"
+                [class]="textInputClass"
+              />
+              <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">
+                Bid
+              </button>
+            </form>
+          </li>
+        }
+      </ul>
 
       @if (hasMore()) {
         <div class="mt-4">

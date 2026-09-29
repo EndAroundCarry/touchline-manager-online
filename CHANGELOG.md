@@ -3,6 +3,70 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 13 — Responsive layouts, touch targets, and the breakpoint suite
+
+The app is responsive in the way Stage 13 promises, and it is proven at more than one width. Below
+`md` the sidebar becomes a header menu, the dense screens present cards instead of tables a phone
+could only scroll sideways, every control is at least 44px tall, and the core Playwright suite now
+runs at a desktop and a mobile breakpoint with a tablet project for the layout boundary. This is the
+third Stage 13 milestone (`F-44`, ADR-0038).
+
+### Added
+
+- **A mobile navigation disclosure** (`F-44`): below `md` a menu button in the header toggles a
+  vertical panel of the same fourteen destinations, and the desktop sidebar is hidden. It is a
+  disclosure rather than a drag drawer, so it needs no focus trap and closes on Escape and on the
+  destination chosen. Both layouts iterate one `NAV_ITEMS` model, so a destination cannot exist on one
+  and be missing from the other.
+- **A 44px touch floor** (`§11.3`): `TOUCH_TARGET` in `control-styles.ts` composes `min-h-11` into
+  every text input, select and button; checkboxes gained a `CHECKBOX_ROW` label target so the whole row
+  is tappable; and `LINK_ACTION` gives action links the same height while `LINK` stays bare for links
+  inside a sentence. The tactics drag chips and the shell's navigation and header controls were raised
+  to match.
+- **Card layouts for the dense screens** (`F-44`): squad (and its contracts), the training focus list,
+  the tactics assignment table, the onboarding club list, scouting results, and transfer listings now
+  render their `hidden md:block` table beside a `md:hidden` card list built from the same data, so a
+  phone never presents a wide table it can only scroll — and the transfer bid control is no longer in
+  a seventh column off the screen.
+- **A breakpoint E2E suite** (`F-44`, ADR-0038): the core `playwright.config.ts` declares a `desktop`
+  and a `mobile` project that each run **every** journey, and a `tablet` project that runs only the
+  `@responsive` spec. A shared `support/navigation.ts` opens the disclosure when it is present, so one
+  journey runs at both widths; `journeys/responsive.spec.ts` asserts the disclosure-versus-sidebar
+  switch, the card-versus-table layouts, the 44px targets, and that no screen makes the page scroll
+  sideways.
+
+### Fixed
+
+- **Four tables had no scroll container.** The squad table, the contracts table, the training focus
+  table, the tactics assignment table, and the onboarding club table could overflow the page on a
+  narrow screen. Each scrolls inside its own box now, or is replaced by cards below `md`.
+- **Row actions were ~20px tap targets.** Squad, fixtures, inbox, and match-viewer links used as
+  actions now use `LINK_ACTION`.
+
+### Notes
+
+- **No migration and no server change.** Everything here is the web client and its tests.
+- **Both layouts are in the DOM; one is hidden.** `display:none` controls are inert for a person, but
+  a DOM-based test locator can still see them, so the journeys scope to the layout the breakpoint is
+  showing via the `data-testid` hooks on each pair.
+- **`docs/architecture/adr/0038-responsive-shell-and-touch-targets.md`** records the decision;
+  `mvp-traceability.md` `F-44` now carries this milestone's evidence, and `test-strategy.md` gains the
+  breakpoint paragraph and gate. The ADR index, which had missed ADR-0037, is corrected.
+
+### Tests
+
+- New `journeys/responsive.spec.ts` (tagged `@responsive`): the shell shows the menu below `md` and the
+  sidebar above it; opening the menu reveals the destinations and Escape closes it; a converted screen
+  shows cards below `md` and its table above it; the shown controls are at least 44px tall; and squad,
+  training, the club list, finances, competitions, transfers, scouting, and the inbox do not overflow
+  the page.
+- `journeys/squad.spec.ts` and `journeys/training.spec.ts` now branch on the breakpoint — asserting the
+  card list on a phone and sorting, the table, and the labelled focus selects on a desktop — so the
+  same journey proves both layouts.
+- `journeys/inbox.spec.ts` was corrected. Its "empty inbox" assumption predated the takeover welcome
+  message (COM-1), which every onboarding writes; it now asserts that message is on screen, and reaches
+  the inbox through the shared navigation helper at both breakpoints.
+
 ## Stage 13 — PWA hardening and the offline boundary
 
 The installable PWA becomes real. A deployed update is offered with a reload, an offline read is labelled,

@@ -56,7 +56,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-41 | Inbox / news notifications | comms | 6 (results), 8 (rollout), 11 (full) | Template + unread-sync tests; Stage 11 adds the news feed, notification preferences, deadline reminders, and outbox dispatch (ADR-0028, ADR-0029) |
 | F-42 | Inactivity handling | world, comms, ops | 11 | Ladder tests: warn at 10 days, AI-assisted at 14, closed at 21; a suspended account is skipped (ADR-0027) |
 | F-43 | Safe return-to-AI control | world, squad | 11 | A closure keeps every commitment; the freed club re-runs the capacity evaluation (ADR-0027) |
-| F-44 | Responsive desktop/mobile/tablet UI | web | 1 (shell), 13 (complete) | Breakpoint E2E suite |
+| F-44 | Responsive desktop/mobile/tablet UI | web | 1 (shell), 13 (complete) | Breakpoint E2E suite: the core journeys run at a desktop and a mobile project and a tablet project runs the `@responsive` spec, which asserts the shell's disclosure-versus-sidebar switch, the card-versus-table layouts, 44px touch targets, and no page-level horizontal overflow (`playwright.config.ts`, `support/navigation.ts`, `journeys/responsive.spec.ts`, ADR-0038) |
 | F-45 | Installable PWA | web | 1 (shell), 7, 13 | Install/update/offline-read tests. Stage 13 adds the `SwUpdate` update prompt, offline mutation gating, the stale-read label, and a production-served PWA journey (`UpdateStore`, `SystemNotices`, `playwright.pwa.config.ts`, ADR-0037) |
 | F-46 | Administration (jobs, matchdays, users, repairs) | ops, web | 14 | Operator can diagnose and resume each workflow |
 | F-47 | Audit | ops | 2 (infra), 14 (complete) | Append-only, restricted, reason-required |

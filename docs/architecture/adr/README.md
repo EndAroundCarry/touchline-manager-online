@@ -53,6 +53,8 @@ the system is shaped the way it is.
 | [0034](0034-operator-rollover-preview-and-resume.md) | Operator preview and resume for the season rollover | Accepted |
 | [0035](0035-five-season-staging-run.md) | A five-season staging run proves rollover continuity | Accepted |
 | [0036](0036-account-sessions-export-and-preferences.md) | Account sessions, machine-readable export, and formatting preferences | Accepted |
+| [0037](0037-pwa-update-ux-and-offline-boundary.md) | PWA update UX, offline mutation gating, and the stale-read indicator | Accepted |
+| [0038](0038-responsive-shell-and-touch-targets.md) | Responsive shell, touch-target baseline, and the breakpoint test matrix | Accepted |
 
 ## Rules for changing an ADR
 

@@ -1,6 +1,7 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
+import { navigateTo } from '../support/navigation';
 
 /**
  * The Stage 6 criteria for the fixture list and the prepare-match screen (F-18, F-19).
@@ -87,7 +88,7 @@ test.describe('fixtures', () => {
     expect(mine.nextFixtureId).not.toBeNull();
 
     // The shell now offers fixtures, which is how a manager reaches them.
-    await page.getByRole('link', { name: 'Fixtures' }).click();
+    await navigateTo(page, 'Fixtures');
 
     await expect(page).toHaveURL(/\/fixtures$/);
     await expect(page.getByRole('heading', { name: 'Next fixture' })).toBeVisible();

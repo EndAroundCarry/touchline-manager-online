@@ -6,7 +6,7 @@ import { OnboardingStore } from '../../../core/world/onboarding-store';
 import { AvailableClub, ProvisioningStatus } from '../../../core/world/world.models';
 import {
   FORM_ERROR,
-  LINK,
+  LINK_ACTION,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -52,7 +52,7 @@ export class ClubChoice implements OnDestroy {
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
-  protected readonly linkClass = LINK;
+  protected readonly linkClass = LINK_ACTION;
 
   constructor() {
     const countryId = this.countryId;

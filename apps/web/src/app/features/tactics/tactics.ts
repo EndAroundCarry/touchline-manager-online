@@ -17,7 +17,7 @@ import { TacticsStore } from '../../core/tactics/tactics-store';
 import { SelectablePlayer, TeamInstructions } from '../../core/tactics/tactics.models';
 import {
   FORM_ERROR,
-  LINK,
+  LINK_ACTION,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -95,7 +95,7 @@ export class Tactics {
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
-  protected readonly linkClass = LINK;
+  protected readonly linkClass = LINK_ACTION;
   protected readonly textInputClass = TEXT_INPUT;
 
   /** The board: each draft slot with its occupant and the marks it should carry. */

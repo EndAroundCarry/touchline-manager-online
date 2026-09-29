@@ -42,7 +42,22 @@ export default defineConfig({
     video: 'off',
   },
 
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // The core suite runs at two breakpoints: a desktop layout and a phone layout, because a screen
+  // that only works at 1280px is not the responsive app Stage 13 promises (`F-44`). A tablet project
+  // runs only the `@responsive` spec, which asserts the 768px layout boundary the shell switches on.
+  projects: [
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile', use: { ...devices['Pixel 5'] } },
+    {
+      name: 'tablet',
+      use: {
+        viewport: { width: 834, height: 1112 },
+        hasTouch: true,
+        deviceScaleFactor: 2,
+      },
+      grep: /@responsive/,
+    },
+  ],
 
   webServer: [
     {

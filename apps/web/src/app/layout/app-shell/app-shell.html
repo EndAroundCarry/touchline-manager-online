@@ -32,6 +32,19 @@
         Touchline Manager
       </a>
 
+      @if (navItems().length > 0) {
+        <button
+          type="button"
+          class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-slate-300 text-slate-800 hover:bg-slate-100 md:hidden"
+          [attr.aria-expanded]="mobileNavOpen()"
+          aria-controls="mobile-main-nav"
+          aria-label="Menu"
+          (click)="toggleMobileNav()"
+        >
+          <i [class]="mobileNavOpen() ? 'pi pi-times' : 'pi pi-bars'" aria-hidden="true"></i>
+        </button>
+      }
+
       <div class="ml-auto flex items-center gap-3">
         @if (isAuthenticated()) {
           <span class="text-sm text-slate-700">
@@ -39,7 +52,7 @@
           </span>
           <button
             type="button"
-            class="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            class="inline-flex min-h-11 items-center rounded border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100"
             (click)="signOut()"
           >
             Sign out
@@ -47,13 +60,13 @@
         } @else {
           <a
             routerLink="/login"
-            class="rounded px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            class="inline-flex min-h-11 items-center rounded px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100"
           >
             Sign in
           </a>
           <a
             routerLink="/register"
-            class="rounded bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
+            class="inline-flex min-h-11 items-center rounded bg-slate-900 px-3 text-sm font-semibold text-white hover:bg-slate-700"
           >
             Create account
           </a>
@@ -64,14 +77,19 @@
 
   <div class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 md:flex-row">
     @if (navItems().length > 0) {
-      <nav aria-label="Main" class="md:w-56 md:shrink-0">
-        <ul class="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+      <!--
+        Desktop sidebar. Below `md` it is replaced by the header disclosure, so the fourteen
+        destinations are never a horizontal strip that scrolls off a phone with no affordance
+        (`F-44`, master plan §11.3).
+      -->
+      <nav aria-label="Main" class="hidden md:block md:w-56 md:shrink-0">
+        <ul class="flex flex-col gap-2">
           @for (item of navItems(); track item.path) {
             <li>
               <a
                 [routerLink]="item.path"
                 routerLinkActive="bg-slate-900 text-white"
-                class="flex items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm font-medium hover:bg-slate-200"
+                class="flex min-h-11 items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm font-medium hover:bg-slate-200"
               >
                 <i [class]="item.icon" aria-hidden="true"></i>
                 {{ item.label }}
@@ -88,6 +106,35 @@
           }
         </ul>
       </nav>
+
+      <!-- Mobile navigation: the same destinations, shown only while the header menu is open. -->
+      @if (mobileNavOpen()) {
+        <nav id="mobile-main-nav" aria-label="Main" class="md:hidden">
+          <ul class="flex flex-col gap-1 rounded border border-slate-200 bg-white p-2 shadow-sm">
+            @for (item of navItems(); track item.path) {
+              <li>
+                <a
+                  [routerLink]="item.path"
+                  routerLinkActive="bg-slate-900 text-white"
+                  class="flex min-h-11 items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm font-medium hover:bg-slate-200"
+                  (click)="closeMobileNav()"
+                >
+                  <i [class]="item.icon" aria-hidden="true"></i>
+                  {{ item.label }}
+                  @if (item.path === '/inbox' && unreadInboxCount() > 0) {
+                    <span
+                      class="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-slate-900"
+                      [attr.aria-label]="unreadInboxCount() + ' unread messages'"
+                    >
+                      {{ unreadInboxCount() }}
+                    </span>
+                  }
+                </a>
+              </li>
+            }
+          </ul>
+        </nav>
+      }
     }
 
     <main id="main-content" class="min-w-0 flex-1">

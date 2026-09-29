@@ -135,6 +135,8 @@ match center. The main journeys keep their persistent shared world and their wor
 
 Stage 13 added a third stack (`playwright.pwa.config.ts`, `npm run test:pwa`) that serves the **production** build from a small static origin, because the service worker is disabled under `ng serve`. It asserts the manifest is served, the worker takes control, an offline reload still loads the shell, and a mutation control is disabled offline and enabled again on reconnection.
 
+Stage 13 also made the core suite **breakpoint-aware** (`F-44`, ADR-0038). `playwright.config.ts` declares a `desktop` and a `mobile` project, each running every journey, and a `tablet` project that selects only the `@responsive` spec by `grep`. A shared `support/navigation.ts` opens the shell's mobile disclosure when it is present, so a journey that reaches a destination through the sidebar also runs on a phone. The responsive spec (`journeys/responsive.spec.ts`) asserts the disclosure-versus-sidebar switch at the `md` boundary, that a converted screen shows its card list below it and its table above it, that the shown controls are at least 44px tall, and that no screen makes the page itself scroll sideways. The journeys on the converted screens branch on the layout they are given — squad and training assert their card list on a phone and their table on a desktop — so the same journey proves both.
+
 ## Layer 9 — Match-engine validation — Stage 5
 
 Golden output hashes per engine version, byte-identical repetition across supported platforms,
@@ -159,6 +161,7 @@ requires 3x projected launch headroom.
 | All .NET test projects | Every pull request | Yes |
 | Angular typecheck, build, unit tests | Every pull request | Yes |
 | End-to-end journeys (Playwright) | Every pull request | Yes |
+| Responsive breakpoints (desktop + mobile journeys, tablet `@responsive`) | Every pull request | Yes |
 | Generated migration SQL | Every pull request, uploaded as an artefact | Review |
 | Bundle size budgets | Every frontend build | Yes (Angular budgets) |
 | Dependency, licence, secret, container scans | Every pull request (Stage 14 for containers) | Yes |

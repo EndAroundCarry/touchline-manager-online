@@ -5,7 +5,7 @@ import { InboxStore } from '../../core/inbox/inbox-store';
 import { formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
-  LINK,
+  LINK_ACTION,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -47,7 +47,7 @@ export class Inbox {
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
-  protected readonly linkClass = LINK;
+  protected readonly linkClass = LINK_ACTION;
 
   constructor() {
     this.store.load();

@@ -24,7 +24,7 @@ import { MatchStore } from '../../core/match/match-store';
 import { formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
-  LINK,
+  LINK_ACTION,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -116,7 +116,7 @@ export class MatchViewer implements OnDestroy {
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
-  protected readonly linkClass = LINK;
+  protected readonly linkClass = LINK_ACTION;
 
   constructor() {
     const matchId = this.route.snapshot.paramMap.get('matchId');

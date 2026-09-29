@@ -23,6 +23,7 @@ import { formatInstant } from '../../core/world/presentation';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import {
   CHECKBOX_INPUT,
+  CHECKBOX_ROW,
   DESTRUCTIVE_BUTTON,
   FIELD_ERROR,
   FORM_ERROR,
@@ -194,6 +195,7 @@ export class Settings {
   protected readonly statusMessageClass = STATUS_MESSAGE;
   protected readonly linkClass = LINK;
   protected readonly checkboxClass = CHECKBOX_INPUT;
+  protected readonly checkboxRowClass = CHECKBOX_ROW;
 
   /** The notification switches the screen shows, in order (`COM-4`). */
   protected readonly notificationSwitches = NOTIFICATION_SWITCHES;

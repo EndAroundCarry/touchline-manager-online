@@ -101,7 +101,7 @@
       } @else if (results().length === 0) {
         <p class="mt-2 text-sm text-slate-600" role="status">No players match those filters.</p>
       } @else {
-        <div class="mt-2 overflow-x-auto">
+        <div class="mt-2 hidden overflow-x-auto md:block" data-testid="scouting-table">
           <table class="min-w-full divide-y divide-slate-200 text-sm">
             <caption class="sr-only">
               Scouting results, with exact public attributes
@@ -159,6 +159,50 @@
             </tbody>
           </table>
         </div>
+
+        <!--
+          The same results as cards below `md`, so the Shortlist action is beside the player rather
+          than in a seventh column off the side of the screen (`F-44`).
+        -->
+        <ul class="mt-2 flex flex-col gap-3 md:hidden" data-testid="scouting-cards">
+          @for (player of results(); track player.playerId) {
+            <li class="rounded border border-slate-200 bg-white p-3">
+              <div class="flex flex-wrap items-baseline justify-between gap-x-2">
+                <h3 class="text-sm font-semibold text-slate-900">
+                  {{ player.fullName }}
+                  <span class="font-normal text-slate-500">({{ player.shortName }})</span>
+                </h3>
+                <span class="text-xs text-slate-500">Ability {{ abilityOf(player) }}</span>
+              </div>
+              <p class="mt-1 text-sm text-slate-700">
+                {{ player.primaryPosition }} · age {{ player.age }} ·
+                {{ player.clubName ?? 'Unattached' }}
+              </p>
+              <p class="mt-1 text-sm text-slate-600">
+                {{ player.isListed ? 'Listed for transfer' : 'Not listed' }}
+              </p>
+              <div class="mt-2">
+                @if (isShortlisted(player.playerId)) {
+                  <button
+                    type="button"
+                    [class]="secondaryButtonClass"
+                    (click)="unshortlist(player.playerId)"
+                  >
+                    Remove
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    [class]="secondaryButtonClass"
+                    (click)="shortlistPlayer(player.playerId)"
+                  >
+                    Shortlist
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
 
         @if (hasMore()) {
           <div class="mt-4">

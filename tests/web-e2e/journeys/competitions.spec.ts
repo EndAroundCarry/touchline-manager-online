@@ -1,6 +1,7 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
+import { navigateTo } from '../support/navigation';
 
 /**
  * The Stage 6 criterion for the division table (F-21, `TBL-1`…`TBL-11`).
@@ -66,7 +67,7 @@ test.describe('division table', () => {
     ).json()) as MyFixturesRead;
 
     // The shell now offers the table, which is how a manager reaches it.
-    await page.getByRole('link', { name: 'Competitions' }).click();
+    await navigateTo(page, 'Competitions');
 
     await expect(page).toHaveURL(/\/competitions$/);
     await expect(page.getByRole('heading', { name: mine.divisionName })).toBeVisible();

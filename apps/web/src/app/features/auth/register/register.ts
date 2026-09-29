@@ -12,6 +12,7 @@ import { AuthApi } from '../../../core/auth/auth-api';
 import { RegistrationAccepted } from '../../../core/auth/auth.models';
 import {
   CHECKBOX_INPUT,
+  CHECKBOX_ROW,
   FIELD_ERROR,
   FORM_CARD,
   FORM_ERROR,
@@ -65,6 +66,7 @@ export class Register {
 
   protected readonly textInputClass = TEXT_INPUT;
   protected readonly checkboxClass = CHECKBOX_INPUT;
+  protected readonly checkboxRowClass = CHECKBOX_ROW;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;
   protected readonly formCardClass = FORM_CARD;
   protected readonly pageHeadingClass = PAGE_HEADING;

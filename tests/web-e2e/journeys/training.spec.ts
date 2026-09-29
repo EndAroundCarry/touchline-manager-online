@@ -1,6 +1,7 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
+import { isCompact, navigateTo } from '../support/navigation';
 
 /**
  * The Stage 4 exit criteria for the training screen (F-20).
@@ -60,14 +61,19 @@ test.describe('training', () => {
     await expect(page).toHaveURL(/\/dashboard$/);
 
     // The shell now offers training, which is how a manager reaches it.
-    await page.getByRole('link', { name: 'Training' }).click();
+    await navigateTo(page, 'Training');
 
     await expect(page).toHaveURL(/\/training$/);
     await expect(page.getByRole('heading', { name: /training$/ })).toBeVisible();
 
     // The roster is the inherited squad, each player with a labelled focus control (SQ-1, TRN-2).
-    await expect(page.locator('table tbody tr')).toHaveCount(22);
-    await expect(page.getByLabel(/^Individual focus for /)).toHaveCount(22);
+    // Below `md` it is a card list rather than the table (`F-44`), so the controls are scoped to the
+    // layout this breakpoint is showing — the other layout is present in the DOM but hidden.
+    const compact = isCompact(page);
+    const roster = compact ? page.getByTestId('training-cards') : page.getByTestId('training-table');
+
+    await expect(roster).toBeVisible();
+    await expect(roster.getByLabel(/^Individual focus for /)).toHaveCount(22);
 
     // Set the club's plan and save it. A re-used club may already hold one, so either answer is correct.
     await page.getByLabel('Team focus').selectOption('fitness');
@@ -105,7 +111,7 @@ test.describe('training', () => {
     await expect(page.getByText(/changed on another device/)).toHaveCount(0);
 
     // Point a player at a family they are not already on, then return them to the team plan (TRN-2).
-    const focusSelect = page.getByLabel(/^Individual focus for /).first();
+    const focusSelect = roster.getByLabel(/^Individual focus for /).first();
     const current = await focusSelect.inputValue();
     const target =
       ['technical', 'mental', 'physical', 'goalkeeping'].find((family) => family !== current) ??
