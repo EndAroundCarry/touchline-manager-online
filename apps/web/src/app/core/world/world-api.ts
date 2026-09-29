@@ -10,6 +10,7 @@ import {
   CreateManagerProfilePayload,
   ManagerProfile,
   OnboardingState,
+  UpdateManagerProfilePayload,
   WorldSummary,
 } from './world.models';
 
@@ -47,6 +48,25 @@ export class WorldApi {
   /** Creates the account's manager profile. Idempotent: a repeat returns the existing profile. */
   createManagerProfile(payload: CreateManagerProfilePayload): Observable<ManagerProfile> {
     return this.api.post<ManagerProfile, CreateManagerProfilePayload>('/manager-profile', payload);
+  }
+
+  /**
+   * Changes the manager's locale and time zone under an optimistic concurrency check.
+   *
+   * The version the client last read travels as the strong entity tag, so a change made on one device
+   * cannot silently overwrite one made on another (`CONC-1`).
+   */
+  updateManagerProfile(
+    payload: UpdateManagerProfilePayload,
+    version: number,
+  ): Observable<ManagerProfile> {
+    return this.api.patch<ManagerProfile, UpdateManagerProfilePayload>(
+      '/manager-profile',
+      payload,
+      {
+        etag: `"${version}"`,
+      },
+    );
   }
 
   /** Takes over a club, under the given idempotency key. */

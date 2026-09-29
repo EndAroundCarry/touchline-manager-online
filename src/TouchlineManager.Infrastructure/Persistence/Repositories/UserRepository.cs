@@ -47,6 +47,16 @@ internal sealed class UserRepository : IUserRepository
         _dbContext.Users.AnyAsync(user => user.NormalizedDisplayName == normalizedDisplayName, cancellationToken);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<UserConsent>> ListConsentsAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.UserConsents
+            .Where(consent => consent.UserId == userId)
+            .OrderBy(consent => consent.AcceptedAt)
+            .ThenBy(consent => consent.Id)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
     public void Add(User user) => _dbContext.Users.Add(user);
 
     /// <inheritdoc />

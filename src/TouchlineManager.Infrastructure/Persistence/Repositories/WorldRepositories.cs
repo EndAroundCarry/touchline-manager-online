@@ -201,6 +201,16 @@ internal sealed class ClubTenureRepository : IClubTenureRepository
             .FirstOrDefaultAsync(cancellationToken);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubTenure>> ListByManagerAsync(
+        Guid managerId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.ClubTenures
+            .Where(tenure => tenure.ManagerId == managerId)
+            .OrderBy(tenure => tenure.StartedAt)
+            .ThenBy(tenure => tenure.Id)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
     public Task<ClubTenure?> FindByTakeoverKeyAsync(
         string takeoverIdempotencyKey,
         CancellationToken cancellationToken) =>

@@ -8,6 +8,7 @@ import { InboxStore } from '../../core/inbox/inbox-store';
 import { MatchStore } from '../../core/match/match-store';
 import { NewsStore } from '../../core/news/news-store';
 import { NotificationPreferencesStore } from '../../core/notifications/notification-preferences-store';
+import { SessionsStore } from '../../core/sessions/sessions-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
@@ -38,6 +39,7 @@ export class AppShell implements OnDestroy {
   private readonly inbox = inject(InboxStore);
   private readonly news = inject(NewsStore);
   private readonly notifications = inject(NotificationPreferencesStore);
+  private readonly sessions = inject(SessionsStore);
   private readonly match = inject(MatchStore);
   private readonly sync = inject(SyncStore);
   private readonly router = inject(Router);
@@ -91,6 +93,7 @@ export class AppShell implements OnDestroy {
       this.inbox.clear();
       this.news.clear();
       this.notifications.clear();
+      this.sessions.clear();
       this.match.clear();
       this.sync.clear();
 

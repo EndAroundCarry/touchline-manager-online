@@ -33,6 +33,23 @@ public interface IRefreshSessionRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Revokes one session, but only when it belongs to the account, so a manager cannot revoke a
+    /// session they do not own (`F-07`, §10.9).
+    /// </summary>
+    /// <remarks>
+    /// A set-based conditional update rather than a read-modify-write, like the family and account
+    /// revocations: the ownership check, the "still active" check, and the write are one statement, so
+    /// two concurrent revocations of the same session cannot both report success.
+    /// </remarks>
+    /// <returns><see langword="true"/> when an active session owned by the account was revoked.</returns>
+    Task<bool> RevokeByIdAsync(
+        Guid sessionId,
+        Guid userId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Rotates a session in place, but only if its stored version still matches
     /// <paramref name="expectedVersion"/> and it is not already revoked.
     /// </summary>

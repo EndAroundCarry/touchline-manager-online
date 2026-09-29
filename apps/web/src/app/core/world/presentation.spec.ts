@@ -1,4 +1,11 @@
-import { formatFunds, formatInstant, preferredLocale } from './presentation';
+import {
+  configurePresentation,
+  formatFunds,
+  formatInstant,
+  preferredLocale,
+  preferredTimeZone,
+  resetPresentation,
+} from './presentation';
 
 /**
  * The presentation helpers onboarding depends on.
@@ -42,5 +49,50 @@ describe('formatInstant', () => {
   it('renders an instant in the given locale', () => {
     // Deadlines are stored in UTC and only rendered locally (CAL-4).
     expect(formatInstant('2026-10-06T19:00:00Z', 'en-GB')).toContain('2026');
+  });
+
+  it('renders in the requested zone when one is passed', () => {
+    const utc = formatInstant('2026-10-06T19:00:00Z', 'en-GB', 'UTC');
+    const tokyo = formatInstant('2026-10-06T19:00:00Z', 'en-GB', 'Asia/Tokyo');
+
+    // Noon in London is the next morning in Tokyo: the zone has to change the rendered time.
+    expect(utc).not.toBe(tokyo);
+  });
+});
+
+describe('presentation preferences', () => {
+  afterEach(() => resetPresentation());
+
+  it("renders in the manager's chosen zone by default (CAL-4)", () => {
+    configurePresentation({ locale: 'en-GB', timeZone: 'Asia/Tokyo' });
+
+    expect(formatInstant('2026-10-06T19:00:00Z')).toBe(
+      formatInstant('2026-10-06T19:00:00Z', 'en-GB', 'Asia/Tokyo'),
+    );
+  });
+
+  it('uses the configured time zone as the default', () => {
+    configurePresentation({ timeZone: 'Europe/Bucharest' });
+
+    expect(preferredTimeZone()).toBe('Europe/Bucharest');
+  });
+
+  it('uses the configured locale for formatting', () => {
+    configurePresentation({ locale: 'de-DE' });
+
+    expect(preferredLocale()).toBe('de-DE');
+  });
+
+  it('falls back to the browser when no preference is configured', () => {
+    configurePresentation({ timeZone: null, locale: null });
+
+    expect(preferredTimeZone().length).toBeGreaterThan(0);
+    expect(preferredLocale()).toMatch(/^[a-z]{2,3}-[A-Z]{2}$/);
+  });
+
+  it('ignores a configured locale that is not a language-and-region tag', () => {
+    configurePresentation({ locale: 'en' });
+
+    expect(preferredLocale()).toBe('en-GB');
   });
 });

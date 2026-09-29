@@ -177,6 +177,12 @@ export interface CreateManagerProfilePayload {
   readonly timeZone: string;
 }
 
+/** Changes the manager's locale and time zone under an optimistic concurrency check (`CAL-4`, `CONC-1`). */
+export interface UpdateManagerProfilePayload {
+  readonly locale: string;
+  readonly timeZone: string;
+}
+
 export interface ClaimClubPayload {
   readonly clubId: string;
 }

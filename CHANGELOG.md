@@ -3,6 +3,57 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 13 — Account sessions, export, and time-zone preferences
+
+Stage 13's account surface is complete. A manager can see every device that can sign in and end one
+without ending the rest, download everything the game holds about them as one JSON file, and choose the
+time zone every deadline is rendered in. This is the first Stage 13 milestone (ADR-0036).
+
+### Added
+
+- **A session list and per-session revoke** (`F-06`, `F-07`, ADR-0036): `GET /api/v1/auth/sessions` lists
+  the account's active sessions and marks the one that is asking; `DELETE /api/v1/auth/sessions/{id}`
+  revokes one and returns `404 SESSION_NOT_FOUND` for an unknown or unowned id. The current session is
+  identified by hashing the refresh cookie the request carries, so the endpoints sit under `/auth`, where
+  the path-scoped cookie travels. The session in use cannot be revoked from the list (`CURRENT_SESSION`);
+  signing out is how it ends. `RevokeByIdAsync` is a set-based, owner-scoped conditional update, so an
+  account can never revoke a session it does not own and two concurrent revokes cannot both succeed.
+- **A machine-readable account export** (`F-07`, master plan §12.4): `GET /api/v1/me/export` returns one
+  JSON document — the account and its consents, the manager profile, every tenure the account has held,
+  the active sessions, and the current club's ledger as the own transactional history — scoped from the
+  authenticated account and sent `Cache-Control: no-store`. It carries no password hash, token, token
+  hash, client-fingerprint hash, or security stamp.
+- **Editable locale and time zone** (`CAL-4`): `PATCH /api/v1/manager-profile` changes the manager's
+  formatting preferences under `If-Match`, reusing `Manager.ChangePreferences` and validating the zone
+  against the runtime's database rather than a pattern. The client adopts the stored locale and zone as
+  its defaults, so every deadline screen renders in the manager's chosen zone and re-renders when it
+  changes.
+- **The settings screen grows three cards**: the session list with a per-device sign-out, the export
+  download, and the locale and time-zone picker.
+
+### Notes
+
+- **No migration.** The features read and update existing tables; the export is a projection and the
+  preference change updates `world.managers`.
+- **The export's scope is written down** (ADR-0036, data classification §6): a club's matches and its
+  earlier ledgers are world records that outlive the managers who ran it, so they are not copied into the
+  departing manager's personal export; the tenure history records the clubs they left.
+- **`docs/security/data-classification.md`** §6 and its Stage 13 verification item were updated,
+  `game-rules.md` `CAL-4` now names the stored preference, and `mvp-traceability.md` F-06 and F-07 carry
+  the new evidence.
+
+### Tests
+
+- New API integration suite (`AccountManagementTests`): the list marks the current session and carries no
+  token or fingerprint material; revoking another session stops it refreshing; the current session is
+  refused; an unknown one is `404`; the export omits every secret and is `no-store`; and the preference
+  change is `428` without `If-Match`, `412` when stale, `400` for an unknown zone, and updates what the
+  position reports.
+- A new auth persistence test asserts `RevokeByIdAsync` scopes to the owner and leaves siblings and other
+  accounts alone.
+- Web unit tests: the sessions store's read, revoke, in-flight guard, failure, and clear; the presentation
+  helpers' configured locale and zone; and the onboarding store adopting and changing the time zone.
+
 ## Stage 12 — The five-season staging run
 
 Stage 12's last exit criterion is met: **at least five consecutive automated staging seasons reconcile

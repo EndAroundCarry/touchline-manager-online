@@ -1,27 +1,80 @@
 /**
  * Client-side presentation helpers for onboarding.
  *
- * Small and pure, so they can be unit tested without a component and so the same formatting is used by
- * every screen that shows a date, a deadline, or an amount.
+ * Small and mostly pure, so they can be unit tested without a component and so the same formatting is
+ * used by every screen that shows a date, a deadline, or an amount.
+ *
+ * The manager's chosen locale and time zone are held in two module signals rather than passed through
+ * every call site. Formatting is needed by a dozen features that do not otherwise know about the manager
+ * profile, and threading a preference signal through all of them would put the same argument in every
+ * template for no benefit. `configurePresentation` seeds it from the manager profile when it loads
+ * (`CAL-4`).
  */
+import { signal } from '@angular/core';
 
 /** A locale-shaped tag: a language and a region, e.g. `en-GB`. */
 const LOCALE_PATTERN = /^[a-z]{2,3}-[A-Z]{2}$/;
 
+const configuredLocale = signal<string | null>(null);
+const configuredTimeZone = signal<string | null>(null);
+
 /**
- * The locale to offer as the manager's default.
+ * Sets the manager's formatting preferences.
  *
- * The server rejects a tag without a region, and `navigator.language` can legitimately be just `en`, so a
- * bare language falls back rather than producing a form the manager has to fix before their first click.
+ * Called when the manager profile loads, when the manager changes it, and cleared when the session ends.
+ * A null value means "no preference", which falls back to the browser.
+ */
+export function configurePresentation(preferences: {
+  readonly locale?: string | null;
+  readonly timeZone?: string | null;
+}): void {
+  if (preferences.locale !== undefined) {
+    configuredLocale.set(preferences.locale);
+  }
+
+  if (preferences.timeZone !== undefined) {
+    configuredTimeZone.set(preferences.timeZone);
+  }
+}
+
+/** Clears the configured preferences. Called when the session ends. */
+export function resetPresentation(): void {
+  configuredLocale.set(null);
+  configuredTimeZone.set(null);
+}
+
+/**
+ * The locale to format with.
+ *
+ * The manager's stored locale when there is one; otherwise the browser's, falling back to `en-GB` when
+ * the browser offers only a bare language. The server rejects a tag without a region, so a stored value
+ * always has the shape the formatter needs.
  */
 export function preferredLocale(): string {
+  const configured = configuredLocale();
+
+  if (configured !== null && LOCALE_PATTERN.test(configured)) {
+    return configured;
+  }
+
   const language = typeof navigator === 'undefined' ? '' : navigator.language;
 
   return LOCALE_PATTERN.test(language) ? language : 'en-GB';
 }
 
-/** The IANA time zone to offer as the manager's default. */
+/**
+ * The IANA time zone to render instants in.
+ *
+ * The manager's stored zone when there is one — travelling, or a device set to a different zone, must not
+ * move every deadline (`CAL-4`) — otherwise the browser's.
+ */
 export function preferredTimeZone(): string {
+  const configured = configuredTimeZone();
+
+  if (configured !== null && configured.length > 0) {
+    return configured;
+  }
+
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   } catch {
@@ -45,10 +98,19 @@ export function formatFunds(minorUnits: number, locale = preferredLocale()): str
   }).format(minorUnits / 100);
 }
 
-/** Formats an instant in the viewer's local time, with the zone named (`VOI-4`). */
-export function formatInstant(instant: string, locale = preferredLocale()): string {
+/**
+ * Formats an instant in the manager's time zone, with the zone named (`VOI-4`, `CAL-4`).
+ *
+ * UTC stays the authority on the server; this only decides where the moment is shown.
+ */
+export function formatInstant(
+  instant: string,
+  locale = preferredLocale(),
+  timeZone = preferredTimeZone(),
+): string {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone,
   }).format(new Date(instant));
 }

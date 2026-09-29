@@ -149,6 +149,12 @@ public static class RefreshSessionRevocationReasons
     /// <summary>The account holder signed out of every session.</summary>
     public const string LogoutAll = "logout_all";
 
+    /// <summary>
+    /// The account holder revoked this session from the session list while staying signed in
+    /// elsewhere (`F-07`).
+    /// </summary>
+    public const string RevokedByUser = "revoked_by_user";
+
     /// <summary>A reused token was presented, so the whole family was revoked (ADR-0002).</summary>
     public const string ReuseDetected = "reuse_detected";
 

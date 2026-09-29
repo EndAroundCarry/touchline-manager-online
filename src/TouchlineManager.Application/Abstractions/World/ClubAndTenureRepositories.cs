@@ -58,6 +58,14 @@ public interface IClubTenureRepository
     Task<ClubTenure?> FindOpenByClubAsync(Guid clubId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Lists every tenure a manager has ever held, open or closed, oldest first, for the account-data
+    /// export (master plan §12.4).
+    /// </summary>
+    /// <param name="managerId">The manager.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<ClubTenure>> ListByManagerAsync(Guid managerId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Finds a tenure by the idempotency key that created it, so a retried takeover can answer with the
     /// outcome of the first attempt instead of attempting a second one (`CONC-3`).
     /// </summary>

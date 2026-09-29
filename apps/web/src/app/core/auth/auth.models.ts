@@ -55,6 +55,89 @@ export interface ProfileSnapshot {
   readonly etag: string | null;
 }
 
+/**
+ * The account's own data as one document (`F-07`, master plan §12.4).
+ *
+ * Mirrors `TouchlineManager.Contracts.Auth.AccountExportResponse`. It carries no secret or hidden value:
+ * no password hash, token hash, or client-fingerprint hash.
+ */
+export interface AccountExport {
+  readonly generatedAt: string;
+  readonly account: ExportedAccount;
+  readonly consents: readonly ExportedConsent[];
+  readonly manager: ExportedManager | null;
+  readonly tenures: readonly ExportedTenure[];
+  readonly sessions: readonly ExportedSession[];
+  readonly finance: ExportedFinance | null;
+}
+
+/** The account's own identity and lifecycle record. */
+export interface ExportedAccount {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly emailVerified: boolean;
+  readonly status: UserStatus;
+  readonly roles: readonly string[];
+  readonly lastLoginAt: string | null;
+  readonly createdAt: string;
+}
+
+/** One legal document the account accepted, and when. */
+export interface ExportedConsent {
+  readonly documentType: string;
+  readonly version: string;
+  readonly acceptedAt: string;
+}
+
+/** The account's manager profile. */
+export interface ExportedManager {
+  readonly id: string;
+  readonly reputation: number;
+  readonly locale: string;
+  readonly timeZone: string;
+  readonly takeoverCooldownUntil: string | null;
+  readonly createdAt: string;
+}
+
+/** One club the account has managed. */
+export interface ExportedTenure {
+  readonly id: string;
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly controlStatus: string;
+  readonly startedAt: string;
+  readonly endedAt: string | null;
+  readonly endReason: string | null;
+}
+
+/** One active session, without any token material. */
+export interface ExportedSession {
+  readonly id: string;
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly lastUsedAt: string | null;
+}
+
+/** The current club's ledger, as the account's own transactional history. */
+export interface ExportedFinance {
+  readonly clubId: string;
+  readonly entries: readonly ExportedLedgerEntry[];
+  readonly truncated: boolean;
+}
+
+/** One ledger line in the export. */
+export interface ExportedLedgerEntry {
+  readonly sequence: number;
+  readonly category: string;
+  readonly cashDeltaMinor: number;
+  readonly reservedDeltaMinor: number;
+  readonly resultingCashMinor: number;
+  readonly resultingReservedMinor: number;
+  readonly descriptionTemplate: string;
+  readonly createdAt: string;
+}
+
 /** Request bodies. */
 export interface RegisterPayload {
   readonly email: string;

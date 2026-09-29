@@ -228,6 +228,70 @@ public sealed class AuthPersistenceTests
         bystanderSessions.Should().HaveCount(1);
     }
 
+    [Fact]
+    public async Task Revoking_one_session_scopes_to_the_owner_and_leaves_siblings_alone()
+    {
+        Guid targetId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var sessions = scope.ServiceProvider.GetRequiredService<IRefreshSessionRepository>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var now = _fixture.Clock.UtcNow;
+            var owner = await CreateUserAsync(scope);
+            var other = await CreateUserAsync(scope);
+
+            var target = RefreshSession.Issue(Guid.CreateVersion7(), owner, "owner-target", Guid.CreateVersion7(), now, now.AddDays(30), null, null);
+            targetId = target.Id;
+
+            sessions.Add(target);
+            sessions.Add(RefreshSession.Issue(Guid.CreateVersion7(), owner, "owner-sibling", Guid.CreateVersion7(), now, now.AddDays(30), null, null));
+            sessions.Add(RefreshSession.Issue(Guid.CreateVersion7(), other, "other-target", Guid.CreateVersion7(), now, now.AddDays(30), null, null));
+
+            await unitOfWork.SaveChangesAsync(CancellationToken.None);
+
+            // An account cannot revoke a session that is not its own, even by knowing its identity.
+            var foreign = await sessions.RevokeByIdAsync(
+                targetId,
+                other,
+                RefreshSessionRevocationReasons.RevokedByUser,
+                now,
+                CancellationToken.None);
+
+            foreign.Should().BeFalse();
+
+            var owned = await sessions.RevokeByIdAsync(
+                targetId,
+                owner,
+                RefreshSessionRevocationReasons.RevokedByUser,
+                now,
+                CancellationToken.None);
+
+            owned.Should().BeTrue();
+
+            // Revoking an already-revoked session reports that it did nothing.
+            var again = await sessions.RevokeByIdAsync(
+                targetId,
+                owner,
+                RefreshSessionRevocationReasons.RevokedByUser,
+                now,
+                CancellationToken.None);
+
+            again.Should().BeFalse();
+        }
+
+        await using var assert = _fixture.CreateScope();
+        var reader = assert.ServiceProvider.GetRequiredService<IRefreshSessionRepository>();
+        var readAt = _fixture.Clock.UtcNow;
+
+        (await reader.FindByTokenHashAsync("owner-target", CancellationToken.None))!.RevocationReason
+            .Should().Be(RefreshSessionRevocationReasons.RevokedByUser);
+        (await reader.FindByTokenHashAsync("owner-sibling", CancellationToken.None))!.IsActive(readAt)
+            .Should().BeTrue();
+        (await reader.FindByTokenHashAsync("other-target", CancellationToken.None))!.IsActive(readAt)
+            .Should().BeTrue();
+    }
+
     private async Task<Guid> CreateUserAsync(AsyncServiceScope scope)
     {
         var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();

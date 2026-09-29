@@ -18,8 +18,8 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-03 | Login | auth | 2 | API integration test; lockout and rate-limit tests |
 | F-04 | Session rotation | auth | 2 | Reuse-detection test revokes the family |
 | F-05 | Password reset | auth | 2 | Single-use, expiry, enumeration-safe test |
-| F-06 | Logout (single and all) | auth | 2 | Revocation test |
-| F-07 | Account settings | auth, web | 2, 13 | Settings screen acceptance |
+| F-06 | Logout (single and all) | auth | 2, 13 | Revocation test; per-session revocation from the session list (`AccountManagementTests`, ADR-0036) |
+| F-07 | Account settings | auth, web | 2, 13 | Settings screen acceptance; session list/revoke, machine-readable export, and locale/time-zone preferences (`AccountManagementTests`, ADR-0036) |
 | F-08 | One active manager career per account | world, auth | 3 | Partial unique index test; `MANAGER_HAS_ACTIVE_CLUB` |
 | F-09 | Country selection | world, web | 3 | Onboarding journey test |
 | F-10 | Atomic takeover of an AI club | world | 3 | Concurrent-claim test: exactly one winner |

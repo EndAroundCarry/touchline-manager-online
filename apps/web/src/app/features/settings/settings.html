@@ -85,6 +85,64 @@
     </div>
 
     <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+      <h2 class="text-lg font-semibold">Time zone and language</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Deadlines are shown in this time zone. The server's clock stays the authority, so changing
+        this only changes what you see.
+      </p>
+
+      @if (manager(); as current) {
+        @if (prefsSaved()) {
+          <p [class]="statusMessageClass" role="status">Your preferences have been saved.</p>
+        }
+
+        @if (prefsConflict()) {
+          <p [class]="formErrorClass" role="alert">
+            Your profile changed on another device while this screen was open. The current values
+            are shown — check them and save again.
+          </p>
+        }
+
+        @if (prefsError(); as message) {
+          <p [class]="formErrorClass" role="alert">{{ message }}</p>
+        }
+
+        <form
+          class="mt-4 space-y-4"
+          [formGroup]="prefsForm"
+          (ngSubmit)="savePreferences()"
+          novalidate
+        >
+          <div>
+            <label class="block text-sm font-medium text-slate-800" for="timeZone">Time zone</label>
+            <select id="timeZone" formControlName="timeZone" [class]="selectClass">
+              @for (zone of timeZoneOptions(); track zone) {
+                <option [value]="zone">{{ zone }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-800" for="locale">Language</label>
+            <select id="locale" formControlName="locale" [class]="selectClass">
+              @for (option of localeOptions(); track option) {
+                <option [value]="option">{{ option }}</option>
+              }
+            </select>
+          </div>
+
+          <button type="submit" [class]="primaryButtonClass" [disabled]="prefsSubmitting()">
+            {{ prefsSubmitting() ? 'Saving…' : 'Save preferences' }}
+          </button>
+        </form>
+      } @else {
+        <p class="mt-4 text-sm text-slate-600" role="status">
+          Create your manager profile during onboarding to choose a time zone.
+        </p>
+      }
+    </div>
+
+    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
       <h2 class="text-lg font-semibold">Notifications</h2>
       <p class="mt-2 text-sm text-slate-600">
         Which emails the game sends you. Inbox messages always arrive; these switches govern email
@@ -95,7 +153,9 @@
         <p class="mt-4 text-sm text-slate-600" role="status">Loading your notification settings…</p>
       } @else {
         @if (notificationsSaved()) {
-          <p [class]="statusMessageClass" role="status">Your notification settings have been saved.</p>
+          <p [class]="statusMessageClass" role="status">
+            Your notification settings have been saved.
+          </p>
         }
 
         @if (notificationsConflict()) {
@@ -107,7 +167,12 @@
 
         @if (notificationsError(); as message) {
           <p [class]="formErrorClass" role="alert">{{ message }}</p>
-          <button type="button" class="mt-2" [class]="secondaryButtonClass" (click)="reloadNotifications()">
+          <button
+            type="button"
+            class="mt-2"
+            [class]="secondaryButtonClass"
+            (click)="reloadNotifications()"
+          >
             Try again
           </button>
         }
@@ -146,11 +211,63 @@
     </div>
 
     <div class="mt-6 rounded border border-slate-200 bg-white p-6">
-      <h2 class="text-lg font-semibold">Sessions</h2>
+      <h2 class="text-lg font-semibold">Where you are signed in</h2>
       <p class="mt-2 text-sm text-slate-600">
-        Signing out everywhere revokes every device and invalidates the access tokens already
-        issued.
+        Every session that can still sign in. Signing one out ends it on that device; the one you
+        are using is left alone.
       </p>
+
+      @if (sessionsError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+        <button
+          type="button"
+          class="mt-2"
+          [class]="secondaryButtonClass"
+          (click)="reloadSessions()"
+        >
+          Try again
+        </button>
+      }
+
+      @if (sessionsLoading()) {
+        <p class="mt-4 text-sm text-slate-600" role="status">Loading your sessions…</p>
+      } @else {
+        <ul class="mt-4 divide-y divide-slate-200">
+          @for (session of sessions(); track session.id) {
+            <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div>
+                <p class="text-sm font-medium text-slate-800">
+                  Started {{ sessionIssued(session) }}
+                  @if (session.isCurrent) {
+                    <span
+                      class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
+                      >This device</span
+                    >
+                  }
+                </p>
+                <p class="text-xs text-slate-500">Last used: {{ sessionLastUsed(session) }}</p>
+              </div>
+
+              @if (!session.isCurrent) {
+                <button
+                  type="button"
+                  [class]="secondaryButtonClass"
+                  [disabled]="revokingId() !== null"
+                  [attr.aria-label]="'Sign out the session started ' + sessionIssued(session)"
+                  (click)="revokeSession(session.id)"
+                >
+                  {{ revokingId() === session.id ? 'Signing out…' : 'Sign out' }}
+                </button>
+              }
+            </li>
+          } @empty {
+            <li class="py-3 text-sm text-slate-600" role="status">
+              No active sessions were found. Sign in again if this looks wrong.
+            </li>
+          }
+        </ul>
+      }
+
       <div class="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
@@ -169,6 +286,32 @@
           Sign out everywhere
         </button>
       </div>
+    </div>
+
+    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+      <h2 class="text-lg font-semibold">Export your data</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Download everything the game holds about your account — your profile, your clubs, your
+        sessions, and your current club's ledger — as a JSON file.
+      </p>
+
+      @if (exportError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      @if (exportedAt(); as generatedAt) {
+        <p [class]="statusMessageClass" role="status">Your export was downloaded.</p>
+      }
+
+      <button
+        type="button"
+        class="mt-4"
+        [class]="primaryButtonClass"
+        [disabled]="exporting()"
+        (click)="exportData()"
+      >
+        {{ exporting() ? 'Preparing…' : 'Download my data' }}
+      </button>
     </div>
 
     <div class="mt-6 rounded border border-red-200 bg-white p-6">

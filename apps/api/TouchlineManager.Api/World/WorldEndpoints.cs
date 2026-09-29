@@ -81,6 +81,15 @@ internal static class WorldEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPatch("/manager-profile", UpdateManagerProfileAsync)
+            .WithName("UpdateManagerProfile")
+            .WithSummary("Changes the manager's locale and time zone. Requires If-Match (`CAL-4`).")
+            .Produces<ManagerProfileResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
         group.MapPost("/club-claims", ClaimClubAsync)
             .RequireAuthorization(AuthorizationPolicies.VerifiedManager)
             .WithName("ClaimClub")
@@ -198,6 +207,61 @@ internal static class WorldEndpoints
 
             _ => ProblemResults.Forbidden("This account cannot create a manager profile."),
         };
+    }
+
+    private static async Task<IResult> UpdateManagerProfileAsync(
+        HttpContext httpContext,
+        UpdateManagerProfileRequest request,
+        IValidator<UpdateManagerProfileRequest> validator,
+        UpdateManagerProfile useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var expectedVersion = EntityTagHeader.ParseIfMatch(httpContext.Request.Headers.IfMatch.ToString());
+
+        if (expectedVersion is null)
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status428PreconditionRequired,
+                ApiErrorCodes.PreconditionRequired,
+                "A version is required.",
+                "Send the profile's current entity tag in If-Match so a concurrent change is not overwritten.");
+        }
+
+        var invalid = await RequestValidation.ValidateAsync(validator, request, cancellationToken);
+
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        var result = await useCase.ExecuteAsync(userId, expectedVersion.Value, request, cancellationToken);
+
+        switch (result.Outcome)
+        {
+            case UpdateManagerProfileOutcome.Updated:
+                httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Profile!.Version);
+
+                return Results.Ok(result.Profile);
+
+            case UpdateManagerProfileOutcome.PreconditionFailed:
+                return ProblemResults.Code(
+                    StatusCodes.Status412PreconditionFailed,
+                    ApiErrorCodes.PreconditionFailed,
+                    "Your profile changed.",
+                    "Reload your settings and reapply the change.");
+
+            default:
+                return ProblemResults.Code(
+                    StatusCodes.Status403Forbidden,
+                    WorldErrorCodes.ManagerProfileRequired,
+                    "No manager profile.",
+                    "Create your manager profile before changing your preferences.");
+        }
     }
 
     private static async Task<IResult> ClaimClubAsync(

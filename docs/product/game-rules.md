@@ -95,7 +95,7 @@ release date is null.
 | CAL-1 | One season is a double round-robin | **34 matchdays**; each club plays every other club once home and once away |
 | CAL-2 | Standard kickoff | **19:00 UTC** on **Tuesday, Thursday, Sunday** |
 | CAL-3 | Team sheets lock before kickoff | **30 minutes** |
-| CAL-4 | Deadlines are displayed in the viewer's local timezone; UTC remains authoritative. | — |
+| CAL-4 | Deadlines are displayed in the manager's time zone; UTC remains authoritative. The zone is a per-manager preference, seeded from the viewer's browser at onboarding and editable afterwards, and the stored value is what every screen renders with (ADR-0036). | — |
 | CAL-5 | The first production season begins on a **configured future Tuesday** with onboarding lead time. It is never derived from deployment time. | — |
 | CAL-6 | Rollover period after matchday 34 | **7 days**; the next season starts on the first configured matchday after rollover |
 | CAL-7 | All six countries share the same real-time cadence. Jobs, data, and standings remain country/division scoped. | — |

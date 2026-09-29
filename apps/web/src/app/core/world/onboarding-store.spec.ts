@@ -1,8 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { OnboardingStore } from './onboarding-store';
+import { preferredTimeZone, resetPresentation } from './presentation';
 import { WorldApi } from './world-api';
-import { ClubDashboard, CountryCapacity, CountrySummary } from './world.models';
+import { ClubDashboard, CountryCapacity, CountrySummary, ManagerProfile } from './world.models';
 
 /**
  * The onboarding store's guarantees.
@@ -40,6 +41,15 @@ const dashboard = {
   club: { id: 'club-1', name: 'Ashvale United' },
 } as unknown as ClubDashboard;
 
+const managerProfile: ManagerProfile = {
+  id: 'manager-1',
+  reputation: 0,
+  takeoverCooldownUntil: null,
+  locale: 'en-GB',
+  timeZone: 'Europe/Bucharest',
+  version: 3,
+};
+
 function createWorldApiStub() {
   return {
     world: vi.fn(),
@@ -47,6 +57,7 @@ function createWorldApiStub() {
     capacity: vi.fn(),
     availableClubs: vi.fn(),
     createManagerProfile: vi.fn(),
+    updateManagerProfile: vi.fn(),
     claimClub: vi.fn(),
     resign: vi.fn(),
     state: vi.fn(),
@@ -65,6 +76,8 @@ describe('OnboardingStore', () => {
 
     store = TestBed.inject(OnboardingStore);
   });
+
+  afterEach(() => resetPresentation());
 
   it('sends a fresh idempotency key for a first claim', async () => {
     api.claimClub.mockReturnValue(of(dashboard));
@@ -154,5 +167,62 @@ describe('OnboardingStore', () => {
     expect(store.countries()).toEqual([]);
     expect(store.state()).toBeNull();
     expect(store.availableClubs()).toBeNull();
+  });
+
+  it("adopts the manager's time zone for formatting when the profile loads (CAL-4)", async () => {
+    api.state.mockReturnValue(
+      of({ manager: managerProfile, tenure: null, serverTime: '2026-09-01T00:00:00Z' }),
+    );
+
+    await firstValueFrom(store.loadState());
+
+    expect(preferredTimeZone()).toBe('Europe/Bucharest');
+  });
+
+  it('changes preferences under the version it last read', async () => {
+    api.state.mockReturnValue(
+      of({ manager: managerProfile, tenure: null, serverTime: '2026-09-01T00:00:00Z' }),
+    );
+    await firstValueFrom(store.loadState());
+    api.updateManagerProfile.mockReturnValue(
+      of({ ...managerProfile, timeZone: 'Asia/Tokyo', version: 4 }),
+    );
+
+    await firstValueFrom(store.updateManagerProfile('en-GB', 'Asia/Tokyo'));
+
+    expect(api.updateManagerProfile).toHaveBeenCalledWith(
+      { locale: 'en-GB', timeZone: 'Asia/Tokyo' },
+      3,
+    );
+    expect(store.state()?.manager?.version).toBe(4);
+    // The new zone applies immediately, so every deadline on screen re-renders without a re-read.
+    expect(preferredTimeZone()).toBe('Asia/Tokyo');
+  });
+
+  it('refuses to change preferences before the profile has loaded', async () => {
+    await expect(firstValueFrom(store.updateManagerProfile('en-GB', 'UTC'))).rejects.toThrow();
+
+    expect(api.updateManagerProfile).not.toHaveBeenCalled();
+  });
+
+  it('forgets the formatting preference when the session ends', async () => {
+    // Pick a zone that cannot be this machine's own, so the assertion distinguishes "configured" from
+    // "fell back to the browser" whatever the test host is set to.
+    const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const configuredZone = browserZone === 'Asia/Tokyo' ? 'America/New_York' : 'Asia/Tokyo';
+
+    api.state.mockReturnValue(
+      of({
+        manager: { ...managerProfile, timeZone: configuredZone },
+        tenure: null,
+        serverTime: '2026-09-01T00:00:00Z',
+      }),
+    );
+    await firstValueFrom(store.loadState());
+    expect(preferredTimeZone()).toBe(configuredZone);
+
+    store.clear();
+
+    expect(preferredTimeZone()).toBe(browserZone);
   });
 });

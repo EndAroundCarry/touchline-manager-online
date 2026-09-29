@@ -28,6 +28,14 @@ public interface IUserRepository
     /// <summary>Whether a normalized display name is already taken.</summary>
     Task<bool> DisplayNameExistsAsync(string normalizedDisplayName, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Lists the consent records an account has accepted, oldest first, for the account-data export
+    /// (master plan §12.4).
+    /// </summary>
+    /// <param name="userId">The account.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<UserConsent>> ListConsentsAsync(Guid userId, CancellationToken cancellationToken);
+
     /// <summary>Stages a new account.</summary>
     void Add(User user);
 

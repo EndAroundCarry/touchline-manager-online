@@ -66,6 +66,12 @@ public static class AuthAuditActions
     /// <summary>Every session was signed out.</summary>
     public const string LoggedOutAll = "auth.logout_all";
 
+    /// <summary>One session was revoked from the session list, while staying signed in elsewhere.</summary>
+    public const string SessionRevoked = "auth.session.revoked";
+
+    /// <summary>The account's own data was exported at its request (master plan §12.4).</summary>
+    public const string AccountExported = "auth.account.exported";
+
     /// <summary>A password reset was requested.</summary>
     public const string PasswordResetRequested = "auth.password.reset_requested";
 

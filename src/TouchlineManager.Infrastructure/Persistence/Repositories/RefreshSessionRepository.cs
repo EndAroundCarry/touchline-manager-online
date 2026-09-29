@@ -63,6 +63,28 @@ internal sealed class RefreshSessionRepository : IRefreshSessionRepository
                 cancellationToken);
 
     /// <inheritdoc />
+    public async Task<bool> RevokeByIdAsync(
+        Guid sessionId,
+        Guid userId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var affected = await _dbContext.RefreshSessions
+            .Where(session => session.Id == sessionId
+                && session.UserId == userId
+                && session.RevokedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(session => session.RevokedAt, now)
+                    .SetProperty(session => session.RevocationReason, reason)
+                    .SetProperty(session => session.Version, session => session.Version + 1),
+                cancellationToken);
+
+        return affected == 1;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> TryRotateAsync(
         Guid sessionId,
         long expectedVersion,

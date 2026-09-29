@@ -78,6 +78,24 @@ internal static class AuthEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        // The session list lives under /auth, not /me, so the path-scoped refresh cookie travels with the
+        // request and the current session can be marked. It still authenticates with the bearer token.
+        group.MapGet("/sessions", ListSessionsAsync)
+            .RequireAuthorization()
+            .WithName("ListSessions")
+            .WithSummary("Lists the account's active sessions, marking the current one (`F-07`).")
+            .Produces<SessionsResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapDelete("/sessions/{sessionId:guid}", RevokeSessionAsync)
+            .RequireAuthorization()
+            .WithName("RevokeSession")
+            .WithSummary("Revokes one of the account's sessions, other than the current one (`F-07`).")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapPost("/forgot-password", ForgotPasswordAsync)
             .AllowAnonymous()
             .RequireRateLimiting(RateLimitPolicies.AuthSensitive)
@@ -129,6 +147,12 @@ internal static class AuthEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
+        group.MapGet("/export", ExportAccountAsync)
+            .WithName("ExportAccountData")
+            .WithSummary("Returns the account's own data as one machine-readable document (`F-07`, §12.4).")
+            .Produces<AccountExportResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         group.MapDelete(string.Empty, DeleteMeAsync)
             .WithName("DeleteMe")
@@ -340,6 +364,58 @@ internal static class AuthEndpoints
         return Results.NoContent();
     }
 
+    private static async Task<IResult> ListSessionsAsync(
+        HttpContext httpContext,
+        ListSessions query,
+        AuthCookieWriter cookies,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var response = await query.ExecuteAsync(userId, cookies.Read(httpContext.Request), cancellationToken);
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> RevokeSessionAsync(
+        HttpContext httpContext,
+        Guid sessionId,
+        RevokeSession useCase,
+        AuthCookieWriter cookies,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var outcome = await useCase.ExecuteAsync(
+            userId,
+            sessionId,
+            cookies.Read(httpContext.Request),
+            cancellationToken);
+
+        return outcome switch
+        {
+            RevokeSessionOutcome.Revoked => Results.NoContent(),
+
+            RevokeSessionOutcome.CurrentSession => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                AuthErrorCodes.CurrentSessionCannotBeRevoked,
+                "That is this session.",
+                "Sign out to end the session you are using."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                AuthErrorCodes.SessionNotFound,
+                "No such session.",
+                "That session does not exist or has already ended."),
+        };
+    }
+
     private static async Task<IResult> ForgotPasswordAsync(
         ForgotPasswordRequest request,
         IValidator<ForgotPasswordRequest> validator,
@@ -418,6 +494,29 @@ internal static class AuthEndpoints
         httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(view.Version);
 
         return Results.Ok(view.Profile);
+    }
+
+    private static async Task<IResult> ExportAccountAsync(
+        HttpContext httpContext,
+        ExportAccountData useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var export = await useCase.ExecuteAsync(userId, cancellationToken);
+
+        if (export is null)
+        {
+            return ProblemResults.Unauthenticated("Your session is no longer valid.");
+        }
+
+        // A copy of the account's own data must never be held by a shared cache or a proxy.
+        httpContext.Response.Headers.CacheControl = "no-store";
+
+        return Results.Ok(export);
     }
 
     private static async Task<IResult> UpdateMeAsync(

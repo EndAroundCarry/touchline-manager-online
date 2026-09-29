@@ -188,6 +188,9 @@ public static class DependencyInjection
         services.AddScoped<GetProfile>();
         services.AddScoped<UpdateProfile>();
         services.AddScoped<DeleteAccount>();
+        services.AddScoped<ListSessions>();
+        services.AddScoped<RevokeSession>();
+        services.AddScoped<ExportAccountData>();
 
         // Validators are registered explicitly rather than by assembly scanning, so that adding a
         // validator to the assembly cannot silently change which requests are validated.
@@ -225,6 +228,7 @@ public static class DependencyInjection
         services.AddScoped<ProvisionDivision>();
         services.AddScoped<EvaluateInactivity>();
         services.AddScoped<CreateManagerProfile>();
+        services.AddScoped<UpdateManagerProfile>();
         services.AddScoped<ClaimClub>();
         services.AddScoped<ResignClub>();
         services.AddScoped<GetWorld>();
@@ -239,6 +243,7 @@ public static class DependencyInjection
         services.AddScoped<TriggerInactivity>();
 
         services.AddScoped<IValidator<CreateManagerProfileRequest>, CreateManagerProfileRequestValidator>();
+        services.AddScoped<IValidator<UpdateManagerProfileRequest>, UpdateManagerProfileRequestValidator>();
         services.AddScoped<IValidator<ClaimClubRequest>, ClaimClubRequestValidator>();
     }
 

@@ -31,6 +31,12 @@ public static class AuthErrorCodes
     /// <summary>The refresh session is unknown, expired, revoked, or was replayed.</summary>
     public const string SessionInvalid = "SESSION_INVALID";
 
+    /// <summary>The session to revoke does not exist or does not belong to the account.</summary>
+    public const string SessionNotFound = "SESSION_NOT_FOUND";
+
+    /// <summary>The session is the one making the request; signing out is how to end it.</summary>
+    public const string CurrentSessionCannotBeRevoked = "CURRENT_SESSION";
+
     /// <summary>The account was deleted or is awaiting anonymization.</summary>
     public const string AccountDeleted = "ACCOUNT_DELETED";
 }

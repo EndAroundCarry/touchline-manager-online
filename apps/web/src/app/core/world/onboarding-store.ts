@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, forkJoin, map, of, switchMap, tap } from 'rxjs';
+import { Observable, defer, forkJoin, map, of, switchMap, tap, throwError } from 'rxjs';
 import { ConnectivityStore } from '../connectivity/connectivity-store';
+import { configurePresentation, resetPresentation } from './presentation';
 import { WorldApi } from './world-api';
 import {
   AvailableClubs,
@@ -92,7 +93,10 @@ export class OnboardingStore {
       return;
     }
 
-    const seconds = Math.max(5, this.capacityFor(this.pollCountryId)?.provisioning?.pollAfterSeconds ?? 30);
+    const seconds = Math.max(
+      5,
+      this.capacityFor(this.pollCountryId)?.provisioning?.pollAfterSeconds ?? 30,
+    );
 
     this.pollTimer = setTimeout(() => {
       this.pollTimer = null;
@@ -150,9 +154,14 @@ export class OnboardingStore {
     return globalThis.document?.visibilityState !== 'hidden';
   }
 
-  /** Reads the account's onboarding position. */
+  /** Reads the account's onboarding position, and adopts the manager's formatting preferences from it. */
   loadState(): Observable<OnboardingState> {
-    return this.api.state().pipe(tap((state) => this.stateSignal.set(state)));
+    return this.api.state().pipe(
+      tap((state) => {
+        this.stateSignal.set(state);
+        this.adoptPreferences(state.manager);
+      }),
+    );
   }
 
   /** Reads the world. A 404 here means the seeder has not been run. */
@@ -196,6 +205,44 @@ export class OnboardingStore {
   }
 
   /**
+   * Changes the manager's locale and time zone.
+   *
+   * The version check happens inside `defer` so that calling this before the profile has loaded produces
+   * a failed observable the caller can handle, rather than throwing past their error handling. On success
+   * the new values are adopted immediately, so every deadline on screen re-renders in the chosen zone
+   * without waiting for the next read (`CAL-4`).
+   */
+  updateManagerProfile(locale: string, timeZone: string): Observable<ManagerProfile> {
+    return defer(() => {
+      const version = this.stateSignal()?.manager?.version;
+
+      if (version === undefined) {
+        return throwError(
+          () =>
+            new Error('The manager profile has not been loaded, so there is no version to send.'),
+        );
+      }
+
+      return this.api.updateManagerProfile({ locale, timeZone }, version).pipe(
+        tap((profile) => {
+          this.stateSignal.update((state) =>
+            state === null ? state : { ...state, manager: profile },
+          );
+          this.adoptPreferences(profile);
+        }),
+      );
+    });
+  }
+
+  /** Applies a manager profile's locale and time zone to every date and amount the screens render. */
+  private adoptPreferences(manager: ManagerProfile | null): void {
+    configurePresentation({
+      locale: manager?.locale ?? null,
+      timeZone: manager?.timeZone ?? null,
+    });
+  }
+
+  /**
    * Claims a club under a stable idempotency key.
    *
    * The key survives a failed attempt on purpose. A claim that timed out may have succeeded on the server,
@@ -225,6 +272,7 @@ export class OnboardingStore {
   /** Forgets the cached reference data. Called when the session ends. */
   clear(): void {
     this.stopProvisioningPoll();
+    resetPresentation();
     this.stateSignal.set(null);
     this.worldSignal.set(null);
     this.countriesSignal.set([]);

@@ -45,6 +45,17 @@ public sealed class CreateManagerProfileRequestValidator : AbstractValidator<Cre
     }
 }
 
+/// <summary>Validates <see cref="UpdateManagerProfileRequest"/>.</summary>
+public sealed class UpdateManagerProfileRequestValidator : AbstractValidator<UpdateManagerProfileRequest>
+{
+    /// <summary>Initializes the validator.</summary>
+    public UpdateManagerProfileRequestValidator()
+    {
+        RuleFor(request => request.Locale).LocaleRules();
+        RuleFor(request => request.TimeZone).TimeZoneRules();
+    }
+}
+
 /// <summary>Validates <see cref="ClaimClubRequest"/>.</summary>
 public sealed class ClaimClubRequestValidator : AbstractValidator<ClaimClubRequest>
 {

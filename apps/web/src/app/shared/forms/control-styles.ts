@@ -11,6 +11,10 @@
 export const TEXT_INPUT =
   'mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-500';
 
+/** A labelled select, matching the text input treatment. */
+export const SELECT_INPUT =
+  'mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-500';
+
 /** A checkbox with its inline label. */
 export const CHECKBOX_INPUT =
   'mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500';

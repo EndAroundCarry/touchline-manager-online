@@ -4,6 +4,7 @@ import { ApiClient } from '../api/api-client';
 import { ApiHeaders } from '../api/api-headers';
 import { authEndpointContext } from './auth-context';
 import {
+  AccountExport,
   AuthSession,
   LoginPayload,
   ProfileSnapshot,
@@ -127,5 +128,10 @@ export class AuthApi {
   /** Closes the account, confirming with the current password. */
   deleteAccount(password: string): Observable<RequestAccepted> {
     return this.api.deleteWithBody<RequestAccepted, { password: string }>('/me', { password });
+  }
+
+  /** Reads the account's own data as one document, for download (`F-07`, master plan §12.4). */
+  exportAccountData(): Observable<AccountExport> {
+    return this.api.get<AccountExport>('/me/export');
   }
 }

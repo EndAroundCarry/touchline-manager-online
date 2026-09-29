@@ -14,6 +14,23 @@ public sealed record CreateManagerProfileRequest
     public required string TimeZone { get; init; }
 }
 
+/// <summary>
+/// Request to change the manager's formatting preferences (master plan §10.2, `VOI-4`).
+/// </summary>
+/// <remarks>
+/// Conditional on the profile version, so a change made on one device cannot silently overwrite one made
+/// on another. The manager's name is the account's display name and is changed through <c>/me</c>, so only
+/// the locale and time zone are here.
+/// </remarks>
+public sealed record UpdateManagerProfileRequest
+{
+    /// <summary>Gets the preferred locale for formatting, e.g. <c>en-GB</c>.</summary>
+    public required string Locale { get; init; }
+
+    /// <summary>Gets the IANA time zone used to render deadlines in local time (`CAL-4`).</summary>
+    public required string TimeZone { get; init; }
+}
+
 /// <summary>Request to take over an AI-controlled club (master plan §7.6).</summary>
 /// <remarks>
 /// The command identifies the club only. Ownership is never taken from the body: the manager is derived

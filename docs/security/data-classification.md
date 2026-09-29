@@ -122,7 +122,7 @@ error category. Structured logs carry these as fields, not as interpolated prose
 
 | Capability | Behaviour |
 |---|---|
-| Export | Returns account, profile, tenure history, and own transactional history in a machine-readable form |
+| Export | Returns account, consents, manager profile, tenure history, active sessions, and the current club's ledger (the own transactional history, capped) as one JSON document at `GET /me/export`, sent `no-store` and carrying no secret or hidden value (ADR-0036). A club's earlier ledgers and its matches are world records, not the departing manager's personal data, and are not included |
 | Deletion | Closes tenure → revokes sessions → cooling period → anonymizes identity; competition records retained anonymized |
 | Consent | Terms and privacy versions are recorded per acceptance with a timestamp |
 | Correction | Display name and timezone are user-editable; game data is not user-editable |
@@ -136,5 +136,7 @@ Stage 0 exit criteria require that the classification is actionable, not aspirat
 - [ ] The redaction list in §4 is implemented as a logging filter with an automated test (Stage 1).
 - [ ] Every C2 field has a test asserting absence from manager-facing DTOs (Stages 3, 4, 10).
 - [ ] Retention values in §3 with a "documented before launch" note are fixed before Stage 15.
-- [ ] The export and deletion flows are exercised by integration tests (Stage 13).
+- [x] The export and deletion flows are exercised by integration tests (Stage 13):
+  `AccountManagementTests` exports an account and asserts the raw response omits the password, the
+  refresh token, and every hash, while `AuthLifecycleTests` covers account closure.
 - [ ] Restore drills confirm ENV-3 (Stage 14).
