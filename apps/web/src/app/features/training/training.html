@@ -63,7 +63,7 @@
             This plan changed on another device since you loaded it. Your choices are still here.
           </p>
           <div class="mt-2 flex flex-wrap gap-2">
-            <button type="button" [class]="primaryButtonClass" (click)="reapply()">
+            <button type="button" [class]="primaryButtonClass" [disabled]="!canMutate()" (click)="reapply()">
               Reapply my changes
             </button>
             <button type="button" [class]="secondaryButtonClass" (click)="discardConflict()">
@@ -85,7 +85,7 @@
         <button
           type="button"
           [class]="primaryButtonClass"
-          [disabled]="saving() || !isDirty()"
+          [disabled]="saving() || !isDirty() || !canMutate()"
           (click)="save()"
         >
           {{ club.isConfigured ? 'Save plan' : 'Set plan' }}
@@ -156,7 +156,7 @@
                     [class]="textInputClass"
                     [attr.aria-label]="'Individual focus for ' + player.fullName"
                     [value]="player.focusFamily ?? ''"
-                    [disabled]="savingFocusPlayerId() === player.id"
+                    [disabled]="savingFocusPlayerId() === player.id || !canMutate()"
                     (change)="onFocusChange(player.id, $event)"
                   >
                     @for (option of focusOptions(); track option.value) {

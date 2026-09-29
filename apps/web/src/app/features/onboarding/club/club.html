@@ -79,7 +79,7 @@
                 <button
                   type="button"
                   [class]="primaryButtonClass"
-                  [disabled]="claimingClubId() !== null"
+                  [disabled]="claimingClubId() !== null || !canMutate()"
                   [attr.aria-label]="'Take over ' + club.name"
                   (click)="claim(club)"
                 >

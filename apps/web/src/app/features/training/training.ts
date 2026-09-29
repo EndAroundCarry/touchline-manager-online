@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { positionLabel, stateBand } from '../../core/squad/squad-presentation';
 import {
   effectiveDateLabel,
@@ -37,6 +38,7 @@ import {
 })
 export class Training {
   private readonly store = inject(TrainingStore);
+  private readonly connectivity = inject(ConnectivityStore);
 
   protected readonly training = this.store.training;
   protected readonly draft = this.store.draft;
@@ -52,6 +54,9 @@ export class Training {
   protected readonly intensityOptions = this.store.intensityOptions;
   protected readonly focusOptions = this.store.focusOptions;
   protected readonly isDirty = this.store.isDirty;
+
+  /** Whether a write is allowed; offline the plan stays editable but nothing is sent (Â§11.4). */
+  protected readonly canMutate = this.connectivity.isOnline;
 
   /** The squad in the order the server returns it: goalkeepers first, then by name. */
   protected readonly players = computed(() => this.training()?.players ?? []);

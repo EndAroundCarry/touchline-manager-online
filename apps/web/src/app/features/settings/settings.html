@@ -77,7 +77,7 @@
         <button
           type="submit"
           [class]="primaryButtonClass"
-          [disabled]="nameSubmitting() || !isVerified()"
+          [disabled]="nameSubmitting() || !isVerified() || !canMutate()"
         >
           {{ nameSubmitting() ? 'Saving…' : 'Save manager name' }}
         </button>
@@ -131,7 +131,7 @@
             </select>
           </div>
 
-          <button type="submit" [class]="primaryButtonClass" [disabled]="prefsSubmitting()">
+          <button type="submit" [class]="primaryButtonClass" [disabled]="prefsSubmitting() || !canMutate()">
             {{ prefsSubmitting() ? 'Saving…' : 'Save preferences' }}
           </button>
         </form>
@@ -202,7 +202,7 @@
           type="button"
           class="mt-4"
           [class]="primaryButtonClass"
-          [disabled]="notificationsSaving()"
+          [disabled]="notificationsSaving() || !canMutate()"
           (click)="saveNotifications()"
         >
           {{ notificationsSaving() ? 'Saving…' : 'Save notification settings' }}
@@ -252,7 +252,7 @@
                 <button
                   type="button"
                   [class]="secondaryButtonClass"
-                  [disabled]="revokingId() !== null"
+                  [disabled]="revokingId() !== null || !canMutate()"
                   [attr.aria-label]="'Sign out the session started ' + sessionIssued(session)"
                   (click)="revokeSession(session.id)"
                 >
@@ -272,7 +272,7 @@
         <button
           type="button"
           [class]="secondaryButtonClass"
-          [disabled]="signingOut()"
+          [disabled]="signingOut() || !canMutate()"
           (click)="signOut()"
         >
           Sign out
@@ -280,7 +280,7 @@
         <button
           type="button"
           [class]="secondaryButtonClass"
-          [disabled]="signingOut()"
+          [disabled]="signingOut() || !canMutate()"
           (click)="signOutEverywhere()"
         >
           Sign out everywhere
@@ -307,7 +307,7 @@
         type="button"
         class="mt-4"
         [class]="primaryButtonClass"
-        [disabled]="exporting()"
+        [disabled]="exporting() || !canMutate()"
         (click)="exportData()"
       >
         {{ exporting() ? 'Preparing…' : 'Download my data' }}
@@ -371,7 +371,7 @@
           </div>
         </div>
 
-        <button type="submit" [class]="destructiveButtonClass" [disabled]="deleteSubmitting()">
+        <button type="submit" [class]="destructiveButtonClass" [disabled]="deleteSubmitting() || !canMutate()">
           {{ deleteSubmitting() ? 'Closing…' : 'Close my account' }}
         </button>
       </form>

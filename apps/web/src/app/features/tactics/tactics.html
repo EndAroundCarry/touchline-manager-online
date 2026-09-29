@@ -73,7 +73,7 @@
             This plan changed on another device since you loaded it. Your edits are still here.
           </p>
           <div class="mt-2 flex flex-wrap gap-2">
-            <button type="button" [class]="primaryButtonClass" (click)="reapply()">
+            <button type="button" [class]="primaryButtonClass" [disabled]="!canMutate()" (click)="reapply()">
               Reapply my changes
             </button>
             <button type="button" [class]="secondaryButtonClass" (click)="discardConflict()">
@@ -295,7 +295,7 @@
         <button
           type="button"
           [class]="primaryButtonClass"
-          [disabled]="saving() || !isDirty()"
+          [disabled]="saving() || !isDirty() || !canMutate()"
           (click)="save()"
         >
           {{ selectedPlan() === null ? 'Create plan' : 'Save plan' }}
@@ -306,7 +306,7 @@
             <button
               type="button"
               [class]="secondaryButtonClass"
-              [disabled]="saving()"
+              [disabled]="saving() || !canMutate()"
               (click)="makeDefault(saved.id)"
             >
               Make default

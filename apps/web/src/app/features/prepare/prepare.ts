@@ -8,6 +8,7 @@ import {
   venueLabel,
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { TeamSheetIssue, TeamSheetSlot } from '../../core/competition/competition.models';
 import { positionLabel } from '../../core/squad/squad-presentation';
 import { familyLabel, roleLabel } from '../../core/tactics/tactics-presentation';
@@ -41,6 +42,7 @@ import {
 export class Prepare implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(CompetitionStore);
+  private readonly connectivity = inject(ConnectivityStore);
   private readonly timer: ReturnType<typeof setInterval>;
 
   /** The clock the countdown is measured against, advanced on an interval. */
@@ -65,6 +67,9 @@ export class Prepare implements OnDestroy {
 
   /** Whether the fixture's side can no longer be changed. */
   protected readonly isLocked = computed(() => this.teamSheet()?.isLocked ?? true);
+
+  /** Whether a write is allowed; offline the side stays editable but nothing is sent (Â§11.4). */
+  protected readonly canMutate = this.connectivity.isOnline;
 
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;

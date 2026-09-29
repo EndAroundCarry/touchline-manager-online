@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import {
   INSTRUCTION_FIELDS,
   POSITION_FAMILY_ORDER,
@@ -63,6 +64,7 @@ interface SlotView {
 })
 export class Tactics {
   private readonly store = inject(TacticsStore);
+  private readonly connectivity = inject(ConnectivityStore);
 
   protected readonly draft = this.store.draft;
   protected readonly plans = this.store.plans;
@@ -81,6 +83,9 @@ export class Tactics {
 
   /** The slot the manager has focused, or 0 when none is. Assigning a player needs a target slot. */
   protected readonly selectedSlot = signal(0);
+
+  /** Whether a write is allowed; offline the board stays editable but nothing is sent (Â§11.4). */
+  protected readonly canMutate = this.connectivity.isOnline;
 
   protected readonly instructionFields = INSTRUCTION_FIELDS;
   protected readonly maxNameLength = 64;

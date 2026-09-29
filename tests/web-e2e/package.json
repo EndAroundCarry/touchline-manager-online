@@ -7,6 +7,7 @@
     "test": "playwright test",
     "test:matchday": "playwright test -c playwright.matchday.config.ts",
     "test:market": "playwright test -c playwright.market.config.ts",
+    "test:pwa": "playwright test -c playwright.pwa.config.ts",
     "test:headed": "playwright test --headed",
     "install:browsers": "playwright install chromium",
     "report": "playwright show-report",

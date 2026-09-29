@@ -135,7 +135,7 @@
               <button
                 type="button"
                 [class]="secondaryButtonClass"
-                [disabled]="quoting()"
+                [disabled]="quoting() || !canMutate()"
                 (click)="quoteRenewal()"
               >
                 {{ quoting() ? 'Quoting…' : 'Get a quote' }}
@@ -153,7 +153,7 @@
                   <button
                     type="button"
                     [class]="primaryButtonClass"
-                    [disabled]="signing()"
+                    [disabled]="signing() || !canMutate()"
                     (click)="signRenewal()"
                   >
                     {{ signing() ? 'Signing…' : 'Sign the renewal' }}

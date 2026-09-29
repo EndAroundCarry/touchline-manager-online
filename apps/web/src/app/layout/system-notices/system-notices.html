@@ -1,0 +1,41 @@
+@if (!isOnline()) {
+  <p
+    class="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900"
+    role="status"
+    aria-live="polite"
+  >
+    You are offline. You can read what is already loaded, but changes are disabled until the
+    connection returns &mdash; deadlines are decided by the server, so a queued action would be
+    misleading.
+  </p>
+}
+
+@if (showStale()) {
+  <div
+    class="flex flex-wrap items-center justify-center gap-3 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+  >
+    <p role="status" aria-live="polite">
+      We could not refresh just now, so you may be seeing older data.@if (lastRefreshed(); as when) {
+        Last updated {{ when }}.}
+    </p>
+    <button type="button" [class]="secondaryButtonClass" (click)="retry()">Retry</button>
+  </div>
+}
+
+@if (showUpdate()) {
+  <div
+    class="flex flex-wrap items-center justify-center gap-3 bg-sky-100 px-4 py-2 text-sm text-sky-900"
+  >
+    <p role="status" aria-live="polite">
+      @if (unrecoverable()) {
+        This version of Touchline can no longer load its files.
+      } @else {
+        A new version of Touchline is ready.
+      }
+    </p>
+    <button type="button" [class]="secondaryButtonClass" (click)="reload()">Reload</button>
+    @if (!unrecoverable()) {
+      <button type="button" [class]="secondaryButtonClass" (click)="dismiss()">Later</button>
+    }
+  </div>
+}

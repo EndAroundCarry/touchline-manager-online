@@ -8,7 +8,6 @@
       "resources": {
         "files": [
           "/favicon.ico",
-          "/index.csr.html",
           "/index.html",
           "/manifest.webmanifest",
           "/*.css",
@@ -28,6 +27,17 @@
     }
   ],
   "dataGroups": [
+    {
+      "name": "reference-data",
+      "description": "The public reference reads — the world summary and the country list (ADR-0007, §11.4). They change only when the world is seeded or a tier is generated, so the network is still preferred but the last answer is kept for reading offline.",
+      "urls": ["/api/v1/world", "/api/v1/countries"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 10,
+        "maxAge": "1d",
+        "timeout": "3s"
+      }
+    },
     {
       "name": "match-presentations",
       "description": "Recently viewed match replays. A published presentation is immutable, so the network is preferred but the last answer is kept for reading offline (ADR-0007, §11.4).",

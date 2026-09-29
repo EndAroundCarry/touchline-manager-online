@@ -57,7 +57,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-42 | Inactivity handling | world, comms, ops | 11 | Ladder tests: warn at 10 days, AI-assisted at 14, closed at 21; a suspended account is skipped (ADR-0027) |
 | F-43 | Safe return-to-AI control | world, squad | 11 | A closure keeps every commitment; the freed club re-runs the capacity evaluation (ADR-0027) |
 | F-44 | Responsive desktop/mobile/tablet UI | web | 1 (shell), 13 (complete) | Breakpoint E2E suite |
-| F-45 | Installable PWA | web | 1 (shell), 7, 13 | Install/update/offline-read tests |
+| F-45 | Installable PWA | web | 1 (shell), 7, 13 | Install/update/offline-read tests. Stage 13 adds the `SwUpdate` update prompt, offline mutation gating, the stale-read label, and a production-served PWA journey (`UpdateStore`, `SystemNotices`, `playwright.pwa.config.ts`, ADR-0037) |
 | F-46 | Administration (jobs, matchdays, users, repairs) | ops, web | 14 | Operator can diagnose and resume each workflow |
 | F-47 | Audit | ops | 2 (infra), 14 (complete) | Append-only, restricted, reason-required |
 | F-48 | Observability | ops, all | 1 (logging/traces), 14 (dashboards/SLO) | Metrics exist; alerts link to runbooks |

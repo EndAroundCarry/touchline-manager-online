@@ -89,7 +89,7 @@ lineup by slot number; a partial lineup is sent rather than dropped, so the serv
 tactics presentation helpers (labels, pitch geometry, and the words for every validator code), and the
 tactics store — the conditional-save contract in unit form: a save carries the version it read, a `412`
 keeps the draft and pulls the server's state, and a reapply then goes out against the version that just
-arrived (`CONC-1`, §11.2).
+arrived (`CONC-1`, §11.2). Stage 13 added the service-worker update store (a ready version is offered, a detected or failed one is not, and a disabled or absent worker makes it inert), the sync store's freshness and refetch (stale after a failed refresh and cleared on the next success, an immediate read when the tab becomes visible or the connection returns, and listeners removed on stop), and the system notices that render the offline, stale, and update banners.
 
 ## Layer 8 — End-to-end journeys (Playwright)
 
@@ -132,6 +132,8 @@ run, because it plays a round and a played round permanently advances a season. 
 prepares a side for the next fixture through the prepare screen, asks a non-production trigger to play the
 round (ADR-0016), waits for the worker to lock, simulate, and publish it, and watches the replay on the
 match center. The main journeys keep their persistent shared world and their worker-free stack.
+
+Stage 13 added a third stack (`playwright.pwa.config.ts`, `npm run test:pwa`) that serves the **production** build from a small static origin, because the service worker is disabled under `ng serve`. It asserts the manifest is served, the worker takes control, an offline reload still loads the shell, and a mutation control is disabled offline and enabled again on reconnection.
 
 ## Layer 9 — Match-engine validation — Stage 5
 

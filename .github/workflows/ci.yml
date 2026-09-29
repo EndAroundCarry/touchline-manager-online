@@ -175,6 +175,13 @@ jobs:
         working-directory: tests/web-e2e
         run: npx playwright test -c playwright.matchday.config.ts
 
+      - name: Run the PWA journey
+        # A third stack: the production build served from a static origin, because the service worker is
+        # disabled under `ng serve`. This is the only stack in which install and offline reads can be
+        # exercised (F-45). It serves on port 4201, so it runs after the suites that share 4200.
+        working-directory: tests/web-e2e
+        run: npx playwright test -c playwright.pwa.config.ts
+
       - name: Upload the report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -183,6 +190,7 @@ jobs:
           path: |
             tests/web-e2e/playwright-report
             tests/web-e2e/playwright-report-matchday
+            tests/web-e2e/playwright-report-pwa
           if-no-files-found: ignore
 
       - name: Stop backing services

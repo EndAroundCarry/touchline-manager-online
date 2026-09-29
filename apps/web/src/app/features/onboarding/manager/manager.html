@@ -76,7 +76,7 @@
           }
         </div>
 
-        <button type="submit" [class]="primaryButtonClass" [disabled]="submitting()">
+        <button type="submit" [class]="primaryButtonClass" [disabled]="submitting() || !canMutate()">
           {{ submitting() ? 'Creating…' : 'Create my profile' }}
         </button>
       </form>

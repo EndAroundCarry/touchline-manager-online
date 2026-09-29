@@ -3,6 +3,60 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 13 — PWA hardening and the offline boundary
+
+The installable PWA becomes real. A deployed update is offered with a reload, an offline read is labelled,
+and — for the first time — mutation controls are actually disabled offline, which is what the offline banner
+had always claimed. This is the second Stage 13 milestone (ADR-0037).
+
+### Added
+
+- **A service-worker update prompt** (`F-45`, ADR-0007): `UpdateStore` watches `SwUpdate` and raises
+  `updateReady` when a new version has downloaded; the notice offers **Reload** (activates the version and
+  reloads onto it) and **Later**. An unrecoverable worker state offers the reload alone.
+- **`SystemNotices`**, one component for the offline, stale, and update banners, so their wording and order
+  are decided in one place and their states are unit-tested without the shell's thirteen stores.
+- **A stale-read indicator**: `SyncStore` now tracks `lastRefreshedAt` and `refreshFailed` and exposes
+  `isStale`; a read that could not reach the server while online is labelled as possibly older rather than
+  passed off as current.
+- **Refetch on visibility and reconnection** (`§11.2`): `SyncStore` reads again the moment the tab becomes
+  visible or the browser comes back online, instead of waiting out the sixty-second tick.
+- **Reference-data caching** (`§11.4`): a `reference-data` data group caches the public world summary and
+  country list, beside the already-cached published match presentations. Volatile reads are not cached.
+- An `apple-touch-icon` in `index.html`.
+
+### Fixed
+
+- **Offline mutations are now blocked, as the banner always said they were.** Every mutation control across
+  onboarding, tactics, training, prepare, transfers, the contract actions, and settings is disabled while
+  offline, so a screen cannot save because it is disabled rather than because the network refused it
+  (ADR-0007, ADR-0037).
+- **`ngsw-config.json` prefetched `/index.csr.html`**, a file the build never emits (there is no
+  SSR/prerender). The dead entry is gone.
+
+### Notes
+
+- **No migration and no server change.** Everything here is the web client: an update store, a notices
+  component, the sync store's freshness signals, per-screen `canMutate` gating, and the worker configuration.
+- **Offline mutations are still never queued** (ADR-0007): no service-worker background sync, no optimistic
+  money, bids, claims, renewals, or team sheets. A control is disabled rather than replayed late.
+- **The stale label is honest about what it can see.** The application cannot observe a service-worker cache
+  hit, so "stale" means the last refresh failed, not "this response came from the cache" (ADR-0037).
+- **`docs/testing/test-strategy.md`** gained the new Layer 7 and Layer 8 material, and `mvp-traceability.md`
+  `F-45` now carries this milestone's evidence; `F-44` (responsive/touch) remains open.
+
+### Tests
+
+- New frontend unit suites: `update-store.spec.ts` (a ready version is offered, a detected or failed one is
+  not, reload activates and reloads, an unrecoverable state is reported, and a disabled or absent worker makes
+  the store inert) and `system-notices.spec.ts` (each banner shown and hidden in the right states, and the
+  buttons wired). `sync-store.spec.ts` gained immediate refetch on visibility and reconnection, the
+  `isStale`/`refreshFailed` transitions, and that stopping removes the listeners.
+- A new Playwright stack (`playwright.pwa.config.ts`, `npm run test:pwa`) builds the production web, serves
+  it from a static origin that proxies `/api`, and asserts the manifest is served, the service worker takes
+  control, an offline reload still loads the shell, and a mutation control is disabled offline and enabled
+  again on reconnection. Wired into the CI end-to-end job.
+
 ## Stage 13 — Account sessions, export, and time-zone preferences
 
 Stage 13's account surface is complete. A manager can see every device that can sign in and end one

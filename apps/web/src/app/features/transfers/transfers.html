@@ -55,7 +55,7 @@
           </div>
 
           <div class="sm:col-span-2 lg:col-span-4">
-            <button type="submit" [class]="primaryButtonClass">List for sale</button>
+            <button type="submit" [class]="primaryButtonClass" [disabled]="!canMutate()">List for sale</button>
           </div>
         </form>
       }
@@ -116,7 +116,7 @@
                       [value]="listing.minimumAcceptableBidMinor"
                       [class]="textInputClass"
                     />
-                    <button type="submit" [class]="secondaryButtonClass">Bid</button>
+                    <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">Bid</button>
                   </form>
                 </td>
               </tr>
@@ -161,6 +161,7 @@
                 <button
                   type="button"
                   [class]="secondaryButtonClass"
+                  [disabled]="!canMutate()"
                   (click)="cancel(listing.listingId)"
                 >
                   Cancel

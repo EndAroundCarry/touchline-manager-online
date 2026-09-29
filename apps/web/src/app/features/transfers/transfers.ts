@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { TransfersStore } from '../../core/transfers/transfers-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
@@ -24,6 +25,7 @@ import {
 export class Transfers {
   private readonly store = inject(TransfersStore);
   private readonly squad = inject(SquadStore);
+  private readonly connectivity = inject(ConnectivityStore);
 
   protected readonly listings = this.store.listings;
   protected readonly myListings = this.store.myListings;
@@ -36,6 +38,9 @@ export class Transfers {
 
   /** The manager's own contracts, which are the players they may list (`TRF-1`). */
   protected readonly contracts = this.squad.contracts;
+
+  /** Whether a write is allowed; offline a listing, a bid, and a cancellation are all refused. */
+  protected readonly canMutate = this.connectivity.isOnline;
 
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;

@@ -1,6 +1,5 @@
 import { Component, OnDestroy, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
 import { CompetitionStore } from '../../core/competition/competition-store';
@@ -13,6 +12,7 @@ import { SquadStore } from '../../core/squad/squad-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
+import { SystemNotices } from '../system-notices/system-notices';
 import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
 
 /**
@@ -24,12 +24,11 @@ import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, SystemNotices],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.css',
 })
 export class AppShell implements OnDestroy {
-  private readonly connectivity = inject(ConnectivityStore);
   private readonly correlation = inject(CorrelationStore);
   private readonly session = inject(SessionStore);
   private readonly onboarding = inject(OnboardingStore);
@@ -59,9 +58,6 @@ export class AppShell implements OnDestroy {
   protected readonly navItems = computed(() =>
     this.session.isAuthenticated() ? AVAILABLE_NAV_ITEMS : [],
   );
-
-  /** Whether the browser reports a connection. */
-  protected readonly isOnline = this.connectivity.isOnline;
 
   /** The most recent server correlation ID, for support. */
   protected readonly correlationId = this.correlation.correlationId;

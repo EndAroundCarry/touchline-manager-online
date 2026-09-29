@@ -57,11 +57,13 @@ Thumbs.db
 playwright-report/
 playwright-report-matchday/
 playwright-report-market/
+playwright-report-pwa/
 blob-report/
 test-results/
 tests/web-e2e/.artifacts/
 tests/web-e2e/.artifacts-matchday/
 tests/web-e2e/.artifacts-market/
+tests/web-e2e/.artifacts-pwa/
 
 # --- Docker ---
 infra/docker/data/
