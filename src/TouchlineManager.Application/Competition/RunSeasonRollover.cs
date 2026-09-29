@@ -1,14 +1,17 @@
 using Microsoft.Extensions.Logging;
 using TouchlineManager.Application.Abstractions;
+using TouchlineManager.Application.Abstractions.Comms;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Finance;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.World.Generation;
+using TouchlineManager.Domain.Comms;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.World;
@@ -81,6 +84,7 @@ public sealed partial class RunSeasonRollover
     private readonly RebuildDivisionProjections _rebuild;
     private readonly SettleSeasonFinances _finances;
     private readonly SettleSquadContinuity _continuity;
+    private readonly IInboxRepository _inbox;
     private readonly IAdvisoryLock _locks;
     private readonly IAuditWriter _audit;
     private readonly IRequestContext _requestContext;
@@ -100,6 +104,7 @@ public sealed partial class RunSeasonRollover
         RebuildDivisionProjections rebuild,
         SettleSeasonFinances finances,
         SettleSquadContinuity continuity,
+        IInboxRepository inbox,
         IAdvisoryLock locks,
         IAuditWriter audit,
         IRequestContext requestContext,
@@ -117,6 +122,7 @@ public sealed partial class RunSeasonRollover
         _rebuild = rebuild;
         _finances = finances;
         _continuity = continuity;
+        _inbox = inbox;
         _locks = locks;
         _audit = audit;
         _requestContext = requestContext;
@@ -456,9 +462,17 @@ public sealed partial class RunSeasonRollover
 
         foreach (var country in plan.Countries)
         {
-            var byDestination = PromotionRelegation.Compute(ToTiers(country))
+            var movements = PromotionRelegation.Compute(ToTiers(country));
+
+            var byDestination = movements
                 .GroupBy(movement => movement.ToTier)
                 .ToDictionary(group => group.Key, group => group.Select(movement => movement.ClubId).ToList());
+
+            // The clubs whose tier changed this rollover, so a manager can be told where their club is going
+            // (PR-1, COM-1). A stationary club is not a story.
+            var moved = movements
+                .Where(movement => !movement.IsStationary)
+                .ToDictionary(movement => movement.ClubId);
 
             foreach (var tier in country.Tiers)
             {
@@ -503,6 +517,10 @@ public sealed partial class RunSeasonRollover
                 }
 
                 _schedules.Generate(nextDivisionSeason, ordered, nextSeason, now, bootstrapCutoff: null);
+
+                // Only where the clubs are actually placed, so a redelivery that finds the entries present
+                // skips both the placement and the message (at-least-once).
+                await NotifyMovementsAsync(country, tier, ordered, moved, now, cancellationToken);
             }
         }
 
@@ -512,6 +530,65 @@ public sealed partial class RunSeasonRollover
         await transaction.CommitAsync(cancellationToken);
 
         return nextSeason.Id;
+    }
+
+    /// <summary>
+    /// Tells the manager of each club that changed tier where their club is going (`PR-1`, `COM-1`).
+    /// </summary>
+    /// <remarks>
+    /// Runs inside the move transaction, next to the placement it announces, so the message commits with the
+    /// movement or not at all. Only the clubs placed in this destination tier are considered, and only the
+    /// attended ones get a message: an AI club has nobody to tell. A redelivery that finds the destination's
+    /// entries already present skips both the placement and this call (at-least-once).
+    /// </remarks>
+    private async Task NotifyMovementsAsync(
+        RolloverCountry country,
+        RolloverTier destination,
+        IReadOnlyList<Guid> placedClubIds,
+        Dictionary<Guid, ClubMovement> moved,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var moving = placedClubIds.Where(moved.ContainsKey).ToList();
+
+        if (moving.Count == 0)
+        {
+            return;
+        }
+
+        var targets = (await _inbox.FindClubTargetsAsync(moving, cancellationToken))
+            .ToDictionary(target => target.ClubId);
+
+        foreach (var clubId in moving)
+        {
+            if (!targets.TryGetValue(clubId, out var target)
+                || target.ManagerId is not { } managerId
+                || managerId == Guid.Empty)
+            {
+                // An AI club has nobody to tell (COM-1).
+                continue;
+            }
+
+            var movement = moved[clubId];
+            var fromDivision = country.Tiers
+                .FirstOrDefault(tier => tier.TierNumber == movement.FromTier)?.DivisionDisplayName
+                ?? destination.DivisionDisplayName;
+
+            var draft = InboxTemplates.Movement(
+                target.Name,
+                fromDivision,
+                destination.DivisionDisplayName,
+                movement.IsPromoted);
+
+            _inbox.Add(InboxMessage.Record(
+                Guid.CreateVersion7(),
+                managerId,
+                draft.Category,
+                draft.TemplateKey,
+                draft.ParametersJson,
+                draft.RelatedEntityId,
+                now));
+        }
     }
 
     /// <summary>
@@ -669,7 +746,13 @@ public sealed partial class RunSeasonRollover
 
                 var entries = await _world.ListClubSeasonEntriesAsync(divisionSeason.Id, cancellationToken);
 
-                tiers.Add(new RolloverTier(division.TierNumber, division.Id, divisionSeason, ranked, entries));
+                tiers.Add(new RolloverTier(
+                    division.TierNumber,
+                    division.Id,
+                    division.DisplayName,
+                    divisionSeason,
+                    ranked,
+                    entries));
             }
 
             plan.Add(new RolloverCountry(country.Id, country.Code, country.DisplayName, tiers));
@@ -778,6 +861,7 @@ public sealed partial class RunSeasonRollover
     private sealed record RolloverTier(
         int TierNumber,
         Guid DivisionId,
+        string DivisionDisplayName,
         DivisionSeason DivisionSeason,
         IReadOnlyList<Guid> RankedClubIds,
         IReadOnlyList<ClubSeasonEntry> Entries)

@@ -3,8 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.World;
+using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.World;
+using TouchlineManager.Domain.Auth;
+using TouchlineManager.Domain.Comms;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Squad;
@@ -136,6 +139,11 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
         var expectedPromoted = tierTwoOrder.Take(3).ToList();
         var expectedRelegated = tierOneOrder.TakeLast(3).ToList();
 
+        // One of the clubs that will move is held by a human, so the movement message has someone to reach;
+        // every other moving club is AI and is told nothing (COM-1).
+        var movedClubId = expectedPromoted[0];
+        var movedManagerId = await AttachManagerAsync(movedClubId);
+
         SeasonRolloverResult result;
 
         await using (var scope = _fixture.CreateScope())
@@ -245,6 +253,22 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             history.History.NextSeason.Should().BeNull(
                 "the world pointer has advanced, so no next season exists yet to be placed in (PR-5)");
 
+            // The manager whose club moved is told where it went, and the AI clubs are not (PR-1, COM-1).
+            var movementMessages = await db.InboxMessages
+                .Where(message => message.TemplateKey == InboxTemplates.SeasonMovement)
+                .ToListAsync();
+
+            movementMessages.Should().ContainSingle("only the club a manager held was told it moved");
+            movementMessages[0].Category.Should().Be(InboxCategory.Table);
+            movementMessages[0].RecipientManagerId.Should().Be(movedManagerId);
+            movementMessages[0].RelatedEntityId.Should().BeNull();
+
+            var rendered = InboxMessageText.Render(
+                movementMessages[0].TemplateKey,
+                movementMessages[0].ParametersJson);
+
+            rendered.Title.Should().StartWith("Promoted", "the club went up from the second tier");
+
             // The closing season's own schedule is untouched history (PR-6).
             var closingMatchdayIds = await db.Matchdays
                 .Where(matchday => matchday.DivisionSeasonId ==
@@ -295,7 +319,47 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == seasonId && entry.IsPromoted))
                 .Should()
                 .Be(3, "the movement was not re-applied");
+            (await db.InboxMessages.CountAsync(message => message.TemplateKey == InboxTemplates.SeasonMovement))
+                .Should()
+                .Be(1, "the movement was not announced twice");
         }
+    }
+
+    /// <summary>
+    /// Attaches a fresh manager to a club, so the rollover has someone to notify about its movement (`PR-1`).
+    /// </summary>
+    private async Task<Guid> AttachManagerAsync(Guid clubId)
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var now = _fixture.Clock.UtcNow;
+
+        var userId = Guid.CreateVersion7();
+        var suffix = userId.ToString("N");
+
+        var user = User.Register(
+            userId,
+            $"{suffix}@example.com",
+            $"Mover{suffix}"[..20],
+            "hash",
+            $"stamp-{suffix}",
+            now);
+        user.MarkEmailVerified(now);
+        db.Users.Add(user);
+
+        var managerId = Guid.CreateVersion7();
+        db.Managers.Add(Manager.Create(managerId, userId, "en-GB", "Europe/London", now));
+
+        db.ClubTenures.Add(ClubTenure.Start(
+            Guid.CreateVersion7(),
+            clubId,
+            managerId,
+            $"mover-{suffix}",
+            now));
+
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        return managerId;
     }
 
     /// <summary>Marks every matchday of a season published with a deterministic score and rebuilds the tables.</summary>

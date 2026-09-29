@@ -50,6 +50,8 @@ public static class InboxMessageText
                 InboxTemplates.Read<InboxTemplates.InjuryParameters>(parametersJson)),
             InboxTemplates.RetirementAnnounced => Retirement(
                 InboxTemplates.Read<InboxTemplates.RetirementParameters>(parametersJson)),
+            InboxTemplates.SeasonMovement => Movement(
+                InboxTemplates.Read<InboxTemplates.MovementParameters>(parametersJson)),
             InboxTemplates.TeamSheetRepaired => RepairedSide(
                 InboxTemplates.Read<InboxTemplates.TeamSheetParameters>(parametersJson)),
             InboxTemplates.OnboardingWelcome => Welcome(
@@ -142,6 +144,17 @@ public static class InboxMessageText
         new(
             $"{parameters.PlayerName} will retire",
             $"{parameters.PlayerName} has announced that this will be their final season.");
+
+    private static InboxText Movement(InboxTemplates.MovementParameters parameters) =>
+        new(
+            parameters.Promoted
+                ? $"Promoted to {parameters.ToDivision}"
+                : $"Relegated to {parameters.ToDivision}",
+            parameters.Promoted
+                ? $"{parameters.ClubName} finished in the promotion places and goes up to "
+                    + $"{parameters.ToDivision} from {parameters.FromDivision}."
+                : $"{parameters.ClubName} finished in the relegation places and goes down to "
+                    + $"{parameters.ToDivision} from {parameters.FromDivision}.");
 
     private static InboxText RepairedSide(InboxTemplates.TeamSheetParameters parameters)
     {

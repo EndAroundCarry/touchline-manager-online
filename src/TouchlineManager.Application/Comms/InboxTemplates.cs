@@ -51,6 +51,9 @@ public static class InboxTemplates
     /// <summary>A player announced that the coming season is their last (`CON-6`).</summary>
     public const string RetirementAnnounced = "inbox.squad.retirement_announced";
 
+    /// <summary>A club was promoted or relegated at rollover (`PR-1`).</summary>
+    public const string SeasonMovement = "inbox.season.movement";
+
     /// <summary>A manager took over a club and is welcomed to it.</summary>
     public const string OnboardingWelcome = "inbox.onboarding.welcome";
 
@@ -153,6 +156,24 @@ public static class InboxTemplates
             new RetirementParameters(playerName),
             playerId);
 
+    /// <summary>Builds the message a club's promotion or relegation produces (`PR-1`).</summary>
+    /// <param name="clubName">The club that moved.</param>
+    /// <param name="fromDivision">The division it left.</param>
+    /// <param name="toDivision">The division it joined.</param>
+    /// <param name="promoted">True when the club went up, false when it came down.</param>
+    public static InboxDraft Movement(
+        string clubName,
+        string fromDivision,
+        string toDivision,
+        bool promoted) =>
+        Write(
+            // A movement is the season's final table event, so it sits on the table shelf rather than adding
+            // a category (and a check-constraint migration) for one message.
+            InboxCategory.Table,
+            SeasonMovement,
+            new MovementParameters(clubName, fromDivision, toDivision, promoted),
+            relatedEntityId: null);
+
     /// <summary>Builds the message a repaired side produces (`DIS-7`).</summary>
     /// <param name="roundNumber">The round the side was frozen for.</param>
     /// <param name="repairs">The decisions the builder made, in slot order.</param>
@@ -241,6 +262,12 @@ public static class InboxTemplates
     internal sealed record InjuryParameters(string PlayerName, int Fixtures, string Severity);
 
     internal sealed record RetirementParameters(string PlayerName);
+
+    internal sealed record MovementParameters(
+        string ClubName,
+        string FromDivision,
+        string ToDivision,
+        bool Promoted);
 
     internal sealed record TeamSheetParameters(int RoundNumber, IReadOnlyList<RepairParameter> Repairs);
 

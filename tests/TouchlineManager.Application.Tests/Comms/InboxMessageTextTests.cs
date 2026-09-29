@@ -111,6 +111,33 @@ public sealed class InboxMessageTextTests
     }
 
     [Fact]
+    public void A_season_movement_names_the_destination_and_the_direction()
+    {
+        var promoted = InboxTemplates.Movement(
+            "Vale Athletic",
+            "England Division 2",
+            "England Division 1",
+            promoted: true);
+        var relegated = InboxTemplates.Movement(
+            "Bramford Rovers",
+            "England Division 1",
+            "England Division 2",
+            promoted: false);
+
+        promoted.TemplateKey.Should().Be(InboxTemplates.SeasonMovement);
+
+        var promotedText = InboxMessageText.Render(promoted.TemplateKey, promoted.ParametersJson);
+
+        promotedText.Title.Should().Be("Promoted to England Division 1");
+        promotedText.Body.Should().Contain("Vale Athletic").And.Contain("England Division 1");
+
+        var relegatedText = InboxMessageText.Render(relegated.TemplateKey, relegated.ParametersJson);
+
+        relegatedText.Title.Should().Be("Relegated to England Division 2");
+        relegatedText.Body.Should().Contain("Bramford Rovers").And.Contain("England Division 2");
+    }
+
+    [Fact]
     public void A_repaired_side_lists_the_decisions_and_the_replacements()
     {
         var draft = InboxTemplates.Repair(
