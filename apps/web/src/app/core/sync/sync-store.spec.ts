@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { SessionStore } from '../auth/session-store';
 import { ConnectivityStore } from '../connectivity/connectivity-store';
+import { MaintenanceStore } from '../maintenance/maintenance-store';
 import { SyncApi } from './sync-api';
 import { SyncStore } from './sync-store';
 
@@ -21,9 +22,14 @@ describe('SyncStore', () => {
 
   function create(): SyncStore {
     api = {
-      summary: vi
-        .fn()
-        .mockReturnValue(of({ serverTime: '2026-10-06T19:00:00Z', unreadInboxCount: 3 })),
+      summary: vi.fn().mockReturnValue(
+        of({
+          serverTime: '2026-10-06T19:00:00Z',
+          unreadInboxCount: 3,
+          readOnly: false,
+          readOnlyMessage: null,
+        }),
+      ),
     };
 
     TestBed.configureTestingModule({
@@ -146,7 +152,12 @@ describe('SyncStore', () => {
     expect(store.isStale()).toBe(true);
 
     api.summary.mockReturnValue(
-      of({ serverTime: '2026-10-06T19:00:00Z', unreadInboxCount: 1 }),
+      of({
+        serverTime: '2026-10-06T19:00:00Z',
+        unreadInboxCount: 1,
+        readOnly: false,
+        readOnlyMessage: null,
+      }),
     );
     store.refresh();
 
@@ -163,6 +174,32 @@ describe('SyncStore', () => {
 
     expect(store.isStale()).toBe(true);
     expect(store.refreshFailed()).toBe(false);
+  });
+
+  it('carries the read-only switch from the summary into the maintenance store', () => {
+    const store = create();
+    const maintenance = TestBed.inject(MaintenanceStore);
+
+    api.summary.mockReturnValue(
+      of({
+        serverTime: '2026-10-06T19:00:00Z',
+        unreadInboxCount: 3,
+        readOnly: true,
+        readOnlyMessage: 'Read-only while we repair the ledger.',
+      }),
+    );
+
+    store.start();
+
+    expect(maintenance.readOnly()).toBe(true);
+    expect(maintenance.message()).toBe('Read-only while we repair the ledger.');
+
+    store.clear();
+
+    expect(maintenance.readOnly()).toBe(false);
+    expect(maintenance.message()).toBeNull();
+
+    store.stop();
   });
 
   it('drops the count and the freshness when the session ends', () => {

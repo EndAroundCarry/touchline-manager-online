@@ -3,6 +3,44 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 14 — Read-only incident mode
+
+The stage's last self-contained control: master plan §13's "emergency read-only mode that blocks manager
+writes while keeping published content available". An operator flips one world-scoped feature flag, and every
+manager command is refused while reads, sign-in, and the operator console keep working and the worker keeps
+advancing deadlines. No migration — it reads the `ops.feature_flags` store ADR-0045 already built
+(`F-51`, ADR-0047).
+
+### Added
+
+- **A request-edge read-only gate** (`F-51`): `ReadOnlyModeMiddleware` runs after authorization and refuses
+  any mutating manager request with `503 READ_ONLY_MODE`, carrying the operator's stated reason. Safe methods
+  always pass; the admin and operational-analytics policies, sign-in, and the health probes are exempt, so an
+  operator can always lift the switch. One registration covers every manager module, because those endpoints
+  share no route group.
+- **`incident.read_only`, read through the flag store** (`IReadOnlyMode`, `ReadOnlyModeReader`): the value is
+  `{"enabled":true,"message":"..."}`, interpreted leniently — anything but an explicit `enabled: true` means
+  "not read-only". The read is cached for five seconds and the admin command invalidates it, so a toggle takes
+  effect at once in the API that serves it.
+- **A client surface** (`MaintenanceStore`, `SystemNotices`): the shell reads the state from the existing
+  `/sync` poll, shows a maintenance banner naming the operator's reason, and disables commands through one
+  derived `canMutate` (online and not read-only). The server gate remains the backstop for a client that has
+  not polled yet.
+- **The incident state on the operator's first read**: `GET /api/v1/admin/health/game` now carries `readOnly`
+  and `readOnlyMessage`, and the runbook gains a procedure to take the game read-only and give it back.
+
+### Notes
+
+- **Worker deadlines are not paused.** §13's wording keeps published content available; a full freeze remains
+  the worker's `Enable*` configuration (ADR-0012). No migration was needed: `ops.feature_flags` already exists.
+
+### Tests
+
+- `ReadOnlyModeTests` (API) drives the real flag command and asserts a manager command is `503 READ_ONLY_MODE`
+  while a read, `/sync`, and an admin mutation all still work, and that the command is allowed again after the
+  flag is cleared; `ReadOnlyModeReaderTests` covers the interpretation and the cache; `SetFeatureFlagTests`
+  asserts the command invalidates the cached read; the web specs cover the store, the banner, and the poll.
+
 ## Stage 14 — Load, supply-chain scans, and the point-in-time restore drill
 
 The stage's operational proof: test-strategy **layer 10**. §16 requires load tests at three times the

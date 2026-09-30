@@ -9,7 +9,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
 import { AuthApi } from '../../core/auth/auth-api';
-import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
+import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { AccountExport } from '../../core/auth/auth.models';
 import { SessionStore } from '../../core/auth/session-store';
 import { NotificationPreferencesStore } from '../../core/notifications/notification-preferences-store';
@@ -105,7 +105,7 @@ function withCurrent(options: readonly string[], current: string | null): readon
 export class Settings {
   private readonly store = inject(SessionStore);
   private readonly router = inject(Router);
-  private readonly connectivity = inject(ConnectivityStore);
+  private readonly maintenance = inject(MaintenanceStore);
   private readonly authApi = inject(AuthApi);
   private readonly notificationsStore = inject(NotificationPreferencesStore);
   private readonly sessionsStore = inject(SessionsStore);
@@ -120,8 +120,8 @@ export class Settings {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
 
-  /** Whether a write is allowed; every account change is refused offline (Â§11.4). */
-  protected readonly canMutate = this.connectivity.isOnline;
+  /** Whether a write is allowed; every account change is refused offline or read-only (Â§11.4). */
+  protected readonly canMutate = this.maintenance.canMutate;
 
   protected readonly nameForm = inject(FormBuilder).nonNullable.group({
     displayName: [

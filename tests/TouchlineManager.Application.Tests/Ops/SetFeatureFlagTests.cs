@@ -21,8 +21,9 @@ public sealed class SetFeatureFlagTests
     {
         var store = new RecordingFeatureFlagStore();
         var audit = new RecordingAuditWriter();
+        var readOnly = new RecordingReadOnlyMode();
 
-        var result = await Create(store, audit).ExecuteAsync(
+        var result = await Create(store, audit, readOnly).ExecuteAsync(
             "market.auctions_enabled",
             "false",
             rolloutMetadataJson: null,
@@ -38,6 +39,8 @@ public sealed class SetFeatureFlagTests
         result.Flag.Version.Should().Be(1);
 
         store.Writes.Should().ContainSingle().Which.ValueJson.Should().Be("false");
+
+        readOnly.Invalidations.Should().Be(1, "the reader applies the change at once (F-51)");
 
         audit.Entries.Should().ContainSingle();
         audit.Entries[0].Action.Should().Be(AdminAuditActions.FeatureFlagSet);
@@ -129,10 +132,14 @@ public sealed class SetFeatureFlagTests
         await act.Should().ThrowAsync<ArgumentException>();
     }
 
-    private static SetFeatureFlag Create(RecordingFeatureFlagStore store, RecordingAuditWriter audit) =>
+    private static SetFeatureFlag Create(
+        RecordingFeatureFlagStore store,
+        RecordingAuditWriter audit,
+        IReadOnlyMode? readOnly = null) =>
         new(
             new FixedClock(),
             store,
+            readOnly ?? new RecordingReadOnlyMode(),
             audit,
             new StubSecureTokens(),
             new StubRequestContext(),
@@ -141,6 +148,16 @@ public sealed class SetFeatureFlagTests
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset UtcNow => Now;
+    }
+
+    private sealed class RecordingReadOnlyMode : IReadOnlyMode
+    {
+        public int Invalidations { get; private set; }
+
+        public Task<ReadOnlyModeState> GetStateAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(ReadOnlyModeState.Off);
+
+        public void Invalidate() => Invalidations++;
     }
 
     private sealed class RecordingFeatureFlagStore : IFeatureFlagStore

@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
-import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
+import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { averageRatingLabel } from '../../core/competition/competition-presentation';
 import {
   attributeGroups,
@@ -47,14 +47,14 @@ export class PlayerProfile implements OnInit {
   readonly id = input.required<string>();
 
   private readonly store = inject(SquadStore);
-  private readonly connectivity = inject(ConnectivityStore);
+  private readonly maintenance = inject(MaintenanceStore);
 
   protected readonly player = this.store.player;
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
 
-  /** Whether a write is allowed; offline a quote and a renewal are both refused. */
-  protected readonly canMutate = this.connectivity.isOnline;
+  /** Whether a write is allowed; offline or read-only a quote and a renewal are both refused. */
+  protected readonly canMutate = this.maintenance.canMutate;
 
   /** The attribute families, in the order the profile shows them. */
   protected readonly attributeFamilies = computed(() => {

@@ -1,18 +1,20 @@
 import { Component, computed, inject } from '@angular/core';
 import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
+import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { UpdateStore } from '../../core/pwa/update-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { formatInstant } from '../../core/world/presentation';
 import { SECONDARY_BUTTON } from '../../shared/forms/control-styles';
 
 /**
- * The shell's system notices: offline, stale, and update banners in one place (master plan §11.4,
- * ADR-0007).
+ * The shell's system notices: maintenance, offline, stale, and update banners in one place
+ * (master plan §11.4, ADR-0007).
  *
- * Three different facts share one surface and one ordering, so they live in one small component rather
- * than in the shell beside the whole game state. Offline is the strongest claim — nothing can be sent —
- * so it reads first and alone; the stale notice appears only while online, when the last read did not
- * reach the server; the update prompt is the calmest and last.
+ * Four different facts share one surface and one ordering, so they live in one small component rather
+ * than in the shell beside the whole game state. Read-only mode is a server decision that refuses every
+ * command, so it reads first; offline is the strongest claim about the connection, so it reads next; the
+ * stale notice appears only while online, when the last read did not reach the server; the update prompt
+ * is the calmest and last.
  */
 @Component({
   selector: 'app-system-notices',
@@ -20,10 +22,13 @@ import { SECONDARY_BUTTON } from '../../shared/forms/control-styles';
 })
 export class SystemNotices {
   private readonly connectivity = inject(ConnectivityStore);
+  private readonly maintenance = inject(MaintenanceStore);
   private readonly sync = inject(SyncStore);
   private readonly update = inject(UpdateStore);
 
   protected readonly isOnline = this.connectivity.isOnline;
+  protected readonly readOnly = this.maintenance.readOnly;
+  protected readonly readOnlyMessage = this.maintenance.message;
   protected readonly refreshFailed = this.sync.refreshFailed;
   protected readonly updateReady = this.update.updateReady;
   protected readonly unrecoverable = this.update.unrecoverable;

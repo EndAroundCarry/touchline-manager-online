@@ -22,12 +22,17 @@ namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 internal sealed class AdminQueries : IAdminQueries
 {
     private readonly TouchlineManagerDbContext _dbContext;
+    private readonly IReadOnlyMode _readOnlyMode;
     private readonly IClock _clock;
 
     /// <summary>Initializes the query.</summary>
-    public AdminQueries(TouchlineManagerDbContext dbContext, IClock clock)
+    public AdminQueries(
+        TouchlineManagerDbContext dbContext,
+        IReadOnlyMode readOnlyMode,
+        IClock clock)
     {
         _dbContext = dbContext;
+        _readOnlyMode = readOnlyMode;
         _clock = clock;
     }
 
@@ -73,6 +78,10 @@ internal sealed class AdminQueries : IAdminQueries
             .Select(job => (DateTimeOffset?)job.DueAt)
             .FirstOrDefaultAsync(cancellationToken);
 
+        // The incident switch belongs on the operator's first read: it changes what the game will accept
+        // (master plan §13, F-51).
+        var readOnly = await _readOnlyMode.GetStateAsync(cancellationToken);
+
         return new AdminGameHealth(
             world.Id,
             world.Status.ToCode(),
@@ -83,7 +92,9 @@ internal sealed class AdminQueries : IAdminQueries
             pendingJobs,
             deadLetterJobs,
             oldestOverdueJob,
-            now);
+            now,
+            readOnly.Enabled,
+            readOnly.Message);
     }
 
     /// <inheritdoc />

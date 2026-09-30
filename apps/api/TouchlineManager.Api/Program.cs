@@ -208,6 +208,10 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 
+// The incident gate (F-51). It runs after authorization so an unauthorized caller still gets its
+// 401/403 first, and before the endpoints so a manager command never runs while the game is read-only.
+app.UseMiddleware<ReadOnlyModeMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

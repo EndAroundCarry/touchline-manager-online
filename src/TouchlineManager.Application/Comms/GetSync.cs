@@ -1,5 +1,6 @@
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Comms;
+using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Contracts.Comms;
 
@@ -22,13 +23,19 @@ public sealed class GetSync
 {
     private readonly IInboxQueries _queries;
     private readonly IManagerRepository _managers;
+    private readonly IReadOnlyMode _readOnlyMode;
     private readonly IClock _clock;
 
     /// <summary>Initializes the query.</summary>
-    public GetSync(IInboxQueries queries, IManagerRepository managers, IClock clock)
+    public GetSync(
+        IInboxQueries queries,
+        IManagerRepository managers,
+        IReadOnlyMode readOnlyMode,
+        IClock clock)
     {
         _queries = queries;
         _managers = managers;
+        _readOnlyMode = readOnlyMode;
         _clock = clock;
     }
 
@@ -43,6 +50,14 @@ public sealed class GetSync
             ? 0
             : await _queries.CountUnreadAsync(manager.Id, cancellationToken);
 
-        return new GetSyncResult(new SyncResponse(_clock.UtcNow, unread));
+        // Read-only mode travels on the same poll so the shell can disable commands between requests
+        // (`F-51`); the server gate remains the backstop for a client that has not caught up.
+        var readOnly = await _readOnlyMode.GetStateAsync(cancellationToken);
+
+        return new GetSyncResult(new SyncResponse(
+            _clock.UtcNow,
+            unread,
+            readOnly.Enabled,
+            readOnly.Message));
     }
 }

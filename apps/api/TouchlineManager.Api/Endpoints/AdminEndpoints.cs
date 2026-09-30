@@ -269,7 +269,9 @@ internal static class AdminEndpoints
             health.PendingJobs,
             health.DeadLetterJobs,
             health.OldestOverdueJobDueAt,
-            health.GeneratedAt));
+            health.GeneratedAt,
+            health.ReadOnly,
+            health.ReadOnlyMessage));
     }
 
     private static async Task<IResult> SuspendAccountAsync(

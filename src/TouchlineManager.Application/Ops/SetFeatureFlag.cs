@@ -46,6 +46,7 @@ public sealed class SetFeatureFlag
 
     private readonly IClock _clock;
     private readonly IFeatureFlagStore _flags;
+    private readonly IReadOnlyMode _readOnlyMode;
     private readonly IAuditWriter _audit;
     private readonly ISecureTokenService _secureTokens;
     private readonly IRequestContext _requestContext;
@@ -55,6 +56,7 @@ public sealed class SetFeatureFlag
     public SetFeatureFlag(
         IClock clock,
         IFeatureFlagStore flags,
+        IReadOnlyMode readOnlyMode,
         IAuditWriter audit,
         ISecureTokenService secureTokens,
         IRequestContext requestContext,
@@ -62,6 +64,7 @@ public sealed class SetFeatureFlag
     {
         _clock = clock;
         _flags = flags;
+        _readOnlyMode = readOnlyMode;
         _audit = audit;
         _secureTokens = secureTokens;
         _requestContext = requestContext;
@@ -110,6 +113,10 @@ public sealed class SetFeatureFlag
             reason));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // The API is the only reader of the incident flag, so the process that served the operator applies
+        // the change at once instead of waiting out the read cache (F-51).
+        _readOnlyMode.Invalidate();
 
         return new SetFeatureFlagResult(
             existing is null ? SetFeatureFlagOutcome.Created : SetFeatureFlagOutcome.Updated,

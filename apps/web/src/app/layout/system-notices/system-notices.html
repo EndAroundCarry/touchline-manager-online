@@ -1,3 +1,16 @@
+@if (readOnly()) {
+  <p
+    class="bg-rose-100 px-4 py-2 text-center text-sm text-rose-900"
+    role="status"
+    aria-live="polite"
+  >
+    Touchline is read-only for a moment. You can still read; changes are disabled until it returns.
+    @if (readOnlyMessage(); as reason) {
+      {{ reason }}
+    }
+  </p>
+}
+
 @if (!isOnline()) {
   <p
     class="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900"
@@ -15,8 +28,10 @@
     class="flex flex-wrap items-center justify-center gap-3 bg-amber-50 px-4 py-2 text-sm text-amber-900"
   >
     <p role="status" aria-live="polite">
-      We could not refresh just now, so you may be seeing older data.@if (lastRefreshed(); as when) {
-        Last updated {{ when }}.}
+      We could not refresh just now, so you may be seeing older data.
+      @if (lastRefreshed(); as when) {
+        Last updated {{ when }}.
+      }
     </p>
     <button type="button" [class]="secondaryButtonClass" (click)="retry()">Retry</button>
   </div>

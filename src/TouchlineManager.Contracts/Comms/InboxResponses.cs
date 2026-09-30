@@ -54,4 +54,13 @@ public sealed record InboxResponse(
 /// </remarks>
 /// <param name="ServerTime">The server's current instant.</param>
 /// <param name="UnreadInboxCount">How many inbox messages are unread.</param>
-public sealed record SyncResponse(DateTimeOffset ServerTime, int UnreadInboxCount);
+/// <param name="ReadOnly">
+/// Whether the game is in read-only mode, so the shell can block manager writes before they are sent
+/// (master plan §13, `F-51`).
+/// </param>
+/// <param name="ReadOnlyMessage">The operator's stated reason while read-only, otherwise null.</param>
+public sealed record SyncResponse(
+    DateTimeOffset ServerTime,
+    int UnreadInboxCount,
+    bool ReadOnly,
+    string? ReadOnlyMessage);

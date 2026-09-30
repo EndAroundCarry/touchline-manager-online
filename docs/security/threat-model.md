@@ -111,6 +111,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | D-5 | Auction contention in the final minutes | Bounded increment rules, one active bid per club per listing, reservations, indexed resolution ordering | 10 |
 | D-6 | Job queue flooded by a hostile producer | Bounded handlers, per-type concurrency caps, dead-letter classification, alerts | 6 |
 | D-7 | Worker outage during a matchday | Durable jobs, leases, retry, idempotent handlers, operator resume, SLO alerting on publication delay | 6, 14 |
+| D-8 | An unsafe write reaches the game during an incident | Emergency read-only mode refuses every manager command with `503 READ_ONLY_MODE` while reads, sign-in, and the operator console stay up; set in seconds, without a deploy, from the audited feature-flag command (`F-51`, ADR-0047) | 14 |
 
 ### 4.6 Elevation of privilege
 
@@ -121,6 +122,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | E-3 | Support role used to alter competitive outcomes | Support cannot mutate game state; only `operator`/`admin` with MFA, reason, and compensating-action tooling. The `AdminMutate` policy names only `operator` and `admin` (`F-46`, ADR-0042) | 14 |
 | E-4 | Emergency grant or repair used as a gameplay advantage | Grant/repair requires an incident reference, dry run, approval, audit, and player notification; alerted and tuned out through balancing (`FIN-16`) | 9, 14 |
 | E-5 | Job payload tampering grants cross-module write | Job handlers call application use cases with the same authorization and invariant checks as the API; payloads are validated | 6 |
+| E-6 | Read-only mode locks out the operators or the whole game | Only `operator`/`admin` may set it, the admin surface and sign-in are exempt, and every set is audited with a reason, so an operator can always lift it (`F-51`, ADR-0047) | 14 |
 
 ### 4.7 Game-specific integrity threats
 

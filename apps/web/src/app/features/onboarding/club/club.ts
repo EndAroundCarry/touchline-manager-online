@@ -1,7 +1,7 @@
 import { Component, OnDestroy, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError } from '../../../core/api/api-error';
-import { ConnectivityStore } from '../../../core/connectivity/connectivity-store';
+import { MaintenanceStore } from '../../../core/maintenance/maintenance-store';
 import { OnboardingStore } from '../../../core/world/onboarding-store';
 import { AvailableClub, ProvisioningStatus } from '../../../core/world/world.models';
 import {
@@ -31,7 +31,7 @@ export class ClubChoice implements OnDestroy {
   private readonly store = inject(OnboardingStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly connectivity = inject(ConnectivityStore);
+  private readonly maintenance = inject(MaintenanceStore);
 
   /** The country whose tier the manager is choosing from. */
   private readonly countryId = this.route.snapshot.queryParamMap.get('countryId');
@@ -44,8 +44,8 @@ export class ClubChoice implements OnDestroy {
   protected readonly provisioning = signal<ProvisioningStatus | null>(null);
   protected readonly cooldownUntil = signal<string | null>(null);
 
-  /** Whether a write is allowed; offline a club cannot be taken over. */
-  protected readonly canMutate = this.connectivity.isOnline;
+  /** Whether a write is allowed; offline or read-only a club cannot be taken over. */
+  protected readonly canMutate = this.maintenance.canMutate;
 
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;

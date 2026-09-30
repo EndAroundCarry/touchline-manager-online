@@ -29,4 +29,10 @@ public static class ApiErrorCodes
 
     /// <summary>Too many requests from this client. Retry after the advertised delay.</summary>
     public const string TooManyRequests = "TOO_MANY_REQUESTS";
+
+    /// <summary>
+    /// The game is in read-only mode: manager commands are refused while published content stays available
+    /// (master plan §13, `F-51`). Reads, sign-in, and operator actions are unaffected.
+    /// </summary>
+    public const string ReadOnlyMode = "READ_ONLY_MODE";
 }

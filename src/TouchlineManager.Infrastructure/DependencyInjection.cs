@@ -21,6 +21,7 @@ using TouchlineManager.Infrastructure.Email;
 using TouchlineManager.Infrastructure.Finance;
 using TouchlineManager.Infrastructure.Jobs;
 using TouchlineManager.Infrastructure.Market;
+using TouchlineManager.Infrastructure.Ops;
 using TouchlineManager.Infrastructure.Persistence;
 using TouchlineManager.Infrastructure.Persistence.Repositories;
 using TouchlineManager.Infrastructure.Requests;
@@ -75,11 +76,14 @@ public static class DependencyInjection
 
     /// <summary>
     /// Registers the ops module's read-only analytics projection and the operational funnel counters
-    /// (master plan §16 Stage 13, `F-54`, ADR-0041).
+    /// (master plan §16 Stage 13, `F-54`, ADR-0041), plus the operator console and the incident-control
+    /// reads (master plan §13, `F-46`, `F-51`).
     /// </summary>
     /// <remarks>
     /// The query is scoped because it reads through the per-request unit of work; the counters are a
     /// singleton because the meter holds no per-request state and every caller shares the one instrument.
+    /// The read-only reader is scoped and caches through a shared memory cache, so the request gate does not
+    /// read the flag from the database on every command.
     /// </remarks>
     private static void AddOpsInfrastructure(IServiceCollection services)
     {
@@ -91,6 +95,10 @@ public static class DependencyInjection
 
         // The operator's feature-flag store (master plan §6.9, §13, F-46, ADR-0045).
         services.AddScoped<IFeatureFlagStore, FeatureFlagStore>();
+
+        // The read-only incident switch and the cache the request gate reads it through (F-51, ADR-0047).
+        services.AddMemoryCache();
+        services.AddScoped<IReadOnlyMode, ReadOnlyModeReader>();
     }
 
     /// <summary>

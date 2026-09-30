@@ -34,4 +34,6 @@ export interface InboxPage {
 export interface SyncSummary {
   readonly serverTime: string;
   readonly unreadInboxCount: number;
+  readonly readOnly: boolean;
+  readonly readOnlyMessage: string | null;
 }

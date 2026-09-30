@@ -9,7 +9,9 @@ The commands below are the operator surface of [ADR-0042](../architecture/adr/00
 (access and MFA), [ADR-0043](../architecture/adr/0043-operator-read-console.md) (the read console),
 [ADR-0044](../architecture/adr/0044-operator-recovery-commands.md) (the recovery commands), and
 [ADR-0045](../architecture/adr/0045-administrative-repairs-and-broadcasts.md) (ownership and finance repairs,
-broadcasts, and flags). The rollover resume is the non-production diagnostics control of
+broadcasts, and flags), with the read-only incident switch of
+[ADR-0047](../architecture/adr/0047-incident-read-only-mode.md) (`F-51`). The rollover resume is the
+non-production diagnostics control of
 [ADR-0034](../architecture/adr/0034-operator-rollover-preview-and-resume.md).
 
 ## Who may act
@@ -61,6 +63,7 @@ Read before acting. Every read is `AdminRead` (support, operator, or admin with 
 | Question | Command |
 |---|---|
 | Is the game healthy? Queue depth, dead letters, oldest overdue job | `GET /api/v1/admin/health/game` |
+| Is the game read-only, and why? | `GET /api/v1/admin/health/game` (`readOnly`, `readOnlyMessage`) |
 | Which jobs are dead-lettered or overdue? | `GET /api/v1/admin/jobs?status=dead_letter` |
 | Why is this round stuck? | `GET /api/v1/admin/matchdays/{id}` |
 | What has already been done, and by whom? | `GET /api/v1/admin/audit?action=admin.` |
@@ -332,6 +335,46 @@ that is not a valid lower-case dotted name, or a value that is not valid JSON, i
 value is in the trail.
 
 **Evidence.** The `admin.feature_flag.set` audit row (actor, reason, key, version).
+
+## Runbook — take the game read-only, and give it back
+
+**Symptom.** A defect or data fault makes manager writes unsafe — a bad deploy, a snapshot fault, a finance
+defect — and the game must stop accepting commands while reading stays available and the worker keeps
+advancing deadlines.
+
+**Who may act.** Operator or admin.
+
+**Prechecks.**
+1. Confirm the fault is in the write path: `GET /api/v1/admin/health/game` shows the world and
+   `readOnly: false`. Decide separately whether the worker's deadlines should also stop; **this switch does
+   not stop them** — by design the game stays readable and published content keeps advancing
+   (`F-51`, ADR-0047).
+2. Agree the reason. Every manager reads it on the maintenance banner.
+
+**Action.**
+
+```bash
+curl -s -X POST $API/admin/feature-flags/incident.read_only \
+  -H "Authorization: Bearer $TOKEN" -H "X-MFA-Code: $CODE" \
+  -H "Idempotency-Key: read-only-$(date +%s)" -H 'Content-Type: application/json' \
+  -d '{"value":{"enabled":true,"message":"Read-only while we repair the ledger; back shortly."},"reason":"<ticket>"}'
+# 201 (created) or 200 (updated) -> {"key":"incident.read_only","scope":"world","value":{...},"version":1,"created":true}
+```
+
+**Validation.** A manager command now returns `503` with code `READ_ONLY_MODE`; a manager read still returns
+`200`; `GET /api/v1/sync` carries `readOnly: true` and the message, so the shell shows the banner and disables
+its controls; `GET /api/v1/admin/health/game` shows `readOnly: true`. The effect is immediate for the API
+instance that served the command and lands within a few seconds on any other.
+
+**Notification.** Tell managers through an announcement (see the announcement runbook) — the reason and the
+expected window.
+
+**Rollback / compensation.** Set the flag back:
+`{"value":{"enabled":false},"reason":"writes restored"}`. There is nothing else to undo: no manager command
+was accepted while it was on. Confirm `readOnly: false` and that a manager write succeeds.
+
+**Evidence.** The two `admin.feature_flag.set` audit rows (actor, reason, key, version) — one to set and one
+to clear.
 
 ## Audit
 

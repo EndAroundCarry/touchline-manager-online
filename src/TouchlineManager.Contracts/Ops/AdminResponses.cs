@@ -19,6 +19,8 @@ namespace TouchlineManager.Contracts.Ops;
 /// <param name="DeadLetterJobs">Jobs that exhausted their attempts and need an operator.</param>
 /// <param name="OldestOverdueJobDueAt">The due instant of the longest-overdue ready job, when one is late.</param>
 /// <param name="GeneratedAt">When the snapshot was taken.</param>
+/// <param name="ReadOnly">Whether the game is in read-only mode (`F-51`).</param>
+/// <param name="ReadOnlyMessage">The operator's stated reason while read-only, otherwise null.</param>
 public sealed record AdminGameHealthResponse(
     Guid WorldId,
     string WorldStatus,
@@ -29,7 +31,9 @@ public sealed record AdminGameHealthResponse(
     int PendingJobs,
     int DeadLetterJobs,
     DateTimeOffset? OldestOverdueJobDueAt,
-    DateTimeOffset GeneratedAt);
+    DateTimeOffset GeneratedAt,
+    bool ReadOnly,
+    string? ReadOnlyMessage);
 
 /// <summary>Request to suspend or restore an account. The reason is required and audited.</summary>
 public sealed record AccountStatusRequest

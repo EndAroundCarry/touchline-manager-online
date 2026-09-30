@@ -1,20 +1,24 @@
 import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
+import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { UpdateStore } from '../../core/pwa/update-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { SystemNotices } from './system-notices';
 
 /**
- * The system notices (`§11.4`, ADR-0007, `F-45`).
+ * The system notices (`§11.4`, ADR-0007, `F-45`, `F-51`).
  *
- * The states are separate claims, so the tests check they do not smear into one another: offline reads
- * on its own, the stale notice appears only while online, and the update prompt offers a reload — but
- * not a "later" for an unrecoverable version, which a reload is the only answer to.
+ * The states are separate claims, so the tests check they do not smear into one another: read-only reads
+ * first and names the operator's reason, offline reads on its own, the stale notice appears only while
+ * online, and the update prompt offers a reload — but not a "later" for an unrecoverable version, which a
+ * reload is the only answer to.
  */
 describe('SystemNotices', () => {
   let fixture: ComponentFixture<SystemNotices>;
   let online: WritableSignal<boolean>;
+  let readOnly: WritableSignal<boolean>;
+  let maintenanceMessage: WritableSignal<string | null>;
   let refreshFailed: WritableSignal<boolean>;
   let lastRefreshedAt: WritableSignal<number | null>;
   let updateReady: WritableSignal<boolean>;
@@ -25,6 +29,8 @@ describe('SystemNotices', () => {
 
   beforeEach(async () => {
     online = signal(true);
+    readOnly = signal(false);
+    maintenanceMessage = signal<string | null>(null);
     refreshFailed = signal(false);
     lastRefreshedAt = signal<number | null>(null);
     updateReady = signal(false);
@@ -37,6 +43,7 @@ describe('SystemNotices', () => {
       imports: [SystemNotices],
       providers: [
         { provide: ConnectivityStore, useValue: { isOnline: online } },
+        { provide: MaintenanceStore, useValue: { readOnly, message: maintenanceMessage } },
         { provide: SyncStore, useValue: { refreshFailed, lastRefreshedAt, retry } },
         { provide: UpdateStore, useValue: { updateReady, unrecoverable, reload, dismiss } },
       ],
@@ -62,6 +69,17 @@ describe('SystemNotices', () => {
 
     return match;
   }
+
+  it('tells the manager the game is read-only and names the operator’s reason', async () => {
+    readOnly.set(true);
+    maintenanceMessage.set('Read-only while we repair the ledger.');
+
+    const element = await render();
+
+    expect(element.textContent).toContain('read-only');
+    expect(element.textContent).toContain('changes are disabled');
+    expect(element.textContent).toContain('Read-only while we repair the ledger.');
+  });
 
   it('tells the manager they are offline and says why changes are blocked', async () => {
     online.set(false);

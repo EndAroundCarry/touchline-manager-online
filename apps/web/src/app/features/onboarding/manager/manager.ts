@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiError } from '../../../core/api/api-error';
-import { ConnectivityStore } from '../../../core/connectivity/connectivity-store';
+import { MaintenanceStore } from '../../../core/maintenance/maintenance-store';
 import { OnboardingStore } from '../../../core/world/onboarding-store';
 import { preferredLocale, preferredTimeZone } from '../../../core/world/presentation';
 import { ManagerProfile as ManagerProfileModel } from '../../../core/world/world.models';
@@ -36,7 +36,7 @@ const LOCALE_PATTERN = /^[a-z]{2,3}-[A-Z]{2}$/;
 export class ManagerProfile {
   private readonly store = inject(OnboardingStore);
   private readonly router = inject(Router);
-  private readonly connectivity = inject(ConnectivityStore);
+  private readonly maintenance = inject(MaintenanceStore);
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
@@ -47,8 +47,8 @@ export class ManagerProfile {
   /** The profile the account already has, when this screen is a confirmation rather than a form. */
   protected readonly profile = signal<ManagerProfileModel | null>(null);
 
-  /** Whether a write is allowed; offline the form is refused rather than failing at the network. */
-  protected readonly canMutate = this.connectivity.isOnline;
+  /** Whether a write is allowed; offline or read-only the form is refused rather than failing at the network. */
+  protected readonly canMutate = this.maintenance.canMutate;
 
   protected readonly form = inject(FormBuilder).nonNullable.group({
     locale: [preferredLocale(), [Validators.required, Validators.pattern(LOCALE_PATTERN)]],

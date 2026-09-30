@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { appEnvironment } from '../config/app-environment';
 import { ConnectivityStore } from '../connectivity/connectivity-store';
+import { MaintenanceStore } from '../maintenance/maintenance-store';
 import { SessionStore } from '../auth/session-store';
 import { SyncApi } from './sync-api';
 
@@ -21,6 +22,7 @@ import { SyncApi } from './sync-api';
 export class SyncStore implements OnDestroy {
   private readonly api = inject(SyncApi);
   private readonly connectivity = inject(ConnectivityStore);
+  private readonly maintenance = inject(MaintenanceStore);
   private readonly session = inject(SessionStore);
 
   private readonly unreadSignal = signal(0);
@@ -73,6 +75,7 @@ export class SyncStore implements OnDestroy {
     this.unreadSignal.set(0);
     this.lastRefreshedSignal.set(null);
     this.refreshFailedSignal.set(false);
+    this.maintenance.clear();
   }
 
   /** Stops the interval when the injector is torn down. */
@@ -94,6 +97,7 @@ export class SyncStore implements OnDestroy {
     this.api.summary().subscribe({
       next: (summary) => {
         this.unreadSignal.set(summary.unreadInboxCount);
+        this.maintenance.set(summary.readOnly, summary.readOnlyMessage);
         this.lastRefreshedSignal.set(Date.now());
         this.refreshFailedSignal.set(false);
       },
