@@ -76,6 +76,15 @@ C4Container
     Rel(ops, cdn, "Operates", "HTTPS")
 ```
 
+The telemetry export is real but its backend is not built here: both hosts export OTLP when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set, and Stage 14 added the local stack that receives it — an OTLP
+collector, Prometheus, Alertmanager, Grafana, and Tempo, in `infra/observability/`
+([ADR-0048](adr/0048-telemetry-dashboards-and-slo-alerting.md),
+[`operations/observability.md`](../operations/observability.md)). Production uses the provider's telemetry
+backend; the local stack is the same OTLP contract with the dashboards and the alerts attached. Note that
+only traces and metrics are wired — neither host registers a logging exporter yet, so the "logs" and the
+"scrubbed frontend errors" in the diagram above remain unbuilt.
+
 ---
 
 ## 3. Deployment mapping

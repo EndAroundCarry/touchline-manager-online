@@ -41,6 +41,7 @@ Start here. Documents are ordered from "what the product is" to "how it is opera
 | Document | Purpose |
 |---|---|
 | [`operations/runbook.md`](operations/runbook.md) | On-call procedures: who may act, prechecks, exact commands, validation, notification, rollback, and evidence for diagnosing and recovering the live game. |
+| [`operations/observability.md`](operations/observability.md) | The local telemetry stack: where the OTLP export lands, the objectives the dashboards measure, the alerts and the runbook behind each, and what is deliberately not covered. |
 | [`operations/supply-chain.md`](operations/supply-chain.md) | Dependency, licence, secret, and base-image scans: how to run them, what fails, and how to triage a finding. |
 | [`operations/load-testing.md`](operations/load-testing.md) | The k6 suite, the population model, the SLOs it asserts, and how to read a run. |
 | [`operations/backup-and-restore.md`](operations/backup-and-restore.md) | The backup strategy, the PITR restore drill and its integrity checks, and the restored-environment rules. |

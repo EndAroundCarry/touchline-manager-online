@@ -1,0 +1,87 @@
+# The service-level objectives master plan §14.1 fixes, as alerts (master plan §16 Stage 14; `F-48`).
+#
+# Two of the four SLOs are expressible over instrumentation that already exists:
+#
+#   * 99.9% monthly API availability  -> the ratio of 5xx to all responses.
+#   * p95 read < 500 ms, p95 command < 800 ms -> the request-duration histogram.
+#
+# Reads are approximated as `GET|HEAD|OPTIONS` and commands as everything else. The k6 load suite tags the
+# two kinds exactly (`tests/load/config.js`); a dashboard can only infer them from the method, and the
+# approximation is recorded in ADR-0048 rather than hidden here.
+#
+# The other two SLOs are not alertable yet and are deliberately absent: "99% of matchdays published within
+# five minutes" needs a publication-delay instrument that does not exist, and "no lost accepted work" is a
+# property rather than a metric. Both are recorded in ADR-0048's Deferred list.
+#
+# The metric names below are the Prometheus forms of the OpenTelemetry instruments: the collector's
+# prometheus exporter maps `.` to `_`, appends the unit for histograms, and appends `_total` to counters.
+# `npm run obs:check` fails the build if a name drifts out of the declared allow-list.
+
+groups:
+  - name: slo
+    interval: 30s
+    rules:
+      - alert: ApiAvailabilityBurnFast
+        # The 0.1% error budget is 1 - 0.999. A five-minute window against a two-minute `for` gives a fast
+        # signal without firing on a single failed request. The second clause stops the ratio from being
+        # 0/0 — an empty window would otherwise evaluate to NaN and never compare true.
+        expr: |
+          (
+            sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count[5m]))
+          ) > 0.001
+          and
+          sum(rate(http_server_request_duration_seconds_count[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: The API is failing more than 0.1% of requests
+          description: >-
+            {{ $value | humanizePercentage }} of responses were 5xx over the last five minutes against a
+            0.1% error budget. A sustained breach eats the monthly 99.9% availability objective.
+          runbook: "docs/operations/runbook.md#runbook--the-api-is-failing-requests"
+
+      - alert: ApiReadLatencyHigh
+        # Reads are the 500 ms objective. Ten minutes of samples with a ten-minute `for` is deliberately not
+        # twitchy: this is an objective, not an incident.
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(http_server_request_duration_seconds_bucket{http_request_method=~"GET|HEAD|OPTIONS"}[10m])
+            )
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          slo: read-latency
+        annotations:
+          summary: Read requests are slower than the 500 ms p95 objective
+          description: >-
+            The p95 read response time is {{ $value | humanizeDuration }}. The objective is 500 ms.
+            The API (RED) dashboard breaks this down by route.
+          runbook: "docs/operations/runbook.md#runbook--the-api-is-slow"
+
+      - alert: ApiCommandLatencyHigh
+        # Commands are the 800 ms objective. `!~` rather than an enumerated list, so a method the game starts
+        # using is treated as a command, which is the conservative side.
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(http_server_request_duration_seconds_bucket{http_request_method!~"GET|HEAD|OPTIONS"}[10m])
+            )
+          ) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          slo: command-latency
+        annotations:
+          summary: Command requests are slower than the 800 ms p95 objective
+          description: >-
+            The p95 command response time is {{ $value | humanizeDuration }}. The objective is 800 ms.
+            The API (RED) dashboard breaks this down by route.
+          runbook: "docs/operations/runbook.md#runbook--the-api-is-slow"

@@ -202,6 +202,35 @@ WAL archive, replay to a chosen instant, promote — whose integrity checks prov
 every stored balance, publication stays atomic, the job queue is sound, leases are cleared, and the
 post-target marker is absent. It tears itself down when it finishes.
 
+## Layer 11 — Telemetry dashboards and alerting — Stage 14
+
+The stack's dashboards are the game's continuous evidence, and its alerts are what turns an objective into
+something an operator actually sees. `npm run obs:check` checks the configuration; like the rest of the
+stage's operational proof it runs locally and by hand, and wiring it into CI is the deployment milestone's
+work ([ADR-0048](../architecture/adr/0048-telemetry-dashboards-and-slo-alerting.md)).
+
+**Dashboards** (`infra/observability/grafana/`, `npm run obs:up`): every dashboard is valid JSON, and every
+datasource it names is one the provisioning file declares — a dashboard pointing at an unprovisioned UID
+loads as empty panels with no error anywhere to explain it.
+
+**Metric names** (`infra/observability/prometheus/rules/` and the dashboards): every metric named in a rule
+or a panel is one the application emits, in the Prometheus form the collector's exporter gives it. This is
+the check that pins the OTLP-to-Prometheus name translation, which is otherwise free to drift on an
+OpenTelemetry upgrade and leave a panel reading "No data" forever.
+
+**Alert-to-runbook links** (`docs/operations/runbook.md`): every rule carries a `runbook` annotation and the
+section it names exists — §14.1's "alerts must be actionable and linked to runbooks", checked rather than
+promised.
+
+**The stack's own configuration**: the rules go through `promtool`, the routing through `amtool`, the
+collector and Tempo configurations through their own validators, and the compose file through
+`docker compose config`. Each Docker-based check reports `SKIP` when no daemon is reachable instead of
+failing, the same way the supply-chain scans do.
+
+The surfaces these checks cover are only the instrumented ones — availability and the read and command
+latency budgets. The publication objective and the queue are not instrumented, and no check pretends
+otherwise; the gap is recorded in ADR-0048's Deferred list.
+
 ---
 
 ## Gates

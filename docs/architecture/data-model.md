@@ -848,6 +848,12 @@ erDiagram
 > `ops.feature_flags` with the documented shape (`scope`, `key`, `value`, `rollout_metadata`, `version`) plus
 > `created_at`/`updated_at` and the unique `ux_feature_flags_scope_key`. No existing column is dropped; the
 > news category widen is the only `AlterColumn`.
+>
+> **Stage 14 status (dashboards and alerting). No schema change:** the telemetry stack is configuration —
+> `infra/observability/` holds the collector, Prometheus, Alertmanager, Grafana, and Tempo files, and the
+> dashboards read the OpenTelemetry instruments through the OTLP collector rather than the database. No
+> table, column, index, or constraint is touched, and nothing new is persisted
+> (`F-48`, ADR-0048).
 
 ---
 

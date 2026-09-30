@@ -1,0 +1,101 @@
+{
+  "uid": "touchline-product-funnels",
+  "title": "Product funnels",
+  "description": "The two counters of the privacy-safe operational funnels (F-54, ADR-0041), shown over the selected range. These are the same numbers GET /ops/analytics/funnels returns: counts of accounts that reached a step and of tenures that ended, with no per-manager row and no address.",
+  "tags": ["touchline", "product"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "annotations": { "list": [] },
+  "links": [],
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Onboarding steps in range",
+      "description": "Accounts that reached each onboarding step. A step that is flat while the one before it climbs is the leak to investigate.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "lineWidth": 1, "fillOpacity": 40, "showPoints": "never", "drawStyle": "bars" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (step) (increase(touchline_analytics_onboarding_total{service_name=\"touchline-api\"}[$__range]))",
+          "legendFormat": "{{step}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Tenure events in range",
+      "description": "Club tenures that became inactive or closed, by reason. `administrator_closed` is an operator handing a club back to the AI; `inactivity_closed` is the ladder reaching its end (ADR-0027).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "lineWidth": 1, "fillOpacity": 40, "showPoints": "never", "drawStyle": "bars" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (event, reason) (increase(touchline_analytics_tenure_total{service_name=\"touchline-api\"}[$__range]))",
+          "legendFormat": "{{event}} {{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Onboarding steps over time",
+      "description": "The same counter as the bars above, as a rate, so a step that has stopped entirely is visible as a line falling to zero rather than as a missing bar.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (step) (rate(touchline_analytics_onboarding_total{service_name=\"touchline-api\"}[$__rate_interval]))",
+          "legendFormat": "{{step}}"
+        }
+      ]
+    }
+  ]
+}

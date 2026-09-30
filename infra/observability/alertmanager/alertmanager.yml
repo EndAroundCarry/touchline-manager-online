@@ -1,0 +1,24 @@
+# Alert routing for the local telemetry stack (master plan §14.1, §16 Stage 14; `F-48`).
+#
+# The receiver is intentionally empty. Alertmanager's UI at http://localhost:19093 is where a local operator
+# reads the firing alerts, and each alert's `runbook` annotation names the section of
+# `docs/operations/runbook.md` that answers it — which is §14.1's "alerts must be actionable and linked to
+# runbooks". There is no `templates:` block for the same reason: with no mail, chat, or webhook receiver
+# there is nothing to render a template into, and dead configuration is worse than none.
+#
+# Sending these alerts somewhere real is the deployment milestone's work (`F-50`, ADR-0048).
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: local-ui
+  # One notification per alert, not per series: an alert that fans out across routes would otherwise arrive
+  # as dozens of pages for the same fault.
+  group_by: ['alertname', 'slo']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: local-ui

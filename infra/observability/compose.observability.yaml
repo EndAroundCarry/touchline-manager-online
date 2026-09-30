@@ -1,0 +1,156 @@
+# The local telemetry stack (master plan §14.1, §16 Stage 14; `F-48`).
+#
+# The API and the worker already export OpenTelemetry over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set,
+# and until now that export went nowhere. This stack is where it lands: an OTLP collector receives the
+# traces and metrics, Prometheus scrapes the collector and evaluates the SLO alert rules, Alertmanager holds
+# the firing alerts, Tempo stores the traces, and Grafana reads both.
+#
+# It is a separate compose project (`touchline-observability`) with its own file, exactly like the restore
+# drill, so it can never tear down the development stack. It runs locally and by hand (`npm run obs:up`);
+# nothing is wired into CI, and routing the alerts to a real receiver is the deployment milestone's work
+# (ADR-0048).
+#
+# This stack has no authentication and is meant for a developer's machine only. Never publish it.
+
+name: touchline-observability
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    container_name: touchline-obs-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/collector.yaml"]
+    volumes:
+      - ./otel/collector.yaml:/etc/otelcol-contrib/collector.yaml:ro
+    ports:
+      # 14317/14318 on the host, not the standard 4317/4318. A developer machine may already run another
+      # OTLP listener (a second collector, a tracing tool), and Docker will bind a second listener without
+      # complaint, after which exports land unpredictably. Keeping every host port in this file inside the
+      # 13000-19093 range also makes the stack's footprint obvious in `docker ps`.
+      #
+      # Every port in this file is bound to 127.0.0.1, unlike the backing services, which bind every
+      # interface. Nothing here is authenticated — Grafana allows anonymous viewing — so a stack that
+      # answers the LAN would hand the game's operational state to anyone on the network. The hosts push to
+      # loopback, so the prefix costs nothing.
+      - "127.0.0.1:${OBS_OTLP_GRPC_PORT:-14317}:4317"
+      - "127.0.0.1:${OBS_OTLP_HTTP_PORT:-14318}:4318"
+    healthcheck:
+      # The collector image has no shell or HTTP client, so the container cannot check itself the way the
+      # others do. The `health_check` extension answers on 13133 inside the network, and Prometheus's
+      # `up{job="otel-collector"}` is the readiness signal used in practice — including by the
+      # `TelemetryPipelineDown` alert. `--version` at least proves the binary starts.
+      test: ["CMD", "/otelcol-contrib", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+  tempo:
+    image: grafana/tempo:3.1.0
+    container_name: touchline-obs-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    # No published port: the collector is the only writer and Grafana the only reader, and both reach it
+    # inside this project's network. Publishing it would widen the surface for nothing.
+    healthcheck:
+      # The Tempo image is distroless — no shell, no HTTP client — so it cannot probe its own `/ready`. This
+      # re-parses the mounted configuration, which is what a broken Tempo config actually looks like: the
+      # process dies on a bad field. `npm run obs:check` runs the same verification before the stack starts.
+      test: ["CMD", "/tempo", "-config.file=/etc/tempo/tempo.yaml", "-config.verify=true"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: touchline-obs-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # The monthly availability objective needs thirty days of samples; this local stack keeps fifteen, so
+      # the SLO dashboard's long window is the production backend's job (ADR-0048).
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports:
+      # 19090, not 9090: other local tooling commonly owns 9090. Bound to loopback for the reason above.
+      - "127.0.0.1:${OBS_PROMETHEUS_PORT:-19090}:9090"
+    depends_on:
+      - otel-collector
+      - alertmanager
+    healthcheck:
+      test: ["CMD", "/bin/promtool", "check", "config", "/etc/prometheus/prometheus.yml"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    container_name: touchline-obs-alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      # 19093, not 9093: it sits beside Prometheus's 19090 rather than in the standard range. Bound to
+      # loopback for the reason above.
+      - "127.0.0.1:${OBS_ALERTMANAGER_PORT:-19093}:9093"
+    healthcheck:
+      test: ["CMD", "/bin/amtool", "check-config", "/etc/alertmanager/alertmanager.yml"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: touchline-obs-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${OBS_GRAFANA_ADMIN_PASSWORD:-local_dev_password_change_me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Anonymous viewing is what makes the dashboards one click from `npm run obs:up`; with no sign-up, no
+      # published port beyond the host's loopback, and no C2+ value in any panel, the trade is worth it.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      # 13000, not 3000: 3000 is the single most contested development port there is. Bound to loopback for
+      # the reason above — Grafana is the one service here a browser must reach, so it is the one that would
+      # otherwise be reachable from the network with anonymous viewing on.
+      - "127.0.0.1:${OBS_GRAFANA_PORT:-13000}:3000"
+    depends_on:
+      - prometheus
+      - tempo
+    healthcheck:
+      # Grafana ships wget, so this probes its own health endpoint rather than guessing at the binary's
+      # subcommands (which are not at `/bin/grafana`).
+      test: ["CMD", "/usr/bin/wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+volumes:
+  prometheus-data:
+    name: touchline-obs-prometheus-data
+  alertmanager-data:
+    name: touchline-obs-alertmanager-data
+  grafana-data:
+    name: touchline-obs-grafana-data
+  tempo-data:
+    name: touchline-obs-tempo-data

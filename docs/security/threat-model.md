@@ -99,6 +99,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | I-9 | An analytics surface leaks a value or a per-manager row | The funnels are counts over rows the game already writes, read only by the `operator`/`admin` role; a test asserts the response carries counts and no account address (`F-54`, ADR-0041) | 13 |
 | I-10 | A disclosed database yields usable second factors | TOTP secrets are encrypted at rest under `Auth:EncryptionKey` (AES-256-GCM, authenticated); recovery codes are stored only as hashes; neither is ever serialized or logged (`F-46`, ADR-0042, data-classification §2) | 14 |
 | I-11 | The audit search discloses a pseudonymous address or internal repair metadata | The operator's audit read serializes only actor, action, target, correlation ID, instant, and reason; the hashed client IP and the before/after metadata columns are withheld, and the read is behind `AdminRead` (role plus a completed second factor) (`F-47`, ADR-0043) | 14 |
+| I-12 | The observability stack discloses operational state to the network | The stack has no authentication beyond Grafana's admin account and Grafana is provisioned for anonymous viewing, so every published port is bound to `127.0.0.1` rather than to all interfaces, and the stack is documented as never deployed. What it carries is bounded by construction: counts, latencies, route templates, and funnel step names, with no address, no manager identity, and no hidden game attribute (`F-48`, ADR-0048) | 14 |
 
 ### 4.5 Denial of service
 
@@ -110,7 +111,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | D-4 | Oversized request bodies | Content-type and size validation on all mutable requests | 1 |
 | D-5 | Auction contention in the final minutes | Bounded increment rules, one active bid per club per listing, reservations, indexed resolution ordering | 10 |
 | D-6 | Job queue flooded by a hostile producer | Bounded handlers, per-type concurrency caps, dead-letter classification, alerts | 6 |
-| D-7 | Worker outage during a matchday | Durable jobs, leases, retry, idempotent handlers, operator resume, SLO alerting on publication delay | 6, 14 |
+| D-7 | Worker outage during a matchday | Durable jobs, leases, retry, idempotent handlers, operator resume, and availability and latency SLO alerting, with the operator's matchday read for the diagnosis (`F-48`, ADR-0048). A **publication-delay** alert is still outstanding: the delay is not instrumented, so this row is only half mitigated | 6, 14 |
 | D-8 | An unsafe write reaches the game during an incident | Emergency read-only mode refuses every manager command with `503 READ_ONLY_MODE` while reads, sign-in, and the operator console stay up; set in seconds, without a deploy, from the audited feature-flag command (`F-51`, ADR-0047) | 14 |
 
 ### 4.6 Elevation of privilege

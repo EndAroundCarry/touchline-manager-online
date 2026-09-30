@@ -1,0 +1,54 @@
+# The OTLP receiver the API and the worker export to (master plan §14.1, §16 Stage 14; `F-48`).
+#
+# The application's contract is unchanged: it exports OpenTelemetry over OTLP, and this collector is the
+# "Telemetry backend — OTLP collector" the C4 context already names. Metrics are re-exposed for Prometheus to
+# scrape; traces are forwarded to Tempo. Nothing here is a second exporter inside the application.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  # Prometheus is a pull system, so the collector holds the latest sample of every series and answers a
+  # scrape. The scrape target is `otel-collector:8889` (see prometheus/prometheus.yml).
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    # Without this the resource attributes stay on the resource and there is no `service_name` label, so
+    # `touchline-api` and `touchline-worker` would be indistinguishable in every query. It is the one
+    # setting that makes the dashboards able to tell the two hosts apart.
+    resource_to_telemetry_conversion:
+      enabled: true
+    # A series that stops being reported disappears rather than flatlining, so a dead metric is visible as
+    # absence instead of a stale value.
+    metric_expiration: 10m
+
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]

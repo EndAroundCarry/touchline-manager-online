@@ -1,0 +1,22 @@
+# The guard on the telemetry pipeline itself (master plan §16 Stage 14; `F-48`).
+#
+# Every other alert travels through this pipeline. If the collector stops answering scrapes, the dashboards
+# and the SLO alerts go quiet at exactly the moment an operator would be looking at them, so a silent
+# pipeline is its own alarm.
+
+groups:
+  - name: pipeline
+    rules:
+      - alert: TelemetryPipelineDown
+        expr: up{job="otel-collector"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          slo: telemetry
+        annotations:
+          summary: The telemetry pipeline is down
+          description: >-
+            Prometheus has failed to scrape the OTLP collector for five minutes. Nothing the API and the
+            worker export is reaching the dashboards or the SLO alerts, so a quiet graph is not evidence
+            that the game is healthy.
+          runbook: "docs/operations/runbook.md#runbook--telemetry-is-not-arriving"

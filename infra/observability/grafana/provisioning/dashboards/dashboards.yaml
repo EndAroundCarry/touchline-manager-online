@@ -1,0 +1,17 @@
+# Loads the dashboards from the directory the compose file mounts read-only (master plan §16 Stage 14;
+# `F-48`). `allowUiUpdates: false` keeps the files the source of truth: a panel changed in the browser is
+# discarded on the next reload, so a dashboard is reviewed like any other artefact.
+
+apiVersion: 1
+
+providers:
+  - name: touchline
+    orgId: 1
+    folder: Touchline Manager
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

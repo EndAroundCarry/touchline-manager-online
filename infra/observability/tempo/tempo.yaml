@@ -1,0 +1,32 @@
+# The trace store (master plan §14.1, §16 Stage 14; `F-48`).
+#
+# Both hosts already export OTLP traces — ASP.NET Core server spans for the API and HttpClient spans — and
+# before this stack they went nowhere. A collector that accepted and discarded them would make "complete
+# telemetry dashboards" false, so they are stored here and read from Grafana's Tempo datasource.
+#
+# Local single-binary mode: the blocks and the write-ahead log live on a named volume, and there is no object
+# store, no multi-tenancy, and no compaction tuning — retention is Tempo's own default, which is long enough
+# for a local drill. Production runs the provider's trace backend.
+#
+# Kept deliberately minimal: Tempo moves configuration between releases (3.x, for instance, has no top-level
+# `compactor`), and `npm run obs:check` verifies this file with the pinned image's own parser, so a field
+# that does not exist fails the check rather than a running container.
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+    wal:
+      path: /var/tempo/wal

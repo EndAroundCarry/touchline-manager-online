@@ -151,4 +151,8 @@ Stage 0 exit criteria require that the classification is actionable, not aspirat
   returns its feed item, and a feature flag returns the operator's own JSON value — never a manager's
   personal data, a hidden valuation, or a secret. The four commands require a reason and record a hashed
   client IP that the reads withhold (`F-46`, `F-47`, ADR-0045).
+- [x] The telemetry dashboards expose no C2-or-higher value (Stage 14): the panels read request counts,
+  latencies, route templates, and funnel step names, and the two `F-54` counters carry only their `step` and
+  `event`/`reason` tags. No address, no manager identity, and no hidden game attribute reaches a dashboard —
+  and the stack that serves them binds to loopback only (`F-48`, ADR-0048).
 - [ ] Restore drills confirm ENV-3 (Stage 14).

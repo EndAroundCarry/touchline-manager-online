@@ -3,6 +3,63 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 14 — Telemetry dashboards and SLO alerting, over the instruments that exist
+
+The stage's last open half: §14.1's dashboards, and its "alerts must be actionable and linked to runbooks".
+Both hosts have exported OpenTelemetry over OTLP since Stage 13, and nothing had ever received it — no metric
+backend, no scrape endpoint, no dashboard, and no alert rule existed in the repository. There is now a local
+stack that receives the export, three dashboards, and four alert rules, each naming the runbook section that
+answers it. Only the instruments that exist are shown; the ones that do not are recorded rather than implied
+(`F-48`, ADR-0048).
+
+### Added
+
+- **A local telemetry stack** (`F-48`): `infra/observability/` is its own compose project
+  (`touchline-observability`, `npm run obs:up`), so it can never tear down the development stack. An
+  OpenTelemetry collector receives the hosts' OTLP and re-exposes the metrics for Prometheus to scrape while
+  forwarding the traces to Tempo; Alertmanager holds the alerts and Grafana reads both. Every published port
+  is bound to `127.0.0.1`, because nothing in the stack is authenticated.
+- **Three provisioned dashboards**: an SLO overview (availability, the error ratio behind it, and p95 read
+  and command against their 500 ms and 800 ms objectives), an API RED view broken down by route template, and
+  the two `F-54` product funnels — the same numbers `GET /ops/analytics/funnels` returns.
+- **Four alert rules, each linked to a runbook**: availability fast burn, read p95, command p95, and a guard
+  on the telemetry pipeline itself — which is what stops a dead collector from looking like a healthy game.
+- **`npm run obs:check`**, which validates what would otherwise fail quietly: that every dashboard is valid
+  JSON and names a provisioned datasource, that every metric named in a rule or a panel is one the
+  application emits, and that every alert's `runbook` annotation resolves to a real section of
+  `docs/operations/runbook.md`. The rules, the routing, the collector, Tempo, and the compose file go through
+  their own validators.
+- **Three runbook procedures** — the API is failing requests, the API is slow, and telemetry is not
+  arriving — plus an alerts table, each following the seven fields §13 requires, and the new
+  `docs/operations/observability.md`.
+
+### Notes
+
+- **No application code, no migration.** The milestone is configuration, dashboards, rules, docs, and one
+  Node script; the .NET build, its tests, and the web build are untouched.
+- **Reads and commands are approximated from the HTTP method.** The load suite tags the two exactly; a
+  dashboard can only infer them, so reads are `GET`/`HEAD`/`OPTIONS` and commands are everything else. The
+  inference is in ADR-0048 rather than hidden in a query.
+- **The publication objective cannot be alarmed on.** "99% of matchdays published within five minutes" needs
+  a delay instrument that does not exist, and neither does §7.1's queue telemetry, so those panels and alerts
+  are deferred along with the rest of §14.1's metric list. The `F-48` traceability row now states exactly
+  which half landed.
+- **The stack is local and never deployed.** It has no authentication beyond Grafana's admin account, so it
+  binds to loopback only and must not be exposed; the threat model records that as `I-12`.
+
+### Tests
+
+- `npm run obs:check` passes end to end: `promtool` validates the rules, `amtool` the routing, the collector
+  and Tempo their own configurations, and `docker compose config` the stack file.
+- Verified live against the running stack: the collector's target is up in Prometheus, `service_name`
+  distinguishes the API from the worker, and the OTLP-to-Prometheus name translation was confirmed against
+  real series — `http_server_request_duration_seconds_*`, `http_server_active_requests`, and
+  `touchline_analytics_onboarding_total{step="registered"}`. Those names are what the allow-list check now
+  pins, so the translation cannot drift silently on an OpenTelemetry upgrade.
+- Tempo received real traces for `touchline-api`, and all three dashboards and both datasources provisioned.
+- `TelemetryPipelineDown` was driven for real by stopping the collector: the rule went `pending`, then
+  reached Alertmanager with its runbook annotation resolved, and resolved again when the collector returned.
+
 ## Stage 14 — Read-only incident mode
 
 The stage's last self-contained control: master plan §13's "emergency read-only mode that blocks manager

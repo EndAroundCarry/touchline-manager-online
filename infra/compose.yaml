@@ -10,6 +10,9 @@
 # Role separation note: this compose file uses one PostgreSQL role for convenience. Production runs
 # a separate migration role and runtime role (ADR-0008, MIG-5); that separation is implemented and
 # verified in Stage 14 rather than half-built here.
+#
+# The telemetry stack is a separate project in its own file (infra/observability/, `npm run obs:up`),
+# so the backing services and the observability stack start and stop independently (ADR-0048).
 
 name: touchline-manager
 

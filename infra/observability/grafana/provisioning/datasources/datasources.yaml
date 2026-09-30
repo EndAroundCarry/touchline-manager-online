@@ -1,0 +1,33 @@
+# The datasources every dashboard in this stack reads (master plan §16 Stage 14; `F-48`).
+#
+# The UIDs are fixed and load-bearing: the dashboard JSON files reference them, and `npm run obs:check`
+# fails if a dashboard names a datasource that is not provisioned here.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      # Matches prometheus.yml's scrape_interval, so Grafana's `$__rate_interval` picks a sensible window.
+      timeInterval: 15s
+      httpMethod: POST
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Lets a trace's span jump to the metrics for the same service in one click, which is the whole reason
+      # both datasources share a stack. The doubled `$$` is Grafana's escape inside a provisioning file: it
+      # renders as a single `$`, so the template is evaluated per span at query time rather than here.
+      tracesToMetrics:
+        datasourceUid: prometheus
+        queries:
+          - name: Request rate
+            query: sum(rate(http_server_request_duration_seconds_count{service_name="$${__span.tags['service.name']}"}[5m]))

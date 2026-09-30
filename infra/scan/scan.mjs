@@ -35,9 +35,18 @@ const GITLEAKS_IMAGE = 'zricethezav/gitleaks:v8.21.2';
 const TRIVY_IMAGE = 'aquasec/trivy:0.58.1';
 const ZAP_IMAGE = 'ghcr.io/zaproxy/zaproxy:stable';
 
-// The only images the stack ships with (infra/compose.yaml). API/worker images are Stage 14
-// deployment work and are deliberately not built here (ADR-0046).
-const BASE_IMAGES = ['postgres:17-alpine', 'axllent/mailpit:v1.27'];
+// The only images the stack ships with: the development backing services (infra/compose.yaml) and the
+// local telemetry stack (infra/observability/, ADR-0048). API/worker images are Stage 14 deployment work
+// and are deliberately not built here (ADR-0046).
+const BASE_IMAGES = [
+  'postgres:17-alpine',
+  'axllent/mailpit:v1.27',
+  'otel/opentelemetry-collector-contrib:0.161.0',
+  'prom/prometheus:v3.15.0',
+  'prom/alertmanager:v0.34.1',
+  'grafana/grafana:13.2.3',
+  'grafana/tempo:3.1.0',
+];
 
 // The npm projects whose lockfiles carry a licence inventory.
 const NPM_PROJECTS = ['apps/web', 'tests/web-e2e'];

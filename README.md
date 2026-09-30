@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 14 underway — roles, TOTP MFA, the gated admin surface, the operator read console, the recovery commands, the remaining §10.8 mutations (AI assignment, finance repair, announcements, and feature flags), and the load, supply-chain, and restore drills.** Stage 13 is
+> **Status: Stage 14 underway — roles, TOTP MFA, the gated admin surface, the operator read console, the recovery commands, the remaining §10.8 mutations (AI assignment, finance repair, announcements, and feature flags), the load, supply-chain, and restore drills, the read-only incident switch, and the local telemetry stack with its dashboards and SLO alerts.** Stage 13 is
 > complete: the responsive PWA, account sessions, the offline boundary, the accessibility gate, the
 > guided help, and the privacy-safe operational funnels. The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
@@ -77,7 +77,13 @@ kick-off. The server decides results; a client can never simulate or influence o
 > a club can be handed back to the AI, a finance error corrected with a compensating entry, an
 > announcement published, and a feature flag set (`F-46`, `F-47`, ADR-0045). The stage's operational
 > proof has landed too: a k6 load suite at three times the projected launch population, a supply-chain
-> scan suite, and a real point-in-time restore drill with integrity checks (`F-49`, ADR-0046).
+> scan suite, and a real point-in-time restore drill with integrity checks (`F-49`, ADR-0046). The
+> read-only incident switch followed: one audited flag refuses every manager command with `503
+> READ_ONLY_MODE` while reads, sign-in, and the operator console stay up and the worker keeps advancing
+> deadlines (`F-51`, ADR-0047). Most recently the telemetry stack has arrived — an OTLP collector,
+> Prometheus, Alertmanager, Grafana, and Tempo receiving the export the hosts always had, with dashboards
+> for the availability and latency objectives and four alerts, each naming the runbook section that
+> answers it (`F-48`, ADR-0048).
 
 ---
 
@@ -158,21 +164,26 @@ key never produces a second job.
 
 ## Operational drills
 
-Stage 14's operational proof — the load suite, the scans, and the restore drill — runs locally and by
-hand. Nothing is wired into CI yet
-([ADR-0046](docs/architecture/adr/0046-load-supply-chain-and-restore-drills.md)).
+Stage 14's operational proof — the load suite, the scans, the restore drill, and the telemetry stack —
+runs locally and by hand. Nothing is wired into CI yet
+([ADR-0046](docs/architecture/adr/0046-load-supply-chain-and-restore-drills.md),
+[ADR-0048](docs/architecture/adr/0048-telemetry-dashboards-and-slo-alerting.md)).
 
 ```bash
 npm run scan              # dependency, licence, secret, and base-image scans
 npm run load:seed         # prepare a world and 108 managers for the load suite
 npm run load:reads        # one k6 scenario (add `-- --smoke` to check the plumbing)
 npm run drill:restore     # a real point-in-time restore with integrity checks
+npm run obs:up            # the telemetry stack: Grafana, Prometheus, and Alertmanager
+npm run obs:check         # validate the stack's dashboards, rules, and runbook links
 ```
 
-Each is documented where it belongs:
+Point the hosts at it with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:14317` and the dashboards fill
+in. Each drill is documented where it belongs:
 [`docs/operations/supply-chain.md`](docs/operations/supply-chain.md),
-[`docs/operations/load-testing.md`](docs/operations/load-testing.md), and
-[`docs/operations/backup-and-restore.md`](docs/operations/backup-and-restore.md).
+[`docs/operations/load-testing.md`](docs/operations/load-testing.md),
+[`docs/operations/backup-and-restore.md`](docs/operations/backup-and-restore.md), and
+[`docs/operations/observability.md`](docs/operations/observability.md).
 
 ---
 

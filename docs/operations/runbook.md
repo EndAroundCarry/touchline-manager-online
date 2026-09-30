@@ -67,10 +67,33 @@ Read before acting. Every read is `AdminRead` (support, operator, or admin with 
 | Which jobs are dead-lettered or overdue? | `GET /api/v1/admin/jobs?status=dead_letter` |
 | Why is this round stuck? | `GET /api/v1/admin/matchdays/{id}` |
 | What has already been done, and by whom? | `GET /api/v1/admin/audit?action=admin.` |
+| Is the API failing or slow, and on which route? | The Grafana dashboards — see below |
 
 The matchday read is the one that answers "why is this round stuck": it carries the nine fixtures with each
 fixture's latest simulation attempt — its error category and message — and the round's lock, resolution, and
 publication job rows.
+
+The **SLO overview** and **API (RED)** dashboards answer the same question for the API as a whole, and they
+are where an alert sends you. Start them with `npm run obs:up` and open them at
+`http://localhost:13000`; the rules behind the alerts, the PromQL, and what each one does *not* cover are in
+[`observability.md`](observability.md) (`F-48`, ADR-0048).
+
+## Alerts
+
+The alerts below are Prometheus rules evaluated by the local observability stack and read in Alertmanager at
+`http://localhost:19093`. **Each one names its procedure in this file**, and `npm run obs:check` fails if that
+link stops resolving. Routing them to a real pager, email, or chat receiver is the deployment milestone's
+work, so on this machine Alertmanager's UI *is* the notification.
+
+| Alert | Severity | Fires when | Procedure |
+|---|---|---|---|
+| `ApiAvailabilityBurnFast` | critical | More than 0.1% of responses are 5xx over five minutes, for two minutes — the monthly 99.9% budget | [The API is failing requests](#runbook--the-api-is-failing-requests) |
+| `ApiReadLatencyHigh` | warning | p95 read (GET/HEAD/OPTIONS) over 500 ms for ten minutes | [The API is slow](#runbook--the-api-is-slow) |
+| `ApiCommandLatencyHigh` | warning | p95 command (every other method) over 800 ms for ten minutes | [The API is slow](#runbook--the-api-is-slow) |
+| `TelemetryPipelineDown` | warning | Prometheus has not scraped the OTLP collector for five minutes | [Telemetry is not arriving](#runbook--telemetry-is-not-arriving) |
+
+An alert that fires on this stack is a statement about **the API and the worker**, not about the game's
+rules. Nothing here can tell you a matchday is stuck — that is still `GET /api/v1/admin/matchdays/{id}`.
 
 ## Runbook — a matchday is stuck
 
@@ -375,6 +398,116 @@ was accepted while it was on. Confirm `readOnly: false` and that a manager write
 
 **Evidence.** The two `admin.feature_flag.set` audit rows (actor, reason, key, version) — one to set and one
 to clear.
+
+## Runbook — the API is failing requests
+
+**Symptom.** `ApiAvailabilityBurnFast` is firing in Alertmanager, or the SLO overview's error-ratio panel is
+above 0.1%. Managers are getting `5xx` responses. This is master plan §14.1's "99.9% monthly availability"
+objective being spent, not a rules question.
+
+**Who may act.** Anyone may diagnose. Only an operator or admin may take the game read-only.
+
+**Prechecks.**
+1. Read the alert in Alertmanager (`http://localhost:19093`); its annotations carry the ratio that tripped it.
+2. Open the **API (RED)** dashboard and read the 5xx-by-route panel. **One route failing is a defect to fix;
+   every route failing is infrastructure** — check PostgreSQL (`infra/compose.yaml`, `npm run infra:up`) and
+   whether the API process is still up at all.
+3. If the failing route is a write, confirm the fault is in the write path before reaching for the switch:
+   `GET /api/v1/admin/health/game` shows the world, the season, and whether the game is already read-only.
+
+**Action.** There is no operator command that repairs a `5xx`. Decide between the two real responses:
+
+- **The fault is in the write path and cannot be fixed forward in minutes** — take the game read-only so no
+  manager command is accepted while you repair it. That is the read-only procedure below; it does not stop
+  the worker, so published content keeps advancing.
+- **The fault is in infrastructure** — restore it (PostgreSQL first), then let the alert resolve on its own.
+
+**Validation.** The error ratio returns under 0.1% and the alert clears in Alertmanager within its
+`resolve_timeout` (five minutes). If read-only was set, confirm a manager read still returns `200` and a
+manager command returns `503 READ_ONLY_MODE`.
+
+**Notification.** If managers saw failures, publish an announcement naming what broke and what they should
+retry. Managers are not emailed automatically.
+
+**Rollback / compensation.** If read-only was set, clear it with
+`{"value":{"enabled":false},"reason":"writes restored"}` and confirm `readOnly: false`. Nothing else is
+reversible: a request that returned `5xx` may have committed or may not have — the game's idempotency keys
+are what make a manager's retry safe, and the affected workflow's own runbook is what recovers a partial one.
+
+**Evidence.** The Alertmanager alert record (start, end, annotations) and, if it was used, the pair of
+`admin.feature_flag.set` audit rows.
+
+## Runbook — the API is slow
+
+**Symptom.** `ApiReadLatencyHigh` (p95 read over 500 ms) or `ApiCommandLatencyHigh` (p95 command over
+800 ms) is firing for ten minutes. This is §14.1's latency objective, not an availability failure: requests
+are still answered.
+
+**Who may act.** Anyone may diagnose. No operator command fixes latency.
+
+**Prechecks.**
+1. Open **API (RED)** and read p95-by-route. **Record the route.** The alert is on the aggregate objective,
+   so the dashboard is what tells you which route is paying for it.
+2. Read the **in-flight requests** panel. A line pinned at a constant value is a queue rather than load, and
+   points at a saturated resource instead of a slow query.
+3. Read the **outbound client p95** panel. If that is also elevated, the API is waiting on something else and
+   the route is a symptom.
+4. Pull a trace: in Grafana, **Explore → Tempo**, filter `service.name = touchline-api`, and sort the window's
+   spans by duration. The slowest span names where the time actually goes.
+
+**Action.** There is no command to run. This is a defect investigation: capture the route, the time window,
+and the trace from step 4, and open a ticket with them. If the slow path is a write and the delay is a
+symptom of a data fault rather than a code fault, treat it as the availability case above and consider taking
+the game read-only while it is repaired.
+
+**Validation.** p95 returns under the objective for ten minutes and the alert clears. A one-off dip is not
+evidence: watch the panel, not a single scrape.
+
+**Notification.** If managers are waiting on the slow route in normal play, publish an announcement naming
+it; otherwise none.
+
+**Rollback / compensation.** None. Nothing was changed.
+
+**Evidence.** The ticket, and the trace ID from step 4 — that is what turns "the API was slow" into something
+fixable.
+
+## Runbook — telemetry is not arriving
+
+**Symptom.** `TelemetryPipelineDown` is firing: Prometheus has not scraped the OTLP collector for five
+minutes. The dashboards have gone flat. **This says nothing about the game.** It means you are now blind, and
+that every other alert on this stack has stopped being able to fire.
+
+**Who may act.** Anyone with access to the machine.
+
+**Prechecks.**
+1. Is the collector up? `docker compose -f infra/observability/compose.observability.yaml ps`.
+2. Are the API and the worker exporting at all? Confirm the process that is running was started with
+   `OTEL_EXPORTER_OTLP_ENDPOINT` set — the hosts read it from the environment, and with it unset the
+   instrumentation is registered but nothing leaves the process (ADR-0041).
+3. Distinguish the two failures: a **dead stack** means the collector container stopped; a **silent host**
+   means the stack is fine and the application was never pointed at it.
+
+**Action.**
+
+```bash
+npm run obs:up          # start or restart the stack; the compose file is idempotent
+```
+
+If the stack was already up, the problem is the host: restart the API and the worker with the endpoint set
+(`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:14317`; `$env:OTEL_EXPORTER_OTLP_ENDPOINT = '...'` in
+PowerShell). If both hosts are already exporting, read the collector's own logs — a bad configuration change
+is the usual cause.
+
+**Validation.** Prometheus's `/targets` page (`http://localhost:19090/targets`) shows `otel-collector` as
+**UP**, and series reappear on the SLO overview within a scrape interval.
+
+**Notification.** None. This stack is local tooling: no manager sees it and nothing about the game changed.
+Do **not** announce a telemetry gap.
+
+**Rollback / compensation.** None.
+
+**Evidence.** The alert record, and a note of the window during which the game ran **unmeasured** — that gap
+is the reason this alert exists, and it belongs in the incident timeline.
 
 ## Audit
 

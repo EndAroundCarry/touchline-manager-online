@@ -61,8 +61,12 @@ away and the scheduler has already materialised the round's jobs, so the diagnos
 and the scenario fails fast with that explanation. Run it against the compressed-clock matchday stack
 ([ADR-0015](../architecture/adr/0015-compressed-test-clock.md)), where the deadline arrives within the
 run, with `Diagnostics__EnableMatchdayTrigger=true` and the worker running. `LOAD_FORCE=1` runs it on a
-real-time stack anyway. In staging, the real five-minute publication SLO is measured from the SLO
-dashboards rather than from this drill.
+real-time stack anyway.
+
+The load run is the **only** evidence for the five-minute publication objective, and it stays that way for
+now: the SLO dashboards ([observability.md](observability.md)) cover availability and the read and command
+latency budgets, but the publication delay is not instrumented, so there is no panel or alert for it yet
+(`F-48`, ADR-0048).
 
 ## After an auction run
 

@@ -31,7 +31,7 @@ daemon is reachable rather than failing.
 | `licenses` | each resolved package's `.nuspec` from the NuGet global packages folder | a licence on the denylist |
 | `licenses-web` | the `license` field in each `package-lock.json` entry | a licence on the denylist |
 | `secrets` | `gitleaks detect --no-git` over the working tree | any finding the allowlist does not cover |
-| `image` | `trivy image` on `postgres:17-alpine` and `axllent/mailpit:v1.27` | advisory by default; a finding under `--strict` |
+| `image` | `trivy image` on every image the local stack runs: `postgres:17-alpine`, `axllent/mailpit:v1.27`, and the five of the telemetry stack ([ADR-0048](../architecture/adr/0048-telemetry-dashboards-and-slo-alerting.md)) | advisory by default; a finding under `--strict` |
 | `zap` | OWASP ZAP baseline against a running API | a baseline failure (optional; needs a live stack) |
 
 The licence denylist is a single named constant in `infra/scan/scan.mjs` (`GPL`/`AGPL`/`SSPL` and the
@@ -44,9 +44,10 @@ reach out.
 ## Why the base-image scan is advisory
 
 The stack ships no container images yet, and per [ADR-0008](../architecture/adr/0008-deployment-topology.md)
-production runs **managed** PostgreSQL rather than this image. The only image scanned is a local
-development dependency, so a finding is reported as `WARN` and does not fail the run. When the
-deployment milestone builds API, worker, and web images, `scan:image:strict` becomes the gate.
+production runs **managed** PostgreSQL and the provider's telemetry backend rather than these images. Every
+image scanned is therefore a local development dependency — the backing services and, since Stage 14, the
+telemetry stack — so a finding is reported as `WARN` and does not fail the run. When the deployment milestone
+builds API, worker, and web images, `scan:image:strict` becomes the gate.
 
 The `postgres:17-alpine` image currently reports fixable `HIGH`/`CRITICAL` advisories in the Go standard
 library bundled into its `gosu` binary — the same set is present in `postgres:18-alpine`, so it is
