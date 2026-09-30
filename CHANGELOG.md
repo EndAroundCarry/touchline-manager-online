@@ -3,6 +3,63 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 14 — The operator read console: jobs, matchdays, and audit
+
+The second Stage 14 milestone gives the operator the diagnosis the first one could only promise. §13
+requires the console to show matchday and worker status, queue depth and dead jobs, and a read-only audit
+search; §16's exit criterion is that "an on-call operator can diagnose and resume failed matchday,
+auction, provisioning, and rollover workflows". The first milestone built the gate — roles, the second
+factor, and one aggregate health read (`F-46`, `F-47`, ADR-0042). This one builds the reads behind it: the
+durable job queue, a single round with its failed simulation attempts, and the append-only audit trail,
+each a projection over rows the game already holds (`F-46`, `F-47`, ADR-0043).
+
+### Added
+
+- **The job-queue read** (`F-46`, §13, ADR-0043): `GET /api/v1/admin/jobs` returns a keyset-paged page of
+  `ops.jobs`, filterable by status and job type, with each job's attempts, lease, due instant, last error,
+  and business key. The handler payload is not serialized — the business key is the correlation an
+  operator needs.
+- **The matchday read** (`F-46`, §13, ADR-0043): `GET /api/v1/admin/matchdays/{id}` returns the round's
+  publication state and its division/country/season context, the nine fixtures with their club names and
+  each fixture's latest simulation attempt (number, status, error category and message), and the lock,
+  resolution, and publication job rows read by their deterministic business keys. It is the answer to
+  "why is this round stuck?".
+- **The audit search** (`F-47`, §13, ADR-0043): `GET /api/v1/admin/audit` returns a keyset-paged page of
+  `ops.audit_log`, filterable by action prefix, actor, and target. It carries the actor, action, target,
+  correlation ID, instant, and reason; the hashed client IP and the before/after metadata columns are
+  withheld.
+- **Stable job-status codes** (`F-46`, ADR-0043): the domain gains `JobStatuses` — `pending`, `leased`,
+  `completed`, `dead_letter` — so the query and the filter validation share one vocabulary, mirroring the
+  other status-code classes.
+
+### Notes
+
+- **No schema change and no web-client change.** Every read is a projection over `ops.jobs`,
+  `competition.matchdays`/`fixtures`, `match.simulation_attempts`, and `ops.audit_log`: no column, index,
+  or constraint moves. The reads are a bearer-token surface until the Angular console consumes them in the
+  next milestone.
+- **The reads reuse the inbox's keyset pagination** (§10): a page of 25, one extra row fetched to prove a
+  successor exists, and an opaque base64url cursor (`AdminJobCursor`, `AdminAuditCursor`). A cursor this
+  build did not produce is a `400` (`INVALID_CURSOR`), and an unrecognised status filter is a `400`
+  (`INVALID_FILTER`).
+- **All three reads sit behind `AdminRead`** — support, operator, or admin with a completed second factor
+  — and are `Cache-Control: no-store`. They are reads, so they carry no `X-MFA-Code`, reason, or
+  idempotency key; that is the mutation contract (ADR-0042).
+- **The remaining §10.8 commands and the web console are the next milestone.** So is a `cancelled` job
+  status, which needs a migration, and a global `audit_log(occurred_at)` page index; the read contract is
+  frozen here (`docs/architecture/adr/0043-operator-read-console.md`).
+
+### Tests
+
+- New `tests/TouchlineManager.Application.Tests/Ops/AdminCursorTests.cs`: the job and audit page cursors
+  round-trip, treat no cursor as the first page, and refuse a value the server did not produce.
+- New `tests/TouchlineManager.Api.IntegrationTests/AdminConsoleTests.cs`: the console's reads from every
+  side — anonymous, a plain manager, an operator with a completed factor, and a read-only `support`
+  operator — the job page's status filter and withheld payload, a keyset walk over thirty rows that
+  neither skips nor repeats, the `INVALID_CURSOR`/`INVALID_FILTER` refusals, a matchday's nine fixtures
+  with their club names, an unknown matchday as `404`, and the audit search returning a recorded
+  suspension without its hashed IP.
+
 ## Stage 14 — Operator access, MFA, and the first admin surface
 
 Stage 14 opens with the track every later one leans on: an operator who can see the live game and act

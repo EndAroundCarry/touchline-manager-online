@@ -1,10 +1,12 @@
 using TouchlineManager.Api.Auth;
 using TouchlineManager.Api.Http;
+using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Ops;
 using TouchlineManager.Application.Ops;
 using TouchlineManager.Contracts.Http;
 using TouchlineManager.Contracts.Ops;
 using TouchlineManager.Domain.Auth;
+using TouchlineManager.Domain.Ops;
 
 namespace TouchlineManager.Api.Endpoints;
 
@@ -45,6 +47,45 @@ internal static class AdminEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group
+            .MapGet("/jobs", ListJobsAsync)
+            .WithName("ListAdminJobs")
+            .WithSummary("Reads a page of the durable job queue (F-46).")
+            .WithDescription(
+                "Support, operator, or admin, with a completed second factor. Filter by status and job "
+                + "type; the failure, attempts, and lease fields tell a stuck job from a busy one.")
+            .RequireAuthorization(AuthorizationPolicies.AdminRead)
+            .Produces<AdminJobPageResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group
+            .MapGet("/matchdays/{id:guid}", GetMatchdayAsync)
+            .WithName("GetAdminMatchday")
+            .WithSummary("Reads one round's publication state, fixtures, and driving jobs (F-46).")
+            .WithDescription(
+                "Support, operator, or admin, with a completed second factor. The nine fixtures with their "
+                + "latest simulation attempt, and the lock, resolution, and publication job rows.")
+            .RequireAuthorization(AuthorizationPolicies.AdminRead)
+            .Produces<AdminMatchdayDetailResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group
+            .MapGet("/audit", ListAuditAsync)
+            .WithName("ListAdminAudit")
+            .WithSummary("Searches the append-only audit trail (F-47).")
+            .WithDescription(
+                "Support, operator, or admin, with a completed second factor. Filter by action prefix, "
+                + "actor, and target; the hashed client IP and any repair metadata are not returned.")
+            .RequireAuthorization(AuthorizationPolicies.AdminRead)
+            .Produces<AdminAuditPageResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         group
             .MapPost("/users/{id:guid}/suspend", SuspendAccountAsync)
@@ -184,6 +225,158 @@ internal static class AdminEndpoints
                 "That account does not exist, or is anonymized."),
         };
     }
+
+    private static async Task<IResult> ListJobsAsync(
+        HttpContext httpContext,
+        string? cursor,
+        string? status,
+        string? jobType,
+        IClock clock,
+        IAdminQueries queries,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminJobCursor.TryDecode(cursor, out var before))
+        {
+            return InvalidCursor();
+        }
+
+        if (status is not null && !JobStatuses.TryFromCode(status, out _))
+        {
+            return InvalidFilter("Send a status of pending, leased, completed, or dead_letter.");
+        }
+
+        var page = await queries.ListJobsAsync(new AdminJobQuery(status, jobType, before), cancellationToken);
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+
+        return Results.Ok(new AdminJobPageResponse(
+            page.Items.Select(ToJobResponse).ToList(),
+            page.NextCursor,
+            clock.UtcNow));
+    }
+
+    private static async Task<IResult> GetMatchdayAsync(
+        Guid id,
+        HttpContext httpContext,
+        IAdminQueries queries,
+        CancellationToken cancellationToken)
+    {
+        var detail = await queries.GetMatchdayAsync(id, cancellationToken);
+
+        if (detail is null)
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                ApiErrorCodes.NotFound,
+                "No such matchday.",
+                "That matchday does not exist.");
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+
+        return Results.Ok(new AdminMatchdayDetailResponse(
+            detail.Id,
+            detail.DivisionSeasonId,
+            detail.RoundNumber,
+            detail.LockAt,
+            detail.KickoffAt,
+            detail.PublicationStatus,
+            detail.DivisionId,
+            detail.DivisionName,
+            detail.TierNumber,
+            detail.CountryCode,
+            detail.CountryName,
+            detail.SeasonNumber,
+            detail.SeasonLabel,
+            detail.Fixtures.Select(ToFixtureResponse).ToList(),
+            detail.Jobs.Select(ToJobResponse).ToList()));
+    }
+
+    private static async Task<IResult> ListAuditAsync(
+        HttpContext httpContext,
+        string? cursor,
+        string? action,
+        Guid? actorUserId,
+        string? targetType,
+        Guid? targetId,
+        IClock clock,
+        IAdminQueries queries,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminAuditCursor.TryDecode(cursor, out var before))
+        {
+            return InvalidCursor();
+        }
+
+        var page = await queries.ListAuditAsync(
+            new AdminAuditQuery(action, actorUserId, targetType, targetId, before),
+            cancellationToken);
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+
+        return Results.Ok(new AdminAuditPageResponse(
+            page.Items.Select(ToAuditResponse).ToList(),
+            page.NextCursor,
+            clock.UtcNow));
+    }
+
+    private static IResult InvalidCursor() => ProblemResults.Code(
+        StatusCodes.Status400BadRequest,
+        AdminErrorCodes.InvalidCursor,
+        "Invalid cursor.",
+        "The page cursor is not one this server produced.");
+
+    private static IResult InvalidFilter(string detail) => ProblemResults.Code(
+        StatusCodes.Status400BadRequest,
+        AdminErrorCodes.InvalidFilter,
+        "Invalid filter.",
+        detail);
+
+    private static AdminJobSummaryResponse ToJobResponse(AdminJobSummary job) => new(
+        job.Id,
+        job.JobType,
+        job.BusinessKey,
+        job.Status,
+        job.AttemptCount,
+        job.MaxAttempts,
+        job.DueAt,
+        job.CreatedAt,
+        job.UpdatedAt,
+        job.CompletedAt,
+        job.LeaseOwner,
+        job.LeaseUntil,
+        job.LastError);
+
+    private static AdminFixtureStatusResponse ToFixtureResponse(AdminFixtureStatus fixture) => new(
+        fixture.Id,
+        fixture.HomeClubId,
+        fixture.HomeClubName,
+        fixture.AwayClubId,
+        fixture.AwayClubName,
+        fixture.KickoffAt,
+        fixture.Status,
+        fixture.HomeScore,
+        fixture.AwayScore,
+        fixture.MatchId,
+        fixture.LatestAttempt is { } attempt
+            ? new AdminSimulationAttemptResponse(
+                attempt.AttemptNumber,
+                attempt.Status,
+                attempt.ErrorCategory,
+                attempt.ErrorMessage,
+                attempt.CompletedAt)
+            : null);
+
+    private static AdminAuditEntryResponse ToAuditResponse(AdminAuditEntry entry) => new(
+        entry.Id,
+        entry.ActorType,
+        entry.ActorUserId,
+        entry.Action,
+        entry.TargetType,
+        entry.TargetId,
+        entry.CorrelationId,
+        entry.OccurredAt,
+        entry.Reason);
 
     private static IResult? Validate(AccountStatusRequest request, HttpContext httpContext)
     {

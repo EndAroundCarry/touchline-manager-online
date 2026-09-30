@@ -824,6 +824,11 @@ erDiagram
 | Index `(recipient_manager_id, created_at, id)` | `inbox_messages` | Keyset page order, newest first |
 | Append-only, restricted access | `audit_log` | Tamper evidence |
 
+> **Stage 14 status (read console). No schema change:** the operator's job, matchday, and audit reads are
+> projections over `ops.jobs`, `competition.matchdays`/`fixtures`, `match.simulation_attempts`, and
+> `ops.audit_log`; no column, index, or constraint changes (`F-46`, `F-47`, ADR-0043). A global
+> `audit_log(occurred_at)` page index is deferred to the next milestone that touches the schema.
+
 ---
 
 ## 4. JSONB policy

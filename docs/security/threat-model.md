@@ -98,6 +98,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | I-8 | Diagnostics leak through error responses | RFC Problem Details with a stable code and safe detail; no exception text, stack trace, or SQL | 1 |
 | I-9 | An analytics surface leaks a value or a per-manager row | The funnels are counts over rows the game already writes, read only by the `operator`/`admin` role; a test asserts the response carries counts and no account address (`F-54`, ADR-0041) | 13 |
 | I-10 | A disclosed database yields usable second factors | TOTP secrets are encrypted at rest under `Auth:EncryptionKey` (AES-256-GCM, authenticated); recovery codes are stored only as hashes; neither is ever serialized or logged (`F-46`, ADR-0042, data-classification §2) | 14 |
+| I-11 | The audit search discloses a pseudonymous address or internal repair metadata | The operator's audit read serializes only actor, action, target, correlation ID, instant, and reason; the hashed client IP and the before/after metadata columns are withheld, and the read is behind `AdminRead` (role plus a completed second factor) (`F-47`, ADR-0043) | 14 |
 
 ### 4.5 Denial of service
 

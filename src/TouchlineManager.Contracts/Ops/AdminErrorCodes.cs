@@ -20,4 +20,10 @@ public static class AdminErrorCodes
 
     /// <summary>The required <c>Idempotency-Key</c> header is missing or too long.</summary>
     public const string IdempotencyKeyRequired = "IDEMPOTENCY_KEY_REQUIRED";
+
+    /// <summary>A page cursor is not one this server produced.</summary>
+    public const string InvalidCursor = "INVALID_CURSOR";
+
+    /// <summary>A list filter names a value this server does not recognise.</summary>
+    public const string InvalidFilter = "INVALID_FILTER";
 }

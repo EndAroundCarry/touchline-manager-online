@@ -92,11 +92,18 @@ public static class MfaScenario
     }
 
     /// <summary>Creates an operator: a verified manager, granted the role, with a confirmed second factor.</summary>
-    public static async Task<OperatorSession> CreateOperatorAsync(ApiFixture fixture, HttpClient client)
+    public static Task<OperatorSession> CreateOperatorAsync(ApiFixture fixture, HttpClient client) =>
+        CreateWithRoleAsync(fixture, client, UserRoles.Operator);
+
+    /// <summary>Creates a role holder with a confirmed second factor, e.g. a read-only support operator.</summary>
+    public static async Task<OperatorSession> CreateWithRoleAsync(
+        ApiFixture fixture,
+        HttpClient client,
+        string role)
     {
         var manager = await AuthScenario.CreateVerifiedManagerAsync(fixture, client);
 
-        await GrantRoleAsync(fixture, manager.UserId, UserRoles.Operator);
+        await GrantRoleAsync(fixture, manager.UserId, role);
 
         // Sign in again so the freshly granted role is stamped into the token, then enrol.
         var login = await client.PostAsJsonAsync(

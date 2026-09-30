@@ -143,4 +143,7 @@ Stage 0 exit criteria require that the classification is actionable, not aspirat
 - [x] Multi-factor secrets are encrypted at rest and never leave the server (Stage 14): the TOTP
   secret is stored under AES-256-GCM and recovery codes as hashes (`F-46`, ADR-0042), neither is
   serialized by any endpoint, and both are on the §4 redaction list.
+- [x] The operator read console exposes no C3/C4 value (Stage 14): the job, matchday, and audit reads
+  return statuses, counts, and reason text, never a secret, a hashed client IP, or repair metadata
+  (`F-46`, `F-47`, ADR-0043).
 - [ ] Restore drills confirm ENV-3 (Stage 14).

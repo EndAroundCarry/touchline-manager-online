@@ -29,7 +29,9 @@ construction rather than silently ignoring work, and that the no-op use case der
 key from domain identity. Stage 14 added the operator's access paths: granting and revoking a role
 with its audit and its actor (`RoleAdministrationTests`), and the multi-factor flows — enrolment,
 confirmation, the login challenge, a spent recovery code, and that a role requiring a second factor
-cannot disable it (`MfaUseCasesTests`).
+cannot disable it (`MfaUseCasesTests`). Stage 14 added the operator console's page cursors: the job and
+audit cursors round-trip, treat no cursor as the first page, and refuse a value the server did not produce
+(`AdminCursorTests`).
 
 ## Layer 3 — Architecture tests (`tests/TouchlineManager.ArchitectureTests`)
 
@@ -80,7 +82,13 @@ is spent once when a recovery code is used, and that the challenge token is refu
 it carries a purpose. `AdminEndpointsTests` asserts the gate from every side: anonymous, a plain
 manager, an operator that never completed a second factor, an operator that did but sent no fresh
 code, and the operator that did both — then that suspending an account closes its sessions immediately
-and records the reason in `ops.audit_log`.
+and records the reason in `ops.audit_log`. `AdminConsoleTests` then covers the console's reads from every
+side — anonymous, a plain manager, an operator with a completed factor, and a read-only `support`
+operator — and asserts the contract each read holds: the job page filters by status and withholds the
+payload, a keyset walk over thirty rows neither skips nor repeats, a bad cursor or status filter is
+refused by name, a matchday returns its nine fixtures with their club names, an unknown matchday is
+`404`, and the audit search returns a recorded suspension without its hashed IP (`F-46`, `F-47`,
+ADR-0043).
 
 ## Layer 6 — Worker integration tests (`tests/TouchlineManager.Worker.IntegrationTests`)
 
