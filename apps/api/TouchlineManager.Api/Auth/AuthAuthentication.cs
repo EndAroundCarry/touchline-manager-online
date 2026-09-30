@@ -33,6 +33,14 @@ internal static class AuthAuthentication
                 + "Set Auth__SigningKey in the environment for non-development deployments.");
         }
 
+        if (Encoding.UTF8.GetByteCount(authOptions.EncryptionKey ?? string.Empty) < 32)
+        {
+            throw new InvalidOperationException(
+                "Auth:EncryptionKey must be configured with at least 32 bytes of key material to protect "
+                + "multi-factor secrets (ADR-0042). Set Auth__EncryptionKey in the environment for "
+                + "non-development deployments.");
+        }
+
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -83,6 +91,20 @@ internal static class AuthAuthentication
             options.AddPolicy(
                 AuthorizationPolicies.OperationalAnalyticsRead,
                 policy => policy.RequireRole(UserRoles.Operator, UserRoles.Admin));
+
+            // The admin surface (master plan §10.8, ADR-0042). Reads are open to support, operator, and
+            // admin once a second factor has been completed; support is excluded from mutations (E-3).
+            options.AddPolicy(
+                AuthorizationPolicies.AdminRead,
+                policy => policy
+                    .RequireRole(UserRoles.Support, UserRoles.Operator, UserRoles.Admin)
+                    .RequireClaim(AuthClaimNames.Mfa, "true"));
+
+            options.AddPolicy(
+                AuthorizationPolicies.AdminMutate,
+                policy => policy
+                    .RequireRole(UserRoles.Operator, UserRoles.Admin)
+                    .RequireClaim(AuthClaimNames.Mfa, "true"));
         });
 
         return services;
@@ -99,6 +121,15 @@ internal static class AuthAuthentication
     /// </remarks>
     private static async Task ValidateSecurityStampAsync(TokenValidatedContext context)
     {
+        // ADR-0042: a token that carries a purpose is not an access token. The multi-factor login challenge
+        // is signed with the same key, so without this check it would be accepted as a session that never
+        // completed a second factor.
+        if (context.Principal?.HasClaim(claim => claim.Type == AuthClaimNames.Purpose) == true)
+        {
+            context.Fail("The token is not an access token.");
+            return;
+        }
+
         var subject = context.Principal?.FindFirst(AuthClaimNames.Subject)?.Value;
         var stamp = context.Principal?.FindFirst(AuthClaimNames.SecurityStamp)?.Value;
 

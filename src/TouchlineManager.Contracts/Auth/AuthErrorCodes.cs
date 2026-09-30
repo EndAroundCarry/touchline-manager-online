@@ -39,4 +39,22 @@ public static class AuthErrorCodes
 
     /// <summary>The account was deleted or is awaiting anonymization.</summary>
     public const string AccountDeleted = "ACCOUNT_DELETED";
+
+    /// <summary>The password was accepted but a second factor is required to finish signing in.</summary>
+    public const string MfaRequired = "MFA_REQUIRED";
+
+    /// <summary>The account has no confirmed second factor to satisfy the requirement with.</summary>
+    public const string MfaNotEnrolled = "MFA_NOT_ENROLLED";
+
+    /// <summary>The account has already confirmed a second factor and must reset it to enrol again.</summary>
+    public const string MfaAlreadyEnrolled = "MFA_ALREADY_ENROLLED";
+
+    /// <summary>The multi-factor code or recovery code did not match.</summary>
+    public const string MfaCodeInvalid = "MFA_CODE_INVALID";
+
+    /// <summary>The account holds a role for which a second factor is mandatory, so it cannot be disabled.</summary>
+    public const string MfaRequiredForRole = "MFA_REQUIRED_FOR_ROLE";
+
+    /// <summary>The multi-factor login challenge is unknown, expired, or not a challenge.</summary>
+    public const string MfaChallengeInvalid = "MFA_CHALLENGE_INVALID";
 }

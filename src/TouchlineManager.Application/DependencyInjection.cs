@@ -11,6 +11,7 @@ using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.Market;
 using TouchlineManager.Application.Market.Validation;
 using TouchlineManager.Application.Match;
+using TouchlineManager.Application.Ops;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.Squad.Validation;
 using TouchlineManager.Application.World;
@@ -67,6 +68,10 @@ public static class DependencyInjection
         AddCommsUseCases(services);
         AddFinanceUseCases(services);
         AddMarketUseCases(services);
+
+        // Operator account administration (master plan §13, F-46, ADR-0042).
+        services.AddScoped<SuspendAccount>();
+        services.AddScoped<RestoreAccount>();
 
         return services;
     }
@@ -196,6 +201,15 @@ public static class DependencyInjection
         services.AddScoped<GrantRole>();
         services.AddScoped<RevokeRole>();
 
+        // Multi-factor authentication: enrolment, the login challenge, and its recovery paths (ADR-0042).
+        services.AddScoped<MfaAuthenticator>();
+        services.AddScoped<MfaRecoveryCodeIssuer>();
+        services.AddScoped<EnrolMfa>();
+        services.AddScoped<ConfirmMfaEnrolment>();
+        services.AddScoped<DisableMfa>();
+        services.AddScoped<RegenerateRecoveryCodes>();
+        services.AddScoped<CompleteMfaLogin>();
+
         // Validators are registered explicitly rather than by assembly scanning, so that adding a
         // validator to the assembly cannot silently change which requests are validated.
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
@@ -206,6 +220,10 @@ public static class DependencyInjection
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
         services.AddScoped<IValidator<UpdateProfileRequest>, UpdateProfileRequestValidator>();
         services.AddScoped<IValidator<DeleteAccountRequest>, DeleteAccountRequestValidator>();
+        services.AddScoped<IValidator<MfaConfirmRequest>, MfaConfirmRequestValidator>();
+        services.AddScoped<IValidator<MfaLoginRequest>, MfaLoginRequestValidator>();
+        services.AddScoped<IValidator<MfaDisableRequest>, MfaDisableRequestValidator>();
+        services.AddScoped<IValidator<RecoveryCodesRequest>, RecoveryCodesRequestValidator>();
     }
 
     /// <summary>

@@ -26,13 +26,26 @@ public enum LoginOutcome
 
     /// <summary>The account is closing or already anonymized.</summary>
     AccountDeleted = 4,
+
+    /// <summary>
+    /// The password was accepted, but the account holds a confirmed second factor, so a challenge must be
+    /// completed to finish signing in (ADR-0042).
+    /// </summary>
+    MfaRequired = 5,
 }
 
 /// <summary>The result of a login attempt.</summary>
 /// <param name="Outcome">What happened.</param>
 /// <param name="Session">The issued session when the outcome is <see cref="LoginOutcome.Succeeded"/>.</param>
 /// <param name="LockedUntil">When the lockout expires, when one is in force.</param>
-public sealed record LoginResult(LoginOutcome Outcome, IssuedSession? Session, DateTimeOffset? LockedUntil);
+/// <param name="Challenge">
+/// The multi-factor challenge when the outcome is <see cref="LoginOutcome.MfaRequired"/>.
+/// </param>
+public sealed record LoginResult(
+    LoginOutcome Outcome,
+    IssuedSession? Session,
+    DateTimeOffset? LockedUntil,
+    MfaChallengeValue? Challenge = null);
 
 /// <summary>
 /// Authenticates an account and issues a session.
@@ -60,6 +73,8 @@ public sealed class Login
     private readonly IUnitOfWork _unitOfWork;
     private readonly IManagerRepository _managers;
     private readonly IClubTenureRepository _tenures;
+    private readonly IMfaCredentialRepository _mfa;
+    private readonly IMfaChallengeIssuer _mfaChallenges;
 
     /// <summary>Initializes the use case.</summary>
     public Login(
@@ -72,7 +87,9 @@ public sealed class Login
         IRequestContext requestContext,
         IUnitOfWork unitOfWork,
         IManagerRepository managers,
-        IClubTenureRepository tenures)
+        IClubTenureRepository tenures,
+        IMfaCredentialRepository mfa,
+        IMfaChallengeIssuer mfaChallenges)
     {
         _clock = clock;
         _users = users;
@@ -84,6 +101,8 @@ public sealed class Login
         _unitOfWork = unitOfWork;
         _managers = managers;
         _tenures = tenures;
+        _mfa = mfa;
+        _mfaChallenges = mfaChallenges;
     }
 
     /// <summary>Authenticates the account.</summary>
@@ -152,11 +171,29 @@ public sealed class Login
         // work as the session, so "seen" and "signed in" are one fact.
         await RecordReturnAsync(user.Id, now, cancellationToken);
 
+        // ADR-0042: an account with a confirmed second factor does not get a session from its password
+        // alone. The password step is recorded and the caller must complete the challenge.
+        var credential = await _mfa.FindByUserIdAsync(user.Id, cancellationToken);
+
+        if (credential is { IsConfirmed: true })
+        {
+            var challenge = _mfaChallenges.Issue(user, now);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return new LoginResult(
+                LoginOutcome.MfaRequired,
+                Session: null,
+                LockedUntil: null,
+                Challenge: challenge);
+        }
+
         var session = await _sessionIssuer.IssueAsync(
             user,
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             now,
+            mfaCompletedAt: null,
             cancellationToken);
 
         _audit.Record(new AuditEntry(

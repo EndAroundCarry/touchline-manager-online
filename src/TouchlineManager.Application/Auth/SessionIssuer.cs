@@ -57,12 +57,14 @@ public sealed class SessionIssuer
     /// replacement before the old row is updated.
     /// </param>
     /// <param name="now">The current instant.</param>
+    /// <param name="mfaCompletedAt">When the second factor was completed, if it was (ADR-0042).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public Task<IssuedSession> IssueAsync(
         User user,
         Guid familyId,
         Guid sessionId,
         DateTimeOffset now,
+        DateTimeOffset? mfaCompletedAt,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -81,9 +83,10 @@ public sealed class SessionIssuer
             now,
             expiresAt,
             _secureTokens.HashClientValue(_requestContext.IpAddress),
-            _secureTokens.HashClientValue(_requestContext.UserAgent)));
+            _secureTokens.HashClientValue(_requestContext.UserAgent),
+            mfaCompletedAt));
 
-        var accessToken = _accessTokens.Issue(user, roles, now);
+        var accessToken = _accessTokens.Issue(user, roles, mfaCompletedAt.HasValue, now);
 
         var response = new AuthSessionResponse(
             accessToken.Token,

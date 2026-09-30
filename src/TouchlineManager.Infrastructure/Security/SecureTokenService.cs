@@ -49,6 +49,14 @@ internal sealed class SecureTokenService : ISecureTokenService
     public string CreateSecurityStamp() => Base64Url(RandomNumberGenerator.GetBytes(StampByteLength));
 
     /// <inheritdoc />
+    public byte[] CreateRandomBytes(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
+
+        return RandomNumberGenerator.GetBytes(length);
+    }
+
+    /// <inheritdoc />
     public string HashToken(string token)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(token);

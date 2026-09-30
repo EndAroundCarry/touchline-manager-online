@@ -41,6 +41,13 @@ public sealed class RefreshSession
     /// <summary>Gets when the session expires.</summary>
     public DateTimeOffset ExpiresAt { get; private set; }
 
+    /// <summary>
+    /// Gets when the session completed the second factor, or <see langword="null"/> when it did not
+    /// (ADR-0042). It is carried across rotation so a refreshed session keeps the assurance it was
+    /// granted.
+    /// </summary>
+    public DateTimeOffset? MfaCompletedAt { get; private set; }
+
     /// <summary>Gets when the session was last used to refresh.</summary>
     public DateTimeOffset? LastUsedAt { get; private set; }
 
@@ -67,6 +74,15 @@ public sealed class RefreshSession
     public bool IsActive(DateTimeOffset now) => RevokedAt is null && ExpiresAt > now;
 
     /// <summary>Issues a new session.</summary>
+    /// <param name="id">The session identity.</param>
+    /// <param name="userId">The account that owns the session.</param>
+    /// <param name="tokenHash">The hash of the opaque refresh token.</param>
+    /// <param name="familyId">The token family.</param>
+    /// <param name="now">The current instant.</param>
+    /// <param name="expiresAt">When the session expires.</param>
+    /// <param name="ipPrefixHash">The hashed client IP prefix.</param>
+    /// <param name="userAgentHash">The hashed user agent.</param>
+    /// <param name="mfaCompletedAt">When the second factor was completed, if it was (ADR-0042).</param>
     public static RefreshSession Issue(
         Guid id,
         Guid userId,
@@ -75,7 +91,8 @@ public sealed class RefreshSession
         DateTimeOffset now,
         DateTimeOffset expiresAt,
         string? ipPrefixHash,
-        string? userAgentHash)
+        string? userAgentHash,
+        DateTimeOffset? mfaCompletedAt = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
 
@@ -92,6 +109,7 @@ public sealed class RefreshSession
             FamilyId = familyId,
             IssuedAt = now,
             ExpiresAt = expiresAt,
+            MfaCompletedAt = mfaCompletedAt,
             IpPrefixHash = ipPrefixHash,
             UserAgentHash = userAgentHash,
             Version = 1,

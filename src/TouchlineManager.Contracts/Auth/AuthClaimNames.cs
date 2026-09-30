@@ -24,6 +24,20 @@ public static class AuthClaimNames
     /// </summary>
     public const string EmailVerified = "email_verified";
 
+    /// <summary>
+    /// <c>true</c> when the session completed a second factor (ADR-0042). Admin policies require it.
+    /// </summary>
+    public const string Mfa = "mfa";
+
+    /// <summary>
+    /// The token's purpose, when it is not an access token. A purpose-carrying token is never accepted as
+    /// an access token (ADR-0042).
+    /// </summary>
+    public const string Purpose = "purpose";
+
+    /// <summary>The <see cref="Purpose"/> of a multi-factor login challenge (ADR-0042).</summary>
+    public const string MfaChallengePurpose = "mfa_challenge";
+
     /// <summary>The token identity, unique per issued token.</summary>
     public const string TokenId = "jti";
 }

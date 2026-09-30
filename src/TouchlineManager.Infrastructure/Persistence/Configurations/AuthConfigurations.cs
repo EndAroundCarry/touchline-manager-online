@@ -31,6 +31,7 @@ internal sealed class RefreshSessionConfiguration : IEntityTypeConfiguration<Ref
         builder.Property(session => session.FamilyId).HasColumnName("family_id").IsRequired();
         builder.Property(session => session.IssuedAt).HasColumnName("issued_at").IsRequired();
         builder.Property(session => session.ExpiresAt).HasColumnName("expires_at").IsRequired();
+        builder.Property(session => session.MfaCompletedAt).HasColumnName("mfa_completed_at");
         builder.Property(session => session.LastUsedAt).HasColumnName("last_used_at");
         builder.Property(session => session.RevokedAt).HasColumnName("revoked_at");
         builder.Property(session => session.RevocationReason)
@@ -173,5 +174,69 @@ internal sealed class OpsAuditEntryConfiguration : IEntityTypeConfiguration<Enti
             .HasDatabaseName("ix_audit_log_actor_user_id_occurred_at");
 
         builder.HasIndex(entry => entry.CorrelationId).HasDatabaseName("ix_audit_log_correlation_id");
+    }
+}
+
+/// <summary>
+/// Maps <c>auth.mfa_credentials</c>: one row per enrolled account, keyed by the account itself
+/// (master plan §10.8, ADR-0042).
+/// </summary>
+internal sealed class MfaCredentialConfiguration : IEntityTypeConfiguration<MfaCredential>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<MfaCredential> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("mfa_credentials", "auth", table => table.HasCheckConstraint(
+            "ck_mfa_credentials_confirmed_at",
+            "confirmed_at is null or confirmed_at >= created_at"));
+
+        builder.HasKey(credential => credential.UserId);
+        builder.Property(credential => credential.UserId).HasColumnName("user_id").ValueGeneratedNever();
+        builder.Property(credential => credential.ProtectedSecret)
+            .HasColumnName("protected_secret")
+            .HasMaxLength(512)
+            .IsRequired();
+        builder.Property(credential => credential.ConfirmedAt).HasColumnName("confirmed_at");
+        builder.Property(credential => credential.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(credential => credential.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(credential => credential.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken();
+
+        // The credential is the account's own secret; it goes when the account is deleted, and never before.
+        builder.HasOne<User>()
+            .WithOne()
+            .HasForeignKey<MfaCredential>(credential => credential.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(credential => credential.RecoveryCodes)
+            .WithOne()
+            .HasForeignKey(code => code.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(credential => credential.RecoveryCodes).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+/// <summary>
+/// Maps <c>auth.mfa_recovery_codes</c>: only the hash is stored, and a used code is kept as evidence
+/// (ADR-0042).
+/// </summary>
+internal sealed class MfaRecoveryCodeConfiguration : IEntityTypeConfiguration<MfaRecoveryCode>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<MfaRecoveryCode> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("mfa_recovery_codes", "auth");
+
+        builder.HasKey(code => new { code.UserId, code.CodeHash });
+        builder.Property(code => code.UserId).HasColumnName("user_id").ValueGeneratedNever();
+        builder.Property(code => code.CodeHash).HasColumnName("code_hash").HasMaxLength(128).IsRequired();
+        builder.Property(code => code.UsedAt).HasColumnName("used_at");
     }
 }

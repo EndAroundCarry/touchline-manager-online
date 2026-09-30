@@ -32,6 +32,7 @@ internal static class ModuleEndpointGroups
         "finance",
         "comms",
         "ops",
+        "admin",
     ];
 
     /// <summary>

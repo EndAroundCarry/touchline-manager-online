@@ -30,4 +30,15 @@ public static class UserRoles
 
     /// <summary>Reports whether a role name is one this product knows.</summary>
     public static bool IsKnown(string role) => All.Contains(role, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Reports whether holding any of these roles makes a second factor mandatory (ADR-0002, ADR-0042).
+    /// </summary>
+    /// <param name="roles">The roles an account holds.</param>
+    public static bool RequiresSecondFactor(IEnumerable<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+
+        return roles.Any(role => MfaRequired.Contains(role, StringComparer.Ordinal));
+    }
 }

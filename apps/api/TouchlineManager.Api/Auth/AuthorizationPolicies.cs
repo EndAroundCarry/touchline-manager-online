@@ -32,6 +32,22 @@ internal static class AuthorizationPolicies
     /// other.
     /// </remarks>
     public const string OperationalAnalyticsRead = "OperationalAnalyticsRead";
+
+    /// <summary>
+    /// An account holding <c>support</c>, <c>operator</c>, or <c>admin</c> that has completed a second
+    /// factor: who may read the admin surface (master plan §10.8, §13, ADR-0042).
+    /// </summary>
+    public const string AdminRead = "AdminRead";
+
+    /// <summary>
+    /// An account holding <c>operator</c> or <c>admin</c> that has completed a second factor: who may
+    /// mutate through the admin surface. Support is deliberately excluded (`E-3`).
+    /// </summary>
+    /// <remarks>
+    /// Mutations additionally require a fresh code, checked by the step-up filter, because ADR-0002
+    /// requires the second factor to be re-asserted for every admin mutation.
+    /// </remarks>
+    public const string AdminMutate = "AdminMutate";
 }
 
 /// <summary>Names of the rate-limiting policies.</summary>

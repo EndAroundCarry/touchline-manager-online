@@ -31,11 +31,19 @@ public static class AuthValidationRules
     /// <summary>Maximum accepted opaque-token length.</summary>
     public const int TokenMaxLength = 512;
 
+    /// <summary>Maximum accepted multi-factor code length (six digits, or a ten-character recovery code).</summary>
+    public const int MfaCodeMaxLength = 32;
+
     /// <summary>Applies the email rules.</summary>
     public static IRuleBuilderOptions<T, string> EmailRules<T>(this IRuleBuilder<T, string> rule) => rule
         .NotEmpty().WithMessage("An email address is required.")
         .MaximumLength(EmailMaxLength)
         .EmailAddress().WithMessage("That does not look like an email address.");
+
+    /// <summary>Applies the multi-factor code rules.</summary>
+    public static IRuleBuilderOptions<T, string> MfaCodeRules<T>(this IRuleBuilder<T, string> rule) => rule
+        .NotEmpty().WithMessage("A code is required.")
+        .MaximumLength(MfaCodeMaxLength);
 
     /// <summary>Applies the display-name rules.</summary>
     public static IRuleBuilderOptions<T, string> DisplayNameRules<T>(this IRuleBuilder<T, string> rule) => rule
@@ -132,4 +140,38 @@ public sealed class DeleteAccountRequestValidator : AbstractValidator<DeleteAcco
     public DeleteAccountRequestValidator() => RuleFor(request => request.Password)
         .NotEmpty()
         .MaximumLength(AuthValidationRules.PasswordMaxLength);
+}
+
+/// <summary>Validates <see cref="MfaConfirmRequest"/>.</summary>
+public sealed class MfaConfirmRequestValidator : AbstractValidator<MfaConfirmRequest>
+{
+    /// <summary>Initializes the validator.</summary>
+    public MfaConfirmRequestValidator() => RuleFor(request => request.Code).MfaCodeRules();
+}
+
+/// <summary>Validates <see cref="MfaLoginRequest"/>.</summary>
+public sealed class MfaLoginRequestValidator : AbstractValidator<MfaLoginRequest>
+{
+    /// <summary>Initializes the validator.</summary>
+    public MfaLoginRequestValidator()
+    {
+        RuleFor(request => request.ChallengeToken)
+            .NotEmpty()
+            .MaximumLength(AuthValidationRules.TokenMaxLength);
+        RuleFor(request => request.Code).MfaCodeRules();
+    }
+}
+
+/// <summary>Validates <see cref="MfaDisableRequest"/>.</summary>
+public sealed class MfaDisableRequestValidator : AbstractValidator<MfaDisableRequest>
+{
+    /// <summary>Initializes the validator.</summary>
+    public MfaDisableRequestValidator() => RuleFor(request => request.Code).MfaCodeRules();
+}
+
+/// <summary>Validates <see cref="RecoveryCodesRequest"/>.</summary>
+public sealed class RecoveryCodesRequestValidator : AbstractValidator<RecoveryCodesRequest>
+{
+    /// <summary>Initializes the validator.</summary>
+    public RecoveryCodesRequestValidator() => RuleFor(request => request.Code).MfaCodeRules();
 }

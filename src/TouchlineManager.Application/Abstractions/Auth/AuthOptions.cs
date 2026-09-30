@@ -30,6 +30,15 @@ public sealed class AuthOptions
     /// <summary>Gets or sets the HMAC signing key for access tokens. Must be at least 32 bytes.</summary>
     public string SigningKey { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets the key material that protects multi-factor secrets at rest. Must be at least 32 bytes
+    /// (ADR-0042). Distinct from <see cref="SigningKey"/>, so rotating one does not disturb the other.
+    /// </summary>
+    public string EncryptionKey { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets how long a multi-factor login challenge remains valid (ADR-0042).</summary>
+    public TimeSpan MfaChallengeLifetime { get; set; } = TimeSpan.FromMinutes(5);
+
     /// <summary>Gets or sets the token issuer.</summary>
     public string Issuer { get; set; } = "touchline-manager";
 

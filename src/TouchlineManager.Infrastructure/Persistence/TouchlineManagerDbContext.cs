@@ -50,6 +50,12 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the auth module's recorded consent rows.</summary>
     public DbSet<UserConsent> UserConsents => Set<UserConsent>();
 
+    /// <summary>Gets the auth module's multi-factor credentials (master plan §10.8, ADR-0042).</summary>
+    public DbSet<MfaCredential> MfaCredentials => Set<MfaCredential>();
+
+    /// <summary>Gets the auth module's single-use multi-factor recovery codes (ADR-0042).</summary>
+    public DbSet<MfaRecoveryCode> MfaRecoveryCodes => Set<MfaRecoveryCode>();
+
     /// <summary>Gets the world module's game world.</summary>
     public DbSet<GameWorld> GameWorlds => Set<GameWorld>();
 

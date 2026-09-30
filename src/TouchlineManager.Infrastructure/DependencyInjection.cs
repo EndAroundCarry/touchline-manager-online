@@ -85,6 +85,9 @@ public static class DependencyInjection
     {
         services.AddScoped<IOperationalAnalyticsQueries, OperationalAnalyticsQueries>();
         services.AddSingleton<IOperationalMetrics, OperationalMetrics>();
+
+        // The operator's game-health read (master plan §13, F-46, ADR-0042).
+        services.AddScoped<IAdminQueries, AdminQueries>();
     }
 
     /// <summary>
@@ -444,10 +447,13 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
         services.AddSingleton<ISecureTokenService, SecureTokenService>();
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+        services.AddSingleton<IMfaSecretProtector, MfaSecretProtector>();
+        services.AddSingleton<IMfaChallengeIssuer, MfaChallengeIssuer>();
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshSessionRepository, RefreshSessionRepository>();
         services.AddScoped<IEmailTokenRepository, EmailTokenRepository>();
+        services.AddScoped<IMfaCredentialRepository, MfaCredentialRepository>();
         services.AddScoped<IAuditWriter, EfAuditWriter>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();

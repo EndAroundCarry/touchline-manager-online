@@ -113,6 +113,50 @@ internal static class AuthEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        group.MapPost("/mfa/login", MfaLoginAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting(RateLimitPolicies.AuthSensitive)
+            .WithName("CompleteMfaLogin")
+            .WithSummary("Completes a two-step login with a code or a recovery code (ADR-0042).")
+            .Produces<AuthSessionResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPost("/mfa/enrol", EnrolMfaAsync)
+            .RequireAuthorization()
+            .WithName("EnrolMfa")
+            .WithSummary("Starts authenticator enrolment: a secret and one-time recovery codes (ADR-0042).")
+            .Produces<MfaEnrolmentResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/mfa/enrol/confirm", ConfirmMfaEnrolmentAsync)
+            .RequireAuthorization()
+            .WithName("ConfirmMfaEnrolment")
+            .WithSummary("Confirms a pending authenticator enrolment with the first valid code (ADR-0042).")
+            .Produces<RequestAcceptedResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapDelete("/mfa", DisableMfaAsync)
+            .RequireAuthorization()
+            .WithName("DisableMfa")
+            .WithSummary("Turns off multi-factor authentication for an account allowed to (ADR-0042).")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPost("/mfa/recovery-codes", RegenerateRecoveryCodesAsync)
+            .RequireAuthorization()
+            .WithName("RegenerateRecoveryCodes")
+            .WithSummary("Issues a fresh set of recovery codes, invalidating the old ones (ADR-0042).")
+            .Produces<RecoveryCodesResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         return group;
     }
 
@@ -272,6 +316,17 @@ internal static class AuthEndpoints
             cookies.Write(httpContext.Response, session.RefreshToken, session.RefreshTokenExpiresAt);
 
             return Results.Ok(session.Response);
+        }
+
+        if (result.Outcome == LoginOutcome.MfaRequired)
+        {
+            // Accepted for a challenge, not signed in: no session, no refresh cookie (ADR-0042).
+            var challenge = result.Challenge!;
+
+            return Results.Accepted(value: new MfaChallengeResponse(
+                challenge.Token,
+                challenge.ExpiresAt,
+                "Enter the code from your authenticator app to finish signing in."));
         }
 
         return result.Outcome switch
@@ -474,6 +529,225 @@ internal static class AuthEndpoints
         };
     }
 
+    private static async Task<IResult> MfaLoginAsync(
+        MfaLoginRequest request,
+        IValidator<MfaLoginRequest> validator,
+        CompleteMfaLogin useCase,
+        AuthCookieWriter cookies,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var invalid = await RequestValidation.ValidateAsync(validator, request, cancellationToken);
+
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        var result = await useCase.ExecuteAsync(request.ChallengeToken, request.Code, cancellationToken);
+
+        if (result.Outcome == MfaLoginOutcome.Succeeded)
+        {
+            var session = result.Session!;
+            cookies.Write(httpContext.Response, session.RefreshToken, session.RefreshTokenExpiresAt);
+
+            return Results.Ok(session.Response);
+        }
+
+        return result.Outcome switch
+        {
+            MfaLoginOutcome.InvalidChallenge => ProblemResults.Code(
+                StatusCodes.Status401Unauthorized,
+                AuthErrorCodes.MfaChallengeInvalid,
+                "Sign-in expired.",
+                "That sign-in challenge is invalid or has expired. Sign in again."),
+
+            MfaLoginOutcome.AccountUnavailable => ProblemResults.Code(
+                StatusCodes.Status403Forbidden,
+                AuthErrorCodes.AccountSuspended,
+                "Account unavailable.",
+                "This account can no longer sign in."),
+
+            MfaLoginOutcome.NotEnrolled => ProblemResults.Code(
+                StatusCodes.Status403Forbidden,
+                AuthErrorCodes.MfaNotEnrolled,
+                "No authenticator.",
+                "This account has no confirmed second factor."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status403Forbidden,
+                AuthErrorCodes.MfaCodeInvalid,
+                "Code rejected.",
+                "The code or recovery code was not valid."),
+        };
+    }
+
+    private static async Task<IResult> EnrolMfaAsync(
+        HttpContext httpContext,
+        EnrolMfa useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await useCase.ExecuteAsync(userId, cancellationToken);
+
+        if (result.Outcome == MfaEnrolmentOutcome.Enrolled)
+        {
+            // The secret and the recovery codes are shown exactly once, so they are never cached (ADR-0042).
+            httpContext.Response.Headers.CacheControl = "no-store";
+
+            return Results.Ok(new MfaEnrolmentResponse(result.Secret!, result.OtpAuthUri!, result.RecoveryCodes));
+        }
+
+        return result.Outcome == MfaEnrolmentOutcome.AlreadyEnrolled
+            ? ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                AuthErrorCodes.MfaAlreadyEnrolled,
+                "Already enrolled.",
+                "This account already has a confirmed authenticator. Reset it before enrolling again.")
+            : ProblemResults.Unauthenticated("Your session is no longer valid.");
+    }
+
+    private static async Task<IResult> ConfirmMfaEnrolmentAsync(
+        HttpContext httpContext,
+        MfaConfirmRequest request,
+        IValidator<MfaConfirmRequest> validator,
+        ConfirmMfaEnrolment useCase,
+        IClock clock,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var invalid = await RequestValidation.ValidateAsync(validator, request, cancellationToken);
+
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        var outcome = await useCase.ExecuteAsync(userId, request.Code, cancellationToken);
+
+        return outcome switch
+        {
+            MfaConfirmOutcome.Confirmed => Results.Ok(new RequestAcceptedResponse(
+                "Multi-factor authentication is now enabled.",
+                clock.UtcNow)),
+
+            MfaConfirmOutcome.NotEnrolled => ProblemResults.Code(
+                StatusCodes.Status400BadRequest,
+                AuthErrorCodes.MfaNotEnrolled,
+                "No pending enrolment.",
+                "Start enrolment before confirming it."),
+
+            MfaConfirmOutcome.InvalidCode => ProblemResults.Code(
+                StatusCodes.Status400BadRequest,
+                AuthErrorCodes.MfaCodeInvalid,
+                "Code rejected.",
+                "That code did not match the pending secret. Check the authenticator's clock and try again."),
+
+            _ => ProblemResults.Unauthenticated("Your session is no longer valid."),
+        };
+    }
+
+    private static async Task<IResult> DisableMfaAsync(
+        HttpContext httpContext,
+        [Microsoft.AspNetCore.Mvc.FromBody] MfaDisableRequest request,
+        IValidator<MfaDisableRequest> validator,
+        DisableMfa useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var invalid = await RequestValidation.ValidateAsync(validator, request, cancellationToken);
+
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        var outcome = await useCase.ExecuteAsync(userId, request.Code, cancellationToken);
+
+        return outcome switch
+        {
+            MfaDisableOutcome.Disabled => Results.NoContent(),
+
+            MfaDisableOutcome.RequiredForRole => ProblemResults.Code(
+                StatusCodes.Status403Forbidden,
+                AuthErrorCodes.MfaRequiredForRole,
+                "Authenticator required.",
+                "This account holds a role that requires a second factor. An operator must reset it."),
+
+            MfaDisableOutcome.InvalidCode => ProblemResults.Code(
+                StatusCodes.Status403Forbidden,
+                AuthErrorCodes.MfaCodeInvalid,
+                "Code rejected.",
+                "The code or recovery code was not valid."),
+
+            MfaDisableOutcome.NotEnrolled => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                AuthErrorCodes.MfaNotEnrolled,
+                "No authenticator.",
+                "This account has no authenticator to remove."),
+
+            _ => ProblemResults.Unauthenticated("Your session is no longer valid."),
+        };
+    }
+
+    private static async Task<IResult> RegenerateRecoveryCodesAsync(
+        HttpContext httpContext,
+        RecoveryCodesRequest request,
+        IValidator<RecoveryCodesRequest> validator,
+        RegenerateRecoveryCodes useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var invalid = await RequestValidation.ValidateAsync(validator, request, cancellationToken);
+
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        var result = await useCase.ExecuteAsync(userId, request.Code, cancellationToken);
+
+        if (result.Outcome == RecoveryCodeOutcome.Regenerated)
+        {
+            httpContext.Response.Headers.CacheControl = "no-store";
+
+            return Results.Ok(new RecoveryCodesResponse(result.Codes));
+        }
+
+        return result.Outcome switch
+        {
+            RecoveryCodeOutcome.NotEnrolled => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                AuthErrorCodes.MfaNotEnrolled,
+                "No authenticator.",
+                "Confirm an authenticator before issuing recovery codes."),
+
+            RecoveryCodeOutcome.InvalidCode => ProblemResults.Code(
+                StatusCodes.Status403Forbidden,
+                AuthErrorCodes.MfaCodeInvalid,
+                "Code rejected.",
+                "That code did not match."),
+
+            _ => ProblemResults.Unauthenticated("Your session is no longer valid."),
+        };
+    }
+
     private static async Task<IResult> GetMeAsync(
         HttpContext httpContext,
         GetProfile query,
@@ -495,7 +769,6 @@ internal static class AuthEndpoints
 
         return Results.Ok(view.Profile);
     }
-
     private static async Task<IResult> ExportAccountAsync(
         HttpContext httpContext,
         ExportAccountData useCase,

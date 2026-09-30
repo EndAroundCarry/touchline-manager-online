@@ -17,5 +17,9 @@ public sealed record AccessTokenValue(string Token, DateTimeOffset ExpiresAt);
 public interface IAccessTokenIssuer
 {
     /// <summary>Issues an access token for an account.</summary>
-    AccessTokenValue Issue(User user, IReadOnlyList<string> roles, DateTimeOffset now);
+    /// <param name="user">The authenticated account.</param>
+    /// <param name="roles">The roles the account holds.</param>
+    /// <param name="mfaCompleted">Whether the session completed a second factor (ADR-0042).</param>
+    /// <param name="now">The current instant.</param>
+    AccessTokenValue Issue(User user, IReadOnlyList<string> roles, bool mfaCompleted, DateTimeOffset now);
 }

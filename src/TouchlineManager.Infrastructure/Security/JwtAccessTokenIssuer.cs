@@ -45,7 +45,11 @@ internal sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
     }
 
     /// <inheritdoc />
-    public AccessTokenValue Issue(User user, IReadOnlyList<string> roles, DateTimeOffset now)
+    public AccessTokenValue Issue(
+        User user,
+        IReadOnlyList<string> roles,
+        bool mfaCompleted,
+        DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(roles);
@@ -60,6 +64,10 @@ internal sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
         identity.AddClaim(new Claim(
             AuthClaimNames.EmailVerified,
             user.EmailVerifiedAt.HasValue ? "true" : "false"));
+
+        // The second factor is earned at login and carried on the session, so a refreshed token keeps the
+        // assurance the session was granted (ADR-0042).
+        identity.AddClaim(new Claim(AuthClaimNames.Mfa, mfaCompleted ? "true" : "false"));
 
         foreach (var role in roles)
         {

@@ -129,6 +129,7 @@ public sealed partial class RefreshAccessToken
             session.FamilyId,
             replacementSessionId,
             now,
+            mfaCompletedAt: session.MfaCompletedAt,
             cancellationToken);
 
         _audit.Record(new AuditEntry(

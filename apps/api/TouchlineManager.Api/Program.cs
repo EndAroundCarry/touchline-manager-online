@@ -245,6 +245,10 @@ moduleGroups["auth"].MapAuthEndpoints();
 // real operator read, gated by the operator/admin policy rather than by a diagnostics flag.
 moduleGroups["ops"].MapOperationalAnalytics();
 
+// The operator surface (`F-46`, ADR-0042). Always mapped, like the funnels: it is a real operator read and
+// a real operator command, gated by role and a completed second factor, not by a diagnostics flag.
+moduleGroups["admin"].MapAdminEndpoints();
+
 app.MapAccountEndpoints();
 app.MapWorldEndpoints();
 app.MapSquadEndpoints();

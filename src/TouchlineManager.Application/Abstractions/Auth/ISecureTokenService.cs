@@ -16,6 +16,10 @@ public interface ISecureTokenService
     /// <summary>Creates a fresh security stamp used to invalidate issued access tokens.</summary>
     string CreateSecurityStamp();
 
+    /// <summary>Creates random bytes from a cryptographic source, for a shared secret or a code.</summary>
+    /// <param name="length">The number of bytes.</param>
+    byte[] CreateRandomBytes(int length);
+
     /// <summary>Hashes a token for storage and lookup. Deterministic, so lookups by hash work.</summary>
     string HashToken(string token);
 

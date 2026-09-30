@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TouchlineManager.Application;
 using TouchlineManager.Application.Abstractions.Auth;
+using TouchlineManager.Application.Abstractions.Ops;
+using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Auth;
 using TouchlineManager.Domain.Auth;
 using TouchlineManager.Infrastructure;
@@ -81,6 +83,40 @@ switch (parsed.Command)
             var result = await revoke.ExecuteAsync(user.Id, parsed.Role, parsed.Reason, CancellationToken.None);
 
             return Report(result, "revoked from", user);
+        }
+
+    case "reset-mfa":
+        {
+            var credentials = scope.ServiceProvider.GetRequiredService<IMfaCredentialRepository>();
+            var credential = await credentials.FindByUserIdAsync(user.Id, CancellationToken.None);
+
+            if (credential is null)
+            {
+                Console.WriteLine($"{user.Email} has no authenticator to reset.");
+
+                return 0;
+            }
+
+            credentials.Remove(credential);
+
+            scope.ServiceProvider.GetRequiredService<IAuditWriter>().Record(new AuditEntry(
+                AdminAuditActions.MfaDisabled,
+                AuditActorTypes.Service,
+                ActorUserId: null,
+                AuditTargetTypes.MfaCredential,
+                user.Id,
+                Guid.CreateVersion7().ToString(),
+                IpHash: null,
+                Reason: parsed.Reason));
+
+            await scope.ServiceProvider
+                .GetRequiredService<IUnitOfWork>()
+                .SaveChangesAsync(CancellationToken.None);
+
+            Console.WriteLine(
+                $"Authenticator reset for {user.Email}. The account must enrol again before using admin routes.");
+
+            return 0;
         }
 
     default:
@@ -178,6 +214,7 @@ static void PrintUsage() => Console.WriteLine(
 
       grant  <email> <role> [--reason <text>]   Grants operator, support, or admin to an account.
       revoke <email> <role> [--reason <text>]   Revokes a role (the base player role cannot be revoked).
+      reset-mfa <email> [--reason <text>]       Removes an account's authenticator so it can enrol again.
       list   <email>                            Shows an account's status and roles.
       --help                                    Shows this text.
 
