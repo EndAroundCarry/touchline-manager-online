@@ -100,6 +100,15 @@ public static class AdminAuditActions
     /// <summary>A suspended account was restored by an operator.</summary>
     public const string AccountRestored = "admin.account.restored";
 
+    /// <summary>A dead-lettered job was returned to the queue by an operator (`F-46`, ADR-0044).</summary>
+    public const string JobRetried = "admin.job.retried";
+
+    /// <summary>A job was cancelled by an operator (`F-46`, ADR-0044).</summary>
+    public const string JobCancelled = "admin.job.cancelled";
+
+    /// <summary>A stuck matchday's resolution or publication job was requeued by an operator (`F-46`, ADR-0044).</summary>
+    public const string MatchdayResumed = "admin.matchday.resumed";
+
     /// <summary>Multi-factor enrolment was started (an unconfirmed credential was created).</summary>
     public const string MfaEnrolmentStarted = "auth.mfa.enrolment_started";
 
@@ -178,4 +187,10 @@ public static class AuditTargetTypes
 
     /// <summary>An account's multi-factor credential (master plan §10.8, ADR-0042).</summary>
     public const string MfaCredential = "mfa_credential";
+
+    /// <summary>A durable job row (`F-46`, ADR-0044).</summary>
+    public const string Job = "job";
+
+    /// <summary>A competition matchday, or the fixtures it holds (`F-46`, ADR-0044).</summary>
+    public const string Matchday = "matchday";
 }

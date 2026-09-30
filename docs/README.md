@@ -36,10 +36,15 @@ Start here. Documents are ordered from "what the product is" to "how it is opera
 |---|---|
 | [`testing/test-strategy.md`](testing/test-strategy.md) | The test layers, what each one is for, the gates, and the rules that keep them useful. |
 
+## Operations
+
+| Document | Purpose |
+|---|---|
+| [`operations/runbook.md`](operations/runbook.md) | On-call procedures: who may act, prechecks, exact commands, validation, notification, rollback, and evidence for diagnosing and recovering the live game. |
+
 ## Reserved for later stages
 
 - `docs/product/balancing.md` — measured distributions and tuning (Stage 9, 10)
-- `docs/operations/runbook.md` and peers — who may act, prechecks, exact action, validation, rollback (Stage 14)
 - `docs/operations/cost-model.md` — provider tiers, limits, storage, backup retention, egress (Stage 14)
 - `docs/api/` — committed OpenAPI artifacts and compatibility notes (Stage 6, once endpoints exist)
 

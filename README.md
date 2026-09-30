@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 14 underway — roles, TOTP MFA, the gated admin surface, and the operator read console.** Stage 13 is
+> **Status: Stage 14 underway — roles, TOTP MFA, the gated admin surface, the operator read console, and the recovery commands.** Stage 13 is
 > complete: the responsive PWA, account sessions, the offline boundary, the accessibility gate, the
 > guided help, and the privacy-safe operational funnels. The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
@@ -70,7 +70,10 @@ kick-off. The server decides results; a client can never simulate or influence o
 > requiring a fresh code, a reason and an idempotency key, and committing an audit entry with the
 > change (`F-46`, `F-47`, ADR-0042). The read console's diagnostic reads have since landed: the durable
 > job queue, a stuck matchday with its failed simulation attempts, and a search over the append-only
-> audit trail, all behind the same role and second factor (`F-46`, `F-47`, ADR-0043).
+> audit trail, all behind the same role and second factor (`F-46`, `F-47`, ADR-0043). The recovery commands
+> have since landed: an operator can retry a dead-lettered job, cancel a stuck job, and requeue a stuck
+> round's resolution or publication — each audited with a reason, and accompanied by the on-call runbook
+> (`F-46`, `F-47`, ADR-0044).
 
 ---
 

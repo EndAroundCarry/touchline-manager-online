@@ -26,4 +26,19 @@ public static class AdminErrorCodes
 
     /// <summary>A list filter names a value this server does not recognise.</summary>
     public const string InvalidFilter = "INVALID_FILTER";
+
+    /// <summary>No job exists with the requested identity.</summary>
+    public const string JobNotFound = "JOB_NOT_FOUND";
+
+    /// <summary>The job is not dead-lettered, so a retry would change nothing.</summary>
+    public const string JobNotRetryable = "JOB_NOT_RETRYABLE";
+
+    /// <summary>The job is already completed or cancelled, so there is nothing to cancel.</summary>
+    public const string JobNotCancellable = "JOB_NOT_CANCELLABLE";
+
+    /// <summary>No matchday exists with the requested identity.</summary>
+    public const string MatchdayNotFound = "MATCHDAY_NOT_FOUND";
+
+    /// <summary>The matchday is published, or the queue already owns its job, so there is nothing to resume.</summary>
+    public const string MatchdayNotResumable = "MATCHDAY_NOT_RESUMABLE";
 }

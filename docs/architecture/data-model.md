@@ -828,6 +828,11 @@ erDiagram
 > projections over `ops.jobs`, `competition.matchdays`/`fixtures`, `match.simulation_attempts`, and
 > `ops.audit_log`; no column, index, or constraint changes (`F-46`, `F-47`, ADR-0043). A global
 > `audit_log(occurred_at)` page index is deferred to the next milestone that touches the schema.
+>
+> **Stage 14 status (recovery commands):** `Stage14JobCancellation` drops and re-adds `ck_jobs_status` to
+> admit the fifth, terminal `ops.jobs.status` value `cancelled` alongside `pending`, `leased`, `completed`,
+> and `dead_letter`. No column and no index moves; `ck_jobs_lease_consistency` already permits a non-leased
+> terminal state with null lease fields (`F-46`, ADR-0044).
 
 ---
 

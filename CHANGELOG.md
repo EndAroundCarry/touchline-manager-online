@@ -3,6 +3,71 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 14 — Operator recovery commands: job retry and cancel, and matchday resume
+
+The third Stage 14 milestone gives the operator the act that the console could only diagnose. §13 requires
+"safe retry/resume of rollover and matchday workflows" and §10.8 lists `POST /admin/jobs/{id}/retry`,
+`/cancel`, and `/admin/matchdays/{id}/resume`; §16's exit criterion is that "an on-call operator can diagnose
+and resume failed matchday, auction, provisioning, and rollover workflows". The reads landed in the previous
+milestone (`F-46`, `F-47`, ADR-0043); this one is the actions behind them, all on the `AdminMutate` gate
+(`F-46`, §7, §10.8, ADR-0044).
+
+### Added
+
+- **Job retry** (`F-46`, §7, ADR-0044): `POST /api/v1/admin/jobs/{id}/retry` returns a dead-lettered job to
+  the queue with a fresh attempt budget through `IJobQueue.RequeueAsync`, the primitive ADR-0034 recorded for
+  the admin UI. Only a dead-lettered job is retried; a pending, leased, or completed job is reported
+  unchanged with a `409`.
+- **Job cancel** (`F-46`, §7, ADR-0044): `POST /api/v1/admin/jobs/{id}/cancel` moves a pending, leased, or
+  dead-lettered job to the new terminal `cancelled` status and clears its lease. A completed or
+  already-cancelled job is a `409`.
+- **Matchday resume** (`F-46`, §13, ADR-0044): `POST /api/v1/admin/matchdays/{id}/resume` requeues a stuck
+  round's governing job — resolution while the round is `pending`, publication while it is `staged` — and
+  falls back to an enqueue under the same business key, exactly like the rollover resume. A published round,
+  or one whose job the queue still owns, is a `409`.
+- **The `cancelled` job status** (`F-46`, ADR-0003, ADR-0044): `JobStatus.Cancelled` and
+  `JobStatuses.CancelledCode` join the four existing codes, and `IJobQueue` gains `FindByIdAsync` and
+  `CancelAsync` so `ops.jobs` access stays in the queue port.
+- **New audit vocabulary** (`F-47`, ADR-0044): `AdminAuditActions.JobRetried`, `JobCancelled`, and
+  `MatchdayResumed`, with `AuditTargetTypes.Job` and `Matchday`. Every command commits its audit row in the
+  same unit of work as the change.
+
+### Notes
+
+- **One migration, one check constraint, no web-client change.** `Stage14JobCancellation` drops and re-adds
+  `ck_jobs_status` to admit `cancelled`; no column and no index moves. The three commands are a bearer-token
+  surface until the Angular console consumes them in the next milestone.
+- **Cancelling a leased job is safe by the queue's own guards.** Every worker terminal statement
+  (`CompleteSql`, `DeadLetterSql`, `RescheduleSql`) is guarded by `status = 'leased'`, so a cancelled job can
+  never also complete. Cancellation does not roll back work a handler already committed; that is inherent to
+  the at-least-once, per-step-commit workflow design.
+- **Matchday resume adds no domain transition.** Resolution already re-runs the fixtures that never staged —
+  a fixture left `simulating` is one of them — and `MatchSnapshotFactory.FreezeAsync` returns the frozen
+  snapshot untouched, so a resume re-reads rather than rebuilds (`MAT-9`, ADR-0014).
+- **The Idempotency-Key is presence-checked, as for suspend and restore.** A replayed command finds the row
+  no longer actionable and returns a `409`, matching the existing admin contract; no dedup store is added.
+- **`docs/operations/runbook.md` now exists** (the file `docs/README.md` reserved for this stage): the
+  diagnosis-to-action procedures for a stuck matchday, a dead-lettered job, a stuck job, and a failed
+  rollover, each with who may act, prechecks, the exact command, validation, notification, compensation, and
+  evidence. The rollover exception and the auction/provisioning limitations are documented there.
+- **The remaining §10.8 mutations and the web console are the next milestone.** So are maintenance/read-only
+  mode, telemetry dashboards, SLO alerts, and the load/restore drills; the recovery contract is frozen here
+  (`docs/architecture/adr/0044-operator-recovery-commands.md`).
+
+### Tests
+
+- Extended `tests/TouchlineManager.Infrastructure.Tests/PostgresJobQueueTests.cs`: find by id, and the cancel
+  edges — a pending job becomes terminal and unclaimable, a leased job's lease is cleared (so
+  `ck_jobs_lease_consistency` holds), a dead letter reaches `cancelled`, and a completed or unknown job is a
+  no-op.
+- New `tests/TouchlineManager.Application.Tests/Ops/JobAdministrationTests.cs`: retry and cancel outcome
+  mapping, the audit entry (action, reason, actor, target), and the race where the row moves between the read
+  and the write.
+- New `tests/TouchlineManager.Api.IntegrationTests/AdminRecoveryTests.cs`: the gate from every side
+  (anonymous, plain manager, no fresh code, no idempotency key), a retried dead letter returning to
+  `pending` with its audit row, a `JOB_NOT_RETRYABLE` and a `JOB_NOT_CANCELLABLE` conflict, a cancelled job,
+  and a resumed round whose resolution job is back on the queue — with the `MATCHDAY_NOT_RESUMABLE` conflict.
+
 ## Stage 14 — The operator read console: jobs, matchdays, and audit
 
 The second Stage 14 milestone gives the operator the diagnosis the first one could only promise. §13

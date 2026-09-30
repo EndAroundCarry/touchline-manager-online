@@ -22,7 +22,7 @@ internal sealed class OpsJobConfiguration : IEntityTypeConfiguration<OpsJob>
             table.HasCheckConstraint("ck_jobs_priority", "priority >= 0");
             table.HasCheckConstraint(
                 "ck_jobs_status",
-                "status in ('pending', 'leased', 'completed', 'dead_letter')");
+                "status in ('pending', 'leased', 'completed', 'dead_letter', 'cancelled')");
             table.HasCheckConstraint(
                 "ck_jobs_lease_consistency",
                 "(status = 'leased' and lease_owner is not null and lease_until is not null) "

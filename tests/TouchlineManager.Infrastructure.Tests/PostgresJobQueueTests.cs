@@ -352,6 +352,130 @@ public sealed class PostgresJobQueueTests
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
+    [Fact]
+    public async Task Finding_a_job_by_id_returns_its_type_key_and_status()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+        var businessKey = NewKey("find");
+
+        await queue.EnqueueAsync(Request(businessKey), CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var id = await db.Jobs.Where(job => job.BusinessKey == businessKey).Select(job => job.Id).SingleAsync();
+
+        var snapshot = await queue.FindByIdAsync(id, CancellationToken.None);
+
+        snapshot.Should().NotBeNull();
+        snapshot!.JobType.Should().Be("ops.test");
+        snapshot.BusinessKey.Should().Be(businessKey);
+        snapshot.Status.Should().Be(JobStatus.Pending);
+    }
+
+    [Fact]
+    public async Task Finding_an_unknown_job_returns_null()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+
+        (await queue.FindByIdAsync(Guid.CreateVersion7(), CancellationToken.None)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Cancelling_a_pending_job_makes_it_terminal_and_unclaimable()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+        var businessKey = NewKey("cancel-pending");
+
+        await queue.EnqueueAsync(Request(businessKey), CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var id = await db.Jobs.Where(job => job.BusinessKey == businessKey).Select(job => job.Id).SingleAsync();
+
+        (await queue.CancelAsync(id, CancellationToken.None)).Should().BeTrue();
+
+        db.ChangeTracker.Clear();
+        (await db.Jobs.SingleAsync(job => job.Id == id)).Status.Should().Be("cancelled");
+
+        var claimed = await queue.ClaimAsync("worker-a", maxJobs: 100, LeaseDuration, CancellationToken.None);
+        claimed.Should().NotContain(job => job.Id == id, "a cancelled job is terminal and is never claimed again");
+
+        (await queue.CancelAsync(id, CancellationToken.None)).Should().BeFalse("it is already cancelled");
+    }
+
+    [Fact]
+    public async Task Cancelling_a_leased_job_clears_its_lease()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+        var businessKey = NewKey("cancel-leased");
+
+        await queue.EnqueueAsync(Request(businessKey), CancellationToken.None);
+
+        var job = (await queue.ClaimAsync("worker-a", maxJobs: 100, LeaseDuration, CancellationToken.None))
+            .Single(candidate => candidate.BusinessKey == businessKey);
+
+        (await queue.CancelAsync(job.Id, CancellationToken.None)).Should().BeTrue();
+
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        db.ChangeTracker.Clear();
+        var row = await db.Jobs.SingleAsync(candidate => candidate.Id == job.Id);
+
+        row.Status.Should().Be("cancelled");
+        row.LeaseOwner.Should().BeNull("a cancelled job cannot hold a lease (ck_jobs_lease_consistency)");
+        row.LeaseUntil.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Cancelling_a_dead_lettered_job_reaches_cancelled()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+        var businessKey = NewKey("cancel-dead-letter");
+
+        await queue.EnqueueAsync(Request(businessKey) with { MaxAttempts = 1 }, CancellationToken.None);
+        var job = (await queue.ClaimAsync("worker-a", maxJobs: 100, LeaseDuration, CancellationToken.None))
+            .Single(candidate => candidate.BusinessKey == businessKey);
+        await queue.FailAsync(job.Id, "no handler is registered", JobFailureKind.Permanent, CancellationToken.None);
+
+        (await queue.CancelAsync(job.Id, CancellationToken.None)).Should().BeTrue();
+
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        db.ChangeTracker.Clear();
+        (await db.Jobs.SingleAsync(candidate => candidate.Id == job.Id)).Status.Should().Be("cancelled");
+    }
+
+    [Fact]
+    public async Task Cancelling_a_completed_job_is_a_no_op()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+        var businessKey = NewKey("cancel-completed");
+
+        await queue.EnqueueAsync(Request(businessKey), CancellationToken.None);
+        var job = (await queue.ClaimAsync("worker-a", maxJobs: 100, LeaseDuration, CancellationToken.None))
+            .Single(candidate => candidate.BusinessKey == businessKey);
+        await queue.CompleteAsync(job.Id, CancellationToken.None);
+
+        (await queue.CancelAsync(job.Id, CancellationToken.None))
+            .Should()
+            .BeFalse("a completed job is already terminal");
+
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        db.ChangeTracker.Clear();
+        (await db.Jobs.SingleAsync(candidate => candidate.Id == job.Id)).Status.Should().Be("completed");
+    }
+
+    [Fact]
+    public async Task Cancelling_an_unknown_job_reports_nothing_to_do()
+    {
+        await using var scope = _fixture.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+
+        (await queue.CancelAsync(Guid.CreateVersion7(), CancellationToken.None)).Should().BeFalse();
+    }
+
     private JobEnqueueRequest Request(
         string businessKey,
         DateTimeOffset? dueAt = null,

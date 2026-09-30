@@ -20,6 +20,9 @@ public enum JobStatus
 
     /// <summary>Failed permanently. Terminal, and surfaces to operations as an alert.</summary>
     DeadLettered = 3,
+
+    /// <summary>Stopped by an operator before it ran to a result. Terminal (`F-46`, ADR-0044).</summary>
+    Cancelled = 4,
 }
 
 /// <summary>Stable codes for <see cref="JobStatus"/>, as stored in <c>ops.jobs.status</c> (`F-46`, ADR-0003).</summary>
@@ -42,6 +45,9 @@ public static class JobStatuses
     /// <summary>The code for <see cref="JobStatus.DeadLettered"/>.</summary>
     public const string DeadLetteredCode = "dead_letter";
 
+    /// <summary>The code for <see cref="JobStatus.Cancelled"/>.</summary>
+    public const string CancelledCode = "cancelled";
+
     /// <summary>The longest code, used to size the storage column.</summary>
     public const int MaxCodeLength = 11;
 
@@ -53,6 +59,7 @@ public static class JobStatuses
         JobStatus.Leased => LeasedCode,
         JobStatus.Completed => CompletedCode,
         JobStatus.DeadLettered => DeadLetteredCode,
+        JobStatus.Cancelled => CancelledCode,
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown job status."),
     };
 
@@ -64,10 +71,11 @@ public static class JobStatuses
         LeasedCode => JobStatus.Leased,
         CompletedCode => JobStatus.Completed,
         DeadLetteredCode => JobStatus.DeadLettered,
+        CancelledCode => JobStatus.Cancelled,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown job status code."),
     };
 
-    /// <summary>Parses a stable code, or reports that it is not one of the four.</summary>
+    /// <summary>Parses a stable code, or reports that it is not one of the five.</summary>
     /// <param name="code">The stable code, or null.</param>
     /// <param name="status">The parsed status.</param>
     /// <returns>Whether the code named a status.</returns>
@@ -86,6 +94,9 @@ public static class JobStatuses
                 return true;
             case DeadLetteredCode:
                 status = JobStatus.DeadLettered;
+                return true;
+            case CancelledCode:
+                status = JobStatus.Cancelled;
                 return true;
             default:
                 status = default;

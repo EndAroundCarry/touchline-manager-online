@@ -40,3 +40,26 @@ public sealed record AccountStatusRequest
 /// <param name="UserId">The account that was addressed.</param>
 /// <param name="Status">The resulting state, as a stable code.</param>
 public sealed record AccountStatusResponse(Guid UserId, string Status);
+
+/// <summary>
+/// Request to act on a durable job or a matchday. The reason is required and audited (master plan §10.8).
+/// </summary>
+public sealed record AdminActionRequest
+{
+    /// <summary>Gets why the operator is taking the action.</summary>
+    public required string Reason { get; init; }
+}
+
+/// <summary>The result of an operator action on a job.</summary>
+/// <param name="JobId">The job that was addressed.</param>
+/// <param name="Status">The job's resulting state, as a stable code.</param>
+public sealed record AdminJobActionResponse(Guid JobId, string Status);
+
+/// <summary>The result of resuming a matchday.</summary>
+/// <param name="MatchdayId">The round that was addressed.</param>
+/// <param name="Step">The workflow step that was requeued: <c>resolve</c> or <c>publish</c>.</param>
+/// <param name="Requeued">
+/// <see langword="true"/> when a dead-lettered job row was reset; <see langword="false"/> when a fresh row
+/// was enqueued under the same business key.
+/// </param>
+public sealed record AdminMatchdayResumeResponse(Guid MatchdayId, string Step, bool Requeued);

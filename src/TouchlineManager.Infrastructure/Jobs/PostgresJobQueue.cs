@@ -111,6 +111,22 @@ internal sealed partial class PostgresJobQueue : IJobQueue
         where job_type = @job_type and business_key = @business_key and status = 'dead_letter';
         """;
 
+    private const string FindByIdSql = """
+        select id, job_type, business_key, status
+        from ops.jobs
+        where id = @id;
+        """;
+
+    private const string CancelSql = """
+        update ops.jobs
+        set status = 'cancelled',
+            lease_owner = null,
+            lease_until = null,
+            updated_at = @now,
+            version = version + 1
+        where id = @id and status in ('pending', 'leased', 'dead_letter');
+        """;
+
     private readonly TouchlineManagerDbContext _dbContext;
     private readonly IClock _clock;
     private readonly ILogger<PostgresJobQueue> _logger;
@@ -181,6 +197,54 @@ internal sealed partial class PostgresJobQueue : IJobQueue
         }
 
         return reset > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<JobSnapshot?> FindByIdAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        var connection = await GetOpenConnectionAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = FindByIdSql;
+        AddParameter(command, "@id", jobId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new JobSnapshot(
+            reader.GetGuid(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            JobStatuses.FromCode(reader.GetString(3)));
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> CancelAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        var now = UtcNow();
+        var connection = await GetOpenConnectionAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = CancelSql;
+        AddParameter(command, "@id", jobId);
+        AddParameter(command, "@now", now);
+
+        var cancelled = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (cancelled == 0)
+        {
+            LogNotCancellable(jobId);
+        }
+        else
+        {
+            LogCancelled(jobId);
+        }
+
+        return cancelled > 0;
     }
 
     /// <inheritdoc />
@@ -340,6 +404,18 @@ internal sealed partial class PostgresJobQueue : IJobQueue
         Level = LogLevel.Debug,
         Message = "Job {JobType}/{BusinessKey} has no dead-lettered row to requeue; the operator resume is a no-op.")]
     private partial void LogNotRequeueable(string jobType, string businessKey);
+
+    [LoggerMessage(
+        EventId = 2004,
+        Level = LogLevel.Warning,
+        Message = "An operator cancelled job {JobId} (F-46, ADR-0044).")]
+    private partial void LogCancelled(Guid jobId);
+
+    [LoggerMessage(
+        EventId = 2005,
+        Level = LogLevel.Debug,
+        Message = "Job {JobId} is not cancellable; it is already completed or cancelled, or does not exist.")]
+    private partial void LogNotCancellable(Guid jobId);
 
     /// <summary>
     /// Returns the context's connection in an open state. The connection is deliberately not

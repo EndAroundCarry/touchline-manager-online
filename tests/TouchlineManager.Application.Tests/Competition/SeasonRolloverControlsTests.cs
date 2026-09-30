@@ -303,6 +303,12 @@ public sealed class SeasonRolloverControlsTests
             return Task.FromResult(RequeueResult);
         }
 
+        public Task<JobSnapshot?> FindByIdAsync(Guid jobId, CancellationToken cancellationToken) =>
+            Task.FromResult<JobSnapshot?>(null);
+
+        public Task<bool> CancelAsync(Guid jobId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
         public Task<IReadOnlyList<LeasedJob>> ClaimAsync(
             string leaseOwner,
             int maxJobs,

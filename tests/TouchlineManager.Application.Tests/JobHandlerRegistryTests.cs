@@ -118,5 +118,11 @@ public sealed class JobHandlerRegistryTests
 
         public Task<bool> RequeueAsync(string jobType, string businessKey, CancellationToken cancellationToken)
             => Task.FromResult(false);
+
+        public Task<JobSnapshot?> FindByIdAsync(Guid jobId, CancellationToken cancellationToken)
+            => Task.FromResult<JobSnapshot?>(null);
+
+        public Task<bool> CancelAsync(Guid jobId, CancellationToken cancellationToken)
+            => Task.FromResult(false);
     }
 }

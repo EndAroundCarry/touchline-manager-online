@@ -73,6 +73,10 @@ public static class DependencyInjection
         services.AddScoped<SuspendAccount>();
         services.AddScoped<RestoreAccount>();
 
+        // Operator recovery commands (master plan §10.8, F-46, ADR-0044).
+        services.AddScoped<RetryJob>();
+        services.AddScoped<CancelJob>();
+
         return services;
     }
 
@@ -334,6 +338,9 @@ public static class DependencyInjection
         services.AddScoped<LockMatchday>();
         services.AddScoped<ResolveMatchday>();
         services.AddScoped<PublishMatchday>();
+
+        // The operator's resume of a stuck round (master plan §10.8, F-46, ADR-0044).
+        services.AddScoped<ResumeMatchday>();
 
         // Driven by the worker's repair job; it has no public command (TBL-13, §7.2).
         services.AddScoped<RebuildDivisionProjections>();

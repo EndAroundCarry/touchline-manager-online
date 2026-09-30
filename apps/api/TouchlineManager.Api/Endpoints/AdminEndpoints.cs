@@ -2,6 +2,7 @@ using TouchlineManager.Api.Auth;
 using TouchlineManager.Api.Http;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Ops;
+using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Ops;
 using TouchlineManager.Contracts.Http;
 using TouchlineManager.Contracts.Ops;
@@ -29,6 +30,7 @@ namespace TouchlineManager.Api.Endpoints;
 internal static class AdminEndpoints
 {
     private const int IdempotencyKeyMaxLength = 80;
+    private const int ReasonMaxLength = 200;
 
     /// <summary>Maps the admin surface onto the admin module group.</summary>
     public static RouteGroupBuilder MapAdminEndpoints(this RouteGroupBuilder group)
@@ -115,6 +117,55 @@ internal static class AdminEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group
+            .MapPost("/jobs/{id:guid}/retry", RetryJobAsync)
+            .WithName("RetryAdminJob")
+            .WithSummary("Returns a dead-lettered job to the queue (F-46).")
+            .WithDescription(
+                "Operator or admin, with a fresh second-factor code. Requires a reason and an idempotency key. "
+                + "Only a dead-lettered job can be retried; the queue already owns any other state.")
+            .RequireAuthorization(AuthorizationPolicies.AdminMutate)
+            .AddEndpointFilter<MfaStepUpFilter>()
+            .Produces<AdminJobActionResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group
+            .MapPost("/jobs/{id:guid}/cancel", CancelJobAsync)
+            .WithName("CancelAdminJob")
+            .WithSummary("Stops a stuck job (F-46).")
+            .WithDescription(
+                "Operator or admin, with a fresh second-factor code. Requires a reason and an idempotency key. "
+                + "A pending, leased, or dead-lettered job becomes cancelled; a completed job cannot be cancelled.")
+            .RequireAuthorization(AuthorizationPolicies.AdminMutate)
+            .AddEndpointFilter<MfaStepUpFilter>()
+            .Produces<AdminJobActionResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group
+            .MapPost("/matchdays/{id:guid}/resume", ResumeMatchdayAsync)
+            .WithName("ResumeAdminMatchday")
+            .WithSummary("Requeues a stuck round's resolution or publication job (F-46).")
+            .WithDescription(
+                "Operator or admin, with a fresh second-factor code. Requires a reason and an idempotency key. "
+                + "A pending round resumes resolution and a staged round resumes publication; a published round "
+                + "cannot be resumed.")
+            .RequireAuthorization(AuthorizationPolicies.AdminMutate)
+            .AddEndpointFilter<MfaStepUpFilter>()
+            .Produces<AdminMatchdayResumeResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return group;
     }
 
@@ -157,7 +208,10 @@ internal static class AdminEndpoints
         SuspendAccount useCase,
         CancellationToken cancellationToken)
     {
-        var refused = Validate(request, httpContext);
+        var refused = Validate(
+            request.Reason,
+            httpContext,
+            "Send why the account's status is being changed, of at most 200 characters.");
 
         if (refused is not null)
         {
@@ -198,7 +252,10 @@ internal static class AdminEndpoints
         RestoreAccount useCase,
         CancellationToken cancellationToken)
     {
-        var refused = Validate(request, httpContext);
+        var refused = Validate(
+            request.Reason,
+            httpContext,
+            "Send why the account's status is being changed, of at most 200 characters.");
 
         if (refused is not null)
         {
@@ -226,6 +283,122 @@ internal static class AdminEndpoints
         };
     }
 
+    private static async Task<IResult> RetryJobAsync(
+        Guid id,
+        AdminActionRequest request,
+        HttpContext httpContext,
+        RetryJob useCase,
+        CancellationToken cancellationToken)
+    {
+        var refused = Validate(
+            request.Reason,
+            httpContext,
+            "Send why the job is being retried, of at most 200 characters.");
+
+        if (refused is not null)
+        {
+            return refused;
+        }
+
+        var result = await useCase.ExecuteAsync(id, request.Reason, cancellationToken);
+
+        return result.Outcome switch
+        {
+            JobAdministrationOutcome.Applied => Results.Json(
+                new AdminJobActionResponse(result.JobId, result.Status!),
+                statusCode: StatusCodes.Status202Accepted),
+
+            JobAdministrationOutcome.NotFound => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                AdminErrorCodes.JobNotFound,
+                "No such job.",
+                "That job does not exist."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                AdminErrorCodes.JobNotRetryable,
+                "Job cannot be retried.",
+                "Only a dead-lettered job can be retried; the queue already owns this one, or it is done."),
+        };
+    }
+
+    private static async Task<IResult> CancelJobAsync(
+        Guid id,
+        AdminActionRequest request,
+        HttpContext httpContext,
+        CancelJob useCase,
+        CancellationToken cancellationToken)
+    {
+        var refused = Validate(
+            request.Reason,
+            httpContext,
+            "Send why the job is being cancelled, of at most 200 characters.");
+
+        if (refused is not null)
+        {
+            return refused;
+        }
+
+        var result = await useCase.ExecuteAsync(id, request.Reason, cancellationToken);
+
+        return result.Outcome switch
+        {
+            JobAdministrationOutcome.Applied => Results.Ok(
+                new AdminJobActionResponse(result.JobId, result.Status!)),
+
+            JobAdministrationOutcome.NotFound => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                AdminErrorCodes.JobNotFound,
+                "No such job.",
+                "That job does not exist."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                AdminErrorCodes.JobNotCancellable,
+                "Job cannot be cancelled.",
+                "That job is already completed or cancelled, so there is nothing to stop."),
+        };
+    }
+
+    private static async Task<IResult> ResumeMatchdayAsync(
+        Guid id,
+        AdminActionRequest request,
+        HttpContext httpContext,
+        ResumeMatchday useCase,
+        CancellationToken cancellationToken)
+    {
+        var refused = Validate(
+            request.Reason,
+            httpContext,
+            "Send why the round is being resumed, of at most 200 characters.");
+
+        if (refused is not null)
+        {
+            return refused;
+        }
+
+        var result = await useCase.ExecuteAsync(id, request.Reason, cancellationToken);
+
+        return result.Outcome switch
+        {
+            ResumeMatchdayOutcome.Resumed => Results.Json(
+                new AdminMatchdayResumeResponse(result.MatchdayId, result.Step!, result.Requeued),
+                statusCode: StatusCodes.Status202Accepted),
+
+            ResumeMatchdayOutcome.MatchdayNotFound => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                AdminErrorCodes.MatchdayNotFound,
+                "No such matchday.",
+                "That matchday does not exist."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                AdminErrorCodes.MatchdayNotResumable,
+                "Round cannot be resumed.",
+                "The round is already published, or the queue already owns its resolution or publication job."),
+        };
+    }
+
     private static async Task<IResult> ListJobsAsync(
         HttpContext httpContext,
         string? cursor,
@@ -242,7 +415,7 @@ internal static class AdminEndpoints
 
         if (status is not null && !JobStatuses.TryFromCode(status, out _))
         {
-            return InvalidFilter("Send a status of pending, leased, completed, or dead_letter.");
+            return InvalidFilter("Send a status of pending, leased, completed, dead_letter, or cancelled.");
         }
 
         var page = await queries.ListJobsAsync(new AdminJobQuery(status, jobType, before), cancellationToken);
@@ -378,7 +551,7 @@ internal static class AdminEndpoints
         entry.OccurredAt,
         entry.Reason);
 
-    private static IResult? Validate(AccountStatusRequest request, HttpContext httpContext)
+    private static IResult? Validate(string reason, HttpContext httpContext, string reasonDetail)
     {
         var idempotencyKey = httpContext.Request.Headers[ApiHeaders.IdempotencyKey].ToString();
 
@@ -391,13 +564,13 @@ internal static class AdminEndpoints
                 $"Send a stable {ApiHeaders.IdempotencyKey} of at most {IdempotencyKeyMaxLength} characters.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Length > 200)
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > ReasonMaxLength)
         {
             return ProblemResults.Code(
                 StatusCodes.Status400BadRequest,
                 AdminErrorCodes.ReasonRequired,
                 "A reason is required.",
-                "Send why the account's status is being changed, of at most 200 characters.");
+                reasonDetail);
         }
 
         return null;
