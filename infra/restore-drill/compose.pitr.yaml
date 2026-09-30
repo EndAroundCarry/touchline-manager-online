@@ -1,0 +1,74 @@
+# The PostgreSQL pair the restore drill drives (master plan §16 Stage 14; `F-49`).
+#
+# `primary` archives every WAL segment to a shared volume; `restore` replays that archive into a
+# point in time given by `PITR_TARGET_TIME`. The drill driver starts the primary, takes a base backup,
+# then starts the restore service under the `restore` profile. See
+# docs/operations/backup-and-restore.md and infra/restore-drill/drill.mjs.
+#
+# This is a drill, not a deployment: production runs managed PostgreSQL with provider PITR (ADR-0008),
+# and the procedure below is what that maps to. Nothing here is wired into CI (ADR-0046).
+
+name: touchline-restore-drill
+
+services:
+  primary:
+    image: postgres:17-alpine
+    container_name: touchline-pitr-primary
+    environment:
+      POSTGRES_DB: touchline
+      POSTGRES_USER: touchline_app
+      POSTGRES_PASSWORD: local_dev_password_change_me
+    # A distinct host port so the drill never contends with the development stack's 55432.
+    ports:
+      - "${PITR_PRIMARY_PORT:-55433}:5432"
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=10
+      - -c
+      - archive_command=test ! -f /archive/wal/%f && cp %p /archive/wal/%f
+      - -c
+      - max_wal_senders=4
+    volumes:
+      - pitr-archive:/archive
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U touchline_app -d touchline"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  restore:
+    image: postgres:17-alpine
+    container_name: touchline-pitr-restore
+    # Started only when the driver passes --profile restore, after the base backup exists.
+    profiles: ["restore"]
+    environment:
+      PGDATA: /archive/base
+      POSTGRES_DB: touchline
+      POSTGRES_USER: touchline_app
+      POSTGRES_PASSWORD: local_dev_password_change_me
+    volumes:
+      - pitr-archive:/archive
+      - ./restore-entrypoint.sh:/restore-entrypoint.sh:ro
+      - ./sanitize.sql:/sanitize.sql:ro
+      - ./checks.sql:/checks.sql:ro
+    # A restored base backup needs a recovery signal; the shim creates it, then hands over to the
+    # official entrypoint.
+    entrypoint: ["/bin/sh", "/restore-entrypoint.sh"]
+    command:
+      - postgres
+      - -c
+      - restore_command=cp /archive/wal/%f %p
+      - -c
+      - recovery_target_time=${PITR_TARGET_TIME}
+      - -c
+      - recovery_target_action=promote
+
+volumes:
+  pitr-archive:
+    name: touchline-pitr-archive
