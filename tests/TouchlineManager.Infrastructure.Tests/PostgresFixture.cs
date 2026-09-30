@@ -67,6 +67,11 @@ public sealed class PostgresFixture : IAsyncLifetime, IDisposable
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Database"] = ConnectionString,
+
+                // The auth providers are singletons that validate their keys on construction, so a test
+                // that resolves one needs the configuration a real environment supplies (ADR-0002, ADR-0042).
+                ["Auth:SigningKey"] = "test-only-signing-key-with-at-least-32-bytes",
+                ["Auth:EncryptionKey"] = "test-only-encryption-key-with-at-least-32-bytes",
             })
             .Build();
 
