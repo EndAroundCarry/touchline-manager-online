@@ -99,9 +99,11 @@ export function formatFunds(minorUnits: number, locale = preferredLocale()): str
 }
 
 /**
- * Formats an instant in the manager's time zone, with the zone named (`VOI-4`, `CAL-4`).
+ * Formats an instant in the manager's time zone (`CAL-4`).
  *
- * UTC stays the authority on the server; this only decides where the moment is shown.
+ * UTC stays the authority on the server; this only decides where the moment is shown. It renders the moment
+ * compactly and without naming the zone, which is what a timestamp wants; a deadline, which is a moment a
+ * manager acts against, is rendered by {@link formatDeadline} instead.
  */
 export function formatInstant(
   instant: string,
@@ -111,6 +113,29 @@ export function formatInstant(
   return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone,
+  }).format(new Date(instant));
+}
+
+/**
+ * Formats a deadline as an absolute moment in the manager's zone, naming that zone (`VOI-4`, `CAL-4`).
+ *
+ * A deadline is the one instant a manager acts against, so it is stated with the zone it falls in rather
+ * than as a bare local time (`VOI-4`). That is also why the components are named explicitly rather than
+ * reusing {@link formatInstant}: `Intl` refuses `timeZoneName` alongside `dateStyle`/`timeStyle`.
+ */
+export function formatDeadline(
+  instant: string,
+  locale = preferredLocale(),
+  timeZone = preferredTimeZone(),
+): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
     timeZone,
   }).format(new Date(instant));
 }

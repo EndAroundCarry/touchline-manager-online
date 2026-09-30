@@ -28,5 +28,13 @@ export async function openNavIfNeeded(page: Page): Promise<void> {
 /** Reaches a shell destination whether the sidebar or the mobile disclosure is showing. */
 export async function navigateTo(page: Page, label: string): Promise<void> {
   await openNavIfNeeded(page);
-  await page.getByRole('link', { name: label }).click();
+
+  // Scoped to the shell's own navigation rather than the whole page. A screen may carry a link whose text
+  // contains a destination's name — the dashboard's first-steps guidance offers "Check your squad is legal"
+  // beside the "Squad" destination — and a page-wide lookup matches both. Only the visible nav is in the
+  // accessibility tree, so this resolves to the sidebar on a desktop and the open disclosure on a phone.
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: label })
+    .click();
 }

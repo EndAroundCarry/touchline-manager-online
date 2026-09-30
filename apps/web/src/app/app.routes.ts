@@ -196,6 +196,13 @@ export const routes: Routes = [
         title: 'News — Touchline Manager',
       },
       {
+        // How the game works: the reference half of the guided help (`F-53`).
+        path: 'help',
+        loadComponent: () => import('./features/help/help').then((m) => m.Help),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Help — Touchline Manager',
+      },
+      {
         // A detail route for one fixture, where a manager prepares a side (`SQ-4`).
         path: 'fixtures/:fixtureId/prepare',
         loadComponent: () => import('./features/prepare/prepare').then((m) => m.Prepare),

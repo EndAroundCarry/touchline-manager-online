@@ -65,6 +65,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-50 | Deployment | ops | 14, 16 | Migration preflight, staged rollout, rollback drill |
 | F-51 | Incident controls (read-only/maintenance) | ops, web | 14 | Read-only mode blocks writes, keeps reads |
 | F-52 | Accessibility (WCAG 2.2 AA) | web | 13 | Axe gate over the core routes at desktop and mobile, plus the Canvas viewer on the matchday stack: zero WCAG 2.2 A/AA violations, a focus-ring guard, the squad roster named, scrollable table regions focusable, a keyboard path to move a tactics slot, and focus moved to `<main>` on navigation (`support/accessibility.ts`, `journeys/accessibility.spec.ts`, `matchday/matchday.spec.ts`, ADR-0039) |
+| F-53 | Guided in-app help (rules, deadlines, tactics, market, season cadence) | web | 13 | A `/help` reference over the five promised subjects, each stating the settled rule and linking to the screen that owns it, with the copy asserted against the disclosure boundary; session-dismissed first-steps guidance on the dashboard; and deadlines that name their time zone (`features/help/`, `formatDeadline`, `journeys/help.spec.ts`, the `/help` entry in `journeys/accessibility.spec.ts`, ADR-0040) |
 
 ---
 
@@ -101,6 +102,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | Staff / youth / cups / social later | 17, 18, 19 | — | Master plan §2.3, §16 |
 | Security / admin / observability / backups | 2, 6, 14 | ops, auth, all | Threat model, data classification |
 | Accessibility (WCAG 2.2 AA) | 1, 13 | web | Master plan §11.3, §15.6, `F-52`, ADR-0039 |
+| Guided in-app help | 13 | web | Master plan §16 Stage 13, §2.4, `F-53`, ADR-0040 |
 
 ---
 

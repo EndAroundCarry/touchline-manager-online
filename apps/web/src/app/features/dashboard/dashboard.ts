@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
 import { ClubFixture } from '../../core/competition/competition.models';
@@ -10,7 +10,7 @@ import {
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { FinanceStore } from '../../core/finance/finance-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
-import { formatFunds, formatInstant } from '../../core/world/presentation';
+import { formatDeadline, formatFunds, formatInstant } from '../../core/world/presentation';
 import { ClubDashboard } from '../../core/world/world.models';
 import {
   DESTRUCTIVE_BUTTON,
@@ -49,6 +49,12 @@ export class Dashboard {
   protected readonly loadError = signal<string | null>(null);
   protected readonly resigning = signal(false);
   protected readonly resignError = signal<string | null>(null);
+
+  /** Whether the first-steps guidance has been dismissed. Session-scoped: nothing is persisted. */
+  protected readonly firstStepsDismissed = signal(false);
+
+  /** The club heading, focused when the guidance is dismissed so focus is not dropped to the body. */
+  private readonly clubHeading = viewChild<ElementRef<HTMLHeadingElement>>('clubHeading');
 
   /** The club's fixture list, read once a club is held so the next fixture can be shown. */
   protected readonly fixtures = this.competition.fixtures;
@@ -131,6 +137,11 @@ export class Dashboard {
     return formatInstant(value);
   }
 
+  /** Formats a team-sheet deadline in the viewer's local time, naming the zone (`VOI-4`, `CAL-4`). */
+  protected deadline(value: string): string {
+    return formatDeadline(value);
+  }
+
   /** Names the manager's side of a fixture: home or away. */
   protected venue(value: string): string {
     return venueLabel(value);
@@ -144,6 +155,17 @@ export class Dashboard {
   /** How long until a fixture's team sheets lock (`CAL-3`). */
   protected countdown(instant: string): string {
     return lockCountdown(instant, new Date());
+  }
+
+  /**
+   * Hides the first-steps guidance.
+   *
+   * The card holds the control that was just activated, so removing it would drop focus onto the document
+   * body. Focus is moved to the club heading instead, which leaves the reading position where it was.
+   */
+  protected dismissFirstSteps(): void {
+    this.firstStepsDismissed.set(true);
+    this.clubHeading()?.nativeElement.focus();
   }
 
   /** Resigns from the club and returns the manager to the country step. */

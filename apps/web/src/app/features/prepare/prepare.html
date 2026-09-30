@@ -11,7 +11,7 @@
       {{ sheet.divisionName }} · {{ round(sheet.roundNumber) }} · {{ status(sheet.fixtureStatus) }}
     </p>
     <p class="mt-1 text-sm text-slate-700">
-      Kick-off {{ instant(sheet.kickoffAt) }} · deadline {{ instant(sheet.lockAt) }}
+      Kick-off {{ instant(sheet.kickoffAt) }} · deadline {{ deadline(sheet.lockAt) }}
     </p>
 
     @if (sheet.isLocked) {

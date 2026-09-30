@@ -11,7 +11,7 @@ import {
   venueLabel,
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
-import { formatInstant } from '../../core/world/presentation';
+import { formatDeadline, formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
   LINK_ACTION,
@@ -84,6 +84,11 @@ export class Fixtures implements OnDestroy {
   /** Formats a kickoff in the viewer's local time (`CAL-4`). */
   protected kickoff(instant: string): string {
     return formatInstant(instant);
+  }
+
+  /** Formats a team-sheet deadline in the viewer's local time, naming the zone (`VOI-4`, `CAL-4`). */
+  protected deadline(instant: string): string {
+    return formatDeadline(instant);
   }
 
   /** Names a fixture's lifecycle state. */

@@ -12,7 +12,7 @@ import { ConnectivityStore } from '../../core/connectivity/connectivity-store';
 import { TeamSheetIssue, TeamSheetSlot } from '../../core/competition/competition.models';
 import { positionLabel } from '../../core/squad/squad-presentation';
 import { familyLabel, roleLabel } from '../../core/tactics/tactics-presentation';
-import { formatInstant } from '../../core/world/presentation';
+import { formatDeadline, formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
   LINK,
@@ -129,6 +129,11 @@ export class Prepare implements OnDestroy {
   /** Formats a kickoff or deadline in the viewer's local time (`CAL-4`). */
   protected instant(value: string): string {
     return formatInstant(value);
+  }
+
+  /** Formats a team-sheet deadline in the viewer's local time, naming the zone (`VOI-4`, `CAL-4`). */
+  protected deadline(value: string): string {
+    return formatDeadline(value);
   }
 
   /** How long until the sheet locks. */

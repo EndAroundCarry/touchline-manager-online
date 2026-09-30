@@ -3,6 +3,72 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 13 — Guided help and the first-steps surface
+
+A manager no longer has to already be standing on a screen to learn what the game does. A help screen states
+the five subjects the stage promises — how the competition works, matchdays and deadlines, formations and
+instructions, scouting and the market, and the season and its rollover — each as the rule, what follows from
+it, and a link to the screen that owns the work. A manager who has just taken over a club is met on the
+dashboard by a short first-steps list they can put away, and the deadline they are racing now says which time
+zone it falls in. This is the fifth Stage 13 milestone (`F-53`, ADR-0040).
+
+### Added
+
+- **A help surface over the rules a manager needs** (`F-53`, §16 Stage 13): `features/help/` at `/help`,
+  reached from the shell navigation. The five topics are authored as data beside the component, following
+  `welcome/`, so the page reads nothing from the server and cannot render empty, stale or half-loaded. Each
+  topic states the settled rule, the consequence, and the action, and links to the screen that owns it
+  (`VOI-2`, `VOI-3`, `ACC-6`).
+- **First-steps guidance on the dashboard** (§2.4): a card inside the claimed-club branch listing four steps —
+  read how the game works, check the squad is legal, set the formation and instructions, and prepare the next
+  team sheet — the last of which appears only while a fixture is actually waiting. It is dismissed for the
+  session, and dismissal moves focus to the club heading rather than dropping it onto the document body.
+- **Deadlines name their time zone** (`VOI-4`, `CAL-4`): a new `formatDeadline` renders a deadline as an
+  absolute moment with the zone beside it, and the dashboard, fixtures and prepare screens use it.
+
+### Fixed
+
+- **A deadline read as a bare local time.** `formatInstant` documented itself as naming the zone but never
+  set `timeZoneName`, so every deadline rendered without saying where it was. The docstring is corrected and
+  the three deadline screens now use the formatter that does name it. `formatInstant` keeps its behaviour for
+  the eighteen call sites that render a timestamp, and no deadline moves — only how the moment is shown.
+
+### Notes
+
+- **No migration, no server change, no new runtime dependency.** The milestone is the web client and its
+  tests. `game-rules.md` is unchanged: rendering a settled rule is not a rule change, and ADR-0021 already set
+  the split where the codes are the server's and the wording is the client's.
+- **The help copy is bounded by the content policy, and the boundary is asserted.** No topic states hidden
+  potential, a seed, an internal valuation, or a detection threshold (`MAT-11`, `VOI-11`), so retirement is
+  described as an announcement a manager receives and never as a chance. The topic spec fails the build if one
+  of those tokens appears, and if a link stops being an absolute in-app path.
+- **The new screen joins the axe gate.** `/help` is added to the signed-in route list in
+  `journeys/accessibility.spec.ts`, so ADR-0039's gate covers it at desktop and mobile, and the new untagged
+  `journeys/help.spec.ts` rides the same two projects.
+- **`docs/architecture/adr/0040-guided-help-and-first-steps.md`** records the decision, including why the
+  guidance is not a tour, why nothing is persisted in browser storage, and why the zone's name is a
+  deadline-only formatter. The ADR index gains its row; `mvp-traceability.md` gains `F-53` and its §2 mapping
+  row; `test-strategy.md` gains the Layer 7 and Layer 8 sentences; `content-and-fictional-data-policy.md`
+  gains the help-copy review gate in §5; and the README status line and `features/README.md` name the new
+  folder.
+- **Product analytics is still the one Stage 13 deliverable outstanding**, left in ADR-0040 for its own
+  privacy-reviewed milestone.
+
+### Tests
+
+- New `features/help/help.spec.ts`: the five subjects are covered in order, every topic has a title, a
+  summary, at least three points and a destination, every link is an absolute in-app route with descriptive
+  text, and no point discloses a server-only value.
+- `core/world/presentation.spec.ts` gains a `formatDeadline` block: it names the zone and so differs from
+  `formatInstant`, it renders a different moment in a different zone, and it honours the configured zone and
+  locale by default. The existing `formatInstant` assertions are untouched.
+- New `features/dashboard/dashboard.spec.ts`: the first steps appear for a manager holding a club, the
+  team-sheet step is absent when no fixture is waiting, and dismissing removes the guidance with focus
+  landing on the heading.
+- New `journeys/help.spec.ts`: a manager takes over a club, dismisses the first steps, reaches Help from the
+  navigation, finds all five subjects, follows a topic to its screen, and resigns the club so the shared
+  world is left as found.
+
 ## Stage 13 — Accessibility remediation and the axe gate
 
 The promise in §11.3 is now enforced where it is easiest to break. An automated axe journey runs over

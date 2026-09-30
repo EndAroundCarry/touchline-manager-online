@@ -106,5 +106,6 @@ Content decisions that are accessibility requirements, not preferences:
 | Name pool review | Before a name pool ships (Stage 3) | Blocklist similarity check, no real identity, deterministic generation test |
 | Badge seed review | Stage 3 | Procedural only, no trademark resemblance, palettes contrast-checked |
 | Template review | Stages 6, 8, 11 | No hidden-attribute leakage, localization-ready structure, tone rules |
+| Help copy review | Stage 13 | No hidden-attribute leakage, second person and present tense, glossary vocabulary, descriptive link text; asserted in `features/help/help.spec.ts` (`F-53`, ADR-0040) |
 | Commentary review | Stage 5/7 | Variation, no repetition pathology, no leakage |
 | Legal page review | Stage 15/16 | Terms, privacy, retention, and fictional-data statement published |

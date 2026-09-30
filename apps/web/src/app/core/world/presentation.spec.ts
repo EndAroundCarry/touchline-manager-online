@@ -1,5 +1,6 @@
 import {
   configurePresentation,
+  formatDeadline,
   formatFunds,
   formatInstant,
   preferredLocale,
@@ -57,6 +58,33 @@ describe('formatInstant', () => {
 
     // Noon in London is the next morning in Tokyo: the zone has to change the rendered time.
     expect(utc).not.toBe(tokyo);
+  });
+});
+
+describe('formatDeadline', () => {
+  afterEach(() => resetPresentation());
+
+  it('states the moment and names its zone, unlike a plain instant', () => {
+    // A deadline is the moment a manager acts against, so the zone is named beside it (VOI-4, CAL-4).
+    const deadline = formatDeadline('2026-10-06T19:00:00Z', 'en-GB', 'Europe/Bucharest');
+
+    expect(deadline).toContain('2026');
+    expect(deadline).not.toBe(formatInstant('2026-10-06T19:00:00Z', 'en-GB', 'Europe/Bucharest'));
+  });
+
+  it('renders a different moment in a different zone', () => {
+    const utc = formatDeadline('2026-10-06T19:00:00Z', 'en-GB', 'UTC');
+    const tokyo = formatDeadline('2026-10-06T19:00:00Z', 'en-GB', 'Asia/Tokyo');
+
+    expect(utc).not.toBe(tokyo);
+  });
+
+  it("uses the manager's configured zone and locale by default", () => {
+    configurePresentation({ locale: 'en-GB', timeZone: 'Asia/Tokyo' });
+
+    expect(formatDeadline('2026-10-06T19:00:00Z')).toBe(
+      formatDeadline('2026-10-06T19:00:00Z', 'en-GB', 'Asia/Tokyo'),
+    );
   });
 });
 

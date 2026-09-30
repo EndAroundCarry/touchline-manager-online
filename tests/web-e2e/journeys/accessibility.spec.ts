@@ -112,6 +112,7 @@ test.describe('@a11y the manager screens meet WCAG 2.2 AA', () => {
       '/news',
       '/history',
       '/settings',
+      '/help',
     ];
 
     for (const route of routes) {
