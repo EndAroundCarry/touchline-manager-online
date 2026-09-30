@@ -154,6 +154,23 @@ public sealed class LedgerPostingsTests
         posting.SourceType.Should().Be(LedgerSourceType.AdminRepair);
         posting.CorrelationId.Should().Be("repair-1", "the operator's key makes the repair idempotent (FIN-12)");
         posting.CashDeltaMinor.Should().Be(-250);
+        posting.ReversesEntryId.Should().BeNull("the operator named no entry to correct");
+    }
+
+    [Fact]
+    public void A_compensating_entry_can_name_the_entry_it_corrects()
+    {
+        var corrected = Guid.CreateVersion7();
+
+        var posting = LedgerPostings.Compensation(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            cashDeltaMinor: 1_000,
+            "repair-2",
+            corrected);
+
+        posting.ReversesEntryId.Should().Be(corrected, "the correction points at the line it corrects (FIN-12)");
+        posting.Category.Should().Be(LedgerCategory.Compensation);
     }
 
     [Fact]

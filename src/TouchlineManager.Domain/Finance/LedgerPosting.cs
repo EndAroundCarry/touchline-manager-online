@@ -28,6 +28,9 @@ namespace TouchlineManager.Domain.Finance;
 /// </param>
 /// <param name="DescriptionTemplate">The stable template key that describes the entry.</param>
 /// <param name="DescriptionParametersJson">The template's parameters, as a stored document.</param>
+/// <param name="ReversesEntryId">
+/// The entry this one corrects, when the posting is an operator's compensating entry (`FIN-12`), or null.
+/// </param>
 public sealed record LedgerPosting(
     Guid EntryId,
     LedgerCategory Category,
@@ -37,4 +40,5 @@ public sealed record LedgerPosting(
     Guid? SourceId,
     string CorrelationId,
     string DescriptionTemplate,
-    string DescriptionParametersJson);
+    string DescriptionParametersJson,
+    Guid? ReversesEntryId = null);

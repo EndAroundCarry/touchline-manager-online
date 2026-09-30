@@ -48,6 +48,24 @@ public sealed class NewsMessageTextTests
     }
 
     [Fact]
+    public void An_operator_announcement_renders_the_title_and_body_it_was_given()
+    {
+        var draft = NewsTemplates.Announcement(
+            "Scheduled maintenance",
+            "The game will be read-only tonight from 22:00 to 22:30 UTC.",
+            countryId: null,
+            divisionId: null,
+            expiresAt: null);
+
+        draft.Category.Should().Be(TouchlineManager.Domain.Comms.NewsCategory.Announcement);
+
+        var text = NewsMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Title.Should().Be("Scheduled maintenance");
+        text.Body.Should().Be("The game will be read-only tonight from 22:00 to 22:30 UTC.");
+    }
+
+    [Fact]
     public void An_unknown_template_is_refused_rather_than_rendered_vaguely()
     {
         var render = () => NewsMessageText.Render("news.future.unknown", "{}");

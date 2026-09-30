@@ -18,13 +18,16 @@ public enum NewsCategory
 
     /// <summary>A division's round was published (`MAT-7`).</summary>
     Result = 2,
+
+    /// <summary>An operator posted a game notice to every manager (`F-46`, ADR-0045).</summary>
+    Announcement = 3,
 }
 
 /// <summary>Stable codes and parsing for <see cref="NewsCategory"/>.</summary>
 public static class NewsCategories
 {
     /// <summary>The longest code, so a column can be sized to hold every value.</summary>
-    public const int MaxCodeLength = 10;
+    public const int MaxCodeLength = 12;
 
     /// <summary>Every category, in declaration order.</summary>
     public static readonly IReadOnlyList<NewsCategory> All = [.. Enum.GetValues<NewsCategory>()];
@@ -36,6 +39,7 @@ public static class NewsCategories
         NewsCategory.Division => "division",
         NewsCategory.Transfer => "transfer",
         NewsCategory.Result => "result",
+        NewsCategory.Announcement => "announcement",
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown news category."),
     };
 
@@ -46,6 +50,7 @@ public static class NewsCategories
         "division" => NewsCategory.Division,
         "transfer" => NewsCategory.Transfer,
         "result" => NewsCategory.Result,
+        "announcement" => NewsCategory.Announcement,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown news category code."),
     };
 }

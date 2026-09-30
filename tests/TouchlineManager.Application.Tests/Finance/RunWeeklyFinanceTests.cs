@@ -217,6 +217,9 @@ public sealed class RunWeeklyFinanceTests
 
         public void Add(LedgerEntry entry) => Entries.Add(entry);
 
+        public Task<LedgerEntry?> FindByIdAsync(Guid entryId, CancellationToken cancellationToken) =>
+            Task.FromResult(Entries.SingleOrDefault(entry => entry.Id == entryId));
+
         public Task<IReadOnlySet<string>> FindExistingCorrelationIdsAsync(
             IReadOnlyCollection<string> correlationIds,
             CancellationToken cancellationToken) =>

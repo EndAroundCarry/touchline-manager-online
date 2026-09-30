@@ -152,6 +152,61 @@ public sealed class LedgerPersistenceTests
         exception.Which.ConstraintName.Should().Be("ck_ledger_entries_balances");
     }
 
+    [Fact]
+    public async Task A_compensating_entry_stores_the_line_it_corrects()
+    {
+        // FIN-12: the correction points at the entry it corrects, so the pair is traceable in the ledger
+        // rather than only in the audit trail.
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var (account, opening) = await PickAccountAsync(db);
+
+        var entry = LedgerEntry.Record(
+            Guid.CreateVersion7(),
+            account.ClubId,
+            sequence: account.LastLedgerSequence + 1,
+            LedgerCategory.Compensation,
+            cashDeltaMinor: 1,
+            reservedDeltaMinor: 0,
+            resultingCashMinor: account.CashMinor + 1,
+            resultingReservedMinor: account.ReservedMinor,
+            LedgerSourceType.AdminRepair,
+            sourceId: null,
+            correlationId: $"repair-{Guid.NewGuid():N}",
+            descriptionTemplate: "finance.compensation",
+            descriptionParametersJson: "{}",
+            _fixture.Clock.UtcNow,
+            reversesEntryId: opening.Id);
+
+        db.LedgerEntries.Add(entry);
+        await db.SaveChangesAsync();
+
+        await using var verification = _fixture.CreateScope();
+        var read = verification.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        (await read.LedgerEntries.AsNoTracking().SingleAsync(candidate => candidate.Id == entry.Id))
+            .ReversesEntryId.Should().Be(opening.Id);
+    }
+
+    [Fact]
+    public async Task Only_a_compensating_entry_may_name_the_entry_it_corrects_in_the_database()
+    {
+        // The domain refuses this before it reaches the store, so the row is written raw to prove the check
+        // constraint is the last line of defence.
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var (_, opening) = await PickAccountAsync(db);
+
+        var act = () => db.Database.ExecuteSqlRawAsync(
+            "update finance.ledger_entries set reverses_entry_id = {0} where id = {1}",
+            opening.Id,
+            opening.Id);
+
+        var exception = await act.Should().ThrowAsync<PostgresException>();
+
+        exception.Which.ConstraintName.Should().Be("ck_ledger_entries_reverses");
+    }
+
     private static async Task<(ClubAccount Account, LedgerEntry Opening)> PickAccountAsync(
         TouchlineManagerDbContext db)
     {

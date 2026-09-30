@@ -109,6 +109,12 @@ public static class AdminAuditActions
     /// <summary>A stuck matchday's resolution or publication job was requeued by an operator (`F-46`, ADR-0044).</summary>
     public const string MatchdayResumed = "admin.matchday.resumed";
 
+    /// <summary>An operator published a game announcement to the news feed (`F-46`, ADR-0045).</summary>
+    public const string AnnouncementPublished = "admin.announcement.published";
+
+    /// <summary>An operator set a feature flag (`F-46`, ADR-0045).</summary>
+    public const string FeatureFlagSet = "admin.feature_flag.set";
+
     /// <summary>Multi-factor enrolment was started (an unconfirmed credential was created).</summary>
     public const string MfaEnrolmentStarted = "auth.mfa.enrolment_started";
 
@@ -193,4 +199,13 @@ public static class AuditTargetTypes
 
     /// <summary>A competition matchday, or the fixtures it holds (`F-46`, ADR-0044).</summary>
     public const string Matchday = "matchday";
+
+    /// <summary>A club ledger entry, as written by an operator's compensating repair (`F-46`, ADR-0045).</summary>
+    public const string LedgerEntry = "ledger_entry";
+
+    /// <summary>A published news item, as written by an operator's announcement (`F-46`, ADR-0045).</summary>
+    public const string NewsItem = "news_item";
+
+    /// <summary>A feature flag (`F-46`, ADR-0045).</summary>
+    public const string FeatureFlag = "feature_flag";
 }

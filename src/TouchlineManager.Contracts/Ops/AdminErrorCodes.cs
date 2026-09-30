@@ -41,4 +41,34 @@ public static class AdminErrorCodes
 
     /// <summary>The matchday is published, or the queue already owns its job, so there is nothing to resume.</summary>
     public const string MatchdayNotResumable = "MATCHDAY_NOT_RESUMABLE";
+
+    /// <summary>No club exists with the requested identity.</summary>
+    public const string ClubNotFound = "CLUB_NOT_FOUND";
+
+    /// <summary>The club already has no human manager, so there is nothing to assign to the AI.</summary>
+    public const string ClubAlreadyAi = "CLUB_ALREADY_AI";
+
+    /// <summary>The ledger entry a compensating repair names does not exist for that club.</summary>
+    public const string LedgerEntryNotFound = "LEDGER_ENTRY_NOT_FOUND";
+
+    /// <summary>The compensating entry is not a repair of an earlier entry, or moves nothing.</summary>
+    public const string CompensationInvalid = "COMPENSATION_INVALID";
+
+    /// <summary>The correction would take the club's cash below zero or below its reserved funds.</summary>
+    public const string CompensationNotAffordable = "COMPENSATION_NOT_AFFORDABLE";
+
+    /// <summary>This idempotency key has already posted a compensating entry.</summary>
+    public const string CompensationAlreadyPosted = "COMPENSATION_ALREADY_POSTED";
+
+    /// <summary>The announcement has no title or body, or would expire before it is published.</summary>
+    public const string AnnouncementInvalid = "ANNOUNCEMENT_INVALID";
+
+    /// <summary>The country or division the announcement is scoped to does not exist.</summary>
+    public const string AnnouncementScopeNotFound = "ANNOUNCEMENT_SCOPE_NOT_FOUND";
+
+    /// <summary>No world has been seeded, so there is nowhere to publish.</summary>
+    public const string WorldNotSeeded = "WORLD_NOT_SEEDED";
+
+    /// <summary>The feature-flag key or value is not one this surface accepts.</summary>
+    public const string FeatureFlagInvalid = "FEATURE_FLAG_INVALID";
 }

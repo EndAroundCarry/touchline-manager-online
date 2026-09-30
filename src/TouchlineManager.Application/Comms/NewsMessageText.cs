@@ -34,6 +34,8 @@ public static class NewsMessageText
                 NewsTemplates.Read<NewsTemplates.TransferParameters>(parametersJson)),
             NewsTemplates.ResultPublished => Round(
                 NewsTemplates.Read<NewsTemplates.ResultParameters>(parametersJson)),
+            NewsTemplates.AnnouncementPublished => Announcement(
+                NewsTemplates.Read<NewsTemplates.AnnouncementParameters>(parametersJson)),
             _ => throw new InvalidOperationException($"'{templateKey}' is not a news template this build renders."),
         };
     }
@@ -63,4 +65,7 @@ public static class NewsMessageText
 
     private static string Money(long minorUnits) =>
         minorUnits.ToString("N0", CultureInfo.InvariantCulture);
+
+    private static NewsText Announcement(NewsTemplates.AnnouncementParameters parameters) =>
+        new(parameters.Title, parameters.Body);
 }

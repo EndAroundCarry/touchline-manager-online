@@ -131,4 +131,85 @@ public sealed class LedgerEntryTests
             LedgerSourceTypes.FromCode(code).Should().Be(sourceType);
         }
     }
+
+    [Fact]
+    public void A_compensating_entry_names_the_entry_it_corrects()
+    {
+        var corrected = Guid.CreateVersion7();
+
+        var entry = Compensating(corrected);
+
+        entry.Category.Should().Be(LedgerCategory.Compensation);
+        entry.ReversesEntryId.Should().Be(corrected, "the ledger states which line it corrects (FIN-12)");
+    }
+
+    [Fact]
+    public void Only_a_compensating_entry_may_name_the_entry_it_corrects()
+    {
+        var act = () => LedgerEntry.Record(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            sequence: 1,
+            LedgerCategory.OpeningBalance,
+            cashDeltaMinor: 1,
+            reservedDeltaMinor: 0,
+            resultingCashMinor: 1,
+            resultingReservedMinor: 0,
+            LedgerSourceType.WorldSeed,
+            sourceId: null,
+            correlationId: "op-1",
+            descriptionTemplate: "test.ledger",
+            descriptionParametersJson: "{}",
+            Now,
+            reversesEntryId: Guid.CreateVersion7());
+
+        act.Should().Throw<ArgumentException>("only a compensating entry reverses another (FIN-12)");
+    }
+
+    [Fact]
+    public void An_entry_cannot_reverse_itself_or_name_an_empty_entry()
+    {
+        var id = Guid.CreateVersion7();
+
+        var self = () => LedgerEntry.Record(
+            id,
+            Guid.CreateVersion7(),
+            sequence: 1,
+            LedgerCategory.Compensation,
+            cashDeltaMinor: 1,
+            reservedDeltaMinor: 0,
+            resultingCashMinor: 1,
+            resultingReservedMinor: 0,
+            LedgerSourceType.AdminRepair,
+            sourceId: null,
+            correlationId: "repair-1",
+            descriptionTemplate: "finance.compensation",
+            descriptionParametersJson: "{}",
+            Now,
+            reversesEntryId: id);
+
+        self.Should().Throw<ArgumentException>();
+
+        var empty = () => Compensating(Guid.Empty);
+
+        empty.Should().Throw<ArgumentException>();
+    }
+
+    private static LedgerEntry Compensating(Guid reversesEntryId) =>
+        LedgerEntry.Record(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            sequence: 2,
+            LedgerCategory.Compensation,
+            cashDeltaMinor: -100,
+            reservedDeltaMinor: 0,
+            resultingCashMinor: 0,
+            resultingReservedMinor: 0,
+            LedgerSourceType.AdminRepair,
+            sourceId: null,
+            correlationId: "repair-1",
+            descriptionTemplate: "finance.compensation",
+            descriptionParametersJson: "{}",
+            Now,
+            reversesEntryId);
 }

@@ -94,6 +94,10 @@ internal sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<Ledger
             table.HasCheckConstraint(
                 "ck_ledger_entries_description_template",
                 "length(description_template) > 0");
+            table.HasCheckConstraint(
+                "ck_ledger_entries_reverses",
+                "reverses_entry_id is null "
+                + "or (category = 'compensation' and reverses_entry_id <> id)");
         });
 
         builder.HasKey(entry => entry.Id);
@@ -129,6 +133,7 @@ internal sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<Ledger
             .HasColumnName("description_parameters")
             .HasColumnType("jsonb")
             .IsRequired();
+        builder.Property(entry => entry.ReversesEntryId).HasColumnName("reverses_entry_id");
         builder.Property(entry => entry.CreatedAt).HasColumnName("created_at").IsRequired();
 
         // The club's ledger is walked in order, and the sequence is unique within it (FIN-11).
@@ -145,9 +150,19 @@ internal sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<Ledger
         builder.HasIndex(entry => new { entry.SourceType, entry.SourceId })
             .HasDatabaseName("ix_ledger_entries_source");
 
+        // A compensating entry points at the entry it corrects, so the correction is traceable in the ledger
+        // itself and the corrected line is never deleted out from under it (FIN-12).
+        builder.HasIndex(entry => entry.ReversesEntryId)
+            .HasDatabaseName("ix_ledger_entries_reverses_entry_id");
+
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(entry => entry.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<LedgerEntry>()
+            .WithMany()
+            .HasForeignKey(entry => entry.ReversesEntryId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

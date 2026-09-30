@@ -37,6 +37,9 @@ public static class NewsTemplates
     /// <summary>A division's round was published (`MAT-7`).</summary>
     public const string ResultPublished = "news.result.published";
 
+    /// <summary>An operator posted a game notice (`F-46`, ADR-0045).</summary>
+    public const string AnnouncementPublished = "news.announcement.published";
+
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
     /// <summary>Builds the item a newly activated tier produces.</summary>
@@ -101,14 +104,35 @@ public static class NewsTemplates
         string templateKey,
         TParameters parameters,
         Guid? countryId,
-        Guid? divisionId) =>
+        Guid? divisionId,
+        DateTimeOffset? expiresAt = null) =>
         new(
             category,
             templateKey,
             JsonSerializer.Serialize(parameters, Options),
             countryId,
             divisionId,
-            ExpiresAt: null);
+            expiresAt);
+
+    /// <summary>Builds the item an operator's announcement produces (`F-46`, ADR-0045).</summary>
+    /// <param name="title">The headline the operator wrote.</param>
+    /// <param name="body">The notice the operator wrote.</param>
+    /// <param name="countryId">The country to scope it to, or null for the whole world.</param>
+    /// <param name="divisionId">The division to scope it to, or null for a broader scope.</param>
+    /// <param name="expiresAt">When it stops being shown, or null when it does not expire.</param>
+    public static NewsDraft Announcement(
+        string title,
+        string body,
+        Guid? countryId,
+        Guid? divisionId,
+        DateTimeOffset? expiresAt) =>
+        Write(
+            NewsCategory.Announcement,
+            AnnouncementPublished,
+            new AnnouncementParameters(title, body),
+            countryId,
+            divisionId,
+            expiresAt);
 
     /// <summary>Reads a stored parameter document back.</summary>
     internal static TParameters Read<TParameters>(string parametersJson) =>
@@ -129,4 +153,6 @@ public static class NewsTemplates
         int HomeGoals,
         string AwayClubName,
         int AwayGoals);
+
+    internal sealed record AnnouncementParameters(string Title, string Body);
 }

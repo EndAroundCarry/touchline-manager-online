@@ -88,6 +88,9 @@ public static class DependencyInjection
 
         // The operator's game-health read (master plan §13, F-46, ADR-0042).
         services.AddScoped<IAdminQueries, AdminQueries>();
+
+        // The operator's feature-flag store (master plan §6.9, §13, F-46, ADR-0045).
+        services.AddScoped<IFeatureFlagStore, FeatureFlagStore>();
     }
 
     /// <summary>

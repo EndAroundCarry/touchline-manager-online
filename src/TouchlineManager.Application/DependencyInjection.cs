@@ -77,6 +77,9 @@ public static class DependencyInjection
         services.AddScoped<RetryJob>();
         services.AddScoped<CancelJob>();
 
+        // Operator feature flags (master plan §10.8, §13, F-46, ADR-0045).
+        services.AddScoped<SetFeatureFlag>();
+
         return services;
     }
 
@@ -133,6 +136,9 @@ public static class DependencyInjection
         services.AddScoped<SettleSeasonFinances>();
         services.AddScoped<GetFinanceSummary>();
         services.AddScoped<GetFinanceLedger>();
+
+        // Operator finance repair (master plan §10.8, FIN-12, F-46, ADR-0045).
+        services.AddScoped<PostCompensatingEntry>();
     }
 
     /// <summary>
@@ -155,6 +161,9 @@ public static class DependencyInjection
         // read the client's screen uses.
         services.AddScoped<PostNews>();
         services.AddScoped<GetNews>();
+
+        // The operator's announcement, published as a scoped news item (master plan §10.8, F-46, ADR-0045).
+        services.AddScoped<PublishAnnouncement>();
 
         // Notification preferences (COM-4) and the deadline reminder (COM-3).
         services.AddScoped<GetNotificationPreferences>();
@@ -257,6 +266,9 @@ public static class DependencyInjection
         services.AddScoped<UpdateManagerProfile>();
         services.AddScoped<ClaimClub>();
         services.AddScoped<ResignClub>();
+
+        // Operator ownership repair (master plan §10.8, OCC-6, F-46, ADR-0045).
+        services.AddScoped<AssignClubToAi>();
         services.AddScoped<GetWorld>();
         services.AddScoped<ListCountries>();
         services.AddScoped<GetCountryCapacity>();

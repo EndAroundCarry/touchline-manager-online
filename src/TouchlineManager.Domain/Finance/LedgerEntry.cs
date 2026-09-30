@@ -74,6 +74,12 @@ public sealed class LedgerEntry
     /// <summary>Gets the template's parameters, as the stored JSON document.</summary>
     public string DescriptionParametersJson { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Gets the identity of the entry this one corrects, when it is an operator's compensating entry
+    /// (`FIN-12`), or null for an ordinary entry.
+    /// </summary>
+    public Guid? ReversesEntryId { get; private set; }
+
     /// <summary>Gets when the entry was written.</summary>
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -95,6 +101,7 @@ public sealed class LedgerEntry
     /// <param name="descriptionTemplate">The stable template key.</param>
     /// <param name="descriptionParametersJson">The template's parameters, as a stored document.</param>
     /// <param name="now">The current instant.</param>
+    /// <param name="reversesEntryId">The entry this one corrects, when it is a compensating entry (`FIN-12`).</param>
     public static LedgerEntry Record(
         Guid id,
         Guid clubId,
@@ -109,7 +116,8 @@ public sealed class LedgerEntry
         string correlationId,
         string descriptionTemplate,
         string descriptionParametersJson,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? reversesEntryId = null)
     {
         if (clubId == Guid.Empty)
         {
@@ -153,6 +161,22 @@ public sealed class LedgerEntry
                 "Reserved funds may never exceed the cash behind them (FIN-10, FIN-13).");
         }
 
+        // A compensating entry names the entry it corrects; only a compensation may carry the link, and it
+        // cannot name itself (FIN-12).
+        if (reversesEntryId == Guid.Empty || reversesEntryId == id)
+        {
+            throw new ArgumentException(
+                "A compensating entry names a different entry it corrects (FIN-12).",
+                nameof(reversesEntryId));
+        }
+
+        if (reversesEntryId is not null && category != LedgerCategory.Compensation)
+        {
+            throw new ArgumentException(
+                "Only a compensating entry may name the entry it corrects (FIN-12).",
+                nameof(reversesEntryId));
+        }
+
         return new LedgerEntry
         {
             Id = id,
@@ -168,6 +192,7 @@ public sealed class LedgerEntry
             CorrelationId = correlationId,
             DescriptionTemplate = descriptionTemplate,
             DescriptionParametersJson = descriptionParametersJson,
+            ReversesEntryId = reversesEntryId,
             CreatedAt = now,
         };
     }

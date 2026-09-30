@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TouchlineManager.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using TouchlineManager.Infrastructure.Persistence;
 namespace TouchlineManager.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TouchlineManagerDbContext))]
-    partial class TouchlineManagerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930151833_Stage14CompensatingEntry")]
+    partial class Stage14CompensatingEntry
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -442,8 +445,8 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Category")
                         .IsRequired()
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
                         .HasColumnName("category");
 
                     b.Property<Guid?>("CountryId")
@@ -506,7 +509,7 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("news_items", "comms", t =>
                         {
-                            t.HasCheckConstraint("ck_news_items_category", "category in ('division', 'transfer', 'result', 'announcement')");
+                            t.HasCheckConstraint("ck_news_items_category", "category in ('division', 'transfer', 'result')");
 
                             t.HasCheckConstraint("ck_news_items_expiry", "expires_at is null or expires_at > published_at");
 
@@ -3883,61 +3886,6 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_log", "ops", t =>
                         {
                             t.HasCheckConstraint("ck_audit_log_actor_type", "actor_type in ('user', 'service', 'anonymous')");
-                        });
-                });
-
-            modelBuilder.Entity("TouchlineManager.Infrastructure.Persistence.Entities.OpsFeatureFlag", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("key");
-
-                    b.Property<string>("RolloutMetadataJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("rollout_metadata");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("scope");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("ValueJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("value");
-
-                    b.Property<long>("Version")
-                        .HasColumnType("bigint")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Scope", "Key")
-                        .IsUnique()
-                        .HasDatabaseName("ux_feature_flags_scope_key");
-
-                    b.ToTable("feature_flags", "ops", t =>
-                        {
-                            t.HasCheckConstraint("ck_feature_flags_key", "length(key) > 0");
-
-                            t.HasCheckConstraint("ck_feature_flags_scope", "length(scope) > 0");
-
-                            t.HasCheckConstraint("ck_feature_flags_version", "version >= 1");
                         });
                 });
 

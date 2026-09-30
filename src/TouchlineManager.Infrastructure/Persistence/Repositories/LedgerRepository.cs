@@ -18,6 +18,10 @@ internal sealed class LedgerRepository : ILedgerRepository
     public void Add(LedgerEntry entry) => _dbContext.LedgerEntries.Add(entry);
 
     /// <inheritdoc />
+    public Task<LedgerEntry?> FindByIdAsync(Guid entryId, CancellationToken cancellationToken) =>
+        _dbContext.LedgerEntries.SingleOrDefaultAsync(entry => entry.Id == entryId, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<IReadOnlySet<string>> FindExistingCorrelationIdsAsync(
         IReadOnlyCollection<string> correlationIds,
         CancellationToken cancellationToken)

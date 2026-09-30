@@ -254,11 +254,13 @@ public static class LedgerPostings
     /// <param name="clubId">The club corrected.</param>
     /// <param name="cashDeltaMinor">The signed correction to cash, which may be positive or negative.</param>
     /// <param name="correlationId">The operator's correlation key, which makes the repair idempotent.</param>
+    /// <param name="reversesEntryId">The entry that is being corrected, or null when the operator names none.</param>
     public static LedgerPosting Compensation(
         Guid entryId,
         Guid clubId,
         long cashDeltaMinor,
-        string correlationId)
+        string correlationId,
+        Guid? reversesEntryId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
@@ -279,7 +281,8 @@ public static class LedgerPostings
             SourceId: clubId,
             correlationId,
             CompensationTemplate,
-            Parameters(("amountMinor", cashDeltaMinor)));
+            Parameters(("amountMinor", cashDeltaMinor)),
+            ReversesEntryId: reversesEntryId);
     }
 
     /// <summary>

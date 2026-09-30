@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace TouchlineManager.Contracts.Ops;
 
 /// <summary>
@@ -63,3 +65,106 @@ public sealed record AdminJobActionResponse(Guid JobId, string Status);
 /// was enqueued under the same business key.
 /// </param>
 public sealed record AdminMatchdayResumeResponse(Guid MatchdayId, string Step, bool Requeued);
+
+/// <summary>The result of handing a club to the AI.</summary>
+/// <param name="ClubId">The club that was addressed.</param>
+/// <param name="ControlStatus">The club's control state afterwards, as a stable code (<c>ai</c>).</param>
+/// <param name="ManagerId">The manager whose tenure was closed, when one was.</param>
+public sealed record AdminClubAssignAiResponse(Guid ClubId, string ControlStatus, Guid? ManagerId);
+
+/// <summary>
+/// Request to post a compensating finance entry. The reason is required and audited, and the idempotency key
+/// becomes the entry's correlation key (master plan §10.8, §13, `FIN-12`).
+/// </summary>
+public sealed record CompensatingEntryRequest
+{
+    /// <summary>Gets the club whose ledger is corrected.</summary>
+    public required Guid ClubId { get; init; }
+
+    /// <summary>Gets the signed correction to the club's cash, in minor units.</summary>
+    public required long CashDeltaMinor { get; init; }
+
+    /// <summary>Gets the entry this correction names, when the operator knows it.</summary>
+    public Guid? ReversesEntryId { get; init; }
+
+    /// <summary>Gets why the operator is posting the correction.</summary>
+    public required string Reason { get; init; }
+}
+
+/// <summary>The result of a compensating finance entry.</summary>
+/// <param name="EntryId">The compensating entry that was posted.</param>
+/// <param name="ClubId">The club whose ledger was corrected.</param>
+/// <param name="CashDeltaMinor">The signed correction that was applied, in minor units.</param>
+/// <param name="ResultingCashMinor">The club's cash after the correction, in minor units.</param>
+/// <param name="ReversesEntryId">The entry that was corrected, when the operator named one.</param>
+public sealed record AdminCompensationResponse(
+    Guid EntryId,
+    Guid ClubId,
+    long CashDeltaMinor,
+    long ResultingCashMinor,
+    Guid? ReversesEntryId);
+
+/// <summary>
+/// Request to publish an operator announcement. The title and body are the notice; the reason is required and
+/// audited (master plan §10.8, §13, `F-46`).
+/// </summary>
+public sealed record AnnouncementRequest
+{
+    /// <summary>Gets the headline.</summary>
+    public required string Title { get; init; }
+
+    /// <summary>Gets the notice.</summary>
+    public required string Body { get; init; }
+
+    /// <summary>Gets the country to scope it to, or null for the whole world.</summary>
+    public Guid? CountryId { get; init; }
+
+    /// <summary>Gets the division to scope it to, or null for a broader scope.</summary>
+    public Guid? DivisionId { get; init; }
+
+    /// <summary>Gets when it stops being shown, or null when it does not expire.</summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    /// <summary>Gets why the operator is publishing it.</summary>
+    public required string Reason { get; init; }
+}
+
+/// <summary>The result of publishing an announcement.</summary>
+/// <param name="NewsItemId">The news item that was published.</param>
+/// <param name="Category">The feed category, as a stable code.</param>
+/// <param name="PublishedAt">When it became public.</param>
+/// <param name="ExpiresAt">When it stops being shown, when it does.</param>
+public sealed record AdminAnnouncementResponse(
+    Guid NewsItemId,
+    string Category,
+    DateTimeOffset PublishedAt,
+    DateTimeOffset? ExpiresAt);
+
+/// <summary>
+/// Request to set a feature flag. The value is an opaque JSON document; the reason is required and audited
+/// (master plan §10.8, §13, `F-46`).
+/// </summary>
+public sealed record SetFeatureFlagRequest
+{
+    /// <summary>Gets the flag's value, as a JSON document.</summary>
+    public JsonElement Value { get; init; }
+
+    /// <summary>Gets optional rollout metadata, as a JSON document.</summary>
+    public JsonElement? RolloutMetadata { get; init; }
+
+    /// <summary>Gets why the operator is setting the flag.</summary>
+    public required string Reason { get; init; }
+}
+
+/// <summary>The result of setting a feature flag.</summary>
+/// <param name="Key">The flag's key.</param>
+/// <param name="Scope">The scope it belongs to.</param>
+/// <param name="Value">The stored value, as a JSON document.</param>
+/// <param name="Version">The stored row's version.</param>
+/// <param name="Created"><see langword="true"/> when the flag was created; <see langword="false"/> when it was updated.</param>
+public sealed record AdminFeatureFlagResponse(
+    string Key,
+    string Scope,
+    JsonElement Value,
+    long Version,
+    bool Created);

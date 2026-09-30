@@ -32,6 +32,14 @@ public interface ILedgerRepository
     void Add(LedgerEntry entry);
 
     /// <summary>
+    /// Finds one entry by identity, so an operator's compensating entry can name the line it corrects
+    /// (`FIN-12`).
+    /// </summary>
+    /// <param name="entryId">The entry.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<LedgerEntry?> FindByIdAsync(Guid entryId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Reports which of the given correlation keys already have an entry, so a retried operation can skip the
     /// work it already did instead of colliding with its own rows (`FIN-17`).
     /// </summary>

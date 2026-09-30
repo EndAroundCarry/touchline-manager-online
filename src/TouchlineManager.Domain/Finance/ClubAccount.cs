@@ -136,7 +136,8 @@ public sealed class ClubAccount
             posting.CorrelationId,
             posting.DescriptionTemplate,
             posting.DescriptionParametersJson,
-            now);
+            now,
+            posting.ReversesEntryId);
 
         CashMinor = cash;
         ReservedMinor = reserved;

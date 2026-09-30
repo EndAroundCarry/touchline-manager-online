@@ -49,6 +49,9 @@ public static class WorldAuditActions
     /// <summary>A tenure was closed because the manager stayed away (`OCC-3`).</summary>
     public const string TenureClosedForInactivity = "world.club_tenure.closed_inactivity";
 
+    /// <summary>An operator handed a club back to full AI control before the standard inactivity period (`OCC-6`).</summary>
+    public const string ClubAssignedToAi = "world.club_tenure.assigned_ai";
+
     /// <summary>A manager's notification preferences changed (Stage 11).</summary>
     public const string NotificationPreferencesChanged = "world.manager_profile.notifications_changed";
 

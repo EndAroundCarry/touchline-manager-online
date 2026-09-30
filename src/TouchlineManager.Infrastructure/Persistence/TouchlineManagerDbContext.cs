@@ -38,6 +38,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the ops module's outbox dispatch intents (`MOD-4`).</summary>
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    /// <summary>Gets the ops module's feature flags (master plan §6.9, §13, ADR-0045).</summary>
+    public DbSet<OpsFeatureFlag> FeatureFlags => Set<OpsFeatureFlag>();
+
     /// <summary>Gets the auth module's accounts.</summary>
     public DbSet<User> Users => Set<User>();
 
