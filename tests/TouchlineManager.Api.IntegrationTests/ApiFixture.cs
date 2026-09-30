@@ -77,7 +77,9 @@ public sealed class ApiFixture : IAsyncLifetime
         bool enableRolloverTrigger = false,
         int? authPermitLimit = null,
         int? marketListingPermitLimit = null,
-        int? marketBidPermitLimit = null)
+        int? marketBidPermitLimit = null,
+        bool enableGameClockControl = false,
+        DateTimeOffset? steppedClockNow = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
@@ -87,6 +89,19 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting(
                 "Diagnostics:EnableRolloverTrigger",
                 enableRolloverTrigger ? "true" : "false");
+            builder.UseSetting(
+                "Diagnostics:EnableGameClockControl",
+                enableGameClockControl ? "true" : "false");
+
+            if (steppedClockNow is { } initialNow)
+            {
+                // A stepped clock is refused in Production (TIME-6), and the host above runs as Development.
+                builder.UseSetting("Clock:Mode", "Stepped");
+                builder.UseSetting(
+                    "Clock:InitialNowUtc",
+                    initialNow.ToString("O", CultureInfo.InvariantCulture));
+            }
+
             builder.UseSetting(
                 "RateLimiting:AuthPermitLimit",
                 (authPermitLimit ?? UnthrottledAuthPermitLimit).ToString(CultureInfo.InvariantCulture));

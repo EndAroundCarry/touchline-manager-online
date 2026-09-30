@@ -75,6 +75,18 @@ public sealed class DiagnosticsOptions
     /// they have no production surface (master plan §17.12, ADR-0034).
     /// </remarks>
     public bool EnableRolloverTrigger { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the Stage 15 stepped-clock controls are reachable.
+    /// </summary>
+    /// <remarks>
+    /// The controls are a read of the stepped game instant and the next round, and a step to the next day or
+    /// the next matchday that materialises that moment's real jobs. The worker still sets the clock and
+    /// produces every result, so the game stays worker-only; these only do what an operator's decision does
+    /// (ADR-0049, §17.12). Off by default, mapped only when the clock is stepped, and never set outside a
+    /// non-production environment, so they have no production surface.
+    /// </remarks>
+    public bool EnableGameClockControl { get; set; }
 }
 
 /// <summary>

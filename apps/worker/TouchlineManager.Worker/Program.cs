@@ -39,4 +39,17 @@ if (clock.IsCompressed)
             builder.Environment.EnvironmentName);
 }
 
+if (clock.IsStepped)
+{
+    host.Services
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("TouchlineManager.Worker")
+        .LogWarning(
+            "A stepped clock is in force: game time is frozen at {InitialNow} and only moves when an operator "
+            + "advances it, in {Environment}. The advance job sets the instant and materialises the day's jobs "
+            + "(ADR-0049, TIME-6).",
+            clock.InitialNowUtc,
+            builder.Environment.EnvironmentName);
+}
+
 await host.RunAsync();

@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, SendDeadlineRemindersJobHandler>();
         services.AddScoped<IJobHandler, DispatchOutboxJobHandler>();
         services.AddScoped<IJobHandler, RunSeasonRolloverJobHandler>();
+        services.AddScoped<IJobHandler, AdvanceGameClockJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -79,6 +80,11 @@ public static class DependencyInjection
 
         // Operator feature flags (master plan §10.8, §13, F-46, ADR-0045).
         services.AddScoped<SetFeatureFlag>();
+
+        // The non-production stepped clock's advance (ADR-0049, §17.12). Reachable only from a
+        // development-flagged endpoint; the worker's advance job does the actual step.
+        services.AddScoped<AdvanceGameClock>();
+        services.AddScoped<GetGameClockStatus>();
 
         return services;
     }

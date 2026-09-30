@@ -797,6 +797,12 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+    game_clock {
+        uuid id PK
+        timestamptz game_now
+        timestamptz updated_at
+        bigint version
+    }
     repair_actions {
         uuid id PK
         text incident_reference
@@ -826,6 +832,7 @@ erDiagram
 | Partial index `recipient_manager_id where read_at is null` | `inbox_messages` | Unread badge and sync counter |
 | Index `(recipient_manager_id, created_at, id)` | `inbox_messages` | Keyset page order, newest first |
 | `unique (scope, key)` | `feature_flags` | One row per operator switch, so setting a flag is an upsert (`ADR-0045`) |
+| `check (id = '00000000-…-00000000c10c')`, `check (version >= 1)` | `game_clock` | One fixed row: a stepped world's clock cannot fork into two that disagree (`ADR-0049`) |
 | `check (reverses_entry_id is null or (category = 'compensation' and reverses_entry_id <> id))`, self-FK `Restrict` | `ledger_entries` | Only an operator's compensating entry may name the line it corrects (`FIN-12`, `ADR-0045`) |
 | Append-only, restricted access | `audit_log` | Tamper evidence |
 
@@ -854,6 +861,11 @@ erDiagram
 > dashboards read the OpenTelemetry instruments through the OTLP collector rather than the database. No
 > table, column, index, or constraint is touched, and nothing new is persisted
 > (`F-48`, ADR-0048).
+>
+> **Stage 15 status (stepped clock):** `Stage15OpsGameClock` creates `ops.game_clock` — one row, fixed by
+> identity and constrained to it, holding the game instant a stepped world is frozen at (`game_now`,
+> `updated_at`, `version`). Nothing else changes; the row exists only while a stepped clock does, and no
+> existing table is touched (`TIME-7`, ADR-0049).
 
 ---
 

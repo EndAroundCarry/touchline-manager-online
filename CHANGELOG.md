@@ -3,6 +3,62 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 15 — A stepped clock and a test toolbar, so a season plays a press at a time
+
+Stage 15's first exit criterion is "at least one complete closed-beta season and rollover succeeds under human
+activity". The compressed clock (ADR-0015) accelerates a season but cannot be stepped: it is chosen at
+composition, needs a restart to change, and runs whether or not anyone is watching. A tester needed the
+opposite — a button that takes the world on one day, or to the next kickoff, and lets everything downstream
+happen through the real worker. `Clock:Mode=Stepped` freezes game time at a stored instant and moves it only
+when an operator advances it, and an app-shell toolbar presses the button (ADR-0049).
+
+### Added
+
+- **A stepped clock mode**: `Clock:Mode=Stepped` with `Clock:InitialNowUtc`. Game time is one stored instant in
+  the new `ops.game_clock` row, read through `IGameClockStore` and kept fresh in each host by a one-second
+  poller. It is refused in Production exactly as the compressed clock is, and the API and the worker must be
+  given the same values (`TIME-6`).
+- **An advance is a real worker job**: `POST /api/v1/ops/diagnostics/advance-game-clock` resolves the target —
+  the next game day, or the next unpublished round's kickoff — and enqueues `ops.advance-game-clock` due now.
+  The worker writes the instant and asks every scheduler's extracted materialisation for the day's jobs, so a
+  step is indistinguishable from the calendar reaching the same moment (`TIME-7`, ADR-0049).
+- **A test-clock toolbar**: a slim, server-gated bar under the header with the game date, the next round, and
+  "Next day" / "Next matchday". It appears only where the API reports a stepped clock, waits for the step to
+  land and the day to settle, then reloads so every screen shows the new day.
+- **`GET /api/v1/ops/diagnostics/game-clock`**, and `Diagnostics:EnableGameClockControl` to map the pair — off
+  everywhere by default, and mapped only when the clock is stepped (§17.12).
+
+### Changed
+
+- **The schedulers' materialisation is extracted behind `IJobMaterializer`.** Each scheduler still runs it on
+  its interval; a step invokes the same code with the stepped instant, so the two paths cannot drift.
+- **Under a frozen clock, transient failures retry at once.** A backoff measured from a frozen "now" would
+  never become due, so the queue retries a transient failure immediately when the clock is stepped, and the
+  attempt budget is what bounds it (ADR-0049).
+
+### Notes
+
+- **One migration, one table.** `Stage15OpsGameClock` creates `ops.game_clock` — a single row fixed by identity
+  and constrained to it. No existing table is touched.
+- **A frozen clock reaches no future deadline.** Leases do not expire and a retry scheduled ahead would not
+  run; both are recorded in ADR-0049 rather than hidden, and both are acceptable for a world an operator is
+  stepping by hand.
+- **This supersedes ADR-0015 decision 4** — the clause that forbade an HTTP control surface over time. The
+  compressed clock remains for unattended acceleration; the stepped clock is for a person with a button.
+
+### Tests
+
+- `SteppedClockTests`: Production refuses a stepped clock, a non-production host wires one, and real time is
+  the default.
+- `AdvanceGameClockTests`: the advance handler writes the target, never moves the clock backwards, invokes
+  every materialiser, and dead-letters a payload with no target.
+- `GameClockControlsTests`: the controls are unmapped when the flag is off and when the host is not stepped,
+  the status reads the stored instant, and a day step targets the next midnight and is idempotent.
+- `SteppedSeasonTests`: a seeded world plays three rounds across all six divisions by pressing "next
+  matchday", through the real worker and engine — every round publishes and every fixture carries a result.
+- `game-clock-store.spec.ts`: the toolbar hides when the host has no stepped clock, reports a step done only
+  once the clock has reached the target, and gives up on a step that never lands.
+
 ## Stage 14 — Telemetry dashboards and SLO alerting, over the instruments that exist
 
 The stage's last open half: §14.1's dashboards, and its "alerts must be actionable and linked to runbooks".

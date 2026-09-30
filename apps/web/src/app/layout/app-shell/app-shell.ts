@@ -4,6 +4,7 @@ import { Subscription, filter } from 'rxjs';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { GameClockStore } from '../../core/devtools/game-clock-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
 import { MatchStore } from '../../core/match/match-store';
 import { NewsStore } from '../../core/news/news-store';
@@ -13,6 +14,7 @@ import { SquadStore } from '../../core/squad/squad-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
+import { GameClockBar } from '../game-clock-bar/game-clock-bar';
 import { SystemNotices } from '../system-notices/system-notices';
 import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
 
@@ -25,7 +27,7 @@ import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, SystemNotices],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, SystemNotices, GameClockBar],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.css',
 })
@@ -42,6 +44,7 @@ export class AppShell implements OnDestroy {
   private readonly sessions = inject(SessionsStore);
   private readonly match = inject(MatchStore);
   private readonly sync = inject(SyncStore);
+  private readonly gameClock = inject(GameClockStore);
   private readonly router = inject(Router);
 
   /** The route-change subscription that moves focus to the main content (`§11.3`). */
@@ -141,6 +144,7 @@ export class AppShell implements OnDestroy {
       this.sessions.clear();
       this.match.clear();
       this.sync.clear();
+      this.gameClock.clear();
 
       void this.router.navigateByUrl('/login');
     });

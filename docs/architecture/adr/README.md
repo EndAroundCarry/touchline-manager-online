@@ -31,7 +31,7 @@ the system is shaped the way it is.
 | [0012](0012-daily-progression-materialised-job.md) | The daily progression is a materialised, feature-gated world job | Accepted |
 | [0013](0013-engine-arithmetic-and-scoreline-effect.md) | Integer basis-point arithmetic and a bounded scoreline effect in the engine | Accepted |
 | [0014](0014-matchday-lock-resolution-and-publication.md) | A matchday is locked, resolved, and published by three jobs, and its snapshot is a stored document | Accepted |
-| [0015](0015-compressed-test-clock.md) | A compressed test clock is chosen at composition and refused in Production | Accepted |
+| [0015](0015-compressed-test-clock.md) | A compressed test clock is chosen at composition and refused in Production | Accepted (decision 4 superseded by ADR-0049) |
 | [0016](0016-non-production-matchday-trigger.md) | A non-production matchday trigger for the end-to-end watch journey | Accepted |
 | [0017](0017-match-load-at-publication.md) | A match's load on the squad is derived from the stored result and applied at publication | Accepted |
 | [0018](0018-ai-club-policy.md) | A club nobody manages is set up by a pure, versioned policy run by the worker | Accepted |
@@ -65,6 +65,7 @@ the system is shaped the way it is.
 | [0046](0046-load-supply-chain-and-restore-drills.md) | Load, supply-chain, and restore drills, run locally | Accepted |
 | [0047](0047-incident-read-only-mode.md) | Read-only incident mode, gated at the request edge | Accepted |
 | [0048](0048-telemetry-dashboards-and-slo-alerting.md) | Telemetry dashboards and SLO alerting, over the instruments that exist | Accepted |
+| [0049](0049-non-production-stepped-game-clock.md) | A non-production stepped game clock, advanced by an operator | Accepted |
 
 ## Rules for changing an ADR
 

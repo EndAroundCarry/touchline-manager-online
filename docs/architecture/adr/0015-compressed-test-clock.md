@@ -1,6 +1,6 @@
 # ADR-0015: A compressed test clock is chosen at composition and refused in Production
 
-- **Status:** Accepted
+- **Status:** Accepted (decision 4 superseded by [ADR-0049](0049-non-production-stepped-game-clock.md))
 - **Date:** 2026-09-25
 - **Stage:** 6
 - **Related:** [ADR-0009](0009-time-identity-and-concurrency.md), [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0012](0012-daily-progression-materialised-job.md), master plan §15.5, §16 Stage 6, game rules `TIME-2`, `TIME-4`, `TIME-6`

@@ -293,6 +293,13 @@ if (diagnostics.EnableRolloverTrigger)
     moduleGroups["ops"].MapRolloverControls();
 }
 
+// The stepped clock's controls exist only when a stepped clock is in force: on a real-time or compressed
+// host the endpoints would have no clock to move, so they are not mapped at all (ADR-0049, §17.12).
+if (diagnostics.EnableGameClockControl && clock.IsStepped)
+{
+    moduleGroups["ops"].MapGameClockControls();
+}
+
 if (clock.IsCompressed)
 {
     app.Logger.LogWarning(
@@ -300,6 +307,15 @@ if (clock.IsCompressed)
         + "Real-time deadlines are deliberately accelerated; a browser's own countdowns are not (TIME-6).",
         clock.Rate,
         clock.RealAnchorUtc,
+        builder.Environment.EnvironmentName);
+}
+
+if (clock.IsStepped)
+{
+    app.Logger.LogWarning(
+        "A stepped clock is in force: game time is frozen at {InitialNow} and only moves when an operator "
+        + "advances it, in {Environment} (ADR-0049, TIME-6).",
+        clock.InitialNowUtc,
         builder.Environment.EnvironmentName);
 }
 

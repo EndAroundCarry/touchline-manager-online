@@ -399,6 +399,49 @@ was accepted while it was on. Confirm `readOnly: false` and that a manager write
 **Evidence.** The two `admin.feature_flag.set` audit rows (actor, reason, key, version) — one to set and one
 to clear.
 
+## Procedure — play a season on a stepped clock
+
+**When.** A non-production environment (staging, or a local clone) is configured with `Clock:Mode=Stepped`,
+and a tester wants to play a season through the real worker a day or a round at a time rather than wait out
+the real Tuesday/Thursday/Sunday cadence. This is not an incident; nothing here runs on the live game.
+
+**Preconditions.**
+1. The API and the worker both run with `Clock:Mode=Stepped` and the same `Clock:InitialNowUtc`, in an
+   environment that is not Production. A Production host refuses to start with a stepped clock (`TIME-6`).
+2. `Diagnostics:EnableGameClockControl` is on. Without it the endpoints are not mapped and the toolbar does
+   not appear (`§17.12`).
+3. The worker runs with a short poll — `Worker:PollIntervalSeconds=1` is what the stepped-season test uses —
+   so a step's jobs run promptly instead of waiting out the idle poll.
+
+**Action.** Open the app: a **Test clock** bar appears under the header with the game date, the next round,
+and two buttons. Under the hood:
+
+```bash
+# Read the game instant and the next round.
+curl -s $API/ops/diagnostics/game-clock
+# -> {"gameNow":"2026-10-05T12:00:00+00:00","nextMatchdayAt":"2026-10-06T19:00:00+00:00"}
+
+# Step one game day, or to the next kickoff.
+curl -s -X POST $API/ops/diagnostics/advance-game-clock \
+  -H 'Content-Type: application/json' -d '{"target":"matchday"}'
+# 202 -> {"target":"matchday","targetInstantUtc":"2026-10-06T19:00:00+00:00","businessKey":"clock:matchday:...","enqueued":true}
+```
+
+**Validation.** The toolbar waits for the clock to reach the target and the day to settle, then reloads, so
+the table, fixtures, and inbox show the new day. `GET /ops/diagnostics/game-clock` reports the advanced
+`gameNow`. A second request for the same target returns `enqueued:false` — a step is idempotent per target,
+not per press.
+
+**Notes.** Time is frozen between steps, so a transient failure is retried at once rather than after a
+backoff, and a lease left by a stopped worker is only reclaimed at the next step (ADR-0049). Stepping past a
+season's deadline materialises the real rollover job, which closes the season and opens the next.
+
+**Rollback / compensation.** None needed and none possible: a step cannot be undone. A stepped world is a
+test world; to start over, re-seed from a fresh database (`WORLD-1` keeps the seeder idempotent).
+
+**Evidence.** The worker's `ops.advance-game-clock` job row (completed or dead-lettered) and the jobs its
+materialisation produced.
+
 ## Runbook — the API is failing requests
 
 **Symptom.** `ApiAvailabilityBurnFast` is firing in Alertmanager, or the SLO overview's error-ratio panel is

@@ -25,7 +25,7 @@ namespace TouchlineManager.Infrastructure.Market;
 /// the resolution's own listing-status check covers the rest.
 /// </para>
 /// </remarks>
-internal sealed partial class AuctionScheduler : BackgroundService
+internal sealed partial class AuctionScheduler : BackgroundService, IJobMaterializer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IClock _clock;
@@ -63,7 +63,7 @@ internal sealed partial class AuctionScheduler : BackgroundService
         {
             try
             {
-                await EnsureAsync(stoppingToken);
+                await MaterializeAsync(_clock.UtcNow, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -86,9 +86,13 @@ internal sealed partial class AuctionScheduler : BackgroundService
         }
     }
 
-    private async Task EnsureAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task MaterializeAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var now = _clock.UtcNow;
+        if (!_options.EnableAuctions)
+        {
+            return;
+        }
 
         await using var scope = _scopeFactory.CreateAsyncScope();
         var listings = scope.ServiceProvider.GetRequiredService<IListingRepository>();

@@ -26,7 +26,7 @@ namespace TouchlineManager.Infrastructure.Finance;
 /// ledger's own correlation keys cover the rest.
 /// </para>
 /// </remarks>
-internal sealed partial class WeeklyFinanceScheduler : BackgroundService
+internal sealed partial class WeeklyFinanceScheduler : BackgroundService, IJobMaterializer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IClock _clock;
@@ -64,7 +64,7 @@ internal sealed partial class WeeklyFinanceScheduler : BackgroundService
         {
             try
             {
-                await EnsureAsync(stoppingToken);
+                await MaterializeAsync(_clock.UtcNow, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -87,9 +87,15 @@ internal sealed partial class WeeklyFinanceScheduler : BackgroundService
         }
     }
 
-    private async Task EnsureAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task MaterializeAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var due = MostRecentBoundary(_clock.UtcNow);
+        if (!_options.EnableWeeklyRun)
+        {
+            return;
+        }
+
+        var due = MostRecentBoundary(now);
         var next = due.AddDays(7);
 
         await using var scope = _scopeFactory.CreateAsyncScope();

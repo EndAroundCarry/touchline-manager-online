@@ -2,6 +2,7 @@ using TouchlineManager.Api.Http;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Jobs;
 using TouchlineManager.Application.Market;
+using TouchlineManager.Application.Ops;
 using TouchlineManager.Application.World;
 using TouchlineManager.Contracts.Competition;
 using TouchlineManager.Contracts.Market;
@@ -176,6 +177,66 @@ internal static class OpsEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         return group;
+    }
+
+    /// <summary>Maps the Stage 15 stepped-clock controls onto the ops module group.</summary>
+    /// <remarks>
+    /// Two non-production controls for the stepped clock (ADR-0049): a read of the game instant and the next
+    /// round, and a step to the next day or the next matchday. The step enqueues the worker's real advance
+    /// job, so the worker still sets the clock and materialises every domain job; the whole group is mapped
+    /// only when the diagnostics flag is on and the clock is stepped.
+    /// </remarks>
+    public static RouteGroupBuilder MapGameClockControls(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapGet("/diagnostics/game-clock", GetGameClockAsync)
+            .WithName("GetGameClock")
+            .WithSummary("Reads the stepped game instant and the next round (ADR-0049).")
+            .WithDescription(
+                "Development and staging diagnostics only. Reports the current game instant and the next "
+                + "round's kickoff, which the toolbar shows and uses to enable its buttons. Mapped only when "
+                + "the stepped clock is in force.")
+            .Produces<GameClockStatusResponse>(StatusCodes.Status200OK);
+
+        group
+            .MapPost("/diagnostics/advance-game-clock", AdvanceGameClockAsync)
+            .WithName("AdvanceGameClock")
+            .WithSummary("Enqueues one step of the stepped game clock, due now (ADR-0049).")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker sets the stored instant and materialises "
+                + "the day's real jobs — a round's lock and resolution, the day's progression — exactly as the "
+                + "calendar would; this only does what an operator's decision does, and a repeated request for "
+                + "the same target is a no-op.")
+            .Produces<GameClockAdvanceResponse>(StatusCodes.Status202Accepted);
+
+        return group;
+    }
+
+    private static async Task<IResult> GetGameClockAsync(
+        GetGameClockStatus status,
+        CancellationToken cancellationToken)
+    {
+        var result = await status.ExecuteAsync(cancellationToken);
+
+        return Results.Ok(new GameClockStatusResponse(result.GameNow, result.NextMatchdayAt));
+    }
+
+    private static async Task<IResult> AdvanceGameClockAsync(
+        AdvanceClockRequest? request,
+        AdvanceGameClock advance,
+        CancellationToken cancellationToken)
+    {
+        var result = await advance.ExecuteAsync(request?.Target, cancellationToken);
+
+        return Results.Json(
+            new GameClockAdvanceResponse(
+                result.Target,
+                result.TargetInstantUtc,
+                result.BusinessKey,
+                result.Enqueued),
+            statusCode: StatusCodes.Status202Accepted);
     }
 
     private static async Task<IResult> ProvisionDivisionAsync(
@@ -425,6 +486,26 @@ internal sealed record ProvisioningTriggerResponse(
 /// <param name="BusinessKey">The business key of the enqueued job.</param>
 /// <param name="Enqueued"><see langword="true"/> when the ladder row was newly inserted.</param>
 internal sealed record InactivityTriggerResponse(string BusinessKey, bool Enqueued);
+
+/// <summary>The body of the stepped-clock advance request.</summary>
+/// <param name="Target">The step kind, <c>day</c> or <c>matchday</c>; defaults to <c>day</c>.</param>
+internal sealed record AdvanceClockRequest(string? Target);
+
+/// <summary>Response of the stepped-clock read.</summary>
+/// <param name="GameNow">The current game instant.</param>
+/// <param name="NextMatchdayAt">The next round's kickoff, or null when none remains.</param>
+internal sealed record GameClockStatusResponse(DateTimeOffset GameNow, DateTimeOffset? NextMatchdayAt);
+
+/// <summary>Response of the stepped-clock advance.</summary>
+/// <param name="Target">The step kind that was requested.</param>
+/// <param name="TargetInstantUtc">The instant the step will land on.</param>
+/// <param name="BusinessKey">The business key of the enqueued job.</param>
+/// <param name="Enqueued"><see langword="true"/> when a new job row was inserted.</param>
+internal sealed record GameClockAdvanceResponse(
+    string Target,
+    DateTimeOffset TargetInstantUtc,
+    string BusinessKey,
+    bool Enqueued);
 
 /// <summary>The body of the rollover preview request.</summary>
 /// <param name="SeasonId">The season to preview, or null for the world's current season.</param>

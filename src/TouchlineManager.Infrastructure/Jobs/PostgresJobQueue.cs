@@ -2,10 +2,12 @@ using System.Data;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Domain.Ops;
 using TouchlineManager.Infrastructure.Persistence;
+using TouchlineManager.Infrastructure.Time;
 
 namespace TouchlineManager.Infrastructure.Jobs;
 
@@ -129,16 +131,21 @@ internal sealed partial class PostgresJobQueue : IJobQueue
 
     private readonly TouchlineManagerDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly ClockOptions _clockOptions;
     private readonly ILogger<PostgresJobQueue> _logger;
 
     /// <summary>Initializes the queue.</summary>
     public PostgresJobQueue(
         TouchlineManagerDbContext dbContext,
         IClock clock,
+        IOptions<ClockOptions> clockOptions,
         ILogger<PostgresJobQueue> logger)
     {
+        ArgumentNullException.ThrowIfNull(clockOptions);
+
         _dbContext = dbContext;
         _clock = clock;
+        _clockOptions = clockOptions.Value;
         _logger = logger;
     }
 
@@ -331,7 +338,13 @@ internal sealed partial class PostgresJobQueue : IJobQueue
         }
         else
         {
-            var nextDue = now.Add(JobRetryPolicy.NextDelay(attempts!.Value.AttemptCount, Random.Shared.NextDouble()));
+            // A backoff is measured from "now", so under a frozen stepped clock a retry scheduled thirty
+            // seconds ahead would never become due until the next step. A stepped world therefore retries a
+            // transient failure at once, and the attempt budget — not the delay — is what bounds it
+            // (ADR-0049, ADR-0003).
+            var nextDue = _clockOptions.IsStepped
+                ? now
+                : now.Add(JobRetryPolicy.NextDelay(attempts!.Value.AttemptCount, Random.Shared.NextDouble()));
 
             command.CommandText = RescheduleSql;
             AddParameter(command, "@id", jobId);
@@ -341,7 +354,7 @@ internal sealed partial class PostgresJobQueue : IJobQueue
 
             await command.ExecuteNonQueryAsync(cancellationToken);
 
-            LogRetryScheduled(jobId, attempts.Value.AttemptCount, attempts.Value.MaxAttempts, nextDue);
+            LogRetryScheduled(jobId, attempts!.Value.AttemptCount, attempts.Value.MaxAttempts, nextDue);
         }
     }
 

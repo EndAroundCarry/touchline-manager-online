@@ -24,7 +24,7 @@ namespace TouchlineManager.Infrastructure.Market;
 /// worker alone (`MAT-2`'s principle, applied to the market), and the scheduler exists only to place the row.
 /// </para>
 /// </remarks>
-internal sealed partial class AiMarketScheduler : BackgroundService
+internal sealed partial class AiMarketScheduler : BackgroundService, IJobMaterializer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IClock _clock;
@@ -62,7 +62,7 @@ internal sealed partial class AiMarketScheduler : BackgroundService
         {
             try
             {
-                await EnsureAsync(stoppingToken);
+                await MaterializeAsync(_clock.UtcNow, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -85,9 +85,14 @@ internal sealed partial class AiMarketScheduler : BackgroundService
         }
     }
 
-    private async Task EnsureAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task MaterializeAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var now = _clock.UtcNow;
+        if (!_options.EnableEvaluation)
+        {
+            return;
+        }
+
         var day = DateOnly.FromDateTime(now.UtcDateTime);
 
         await using var scope = _scopeFactory.CreateAsyncScope();

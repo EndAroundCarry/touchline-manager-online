@@ -35,7 +35,7 @@ namespace TouchlineManager.Infrastructure.Competition;
 /// then lost to an operator action.
 /// </para>
 /// </remarks>
-internal sealed partial class MatchdayScheduleScheduler : BackgroundService
+internal sealed partial class MatchdayScheduleScheduler : BackgroundService, IJobMaterializer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IClock _clock;
@@ -73,7 +73,7 @@ internal sealed partial class MatchdayScheduleScheduler : BackgroundService
         {
             try
             {
-                await EnsureAsync(stoppingToken);
+                await MaterializeAsync(_clock.UtcNow, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -96,9 +96,14 @@ internal sealed partial class MatchdayScheduleScheduler : BackgroundService
         }
     }
 
-    private async Task EnsureAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task MaterializeAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var now = _clock.UtcNow;
+        if (!_options.EnableMatchdayWorker)
+        {
+            return;
+        }
+
         var horizon = now.AddDays(_options.MaterializeHorizonDays);
 
         await using var scope = _scopeFactory.CreateAsyncScope();

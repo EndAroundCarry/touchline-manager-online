@@ -155,19 +155,19 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Binds the clock configuration, then replaces the real clock with a compressed one when a
-    /// non-production environment has opted in (ADR-0009, `TIME-6`).
+    /// Binds the clock configuration, then replaces the real clock with a compressed or stepped one when a
+    /// non-production environment has opted in (ADR-0009, ADR-0015, ADR-0049, `TIME-6`).
     /// </summary>
     /// <remarks>
     /// <para>
     /// Called by the composition roots, which are the only places that know the environment. The clock
     /// itself is chosen here rather than in each root so the rule lives in one place: real time by
-    /// default, compressed only where the configuration asks for it and the environment allows it.
+    /// default, non-real time only where the configuration asks for it and the environment allows it.
     /// </para>
     /// <para>
-    /// A production host that asks for compression does not silently fall back to real time — it fails to
-    /// start, by name. A quiet fallback would leave an operator believing a season was accelerated when it
-    /// was not, which is exactly the accident this guard exists to prevent (`TIME-6`).
+    /// A production host that asks for a compressed or stepped clock does not silently fall back to real
+    /// time — it fails to start, by name. A quiet fallback would leave an operator believing a season was
+    /// accelerated when it was not, which is exactly the accident this guard exists to prevent (`TIME-6`).
     /// </para>
     /// </remarks>
     /// <returns>The clock configuration in force, so a root can report a compressed clock in its logs.</returns>
@@ -183,7 +183,7 @@ public static class DependencyInjection
         var options = configuration.GetSection(ClockOptions.SectionName).Get<ClockOptions>()
             ?? new ClockOptions();
 
-        if (!options.IsCompressed)
+        if (!options.IsNonProduction)
         {
             return options;
         }
@@ -191,14 +191,26 @@ public static class DependencyInjection
         if (environment.IsProduction())
         {
             throw new InvalidOperationException(
-                "A compressed clock is never permitted in Production (ADR-0009, TIME-6). "
-                + "Remove Clock:Mode=Compressed, or run this configuration in a non-production environment.");
+                "A compressed or stepped clock is never permitted in Production (ADR-0009, ADR-0049, TIME-6). "
+                + "Remove Clock:Mode, or run this configuration in a non-production environment.");
         }
 
-        // Last registration wins, so this replaces the SystemClock AddInfrastructure registered. The clock
-        // reads the validated options, so an unsound rate or a missing anchor fails when it is resolved.
+        if (options.IsCompressed)
+        {
+            // Last registration wins, so this replaces the SystemClock AddInfrastructure registered. The clock
+            // reads the validated options, so an unsound rate or a missing anchor fails when it is resolved.
+            services.AddSingleton<IClock>(provider =>
+                new CompressedClock(provider.GetRequiredService<IOptions<ClockOptions>>().Value));
+
+            return options;
+        }
+
+        // Stepped: the instant is stored, so every host reads the same frozen "now", and each host keeps a
+        // fresh copy of it through the poller (ADR-0049).
         services.AddSingleton<IClock>(provider =>
-            new CompressedClock(provider.GetRequiredService<IOptions<ClockOptions>>().Value));
+            new SteppedClock(provider.GetRequiredService<IGameClockStore>()));
+
+        services.AddHostedService<GameClockPoller>();
 
         return options;
     }
@@ -213,6 +225,11 @@ public static class DependencyInjection
     /// </remarks>
     private static void AddClockInfrastructure(IServiceCollection services, IConfiguration configuration)
     {
+        // The one persisted instant a stepped clock reads. Registered in every host so the store is
+        // resolvable wherever the clock might be chosen; nothing creates a row unless the stepped clock
+        // actually reads it (ADR-0049).
+        services.AddSingleton<IGameClockStore, PostgresGameClockStore>();
+
         services
             .AddOptions<ClockOptions>()
             .Bind(configuration.GetSection(ClockOptions.SectionName))
@@ -222,6 +239,9 @@ public static class DependencyInjection
             .Validate(
                 options => !options.IsCompressed || options.Rate is >= 2 and <= 100_000,
                 "Clock:Rate must be between 2 and 100000 when Clock:Mode is Compressed (TIME-6).")
+            .Validate(
+                options => !options.IsStepped || options.InitialNowUtc is not null,
+                "Clock:InitialNowUtc must be set when Clock:Mode is Stepped (ADR-0049, TIME-6).")
             .ValidateOnStart();
     }
 
@@ -487,49 +507,66 @@ public static class DependencyInjection
         // The materializer that makes the daily progression row exist, and the row that becomes the
         // deadline (`TRN-3`). Worker-only for the same reason the poller is: the API must never advance
         // a player's training.
-        services.AddHostedService<DailyProgressionScheduler>();
+        AddMaterializer<DailyProgressionScheduler>(services);
 
         // The same arrangement for the season: this service turns the calendar into lock, resolution, and
         // publication jobs, and the rows it inserts are the deadlines (§7.2, ADR-0003).
-        services.AddHostedService<MatchdayScheduleScheduler>();
+        AddMaterializer<MatchdayScheduleScheduler>(services);
 
         // And the same for the AI: this service places the day's evaluation row, and the row is what gives
         // every club nobody holds a side and a training plan (INS-12).
-        services.AddHostedService<AiClubScheduler>();
+        AddMaterializer<AiClubScheduler>(services);
 
         // And the same for money: this service places the week's settlement row, and the row is what charges
         // every club its wages after the Sunday matchday (CON-2, FIN-7).
-        services.AddHostedService<WeeklyFinanceScheduler>();
+        AddMaterializer<WeeklyFinanceScheduler>(services);
 
         // And the same for the market: this service places a resolution row for every due listing, and the row
         // is what settles the winning bid (TRF-2, TRF-9).
-        services.AddHostedService<AuctionScheduler>();
+        AddMaterializer<AuctionScheduler>(services);
 
         // And the same for the AI's own trading: this service places the day's evaluation row, and the row is
         // what lists a surplus player and bids for a better one through the same writers a manager's command
         // uses (TRF-12, ADR-0025).
-        services.AddHostedService<AiMarketScheduler>();
+        AddMaterializer<AiMarketScheduler>(services);
 
         // And the same for the pyramid: this service places a provisioning row for every pending tier request,
         // and the row is what generates, backfills, and activates the next tier (PYR-4).
-        services.AddHostedService<ProvisioningScheduler>();
+        AddMaterializer<ProvisioningScheduler>(services);
 
         // And the same for tenure activity: this service places one ladder row a day, and the row is what
         // warns, hands routine decisions to the AI, and finally frees a club (OCC-1..OCC-3).
-        services.AddHostedService<InactivityScheduler>();
+        AddMaterializer<InactivityScheduler>(services);
 
         // And the same for the calendar's notifications: this service places a reminder row for every round
         // about to lock, and the row is what tells the managers holding its clubs (COM-3).
-        services.AddHostedService<ReminderScheduler>();
+        AddMaterializer<ReminderScheduler>(services);
 
         // And the same for the outbox: this service places a dispatch row every minute, and the row is what
         // sends the notifications the game has already committed to sending (MOD-4).
-        services.AddHostedService<OutboxScheduler>();
+        AddMaterializer<OutboxScheduler>(services);
 
         // And the same for the season: this service places a rollover row once the current season's deadline
         // has passed, and the row is what closes the season and opens the next one (PR-4, ADR-0031).
-        services.AddHostedService<SeasonRolloverScheduler>();
+        AddMaterializer<SeasonRolloverScheduler>(services);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers one worker scheduler so it runs on its interval and can also be materialised on demand.
+    /// </summary>
+    /// <remarks>
+    /// The scheduler is registered once as its concrete type and forwarded as both <see cref="IHostedService"/>
+    /// and <see cref="IJobMaterializer"/>, so there is one instance: a stepped clock's advance calls the same
+    /// object whose loop is already running, rather than a second copy that would duplicate its logs and its
+    /// options.
+    /// </remarks>
+    private static void AddMaterializer<T>(IServiceCollection services)
+        where T : class, IHostedService, IJobMaterializer
+    {
+        services.AddSingleton<T>();
+        services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<T>());
+        services.AddSingleton<IJobMaterializer>(provider => provider.GetRequiredService<T>());
     }
 }

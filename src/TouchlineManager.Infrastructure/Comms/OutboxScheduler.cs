@@ -25,7 +25,7 @@ namespace TouchlineManager.Infrastructure.Comms;
 /// command, and only the worker may dispatch it (ADR-0001, ADR-0008).
 /// </para>
 /// </remarks>
-internal sealed partial class OutboxScheduler : BackgroundService
+internal sealed partial class OutboxScheduler : BackgroundService, IJobMaterializer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IClock _clock;
@@ -63,7 +63,7 @@ internal sealed partial class OutboxScheduler : BackgroundService
         {
             try
             {
-                await EnsureAsync(stoppingToken);
+                await MaterializeAsync(_clock.UtcNow, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -85,9 +85,14 @@ internal sealed partial class OutboxScheduler : BackgroundService
         }
     }
 
-    private async Task EnsureAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task MaterializeAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var now = _clock.UtcNow;
+        if (!_options.EnableDispatch)
+        {
+            return;
+        }
+
         var businessKey = OutboxJobTypes.MinuteKey(now);
 
         await using var scope = _scopeFactory.CreateAsyncScope();

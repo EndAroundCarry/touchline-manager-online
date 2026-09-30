@@ -41,6 +41,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the ops module's feature flags (master plan §6.9, §13, ADR-0045).</summary>
     public DbSet<OpsFeatureFlag> FeatureFlags => Set<OpsFeatureFlag>();
 
+    /// <summary>Gets the ops module's single stepped game clock (ADR-0049, `TIME-6`).</summary>
+    public DbSet<OpsGameClock> GameClocks => Set<OpsGameClock>();
+
     /// <summary>Gets the auth module's accounts.</summary>
     public DbSet<User> Users => Set<User>();
 

@@ -63,6 +63,15 @@ if (clockOptions.IsCompressed)
             + $"{clockOptions.RealAnchorUtc:u} (TIME-6)."));
 }
 
+if (clockOptions.IsStepped)
+{
+    Console.WriteLine(
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Stepped clock in force: game time is frozen at {clockOptions.InitialNowUtc:u} and only moves "
+            + $"when an operator advances it (ADR-0049, TIME-6)."));
+}
+
 var result = await seeder.ExecuteAsync(
     new SeedWorldRequest(options.Seed, options.FirstMatchday),
     CancellationToken.None);

@@ -35,7 +35,7 @@ namespace TouchlineManager.Infrastructure.Competition;
 /// command, and only the worker may run it (ADR-0001, ADR-0008).
 /// </para>
 /// </remarks>
-internal sealed partial class SeasonRolloverScheduler : BackgroundService
+internal sealed partial class SeasonRolloverScheduler : BackgroundService, IJobMaterializer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IClock _clock;
@@ -73,7 +73,7 @@ internal sealed partial class SeasonRolloverScheduler : BackgroundService
         {
             try
             {
-                await EnsureAsync(stoppingToken);
+                await MaterializeAsync(_clock.UtcNow, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -96,9 +96,13 @@ internal sealed partial class SeasonRolloverScheduler : BackgroundService
         }
     }
 
-    private async Task EnsureAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task MaterializeAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var now = _clock.UtcNow;
+        if (!_options.EnableRollover)
+        {
+            return;
+        }
 
         await using var scope = _scopeFactory.CreateAsyncScope();
 

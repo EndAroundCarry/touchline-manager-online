@@ -12,6 +12,12 @@ public enum ClockMode
     /// Test time, advancing at a configured multiple of real time. Refused in Production (`TIME-6`).
     /// </summary>
     Compressed = 1,
+
+    /// <summary>
+    /// Test time that only moves when an operator advances it, frozen between steps. Refused in
+    /// Production (`TIME-6`, ADR-0049).
+    /// </summary>
+    Stepped = 2,
 }
 
 /// <summary>
@@ -75,8 +81,25 @@ public sealed class ClockOptions
     /// </remarks>
     public DateTimeOffset? VirtualAnchorUtc { get; set; }
 
+    /// <summary>
+    /// Gets or sets the instant the stepped clock starts at. Required when <see cref="Mode"/> is
+    /// <see cref="ClockMode.Stepped"/>.
+    /// </summary>
+    /// <remarks>
+    /// It seeds the one <c>ops.game_clock</c> row the first time the stepped clock is read, so a fresh
+    /// world begins at a chosen moment (typically just before its first kickoff) and every process that
+    /// reads the row agrees. Ignored in every other mode.
+    /// </remarks>
+    public DateTimeOffset? InitialNowUtc { get; set; }
+
     /// <summary>Gets a value indicating whether the compressed clock is in force.</summary>
     public bool IsCompressed => Mode == ClockMode.Compressed;
+
+    /// <summary>Gets a value indicating whether the stepped clock is in force.</summary>
+    public bool IsStepped => Mode == ClockMode.Stepped;
+
+    /// <summary>Gets a value indicating whether time is anything other than real time.</summary>
+    public bool IsNonProduction => Mode != ClockMode.System;
 
     /// <summary>Gets the game instant the map is anchored at, defaulting to the real anchor.</summary>
     public DateTimeOffset? EffectiveVirtualAnchorUtc => VirtualAnchorUtc ?? RealAnchorUtc;
