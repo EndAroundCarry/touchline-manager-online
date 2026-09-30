@@ -187,7 +187,7 @@ what makes it atomic, what happens on retry, and how it is recovered.
 | Ref | Rule |
 |---|---|
 | SC-1 | Dependencies are restored from lockfiles; CI fails on unresolved or drifting versions. |
-| SC-2 | Dependency, license, secret, and container vulnerability scanning run in the pull-request pipeline. |
-| SC-3 | Secrets live in environment/provider secret storage and are never committed. A secret-scanning check runs on every change. |
-| SC-4 | Container images are built from pinned base digests and scanned; production runs the scanned artifact. |
+| SC-2 | Dependency, licence, and base-image vulnerability scanning is the `infra/scan` suite, runnable locally with `npm run scan`; wiring it into the pull-request pipeline is the deployment milestone (`F-49`, ADR-0046). |
+| SC-3 | Secrets live in environment/provider secret storage and are never committed. `npm run scan:secrets` runs gitleaks over the working tree with a value-based allowlist for the deliberate development-only secrets, so a real secret in the same file is still caught (`SC-3`, ADR-0046). |
+| SC-4 | Container images are built from pinned base digests and scanned — deferred: no image is built yet, and production runs managed PostgreSQL (ADR-0008, ADR-0046). |
 | SC-5 | Engine and rule builds that produced historical matches are retained so replays remain possible (ADR-0004). |

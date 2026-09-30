@@ -62,6 +62,7 @@ the system is shaped the way it is.
 | [0043](0043-operator-read-console.md) | Operator read console — jobs, matchdays, and audit | Accepted |
 | [0044](0044-operator-recovery-commands.md) | Operator recovery commands — job retry and cancel, and matchday resume | Accepted |
 | [0045](0045-administrative-repairs-and-broadcasts.md) | Administrative ownership and finance repairs, operator broadcasts, and the flag store | Accepted |
+| [0046](0046-load-supply-chain-and-restore-drills.md) | Load, supply-chain, and restore drills, run locally | Accepted |
 
 ## Rules for changing an ADR
 

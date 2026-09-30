@@ -181,9 +181,26 @@ tool in `tools/simulation-benchmarks`.
 
 ## Layer 10 — Load, security, and restore — Stage 14
 
-k6 scenarios for login bursts, dashboard reads, matchday polling, and concurrent bids; OWASP
-dependency and dynamic baseline scans; a backup/PITR restore drill with integrity checks. The plan
-requires 3x projected launch headroom.
+Stage 14 delivered all three, runnable locally and by hand; wiring them into CI is the deployment
+milestone's work ([ADR-0046](../architecture/adr/0046-load-supply-chain-and-restore-drills.md)).
+
+**Load** (`tests/load/`, `npm run load:*`): k6 scenarios for a sign-in burst, dashboard reads, the
+matchday polling cadence, and auction contention, plus a matchday-publication scenario. The population
+model is the world itself — 108 clubs, so 108 concurrent managers and 324 virtual users at the required
+three-times headroom. Each request is tagged `read` or `command`, so the read p95 (500 ms) and command
+p95 (800 ms) objectives are asserted per endpoint; an expected `409` on a losing bid is excluded so
+`http_req_failed` still means "a 5xx". The publication scenario needs a due round and fails fast with
+that reason on a real-time stack, so it is run against the compressed-clock matchday stack.
+
+**Scans** (`infra/scan/`, `npm run scan*`): a dependency-vulnerability scan for .NET and npm, a licence
+inventory for both read from the lockfiles and nuspecs a restore already produced, a secret scan
+(gitleaks), and a base-image scan (trivy). Dependency, licence, and secret findings block; the image
+scan is advisory while no image is shipped, with `scan:image:strict` as the future gate.
+
+**Restore** (`infra/restore-drill/`, `npm run drill:restore`): a real point-in-time drill — base backup,
+WAL archive, replay to a chosen instant, promote — whose integrity checks prove the ledger replays to
+every stored balance, publication stays atomic, the job queue is sound, leases are cleared, and the
+post-target marker is absent. It tears itself down when it finishes.
 
 ---
 

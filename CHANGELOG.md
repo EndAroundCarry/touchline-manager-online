@@ -3,6 +3,69 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 14 — Load, supply-chain scans, and the point-in-time restore drill
+
+The stage's operational proof: test-strategy **layer 10**. §16 requires load tests at three times the
+projected launch population, dependency and container scans, and a backup/PITR restore with integrity
+checks; `SC-2`/`SC-3` require the scans and §14 fixes the SLOs the load must meet. None of it existed.
+All of it now runs **locally and by hand** — no application code changed, no schema moved, and nothing
+is wired into CI yet (`F-49`, `SC-2`, `SC-3`, ADR-0046).
+
+### Added
+
+- **A k6 load suite at three times the projected launch population** (`F-49`): `tests/load/` holds five
+  scenarios — a sign-in burst, dashboard reads, the matchday polling cadence, auction contention, and
+  matchday publication. The population model is the world itself: six countries of eighteen clubs is 108
+  clubs, so 108 concurrent managers and 324 virtual users at the required headroom. Each request is
+  tagged `read` or `command`, so the p95 read (500 ms) and command (800 ms) SLOs are asserted per
+  endpoint; a losing bid's expected `409` is declared, so `http_req_failed` still means "a `5xx`". k6
+  runs through its pinned image, and the runner arranges the network per platform.
+- **A load fixture built through the public API** (`tests/load/seed.mjs`): it brings the stack up,
+  migrates and seeds the world, then registers, confirms, signs in, onboards, and claims one club per
+  manager through the real endpoints — and opens a few listings for the auction scenario.
+- **A supply-chain scan suite** (`SC-2`, `SC-3`): `infra/scan/scan.mjs` runs a .NET and npm
+  vulnerability scan, a licence inventory for both read from the lockfiles and nuspecs a restore already
+  wrote, a gitleaks secret scan, and a trivy scan of the base images. `.gitleaks.toml` allowlists by
+  value, never by whole file, so a real secret in a test file is still caught.
+- **A real point-in-time restore drill** (`F-49`): `infra/restore-drill/` stands up an archive-enabled
+  PostgreSQL, seeds a world, marks a point in time, takes a `pg_basebackup`, writes data after that
+  point, then recovers a fresh cluster to the point with `recovery.signal` and `recovery_target_time`,
+  promotes it, and proves the outcome. `checks.sql` fails loudly unless the ledger replays to every
+  stored balance, publication stays atomic, the job queue is sound, leases are cleared (ADR-0008), the
+  post-target marker is absent, and the world is intact. `sanitize.sql` is the restored-environment step.
+- **New npm scripts and three operations documents**: `scan`, `scan:*`, `load:*`, and `drill:restore`,
+  with `docs/operations/supply-chain.md`, `load-testing.md`, and `backup-and-restore.md`.
+
+### Notes
+
+- **No migration, no application change.** The whole milestone is scripts, SQL, compose, npm wiring, and
+  documentation; the .NET build, tests, and web build are untouched.
+- **The base-image scan is advisory.** No image is shipped yet and production runs managed PostgreSQL
+  (ADR-0008), so a trivy finding is a `WARN`; `scan:image:strict` becomes the gate when the deployment
+  milestone builds images. The current `postgres:17-alpine` reports fixable Go `stdlib` advisories in its
+  bundled `gosu` — the same set is in `postgres:18-alpine`, so it is upstream.
+- **The matchday-publication scenario needs a due round.** On a real-time stack the next kickoff is days
+  away and the scheduler has already materialised the round's jobs, so the diagnostics trigger is a
+  no-op; the scenario says so and fails fast rather than polling for nothing. It runs against the
+  compressed-clock matchday stack (ADR-0015).
+- **Deferred to the deployment milestone** (recorded in ADR-0046): production Dockerfiles and image
+  build/scan/publish; CI wiring and gating; deployment rollback and API/PWA compatibility (`F-50`);
+  maintenance/read-only mode (`F-51`); telemetry dashboards and SLO alerting (`F-48`); and acting on the
+  load evidence.
+
+### Tests
+
+- **Load**: the four pure-load scenarios were run against a live stack at 324 virtual users in smoke and
+  full form — reads held a p95 well inside 500 ms with zero failures; the auction scenario placed bids
+  under contention with no `5xx`. The publication scenario's guard was verified to fail fast and explain
+  itself when no round is due.
+- **Scans**: `npm run scan` was run end to end — dependency, licence, and secret checks pass; the
+  base-image check reports its advisories as a warning. A deliberately introduced finding was confirmed
+  to fail the run.
+- **Restore**: `npm run drill:restore` recovered a seeded world to a chosen instant and passed every
+  `checks.sql` invariant, with the post-target marker absent — the point-in-time property that makes the
+  drill meaningful.
+
 ## Stage 14 — Administrative repairs and broadcasts: AI assignment, finance repair, announcements, and flags
 
 The fourth Stage 14 milestone completes §10.8. §13 requires "account suspension/restoration and AI takeover",
