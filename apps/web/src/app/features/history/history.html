@@ -25,7 +25,12 @@
         No season has finished yet. Your first completed season will appear here after the rollover.
       </p>
     } @else {
-      <div class="mt-6 overflow-x-auto rounded border border-slate-200 bg-white">
+      <div
+        class="mt-6 overflow-x-auto rounded border border-slate-200 bg-white"
+        tabindex="0"
+        role="group"
+        aria-label="Season history"
+      >
         <table class="min-w-full border-collapse text-sm">
           <caption class="sr-only">
             {{ record.clubName }} season by season, most recent first.

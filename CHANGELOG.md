@@ -3,6 +3,65 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 13 — Accessibility remediation and the axe gate
+
+The promise in §11.3 is now enforced where it is easiest to break. An automated axe journey runs over
+every core screen at desktop and mobile, and the gaps it can see were fixed: the squad roster has a name,
+a tactics slot can be moved without a mouse, a scrollable table region is reachable by keyboard, a focused
+control keeps its ring, and focus follows the navigation rather than staying on the link that was pressed.
+This is the fourth Stage 13 milestone (`F-52`, ADR-0039).
+
+### Added
+
+- **An axe gate over the core routes** (`F-52`, §15.6): `@axe-core/playwright` and a new `@a11y` journey
+  (`journeys/accessibility.spec.ts`) scan every public screen and every manager screen a claimed club
+  reaches, filtered to the WCAG 2.2 A/AA tags. It runs in the desktop and mobile projects the suite
+  already has — so the card layouts are audited on a phone and the tables on a desktop — and collects
+  each screen's violations so one run names every offending page. `npm run test:a11y` runs it alone.
+- **A focus-ring guard** (`§11.3`): the journey focuses a text control and asserts a ≥2px outline, because
+  the ring survives only through the unlayered global `:focus-visible` rule.
+- **A keyboard path to move a tactics slot** (`TAC-7`, §11.3): a focused slot marker moves with the arrow
+  keys, bounded to the pitch, and the selection status line announces the new position — the non-drag
+  alternative for a slot's position, alongside the assignment table that already covers player and role.
+
+### Fixed
+
+- **The squad roster was the one unnamed table.** PrimeNG's `p-table` renders `<table role="table">` with
+  no accessible name; it is named now through PrimeNG pass-through (`[pt]="{ table: { 'aria-label': … } }"`).
+- **Scrollable table regions had no keyboard access.** Every `overflow-x-auto` table wrapper that can
+  scroll on a narrow screen is now a focusable, named `role="group"`, so a keyboard user can scroll it
+  (WCAG 2.1.1) instead of needing a pointer.
+- **A slot's state was invisible to assistive technology.** "Out of position" and "unavailable" were
+  rendered `aria-hidden` and were absent from the marker's accessible name; the name now carries the state
+  and the empty case.
+- **Focus did not move on navigation.** A single-page app swaps the view without moving focus; the shell
+  now focuses `<main>` on every navigation after the first (WCAG 2.4.3). The router already set the title.
+- **Contrast and labelling details:** the footer's support reference `<code>` met 4.5:1; the training
+  card's per-player focus select is single-sourced through `aria-label` with a plain visible label (it had
+  both a wrapping `<label>` and an overriding `aria-label`); and the mobile menu's `aria-controls` no
+  longer points at an element that only exists while the menu is open.
+
+### Notes
+
+- **No migration, no server change, no new runtime dependency.** Everything here is the web client and its
+  tests; `@axe-core/playwright` is a test-only dev dependency (its lockfile change is committed).
+- **The gate rides the existing e2e job.** Because the `@a11y` journey lives in `journeys/`, the CI e2e
+  step already runs it at desktop and mobile; the Canvas viewer is scanned in the matchday step, where a
+  real replay exists. No workflow change was needed.
+- **Axe is a floor, not a proof of AA.** It cannot see reduced-motion behaviour or a screen reader's
+  experience, so the manual keyboard and screen-reader checks in §15.6 remain.
+- **`docs/architecture/adr/0039-accessibility-baseline-and-axe-gate.md`** records the decision;
+  `mvp-traceability.md` gains `F-52` and its §2 mapping row, and `test-strategy.md` gains the Layer 8
+  paragraph and the accessibility gate row.
+
+### Tests
+
+- New `journeys/accessibility.spec.ts` (tagged `@a11y`): axe over the signed-out screens and the
+  onboarding and manager screens, plus the focus-ring guard. It passes at desktop and mobile.
+- `matchday/matchday.spec.ts` scans the match center while a replay is on screen, covering the Canvas
+  viewer's `role="img"`, narration, and transport.
+- `support/accessibility.ts` (new) holds the axe helper, the violation report, and the focus-ring check.
+
 ## Stage 13 — Responsive layouts, touch targets, and the breakpoint suite
 
 The app is responsive in the way Stage 13 promises, and it is proven at more than one width. Below

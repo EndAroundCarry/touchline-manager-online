@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 13 in progress — the responsive PWA, account sessions, and the offline boundary.** The playable
+> **Status: Stage 13 in progress — the responsive PWA, account sessions, the offline boundary, and the accessibility gate.** The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
 > pipeline, the API and worker composition roots, the health and observability baseline, and the Angular
 > PWA shell. Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions
@@ -53,7 +53,10 @@ kick-off. The server decides results; a client can never simulate or influence o
 > label, and offline mutation blocking (ADR-0037). Its responsive work is now done too: below `md` the
 > sidebar becomes a header menu, the dense screens present cards instead of tables, every control is at
 > least 44px tall, and the core Playwright suite runs at desktop and mobile breakpoints with a tablet
-> project for the layout boundary (`F-44`, ADR-0038).
+> project for the layout boundary (`F-44`, ADR-0038). Accessibility is now enforced too: an axe gate over
+> the core routes at desktop and mobile, and the gaps it found fixed — the squad roster named, a tactics
+> slot moved with the arrow keys, scrollable table regions reachable by keyboard, and focus following the
+> navigation (`F-52`, ADR-0039).
 
 ---
 
@@ -110,6 +113,7 @@ npm run format:check  # formatting gate
 
 npm run e2e:install   # once: installs Playwright and its Chromium browser
 npm run test:e2e      # end-to-end journeys in a real browser
+npm run test:e2e:a11y # just the accessibility (axe) gate, a subset of the journeys
 ```
 
 `npm run test:e2e` needs Docker. It brings up PostgreSQL and the mail catcher, applies migrations,

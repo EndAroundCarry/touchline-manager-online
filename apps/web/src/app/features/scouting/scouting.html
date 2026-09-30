@@ -101,7 +101,13 @@
       } @else if (results().length === 0) {
         <p class="mt-2 text-sm text-slate-600" role="status">No players match those filters.</p>
       } @else {
-        <div class="mt-2 hidden overflow-x-auto md:block" data-testid="scouting-table">
+        <div
+          class="mt-2 hidden overflow-x-auto md:block"
+          data-testid="scouting-table"
+          tabindex="0"
+          role="group"
+          aria-label="Scouting results"
+        >
           <table class="min-w-full divide-y divide-slate-200 text-sm">
             <caption class="sr-only">
               Scouting results, with exact public attributes

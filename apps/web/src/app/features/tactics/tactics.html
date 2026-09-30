@@ -119,7 +119,8 @@
           <h2 class="text-lg font-semibold text-slate-900">Formation</h2>
           <p class="mt-1 text-sm text-slate-600">
             Drag a player onto a slot to pick them, or drag a slot to move it. Selecting a slot and
-            then choosing a player on the right does the same without dragging.
+            then choosing a player on the right assigns them without dragging, and the arrow keys
+            move the selected slot.
           </p>
 
           <div
@@ -147,6 +148,7 @@
                 [attr.aria-pressed]="slot.isSelected"
                 [attr.aria-label]="slotLabel(slot)"
                 (click)="selectSlot(slot.slotNumber)"
+                (keydown)="onSlotKeydown($event, slot.slotNumber)"
                 (dragstart)="onSlotDragStart($event, slot.slotNumber)"
                 (dragover)="onSlotDragOver($event)"
                 (drop)="onSlotDrop($event, slot.slotNumber)"
@@ -168,7 +170,8 @@
 
           @if (selectedSlot() > 0) {
             <p class="mt-3 text-sm text-slate-600" role="status">
-              Slot {{ selectedSlot() }} is selected. Choose a player on the right, or
+              Slot {{ selectedSlot() }} is selected at {{ selectedPosition() }}. Choose a player on
+              the right, or
               <button type="button" [class]="linkClass" (click)="clearSlot(selectedSlot())">
                 empty it</button
               >.
@@ -237,7 +240,7 @@
           An alternative to dragging: pick a role and a player for each slot (TAC-8, INS-10).
         </p>
 
-        <div class="mt-3 overflow-x-auto">
+        <div class="mt-3 overflow-x-auto" tabindex="0" role="group" aria-label="Slot assignments">
           <table class="w-full border-collapse text-left text-sm">
             <caption class="sr-only">
               Assign a role and a player to each of the eleven slots

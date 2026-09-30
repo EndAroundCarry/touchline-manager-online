@@ -15,6 +15,7 @@
     "test": "dotnet test TouchlineManager.slnx",
     "test:web": "npm --prefix apps/web run test:ci",
     "test:e2e": "npm --prefix tests/web-e2e test",
+    "test:e2e:a11y": "npm --prefix tests/web-e2e run test:a11y",
     "test:e2e:matchday": "npm --prefix tests/web-e2e run test:matchday",
     "test:e2e:market": "npm --prefix tests/web-e2e run test:market",
     "test:e2e:pwa": "npm --prefix tests/web-e2e run test:pwa",

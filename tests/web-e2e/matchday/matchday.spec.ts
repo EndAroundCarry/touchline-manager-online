@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
+import { expectNoA11yViolations } from '../support/accessibility';
 import { createVerifiedManager } from '../support/auth-flows';
 import {
   apiAccessToken,
@@ -146,5 +147,9 @@ test.describe('the matchday', () => {
     } else {
       await expect(page.getByText(/This match has no highlights to replay/)).toBeVisible();
     }
+
+    // The Canvas viewer's accessibility is only real where a replay exists, so it is scanned on this
+    // stack: the `role="img"` canvas, its narration, and the keyboard-operable transport (§11.3, §15.6).
+    await expectNoA11yViolations(page);
   });
 });

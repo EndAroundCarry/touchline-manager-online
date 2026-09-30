@@ -109,7 +109,12 @@
           No entries yet. Gate receipts, wages, and costs arrive here as the season plays.
         </p>
       } @else {
-        <div class="mt-4 overflow-x-auto">
+        <div
+          class="mt-4 overflow-x-auto"
+          tabindex="0"
+          role="group"
+          aria-label="Ledger entries"
+        >
           <table class="min-w-full divide-y divide-slate-200 text-sm">
             <caption class="sr-only">Your club's ledger, newest first</caption>
             <thead>

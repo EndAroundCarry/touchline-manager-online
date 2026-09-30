@@ -31,6 +31,14 @@ const PLAYER_MIME = 'application/x-touchline-player';
 /** The drag payload for a slot marker, so a drop on the pitch repositions rather than assigns. */
 const SLOT_MIME = 'application/x-touchline-slot';
 
+/** How far an arrow key nudges a slot, as a share of the 0–10,000 pitch axis (`TAC-7`). */
+const KEYBOARD_MOVE_STEP = 500;
+
+/** A normalized pitch coordinate as the whole-number percentage a manager reads. */
+function percent(value: number): number {
+  return Math.round(value / 100);
+}
+
 /** One slot as the board draws it: the layout, its occupant, and how both should read. */
 interface SlotView {
   readonly slotNumber: number;
@@ -154,6 +162,16 @@ export class Tactics {
     );
 
     return validation.issues.map((issue) => issueMessage(issue, names));
+  });
+
+  /** Where the selected slot sits, in the words a manager reads, so a keyboard move can be announced. */
+  protected readonly selectedPosition = computed(() => {
+    const selected = this.selectedSlot();
+    const slot = this.draft()?.slots.find((candidate) => candidate.slotNumber === selected) ?? null;
+
+    return slot === null
+      ? null
+      : `${percent(slot.normalizedX)}% depth, ${percent(slot.normalizedY)}% width`;
   });
 
   constructor() {
@@ -305,11 +323,23 @@ export class Tactics {
     return `${base} border-white bg-white text-slate-900`;
   }
 
-  /** The accessible name of a slot marker, describing where it is and who is in it. */
+  /** The accessible name of a slot marker, describing where it is, who is in it, and its state. */
   protected slotLabel(slot: SlotView): string {
-    const occupant = slot.player === null ? 'empty' : slot.player.fullName;
+    const position = `${familyLabel(slot.positionFamily)}, ${roleLabel(slot.role)}`;
 
-    return `Slot ${slot.slotNumber}, ${familyLabel(slot.positionFamily)}, ${roleLabel(slot.role)}: ${occupant}`;
+    if (slot.player === null) {
+      return `Slot ${slot.slotNumber}, ${position}: empty`;
+    }
+
+    // The state is in the accessible name, not only in the visual words the marker renders — the marker
+    // marks those `aria-hidden`, so a screen-reader manager would otherwise miss it (§11.3).
+    const state = slot.isOutOfPosition
+      ? ', out of position'
+      : slot.isUnavailable
+        ? ', unavailable'
+        : '';
+
+    return `Slot ${slot.slotNumber}, ${position}: ${slot.player.fullName}${state}`;
   }
 
   /** Starts dragging a player chip. */
@@ -386,6 +416,47 @@ export class Tactics {
     const normalizedY = clampPitchCoordinate(((event.clientX - rect.left) / rect.width) * 10_000);
 
     this.store.moveSlot(slotNumber, normalizedX, normalizedY);
+    this.selectedSlot.set(slotNumber);
+  }
+
+  /**
+   * Moves the focused slot with the arrow keys (`TAC-7`, §11.3).
+   *
+   * Repositioning a slot was drag-only, which a keyboard or screen-reader manager could not do; assigning
+   * a player and a role already had the assignment table, but the slot's own position did not. The marker
+   * is already a focusable button, so the arrow keys nudge it by a fixed step, bounded to the pitch. The
+   * depth axis is drawn upward, so up increases depth, and the selection status line announces the result.
+   */
+  protected onSlotKeydown(event: KeyboardEvent, slotNumber: number): void {
+    const slot =
+      this.draft()?.slots.find((candidate) => candidate.slotNumber === slotNumber) ?? null;
+
+    if (slot === null) {
+      return;
+    }
+
+    let x = slot.normalizedX;
+    let y = slot.normalizedY;
+
+    switch (event.key) {
+      case 'ArrowUp':
+        x += KEYBOARD_MOVE_STEP;
+        break;
+      case 'ArrowDown':
+        x -= KEYBOARD_MOVE_STEP;
+        break;
+      case 'ArrowLeft':
+        y -= KEYBOARD_MOVE_STEP;
+        break;
+      case 'ArrowRight':
+        y += KEYBOARD_MOVE_STEP;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    this.store.moveSlot(slotNumber, clampPitchCoordinate(x), clampPitchCoordinate(y));
     this.selectedSlot.set(slotNumber);
   }
 }

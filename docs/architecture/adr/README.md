@@ -55,6 +55,7 @@ the system is shaped the way it is.
 | [0036](0036-account-sessions-export-and-preferences.md) | Account sessions, machine-readable export, and formatting preferences | Accepted |
 | [0037](0037-pwa-update-ux-and-offline-boundary.md) | PWA update UX, offline mutation gating, and the stale-read indicator | Accepted |
 | [0038](0038-responsive-shell-and-touch-targets.md) | Responsive shell, touch-target baseline, and the breakpoint test matrix | Accepted |
+| [0039](0039-accessibility-baseline-and-axe-gate.md) | Accessibility baseline and the axe gate | Accepted |
 
 ## Rules for changing an ADR
 

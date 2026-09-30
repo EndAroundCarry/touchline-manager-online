@@ -5,6 +5,7 @@
   "description": "End-to-end journeys driven through a real browser against the real API and database.",
   "scripts": {
     "test": "playwright test",
+    "test:a11y": "playwright test --grep @a11y",
     "test:matchday": "playwright test -c playwright.matchday.config.ts",
     "test:market": "playwright test -c playwright.market.config.ts",
     "test:pwa": "playwright test -c playwright.pwa.config.ts",
@@ -15,6 +16,7 @@
   },
   "packageManager": "npm@12.0.2",
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.2",
     "typescript": "~6.0.2"

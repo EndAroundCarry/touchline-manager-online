@@ -115,7 +115,13 @@
           <p [class]="formErrorClass" role="alert">{{ message }}</p>
         }
 
-        <div class="mt-3 hidden overflow-x-auto md:block" data-testid="training-table">
+        <div
+          class="mt-3 hidden overflow-x-auto md:block"
+          data-testid="training-table"
+          tabindex="0"
+          role="group"
+          aria-label="Individual training focus"
+        >
           <table class="w-full border-collapse text-left text-sm">
             <caption class="sr-only">
               The squad, with each player's individual training focus
@@ -202,8 +208,8 @@
                 </span>
               </div>
 
-              <label class="mt-2 block">
-                <span class="text-sm font-medium text-slate-700">Focus</span>
+              <div class="mt-2">
+                <span class="text-sm font-medium text-slate-700">Individual focus</span>
                 <select
                   [class]="textInputClass"
                   [attr.aria-label]="'Individual focus for ' + player.fullName"
@@ -215,7 +221,7 @@
                     <option [value]="option.value">{{ option.label }}</option>
                   }
                 </select>
-              </label>
+              </div>
             </li>
           }
         </ul>

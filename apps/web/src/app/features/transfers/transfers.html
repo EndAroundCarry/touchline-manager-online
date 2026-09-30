@@ -72,7 +72,13 @@
     } @else if (listings().length === 0) {
       <p class="mt-2 text-sm text-slate-600" role="status">No players are listed right now.</p>
     } @else {
-      <div class="mt-2 hidden overflow-x-auto md:block" data-testid="listings-table">
+      <div
+        class="mt-2 hidden overflow-x-auto md:block"
+        data-testid="listings-table"
+        tabindex="0"
+        role="group"
+        aria-label="Transfer listings"
+      >
         <table class="min-w-full divide-y divide-slate-200 text-sm">
           <caption class="sr-only">
             Open transfer listings
@@ -258,7 +264,7 @@
     @if (history().length === 0) {
       <p class="mt-2 text-sm text-slate-600" role="status">No transfers have completed yet.</p>
     } @else {
-      <div class="mt-2 overflow-x-auto">
+      <div class="mt-2 overflow-x-auto" tabindex="0" role="group" aria-label="Recent transfers">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
           <caption class="sr-only">
             Completed transfers

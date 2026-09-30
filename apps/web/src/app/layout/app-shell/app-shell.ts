@@ -1,5 +1,6 @@
 import { Component, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Subscription, filter } from 'rxjs';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
 import { CompetitionStore } from '../../core/competition/competition-store';
@@ -43,10 +44,32 @@ export class AppShell implements OnDestroy {
   private readonly sync = inject(SyncStore);
   private readonly router = inject(Router);
 
+  /** The route-change subscription that moves focus to the main content (`§11.3`). */
+  private readonly navigationSubscription: Subscription;
+
+  /** Whether the initial navigation has been seen, so focus is not stolen on first load. */
+  private isInitialNavigation = true;
+
   constructor() {
     // The poll starts with the shell and stops with it, so the badge is fresh on every screen and no timer
     // outlives the shell that owns it (§11.2).
     this.sync.start();
+
+    // A single-page app does not move focus when the view swaps, so a keyboard manager is left on the link
+    // they pressed while the page under them changed (WCAG 2.4.3). Focus the main landmark on every
+    // navigation after the first, so the new page's heading is read next; the router already sets the
+    // document title, so only focus was missing.
+    this.navigationSubscription = this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd))
+      .subscribe(() => {
+        if (this.isInitialNavigation) {
+          this.isInitialNavigation = false;
+
+          return;
+        }
+
+        document.getElementById('main-content')?.focus();
+      });
   }
 
   /**
@@ -96,9 +119,10 @@ export class AppShell implements OnDestroy {
     this.closeMobileNav();
   }
 
-  /** Stops the synchronization poll when the shell goes away. */
+  /** Stops the synchronization poll and the focus subscription when the shell goes away. */
   ngOnDestroy(): void {
     this.sync.stop();
+    this.navigationSubscription.unsubscribe();
   }
 
   /** Ends the session on this device. */

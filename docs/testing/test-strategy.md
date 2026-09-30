@@ -137,6 +137,8 @@ Stage 13 added a third stack (`playwright.pwa.config.ts`, `npm run test:pwa`) th
 
 Stage 13 also made the core suite **breakpoint-aware** (`F-44`, ADR-0038). `playwright.config.ts` declares a `desktop` and a `mobile` project, each running every journey, and a `tablet` project that selects only the `@responsive` spec by `grep`. A shared `support/navigation.ts` opens the shell's mobile disclosure when it is present, so a journey that reaches a destination through the sidebar also runs on a phone. The responsive spec (`journeys/responsive.spec.ts`) asserts the disclosure-versus-sidebar switch at the `md` boundary, that a converted screen shows its card list below it and its table above it, that the shown controls are at least 44px tall, and that no screen makes the page itself scroll sideways. The journeys on the converted screens branch on the layout they are given — squad and training assert their card list on a phone and their table on a desktop — so the same journey proves both.
 
+Stage 13 also added the accessibility gate (`F-52`, ADR-0039). An `@a11y` journey runs axe, filtered to the WCAG 2.2 A/AA tags, over every public screen and every manager screen a claimed club reaches, at the desktop and mobile projects — so the card layouts are audited on a phone and the tables on a desktop — collecting each screen's violations so one run names every offending page. The Canvas viewer is scanned in the matchday journey, where a real replay exists. The same journey guards the focus ring the shared controls depend on, and the milestone fixes what axe found: the squad roster is named, a focused tactics slot moves with the arrow keys and its state and position are in its accessible name, every horizontal-scroll table region is focusable and named, and focus moves to `<main>` on navigation.
+
 ## Layer 9 — Match-engine validation — Stage 5
 
 Golden output hashes per engine version, byte-identical repetition across supported platforms,
@@ -162,6 +164,7 @@ requires 3x projected launch headroom.
 | Angular typecheck, build, unit tests | Every pull request | Yes |
 | End-to-end journeys (Playwright) | Every pull request | Yes |
 | Responsive breakpoints (desktop + mobile journeys, tablet `@responsive`) | Every pull request | Yes |
+| Automated accessibility (axe, WCAG 2.2 AA) on core routes | Every pull request | Yes |
 | Generated migration SQL | Every pull request, uploaded as an artefact | Review |
 | Bundle size budgets | Every frontend build | Yes (Angular budgets) |
 | Dependency, licence, secret, container scans | Every pull request (Stage 14 for containers) | Yes |
