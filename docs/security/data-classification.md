@@ -146,4 +146,9 @@ Stage 0 exit criteria require that the classification is actionable, not aspirat
 - [x] The operator read console exposes no C3/C4 value (Stage 14): the job, matchday, and audit reads
   return statuses, counts, and reason text, never a secret, a hashed client IP, or repair metadata
   (`F-46`, `F-47`, ADR-0043).
+- [x] The operator repairs and broadcasts carry no C3/C4 value (Stage 14): `assign-ai` returns a club
+  control status, the compensating entry returns a balance delta and the resulting cash, an announcement
+  returns its feed item, and a feature flag returns the operator's own JSON value — never a manager's
+  personal data, a hidden valuation, or a secret. The four commands require a reason and record a hashed
+  client IP that the reads withhold (`F-46`, `F-47`, ADR-0045).
 - [ ] Restore drills confirm ENV-3 (Stage 14).

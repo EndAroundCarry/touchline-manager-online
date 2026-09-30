@@ -620,6 +620,7 @@ erDiagram
         text correlation_id
         text description_template
         jsonb description_parameters
+        uuid reverses_entry_id FK
         timestamptz created_at
     }
     club_season_finances {
@@ -789,10 +790,12 @@ erDiagram
     feature_flags {
         uuid id PK
         text scope
-        text key UK
+        text key
         jsonb value
         jsonb rollout_metadata
         bigint version
+        timestamptz created_at
+        timestamptz updated_at
     }
     repair_actions {
         uuid id PK
@@ -822,6 +825,8 @@ erDiagram
 | `check (category in (...))`, `check (length(template_key) > 0)` | `inbox_messages` | A stored shelf and template are codes, not ordinals |
 | Partial index `recipient_manager_id where read_at is null` | `inbox_messages` | Unread badge and sync counter |
 | Index `(recipient_manager_id, created_at, id)` | `inbox_messages` | Keyset page order, newest first |
+| `unique (scope, key)` | `feature_flags` | One row per operator switch, so setting a flag is an upsert (`ADR-0045`) |
+| `check (reverses_entry_id is null or (category = 'compensation' and reverses_entry_id <> id))`, self-FK `Restrict` | `ledger_entries` | Only an operator's compensating entry may name the line it corrects (`FIN-12`, `ADR-0045`) |
 | Append-only, restricted access | `audit_log` | Tamper evidence |
 
 > **Stage 14 status (read console). No schema change:** the operator's job, matchday, and audit reads are
@@ -833,6 +838,16 @@ erDiagram
 > admit the fifth, terminal `ops.jobs.status` value `cancelled` alongside `pending`, `leased`, `completed`,
 > and `dead_letter`. No column and no index moves; `ck_jobs_lease_consistency` already permits a non-leased
 > terminal state with null lease fields (`F-46`, ADR-0044).
+>
+> **Stage 14 status (repairs and broadcasts):** three changes, one per command (`F-46`, `F-47`, ADR-0045).
+> `Stage14CompensatingEntry` adds `finance.ledger_entries.reverses_entry_id` (nullable, self-FK `Restrict`),
+> the index `ix_ledger_entries_reverses_entry_id`, and `ck_ledger_entries_reverses`, so an operator's
+> compensating entry can name the line it corrects. `Stage14NewsAnnouncements` widens
+> `comms.news_items.category` from `varchar(10)` to `varchar(12)` and adds `announcement` to
+> `ck_news_items_category`, so an operator notice is a scoped news item. `Stage14FeatureFlags` creates
+> `ops.feature_flags` with the documented shape (`scope`, `key`, `value`, `rollout_metadata`, `version`) plus
+> `created_at`/`updated_at` and the unique `ux_feature_flags_scope_key`. No existing column is dropped; the
+> news category widen is the only `AlterColumn`.
 
 ---
 

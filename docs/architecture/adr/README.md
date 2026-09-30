@@ -61,6 +61,7 @@ the system is shaped the way it is.
 | [0042](0042-operator-access-and-mfa.md) | Operator access — role administration, TOTP MFA, and the gated admin surface | Accepted |
 | [0043](0043-operator-read-console.md) | Operator read console — jobs, matchdays, and audit | Accepted |
 | [0044](0044-operator-recovery-commands.md) | Operator recovery commands — job retry and cancel, and matchday resume | Accepted |
+| [0045](0045-administrative-repairs-and-broadcasts.md) | Administrative ownership and finance repairs, operator broadcasts, and the flag store | Accepted |
 
 ## Rules for changing an ADR
 

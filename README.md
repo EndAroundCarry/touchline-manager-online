@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 14 underway — roles, TOTP MFA, the gated admin surface, the operator read console, and the recovery commands.** Stage 13 is
+> **Status: Stage 14 underway — roles, TOTP MFA, the gated admin surface, the operator read console, the recovery commands, and the remaining §10.8 mutations (AI assignment, finance repair, announcements, and feature flags).** Stage 13 is
 > complete: the responsive PWA, account sessions, the offline boundary, the accessibility gate, the
 > guided help, and the privacy-safe operational funnels. The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job

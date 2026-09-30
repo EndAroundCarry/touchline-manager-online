@@ -3,6 +3,81 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 14 — Administrative repairs and broadcasts: AI assignment, finance repair, announcements, and flags
+
+The fourth Stage 14 milestone completes §10.8. §13 requires "account suspension/restoration and AI takeover",
+"compensating finance entries rather than balance edits", and "feature flags and maintenance banners"; the
+operator console could read and recover, but it could not yet hand a club to the AI, correct a ledger, tell
+managers anything, or flip a switch. All four now exist on the frozen `AdminMutate` gate and cross the
+`F-46`/`F-47` line (`F-46`, `F-47`, §13, ADR-0045).
+
+### Added
+
+- **Club assignment to the AI** (`F-46`, `OCC-3`, `OCC-6`, ADR-0045): `POST /api/v1/admin/clubs/{id}/assign-ai`
+  closes the club's human tenure with `ClubTenureEndReasons.AdministratorClosed`, returning it fully to the
+  AI, freeing its pyramid occupancy, and leaving it claimable — with **no** takeover cooldown and no change to
+  the club's squad, contracts, cash, fixtures, or commitments (`OCC-5`). A club that already has no manager
+  is a `409 CLUB_ALREADY_AI`.
+- **Compensating finance entries** (`F-46`, `FIN-12`, ADR-0045): `POST /api/v1/admin/finance/compensating-entry`
+  posts an append-only correction that moves a club's cash by a signed delta and names the line it corrects.
+  The operator's `Idempotency-Key` becomes the entry's correlation key, so the ledger's own
+  `unique (correlation_id, category)` index is the idempotency guarantee and no dedup store is added.
+- **A reversal link on the ledger** (`F-46`, ADR-0045): `finance.ledger_entries.reverses_entry_id` (nullable,
+  self-FK `Restrict`), so §13's "preserved original record" is a fact in the ledger and not only a sentence in
+  an audit reason. `ck_ledger_entries_reverses` keeps the link exclusive to a `compensation` entry.
+- **Operator announcements** (`F-46`, `COM-6`, ADR-0045): `POST /api/v1/admin/announcements` publishes a
+  world-, country-, or division-scoped notice, optionally with an expiry, as a `comms.news_items` row under
+  the new `announcement` category. Managers read it on the existing `GET /api/v1/news` feed.
+- **The feature-flag store** (`F-46`, §6.9, ADR-0045): `ops.feature_flags` (`scope`, `key`, `value` jsonb,
+  `rollout_metadata` jsonb, `version`; unique `(scope, key)`) and `POST /api/v1/admin/feature-flags/{key}`,
+  which upserts a world-scoped flag to an opaque JSON value. Reading a flag to gate behaviour is the
+  incident-control milestone; this makes the switch settable and audited.
+- **New audit vocabulary** (`F-47`, ADR-0045): `world.club_tenure.assigned_ai`,
+  `finance.compensating_entry.posted` (existing constant, first caller), `admin.announcement.published`, and
+  `admin.feature_flag.set`, with target types `ledger_entry`, `news_item`, and `feature_flag`. Every command
+  commits its audit row in the same unit of work as the change.
+
+### Notes
+
+- **Three migrations, one per command that touches storage.** `Stage14CompensatingEntry` adds the reversal
+  column, its index, its self-FK, and its check constraint. `Stage14NewsAnnouncements` widens
+  `comms.news_items.category` from `varchar(10)` to `varchar(12)` and adds `announcement` to
+  `ck_news_items_category` — the only `AlterColumn`, and safe because the column only widens.
+  `Stage14FeatureFlags` creates `ops.feature_flags`. `assign-ai` needs no migration.
+- **`assign-ai` starts no cooldown.** `OCC-4`'s cooldown stops a manager resigning to shop for clubs; a repair
+  the game makes on its own authority is not that, so applying it would lock a manager out of a repair.
+- **The API never writes a squad decision.** Closing the tenure hands the club to the AI, and the worker's
+  daily pass (ADR-0018) sets the tactics and training it now lacks.
+- **Announcements store operator prose, the one such place.** The row still carries a template key and a
+  parameter document, but the parameters hold the operator's title and body — a deliberate exception to
+  `COM-2`, which exists so engine-written messages stay translatable.
+- **The Angular operator console is the last `F-46` item.** The four commands, like the ones before them, are
+  a bearer-token surface until the web milestone consumes them (`docs/architecture/adr/0045-...`).
+
+### Tests
+
+- New `tests/TouchlineManager.Infrastructure.Tests/World/AssignClubToAiTests.cs`: the tenure closes with
+  `administrator_closed`, no cooldown starts, the club's cash is unchanged, the club is free again, and the
+  audit row carries the reason; plus `AlreadyAi`, `ClubNotFound`, and a blank reason.
+- Extended `tests/TouchlineManager.Domain.Tests/Finance/LedgerEntryTests.cs` and
+  `tests/.../Application.Tests/Finance/LedgerPostingsTests.cs`: a compensating entry names the line it
+  corrects, and only a compensation may carry the link.
+- Extended `tests/.../Infrastructure.Tests/Finance/LedgerPersistenceTests.cs`: the reversal is stored, and
+  the check constraint refuses a linked non-compensation row.
+- New `tests/.../Application.Tests/Finance/PostCompensatingEntryTests.cs` and
+  `tests/.../Api.IntegrationTests/AdminFinanceRepairTests.cs`: outcome mapping and audit; the gate from every
+  side; a posted correction that names its target; an overdraw conflict; and an unknown club.
+- New `tests/.../Application.Tests/Comms/PublishAnnouncementTests.cs` and
+  `tests/.../Api.IntegrationTests/AdminAnnouncementTests.cs`: validation, scope, and audit; the gate matrix; a
+  published notice that renders its title and body; and `ANNOUNCEMENT_INVALID` / `ANNOUNCEMENT_SCOPE_NOT_FOUND`.
+  Extended `NewsMessageTextTests` for the announcement render.
+- New `tests/.../Application.Tests/Ops/SetFeatureFlagTests.cs`,
+  `tests/.../Infrastructure.Tests/Ops/FeatureFlagPersistenceTests.cs`, and
+  `tests/.../Api.IntegrationTests/AdminFeatureFlagTests.cs`: create-then-update with a version bump, the
+  `(scope, key)` uniqueness, jsonb round-trip, invalid key/value refusal, and the audit row.
+- New `tests/.../Api.IntegrationTests/AdminClubTests.cs`: the gate matrix, a managed club handed to the AI
+  with its audit row, `CLUB_ALREADY_AI`, and `CLUB_NOT_FOUND`.
+
 ## Stage 14 — Operator recovery commands: job retry and cancel, and matchday resume
 
 The third Stage 14 milestone gives the operator the act that the console could only diagnose. §13 requires

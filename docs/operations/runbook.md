@@ -6,9 +6,10 @@ master plan §13 requires. Behavioural rules live in [`../product/game-rules.md`
 this file is how you operate the system that enforces them.
 
 The commands below are the operator surface of [ADR-0042](../architecture/adr/0042-operator-access-and-mfa.md)
-(access and MFA), [ADR-0043](../architecture/adr/0043-operator-read-console.md) (the read console), and
-[ADR-0044](../architecture/adr/0044-operator-recovery-commands.md) (the recovery commands). The rollover
-resume is the non-production diagnostics control of
+(access and MFA), [ADR-0043](../architecture/adr/0043-operator-read-console.md) (the read console),
+[ADR-0044](../architecture/adr/0044-operator-recovery-commands.md) (the recovery commands), and
+[ADR-0045](../architecture/adr/0045-administrative-repairs-and-broadcasts.md) (ownership and finance repairs,
+broadcasts, and flags). The rollover resume is the non-production diagnostics control of
 [ADR-0034](../architecture/adr/0034-operator-rollover-preview-and-resume.md).
 
 ## Who may act
@@ -193,6 +194,144 @@ curl -s -X POST $API/ops/diagnostics/resume-rollover \
 **Validation.** The rollover row returns to `Started` and the job is `pending`. Watch it reach `Completed`.
 
 **Evidence.** The `world.season_rollover.resumed` audit row.
+
+## Runbook — hand a club to the AI
+
+**Symptom.** A manager has asked support to step in, or is unreachable, and their club should be run by the
+AI before the inactivity ladder (ADR-0027) would reach it. This is `OCC-6`.
+
+**Who may act.** Operator or admin.
+
+**Prechecks.**
+1. Confirm the club has a human manager. `GET /api/v1/admin/audit?targetId=<clubId>` or the club dashboard
+   shows an open tenure; a club with no manager is already AI-run and returns `409 CLUB_ALREADY_AI`.
+2. Decide with the account team whether the *account* is also to be suspended. `assign-ai` does not touch the
+   account; `suspend` does not touch the club. They are separate commands, often run together.
+
+**Action.**
+
+```bash
+curl -s -X POST $API/admin/clubs/$CLUB_ID/assign-ai \
+  -H "Authorization: Bearer $TOKEN" -H "X-MFA-Code: $CODE" \
+  -H "Idempotency-Key: assign-ai-$CLUB_ID-$(date +%s)" -H 'Content-Type: application/json' \
+  -d '{"reason":"manager unreachable; support handover <ticket>"}'
+# 200 -> {"clubId":"...","controlStatus":"ai","managerId":"..."}
+```
+
+**Validation.** The club's tenure is `closed` with `end_reason = administrator_closed`; the club is claimable
+again and the AI's daily pass (ADR-0018) will set its tactics and training. If the country's lowest tier was
+full of humans, this frees a place and can provision a new tier (`PYR-1`) — check
+`GET /api/v1/countries/<id>/capacity` if that matters.
+
+**Notification.** The former manager is **not** emailed by this command; if they should be told, send that
+notice through your usual support channel. Their club's state is untouched (`OCC-5`): squad, contracts, cash,
+fixtures, and commitments all continue.
+
+**Rollback / compensation.** There is no un-assign: re-claiming the club is the ordinary takeover path, and
+it is the manager's (or a successor's) choice. **No cooldown is started**, so the freed club can be claimed
+immediately.
+
+**Evidence.** The `world.club_tenure.assigned_ai` audit row (actor, reason, correlation ID).
+
+## Runbook — correct a club's ledger
+
+**Symptom.** A club's money is wrong in a way a workflow produced and cannot be re-run cleanly — a
+double-counted gate, a mis-posted award. This is `FIN-12`: a balance is never edited.
+
+**Who may act.** Operator or admin. Treat this as a last resort: prefer re-running the idempotent workflow.
+
+**Prechecks.**
+1. Find the offensive entry. `GET /api/v1/admin/audit` will not show balances; read the club's ledger through
+   the manager-facing ledger view or the database, and record the exact `ledger_entries.id` and amount.
+2. Compute the **signed** correction that restores the intended balance — a positive delta to add money, a
+   negative one to remove it. A correction cannot take cash below zero, nor below the club's reserved funds.
+
+**Action.**
+
+```bash
+curl -s -X POST $API/admin/finance/compensating-entry \
+  -H "Authorization: Bearer $TOKEN" -H "X-MFA-Code: $CODE" \
+  -H "Idempotency-Key: repair-$CLUB_ID-$(date +%s)" -H 'Content-Type: application/json' \
+  -d '{"clubId":"'$CLUB_ID'","cashDeltaMinor":-2500000,"reversesEntryId":"'$ENTRY_ID'","reason":"gate double-counted on fixture <id>; ticket <ref>"}'
+# 201 -> {"entryId":"...","clubId":"...","cashDeltaMinor":-2500000,"resultingCashMinor":...,"reversesEntryId":"..."}
+```
+
+The `Idempotency-Key` becomes the new entry's correlation key, so a retried POST with the same key returns
+`409 COMPENSATION_ALREADY_POSTED` rather than posting twice. `reversesEntryId` is optional but should be
+given whenever the offending entry is known.
+
+**Validation.** The new `finance.ledger_entries` row is `category = compensation`, `source_type =
+admin_repair`, and names `reverses_entry_id`; the account's cash moved by exactly the delta. The original
+entry is unchanged and the ledger still replays to the stored balances.
+
+**Notification.** None automatic. If a manager's money changed in a way they would notice, tell them.
+
+**Rollback / compensation.** A mistaken correction is corrected by another compensating entry — never by
+editing or deleting the first. Record the reason for the reversal.
+
+**Evidence.** The `finance.compensating_entry.posted` audit row (actor, reason, correlation key = the operator
+idempotency key; target = the new entry's id).
+
+## Runbook — publish an announcement
+
+**Symptom.** Managers need to be told something that is not a game event — a maintenance window, a rule
+clarification, a known-issue notice.
+
+**Who may act.** Operator or admin.
+
+**Prechecks.** Decide the scope: the whole world (no `countryId`/`divisionId`), one country, or one division.
+Decide whether it should expire; a maintenance notice usually should.
+
+**Action.**
+
+```bash
+curl -s -X POST $API/admin/announcements \
+  -H "Authorization: Bearer $TOKEN" -H "X-MFA-Code: $CODE" \
+  -H "Idempotency-Key: announcement-$(date +%s)" -H 'Content-Type: application/json' \
+  -d '{"title":"Scheduled maintenance","body":"Read-only tonight 22:00-22:30 UTC.","expiresAt":"2026-10-07T00:00:00Z","reason":"maintenance window announced"}'
+# 201 -> {"newsItemId":"...","category":"announcement","publishedAt":"...","expiresAt":"..."}
+```
+
+**Validation.** The item appears on `GET /api/v1/news` within its scope. A country or division scope that
+does not exist returns `404 ANNOUNCEMENT_SCOPE_NOT_FOUND`.
+
+**Notification.** The announcement *is* the notice; it is a news-feed item, not an inbox message, so it
+carries no per-manager unread state.
+
+**Rollback / compensation.** There is no delete. A wrong announcement is corrected by publishing a
+follow-up. (This command is presence-checked on the idempotency key only, so a duplicated POST posts a
+second item — send it once.)
+
+**Evidence.** The `admin.announcement.published` audit row.
+
+## Runbook — set a feature flag
+
+**Symptom.** A switch has to change without a deploy. This milestone makes flags **settable and audited**;
+nothing reads them to gate behaviour yet — that is the incident-control milestone. Until then, the runtime
+`EnableXxx` configuration is what actually gates work.
+
+**Who may act.** Operator or admin.
+
+**Prechecks.** Agree the key with the team that will read it. Keys are lower-case and dotted
+(`matchday.enabled`, `market.auctions_enabled`). The value is any JSON document.
+
+**Action.**
+
+```bash
+curl -s -X POST $API/admin/feature-flags/market.auctions_enabled \
+  -H "Authorization: Bearer $TOKEN" -H "X-MFA-Code: $CODE" \
+  -H "Idempotency-Key: flag-$(date +%s)" -H 'Content-Type: application/json' \
+  -d '{"value":{"enabled":false},"reason":"pausing auctions for a ledger repair <ticket>"}'
+# 201 (created) or 200 (updated) -> {"key":"market.auctions_enabled","scope":"world","value":{"enabled":false},"version":1,"created":true}
+```
+
+**Validation.** The response's `version` increments on each set, and `value` echoes what was stored. A key
+that is not a valid lower-case dotted name, or a value that is not valid JSON, is `400 FEATURE_FLAG_INVALID`.
+
+**Rollback / compensation.** Set the flag back to its previous value; every set is audited, so the previous
+value is in the trail.
+
+**Evidence.** The `admin.feature_flag.set` audit row (actor, reason, key, version).
 
 ## Audit
 
