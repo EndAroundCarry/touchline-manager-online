@@ -1,0 +1,42 @@
+# gitleaks configuration for the repository (master plan §16 Stage 14; threat model SC-3).
+#
+# The scan runs over the working tree (`gitleaks detect --no-git`), so the default rules would
+# otherwise read the build output, third-party code, and this scan's own report. The single allowlist
+# below is deliberate and reviewed: it is the difference between a meaningful scan and a noisy one.
+# Run it with `npm run scan:secrets`; see docs/operations/supply-chain.md.
+
+title = "Touchline Manager"
+
+[extend]
+useDefault = true
+
+# Every entry is a known-safe value or an untracked location, each allowlisted by value or path rather
+# than by whole file, so a real secret committed into the same test file is still caught.
+[allowlist]
+description = "Build output and third-party code; deliberate development-only secrets; and public test vectors."
+
+# Build output, third-party code, and the scan's own report are not project content.
+paths = [
+  '''node_modules/''',
+  '''\.git/''',
+  '''(^|/)bin/''',
+  '''(^|/)obj/''',
+  '''(^|/)dist/''',
+  '''(^|/)\.angular/''',
+  '''(^|/)TestResults/''',
+  '''infra/scan/\.artifacts/''',
+]
+
+regexes = [
+  # Development-only secrets, committed on purpose and refused in every non-development environment
+  # (ADR-0002, ADR-0042). .env.example carries placeholders rather than values.
+  '''dev-only-access-token-signing-key-never-use-in-production-\d+''',
+  '''dev-only-mfa-secret-encryption-key-never-use-in-production-\d+''',
+  '''local_dev_password_change_me''',
+  '''local_dev_migration_password_change_me''',
+  # Public test vectors and redaction-unit-test fixtures, none of them real secrets.
+  '''2f0c1a9e-6a5f-4c3a-9f7e-1d2b3c4d5e6f''',
+  '''GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ''',
+  '''abc123def456''',
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_.\-]+''',
+]

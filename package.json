@@ -25,7 +25,25 @@
     "migration:add": "dotnet dotnet-ef migrations add --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
     "migration:script": "dotnet dotnet-ef migrations script --idempotent --project src/TouchlineManager.Infrastructure --startup-project src/TouchlineManager.Infrastructure",
     "format": "dotnet format TouchlineManager.slnx",
-    "format:check": "dotnet format TouchlineManager.slnx --verify-no-changes"
+    "format:check": "dotnet format TouchlineManager.slnx --verify-no-changes",
+    "scan": "node infra/scan/scan.mjs",
+    "scan:deps": "node infra/scan/scan.mjs deps",
+    "scan:deps:web": "node infra/scan/scan.mjs deps-web",
+    "scan:licenses": "node infra/scan/scan.mjs licenses",
+    "scan:licenses:web": "node infra/scan/scan.mjs licenses-web",
+    "scan:secrets": "node infra/scan/scan.mjs secrets",
+    "scan:image": "node infra/scan/scan.mjs image",
+    "scan:image:strict": "node infra/scan/scan.mjs image --strict",
+    "scan:zap": "node infra/scan/scan.mjs zap",
+    "load:seed": "node tests/load/seed.mjs",
+    "load": "node tests/load/run.mjs",
+    "load:logins": "node tests/load/run.mjs login-burst",
+    "load:reads": "node tests/load/run.mjs dashboard-reads",
+    "load:polling": "node tests/load/run.mjs matchday-polling",
+    "load:auctions": "node tests/load/run.mjs auction-contention",
+    "load:publication": "node tests/load/run.mjs matchday-publication",
+    "load:all": "node tests/load/run.mjs login-burst && node tests/load/run.mjs dashboard-reads && node tests/load/run.mjs matchday-polling && node tests/load/run.mjs auction-contention && node tests/load/run.mjs matchday-publication",
+    "drill:restore": "node infra/restore-drill/drill.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

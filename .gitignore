@@ -67,3 +67,10 @@ tests/web-e2e/.artifacts-pwa/
 
 # --- Docker ---
 infra/docker/data/
+
+# --- Operational drills (Stage 14) ---
+# Scan reports, load-run credentials, and the restore drill's base backup and WAL archive. All of it
+# is regenerated locally and can carry data that must never be committed.
+infra/scan/.artifacts/
+infra/restore-drill/.artifacts/
+tests/load/.artifacts/
