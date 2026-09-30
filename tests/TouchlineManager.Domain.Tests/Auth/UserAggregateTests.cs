@@ -283,6 +283,25 @@ public sealed class UserAggregateTests
     }
 
     [Fact]
+    public void Revoking_a_role_is_idempotent_and_the_base_role_cannot_be_revoked()
+    {
+        var user = Register();
+        user.GrantRole(UserRoles.Operator, Now);
+
+        user.RevokeRole(UserRoles.Operator, Now);
+        user.RevokeRole(UserRoles.Operator, Now);
+
+        user.HasRole(UserRoles.Operator).Should().BeFalse();
+        user.RoleNames().Should().Equal(UserRoles.Player);
+
+        var baseRole = () => user.RevokeRole(UserRoles.Player, Now);
+        baseRole.Should().Throw<InvalidOperationException>();
+
+        var unknown = () => user.RevokeRole("superuser", Now);
+        unknown.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void Pending_accounts_may_authenticate_but_not_write()
     {
         var user = Register();

@@ -192,6 +192,10 @@ public static class DependencyInjection
         services.AddScoped<RevokeSession>();
         services.AddScoped<ExportAccountData>();
 
+        // Role administration: how an operator, support, or admin account comes to exist (F-46, ADR-0042).
+        services.AddScoped<GrantRole>();
+        services.AddScoped<RevokeRole>();
+
         // Validators are registered explicitly rather than by assembly scanning, so that adding a
         // validator to the assembly cannot silently change which requests are validated.
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();

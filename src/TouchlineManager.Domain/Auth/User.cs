@@ -330,6 +330,38 @@ public sealed class User
         _roles.Add(UserRoleAssignment.Create(Id, role, now));
     }
 
+    /// <summary>
+    /// Revokes a known role. Idempotent. The base <see cref="UserRoles.Player"/> role cannot be revoked,
+    /// because every account is a manager (master plan §6.2).
+    /// </summary>
+    /// <param name="role">The role name.</param>
+    /// <param name="now">The current instant.</param>
+    public void RevokeRole(string role, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(role);
+
+        if (!UserRoles.IsKnown(role))
+        {
+            throw new ArgumentException($"'{role}' is not a known role.", nameof(role));
+        }
+
+        if (string.Equals(role, UserRoles.Player, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The base player role cannot be revoked.");
+        }
+
+        var index = _roles.FindIndex(existing => string.Equals(existing.Role, role, StringComparison.Ordinal));
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        _roles.RemoveAt(index);
+
+        Touch(now);
+    }
+
     /// <summary>Gets whether the account holds a role.</summary>
     public bool HasRole(string role) =>
         _roles.Exists(assignment => string.Equals(assignment.Role, role, StringComparison.Ordinal));

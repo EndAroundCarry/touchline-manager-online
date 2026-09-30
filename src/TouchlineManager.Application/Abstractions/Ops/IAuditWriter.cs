@@ -85,6 +85,34 @@ public static class AuthAuditActions
     public const string DeletionRequested = "auth.account.deletion_requested";
 }
 
+/// <summary>Recorded audit actions for operator and administrative authority (master plan §10.8, §13).</summary>
+public static class AdminAuditActions
+{
+    /// <summary>A role was granted to an account.</summary>
+    public const string RoleGranted = "admin.role.granted";
+
+    /// <summary>A role was revoked from an account.</summary>
+    public const string RoleRevoked = "admin.role.revoked";
+
+    /// <summary>An account was suspended by an operator.</summary>
+    public const string AccountSuspended = "admin.account.suspended";
+
+    /// <summary>A suspended account was restored by an operator.</summary>
+    public const string AccountRestored = "admin.account.restored";
+
+    /// <summary>Multi-factor enrolment was started (an unconfirmed credential was created).</summary>
+    public const string MfaEnrolmentStarted = "auth.mfa.enrolment_started";
+
+    /// <summary>Multi-factor authentication was enabled for an account.</summary>
+    public const string MfaEnabled = "auth.mfa.enabled";
+
+    /// <summary>Multi-factor authentication was disabled for an account.</summary>
+    public const string MfaDisabled = "auth.mfa.disabled";
+
+    /// <summary>A fresh set of recovery codes was issued.</summary>
+    public const string RecoveryCodesRegenerated = "auth.mfa.recovery_codes_regenerated";
+}
+
 /// <summary>The audit trail writer for the ops module.</summary>
 /// <remarks>
 /// <see cref="Record"/> stages an entry in the current unit of work rather than writing
@@ -147,4 +175,7 @@ public static class AuditTargetTypes
 
     /// <summary>A season rollover and the season it closed (`PR-4`, ADR-0031).</summary>
     public const string SeasonRollover = "season_rollover";
+
+    /// <summary>An account's multi-factor credential (master plan §10.8, ADR-0042).</summary>
+    public const string MfaCredential = "mfa_credential";
 }
