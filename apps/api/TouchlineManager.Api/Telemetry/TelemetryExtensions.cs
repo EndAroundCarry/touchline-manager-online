@@ -1,6 +1,7 @@
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using TouchlineManager.Infrastructure.Telemetry;
 
 namespace TouchlineManager.Api.Telemetry;
 
@@ -50,7 +51,11 @@ internal static class TelemetryExtensions
         {
             metrics
                 .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation();
+                .AddHttpClientInstrumentation()
+
+                // The operational funnel counters (`F-54`, ADR-0041). Without this the instruments exist
+                // but are never exported, so the Stage 14 dashboards would read nothing.
+                .AddMeter(OperationalMetrics.MeterName);
 
             if (otlpEndpoint is not null)
             {

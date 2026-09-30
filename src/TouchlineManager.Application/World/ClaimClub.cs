@@ -99,6 +99,7 @@ public sealed class ClaimClub
     private readonly CapacityEvaluator _capacity;
     private readonly IInboxRepository _inbox;
     private readonly IAuditWriter _audit;
+    private readonly IOperationalMetrics _metrics;
     private readonly ISecureTokenService _secureTokens;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
@@ -116,6 +117,7 @@ public sealed class ClaimClub
         CapacityEvaluator capacity,
         IInboxRepository inbox,
         IAuditWriter audit,
+        IOperationalMetrics metrics,
         ISecureTokenService secureTokens,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork)
@@ -131,6 +133,7 @@ public sealed class ClaimClub
         _capacity = capacity;
         _inbox = inbox;
         _audit = audit;
+        _metrics = metrics;
         _secureTokens = secureTokens;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
@@ -314,6 +317,10 @@ public sealed class ClaimClub
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
+
+        // Counted after the commit, and only here rather than in the replay path, so an idempotent retry
+        // does not count a second claim (`F-54`, ADR-0041).
+        _metrics.OnboardingStep(OnboardingStep.ClubClaimed);
 
         var dashboard = await _queries.GetClubDashboardAsync(club.Id, seasonNumber, cancellationToken);
 

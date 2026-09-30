@@ -96,6 +96,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | I-6 | Unpublished results visible before publication | Publication is atomic; staged fixtures are not readable through public endpoints | 6 |
 | I-7 | Match payload grows until it is an abuse vector | Payload caps on match presentations, search, pagination, and request bodies; pathological payloads rejected | 6, 7 |
 | I-8 | Diagnostics leak through error responses | RFC Problem Details with a stable code and safe detail; no exception text, stack trace, or SQL | 1 |
+| I-9 | An analytics surface leaks a value or a per-manager row | The funnels are counts over rows the game already writes, read only by the `operator`/`admin` role; a test asserts the response carries counts and no account address (`F-54`, ADR-0041) | 13 |
 
 ### 4.5 Denial of service
 

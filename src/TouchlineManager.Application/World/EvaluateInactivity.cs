@@ -51,6 +51,7 @@ public sealed partial class EvaluateInactivity
     private readonly IOutboxWriter _outbox;
     private readonly CapacityEvaluator _capacity;
     private readonly IAuditWriter _audit;
+    private readonly IOperationalMetrics _metrics;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<EvaluateInactivity> _logger;
@@ -64,6 +65,7 @@ public sealed partial class EvaluateInactivity
         IOutboxWriter outbox,
         CapacityEvaluator capacity,
         IAuditWriter audit,
+        IOperationalMetrics metrics,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork,
         ILogger<EvaluateInactivity> logger)
@@ -75,6 +77,7 @@ public sealed partial class EvaluateInactivity
         _outbox = outbox;
         _capacity = capacity;
         _audit = audit;
+        _metrics = metrics;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -147,6 +150,18 @@ public sealed partial class EvaluateInactivity
         if (warned > 0 || markedInactive > 0 || closed > 0)
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // Counted after the commit, so a pass that failed to save leaves no phantom transition in the
+            // funnel (`F-54`, ADR-0041).
+            for (var transition = 0; transition < markedInactive; transition++)
+            {
+                _metrics.TenureBecameInactive();
+            }
+
+            for (var transition = 0; transition < closed; transition++)
+            {
+                _metrics.TenureClosed(ClubTenureEndReasons.InactivityClosed);
+            }
         }
 
         // PYR-1: a club freed in the lowest tier is what fills it, so each affected country is re-measured once

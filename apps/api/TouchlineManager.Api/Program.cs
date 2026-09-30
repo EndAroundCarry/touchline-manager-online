@@ -240,6 +240,11 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 var moduleGroups = app.MapModuleGroups();
 
 moduleGroups["auth"].MapAuthEndpoints();
+
+// The ops read-only funnels (`F-54`, ADR-0041). Unlike the diagnostics below it is always mapped: it is a
+// real operator read, gated by the operator/admin policy rather than by a diagnostics flag.
+moduleGroups["ops"].MapOperationalAnalytics();
+
 app.MapAccountEndpoints();
 app.MapWorldEndpoints();
 app.MapSquadEndpoints();

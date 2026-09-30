@@ -44,6 +44,7 @@ public sealed class CreateManagerProfile
     private readonly IUserRepository _users;
     private readonly IManagerRepository _managers;
     private readonly IAuditWriter _audit;
+    private readonly IOperationalMetrics _metrics;
     private readonly ISecureTokenService _secureTokens;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
@@ -54,6 +55,7 @@ public sealed class CreateManagerProfile
         IUserRepository users,
         IManagerRepository managers,
         IAuditWriter audit,
+        IOperationalMetrics metrics,
         ISecureTokenService secureTokens,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork)
@@ -62,6 +64,7 @@ public sealed class CreateManagerProfile
         _users = users;
         _managers = managers;
         _audit = audit;
+        _metrics = metrics;
         _secureTokens = secureTokens;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
@@ -110,6 +113,10 @@ public sealed class CreateManagerProfile
             Reason: null));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Only a newly created profile counts: an idempotent repeat is not a second walk of the funnel
+        // (`F-54`, ADR-0041).
+        _metrics.OnboardingStep(OnboardingStep.ProfileCreated);
 
         return new CreateManagerProfileResult(CreateManagerProfileOutcome.Created, manager.ToResponse());
     }

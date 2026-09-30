@@ -50,6 +50,7 @@ public sealed partial class RegisterUser
     private readonly ISecureTokenService _secureTokens;
     private readonly IEmailSender _emailSender;
     private readonly IAuditWriter _audit;
+    private readonly IOperationalMetrics _metrics;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
     private readonly AuthOptions _options;
@@ -64,6 +65,7 @@ public sealed partial class RegisterUser
         ISecureTokenService secureTokens,
         IEmailSender emailSender,
         IAuditWriter audit,
+        IOperationalMetrics metrics,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork,
         IOptions<AuthOptions> options,
@@ -78,6 +80,7 @@ public sealed partial class RegisterUser
         _secureTokens = secureTokens;
         _emailSender = emailSender;
         _audit = audit;
+        _metrics = metrics;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
         _options = options.Value;
@@ -138,6 +141,10 @@ public sealed partial class RegisterUser
             Reason: null));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Counted after the commit, so the funnel only counts a registration that actually happened
+        // (`F-54`, ADR-0041).
+        _metrics.OnboardingStep(OnboardingStep.Registered);
 
         var sent = await TrySendVerificationEmailAsync(user, verificationToken, cancellationToken);
 

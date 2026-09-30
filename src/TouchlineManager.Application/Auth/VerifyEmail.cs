@@ -25,6 +25,7 @@ public sealed class VerifyEmail
     private readonly IEmailTokenRepository _emailTokens;
     private readonly ISecureTokenService _secureTokens;
     private readonly IAuditWriter _audit;
+    private readonly IOperationalMetrics _metrics;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -35,6 +36,7 @@ public sealed class VerifyEmail
         IEmailTokenRepository emailTokens,
         ISecureTokenService secureTokens,
         IAuditWriter audit,
+        IOperationalMetrics metrics,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork)
     {
@@ -43,6 +45,7 @@ public sealed class VerifyEmail
         _emailTokens = emailTokens;
         _secureTokens = secureTokens;
         _audit = audit;
+        _metrics = metrics;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
     }
@@ -90,6 +93,8 @@ public sealed class VerifyEmail
             Reason: null));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _metrics.OnboardingStep(OnboardingStep.Verified);
 
         return VerifyEmailOutcome.Verified;
     }

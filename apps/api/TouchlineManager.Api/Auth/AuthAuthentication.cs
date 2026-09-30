@@ -78,6 +78,11 @@ internal static class AuthAuthentication
             options.AddPolicy(AuthorizationPolicies.Admin, policy => policy.RequireRole(UserRoles.Admin));
             options.AddPolicy(AuthorizationPolicies.Operator, policy => policy.RequireRole(UserRoles.Operator));
             options.AddPolicy(AuthorizationPolicies.Support, policy => policy.RequireRole(UserRoles.Support));
+
+            // Operator or admin (F-54, ADR-0041). RequireRole with two roles is satisfied by either.
+            options.AddPolicy(
+                AuthorizationPolicies.OperationalAnalyticsRead,
+                policy => policy.RequireRole(UserRoles.Operator, UserRoles.Admin));
         });
 
         return services;

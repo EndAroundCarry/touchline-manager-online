@@ -2,6 +2,7 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using TouchlineManager.Infrastructure.Telemetry;
 
 namespace TouchlineManager.Worker.Telemetry;
 
@@ -47,7 +48,12 @@ internal static class WorkerTelemetry
 
         openTelemetry.WithMetrics(metrics =>
         {
-            metrics.AddHttpClientInstrumentation();
+            metrics
+                .AddHttpClientInstrumentation()
+
+                // The operational funnel counters (`F-54`, ADR-0041). The retention transitions happen in
+                // the worker, so this host must register the same meter as the API.
+                .AddMeter(OperationalMetrics.MeterName);
 
             if (otlpEndpoint is not null)
             {

@@ -46,7 +46,10 @@ an in-memory provider reproduces.
 enqueue idempotency, claim and lease recording, a leased job not being re-claimable early, recovery
 from an expired lease, future-due jobs not being claimed early, completion being terminal, transient
 reschedule within the retry budget, permanent dead-lettering, attempt-budget exhaustion, claim
-ordering, and the lease-consistency check constraint.
+ordering, and the lease-consistency check constraint. Stage 13 added the operational funnels
+(`F-54`, ADR-0041): the counters pinned by instrument name and step/event tag with nothing else on
+them (`OperationalMetricsTests`), and the onboarding and retention counts asserted as deltas over real
+rows as a manager walks the funnel and then resigns (`OperationalAnalyticsQueriesTests`).
 
 ## Layer 5 — API integration tests (`tests/TouchlineManager.Api.IntegrationTests`)
 
@@ -57,7 +60,11 @@ mapping, and — as happened in Stage 1 — a service registered with the wrong 
 *Today:* liveness/readiness/detailed health semantics (including that liveness does **not** depend on
 the database), correlation ID propagation and substitution of unsafe values, RFC 9457 Problem
 Details shape, that error bodies contain no server internals, that unimplemented modules expose no
-endpoints, and the job probe's gating and idempotency.
+endpoints, and the job probe's gating and idempotency. Stage 13 added the operator-only funnels read
+(`F-54`, ADR-0041): `AnalyticsTests` covers the product's first role-gated endpoint from both sides —
+anonymous is refused, a plain manager is forbidden, an operator reads — and asserts the body is counts
+with no account address anywhere in it, which is the disclosure boundary `MAT-11` and
+data-classification §4 require.
 
 ## Layer 6 — Worker integration tests (`tests/TouchlineManager.Worker.IntegrationTests`)
 

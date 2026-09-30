@@ -21,6 +21,17 @@ internal static class AuthorizationPolicies
 
     /// <summary>An account holding the <c>support</c> role.</summary>
     public const string Support = "Support";
+
+    /// <summary>
+    /// An account holding the <c>operator</c> or <c>admin</c> role, which is who may read the operational
+    /// funnels (master plan §16 Stage 13, `F-54`, ADR-0041).
+    /// </summary>
+    /// <remarks>
+    /// The two single-role policies above are not hierarchical — an admin does not satisfy
+    /// <see cref="Operator"/> — so the read names both explicitly rather than assuming one implies the
+    /// other.
+    /// </remarks>
+    public const string OperationalAnalyticsRead = "OperationalAnalyticsRead";
 }
 
 /// <summary>Names of the rate-limiting policies.</summary>

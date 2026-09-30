@@ -3,6 +3,56 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 13 — Privacy-safe operational funnels
+
+The last Stage 13 deliverable: the two funnels an operator needs to run the game — how far the membership
+walks onboarding, and who is still holding a club — read as counts over rows the game already writes. No
+new table, no migration, no client collection, and no personal data: the surface is the product's first
+role-gated endpoint, and its boundary is asserted by tests. This is the sixth Stage 13 milestone (`F-54`,
+ADR-0041).
+
+### Added
+
+- **The onboarding and retention funnels, as counts** (`F-54`, §16 Stage 13, `LGL-5`):
+  `GET /api/v1/ops/analytics/funnels` returns `registered → verified → profile → club` and the
+  active/inactive/closed tenure and recent-login counts, derived by `IOperationalAnalyticsQueries` from
+  `auth.users`, `world.managers`, and `world.club_tenures`. It adds no table and no personal data, and
+  answers `Cache-Control: no-store`.
+- **The product's first role-gated endpoint** (`LGL-6`, ADR-0002): the read requires the `operator` or
+  `admin` role through a new `OperationalAnalyticsRead` policy — the policies Stage 2 defined, applied for
+  the first time.
+- **Operational funnel counters on the OpenTelemetry meter** (`§14.1`): `IOperationalMetrics` records an
+  onboarding step and a tenure change as counts with no identity, and both hosts register the meter so a
+  collector sees them; with no collector the calls are a no-op.
+
+### Notes
+
+- **No migration, no schema change, no web-client change.** The whole milestone is the server: a port, a
+  projection query, a metrics port, six emission call sites, one endpoint, and its tests.
+- **The disclosure boundary is executable.** The response carries counts and the world/season context and
+  nothing else; `AnalyticsTests` fails the build if an account address appears in the body, and the metric
+  vocabulary is pinned by name and tag.
+- **`docs/architecture/adr/0041-privacy-safe-operational-funnels.md`** records the decision, including
+  why the counts are derived rather than collected and why there is no client beacon. The ADR index gains
+  its row; `mvp-traceability.md` gains `F-54` and its §2 mapping row; `test-strategy.md` gains the Layer 4
+  and Layer 5 sentences; `content-and-fictional-data-policy.md` gains the analytics-boundary review gate
+  in §5; `threat-model.md` gains `I-9`; `modules.md` names the funnels under `ops`; and the README status
+  line closes the stage.
+- **Product analytics beyond these two funnels is Stage 14/15 work.** Match distributions, financial
+  health, auction liquidity, AI behavior, job lag, support volume, and scrubbed frontend error reporting
+  belong to master plan §15 under `F-48`.
+
+### Tests
+
+- New `tests/TouchlineManager.Infrastructure.Tests/Ops/OperationalAnalyticsQueriesTests.cs`: a manager
+  walking the funnel moves each of the four onboarding counts and the active-tenure count by exactly one,
+  and resigning moves the tenure from active to closed — asserted as deltas over a shared seeded world.
+- New `tests/TouchlineManager.Infrastructure.Tests/Ops/OperationalMetricsTests.cs`: the onboarding
+  counter carries only its `step` tag, the tenure counter carries `event` and `reason`, and every step has
+  a stable code.
+- New `tests/TouchlineManager.Api.IntegrationTests/AnalyticsTests.cs`: anonymous is refused, a plain
+  manager is forbidden, and an operator reads counts-only, with no account address in the raw body.
+
 ## Stage 13 — Guided help and the first-steps surface
 
 A manager no longer has to already be standing on a screen to learn what the game does. A help screen states

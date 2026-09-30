@@ -57,6 +57,7 @@ the system is shaped the way it is.
 | [0038](0038-responsive-shell-and-touch-targets.md) | Responsive shell, touch-target baseline, and the breakpoint test matrix | Accepted |
 | [0039](0039-accessibility-baseline-and-axe-gate.md) | Accessibility baseline and the axe gate | Accepted |
 | [0040](0040-guided-help-and-first-steps.md) | Guided help and the first-steps surface | Accepted |
+| [0041](0041-privacy-safe-operational-funnels.md) | Privacy-safe operational funnels | Accepted |
 
 ## Rules for changing an ADR
 

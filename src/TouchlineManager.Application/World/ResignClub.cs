@@ -64,6 +64,7 @@ public sealed class ResignClub
     private readonly IAdvisoryLock _locks;
     private readonly CapacityEvaluator _capacity;
     private readonly IAuditWriter _audit;
+    private readonly IOperationalMetrics _metrics;
     private readonly ISecureTokenService _secureTokens;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
@@ -79,6 +80,7 @@ public sealed class ResignClub
         IAdvisoryLock locks,
         CapacityEvaluator capacity,
         IAuditWriter audit,
+        IOperationalMetrics metrics,
         ISecureTokenService secureTokens,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork)
@@ -92,6 +94,7 @@ public sealed class ResignClub
         _locks = locks;
         _capacity = capacity;
         _audit = audit;
+        _metrics = metrics;
         _secureTokens = secureTokens;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
@@ -175,6 +178,8 @@ public sealed class ResignClub
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
+
+        _metrics.TenureClosed(ClubTenureEndReasons.Resigned);
 
         return new ResignClubResult(
             ResignClubOutcome.Resigned,

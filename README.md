@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 13 in progress — the responsive PWA, account sessions, the offline boundary, the accessibility gate, and the guided help.** The playable
+> **Status: Stage 13 complete — the responsive PWA, account sessions, the offline boundary, the accessibility gate, the guided help, and the privacy-safe operational funnels.** The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
 > pipeline, the API and worker composition roots, the health and observability baseline, and the Angular
 > PWA shell. Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions
@@ -58,7 +58,10 @@ kick-off. The server decides results; a client can never simulate or influence o
 > slot moved with the arrow keys, scrollable table regions reachable by keyboard, and focus following the
 > navigation (`F-52`, ADR-0039). The guided help is the stage's fifth milestone: a `/help` reference that
 > states the rules a manager needs and links to the screen that owns each, first-steps guidance on the
-> dashboard that can be dismissed, and deadlines that now name their time zone (`F-53`, ADR-0040).
+> dashboard that can be dismissed, and deadlines that now name their time zone (`F-53`, ADR-0040). The
+> stage closes with its analytics deliverable: the onboarding and retention funnels, read as counts over
+> rows the game already writes, behind the product's first role-gated endpoint, with the same transitions
+> counted on the OpenTelemetry meter and no client collection at all (`F-54`, ADR-0041).
 
 ---
 

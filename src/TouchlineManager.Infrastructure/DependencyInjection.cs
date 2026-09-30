@@ -25,6 +25,7 @@ using TouchlineManager.Infrastructure.Persistence;
 using TouchlineManager.Infrastructure.Persistence.Repositories;
 using TouchlineManager.Infrastructure.Requests;
 using TouchlineManager.Infrastructure.Security;
+using TouchlineManager.Infrastructure.Telemetry;
 using TouchlineManager.Infrastructure.Time;
 using TouchlineManager.Infrastructure.Training;
 using TouchlineManager.Infrastructure.World;
@@ -67,8 +68,23 @@ public static class DependencyInjection
         AddMatchdayInfrastructure(services, configuration);
         AddFinanceInfrastructure(services, configuration);
         AddMarketInfrastructure(services, configuration);
+        AddOpsInfrastructure(services);
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the ops module's read-only analytics projection and the operational funnel counters
+    /// (master plan §16 Stage 13, `F-54`, ADR-0041).
+    /// </summary>
+    /// <remarks>
+    /// The query is scoped because it reads through the per-request unit of work; the counters are a
+    /// singleton because the meter holds no per-request state and every caller shares the one instrument.
+    /// </remarks>
+    private static void AddOpsInfrastructure(IServiceCollection services)
+    {
+        services.AddScoped<IOperationalAnalyticsQueries, OperationalAnalyticsQueries>();
+        services.AddSingleton<IOperationalMetrics, OperationalMetrics>();
     }
 
     /// <summary>
