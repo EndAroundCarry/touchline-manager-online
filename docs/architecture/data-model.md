@@ -34,6 +34,8 @@ flowchart LR
         email_tokens
         user_roles
         user_consents
+        mfa_credentials
+        mfa_recovery_codes
     end
     subgraph world[world]
         game_worlds
@@ -146,6 +148,8 @@ erDiagram
     users ||--o{ email_tokens : "requests"
     users ||--o{ user_roles : "granted"
     users ||--o{ user_consents : "accepts"
+    users ||--o| mfa_credentials : "enrols"
+    mfa_credentials ||--o{ mfa_recovery_codes : "issues"
     managers ||--o{ club_tenures : "serves"
     game_worlds ||--o{ countries : "contains"
     game_worlds ||--o{ seasons : "runs"
@@ -214,6 +218,18 @@ erDiagram
         timestamptz completed_at
         text failure_diagnostics
     }
+    mfa_credentials {
+        uuid user_id PK
+        text protected_secret "AES-256-GCM, version-prefixed"
+        timestamptz confirmed_at
+        timestamptz created_at
+        bigint version
+    }
+    mfa_recovery_codes {
+        uuid user_id PK
+        text code_hash PK
+        timestamptz used_at
+    }
 ```
 
 **Critical indexes and constraints**
@@ -225,6 +241,10 @@ erDiagram
 | `check (status in ...)`, `check (failed_login_count >= 0)` | `users` | The lifecycle cannot leave the states the code knows |
 | `unique (token_hash)` | `refresh_sessions`, `email_tokens` | Tokens are looked up by hash; a duplicate could only mean a reused secret |
 | `unique (user_id, role)` (primary key) | `user_roles` | A role is granted to an account once |
+| `unique (user_id)` (primary key) | `mfa_credentials` | One authenticator per account (ADR-0042) |
+| `unique (user_id, code_hash)` (primary key) | `mfa_recovery_codes` | A recovery code is issued once and consumed at most once (ADR-0042) |
+| `check (confirmed_at is null or confirmed_at >= created_at)` | `mfa_credentials` | A credential is confirmed after it is created, never before |
+| Cascading FKs to `users`/`mfa_credentials` | `mfa_credentials`, `mfa_recovery_codes` | A credential is the account's own secret and goes when the account does (ADR-0042) |
 | `check (revoked_at is null) = (revocation_reason is null)` | `refresh_sessions` | A revoked session always says why |
 | Restrictive FKs to `users` | `user_roles`, `refresh_sessions`, `email_tokens`, `user_consents` | Session and consent history cannot outlive its account; account deletion is a status change, never a delete (ADR-0002) |
 | `unique (world_id, code)` | `countries` | Stable country identity |

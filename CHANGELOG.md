@@ -3,6 +3,75 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 14 — Operator access, MFA, and the first admin surface
+
+Stage 14 opens with the track every later one leans on: an operator who can see the live game and act
+on it. §10.8 fixes the rule — _"All admin mutations require MFA-authenticated role, explicit reason,
+idempotency key, and audit event"_ — and none of it existed. No production path could grant
+`admin`/`operator`/`support`; no second factor existed beyond `UserRoles.MfaRequired`; and no admin
+route group was mapped. This milestone makes roles real, adds TOTP MFA with a two-step login, and
+gates the first operator surface behind both. It is the first Stage 14 milestone (`F-46`, `F-47`,
+ADR-0042).
+
+### Added
+
+- **Role administration** (`F-46`, §6.2, ADR-0042): `User.RevokeRole`, the audited `GrantRole` and
+  `RevokeRole` use cases, and `tools/access-admin` — a console over the same composition roots, in the
+  shape of `tools/world-seeder`, that grants, revokes, resets an authenticator, and lists. It is the
+  bootstrap for the first administrator and the break-glass path when one loses their factor.
+- **TOTP multi-factor authentication** (`F-46`, ADR-0042): a pure RFC 6238 implementation pinned to the
+  RFC's Appendix B vectors, the `MfaCredential` aggregate with single-use recovery codes, and
+  `auth.mfa_credentials` / `auth.mfa_recovery_codes`. The secret is encrypted at rest with AES-256-GCM
+  under `Auth:EncryptionKey`, because a value that must be recovered to compute a code cannot be hashed.
+- **A two-step login** (`F-46`, ADR-0042): a password success for an account with a confirmed factor
+  returns a short-lived challenge instead of a session, and `POST /auth/mfa/login` completes it. The
+  `mfa` claim is earned there and carried by the refresh session, so a rotated session keeps it. The
+  challenge carries a purpose claim, and the access-token validator rejects any purpose, so a challenge
+  is never a session. Self-service enrolment, confirmation, disable (refused for roles that require the
+  factor) and recovery-code rotation are at `/auth/mfa/*`.
+- **The gated admin surface** (`F-46`, `F-47`, ADR-0042): an always-mapped `admin` route group.
+  `GET /api/v1/admin/health/game` reports world and season status, the next kickoff, and queue depth,
+  dead letters and the oldest overdue job — behind `AdminRead` (support, operator, or admin with a
+  completed second factor). `POST /api/v1/admin/users/{id}/suspend` and `/restore` are behind
+  `AdminMutate` (support excluded, `E-3`) and a fresh `X-MFA-Code`, re-asserting the factor per
+  mutation as ADR-0002 requires; both require a reason and an idempotency key and commit an audit entry
+  with the change. Suspension revokes the account's sessions immediately.
+
+### Notes
+
+- **One migration, no web-client change.** `Stage14OperatorAccess` adds `auth.mfa_credentials`,
+  `auth.mfa_recovery_codes`, and `auth.refresh_sessions.mfa_completed_at`. The `202` challenge branch
+  only triggers for an account holding a confirmed factor, and none can hold one until a role is
+  granted, so the existing client is unaffected until the MFA screens land.
+- **The security policy is now enforced, not promised.** `S-6`, `E-1` and `E-3` move from "Stage 14
+  will" to enforced; `data-classification.md` gains the multi-factor secret and recovery-code handling
+  rules and the redaction note; `threat-model.md` gains `I-10` and the residual risk about a lost
+  authenticator.
+- **`Auth:EncryptionKey` is a new required secret** in every non-development environment, validated at
+  startup beside `Auth:SigningKey`. `docs/architecture/adr/0042-operator-access-and-mfa.md` records the
+  decision, the two-step login, and why the secret is encrypted rather than hashed; `modules.md`,
+  `data-model.md`, `mvp-traceability.md`, `test-strategy.md`, `adr/README.md` and the README status
+  line are updated with it.
+- **The read console (jobs, matchdays, audit) and the remaining §10.8 commands are the next milestone.**
+  So are the web MFA screens; the contract is frozen here.
+
+### Tests
+
+- New `tests/TouchlineManager.Domain.Tests/Auth/TotpTests.cs`: the RFC 6238 Appendix B vectors, the
+  acceptance window, and the RFC 4648 base32 vectors including a round trip.
+- New `tests/TouchlineManager.Domain.Tests/Auth/MfaCredentialTests.cs`: confirmation, secret
+  replacement, and single-use recovery codes.
+- New `tests/TouchlineManager.Application.Tests/Auth/RoleAdministrationTests.cs` and
+  `MfaUseCasesTests.cs`: role changes with their audit and actor, and the multi-factor flows including a
+  role that forbids disabling.
+- New `tests/TouchlineManager.Infrastructure.Tests/Auth/MfaPersistenceTests.cs`: the stored column is
+  ciphertext holding neither the base32 nor the raw secret, recovery codes cascade with the credential,
+  and one account has one authenticator at the database.
+- New `tests/TouchlineManager.Api.IntegrationTests/MfaTests.cs` and `AdminEndpointsTests.cs`: the whole
+  journey over the real stack, the `mfa` claim earned and kept across a refresh, the challenge refused at
+  `/me`, and the admin gate asserted from anonymous, plain manager, un-enrolled operator, operator
+  without a fresh code, and operator with one — then suspension closing sessions and auditing its reason.
+
 ## Stage 13 — Privacy-safe operational funnels
 
 The last Stage 13 deliverable: the two funnels an operator needs to run the game — how far the membership

@@ -13,7 +13,7 @@
 | **C1 — Internal game data** | Correctness-critical, not user-private, but not meant for arbitrary exposure | Standings projections, discipline records, engine configuration hashes, job metadata, audit references |
 | **C2 — Restricted game data** | Must never be exposed to any manager; operator/support only | Hidden potential, internal valuations, collusion risk flags, raw match snapshots, RNG seed material, simulation diagnostics, AI policy internals |
 | **C3 — Personal data** | Identifies or can locate a natural person | Email, display name, password hash, consent records, session records, IP hashes, user-agent hash, support correspondence |
-| **C4 — Secrets and credentials** | Compromise enables access or forgery | Refresh and email token hashes, password hashes, signing keys, world seed secret, provider API keys, database credentials |
+| **C4 — Secrets and credentials** | Compromise enables access or forgery | Refresh and email token hashes, password hashes, signing keys, TOTP secrets and recovery codes, world seed secret, provider API keys, database credentials |
 
 ---
 
@@ -25,7 +25,7 @@
 | **C1** | Plain, backed up | Only where the viewer is authorized (for example own club, own division) | Values allowed with identifiers; no cross-tenant leakage | Season-linked; permanent for history |
 | **C2** | Plain tables/columns with restricted access, or `server_only` columns never mapped to DTOs | **Never** in a manager-facing response | Counts and durations only, never values | Engine/rule artifacts retained while their matches are replayable |
 | **C3** | Plain where functionally necessary; hashed where the hash suffices | Own data only; never another manager's | **Redacted by default**; identifiers/hashes only when operationally required | See §3 |
-| **C4** | Hashed where a hash suffices (tokens, passwords); encrypted where reversible (seed material) | **Never** | **Never**; tokens and secrets are on the log redaction list | See §3 |
+| **C4** | Hashed where a hash suffices (tokens, passwords); encrypted where reversible (seed material, TOTP secrets) | **Never** | **Never**; tokens and secrets are on the log redaction list | See §3 |
 
 ### 2.1 Restricted-column convention
 
@@ -74,6 +74,7 @@ Two different values are both called a seed, and they are not the same class.
 | Security/IP and device hashes | Bounded period, documented before launch | Abuse detection without indefinite tracking |
 | Support correspondence | Bounded period, documented before launch | Support continuity |
 | Refresh sessions | Until expiry or revocation, then purged | Session hygiene |
+| Multi-factor credentials and recovery codes | Until reset by the account or an operator, or removed with the account at anonymization | Least data; a code that is spent or superseded is not kept |
 | Email tokens (verification/reset) | Consumed, then purged after expiry | Least data |
 | Account identity after deletion | Anonymized after a cooling period | Privacy right vs competition integrity |
 
@@ -139,4 +140,7 @@ Stage 0 exit criteria require that the classification is actionable, not aspirat
 - [x] The export and deletion flows are exercised by integration tests (Stage 13):
   `AccountManagementTests` exports an account and asserts the raw response omits the password, the
   refresh token, and every hash, while `AuthLifecycleTests` covers account closure.
+- [x] Multi-factor secrets are encrypted at rest and never leave the server (Stage 14): the TOTP
+  secret is stored under AES-256-GCM and recovery codes as hashes (`F-46`, ADR-0042), neither is
+  serialized by any endpoint, and both are on the §4 redaction list.
 - [ ] Restore drills confirm ENV-3 (Stage 14).

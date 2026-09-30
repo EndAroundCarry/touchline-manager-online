@@ -57,7 +57,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | S-3 | Credential stuffing | Generic responses (no enumeration), per-route/IP/account rate limits, progressive lockout, optional bot challenge | 2 |
 | S-4 | Self-asserted club/manager identity in a command body | Server derives manager and club from the authenticated tenure; client-supplied ownership is ignored (`INT-1`) | 3, 6, 10 |
 | S-5 | Forged `Origin` to defeat CSRF assumptions | Exact allowlist asserted by the API itself, not only the edge; state-changing requests rejected on mismatch | 2 |
-| S-6 | Operator impersonation | MFA required for `support`/`operator`/`admin`, re-asserted per admin mutation | 2, 14 |
+| S-6 | Operator impersonation | MFA required for `support`/`operator`/`admin`, re-asserted per admin mutation. TOTP is enforced at login and by a fresh `X-MFA-Code` on every admin mutation (`F-46`, ADR-0042) | 2, 14 |
 | S-7 | Spoofed email sender damaging deliverability | Provider-managed authenticated sending (SPF/DKIM/DMARC), no user-controlled sender | 14 |
 
 ### 4.2 Tampering
@@ -97,6 +97,7 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 | I-7 | Match payload grows until it is an abuse vector | Payload caps on match presentations, search, pagination, and request bodies; pathological payloads rejected | 6, 7 |
 | I-8 | Diagnostics leak through error responses | RFC Problem Details with a stable code and safe detail; no exception text, stack trace, or SQL | 1 |
 | I-9 | An analytics surface leaks a value or a per-manager row | The funnels are counts over rows the game already writes, read only by the `operator`/`admin` role; a test asserts the response carries counts and no account address (`F-54`, ADR-0041) | 13 |
+| I-10 | A disclosed database yields usable second factors | TOTP secrets are encrypted at rest under `Auth:EncryptionKey` (AES-256-GCM, authenticated); recovery codes are stored only as hashes; neither is ever serialized or logged (`F-46`, ADR-0042, data-classification §2) | 14 |
 
 ### 4.5 Denial of service
 
@@ -114,9 +115,9 @@ TB-6 operator↔admin API, TB-7 engine↔everything (no boundary: it is pure).
 
 | # | Threat | Mitigation | Stage |
 |---|---|---|---|
-| E-1 | Manager reaches an admin route | Role-based policies on every admin route; admin UI lazy-loaded and role-protected; API is authoritative | 14 |
+| E-1 | Manager reaches an admin route | Role-based policies on every admin route; admin UI lazy-loaded and role-protected; API is authoritative. `AdminRead`/`AdminMutate` require the role and a completed second factor (`F-46`, ADR-0042) | 14 |
 | E-2 | AI code path bypasses a rule a human must obey | Humans and AI share the same validators; AI has no privileged finance or attributes; covered by tests (`INS-12`, `FIN-15`) | 8, 10, 11 |
-| E-3 | Support role used to alter competitive outcomes | Support cannot mutate game state; only `operator`/`admin` with MFA, reason, and compensating-action tooling | 14 |
+| E-3 | Support role used to alter competitive outcomes | Support cannot mutate game state; only `operator`/`admin` with MFA, reason, and compensating-action tooling. The `AdminMutate` policy names only `operator` and `admin` (`F-46`, ADR-0042) | 14 |
 | E-4 | Emergency grant or repair used as a gameplay advantage | Grant/repair requires an incident reference, dry run, approval, audit, and player notification; alerted and tuned out through balancing (`FIN-16`) | 9, 14 |
 | E-5 | Job payload tampering grants cross-module write | Job handlers call application use cases with the same authorization and invariant checks as the API; payloads are validated | 6 |
 
@@ -156,8 +157,8 @@ what makes it atomic, what happens on retry, and how it is recovered.
 **Cross-cutting answers**
 
 - **Who may act:** only the worker (business deadlines), only the authenticated tenure owner
-  (manager intents), only MFA-authenticated operators with a reason (repairs). No client ever
-  decides an outcome.
+  (manager intents), only MFA-authenticated operators with a reason and a fresh code (repairs). No
+  client ever decides an outcome.
 - **Preconditions:** every workflow validates authorization, resource state, and invariants
   inside the transaction that performs its effect, not in a prior request.
 - **Replay and repudiation:** every workflow stores its correlation/idempotency key, hashes
@@ -176,7 +177,7 @@ what makes it atomic, what happens on retry, and how it is recovered.
 |---|---|---|
 | Shared households may be flagged as collusion | Detection is advisory and never auto-punishes (`INT-3`) | After beta signals are measured |
 | No anti-sniping extension invites last-second bidding | Explicit MVP non-goal; fixed windows and reservations are the designed answer | Post-MVP |
-| Admin MFA is a flag requirement, not enforced in staging | Staging holds no real data | Enforced from Stage 14 |
+| A lost operator authenticator needs shell access to reset | A self-service reset would defeat the factor; `access-admin reset-mfa` is the audited break-glass path (`F-46`, ADR-0042) | If support volume shows the need |
 | Single region means a provider incident pauses the game | Deadline correctness beats degraded continuity; promotion rises from the incident runbook | Stage 21 |
 | An operator with a systemic engine defect can only void/replay | Preserving history is more valuable than instant repair | Stage 14 exercises |
 

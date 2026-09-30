@@ -15,7 +15,10 @@ Pure logic with no dependencies: invariant calculations, ordering rules, retry s
 comparators, money arithmetic, schedule generation properties.
 
 *Today:* the job retry policy (43 assertions over backoff, caps, jitter bounds, and argument
-validation).
+validation). Stage 14 added the second factor's pure core: the TOTP algorithm pinned to the RFC 6238
+Appendix B vectors and its acceptance window (`TotpTests`), the base32 encoding and decoding RFC 4648
+defines (`Base32Tests`), and the credential's lifecycle — confirmation, secret replacement,
+single-use recovery codes (`MfaCredentialTests`).
 
 ## Layer 2 — Application unit tests (`tests/TouchlineManager.Application.Tests`)
 
@@ -23,7 +26,10 @@ Use cases and policies with ports replaced by hand-written doubles. No database,
 
 *Today:* job handler registration, including that two handlers claiming one job type fails at
 construction rather than silently ignoring work, and that the no-op use case derives its business
-key from domain identity.
+key from domain identity. Stage 14 added the operator's access paths: granting and revoking a role
+with its audit and its actor (`RoleAdministrationTests`), and the multi-factor flows — enrolment,
+confirmation, the login challenge, a spent recovery code, and that a role requiring a second factor
+cannot disable it (`MfaUseCasesTests`).
 
 ## Layer 3 — Architecture tests (`tests/TouchlineManager.ArchitectureTests`)
 
@@ -49,7 +55,10 @@ reschedule within the retry budget, permanent dead-lettering, attempt-budget exh
 ordering, and the lease-consistency check constraint. Stage 13 added the operational funnels
 (`F-54`, ADR-0041): the counters pinned by instrument name and step/event tag with nothing else on
 them (`OperationalMetricsTests`), and the onboarding and retention counts asserted as deltas over real
-rows as a manager walks the funnel and then resigns (`OperationalAnalyticsQueriesTests`).
+rows as a manager walks the funnel and then resigns (`OperationalAnalyticsQueriesTests`). Stage 14
+added the second factor's storage contract (`MfaPersistenceTests`): the raw column is asserted to be
+ciphertext — version-prefixed, and containing neither the base32 nor the raw secret — recovery codes
+are rows that cascade with the credential, and one account has one authenticator at the database.
 
 ## Layer 5 — API integration tests (`tests/TouchlineManager.Api.IntegrationTests`)
 
@@ -64,7 +73,14 @@ endpoints, and the job probe's gating and idempotency. Stage 13 added the operat
 (`F-54`, ADR-0041): `AnalyticsTests` covers the product's first role-gated endpoint from both sides —
 anonymous is refused, a plain manager is forbidden, an operator reads — and asserts the body is counts
 with no account address anywhere in it, which is the disclosure boundary `MAT-11` and
-data-classification §4 require.
+data-classification §4 require. Stage 14 added the second factor and the admin gate (`F-46`, ADR-0042):
+`MfaTests` drives the whole journey through the real stack — enrol, confirm with a computed code, be
+challenged at sign-in, complete it — and asserts the `mfa` claim is earned, is kept across a refresh,
+is spent once when a recovery code is used, and that the challenge token is refused at `/me` because
+it carries a purpose. `AdminEndpointsTests` asserts the gate from every side: anonymous, a plain
+manager, an operator that never completed a second factor, an operator that did but sent no fresh
+code, and the operator that did both — then that suspending an account closes its sessions immediately
+and records the reason in `ops.audit_log`.
 
 ## Layer 6 — Worker integration tests (`tests/TouchlineManager.Worker.IntegrationTests`)
 

@@ -7,7 +7,9 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 13 complete — the responsive PWA, account sessions, the offline boundary, the accessibility gate, the guided help, and the privacy-safe operational funnels.** The playable
+> **Status: Stage 14 underway — roles, TOTP MFA, and the first gated admin surface.** Stage 13 is
+> complete: the responsive PWA, account sessions, the offline boundary, the accessibility gate, the
+> guided help, and the privacy-safe operational funnels. The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
 > pipeline, the API and worker composition roots, the health and observability baseline, and the Angular
 > PWA shell. Stage 2 added the account schema, the full credential lifecycle, rotating refresh sessions
@@ -61,7 +63,12 @@ kick-off. The server decides results; a client can never simulate or influence o
 > dashboard that can be dismissed, and deadlines that now name their time zone (`F-53`, ADR-0040). The
 > stage closes with its analytics deliverable: the onboarding and retention funnels, read as counts over
 > rows the game already writes, behind the product's first role-gated endpoint, with the same transitions
-> counted on the OpenTelemetry meter and no client collection at all (`F-54`, ADR-0041).
+> counted on the OpenTelemetry meter and no client collection at all (`F-54`, ADR-0041). Stage 14 has
+> since begun with the access foundation: roles are real and administered by the `access-admin` tool,
+> `support`/`operator`/`admin` must complete a TOTP second factor to finish signing in, and the first
+> gated admin surface reports the live game and suspends or restores an account — every mutation
+> requiring a fresh code, a reason and an idempotency key, and committing an audit entry with the
+> change (`F-46`, `F-47`, ADR-0042).
 
 ---
 
@@ -170,6 +177,41 @@ reads the confirmation and reset links out of the mail catcher instead of being 
 
 `Auth__SigningKey` must be at least 32 bytes and is validated at startup. Development has a
 committed dev-only value; every other environment supplies its own (see `.env.example`).
+
+---
+
+## Administering access
+
+Operator accounts are created by a tool, not an endpoint: the first administrator cannot be granted by
+an administrator, and a production route that grants roles would itself be a privilege-escalation
+surface ([ADR-0042](docs/architecture/adr/0042-operator-access-and-mfa.md)). Grant a role to a
+registered account and inspect it:
+
+```bash
+dotnet run --project tools/access-admin -- grant ops@example.com operator
+dotnet run --project tools/access-admin -- list ops@example.com
+```
+
+`support`, `operator`, and `admin` must complete a TOTP second factor. Enrolment is two steps — a
+secret and one-time recovery codes, then a code derived from the secret:
+
+```bash
+# with the account's access token
+curl -X POST http://localhost:5080/api/v1/auth/mfa/enrol -H "Authorization: Bearer $TOKEN"
+
+curl -X POST http://localhost:5080/api/v1/auth/mfa/enrol/confirm \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"code":"123456"}'
+```
+
+From then on a password alone is not a session: `POST /api/v1/auth/login` answers `202` with a
+challenge, and `POST /api/v1/auth/mfa/login` completes it. An admin mutation repeats the code in an
+`X-MFA-Code` header, and every mutation needs a reason and an idempotency key. If an operator loses
+their authenticator, `dotnet run --project tools/access-admin -- reset-mfa ops@example.com` removes it
+so they can enrol again — the only path, because a self-service reset would defeat the factor.
+
+`Auth:EncryptionKey` protects the stored TOTP secret with AES-256-GCM and must be at least 32 bytes.
+Like `Auth:SigningKey` it is validated at startup, has a committed dev-only value, and must be supplied
+in every other environment (see `.env.example`).
 
 ---
 

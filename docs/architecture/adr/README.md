@@ -58,6 +58,7 @@ the system is shaped the way it is.
 | [0039](0039-accessibility-baseline-and-axe-gate.md) | Accessibility baseline and the axe gate | Accepted |
 | [0040](0040-guided-help-and-first-steps.md) | Guided help and the first-steps surface | Accepted |
 | [0041](0041-privacy-safe-operational-funnels.md) | Privacy-safe operational funnels | Accepted |
+| [0042](0042-operator-access-and-mfa.md) | Operator access — role administration, TOTP MFA, and the gated admin surface | Accepted |
 
 ## Rules for changing an ADR
 

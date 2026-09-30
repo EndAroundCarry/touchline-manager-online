@@ -10,7 +10,7 @@
 
 | Module | PostgreSQL schema | Owns | Primary stages |
 |---|---|---|---|
-| **auth** | `auth` | Accounts, credentials, sessions, email tokens, roles, consents, lockout | 2, 13, 14 |
+| **auth** | `auth` | Accounts, credentials, sessions, email tokens, roles, consents, lockout, multi-factor credentials and recovery codes | 2, 13, 14 |
 | **world** | `world` | World, countries, clubs, managers, tenures, division provisioning, generation runs | 3, 11 |
 | **squad** | `squad` | Players, attributes, state, contracts, registrations, unavailability, tactical plans and slots, team sheets, training | 4, 8 |
 | **competition** | `competition` | Seasons, divisions, division-seasons, club season entries, matchdays, fixtures, standings, player/club season stats, discipline | 6, 8, 12 |
@@ -18,7 +18,7 @@
 | **market** | `market` | Shortlists, transfer listings, bids, outcomes, AI market decisions | 10 |
 | **finance** | `finance` | Club accounts, append-only ledger, season finance summaries | 9 |
 | **comms** | `comms` | Inbox messages, news items, email dispatch intent | 6, 8, 11 |
-| **ops** | `ops` | Jobs, outbox, idempotency records, audit log, feature flags, repair actions, the read-only operational funnels and their counters | 1, 6, 13, 14 |
+| **ops** | `ops` | Jobs, outbox, idempotency records, audit log, feature flags, repair actions, the read-only operational funnels and their counters, and the operator game-health read | 1, 6, 13, 14 |
 
 Logical model detail is in [`data-model.md`](data-model.md) and master plan §6.
 
@@ -133,5 +133,5 @@ flowchart TD
 | 11 | world, comms, competition | Pyramid growth, inbox, inactivity — *delivered: generic provisioning execution + backfill (`PYR-4`–`PYR-8`), the inactivity ladder (`OCC-1`–`OCC-3`), and the comms completion (news feed, preferences, deadline reminders, outbox)* |
 | 12 | competition, finance, squad, world | Rollover and continuity — *delivered: the world-scoped resumable rollover state machine, promotion/relegation (`PR-1`–`PR-6`), and next-season generation (ADR-0031), plus the continuity work — contract expiry and AI renewal (`CON-6`, `CON-9`), announce-then-play retirement (`CON-10`), emergency replacements (`SQ-8`), the position award (`FIN-5`), the season finance summary (`FIN-19`), the `PYR-9` next-season provisioning target (ADR-0032), the club season-history and next-season read (`PR-4`, `PR-6`), player career stats derived from the season lines (`STA-2`), the promotion/relegation inbox message (`PR-1`, `COM-1`), and the world-seed club-identity fix (`PYR-11`, ADR-0033)* |
 | 13 | web (all features), ops | Feature-complete PWA — *delivered: account sessions, export, and preferences (ADR-0036), PWA hardening and the offline boundary (ADR-0037), responsive layouts and the breakpoint suite (`F-44`, ADR-0038), the accessibility baseline and axe gate (`F-52`, ADR-0039), guided help and the first-steps surface (`F-53`, ADR-0040), and the privacy-safe operational funnels (`F-54`, ADR-0041)* |
-| 14 | ops, security | Hardened live operations |
+| 14 | ops, security, auth, web | Hardened live operations — *delivered so far: role administration and the access-admin tool, TOTP multi-factor authentication with the two-step login, and the gated admin surface (`F-46`, `F-47`, ADR-0042)* |
 | 15–16 | — | Closed beta, public MVP |
