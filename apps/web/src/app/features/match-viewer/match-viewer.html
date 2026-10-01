@@ -1,195 +1,470 @@
+﻿<!-- FM-style Match Center (Stage 5 - plan 9.5) -->
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading the match…</p>
+  <div class="flex h-screen items-center justify-center bg-[#090d16]">
+    <div class="text-center">
+      <div class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" role="status" aria-label="Loading"></div>
+      <p class="text-sm text-slate-400">Loading the match...</p>
+    </div>
+  </div>
 } @else if (loadError(); as message) {
-  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  <div class="flex h-screen items-center justify-center bg-[#090d16]">
+    <div class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-6 py-4 text-center">
+      <p class="text-rose-400" role="alert">{{ message }}</p>
+    </div>
+  </div>
 } @else if (match(); as result) {
-  <section aria-labelledby="match-heading">
-    <h1 id="match-heading" [class]="pageHeadingClass">
-      {{ result.home.name }} {{ score() }} {{ result.away.name }}
-    </h1>
-    <p class="mt-1 text-sm text-slate-600">
-      {{ result.divisionName }} · tier {{ result.tierNumber }} · round {{ result.roundNumber }} ·
-      {{ kickoff(result.kickoffAt) }}
-    </p>
-    <p class="mt-1 text-sm text-slate-700">
-      Full time: {{ result.home.name }} {{ result.home.goals }}, {{ result.away.name }}
-      {{ result.away.goals }}.
-    </p>
+  <div class="flex min-h-screen flex-col bg-[#090d16] text-slate-100">
 
-    @if (presentation(); as view) {
-      <div class="mt-6 rounded border border-slate-200 bg-white p-4">
-        <h2 class="text-lg font-semibold">Highlights</h2>
+    <!-- SCOREBOARD HEADER -->
+    <header class="border-b border-slate-800 bg-[#0c1220] shadow-2xl">
+      <div class="px-4 py-3">
+        <p class="mb-2 text-center text-[10px] tracking-widest text-slate-500 uppercase">
+          {{ result.divisionName }} &middot; Tier {{ result.tierNumber }} &middot; Round {{ result.roundNumber }} &middot; {{ kickoff(result.kickoffAt) }}
+        </p>
 
-        @if (view.highlights.length === 0) {
-          <p [class]="statusMessageClass" role="status">
-            This match has no highlights to replay. The commentary below has the whole story.
-          </p>
-        } @else {
-          <p class="mt-1 text-sm text-slate-600" role="status">
-            Highlight {{ activeIndex() + 1 }} of {{ totalHighlights() }} · {{ clock() }}
-          </p>
-
-          <div class="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              [class]="primaryButtonClass"
-              [attr.aria-pressed]="playing()"
-              (click)="togglePlay()"
-            >
-              {{ playing() ? 'Pause' : 'Play' }}
-            </button>
-            <button type="button" [class]="secondaryButtonClass" (click)="replay()">Replay</button>
-            <button type="button" [class]="secondaryButtonClass" (click)="skipCurrent()">
-              Skip highlight
-            </button>
-            <button type="button" [class]="secondaryButtonClass" (click)="skipAll()">
-              Skip all
-            </button>
-
-            <span id="speed-label" class="ml-2 text-sm text-slate-600">Speed</span>
-            <div role="group" aria-labelledby="speed-label" class="flex items-center gap-1">
-              @for (option of speeds; track option) {
-                <button
-                  type="button"
-                  [class]="speed() === option ? primaryButtonClass : secondaryButtonClass"
-                  [attr.aria-pressed]="speed() === option"
-                  (click)="setSpeed(option)"
-                >
-                  {{ option }}x
-                </button>
-              }
-            </div>
-
-            <button
-              type="button"
-              [class]="secondaryButtonClass"
-              [attr.aria-pressed]="textOnly()"
-              (click)="toggleTextOnly()"
-            >
-              {{ textOnly() ? 'Show the pitch' : 'Text only' }}
-            </button>
+        <div class="flex items-center justify-center gap-6">
+          <div class="flex min-w-[140px] flex-col items-end">
+            <span class="text-lg font-bold tracking-wide text-slate-100">{{ result.home.name }}</span>
+            <span class="text-xs text-slate-500">{{ result.home.shortName }}</span>
           </div>
 
-          @if (activeHighlight(); as highlight) {
-            <p class="mt-3 text-sm font-medium text-slate-800" role="status" aria-live="polite">
-              {{ highlight.narration }}
-            </p>
-
-            @if (!textOnly()) {
-              <div
-                class="mt-2 aspect-[105/68] w-full overflow-hidden rounded border border-slate-300 bg-green-800"
-              >
-                <canvas
-                  #pitch
-                  class="pitch h-full w-full"
-                  role="img"
-                  [attr.aria-label]="highlight.narration"
-                ></canvas>
+          <div class="flex items-center gap-3">
+            @if (presentation(); as view) {
+              <div class="flex min-w-[110px] items-center justify-center rounded-lg bg-[#0f172a] px-5 py-2 shadow-inner">
+                <span class="font-mono text-4xl font-black tracking-tighter" [class]="homeGoalAnimation() ? 'text-emerald-400' : 'text-slate-100'">{{ view.homeGoals }}</span>
+                <span class="mx-2 font-mono text-2xl font-light text-slate-600">-</span>
+                <span class="font-mono text-4xl font-black tracking-tighter" [class]="awayGoalAnimation() ? 'text-emerald-400' : 'text-slate-100'">{{ view.awayGoals }}</span>
               </div>
-              @if (reduced()) {
-                <p class="mt-1 text-xs text-slate-600">
-                  Reduced motion is on, so the event is shown as a still frame. Press Play to
-                  animate it.
-                </p>
-              }
-              <p class="mt-1 text-xs text-slate-500">
-                The home side is drawn as circles and the away side as squares, and every player
-                carries a shirt number, so the teams are never told apart by colour alone.
-              </p>
+              <div class="rounded border border-slate-700 bg-slate-800/60 px-3 py-1 text-center">
+                <span class="block font-mono text-base font-bold text-emerald-400">{{ clock() }}</span>
+                <span class="block text-[9px] tracking-widest text-slate-500 uppercase">
+                  {{ state() === 'playing' ? 'LIVE' : state() === 'idle' ? 'END' : 'PAUSED' }}
+                </span>
+              </div>
             } @else {
-              <p class="mt-2 text-sm text-slate-600">
-                Text-only mode: the event diagram is hidden. Every highlight is described above and
-                in the timeline below.
-              </p>
+              <div class="flex min-w-[110px] items-center justify-center rounded-lg bg-[#0f172a] px-5 py-2">
+                <span class="font-mono text-4xl font-black text-slate-700">{{ result.home.goals }}</span>
+                <span class="mx-2 font-mono text-2xl text-slate-700">-</span>
+                <span class="font-mono text-4xl font-black text-slate-700">{{ result.away.goals }}</span>
+              </div>
             }
-          }
+          </div>
 
-          <ul class="mt-4 flex flex-wrap gap-2" aria-label="Events in this match">
-            @for (
-              highlight of view.highlights;
-              track highlight.sourceEventSequence;
-              let index = $index
-            ) {
-              <li>
-                <button
-                  type="button"
-                  [class]="index === activeIndex() ? primaryButtonClass : secondaryButtonClass"
-                  [attr.aria-current]="index === activeIndex() ? 'true' : null"
-                  (click)="seekTo(index)"
-                >
-                  {{ title(index) }}
-                </button>
-              </li>
+          <div class="flex min-w-[140px] flex-col items-start">
+            <span class="text-lg font-bold tracking-wide text-slate-100">{{ result.away.name }}</span>
+            <span class="text-xs text-slate-500">{{ result.away.shortName }}</span>
+          </div>
+        </div>
+
+        @if (scorers().length > 0) {
+          <p class="mt-1 text-center text-xs text-slate-400">
+            @for (scorer of scorers(); track scorer) {
+              <span class="mx-2">{{ scorer }}</span>
             }
-          </ul>
+          </p>
+        }
+
+        @if (presentation(); as view) {
+          @if (view.highlights.length > 0) {
+            <div class="mt-3 flex items-center justify-center gap-2">
+              <button id="mv-play-pause" type="button"
+                class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white shadow transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                [attr.aria-pressed]="playing()" (click)="togglePlay()"
+                [attr.aria-label]="playing() ? 'Pause replay' : 'Play replay'">
+                @if (playing()) {
+                  <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <rect x="4" y="3" width="4" height="14" rx="1"/><rect x="12" y="3" width="4" height="14" rx="1"/>
+                  </svg>
+                } @else {
+                  <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <polygon points="5,3 17,10 5,17"/>
+                  </svg>
+                }
+              </button>
+              <button id="mv-replay" type="button"
+                class="rounded border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs text-slate-300 transition hover:border-slate-600 hover:bg-slate-700/60"
+                (click)="replay()">&#8617; Replay</button>
+              <button id="mv-skip" type="button"
+                class="rounded border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs text-slate-300 transition hover:border-slate-600 hover:bg-slate-700/60"
+                (click)="skipCurrent()">Skip &#9197;</button>
+              <span class="h-5 w-px bg-slate-700" aria-hidden="true"></span>
+              <div class="flex items-center gap-1" role="group" aria-label="Playback speed">
+                @for (option of speeds; track option) {
+                  <button type="button"
+                    class="rounded px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500"
+                    [class]="speed() === option ? 'bg-emerald-700 text-white' : 'border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200'"
+                    [attr.aria-pressed]="speed() === option" (click)="setSpeed(option)">{{ option }}x</button>
+                }
+              </div>
+              <span class="h-5 w-px bg-slate-700" aria-hidden="true"></span>
+              <button id="mv-text-only" type="button"
+                class="rounded border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs text-slate-300 transition hover:border-slate-600 hover:bg-slate-700/60"
+                [attr.aria-pressed]="textOnly()" (click)="toggleTextOnly()">
+                {{ textOnly() ? 'Show Pitch' : 'Text Only' }}
+              </button>
+            </div>
+          }
         }
       </div>
+    </header>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <section aria-labelledby="commentary-heading">
-          <h2 id="commentary-heading" class="text-lg font-semibold">Commentary</h2>
-          <ol class="mt-2 divide-y divide-slate-100 rounded border border-slate-200 bg-white">
-            @for (line of view.commentary; track line.sequence) {
-              <li class="flex items-start gap-3 p-2 text-sm">
-                <span class="w-12 shrink-0 text-right tabular-nums text-slate-500">
-                  {{ minute(line.minute, line.stoppageMinute) }}
-                </span>
-                <span class="flex-1 text-slate-800">
-                  <span class="sr-only">{{ side(line.side) }}: </span>{{ line.text }}
-                </span>
-                @if (hasHighlight(line)) {
-                  <button type="button" [class]="linkClass" (click)="showLine(line)">Watch</button>
-                }
-              </li>
+    <!-- TABS -->
+    <div class="border-b border-slate-800 bg-[#0c1220]">
+      <nav class="flex" role="tablist" aria-label="Match center sections">
+        @for (tab of tabs; track tab.id) {
+          <button type="button" role="tab"
+            [id]="'tab-' + tab.id"
+            [attr.aria-selected]="activeTab() === tab.id"
+            [attr.aria-controls]="'panel-' + tab.id"
+            class="relative px-5 py-2.5 text-xs font-medium tracking-wide uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
+            [class]="activeTab() === tab.id ? 'text-emerald-400 border-b-2 border-emerald-500' : 'text-slate-500 hover:text-slate-300'"
+            (click)="setTab(tab.id)">{{ tab.label }}</button>
+        }
+      </nav>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex flex-1 flex-col overflow-hidden">
+
+      <!-- TAB: 2D Match Replay -->
+      @if (activeTab() === 'replay') {
+        <div id="panel-replay" role="tabpanel" aria-labelledby="tab-replay" class="flex flex-1 flex-col overflow-hidden">
+          @if (presentation(); as view) {
+            @if (view.highlights.length === 0) {
+              <div class="flex flex-1 items-center justify-center">
+                <p class="text-sm text-slate-500">This match has no highlights to replay.</p>
+              </div>
+            } @else {
+              <div class="grid flex-1 overflow-hidden lg:grid-cols-[260px_1fr_260px]">
+
+                <!-- Left: Home lineup -->
+                <aside class="hidden overflow-y-auto border-r border-slate-800 bg-[#0c1220] lg:block">
+                  @if (view.homeLineup; as lineup) {
+                    <div class="p-3">
+                      <div class="mb-2 flex items-center justify-between">
+                        <h2 class="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">{{ lineup.shortName }}</h2>
+                        <span class="text-[9px] text-slate-600">{{ lineup.formation }}</span>
+                      </div>
+                      <table class="w-full text-xs" aria-label="Home team lineup">
+                        <thead class="sr-only"><tr><th scope="col">#</th><th scope="col">Pos</th><th scope="col">Player</th><th scope="col">Cond</th><th scope="col">Rating</th></tr></thead>
+                        <tbody>
+                          @for (player of lineup.starters; track player.participantId) {
+                            <tr class="group border-b border-slate-800/50 transition hover:bg-slate-800/40" [class.opacity-50]="player.sentOff">
+                              <td class="py-1 pr-1 text-right tabular-nums text-slate-600">{{ player.shirtNumber }}</td>
+                              <td class="px-1 py-1"><span class="inline-block rounded bg-slate-800 px-1 py-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">{{ player.position }}</span></td>
+                              <td class="truncate px-1 py-1 font-medium text-slate-200">
+                                {{ player.name }}
+                                @if (player.yellowCards > 0 && !player.sentOff) { <span class="ml-1 text-yellow-400" aria-label="Yellow card">Y</span> }
+                                @if (player.sentOff) { <span class="ml-1 text-red-500" aria-label="Red card">R</span> }
+                                @if (player.isInjured) { <span class="ml-1 text-orange-400" aria-label="Injured">+</span> }
+                                @if (player.subbedOutMinute !== null) { <span class="ml-1 text-[9px] text-slate-500">{{ player.subbedOutMinute }}'&#8595;</span> }
+                              </td>
+                              <td class="px-1 py-1">
+                                <div class="relative h-1.5 w-10 overflow-hidden rounded-full bg-slate-800">
+                                  <div class="absolute inset-y-0 left-0 rounded-full transition-all"
+                                    [class]="conditionBarClass(liveCondition(player.participantId, view))"
+                                    [style.width]="liveConditionPercent(player.participantId, view)"
+                                    role="meter"></div>
+                                </div>
+                              </td>
+                              <td class="py-1 pl-1 text-right">
+                                <span class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+                                  [class]="ratingBadgeClass(liveRating(player.participantId, view))">
+                                  {{ formatRating(liveRating(player.participantId, view)) }}
+                                </span>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                      @if (lineup.bench.length > 0) {
+                        <div class="mt-3 border-t border-slate-800 pt-2">
+                          <p class="mb-1 text-[9px] tracking-widest text-slate-600 uppercase">Bench</p>
+                          @for (player of lineup.bench; track player.participantId) {
+                            <div class="flex items-center gap-1 py-0.5 text-xs text-slate-500">
+                              <span class="w-4 text-right tabular-nums text-slate-700">{{ player.shirtNumber }}</span>
+                              <span class="truncate font-medium">{{ player.name }}</span>
+                              @if (player.subbedInMinute !== null) { <span class="ml-auto text-[9px] text-emerald-600">{{ player.subbedInMinute }}'&#8593;</span> }
+                            </div>
+                          }
+                        </div>
+                      }
+                      @if (teamGoalScorers(lineup.starters).length > 0) {
+                        <div class="mt-3 border-t border-slate-800 pt-2">
+                          @for (entry of teamGoalScorers(lineup.starters); track entry) {
+                            <p class="text-[10px] text-emerald-500">Goal: {{ entry }}</p>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="p-3 text-xs text-slate-600">Lineup not available</div>
+                  }
+                </aside>
+
+                <!-- Center: Pitch + narration + mini-timeline -->
+                <section class="flex flex-col overflow-hidden" aria-labelledby="pitch-section-heading">
+                  <h2 id="pitch-section-heading" class="sr-only">2D Match Replay</h2>
+                  @if (activeHighlight(); as highlight) {
+                    <div class="border-b border-slate-800 bg-[#0c1220] px-4 py-2">
+                      <p class="text-center text-xs font-medium text-slate-300" role="status" aria-live="polite">{{ highlight.narration }}</p>
+                    </div>
+                  }
+                  @if (!textOnly()) {
+                    <div class="flex flex-1 items-center justify-center overflow-hidden bg-[#090d16] p-2">
+                      <div class="relative w-full overflow-hidden rounded-lg border border-slate-800 shadow-2xl" style="aspect-ratio: 105 / 68; max-height: calc(100vh - 320px);">
+                        <canvas #pitch class="h-full w-full" role="img" [attr.aria-label]="activeHighlight()?.narration ?? 'Football pitch'"></canvas>
+                        @if (goalFlash()) {
+                          <div class="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden="true">
+                            <span class="animate-bounce text-5xl font-black text-emerald-400 drop-shadow-lg">GOAL!</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                    @if (reduced()) {
+                      <p class="px-3 pb-1 text-center text-[10px] text-slate-600">Reduced motion - press Play to animate.</p>
+                    }
+                  } @else {
+                    <div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+                      <p class="text-sm text-slate-400">Text-only mode</p>
+                      @if (activeHighlight(); as highlight) { <p class="text-xs text-slate-500">{{ highlight.narration }}</p> }
+                    </div>
+                  }
+                  <!-- Mini-timeline -->
+                  <div class="border-t border-slate-800 bg-[#0c1220] px-3 py-2">
+                    <ul class="flex flex-wrap gap-1.5" aria-label="Match highlights">
+                      @for (highlight of view.highlights; track highlight.sourceEventSequence; let index = $index) {
+                        <li>
+                          <button type="button"
+                            class="rounded px-2.5 py-1 text-[10px] font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500"
+                            [class]="index === activeIndex() ? 'bg-emerald-700 text-white' : isGoalHighlight(highlight) ? 'bg-emerald-900/40 border border-emerald-800 text-emerald-400 hover:bg-emerald-900/60' : 'bg-slate-800/60 border border-slate-700 text-slate-400 hover:text-slate-200'"
+                            [attr.aria-current]="index === activeIndex() ? 'true' : null"
+                            (click)="seekTo(index)">{{ title(index) }}</button>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                </section>
+
+                <!-- Right: Away lineup -->
+                <aside class="hidden overflow-y-auto border-l border-slate-800 bg-[#0c1220] lg:block">
+                  @if (view.awayLineup; as lineup) {
+                    <div class="p-3">
+                      <div class="mb-2 flex items-center justify-between">
+                        <span class="text-[9px] text-slate-600">{{ lineup.formation }}</span>
+                        <h2 class="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">{{ lineup.shortName }}</h2>
+                      </div>
+                      <table class="w-full text-xs" aria-label="Away team lineup">
+                        <thead class="sr-only"><tr><th scope="col">Rating</th><th scope="col">Cond</th><th scope="col">Player</th><th scope="col">Pos</th><th scope="col">#</th></tr></thead>
+                        <tbody>
+                          @for (player of lineup.starters; track player.participantId) {
+                            <tr class="group border-b border-slate-800/50 transition hover:bg-slate-800/40" [class.opacity-50]="player.sentOff">
+                              <td class="py-1 pr-1 text-left">
+                                <span class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+                                  [class]="ratingBadgeClass(liveRating(player.participantId, view))">
+                                  {{ formatRating(liveRating(player.participantId, view)) }}
+                                </span>
+                              </td>
+                              <td class="px-1 py-1">
+                                <div class="relative h-1.5 w-10 overflow-hidden rounded-full bg-slate-800">
+                                  <div class="absolute inset-y-0 left-0 rounded-full transition-all"
+                                    [class]="conditionBarClass(liveCondition(player.participantId, view))"
+                                    [style.width]="liveConditionPercent(player.participantId, view)"
+                                    role="meter"></div>
+                                </div>
+                              </td>
+                              <td class="truncate px-1 py-1 text-right font-medium text-slate-200">
+                                @if (player.subbedOutMinute !== null) { <span class="mr-1 text-[9px] text-slate-500">{{ player.subbedOutMinute }}'&#8595;</span> }
+                                @if (player.isInjured) { <span class="mr-1 text-orange-400" aria-label="Injured">+</span> }
+                                @if (player.sentOff) { <span class="mr-1 text-red-500" aria-label="Red card">R</span> }
+                                @if (player.yellowCards > 0 && !player.sentOff) { <span class="mr-1 text-yellow-400" aria-label="Yellow card">Y</span> }
+                                {{ player.name }}
+                              </td>
+                              <td class="px-1 py-1"><span class="inline-block rounded bg-slate-800 px-1 py-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">{{ player.position }}</span></td>
+                              <td class="py-1 pl-1 text-left tabular-nums text-slate-600">{{ player.shirtNumber }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                      @if (lineup.bench.length > 0) {
+                        <div class="mt-3 border-t border-slate-800 pt-2">
+                          <p class="mb-1 text-[9px] tracking-widest text-slate-600 uppercase">Bench</p>
+                          @for (player of lineup.bench; track player.participantId) {
+                            <div class="flex flex-row-reverse items-center gap-1 py-0.5 text-xs text-slate-500">
+                              <span class="w-4 text-left tabular-nums text-slate-700">{{ player.shirtNumber }}</span>
+                              <span class="truncate font-medium">{{ player.name }}</span>
+                              @if (player.subbedInMinute !== null) { <span class="mr-auto text-[9px] text-emerald-600">{{ player.subbedInMinute }}'&#8593;</span> }
+                            </div>
+                          }
+                        </div>
+                      }
+                      @if (teamGoalScorers(lineup.starters).length > 0) {
+                        <div class="mt-3 border-t border-slate-800 pt-2">
+                          @for (entry of teamGoalScorers(lineup.starters); track entry) {
+                            <p class="text-right text-[10px] text-emerald-500">{{ entry }} Goal</p>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="p-3 text-xs text-slate-600">Lineup not available</div>
+                  }
+                </aside>
+              </div>
+
+              <!-- Bottom commentary ticker -->
+              <div class="border-t border-slate-800 bg-[#0c1220]" role="status" aria-live="polite" aria-label="Match commentary">
+                <div class="flex items-center gap-3 px-4 py-2">
+                  <span class="shrink-0 font-mono text-[10px] font-semibold text-emerald-500">{{ clock() }}</span>
+                  <span class="ticker-text flex-1 truncate text-xs text-slate-300">{{ tickerText() }}</span>
+                </div>
+              </div>
             }
-          </ol>
-        </section>
+          } @else {
+            <div class="flex flex-1 items-center justify-center">
+              <div class="text-center">
+                <p class="mb-2 text-2xl font-bold text-slate-600">{{ result.home.goals }}-{{ result.away.goals }}</p>
+                <p class="text-sm text-slate-500">Loading presentation...</p>
+              </div>
+            </div>
+          }
+        </div>
+      }
 
-        <section aria-labelledby="statistics-heading">
-          <h2 id="statistics-heading" class="text-lg font-semibold">Statistics</h2>
-          <div
-            class="mt-2 overflow-x-auto rounded border border-slate-200 bg-white"
-            tabindex="0"
-            role="group"
-            aria-label="Match statistics"
-          >
-            <table class="min-w-full border-collapse text-sm">
-              <caption class="sr-only">
-                Match statistics for
-                {{
-                  result.home.name
-                }}
-                and
-                {{
-                  result.away.name
-                }}.
-              </caption>
-              <thead>
-                <tr class="border-b border-slate-200 text-slate-600">
-                  <th scope="col" class="px-3 py-2 text-right font-medium">
-                    {{ result.home.shortName }}
-                  </th>
-                  <th scope="col" class="px-3 py-2 text-center font-medium">Statistic</th>
-                  <th scope="col" class="px-3 py-2 text-left font-medium">
-                    {{ result.away.shortName }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of statisticRows(); track row.label) {
-                  <tr class="border-b border-slate-100 last:border-b-0">
-                    <td class="px-3 py-2 text-right tabular-nums">{{ row.home }}</td>
-                    <th scope="row" class="px-3 py-2 text-center font-normal text-slate-600">
-                      {{ row.label }}
-                    </th>
-                    <td class="px-3 py-2 text-left tabular-nums">{{ row.away }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+      <!-- TAB: Full Match Report -->
+      @if (activeTab() === 'report') {
+        <div id="panel-report" role="tabpanel" aria-labelledby="tab-report" class="flex-1 overflow-y-auto px-4 py-4">
+          <h2 class="mb-4 text-sm font-semibold tracking-widest text-slate-400 uppercase">Full Match Commentary</h2>
+          @if (presentation(); as view) {
+            <ol class="space-y-0.5">
+              @for (line of view.commentary; track line.sequence) {
+                <li class="flex items-start gap-3 rounded px-2 py-1.5 text-sm transition hover:bg-slate-800/40"
+                  [class.bg-emerald-900/20]="isGoalCommentaryLine(line)">
+                  <span class="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-slate-500">{{ minute(line.minute, line.stoppageMinute) }}</span>
+                  <span class="flex-1 leading-snug" [class]="isGoalCommentaryLine(line) ? 'font-semibold text-emerald-400' : 'text-slate-300'">
+                    <span class="sr-only">{{ side(line.side) }}: </span>{{ line.text }}
+                  </span>
+                  @if (hasHighlight(line)) {
+                    <button type="button"
+                      class="shrink-0 rounded border border-emerald-800 px-2 py-0.5 text-[10px] text-emerald-500 transition hover:bg-emerald-900/40"
+                      (click)="showLineAndSwitch(line)">Watch</button>
+                  }
+                </li>
+              }
+            </ol>
+          } @else {
+            <p class="text-sm text-slate-500">Commentary not available.</p>
+          }
+        </div>
+      }
+
+      <!-- TAB: Match Statistics -->
+      @if (activeTab() === 'stats') {
+        <div id="panel-stats" role="tabpanel" aria-labelledby="tab-stats" class="flex-1 overflow-y-auto px-4 py-4">
+          <h2 class="mb-4 text-sm font-semibold tracking-widest text-slate-400 uppercase">Match Statistics</h2>
+          <div class="mx-auto max-w-lg">
+            <div class="mb-4 grid grid-cols-3 text-center text-xs font-medium text-slate-500">
+              <span class="pr-4 text-right">{{ result.home.shortName }}</span>
+              <span></span>
+              <span class="pl-4 text-left">{{ result.away.shortName }}</span>
+            </div>
+            @for (row of statisticRows(); track row.label) {
+              <div class="mb-2">
+                <div class="mb-0.5 grid grid-cols-3 items-center text-center text-xs">
+                  <span class="pr-3 text-right tabular-nums font-medium text-slate-200">{{ row.home }}</span>
+                  <span class="text-[10px] text-slate-500">{{ row.label }}</span>
+                  <span class="pl-3 text-left tabular-nums font-medium text-slate-200">{{ row.away }}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-px">
+                  <div class="flex justify-end"><div class="h-1 rounded-l bg-blue-600 transition-all" [style.width]="statBarWidth(row.home, row.away, true)"></div></div>
+                  <div class="flex justify-start"><div class="h-1 rounded-r bg-rose-600 transition-all" [style.width]="statBarWidth(row.home, row.away, false)"></div></div>
+                </div>
+              </div>
+            }
           </div>
-        </section>
-      </div>
-    }
-  </section>
+        </div>
+      }
+
+      <!-- TAB: Player Performance -->
+      @if (activeTab() === 'players') {
+        <div id="panel-players" role="tabpanel" aria-labelledby="tab-players" class="flex-1 overflow-y-auto px-4 py-4">
+          <h2 class="mb-4 text-sm font-semibold tracking-widest text-slate-400 uppercase">Player Performance</h2>
+          @if (presentation(); as view) {
+            <div class="grid gap-6 lg:grid-cols-2">
+              @if (view.homeLineup; as lineup) {
+                <section>
+                  <h3 class="mb-2 text-xs font-semibold text-slate-400">{{ lineup.clubName }}</h3>
+                  <table class="w-full text-xs" aria-label="Home team player stats">
+                    <thead>
+                      <tr class="border-b border-slate-800 text-[10px] text-slate-500">
+                        <th scope="col" class="pb-1 text-left">#</th><th scope="col" class="pb-1 text-left">Player</th>
+                        <th scope="col" class="pb-1 text-center">Pos</th><th scope="col" class="pb-1 text-center">G</th>
+                        <th scope="col" class="pb-1 text-center">A</th><th scope="col" class="pb-1 text-right">Rating</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (player of lineup.starters; track player.participantId) {
+                        <tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
+                          <td class="py-1.5 pr-2 tabular-nums text-slate-600">{{ player.shirtNumber }}</td>
+                          <td class="py-1.5 font-medium text-slate-200">{{ player.name }}
+                            @if (player.sentOff) { <span class="text-red-500">R</span> }
+                            @if (player.yellowCards > 0 && !player.sentOff) { <span class="text-yellow-400">Y</span> }
+                          </td>
+                          <td class="py-1.5 text-center text-slate-500">{{ player.position }}</td>
+                          <td class="py-1.5 text-center tabular-nums text-slate-300">{{ player.goals || '-' }}</td>
+                          <td class="py-1.5 text-center tabular-nums text-slate-300">{{ player.assists || '-' }}</td>
+                          <td class="py-1.5 text-right">
+                            <span class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+                              [class]="ratingBadgeClass(liveRating(player.participantId, view))">
+                              {{ formatRating(liveRating(player.participantId, view)) }}
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </section>
+              }
+              @if (view.awayLineup; as lineup) {
+                <section>
+                  <h3 class="mb-2 text-xs font-semibold text-slate-400">{{ lineup.clubName }}</h3>
+                  <table class="w-full text-xs" aria-label="Away team player stats">
+                    <thead>
+                      <tr class="border-b border-slate-800 text-[10px] text-slate-500">
+                        <th scope="col" class="pb-1 text-left">#</th><th scope="col" class="pb-1 text-left">Player</th>
+                        <th scope="col" class="pb-1 text-center">Pos</th><th scope="col" class="pb-1 text-center">G</th>
+                        <th scope="col" class="pb-1 text-center">A</th><th scope="col" class="pb-1 text-right">Rating</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (player of lineup.starters; track player.participantId) {
+                        <tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
+                          <td class="py-1.5 pr-2 tabular-nums text-slate-600">{{ player.shirtNumber }}</td>
+                          <td class="py-1.5 font-medium text-slate-200">{{ player.name }}
+                            @if (player.sentOff) { <span class="text-red-500">R</span> }
+                            @if (player.yellowCards > 0 && !player.sentOff) { <span class="text-yellow-400">Y</span> }
+                          </td>
+                          <td class="py-1.5 text-center text-slate-500">{{ player.position }}</td>
+                          <td class="py-1.5 text-center tabular-nums text-slate-300">{{ player.goals || '-' }}</td>
+                          <td class="py-1.5 text-center tabular-nums text-slate-300">{{ player.assists || '-' }}</td>
+                          <td class="py-1.5 text-right">
+                            <span class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+                              [class]="ratingBadgeClass(liveRating(player.participantId, view))">
+                              {{ formatRating(liveRating(player.participantId, view)) }}
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </section>
+              }
+            </div>
+          } @else {
+            <p class="text-sm text-slate-500">Player stats not available.</p>
+          }
+        </div>
+      }
+    </main>
+  </div>
 }

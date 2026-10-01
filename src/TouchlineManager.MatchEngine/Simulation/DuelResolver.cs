@@ -58,7 +58,7 @@ public static class DuelResolver
         {
             defenderScore += 8;
         }
-        else if (tacklingStyle == MatchTacklingStyle.Cautious)
+        else if (tacklingStyle == MatchTacklingStyle.StayOnFeet)
         {
             defenderScore -= 5;
         }

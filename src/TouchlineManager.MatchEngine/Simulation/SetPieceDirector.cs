@@ -44,7 +44,8 @@ public static class SetPieceDirector
         var isGoal = random.RollBasisPoints(goalProb);
         var wasSaved = !isGoal && random.RollBasisPoints(7000); // 70% of misses are keeper saves
 
-        var targetY = random.Next(SpatialPitch.GoalYMin + 100, SpatialPitch.GoalYMax - 100);
+        var goalRange = SpatialPitch.GoalYMax - 100 - (SpatialPitch.GoalYMin + 100);
+        var targetY = SpatialPitch.GoalYMin + 100 + random.NextInt(Math.Max(1, goalRange));
         var targetX = takerIsHome ? SpatialPitch.AwayGoalX : SpatialPitch.HomeGoalX;
 
         return new SetPieceOutcome(

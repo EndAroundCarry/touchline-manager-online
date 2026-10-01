@@ -32,10 +32,10 @@ public static class TacticalFormationResolver
             // Attacking phase: team shifts forward into space
             var mentalityShift = instructions.Mentality switch
             {
-                MatchMentality.VeryAttacking => 900,
-                MatchMentality.Attacking => 600,
-                MatchMentality.Defensive => -300,
-                MatchMentality.VeryDefensive => -600,
+                MatchMentality.Attacking => 700,
+                MatchMentality.Positive => 400,
+                MatchMentality.Defensive => -400,
+                MatchMentality.Cautious => -200,
                 _ => 200,
             };
 

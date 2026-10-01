@@ -33,7 +33,7 @@ public sealed class FatigueManager
         // Lower stamina -> faster drain
         var baseDrainRate = 24 - stamina; // 4..23 per minute
 
-        if (instructions.Tempo == MatchTempo.Fast)
+        if (instructions.Tempo == MatchTempo.High)
         {
             baseDrainRate = (int)(baseDrainRate * 1.25);
         }
