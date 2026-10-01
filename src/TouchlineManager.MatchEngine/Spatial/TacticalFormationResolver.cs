@@ -109,13 +109,22 @@ public static class TacticalFormationResolver
     }
 
     /// <summary>Mirrors tactical coordinates for the away side, which attacks the other way.</summary>
+    /// <remarks>
+    /// The slot's X runs 0..10_000 along the pitch, but its Y is the tactics board's normalized 0..10_000
+    /// (`TAC-9`), while the pitch model's width is the real 0..7_000 — so the Y is scaled onto the pitch as
+    /// well as mirrored. Both sides then stand where the team sheet says, whatever end they defend.
+    /// </remarks>
     /// <param name="x">Position towards the goal the side attacks, 0..10_000.</param>
-    /// <param name="y">Position across the pitch, 0..10_000.</param>
+    /// <param name="y">Position across the pitch, 0..10_000 normalized.</param>
     /// <param name="isHome">Whether the coordinates are the home side's.</param>
-    public static SpatialPoint Orient(int x, int y, bool isHome) =>
-        isHome
-            ? new SpatialPoint(x, y)
-            : new SpatialPoint(SpatialPitch.PitchLength - x, SpatialPitch.PitchWidth - y);
+    public static SpatialPoint Orient(int x, int y, bool isHome)
+    {
+        var pitchY = (y * SpatialPitch.PitchWidth) / EngineRulesV2.SlotCoordinateScale;
+
+        return isHome
+            ? new SpatialPoint(x, pitchY)
+            : new SpatialPoint(SpatialPitch.PitchLength - x, SpatialPitch.PitchWidth - pitchY);
+    }
 
     /// <summary>Clamps an X position inside the pitch.</summary>
     private static int ClampAxis(int x)

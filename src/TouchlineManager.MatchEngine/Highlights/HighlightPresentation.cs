@@ -61,6 +61,30 @@ public sealed record HighlightKeyframeV1(
 /// <param name="Keyframes">Its positions, ordered by time.</param>
 public sealed record HighlightTrackV1(string EntityId, IReadOnlyList<HighlightKeyframeV1> Keyframes);
 
+/// <summary>
+/// The recycling passage between two highlights, keyed to the highlight it leads into (`replay-v2`).
+/// </summary>
+/// <remarks>
+/// A condensed replay that cuts from one chance to the next teleports the ball back to the halfway line
+/// between highlights, and a viewer reads that as a fake match. A bridge carries the entities' movement
+/// between one highlight's ending and the next's beginning: the ball travelling back, the teams shifting
+/// with it. It is optional — a bridge that does not fit the budget is dropped and the cut remains — and
+/// the client plays it at speed, which is what condenses ninety minutes into the plan's five to ten minutes.
+/// </remarks>
+/// <param name="AfterEventSequence">The highlight this bridge leads into.</param>
+/// <param name="DurationMilliseconds">How long the bridge runs for.</param>
+/// <param name="Tracks">One track per entity, ordered by entity identifier.</param>
+public sealed record BridgeV1(
+    int AfterEventSequence,
+    int DurationMilliseconds,
+    IReadOnlyList<HighlightTrackV1> Tracks)
+{
+    /// <summary>
+    /// Gets an estimate of the serialized payload, on the same accounting the highlights use.
+    /// </summary>
+    public int EstimatedPayloadBytes => (DurationMilliseconds / 1_000) + (Tracks.Sum(track => track.Keyframes.Count) * 24) + 32;
+}
+
 /// <summary>One player's full match participation line for the match center lineups.</summary>
 public sealed record MatchLineupPlayerV1
 {
@@ -106,13 +130,15 @@ public sealed record PlayerLiveMetricV1
 }
 
 /// <summary>
-/// One immutable, replayable highlight (master plan §9.3).
+/// One immutable, replayable highlight (master plan §9.3, `replay-v2`).
 /// </summary>
 /// <remarks>
 /// Carries no raw frames and no video: the client interpolates between keyframes at its own refresh rate, so
 /// the payload is a few kilobytes instead of a few megabytes and a replay is identical on a 60 Hz and a
 /// 144 Hz display. The narration is derived from the event, and the colours come from safe generated
-/// palettes rather than from any real club's identity (`WORLD-3`).
+/// palettes rather than from any real club's identity (`WORLD-3`). Since `replay-v2` a highlight is a whole
+/// passage of play — ten to twenty-five seconds — whose entities move as the play model moved them, and the
+/// ball's keyframes carry the altitude the flight model gave them.
 /// </remarks>
 public sealed record HighlightPresentationV1
 {
@@ -186,6 +212,9 @@ public sealed record MatchPresentationV1
     /// <summary>Gets the highlights, in event order.</summary>
     public required IReadOnlyList<HighlightPresentationV1> Highlights { get; init; }
 
+    /// <summary>Gets the bridges between consecutive highlights, keyed to the highlight each leads into.</summary>
+    public IReadOnlyList<BridgeV1> Bridges { get; init; } = [];
+
     /// <summary>Gets the home side's lineup and player stats.</summary>
     public MatchLineupV1? HomeLineup { get; init; }
 
@@ -195,15 +224,20 @@ public sealed record MatchPresentationV1
     /// <summary>Gets the live minute-by-minute condition and ratings for all players.</summary>
     public IReadOnlyList<PlayerLiveMetricV1>? LiveMetrics { get; init; }
 
-    /// <summary>Gets the estimated total payload.</summary>
-    public int EstimatedPayloadBytes => Highlights.Sum(highlight => highlight.EstimatedPayloadBytes);
+    /// <summary>Gets the estimated total payload, bridges included.</summary>
+    public int EstimatedPayloadBytes =>
+        Highlights.Sum(highlight => highlight.EstimatedPayloadBytes)
+        + Bridges.Sum(bridge => bridge.EstimatedPayloadBytes);
 }
 
-/// <summary>How much is worth showing, and how much may be sent.</summary>
+/// <summary>
+/// How much is worth showing, and how much may be sent (`replay-v2`).
+/// </summary>
 /// <remarks>
 /// The caps are policy rather than formulas, but they are versioned with the presentation so a stored
 /// payload can always be explained. They exist because "show every shot" produces a payload nobody wants to
-/// download on a phone (`match_presentation_payload_budget_kb`).
+/// download on a phone (`match_presentation_payload_budget_kb`). Stage 3 widens a highlight from a single
+/// moment to a whole passage of play, so the duration band and the bridge budget are part of the options.
 /// </remarks>
 public sealed record HighlightOptionsV1
 {
@@ -213,6 +247,9 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets whether shots that hit the woodwork are worth showing.</summary>
     public bool IncludeWoodwork { get; init; } = true;
 
+    /// <summary>Gets whether direct free kicks are worth showing, at any quality (`replay-v2`).</summary>
+    public bool IncludeFreeKicks { get; init; } = true;
+
     /// <summary>Gets the most highlights one match may carry, goals excepted.</summary>
     public int MaxHighlights { get; init; } = 24;
 
@@ -220,8 +257,25 @@ public sealed record HighlightOptionsV1
     public int PayloadBudgetBytes { get; init; } = 750 * 1024;
 
     /// <summary>Gets the shortest a highlight runs for, in milliseconds.</summary>
-    public int MinDurationMilliseconds { get; init; } = 5_000;
+    /// <remarks>
+    /// A passage of play, not a moment: the plan's Stage 3 asks highlights to represent ten to twenty-five
+    /// seconds of football.
+    /// </remarks>
+    public int MinDurationMilliseconds { get; init; } = 10_000;
 
     /// <summary>Gets the longest a highlight runs for, in milliseconds.</summary>
-    public int MaxDurationMilliseconds { get; init; } = 8_000;
+    public int MaxDurationMilliseconds { get; init; } = 25_000;
+
+    /// <summary>Gets the most an inter-highlight bridge may add to the payload, in bytes.</summary>
+    /// <remarks>
+    /// Bridges are the recycling passages between chances; they are worth having only while they fit the
+    /// same budget the highlights were sized against.
+    /// </remarks>
+    public int BridgeBudgetBytes { get; init; } = 160 * 1024;
+
+    /// <summary>Gets the shortest a bridge runs for, in milliseconds.</summary>
+    public int MinBridgeDurationMilliseconds { get; init; } = 4_000;
+
+    /// <summary>Gets the longest a bridge runs for, in milliseconds.</summary>
+    public int MaxBridgeDurationMilliseconds { get; init; } = 9_000;
 }

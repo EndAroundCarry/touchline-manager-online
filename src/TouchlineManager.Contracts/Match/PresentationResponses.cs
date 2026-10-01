@@ -51,6 +51,17 @@ public sealed record HighlightKeyframeResponse(
 /// <param name="Keyframes">Its positions, ordered by time.</param>
 public sealed record HighlightTrackResponse(string EntityId, IReadOnlyList<HighlightKeyframeResponse> Keyframes);
 
+/// <summary>
+/// The recycling passage between two highlights, keyed to the highlight it leads into (`replay-v2`).
+/// </summary>
+/// <param name="AfterEventSequence">The highlight this bridge leads into.</param>
+/// <param name="DurationMilliseconds">How long the bridge runs for.</param>
+/// <param name="Tracks">One track per entity, ordered by entity identifier.</param>
+public sealed record BridgeResponse(
+    int AfterEventSequence,
+    int DurationMilliseconds,
+    IReadOnlyList<HighlightTrackResponse> Tracks);
+
 /// <summary>One entity in a highlight: a player or the ball.</summary>
 /// <remarks>
 /// Identity and anchor position only. Where the entity goes is a track, so a stationary player costs two
@@ -135,6 +146,8 @@ public sealed record PlayerLiveMetricResponse(
 /// <param name="AwayColour">The away side's colour.</param>
 /// <param name="Entities">Every entity, including the ball.</param>
 /// <param name="Tracks">One track per entity, ordered by entity identifier.</param>
+/// <param name="AttemptedX">Where the passage's play was fought, across the pitch, 0…10,000.</param>
+/// <param name="AttemptedY">Where the passage's play was fought, down the pitch, 0…10,000.</param>
 public sealed record HighlightResponse(
     int SourceEventSequence,
     int Minute,
@@ -167,6 +180,7 @@ public sealed record HighlightResponse(
 /// <param name="HomeLineup">The home side's complete lineup and player performance.</param>
 /// <param name="AwayLineup">The away side's complete lineup and player performance.</param>
 /// <param name="LiveMetrics">Minute-by-minute condition and ratings for all players.</param>
+/// <param name="Bridges">The recycling passages between consecutive highlights, in event order (`replay-v2`).</param>
 public sealed record MatchPresentationResponse(
     Guid MatchId,
     string PresentationVersion,
@@ -178,5 +192,6 @@ public sealed record MatchPresentationResponse(
     int EstimatedPayloadBytes,
     MatchLineupResponse? HomeLineup = null,
     MatchLineupResponse? AwayLineup = null,
-    IReadOnlyList<PlayerLiveMetricResponse>? LiveMetrics = null);
+    IReadOnlyList<PlayerLiveMetricResponse>? LiveMetrics = null,
+    IReadOnlyList<BridgeResponse>? Bridges = null);
 

@@ -91,7 +91,20 @@ public static class MatchMapping
             presentation.EstimatedPayloadBytes,
             presentation.HomeLineup is { } homeLineup ? ToResponse(homeLineup) : null,
             presentation.AwayLineup is { } awayLineup ? ToResponse(awayLineup) : null,
-            presentation.LiveMetrics is { } metrics ? [.. metrics.Select(ToResponse)] : null);
+            presentation.LiveMetrics is { } metrics ? [.. metrics.Select(ToResponse)] : null,
+            presentation.Bridges.Count > 0 ? [.. presentation.Bridges.Select(ToResponse)] : null);
+    }
+
+    /// <summary>Projects one recycling bridge.</summary>
+    /// <param name="bridge">The bridge.</param>
+    public static BridgeResponse ToResponse(this BridgeV1 bridge)
+    {
+        ArgumentNullException.ThrowIfNull(bridge);
+
+        return new BridgeResponse(
+            bridge.AfterEventSequence,
+            bridge.DurationMilliseconds,
+            [.. bridge.Tracks.Select(ToResponse)]);
     }
 
     /// <summary>Projects one commentary line.</summary>
