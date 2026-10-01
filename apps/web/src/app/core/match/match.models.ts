@@ -81,6 +81,9 @@ export interface HighlightKeyframe {
   readonly timeMilliseconds: number;
   readonly x: number;
   readonly y: number;
+  readonly z?: number;
+  readonly speed?: number;
+  readonly action?: string | null;
 }
 
 /** One entity's movement through a highlight. */
@@ -99,6 +102,49 @@ export interface HighlightEntity {
   readonly family: string | null;
   readonly x: number;
   readonly y: number;
+  readonly name?: string | null;
+  readonly position?: string | null;
+}
+
+/** One player's performance and state for the match center lineup. */
+export interface MatchLineupPlayer {
+  readonly participantId: string;
+  readonly playerId: string;
+  readonly shirtNumber: number;
+  readonly name: string;
+  readonly position: string;
+  readonly family: string;
+  readonly isStarter: boolean;
+  readonly slotNumber: number;
+  readonly kickoffCondition: number;
+  readonly finalCondition: number;
+  readonly finalRating: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly yellowCards: number;
+  readonly sentOff: boolean;
+  readonly subbedOutMinute: number | null;
+  readonly subbedInMinute: number | null;
+  readonly isInjured: boolean;
+}
+
+/** One team's tactical lineup setup for the match center. */
+export interface MatchLineup {
+  readonly clubName: string;
+  readonly shortName: string;
+  readonly primaryColour: string;
+  readonly secondaryColour: string;
+  readonly formation: string;
+  readonly starters: readonly MatchLineupPlayer[];
+  readonly bench: readonly MatchLineupPlayer[];
+}
+
+/** A player's live condition and rating at a specific minute in the match. */
+export interface PlayerLiveMetric {
+  readonly participantId: string;
+  readonly minute: number;
+  readonly conditionBasisPoints: number;
+  readonly ratingBasisPoints: number;
 }
 
 /** One immutable, replayable highlight. */
@@ -125,4 +171,8 @@ export interface MatchPresentation {
   readonly commentary: readonly CommentaryLine[];
   readonly highlights: readonly Highlight[];
   readonly estimatedPayloadBytes: number;
+  readonly homeLineup?: MatchLineup | null;
+  readonly awayLineup?: MatchLineup | null;
+  readonly liveMetrics?: readonly PlayerLiveMetric[] | null;
 }
+

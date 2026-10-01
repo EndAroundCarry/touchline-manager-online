@@ -169,3 +169,47 @@ export function highlightIndexForLine(
 ): number {
   return highlights.findIndex((highlight) => highlight.sourceEventSequence === line.sequence);
 }
+
+/** Formats a player's rating in basis points (e.g., 7200 -> "7.2"). */
+export function formatMatchRating(basisPoints: number): string {
+  if (basisPoints <= 0) {
+    return '-';
+  }
+
+  return (basisPoints / 1000).toFixed(1);
+}
+
+/** Formats player condition as percentage (e.g., 9500 -> "95%"). */
+export function formatConditionPercent(basisPoints: number): string {
+  const percent = Math.round(Math.max(0, Math.min(10000, basisPoints)) / 100);
+
+  return `${percent}%`;
+}
+
+/** Returns the Football Manager style color badge class for a player rating. */
+export function ratingColorClass(basisPoints: number): string {
+  if (basisPoints <= 0) {
+    return 'bg-slate-800 text-slate-400 border-slate-700';
+  }
+
+  const rating = basisPoints / 1000;
+
+  if (rating >= 8.0) {
+    return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-semibold';
+  }
+
+  if (rating >= 7.0) {
+    return 'bg-green-500/20 text-green-400 border-green-500/40';
+  }
+
+  if (rating >= 6.5) {
+    return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+  }
+
+  if (rating >= 6.0) {
+    return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+  }
+
+  return 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+}
+

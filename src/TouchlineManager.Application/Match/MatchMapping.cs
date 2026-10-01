@@ -88,7 +88,10 @@ public static class MatchMapping
             presentation.AwayGoals,
             [.. commentary.Select(ToResponse)],
             [.. presentation.Highlights.Select(ToResponse)],
-            presentation.EstimatedPayloadBytes);
+            presentation.EstimatedPayloadBytes,
+            presentation.HomeLineup is { } homeLineup ? ToResponse(homeLineup) : null,
+            presentation.AwayLineup is { } awayLineup ? ToResponse(awayLineup) : null,
+            presentation.LiveMetrics is { } metrics ? [.. metrics.Select(ToResponse)] : null);
     }
 
     /// <summary>Projects one commentary line.</summary>
@@ -141,7 +144,9 @@ public static class MatchMapping
             entity.ShirtNumber,
             Code(entity.Family),
             entity.X,
-            entity.Y);
+            entity.Y,
+            entity.Name,
+            entity.Position);
     }
 
     /// <summary>Projects one entity's track.</summary>
@@ -158,7 +163,48 @@ public static class MatchMapping
     /// <summary>Projects one keyframe.</summary>
     /// <param name="keyframe">The keyframe.</param>
     public static HighlightKeyframeResponse ToResponse(this HighlightKeyframeV1 keyframe) =>
-        new(keyframe.TimeMilliseconds, keyframe.X, keyframe.Y);
+        new(keyframe.TimeMilliseconds, keyframe.X, keyframe.Y, keyframe.Z, keyframe.Speed, keyframe.Action);
+
+    /// <summary>Projects one team's lineup.</summary>
+    public static MatchLineupResponse ToResponse(this MatchLineupV1 lineup) =>
+        new(
+            lineup.ClubName,
+            lineup.ShortName,
+            lineup.PrimaryColour,
+            lineup.SecondaryColour,
+            lineup.Formation,
+            [.. lineup.Starters.Select(ToResponse)],
+            [.. lineup.Bench.Select(ToResponse)]);
+
+    /// <summary>Projects one player's lineup line.</summary>
+    public static MatchLineupPlayerResponse ToResponse(this MatchLineupPlayerV1 player) =>
+        new(
+            player.ParticipantId,
+            player.PlayerId,
+            player.ShirtNumber,
+            player.Name,
+            player.Position,
+            Code(player.Family) ?? "unknown",
+            player.IsStarter,
+            player.SlotNumber,
+            player.KickoffCondition,
+            player.FinalCondition,
+            player.FinalRating,
+            player.Goals,
+            player.Assists,
+            player.YellowCards,
+            player.SentOff,
+            player.SubbedOutMinute,
+            player.SubbedInMinute,
+            player.IsInjured);
+
+    /// <summary>Projects one live metric snapshot.</summary>
+    public static PlayerLiveMetricResponse ToResponse(this PlayerLiveMetricV1 metric) =>
+        new(
+            metric.ParticipantId,
+            metric.Minute,
+            metric.ConditionBasisPoints,
+            metric.RatingBasisPoints);
 
     /// <summary>Projects one side's statistics.</summary>
     /// <param name="statistics">The engine's statistics.</param>

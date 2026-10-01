@@ -35,7 +35,16 @@ public sealed record CommentaryLineResponse(
 /// <param name="TimeMilliseconds">Milliseconds from the start of the highlight.</param>
 /// <param name="X">Position across the pitch, 0…10,000.</param>
 /// <param name="Y">Position down the pitch, 0…10,000.</param>
-public sealed record HighlightKeyframeResponse(int TimeMilliseconds, int X, int Y);
+/// <param name="Z">Altitude / ball height 0…100 (0 = on pitch, 100 = maximum aerial height).</param>
+/// <param name="Speed">Movement speed normalized in units/sec.</param>
+/// <param name="Action">Optional action or duel tag (e.g., tackle, pass, shot, save, header).</param>
+public sealed record HighlightKeyframeResponse(
+    int TimeMilliseconds,
+    int X,
+    int Y,
+    int Z = 0,
+    int Speed = 0,
+    string? Action = null);
 
 /// <summary>One entity's movement through a highlight, as keyframes the client interpolates between.</summary>
 /// <param name="EntityId">The entity the track belongs to.</param>
@@ -55,6 +64,8 @@ public sealed record HighlightTrackResponse(string EntityId, IReadOnlyList<Highl
 /// <param name="Family">The position family the player occupies: <c>goalkeeper</c>, <c>defence</c>, <c>midfield</c>, or <c>attack</c>.</param>
 /// <param name="X">The entity's resting position across the pitch, 0…10,000.</param>
 /// <param name="Y">The entity's resting position down the pitch, 0…10,000.</param>
+/// <param name="Name">Display name of the player, absent for the ball.</param>
+/// <param name="Position">Abbreviated position of the player (e.g. GK, DC, MC, ST), absent for the ball.</param>
 public sealed record HighlightEntityResponse(
     string EntityId,
     bool IsBall,
@@ -63,7 +74,47 @@ public sealed record HighlightEntityResponse(
     int ShirtNumber,
     string? Family,
     int X,
-    int Y);
+    int Y,
+    string? Name = null,
+    string? Position = null);
+
+/// <summary>One player's full match participation line for the match center lineups.</summary>
+public sealed record MatchLineupPlayerResponse(
+    Guid ParticipantId,
+    Guid PlayerId,
+    int ShirtNumber,
+    string Name,
+    string Position,
+    string Family,
+    bool IsStarter,
+    int SlotNumber,
+    int KickoffCondition,
+    int FinalCondition,
+    int FinalRating,
+    int Goals,
+    int Assists,
+    int YellowCards,
+    bool SentOff,
+    int? SubbedOutMinute,
+    int? SubbedInMinute,
+    bool IsInjured);
+
+/// <summary>One team's lineup and tactical setup for the match center.</summary>
+public sealed record MatchLineupResponse(
+    string ClubName,
+    string ShortName,
+    string PrimaryColour,
+    string SecondaryColour,
+    string Formation,
+    IReadOnlyList<MatchLineupPlayerResponse> Starters,
+    IReadOnlyList<MatchLineupPlayerResponse> Bench);
+
+/// <summary>A player's live condition and rating at a specific minute in the match.</summary>
+public sealed record PlayerLiveMetricResponse(
+    Guid ParticipantId,
+    int Minute,
+    int ConditionBasisPoints,
+    int RatingBasisPoints);
 
 /// <summary>
 /// One immutable, replayable highlight (master plan §9.3).
@@ -113,6 +164,9 @@ public sealed record HighlightResponse(
 /// <param name="Commentary">One line per narrated event, in event order.</param>
 /// <param name="Highlights">The highlights, in event order.</param>
 /// <param name="EstimatedPayloadBytes">The estimated serialized size, for the payload budget (§9.3).</param>
+/// <param name="HomeLineup">The home side's complete lineup and player performance.</param>
+/// <param name="AwayLineup">The away side's complete lineup and player performance.</param>
+/// <param name="LiveMetrics">Minute-by-minute condition and ratings for all players.</param>
 public sealed record MatchPresentationResponse(
     Guid MatchId,
     string PresentationVersion,
@@ -121,4 +175,8 @@ public sealed record MatchPresentationResponse(
     int AwayGoals,
     IReadOnlyList<CommentaryLineResponse> Commentary,
     IReadOnlyList<HighlightResponse> Highlights,
-    int EstimatedPayloadBytes);
+    int EstimatedPayloadBytes,
+    MatchLineupResponse? HomeLineup = null,
+    MatchLineupResponse? AwayLineup = null,
+    IReadOnlyList<PlayerLiveMetricResponse>? LiveMetrics = null);
+

@@ -33,18 +33,77 @@ public sealed record HighlightEntityV1
 
     /// <summary>Gets the entity's resting position down the pitch, 0…10_000.</summary>
     public required int Y { get; init; }
+
+    /// <summary>Gets the display name of the player, absent for the ball.</summary>
+    public string? Name { get; init; }
+
+    /// <summary>Gets the position of the player (e.g. GK, DC, MC, ST), absent for the ball.</summary>
+    public string? Position { get; init; }
 }
 
 /// <summary>One position at one moment, normalized to the pitch.</summary>
 /// <param name="TimeMilliseconds">Milliseconds from the start of the highlight.</param>
-/// <param name="X">Position across the pitch, 0…10_000.</param>
-/// <param name="Y">Position down the pitch, 0…10_000.</param>
-public sealed record HighlightKeyframeV1(int TimeMilliseconds, int X, int Y);
+/// <param name="X">Position across the pitch, 0…10,000.</param>
+/// <param name="Y">Position down the pitch, 0…10,000.</param>
+/// <param name="Z">Altitude / ball height 0…100 (0 = on pitch, 100 = aerial).</param>
+/// <param name="Speed">Movement speed normalized in units/sec.</param>
+/// <param name="Action">Optional action or duel tag (e.g., tackle, pass, shot, save, header).</param>
+public sealed record HighlightKeyframeV1(
+    int TimeMilliseconds,
+    int X,
+    int Y,
+    int Z = 0,
+    int Speed = 0,
+    string? Action = null);
 
 /// <summary>One entity's movement through a highlight, as keyframes the client interpolates between.</summary>
 /// <param name="EntityId">The entity.</param>
 /// <param name="Keyframes">Its positions, ordered by time.</param>
 public sealed record HighlightTrackV1(string EntityId, IReadOnlyList<HighlightKeyframeV1> Keyframes);
+
+/// <summary>One player's full match participation line for the match center lineups.</summary>
+public sealed record MatchLineupPlayerV1
+{
+    public required Guid ParticipantId { get; init; }
+    public required Guid PlayerId { get; init; }
+    public required int ShirtNumber { get; init; }
+    public required string Name { get; init; }
+    public required string Position { get; init; }
+    public required MatchPositionFamily Family { get; init; }
+    public required bool IsStarter { get; init; }
+    public required int SlotNumber { get; init; }
+    public required int KickoffCondition { get; init; }
+    public required int FinalCondition { get; init; }
+    public required int FinalRating { get; init; }
+    public required int Goals { get; init; }
+    public required int Assists { get; init; }
+    public required int YellowCards { get; init; }
+    public required bool SentOff { get; init; }
+    public int? SubbedOutMinute { get; init; }
+    public int? SubbedInMinute { get; init; }
+    public bool IsInjured { get; init; }
+}
+
+/// <summary>One team's lineup and tactical setup for the match center.</summary>
+public sealed record MatchLineupV1
+{
+    public required string ClubName { get; init; }
+    public required string ShortName { get; init; }
+    public required string PrimaryColour { get; init; }
+    public required string SecondaryColour { get; init; }
+    public required string Formation { get; init; }
+    public required IReadOnlyList<MatchLineupPlayerV1> Starters { get; init; }
+    public required IReadOnlyList<MatchLineupPlayerV1> Bench { get; init; }
+}
+
+/// <summary>A player's live condition and rating at a specific minute in the match.</summary>
+public sealed record PlayerLiveMetricV1
+{
+    public required Guid ParticipantId { get; init; }
+    public required int Minute { get; init; }
+    public required int ConditionBasisPoints { get; init; }
+    public required int RatingBasisPoints { get; init; }
+}
 
 /// <summary>
 /// One immutable, replayable highlight (master plan §9.3).
@@ -126,6 +185,15 @@ public sealed record MatchPresentationV1
 
     /// <summary>Gets the highlights, in event order.</summary>
     public required IReadOnlyList<HighlightPresentationV1> Highlights { get; init; }
+
+    /// <summary>Gets the home side's lineup and player stats.</summary>
+    public MatchLineupV1? HomeLineup { get; init; }
+
+    /// <summary>Gets the away side's lineup and player stats.</summary>
+    public MatchLineupV1? AwayLineup { get; init; }
+
+    /// <summary>Gets the live minute-by-minute condition and ratings for all players.</summary>
+    public IReadOnlyList<PlayerLiveMetricV1>? LiveMetrics { get; init; }
 
     /// <summary>Gets the estimated total payload.</summary>
     public int EstimatedPayloadBytes => Highlights.Sum(highlight => highlight.EstimatedPayloadBytes);
