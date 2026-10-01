@@ -255,6 +255,10 @@ moduleGroups["admin"].MapAdminEndpoints();
 
 app.MapAccountEndpoints();
 app.MapWorldEndpoints();
+
+// The public service status and document versions (master plan §16 Stage 15, F-55, ADR-0050). Always
+// mapped and anonymous, because the pages it feeds are reachable signed out.
+app.MapStatusEndpoints();
 app.MapSquadEndpoints();
 app.MapTacticsEndpoints();
 app.MapTrainingEndpoints();

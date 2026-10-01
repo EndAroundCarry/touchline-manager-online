@@ -71,8 +71,8 @@ Two different values are both called a seed, and they are not the same class.
 | Audit log | Permanent, access-restricted | Repudiation defence |
 | Job records (completed) | Retained per operational policy; attempt history kept for the season | Incident investigation |
 | Raw email delivery events | Short, provider-defined (days) | Deliverability debugging only |
-| Security/IP and device hashes | Bounded period, documented before launch | Abuse detection without indefinite tracking |
-| Support correspondence | Bounded period, documented before launch | Support continuity |
+| Security/IP and device hashes | 90 days | Abuse detection without indefinite tracking |
+| Support correspondence | 24 months | Support continuity |
 | Refresh sessions | Until expiry or revocation, then purged | Session hygiene |
 | Multi-factor credentials and recovery codes | Until reset by the account or an operator, or removed with the account at anonymization | Least data; a code that is spent or superseded is not kept |
 | Email tokens (verification/reset) | Consumed, then purged after expiry | Least data |
@@ -136,7 +136,9 @@ Stage 0 exit criteria require that the classification is actionable, not aspirat
 
 - [ ] The redaction list in §4 is implemented as a logging filter with an automated test (Stage 1).
 - [ ] Every C2 field has a test asserting absence from manager-facing DTOs (Stages 3, 4, 10).
-- [ ] Retention values in §3 with a "documented before launch" note are fixed before Stage 15.
+- [x] Retention values in §3 with a "documented before launch" note are fixed before Stage 15: security/IP and
+  device hashes at 90 days, and support correspondence at 24 months. The privacy page states the same values
+  and the spec fails if they drift (`F-55`, ADR-0050).
 - [x] The export and deletion flows are exercised by integration tests (Stage 13):
   `AccountManagementTests` exports an account and asserts the raw response omits the password, the
   refresh token, and every hash, while `AuthLifecycleTests` covers account closure.

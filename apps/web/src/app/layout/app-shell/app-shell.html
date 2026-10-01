@@ -154,6 +154,13 @@
     <div
       class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-slate-500"
     >
+      <nav aria-label="Information" class="flex flex-wrap gap-x-4 gap-y-1">
+        <a routerLink="/rules" class="underline underline-offset-2 hover:text-slate-700">Rules</a>
+        <a routerLink="/privacy" class="underline underline-offset-2 hover:text-slate-700">Privacy</a>
+        <a routerLink="/terms" class="underline underline-offset-2 hover:text-slate-700">Terms</a>
+        <a routerLink="/status" class="underline underline-offset-2 hover:text-slate-700">Status</a>
+        <a routerLink="/support" class="underline underline-offset-2 hover:text-slate-700">Support</a>
+      </nav>
       <p>Matchdays: Tuesday, Thursday and Sunday at 19:00 UTC.</p>
       @if (correlationId(); as reference) {
         <p>

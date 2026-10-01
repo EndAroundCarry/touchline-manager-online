@@ -67,6 +67,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-52 | Accessibility (WCAG 2.2 AA) | web | 13 | Axe gate over the core routes at desktop and mobile, plus the Canvas viewer on the matchday stack: zero WCAG 2.2 A/AA violations, a focus-ring guard, the squad roster named, scrollable table regions focusable, a keyboard path to move a tactics slot, and focus moved to `<main>` on navigation (`support/accessibility.ts`, `journeys/accessibility.spec.ts`, `matchday/matchday.spec.ts`, ADR-0039) |
 | F-53 | Guided in-app help (rules, deadlines, tactics, market, season cadence) | web | 13 | A `/help` reference over the five promised subjects, each stating the settled rule and linking to the screen that owns it, with the copy asserted against the disclosure boundary; session-dismissed first-steps guidance on the dashboard; and deadlines that name their time zone (`features/help/`, `formatDeadline`, `journeys/help.spec.ts`, the `/help` entry in `journeys/accessibility.spec.ts`, ADR-0040) |
 | F-54 | Product analytics (privacy-safe operational funnels) | ops | 13 | Onboarding and retention funnels read as counts over rows the game already writes, behind the first role-gated endpoint (`GET /ops/analytics/funnels`, `operator`/`admin`), with the same transitions counted on the OTel meter (`IOperationalAnalyticsQueries`, `IOperationalMetrics`, `OperationalAnalyticsQueriesTests`, `OperationalMetricsTests`, `AnalyticsTests`, ADR-0041) |
+| F-55 | Player-facing rules/privacy/terms/status/support pages | web, ops | 15 | Four pages authored as data (`features/info/`) and reachable signed out, linked from the footer and the register consent, with the terms/privacy versions read from the server so a page cannot disagree with the recorded consent (`LGL-1`, `features/info/info.spec.ts`). A public service status backed by the product's first anonymous read, `GET /api/v1/status`, which carries the read-only state and its reason, the season, the next matchday, and the document versions (`features/status/`, `core/status/`, `GetPublicStatus`, `StatusEndpoints`, `PublicStatusTests`, `journeys/info.spec.ts`, ADR-0050). The two retention values are fixed in `docs/security/data-classification.md` §3 and stated on the privacy page, pinned by the spec |
 
 ---
 
@@ -105,6 +106,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | Accessibility (WCAG 2.2 AA) | 1, 13 | web | Master plan §11.3, §15.6, `F-52`, ADR-0039 |
 | Guided in-app help | 13 | web | Master plan §16 Stage 13, §2.4, `F-53`, ADR-0040 |
 | Product analytics (privacy-safe operational funnels) | 13 | ops | Master plan §16 Stage 13, §14.1, `LGL-5`, `F-54`, ADR-0041 |
+| Player-facing information pages (rules, privacy, terms, status, support) | 15 | web, ops | Master plan §16 Stage 15, §12.4, `LGL-1`–`LGL-4`, `F-55`, ADR-0050 |
 
 ---
 

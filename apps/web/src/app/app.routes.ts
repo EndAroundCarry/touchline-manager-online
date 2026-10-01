@@ -29,6 +29,37 @@ export const routes: Routes = [
         title: 'Welcome — Touchline Manager',
       },
       {
+        // The player-facing information pages (master plan §16 Stage 15, F-55, ADR-0050). Unguarded and
+        // shell-wrapped, so a signed-out visitor — and the register consent — can reach them.
+        path: 'rules',
+        data: { document: 'rules' },
+        loadComponent: () => import('./features/info/info').then((m) => m.Info),
+        title: 'Game rules — Touchline Manager',
+      },
+      {
+        path: 'privacy',
+        data: { document: 'privacy' },
+        loadComponent: () => import('./features/info/info').then((m) => m.Info),
+        title: 'Privacy — Touchline Manager',
+      },
+      {
+        path: 'terms',
+        data: { document: 'terms' },
+        loadComponent: () => import('./features/info/info').then((m) => m.Info),
+        title: 'Terms — Touchline Manager',
+      },
+      {
+        path: 'support',
+        data: { document: 'support' },
+        loadComponent: () => import('./features/info/info').then((m) => m.Info),
+        title: 'Support — Touchline Manager',
+      },
+      {
+        path: 'status',
+        loadComponent: () => import('./features/status/status').then((m) => m.Status),
+        title: 'Service status — Touchline Manager',
+      },
+      {
         path: 'register',
         loadComponent: () => import('./features/auth/register/register').then((m) => m.Register),
         canActivate: [requireAnonymous],

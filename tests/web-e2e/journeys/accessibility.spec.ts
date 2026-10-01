@@ -49,6 +49,11 @@ test.describe('@a11y the public screens meet WCAG 2.2 AA', () => {
       '/forgot-password',
       '/reset-password',
       '/verify-email',
+      '/rules',
+      '/privacy',
+      '/terms',
+      '/status',
+      '/support',
     ]) {
       await page.goto(path);
       await audit.scan(path);

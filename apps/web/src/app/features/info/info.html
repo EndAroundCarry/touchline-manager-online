@@ -1,0 +1,44 @@
+<section class="max-w-3xl">
+  <h1 [class]="pageHeadingClass">{{ doc().title }}</h1>
+  <p class="mt-1 text-sm text-slate-600">{{ doc().summary }}</p>
+
+  @if (doc().versioned) {
+    <p class="mt-2 text-sm text-slate-600" role="status">
+      @if (version(); as published) {
+        Published version {{ published }}.
+      } @else if (versionFailed()) {
+        The published version could not be read just now.
+      } @else {
+        Reading the published version…
+      }
+    </p>
+  }
+
+  @for (section of doc().sections; track section.id) {
+    <section class="mt-8 border-t border-slate-200 pt-6" [attr.aria-labelledby]="section.id">
+      <h2 [id]="section.id" class="text-xl font-semibold">{{ section.heading }}</h2>
+
+      @for (paragraph of section.paragraphs ?? []; track $index) {
+        <p class="mt-2 text-slate-700">{{ paragraph }}</p>
+      }
+
+      @if (section.bullets; as bullets) {
+        <ul class="mt-3 list-disc space-y-2 pl-6 text-slate-700">
+          @for (bullet of bullets; track $index) {
+            <li>{{ bullet }}</li>
+          }
+        </ul>
+      }
+
+      @if (section.links; as links) {
+        <ul class="mt-3 flex flex-wrap gap-x-6">
+          @for (link of links; track link.path) {
+            <li>
+              <a [routerLink]="link.path" [class]="linkActionClass">{{ link.label }}</a>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</section>

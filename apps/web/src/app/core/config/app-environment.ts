@@ -13,4 +13,7 @@ export const appEnvironment = {
 
   /** Cadence used near a deadline, where freshness is worth the extra requests. */
   syncIntervalNearDeadlineMs: 15_000,
+
+  /** Polling cadence for the public service status while its page is open (`F-55`, ADR-0050). */
+  statusIntervalMs: 30_000,
 } as const;

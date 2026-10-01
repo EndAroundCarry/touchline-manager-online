@@ -14,6 +14,7 @@ using TouchlineManager.Application.Match;
 using TouchlineManager.Application.Ops;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Application.Squad.Validation;
+using TouchlineManager.Application.Status;
 using TouchlineManager.Application.World;
 using TouchlineManager.Application.World.Generation;
 using TouchlineManager.Application.World.Validation;
@@ -85,6 +86,10 @@ public static class DependencyInjection
         // development-flagged endpoint; the worker's advance job does the actual step.
         services.AddScoped<AdvanceGameClock>();
         services.AddScoped<GetGameClockStatus>();
+
+        // The public service status and document versions (master plan §16 Stage 15, F-55, ADR-0050). The
+        // product's first anonymous read; it is always mapped, so it has no diagnostics flag.
+        services.AddScoped<GetPublicStatus>();
 
         return services;
     }

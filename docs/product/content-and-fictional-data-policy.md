@@ -109,4 +109,4 @@ Content decisions that are accessibility requirements, not preferences:
 | Help copy review | Stage 13 | No hidden-attribute leakage, second person and present tense, glossary vocabulary, descriptive link text; asserted in `features/help/help.spec.ts` (`F-53`, ADR-0040) |
 | Analytics boundary review | Stage 13 | Counts only, no per-manager row, no hidden value, operator-gated; asserted in `AnalyticsTests` (`F-54`, ADR-0041) |
 | Commentary review | Stage 5/7 | Variation, no repetition pathology, no leakage |
-| Legal page review | Stage 15/16 | Terms, privacy, retention, and fictional-data statement published |
+| Legal page review | Stage 15 | Terms, privacy, retention, and fictional-data statement published at `/terms`, `/privacy` and `/rules`; the retention values are the ones fixed in `data-classification.md` §3, and the pages are asserted by `features/info/info.spec.ts` and `journeys/info.spec.ts` (`F-55`, ADR-0050) |

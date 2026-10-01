@@ -114,6 +114,10 @@
             <label class="text-sm text-slate-800" for="acceptTerms">
               I accept the terms of service and the privacy policy.
             </label>
+            <p class="text-xs text-slate-500">
+              Read the <a routerLink="/terms" [class]="linkClass">terms of service</a> and the
+              <a routerLink="/privacy" [class]="linkClass">privacy policy</a>.
+            </p>
             @if (errorFor('acceptTerms', 'AcceptTerms'); as message) {
               <p [id]="idFor('acceptTerms')" [class]="fieldErrorClass">{{ message }}</p>
             }

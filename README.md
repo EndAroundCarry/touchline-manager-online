@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 14 underway — roles, TOTP MFA, the gated admin surface, the operator read console, the recovery commands, the remaining §10.8 mutations (AI assignment, finance repair, announcements, and feature flags), the load, supply-chain, and restore drills, the read-only incident switch, and the local telemetry stack with its dashboards and SLO alerts.** Stage 13 is
+> **Status: Stage 15 underway — the non-production stepped clock and its test toolbar, and the player-facing rules, privacy, terms, status and support pages. Stage 14 is complete: roles, TOTP MFA, the gated admin surface, the operator read console, the recovery commands, the remaining §10.8 mutations (AI assignment, finance repair, announcements, and feature flags), the load, supply-chain, and restore drills, the read-only incident switch, and the local telemetry stack with its dashboards and SLO alerts.** Stage 13 is
 > complete: the responsive PWA, account sessions, the offline boundary, the accessibility gate, the
 > guided help, and the privacy-safe operational funnels. The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
@@ -83,7 +83,11 @@ kick-off. The server decides results; a client can never simulate or influence o
 > deadlines (`F-51`, ADR-0047). Most recently the telemetry stack has arrived — an OTLP collector,
 > Prometheus, Alertmanager, Grafana, and Tempo receiving the export the hosts always had, with dashboards
 > for the availability and latency objectives and four alerts, each naming the runbook section that
-> answers it (`F-48`, ADR-0048).
+> answers it (`F-48`, ADR-0048). Stage 15 has since begun with the stepped clock: a non-production mode
+> that freezes game time at a stored instant and moves it only when an operator presses a button, so a
+> season can be played one day or one matchday at a time through the real worker (`TIME-6`, `TIME-7`,
+> ADR-0049). Its player-facing pages followed — rules, privacy, terms, a live service status and support,
+> reachable signed out and backed by the product's first anonymous read (`F-55`, ADR-0050).
 
 ---
 

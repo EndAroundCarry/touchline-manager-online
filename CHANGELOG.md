@@ -3,6 +3,78 @@
 Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
 
+## Stage 15 — Player-facing rules, privacy, terms, status, and support pages
+
+Stage 15 asks for "player-facing rules/privacy/terms/status/support pages", and the gap was concrete rather
+than cosmetic: the registration screen asked a manager to accept "the terms of service and the privacy policy"
+with **no page to link to**, no footer link, and no public endpoint a signed-out client could call. All five
+pages now exist. Four are authored as data and reachable signed out; the fifth is a live service status behind
+the product's **first anonymous read**, `GET /api/v1/status` (`F-55`, ADR-0050).
+
+### Added
+
+- **Four player-facing information pages** (`F-55`): `/rules`, `/privacy`, `/terms` and `/support`, one
+  data-driven component (`features/info/`) selected by the route's `data.document`, so a page reads nothing from
+  the server and a new one is a route plus a document. They are unguarded and shell-wrapped, because the
+  register consent — and the footer — must reach them while signed out.
+- **A live service status** (`F-55`, `F-51`): `/status` reads `GET /api/v1/status` and shows whether the game is
+  operational or in read-only maintenance (with the operator's reason), the running season, and the next
+  matchday, polling while the page is open (`core/status/`, `features/status/`).
+- **The product's first anonymous read** (`F-55`, `LGL-1`): `StatusEndpoints` maps `GET /api/v1/status` with no
+  authorization policy. `GetPublicStatus` composes the incident reader (`F-51`), the world's running season, the
+  same next-round read the stepped clock's status uses (ADR-0049), and `AuthOptions` for the terms and privacy
+  versions. It adds no table and no repository.
+- **The published document versions on the pages** (`LGL-1`): the terms and privacy pages name the version the
+  server records on consent, read from the status endpoint rather than authored beside the copy, so a page
+  cannot disagree with the consent.
+- **Footer and register-consent links**: the shell footer gains an "Information" navigation to all five pages,
+  and the registration form's consent line links the terms of service and the privacy policy it names.
+
+### Fixed
+
+- **Two order-dependent API integration tests.** Adding a test class perturbs xUnit's non-deterministic
+  ordering within the shared `api` world, and two long-standing assumptions did not survive it:
+  `CompetitionTests.Another_clubs_fixture_is_refused_by_name` could pick the "other club's" earliest fixture
+  when that fixture was the one it played against the manager's own club — so it read the manager's own side
+  and got `200` rather than the expected `403`; and `MatchTests.A_replay_carries_commentary_...` required at
+  least one goal in a match that can legitimately end goalless. Both are made robust (the fixture is chosen
+  from a match the other club plays against somebody else; a goal event is required only when the score has
+  one, and the score-to-highlight reconciliation is asserted unconditionally). Neither is a product change.
+
+### Notes
+
+- **One endpoint and four documents, deliberately.** One small public read serves both the live status and the
+  versioned documents; a second endpoint for four short strings would be surface without a caller.
+- **The retention values are fixed here and stated on the page.** `data-classification.md` §3 sets security/IP
+  and device hashes at 90 days and support correspondence at 24 months, the privacy page states the same values,
+  and `features/info/info.spec.ts` fails if they drift.
+- **No rate limit on the anonymous read, recorded rather than overlooked.** It is a small read over a
+  five-second-cached flag and existing tables, and it is the page a person opens when something is wrong
+  (ADR-0050).
+- **No migration, no new table.** The milestone is a contract, a query, one endpoint, the web pages, and their
+  tests; the schema and existing endpoints are untouched.
+- **Support names no address.** There is no support channel in the product, so the support page explains how to
+  describe a problem and to quote the reference the footer already shows; the submission tool is the separate
+  feedback/report deliverable of this stage.
+- **`docs/architecture/adr/0050-...`** records the decision; the ADR index, `mvp-traceability.md` (`F-55` and
+  its §2 row), `content-and-fictional-data-policy.md` §5's legal-page gate, `data-classification.md` §3 and §7,
+  and `features/README.md` are updated with it.
+
+### Tests
+
+- New `PublicStatusTests` (API integration): the status is readable with no token and carries no address, a
+  seeded world yields a season and a next matchday, the configured document versions are served, and driving the
+  read-only flag command flips the state with the operator's reason — over the real database.
+- New `features/info/info.spec.ts`: all four documents present in order, every document has sections with
+  content, every link is an absolute in-app route, the disclosure-boundary tokens are absent, the terms and
+  privacy documents are versioned, and the privacy page states the retention values fixed in the policy.
+- New `core/status/status-store.spec.ts` and `features/status/status.spec.ts`: the store reads on start and each
+  interval and stops when the page goes away, a failed read is remembered without blanking the last status, and
+  the page maps operational, maintenance, unseeded and unreachable states without relying on colour.
+- New `journeys/info.spec.ts`: a signed-out visitor reads every page from the footer, the register consent leads
+  to the terms and privacy pages, a versioned page names the published version, and the status page reports the
+  service operational; the five routes join `journeys/accessibility.spec.ts`'s signed-out axe scan.
+
 ## Stage 15 — A stepped clock and a test toolbar, so a season plays a press at a time
 
 Stage 15's first exit criterion is "at least one complete closed-beta season and rollover succeeds under human

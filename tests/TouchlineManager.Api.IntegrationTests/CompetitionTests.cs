@@ -307,12 +307,15 @@ public sealed class CompetitionTests : IAsyncLifetime
 
         client.WithBearer(manager.AccessToken);
 
-        await OnboardAsync(client);
+        var myClubId = await OnboardAsync(client);
 
         var (_, otherClubId) = await FirstAvailableClubAsync(client);
 
+        // The other club's earliest fixture can be the one it plays against the manager's own club, which is
+        // not the refusal under test — the manager would read their own side from it. Pick a fixture it plays
+        // against somebody else, so the assertion is about ownership rather than about the calendar.
         await using var scope = _fixture.Factory.Services.CreateAsyncScope();
-        var otherFixtureId = await OtherClubFixtureAsync(otherClubId);
+        var otherFixtureId = await OtherClubFixtureAsync(otherClubId, myClubId);
 
         var response = await client.GetAsync($"/api/v1/fixtures/{otherFixtureId}/team-sheet");
 
@@ -432,14 +435,17 @@ public sealed class CompetitionTests : IAsyncLifetime
         return client.SendAsync(request);
     }
 
-    /// <summary>Finds a fixture the given club plays in, so a manager can be refused for it.</summary>
-    private async Task<Guid> OtherClubFixtureAsync(Guid clubId)
+    /// <summary>Finds a fixture the given club plays against somebody other than <paramref name="excludedClubId"/>.</summary>
+    private async Task<Guid> OtherClubFixtureAsync(Guid clubId, Guid excludedClubId)
     {
         await using var scope = _fixture.Factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
 
         return await dbContext.Fixtures
-            .Where(fixture => fixture.HomeClubId == clubId || fixture.AwayClubId == clubId)
+            .Where(fixture =>
+                (fixture.HomeClubId == clubId || fixture.AwayClubId == clubId)
+                && fixture.HomeClubId != excludedClubId
+                && fixture.AwayClubId != excludedClubId)
             .OrderBy(fixture => fixture.Id)
             .Select(fixture => fixture.Id)
             .FirstAsync();

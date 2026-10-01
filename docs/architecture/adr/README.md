@@ -66,6 +66,7 @@ the system is shaped the way it is.
 | [0047](0047-incident-read-only-mode.md) | Read-only incident mode, gated at the request edge | Accepted |
 | [0048](0048-telemetry-dashboards-and-slo-alerting.md) | Telemetry dashboards and SLO alerting, over the instruments that exist | Accepted |
 | [0049](0049-non-production-stepped-game-clock.md) | A non-production stepped game clock, advanced by an operator | Accepted |
+| [0050](0050-public-information-pages-and-status.md) | Player-facing information pages and a public service status | Accepted |
 
 ## Rules for changing an ADR
 

@@ -92,15 +92,22 @@ public sealed class MatchTests : IAsyncLifetime
 
         // Every goal the engine recorded is shown, and the goals shown reconcile with the score (MAT-8).
         var goalSequences = await GoalSequencesAsync(matchId);
+        var goals = presentation.HomeGoals + presentation.AwayGoals;
 
-        goalSequences.Should().NotBeEmpty("a published match almost always has a goal");
+        // A round can end goalless, so a goal event is only required when the score has one. What must always
+        // hold is the reconciliation: every goal the score claims is shown as a highlight, and no highlight
+        // claims a goal the score does not (MAT-5, §9.2).
+        if (goals > 0)
+        {
+            goalSequences.Should().NotBeEmpty("a match with goals has a goal event");
+        }
 
         presentation.Highlights.Select(highlight => highlight.SourceEventSequence)
             .Should().Contain(goalSequences, "§9.2: every goal is always shown");
 
         presentation.Highlights
             .Count(highlight => highlight.OutcomeCode is "goal" or "penalty_goal")
-            .Should().Be(presentation.HomeGoals + presentation.AwayGoals, "MAT-5: every goal links to a highlight");
+            .Should().Be(goals, "MAT-5: every goal links to a highlight");
 
         presentation.Highlights.Should().BeInAscendingOrder(highlight => highlight.SourceEventSequence);
     }
