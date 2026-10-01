@@ -92,6 +92,30 @@ export interface HighlightTrack {
   readonly keyframes: readonly HighlightKeyframe[];
 }
 
+/** One line of commentary pinned to a moment inside a highlight (`replay-v2`). */
+export interface HighlightCommentary {
+  readonly timeMilliseconds: number;
+  readonly templateKey: string;
+  readonly variantKey: string;
+  readonly parameters: readonly CommentaryParameter[];
+  readonly text: string;
+}
+
+/** One segment of the condensed playback clock: a highlight or the recycling passage before it. */
+export interface PlaybackSegment {
+  readonly kind: string;
+  readonly sourceEventSequence: number;
+  readonly startMilliseconds: number;
+  readonly durationMilliseconds: number;
+}
+
+/** The recycling passage between two highlights, keyed to the highlight it leads into. */
+export interface Bridge {
+  readonly afterEventSequence: number;
+  readonly durationMilliseconds: number;
+  readonly tracks: readonly HighlightTrack[];
+}
+
 /** One entity in a highlight: a player or the ball. */
 export interface HighlightEntity {
   readonly entityId: string;
@@ -159,6 +183,7 @@ export interface Highlight {
   readonly awayColour: string;
   readonly entities: readonly HighlightEntity[];
   readonly tracks: readonly HighlightTrack[];
+  readonly commentary?: readonly HighlightCommentary[] | null;
 }
 
 /** A played match's whole replay: commentary and highlights, in event order. */
@@ -174,5 +199,8 @@ export interface MatchPresentation {
   readonly homeLineup?: MatchLineup | null;
   readonly awayLineup?: MatchLineup | null;
   readonly liveMetrics?: readonly PlayerLiveMetric[] | null;
+  readonly bridges?: readonly Bridge[] | null;
+  readonly playback?: readonly PlaybackSegment[] | null;
+  readonly totalPlaybackMilliseconds?: number;
 }
 

@@ -31,6 +31,39 @@ public sealed record CommentaryLineResponse(
     IReadOnlyList<CommentaryParameterResponse> Parameters,
     string Text);
 
+/// <summary>
+/// One line of commentary pinned to a moment inside a highlight (`replay-v2`).
+/// </summary>
+/// <remarks>
+/// The full match log narrates by the minute; a ten-to-twenty-five-second passage needs better resolution
+/// than that, so the offset is milliseconds from the passage's first frame. The keys and parameters are the
+/// durable part and the text is a rendering of them, exactly as they are for the match log.
+/// </remarks>
+/// <param name="TimeMilliseconds">The offset from the passage's first frame, in milliseconds.</param>
+/// <param name="TemplateKey">The stable template key.</param>
+/// <param name="VariantKey">Which variant of the template was used.</param>
+/// <param name="Parameters">The facts the line was built from.</param>
+/// <param name="Text">The current English rendering.</param>
+public sealed record HighlightCommentaryResponse(
+    int TimeMilliseconds,
+    string TemplateKey,
+    string VariantKey,
+    IReadOnlyList<CommentaryParameterResponse> Parameters,
+    string Text);
+
+/// <summary>
+/// One segment of the condensed playback clock: a highlight or the recycling passage before it (`replay-v2`).
+/// </summary>
+/// <param name="Kind">What the segment is: <c>highlight</c> or <c>bridge</c>.</param>
+/// <param name="SourceEventSequence">The event the segment presents or leads into.</param>
+/// <param name="StartMilliseconds">When the segment starts on the playback clock.</param>
+/// <param name="DurationMilliseconds">How long the segment runs for.</param>
+public sealed record PlaybackSegmentResponse(
+    string Kind,
+    int SourceEventSequence,
+    int StartMilliseconds,
+    int DurationMilliseconds);
+
 /// <summary>One position at one moment, normalized to the pitch.</summary>
 /// <param name="TimeMilliseconds">Milliseconds from the start of the highlight.</param>
 /// <param name="X">Position across the pitch, 0…10,000.</param>
@@ -146,8 +179,7 @@ public sealed record PlayerLiveMetricResponse(
 /// <param name="AwayColour">The away side's colour.</param>
 /// <param name="Entities">Every entity, including the ball.</param>
 /// <param name="Tracks">One track per entity, ordered by entity identifier.</param>
-/// <param name="AttemptedX">Where the passage's play was fought, across the pitch, 0…10,000.</param>
-/// <param name="AttemptedY">Where the passage's play was fought, down the pitch, 0…10,000.</param>
+/// <param name="Commentary">The passage's synchronized commentary, ordered by offset (`replay-v2`).</param>
 public sealed record HighlightResponse(
     int SourceEventSequence,
     int Minute,
@@ -158,7 +190,8 @@ public sealed record HighlightResponse(
     string HomeColour,
     string AwayColour,
     IReadOnlyList<HighlightEntityResponse> Entities,
-    IReadOnlyList<HighlightTrackResponse> Tracks);
+    IReadOnlyList<HighlightTrackResponse> Tracks,
+    IReadOnlyList<HighlightCommentaryResponse>? Commentary = null);
 
 /// <summary>
 /// A played match's whole replay: its commentary timeline and its highlights, in event order (§9.5).
@@ -181,6 +214,8 @@ public sealed record HighlightResponse(
 /// <param name="AwayLineup">The away side's complete lineup and player performance.</param>
 /// <param name="LiveMetrics">Minute-by-minute condition and ratings for all players.</param>
 /// <param name="Bridges">The recycling passages between consecutive highlights, in event order (`replay-v2`).</param>
+/// <param name="Playback">The condensed playback schedule, in the order the segments play (`replay-v2`).</param>
+/// <param name="TotalPlaybackMilliseconds">How long the condensed replay runs for, in milliseconds.</param>
 public sealed record MatchPresentationResponse(
     Guid MatchId,
     string PresentationVersion,
@@ -193,5 +228,7 @@ public sealed record MatchPresentationResponse(
     MatchLineupResponse? HomeLineup = null,
     MatchLineupResponse? AwayLineup = null,
     IReadOnlyList<PlayerLiveMetricResponse>? LiveMetrics = null,
-    IReadOnlyList<BridgeResponse>? Bridges = null);
+    IReadOnlyList<BridgeResponse>? Bridges = null,
+    IReadOnlyList<PlaybackSegmentResponse>? Playback = null,
+    int TotalPlaybackMilliseconds = 0);
 

@@ -51,6 +51,38 @@ public sealed record CommentaryToken
 }
 
 /// <summary>
+/// One line of commentary pinned to a moment inside a highlight (`replay-v2`, Stage 3).
+/// </summary>
+/// <remarks>
+/// The full match log narrates by the minute; a replay needs better resolution than that, because a passage
+/// of play is ten to twenty-five seconds long and its build-up, its strike, and its outcome all happen
+/// inside the same minute. The offset is milliseconds from the passage's first frame, which is what lets the
+/// bottom ticker overwrite in time with the action on the pitch. Keys and parameters are the durable part,
+/// exactly as they are for <see cref="CommentaryToken"/>.
+/// </remarks>
+public sealed record HighlightCommentaryV1
+{
+    /// <summary>Gets the offset from the passage's first frame, in milliseconds.</summary>
+    public required int TimeMilliseconds { get; init; }
+
+    /// <summary>Gets the stable template key, which is what a translation keys off.</summary>
+    public required string TemplateKey { get; init; }
+
+    /// <summary>Gets which variant of the template was used, so repeated lines can be told apart.</summary>
+    public required string VariantKey { get; init; }
+
+    /// <summary>Gets the facts the line was built from.</summary>
+    public required IReadOnlyList<CommentaryParameter> Parameters { get; init; }
+
+    /// <summary>Gets the current English rendering.</summary>
+    public required string Text { get; init; }
+
+    /// <summary>Gets an estimate of the serialized payload, on the same accounting the highlights use.</summary>
+    public int EstimatedPayloadBytes =>
+        (Text.Length * 2) + Parameters.Sum(parameter => (parameter.Name.Length + parameter.Value.Length) * 2) + 48;
+}
+
+/// <summary>
 /// Turns a simulated match into commentary tokens (master plan §8.6, `MAT-8`).
 /// </summary>
 /// <remarks>
@@ -69,7 +101,10 @@ public sealed record CommentaryToken
 public static class CommentaryTokenBuilder
 {
     /// <summary>The version label of this template set.</summary>
-    public const string Version = "commentary-v1";
+    public const string Version = "commentary-v2";
+
+    /// <summary>The delay between a strike and the line that reports where it ended up.</summary>
+    private const int OutcomeDelayMilliseconds = 900;
 
     /// <summary>Builds the commentary for a finished match, in event order.</summary>
     /// <param name="input">The frozen snapshot, which supplies the names.</param>
@@ -115,6 +150,93 @@ public static class CommentaryTokenBuilder
 
         return tokens;
     }
+
+    /// <summary>
+    /// Builds the synchronized commentary for one highlight passage (`replay-v2`, Stage 3).
+    /// </summary>
+    /// <remarks>
+    /// Three moments are worth narrating in a ten-to-twenty-five-second passage: the build-up as it starts,
+    /// the strike when the shooter reaches the ball, and the outcome a beat later. The outcome reuses the
+    /// match log's own template, so the ticker and the report never word the same goal differently. Times are
+    /// clamped into the passage, so a caller can never hand a client a line that plays after the whistle.
+    /// </remarks>
+    /// <param name="input">The frozen snapshot, which supplies the names.</param>
+    /// <param name="matchEvent">The event the highlight presents.</param>
+    /// <param name="durationMilliseconds">How long the passage runs for.</param>
+    /// <param name="strikeMilliseconds">When in the passage the ball is struck, or zero for a set piece.</param>
+    public static IReadOnlyList<HighlightCommentaryV1> BuildPassage(
+        MatchInputV1 input,
+        EngineEventV1 matchEvent,
+        int durationMilliseconds,
+        int strikeMilliseconds)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(matchEvent);
+
+        if (durationMilliseconds <= 0)
+        {
+            return [];
+        }
+
+        var names = BuildNameLookup(input);
+        var facts = Facts(input, matchEvent, names);
+        var lines = new List<HighlightCommentaryV1>
+        {
+            Token(0, PassageOpener(matchEvent.Type), matchEvent.Sequence, facts),
+        };
+
+        var actionAt = int.Clamp(strikeMilliseconds, 1, durationMilliseconds);
+        lines.Add(Token(actionAt, PassageAction(matchEvent.Type), matchEvent.Sequence + 1, facts));
+
+        var outcome = OutcomeTemplate(matchEvent.Type);
+
+        if (outcome is not null)
+        {
+            var outcomeAt = Math.Min(durationMilliseconds, actionAt + OutcomeDelayMilliseconds);
+            lines.Add(Token(outcomeAt, outcome, matchEvent.Sequence + 2, facts));
+        }
+
+        return lines;
+    }
+
+    private static HighlightCommentaryV1 Token(
+        int timeMilliseconds,
+        Template template,
+        int variantSeed,
+        Dictionary<string, string> facts)
+    {
+        var variant = ((variantSeed % template.Variants.Count) + template.Variants.Count) % template.Variants.Count;
+
+        return new HighlightCommentaryV1
+        {
+            TimeMilliseconds = timeMilliseconds,
+            TemplateKey = template.Key,
+            VariantKey = $"{template.Key}.v{variant + 1}",
+            Parameters =
+            [
+                .. facts
+                    .Where(fact => fact.Key != "clock" && fact.Key != "player" && fact.Key != "opponent")
+                    .OrderBy(fact => fact.Key, StringComparer.Ordinal)
+                    .Select(fact => new CommentaryParameter(fact.Key, fact.Value)),
+            ],
+            Text = Render(template.Variants[variant], facts),
+        };
+    }
+
+    private static Template PassageOpener(EngineEventType type) =>
+        type is EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed or EngineEventType.FreeKickShot
+            ? PassageTemplates["set_piece"]
+            : PassageTemplates["build_up"];
+
+    private static Template PassageAction(EngineEventType type) => type switch
+    {
+        EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed => PassageTemplates["penalty"],
+        EngineEventType.FreeKickShot => PassageTemplates["free_kick"],
+        _ => PassageTemplates["shot"],
+    };
+
+    private static Template? OutcomeTemplate(EngineEventType type) =>
+        Templates.TryGetValue(type, out var template) ? template : null;
 
     private static Dictionary<string, string> Facts(
         MatchInputV1 input,
@@ -211,6 +333,46 @@ public static class CommentaryTokenBuilder
     }
 
     private sealed record Template(string Key, IReadOnlyList<string> Variants);
+
+    /// <summary>The passage templates, keyed by the moment they narrate rather than by event type.</summary>
+    private static readonly Dictionary<string, Template> PassageTemplates = new(StringComparer.Ordinal)
+    {
+        ["build_up"] = new(
+            "match.passage.build_up",
+            [
+                "{club} work the opening.",
+                "{club} build the move.",
+                "The ball is moved forward by {club}.",
+            ]),
+        ["set_piece"] = new(
+            "match.passage.set_piece",
+            [
+                "{club} set themselves for the set piece.",
+                "The set piece is set up for {club}.",
+                "{club} line up the dead ball.",
+            ]),
+        ["shot"] = new(
+            "match.passage.shot",
+            [
+                "{player} lets fly.",
+                "{player} goes for goal.",
+                "The chance falls to {player}.",
+            ]),
+        ["penalty"] = new(
+            "match.passage.penalty",
+            [
+                "{player} steps up from twelve yards.",
+                "{player} places the ball on the spot.",
+                "It is {player} who takes the penalty.",
+            ]),
+        ["free_kick"] = new(
+            "match.passage.free_kick",
+            [
+                "{player} strikes the free kick.",
+                "{player} goes directly for goal.",
+                "The free kick is {player}'s to take.",
+            ]),
+    };
 
     private static readonly Dictionary<EngineEventType, Template> Templates =
         new Dictionary<EngineEventType, Template>

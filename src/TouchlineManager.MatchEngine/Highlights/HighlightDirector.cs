@@ -1,4 +1,5 @@
 using System.Globalization;
+using TouchlineManager.MatchEngine.Commentary;
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Spatial;
@@ -15,17 +16,24 @@ namespace TouchlineManager.MatchEngine.Highlights;
 /// the budget goes to the best chances, measured by the goal probability the shot was resolved against.
 /// </para>
 /// <para>
-/// The two limits are a count and a payload budget, and they are applied in that order: a match with fifty
-/// chances is trimmed to the most important ones, and then trimmed again if the result still exceeds what a
-/// phone should download. Goals survive both, so the requirement "all goals always remain" holds even for a
+/// The limits are a count, a payload budget, and the length of the condensed replay, and they are applied in
+/// that order: a match with fifty chances is trimmed to the most important ones, trimmed again if the result
+/// still exceeds what a phone should download, and trimmed once more if watching it would take longer than
+/// the plan allows. Goals survive all three, so the requirement "all goals always remain" holds even for a
 /// nine-goal game on a bad connection.
 /// </para>
 /// <para>
 /// Since `replay-v2`, a highlight is a whole passage of play (Stage 3): its 22 players move through the
 /// passage with the coordinated shape the play model gave them — a defensive block dropping off, a
-/// full-back overlapping — and the ball flies with the altitude the flight model computed, rather than
-/// teleporting from the centre spot. Between consecutive highlights the director bridges the recycling
-/// passage, and a payload-aware trim drops bridges before it ever drops a goal.
+/// full-back overlapping, a goalkeeper angling towards the ball — and the ball flies with the altitude the
+/// flight model computed. Tracks are sampled at the delta-compression interval and stored only where the
+/// movement changes, and each passage carries commentary tokens pinned to the milliseconds at which they
+/// happen, so the ticker and the pitch tell the same story at the same moment.
+/// </para>
+/// <para>
+/// Between consecutive highlights the director bridges the recycling passage, and a bounded schedule lays
+/// every segment out on the playback clock so the client never has to guess when anything plays. The whole
+/// replay condenses ninety minutes into the plan's five-to-ten-minute viewing experience.
 /// </para>
 /// </remarks>
 public static class HighlightDirector
@@ -33,7 +41,7 @@ public static class HighlightDirector
     /// <summary>The version label of this presentation.</summary>
     public const string Version = "replay-v2";
 
-    /// <summary>The pitch coordinate scale.</summary>
+    /// <summary>The pitch coordinate scale the presentation speaks, on both axes.</summary>
     private const int Pitch = 10_000;
 
     /// <summary>Builds the match's presentation.</summary>
@@ -63,31 +71,11 @@ public static class HighlightDirector
             .Select(matchEvent => (Event: matchEvent, Highlight: BuildHighlight(input, matchEvent, names, colours, settings)))
             .ToList();
 
-        // A count cap is not a size cap: twenty-four highlights are small if they are twenty-four tap-ins and
-        // large if they are twenty-four long-range efforts with a full set of tracks. The payload budget is
-        // what actually protects a phone on a train, so it is applied after the count and it yields the
-        // lowest-quality chances first — never a goal.
-        while (built.Sum(pair => pair.Highlight.EstimatedPayloadBytes) > settings.PayloadBudgetBytes)
-        {
-            var least = built
-                .Where(pair => !pair.Event.IsGoal)
-                .OrderBy(pair => pair.Event.QualityBasisPoints ?? 0)
-                .ThenByDescending(pair => pair.Event.Sequence)
-                .FirstOrDefault();
-
-            if (least.Highlight is null)
-            {
-                // Only goals are left. They stay, however large the payload, because a result a manager cannot
-                // watch is a worse failure than a large download.
-                break;
-            }
-
-            built.Remove(least);
-        }
+        TrimToPayload(built, settings);
+        TrimToPlayback(built, settings);
 
         var highlights = built.Select(pair => pair.Highlight).ToList();
-
-        var bridges = BuildBridges(input, built, highlights, settings);
+        var bridges = BuildBridges(input, built, PlanBridges(built, settings), settings);
 
         return new MatchPresentationV1
         {
@@ -97,7 +85,165 @@ public static class HighlightDirector
             AwayGoals = result.AwayGoals,
             Highlights = highlights,
             Bridges = bridges,
+            Playback = Schedule(highlights, bridges),
         };
+    }
+
+    /// <summary>
+    /// Sheds the lowest-quality chances until the estimated payload fits its budget.
+    /// </summary>
+    /// <remarks>
+    /// A count cap is not a size cap: twenty-four highlights are small if they are twenty-four tap-ins and
+    /// large if they are twenty-four long-range efforts with a full set of tracks. The payload budget is what
+    /// actually protects a phone on a train, so it is applied after the count and it yields the
+    /// lowest-quality chances first — never a goal.
+    /// </remarks>
+    private static void TrimToPayload(
+        List<(EngineEventV1 Event, HighlightPresentationV1 Highlight)> built,
+        HighlightOptionsV1 settings)
+    {
+        while (built.Sum(pair => pair.Highlight.EstimatedPayloadBytes) > settings.PayloadBudgetBytes)
+        {
+            var least = LowestQuality(built);
+
+            if (least.Highlight is null)
+            {
+                // Only goals are left. They stay, however large the payload, because a result a manager cannot
+                // watch is a worse failure than a large download.
+                return;
+            }
+
+            built.Remove(least);
+        }
+    }
+
+    /// <summary>
+    /// Sheds the lowest-quality chances until the condensed replay fits its length (`replay-v2`, Stage 3).
+    /// </summary>
+    /// <remarks>
+    /// The plan's viewing experience is five to ten minutes at normal speed. The bridge allowance is
+    /// deliberately the worst case — every remaining gap bridged at its maximum length — so the schedule
+    /// that is actually built can only be shorter than the estimate it was fitted against. Goals are never
+    /// shed; a nine-goal match is the one replay allowed to run long.
+    /// </remarks>
+    private static void TrimToPlayback(
+        List<(EngineEventV1 Event, HighlightPresentationV1 Highlight)> built,
+        HighlightOptionsV1 settings)
+    {
+        while (built.Count > 0)
+        {
+            var replay = built.Sum(pair => pair.Highlight.DurationMilliseconds)
+                + (Math.Max(0, built.Count - 1) * settings.MaxBridgeDurationMilliseconds);
+
+            if (replay <= settings.MaxPlaybackMilliseconds)
+            {
+                return;
+            }
+
+            var least = LowestQuality(built);
+
+            if (least.Highlight is null)
+            {
+                return;
+            }
+
+            built.Remove(least);
+        }
+    }
+
+    /// <summary>The least valuable chance still in the set, or a default pair when only goals remain.</summary>
+    private static (EngineEventV1 Event, HighlightPresentationV1 Highlight) LowestQuality(
+        List<(EngineEventV1 Event, HighlightPresentationV1 Highlight)> built) =>
+        built
+            .Where(pair => !pair.Event.IsGoal)
+            .OrderBy(pair => pair.Event.QualityBasisPoints ?? 0)
+            .ThenByDescending(pair => pair.Event.Sequence)
+            .FirstOrDefault();
+
+    /// <summary>
+    /// Lays the highlights and their bridges out on one contiguous playback clock (`replay-v2`, Stage 3).
+    /// </summary>
+    /// <remarks>
+    /// A bridge belongs immediately before the highlight it leads into, so the client plays a single ordered
+    /// list rather than threading two collections together — and every highlight's event sequence is on the
+    /// schedule, which is what lets a commentary line seek to the passage that narrates it.
+    /// </remarks>
+    private static List<PlaybackSegmentV1> Schedule(
+        List<HighlightPresentationV1> highlights,
+        List<BridgeV1> bridges)
+    {
+        var bridged = bridges.ToDictionary(bridge => bridge.AfterEventSequence);
+        var schedule = new List<PlaybackSegmentV1>();
+        var cursor = 0;
+
+        foreach (var highlight in highlights)
+        {
+            if (bridged.TryGetValue(highlight.SourceEventSequence, out var bridge))
+            {
+                schedule.Add(new PlaybackSegmentV1("bridge", bridge.AfterEventSequence, cursor, bridge.DurationMilliseconds));
+                cursor += bridge.DurationMilliseconds;
+            }
+
+            schedule.Add(new PlaybackSegmentV1("highlight", highlight.SourceEventSequence, cursor, highlight.DurationMilliseconds));
+            cursor += highlight.DurationMilliseconds;
+        }
+
+        return schedule;
+    }
+
+    /// <summary>
+    /// Decides how long each recycling passage should run (`replay-v2`, Stage 3).
+    /// </summary>
+    /// <remarks>
+    /// Each gap is worth time in proportion to the match time it covers — a minute of football is a second
+    /// of condensed replay — and then the whole schedule is stretched evenly, up to the per-bridge maximum,
+    /// until the replay reaches the plan's five-minute floor. Stretching the recycling rather than the
+    /// passage keeps the highlights honest: a chance stays twenty seconds however quiet the match was, and
+    /// the difference between a quiet match and a busy one is how much of the rest of it a viewer sees.
+    /// </remarks>
+    private static List<int> PlanBridges(
+        List<(EngineEventV1 Event, HighlightPresentationV1 Highlight)> built,
+        HighlightOptionsV1 settings)
+    {
+        var durations = new List<int>();
+
+        for (var index = 0; index < built.Count - 1; index++)
+        {
+            var gapMinutes = Math.Max(0, built[index + 1].Event.Minute - built[index].Event.Minute);
+
+            durations.Add(int.Clamp(
+                gapMinutes * 1_000,
+                settings.MinBridgeDurationMilliseconds,
+                settings.MaxBridgeDurationMilliseconds));
+        }
+
+        var total = built.Sum(pair => pair.Highlight.DurationMilliseconds) + durations.Sum();
+        var deficit = settings.MinPlaybackMilliseconds - total;
+
+        while (deficit > 0)
+        {
+            var grew = false;
+
+            for (var index = 0; index < durations.Count && deficit > 0; index++)
+            {
+                if (durations[index] >= settings.MaxBridgeDurationMilliseconds)
+                {
+                    continue;
+                }
+
+                durations[index] += BridgeStretchStepMilliseconds;
+                deficit -= BridgeStretchStepMilliseconds;
+                grew = true;
+            }
+
+            if (!grew)
+            {
+                // Every bridge is at its maximum: this match simply does not hold five minutes of football.
+                break;
+            }
+        }
+
+        return durations;
     }
 
     /// <summary>
@@ -111,7 +257,7 @@ public static class HighlightDirector
     private static List<BridgeV1> BuildBridges(
         MatchInputV1 input,
         List<(EngineEventV1 Event, HighlightPresentationV1 Highlight)> built,
-        List<HighlightPresentationV1> highlights,
+        List<int> durations,
         HighlightOptionsV1 settings)
     {
         if (built.Count < 2)
@@ -120,15 +266,11 @@ public static class HighlightDirector
         }
 
         var bridges = new List<BridgeV1>();
-        var names = Names(input);
         var budget = settings.BridgeBudgetBytes;
 
         for (var index = 0; index < built.Count - 1; index++)
         {
-            var current = built[index];
-            var next = built[index + 1];
-
-            var bridge = BuildBridge(input, current, next, names, settings);
+            var bridge = BuildBridge(input, built[index], built[index + 1], durations[index]);
 
             if (bridge.EstimatedPayloadBytes > budget)
             {
@@ -146,19 +288,8 @@ public static class HighlightDirector
         MatchInputV1 input,
         (EngineEventV1 Event, HighlightPresentationV1 Highlight) current,
         (EngineEventV1 Event, HighlightPresentationV1 Highlight) next,
-        Dictionary<Guid, string> names,
-        HighlightOptionsV1 settings)
+        int duration)
     {
-        var duration = int.Clamp(
-            (next.Event.Minute - current.Event.Minute) * 500,
-            settings.MinBridgeDurationMilliseconds,
-            settings.MaxBridgeDurationMilliseconds);
-
-        // The bridge runs from where this passage ended to where the next begins: the ball returns towards
-        // the middle third and both teams shift with it, so the cut reads as recycling rather than teleport.
-        var from = BallAnchor(current.Event, attackingSide: current.Event.Side);
-        var to = BallAnchor(next.Event, attackingSide: next.Event.Side);
-
         var tracks = new List<HighlightTrackV1>();
 
         foreach (var side in new[] { MatchSide.Home, MatchSide.Away })
@@ -169,37 +300,63 @@ public static class HighlightDirector
             {
                 var entityId = EntityId(isHome, slot.SlotNumber);
 
-                // The formation anchor the block returns to in a recycling passage, with a small shift of
-                // the block towards the end of the pitch the next passage will be fought in.
+                // The bridge starts exactly where the previous passage left the player and ends exactly where
+                // the next one picks them up, so a cut between highlights is a movement rather than a jump.
                 var anchor = FormationAnchor(slot, isHome);
-                var drift = (to.X - anchor.X) / 8;
+                var resting = new HighlightKeyframeV1(0, anchor.X, anchor.Y);
+                var from = EdgeOf(current.Highlight, entityId, last: true) ?? resting;
+                var to = EdgeOf(next.Highlight, entityId, last: false) ?? resting;
 
-                tracks.Add(new HighlightTrackV1(entityId, new[]
-                {
-                    new HighlightKeyframeV1(0, Clamp(anchor.X), Clamp(anchor.Y)),
-                    new HighlightKeyframeV1(duration / 2, Clamp(anchor.X + (drift / 2)), Clamp(anchor.Y + ((to.Y - anchor.Y) / 10))),
-                    new HighlightKeyframeV1(duration, Clamp(anchor.X + drift), Clamp(anchor.Y + ((to.Y - anchor.Y) / 5))),
-                }));
+                // The recycling path bends through the shape: both teams return towards their formation as
+                // the ball is worked back out, which is what a passage between chances looks like.
+                var mid = new HighlightKeyframeV1(
+                    duration / 2,
+                    Clamp((from.X + to.X + anchor.X) / 3),
+                    Clamp((from.Y + to.Y + anchor.Y) / 3));
+
+                tracks.Add(new HighlightTrackV1(
+                    entityId,
+                    Track(
+                    [
+                        new HighlightKeyframeV1(0, from.X, from.Y, from.Z),
+                        mid,
+                        new HighlightKeyframeV1(duration, to.X, to.Y, to.Z),
+                    ])));
             }
         }
 
         // The ball crosses with the recycling pass: out to the middle third, then onwards to where the next
-        // passage begins, at ground level.
-        var midway = (from.X + to.X) / 2;
+        // passage begins. It comes down onto the ground between the two passages and is picked up in the air
+        // only if the next passage starts with it there.
+        var fromBall = EdgeOf(current.Highlight, BallEntityId, last: true) ?? BallAt(NormalizedX(current.Event), NormalizedY(current.Event));
+        var toBall = EdgeOf(next.Highlight, BallEntityId, last: false) ?? BallAt(NormalizedX(next.Event), NormalizedY(next.Event));
 
         tracks.Add(new HighlightTrackV1(
             BallEntityId,
-            new[]
-            {
-                new HighlightKeyframeV1(0, Clamp(from.X), Clamp(from.Y)),
-                new HighlightKeyframeV1(duration / 2, Clamp(midway), Clamp((from.Y + to.Y) / 2)),
-                new HighlightKeyframeV1(duration, Clamp(to.X), Clamp(to.Y)),
-            }));
+            Track(
+            [
+                new HighlightKeyframeV1(0, fromBall.X, fromBall.Y, fromBall.Z),
+                new HighlightKeyframeV1(duration / 2, Clamp((fromBall.X + toBall.X) / 2), Clamp(((fromBall.Y + toBall.Y) / 2 + (Pitch / 2)) / 2)),
+                new HighlightKeyframeV1(duration, toBall.X, toBall.Y, toBall.Z),
+            ])));
 
         return new BridgeV1(
             next.Event.Sequence,
             duration,
             [.. tracks.OrderBy(track => track.EntityId, StringComparer.Ordinal)]);
+    }
+
+    /// <summary>The first or last keyframe an entity's track ends on, or null when it has none.</summary>
+    private static HighlightKeyframeV1? EdgeOf(HighlightPresentationV1 highlight, string entityId, bool last)
+    {
+        var track = highlight.Tracks.FirstOrDefault(candidate => string.Equals(candidate.EntityId, entityId, StringComparison.Ordinal));
+
+        if (track is null || track.Keyframes.Count == 0)
+        {
+            return null;
+        }
+
+        return last ? track.Keyframes[^1] : track.Keyframes[0];
     }
 
     /// <summary>
@@ -251,8 +408,6 @@ public static class HighlightDirector
     {
         var duration = DurationFor(matchEvent, options);
         var attackingSide = matchEvent.Side;
-        var isSetPiece = matchEvent.Type is EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed
-            or EngineEventType.FreeKickShot;
 
         var entities = new List<HighlightEntityV1>();
 
@@ -283,9 +438,10 @@ public static class HighlightDirector
             }
         }
 
-        // The ball is where the play model put it: the event carries its own pitch location (`engine-v3`).
-        var ballX = Clamp(matchEvent.X ?? Pitch / 2);
-        var ballY = Clamp(matchEvent.Y ?? Pitch / 2);
+        // The ball is where the play model put it: the event carries its own pitch location (`engine-v3`),
+        // expressed on the presentation's two 0..10_000 axes.
+        var ballX = NormalizedX(matchEvent);
+        var ballY = NormalizedY(matchEvent);
 
         entities.Add(new HighlightEntityV1
         {
@@ -304,12 +460,14 @@ public static class HighlightDirector
         {
             // Uninvolved players shift as their shape shifts: the block moves as one, towards the ball's
             // location, compressed slightly out of possession (`replay-v2` coordinated movement).
-            tracks[entity.EntityId] = ShapeShiftTrack(entity, attackingSide, ballX, ballY, duration);
+            tracks[entity.EntityId] = Track(ShapeShift(entity, attackingSide, ballX, ballY, duration));
         }
 
         // The ball's track is a flight from the passage's build-up point to the strike point: rising, arcing,
         // and landing where the event was located (`replay-v2` ball aerodynamics).
         tracks[BallEntityId] = BallTrack(matchEvent, attackingSide, duration, ballX, ballY);
+
+        var strikeTime = StrikeTime(matchEvent.Type, duration);
 
         // The striker closes on the ball before striking it, which is what a shot looks like from the stands.
         var shooter = entities.FirstOrDefault(
@@ -317,15 +475,7 @@ public static class HighlightDirector
 
         if (shooter is not null)
         {
-            var strikeTime = isSetPiece ? 0 : (int)(duration * 0.55);
-
-            tracks[shooter.EntityId] =
-            [
-                new HighlightKeyframeV1(0, shooter.X, shooter.Y),
-                new HighlightKeyframeV1(Math.Max(0, strikeTime - SetPieceRunInMs), Midpoint(shooter.X, ballX), Midpoint(shooter.Y, ballY), Action: "run"),
-                new HighlightKeyframeV1(strikeTime, ballX, ballY, Action: ActionFor(matchEvent.Type)),
-                new HighlightKeyframeV1(duration, FollowThrough(shooter.X, ballX), FollowThrough(shooter.Y, ballY)),
-            ];
+            tracks[shooter.EntityId] = ShooterTrack(shooter, matchEvent, duration, ballX, ballY, strikeTime);
         }
 
         var keeper = entities.FirstOrDefault(
@@ -334,12 +484,7 @@ public static class HighlightDirector
 
         if (keeper is not null)
         {
-            tracks[keeper.EntityId] =
-            [
-                new HighlightKeyframeV1(0, keeper.X, keeper.Y),
-                new HighlightKeyframeV1(duration / 2, KeeperDiveX(keeper.X, attackingSide), Midpoint(keeper.Y, ballY), Action: "save"),
-                new HighlightKeyframeV1(duration, keeper.X, keeper.Y),
-            ];
+            tracks[keeper.EntityId] = KeeperTrack(keeper, duration, ballY, attackingSide);
         }
 
         return new HighlightPresentationV1
@@ -353,6 +498,7 @@ public static class HighlightDirector
             Narration = Narration(matchEvent, names),
             HomeColour = colours.Home,
             AwayColour = colours.Away,
+            Commentary = CommentaryTokenBuilder.BuildPassage(input, matchEvent, duration, strikeTime),
             Entities = [.. entities.OrderBy(entity => entity.EntityId, StringComparer.Ordinal)],
             Tracks =
             [
@@ -364,14 +510,29 @@ public static class HighlightDirector
     }
 
     /// <summary>
+    /// Samples a waypoint path at the delta-compression interval and keeps only its direction changes
+    /// (`replay-v2`, Stage 3).
+    /// </summary>
+    private static List<HighlightKeyframeV1> Track(IReadOnlyList<HighlightKeyframeV1> waypoints) =>
+        KeyframeCompressor.Compress(KeyframeCompressor.Sample(waypoints));
+
+    /// <summary>
     /// Builds a coordinated shape-shift track for an uninvolved player (`replay-v2`, Stage 3).
     /// </summary>
     /// <remarks>
-    /// The 22 shift with the play: the attacking block pushes up behind the ball, the defending block drops
-    /// towards its own goal and compresses, each moving a bounded share of the way — enough to read as a
-    /// team moving as a unit, never enough to leave a player out of position in the replay's first frame.
+    /// <para>
+    /// The 22 shift with the play, and they do not all shift the same way. The defensive line pushes up in
+    /// possession and drops off without it; the midfield tracks the ball across the pitch with the runners;
+    /// the front line pushes highest; a full-back on the ball's side overlaps beyond the man in front; and
+    /// the goalkeeper stays near his goal but angles his position towards the ball's line. Every movement is
+    /// a bounded share of the way, so no player can leave the shape the replay began in.
+    /// </para>
+    /// <para>
+    /// A player never advances past the ball: if the play is behind the block, the line turns and drops
+    /// instead, which is what makes a passage read as football rather than as a magnet.
+    /// </para>
     /// </remarks>
-    private static List<HighlightKeyframeV1> ShapeShiftTrack(
+    private static IReadOnlyList<HighlightKeyframeV1> ShapeShift(
         HighlightEntityV1 entity,
         MatchSide attackingSide,
         int ballX,
@@ -379,27 +540,55 @@ public static class HighlightDirector
         int duration)
     {
         var isAttackingSide = entity.Side == attackingSide;
-        var pull = isAttackingSide ? 700 : -450;
-        var squeeze = isAttackingSide ? 0 : 120;
+        var family = entity.Family ?? MatchPositionFamily.Midfield;
 
-        var shiftX = (ballX > entity.X) == isAttackingSide ? pull : pull / 2;
-        var shiftY = Math.Clamp(ballY - entity.Y, -squeeze, squeeze);
+        // The direction this player attacks in. A block that drops off moves the other way.
+        var attackDirection = entity.Side == MatchSide.Home ? 1 : -1;
 
-        var shiftToward = new
+        var (push, track, drop) = family switch
         {
-            X = Clamp(entity.X + shiftX),
-            Y = Clamp(entity.Y + shiftY),
+            MatchPositionFamily.Goalkeeper => (120, 2, 60),
+            MatchPositionFamily.Defence => (360, 4, 260),
+            MatchPositionFamily.Midfield => (520, 3, 360),
+            _ => (680, 3, 420),
         };
 
-        // A three-phase shift: settle, hold the shape as the ball moves, recover. The mid-point holds so the
-        // movement reads as a block shifting once, not as continuous noisy jitter.
-        return new List<HighlightKeyframeV1>
+        // Whether the ball is in front of the player, seen from the goal the player attacks. A block whose
+        // ball has gone past it does not keep running forward.
+        var ballAhead = attackDirection > 0 ? ballX > entity.X : ballX < entity.X;
+        var depthShift = (isAttackingSide && ballAhead ? push : -drop) * attackDirection;
+
+        // A full-back level with the ball overlaps beyond his winger rather than holding the line.
+        if (isAttackingSide
+            && family == MatchPositionFamily.Defence
+            && Math.Abs(entity.Y - ballY) < OverlapBand)
         {
-            new(0, entity.X, entity.Y),
-            new(duration / 3, Midpoint(entity.X, shiftToward.X), Midpoint(entity.Y, shiftToward.Y)),
-            new((duration * 2) / 3, shiftToward.X, shiftToward.Y),
-            new(duration, Midpoint(shiftToward.X, entity.X), Midpoint(shiftToward.Y, entity.Y)),
-        };
+            depthShift += OverlapPush * attackDirection;
+        }
+
+        var lateralShift = (ballY - entity.Y) / track;
+
+        // Out of possession every player drifts a little towards the centre, which is how a block compresses.
+        if (!isAttackingSide)
+        {
+            lateralShift += (SpatialPitch.GoalYCenter - (entity.Y * SpatialPitch.PitchWidth / Pitch)) / 12;
+        }
+
+        lateralShift = family == MatchPositionFamily.Goalkeeper
+            ? int.Clamp(lateralShift, -KeeperAngle, KeeperAngle)
+            : int.Clamp(lateralShift, -LateralLimit, LateralLimit);
+
+        var shiftedX = Clamp(entity.X + depthShift);
+        var shiftedY = Clamp(entity.Y + lateralShift);
+
+        // A three-phase shift: move as the passage builds, then hold the block where the play has taken it.
+        // The bridge after the highlight carries the block back to its shape, so the hold is not a snap back.
+        return
+        [
+            new HighlightKeyframeV1(0, entity.X, entity.Y),
+            new HighlightKeyframeV1((duration * 2) / 3, shiftedX, shiftedY),
+            new HighlightKeyframeV1(duration, shiftedX, shiftedY),
+        ];
     }
 
     /// <summary>
@@ -409,6 +598,8 @@ public static class HighlightDirector
     /// The trajectory is deterministic: a ground pass from the halfway-line anchor into the passage's fight
     /// point, then — for a strike — an arcing climb and fall resolved with the flight model's own
     /// parabola, so a lofted cross and a driven shot read differently without the client owning physics.
+    /// It is then compressed like every other track, so the arc costs the keyframes its curvature needs and
+    /// not one per animation tick.
     /// </remarks>
     private static List<HighlightKeyframeV1> BallTrack(
         EngineEventV1 matchEvent,
@@ -422,35 +613,80 @@ public static class HighlightDirector
 
         var start = isSetPiece
             ? new HighlightKeyframeV1(0, ballX, ballY)
-            : new HighlightKeyframeV1(0, BuildUpX(attackingSide), Clamp(matchEvent.Y ?? (Pitch / 2)));
+            : new HighlightKeyframeV1(0, BuildUpX(attackingSide), ballY);
 
-        var goalLine = attackingSide == MatchSide.Home ? Pitch : 0;
         var peak = PeakFor(matchEvent, isSetPiece);
+        var flightDuration = Math.Max(1, duration - (duration / 3));
+        var steps = Math.Max(2, flightDuration / KeyframeCompressor.SampleIntervalMilliseconds);
 
         var flight = BallPhysics.Trajectory(
             new BallState(start.X, start.Y, 0),
             new BallState(ballX, ballY, 0),
-            Math.Max(1, duration - (duration / 3)),
+            flightDuration,
             peak,
-            5);
+            steps);
 
-        var track = new List<HighlightKeyframeV1> { start };
+        var waypoints = new List<HighlightKeyframeV1>(flight.Count + 2) { start };
 
         foreach (var (timeMs, position) in flight)
         {
-            track.Add(new HighlightKeyframeV1(
+            if (timeMs == 0)
+            {
+                continue;
+            }
+
+            waypoints.Add(new HighlightKeyframeV1(
                 start.TimeMilliseconds + timeMs,
                 Clamp(position.X),
                 Clamp(position.Y),
-                position.Z,
-                Speed: 0,
-                Action: position.Z > 15 ? "aerial" : null));
+                position.Z));
         }
 
         // The ball comes to rest where the event happened, which is where the next bridge picks it up.
-        track.Add(new HighlightKeyframeV1(duration, Clamp(ballX), Clamp(ballY)));
+        waypoints.Add(new HighlightKeyframeV1(duration, Clamp(ballX), Clamp(ballY)));
 
-        return track;
+        return Track(waypoints);
+    }
+
+    /// <summary>The striker's run: start, close on the ball, strike, follow through (`replay-v2`).</summary>
+    private static List<HighlightKeyframeV1> ShooterTrack(
+        HighlightEntityV1 shooter,
+        EngineEventV1 matchEvent,
+        int duration,
+        int ballX,
+        int ballY,
+        int strikeTime)
+    {
+        return Track(
+        [
+            new HighlightKeyframeV1(0, shooter.X, shooter.Y),
+            new HighlightKeyframeV1(
+                Math.Max(0, strikeTime - SetPieceRunInMs),
+                Midpoint(shooter.X, ballX),
+                Midpoint(shooter.Y, ballY),
+                Action: "run"),
+            new HighlightKeyframeV1(strikeTime, ballX, ballY, Action: ActionFor(matchEvent.Type)),
+            new HighlightKeyframeV1(
+                duration,
+                FollowThrough(shooter.X, ballX),
+                FollowThrough(shooter.Y, ballY),
+                Action: matchEvent.IsGoal ? "celebrate" : null),
+        ]);
+    }
+
+    /// <summary>The goalkeeper's angle and dive: hold, come for the ball's line, recover.</summary>
+    private static List<HighlightKeyframeV1> KeeperTrack(
+        HighlightEntityV1 keeper,
+        int duration,
+        int ballY,
+        MatchSide attackingSide)
+    {
+        return Track(
+        [
+            new HighlightKeyframeV1(0, keeper.X, keeper.Y),
+            new HighlightKeyframeV1(duration / 2, KeeperDiveX(keeper.X, attackingSide), Midpoint(keeper.Y, ballY), Action: "save"),
+            new HighlightKeyframeV1(duration, keeper.X, keeper.Y),
+        ]);
     }
 
     private static int PeakFor(EngineEventV1 matchEvent, bool isSetPiece)
@@ -468,35 +704,55 @@ public static class HighlightDirector
         };
     }
 
+    /// <summary>When in a passage the ball is struck (`replay-v2`).</summary>
+    private static int StrikeTime(EngineEventType type, int duration) =>
+        type is EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed or EngineEventType.FreeKickShot
+            ? 0
+            : (int)(duration * 0.55);
+
     /// <summary>The X the build-up starts from: the attacking third's edge, on the attacking side's own axis.</summary>
     private static int BuildUpX(MatchSide attackingSide) =>
         attackingSide == MatchSide.Home ? Pitch / 3 : Pitch - (Pitch / 3);
 
-    /// <summary>Where the ball sits after an event, as the bridge's starting anchor.</summary>
-    private static (int X, int Y) BallAnchor(EngineEventV1 matchEvent, MatchSide attackingSide)
-    {
-        var x = Clamp(matchEvent.X ?? BuildUpX(attackingSide));
-        var y = Clamp(matchEvent.Y ?? (Pitch / 2));
+    /// <summary>The event's X on the presentation's axis.</summary>
+    private static int NormalizedX(EngineEventV1 matchEvent) => Clamp(matchEvent.X ?? (Pitch / 2));
 
-        return (x, y);
-    }
+    /// <summary>
+    /// The event's Y on the presentation's axis.
+    /// </summary>
+    /// <remarks>
+    /// The play model speaks a 10_000 × 7_000 pitch; the presentation speaks 0..10_000 on both axes, which is
+    /// what the client scales onto a canvas of any shape. The conversion happens once, here, so no track can
+    /// mix the two spaces.
+    /// </remarks>
+    private static int NormalizedY(EngineEventV1 matchEvent) =>
+        NormalizeY(matchEvent.Y ?? (SpatialPitch.PitchWidth / 2));
 
-    /// <summary>The formation anchor for a slot, on the shared pitch, at the scale the resolver speaks.</summary>
+    private static int NormalizeY(int pitchY) => Clamp((pitchY * Pitch) / SpatialPitch.PitchWidth);
+
+    /// <summary>The formation anchor for a slot, on the presentation's axes, at the scale the resolver speaks.</summary>
     private static SpatialPoint FormationAnchor(MatchSlotV1 slot, bool isHome)
     {
-        // The resolver maps the tactics board's own 0..10_000 axes onto the shared pitch and mirrors for
-        // the away side, which is the same mapping the simulation used when it located the play.
-        return TacticalFormationResolver.ResolvePosition(
+        // The resolver maps the tactics board's own axes onto the 10_000 x 7_000 pitch and mirrors for the
+        // away side, which is the same mapping the simulation used when it located the play.
+        var anchor = TacticalFormationResolver.ResolvePosition(
             slot,
             isHome,
             hasPossession: false,
             new SpatialPoint(Pitch / 2, SpatialPitch.PitchWidth / 2),
             new MatchInstructionsV1(),
             EngineRulesV2.Default);
+
+        return new SpatialPoint(anchor.X, NormalizeY(anchor.Y));
     }
 
     private const string BallEntityId = "ball";
     private const int SetPieceRunInMs = 700;
+    private const int BridgeStretchStepMilliseconds = 500;
+    private const int OverlapPush = 320;
+    private const int OverlapBand = 1_600;
+    private const int LateralLimit = 900;
+    private const int KeeperAngle = 1_200;
 
     private static string EntityId(bool isHome, int slotNumber) => $"{(isHome ? "H" : "A")}{slotNumber}";
 
@@ -505,6 +761,8 @@ public static class HighlightDirector
     private static int Midpoint(int from, int to) => (from + to) / 2;
 
     private static int FollowThrough(int from, int to) => Clamp(from + ((to - from) / 4));
+
+    private static HighlightKeyframeV1 BallAt(int x, int y) => new(0, x, y);
 
     private static int KeeperDiveX(int keeperX, MatchSide attackingSide)
     {
@@ -532,7 +790,7 @@ public static class HighlightDirector
         // control means the same thing on every highlight.
         var length = matchEvent.IsGoal
             ? options.MaxDurationMilliseconds
-            : options.MinDurationMilliseconds + ((options.MaxDurationMilliseconds - options.MinDurationMilliseconds) / 2);
+            : options.MinDurationMilliseconds + ((options.MaxDurationMilliseconds - options.MinDurationMilliseconds) * 2 / 3);
 
         return int.Clamp(length, options.MinDurationMilliseconds, options.MaxDurationMilliseconds);
     }

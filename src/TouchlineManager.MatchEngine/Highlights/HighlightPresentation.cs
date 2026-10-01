@@ -1,3 +1,4 @@
+using TouchlineManager.MatchEngine.Commentary;
 using TouchlineManager.MatchEngine.Model;
 
 namespace TouchlineManager.MatchEngine.Highlights;
@@ -84,6 +85,26 @@ public sealed record BridgeV1(
     /// </summary>
     public int EstimatedPayloadBytes => (DurationMilliseconds / 1_000) + (Tracks.Sum(track => track.Keyframes.Count) * 24) + 32;
 }
+
+/// <summary>
+/// One segment of the condensed playback clock: a highlight or the recycling passage before it.
+/// </summary>
+/// <remarks>
+/// The presentation is a sequence of passages rather than a continuous recording, so a client needs to know
+/// where each one sits on its own playback clock. The schedule is that answer: segments run back to back
+/// from zero, a bridge sits immediately before the highlight it leads into, and the last segment's end is
+/// the replay's total length. It is what lets the ticker, the clock, and the animation all agree on when
+/// something happened without any of them owning the arithmetic.
+/// </remarks>
+/// <param name="Kind">What the segment is: <c>highlight</c> or <c>bridge</c>.</param>
+/// <param name="SourceEventSequence">The event the segment presents or leads into.</param>
+/// <param name="StartMilliseconds">When the segment starts on the playback clock.</param>
+/// <param name="DurationMilliseconds">How long the segment runs for.</param>
+public sealed record PlaybackSegmentV1(
+    string Kind,
+    int SourceEventSequence,
+    int StartMilliseconds,
+    int DurationMilliseconds);
 
 /// <summary>One player's full match participation line for the match center lineups.</summary>
 public sealed record MatchLineupPlayerV1
@@ -176,6 +197,16 @@ public sealed record HighlightPresentationV1
     public required IReadOnlyList<HighlightTrackV1> Tracks { get; init; }
 
     /// <summary>
+    /// Gets the passage's synchronized commentary, ordered by its offset in the highlight (`replay-v2`).
+    /// </summary>
+    /// <remarks>
+    /// The narration says what happened; these tokens say when, in milliseconds from the highlight's first
+    /// frame, so the bottom ticker can overwrite line by line with the action rather than a minute at a time.
+    /// The keys and parameters are the durable part, exactly as they are for the full match log.
+    /// </remarks>
+    public IReadOnlyList<HighlightCommentaryV1> Commentary { get; init; } = [];
+
+    /// <summary>
     /// Gets an estimate of the serialized payload, for the instrumentation the payload budget requires.
     /// </summary>
     /// <remarks>
@@ -188,8 +219,9 @@ public sealed record HighlightPresentationV1
         get
         {
             var keyframes = Tracks.Sum(track => track.Keyframes.Count);
+            var commentary = Commentary.Sum(line => line.EstimatedPayloadBytes);
 
-            return (Entities.Count * 48) + (keyframes * 24) + (Narration.Length * 2) + 128;
+            return (Entities.Count * 48) + (keyframes * 24) + (Narration.Length * 2) + commentary + 128;
         }
     }
 }
@@ -224,10 +256,24 @@ public sealed record MatchPresentationV1
     /// <summary>Gets the live minute-by-minute condition and ratings for all players.</summary>
     public IReadOnlyList<PlayerLiveMetricV1>? LiveMetrics { get; init; }
 
+    /// <summary>
+    /// Gets the condensed playback schedule, in the order the segments play (`replay-v2`).
+    /// </summary>
+    /// <remarks>
+    /// Empty only when there is nothing to watch. Segments are contiguous — each starts where the previous
+    /// ended — so the client plays one list rather than threading highlights and bridges together itself.
+    /// </remarks>
+    public IReadOnlyList<PlaybackSegmentV1> Playback { get; init; } = [];
+
+    /// <summary>Gets how long the condensed replay runs for, in milliseconds.</summary>
+    public int TotalPlaybackMilliseconds =>
+        Playback.Count > 0 ? Playback[^1].StartMilliseconds + Playback[^1].DurationMilliseconds : 0;
+
     /// <summary>Gets the estimated total payload, bridges included.</summary>
     public int EstimatedPayloadBytes =>
         Highlights.Sum(highlight => highlight.EstimatedPayloadBytes)
-        + Bridges.Sum(bridge => bridge.EstimatedPayloadBytes);
+        + Bridges.Sum(bridge => bridge.EstimatedPayloadBytes)
+        + (Playback.Count * 48);
 }
 
 /// <summary>
@@ -241,8 +287,17 @@ public sealed record MatchPresentationV1
 /// </remarks>
 public sealed record HighlightOptionsV1
 {
-    /// <summary>Gets the least goal probability that makes a shot worth replaying, in basis points.</summary>
-    public int MinQualityForShotBasisPoints { get; init; } = 1_600;
+    /// <summary>
+    /// Gets the least goal probability that makes a shot worth replaying, in basis points.
+    /// </summary>
+    /// <remarks>
+    /// The condensed replay is a ten-to-twenty-second passage per chance, so it is selection that decides
+    /// whether a match is watchable at all: at the older, stricter threshold a typical match produced four
+    /// highlights and a two-minute replay. Seven per cent is still a chance rather than a hopeful punt, and
+    /// the count and duration caps trim from there by quality, so the replay shows the shots a manager would
+    /// have reacted to without showing all twenty-nine.
+    /// </remarks>
+    public int MinQualityForShotBasisPoints { get; init; } = 700;
 
     /// <summary>Gets whether shots that hit the woodwork are worth showing.</summary>
     public bool IncludeWoodwork { get; init; } = true;
@@ -255,6 +310,24 @@ public sealed record HighlightOptionsV1
 
     /// <summary>Gets the estimated payload budget for one match, in bytes (750 KB, ADR-0006).</summary>
     public int PayloadBudgetBytes { get; init; } = 750 * 1024;
+
+    /// <summary>Gets the longest the condensed replay may run for, in milliseconds (`replay-v2`).</summary>
+    /// <remarks>
+    /// The plan's viewing experience is five to ten minutes at normal speed, so ten is a hard ceiling rather
+    /// than a target: chances are trimmed by quality until the schedule fits, and goals — the shortest part
+    /// of any match — are never trimmed. A match's own selection is what makes the replay long; this only
+    /// keeps a twenty-four-chance thriller from becoming a twenty-minute download-and-watch.
+    /// </remarks>
+    public int MaxPlaybackMilliseconds { get; init; } = 10 * 60 * 1000;
+
+    /// <summary>Gets the shortest the condensed replay should run for, in milliseconds (`replay-v2`).</summary>
+    /// <remarks>
+    /// A target rather than a guarantee, and one the director meets honestly: it does not pad the passages,
+    /// it lengthens the recycling between them until the replay reaches five minutes. A match with almost
+    /// nothing in it — four goals and no other chance — cannot be stretched to five minutes without inventing
+    /// football, so it is the one replay allowed to run short.
+    /// </remarks>
+    public int MinPlaybackMilliseconds { get; init; } = 5 * 60 * 1000;
 
     /// <summary>Gets the shortest a highlight runs for, in milliseconds.</summary>
     /// <remarks>
@@ -274,8 +347,12 @@ public sealed record HighlightOptionsV1
     public int BridgeBudgetBytes { get; init; } = 160 * 1024;
 
     /// <summary>Gets the shortest a bridge runs for, in milliseconds.</summary>
-    public int MinBridgeDurationMilliseconds { get; init; } = 4_000;
+    public int MinBridgeDurationMilliseconds { get; init; } = 6_000;
 
     /// <summary>Gets the longest a bridge runs for, in milliseconds.</summary>
-    public int MaxBridgeDurationMilliseconds { get; init; } = 9_000;
+    /// <remarks>
+    /// A long bridge represents a long spell of recycling, condensed: the plan's five-to-ten-minute replay
+    /// is mostly bridges, because a ninety-minute match holds only a few minutes of genuine chances.
+    /// </remarks>
+    public int MaxBridgeDurationMilliseconds { get; init; } = 18_000;
 }

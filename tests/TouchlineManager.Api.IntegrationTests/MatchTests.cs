@@ -61,7 +61,7 @@ public sealed class MatchTests : IAsyncLifetime
         summary.RoundNumber.Should().BeGreaterThan(0);
         summary.SeasonLabel.Should().NotBeEmpty();
         summary.EngineVersion.Should().NotBeEmpty();
-        summary.PresentationVersion.Should().Be("highlights-v1");
+        summary.PresentationVersion.Should().Be("replay-v2");
         summary.ServerTime.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2), "TIME-5");
 
         // Possession is a share, so the two sides' shares are complementary.
@@ -83,7 +83,7 @@ public sealed class MatchTests : IAsyncLifetime
             $"/api/v1/matches/{matchId}/presentation"))!;
 
         presentation.MatchId.Should().Be(matchId);
-        presentation.PresentationVersion.Should().Be("highlights-v1");
+        presentation.PresentationVersion.Should().Be("replay-v2");
         presentation.Commentary.Should().NotBeEmpty();
         presentation.Commentary.Select(line => line.TemplateKey).Should()
             .Contain(["match.kickoff", "match.full_time"], "a match is narrated from kick-off to full time");
@@ -110,6 +110,27 @@ public sealed class MatchTests : IAsyncLifetime
             .Should().Be(goals, "MAT-5: every goal links to a highlight");
 
         presentation.Highlights.Should().BeInAscendingOrder(highlight => highlight.SourceEventSequence);
+
+        // The condensed replay is one contiguous schedule: the client plays a single list, and the total is
+        // the plan's viewing window rather than ninety minutes (Stage 3).
+        presentation.Playback.Should().NotBeNull().And.NotBeEmpty();
+        presentation.Playback![0].StartMilliseconds.Should().Be(0);
+
+        var cursor = 0;
+
+        foreach (var segment in presentation.Playback)
+        {
+            segment.StartMilliseconds.Should().Be(cursor);
+            segment.DurationMilliseconds.Should().BeGreaterThan(0);
+            cursor += segment.DurationMilliseconds;
+        }
+
+        cursor.Should().Be(presentation.TotalPlaybackMilliseconds);
+        presentation.TotalPlaybackMilliseconds.Should().BeLessThanOrEqualTo(10 * 60 * 1000);
+
+        presentation.Bridges.Should().NotBeNull().And.NotBeEmpty();
+        presentation.Playback.Count(segment => segment.Kind == "bridge")
+            .Should().Be(presentation.Bridges!.Count, "every bridge is on the schedule it was built for");
     }
 
     [Fact]
@@ -128,9 +149,18 @@ public sealed class MatchTests : IAsyncLifetime
         foreach (var highlight in presentation.Highlights)
         {
             highlight.Narration.Should().NotBeEmpty("§9.4: the Canvas is not the only way to follow a highlight");
-            highlight.DurationMilliseconds.Should().BeInRange(5_000, 8_000, "§9.3");
+            highlight.DurationMilliseconds.Should().BeInRange(10_000, 25_000, "replay-v2: a passage of play, not a moment");
             highlight.HomeColour.Should().StartWith("#");
             highlight.AwayColour.Should().StartWith("#");
+
+            // The bottom ticker's lines are pinned to the passage's own millisecond clock (§9.3, replay-v2).
+            highlight.Commentary.Should().NotBeNull().And.NotBeEmpty();
+            highlight.Commentary![0].TimeMilliseconds.Should().Be(0);
+            highlight.Commentary.Select(line => line.TimeMilliseconds).Should().BeInAscendingOrder();
+            highlight.Commentary.Should().OnlyContain(line =>
+                line.TimeMilliseconds >= 0
+                && line.TimeMilliseconds <= highlight.DurationMilliseconds
+                && !string.IsNullOrWhiteSpace(line.Text));
 
             // Twenty-two players and a ball, each with a track, so the renderer interpolates rather than
             // being sent frames (§9.1, §9.3).

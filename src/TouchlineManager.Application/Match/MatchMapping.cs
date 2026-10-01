@@ -92,7 +92,22 @@ public static class MatchMapping
             presentation.HomeLineup is { } homeLineup ? ToResponse(homeLineup) : null,
             presentation.AwayLineup is { } awayLineup ? ToResponse(awayLineup) : null,
             presentation.LiveMetrics is { } metrics ? [.. metrics.Select(ToResponse)] : null,
-            presentation.Bridges.Count > 0 ? [.. presentation.Bridges.Select(ToResponse)] : null);
+            presentation.Bridges.Count > 0 ? [.. presentation.Bridges.Select(ToResponse)] : null,
+            presentation.Playback.Count > 0 ? [.. presentation.Playback.Select(ToResponse)] : null,
+            presentation.TotalPlaybackMilliseconds);
+    }
+
+    /// <summary>Projects one playback segment.</summary>
+    /// <param name="segment">The segment.</param>
+    public static PlaybackSegmentResponse ToResponse(this PlaybackSegmentV1 segment)
+    {
+        ArgumentNullException.ThrowIfNull(segment);
+
+        return new PlaybackSegmentResponse(
+            segment.Kind,
+            segment.SourceEventSequence,
+            segment.StartMilliseconds,
+            segment.DurationMilliseconds);
     }
 
     /// <summary>Projects one recycling bridge.</summary>
@@ -140,7 +155,22 @@ public static class MatchMapping
             highlight.HomeColour,
             highlight.AwayColour,
             [.. highlight.Entities.Select(ToResponse)],
-            [.. highlight.Tracks.Select(ToResponse)]);
+            [.. highlight.Tracks.Select(ToResponse)],
+            [.. highlight.Commentary.Select(ToResponse)]);
+    }
+
+    /// <summary>Projects one synchronized passage commentary line.</summary>
+    /// <param name="line">The line.</param>
+    public static HighlightCommentaryResponse ToResponse(this HighlightCommentaryV1 line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+
+        return new HighlightCommentaryResponse(
+            line.TimeMilliseconds,
+            line.TemplateKey,
+            line.VariantKey,
+            [.. line.Parameters.Select(parameter => new CommentaryParameterResponse(parameter.Name, parameter.Value))],
+            line.Text);
     }
 
     /// <summary>Projects one highlight entity.</summary>

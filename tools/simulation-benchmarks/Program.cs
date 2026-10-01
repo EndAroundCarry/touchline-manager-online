@@ -13,7 +13,7 @@ using TouchlineManager.SimulationBenchmarks;
 // rather than a test: the numbers that tune the engine want a hundred thousand matches and a printed table,
 // and a test suite that took twenty minutes would stop being run.
 //
-// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|bench|all] [count] [seed]
+// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|bench|all] [count] [seed]
 
 var mode = args.Length > 0 ? args[0] : "all";
 var count = args.Length > 1 && int.TryParse(args[1], CultureInfo.InvariantCulture, out var parsed) ? parsed : 20_000;
@@ -36,6 +36,11 @@ if (mode is "single" or "all")
 if (mode is "distributions" or "all")
 {
     Distributions(count, seed);
+}
+
+if (mode is "replay" or "all")
+{
+    Replay(Math.Min(count, 10_000), seed);
 }
 
 if (mode is "bench" or "all")
@@ -161,6 +166,57 @@ void Distributions(int matches, ulong baseSeed)
     Console.WriteLine();
 }
 
+void Replay(int matches, ulong baseSeed)
+{
+    Console.WriteLine($"== replay, {matches:N0} matches ==");
+
+    var highlightCounts = new double[matches];
+    var durations = new double[matches];
+    var payloads = new double[matches];
+    var qualities = new List<double>();
+    var highlightsInFiveToTen = 0;
+    var overTenMinutes = 0;
+
+    for (var index = 0; index < matches; index++)
+    {
+        var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index);
+        var result = MatchSimulator.Simulate(input, rules);
+        var presentation = HighlightDirector.Build(input, result);
+
+        qualities.AddRange(result.Events
+            .Where(matchEvent => matchEvent.QualityBasisPoints is not null)
+            .Select(matchEvent => (double)matchEvent.QualityBasisPoints!.Value));
+
+        highlightCounts[index] = presentation.Highlights.Count;
+        durations[index] = presentation.TotalPlaybackMilliseconds;
+        payloads[index] = presentation.EstimatedPayloadBytes;
+
+        if (presentation.TotalPlaybackMilliseconds is >= 5 * 60 * 1000 and <= 10 * 60 * 1000)
+        {
+            highlightsInFiveToTen++;
+        }
+
+        if (presentation.TotalPlaybackMilliseconds > 10 * 60 * 1000)
+        {
+            overTenMinutes++;
+        }
+    }
+
+    Array.Sort(highlightCounts);
+    Array.Sort(durations);
+    Array.Sort(payloads);
+    var sortedQualities = qualities.ToArray();
+    Array.Sort(sortedQualities);
+
+    Console.WriteLine($"  {"shot quality bp p10/p50/p90",-28} {Percentile(sortedQualities, 0.10),7:F0}       {Percentile(sortedQualities, 0.50),7:F0}       {Percentile(sortedQualities, 0.90),7:F0}   over 1600: {100.0 * sortedQualities.Count(value => value >= 1_600) / sortedQualities.Length:F0}%");
+
+    Console.WriteLine($"  {"highlights per match",-28} {Percentile(highlightCounts, 0.50),7} p50   {Percentile(highlightCounts, 0.05),7} p05   {Percentile(highlightCounts, 0.95),7} p95");
+    Console.WriteLine($"  {"replay minutes p05/p50/p95",-28} {Percentile(durations, 0.05) / 60_000.0,7:F1}       {Percentile(durations, 0.50) / 60_000.0,7:F1}       {Percentile(durations, 0.95) / 60_000.0,7:F1}   min {durations[0] / 60_000.0:F1}  max {durations[^1] / 60_000.0:F1}");
+    Console.WriteLine($"  {"payload KB p05/p50/p95",-28} {Percentile(payloads, 0.05) / 1024.0,7:F1}       {Percentile(payloads, 0.50) / 1024.0,7:F1}       {Percentile(payloads, 0.95) / 1024.0,7:F1}");
+    Console.WriteLine($"  {"inside 5-10 minutes",-28} {100.0 * highlightsInFiveToTen / matches,7:F1}%   over 10 min {100.0 * overTenMinutes / matches:F2}%");
+    Console.WriteLine();
+}
+
 void Bench(int matches, ulong baseSeed)
 {
     Console.WriteLine($"== timing, {matches:N0} matches ==");
@@ -209,6 +265,8 @@ static double Percentile(double[] sorted, double fraction)
 
     return sorted[index];
 }
+
+
 
 static void Print(string label, double value, string target) =>
     Console.WriteLine($"  {label,-28} {value,10:F3}   target {target}");
