@@ -169,7 +169,7 @@ public static class CanonicalMatchSerializer
     {
         var lines = new List<string>
         {
-            "match-result-v2",
+            "match-result-v3",
             Field("engineVersion", result.EngineVersion),
             Field("ruleSetVersion", result.RuleSetVersion),
             Field("inputHash", result.InputHash),
@@ -197,6 +197,8 @@ public static class CanonicalMatchSerializer
             lines.Add(Field($"{prefix}.qualityBasisPoints", matchEvent.QualityBasisPoints));
             lines.Add(Field($"{prefix}.absenceFixtures", matchEvent.AbsenceFixtures));
             lines.Add(Field($"{prefix}.substitutionReason", matchEvent.SubstitutionReason is null ? null : (int)matchEvent.SubstitutionReason.Value));
+            lines.Add(Field($"{prefix}.x", matchEvent.X));
+            lines.Add(Field($"{prefix}.y", matchEvent.Y));
         }
 
         foreach (var line in result.PlayerLines.OrderBy(line => line.ClubId).ThenBy(line => line.ParticipantId))
@@ -213,6 +215,11 @@ public static class CanonicalMatchSerializer
             lines.Add(Field($"{prefix}.sentOff", line.SentOff));
             lines.Add(Field($"{prefix}.absenceFixtures", line.AbsenceFixtures));
             lines.Add(Field($"{prefix}.ratingBasisPoints", line.RatingBasisPoints));
+            lines.Add(Field($"{prefix}.finalConditionBasisPoints", line.FinalConditionBasisPoints));
+            lines.Add(Field($"{prefix}.subbedOutMinute", line.SubbedOutMinute));
+            lines.Add(Field($"{prefix}.subbedInMinute", line.SubbedInMinute));
+            lines.Add(Field($"{prefix}.isInjured", line.IsInjured));
+            lines.Add(Field($"{prefix}.liveRatingBasisPoints", line.LiveRatingBasisPoints));
         }
 
         return string.Join('\n', lines);

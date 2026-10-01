@@ -267,5 +267,6 @@ public sealed class MatchLoadCalculatorTests
             SentOff = false,
             AbsenceFixtures = 0,
             RatingBasisPoints = 0,
+            FinalConditionBasisPoints = 6_000,
         };
 }

@@ -1,5 +1,6 @@
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Serialization;
+using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Simulation;
 
@@ -17,7 +18,13 @@ internal static class MatchResultBuilder
     /// <summary>Builds the result, including its output hash.</summary>
     /// <param name="state">The finished match state.</param>
     /// <param name="inputHash">The input hash the result is bound to.</param>
-    public static MatchResultV1 Build(MatchState state, string inputHash)
+    /// <param name="possessionBallPosition">Where the last possession put the ball, for the events' pitch coordinates.</param>
+    /// <remarks>
+    /// The builder stamps each stored event with the ball position the possession that produced it had
+    /// reached. The event log is replayed in order, so each event's location is the ball's location at
+    /// that event, not at the end of the match.
+    /// </remarks>
+    public static MatchResultV1 Build(MatchState state, string inputHash, SpatialPoint possessionBallPosition)
     {
         ArgumentNullException.ThrowIfNull(state);
 
@@ -102,58 +109,91 @@ internal static class MatchResultBuilder
             var won = goalsFor > goalsAgainst;
             var drew = goalsFor == goalsAgainst;
 
-            foreach (var participant in state.Input.SideOf(side).Squad)
+            // A substitution names the player leaving and the player entering, so the minutes the match
+            // center shows are read from the events rather than accumulated in a third place.
+            var subbedOut = new Dictionary<Guid, int>();
+            var subbedIn = new Dictionary<Guid, int>();
+
+            foreach (var matchEvent in state.Events)
             {
-                var id = participant.ParticipantId;
-                var started = starters.Contains(id);
-
-                int? entered;
-
-                if (runtime.EnteredMinute.TryGetValue(id, out var cameOn))
+                if (matchEvent.Side != side
+                    || matchEvent.Type != EngineEventType.Substitution
+                    || matchEvent.ParticipantId is not Guid outgoing
+                    || matchEvent.SecondaryParticipantId is not Guid incoming)
                 {
-                    entered = cameOn;
-                }
-                else
-                {
-                    // A starter who was never substituted on has no entry recorded; they were on from kickoff.
-                    entered = started ? 0 : null;
+                    continue;
                 }
 
-                var left = runtime.LeftMinute.TryGetValue(id, out var wentOff)
-                    ? wentOff
-                    : state.TotalMinutesPlayed;
-
-                var minutes = entered is int fromMinute ? Math.Max(0, left - fromMinute) : 0;
-                var goals = runtime.Goals.TryGetValue(id, out var scored) ? scored : 0;
-                var assists = runtime.Assists.TryGetValue(id, out var setUp) ? setUp : 0;
-                var yellows = runtime.Yellows.TryGetValue(id, out var bookings) ? bookings : 0;
-                var sentOff = runtime.SentOff.Contains(id);
-
-                lines.Add(new MatchPlayerLineV1
-                {
-                    ParticipantId = id,
-                    ClubId = participant.ClubId,
-                    Side = side,
-                    Started = started,
-                    MinutesPlayed = minutes,
-                    Goals = goals,
-                    Assists = assists,
-                    YellowCards = yellows,
-                    SentOff = sentOff,
-                    AbsenceFixtures = runtime.AbsenceFixtures.TryGetValue(id, out var absence) ? absence : 0,
-                    RatingBasisPoints = PlayerRatingCalculator.Calculate(
-                        state.Rules,
-                        new PlayerMatchFacts(
-                            minutes,
-                            goals,
-                            assists,
-                            yellows,
-                            sentOff,
-                            saves.TryGetValue(id, out var made) ? made : 0,
-                            won,
-                            drew)),
-                });
+                subbedOut[outgoing] = matchEvent.Minute;
+                subbedIn[incoming] = matchEvent.Minute;
             }
+
+        foreach (var participant in state.Input.SideOf(side).Squad)
+        {
+            var id = participant.ParticipantId;
+            var started = starters.Contains(id);
+
+            int? entered;
+
+            if (runtime.EnteredMinute.TryGetValue(id, out var cameOn))
+            {
+                entered = cameOn;
+            }
+            else
+            {
+                // A starter who was never substituted on has no entry recorded; they were on from kickoff.
+                entered = started ? 0 : null;
+            }
+
+            var left = runtime.LeftMinute.TryGetValue(id, out var wentOff)
+                ? wentOff
+                : state.TotalMinutesPlayed;
+
+            var minutes = entered is int fromMinute ? Math.Max(0, left - fromMinute) : 0;
+            var goals = runtime.Goals.TryGetValue(id, out var scored) ? scored : 0;
+            var assists = runtime.Assists.TryGetValue(id, out var setUp) ? setUp : 0;
+            var yellows = runtime.Yellows.TryGetValue(id, out var bookings) ? bookings : 0;
+            var sentOff = runtime.SentOff.Contains(id);
+            var injured = runtime.AbsenceFixtures.ContainsKey(id);
+
+            // A substitute who never came on has no live rating, because a rating is what a player earned
+            // on the pitch. An unused bench player's line still exists for the squad's continuity records.
+            int? liveRating = runtime.LiveRatings.TryGetValue(id, out var rating)
+                ? rating
+                : null;
+
+            lines.Add(new MatchPlayerLineV1
+            {
+                ParticipantId = id,
+                ClubId = participant.ClubId,
+                Side = side,
+                Started = started,
+                MinutesPlayed = minutes,
+                Goals = goals,
+                Assists = assists,
+                YellowCards = yellows,
+                SentOff = sentOff,
+                AbsenceFixtures = runtime.AbsenceFixtures.TryGetValue(id, out var absence) ? absence : 0,
+                RatingBasisPoints = PlayerRatingCalculator.Calculate(
+                    state.Rules,
+                    new PlayerMatchFacts(
+                        minutes,
+                        goals,
+                        assists,
+                        yellows,
+                        sentOff,
+                        saves.TryGetValue(id, out var made) ? made : 0,
+                        won,
+                        drew)),
+                FinalConditionBasisPoints = runtime.FinalConditions.TryGetValue(id, out var condition)
+                    ? condition
+                    : participant.State.ConditionBasisPoints,
+                SubbedOutMinute = subbedOut.TryGetValue(id, out var outMinute) ? outMinute : null,
+                SubbedInMinute = subbedIn.TryGetValue(id, out var inMinute) ? inMinute : null,
+                IsInjured = injured,
+                LiveRatingBasisPoints = liveRating ?? 0,
+            });
+        }
         }
 
         // One fixed order, so the canonical output hash does not depend on the order the squads arrived in.

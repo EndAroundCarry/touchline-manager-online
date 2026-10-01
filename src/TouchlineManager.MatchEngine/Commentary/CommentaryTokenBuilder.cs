@@ -341,6 +341,20 @@ public static class CommentaryTokenBuilder
                     "{club} win a corner.",
                     "It will be a corner for {club}.",
                 ]),
+            [EngineEventType.FreeKickWon] = new(
+                "match.free_kick.won",
+                [
+                    "A free kick to {club} in a dangerous area.",
+                    "{player} is fouled — free kick to {club}.",
+                    "Free kick for {club}, within shooting range.",
+                ]),
+            [EngineEventType.FreeKickShot] = new(
+                "match.free_kick.struck",
+                [
+                    "{player} lines it up and strikes the free kick.",
+                    "The free kick is taken by {player}.",
+                    "{player} goes for goal from the free kick.",
+                ]),
             [EngineEventType.Injury] = new(
                 "match.injury",
                 [

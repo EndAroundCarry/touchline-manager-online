@@ -1,5 +1,7 @@
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
+using TouchlineManager.MatchEngine.Ratings;
+using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Simulation;
 
@@ -72,9 +74,47 @@ internal static class PossessionSimulator
 
         SubstitutionPlanner.ConsiderBothSides(state);
 
+        // The ball begins the passage where the last one left it, and the carrier advances it before the
+        // defence engages: this is the possession's spatial location, which events and free kicks inherit
+        // (engine-v3).
+        AdvanceBall(state, possessionSide);
+
         // The defending side's foul comes first: a foul ends the passage of play before it develops, which is
-        // what makes it the defending side's event rather than a consequence of the attack.
-        if (DisciplineSimulator.TryResolveFoul(state, MatchInputV1.OpponentOf(possessionSide)))
+        // what makes it the defending side's event rather than a consequence of the attack. What the foul
+        // gives — a penalty, or a direct free kick in range — is resolved here, where the ball's location is
+        // known; the discipline flow recorded only the foul and its card.
+        var foul = DisciplineSimulator.TryResolveFoul(state, MatchInputV1.OpponentOf(possessionSide));
+
+        if (foul.FoulCommitted)
+        {
+            ApplyFoulLiveRatings(state, possessionSide, foul);
+
+            if (state.Random.RollBasisPoints(rules.PenaltyFromFoulBasisPoints))
+            {
+                ChanceSimulator.ResolvePenalty(state, possessionSide);
+                InjurySimulator.TryResolveInjury(state);
+
+                return;
+            }
+
+            var attackingX = AttackingX(state, possessionSide);
+
+            if (attackingX >= rules.FreeKickShootingRangeX && state.Random.RollBasisPoints(rules.FreeKickAwardBasisPoints))
+            {
+                ResolveFreeKick(state, possessionSide, attackingX);
+                InjurySimulator.TryResolveInjury(state);
+
+                return;
+            }
+
+            InjurySimulator.TryResolveInjury(state);
+
+            return;
+        }
+
+        // A loose ball opens only a share of passages: most possessions begin with the ball already under
+        // control, and the contested 50/50 is the exception rather than the tax on every attack (engine-v3).
+        if (state.Random.RollBasisPoints(rules.ScrambleOpeningBasisPoints) && ResolveScramble(state, possessionSide))
         {
             InjurySimulator.TryResolveInjury(state);
 
@@ -104,8 +144,13 @@ internal static class PossessionSimulator
             attacker.Ratings.Creation + (attacker.Ratings.Finishing / 2),
             defender.Ratings.DefensiveShape + (defender.Ratings.Goalkeeping / 2));
 
+        // The 1v1 the carrier fights to reach the creation phase: a beat man makes the chance more likely,
+        // a tackle shuts the passage down (engine-v3).
+        var duelBonus = ResolveGroundDuel(state, possessionSide);
+
         var creationChance = Probability.Band(
             rules.BaseCreationBasisPoints
+                + duelBonus
                 + Probability.Swing(
                     creation,
                     rules.CreationSwingBasisPoints,
@@ -125,6 +170,257 @@ internal static class PossessionSimulator
 
         ChanceSimulator.ResolveOpenPlay(state, possessionSide);
         InjurySimulator.TryResolveInjury(state);
+    }
+
+    /// <summary>
+    /// Advances the ball up the pitch for the side in possession, to where this passage of play is fought.
+    /// </summary>
+    /// <remarks>
+    /// The advance is a draw inside the rules' band, so a possession's location is a fact the seed decides
+    /// rather than a formula's constant answer, and the same seed always fights the passage in the same
+    /// place. The side defending is mirrored, so the ball is always somewhere real on the shared pitch.
+    /// </remarks>
+    private static void AdvanceBall(MatchState state, MatchSide possessionSide)
+    {
+        var rules = state.Rules;
+        var isHome = possessionSide == MatchSide.Home;
+        var advance = state.Random.NextRange(rules.MinPossessionAdvanceBasisPoints, rules.MaxPossessionAdvanceBasisPoints);
+
+        var x = isHome
+            ? (advance * SpatialPitch.PitchLength) / EngineRulesV2.Certain
+            : SpatialPitch.PitchLength - ((advance * SpatialPitch.PitchLength) / EngineRulesV2.Certain);
+
+        // Width comes from a second draw, so play spreads across the pitch rather than running down one line.
+        var y = state.Random.NextInt(SpatialPitch.PitchWidth + 1);
+
+        state.MoveBall(new SpatialPoint(x, y));
+    }
+
+    /// <summary>Gets how far up the pitch the ball is from the attacking side's own goal.</summary>
+    private static int AttackingX(MatchState state, MatchSide possessionSide)
+    {
+        var x = state.Ball.GroundPoint.X;
+
+        return possessionSide == MatchSide.Home ? x : SpatialPitch.PitchLength - x;
+    }
+
+    /// <summary>
+    /// Resolves the loose-ball scramble that opens a passage: whether the possession side keeps the ball.
+    /// </summary>
+    /// <remarks>
+    /// Returns <see langword="true"/> when the scramble is <em>lost</em>, which ends the possession with a
+    /// turnover. The nearest players from each side contest it, chosen by the legs a scramble asks for
+    /// (engine-v3).
+    /// </remarks>
+    private static bool ResolveScramble(MatchState state, MatchSide possessionSide)
+    {
+        var attacker = WeightedPick.From(
+            state.SideOf(possessionSide).Outfield,
+            slot => ScrambleWeight(slot.Participant),
+            state.Random);
+
+        var defender = WeightedPick.From(
+            state.OpponentOf(possessionSide).Outfield,
+            slot => ScrambleWeight(slot.Participant),
+            state.Random);
+
+        if (attacker is null || defender is null)
+        {
+            return false;
+        }
+
+        var kept = DuelResolver.ResolveScramble(
+            attacker.Participant,
+            defender.Participant,
+            possessionSide == MatchSide.Home,
+            state.Rules,
+            state.Random);
+
+        // Both players' ratings record the 50/50, won or lost.
+        if (kept)
+        {
+            state.SideOf(possessionSide).AdjustLiveRating(attacker.Participant.ParticipantId, state.Rules.LiveRatingTackleBonusBasisPoints);
+            state.OpponentOf(possessionSide).AdjustLiveRating(defender.Participant.ParticipantId, -state.Rules.LiveRatingTackleLostPenaltyBasisPoints);
+        }
+        else
+        {
+            state.SideOf(possessionSide).AdjustLiveRating(attacker.Participant.ParticipantId, -state.Rules.LiveRatingTackleLostPenaltyBasisPoints);
+            state.OpponentOf(possessionSide).AdjustLiveRating(defender.Participant.ParticipantId, state.Rules.LiveRatingTackleBonusBasisPoints);
+        }
+
+        return !kept;
+    }
+
+    private static int ScrambleWeight(MatchParticipantV1 participant) =>
+        participant.Attributes.ValueOf(MatchAttributeName.Pace)
+        + participant.Attributes.ValueOf(MatchAttributeName.Acceleration)
+        + participant.Attributes.ValueOf(MatchAttributeName.WorkRate);
+
+    /// <summary>
+    /// Resolves a direct free kick awarded in the attacking half: the award event, the strike, and what it
+    /// produced (engine-v3).
+    /// </summary>
+    private static void ResolveFreeKick(MatchState state, MatchSide side, int attackingX)
+    {
+        var attacker = state.SideOf(side);
+        var defender = state.OpponentOf(side);
+
+        var taker = WeightedPick.From(
+            attacker.Outfield,
+            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.SetPieces)
+                + slot.Participant.Attributes.ValueOf(MatchAttributeName.Finishing),
+            state.Random);
+
+        if (taker is null)
+        {
+            return;
+        }
+
+        state.Emit(side, EngineEventType.FreeKickWon, taker.Participant.ParticipantId);
+
+        var outcome = SetPieceDirector.ResolveDirectFreeKick(
+            taker.Participant,
+            defender.Goalkeeper?.Participant,
+            attackingX,
+            side == MatchSide.Home,
+            state.Rules,
+            state.Random);
+
+        if (!outcome.Attempted)
+        {
+            // Crossed rather than struck: the passage ends with the ball delivered into the box.
+            return;
+        }
+
+        state.Emit(
+            side,
+            EngineEventType.FreeKickShot,
+            outcome.TakerId,
+            outcome.GoalkeeperId,
+            outcome.Zone,
+            state.Rules.FreeKickGoalBasisPoints);
+
+        if (outcome.IsGoal)
+        {
+            ScoreFromSetPiece(state, side, outcome.TakerId, EngineEventType.Goal);
+            return;
+        }
+
+        // The strike missed: attribute it, saved, blocked, woodwork, or off target, like an open-play shot.
+        if (outcome.WasSaved)
+        {
+            state.Emit(side, EngineEventType.ShotSaved, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, state.Rules.FreeKickGoalBasisPoints);
+
+            if (outcome.GoalkeeperId is Guid keeper)
+            {
+                defender.AdjustLiveRating(keeper, state.Rules.LiveRatingSaveBonusBasisPoints);
+            }
+        }
+        else if (outcome.HitWoodwork)
+        {
+            state.Emit(side, EngineEventType.Woodwork, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, state.Rules.FreeKickGoalBasisPoints);
+        }
+        else
+        {
+            state.Emit(side, EngineEventType.ShotOffTarget, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, state.Rules.FreeKickGoalBasisPoints);
+        }
+
+        attacker.AdjustLiveRating(outcome.TakerId, -state.Rules.LiveRatingShotMissPenaltyBasisPoints);
+    }
+
+    /// <summary>
+    /// Scores a goal from a set piece and records everything the open-play scorer records, minus the assist
+    /// a set piece does not model.
+    /// </summary>
+    private static void ScoreFromSetPiece(MatchState state, MatchSide side, Guid scorerId, EngineEventType type)
+    {
+        var runtime = state.SideOf(side);
+        var goalkeeper = state.OpponentOf(side).Goalkeeper?.Participant.ParticipantId;
+
+        runtime.Goals.TryGetValue(scorerId, out var goals);
+        runtime.Goals[scorerId] = goals + 1;
+
+        state.AddGoalStoppage();
+
+        runtime.ShiftMorale(state.Rules.MoraleGainPerGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints);
+        state
+            .OpponentOf(side)
+            .ShiftMorale(-state.Rules.MoraleLossPerConcededGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints);
+
+        runtime.AdjustLiveRating(scorerId, state.Rules.LiveRatingGoalBonusBasisPoints);
+
+        if (goalkeeper is Guid keeper)
+        {
+            state.OpponentOf(side).AdjustLiveRating(keeper, -state.Rules.LiveRatingGoalConcededPenaltyBasisPoints);
+        }
+
+        state.Emit(side, type, scorerId, goalkeeper, ShotZone.Central, state.Rules.FreeKickGoalBasisPoints);
+    }
+
+    /// <summary>
+    /// Records what the foul cost in live ratings: a foul is a duel lost badly, whether or not it drew a
+    /// card — the card's own penalty, when there was one, was applied where the card was shown (engine-v3).
+    /// </summary>
+    private static void ApplyFoulLiveRatings(
+        MatchState state,
+        MatchSide possessionSide,
+        DisciplineSimulator.FoulOutcome foul)
+    {
+        if (foul.FoulerId is Guid foulerId)
+        {
+            state.OpponentOf(possessionSide).AdjustLiveRating(
+                foulerId,
+                -state.Rules.LiveRatingTackleLostPenaltyBasisPoints);
+        }
+    }
+
+    /// <summary>
+    /// Resolves the 1v1 ground duel the carrier fights once the possession has progressed (engine-v3).
+    /// </summary>
+    /// <remarks>
+    /// Winning the duel buys the creation that follows a beat man — the rules' dribble bonus — and losing
+    /// it hands the initiative back, which is the same bonus taken away. The possession is not ended by a
+    /// lost duel: the scramble already decides hard turnovers, and a tackled attack regrouping is the
+    /// ordinary rhythm of a match.
+    /// </remarks>
+    /// <returns>The signed creation bonus the duel earned the attacking side, in basis points.</returns>
+    private static int ResolveGroundDuel(MatchState state, MatchSide possessionSide)
+    {
+        var carrier = WeightedPick.From(
+            state.SideOf(possessionSide).Outfield,
+            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.Dribbling),
+            state.Random);
+
+        var tackler = WeightedPick.From(
+            state.OpponentOf(possessionSide).Outfield,
+            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.Tackling),
+            state.Random);
+
+        if (carrier is null || tackler is null)
+        {
+            return 0;
+        }
+
+        var duel = DuelResolver.ResolveGroundDuel(
+            carrier.Participant,
+            tackler.Participant,
+            possessionSide == MatchSide.Home,
+            state.OpponentOf(possessionSide).Instructions.Tackling,
+            state.Rules,
+            state.Random);
+
+        if (duel.AttackerWon)
+        {
+            state.SideOf(possessionSide).AdjustLiveRating(duel.AttackerId, state.Rules.LiveRatingTackleBonusBasisPoints);
+            state.OpponentOf(possessionSide).AdjustLiveRating(duel.DefenderId, -state.Rules.LiveRatingTackleLostPenaltyBasisPoints);
+
+            return state.Rules.DribbleCreationBonusBasisPoints;
+        }
+
+        state.SideOf(possessionSide).AdjustLiveRating(duel.AttackerId, -state.Rules.LiveRatingTackleLostPenaltyBasisPoints);
+        state.OpponentOf(possessionSide).AdjustLiveRating(duel.DefenderId, state.Rules.LiveRatingTackleBonusBasisPoints);
+
+        return -state.Rules.DribbleCreationBonusBasisPoints;
     }
 
     /// <summary>

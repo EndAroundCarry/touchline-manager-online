@@ -61,10 +61,31 @@ internal sealed class SideRuntime
     public Dictionary<Guid, int> AbsenceFixtures { get; } = [];
 
     /// <summary>
+    /// Gets each participant's condition at the moment they left the match (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// Recorded when a player is substituted or sent off, and for everybody still on the pitch at full
+    /// time when the result is built. It is the match center's condition bar and the load calculator's
+    /// input, so it is captured once where the fact is known rather than reconstructed later.
+    /// </remarks>
+    public Dictionary<Guid, int> FinalConditions { get; } = [];
+
+    /// <summary>
     /// Gets the injured players who are waiting to be replaced. An injury forces a substitution, but whether
     /// one can be made is the planner's decision, so the injury only records the obligation.
     /// </summary>
     public HashSet<Guid> PendingInjurySubstitutions { get; } = [];
+
+    /// <summary>
+    /// Gets how many players are short on the pitch, which multiplies the condition the load costs.
+    /// </summary>
+    /// <remarks>
+    /// A sending-off, or an injury the bench could not replace, leaves the vacated zone covered by
+    /// teammates running further (master plan Stage 2). The simulation keeps the count here so the load
+    /// formula stays one formula, and the cost is bounded to the rules' multiplier rather than growing
+    /// without limit.
+    /// </remarks>
+    public int ShorthandedCount => Math.Max(0, MatchInputV1.StartersOnPitch - Active.Count);
 
     /// <summary>Gets how many substitutions the side has made.</summary>
     public int Substitutions { get; set; }
@@ -74,6 +95,16 @@ internal sealed class SideRuntime
 
     /// <summary>Gets the side's current unit ratings.</summary>
     public MatchUnitRatings Ratings { get; set; } = MatchUnitRatings.Neutral;
+
+    /// <summary>
+    /// Gets each participant's live match rating at the moment they left the match (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// Populated by the simulation as players leave the pitch and read when the result is built for those
+    /// still on. A bench player who never came on has no entry, which is why the dictionary lookup fails
+    /// rather than defaulting: the absence is the fact.
+    /// </remarks>
+    public Dictionary<Guid, int> LiveRatings { get; } = [];
 
     /// <summary>Gets the club's identity.</summary>
     public Guid ClubId => Lineup.ClubId;
@@ -120,6 +151,8 @@ internal sealed class SideRuntime
             var outgoing = Active[index].Participant;
 
             LeftMinute[outgoing.ParticipantId] = minute;
+            FinalConditions[outgoing.ParticipantId] = Active[index].Condition.ConditionBasisPoints;
+            LiveRatings[outgoing.ParticipantId] = Active[index].LiveRatingBasisPoints;
             EnteredMinute.TryAdd(replacement.ParticipantId, minute);
 
             Active[index] = new ActiveSlot
@@ -128,6 +161,7 @@ internal sealed class SideRuntime
                 Participant = replacement,
                 FamiliarityBasisPoints = LineupResolver.FamiliarityOf(replacement, Active[index].Slot, rules),
                 Condition = PlayerCondition.From(replacement.State),
+                LiveRatingBasisPoints = rules.LiveRatingBaseBasisPoints,
             };
 
             RecalculateRatings(rules);
@@ -154,6 +188,8 @@ internal sealed class SideRuntime
             return false;
         }
 
+        FinalConditions[participantId] = Active[index].Condition.ConditionBasisPoints;
+        LiveRatings[participantId] = Active[index].LiveRatingBasisPoints;
         Active.RemoveAt(index);
         LeftMinute[participantId] = minute;
         RecalculateRatings(rules);
@@ -210,7 +246,8 @@ internal sealed class SideRuntime
     /// <remarks>
     /// The load is the side's own instructions' doing, so a side that presses high and plays fast tires
     /// faster — which is the cost side of `INS-9` and the reason a manager has to rotate a squad rather
-    /// than pick the same eleven every week.
+    /// than pick the same eleven every week. A side playing a man short pays more still: the tactical
+    /// imbalance handler's coverage cost, so a red card is felt in the legs as well as on the scoreboard.
     /// </remarks>
     /// <param name="rules">The rules in force.</param>
     public void ApplyLoad(EngineRulesV2 rules)
@@ -232,6 +269,9 @@ internal sealed class SideRuntime
                 Probability.Apply(conditionLoss, rules.LowBlockConditionLossMultiplierBasisPoints),
             _ => conditionLoss,
         };
+
+        // Tactical imbalance (master plan Stage 2): covering a teammate's vacated zone costs legs.
+        conditionLoss = Probability.Apply(conditionLoss, 10_000 + (ShorthandedCount * (rules.ShorthandedConditionLossMultiplierBasisPoints - 10_000)));
 
         var fatigueGain = rules.FatigueGainPerPossessionBasisPoints;
 
@@ -263,6 +303,53 @@ internal sealed class SideRuntime
                     .WithConditionDelta(rules.HalfTimeConditionRecoveryBasisPoints)
                     .WithFatigueDelta(-rules.HalfTimeFatigueRecoveryBasisPoints),
             };
+        }
+    }
+
+    /// <summary>
+    /// Adjusts one player's live match rating by a signed amount (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// Adjusts in place and ignores players who have left the pitch: a booking given to a player who has
+    /// already been substituted belongs to nobody's rating. The clamp keeps a calamitous afternoon inside
+    /// the scale the match viewer draws.
+    /// </remarks>
+    /// <param name="participantId">The player.</param>
+    /// <param name="deltaBasisPoints">The change, which may be negative.</param>
+    public void AdjustLiveRating(Guid participantId, int deltaBasisPoints)
+    {
+        for (var index = 0; index < Active.Count; index++)
+        {
+            if (Active[index].Participant.ParticipantId != participantId)
+            {
+                continue;
+            }
+
+            Active[index] = Active[index].WithLiveRatingDelta(deltaBasisPoints);
+
+            return;
+        }
+    }
+
+    /// <summary>Adjusts every player on the pitch's live rating by a signed amount.</summary>
+    /// <param name="deltaBasisPoints">The change, which may be negative.</param>
+    public void AdjustAllLiveRatings(int deltaBasisPoints)
+    {
+        for (var index = 0; index < Active.Count; index++)
+        {
+            Active[index] = Active[index].WithLiveRatingDelta(deltaBasisPoints);
+        }
+    }
+
+    /// <summary>
+    /// Records the condition and live rating of everybody still on the pitch at the final whistle.
+    /// </summary>
+    public void CaptureEndOfMatchStates()
+    {
+        foreach (var slot in Active)
+        {
+            FinalConditions[slot.Participant.ParticipantId] = slot.Condition.ConditionBasisPoints;
+            LiveRatings[slot.Participant.ParticipantId] = slot.LiveRatingBasisPoints;
         }
     }
 }

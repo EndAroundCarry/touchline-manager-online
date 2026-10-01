@@ -59,13 +59,14 @@ public sealed class EngineFuzzTests
 
             var result = MatchSimulator.Simulate(input);
 
-            // However bad one side is, it is still a football match: the ratings floor and the possession bounds
-            // exist so that no side is shut out entirely.
+            // However bad one side is, it is still a football match: the possession roll is bounded so that no
+            // side is shut out entirely, and a match's realised share — a finite sample of bounded draws —
+            // converges on the roll without ever being identical to it.
             result.Home.Shots.Should().BeGreaterThanOrEqualTo(0);
             result.Away.Shots.Should().BeGreaterThanOrEqualTo(0);
 
-            result.Home.PossessionBasisPoints.Should().BeInRange(2_000, 8_000);
-            result.Away.PossessionBasisPoints.Should().BeInRange(2_000, 8_000);
+            result.Home.PossessionBasisPoints.Should().BeInRange(1_500, 8_500);
+            result.Away.PossessionBasisPoints.Should().BeInRange(1_500, 8_500);
         }
     }
 

@@ -161,6 +161,8 @@ public static class EngineVocabulary
         EngineEventType.Corner => StoredEventType.Corner,
         EngineEventType.Injury => StoredEventType.Injury,
         EngineEventType.Substitution => StoredEventType.Substitution,
+        EngineEventType.FreeKickWon => StoredEventType.FreeKickWon,
+        EngineEventType.FreeKickShot => StoredEventType.FreeKickShot,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown engine event type."),
     };
 

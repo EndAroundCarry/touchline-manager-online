@@ -23,13 +23,32 @@ namespace TouchlineManager.MatchEngine.Simulation;
 /// </remarks>
 internal static class DisciplineSimulator
 {
+    /// <summary>What one possession's foul produced, for the caller that resolves what the foul gave.</summary>
+    /// <param name="FoulCommitted">Whether a foul was committed.</param>
+    /// <param name="FoulerId">The player who fouled, when there was one.</param>
+    /// <param name="CardShown">Whether the foul drew a card: a booking, a second booking, or a red.</param>
+    /// <param name="SecondYellow">Whether the card was a second booking rather than a first.</param>
+    /// <param name="StraightRed">Whether the card was a straight red rather than a booking.</param>
+    public readonly record struct FoulOutcome(
+        bool FoulCommitted,
+        Guid? FoulerId,
+        bool CardShown,
+        bool SecondYellow,
+        bool StraightRed);
+
     /// <summary>
-    /// Rolls the defending side's foul for one possession and resolves everything that follows from it.
+    /// Rolls the defending side's foul for one possession and resolves the card the foul drew.
     /// </summary>
+    /// <remarks>
+    /// What the foul <em>gives</em> the attacking side — a penalty, or a free kick in a promising position —
+    /// is resolved by the possession flow that called this, because that flow knows where the ball was and
+    /// who was attacking; the discipline flow owns only the foul and its card. The card's stoppage, event,
+    /// and removal are still handled here, as they always were.
+    /// </remarks>
     /// <param name="state">The match state.</param>
     /// <param name="defendingSide">The side not in possession.</param>
     /// <returns>Whether a foul happened, which ends the possession.</returns>
-    public static bool TryResolveFoul(MatchState state, MatchSide defendingSide)
+    public static FoulOutcome TryResolveFoul(MatchState state, MatchSide defendingSide)
     {
         var defender = state.SideOf(defendingSide);
         var rules = state.Rules;
@@ -40,7 +59,7 @@ internal static class DisciplineSimulator
 
         if (!state.Random.RollBasisPoints(foulChance))
         {
-            return false;
+            return new FoulOutcome(FoulCommitted: false, null, CardShown: false, SecondYellow: false, StraightRed: false);
         }
 
         var fouler = WeightedPick.From(
@@ -50,25 +69,21 @@ internal static class DisciplineSimulator
 
         if (fouler is null)
         {
-            return true;
+            return new FoulOutcome(FoulCommitted: true, null, CardShown: false, SecondYellow: false, StraightRed: false);
         }
 
         var foulerId = fouler.Participant.ParticipantId;
 
         state.Emit(defendingSide, EngineEventType.Foul, foulerId);
 
-        // A foul in the box is resolved as a penalty and the possession ends there, rather than the attack
-        // continuing: the award is the end of the passage of play.
-        if (state.Random.RollBasisPoints(rules.PenaltyFromFoulBasisPoints))
-        {
-            ChanceSimulator.ResolvePenalty(state, MatchInputV1.OpponentOf(defendingSide));
+        var card = ApplyCard(state, defendingSide, defender, fouler, rules);
 
-            return true;
-        }
-
-        ApplyCard(state, defendingSide, defender, fouler, rules);
-
-        return true;
+        return new FoulOutcome(
+            FoulCommitted: true,
+            foulerId,
+            card.Shown,
+            card.SecondYellow,
+            card.StraightRed);
     }
 
     /// <summary>
@@ -80,7 +95,13 @@ internal static class DisciplineSimulator
     /// it makes every later decision depend on how many cards happened to fall, which makes a golden hash
     /// change for reasons nobody can see in the diff.
     /// </remarks>
-    private static void ApplyCard(
+    /// <summary>What the card decision showed.</summary>
+    /// <param name="Shown">Whether any card came out.</param>
+    /// <param name="SecondYellow">Whether it was a second booking.</param>
+    /// <param name="StraightRed">Whether it was a straight red.</param>
+    private readonly record struct CardResult(bool Shown, bool SecondYellow, bool StraightRed);
+
+    private static CardResult ApplyCard(
         MatchState state,
         MatchSide defendingSide,
         SideRuntime defender,
@@ -98,15 +119,14 @@ internal static class DisciplineSimulator
         {
             SendOff(state, defendingSide, defender, fouler, rules, secondBooking: false);
 
-            return;
+            return new CardResult(Shown: true, SecondYellow: false, StraightRed: true);
         }
 
         if (roll >= straightRed + booking)
         {
-            return;
-        }
+            return new CardResult(Shown: false, SecondYellow: false, StraightRed: false);
+        }        var foulerId = fouler.Participant.ParticipantId;
 
-        var foulerId = fouler.Participant.ParticipantId;
         var second = defender.Book(foulerId);
 
         state.AddCardStoppage();
@@ -114,11 +134,16 @@ internal static class DisciplineSimulator
         if (second)
         {
             SendOff(state, defendingSide, defender, fouler, rules, secondBooking: true);
+
+            return new CardResult(Shown: true, SecondYellow: true, StraightRed: false);
         }
-        else
-        {
-            state.Emit(defendingSide, EngineEventType.YellowCard, foulerId);
-        }
+
+        state.Emit(defendingSide, EngineEventType.YellowCard, foulerId);
+
+        // A booking is what the crowd saw, so the live rating shows it too (engine-v3).
+        defender.AdjustLiveRating(foulerId, -rules.LiveRatingYellowPenaltyBasisPoints);
+
+        return new CardResult(Shown: true, SecondYellow: false, StraightRed: false);
     }
 
     private static void SendOff(
@@ -142,6 +167,10 @@ internal static class DisciplineSimulator
             participantId);
 
         state.AddCardStoppage();
+
+        // A sending-off is what the crowd saw, so the live rating records it before the player leaves the
+        // pitch (engine-v3).
+        defender.AdjustLiveRating(participantId, -rules.LiveRatingRedPenaltyBasisPoints);
 
         // A sent-off player is not replaced — no substitution can bring one on — so the side plays a player
         // short for the rest of the match. That is the whole point of the sanction.

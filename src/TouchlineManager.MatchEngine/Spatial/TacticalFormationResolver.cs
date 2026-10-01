@@ -1,82 +1,127 @@
+using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 
 namespace TouchlineManager.MatchEngine.Spatial;
 
 /// <summary>
-/// Resolves a player's dynamic spatial pitch position based on base formation coordinates,
-/// ball position, attacking/defending phases, and tactical instructions.
+/// Resolves a player's dynamic spatial pitch position for a possession: their formation anchor, moved by
+/// the ball's location, the phase of play, and the side's instructions (master plan Stage 2).
 /// </summary>
+/// <remarks>
+/// <para>
+/// The resolver is pure: it maps a slot onto the normalized pitch for one moment of the match and touches
+/// nothing. The simulation calls it to know where the play is, and the highlight director consumes the
+/// same normalized coordinates the tactics board stores, so a replay and a team sheet never disagree
+/// about where a player stands.
+/// </para>
+/// </remarks>
 public static class TacticalFormationResolver
 {
+    /// <summary>The margin any resolved position keeps from a touchline, in normalized units.</summary>
+    public const int TouchlineMargin = 150;
+
+    /// <summary>
+    /// Resolves one slot's position for one possession.
+    /// </summary>
+    /// <param name="slot">The slot, whose coordinates are the normalized values the tactics board stores.</param>
+    /// <param name="isHome">Whether the side is at home.</param>
+    /// <param name="hasPossession">Whether the side has the ball this possession.</param>
+    /// <param name="ballPosition">Where the ball is, in pitch coordinates.</param>
+    /// <param name="instructions">The side's instructions.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <returns>The position, clamped strictly inside the pitch.</returns>
     public static SpatialPoint ResolvePosition(
         MatchSlotV1 slot,
         bool isHome,
         bool hasPossession,
         SpatialPoint ballPosition,
-        MatchInstructionsV1 instructions)
+        MatchInstructionsV1 instructions,
+        EngineRulesV2 rules)
     {
-        var anchor = SpatialPitch.Orient(slot.X, slot.Y, isHome);
+        ArgumentNullException.ThrowIfNull(slot);
+        ArgumentNullException.ThrowIfNull(instructions);
+        ArgumentNullException.ThrowIfNull(rules);
 
-        // Calculate team movement offsets based on ball position and tactical phase
-        var ballProgression = (double)ballPosition.X / SpatialPitch.PitchLength;
-        if (!isHome)
+        // The slot's coordinates are normalized 0..10_000 on both axes, with X running towards the goal the
+        // side attacks. The away side is mirrored on both axes, so both sides always advance the same way.
+        var anchor = Orient(slot.X, slot.Y, isHome);
+
+        // How far up the pitch the ball is from the side's own point of view: 0 near their own goal, 10_000
+        // at the goal they attack.
+        var ballProgress = isHome ? ballPosition.X : SpatialPitch.PitchLength - ballPosition.X;
+
+        // The block shifts with the ball: a twelfth of the distance the ball is from halfway, so play flows
+        // up and down the pitch as a unit rather than teleporting between phases.
+        var ballShift = ((ballProgress - (SpatialPitch.PitchLength / 2)) * 12) / 100;
+
+        var mentalityShift = instructions.Mentality switch
         {
-            ballProgression = 1.0 - ballProgression;
-        }
+            MatchMentality.Attacking => 700,
+            MatchMentality.Positive => 400,
+            MatchMentality.Defensive => -400,
+            MatchMentality.Cautious => -200,
+            _ => 200,
+        };
 
-        var xOffset = 0;
-        var yOffset = 0;
+        var phaseShift = hasPossession ? mentalityShift : -mentalityShift / 2;
 
-        if (hasPossession)
+        var lineShift = instructions.DefensiveLine switch
         {
-            // Attacking phase: team shifts forward into space
-            var mentalityShift = instructions.Mentality switch
-            {
-                MatchMentality.Attacking => 700,
-                MatchMentality.Positive => 400,
-                MatchMentality.Defensive => -400,
-                MatchMentality.Cautious => -200,
-                _ => 200,
-            };
+            MatchDefensiveLine.High => 350,
+            MatchDefensiveLine.Deep => -500,
+            _ => 0,
+        };
 
-            var lineAdvance = (int)((ballProgression - 0.5) * 1200);
-            xOffset = isHome ? (mentalityShift + lineAdvance) : -(mentalityShift + lineAdvance);
+        // A high press converges on the ball's line vertically, a fifth of the way across.
+        var pressSqueeze = !hasPossession && instructions.Pressing == MatchPressing.HighPress
+            ? (ballPosition.Y - anchor.Y) / 5
+            : 0;
 
-            // Width stretch in possession
-            var widthScale = instructions.Width switch
-            {
-                MatchWidth.Wide => 1.25,
-                MatchWidth.Narrow => 0.85,
-                _ => 1.0,
-            };
-            yOffset = (int)((anchor.Y - SpatialPitch.GoalYCenter) * (widthScale - 1.0));
-        }
-        else
-        {
-            // Defensive phase: team forms a compact block
-            var defensiveLineShift = instructions.DefensiveLine switch
-            {
-                MatchDefensiveLine.High => 400,
-                MatchDefensiveLine.Deep => -600,
-                _ => 0,
-            };
+        var xOffset = phaseShift + lineShift + ballShift;
+        var yOffset = pressSqueeze;
 
-            var ballAttraction = (int)((ballProgression - 0.5) * 800);
-            xOffset = isHome ? (defensiveLineShift + ballAttraction) : -(defensiveLineShift + ballAttraction);
-
-            // Compression towards center defensively
-            yOffset = -(int)((anchor.Y - SpatialPitch.GoalYCenter) * 0.15);
-        }
-
-        // Goalkeepers stay mostly near their line
+        // A goalkeeper tracks the ball's line but stays near their goal, whatever the phase asks of them.
         if (slot.Family == MatchPositionFamily.Goalkeeper)
         {
-            xOffset = Math.Clamp(xOffset, isHome ? 0 : -400, isHome ? 400 : 0);
-            yOffset = Math.Clamp(yOffset, -300, 300);
+            xOffset /= 4;
         }
 
-        return new SpatialPoint(
-            Math.Clamp(anchor.X + xOffset, 150, SpatialPitch.PitchLength - 150),
-            Math.Clamp(anchor.Y + yOffset, 150, SpatialPitch.PitchWidth - 150));
+        // Width instructions stretch the block in possession and compress it out of possession.
+        var widthFactor = instructions.Width switch
+        {
+            MatchWidth.Wide => 1_250,
+            MatchWidth.Narrow => 850,
+            _ => 1_000,
+        };
+
+        if (!hasPossession)
+        {
+            widthFactor = 2_000 - widthFactor;
+        }
+
+        yOffset += ((anchor.Y - SpatialPitch.GoalYCenter) * (widthFactor - 1_000)) / 1_000;
+
+        var position = new SpatialPoint(
+            ClampAxis(anchor.X + xOffset),
+            int.Clamp(anchor.Y + yOffset, TouchlineMargin, SpatialPitch.PitchWidth - TouchlineMargin));
+
+        return position;
+    }
+
+    /// <summary>Mirrors tactical coordinates for the away side, which attacks the other way.</summary>
+    /// <param name="x">Position towards the goal the side attacks, 0..10_000.</param>
+    /// <param name="y">Position across the pitch, 0..10_000.</param>
+    /// <param name="isHome">Whether the coordinates are the home side's.</param>
+    public static SpatialPoint Orient(int x, int y, bool isHome) =>
+        isHome
+            ? new SpatialPoint(x, y)
+            : new SpatialPoint(SpatialPitch.PitchLength - x, SpatialPitch.PitchWidth - y);
+
+    /// <summary>Clamps an X position inside the pitch.</summary>
+    private static int ClampAxis(int x)
+    {
+        var clamped = int.Clamp(x, TouchlineMargin, SpatialPitch.PitchLength - TouchlineMargin);
+
+        return clamped;
     }
 }

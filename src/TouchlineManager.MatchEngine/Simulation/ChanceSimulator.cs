@@ -74,6 +74,14 @@ internal static class ChanceSimulator
                 goalkeeper,
                 ShotZone.Central,
                 state.Rules.PenaltyGoalBasisPoints);
+
+            // The conversion and the beaten keeper, on the live scale (engine-v3).
+            state.SideOf(side).AdjustLiveRating(taker.Participant.ParticipantId, state.Rules.LiveRatingGoalBonusBasisPoints);
+
+            if (goalkeeper is Guid beatenKeeper)
+            {
+                state.OpponentOf(side).AdjustLiveRating(beatenKeeper, -state.Rules.LiveRatingGoalConcededPenaltyBasisPoints);
+            }
         }
         else
         {
@@ -84,10 +92,19 @@ internal static class ChanceSimulator
                 goalkeeper,
                 ShotZone.Central,
                 state.Rules.PenaltyGoalBasisPoints);
+
+            // A missed penalty is a shot that did not test anybody worth naming (engine-v3).
+            state.SideOf(side).AdjustLiveRating(taker.Participant.ParticipantId, -state.Rules.LiveRatingShotMissPenaltyBasisPoints);
         }
     }
 
-    /// <summary>Resolves a header from a corner.</summary>
+    /// <summary>
+    /// Resolves a header from a corner, contested with the defender marking it (engine-v3).
+    /// </summary>
+    /// <remarks>
+    /// The corner becomes a chance only when the attacker wins the aerial duel; a lost header ends the
+    /// passage with the defence heading clear. Both players' live ratings record the contest.
+    /// </remarks>
     /// <param name="state">The match state.</param>
     /// <param name="side">The side taking the corner.</param>
     public static void ResolveCorner(MatchState state, MatchSide side)
@@ -95,8 +112,31 @@ internal static class ChanceSimulator
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
         var headerer = ChooseShooter(state, attacker, MatchAttributeName.Heading);
+        var marker = WeightedPick.From(
+            defender.Outfield,
+            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.Heading),
+            state.Random);
 
-        if (headerer is null)
+        if (headerer is null || marker is null)
+        {
+            return;
+        }
+
+        var aerial = DuelResolver.ResolveAerialDuel(
+            headerer.Participant,
+            marker.Participant,
+            side == MatchSide.Home,
+            state.Rules,
+            state.Random);
+
+        attacker.AdjustLiveRating(
+            aerial.AttackerId,
+            aerial.AttackerWon ? state.Rules.LiveRatingAerialBonusBasisPoints : -state.Rules.LiveRatingAerialLostPenaltyBasisPoints);
+        defender.AdjustLiveRating(
+            aerial.DefenderId,
+            aerial.AttackerWon ? -state.Rules.LiveRatingAerialLostPenaltyBasisPoints : state.Rules.LiveRatingAerialBonusBasisPoints);
+
+        if (!aerial.AttackerWon)
         {
             return;
         }
@@ -125,6 +165,14 @@ internal static class ChanceSimulator
             // The assister is the last thing a goal decides, and it is decided from a stream of its own so
             // that crediting one cannot move a single draw of the play (see AssistPlanner).
             AssistPlanner.Credit(state, side, shooterId, goal.Sequence);
+
+            // The scorer and the beaten keeper, on the live scale the match viewer showed (engine-v3).
+            state.SideOf(side).AdjustLiveRating(shooterId, state.Rules.LiveRatingGoalBonusBasisPoints);
+
+            if (goalkeeper is Guid beatenKeeper)
+            {
+                state.OpponentOf(side).AdjustLiveRating(beatenKeeper, -state.Rules.LiveRatingGoalConcededPenaltyBasisPoints);
+            }
 
             return;
         }
@@ -164,10 +212,20 @@ internal static class ChanceSimulator
         if (state.Random.RollBasisPoints(saveChance))
         {
             state.Emit(side, EngineEventType.ShotSaved, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+
+            // An effort that tested the goalkeeper is worth something; a miss is not (engine-v3).
+            state.SideOf(side).AdjustLiveRating(shooterId, state.Rules.LiveRatingShotBonusBasisPoints);
+
+            if (goalkeeper is Guid savingKeeper)
+            {
+                state.OpponentOf(side).AdjustLiveRating(savingKeeper, state.Rules.LiveRatingSaveBonusBasisPoints);
+            }
         }
         else
         {
             state.Emit(side, EngineEventType.ShotOffTarget, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+
+            state.SideOf(side).AdjustLiveRating(shooterId, -state.Rules.LiveRatingShotMissPenaltyBasisPoints);
         }
     }
 

@@ -209,6 +209,7 @@ public sealed class SeasonStatisticsCalculatorTests
             SentOff = false,
             AbsenceFixtures = 0,
             RatingBasisPoints = rating,
+            FinalConditionBasisPoints = 6_000,
         };
 
     private static MatchStatisticsV1 Statistics() => new()

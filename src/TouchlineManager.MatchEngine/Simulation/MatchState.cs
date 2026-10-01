@@ -1,6 +1,7 @@
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Randomness;
+using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Simulation;
 
@@ -72,6 +73,27 @@ internal sealed class MatchState
     /// possession happened to take.
     /// </remarks>
     public int LastPlannerMinute { get; set; }
+
+    /// <summary>
+    /// Where the ball is on the normalized pitch, and how high it is (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// The simulation is not a physics engine — the ball moves with the play rather than the play moving
+    /// the ball — but its position is a fact the play produces, and the highlight director consumes the
+    /// same coordinates. Ground level is the rule: only a strike or a cross lifts the ball, which keeps
+    /// the spatial model honest about what it is for.
+    /// </remarks>
+    public BallState Ball { get; private set; } = BallState.Center;
+
+    /// <summary>Moves the ball to a new ground position.</summary>
+    /// <param name="position">The position, in pitch coordinates.</param>
+    public void MoveBall(SpatialPoint position) => Ball = new BallState(position.X, position.Y);
+
+    /// <summary>Moves the ball to a new position at an altitude, for a strike or a cross.</summary>
+    /// <param name="position">The position, in pitch coordinates.</param>
+    /// <param name="altitude">The altitude, 0..100.</param>
+    public void MoveBall(SpatialPoint position, int altitude) =>
+        Ball = new BallState(position.X, position.Y, int.Clamp(altitude, 0, 100));
 
     /// <summary>Gets how much stoppage the first half was given, once it has ended.</summary>
     public int FirstHalfStoppageSeconds { get; private set; }
@@ -176,7 +198,8 @@ internal sealed class MatchState
     public void AddInjuryStoppage() => AddStoppage(Rules.StoppageSecondsPerInjury);
 
     /// <summary>
-    /// Emits an event at the current clock position, stamping it with the next sequence number.
+    /// Emits an event at the current clock position, stamping it with the next sequence number and the
+    /// ball's current location on the pitch (`engine-v3`).
     /// </summary>
     /// <param name="side">Which side it belongs to.</param>
     /// <param name="type">What happened.</param>
@@ -211,6 +234,8 @@ internal sealed class MatchState
             QualityBasisPoints = qualityBasisPoints,
             AbsenceFixtures = absenceFixtures,
             SubstitutionReason = substitutionReason,
+            X = Ball.X,
+            Y = Ball.Y,
         };
 
         Events.Add(matchEvent);

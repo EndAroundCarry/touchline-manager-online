@@ -1,3 +1,4 @@
+using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Simulation;
 
@@ -103,6 +104,27 @@ public sealed record ActiveSlot
 
     /// <summary>Gets the player's live condition.</summary>
     public required PlayerCondition Condition { get; init; }
+
+    /// <summary>
+    /// Gets the player's live match rating, in basis points (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// Starts at the rules' baseline and moves with what the player does on the pitch — completed passes,
+    /// tackles, saves, goals, and cards. It is the match-viewer's rating rather than the season's: the
+    /// final line a result carries for the season projection is the summary rating, which is derived once
+    /// from the match's facts, while this one is the figure that fluctuated while the match was played.
+    /// </remarks>
+    public int LiveRatingBasisPoints { get; init; } = 6_000;
+
+    /// <summary>Returns a copy with the live rating changed by a signed amount, clamped to the scale.</summary>
+    /// <param name="deltaBasisPoints">The change, which may be negative.</param>
+    public ActiveSlot WithLiveRatingDelta(int deltaBasisPoints) => this with
+    {
+        LiveRatingBasisPoints = int.Clamp(
+            LiveRatingBasisPoints + deltaBasisPoints,
+            EngineRulesV2.MinLiveRatingBasisPoints,
+            EngineRulesV2.MaxLiveRatingBasisPoints),
+    };
 
     /// <summary>Resolves a starting lineup slot into an active slot.</summary>
     /// <param name="slot">The resolved starting slot.</param>

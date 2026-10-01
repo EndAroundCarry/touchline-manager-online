@@ -39,12 +39,13 @@ public static class MatchStatisticsDocument
 {
     /// <summary>The document's schema discriminator.</summary>
     /// <remarks>
-    /// Version 2 added the player lines; version 3 adds the assists and the match rating those lines now
-    /// carry (`engine-v2`), which the season-statistics projection reads. The version is bumped rather than
-    /// read leniently for the same reason each time: a document of an older shape would be accepted with a
-    /// field missing, so a reader that cannot honour it refuses it by name instead (`JSN-5`).
+    /// Version 2 added the player lines; version 3 added the assists and the match rating those lines now
+    /// carry (`engine-v2`); version 4 adds each player's final condition, substitution minutes, injury flag,
+    /// and live rating (`engine-v3`), which the match center reads. The version is bumped rather than read
+    /// leniently for the same reason each time: a document of an older shape would be accepted with a field
+    /// missing, so a reader that cannot honour it refuses it by name instead (`JSN-5`).
     /// </remarks>
-    public const string Schema = "match-statistics-v3";
+    public const string Schema = "match-statistics-v4";
 
     /// <summary>Writes a result's statistics.</summary>
     /// <param name="result">The engine's result.</param>

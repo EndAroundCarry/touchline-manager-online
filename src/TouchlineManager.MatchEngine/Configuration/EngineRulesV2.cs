@@ -230,6 +230,122 @@ public sealed record EngineRulesV2
     /// <summary>The goal probability of a penalty.</summary>
     public int PenaltyGoalBasisPoints { get; init; } = 7_600;
 
+    // ---- Spatial play (engine-v3) ----------------------------------------------------------------
+
+    /// <summary>
+    /// The share of a progressed possession the ball-carrier keeps through a 1v1 dribble rather than losing
+    /// to the covering defender, before attributes are weighed.
+    /// </summary>
+    public int BaseGroundDuelBasisPoints { get; init; } = 5_000;
+
+    /// <summary>How far a maximal dribble-versus-tackling attribute differential moves the ground duel.</summary>
+    public int GroundDuelSwingBasisPoints { get; init; } = 3_500;
+
+    /// <summary>The share of an aerial contest the attacker wins before attributes are weighed.</summary>
+    public int BaseAerialDuelBasisPoints { get; init; } = 5_000;
+
+    /// <summary>How far a maximal aerial attribute differential moves the aerial duel.</summary>
+    public int AerialDuelSwingBasisPoints { get; init; } = 3_200;
+
+    /// <summary>The share of possessions that open with a contested loose-ball scramble at all.</summary>
+    /// <remarks>
+    /// Most possessions begin with the side in possession already holding the ball cleanly; only a share
+    /// start with a genuine 50/50. Keeping the scramble occasional is what keeps the model from taxing
+    /// every attack with a coin flip.
+    /// </remarks>
+    public int ScrambleOpeningBasisPoints { get; init; } = 1_500;
+
+    /// <summary>
+    /// The attribute-scale differential at which a duel's swing is applied in full (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// Duels read attributes on the 1–20 scale, whose maximal weighted differential is a tenth or so of the
+    /// unit ratings', so they carry their own reference rather than borrowing the ratings'. At 150, a
+    /// maximal mismatch applies the full swing and wins about the plan's 85% share; an even contest stays
+    /// at even.
+    /// </remarks>
+    public int DuelDifferentialReference { get; init; } = 150;
+
+    /// <summary>The share of a loose-ball scramble the side in possession wins before attributes are weighed.</summary>
+    public int BaseScrambleBasisPoints { get; init; } = 5_000;
+
+    /// <summary>How far a maximal scramble attribute differential moves the scramble.</summary>
+    public int ScrambleSwingBasisPoints { get; init; } = 3_000;
+
+    /// <summary>
+    /// The share of a ground duel won that converts into extra creation appetite, which is how a dribble
+    /// past a man becomes the chance that follows.
+    /// </summary>
+    public int DribbleCreationBonusBasisPoints { get; init; } = 1_200;
+
+    /// <summary>The home crowd's duel bonus (master plan Stage 2), applied on top of the rating advantage.</summary>
+    public int DuelHomeBonusBasisPoints { get; init; } = 400;
+
+    /// <summary>
+    /// The stochastic variance around every duel, scramble, and set-piece roll (master plan Stage 2).
+    /// </summary>
+    /// <remarks>
+    /// The underdog factor: a bounded band of noise each contest is rolled inside, so a worse side wins the
+    /// contests it would lose nine times in ten rather than never, while attributes still govern the
+    /// overwhelming share of outcomes over a season.
+    /// </remarks>
+    public int UnderdogVarianceBasisPoints { get; init; } = 1_200;
+
+    /// <summary>The chance a lost ground duel becomes a foul by the defender.</summary>
+    public int DuelFoulBasisPoints { get; init; } = 1_200;
+
+    /// <summary>What aggressive tackling multiplies the duel's foul chance by.</summary>
+    public int AggressiveTacklingDuelFoulMultiplierBasisPoints { get; init; } = 16_000;
+
+    /// <summary>What staying on your feet multiplies the duel's foul chance by.</summary>
+    public int StayOnFeetDuelFoulMultiplierBasisPoints { get; init; } = 6_000;
+
+    /// <summary>The chance a duel foul is booked.</summary>
+    public int DuelYellowCardBasisPoints { get; init; } = 1_800;
+
+    /// <summary>The chance a duel foul is a straight red.</summary>
+    public int DuelRedCardBasisPoints { get; init; } = 150;
+
+    /// <summary>What each man short multiplies the side's condition loss by, as covering teammates tire (Stage 2).</summary>
+    public int ShorthandedConditionLossMultiplierBasisPoints { get; init; } = 12_500;
+
+    /// <summary>How far up the pitch a progressed possession advances, at least, of the distance to the far goal.</summary>
+    public int MinPossessionAdvanceBasisPoints { get; init; } = 2_600;
+
+    /// <summary>How far up the pitch a progressed possession advances, at most.</summary>
+    public int MaxPossessionAdvanceBasisPoints { get; init; } = 4_200;
+
+    /// <summary>The chance a foul in the attacking half becomes a direct free kick rather than a quick restart.</summary>
+    public int FreeKickAwardBasisPoints { get; init; } = 4_500;
+
+    /// <summary>The chance a free kick within shooting range is struck directly at goal.</summary>
+    public int FreeKickAttemptBasisPoints { get; init; } = 3_000;
+
+    /// <summary>The baseline goal probability of a direct free kick.</summary>
+    public int FreeKickGoalBasisPoints { get; init; } = 900;
+
+    /// <summary>How far a maximal set-piece-versus-goalkeeping differential moves the free kick's goal chance.</summary>
+    public int FreeKickQualitySwingBasisPoints { get; init; } = 1_400;
+
+    /// <summary>The share of non-goal free kicks that are saved.</summary>
+    public int FreeKickSavedShareBasisPoints { get; init; } = 4_500;
+
+    /// <summary>The share of non-goal free kicks that are blocked by the wall.</summary>
+    public int FreeKickBlockedShareBasisPoints { get; init; } = 2_500;
+
+    /// <summary>The share of non-goal free kicks that hit the woodwork.</summary>
+    public int FreeKickWoodworkShareBasisPoints { get; init; } = 800;
+
+    /// <summary>The distance from the halfway line beyond which a free kick is in shooting range.</summary>
+    /// <remarks>
+    /// A spatial threshold rather than a probability: it is the X coordinate, on the attacking half's own
+    /// scale, past which the wall and the angle make a direct strike worth attempting.
+    /// </remarks>
+    public int FreeKickShootingRangeX { get; init; } = 6_500;
+
+    /// <summary>The chance a free-kick foul is booked, slightly above an open-play duel's.</summary>
+    public int FreeKickFoulCardBasisPoints { get; init; } = 2_200;
+
     // ---- Discipline ------------------------------------------------------------------------------
 
     /// <summary>The baseline chance a possession contains a foul by the defending side.</summary>
@@ -410,6 +526,63 @@ public sealed record EngineRulesV2
 
     /// <summary>The highest match rating a player who appeared can be given.</summary>
     public int RatingMaxBasisPoints { get; init; } = 10_000;
+
+    /// <summary>What a player's live, fluctuating match rating starts at, in basis points (`engine-v3`).</summary>
+    public int LiveRatingBaseBasisPoints { get; init; } = 6_000;
+
+    /// <summary>The lowest a live rating can reach during a match, as a pinned constant of the scale.</summary>
+    public const int MinLiveRatingBasisPoints = 3_000;
+
+    /// <summary>The highest a live rating can reach during a match, as a pinned constant of the scale.</summary>
+    public const int MaxLiveRatingBasisPoints = 10_000;
+
+    /// <summary>What a completed pass adds to the passer's live rating.</summary>
+    public int LiveRatingPassBonusBasisPoints { get; init; } = 30;
+
+    /// <summary>What a key pass — one that creates a chance — adds.</summary>
+    public int LiveRatingKeyPassBonusBasisPoints { get; init; } = 300;
+
+    /// <summary>What a tackle won adds, and what a tackle lost takes.</summary>
+    public int LiveRatingTackleBonusBasisPoints { get; init; } = 120;
+
+    /// <summary>What a tackle lost takes from the tackler's live rating.</summary>
+    public int LiveRatingTackleLostPenaltyBasisPoints { get; init; } = 80;
+
+    /// <summary>What an interception adds.</summary>
+    public int LiveRatingInterceptionBonusBasisPoints { get; init; } = 80;
+
+    /// <summary>What an aerial duel won adds.</summary>
+    public int LiveRatingAerialBonusBasisPoints { get; init; } = 80;
+
+    /// <summary>What an aerial duel lost takes.</summary>
+    public int LiveRatingAerialLostPenaltyBasisPoints { get; init; } = 50;
+
+    /// <summary>What a shot on target adds.</summary>
+    public int LiveRatingShotBonusBasisPoints { get; init; } = 100;
+
+    /// <summary>What a shot off target takes.</summary>
+    public int LiveRatingShotMissPenaltyBasisPoints { get; init; } = 40;
+
+    /// <summary>What a goal adds to the scorer's live rating.</summary>
+    public int LiveRatingGoalBonusBasisPoints { get; init; } = 800;
+
+    /// <summary>What an assist adds to the assister's live rating.</summary>
+    public int LiveRatingAssistBonusBasisPoints { get; init; } = 450;
+
+    /// <summary>What a save adds to the goalkeeper's live rating.</summary>
+    public int LiveRatingSaveBonusBasisPoints { get; init; } = 250;
+
+    /// <summary>What conceding a goal takes from the goalkeeper who faced it.</summary>
+    public int LiveRatingGoalConcededPenaltyBasisPoints { get; init; } = 250;
+
+    /// <summary>What a yellow card takes.</summary>
+    public int LiveRatingYellowPenaltyBasisPoints { get; init; } = 200;
+
+    /// <summary>What a sending-off takes.</summary>
+    public int LiveRatingRedPenaltyBasisPoints { get; init; } = 1_200;
+
+    /// <summary>What an error leading to a goal takes.</summary>
+    public int LiveRatingErrorPenaltyBasisPoints { get; init; } = 600;
 
     /// <summary>
     /// The rating difference at which a swing is applied in full, so the probability formulas can express
@@ -691,6 +864,29 @@ public sealed record EngineRulesV2
         yield return (nameof(MinSaveBasisPoints), MinSaveBasisPoints);
         yield return (nameof(MaxSaveBasisPoints), MaxSaveBasisPoints);
         yield return (nameof(PenaltyGoalBasisPoints), PenaltyGoalBasisPoints);
+        yield return (nameof(GroundDuelSwingBasisPoints), GroundDuelSwingBasisPoints);
+        yield return (nameof(AerialDuelSwingBasisPoints), AerialDuelSwingBasisPoints);
+        yield return (nameof(ScrambleSwingBasisPoints), ScrambleSwingBasisPoints);
+        yield return (nameof(DribbleCreationBonusBasisPoints), DribbleCreationBonusBasisPoints);
+        yield return (nameof(FreeKickQualitySwingBasisPoints), FreeKickQualitySwingBasisPoints);
+        yield return (nameof(BaseGroundDuelBasisPoints), BaseGroundDuelBasisPoints);
+        yield return (nameof(BaseAerialDuelBasisPoints), BaseAerialDuelBasisPoints);
+        yield return (nameof(ScrambleOpeningBasisPoints), ScrambleOpeningBasisPoints);
+        yield return (nameof(BaseScrambleBasisPoints), BaseScrambleBasisPoints);
+        yield return (nameof(DuelDifferentialReference), DuelDifferentialReference);
+        yield return (nameof(FreeKickAwardBasisPoints), FreeKickAwardBasisPoints);
+        yield return (nameof(FreeKickAttemptBasisPoints), FreeKickAttemptBasisPoints);
+        yield return (nameof(FreeKickGoalBasisPoints), FreeKickGoalBasisPoints);
+        yield return (nameof(FreeKickSavedShareBasisPoints), FreeKickSavedShareBasisPoints);
+        yield return (nameof(FreeKickBlockedShareBasisPoints), FreeKickBlockedShareBasisPoints);
+        yield return (nameof(FreeKickWoodworkShareBasisPoints), FreeKickWoodworkShareBasisPoints);
+        yield return (nameof(DuelFoulBasisPoints), DuelFoulBasisPoints);
+        yield return (nameof(DuelYellowCardBasisPoints), DuelYellowCardBasisPoints);
+        yield return (nameof(DuelRedCardBasisPoints), DuelRedCardBasisPoints);
+        yield return (nameof(FreeKickFoulCardBasisPoints), FreeKickFoulCardBasisPoints);
+
+        // A spatial threshold on the normalized pitch, checked on the same 0..10000 scale it lives on.
+        yield return (nameof(FreeKickShootingRangeX), FreeKickShootingRangeX);
         yield return (nameof(BaseFoulBasisPoints), BaseFoulBasisPoints);
         yield return (nameof(YellowCardPerFoulBasisPoints), YellowCardPerFoulBasisPoints);
         yield return (nameof(StraightRedPerFoulBasisPoints), StraightRedPerFoulBasisPoints);
@@ -706,6 +902,10 @@ public sealed record EngineRulesV2
         yield return (nameof(MaxInjuryProbabilityBasisPoints), MaxInjuryProbabilityBasisPoints);
         yield return (nameof(ConditionSubstitutionThresholdBasisPoints), ConditionSubstitutionThresholdBasisPoints);
         yield return (nameof(MinimumConditionAdvantageBasisPoints), MinimumConditionAdvantageBasisPoints);
+
+        // Possession advance is a fraction of the pitch's length, on the same 0..10000 scale.
+        yield return (nameof(MinPossessionAdvanceBasisPoints), MinPossessionAdvanceBasisPoints);
+        yield return (nameof(MaxPossessionAdvanceBasisPoints), MaxPossessionAdvanceBasisPoints);
     }
 
     private IEnumerable<(string Name, int Value)> MultiplierConstants()
@@ -730,6 +930,9 @@ public sealed record EngineRulesV2
         yield return (nameof(UnfamiliarRolePenaltyBasisPoints), UnfamiliarRolePenaltyBasisPoints);
         yield return (nameof(ShortHandedPenaltyBasisPoints), ShortHandedPenaltyBasisPoints);
         yield return (nameof(HomeAdvantageBasisPoints), HomeAdvantageBasisPoints);
+        yield return (nameof(AggressiveTacklingDuelFoulMultiplierBasisPoints), AggressiveTacklingDuelFoulMultiplierBasisPoints);
+        yield return (nameof(StayOnFeetDuelFoulMultiplierBasisPoints), StayOnFeetDuelFoulMultiplierBasisPoints);
+        yield return (nameof(ShorthandedConditionLossMultiplierBasisPoints), ShorthandedConditionLossMultiplierBasisPoints);
     }
 
     private IEnumerable<(string Name, int Value)> RatingConstants()
@@ -746,6 +949,23 @@ public sealed record EngineRulesV2
         yield return (nameof(RatingRedPenaltyBasisPoints), RatingRedPenaltyBasisPoints);
         yield return (nameof(RatingMinBasisPoints), RatingMinBasisPoints);
         yield return (nameof(RatingMaxBasisPoints), RatingMaxBasisPoints);
+        yield return (nameof(LiveRatingBaseBasisPoints), LiveRatingBaseBasisPoints);
+        yield return (nameof(LiveRatingPassBonusBasisPoints), LiveRatingPassBonusBasisPoints);
+        yield return (nameof(LiveRatingKeyPassBonusBasisPoints), LiveRatingKeyPassBonusBasisPoints);
+        yield return (nameof(LiveRatingTackleBonusBasisPoints), LiveRatingTackleBonusBasisPoints);
+        yield return (nameof(LiveRatingTackleLostPenaltyBasisPoints), LiveRatingTackleLostPenaltyBasisPoints);
+        yield return (nameof(LiveRatingInterceptionBonusBasisPoints), LiveRatingInterceptionBonusBasisPoints);
+        yield return (nameof(LiveRatingAerialBonusBasisPoints), LiveRatingAerialBonusBasisPoints);
+        yield return (nameof(LiveRatingAerialLostPenaltyBasisPoints), LiveRatingAerialLostPenaltyBasisPoints);
+        yield return (nameof(LiveRatingShotBonusBasisPoints), LiveRatingShotBonusBasisPoints);
+        yield return (nameof(LiveRatingShotMissPenaltyBasisPoints), LiveRatingShotMissPenaltyBasisPoints);
+        yield return (nameof(LiveRatingGoalBonusBasisPoints), LiveRatingGoalBonusBasisPoints);
+        yield return (nameof(LiveRatingAssistBonusBasisPoints), LiveRatingAssistBonusBasisPoints);
+        yield return (nameof(LiveRatingSaveBonusBasisPoints), LiveRatingSaveBonusBasisPoints);
+        yield return (nameof(LiveRatingGoalConcededPenaltyBasisPoints), LiveRatingGoalConcededPenaltyBasisPoints);
+        yield return (nameof(LiveRatingYellowPenaltyBasisPoints), LiveRatingYellowPenaltyBasisPoints);
+        yield return (nameof(LiveRatingRedPenaltyBasisPoints), LiveRatingRedPenaltyBasisPoints);
+        yield return (nameof(LiveRatingErrorPenaltyBasisPoints), LiveRatingErrorPenaltyBasisPoints);
     }
 
     private IEnumerable<(string Name, int Min, int Max)> OrderedTriples()

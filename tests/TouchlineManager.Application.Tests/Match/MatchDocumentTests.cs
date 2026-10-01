@@ -207,6 +207,7 @@ public sealed class MatchDocumentTests
                 SentOff = false,
                 AbsenceFixtures = 0,
                 RatingBasisPoints = 8_500,
+                FinalConditionBasisPoints = 6_000,
             },
         ],
         TotalMinutesPlayed = 94,

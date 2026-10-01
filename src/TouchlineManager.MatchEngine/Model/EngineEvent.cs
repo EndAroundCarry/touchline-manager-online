@@ -70,6 +70,12 @@ public enum EngineEventType
 
     /// <summary>A substitution was made.</summary>
     Substitution = 19,
+
+    /// <summary>A foul gave the attacking side a free kick in a promising position (`engine-v3`).</summary>
+    FreeKickWon = 20,
+
+    /// <summary>A direct free kick was struck at goal (`engine-v3`).</summary>
+    FreeKickShot = 21,
 }
 
 /// <summary>Why a substitution was made, which the determinant planner records.</summary>
@@ -155,6 +161,19 @@ public sealed record EngineEventV1
 
     /// <summary>Gets why a substitution was made.</summary>
     public MatchSubstitutionReason? SubstitutionReason { get; init; }
+
+    /// <summary>
+    /// Gets where across the pitch the event happened, in normalized coordinates (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// The spatial play model locates possessions on the pitch, so the events that come out of them carry
+    /// where they happened. Nullable because the period boundaries — kick-off, half-time, full time — have
+    /// no location the play produced.
+    /// </remarks>
+    public int? X { get; init; }
+
+    /// <summary>Gets where down the pitch the event happened, in normalized coordinates (`engine-v3`).</summary>
+    public int? Y { get; init; }
 
     /// <summary>Gets whether the event is one of the two halves' boundaries.</summary>
     public bool IsPeriodBoundary =>

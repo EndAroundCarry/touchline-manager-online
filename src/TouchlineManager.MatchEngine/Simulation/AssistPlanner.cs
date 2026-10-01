@@ -63,6 +63,9 @@ internal static class AssistPlanner
 
         runtime.Assists.TryGetValue(id, out var assists);
         runtime.Assists[id] = assists + 1;
+
+        // The assist the crowd saw is also on the live scale, the moment the goal is credited (engine-v3).
+        runtime.AdjustLiveRating(id, state.Rules.LiveRatingAssistBonusBasisPoints);
     }
 
     /// <summary>The weight that makes a player likely to be the one who set the goal up.</summary>

@@ -77,6 +77,12 @@ public enum MatchEventType
 
     /// <summary>A substitution was made.</summary>
     Substitution = 19,
+
+    /// <summary>A foul gave the attacking side a free kick in a promising position (<c>engine-v3</c>).</summary>
+    FreeKickWon = 20,
+
+    /// <summary>A direct free kick was struck at goal (<c>engine-v3</c>).</summary>
+    FreeKickShot = 21,
 }
 
 /// <summary>Why a substitution was made.</summary>
@@ -144,6 +150,8 @@ public static class MatchEventTypes
         MatchEventType.Corner => "corner",
         MatchEventType.Injury => "injury",
         MatchEventType.Substitution => "substitution",
+        MatchEventType.FreeKickWon => "free_kick_won",
+        MatchEventType.FreeKickShot => "free_kick_shot",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown event type."),
     };
 
@@ -171,6 +179,8 @@ public static class MatchEventTypes
         "corner" => MatchEventType.Corner,
         "injury" => MatchEventType.Injury,
         "substitution" => MatchEventType.Substitution,
+        "free_kick_won" => MatchEventType.FreeKickWon,
+        "free_kick_shot" => MatchEventType.FreeKickShot,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown event type code."),
     };
 

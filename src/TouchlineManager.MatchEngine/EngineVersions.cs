@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 2;
+    public const int Engine = 3;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,19 +30,21 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 2;
+    public const int RuleSet = 3;
 
-    /// <summary>The stable label for engine version 2, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 3, used in hashes and diagnostics.</summary>
     /// <remarks>
-    /// Version 2 adds the assists and the per-player match rating to a result's player lines, so a
-    /// player's season statistics can be projected from the stored result. It changes the output
-    /// contract and the new rating constants, so it is a new engine version and a new rules version —
-    /// the play model itself is unchanged, which is why the scoreline distribution bands did not move.
+    /// Version 3 is the spatial play model (master plan Stage 2): every possession is located on the
+    /// normalized 2D pitch, possessions resolve through explicit 1v1 duels and loose-ball scrambles, set
+    /// pieces gain direct free kicks alongside corners and penalties, and the result carries each
+    /// player's final condition and substitution minutes for the match center. The new duel, scramble,
+    /// free-kick, and spatial constants are rules constants, so this is a new engine version and a new
+    /// rules version, and the golden hashes are re-pinned against it.
     /// </remarks>
-    public const string EngineLabel = "engine-v2";
+    public const string EngineLabel = "engine-v3";
 
-    /// <summary>The stable label for engine rules version 2.</summary>
-    public const string RuleSetLabel = "engine-rules-v2";
+    /// <summary>The stable label for engine rules version 3.</summary>
+    public const string RuleSetLabel = "engine-rules-v3";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v1";

@@ -4,6 +4,7 @@ using TouchlineManager.MatchEngine.Randomness;
 using TouchlineManager.MatchEngine.Ratings;
 using TouchlineManager.MatchEngine.Serialization;
 using TouchlineManager.MatchEngine.Simulation;
+using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine;
 
@@ -56,7 +57,10 @@ public static class MatchSimulator
 
         PossessionSimulator.Run(state);
 
-        return MatchResultBuilder.Build(state, CanonicalMatchSerializer.InputHash(input));
+        state.Home.CaptureEndOfMatchStates();
+        state.Away.CaptureEndOfMatchStates();
+
+        return MatchResultBuilder.Build(state, CanonicalMatchSerializer.InputHash(input), state.Ball.GroundPoint);
     }
 
     /// <summary>

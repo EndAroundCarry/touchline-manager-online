@@ -118,6 +118,40 @@ public sealed record MatchPlayerLineV1
     /// result rather than re-derived by the season-statistics projection.
     /// </remarks>
     public required int RatingBasisPoints { get; init; }
+
+    /// <summary>
+    /// Gets the player's condition at the moment they left the match, in basis points (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// A player who played the full match carries their condition at the final whistle; a substitute who
+    /// never came on carries the condition they arrived with. It is the match center's condition bar and
+    /// the load the publication applies to the squad, read from the simulation rather than re-derived.
+    /// </remarks>
+    public required int FinalConditionBasisPoints { get; init; }
+
+    /// <summary>Gets the minute the player was substituted off, when they were.</summary>
+    public int? SubbedOutMinute { get; init; }
+
+    /// <summary>Gets the minute the player came on as a substitute, when they did.</summary>
+    public int? SubbedInMinute { get; init; }
+
+    /// <summary>Gets whether the player was injured during the match (DIS-1).</summary>
+    /// <remarks>
+    /// Duplicates the absence rather than replacing it: the absence counts fixtures, and this says the
+    /// injury happened in this match, which a zero-absence injury would otherwise lose.
+    /// </remarks>
+    public bool IsInjured { get; init; }
+
+    /// <summary>
+    /// Gets the live, fluctuating match rating the player last held on the pitch (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// The figure the match viewer showed while the match was being played, carried through so a replay
+    /// shows the same numbers the live panels did. Zero when the player did not appear; the season's
+    /// average continues to read <see cref="RatingBasisPoints"/>, which is derived once from the match's
+    /// facts rather than accumulated from contested live adjustments.
+    /// </remarks>
+    public int LiveRatingBasisPoints { get; init; }
 }
 
 /// <summary>
