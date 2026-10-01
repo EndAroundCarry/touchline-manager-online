@@ -190,6 +190,89 @@ public sealed class MatchTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_replay_carries_both_lineups_and_the_live_condition_and_rating_curve()
+    {
+        using var client = _fixture.CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture.Email, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var matchId = await PublishNextRoundAsync();
+
+        var presentation = (await client.GetFromJsonAsync<MatchPresentationResponse>(
+            $"/api/v1/matches/{matchId}/presentation"))!;
+
+        presentation.HomeLineup.Should().NotBeNull("the match center draws a panel per side (Stage 4)");
+        presentation.AwayLineup.Should().NotBeNull();
+        presentation.LiveMetrics.Should().NotBeNull().And.NotBeEmpty();
+
+        string[] formations = ["4-4-2", "4-3-3", "4-2-3-1", "4-1-4-1", "3-5-2", "5-3-2"];
+
+        foreach (var lineup in new[] { presentation.HomeLineup!, presentation.AwayLineup! })
+        {
+            lineup.ClubName.Should().NotBeEmpty();
+            lineup.ShortName.Should().NotBeEmpty();
+            lineup.PrimaryColour.Should().StartWith("#");
+            lineup.SecondaryColour.Should().StartWith("#");
+            lineup.Formation.Should().BeOneOf(formations, "a seeded side takes the field in a standard shape");
+
+            lineup.Starters.Should().HaveCount(11);
+            lineup.Starters.Select(player => player.SlotNumber).Should().Equal(Enumerable.Range(1, 11));
+            lineup.Starters.Should().OnlyContain(player =>
+                player.IsStarter
+                && !string.IsNullOrWhiteSpace(player.Name)
+                && player.Position.Length >= 2
+                && player.ShirtNumber > 0);
+            lineup.Bench.Should().OnlyContain(player => !player.IsStarter && player.SlotNumber == 0);
+
+            lineup.Starters.Concat(lineup.Bench).Should().OnlyContain(player =>
+                player.KickoffCondition > 0
+                && player.KickoffCondition <= 10_000
+                && player.FinalCondition >= 0
+                && player.FinalCondition <= 10_000
+                && player.FinalRating >= 0
+                && player.FinalRating <= 10_000);
+        }
+
+        var players = presentation.HomeLineup!.Starters
+            .Concat(presentation.HomeLineup.Bench)
+            .Concat(presentation.AwayLineup!.Starters)
+            .Concat(presentation.AwayLineup.Bench)
+            .ToDictionary(player => player.ParticipantId);
+
+        presentation.LiveMetrics!.Should().OnlyContain(metric =>
+            metric.Minute >= 1
+            && metric.ConditionBasisPoints > 0
+            && metric.ConditionBasisPoints <= 10_000
+            && metric.RatingBasisPoints > 0
+            && metric.RatingBasisPoints <= 10_000);
+
+        presentation.LiveMetrics!.Select(metric => metric.ParticipantId)
+            .Should().BeSubsetOf(players.Keys, "the curve belongs to the players the lineups name");
+
+        // One bar and one badge per player per minute, so a panel never has to choose between two values.
+        presentation.LiveMetrics!
+            .GroupBy(metric => metric.Minute)
+            .Should().OnlyContain(minute =>
+                minute.Select(metric => metric.ParticipantId).Distinct().Count() == minute.Count());
+
+        // The curve ends where the panel's bar and badge end: a replay that showed a different final
+        // figure from the result would be describing a second match (MAT-8).
+        foreach (var player in players.Values.Where(player =>
+            player.IsStarter && player.SubbedOutMinute is null && !player.SentOff))
+        {
+            var last = presentation.LiveMetrics!
+                .Where(metric => metric.ParticipantId == player.ParticipantId)
+                .OrderBy(metric => metric.Minute)
+                .LastOrDefault();
+
+            last.Should().NotBeNull($"{player.Name} played the whole match");
+            last!.ConditionBasisPoints.Should().Be(player.FinalCondition);
+            last.RatingBasisPoints.Should().Be(player.FinalRating);
+        }
+    }
+
+    [Fact]
     public async Task A_replay_is_immutable_and_answers_a_conditional_request_with_not_modified()
     {
         using var client = _fixture.CreateClient();

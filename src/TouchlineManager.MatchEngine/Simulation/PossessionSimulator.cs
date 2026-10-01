@@ -30,6 +30,7 @@ internal static class PossessionSimulator
     {
         state.BeginHalf(firstHalf: true);
         state.Emit(MatchSide.Home, EngineEventType.KickOff);
+        state.CaptureLiveMetrics();
         RunHalf(state);
         state.EndHalf();
         state.Emit(MatchSide.Home, EngineEventType.HalfTime);
@@ -39,9 +40,11 @@ internal static class PossessionSimulator
 
         state.BeginHalf(firstHalf: false);
         state.Emit(MatchSide.Away, EngineEventType.SecondHalfStart);
+        state.CaptureLiveMetrics();
         RunHalf(state);
         state.EndHalf();
         state.Emit(MatchSide.Home, EngineEventType.FullTime);
+        state.CaptureLiveMetrics();
     }
 
     private static void RunHalf(MatchState state)
@@ -53,6 +56,10 @@ internal static class PossessionSimulator
             // The planner's windows are minutes, and a possession can straddle two of them, so the window is
             // consumed for both sides at once rather than once per side.
             state.LastPlannerMinute = state.Minute;
+
+            // The replay's condition bars and rating badges are sampled from the same run, one row per
+            // player per minute the possession passed through (`engine-v3`, §9.5).
+            state.CaptureLiveMetrics();
         }
     }
 

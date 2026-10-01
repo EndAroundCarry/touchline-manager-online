@@ -18,6 +18,8 @@ internal sealed class MatchState
     private int _sequence;
     private int _halfEventStoppageSeconds;
     private int _halfStoppageJitterSeconds;
+    private int _metricMinute = -1;
+    private int _metricStart;
 
     /// <summary>Initializes the state for one match.</summary>
     /// <param name="input">The frozen snapshot.</param>
@@ -38,6 +40,15 @@ internal sealed class MatchState
         Home = home;
         Away = away;
     }
+
+    /// <summary>
+    /// Gets the sink the replay's live metrics are captured into, when one was supplied (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// Null for every ordinary simulation — the result does not depend on it, which is the point: the
+    /// recorder is a by-product of the same run rather than a second mode of simulation.
+    /// </remarks>
+    internal PlayerLiveMetricsRecorder? LiveMetrics { get; init; }
 
     /// <summary>Gets the frozen snapshot.</summary>
     public MatchInputV1 Input { get; }
@@ -241,6 +252,51 @@ internal sealed class MatchState
         Events.Add(matchEvent);
 
         return matchEvent;
+    }
+
+    /// <summary>
+    /// Captures every player on the pitch's condition and live rating when the clock has reached a new
+    /// minute (`engine-v3`, §9.5).
+    /// </summary>
+    /// <remarks>
+    /// Called after each possession, because a possession is longer than a minute and there is no finer
+    /// moment to sample: each minute the play passed through ends holding the condition and rating the
+    /// players had when it did. A minute captured again later in the same run replaces its earlier rows
+    /// rather than adding to them, so a minute carries one bar per player and it is the state that minute
+    /// ended in. A player who came on during the possession is captured from it; a player who left is not
+    /// captured by it, so a substitution's minute is the first minute the substitute's bar is drawn from
+    /// and the last minute the departing player's is.
+    /// </remarks>
+    public void CaptureLiveMetrics()
+    {
+        if (LiveMetrics is null)
+        {
+            return;
+        }
+
+        var minute = Minute;
+
+        if (minute == _metricMinute)
+        {
+            LiveMetrics.Truncate(_metricStart);
+        }
+        else
+        {
+            _metricMinute = minute;
+            _metricStart = LiveMetrics.Count;
+        }
+
+        foreach (var side in new[] { Home, Away })
+        {
+            foreach (var slot in side.Active)
+            {
+                LiveMetrics.Record(
+                    slot.Participant.ParticipantId,
+                    minute,
+                    slot.Condition.ConditionBasisPoints,
+                    slot.LiveRatingBasisPoints);
+            }
+        }
     }
 
     /// <summary>Gets the total minutes played, regulation plus both halves' stoppage.</summary>

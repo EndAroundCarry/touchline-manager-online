@@ -133,12 +133,19 @@ public sealed class HighlightTests
     public void The_payload_stays_inside_its_budget()
     {
         // The whole reason for semantic keyframes: a match's presentation is kilobytes, not megabytes
-        // (ADR-0006, match_presentation_payload_budget_kb).
+        // (ADR-0006, match_presentation_payload_budget_kb). The budget covers everything the replay ships,
+        // so it is measured on the presentation a match center read actually answers with: highlights,
+        // bridges, the schedule, both lineups, and the live condition and rating curve.
         for (var seed = 1UL; seed <= 30; seed++)
         {
             var input = TestMatchFactory.Even(seed);
-            var presentation = HighlightDirector.Build(input, MatchSimulator.Simulate(input));
+            var liveMetrics = new PlayerLiveMetricsRecorder();
+            var presentation = HighlightDirector.Build(
+                input,
+                MatchSimulator.Simulate(input, TestMatchFactory.Rules, liveMetrics),
+                liveMetrics: liveMetrics.Metrics);
 
+            presentation.LiveMetrics.Should().NotBeNull().And.NotBeEmpty();
             presentation.EstimatedPayloadBytes.Should().BeLessThan(750 * 1024);
 
             foreach (var highlight in presentation.Highlights)

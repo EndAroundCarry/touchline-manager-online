@@ -30,16 +30,25 @@ public static class MatchSimulator
     /// <param name="input">The frozen snapshot.</param>
     /// <returns>The result, including both hashes.</returns>
     /// <exception cref="InvalidMatchInputException">When the snapshot cannot be simulated.</exception>
-    public static MatchResultV1 Simulate(MatchInputV1 input) => Simulate(input, EngineRulesV2.Default);
+    public static MatchResultV1 Simulate(MatchInputV1 input) =>
+        Simulate(input, EngineRulesV2.Default, liveMetrics: null);
 
     /// <summary>Simulates a match under an explicitly supplied rules set.</summary>
     /// <param name="input">The frozen snapshot.</param>
     /// <param name="rules">The rules in force. Its hash must match the snapshot's.</param>
+    /// <param name="liveMetrics">
+    /// The recorder the replay's minute-by-minute condition and ratings are captured into, or null when no
+    /// replay is being derived. Capturing consumes no draw and changes no state, so the result is identical
+    /// either way — which is what lets a replay read re-simulate the same match for free (`MAT-8`, §9.5).
+    /// </param>
     /// <returns>The result, including both hashes.</returns>
     /// <exception cref="InvalidMatchInputException">
     /// When the snapshot cannot be simulated, or was frozen against a different engine or rules version.
     /// </exception>
-    public static MatchResultV1 Simulate(MatchInputV1 input, EngineRulesV2 rules)
+    public static MatchResultV1 Simulate(
+        MatchInputV1 input,
+        EngineRulesV2 rules,
+        PlayerLiveMetricsRecorder? liveMetrics = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(rules);
@@ -53,7 +62,10 @@ public static class MatchSimulator
         var home = BuildSide(input.Home, MatchSide.Home, rules);
         var away = BuildSide(input.Away, MatchSide.Away, rules);
 
-        var state = new MatchState(input, rules, random, home, away);
+        var state = new MatchState(input, rules, random, home, away)
+        {
+            LiveMetrics = liveMetrics,
+        };
 
         PossessionSimulator.Run(state);
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -161,6 +162,33 @@ public sealed class MatchdayWorkflowTests
         again.Simulated.Should().Be(0);
 
         (await db.Matches.CountAsync(match => matchIds.Contains(match.Id))).Should().Be(9, "a completed attempt is not run again");
+    }
+
+    [Fact]
+    public async Task A_whole_round_of_nine_fixtures_simulates_inside_the_two_second_window()
+    {
+        await using var scope = Fixture.CreateScope();
+        var matchdayId = await ClaimRoundAsync(scope);
+
+        await scope.ServiceProvider.GetRequiredService<LockMatchday>()
+            .ExecuteAsync(matchdayId, CancellationToken.None);
+
+        var stopwatch = Stopwatch.StartNew();
+
+        var resolved = await scope.ServiceProvider.GetRequiredService<ResolveMatchday>()
+            .ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
+
+        stopwatch.Stop();
+
+        resolved.Outcome.Should().Be(ResolveMatchdayOutcome.Resolved);
+        resolved.Simulated.Should().Be(9);
+
+        // The plan's Stage 4 checkpoint: a division's whole round has to simulate inside the window a
+        // matchday worker has. The stopwatch covers the real work — nine fixtures simulated from their
+        // frozen snapshots and staged in their own transactions — rather than a projection of it.
+        stopwatch.Elapsed.Should().BeLessThan(
+            TimeSpan.FromSeconds(2),
+            "a nine-fixture round is the unit the matchday worker runs (§7.4)");
     }
 
     [Fact]

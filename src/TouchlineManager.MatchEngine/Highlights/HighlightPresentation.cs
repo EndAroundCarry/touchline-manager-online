@@ -127,6 +127,16 @@ public sealed record MatchLineupPlayerV1
     public int? SubbedOutMinute { get; init; }
     public int? SubbedInMinute { get; init; }
     public bool IsInjured { get; init; }
+
+    /// <summary>
+    /// Gets an estimate of the serialized payload this line contributes.
+    /// </summary>
+    /// <remarks>
+    /// On the same accounting the highlights use: an estimate rather than a serialization, because the
+    /// engine has no serializer and should not acquire one, and because the match center's budget is
+    /// enforced by the sum rather than by measuring one field.
+    /// </remarks>
+    public int EstimatedPayloadBytes => 96 + (Name.Length * 2) + (Position.Length * 2);
 }
 
 /// <summary>One team's lineup and tactical setup for the match center.</summary>
@@ -139,15 +149,15 @@ public sealed record MatchLineupV1
     public required string Formation { get; init; }
     public required IReadOnlyList<MatchLineupPlayerV1> Starters { get; init; }
     public required IReadOnlyList<MatchLineupPlayerV1> Bench { get; init; }
-}
 
-/// <summary>A player's live condition and rating at a specific minute in the match.</summary>
-public sealed record PlayerLiveMetricV1
-{
-    public required Guid ParticipantId { get; init; }
-    public required int Minute { get; init; }
-    public required int ConditionBasisPoints { get; init; }
-    public required int RatingBasisPoints { get; init; }
+    /// <summary>Gets an estimate of the serialized payload this lineup contributes.</summary>
+    public int EstimatedPayloadBytes =>
+        128
+        + (ClubName.Length * 2)
+        + (ShortName.Length * 2)
+        + (Formation.Length * 2)
+        + Starters.Sum(player => player.EstimatedPayloadBytes)
+        + Bench.Sum(player => player.EstimatedPayloadBytes);
 }
 
 /// <summary>
@@ -269,11 +279,27 @@ public sealed record MatchPresentationV1
     public int TotalPlaybackMilliseconds =>
         Playback.Count > 0 ? Playback[^1].StartMilliseconds + Playback[^1].DurationMilliseconds : 0;
 
-    /// <summary>Gets the estimated total payload, bridges included.</summary>
+    /// <summary>
+    /// Gets the estimated total payload: the highlights, the bridges, the playback schedule, both lineups,
+    /// and the live metric curve (`match_presentation_payload_budget_kb`, ADR-0006).
+    /// </summary>
+    /// <remarks>
+    /// Everything the replay ships is counted, because a budget that ignored the lineups and the metrics
+    /// would be measuring the highlights while the client downloaded three times as much.
+    /// </remarks>
     public int EstimatedPayloadBytes =>
         Highlights.Sum(highlight => highlight.EstimatedPayloadBytes)
         + Bridges.Sum(bridge => bridge.EstimatedPayloadBytes)
-        + (Playback.Count * 48);
+        + (Playback.Count * ScheduleSegmentBytes)
+        + (HomeLineup?.EstimatedPayloadBytes ?? 0)
+        + (AwayLineup?.EstimatedPayloadBytes ?? 0)
+        + ((LiveMetrics?.Count ?? 0) * LiveMetricBytes);
+
+    /// <summary>Gets the estimated bytes one captured metric contributes, on the same accounting.</summary>
+    public const int LiveMetricBytes = 64;
+
+    /// <summary>Gets the estimated bytes one playback segment contributes, on the same accounting.</summary>
+    public const int ScheduleSegmentBytes = 48;
 }
 
 /// <summary>

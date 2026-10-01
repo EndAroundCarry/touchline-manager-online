@@ -4,6 +4,7 @@ using TouchlineManager.MatchEngine;
 using TouchlineManager.MatchEngine.Commentary;
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Highlights;
+using TouchlineManager.MatchEngine.Model;
 
 namespace TouchlineManager.Application.Match;
 
@@ -23,8 +24,15 @@ public sealed record GetMatchPresentationResult(
 /// <para>
 /// The replay is re-derived rather than stored: the engine is pure and deterministic, the snapshot is
 /// frozen and verified, and re-simulating from it reproduces the published result byte for byte. That is
-/// what makes the commentary and the highlights impossible to drift from the result they describe — a
-/// stored presentation would be a second copy that a later change could leave behind (`MAT-8`, `MAT-9`).
+/// what makes the commentary, the highlights, the lineups, and the live condition and rating curve
+/// impossible to drift from the result they describe — a stored presentation would be a second copy that a
+/// later change could leave behind (`MAT-8`, `MAT-9`).
+/// </para>
+/// <para>
+/// The live metrics are captured by the same pass that reproduces the result. Capturing consumes no draw
+/// and changes no state, so the hash check below still proves the run is the published match, and the
+/// curve the match center draws is the one the live panels showed rather than an interpolation between
+/// kickoff and full time.
 /// </para>
 /// <para>
 /// The re-derived output hash is compared with the stored one before anything is returned. A mismatch means
@@ -54,7 +62,8 @@ public sealed class GetMatchPresentation
         }
 
         var input = MatchSnapshotFactory.ReadVerified(snapshot.Snapshot);
-        var result = MatchSimulator.Simulate(input, EngineRulesV2.Default);
+        var liveMetrics = new PlayerLiveMetricsRecorder();
+        var result = MatchSimulator.Simulate(input, EngineRulesV2.Default, liveMetrics);
 
         if (!string.Equals(result.OutputHash, snapshot.OutputHash, StringComparison.Ordinal))
         {
@@ -64,7 +73,7 @@ public sealed class GetMatchPresentation
         }
 
         var commentary = CommentaryTokenBuilder.Build(input, result);
-        var highlights = HighlightDirector.Build(input, result);
+        var highlights = HighlightDirector.Build(input, result, liveMetrics: liveMetrics.Metrics);
 
         return new GetMatchPresentationResult(
             MatchReadOutcome.Found,

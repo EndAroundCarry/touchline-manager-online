@@ -48,16 +48,23 @@ public static class HighlightDirector
     /// <param name="input">The frozen snapshot, which supplies the eleven and their positions.</param>
     /// <param name="result">The simulated result.</param>
     /// <param name="options">How much is worth showing.</param>
+    /// <param name="liveMetrics">
+    /// The minute-by-minute condition and rating curve captured while the match was simulated, or null when
+    /// the caller has no use for the match center's panels.
+    /// </param>
     public static MatchPresentationV1 Build(
         MatchInputV1 input,
         MatchResultV1 result,
-        HighlightOptionsV1? options = null)
+        HighlightOptionsV1? options = null,
+        IReadOnlyList<PlayerLiveMetricV1>? liveMetrics = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(result);
 
         var settings = options ?? new HighlightOptionsV1();
         var names = Names(input);
+        var homeLineup = MatchLineupBuilder.Build(input, result, MatchSide.Home);
+        var awayLineup = MatchLineupBuilder.Build(input, result, MatchSide.Away);
 
         var candidates = result.Events
             .OrderBy(matchEvent => matchEvent.Sequence)
@@ -71,7 +78,7 @@ public static class HighlightDirector
             .Select(matchEvent => (Event: matchEvent, Highlight: BuildHighlight(input, matchEvent, names, colours, settings)))
             .ToList();
 
-        TrimToPayload(built, settings);
+        TrimToPayload(built, settings, ReservedBytes(settings, homeLineup, awayLineup, liveMetrics));
         TrimToPlayback(built, settings);
 
         var highlights = built.Select(pair => pair.Highlight).ToList();
@@ -86,8 +93,32 @@ public static class HighlightDirector
             Highlights = highlights,
             Bridges = bridges,
             Playback = Schedule(highlights, bridges),
+            HomeLineup = homeLineup,
+            AwayLineup = awayLineup,
+            LiveMetrics = liveMetrics,
         };
     }
+
+    /// <summary>
+    /// The bytes the highlights may not spend, because the rest of the presentation already owns them
+    /// (`match_presentation_payload_budget_kb`, ADR-0006).
+    /// </summary>
+    /// <remarks>
+    /// The budget is the whole replay's, not the highlights': a client that downloads a match downloads the
+    /// lineups and the live curve too. The bridges and the schedule are reserved at their worst case — every
+    /// bridge at its own budget and every highlight with both a bridge and a highlight segment — so the
+    /// estimate the trim fits against can only be larger than what is finally built.
+    /// </remarks>
+    private static int ReservedBytes(
+        HighlightOptionsV1 settings,
+        MatchLineupV1 homeLineup,
+        MatchLineupV1 awayLineup,
+        IReadOnlyList<PlayerLiveMetricV1>? liveMetrics) =>
+        homeLineup.EstimatedPayloadBytes
+        + awayLineup.EstimatedPayloadBytes
+        + ((liveMetrics?.Count ?? 0) * MatchPresentationV1.LiveMetricBytes)
+        + settings.BridgeBudgetBytes
+        + (settings.MaxHighlights * 2 * MatchPresentationV1.ScheduleSegmentBytes);
 
     /// <summary>
     /// Sheds the lowest-quality chances until the estimated payload fits its budget.
@@ -96,13 +127,15 @@ public static class HighlightDirector
     /// A count cap is not a size cap: twenty-four highlights are small if they are twenty-four tap-ins and
     /// large if they are twenty-four long-range efforts with a full set of tracks. The payload budget is what
     /// actually protects a phone on a train, so it is applied after the count and it yields the
-    /// lowest-quality chances first — never a goal.
+    /// lowest-quality chances first — never a goal. What the rest of the presentation has already reserved
+    /// comes off the budget first, so the match fits as a whole rather than the highlights fitting alone.
     /// </remarks>
     private static void TrimToPayload(
         List<(EngineEventV1 Event, HighlightPresentationV1 Highlight)> built,
-        HighlightOptionsV1 settings)
+        HighlightOptionsV1 settings,
+        int reservedBytes)
     {
-        while (built.Sum(pair => pair.Highlight.EstimatedPayloadBytes) > settings.PayloadBudgetBytes)
+        while (reservedBytes + built.Sum(pair => pair.Highlight.EstimatedPayloadBytes) > settings.PayloadBudgetBytes)
         {
             var least = LowestQuality(built);
 
@@ -859,39 +892,8 @@ public static class HighlightDirector
     }
 
     /// <summary>
-    /// The two sides' colours, from small generated palettes chosen by club identity.
+    /// The two sides' colours, from the palette the lineups draw the same clubs in.
     /// </summary>
-    /// <remarks>
-    /// Generated rather than supplied, and drawn from a fixed palette rather than from any real kit: the
-    /// engine never has a real club's colours to leak (`WORLD-3`), and the renderer's requirement not to
-    /// distinguish teams by colour alone is met downstream by ship numbers and labels.
-    /// </remarks>
     private static (string Home, string Away) Colours(MatchInputV1 input) =>
-        (Palette[Index(input.Home.ClubId)], Palette[Index(input.Away.ClubId)]);
-
-    private static readonly string[] Palette =
-    [
-        "#1f4e79",
-        "#8c2f39",
-        "#2d6a4f",
-        "#6a4c93",
-        "#b5651d",
-        "#2c3e50",
-        "#a4133c",
-        "#006d77",
-    ];
-
-    /// <summary>Maps a club identity onto the palette, stably across runs and platforms.</summary>
-    private static int Index(Guid clubId)
-    {
-        var bytes = clubId.ToByteArray();
-        var hash = 2166136261u;
-
-        foreach (var value in bytes)
-        {
-            hash = (hash ^ value) * 16777619u;
-        }
-
-        return (int)(hash % (uint)Palette.Length);
-    }
+        (ClubPalette.PrimaryOf(input.Home.ClubId), ClubPalette.PrimaryOf(input.Away.ClubId));
 }

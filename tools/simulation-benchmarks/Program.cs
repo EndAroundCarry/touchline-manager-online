@@ -53,7 +53,8 @@ return 0;
 void SingleMatch(ulong matchSeed)
 {
     var input = LaboratoryFixtures.EvenlyMatched(matchSeed);
-    var result = MatchSimulator.Simulate(input, rules);
+    var liveMetrics = new PlayerLiveMetricsRecorder();
+    var result = MatchSimulator.Simulate(input, rules, liveMetrics);
 
     Console.WriteLine("== One match ==");
     Console.WriteLine($"  {input.Home.ClubName} {result.HomeGoals} - {result.AwayGoals} {input.Away.ClubName}");
@@ -69,9 +70,10 @@ void SingleMatch(ulong matchSeed)
     Console.WriteLine($"  output hash      {result.OutputHash}");
 
     var commentary = CommentaryTokenBuilder.Build(input, result);
-    var presentation = HighlightDirector.Build(input, result);
+    var presentation = HighlightDirector.Build(input, result, liveMetrics: liveMetrics.Metrics);
 
     Console.WriteLine($"  commentary lines {commentary.Count}");
+    Console.WriteLine($"  live metrics     {liveMetrics.Metrics.Count}");
     Console.WriteLine($"  highlights       {presentation.Highlights.Count}, ~{presentation.EstimatedPayloadBytes / 1024.0:F1} KB");
     Console.WriteLine();
 }
@@ -180,8 +182,9 @@ void Replay(int matches, ulong baseSeed)
     for (var index = 0; index < matches; index++)
     {
         var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index);
-        var result = MatchSimulator.Simulate(input, rules);
-        var presentation = HighlightDirector.Build(input, result);
+        var liveMetrics = new PlayerLiveMetricsRecorder();
+        var result = MatchSimulator.Simulate(input, rules, liveMetrics);
+        var presentation = HighlightDirector.Build(input, result, liveMetrics: liveMetrics.Metrics);
 
         qualities.AddRange(result.Events
             .Where(matchEvent => matchEvent.QualityBasisPoints is not null)
