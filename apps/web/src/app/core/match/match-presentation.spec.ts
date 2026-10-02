@@ -1,4 +1,5 @@
 import {
+  cardKindFor,
   commentarySideLabel,
   conditionColorClass,
   highlightIndexForLine,
@@ -210,5 +211,12 @@ describe('match presentation helpers', () => {
     expect(isShotOutcome('goal')).toBe(true);
     expect(isShotOutcome('bridge')).toBe(false);
     expect(shotMapEntries([{ ...highlight(1), outcomeCode: 'bridge' }])).toHaveLength(0);
+  });
+
+  it('reads a booking from the line that reports it, second yellow included', () => {
+    expect(cardKindFor('match.card.yellow')).toBe('yellow');
+    expect(cardKindFor('match.card.second_yellow')).toBe('red');
+    expect(cardKindFor('match.card.red')).toBe('red');
+    expect(cardKindFor('match.foul')).toBeNull();
   });
 });

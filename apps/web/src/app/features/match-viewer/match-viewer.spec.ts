@@ -281,6 +281,23 @@ describe('MatchViewer', () => {
     expect(native.querySelector('button[aria-label="Play replay"]')).toBeNull();
   });
 
+  it('offers skip-all, which ends the replay rather than pausing it', async () => {
+    const native = await load();
+
+    (native.querySelector('button[aria-label="Play replay"]') as HTMLButtonElement).click();
+
+    await fixture.whenStable();
+
+    expect(native.querySelector('button[aria-label="Pause replay"]')).not.toBeNull();
+
+    buttonByText(native, 'Skip all')!.click();
+
+    await fixture.whenStable();
+
+    expect(native.querySelector('button[aria-label="Play replay"]')).not.toBeNull();
+    expect(native.textContent).toContain('END');
+  });
+
   it('moves the lineup panels with the minute-by-minute curve the server captured', async () => {
     const native = await load();
 

@@ -17,6 +17,7 @@ import {
   PlaybackSpeed,
 } from '../../core/match/match-playback';
 import {
+  cardKindFor,
   commentarySideLabel,
   conditionColorClass,
   formatConditionPercent,
@@ -43,6 +44,7 @@ import {
 import { MatchStore } from '../../core/match/match-store';
 import { formatInstant } from '../../core/world/presentation';
 import { CanvasMatchRenderer } from './renderer/canvas-match-renderer';
+import { CardKind } from './renderer/renderer.models';
 import { RenderLoop } from './renderer/render-loop';
 
 /** The match center's sections, in the order a manager reads them. */
@@ -56,14 +58,14 @@ const TABS = [
 /** One of the match center's tabs. */
 type TabId = (typeof TABS)[number]['id'];
 
-/** How long a goal's flash and score highlight stay up, in milliseconds. */
+/** How long the scoreboard's goal highlight stays up, in milliseconds. */
 const GOAL_FLASH_MILLISECONDS = 2_500;
 
 /** The normalized scale the pitch speaks on both axes. */
 const PITCH_SCALE = 10_000;
 
 /**
- * The FM/CM-style match center (master plan §9.5, §11.1, Stage 5).
+ * The FM/CM-style match center (master plan §9.5, §11.1, Stages 5 and 6).
  *
  * A result and its replay. The summary is the scoreboard and the scoreline; the replay is the pitch beside
  * the two lineups, the commentary ticker under it, and three more tabs — report, statistics and shot map,
@@ -75,7 +77,9 @@ const PITCH_SCALE = 10_000;
  * playback state every frame, and signals are written only when something discrete changes — the passage,
  * the play state, the ticker line — so a 60 Hz animation does not re-evaluate the commentary list 60 times a
  * second (§9.4). The loop is stopped on pause, on the tab going hidden, and on destruction, so no callback
- * outlives the canvas it draws to.
+ * outlives the canvas it draws to. The renderer itself does the Stage 6 work — pitch markings, kit and
+ * keeper graphics, the ball's altitude, the action effects, the goal celebration — and receives only a
+ * frame's worth of settings, so the drawing stays off the change-detection path.
  *
  * Two viewing modes share one player: *Highlights* cuts from chance to chance, *Condensed* plays the
  * recycling passages the director laid out between them, so the ball is carried rather than teleported.
@@ -143,9 +147,6 @@ export class MatchViewer implements OnDestroy {
 
   /** The ticker's current line, overwritten as the passage's own commentary reaches its offsets. */
   protected readonly tickerText = signal('');
-
-  /** Whether a goal's flash and score highlight are up. */
-  protected readonly goalFlash = signal(false);
 
   /** Which side just scored, for the scoreboard's own flash. */
   protected readonly scoringSide = signal<'home' | 'away' | null>(null);
@@ -241,6 +242,7 @@ export class MatchViewer implements OnDestroy {
   private readonly lineupIndex = computed(() => {
     const byParticipant = new Map<string, MatchLineupPlayer>();
     const nameByPlayerId = new Map<string, string>();
+    const participantByPlayerId = new Map<string, string>();
     const view = this.presentation();
 
     for (const lineup of [view?.homeLineup, view?.awayLineup]) {
@@ -251,10 +253,55 @@ export class MatchViewer implements OnDestroy {
       for (const player of [...lineup.starters, ...lineup.bench]) {
         byParticipant.set(player.participantId, player);
         nameByPlayerId.set(player.playerId, player.name);
+        participantByPlayerId.set(player.playerId, player.participantId);
       }
     }
 
-    return { byParticipant, nameByPlayerId };
+    return { byParticipant, nameByPlayerId, participantByPlayerId };
+  });
+
+  /**
+   * The card each player carries at the shown minute, which the pitch draws above their token.
+   *
+   * A booking is a state a player keeps for the rest of the match, so the badge appears once the replay
+   * reaches the event that produced it: the card lines before the active passage's own event are read from
+   * the same commentary the report lists, and the player they name is resolved through the lineups rather
+   * than through a rendered sentence. Nothing is carried in before the replay starts, so the opening
+   * passage is not drawn with bookings the manager has not watched yet.
+   */
+  private readonly cardState = computed(() => {
+    const view = this.presentation();
+    const highlight = this.activeHighlight();
+    const cards = new Map<string, CardKind>();
+
+    if (view === null || highlight === null || this.state() === 'idle') {
+      return cards;
+    }
+
+    const participants = this.lineupIndex().participantByPlayerId;
+
+    for (const line of view.commentary) {
+      // Commentary is in event order, so once a line belongs to the passage being shown — or to anything
+      // after it — no later line can have happened yet.
+      if (line.sequence >= highlight.sourceEventSequence) {
+        break;
+      }
+
+      const card = cardKindFor(line.templateKey);
+
+      if (card === null) {
+        continue;
+      }
+
+      const playerId = line.parameters.find((parameter) => parameter.name === 'playerId')?.value;
+      const participantId = playerId === undefined ? undefined : participants.get(playerId);
+
+      if (participantId !== undefined) {
+        cards.set(participantId, card);
+      }
+    }
+
+    return cards;
   });
 
   /** The match minute the live panels show: kickoff before the replay starts, the active passage after. */
@@ -355,6 +402,7 @@ export class MatchViewer implements OnDestroy {
       const passage = this.passage();
       const canvas = this.canvas();
       const textOnly = this.textOnly();
+      const cards = this.cardState();
       // Reduced motion shows the passage as a still frame at its end rather than animating it, which is the
       // "static event diagram" the plan asks for (`§9.4`). It is the *idle* state that is drawn still, so a
       // pause mid-highlight keeps the frame the manager paused on rather than jumping to the end; pressing
@@ -368,7 +416,14 @@ export class MatchViewer implements OnDestroy {
         return;
       }
 
-      this.renderer = new CanvasMatchRenderer(canvas.nativeElement, passage);
+      this.renderer = new CanvasMatchRenderer(canvas.nativeElement, passage, {
+        kits: {
+          home: { primary: this.homeColour(), secondary: this.homeSecondaryColour() },
+          away: { primary: this.awayColour(), secondary: this.awaySecondaryColour() },
+        },
+        cards,
+        reducedMotion: this.reduced(),
+      });
       this.renderer.render(still ? passage.durationMilliseconds : this.playback.positionMs);
     });
   }
@@ -426,6 +481,12 @@ export class MatchViewer implements OnDestroy {
   /** Moves to the next highlight. */
   protected skipCurrent(): void {
     this.playback.skipCurrent();
+    this.apply();
+  }
+
+  /** Jumps to the end of the replay, which is the "skip all" of the playback contract (§9.4). */
+  protected skipAll(): void {
+    this.playback.skipAll();
     this.apply();
   }
 
@@ -687,7 +748,6 @@ export class MatchViewer implements OnDestroy {
 
     this.flashedSequence = highlight.sourceEventSequence;
     this.scoringSide.set(side);
-    this.goalFlash.set(true);
 
     if (this.flashTimer !== null) {
       clearTimeout(this.flashTimer);
@@ -697,7 +757,6 @@ export class MatchViewer implements OnDestroy {
       this.flashTimer = null;
       this.flashedSequence = null;
       this.scoringSide.set(null);
-      this.goalFlash.set(false);
     }, GOAL_FLASH_MILLISECONDS);
   }
 

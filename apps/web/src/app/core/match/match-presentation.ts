@@ -306,6 +306,23 @@ export function highlightIndexForLine(
   return highlights.findIndex((highlight) => highlight.sourceEventSequence === line.sequence);
 }
 
+/** The commentary template keys that report a booking, and the card each one means. */
+const CARD_TEMPLATES: Record<string, 'yellow' | 'red'> = {
+  'match.card.yellow': 'yellow',
+  'match.card.second_yellow': 'red',
+  'match.card.red': 'red',
+};
+
+/**
+ * The card a commentary line reports, or null when it reports no booking.
+ *
+ * The pitch draws a booking above the offending player's token from the same timeline the report reads, so
+ * the two can never disagree about who was booked or when.
+ */
+export function cardKindFor(templateKey: string): 'yellow' | 'red' | null {
+  return CARD_TEMPLATES[templateKey] ?? null;
+}
+
 /** Formats a player's rating in basis points (e.g., 7200 -> "7.2"). */
 export function formatMatchRating(basisPoints: number): string {
   if (basisPoints <= 0) {

@@ -69,7 +69,7 @@
                   clock()
                 }}</span>
                 <span class="block text-[9px] tracking-widest text-slate-500 uppercase">
-                  {{ state() === 'playing' ? 'LIVE' : state() === 'idle' ? 'END' : 'PAUSED' }}
+                  {{ state() === 'playing' ? 'LIVE' : state() === 'paused' ? 'PAUSED' : 'END' }}
                 </span>
               </div>
             } @else {
@@ -148,6 +148,14 @@
                 (click)="skipCurrent()"
               >
                 Skip &#9197;
+              </button>
+              <button
+                id="mv-skip-all"
+                type="button"
+                class="rounded border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs text-slate-300 transition hover:border-slate-600 hover:bg-slate-700/60"
+                (click)="skipAll()"
+              >
+                Skip all
               </button>
               <span class="h-5 w-px bg-slate-700" aria-hidden="true"></span>
               <div class="flex items-center gap-1" role="group" aria-label="Playback speed">
@@ -399,23 +407,18 @@
                         class="relative w-full overflow-hidden rounded-lg border border-slate-800 shadow-2xl"
                         style="aspect-ratio: 105 / 68; max-height: calc(100vh - 320px)"
                       >
+                        <!--
+                          Every effect on the pitch is drawn by the renderer itself (Stage 6), including a
+                          goal's pulsating flash and GOAL! badge, so the celebration is synchronized with the
+                          passage rather than with the moment the passage was selected. The canvas stays a
+                          labelled image and the narration outside it remains the accessible reading.
+                        -->
                         <canvas
                           #pitch
                           class="h-full w-full"
                           role="img"
                           [attr.aria-label]="activeHighlight()?.narration || 'Football pitch'"
                         ></canvas>
-                        @if (goalFlash()) {
-                          <div
-                            class="pointer-events-none absolute inset-0 flex items-center justify-center"
-                            aria-hidden="true"
-                          >
-                            <span
-                              class="animate-bounce text-5xl font-black text-emerald-400 drop-shadow-lg"
-                              >GOAL!</span
-                            >
-                          </div>
-                        }
                       </div>
                     </div>
                     @if (reduced()) {
