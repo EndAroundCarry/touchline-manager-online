@@ -37,12 +37,12 @@ public sealed class GetMatchPresentationTests
         var read = await query.ExecuteAsync(matchId, CancellationToken.None);
 
         read.Outcome.Should().Be(MatchReadOutcome.Found);
-        read.EntityTag.Should().Be(result.OutputHash, "the replay is cached under the result it was derived from");
+        read.EntityTag.Should().Be($"{result.OutputHash}:replay-v3", "the replay is cached under the result and its presentation version");
         read.Presentation.Should().NotBeNull();
 
         var presentation = read.Presentation!;
 
-        presentation.PresentationVersion.Should().Be("replay-v2");
+        presentation.PresentationVersion.Should().Be("replay-v3");
         presentation.HomeLineup.Should().NotBeNull();
         presentation.AwayLineup.Should().NotBeNull();
         presentation.LiveMetrics.Should().NotBeNull().And.NotBeEmpty();

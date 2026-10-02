@@ -20,8 +20,7 @@ public sealed class MatchLineupTests
         for (var seed = 1UL; seed <= 10; seed++)
         {
             var input = TestMatchFactory.Even(seed);
-            var result = MatchSimulator.Simulate(input);
-            var presentation = HighlightDirector.Build(input, result);
+            var presentation = TestMatchFactory.Play(input).Presentation;
 
             foreach (var (lineup, side) in new[]
             {
@@ -63,8 +62,7 @@ public sealed class MatchLineupTests
         for (var seed = 1UL; seed <= 20; seed++)
         {
             var input = TestMatchFactory.Even(seed);
-            var result = MatchSimulator.Simulate(input);
-            var presentation = HighlightDirector.Build(input, result);
+            var (result, presentation) = TestMatchFactory.Play(input);
 
             foreach (var (lineup, side) in new[]
             {
@@ -136,9 +134,7 @@ public sealed class MatchLineupTests
     public void Live_metrics_are_captured_for_every_player_on_the_pitch_at_every_minute()
     {
         var input = TestMatchFactory.Even();
-        var recorder = new PlayerLiveMetricsRecorder();
-        var result = MatchSimulator.Simulate(input, TestMatchFactory.Rules, recorder);
-        var presentation = HighlightDirector.Build(input, result, liveMetrics: recorder.Metrics);
+        var (result, presentation) = TestMatchFactory.Play(input);
 
         presentation.LiveMetrics.Should().NotBeNull().And.NotBeEmpty();
 

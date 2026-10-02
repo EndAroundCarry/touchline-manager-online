@@ -63,7 +63,8 @@ public sealed class GetMatchPresentation
 
         var input = MatchSnapshotFactory.ReadVerified(snapshot.Snapshot);
         var liveMetrics = new PlayerLiveMetricsRecorder();
-        var result = MatchSimulator.Simulate(input, EngineRulesV2.Default, liveMetrics);
+        var passages = new MatchPassageRecorder();
+        var result = MatchSimulator.Simulate(input, EngineRulesV2.Default, liveMetrics, passages);
 
         if (!string.Equals(result.OutputHash, snapshot.OutputHash, StringComparison.Ordinal))
         {
@@ -73,11 +74,11 @@ public sealed class GetMatchPresentation
         }
 
         var commentary = CommentaryTokenBuilder.Build(input, result);
-        var highlights = HighlightDirector.Build(input, result, liveMetrics: liveMetrics.Metrics);
+        var presentation = ReplayDirector.Build(input, result, passages.Passages, liveMetrics: liveMetrics.Metrics);
 
         return new GetMatchPresentationResult(
             MatchReadOutcome.Found,
-            snapshot.ToResponse(highlights, commentary),
-            snapshot.OutputHash);
+            snapshot.ToResponse(presentation, commentary),
+            $"{snapshot.OutputHash}:{presentation.PresentationVersion}");
     }
 }

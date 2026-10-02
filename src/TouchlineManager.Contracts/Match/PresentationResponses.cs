@@ -52,10 +52,10 @@ public sealed record HighlightCommentaryResponse(
     string Text);
 
 /// <summary>
-/// One segment of the condensed playback clock: a highlight or the recycling passage before it (`replay-v2`).
+/// One segment of the film playback clock: a passage (`replay-v3`).
 /// </summary>
-/// <param name="Kind">What the segment is: <c>highlight</c> or <c>bridge</c>.</param>
-/// <param name="SourceEventSequence">The event the segment presents or leads into.</param>
+/// <param name="Kind">What the segment is: <c>passage</c>.</param>
+/// <param name="SourceEventSequence">The passage's principal event sequence, or zero when it has none.</param>
 /// <param name="StartMilliseconds">When the segment starts on the playback clock.</param>
 /// <param name="DurationMilliseconds">How long the segment runs for.</param>
 public sealed record PlaybackSegmentResponse(
@@ -84,18 +84,7 @@ public sealed record HighlightKeyframeResponse(
 /// <param name="Keyframes">Its positions, ordered by time.</param>
 public sealed record HighlightTrackResponse(string EntityId, IReadOnlyList<HighlightKeyframeResponse> Keyframes);
 
-/// <summary>
-/// The recycling passage between two highlights, keyed to the highlight it leads into (`replay-v2`).
-/// </summary>
-/// <param name="AfterEventSequence">The highlight this bridge leads into.</param>
-/// <param name="DurationMilliseconds">How long the bridge runs for.</param>
-/// <param name="Tracks">One track per entity, ordered by entity identifier.</param>
-public sealed record BridgeResponse(
-    int AfterEventSequence,
-    int DurationMilliseconds,
-    IReadOnlyList<HighlightTrackResponse> Tracks);
-
-/// <summary>One entity in a highlight: a player or the ball.</summary>
+/// <summary>One entity in a passage: a player or the ball.</summary>
 /// <remarks>
 /// Identity and anchor position only. Where the entity goes is a track, so a stationary player costs two
 /// keyframes rather than a frame per animation tick (master plan §9.1, §9.3).
@@ -161,7 +150,7 @@ public sealed record PlayerLiveMetricResponse(
     int RatingBasisPoints);
 
 /// <summary>
-/// One immutable, replayable highlight (master plan §9.3).
+/// One film passage: an immutable, replayable slice of a continuous match (`replay-v3`).
 /// </summary>
 /// <remarks>
 /// Carries no frames and no video: the client interpolates between keyframes at its own refresh rate, so
@@ -169,32 +158,55 @@ public sealed record PlayerLiveMetricResponse(
 /// 144 Hz display. The narration is what makes the Canvas accessible, and the colours come from safe
 /// generated palettes rather than from any real club's identity (`WORLD-3`).
 /// </remarks>
-/// <param name="SourceEventSequence">The sequence number of the event this presents.</param>
-/// <param name="Minute">The match minute.</param>
+/// <param name="SourceEventSequence">The sequence of the passage's principal event, or zero when it has none.</param>
+/// <param name="Minute">The match minute the passage begins in.</param>
 /// <param name="StoppageMinute">The stoppage minute, or zero in regulation.</param>
-/// <param name="DurationMilliseconds">How long the highlight runs for.</param>
-/// <param name="OutcomeCode">The outcome as a stable code: <c>goal</c>, <c>saved</c>, and so on.</param>
+/// <param name="StartMatchSecond">The match second the passage begins at.</param>
+/// <param name="EndMatchSecond">The match second the passage ends at.</param>
+/// <param name="DurationMilliseconds">How long the passage runs for in the film.</param>
+/// <param name="OutcomeCode">The outcome as a stable code: <c>goal</c>, <c>saved</c>, <c>play</c>, and so on.</param>
 /// <param name="Narration">The narration, so the Canvas is not the only way to follow it.</param>
 /// <param name="HomeColour">The home side's colour.</param>
 /// <param name="AwayColour">The away side's colour.</param>
+/// <param name="EventSequences">The sequences of the events the passage produced, in order.</param>
 /// <param name="Entities">Every entity, including the ball.</param>
 /// <param name="Tracks">One track per entity, ordered by entity identifier.</param>
-/// <param name="Commentary">The passage's synchronized commentary, ordered by offset (`replay-v2`).</param>
-public sealed record HighlightResponse(
+/// <param name="Commentary">The passage's synchronized commentary, ordered by offset.</param>
+public sealed record PassageResponse(
     int SourceEventSequence,
     int Minute,
     int StoppageMinute,
+    int StartMatchSecond,
+    int EndMatchSecond,
     int DurationMilliseconds,
     string OutcomeCode,
     string Narration,
     string HomeColour,
     string AwayColour,
+    IReadOnlyList<int> EventSequences,
     IReadOnlyList<HighlightEntityResponse> Entities,
     IReadOnlyList<HighlightTrackResponse> Tracks,
     IReadOnlyList<HighlightCommentaryResponse>? Commentary = null);
 
 /// <summary>
-/// A played match's whole replay: its commentary timeline and its highlights, in event order (§9.5).
+/// One clip of the highlights reel: a window of the film to watch, around a chance (`replay-v3`).
+/// </summary>
+/// <param name="SourceEventSequence">The sequence of the event the clip is built around.</param>
+/// <param name="OutcomeCode">The outcome as a stable code: <c>goal</c>, <c>saved</c>, and so on.</param>
+/// <param name="Minute">The match minute of the chance.</param>
+/// <param name="StoppageMinute">The stoppage minute of the chance, or zero in regulation.</param>
+/// <param name="StartMilliseconds">Where the clip starts on the film clock.</param>
+/// <param name="EndMilliseconds">Where the clip ends on the film clock.</param>
+public sealed record ReelClipResponse(
+    int SourceEventSequence,
+    string OutcomeCode,
+    int Minute,
+    int StoppageMinute,
+    int StartMilliseconds,
+    int EndMilliseconds);
+
+/// <summary>
+/// A played match's whole replay: one continuous film, a highlights reel, and the commentary log (§9.5).
 /// </summary>
 /// <remarks>
 /// Immutable once published — the events it is built from are history and the engine is deterministic —
@@ -208,14 +220,14 @@ public sealed record HighlightResponse(
 /// <param name="HomeGoals">The home side's goals.</param>
 /// <param name="AwayGoals">The away side's goals.</param>
 /// <param name="Commentary">One line per narrated event, in event order.</param>
-/// <param name="Highlights">The highlights, in event order.</param>
+/// <param name="Passages">The film passages, in match order.</param>
+/// <param name="Reel">The highlights reel: the selected chance clips, in order (`replay-v3`).</param>
 /// <param name="EstimatedPayloadBytes">The estimated serialized size, for the payload budget (§9.3).</param>
 /// <param name="HomeLineup">The home side's complete lineup and player performance.</param>
 /// <param name="AwayLineup">The away side's complete lineup and player performance.</param>
 /// <param name="LiveMetrics">Minute-by-minute condition and ratings for all players.</param>
-/// <param name="Bridges">The recycling passages between consecutive highlights, in event order (`replay-v2`).</param>
-/// <param name="Playback">The condensed playback schedule, in the order the segments play (`replay-v2`).</param>
-/// <param name="TotalPlaybackMilliseconds">How long the condensed replay runs for, in milliseconds.</param>
+/// <param name="Playback">The film playback schedule, in the order the segments play (`replay-v3`).</param>
+/// <param name="TotalPlaybackMilliseconds">How long the film runs for, in milliseconds.</param>
 public sealed record MatchPresentationResponse(
     Guid MatchId,
     string PresentationVersion,
@@ -223,12 +235,12 @@ public sealed record MatchPresentationResponse(
     int HomeGoals,
     int AwayGoals,
     IReadOnlyList<CommentaryLineResponse> Commentary,
-    IReadOnlyList<HighlightResponse> Highlights,
+    IReadOnlyList<PassageResponse> Passages,
+    IReadOnlyList<ReelClipResponse> Reel,
     int EstimatedPayloadBytes,
     MatchLineupResponse? HomeLineup = null,
     MatchLineupResponse? AwayLineup = null,
     IReadOnlyList<PlayerLiveMetricResponse>? LiveMetrics = null,
-    IReadOnlyList<BridgeResponse>? Bridges = null,
     IReadOnlyList<PlaybackSegmentResponse>? Playback = null,
     int TotalPlaybackMilliseconds = 0);
 

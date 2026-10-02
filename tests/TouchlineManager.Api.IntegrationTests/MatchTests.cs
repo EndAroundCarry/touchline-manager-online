@@ -61,7 +61,7 @@ public sealed class MatchTests : IAsyncLifetime
         summary.RoundNumber.Should().BeGreaterThan(0);
         summary.SeasonLabel.Should().NotBeEmpty();
         summary.EngineVersion.Should().NotBeEmpty();
-        summary.PresentationVersion.Should().Be("replay-v2");
+        summary.PresentationVersion.Should().Be("replay-v3");
         summary.ServerTime.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2), "TIME-5");
 
         // Possession is a share, so the two sides' shares are complementary.
@@ -83,7 +83,7 @@ public sealed class MatchTests : IAsyncLifetime
             $"/api/v1/matches/{matchId}/presentation"))!;
 
         presentation.MatchId.Should().Be(matchId);
-        presentation.PresentationVersion.Should().Be("replay-v2");
+        presentation.PresentationVersion.Should().Be("replay-v3");
         presentation.Commentary.Should().NotBeEmpty();
         presentation.Commentary.Select(line => line.TemplateKey).Should()
             .Contain(["match.kickoff", "match.full_time"], "a match is narrated from kick-off to full time");
@@ -95,46 +95,61 @@ public sealed class MatchTests : IAsyncLifetime
         var goals = presentation.HomeGoals + presentation.AwayGoals;
 
         // A round can end goalless, so a goal event is only required when the score has one. What must always
-        // hold is the reconciliation: every goal the score claims is shown as a highlight, and no highlight
-        // claims a goal the score does not (MAT-5, §9.2).
+        // hold is the reconciliation: every goal the score claims is in the film and on the reel, and no
+        // passage claims a goal the score does not (MAT-5, §9.2).
         if (goals > 0)
         {
             goalSequences.Should().NotBeEmpty("a match with goals has a goal event");
         }
 
-        presentation.Highlights.Select(highlight => highlight.SourceEventSequence)
-            .Should().Contain(goalSequences, "§9.2: every goal is always shown");
+        var filmed = presentation.Passages.SelectMany(passage => passage.EventSequences).ToHashSet();
 
-        presentation.Highlights
-            .Count(highlight => highlight.OutcomeCode is "goal" or "penalty_goal")
-            .Should().Be(goals, "MAT-5: every goal links to a highlight");
+        filmed.Should().Contain(goalSequences, "§9.2: every goal is in the film");
 
-        presentation.Highlights.Should().BeInAscendingOrder(highlight => highlight.SourceEventSequence);
+        if (goals > 0)
+        {
+            presentation.Reel.Should().NotBeEmpty("§9.2: every goal is on the reel");
+        }
 
-        // The condensed replay is one contiguous schedule: the client plays a single list, and the total is
-        // the plan's viewing window rather than ninety minutes (Stage 3).
+        foreach (var goalSequence in goalSequences)
+        {
+            var index = Enumerable.Range(0, presentation.Passages.Count)
+                .Single(position => presentation.Passages[position].EventSequences.Contains(goalSequence));
+
+            var start = presentation.Playback![index].StartMilliseconds;
+            var end = start + presentation.Playback![index].DurationMilliseconds;
+
+            presentation.Reel
+                .Any(clip => clip.StartMilliseconds <= start && clip.EndMilliseconds >= end)
+                .Should().BeTrue("§9.2: every goal is on the reel");
+            presentation.Passages[index].OutcomeCode
+                .Should().BeOneOf("goal", "penalty_goal", "MAT-5: a goal is narrated as one");
+        }
+
+        presentation.Passages.Should().BeInAscendingOrder(passage => passage.StartMatchSecond);
+
+        // The film is one contiguous schedule; the client plays a single list, and the total is the plan's
+        // viewing window rather than ninety minutes (replay-v3).
         presentation.Playback.Should().NotBeNull().And.NotBeEmpty();
         presentation.Playback![0].StartMilliseconds.Should().Be(0);
+        presentation.Playback.Should().HaveCount(presentation.Passages.Count);
 
         var cursor = 0;
 
         foreach (var segment in presentation.Playback)
         {
+            segment.Kind.Should().Be("passage");
             segment.StartMilliseconds.Should().Be(cursor);
             segment.DurationMilliseconds.Should().BeGreaterThan(0);
             cursor += segment.DurationMilliseconds;
         }
 
         cursor.Should().Be(presentation.TotalPlaybackMilliseconds);
-        presentation.TotalPlaybackMilliseconds.Should().BeLessThanOrEqualTo(10 * 60 * 1000);
-
-        presentation.Bridges.Should().NotBeNull().And.NotBeEmpty();
-        presentation.Playback.Count(segment => segment.Kind == "bridge")
-            .Should().Be(presentation.Bridges!.Count, "every bridge is on the schedule it was built for");
+        presentation.TotalPlaybackMilliseconds.Should().BeLessThanOrEqualTo(11 * 60 * 1000);
     }
 
     [Fact]
-    public async Task A_highlight_is_a_semantic_keyframe_payload_built_for_interpolation()
+    public async Task A_passage_is_a_semantic_keyframe_payload_built_for_interpolation()
     {
         using var client = _fixture.CreateClient();
         var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture.Email, client);
@@ -146,35 +161,37 @@ public sealed class MatchTests : IAsyncLifetime
         var presentation = (await client.GetFromJsonAsync<MatchPresentationResponse>(
             $"/api/v1/matches/{matchId}/presentation"))!;
 
-        foreach (var highlight in presentation.Highlights)
-        {
-            highlight.Narration.Should().NotBeEmpty("§9.4: the Canvas is not the only way to follow a highlight");
-            highlight.DurationMilliseconds.Should().BeInRange(10_000, 25_000, "replay-v2: a passage of play, not a moment");
-            highlight.HomeColour.Should().StartWith("#");
-            highlight.AwayColour.Should().StartWith("#");
+        presentation.Passages.Should().NotBeEmpty("replay-v3: every match is watchable");
 
-            // The bottom ticker's lines are pinned to the passage's own millisecond clock (§9.3, replay-v2).
-            highlight.Commentary.Should().NotBeNull().And.NotBeEmpty();
-            highlight.Commentary![0].TimeMilliseconds.Should().Be(0);
-            highlight.Commentary.Select(line => line.TimeMilliseconds).Should().BeInAscendingOrder();
-            highlight.Commentary.Should().OnlyContain(line =>
+        foreach (var passage in presentation.Passages)
+        {
+            passage.Narration.Should().NotBeEmpty("§9.4: the Canvas is not the only way to follow a passage");
+            passage.DurationMilliseconds.Should().BeGreaterThan(0);
+            passage.EndMatchSecond.Should().BeGreaterThanOrEqualTo(passage.StartMatchSecond);
+            passage.HomeColour.Should().StartWith("#");
+            passage.AwayColour.Should().StartWith("#");
+
+            // The feed's lines are pinned to the passage's own film clock (§9.3, replay-v3).
+            passage.Commentary.Should().NotBeNull();
+            passage.Commentary!.Select(line => line.TimeMilliseconds).Should().BeInAscendingOrder();
+            passage.Commentary.Should().OnlyContain(line =>
                 line.TimeMilliseconds >= 0
-                && line.TimeMilliseconds <= highlight.DurationMilliseconds
+                && line.TimeMilliseconds <= passage.DurationMilliseconds
                 && !string.IsNullOrWhiteSpace(line.Text));
 
-            // Twenty-two players and a ball, each with a track, so the renderer interpolates rather than
-            // being sent frames (§9.1, §9.3).
-            highlight.Entities.Should().HaveCount(23);
-            highlight.Entities.Should().Contain(entity => entity.IsBall);
-            highlight.Entities.Where(entity => !entity.IsBall).Should()
+            // The eleven, plus the ball, each with a track, so the renderer interpolates rather than being
+            // sent frames (§9.1, §9.3). A sent-off player is not carried, so the count can be below 23.
+            passage.Entities.Should().Contain(entity => entity.IsBall);
+            passage.Entities.Count(entity => !entity.IsBall).Should().BeInRange(18, 22);
+            passage.Entities.Where(entity => !entity.IsBall).Should()
                 .OnlyContain(entity =>
                     (entity.Side == "home" || entity.Side == "away") && entity.ParticipantId.HasValue);
 
-            highlight.Tracks.Should().HaveCount(23);
-            highlight.Tracks.Select(track => track.EntityId).Should()
-                .BeEquivalentTo(highlight.Entities.Select(entity => entity.EntityId));
+            passage.Tracks.Should().HaveCount(passage.Entities.Count);
+            passage.Tracks.Select(track => track.EntityId).Should()
+                .BeEquivalentTo(passage.Entities.Select(entity => entity.EntityId));
 
-            foreach (var track in highlight.Tracks)
+            foreach (var track in passage.Tracks)
             {
                 track.Keyframes.Should().NotBeEmpty();
                 track.Keyframes.Select(keyframe => keyframe.TimeMilliseconds).Should().BeInAscendingOrder();

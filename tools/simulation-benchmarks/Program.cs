@@ -75,7 +75,8 @@ void SingleMatch(ulong matchSeed)
 {
     var input = LaboratoryFixtures.EvenlyMatched(matchSeed);
     var liveMetrics = new PlayerLiveMetricsRecorder();
-    var result = MatchSimulator.Simulate(input, rules, liveMetrics);
+    var passages = new MatchPassageRecorder();
+    var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
 
     Console.WriteLine("== One match ==");
     Console.WriteLine($"  {input.Home.ClubName} {result.HomeGoals} - {result.AwayGoals} {input.Away.ClubName}");
@@ -91,11 +92,14 @@ void SingleMatch(ulong matchSeed)
     Console.WriteLine($"  output hash      {result.OutputHash}");
 
     var commentary = CommentaryTokenBuilder.Build(input, result);
-    var presentation = HighlightDirector.Build(input, result, liveMetrics: liveMetrics.Metrics);
+    var presentation = ReplayDirector.Build(input, result, passages.Passages, liveMetrics: liveMetrics.Metrics);
 
     Console.WriteLine($"  commentary lines {commentary.Count}");
     Console.WriteLine($"  live metrics     {liveMetrics.Metrics.Count}");
-    Console.WriteLine($"  highlights       {presentation.Highlights.Count}, ~{presentation.EstimatedPayloadBytes / 1024.0:F1} KB");
+    Console.WriteLine($"  passages         {presentation.Passages.Count}"
+        + $", film {presentation.TotalPlaybackMilliseconds / 60_000.0:F1} min"
+        + $", reel {presentation.Reel.Sum(clip => clip.DurationMilliseconds) / 60_000.0:F1} min"
+        + $", ~{presentation.EstimatedPayloadBytes / 1024.0:F1} KB");
     Console.WriteLine();
 }
 
@@ -191,53 +195,49 @@ void Distributions(int matches, ulong baseSeed)
 
 void Replay(int matches, ulong baseSeed)
 {
-    Console.WriteLine($"== replay, {matches:N0} matches ==");
+    Console.WriteLine($"== replay-v3 film and reel, {matches:N0} matches ==");
 
-    var highlightCounts = new double[matches];
-    var durations = new double[matches];
+    var passageCounts = new double[matches];
+    var filmDurations = new double[matches];
+    var reelDurations = new double[matches];
     var payloads = new double[matches];
-    var qualities = new List<double>();
-    var highlightsInFiveToTen = 0;
-    var overTenMinutes = 0;
+    var inWindow = 0;
+    var overCeiling = 0;
 
     for (var index = 0; index < matches; index++)
     {
         var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index);
         var liveMetrics = new PlayerLiveMetricsRecorder();
-        var result = MatchSimulator.Simulate(input, rules, liveMetrics);
-        var presentation = HighlightDirector.Build(input, result, liveMetrics: liveMetrics.Metrics);
+        var passages = new MatchPassageRecorder();
+        var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
+        var presentation = ReplayDirector.Build(input, result, passages.Passages, liveMetrics: liveMetrics.Metrics);
 
-        qualities.AddRange(result.Events
-            .Where(matchEvent => matchEvent.QualityBasisPoints is not null)
-            .Select(matchEvent => (double)matchEvent.QualityBasisPoints!.Value));
-
-        highlightCounts[index] = presentation.Highlights.Count;
-        durations[index] = presentation.TotalPlaybackMilliseconds;
+        passageCounts[index] = presentation.Passages.Count;
+        filmDurations[index] = presentation.TotalPlaybackMilliseconds;
+        reelDurations[index] = presentation.Reel.Sum(clip => clip.DurationMilliseconds);
         payloads[index] = presentation.EstimatedPayloadBytes;
 
-        if (presentation.TotalPlaybackMilliseconds is >= 5 * 60 * 1000 and <= 10 * 60 * 1000)
+        if (presentation.TotalPlaybackMilliseconds is >= (9 * 60 * 1000) and <= (11 * 60 * 1000))
         {
-            highlightsInFiveToTen++;
+            inWindow++;
         }
 
-        if (presentation.TotalPlaybackMilliseconds > 10 * 60 * 1000)
+        if (presentation.TotalPlaybackMilliseconds > 11 * 60 * 1000)
         {
-            overTenMinutes++;
+            overCeiling++;
         }
     }
 
-    Array.Sort(highlightCounts);
-    Array.Sort(durations);
+    Array.Sort(passageCounts);
+    Array.Sort(filmDurations);
+    Array.Sort(reelDurations);
     Array.Sort(payloads);
-    var sortedQualities = qualities.ToArray();
-    Array.Sort(sortedQualities);
 
-    Console.WriteLine($"  {"shot quality bp p10/p50/p90",-28} {Percentile(sortedQualities, 0.10),7:F0}       {Percentile(sortedQualities, 0.50),7:F0}       {Percentile(sortedQualities, 0.90),7:F0}   over 1600: {100.0 * sortedQualities.Count(value => value >= 1_600) / sortedQualities.Length:F0}%");
-
-    Console.WriteLine($"  {"highlights per match",-28} {Percentile(highlightCounts, 0.50),7} p50   {Percentile(highlightCounts, 0.05),7} p05   {Percentile(highlightCounts, 0.95),7} p95");
-    Console.WriteLine($"  {"replay minutes p05/p50/p95",-28} {Percentile(durations, 0.05) / 60_000.0,7:F1}       {Percentile(durations, 0.50) / 60_000.0,7:F1}       {Percentile(durations, 0.95) / 60_000.0,7:F1}   min {durations[0] / 60_000.0:F1}  max {durations[^1] / 60_000.0:F1}");
-    Console.WriteLine($"  {"payload KB p05/p50/p95",-28} {Percentile(payloads, 0.05) / 1024.0,7:F1}       {Percentile(payloads, 0.50) / 1024.0,7:F1}       {Percentile(payloads, 0.95) / 1024.0,7:F1}");
-    Console.WriteLine($"  {"inside 5-10 minutes",-28} {100.0 * highlightsInFiveToTen / matches,7:F1}%   over 10 min {100.0 * overTenMinutes / matches:F2}%");
+    Console.WriteLine($"  {"passages per match",-28} {Percentile(passageCounts, 0.50),7} p50   {Percentile(passageCounts, 0.05),7} p05   {Percentile(passageCounts, 0.95),7} p95   max {passageCounts[^1]}");
+    Console.WriteLine($"  {"film minutes p05/p50/p95",-28} {Percentile(filmDurations, 0.05) / 60_000.0,7:F1}       {Percentile(filmDurations, 0.50) / 60_000.0,7:F1}       {Percentile(filmDurations, 0.95) / 60_000.0,7:F1}   min {filmDurations[0] / 60_000.0:F1}  max {filmDurations[^1] / 60_000.0:F1}");
+    Console.WriteLine($"  {"reel minutes p05/p50/p95",-28} {Percentile(reelDurations, 0.05) / 60_000.0,7:F1}       {Percentile(reelDurations, 0.50) / 60_000.0,7:F1}       {Percentile(reelDurations, 0.95) / 60_000.0,7:F1}   max {reelDurations[^1] / 60_000.0:F1}");
+    Console.WriteLine($"  {"payload KB p05/p50/p95",-28} {Percentile(payloads, 0.05) / 1024.0,7:F1}       {Percentile(payloads, 0.50) / 1024.0,7:F1}       {Percentile(payloads, 0.95) / 1024.0,7:F1}   max {payloads[^1] / 1024.0:F1}");
+    Console.WriteLine($"  {"inside 9:30-11:00",-28} {100.0 * inWindow / matches,7:F1}%   over 11 min {100.0 * overCeiling / matches:F2}%");
     Console.WriteLine();
 }
 

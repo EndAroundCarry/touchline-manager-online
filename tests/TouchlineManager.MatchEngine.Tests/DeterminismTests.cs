@@ -134,8 +134,10 @@ public sealed class DeterminismTests
         Commentary.CommentaryTokenBuilder.Build(input, first)
             .Should().BeEquivalentTo(Commentary.CommentaryTokenBuilder.Build(input, second), options => options.WithStrictOrdering());
 
-        HighlightDirector.Build(input, first)
-            .Should().BeEquivalentTo(HighlightDirector.Build(input, second), options => options.WithStrictOrdering());
+        TestMatchFactory.Play(input).Presentation
+            .Should().BeEquivalentTo(
+                TestMatchFactory.Play(input).Presentation,
+                options => options.WithStrictOrdering());
     }
 
     [Fact]

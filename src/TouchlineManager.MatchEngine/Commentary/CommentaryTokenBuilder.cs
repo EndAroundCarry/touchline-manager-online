@@ -83,6 +83,69 @@ public sealed record HighlightCommentaryV1
 }
 
 /// <summary>
+/// What kind of build-up moment a film beat narrates (`commentary-v3`).
+/// </summary>
+/// <remarks>
+/// The build-up families a continuous film needs, one per meaningful touch. A beat whose kind is
+/// <see cref="Event"/> names the event it narrates and is rendered from the full log's own templates, so the
+/// feed and the report never word the same goal differently.
+/// </remarks>
+public enum PassageBeatKind
+{
+    /// <summary>A progressive pass or a pass received.</summary>
+    Pass = 0,
+
+    /// <summary>A player carried the ball.</summary>
+    Carry = 1,
+
+    /// <summary>A player dribbled past a challenge.</summary>
+    Dribble = 2,
+
+    /// <summary>A ball crossed into the box.</summary>
+    Cross = 3,
+
+    /// <summary>A header won.</summary>
+    Header = 4,
+
+    /// <summary>A tackle made.</summary>
+    Tackle = 5,
+
+    /// <summary>The ball intercepted.</summary>
+    Interception = 6,
+
+    /// <summary>A save made.</summary>
+    Save = 7,
+
+    /// <summary>A shot, penalty, or free kick taken.</summary>
+    Chance = 8,
+
+    /// <summary>An event, rendered from the full match log's own template for its type.</summary>
+    Event = 9,
+}
+
+/// <summary>
+/// One narrated moment inside a film passage (`commentary-v3`).
+/// </summary>
+/// <remarks>
+/// The director decides which touches and events are worth narrating and where they sit on the passage's
+/// film clock; the builder decides the words. Every fact here is one a manager can already see — a player, a
+/// club, a minute — and never a hidden value (`MAT-11`).
+/// </remarks>
+/// <param name="TimeMilliseconds">The offset from the passage's first frame, in milliseconds.</param>
+/// <param name="Side">Which side the beat belongs to.</param>
+/// <param name="ParticipantId">The player involved, absent for a beat that names nobody.</param>
+/// <param name="Kind">What kind of moment it is.</param>
+/// <param name="Event">The event to narrate when <paramref name="Kind"/> is <see cref="PassageBeatKind.Event"/>.</param>
+/// <param name="Seed">A stable seed that chooses the variant, so repeated lines can be told apart.</param>
+public sealed record PassageBeatV1(
+    int TimeMilliseconds,
+    MatchSide Side,
+    Guid? ParticipantId,
+    PassageBeatKind Kind,
+    EngineEventV1? Event,
+    int Seed);
+
+/// <summary>
 /// Turns a simulated match into commentary tokens (master plan §8.6, `MAT-8`).
 /// </summary>
 /// <remarks>
@@ -101,7 +164,7 @@ public sealed record HighlightCommentaryV1
 public static class CommentaryTokenBuilder
 {
     /// <summary>The version label of this template set.</summary>
-    public const string Version = "commentary-v2";
+    public const string Version = "commentary-v3";
 
     /// <summary>The delay between a strike and the line that reports where it ended up.</summary>
     private const int OutcomeDelayMilliseconds = 900;
@@ -186,7 +249,7 @@ public static class CommentaryTokenBuilder
         };
 
         var actionAt = int.Clamp(strikeMilliseconds, 1, durationMilliseconds);
-        lines.Add(Token(actionAt, PassageAction(matchEvent.Type), matchEvent.Sequence + 1, facts));
+        lines.Add(Token(actionAt, PassageActionTemplate(matchEvent.Type), matchEvent.Sequence + 1, facts));
 
         var outcome = OutcomeTemplate(matchEvent.Type);
 
@@ -198,6 +261,135 @@ public static class CommentaryTokenBuilder
 
         return lines;
     }
+
+    /// <summary>
+    /// Maps a recorded passage action to the build-up family that narrates it, or null for one not narrated
+    /// (`commentary-v3`).
+    /// </summary>
+    /// <param name="action">What the player did with the ball.</param>
+    public static PassageBeatKind? KindOf(PassageAction action) => action switch
+    {
+        PassageAction.Pass or PassageAction.Receive => PassageBeatKind.Pass,
+        PassageAction.Carry => PassageBeatKind.Carry,
+        PassageAction.Cross => PassageBeatKind.Cross,
+        PassageAction.Header => PassageBeatKind.Header,
+        PassageAction.Tackle => PassageBeatKind.Tackle,
+        PassageAction.Interception => PassageBeatKind.Interception,
+        PassageAction.Save or PassageAction.Dive => PassageBeatKind.Save,
+        PassageAction.Shot or PassageAction.Penalty or PassageAction.FreeKick => PassageBeatKind.Chance,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Builds the synchronized commentary for a film passage from its beats (`replay-v3`, `commentary-v3`).
+    /// </summary>
+    /// <remarks>
+    /// The director hands over the touches and events it decided are worth narrating, already on the passage's
+    /// own film clock; the builder turns each into a line. A build-up beat uses its family's template, and an
+    /// event beat reuses the full log's template for its type, so a goal reads the same in the feed as it does
+    /// in the report. Times are clamped into the passage, so a caller can never hand a client a line that
+    /// plays after the whistle.
+    /// </remarks>
+    /// <param name="input">The frozen snapshot, which supplies the names.</param>
+    /// <param name="beats">The passage's narrated moments, ordered by the director.</param>
+    /// <param name="durationMilliseconds">How long the passage runs for in the film.</param>
+    public static IReadOnlyList<HighlightCommentaryV1> BuildPassageCommentary(
+        MatchInputV1 input,
+        IReadOnlyList<PassageBeatV1> beats,
+        int durationMilliseconds)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(beats);
+
+        if (durationMilliseconds <= 0 || beats.Count == 0)
+        {
+            return [];
+        }
+
+        var names = BuildNameLookup(input);
+        var lines = new List<HighlightCommentaryV1>(beats.Count);
+
+        foreach (var beat in beats.OrderBy(beat => beat.TimeMilliseconds))
+        {
+            var template = TemplateFor(beat);
+
+            if (template is null)
+            {
+                continue;
+            }
+
+            var facts = BeatFacts(input, names, beat);
+            var variant = ((beat.Seed % template.Variants.Count) + template.Variants.Count) % template.Variants.Count;
+
+            lines.Add(new HighlightCommentaryV1
+            {
+                TimeMilliseconds = int.Clamp(beat.TimeMilliseconds, 0, durationMilliseconds),
+                TemplateKey = template.Key,
+                VariantKey = $"{template.Key}.v{variant + 1}",
+                Parameters = DurableParameters(facts),
+                Text = Render(template.Variants[variant], facts),
+            });
+        }
+
+        return lines;
+    }
+
+    /// <summary>The template a beat renders from: its own family, or the event's full-log template.</summary>
+    private static Template? TemplateFor(PassageBeatV1 beat) => beat.Kind switch
+    {
+        PassageBeatKind.Event => beat.Event is { } matchEvent && Templates.TryGetValue(matchEvent.Type, out var template)
+            ? template
+            : null,
+        PassageBeatKind.Pass => BuildTemplates["pass"],
+        PassageBeatKind.Carry => BuildTemplates["carry"],
+        PassageBeatKind.Dribble => BuildTemplates["dribble"],
+        PassageBeatKind.Cross => BuildTemplates["cross"],
+        PassageBeatKind.Header => BuildTemplates["header"],
+        PassageBeatKind.Tackle => BuildTemplates["tackle"],
+        PassageBeatKind.Interception => BuildTemplates["interception"],
+        PassageBeatKind.Save => BuildTemplates["save"],
+        PassageBeatKind.Chance => BuildTemplates["chance"],
+        _ => null,
+    };
+
+    /// <summary>The facts a beat is rendered from: the event's own, or a player-fact set for a build-up beat.</summary>
+    private static Dictionary<string, string> BeatFacts(
+        MatchInputV1 input,
+        IReadOnlyDictionary<Guid, string> names,
+        PassageBeatV1 beat)
+    {
+        if (beat.Kind == PassageBeatKind.Event && beat.Event is { } matchEvent)
+        {
+            return Facts(input, matchEvent, names);
+        }
+
+        var side = input.SideOf(beat.Side);
+        var opponent = input.SideOf(MatchInputV1.OpponentOf(beat.Side));
+
+        var facts = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["club"] = side.ClubName,
+            ["clubId"] = side.ClubId.ToString("D"),
+            ["opponent"] = opponent.ClubName,
+        };
+
+        if (beat.ParticipantId is Guid player)
+        {
+            facts["player"] = NameOf(names, player);
+            facts["playerId"] = player.ToString("D");
+        }
+
+        return facts;
+    }
+
+    /// <summary>The durable parameters of a line, with the rendering-only facts dropped.</summary>
+    private static IReadOnlyList<CommentaryParameter> DurableParameters(IReadOnlyDictionary<string, string> facts) =>
+    [
+        .. facts
+            .Where(fact => fact.Key != "clock" && fact.Key != "player" && fact.Key != "opponent")
+            .OrderBy(fact => fact.Key, StringComparer.Ordinal)
+            .Select(fact => new CommentaryParameter(fact.Key, fact.Value)),
+    ];
 
     private static HighlightCommentaryV1 Token(
         int timeMilliseconds,
@@ -228,7 +420,7 @@ public static class CommentaryTokenBuilder
             ? PassageTemplates["set_piece"]
             : PassageTemplates["build_up"];
 
-    private static Template PassageAction(EngineEventType type) => type switch
+    private static Template PassageActionTemplate(EngineEventType type) => type switch
     {
         EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed => PassageTemplates["penalty"],
         EngineEventType.FreeKickShot => PassageTemplates["free_kick"],
@@ -371,6 +563,91 @@ public static class CommentaryTokenBuilder
                 "{player} strikes the free kick.",
                 "{player} goes directly for goal.",
                 "The free kick is {player}'s to take.",
+            ]),
+    };
+
+    /// <summary>
+    /// The build-up families a continuous film narrates from (`commentary-v3`), keyed by the moment they name.
+    /// </summary>
+    /// <remarks>
+    /// Every meaningful touch gets a family rather than a fixed opening line, which is what turns the feed from
+    /// three generic sentences a passage into a readable account of the move. Filler square passes are simply
+    /// not handed to the builder, so the policy of skipping them lives in the director's beat selection rather
+    /// than in a template.
+    /// </remarks>
+    private static readonly Dictionary<string, Template> BuildTemplates = new(StringComparer.Ordinal)
+    {
+        ["pass"] = new(
+            "match.build.pass",
+            [
+                "{player} plays it forward.",
+                "{player} finds a team-mate.",
+                "{player} moves it on.",
+                "{player} keeps the move going.",
+            ]),
+        ["carry"] = new(
+            "match.build.carry",
+            [
+                "{player} carries the ball forward.",
+                "{player} drives on.",
+                "{player} advances with it.",
+                "{player} strides forward.",
+            ]),
+        ["dribble"] = new(
+            "match.build.dribble",
+            [
+                "{player} beats his man.",
+                "{player} skips past a challenge.",
+                "{player} goes past one.",
+                "{player} dribbles through.",
+            ]),
+        ["cross"] = new(
+            "match.build.cross",
+            [
+                "{player} swings in a cross.",
+                "{player} delivers into the box.",
+                "{player} whips it in.",
+                "{player} sends a cross over.",
+            ]),
+        ["header"] = new(
+            "match.build.header",
+            [
+                "{player} rises to head it.",
+                "{player} meets it with his head.",
+                "{player} wins the header.",
+                "{player} heads it on.",
+            ]),
+        ["tackle"] = new(
+            "match.build.tackle",
+            [
+                "{player} makes the tackle.",
+                "{player} wins it back.",
+                "{player} slides in and takes it.",
+                "{player} dispossesses his man.",
+            ]),
+        ["interception"] = new(
+            "match.build.interception",
+            [
+                "{player} intercepts.",
+                "{player} reads it and cuts it out.",
+                "{player} steps in front.",
+                "{player} nips in to intercept.",
+            ]),
+        ["save"] = new(
+            "match.build.save",
+            [
+                "{player} saves it.",
+                "{player} gets a hand to it.",
+                "{player} keeps it out.",
+                "A save by {player}.",
+            ]),
+        ["chance"] = new(
+            "match.build.chance",
+            [
+                "{player} has a go.",
+                "{player} lets fly.",
+                "The chance falls to {player}.",
+                "{player} goes for goal.",
             ]),
     };
 

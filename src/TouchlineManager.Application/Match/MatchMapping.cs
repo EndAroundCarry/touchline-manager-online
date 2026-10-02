@@ -63,7 +63,7 @@ public static class MatchMapping
                 snapshot.AwayGoals,
                 ToResponse(statistics.Away)),
             snapshot.EngineVersion,
-            HighlightDirector.Version,
+            ReplayDirector.Version,
             serverTime);
     }
 
@@ -87,12 +87,12 @@ public static class MatchMapping
             presentation.HomeGoals,
             presentation.AwayGoals,
             [.. commentary.Select(ToResponse)],
-            [.. presentation.Highlights.Select(ToResponse)],
+            [.. presentation.Passages.Select(ToResponse)],
+            [.. presentation.Reel.Select(ToResponse)],
             presentation.EstimatedPayloadBytes,
             presentation.HomeLineup is { } homeLineup ? ToResponse(homeLineup) : null,
             presentation.AwayLineup is { } awayLineup ? ToResponse(awayLineup) : null,
             presentation.LiveMetrics is { } metrics ? [.. metrics.Select(ToResponse)] : null,
-            presentation.Bridges.Count > 0 ? [.. presentation.Bridges.Select(ToResponse)] : null,
             presentation.Playback.Count > 0 ? [.. presentation.Playback.Select(ToResponse)] : null,
             presentation.TotalPlaybackMilliseconds);
     }
@@ -110,16 +110,19 @@ public static class MatchMapping
             segment.DurationMilliseconds);
     }
 
-    /// <summary>Projects one recycling bridge.</summary>
-    /// <param name="bridge">The bridge.</param>
-    public static BridgeResponse ToResponse(this BridgeV1 bridge)
+    /// <summary>Projects one reel clip.</summary>
+    /// <param name="clip">The clip.</param>
+    public static ReelClipResponse ToResponse(this ReelClipV1 clip)
     {
-        ArgumentNullException.ThrowIfNull(bridge);
+        ArgumentNullException.ThrowIfNull(clip);
 
-        return new BridgeResponse(
-            bridge.AfterEventSequence,
-            bridge.DurationMilliseconds,
-            [.. bridge.Tracks.Select(ToResponse)]);
+        return new ReelClipResponse(
+            clip.SourceEventSequence,
+            clip.OutcomeCode,
+            clip.Minute,
+            clip.StoppageMinute,
+            clip.StartMilliseconds,
+            clip.EndMilliseconds);
     }
 
     /// <summary>Projects one commentary line.</summary>
@@ -139,24 +142,27 @@ public static class MatchMapping
             token.Text);
     }
 
-    /// <summary>Projects one highlight.</summary>
-    /// <param name="highlight">The highlight.</param>
-    public static HighlightResponse ToResponse(this HighlightPresentationV1 highlight)
+    /// <summary>Projects one film passage.</summary>
+    /// <param name="passage">The passage.</param>
+    public static PassageResponse ToResponse(this PassageV1 passage)
     {
-        ArgumentNullException.ThrowIfNull(highlight);
+        ArgumentNullException.ThrowIfNull(passage);
 
-        return new HighlightResponse(
-            highlight.SourceEventSequence,
-            highlight.Minute,
-            highlight.StoppageMinute,
-            highlight.DurationMilliseconds,
-            highlight.OutcomeCode,
-            highlight.Narration,
-            highlight.HomeColour,
-            highlight.AwayColour,
-            [.. highlight.Entities.Select(ToResponse)],
-            [.. highlight.Tracks.Select(ToResponse)],
-            [.. highlight.Commentary.Select(ToResponse)]);
+        return new PassageResponse(
+            passage.SourceEventSequence,
+            passage.Minute,
+            passage.StoppageMinute,
+            passage.StartMatchSecond,
+            passage.EndMatchSecond,
+            passage.DurationMilliseconds,
+            passage.OutcomeCode,
+            passage.Narration,
+            passage.HomeColour,
+            passage.AwayColour,
+            passage.EventSequences,
+            [.. passage.Entities.Select(ToResponse)],
+            [.. passage.Tracks.Select(ToResponse)],
+            [.. passage.Commentary.Select(ToResponse)]);
     }
 
     /// <summary>Projects one synchronized passage commentary line.</summary>

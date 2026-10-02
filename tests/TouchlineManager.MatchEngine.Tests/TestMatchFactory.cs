@@ -1,5 +1,6 @@
 using TouchlineManager.MatchEngine;
 using TouchlineManager.MatchEngine.Configuration;
+using TouchlineManager.MatchEngine.Highlights;
 using TouchlineManager.MatchEngine.Model;
 
 namespace TouchlineManager.MatchEngine.Tests;
@@ -150,6 +151,54 @@ internal static class TestMatchFactory
             Slots = slots,
             Instructions = instructions,
         };
+    }
+
+    /// <summary>
+    /// Simulates a snapshot with both replay recorders attached and builds its presentation.
+    /// </summary>
+    /// <param name="input">The snapshot.</param>
+    /// <param name="options">The film's pacing and caps, or the defaults.</param>
+    /// <remarks>
+    /// The one way a test gets a presentation: the passages must be recorded from the same run the result
+    /// came from, so the film and the result cannot describe two different matches.
+    /// </remarks>
+    public static (MatchResultV1 Result, MatchPresentationV1 Presentation) Play(
+        MatchInputV1 input,
+        HighlightOptionsV1? options = null)
+    {
+        var liveMetrics = new PlayerLiveMetricsRecorder();
+        var passages = new MatchPassageRecorder();
+        var result = MatchSimulator.Simulate(input, Rules, liveMetrics, passages);
+        var presentation = ReplayDirector.Build(input, result, passages.Passages, options, liveMetrics.Metrics);
+
+        return (result, presentation);
+    }
+
+    /// <summary>
+    /// Whether the reel carries the passage an event belongs to.
+    /// </summary>
+    /// <param name="presentation">The built presentation.</param>
+    /// <param name="eventSequence">The event whose passage must be on the reel.</param>
+    /// <remarks>
+    /// Clips that overlap are merged, so a merged clip no longer names every chance it holds; the guarantee
+    /// the reel makes is coverage of the film, which is what this checks.
+    /// </remarks>
+    public static bool ReelCovers(MatchPresentationV1 presentation, int eventSequence)
+    {
+        for (var index = 0; index < presentation.Passages.Count; index++)
+        {
+            if (!presentation.Passages[index].EventSequences.Contains(eventSequence))
+            {
+                continue;
+            }
+
+            var start = presentation.Playback[index].StartMilliseconds;
+            var end = start + presentation.Playback[index].DurationMilliseconds;
+
+            return presentation.Reel.Any(clip => clip.StartMilliseconds <= start && clip.EndMilliseconds >= end);
+        }
+
+        return false;
     }
 
     /// <summary>A four-four-two, which is the shape the domain's first preset describes.</summary>

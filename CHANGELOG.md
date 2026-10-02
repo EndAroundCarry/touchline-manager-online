@@ -4,6 +4,51 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine-v4 replay — one continuous film, and a reel over it
+
+`replay-v2` turned the engine's events into at most two dozen chance snippets and bridged the gaps, so the
+replay cut between chances and never showed a build-up. `engine-v4` gave the simulation a real ball path;
+`replay-v3` now turns it into one continuous condensed film of the whole match, plus a highlights reel over
+the same data. Presentation is re-derived, never stored, so this is a clean change.
+
+The director merges the recorded possessions into roughly fifty to seventy-five film passages — split at
+substitutions, half-time, and bookings of personnel so a passage's eleven is stable — and warps their time so
+a ninety-minute match becomes a ten-minute film, weighted so chances are readable and dull spells fly by. The
+ball's track is the recorded path; the eleven's tracks are the shape the tactical resolver gives them over
+that real path, overwritten by the recorded touches of the carrier, passer, shooter, and keeper. Boundary
+frames are copied exactly, so the film joins rather than cuts. A server-side reel selects every goal and the
+best chances, each clip carrying a genuine lead-in of up to ten match-minutes, with overlaps merged. Payload
+is guarded by an adaptive compression ladder (tolerance 32 → 40 → 48, sample interval 400 → 600 → 800 ms).
+
+### Changed
+
+- **`HighlightDirector` → `ReplayDirector`** (`Highlights/ReplayDirector.cs`, `replay-v3`), with a new
+  `Highlights/ReelBuilder.cs` beside it; the highlights model becomes `PassageV1`/`ReelClipV1` and the bridge
+  concept is deleted.
+- **Presentation contract:** `MatchPresentationResponse.Highlights` → `Passages` (each a passage plus
+  `StartMatchSecond`, `EndMatchSecond`, `EventSequences`), a new `Reel` of `ReelClipResponse`, `Bridges`
+  removed, and `Playback` is one `passage` segment per passage. The presentation ETag becomes
+  `{OutputHash}:{PresentationVersion}`, so a future replay revision invalidates cached payloads.
+- **Commentary (`commentary-v3`):** `CommentaryTokenBuilder` gains the build-up families — `match.build.pass`,
+  `carry`, `dribble`, `cross`, `header`, `tackle`, `interception`, `save`, `chance` — and narrates film
+  passages from their recorded touches and events; a goal keeps the full log's own wording.
+
+### Notes
+
+- The film is a by-product of the ordinary simulation: the passage recorder is optional, consumes no draw,
+  and the output hash is identical with and without it.
+- The web viewer still reads `replay-v2`; the engine roadmap's M3 updates it to `replay-v3`.
+- The dev database seeded under `engine-v3` was archived (`touchline_engine_v3_backup`) and reseeded, because
+  a version-4 match cannot replay a version-3 result.
+
+### Tests
+
+- New `ReplayDirectorTests`: contiguous one-segment-per-passage schedule, the nine-to-eleven-minute film,
+  passage windows in order, boundary-frame continuity, on-pitch and in-passage keyframes, the eleven and the
+  ball with a track each, synchronized and `MAT-11`-safe passage commentary, the reel carrying every goal,
+  goal narration naming the scorer, determinism, and the payload budget. `HighlightTests` re-expressed for
+  reel selection. `GetMatchPresentationTests` and `MatchTests` updated for the new contract and ETag.
+
 ## Engine-v4 — a possession is played along a real passage
 
 `engine-v3` located a possession on the pitch with a single absolute draw: every possession was assigned a
