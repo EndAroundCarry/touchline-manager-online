@@ -92,7 +92,8 @@ function presentation(): MatchPresentation {
     homeGoals: 2,
     awayGoals: 1,
     commentary: [],
-    highlights: [],
+    passages: [],
+    reel: [],
     estimatedPayloadBytes: 1_024,
   };
 }

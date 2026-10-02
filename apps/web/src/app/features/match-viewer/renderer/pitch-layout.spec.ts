@@ -79,20 +79,20 @@ describe('pitchGeometry', () => {
 describe('altitude', () => {
   const rect = { x: 0, y: 0, width: 1_050, height: 680 };
 
-  it('lifts the ball by a share of the pitch, growing with altitude', () => {
+  it('lifts the ball by a small share of the pitch, growing with altitude', () => {
     expect(altitudeLift(rect, 0)).toBe(0);
-    expect(altitudeLift(rect, 50)).toBeCloseTo(rect.height * 0.15, 5);
-    expect(altitudeLift(rect, 100)).toBeCloseTo(rect.height * 0.3, 5);
+    expect(altitudeLift(rect, 50)).toBeCloseTo(rect.height * 0.06, 5);
+    expect(altitudeLift(rect, 100)).toBeCloseTo(rect.height * 0.12, 5);
   });
 
   it("keeps an out-of-band altitude inside the contract's 0…100", () => {
     expect(altitudeLift(rect, -20)).toBe(0);
-    expect(altitudeLift(rect, 400)).toBeCloseTo(rect.height * 0.3, 5);
+    expect(altitudeLift(rect, 400)).toBeCloseTo(rect.height * 0.12, 5);
   });
 
   it('grows the ball with altitude, so height reads as size as well as offset', () => {
     expect(altitudeScale(0)).toBe(1);
-    expect(altitudeScale(100)).toBeCloseTo(1.9, 5);
-    expect(altitudeScale(200)).toBeCloseTo(1.9, 5);
+    expect(altitudeScale(100)).toBeCloseTo(1.35, 5);
+    expect(altitudeScale(200)).toBeCloseTo(1.35, 5);
   });
 });

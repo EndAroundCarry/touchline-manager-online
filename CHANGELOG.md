@@ -4,6 +4,45 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Replay-v3 viewer — one film, a feed, and a scrubber
+
+`replay-v3` gave the client one continuous film and a reel over it; the match center still spoke
+`replay-v2`'s chance chips, bridge passages, and single-line ticker. This milestone moves the viewer onto
+the new contract.
+
+### Changed
+
+- **Playback (`core/match/match-playback.ts`).** The player is now a global film timeline rather than a
+  list of chances: `position` is a film moment, the active passage is looked up from it, and the reel is a
+  playlist of windows over the same film (`mode: 'full' | 'reel'`), with overlapped clips merged. Speeds
+  become `0.5 / 1 / 2 / 4 / 8`; `advance`, `seekTo`, and `seekToEvent` keep their shapes, and a highlights
+  playlist whose reel is empty falls back to the whole film so no match is unwatchable.
+- **Presentation helpers.** `Highlight` becomes `Passage` (carrying `startMatchSecond`/`endMatchSecond`/
+  `eventSequences`) and `ReelClip` is added; `highlightTitle` → `passageTitle` and `highlightIndexForLine`
+  → `passageIndexForLine`, which also matches a line narrated inside a passage's event window. A continuous
+  match clock is read from a match second (`matchClockFromSeconds`), and the shot map is built from the film
+  passages rather than from chance highlights.
+- **Viewer.** A "Full match | Highlights" control replaces "Condensed | Highlights"; the clock ticks
+  continuously across a passage's match window and becomes `90+N'` in stoppage; the chip timeline is
+  replaced by a scrubber with goal and shot markers; the ticker is replaced by a scrolling commentary feed
+  (`role="log"`) that gains a row as the playhead passes each one's film time, with a "jump to live" control
+  when the manager scrolls up. There is no empty state. The report's "Watch" buttons seek into the film,
+  switching back to full mode when the reel cannot show an event.
+- **Renderer.** Both teams are drawn as circles with shirt numbers, told apart by kit colour and border
+  (home white, away dark ink) rather than shape; the ball only casts a shadow above ~10 altitude and only
+  trails on a shot, a cross, or a genuinely airborne ball; a jumping player lifts off a ground shadow; a
+  keeper going down gets a lateral streak and no shadow; `altitudeLift` drops from 0.3 to 0.12 of the pitch
+  height and `altitudeScale` tops out at 1.35; the duel ring now also fires on `interception`.
+
+### Tests
+
+- `match-playback.spec.ts` re-expressed for the film timeline and reel playlist, with new cases for the two
+  modes, reel-window walking and seeking, clip-overlap merging, and the empty-reel fallback.
+  `match-presentation.spec.ts`, `canvas-match-renderer.spec.ts`, `pitch-layout.spec.ts`, and
+  `renderer-effects.spec.ts` updated for the renamed model, the continuous clock, the shadow/trail policy,
+  the keeper dive, and the dots. `match-viewer.spec.ts` re-expressed for the two modes, the feed, and the
+  scrubber.
+
 ## Engine-v4 replay — one continuous film, and a reel over it
 
 `replay-v2` turned the engine's events into at most two dozen chance snippets and bridged the gaps, so the
@@ -37,7 +76,7 @@ is guarded by an adaptive compression ladder (tolerance 32 → 40 → 48, sample
 
 - The film is a by-product of the ordinary simulation: the passage recorder is optional, consumes no draw,
   and the output hash is identical with and without it.
-- The web viewer still reads `replay-v2`; the engine roadmap's M3 updates it to `replay-v3`.
+- The web viewer's move onto `replay-v3` — the film timeline, the feed, and the renderer's dot/shadow policy — is the change set above.
 - The dev database seeded under `engine-v3` was archived (`touchline_engine_v3_backup`) and reseeded, because
   a version-4 match cannot replay a version-3 result.
 

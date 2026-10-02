@@ -1,4 +1,4 @@
-import { Highlight } from '../../../core/match/match.models';
+import { Passage } from '../../../core/match/match.models';
 import { CanvasMatchRenderer, readableInk } from './canvas-match-renderer';
 import { altitudeLift, altitudeScale, pitchRect, toCanvasPoint } from './pitch-layout';
 
@@ -120,11 +120,13 @@ function canvasWithContext(): { canvas: HTMLCanvasElement; context: RecordingCon
   return { canvas, context };
 }
 
-function highlight(overrides: Partial<Highlight> = {}): Highlight {
+function highlight(overrides: Partial<Passage> = {}): Passage {
   return {
     sourceEventSequence: 9,
     minute: 22,
     stoppageMinute: 0,
+    startMatchSecond: 1_320,
+    endMatchSecond: 1_360,
     durationMilliseconds: 20_000,
     outcomeCode: 'goal',
     narration: 'Goal.',
@@ -200,6 +202,7 @@ function highlight(overrides: Partial<Highlight> = {}): Highlight {
         text: 'Goal!',
       },
     ],
+    eventSequences: [9],
     ...overrides,
   };
 }
@@ -300,16 +303,99 @@ describe('CanvasMatchRenderer', () => {
     expect(context.calls.some((call) => call.text === 'GOAL!')).toBe(true);
   });
 
-  it('leaves a trail behind a struck ball', () => {
+  it('leaves a trail behind an airborne ball', () => {
     const { canvas, context } = canvasWithContext();
 
-    new CanvasMatchRenderer(canvas, highlight()).render(500);
+    // A quarter of the way along the track the ball is at 40, high enough to streak.
+    new CanvasMatchRenderer(canvas, highlight()).render(4_000);
 
     const trail = context.calls.filter(
       (call) => call.op === 'stroke' && (call.strokeStyle ?? '').startsWith('rgba(248, 250, 252'),
     );
 
     expect(trail.length).toBeGreaterThan(0);
+  });
+
+  it('leaves a ball on the grass with no shadow and no trail', () => {
+    const { canvas, context } = canvasWithContext();
+    const grounded = highlight({
+      tracks: [
+        {
+          entityId: 'ball',
+          keyframes: [
+            { timeMilliseconds: 0, x: 5_000, y: 5_000, z: 0 },
+            { timeMilliseconds: 20_000, x: 6_000, y: 5_000, z: 0 },
+          ],
+        },
+      ],
+    });
+
+    new CanvasMatchRenderer(canvas, grounded).render(5_000);
+
+    expect(context.calls.some((call) => call.op === 'ellipse')).toBe(false);
+  });
+
+  it('draws both teams as dots, told apart by border rather than shape', () => {
+    const { canvas, context } = canvasWithContext();
+
+    new CanvasMatchRenderer(canvas, highlight(), {
+      kits: {
+        home: { primary: '#1f4e79', secondary: '#d6e4f0' },
+        away: { primary: '#8c2f39', secondary: '#f2e3e5' },
+      },
+    }).render(0);
+
+    const dots = context.calls.filter((call) => call.op === 'arc');
+
+    expect(dots.some((call) => call.strokeStyle === '#ffffff')).toBe(true);
+    expect(dots.some((call) => call.strokeStyle === '#0f172a')).toBe(true);
+  });
+
+  it('lifts a jumping player off a ground shadow', () => {
+    const { canvas, context } = canvasWithContext();
+    const jumping = highlight({
+      tracks: [
+        {
+          entityId: 'H9',
+          keyframes: [
+            { timeMilliseconds: 0, x: 7_000, y: 4_000, z: 0 },
+            { timeMilliseconds: 5_000, x: 7_000, y: 4_000, z: 60, action: 'header' },
+          ],
+        },
+      ],
+    });
+
+    new CanvasMatchRenderer(canvas, jumping).render(5_000);
+
+    expect(
+      context.calls.some(
+        (call) => call.op === 'ellipse' && (call.fillStyle ?? '').startsWith('rgba(2, 6, 23'),
+      ),
+    ).toBe(true);
+  });
+
+  it('draws a keeper going down as a lateral streak with no shadow', () => {
+    const { canvas, context } = canvasWithContext();
+    const diving = highlight({
+      tracks: [
+        {
+          entityId: 'H1',
+          keyframes: [
+            { timeMilliseconds: 0, x: 500, y: 5_000, z: 0 },
+            { timeMilliseconds: 5_000, x: 1_500, y: 5_000, z: 0, action: 'save' },
+          ],
+        },
+      ],
+    });
+
+    new CanvasMatchRenderer(canvas, diving).render(5_000);
+
+    expect(
+      context.calls.some(
+        (call) => call.op === 'stroke' && call.strokeStyle === 'rgba(248, 250, 252, 0.55)',
+      ),
+    ).toBe(true);
+    expect(context.calls.some((call) => call.op === 'ellipse')).toBe(false);
   });
 
   it('clears the canvas and releases the pointer when it is disposed', () => {

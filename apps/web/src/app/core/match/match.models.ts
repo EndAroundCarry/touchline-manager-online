@@ -101,19 +101,12 @@ export interface HighlightCommentary {
   readonly text: string;
 }
 
-/** One segment of the condensed playback clock: a highlight or the recycling passage before it. */
+/** One segment of the film playback clock: a passage (`replay-v3`). */
 export interface PlaybackSegment {
   readonly kind: string;
   readonly sourceEventSequence: number;
   readonly startMilliseconds: number;
   readonly durationMilliseconds: number;
-}
-
-/** The recycling passage between two highlights, keyed to the highlight it leads into. */
-export interface Bridge {
-  readonly afterEventSequence: number;
-  readonly durationMilliseconds: number;
-  readonly tracks: readonly HighlightTrack[];
 }
 
 /** One entity in a highlight: a player or the ball. */
@@ -171,22 +164,41 @@ export interface PlayerLiveMetric {
   readonly ratingBasisPoints: number;
 }
 
-/** One immutable, replayable highlight. */
-export interface Highlight {
+/**
+ * One immutable, replayable film passage: a slice of a continuous match (`replay-v3`).
+ *
+ * Carries no frames and no video: the client interpolates between keyframes at its own refresh rate. The
+ * match window (`startMatchSecond`…`endMatchSecond`) is what the continuous clock reads, and the event
+ * sequences are what the report's "watch" seeks by.
+ */
+export interface Passage {
   readonly sourceEventSequence: number;
   readonly minute: number;
   readonly stoppageMinute: number;
+  readonly startMatchSecond: number;
+  readonly endMatchSecond: number;
   readonly durationMilliseconds: number;
   readonly outcomeCode: string;
   readonly narration: string;
   readonly homeColour: string;
   readonly awayColour: string;
+  readonly eventSequences: readonly number[];
   readonly entities: readonly HighlightEntity[];
   readonly tracks: readonly HighlightTrack[];
   readonly commentary?: readonly HighlightCommentary[] | null;
 }
 
-/** A played match's whole replay: commentary and highlights, in event order. */
+/** One clip of the highlights reel: a window of the film around a chance (`replay-v3`). */
+export interface ReelClip {
+  readonly sourceEventSequence: number;
+  readonly outcomeCode: string;
+  readonly minute: number;
+  readonly stoppageMinute: number;
+  readonly startMilliseconds: number;
+  readonly endMilliseconds: number;
+}
+
+/** A played match's whole replay: one continuous film, a highlights reel, and the commentary log. */
 export interface MatchPresentation {
   readonly matchId: string;
   readonly presentationVersion: string;
@@ -194,12 +206,12 @@ export interface MatchPresentation {
   readonly homeGoals: number;
   readonly awayGoals: number;
   readonly commentary: readonly CommentaryLine[];
-  readonly highlights: readonly Highlight[];
+  readonly passages: readonly Passage[];
+  readonly reel: readonly ReelClip[];
   readonly estimatedPayloadBytes: number;
   readonly homeLineup?: MatchLineup | null;
   readonly awayLineup?: MatchLineup | null;
   readonly liveMetrics?: readonly PlayerLiveMetric[] | null;
-  readonly bridges?: readonly Bridge[] | null;
   readonly playback?: readonly PlaybackSegment[] | null;
   readonly totalPlaybackMilliseconds?: number;
 }

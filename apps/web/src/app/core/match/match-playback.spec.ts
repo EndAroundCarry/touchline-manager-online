@@ -1,58 +1,117 @@
-import { Bridge, Highlight, HighlightEntity } from './match.models';
+import { Passage, PlaybackSegment, ReelClip } from './match.models';
 import { MatchPlayback, PLAYBACK_SPEEDS } from './match-playback';
 
 /**
- * The replay's playback guarantees (`§9.4`).
+ * The film playback guarantees (`replay-v3`).
  *
- * The player is pure and timer-free, so every requirement about speed, queueing, skipping, and seeking is
- * asserted here with plain calls rather than by waiting for a browser to animate something.
+ * The player is pure and timer-free, so every requirement about speed, the film timeline, the reel playlist,
+ * skipping, and seeking is asserted here with plain calls rather than by waiting for a browser to animate
+ * something.
  */
 
-function highlight(sequence: number, durationMilliseconds = 1_000, minute = 10): Highlight {
+function passage(
+  sequence: number,
+  durationMilliseconds = 1_000,
+  minute = 10,
+  overrides: Partial<Passage> = {},
+): Passage {
   return {
     sourceEventSequence: sequence,
     minute,
     stoppageMinute: 0,
+    startMatchSecond: minute * 60,
+    endMatchSecond: minute * 60 + 1,
     durationMilliseconds,
-    outcomeCode: 'goal',
-    narration: `Event ${sequence}`,
+    outcomeCode: 'play',
+    narration: `Passage ${sequence}`,
     homeColour: '#1f4e79',
     awayColour: '#8c2f39',
+    eventSequences: sequence === 0 ? [] : [sequence],
     entities: [],
     tracks: [],
+    ...overrides,
   };
 }
 
-function bridge(afterEventSequence: number, durationMilliseconds = 2_000): Bridge {
-  return { afterEventSequence, durationMilliseconds, tracks: [] };
+/** A schedule that lays the passages out back to back from zero. */
+function schedule(passages: readonly Passage[]): PlaybackSegment[] {
+  let cursor = 0;
+
+  return passages.map((item) => {
+    const segment: PlaybackSegment = {
+      kind: 'passage',
+      sourceEventSequence: item.sourceEventSequence,
+      startMilliseconds: cursor,
+      durationMilliseconds: item.durationMilliseconds,
+    };
+
+    cursor += item.durationMilliseconds;
+
+    return segment;
+  });
 }
 
-function entity(entityId: string): HighlightEntity {
+function clip(
+  sourceEventSequence: number,
+  startMilliseconds: number,
+  endMilliseconds: number,
+): ReelClip {
   return {
-    entityId,
-    isBall: false,
-    side: entityId.startsWith('H') ? 'home' : 'away',
-    participantId: null,
-    shirtNumber: 0,
-    family: null,
-    x: 5_000,
-    y: 3_500,
+    sourceEventSequence,
+    outcomeCode: 'goal',
+    minute: 10,
+    stoppageMinute: 0,
+    startMilliseconds,
+    endMilliseconds,
   };
 }
 
 describe('MatchPlayback', () => {
-  it('has nothing to play without highlights and refuses to start', () => {
+  it('has nothing to play without passages and refuses to start', () => {
     const playback = new MatchPlayback([]);
 
-    expect(playback.hasHighlights).toBe(false);
+    expect(playback.hasPassages).toBe(false);
 
     playback.play();
 
     expect(playback.currentState).toBe('idle');
   });
 
+  it('lays the film out end to end and reports the total', () => {
+    const playback = new MatchPlayback([passage(1, 1_000), passage(2, 2_000), passage(3, 1_500)]);
+
+    expect(playback.count).toBe(3);
+    expect(playback.filmStartOf(0)).toBe(0);
+    expect(playback.filmStartOf(1)).toBe(1_000);
+    expect(playback.filmStartOf(2)).toBe(3_000);
+    expect(playback.totalMilliseconds).toBe(4_500);
+  });
+
+  it('prefers the schedule the server sent for the film offsets', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000)];
+
+    // The director pads the first passage; the client must honour its clock rather than the durations'.
+    const playback = new MatchPlayback(items, [
+      {
+        kind: 'passage',
+        sourceEventSequence: 1,
+        startMilliseconds: 0,
+        durationMilliseconds: 4_000,
+      },
+      {
+        kind: 'passage',
+        sourceEventSequence: 2,
+        startMilliseconds: 4_000,
+        durationMilliseconds: 1_000,
+      },
+    ]);
+
+    expect(playback.filmStartOf(1)).toBe(4_000);
+    expect(playback.totalMilliseconds).toBe(5_000);
+  });
+
   it('advances the playhead by the real time when playing', () => {
-    const playback = new MatchPlayback([highlight(1)]);
+    const playback = new MatchPlayback([passage(1)]);
 
     expect(playback.advance(1_000)).toBe(false);
 
@@ -63,7 +122,7 @@ describe('MatchPlayback', () => {
   });
 
   it('scales the playhead by the speed, so the animation and the clock agree', () => {
-    const playback = new MatchPlayback([highlight(1)]);
+    const playback = new MatchPlayback([passage(1)]);
 
     playback.play();
     playback.setSpeed(4);
@@ -72,42 +131,31 @@ describe('MatchPlayback', () => {
     expect(playback.positionMs).toBe(400);
   });
 
-  it('walks into the next highlight when a frame crosses its end', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2), highlight(3)]);
+  it('walks into the next passage when a frame crosses its end, and reports the change', () => {
+    const playback = new MatchPlayback([passage(1), passage(2), passage(3)]);
 
     playback.play();
 
     expect(playback.advance(1_500)).toBe(true);
     expect(playback.activeIndex).toBe(1);
-    expect(playback.positionMs).toBe(500);
+    expect(playback.positionMs).toBe(1_500);
+    expect(playback.passageTimeMs).toBe(500);
     expect(playback.currentState).toBe('playing');
   });
 
-  it('crosses several highlights in one long frame and then finishes', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2), highlight(3)]);
+  it('crosses several passages in one long frame and then finishes', () => {
+    const playback = new MatchPlayback([passage(1), passage(2), passage(3)]);
 
     playback.play();
 
     expect(playback.advance(3_500)).toBe(true);
     expect(playback.currentState).toBe('finished');
     expect(playback.activeIndex).toBe(2);
-    expect(playback.positionMs).toBe(1_000);
+    expect(playback.positionMs).toBe(3_000);
   });
 
-  it('keeps two chances in the same minute as two queued highlights', () => {
-    const playback = new MatchPlayback([highlight(1, 1_000, 30), highlight(2, 1_000, 30)]);
-
-    expect(playback.count).toBe(2);
-    expect(playback.active?.sourceEventSequence).toBe(1);
-
-    playback.skipCurrent();
-
-    expect(playback.active?.sourceEventSequence).toBe(2);
-    expect(playback.currentState).toBe('playing');
-  });
-
-  it('skips the last highlight to the end rather than off the list', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2)]);
+  it('skips the last passage to the end rather than off the film', () => {
+    const playback = new MatchPlayback([passage(1), passage(2)]);
 
     playback.play();
     playback.skipCurrent();
@@ -118,7 +166,7 @@ describe('MatchPlayback', () => {
   });
 
   it('skips all, and refuses to play once finished, until it is replayed', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2)]);
+    const playback = new MatchPlayback([passage(1), passage(2)]);
 
     playback.skipAll();
 
@@ -136,19 +184,25 @@ describe('MatchPlayback', () => {
     expect(playback.positionMs).toBe(0);
   });
 
-  it('seeks to the highlight that presents an event, and refuses one it does not hold', () => {
-    const playback = new MatchPlayback([highlight(4), highlight(9)]);
+  it('seeks to the passage that presents an event, including one inside a passage window', () => {
+    const playback = new MatchPlayback([
+      passage(4),
+      passage(9, 1_000, 20, { eventSequences: [9, 11] }),
+    ]);
 
     expect(playback.seekToEvent(9)).toBe(true);
     expect(playback.activeIndex).toBe(1);
-    expect(playback.positionMs).toBe(0);
+    expect(playback.positionMs).toBe(1_000);
+
+    expect(playback.seekToEvent(11)).toBe(true);
+    expect(playback.activeIndex).toBe(1);
 
     expect(playback.seekToEvent(5)).toBe(false);
     expect(playback.activeIndex).toBe(1);
   });
 
-  it('pauses at a chosen highlight when seeking backwards from the end', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2)]);
+  it('pauses at a chosen passage when seeking backwards from the end', () => {
+    const playback = new MatchPlayback([passage(1), passage(2)]);
 
     playback.skipAll();
     playback.seekTo(0);
@@ -158,7 +212,7 @@ describe('MatchPlayback', () => {
   });
 
   it('pauses only while playing', () => {
-    const playback = new MatchPlayback([highlight(1)]);
+    const playback = new MatchPlayback([passage(1)]);
 
     playback.pause();
 
@@ -170,89 +224,144 @@ describe('MatchPlayback', () => {
     expect(playback.currentState).toBe('paused');
   });
 
-  it('plays the recycling passage before the highlight it leads into, and nothing before the first', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2)], [bridge(2, 2_000)]);
+  it("offers the plan's speeds, half speed included", () => {
+    expect(PLAYBACK_SPEEDS).toEqual([0.5, 1, 2, 4, 8]);
 
-    expect(playback.count).toBe(3);
-    expect(playback.highlightCount).toBe(2);
-    expect(playback.activePassageKind).toBe('highlight');
+    const playback = new MatchPlayback([passage(1, 10_000)]);
 
     playback.play();
+    playback.setSpeed(0.5);
+    playback.advance(100);
 
-    // The first highlight runs for a second, then the bridge is the active passage — still counted as
-    // leading into the second highlight, which is the index the timeline and panels speak.
-    expect(playback.advance(1_000)).toBe(true);
-    expect(playback.activePassageKind).toBe('bridge');
-    expect(playback.activeHighlightIndex).toBe(1);
+    expect(playback.positionMs).toBe(50);
 
-    expect(playback.advance(2_000)).toBe(true);
-    expect(playback.activePassageKind).toBe('highlight');
-    expect(playback.active?.sourceEventSequence).toBe(2);
-    expect(playback.activeHighlightIndex).toBe(1);
-  });
-
-  it('gives a bridge the highlight-shaped body the renderer draws, filled in from its neighbours', () => {
-    const first = { ...highlight(1), entities: [entity('H9')] };
-    const second = { ...highlight(2), entities: [entity('H9'), entity('A4')] };
-    const crossing: Bridge = {
-      afterEventSequence: 2,
-      durationMilliseconds: 2_000,
-      tracks: [
-        {
-          entityId: 'H9',
-          keyframes: [
-            { timeMilliseconds: 0, x: 1_000, y: 2_000 },
-            { timeMilliseconds: 2_000, x: 3_000, y: 4_000 },
-          ],
-        },
-      ],
-    };
-
-    const playback = new MatchPlayback([first, second], [crossing]);
-
-    playback.play();
-    playback.advance(1_000);
-
-    const body = playback.active!;
-
-    expect(playback.activePassageKind).toBe('bridge');
-    expect(body.outcomeCode).toBe('bridge');
-    expect(body.durationMilliseconds).toBe(2_000);
-    expect(body.tracks).toHaveLength(1);
-    expect(body.entities.map((item) => item.entityId)).toEqual(['H9', 'A4']);
-  });
-
-  it('skips over the recycling to the next highlight', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2)], [bridge(2)]);
-
-    playback.play();
-    playback.skipCurrent();
-
-    expect(playback.activePassageKind).toBe('highlight');
-    expect(playback.active?.sourceEventSequence).toBe(2);
-  });
-
-  it('seeks to a highlight rather than to the bridge that leads into it', () => {
-    const playback = new MatchPlayback([highlight(1), highlight(2)], [bridge(2)]);
-
-    playback.seekTo(1);
-
-    expect(playback.activePassageKind).toBe('highlight');
-    expect(playback.active?.sourceEventSequence).toBe(2);
-
-    expect(playback.seekToEvent(2)).toBe(true);
-    expect(playback.activePassageKind).toBe('highlight');
-  });
-
-  it("offers the plan's speeds and scales the playhead at eight times", () => {
-    expect(PLAYBACK_SPEEDS).toEqual([1, 2, 4, 8]);
-
-    const playback = new MatchPlayback([highlight(1, 10_000)]);
-
-    playback.play();
     playback.setSpeed(8);
     playback.advance(100);
 
-    expect(playback.positionMs).toBe(800);
+    expect(playback.positionMs).toBe(850);
+  });
+
+  it('plays only the reel windows, and reports their combined length as the total', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000), passage(4, 1_000)];
+    const playback = new MatchPlayback(
+      items,
+      schedule(items),
+      [clip(2, 1_000, 2_500), clip(4, 3_000, 4_000)],
+      'reel',
+    );
+
+    expect(playback.currentMode).toBe('reel');
+    expect(playback.totalMilliseconds).toBe(2_500);
+    expect(playback.elapsedMilliseconds).toBe(0);
+    expect(playback.positionMs).toBe(1_000);
+    expect(playback.activeIndex).toBe(1);
+
+    playback.play();
+    playback.advance(2_600);
+
+    // The first window ends at 2,500 film ms, so the playhead lands at the second window's start (3,000).
+    expect(playback.currentState).toBe('finished');
+    expect(playback.elapsedMilliseconds).toBe(2_500);
+    expect(playback.positionMs).toBe(4_000);
+  });
+
+  it('maps film moments onto the reel clock for the progress markers', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000), passage(4, 1_000)];
+    const playback = new MatchPlayback(
+      items,
+      schedule(items),
+      [clip(2, 1_000, 2_500), clip(4, 3_500, 4_000)],
+      'reel',
+    );
+
+    expect(playback.playlistMillisecondsForFilm(1_000)).toBe(0);
+    expect(playback.playlistMillisecondsForFilm(2_000)).toBe(1_000);
+    expect(playback.playlistMillisecondsForFilm(3_500)).toBe(1_500);
+    expect(playback.playlistMillisecondsForFilm(2_800)).toBeNull();
+  });
+
+  it('merges overlapping reel clips, so a shared build-up is not replayed twice', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000)];
+    const playback = new MatchPlayback(
+      items,
+      schedule(items),
+      [clip(2, 500, 2_000), clip(3, 1_500, 2_500)],
+      'reel',
+    );
+
+    expect(playback.totalMilliseconds).toBe(2_000);
+    expect(playback.positionMs).toBe(500);
+  });
+
+  it('plays the whole film on the highlights playlist when the reel is empty, so no match is unwatchable', () => {
+    const playback = new MatchPlayback([passage(1), passage(2)], [], [], 'reel');
+
+    expect(playback.hasReel).toBe(false);
+    expect(playback.currentMode).toBe('reel');
+    expect(playback.totalMilliseconds).toBe(2_000);
+  });
+
+  it('keeps the film moment when switching playlists, and starts the reel when it is not carried', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000), passage(4, 1_000)];
+    const playback = new MatchPlayback(items, schedule(items), [
+      clip(2, 1_000, 2_000),
+      clip(4, 3_000, 4_000),
+    ]);
+
+    playback.play();
+    playback.advance(1_200);
+
+    expect(playback.positionMs).toBe(1_200);
+
+    // 1,200 film ms is inside the first clip, so the playhead is carried across.
+    playback.setMode('reel');
+
+    expect(playback.positionMs).toBe(1_200);
+    expect(playback.elapsedMilliseconds).toBe(200);
+
+    // 2,200 film ms is between the clips, so the reel restarts at the first window.
+    playback.setMode('full');
+    playback.seekTo(2);
+
+    expect(playback.positionMs).toBe(2_000);
+
+    playback.setMode('reel');
+
+    expect(playback.positionMs).toBe(1_000);
+  });
+
+  it('seeks within the reel by elapsed time and reports whether a passage is carried', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000), passage(4, 1_000)];
+    const playback = new MatchPlayback(
+      items,
+      schedule(items),
+      [clip(2, 1_000, 2_000), clip(4, 3_000, 4_000)],
+      'reel',
+    );
+
+    playback.seekToMilliseconds(1_500);
+
+    expect(playback.positionMs).toBe(3_500);
+
+    expect(playback.seekTo(0)).toBe(false);
+    expect(playback.seekTo(1)).toBe(true);
+    expect(playback.seekTo(3)).toBe(true);
+  });
+
+  it('walks across a reel window boundary in one long frame', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000), passage(4, 1_000)];
+    const playback = new MatchPlayback(
+      items,
+      schedule(items),
+      [clip(2, 1_000, 2_000), clip(4, 3_000, 4_000)],
+      'reel',
+    );
+
+    playback.play();
+    playback.advance(1_500);
+
+    expect(playback.positionMs).toBe(3_500);
+    expect(playback.activeIndex).toBe(3);
+    expect(playback.currentState).toBe('playing');
   });
 });

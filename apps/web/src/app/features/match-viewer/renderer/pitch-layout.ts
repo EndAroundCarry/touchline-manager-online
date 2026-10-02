@@ -135,19 +135,24 @@ export function pitchGeometry(rect: PitchRect): PitchGeometry {
 }
 
 /**
- * How far above its shadow a ball at an altitude is drawn, in CSS pixels (Stage 6).
+ * How far above its shadow a ball at an altitude is drawn, in CSS pixels (`replay-v3`).
  *
  * The plan's altitude band is 0…100, and the lift is a share of the pitch's own height rather than a fixed
- * number of pixels, so a cross climbs the same fraction of the pitch on a phone as on a desktop.
+ * number of pixels, so a cross climbs the same fraction of the pitch on a phone as on a desktop. The share
+ * is deliberately small: a big lift reads as a 3D projection the flat pitch does not have, and the ball's
+ * height is mostly told by the shadow it casts.
  */
 export function altitudeLift(rect: PitchRect, z: number): number {
-  return (clampAltitude(z) / 100) * rect.height * 0.3;
+  return (clampAltitude(z) / 100) * rect.height * 0.12;
 }
 
 /** How much a ball's token grows as it climbs, so height reads as size as well as offset. */
 export function altitudeScale(z: number): number {
-  return 1 + (clampAltitude(z) / 100) * 0.9;
+  return 1 + (clampAltitude(z) / 100) * 0.35;
 }
+
+/** The altitude above which the ball casts a shadow, so a rolled pass is drawn flat on the grass. */
+export const SHADOW_MIN_ALTITUDE = 10;
 
 function clampAltitude(z: number): number {
   return Number.isFinite(z) ? Math.min(100, Math.max(0, z)) : 0;

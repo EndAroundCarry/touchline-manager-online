@@ -1,110 +1,197 @@
-import { Bridge, Highlight, HighlightEntity } from './match.models';
+import { Passage, PlaybackSegment, ReelClip } from './match.models';
 
 /** What the replay is doing. */
 export type PlaybackState = 'idle' | 'playing' | 'paused' | 'finished';
 
-/** The playback speeds the viewer offers (`§9.4`, master plan Stage 5). */
-export const PLAYBACK_SPEEDS = [1, 2, 4, 8] as const;
+/** Which playlist is playing: the whole film, or the reel of selected chance clips (`replay-v3`). */
+export type PlaybackMode = 'full' | 'reel';
+
+/** The playback speeds the viewer offers. */
+export const PLAYBACK_SPEEDS = [0.5, 1, 2, 4, 8] as const;
 
 /** One of the viewer's speeds. */
 export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
 
-/** What one passage of the replay is: a highlight, or the recycling before the next one. */
-export type PassageKind = 'highlight' | 'bridge';
-
-/** One playable passage of the replay, with the highlight-shaped body the renderer draws. */
-export interface PlaybackPassage {
-  readonly kind: PassageKind;
-  readonly sourceEventSequence: number;
+/** One passage placed on the film clock. */
+export interface FilmPassage {
+  readonly index: number;
+  readonly passage: Passage;
+  readonly startMilliseconds: number;
   readonly durationMilliseconds: number;
-  readonly highlight: Highlight;
+}
+
+/** A contiguous window of film time the active playlist plays (`replay-v3`). */
+interface PlaylistWindow {
+  readonly startMilliseconds: number;
+  readonly endMilliseconds: number;
 }
 
 /**
- * The replay's playback state machine.
+ * The replay's playback state machine over one continuous film (`replay-v3`).
  *
  * Framework-neutral and free of timers: it is advanced by whatever is driving the animation — a
  * `requestAnimationFrame` loop in the browser, a plain call in a test — with the real elapsed milliseconds.
  * That is what keeps the speed control honest, because the *only* thing a speed setting does is scale the
- * elapsed time before it is applied to the playhead, so the animation and the match clock are always at the
- * same point of the same highlight.
+ * elapsed time before it is applied to the playhead.
  *
- * Highlights play in event order and never reorder: two chances in the same minute are two entries in the
- * list, and `skipCurrent` walks them one at a time rather than collapsing them (`§9.4`).
+ * There is one film. Every passage the director authored plays in match order from the first kick to full
+ * time, so the playhead is a *film* moment rather than an index into a list of chances. The reel is not a
+ * second film: it is a playlist of windows over the same film, and `mode` decides which playlist is playing.
+ * A window may open mid-passage and close mid-passage, so the reels' clips join on real film time.
  *
- * Passing the presentation's bridges plays the condensed replay: the recycling passage between two chances
- * is a passage of its own, so the ball is carried from one highlight's ending to the next one's beginning
- * instead of teleporting between them (`replay-v2`). Without bridges the player cuts from highlight to
- * highlight, which is what the viewer's "Highlights" mode offers; the *highlight* index is what everything
- * outside the player addresses — the timeline, a commentary line, a seek — so both modes speak the same
- * language.
+ * `advance(delta)` returns whether the active passage changed, which is what tells a viewer to rebuild its
+ * renderer from a new set of tracks.
  */
 export class MatchPlayback {
-  private readonly passages: readonly PlaybackPassage[];
-  private index = 0;
+  private readonly film: readonly FilmPassage[];
+  private readonly filmMilliseconds: number;
+  private readonly reelWindows: readonly PlaylistWindow[];
+  private readonly fullWindows: readonly PlaylistWindow[];
+
+  private mode: PlaybackMode;
+  private windowIndex = 0;
   private position = 0;
   private state: PlaybackState = 'idle';
   private playbackSpeed: PlaybackSpeed = 1;
 
   /**
-   * Initializes the player over a match's highlights.
+   * Initializes the player over a match's film and reel.
    *
-   * @param highlights The highlights, in event order.
-   * @param bridges The recycling passages between them, when the condensed replay is wanted.
+   * @param passages The film passages, in match order.
+   * @param playback The film schedule: one `passage` segment per passage, in the same order.
+   * @param reel The reel's clips, as windows over the film clock.
+   * @param mode Which playlist to start on.
    */
-  constructor(highlights: readonly Highlight[], bridges: readonly Bridge[] = []) {
-    this.passages = passageList(highlights, bridges);
+  constructor(
+    passages: readonly Passage[],
+    playback: readonly PlaybackSegment[] = [],
+    reel: readonly ReelClip[] = [],
+    mode: PlaybackMode = 'full',
+  ) {
+    this.film = filmFrom(passages, playback);
+    this.filmMilliseconds =
+      this.film.length === 0
+        ? 0
+        : this.film[this.film.length - 1].startMilliseconds +
+          this.film[this.film.length - 1].durationMilliseconds;
+    this.fullWindows = [{ startMilliseconds: 0, endMilliseconds: this.filmMilliseconds }];
+    this.reelWindows = windowsFrom(reel);
+    this.mode = mode;
+
+    const windows = this.playlist;
+
+    this.position = windows[0]?.startMilliseconds ?? 0;
   }
 
-  /** Whether there is anything to play at all. */
-  get hasHighlights(): boolean {
-    return this.highlightCount > 0;
+  /** Whether the film holds anything to play at all. */
+  get hasPassages(): boolean {
+    return this.film.length > 0;
   }
 
-  /** How many highlights the replay holds, which is what the timeline addresses. */
-  get highlightCount(): number {
-    return this.passages.reduce(
-      (total, passage) => total + (passage.kind === 'highlight' ? 1 : 0),
+  /** Whether the reel differs from the whole film, so the viewer can offer a highlights playlist. */
+  get hasReel(): boolean {
+    return this.reelWindows.length > 0;
+  }
+
+  /** How many passages the film holds. */
+  get count(): number {
+    return this.film.length;
+  }
+
+  /** The passages, in match order. */
+  get passages(): readonly Passage[] {
+    return this.film.map((item) => item.passage);
+  }
+
+  /** Which playlist is playing. */
+  get currentMode(): PlaybackMode {
+    return this.mode;
+  }
+
+  /** The windows the active playlist plays, in playback order. */
+  private get playlist(): readonly PlaylistWindow[] {
+    return this.mode === 'reel' && this.reelWindows.length > 0
+      ? this.reelWindows
+      : this.fullWindows;
+  }
+
+  /** The passage the playhead stands in, or null when the film is empty. */
+  get active(): Passage | null {
+    return this.activePassage?.passage ?? null;
+  }
+
+  /** The film-placed passage the playhead stands in, or null when the film is empty. */
+  get activePassage(): FilmPassage | null {
+    return this.film[this.activeIndex] ?? null;
+  }
+
+  /** The index of the passage being played, which is what the timeline and panels address. */
+  get activeIndex(): number {
+    for (let index = 0; index < this.film.length; index += 1) {
+      const item = this.film[index];
+
+      if (this.position < item.startMilliseconds + item.durationMilliseconds) {
+        return index;
+      }
+    }
+
+    return Math.max(0, this.film.length - 1);
+  }
+
+  /** How far into the active passage the playhead stands, in film milliseconds. */
+  get passageTimeMs(): number {
+    const active = this.activePassage;
+
+    if (active === null) {
+      return 0;
+    }
+
+    return clamp(this.position - active.startMilliseconds, 0, active.durationMilliseconds);
+  }
+
+  /** How long the active passage runs for, in film milliseconds. */
+  get passageDurationMs(): number {
+    return this.activePassage?.durationMilliseconds ?? 0;
+  }
+
+  /** The playhead's film moment, in milliseconds from kick-off. */
+  get positionMs(): number {
+    return this.position;
+  }
+
+  /** Where a passage starts on the film clock. */
+  filmStartOf(index: number): number {
+    return this.film[index]?.startMilliseconds ?? 0;
+  }
+
+  /** How long the active playlist runs for, in milliseconds. */
+  get totalMilliseconds(): number {
+    return this.playlist.reduce(
+      (sum, window) => sum + (window.endMilliseconds - window.startMilliseconds),
       0,
     );
   }
 
-  /** How many passages the replay holds, bridges included. */
-  get count(): number {
-    return this.passages.length;
-  }
+  /** How much of the active playlist has played, in milliseconds. */
+  get elapsedMilliseconds(): number {
+    const windows = this.playlist;
+    let elapsed = 0;
 
-  /** The body being played — the highlight, or the bridge's own movement — or null when there is none. */
-  get active(): Highlight | null {
-    return this.passages[this.index]?.highlight ?? null;
-  }
-
-  /** What the player is showing: a highlight or the recycling before one. */
-  get activePassageKind(): PassageKind {
-    return this.passages[this.index]?.kind ?? 'highlight';
-  }
-
-  /** The index of the passage being played. */
-  get activeIndex(): number {
-    return this.index;
-  }
-
-  /** The index of the highlight being played, whichever passage carries the playhead. */
-  get activeHighlightIndex(): number {
-    let seen = 0;
-
-    for (let passage = 0; passage < this.index; passage += 1) {
-      if (this.passages[passage].kind === 'highlight') {
-        seen += 1;
-      }
+    for (let index = 0; index < this.windowIndex && index < windows.length; index += 1) {
+      elapsed += windows[index].endMilliseconds - windows[index].startMilliseconds;
     }
 
-    return seen;
-  }
+    const window = windows[this.windowIndex];
 
-  /** How far into the active passage the playhead stands, in animation milliseconds. */
-  get positionMs(): number {
-    return this.position;
+    if (window !== undefined) {
+      elapsed += clamp(
+        this.position - window.startMilliseconds,
+        0,
+        window.endMilliseconds - window.startMilliseconds,
+      );
+    }
+
+    return elapsed;
   }
 
   /** What the replay is doing. */
@@ -117,14 +204,9 @@ export class MatchPlayback {
     return this.playbackSpeed;
   }
 
-  /** How long the active passage runs for, or zero when there are none. */
-  get activeDurationMs(): number {
-    return this.passages[this.index]?.durationMilliseconds ?? 0;
-  }
-
-  /** Starts or resumes, and has no effect once every highlight has played. */
+  /** Starts or resumes, and has no effect once the film has played out. */
   play(): void {
-    if (!this.hasHighlights || this.state === 'finished') {
+    if (!this.hasPassages || this.state === 'finished') {
       return;
     }
 
@@ -144,250 +226,283 @@ export class MatchPlayback {
   }
 
   /**
+   * Switches playlists, keeping the playhead on the same film moment where the new one covers it.
+   *
+   * A film moment the reel does not carry — the middle of a dull spell — sends the playhead to the start of
+   * the reel, because there is nothing there to show.
+   */
+  setMode(mode: PlaybackMode): void {
+    if (mode === this.mode) {
+      return;
+    }
+
+    const filmPosition = this.position;
+
+    this.mode = mode;
+
+    const windows = this.playlist;
+    const index = this.windowFor(filmPosition, windows);
+    const window = windows[index];
+
+    if (
+      window !== undefined &&
+      filmPosition >= window.startMilliseconds &&
+      filmPosition <= window.endMilliseconds
+    ) {
+      this.windowIndex = index;
+      this.position = filmPosition;
+
+      return;
+    }
+
+    this.windowIndex = 0;
+    this.position = windows[0]?.startMilliseconds ?? 0;
+  }
+
+  /**
    * Advances the playhead by the real time that has passed.
    *
    * @returns Whether the active passage changed, which is what tells a viewer to redraw from a new track.
    */
   advance(realDeltaMs: number): boolean {
-    if (this.state !== 'playing' || !this.hasHighlights || realDeltaMs <= 0) {
+    if (this.state !== 'playing' || realDeltaMs <= 0) {
       return false;
     }
 
-    this.position += realDeltaMs * this.playbackSpeed;
+    const windows = this.playlist;
 
-    let changed = false;
-
-    // A long frame — a backgrounded tab returning, a slow device — can cross more than one passage, so the
-    // playhead is walked forward rather than assumed to land inside the current one.
-    while (
-      this.index < this.passages.length &&
-      this.position >= this.passages[this.index].durationMilliseconds
-    ) {
-      this.position -= this.passages[this.index].durationMilliseconds;
-      this.index += 1;
-      changed = true;
+    if (windows.length === 0) {
+      return false;
     }
 
-    if (this.index >= this.passages.length) {
-      // Finished: the playhead rests at the end of the last passage rather than falling off the list.
-      this.index = this.passages.length - 1;
-      this.position = this.passages[this.index].durationMilliseconds;
-      this.state = 'finished';
-      changed = true;
+    const before = this.activeIndex;
+    let remaining = realDeltaMs * this.playbackSpeed;
+
+    // A long frame — a backgrounded tab returning, a slow device — can cross a window boundary, so the
+    // playhead is walked forward rather than assumed to land inside the current window.
+    while (remaining > 0) {
+      const window = windows[this.windowIndex];
+      const room = window.endMilliseconds - this.position;
+
+      if (remaining < room) {
+        this.position += remaining;
+
+        break;
+      }
+
+      remaining -= Math.max(0, room);
+      this.position = window.endMilliseconds;
+
+      if (this.windowIndex + 1 >= windows.length) {
+        this.state = 'finished';
+
+        break;
+      }
+
+      this.windowIndex += 1;
+      this.position = windows[this.windowIndex].startMilliseconds;
     }
 
-    return changed;
+    return this.activeIndex !== before;
   }
 
-  /** Moves to the next highlight, bridging over the recycling before it, or finishes when this was the last. */
+  /** Moves to the next passage the active playlist carries, or finishes when this was the last. */
   skipCurrent(): void {
-    if (!this.hasHighlights) {
+    if (!this.hasPassages) {
       return;
     }
 
-    const next = this.nextHighlightPassage(this.index + 1);
+    for (let index = this.activeIndex + 1; index < this.film.length; index += 1) {
+      if (this.seekTo(index)) {
+        this.state = 'playing';
 
-    if (next < 0) {
-      this.skipAll();
-
-      return;
+        return;
+      }
     }
 
-    this.goTo(next);
-    this.state = 'playing';
+    this.skipAll();
   }
 
-  /** Jumps to the end of the replay. */
+  /** Jumps to the end of the active playlist. */
   skipAll(): void {
-    if (!this.hasHighlights) {
+    const windows = this.playlist;
+
+    if (windows.length === 0) {
       return;
     }
 
-    const last = this.lastHighlightPassage();
-
-    this.index = last;
-    this.position = this.passages[last].durationMilliseconds;
+    this.windowIndex = windows.length - 1;
+    this.position = windows[windows.length - 1].endMilliseconds;
     this.state = 'finished';
   }
 
-  /** Starts the replay again from the first highlight. */
+  /** Starts the film again from the beginning of the active playlist. */
   replay(): void {
-    if (!this.hasHighlights) {
+    const windows = this.playlist;
+
+    if (windows.length === 0) {
       return;
     }
 
-    this.index = 0;
-    this.position = 0;
+    this.windowIndex = 0;
+    this.position = windows[0].startMilliseconds;
     this.state = 'playing';
   }
 
-  /** Seeks to a highlight by index, clamped to the replay. */
-  seekTo(index: number): void {
-    if (!this.hasHighlights) {
-      return;
+  /** Seeks to the start of a passage, or reports that the active playlist does not carry it. */
+  seekTo(index: number): boolean {
+    const item = this.film[Math.max(0, index)];
+
+    if (item === undefined) {
+      return false;
     }
 
-    const passage = this.passageForHighlight(Math.max(0, index));
+    const windows = this.playlist;
+    const windowIndex = this.windowFor(item.startMilliseconds, windows);
+    const window = windows[windowIndex];
 
-    if (passage < 0) {
-      this.skipAll();
-
-      return;
+    if (
+      window === undefined ||
+      item.startMilliseconds < window.startMilliseconds ||
+      item.startMilliseconds >= window.endMilliseconds
+    ) {
+      return false;
     }
 
-    this.goTo(passage);
+    this.windowIndex = windowIndex;
+    this.position = item.startMilliseconds;
 
     if (this.state === 'finished') {
-      // Seeking backwards from the end leaves the replay paused at the chosen highlight rather than
+      // Seeking backwards from the end leaves the replay paused at the chosen passage rather than
       // claiming to be finished.
+      this.state = 'paused';
+    }
+
+    return true;
+  }
+
+  /** Seeks to the passage that presents an event, if the active playlist carries one. */
+  seekToEvent(sequence: number): boolean {
+    const index = this.film.findIndex(
+      (item) =>
+        item.passage.sourceEventSequence === sequence ||
+        item.passage.eventSequences.includes(sequence),
+    );
+
+    return index < 0 ? false : this.seekTo(index);
+  }
+
+  /** Seeks within the active playlist, by elapsed milliseconds. */
+  seekToMilliseconds(milliseconds: number): void {
+    const windows = this.playlist;
+
+    if (windows.length === 0) {
+      return;
+    }
+
+    const total = this.totalMilliseconds;
+    let target = clamp(milliseconds, 0, total);
+    let index = 0;
+
+    while (
+      index < windows.length - 1 &&
+      target >= windows[index].endMilliseconds - windows[index].startMilliseconds
+    ) {
+      target -= windows[index].endMilliseconds - windows[index].startMilliseconds;
+      index += 1;
+    }
+
+    this.windowIndex = index;
+    this.position = windows[index].startMilliseconds + target;
+
+    if (this.state === 'finished' && milliseconds < total) {
       this.state = 'paused';
     }
   }
 
-  /** Seeks to the highlight that presents an event, if the replay holds one. */
-  seekToEvent(sequence: number): boolean {
-    let highlightIndex = 0;
+  /** Where a film moment sits on the active playlist, or null when the playlist does not carry it. */
+  playlistMillisecondsForFilm(filmMilliseconds: number): number | null {
+    const windows = this.playlist;
+    let elapsed = 0;
 
-    for (const passage of this.passages) {
-      if (passage.kind !== 'highlight') {
-        continue;
+    for (const window of windows) {
+      if (
+        filmMilliseconds >= window.startMilliseconds &&
+        filmMilliseconds <= window.endMilliseconds
+      ) {
+        return elapsed + (filmMilliseconds - window.startMilliseconds);
       }
 
-      if (passage.sourceEventSequence === sequence) {
-        this.seekTo(highlightIndex);
-
-        return true;
-      }
-
-      highlightIndex += 1;
+      elapsed += window.endMilliseconds - window.startMilliseconds;
     }
 
-    return false;
+    return null;
   }
 
-  /** The passage that presents a highlight, or -1 when the index names none. */
-  private passageForHighlight(index: number): number {
-    if (index < 0) {
-      return -1;
-    }
-
-    let highlight = 0;
-
-    for (let passage = 0; passage < this.passages.length; passage += 1) {
-      if (this.passages[passage].kind !== 'highlight') {
-        continue;
-      }
-
-      if (highlight === index) {
-        return passage;
-      }
-
-      highlight += 1;
-    }
-
-    return -1;
-  }
-
-  /** The first highlight passage at or after an index, or -1 when there is none. */
-  private nextHighlightPassage(from: number): number {
-    for (let passage = Math.max(0, from); passage < this.passages.length; passage += 1) {
-      if (this.passages[passage].kind === 'highlight') {
-        return passage;
+  /** The first window at or after a film moment. */
+  private windowFor(filmMilliseconds: number, windows: readonly PlaylistWindow[]): number {
+    for (let index = 0; index < windows.length; index += 1) {
+      if (filmMilliseconds < windows[index].endMilliseconds) {
+        return index;
       }
     }
 
-    return -1;
-  }
-
-  /** The last highlight passage in the replay. */
-  private lastHighlightPassage(): number {
-    for (let passage = this.passages.length - 1; passage >= 0; passage -= 1) {
-      if (this.passages[passage].kind === 'highlight') {
-        return passage;
-      }
-    }
-
-    return this.passages.length - 1;
-  }
-
-  private goTo(index: number): void {
-    this.index = index;
-    this.position = 0;
+    return Math.max(0, windows.length - 1);
   }
 }
 
-/** Lays the highlights and their bridges out as one passage list, in the order they play. */
-function passageList(
-  highlights: readonly Highlight[],
-  bridges: readonly Bridge[],
-): readonly PlaybackPassage[] {
-  const bySequence = new Map(bridges.map((bridge) => [bridge.afterEventSequence, bridge]));
-  const passages: PlaybackPassage[] = [];
-  let previous: Highlight | null = null;
+/** Places the passages on the film clock, using the schedule's offsets where it agrees on the count. */
+function filmFrom(
+  passages: readonly Passage[],
+  playback: readonly PlaybackSegment[],
+): readonly FilmPassage[] {
+  const film: FilmPassage[] = [];
+  let cursor = 0;
 
-  for (const highlight of highlights) {
-    const bridge = bySequence.get(highlight.sourceEventSequence);
+  passages.forEach((passage, index) => {
+    const schedule = playback[index];
+    const scheduled = schedule !== undefined && schedule.kind === 'passage';
+    const startMilliseconds = scheduled ? schedule.startMilliseconds : cursor;
+    const durationMilliseconds = scheduled
+      ? schedule.durationMilliseconds
+      : passage.durationMilliseconds;
 
-    // No bridge precedes the first highlight: there is nothing before it to recycle from, which is the
-    // director's own rule as well as this player's.
-    if (bridge !== undefined && previous !== null) {
-      passages.push({
-        kind: 'bridge',
-        sourceEventSequence: bridge.afterEventSequence,
-        durationMilliseconds: bridge.durationMilliseconds,
-        highlight: bridgeHighlight(bridge, previous, highlight),
-      });
-    }
+    film.push({ index, passage, startMilliseconds, durationMilliseconds });
+    cursor = startMilliseconds + durationMilliseconds;
+  });
 
-    passages.push({
-      kind: 'highlight',
-      sourceEventSequence: highlight.sourceEventSequence,
-      durationMilliseconds: highlight.durationMilliseconds,
-      highlight,
-    });
-
-    previous = highlight;
-  }
-
-  return passages;
+  return film;
 }
 
-/**
- * Gives a bridge the highlight-shaped body the renderer draws.
- *
- * A bridge carries movement only — no outcome, no narration, no entity list — because the entities it moves
- * are the players the neighbouring highlights already described. The shape is completed from those
- * neighbours, preferring the passage it leads into, so the renderer can draw the recycling without knowing
- * the payload is a bridge at all.
- */
-function bridgeHighlight(bridge: Bridge, previous: Highlight, next: Highlight): Highlight {
-  return {
-    sourceEventSequence: bridge.afterEventSequence,
-    minute: next.minute,
-    stoppageMinute: next.stoppageMinute,
-    durationMilliseconds: bridge.durationMilliseconds,
-    outcomeCode: 'bridge',
-    narration: '',
-    homeColour: next.homeColour,
-    awayColour: next.awayColour,
-    entities: mergeEntities(next.entities, previous.entities),
-    tracks: bridge.tracks,
-    commentary: [],
-  };
-}
+/** Merges the reel's clips into ordered, non-overlapping windows over the film clock. */
+function windowsFrom(reel: readonly ReelClip[]): readonly PlaylistWindow[] {
+  const ordered = reel
+    .map((clip) => ({
+      startMilliseconds: clip.startMilliseconds,
+      endMilliseconds: clip.endMilliseconds,
+    }))
+    .filter((window) => window.endMilliseconds > window.startMilliseconds)
+    .sort((one, other) => one.startMilliseconds - other.startMilliseconds);
+  const merged: PlaylistWindow[] = [];
 
-/** The union of two entity lists, keeping the first list's version of any entity both carry. */
-function mergeEntities(
-  preferred: readonly HighlightEntity[],
-  fallback: readonly HighlightEntity[],
-): readonly HighlightEntity[] {
-  const byId = new Map(preferred.map((entity) => [entity.entityId, entity]));
+  for (const window of ordered) {
+    const previous = merged[merged.length - 1];
 
-  for (const entity of fallback) {
-    if (!byId.has(entity.entityId)) {
-      byId.set(entity.entityId, entity);
+    if (previous !== undefined && window.startMilliseconds <= previous.endMilliseconds) {
+      merged[merged.length - 1] = {
+        startMilliseconds: previous.startMilliseconds,
+        endMilliseconds: Math.max(previous.endMilliseconds, window.endMilliseconds),
+      };
+
+      continue;
     }
+
+    merged.push(window);
   }
 
-  return [...byId.values()];
+  return merged;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
 }

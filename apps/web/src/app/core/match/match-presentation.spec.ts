@@ -2,19 +2,21 @@ import {
   cardKindFor,
   commentarySideLabel,
   conditionColorClass,
-  highlightIndexForLine,
-  highlightTitle,
   isGoalCommentary,
   isGoalOutcome,
   isShotOutcome,
+  matchClockFromSeconds,
   matchClockLabel,
   matchStatisticRows,
   outcomeLabel,
+  passageIndexForLine,
+  passageTitle,
+  playbackClockLabel,
   possessionPercent,
   scoreLine,
   shotMapEntries,
 } from './match-presentation';
-import { CommentaryLine, Highlight, HighlightKeyframe, MatchStatistics } from './match.models';
+import { CommentaryLine, HighlightKeyframe, MatchStatistics, Passage } from './match.models';
 
 /** The match center's pure formatting guarantees. */
 
@@ -41,16 +43,19 @@ function statistics(overrides: Partial<MatchStatistics> = {}): MatchStatistics {
   };
 }
 
-function highlight(sequence: number): Highlight {
+function highlight(sequence: number): Passage {
   return {
     sourceEventSequence: sequence,
     minute: 67,
     stoppageMinute: 0,
+    startMatchSecond: 4_020,
+    endMatchSecond: 4_090,
     durationMilliseconds: 8_000,
     outcomeCode: 'goal',
     narration: 'Goal',
     homeColour: '#1f4e79',
     awayColour: '#8c2f39',
+    eventSequences: sequence === 0 ? [] : [sequence],
     entities: [],
     tracks: [],
   };
@@ -62,7 +67,7 @@ function shot(overrides: {
   side?: 'home' | 'away';
   action?: string;
   ball?: HighlightKeyframe;
-}): Highlight {
+}): Passage {
   const side = overrides.side ?? 'home';
 
   return {
@@ -154,8 +159,20 @@ describe('match presentation helpers', () => {
     expect(commentarySideLabel('away')).toBe('Away');
   });
 
-  it('titles a highlight with its outcome and clock', () => {
-    expect(highlightTitle(highlight(1))).toBe("Goal \u2014 67'");
+  it('titles a passage with its outcome and clock', () => {
+    expect(passageTitle(highlight(1))).toBe("Goal \u2014 67'");
+  });
+
+  it('reads a continuous clock from a match second, stoppage included', () => {
+    expect(matchClockFromSeconds(0)).toEqual({ minute: 1, stoppageMinute: 0 });
+    expect(matchClockFromSeconds(66 * 60)).toEqual({ minute: 67, stoppageMinute: 0 });
+    expect(matchClockFromSeconds(90 * 60 + 120)).toEqual({ minute: 90, stoppageMinute: 3 });
+  });
+
+  it('writes a playback position as a film clock', () => {
+    expect(playbackClockLabel(0)).toBe('0:00');
+    expect(playbackClockLabel(65_000)).toBe('1:05');
+    expect(playbackClockLabel(635_000)).toBe('10:35');
   });
 
   it('builds the statistics panel with both sides on one row each', () => {
@@ -170,9 +187,15 @@ describe('match presentation helpers', () => {
     expect(rows[2]).toEqual({ label: 'Shots', home: '9', away: '4' });
   });
 
-  it('finds the highlight a commentary line can be shown as, or -1', () => {
-    expect(highlightIndexForLine([highlight(4), highlight(9)], line(9))).toBe(1);
-    expect(highlightIndexForLine([highlight(4)], line(5))).toBe(-1);
+  it('finds the passage a commentary line can be shown in, or -1', () => {
+    expect(passageIndexForLine([highlight(4), highlight(9)], line(9))).toBe(1);
+    expect(passageIndexForLine([highlight(4)], line(5))).toBe(-1);
+  });
+
+  it('finds a passage for a line that is narrated inside its event window', () => {
+    const windowed = { ...highlight(9), sourceEventSequence: 9, eventSequences: [9, 10, 11] };
+
+    expect(passageIndexForLine([windowed], line(11))).toBe(0);
   });
 
   it('knows the commentary templates that report a goal', () => {
@@ -207,10 +230,10 @@ describe('match presentation helpers', () => {
     expect(entries[0]).toMatchObject({ side: 'home', x: 7_800, y: 3_600 });
   });
 
-  it('plots nothing for a highlight that is not a shot at all', () => {
+  it('plots nothing for a passage that is not a shot at all', () => {
     expect(isShotOutcome('goal')).toBe(true);
-    expect(isShotOutcome('bridge')).toBe(false);
-    expect(shotMapEntries([{ ...highlight(1), outcomeCode: 'bridge' }])).toHaveLength(0);
+    expect(isShotOutcome('play')).toBe(false);
+    expect(shotMapEntries([{ ...highlight(1), outcomeCode: 'play' }])).toHaveLength(0);
   });
 
   it('reads a booking from the line that reports it, second yellow included', () => {

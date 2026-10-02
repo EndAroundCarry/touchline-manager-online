@@ -1,11 +1,14 @@
-import { Highlight } from '../../../core/match/match.models';
+import { Passage } from '../../../core/match/match.models';
 import {
   celebrationStartMilliseconds,
   duelClashes,
+  isDiveAction,
   isStrikeAction,
   isTackleAction,
+  isTrailAction,
   nearestPlayerToBall,
   trailStrength,
+  wantsTrail,
 } from './renderer-effects';
 import { FrameEntity, MatchSide } from './renderer.models';
 
@@ -55,16 +58,19 @@ function ball(x: number, y: number): FrameEntity {
   };
 }
 
-function highlight(overrides: Partial<Highlight> = {}): Highlight {
+function highlight(overrides: Partial<Passage> = {}): Passage {
   return {
     sourceEventSequence: 7,
     minute: 36,
     stoppageMinute: 0,
+    startMatchSecond: 2_160,
+    endMatchSecond: 2_220,
     durationMilliseconds: 20_000,
     outcomeCode: 'goal',
     narration: 'Goal.',
     homeColour: '#1f4e79',
     awayColour: '#8c2f39',
+    eventSequences: [7],
     entities: [],
     tracks: [],
     commentary: null,
@@ -85,7 +91,33 @@ describe('action tags', () => {
   it('knows a duel tag', () => {
     expect(isTackleAction('tackle')).toBe(true);
     expect(isTackleAction('duel')).toBe(true);
+    expect(isTackleAction('interception')).toBe(true);
     expect(isTackleAction('pass')).toBe(false);
+  });
+
+  it('knows the ball actions that earn a trail and the keeper actions that dive', () => {
+    expect(isTrailAction('shot')).toBe(true);
+    expect(isTrailAction('cross')).toBe(true);
+    expect(isTrailAction('pass')).toBe(false);
+    expect(isDiveAction('save')).toBe(true);
+    expect(isDiveAction('dive')).toBe(true);
+    expect(isDiveAction('run')).toBe(false);
+  });
+});
+
+describe('wantsTrail', () => {
+  it('leaves a short ground pass with no trail, whatever its speed', () => {
+    expect(wantsTrail('pass', 0, 4_000)).toBe(false);
+  });
+
+  it('streaks a struck ball and a crossed ball', () => {
+    expect(wantsTrail('shot', 0, 900)).toBe(true);
+    expect(wantsTrail('cross', 70, 300)).toBe(true);
+  });
+
+  it('streaks a genuinely airborne ball even without a tag', () => {
+    expect(wantsTrail(null, 60, 200)).toBe(true);
+    expect(wantsTrail(null, 4, 200)).toBe(false);
   });
 });
 

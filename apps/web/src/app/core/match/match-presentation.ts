@@ -1,4 +1,4 @@
-import { CommentaryLine, Highlight, MatchStatistics } from './match.models';
+import { CommentaryLine, MatchStatistics, Passage } from './match.models';
 
 /**
  * Client-side presentation helpers for the match center.
@@ -12,11 +12,13 @@ const OUTCOME_LABELS: Record<string, string> = {
   goal: 'Goal',
   penalty_goal: 'Penalty goal',
   penalty_missed: 'Penalty missed',
+  free_kick_shot: 'Free kick',
   woodwork: 'Woodwork',
   saved: 'Saved',
   blocked: 'Blocked',
   off_target: 'Off target',
   chance: 'Chance',
+  play: 'Play',
 };
 
 /** The outcome codes that mean the ball finished in the net. */
@@ -32,7 +34,42 @@ export function matchClockLabel(minute: number, stoppageMinute: number): string 
   return stoppageMinute > 0 ? `${minute}+${stoppageMinute}'` : `${minute}'`;
 }
 
-/** Names a highlight's outcome, falling back to the code. */
+/** Regulation time, in minutes, that the continuous clock counts up to before stoppage. */
+const REGULATION_MINUTES = 90;
+
+/**
+ * A continuous scoreboard label for a match second (`replay-v3`).
+ *
+ * The engine records a match second as `(minute + stoppage) * 60`, so a passage's window can be walked
+ * continuously: the label ticks over as the film plays rather than jumping at each passage boundary. Past
+ * ninety minutes the label becomes `90+N'`, which is how a manager reads stoppage time.
+ */
+export function matchClockFromSeconds(matchSecond: number): {
+  readonly minute: number;
+  readonly stoppageMinute: number;
+} {
+  const regulationSeconds = REGULATION_MINUTES * 60;
+
+  if (matchSecond >= regulationSeconds) {
+    return {
+      minute: REGULATION_MINUTES,
+      stoppageMinute: Math.floor((matchSecond - regulationSeconds) / 60) + 1,
+    };
+  }
+
+  return { minute: Math.max(1, Math.floor(Math.max(0, matchSecond) / 60) + 1), stoppageMinute: 0 };
+}
+
+/** A playback position as a clock, e.g. `1:05` or `10:35`. */
+export function playbackClockLabel(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1_000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+/** Names a passage's outcome, falling back to the code. */
 export function outcomeLabel(code: string): string {
   return OUTCOME_LABELS[code] ?? code;
 }
@@ -65,9 +102,9 @@ export function commentarySideLabel(side: string): string {
   return side === 'home' ? 'Home' : side === 'away' ? 'Away' : side;
 }
 
-/** A one-line title for a highlight, e.g. `Goal — 67'`. */
-export function highlightTitle(highlight: Highlight): string {
-  return `${outcomeLabel(highlight.outcomeCode)} \u2014 ${matchClockLabel(highlight.minute, highlight.stoppageMinute)}`;
+/** A one-line title for a passage, e.g. `Goal — 67'`. */
+export function passageTitle(passage: Passage): string {
+  return `${outcomeLabel(passage.outcomeCode)} \u2014 ${matchClockLabel(passage.minute, passage.stoppageMinute)}`;
 }
 
 /** One row of the statistics panel, with both sides already formatted. */
@@ -198,57 +235,56 @@ export interface ShotMapEntry {
 }
 
 /**
- * Every shot worth plotting, derived from the highlights themselves.
+ * Every shot worth plotting, derived from the film passages themselves.
  *
- * Since `replay-v2` the shooter's own track carries a keyframe tagged with the strike, and its coordinates
- * are the exact spot the ball was struck from — so the map is the replay's own geometry rather than an
- * estimate. A `replay-v1` highlight carries no action tags, so it falls back to where the ball came to
- * rest and reads the side from the pitch half, which is the best a tagless presentation can support.
+ * The shooter's own track carries a keyframe tagged with the strike, and its coordinates are the exact spot
+ * the ball was struck from — so the map is the replay's own geometry rather than an estimate. A tagged
+ * presentation is what `replay-v3` always sends; the fallback to where the ball came to rest exists only for
+ * a vintage payload whose action tags are absent.
  *
  * The engine's axis is fixed: the home side attacks towards the higher X, so a fallback shot in the
- * defending half would be read as the wrong side. That is the honest trade — a map that omits a vintage
- * shot would be emptier than one that can occasionally colour it wrong, and the fallback only exists for
- * matches recorded before the tags did.
+ * defending half would be read as the wrong side. That is the honest trade — a map that omits a shot would
+ * be emptier than one that can occasionally colour it wrong.
  */
-export function shotMapEntries(highlights: readonly Highlight[]): readonly ShotMapEntry[] {
+export function shotMapEntries(passages: readonly Passage[]): readonly ShotMapEntry[] {
   const entries: ShotMapEntry[] = [];
 
-  for (const highlight of highlights) {
-    if (!isShotOutcome(highlight.outcomeCode)) {
+  for (const passage of passages) {
+    if (!isShotOutcome(passage.outcomeCode)) {
       continue;
     }
 
-    const strike = strikePoint(highlight);
+    const strike = strikePoint(passage);
 
     if (strike === null) {
       continue;
     }
 
     entries.push({
-      sourceEventSequence: highlight.sourceEventSequence,
+      sourceEventSequence: passage.sourceEventSequence,
       side: strike.side,
       x: strike.x,
       y: strike.y,
-      outcomeCode: highlight.outcomeCode,
-      minute: highlight.minute,
-      stoppageMinute: highlight.stoppageMinute,
+      outcomeCode: passage.outcomeCode,
+      minute: passage.minute,
+      stoppageMinute: passage.stoppageMinute,
     });
   }
 
   return entries;
 }
 
-/** Where a highlight's shot was struck from, or null when nothing in it says. */
-function strikePoint(highlight: Highlight): { side: 'home' | 'away'; x: number; y: number } | null {
+/** Where a passage's shot was struck from, or null when nothing in it says. */
+function strikePoint(passage: Passage): { side: 'home' | 'away'; x: number; y: number } | null {
   const sides = new Map<string, 'home' | 'away'>();
 
-  for (const entity of highlight.entities) {
+  for (const entity of passage.entities) {
     if (entity.side === 'home' || entity.side === 'away') {
       sides.set(entity.entityId, entity.side);
     }
   }
 
-  for (const track of highlight.tracks) {
+  for (const track of passage.tracks) {
     const side = sides.get(track.entityId);
 
     if (side === undefined) {
@@ -267,7 +303,7 @@ function strikePoint(highlight: Highlight): { side: 'home' | 'away'; x: number; 
     }
   }
 
-  const ball = highlight.tracks.find((track) => track.entityId === 'ball')?.keyframes.at(-1);
+  const ball = passage.tracks.find((track) => track.entityId === 'ball')?.keyframes.at(-1);
 
   return ball === undefined
     ? null
@@ -294,16 +330,17 @@ export function conditionColorClass(basisPoints: number): string {
 }
 
 /**
- * The highlight a commentary line can be shown as, or -1 when the line has none.
+ * The passage a commentary line can be shown in, or -1 when the line has none.
  *
- * A line narrates an event; only some events are worth replaying (§9.2), so the timeline offers "show me
- * this" only where there is something to show rather than a button that does nothing.
+ * A line narrates an event; a passage carries the events it produced, so the report offers "watch" only
+ * where a passage actually presents the event rather than a button that does nothing.
  */
-export function highlightIndexForLine(
-  highlights: readonly Highlight[],
-  line: CommentaryLine,
-): number {
-  return highlights.findIndex((highlight) => highlight.sourceEventSequence === line.sequence);
+export function passageIndexForLine(passages: readonly Passage[], line: CommentaryLine): number {
+  return passages.findIndex(
+    (passage) =>
+      passage.sourceEventSequence === line.sequence ||
+      passage.eventSequences.includes(line.sequence),
+  );
 }
 
 /** The commentary template keys that report a booking, and the card each one means. */

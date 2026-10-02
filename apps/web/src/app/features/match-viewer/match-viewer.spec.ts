@@ -1,12 +1,12 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
-import { CommentaryLine, Highlight, Match, MatchPresentation } from '../../core/match/match.models';
+import { CommentaryLine, Match, MatchPresentation, Passage } from '../../core/match/match.models';
 import { MatchStore } from '../../core/match/match-store';
 import { MatchViewer } from './match-viewer';
 
 /**
- * The viewer's wiring from a loaded presentation to a working FM-style match center (`§9.4`, `§9.5`).
+ * The viewer's wiring from a loaded presentation to a working FM-style match center (`replay-v3`).
  *
  * The playback state machine, the renderer, and the store are all tested on their own elsewhere; what was
  * never tested is the seam between them — that the viewer builds its player from the presentation it was
@@ -14,20 +14,23 @@ import { MatchViewer } from './match-viewer';
  * replay's own facts. A viewer that kept an empty player would render a complete, believable match center
  * whose Play button did nothing, which is exactly the bug this guards.
  *
- * The control is exercised in text-only mode (`§9.4`), because a headless DOM has no canvas 2D context and
- * the replay's controls are what this seam is about.
+ * The control is exercised in text-only mode, because a headless DOM has no canvas 2D context and the
+ * replay's controls are what this seam is about.
  */
 
-function highlight(): Highlight {
+function passage(): Passage {
   return {
     sourceEventSequence: 5,
     minute: 8,
     stoppageMinute: 0,
+    startMatchSecond: 480,
+    endMatchSecond: 540,
     durationMilliseconds: 6_000,
     outcomeCode: 'goal',
     narration: 'Goal — A Scorer, 8.',
     homeColour: '#1f6f43',
     awayColour: '#7a1f2b',
+    eventSequences: [5],
     entities: [
       {
         entityId: 'H9',
@@ -69,15 +72,15 @@ function highlight(): Highlight {
     commentary: [
       {
         timeMilliseconds: 0,
-        templateKey: 'match.passage.build_up',
-        variantKey: 'match.passage.build_up.v1',
-        parameters: [],
+        templateKey: 'match.build.pass',
+        variantKey: 'match.build.pass.v1',
+        parameters: [{ name: 'playerId', value: 'pl1' }],
         text: 'Ashvale United build the move.',
       },
       {
         timeMilliseconds: 3_000,
-        templateKey: 'match.passage.shot',
-        variantKey: 'match.passage.shot.v1',
+        templateKey: 'match.build.chance',
+        variantKey: 'match.build.chance.v1',
         parameters: [],
         text: 'The shot is struck.',
       },
@@ -101,12 +104,22 @@ function line(): CommentaryLine {
 function presentation(): MatchPresentation {
   return {
     matchId: 'm1',
-    presentationVersion: 'replay-v2',
-    engineVersion: 'engine-v3',
+    presentationVersion: 'replay-v3',
+    engineVersion: 'engine-v4',
     homeGoals: 1,
     awayGoals: 0,
     commentary: [line()],
-    highlights: [highlight()],
+    passages: [passage()],
+    reel: [
+      {
+        sourceEventSequence: 5,
+        outcomeCode: 'goal',
+        minute: 8,
+        stoppageMinute: 0,
+        startMilliseconds: 0,
+        endMilliseconds: 6_000,
+      },
+    ],
     estimatedPayloadBytes: 2_048,
     homeLineup: {
       clubName: 'Ashvale United',
@@ -143,8 +156,15 @@ function presentation(): MatchPresentation {
       { participantId: 'p1', minute: 0, conditionBasisPoints: 10_000, ratingBasisPoints: 6_000 },
       { participantId: 'p1', minute: 8, conditionBasisPoints: 8_000, ratingBasisPoints: 7_400 },
     ],
-    bridges: [],
-    playback: [],
+    playback: [
+      {
+        kind: 'passage',
+        sourceEventSequence: 5,
+        startMilliseconds: 0,
+        durationMilliseconds: 6_000,
+      },
+    ],
+    totalPlaybackMilliseconds: 6_000,
   };
 }
 
@@ -177,8 +197,8 @@ function match(): Match {
       goals: 0,
       statistics: statistics(0),
     },
-    engineVersion: 'engine-v3',
-    presentationVersion: 'replay-v2',
+    engineVersion: 'engine-v4',
+    presentationVersion: 'replay-v3',
     serverTime: '2026-10-06T21:00:00Z',
   };
 }
@@ -268,7 +288,7 @@ describe('MatchViewer', () => {
       (button) => button.getAttribute('aria-label') === 'Play replay',
     ) as HTMLButtonElement | undefined;
 
-    expect(play, 'the replay offers Play once it has a highlight to play').toBeDefined();
+    expect(play, 'the replay offers Play once it has a passage to play').toBeDefined();
 
     play!.click();
 
@@ -311,15 +331,25 @@ describe('MatchViewer', () => {
 
     await fixture.whenStable();
 
-    // At minute eight the curve's own figures are on the panel, not an interpolation to full time.
+    // At the active passage's minute the curve's own figures are on the panel, not an interpolation.
     expect(native.textContent).toContain('7.4');
     expect(barWidth(native)).toBe('80%');
   });
 
-  it("overwrites the ticker with the passage's own commentary", async () => {
+  it('shows the build-up commentary feed as the playhead reaches it', async () => {
     const native = await load();
 
-    expect(native.textContent).toContain('Ashvale United build the move.');
+    const feed = native.querySelector('[data-testid="match-feed"]');
+
+    expect(feed).not.toBeNull();
+    expect(feed!.textContent).toContain('Ashvale United build the move.');
+  });
+
+  it('offers a progress scrubber with the film clock', async () => {
+    const native = await load();
+
+    expect(native.querySelector('input[aria-label="Replay position"]')).not.toBeNull();
+    expect(native.querySelector('[data-testid="match-elapsed"]')?.textContent).toContain('0:00');
   });
 
   it('keeps a screen-reader scoreline and switches between the report, statistics, and player tabs', async () => {
@@ -341,22 +371,21 @@ describe('MatchViewer', () => {
     expect(native.textContent).toContain('A Scorer');
   });
 
-  it('offers the condensed replay by default and cuts to highlights on request', async () => {
+  it('offers the full match by default and switches to the highlights reel on request', async () => {
     const native = await load();
 
-    const condensed = buttonByText(native, 'Condensed')!;
+    const full = buttonByText(native, 'Full match')!;
     const highlights = buttonByText(native, 'Highlights')!;
 
-    expect(condensed.getAttribute('aria-pressed')).toBe('true');
+    expect(full.getAttribute('aria-pressed')).toBe('true');
     expect(highlights.getAttribute('aria-pressed')).toBe('false');
 
-    // Switching modes resumes on the same highlight rather than restarting the replay.
     highlights.click();
 
     await fixture.whenStable();
 
     expect(highlights.getAttribute('aria-pressed')).toBe('true');
-    expect(condensed.getAttribute('aria-pressed')).toBe('false');
+    expect(full.getAttribute('aria-pressed')).toBe('false');
   });
 });
 

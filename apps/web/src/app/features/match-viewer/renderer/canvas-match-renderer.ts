@@ -1,7 +1,8 @@
-import { Highlight, HighlightEntity, HighlightKeyframe } from '../../../core/match/match.models';
+import { HighlightEntity, HighlightKeyframe, Passage } from '../../../core/match/match.models';
 import { frameAt, sampleAt } from './keyframe-interpolator';
 import {
   PitchGeometry,
+  SHADOW_MIN_ALTITUDE,
   altitudeLift,
   altitudeScale,
   pitchGeometry,
@@ -11,9 +12,11 @@ import {
 import {
   celebrationStartMilliseconds,
   duelClashes,
+  isDiveAction,
   isStrikeAction,
   nearestPlayerToBall,
   trailStrength,
+  wantsTrail,
 } from './renderer-effects';
 import {
   CardKind,
@@ -69,30 +72,30 @@ export class CanvasMatchRenderer {
     milliseconds: 0,
   };
 
-  /** Initializes the renderer for one highlight on one canvas. */
+  /** Initializes the renderer for one passage on one canvas. */
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    highlight: Highlight,
+    passage: Passage,
     options: RendererOptions = {},
   ) {
     const context = canvas.getContext('2d');
 
     if (context === null) {
-      throw new Error('A highlight cannot be drawn: the canvas has no 2D context.');
+      throw new Error('A passage cannot be drawn: the canvas has no 2D context.');
     }
 
     this.context = context;
-    this.entities = toRendererEntities(highlight.entities);
-    this.tracks = toRendererTracks(highlight.tracks);
+    this.entities = toRendererEntities(passage.entities);
+    this.tracks = toRendererTracks(passage.tracks);
     this.ballTrack =
-      highlight.tracks.find((track) => track.entityId === BALL_ENTITY_ID)?.keyframes ?? null;
+      passage.tracks.find((track) => track.entityId === BALL_ENTITY_ID)?.keyframes ?? null;
     this.kits = {
-      home: kitFor(options.kits?.home, highlight.homeColour),
-      away: kitFor(options.kits?.away, highlight.awayColour),
+      home: kitFor(options.kits?.home, passage.homeColour),
+      away: kitFor(options.kits?.away, passage.awayColour),
     };
     this.cards = options.cards ?? new Map<string, CardKind>();
     this.reducedMotion = options.reducedMotion ?? false;
-    this.celebrateStart = celebrationStartMilliseconds(highlight);
+    this.celebrateStart = celebrationStartMilliseconds(passage);
 
     this.canvas.addEventListener('pointermove', this.pointerListener);
     this.canvas.addEventListener('pointerleave', this.pointerLeaveListener);
@@ -122,7 +125,7 @@ export class CanvasMatchRenderer {
     const radius = playerRadius(rect);
 
     for (const player of players) {
-      this.drawPlayer(rect, player, radius);
+      this.drawPlayer(rect, player, radius, ball);
     }
 
     for (const clash of clashes) {
@@ -130,10 +133,8 @@ export class CanvasMatchRenderer {
     }
 
     if (ball !== undefined) {
-      const strength = trailStrength(ball.z, ball.speed);
-
-      if (strength > TRAIL_MIN_STRENGTH) {
-        this.drawTrail(rect, strength);
+      if (wantsTrail(ball.action, ball.z, ball.speed)) {
+        this.drawTrail(rect, Math.max(0.4, trailStrength(ball.z, ball.speed)));
         effects += 1;
       }
 
@@ -353,33 +354,42 @@ export class CanvasMatchRenderer {
     context.restore();
   }
 
-  /** Draws one player: kit colours, a contrasting border, the shirt number, and any card they carry. */
-  private drawPlayer(rect: PitchRect, item: FrameEntity, radius: number): void {
+  /** Draws one player: a kit-coloured dot, a contrasting border, the shirt number, and any card. */
+  private drawPlayer(
+    rect: PitchRect,
+    item: FrameEntity,
+    radius: number,
+    ball: FrameEntity | undefined,
+  ): void {
     const context = this.context;
-    const point = toCanvasPoint(item.position, rect);
     const isHome = item.entity.side !== 'away';
     const kit = isHome ? this.kits.home : this.kits.away;
     const isKeeper = item.entity.family === 'goalkeeper';
     // A keeper wears the club's second colour, which is how a goalkeeper is told apart at a glance without
     // either side's outfield kit being touched.
     const fill = isKeeper ? kit.secondary : kit.primary;
-    const border = isKeeper ? kit.primary : '#ffffff';
+    // Both teams are dots. They are told apart by kit colour and by a border — the home side white, the away
+    // side dark ink — rather than by shape, which the product owner overrode for `replay-v3`.
+    const border = isHome ? '#ffffff' : AWAY_INK;
+    const diving = isDiveAction(item.action);
+    const ground = toCanvasPoint(item.position, rect);
+    const lift = item.z > 0 ? altitudeLift(rect, item.z) : 0;
+    const point = { x: ground.x, y: ground.y - lift };
+
+    // A jumping player lifts off a short ground shadow; a keeper going down has none, because a dive is a
+    // lateral move rather than a leap and the ball is the thing with height.
+    if (lift > 1 && !diving) {
+      this.drawGroundShadow(ground, radius);
+    }
 
     context.save();
     context.fillStyle = fill;
     context.strokeStyle = border;
     context.lineWidth = 2;
-
-    if (isHome) {
-      context.beginPath();
-      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
-      context.fill();
-      context.stroke();
-    } else {
-      // A square for the away side, so the two teams are told apart by shape as well as colour (§9.4).
-      context.fillRect(point.x - radius, point.y - radius, radius * 2, radius * 2);
-      context.strokeRect(point.x - radius, point.y - radius, radius * 2, radius * 2);
-    }
+    context.beginPath();
+    context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
 
     context.fillStyle = readableInk(fill);
     context.font = `600 ${Math.max(7, Math.round(radius * 1.15))}px system-ui, sans-serif`;
@@ -388,12 +398,50 @@ export class CanvasMatchRenderer {
     context.fillText(`${item.entity.shirtNumber}`, point.x, point.y + 0.5);
     context.restore();
 
+    if (diving) {
+      this.drawDiveStreak(ground, radius, diveDirection(item, ball));
+    }
+
     const card =
       item.entity.participantId === null ? undefined : this.cards.get(item.entity.participantId);
 
     if (card !== undefined) {
       this.drawCard(point, radius, card);
     }
+  }
+
+  /** A short shadow on the grass under a player who has jumped. */
+  private drawGroundShadow(ground: PitchPoint, radius: number): void {
+    const context = this.context;
+
+    context.save();
+    context.fillStyle = 'rgba(2, 6, 23, 0.28)';
+    context.beginPath();
+    context.ellipse(
+      ground.x,
+      ground.y + radius * 0.55,
+      radius * 0.9,
+      radius * 0.34,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+    context.restore();
+  }
+
+  /** A short streak toward the ball where a keeper is going down, standing in for the missing shadow. */
+  private drawDiveStreak(ground: PitchPoint, radius: number, direction: number): void {
+    const context = this.context;
+
+    context.save();
+    context.strokeStyle = 'rgba(248, 250, 252, 0.55)';
+    context.lineWidth = Math.max(1.5, radius * 0.35);
+    context.beginPath();
+    context.moveTo(ground.x - direction * radius * 0.6, ground.y + radius * 0.7);
+    context.lineTo(ground.x + direction * radius * 2.4, ground.y + radius * 0.7);
+    context.stroke();
+    context.restore();
   }
 
   /** Draws a booking as a small card floating above the offending player's token. */
@@ -437,21 +485,24 @@ export class CanvasMatchRenderer {
     const radius = ballRadius(rect) * altitudeScale(ball.z);
     const centre = { x: ground.x, y: ground.y - lift };
 
-    // The shadow stays on the ground and shrinks as the ball climbs, which is what sells the height.
-    context.save();
-    context.fillStyle = `rgba(2, 6, 23, ${(0.35 - (ball.z / 100) * 0.15).toFixed(3)})`;
-    context.beginPath();
-    context.ellipse(
-      ground.x,
-      ground.y,
-      radius * (1.1 - (ball.z / 100) * 0.35),
-      radius * 0.42,
-      0,
-      0,
-      Math.PI * 2,
-    );
-    context.fill();
-    context.restore();
+    // A ball on the grass — a rolled pass — casts no shadow at all; one in the air casts a small ellipse
+    // that shrinks and fades as it climbs, which is what sells the height (`replay-v3`).
+    if (ball.z >= SHADOW_MIN_ALTITUDE) {
+      context.save();
+      context.fillStyle = `rgba(2, 6, 23, ${(0.32 - (ball.z / 100) * 0.14).toFixed(3)})`;
+      context.beginPath();
+      context.ellipse(
+        ground.x,
+        ground.y,
+        radius * (0.95 - (ball.z / 100) * 0.3),
+        radius * 0.36,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+      context.restore();
+    }
 
     // A white ball with dark patches, so it reads as a football rather than a dot.
     context.save();
@@ -707,10 +758,12 @@ const TAG_BORDER = 'rgba(248, 250, 252, 0.3)';
 const CARD_COLOURS: Record<CardKind, string> = { yellow: '#facc15', red: '#ef4444' };
 const CLASH_PERIOD = 620;
 const CELEBRATION_MILLISECONDS = 4_000;
-const TRAIL_MIN_STRENGTH = 0.34;
 const DEFAULT_KEEPER_TRIM = '#f8fafc';
 
-/** Maps a highlight's entities to the renderer's shape. */
+/** The away side's border: dark ink against the home side's white, so the two dots are told apart. */
+const AWAY_INK = '#0f172a';
+
+/** Maps a passage's entities to the renderer's shape. */
 export function toRendererEntities(
   entities: readonly HighlightEntity[],
 ): readonly RendererEntity[] {
@@ -726,7 +779,7 @@ export function toRendererEntities(
   }));
 }
 
-/** Maps a highlight's tracks to the renderer's shape, dropping any that name no entity. */
+/** Maps a passage's tracks to the renderer's shape, dropping any that name no entity. */
 export function toRendererTracks(
   tracks: readonly {
     readonly entityId: string;
@@ -777,7 +830,18 @@ function ballRadius(rect: PitchRect): number {
   return Math.max(3.5, Math.min(6.5, rect.height / 105));
 }
 
-/** The kit the renderer draws a side in, preferring the complete kit and falling back to the highlight. */
+/** Which way a keeper is going down: toward the ball, or a fixed way when the ball is not there. */
+function diveDirection(item: FrameEntity, ball: FrameEntity | undefined): number {
+  if (ball === undefined) {
+    return 1;
+  }
+
+  const away = Math.sign(ball.position.x - item.position.x);
+
+  return away === 0 ? 1 : away;
+}
+
+/** The kit the renderer draws a side in, preferring the complete kit and falling back to the passage. */
 function kitFor(kit: TeamKit | undefined, primary: string): TeamKit {
   return {
     primary: kit?.primary ?? primary,
