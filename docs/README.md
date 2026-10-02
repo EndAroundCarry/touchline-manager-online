@@ -8,7 +8,7 @@ Start here. Documents are ordered from "what the product is" to "how it is opera
 |---|---|
 | [`product/master-plan.md`](product/master-plan.md) | The approved master implementation plan. Product contract, architecture, stages, definition of done. |
 | [`product/game-rules.md`](product/game-rules.md) | **The normative rule set.** Every configurable value, with stable refs (`WORLD-4`, `CAL-3`, `TRF-8`, …) cited by tests, runbooks, and support. |
-| [`product/match-engine.md`](product/match-engine.md) | The match engine specification: every formula, every versioned constant, the determinism contract, and the measured distributions. |
+| [`product/match-engine.md`](product/match-engine.md) | The match engine specification (`engine-v4`): every formula, every versioned constant, the determinism contract, the continuous passage, the `replay-v3` film and reel, and the measured distributions. |
 | [`product/glossary.md`](product/glossary.md) | Canonical vocabulary. Use these terms verbatim in code, schema, API, and UI. |
 | [`product/mvp-traceability.md`](product/mvp-traceability.md) | Every MVP feature mapped to a module and a stage, plus a guardrail per non-goal. |
 | [`product/content-and-fictional-data-policy.md`](product/content-and-fictional-data-policy.md) | UI voice, localization readiness, accessibility-in-content rules, and the fictional-data/legal mandate. |

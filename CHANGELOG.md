@@ -4,6 +4,50 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine-v4 and replay-v3 — calibration, ADRs, and documentation
+
+The milestone's final stage measures the engine and the replay, records the decision behind the
+continuous film, and brings the product documentation back in line with behaviour.
+
+Monte Carlo at scale — 20,000 matches between evenly matched 13/20 sides, a 10,000-match replay sweep,
+and the calibration and tactical-invariant experiments — holds every band. Goals come out at **2.89** a
+match (target 2.5–3.0) on **27.3** shots; home advantage is worth **+3.9** points; a three-point favourite
+is upset **16.1%** of the time; a side sent off early finishes **1.16** goals worse; direct free kicks —
+dead code before engine-v4 — now occur about **1.5** times a match. The film lands inside the
+nine-and-a-half-to-eleven-minute window in **100%** of matches (p50 10.7 min) and none exceed eleven; the
+reel runs p50 8.3 min (max 10.9) and the payload estimate is p50 **519 KB** (max 574), comfortably inside
+the 750 KB budget.
+
+### Added
+
+- **`ADR-0052`** records the replay-v3 decision: one continuous film re-derived from the frozen snapshot,
+  the weighted time warp, the recorded-touch tracks and exact boundary continuity, the server-side reel
+  with its lead-in and goal exception, and the adaptive payload ladder. The engine-v4 progression and
+  passage-recording decision is already `ADR-0051`; the ADR index is updated with both.
+- **Measured numbers in the docs.** `docs/product/match-engine.md` §12 now records the engine-v4 outcome
+  bands, the calibration and tactical invariants, the film/reel/payload percentiles, and the current
+  performance figures under the `engine-v4` rules hash.
+- **Replay constants in the rule set.** `docs/product/game-rules.md` §18 gains `replay_version`
+  (`replay-v3`), `commentary_version` (`commentary-v3`), `match_film_seconds`, `reel_seconds_max`,
+  `reel_clips_max`, and `reel_lead_in_match_seconds`, and marks `highlight_target_seconds` as superseded
+  for the film.
+
+### Changed
+
+- **`docs/product/match-engine.md` retargeted from engine-v2 to engine-v4.** The header, scope, simulation
+  order (the engine-v3 scramble/duel/set-piece phases and the engine-v4 passage geometry and direct free
+  kick), commentary (`commentary-v3`), highlights (the `replay-v3` film and reel), and the whole
+  configuration table are brought up to date; the rule set and engine versions read `4`/`engine-v4`.
+- **`docs/architecture/data-model.md`** records the milestone as a no-schema-change stage: `presentation_version`
+  reads `replay-v3`, the ETag is versioned, the replay is re-derived (so `match.highlights` is no longer
+  written), and a database seeded under `engine-v3` was archived and reseeded.
+
+### Tests
+
+- No new behavioural tests: this stage records measurements and decisions. `DistributionTests`,
+  `CalibrationTests`, `ReplayDirectorTests`, and `PassageTests` are the guards the recorded numbers cite,
+  and the full suite is green under the re-pinned `engine-v4` golden hashes.
+
 ## Replay-v3 viewer — one film, a feed, and a scrubber
 
 `replay-v3` gave the client one continuous film and a reel over it; the match center still spoke

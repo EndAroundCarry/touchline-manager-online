@@ -866,6 +866,16 @@ erDiagram
 > identity and constrained to it, holding the game instant a stepped world is frozen at (`game_now`,
 > `updated_at`, `version`). Nothing else changes; the row exists only while a stepped clock does, and no
 > existing table is touched (`TIME-7`, ADR-0049).
+>
+> **Engine roadmap status (engine-v4 / replay-v3). No schema change:** the continuous passage (ADR-0051)
+> and the film/reel presentation (ADR-0052) are engine and presentation changes only. `match.input_snapshots`
+> now records `engine_version` = `engine-v4` and `rule_set_version` = `engine-rules-v4`, and
+> `match.matches.presentation_version` reads `replay-v3`; the presentation ETag is
+> `{output_hash}:{presentation_version}`. The passage recorder is an optional side channel whose output is
+> never persisted — the replay is re-derived from the frozen snapshot on read, so there is no stored payload
+> to migrate and `match.highlights` is no longer written (`MAT-8`, ADR-0052). No column, index, or
+> constraint is touched. A database seeded under `engine-v3` was archived (`touchline_engine_v3_backup`) and
+> reseeded, because a version-4 match cannot re-simulate a version-3 result (ADR-0051).
 
 ---
 
@@ -880,7 +890,7 @@ permitted **only** for:
 | Immutable match input snapshot | `match.input_snapshots.snapshot` | `engine_version` + `snapshot_hash` |
 | Engine configuration snapshot/hash | `match.input_snapshots.snapshot` | `rule_set_version` |
 | Typed match-event detail | `match.events.detail` | `detail_schema_version` |
-| Semantic highlight keyframes | `match.highlights.keyframe_payload` | `presentation_version` |
+| Semantic highlight keyframes (legacy: the replay is re-derived from the frozen snapshot, never stored — ADR-0052) | `match.highlights.keyframe_payload` | `presentation_version` |
 | Notification/news template parameters | `comms.inbox_messages.parameters`, `comms.news_items.parameters` | template key |
 | Audit before/after metadata where relational querying is not needed | `ops.audit_log.before_metadata`, `.after_metadata` | — |
 | Job payloads | `ops.jobs.payload` | `job_type` |

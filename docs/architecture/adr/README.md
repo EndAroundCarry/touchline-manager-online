@@ -68,6 +68,7 @@ the system is shaped the way it is.
 | [0049](0049-non-production-stepped-game-clock.md) | A non-production stepped game clock, advanced by an operator | Accepted |
 | [0050](0050-public-information-pages-and-status.md) | Player-facing information pages and a public service status | Accepted |
 | [0051](0051-engine-v4-continuous-passages.md) | Engine-v4 plays a possession along a continuous passage, and records the film as a side channel | Accepted |
+| [0052](0052-replay-v3-film-and-reel.md) | Replay-v3 turns a match into one continuous film with a companion highlights reel | Accepted |
 
 ## Rules for changing an ADR
 

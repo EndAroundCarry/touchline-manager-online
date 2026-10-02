@@ -7,7 +7,7 @@ other on fixed matchdays. Every club, player, competition and badge is fictional
 **Matchdays:** Tuesday, Thursday and Sunday at 19:00 UTC. Team sheets lock 30 minutes before
 kick-off. The server decides results; a client can never simulate or influence one.
 
-> **Status: Stage 15 underway — the non-production stepped clock and its test toolbar, and the player-facing rules, privacy, terms, status and support pages. Stage 14 is complete: roles, TOTP MFA, the gated admin surface, the operator read console, the recovery commands, the remaining §10.8 mutations (AI assignment, finance repair, announcements, and feature flags), the load, supply-chain, and restore drills, the read-only incident switch, and the local telemetry stack with its dashboards and SLO alerts.** Stage 13 is
+> **Status: Stage 15 underway — the non-production stepped clock and its test toolbar, and the player-facing rules, privacy, terms, status and support pages; the engine roadmap's continuous-replay milestone has landed — `engine-v4` plays a possession along a real passage and the match center replays it as one continuous film with a highlights reel. Stage 14 is complete: roles, TOTP MFA, the gated admin surface, the operator read console, the recovery commands, the remaining §10.8 mutations (AI assignment, finance repair, announcements, and feature flags), the load, supply-chain, and restore drills, the read-only incident switch, and the local telemetry stack with its dashboards and SLO alerts.** Stage 13 is
 > complete: the responsive PWA, account sessions, the offline boundary, the accessibility gate, the
 > guided help, and the privacy-safe operational funnels. The playable
 > game is being built in the staged order defined in the master plan. Stage 1 delivered the monorepo, the durable job
@@ -87,7 +87,15 @@ kick-off. The server decides results; a client can never simulate or influence o
 > that freezes game time at a stored instant and moves it only when an operator presses a button, so a
 > season can be played one day or one matchday at a time through the real worker (`TIME-6`, `TIME-7`,
 > ADR-0049). Its player-facing pages followed — rules, privacy, terms, a live service status and support,
-> reachable signed out and backed by the product's first anonymous read (`F-55`, ADR-0050).
+> reachable signed out and backed by the product's first anonymous read (`F-55`, ADR-0050). Most recently
+> the engine roadmap's continuous-replay milestone has landed. `engine-v4` / `engine-rules-v4` makes the
+> passage the unit of movement: a possession begins where the last one left the ball — or at a restart —
+> progresses into the attacking third through a real chain of touches, and ends at an outcome-appropriate
+> point, so event coordinates, shot maps, and direct free kicks are finally meaningful; `replay-v3` then
+> turns a recorded match into one continuous condensed film of the whole match, joined rather than cut,
+> with a companion highlights reel that gives every chance a genuine lead-in, and the match center plays
+> it with a continuous clock, a scrolling commentary feed, and a scrubber (`MAT-8`, `MAT-11`, ADR-0051,
+> ADR-0052).
 
 ---
 

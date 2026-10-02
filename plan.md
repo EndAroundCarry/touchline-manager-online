@@ -2,6 +2,13 @@
 
 This document outlines the complete specification, mathematical modeling, and staged execution plan to recreate the **Match Engine** and **Match Viewer** for Touchline Manager. The system is inspired by the iconic **Football Manager** (Sports Interactive) and **Championship Manager** engines.
 
+> **Status:** This is the original seven-stage plan that built the engine and the match center. Stages 1–6
+> are delivered and stage 7's tuning and validation is the ongoing work. The engine has since advanced to
+> `engine-v4` / `engine-rules-v4` and the replay to `replay-v3`: a possession is now played along a real
+> passage, and the replay is one continuous film with a companion highlights reel (ADR-0051, ADR-0052). The
+> current milestone plan is [`engine-v4-continuous-match-replay.md`](engine-v4-continuous-match-replay.md);
+> where a stage below names `engine-v3` or `replay-v2`, read the version the engine roadmap records.
+
 ---
 
 ## 1. Vision & Architecture Overview
