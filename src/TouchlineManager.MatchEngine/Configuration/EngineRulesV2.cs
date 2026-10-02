@@ -309,11 +309,82 @@ public sealed record EngineRulesV2
     /// <summary>What each man short multiplies the side's condition loss by, as covering teammates tire (Stage 2).</summary>
     public int ShorthandedConditionLossMultiplierBasisPoints { get; init; } = 12_500;
 
-    /// <summary>How far up the pitch a progressed possession advances, at least, of the distance to the far goal.</summary>
-    public int MinPossessionAdvanceBasisPoints { get; init; } = 2_600;
+    // ---- Passage progression (engine-v4) ---------------------------------------------------------
 
-    /// <summary>How far up the pitch a progressed possession advances, at most.</summary>
-    public int MaxPossessionAdvanceBasisPoints { get; init; } = 4_200;
+    /// <summary>The fewest touches a possession's passage is built from.</summary>
+    public int MinPassageTouches { get; init; } = 3;
+
+    /// <summary>The most touches a possession's passage is built from.</summary>
+    public int MaxPassageTouches { get; init; } = 8;
+
+    /// <summary>How far the ball is advanced, at least, by one touch, of the distance to the far goal.</summary>
+    public int MinTouchAdvanceBasisPoints { get; init; } = 350;
+
+    /// <summary>How far the ball is advanced, at most, by one touch.</summary>
+    public int MaxTouchAdvanceBasisPoints { get; init; } = 1_700;
+
+    /// <summary>How far a touch may drift across the pitch, either way, of the pitch's width.</summary>
+    public int MaxTouchLateralDriftBasisPoints { get; init; } = 1_600;
+
+    /// <summary>How far up the pitch a defended possession's pressure point is, at least (`engine-v4`).</summary>
+    /// <remarks>
+    /// The pressure point is where the defending side engages and where a foul, when there is one, is
+    /// committed. Its band is what gives fouls a realistic spread across the middle and attacking thirds, so
+    /// a direct free kick in range is a genuine possibility rather than unreachable code
+    /// (<see cref="FreeKickShootingRangeX"/>).
+    /// </remarks>
+    public int PressurePointXMinBasisPoints { get; init; } = 4_200;
+
+    /// <summary>How far up the pitch a defended possession's pressure point is, at most.</summary>
+    public int PressurePointXMaxBasisPoints { get; init; } = 8_800;
+
+    /// <summary>How far up the pitch an open-play shot is taken from, at least, on the attacker's own scale.</summary>
+    public int ShotFinalThirdXMinBasisPoints { get; init; } = 8_300;
+
+    /// <summary>How far up the pitch an open-play shot is taken from, at most.</summary>
+    public int ShotFinalThirdXMaxBasisPoints { get; init; } = 9_700;
+
+    /// <summary>The low edge of the central shooting band across the pitch.</summary>
+    public int ShotCentralBandYMinBasisPoints { get; init; } = 3_050;
+
+    /// <summary>The high edge of the central shooting band.</summary>
+    public int ShotCentralBandYMaxBasisPoints { get; init; } = 3_950;
+
+    /// <summary>The low edge of an inside-channel shooting band.</summary>
+    public int ShotInsideBandYMinBasisPoints { get; init; } = 1_700;
+
+    /// <summary>The high edge of an inside-channel shooting band.</summary>
+    public int ShotInsideBandYMaxBasisPoints { get; init; } = 5_300;
+
+    /// <summary>The low edge of a wide shooting band.</summary>
+    public int ShotWideBandYMinBasisPoints { get; init; } = 500;
+
+    /// <summary>The high edge of a wide shooting band.</summary>
+    public int ShotWideBandYMaxBasisPoints { get; init; } = 6_500;
+
+    /// <summary>How far up the pitch an offside is given, on the attacker's own scale.</summary>
+    public int OffsideLineXBasisPoints { get; init; } = 7_400;
+
+    /// <summary>How far up the pitch a plain turnover leaves the ball.</summary>
+    public int TurnoverMiddleThirdXBasisPoints { get; init; } = 4_800;
+
+    /// <summary>How far up the pitch a side restarts from after a goal kick or a keeper claim.</summary>
+    public int GoalAreaXBasisPoints { get; init; } = 1_200;
+
+    /// <summary>The share of a possession's final approach that is crossed rather than passed.</summary>
+    public int CrossShareOfPassageBasisPoints { get; init; } = 2_800;
+
+    /// <summary>The ball's altitude at a cross, 0…100.</summary>
+    public int CrossAltitude { get; init; } = 70;
+
+    /// <summary>The ball's altitude at a shot, 0…100.</summary>
+    public int ShotAltitude { get; init; } = 30;
+
+    /// <summary>The ball's altitude at a header, 0…100.</summary>
+    public int HeaderAltitude { get; init; } = 80;
+
+    /// <summary>The ball's altitude at a clearance, 0…100.</summary>
+    public int ClearanceAltitude { get; init; } = 55;
 
     /// <summary>The chance a foul in the attacking half becomes a direct free kick rather than a quick restart.</summary>
     public int FreeKickAwardBasisPoints { get; init; } = 4_500;
@@ -839,6 +910,68 @@ public sealed record EngineRulesV2
                 $"Injury absence bounds are invalid: {MinInjuryAbsenceFixtures}..{MaxInjuryAbsenceFixtures}.");
         }
 
+        // The passage geometry has its own shape: a bounded number of touches between the anchors, a
+        // pressure band that can reach the free-kick range, a shot band wholly inside the final third, and
+        // altitudes that stay on the ball's 0..100 scale. Each of these would otherwise produce a ball that
+        // teleports, a shot from the halfway line, or a waypoint above the sky.
+        if (MinPassageTouches < 1 || MaxPassageTouches < MinPassageTouches || MaxPassageTouches > 32)
+        {
+            problems.Add(
+                $"Passage touch bounds are invalid: {MinPassageTouches}..{MaxPassageTouches}.");
+        }
+
+        if (MinTouchAdvanceBasisPoints < 1)
+        {
+            problems.Add(
+                $"MinTouchAdvanceBasisPoints must be positive, was {MinTouchAdvanceBasisPoints}.");
+        }
+
+        if (MaxTouchLateralDriftBasisPoints is < 0 or > Certain)
+        {
+            problems.Add(
+                $"MaxTouchLateralDriftBasisPoints must be in 0..{Certain}, was {MaxTouchLateralDriftBasisPoints}.");
+        }
+
+        if (ShotFinalThirdXMinBasisPoints <= Certain / 2)
+        {
+            problems.Add(
+                $"ShotFinalThirdXMinBasisPoints ({ShotFinalThirdXMinBasisPoints}) must put shots in the final third.");
+        }
+
+        if (PressurePointXMaxBasisPoints < FreeKickShootingRangeX / 2)
+        {
+            problems.Add(
+                $"PressurePointXMaxBasisPoints ({PressurePointXMaxBasisPoints}) is too shallow to reach the "
+                + $"free-kick range ({FreeKickShootingRangeX}).");
+        }
+
+        foreach (var (name, value) in new[]
+                 {
+                     (nameof(OffsideLineXBasisPoints), OffsideLineXBasisPoints),
+                     (nameof(TurnoverMiddleThirdXBasisPoints), TurnoverMiddleThirdXBasisPoints),
+                     (nameof(GoalAreaXBasisPoints), GoalAreaXBasisPoints),
+                 })
+        {
+            if (value is < 0 or > Certain)
+            {
+                problems.Add($"{name} must be a pitch coordinate in 0..{Certain}, was {value}.");
+            }
+        }
+
+        foreach (var (name, value) in new[]
+                 {
+                     (nameof(CrossAltitude), CrossAltitude),
+                     (nameof(ShotAltitude), ShotAltitude),
+                     (nameof(HeaderAltitude), HeaderAltitude),
+                     (nameof(ClearanceAltitude), ClearanceAltitude),
+                 })
+        {
+            if (value is < 0 or > 100)
+            {
+                problems.Add($"{name} must be a ball altitude in 0..100, was {value}.");
+            }
+        }
+
         if (problems.Count > 0)
         {
             throw new InvalidOperationException(
@@ -910,10 +1043,7 @@ public sealed record EngineRulesV2
         yield return (nameof(MaxInjuryProbabilityBasisPoints), MaxInjuryProbabilityBasisPoints);
         yield return (nameof(ConditionSubstitutionThresholdBasisPoints), ConditionSubstitutionThresholdBasisPoints);
         yield return (nameof(MinimumConditionAdvantageBasisPoints), MinimumConditionAdvantageBasisPoints);
-
-        // Possession advance is a fraction of the pitch's length, on the same 0..10000 scale.
-        yield return (nameof(MinPossessionAdvanceBasisPoints), MinPossessionAdvanceBasisPoints);
-        yield return (nameof(MaxPossessionAdvanceBasisPoints), MaxPossessionAdvanceBasisPoints);
+        yield return (nameof(CrossShareOfPassageBasisPoints), CrossShareOfPassageBasisPoints);
     }
 
     private IEnumerable<(string Name, int Value)> MultiplierConstants()
@@ -982,6 +1112,12 @@ public sealed record EngineRulesV2
         yield return (nameof(MinCreationBasisPoints), MinCreationBasisPoints, MaxCreationBasisPoints);
         yield return (nameof(MinShotGoalBasisPoints), MinShotGoalBasisPoints, MaxShotGoalBasisPoints);
         yield return (nameof(MinSaveBasisPoints), MinSaveBasisPoints, MaxSaveBasisPoints);
+        yield return (nameof(MinTouchAdvanceBasisPoints), MinTouchAdvanceBasisPoints, MaxTouchAdvanceBasisPoints);
+        yield return (nameof(PressurePointXMinBasisPoints), PressurePointXMinBasisPoints, PressurePointXMaxBasisPoints);
+        yield return (nameof(ShotFinalThirdXMinBasisPoints), ShotFinalThirdXMinBasisPoints, ShotFinalThirdXMaxBasisPoints);
+        yield return (nameof(ShotCentralBandYMinBasisPoints), ShotCentralBandYMinBasisPoints, ShotCentralBandYMaxBasisPoints);
+        yield return (nameof(ShotInsideBandYMinBasisPoints), ShotInsideBandYMinBasisPoints, ShotInsideBandYMaxBasisPoints);
+        yield return (nameof(ShotWideBandYMinBasisPoints), ShotWideBandYMinBasisPoints, ShotWideBandYMaxBasisPoints);
     }
 
     private IEnumerable<(string Name, int Floor, int Ceiling)> FactorPairs()

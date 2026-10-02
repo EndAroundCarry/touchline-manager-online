@@ -218,6 +218,7 @@ public sealed class HighlightTests
                 EngineEventType.ShotSaved => "saved",
                 EngineEventType.ShotBlocked => "blocked",
                 EngineEventType.ShotOffTarget => "off_target",
+                EngineEventType.FreeKickShot => "free_kick_shot",
                 _ => "chance",
             };
 

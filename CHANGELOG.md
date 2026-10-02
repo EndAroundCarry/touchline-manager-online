@@ -1,7 +1,65 @@
 # Changelog
 
 Notable changes by stage. The stage numbering follows
-[`docs/product/master-plan.md`](docs/product/master-plan.md) §16.
+[`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
+engine version.
+
+## Engine-v4 — a possession is played along a real passage
+
+`engine-v3` located a possession on the pitch with a single absolute draw: every possession was assigned a
+random point in the possessing side's **own half**, and every event inherited it. The ball therefore moved
+randomly, no pass, carry, or cross existed in the model, and `attackingX >= FreeKickShootingRangeX` was
+unreachable — direct free kicks were dead code and any shot map built from event positions was nonsense.
+
+Engine-v4 makes the passage the unit of movement. A possession begins where the last one left the ball — or at
+a restart (centre after a goal, the goal area after a keeper claim) — progresses into the attacking third
+through three to eight touches with lateral drift, and ends at a point its outcome names: the final third for
+an open-play shot, the penalty spot, the corner flag, the offside line, the middle third, or the pressure
+point where a foul was committed. `state.MoveBall` is called along the passage and before every `Emit`, so
+event coordinates finally mean something. A per-possession derived stream (`seed * 1_000_003 + ordinal`, the
+`AssistPlanner` pattern) draws all of the geometry, so the outcome formulas and their calibrated
+distributions are untouched. `AdvanceBall` and `Min/MaxPossessionAdvanceBasisPoints` are deleted.
+
+The change is rounded off by `MatchPassageRecorder`: an optional side channel, in the
+`PlayerLiveMetricsRecorder` style, that captures each possession's ball waypoints and the touches of the
+players the simulation actually picked (carrier, passer, shooter, keeper, header winner, free-kick taker).
+The engine and rules versions become `engine-v4` / `engine-rules-v4` (ADR-0051).
+
+### Added
+
+- **Continuous passages** (`engine-v4`): `Model/MatchPassage.cs` holds `MatchPassageV1`, `PassageWaypointV1`,
+  `PassageTouchV1`, the waypoint/action vocabulary and codes, and the public `MatchPassageRecorder`;
+  `Simulation/PassagePlanner.cs` builds the path from the possession's own derived stream.
+- **Progression rules**: `EngineRulesV2` gains the passage constants — touch count, per-touch advance, lateral
+  drift, the pressure-point band, the per-zone final-third shot bands, the offside line, the turnover and
+  goal-area anchors, the cross share, and the cross/shot/header/clearance altitudes — replacing the advance
+  band, with validation for every one of them.
+- **`MatchSimulator.Simulate(input, rules, liveMetrics, passages)`**: the passage recorder is optional and
+  consumes no draw, so the output hash is identical with and without it.
+
+### Notes
+
+- **The ball is now a simulation fact, and the free kick is real.** `FreeKickShot` — unreachable in version 3
+  — is produced by a foul deep in the attacking third; measured on even sides it is about 1.5 per match,
+  with the goal and shot bands held (2.88 goals and 27.0 shots per match over a thousand fixtures). The
+  measured bands are unchanged, so the free-kick constants did not need retuning (ADR-0051).
+- **The golden hashes move, and that is the point.** The main stream advances differently because the
+  absolute positional draw is gone, so every stored match would replay differently; `engine-v4` is a new
+  version and the input, output, and rules hashes are re-pinned. A database seeded before this change must be
+  archived and reseeded.
+- **A substitute who takes a chance is still not carried as a presentation entity.** The replay director's
+  entity list is the starting eleven; making it the current XI is the next engine-roadmap milestone, and two
+  director tests skip a substitute shooter with that noted.
+- **`ADR-0051`** records the decision; the ADR index is updated with it.
+
+### Tests
+
+- New `PassageTests`: one passage per possession, every waypoint and touch on the pitch and in fraction
+  order, continuity between possessions (or a restart), every shot in the attacking third and free-kick shots
+  in range, touches naming match participants, recorder determinism, the with/without-recorder hash equality,
+  and the post-goal centre restart.
+- Re-pinned `DeterminismTests` golden input/output/rules hashes and the version-label tests; the
+  `HighlightTests` and `ReplayDirectorTests` updates are the two noted above.
 
 ## Stage 15 — Player-facing rules, privacy, terms, status, and support pages
 

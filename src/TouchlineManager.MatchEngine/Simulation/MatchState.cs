@@ -50,6 +50,39 @@ internal sealed class MatchState
     /// </remarks>
     internal PlayerLiveMetricsRecorder? LiveMetrics { get; init; }
 
+    /// <summary>
+    /// Gets the sink the replay's ball paths and touches are captured into, when one was supplied
+    /// (`engine-v4`).
+    /// </summary>
+    /// <remarks>
+    /// Null for every ordinary simulation — the result does not depend on it, which is the point: the
+    /// recorder is a by-product of the same run rather than a second mode of simulation, and the geometry
+    /// that fills it is drawn from a per-possession stream of its own so it can never move a play draw.
+    /// </remarks>
+    internal MatchPassageRecorder? Passages { get; init; }
+
+    /// <summary>Gets or sets the 1-based ordinal of the possession being played (`engine-v4`).</summary>
+    /// <remarks>
+    /// The ordinal is what the per-possession geometry stream is derived from, so it must advance whether or
+    /// not a recorder is attached: the same seed must produce the same ball path and the same outcome, with or
+    /// without a replay reading it.
+    /// </remarks>
+    internal int PossessionOrdinal { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the next possession restarts from the centre spot (`engine-v4`).
+    /// </summary>
+    /// <remarks>Set at kick-off, at the second-half restart, and after a goal, then consumed by the next passage.</remarks>
+    internal bool RestartFromCentre { get; set; }
+
+    /// <summary>
+    /// Gets or sets the side that restarts from its own goal area, when a keeper has just claimed or parried
+    /// the ball (`engine-v4`).
+    /// </summary>
+    internal MatchSide? GoalAreaRestartSide { get; set; }
+
+    private PassageAccumulator? _passage;
+
     /// <summary>Gets the frozen snapshot.</summary>
     public MatchInputV1 Input { get; }
 
@@ -105,6 +138,49 @@ internal sealed class MatchState
     /// <param name="altitude">The altitude, 0..100.</param>
     public void MoveBall(SpatialPoint position, int altitude) =>
         Ball = new BallState(position.X, position.Y, int.Clamp(altitude, 0, 100));
+
+    /// <summary>
+    /// Moves the ball along the passage being played and records the point it reached (`engine-v4`).
+    /// </summary>
+    /// <param name="position">The position, in pitch coordinates.</param>
+    /// <param name="kind">How the ball travelled to this point.</param>
+    /// <param name="altitude">The altitude, 0..100; zero for a ground touch.</param>
+    public void MoveBallAndRecord(SpatialPoint position, PassageWaypointKind kind, int altitude = 0)
+    {
+        MoveBall(position, altitude);
+        _passage?.AddWaypoint(Ball.X, Ball.Y, Ball.Z, kind);
+    }
+
+    /// <summary>
+    /// Records a player's touch of the ball at its current position (`engine-v4`).
+    /// </summary>
+    /// <param name="participantId">The player who touched it.</param>
+    /// <param name="action">What they did with it.</param>
+    public void RecordTouch(Guid participantId, PassageAction action) =>
+        _passage?.AddTouch(participantId, action, Ball.X, Ball.Y, Ball.Z);
+
+    /// <summary>Opens a new passage for the possession that is about to be played (`engine-v4`).</summary>
+    /// <param name="side">The side in possession.</param>
+    public void BeginPassage(MatchSide side) =>
+        _passage = new PassageAccumulator(PossessionOrdinal, side, ClockSeconds);
+
+    /// <summary>
+    /// Closes the current passage and hands it to the recorder, when one is attached (`engine-v4`).
+    /// </summary>
+    /// <remarks>
+    /// Called once per possession, after the ball has reached the point the possession ends at, so the next
+    /// passage can begin where this one left it.
+    /// </remarks>
+    public void EndPassage()
+    {
+        if (_passage is null)
+        {
+            return;
+        }
+
+        Passages?.Add(_passage.Build(ClockSeconds));
+        _passage = null;
+    }
 
     /// <summary>Gets how much stoppage the first half was given, once it has ended.</summary>
     public int FirstHalfStoppageSeconds { get; private set; }
@@ -251,6 +327,10 @@ internal sealed class MatchState
 
         Events.Add(matchEvent);
 
+        // An event that happens during a passage is a fact of that passage; a period boundary is not, because
+        // no passage is open when it is emitted.
+        _passage?.AddEvent(matchEvent.Sequence);
+
         return matchEvent;
     }
 
@@ -307,4 +387,73 @@ internal sealed class MatchState
     /// <summary>Gets the goals scored by a side, read from the events (MAT-5).</summary>
     /// <param name="side">Which end.</param>
     public int GoalsOf(MatchSide side) => Events.Count(matchEvent => matchEvent.Side == side && matchEvent.IsGoal);
+
+    /// <summary>
+    /// Assembles one possession's record as it is played and hands it to the recorder when it ends.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Waypoints and touches are stamped with a monotonic tick rather than a clock reading, because a
+    /// possession's seconds are drawn up front and the clock does not move again until it is over. The tick
+    /// is the order the ball reached each fact in, and the finished passage maps it evenly onto the 0…10,000
+    /// fraction a replay measures playback against.
+    /// </para>
+    /// <para>
+    /// The accumulator never reads the random stream and never writes to the match, so a recorder attached to
+    /// a simulation cannot move its outcome.
+    /// </para>
+    /// </remarks>
+    private sealed class PassageAccumulator
+    {
+        private readonly List<int> _events = [];
+        private readonly List<(int Tick, PassageWaypointV1 Waypoint)> _waypoints = [];
+        private readonly List<(int Tick, PassageTouchV1 Touch)> _touches = [];
+        private readonly int _ordinal;
+        private readonly MatchSide _side;
+        private readonly int _startClockSeconds;
+        private int _nextTick;
+
+        public PassageAccumulator(int ordinal, MatchSide side, int startClockSeconds)
+        {
+            _ordinal = ordinal;
+            _side = side;
+            _startClockSeconds = startClockSeconds;
+        }
+
+        public void AddWaypoint(int x, int y, int z, PassageWaypointKind kind) =>
+            _waypoints.Add((_nextTick++, new PassageWaypointV1(0, x, y, z, kind)));
+
+        public void AddTouch(Guid participantId, PassageAction action, int x, int y, int z) =>
+            _touches.Add((_nextTick++, new PassageTouchV1(0, participantId, action, x, y, z)));
+
+        public void AddEvent(int sequence) => _events.Add(sequence);
+
+        public MatchPassageV1 Build(int endClockSeconds)
+        {
+            var span = Math.Max(1, _nextTick - 1);
+
+            return new MatchPassageV1
+            {
+                Ordinal = _ordinal,
+                Side = _side,
+                StartClockSeconds = _startClockSeconds,
+                EndClockSeconds = endClockSeconds,
+                EventSequences = [.. _events],
+                Waypoints =
+                [
+                    .. _waypoints.Select(pair => pair.Waypoint with
+                    {
+                        FractionBasisPoints = pair.Tick * EngineRulesV2.Certain / span,
+                    }),
+                ],
+                Touches =
+                [
+                    .. _touches.Select(pair => pair.Touch with
+                    {
+                        FractionBasisPoints = pair.Tick * EngineRulesV2.Certain / span,
+                    }),
+                ],
+            };
+        }
+    }
 }

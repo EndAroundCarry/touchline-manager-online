@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 3;
+    public const int Engine = 4;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,21 +30,22 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 3;
+    public const int RuleSet = 4;
 
-    /// <summary>The stable label for engine version 3, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 4, used in hashes and diagnostics.</summary>
     /// <remarks>
-    /// Version 3 is the spatial play model (master plan Stage 2): every possession is located on the
-    /// normalized 2D pitch, possessions resolve through explicit 1v1 duels and loose-ball scrambles, set
-    /// pieces gain direct free kicks alongside corners and penalties, and the result carries each
-    /// player's final condition and substitution minutes for the match center. The new duel, scramble,
-    /// free-kick, and spatial constants are rules constants, so this is a new engine version and a new
-    /// rules version, and the golden hashes are re-pinned against it.
+    /// Version 4 is the continuous passage model: a possession no longer teleports to an absolute random
+    /// point in its own half, but is played along a real chain of touches that begins where the last one
+    /// left the ball — or at a restart — progresses into the attacking third, and ends at an
+    /// outcome-appropriate point, so event coordinates, shots, and direct free kicks are meaningful. The
+    /// geometry is drawn from a per-possession stream of its own, so the outcome formulas and their
+    /// distributions are comparable to version 3 while the ball finally moves like football. An optional
+    /// passage recorder captures the film for the replay without touching the result.
     /// </remarks>
-    public const string EngineLabel = "engine-v3";
+    public const string EngineLabel = "engine-v4";
 
-    /// <summary>The stable label for engine rules version 3.</summary>
-    public const string RuleSetLabel = "engine-rules-v3";
+    /// <summary>The stable label for engine rules version 4.</summary>
+    public const string RuleSetLabel = "engine-rules-v4";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v1";

@@ -155,7 +155,7 @@ public sealed class CanonicalSerializationTests
         var text = CanonicalMatchSerializer.CanonicalText(TestMatchFactory.Even());
 
         text.Should().StartWith("match-input-v1\n");
-        text.Should().Contain("engineVersion=engine-v3");
+        text.Should().Contain("engineVersion=engine-v4");
         text.Should().Contain("side.home");
         text.Should().Contain("slot.home.1");
     }

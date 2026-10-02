@@ -103,15 +103,15 @@ public sealed class DeterminismTests
     public void The_golden_hash_for_a_known_snapshot_is_pinned()
     {
         // The most important test in the project. If this fails, an engine change has altered what a historical
-        // match would replay as. Engine version 3 was still unreleased when the Stage 7 calibration re-pinned
-        // these values, so no played match was rewritten; from its release onward, any change requires a new
-        // engine version and a new labelled constant rather than an updated hash.
+        // match would replay as. Engine version 4 is still unreleased while the continuous passage model is
+        // built, so no played match was rewritten; from its release onward, any change requires a new engine
+        // version and a new labelled constant rather than an updated hash.
         var result = MatchSimulator.Simulate(TestMatchFactory.Even());
 
         result.OutputHash.Should().Be(GoldenOutputHash);
         result.InputHash.Should().Be(GoldenInputHash);
         result.HomeGoals.Should().Be(3);
-        result.AwayGoals.Should().Be(0);
+        result.AwayGoals.Should().Be(2);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public sealed class DeterminismTests
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
         EngineConfiguration.HashOf(EngineRulesV2.Default)
-            .Should().Be("714a92fa000192a235bb48c591f658dcfb88143ffa8a016a07797153ca4ce50e");
+            .Should().Be("c0f6aaf3e949cb488d91815be7c48cdc093cbacb016c959545f238e3bf2f178f");
     }
 
     [Fact]
@@ -160,8 +160,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "53914805e817aaffa1d317ea7c00d108faf07ca4ead444cd3be93c3d69c72ee9";
+        "c694c34ab18cc83ada0533c0cf1847a5f0488761064814c4d957fa26d719674e";
 
     private const string GoldenOutputHash =
-        "cb056dab19433b58f2f4ccd2afc6d94137fc8535a9811967c0e7de470b60712c";
+        "ec944d323ab26821cfb467bf34a8ac4d8c1f20327e14b52ee7b307e150bc0729";
 }

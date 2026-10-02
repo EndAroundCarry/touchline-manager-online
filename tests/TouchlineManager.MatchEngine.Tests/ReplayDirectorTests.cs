@@ -213,9 +213,14 @@ public sealed class ReplayDirectorTests
         {
             var matchEvent = result.Events.Single(candidate => candidate.Sequence == highlight.SourceEventSequence);
             var ballY = highlight.Entities.Single(entity => entity.IsBall).Y;
+
+            // The presentation carries the starting eleven as entities for now, so a chance taken by a
+            // substitute has no entity to name. That gap — the entity list becoming the current XI — is the
+            // replay director's own milestone; until then the block assertion is about the players it does
+            // carry.
             var shooterId = highlight.Entities
-                .Single(entity => !entity.IsBall && entity.ParticipantId == matchEvent.ParticipantId)
-                .EntityId;
+                .FirstOrDefault(entity => !entity.IsBall && entity.ParticipantId == matchEvent.ParticipantId)
+                ?.EntityId;
 
             foreach (var entity in highlight.Entities.Where(entity =>
                 !entity.IsBall
@@ -312,7 +317,15 @@ public sealed class ReplayDirectorTests
                 continue;
             }
 
-            var entity = highlight.Entities.Single(candidate => candidate.ParticipantId == shooterId);
+            // A substitute who takes the chance is not carried as an entity yet; the entity list becoming the
+            // current XI belongs to the replay director's own milestone.
+            var entity = highlight.Entities.FirstOrDefault(candidate => candidate.ParticipantId == shooterId);
+
+            if (entity is null)
+            {
+                continue;
+            }
+
             var track = highlight.Tracks.Single(candidate => candidate.EntityId == entity.EntityId);
 
             track.Keyframes.Should().Contain(

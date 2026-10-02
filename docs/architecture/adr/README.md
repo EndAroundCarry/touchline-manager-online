@@ -67,6 +67,7 @@ the system is shaped the way it is.
 | [0048](0048-telemetry-dashboards-and-slo-alerting.md) | Telemetry dashboards and SLO alerting, over the instruments that exist | Accepted |
 | [0049](0049-non-production-stepped-game-clock.md) | A non-production stepped game clock, advanced by an operator | Accepted |
 | [0050](0050-public-information-pages-and-status.md) | Player-facing information pages and a public service status | Accepted |
+| [0051](0051-engine-v4-continuous-passages.md) | Engine-v4 plays a possession along a continuous passage, and records the film as a side channel | Accepted |
 
 ## Rules for changing an ADR
 

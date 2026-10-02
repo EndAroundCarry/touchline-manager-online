@@ -33,13 +33,19 @@ public static class MatchSimulator
     public static MatchResultV1 Simulate(MatchInputV1 input) =>
         Simulate(input, EngineRulesV2.Default, liveMetrics: null);
 
-    /// <summary>Simulates a match under an explicitly supplied rules set.</summary>
+    /// <summary>Simulates a match under an explicitly supplied rules set, capturing replay side channels.</summary>
     /// <param name="input">The frozen snapshot.</param>
-    /// <param name="rules">The rules in force. Its hash must match the snapshot's.</param>
+    /// <param name="rules">The rules in force.</param>
     /// <param name="liveMetrics">
     /// The recorder the replay's minute-by-minute condition and ratings are captured into, or null when no
     /// replay is being derived. Capturing consumes no draw and changes no state, so the result is identical
-    /// either way — which is what lets a replay read re-simulate the same match for free (`MAT-8`, §9.5).
+    /// either way (`MAT-8`, §9.5).
+    /// </param>
+    /// <param name="passages">
+    /// The recorder the replay's ball paths and touches are captured into, or null when no film is being
+    /// derived (`engine-v4`). Like <paramref name="liveMetrics"/> it is a by-product of the same run: the
+    /// geometry it captures is drawn from a per-possession stream of its own, so the output hash is identical
+    /// with and without it — which is what the with/without-recorder test pins.
     /// </param>
     /// <returns>The result, including both hashes.</returns>
     /// <exception cref="InvalidMatchInputException">
@@ -48,7 +54,8 @@ public static class MatchSimulator
     public static MatchResultV1 Simulate(
         MatchInputV1 input,
         EngineRulesV2 rules,
-        PlayerLiveMetricsRecorder? liveMetrics = null)
+        PlayerLiveMetricsRecorder? liveMetrics = null,
+        MatchPassageRecorder? passages = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(rules);
@@ -65,6 +72,7 @@ public static class MatchSimulator
         var state = new MatchState(input, rules, random, home, away)
         {
             LiveMetrics = liveMetrics,
+            Passages = passages,
         };
 
         PossessionSimulator.Run(state);
