@@ -42,6 +42,14 @@ export function isGoalOutcome(code: string): boolean {
   return GOAL_OUTCOMES.has(code);
 }
 
+/** The commentary template keys that report a goal. */
+const GOAL_TEMPLATES = new Set(['match.goal', 'match.penalty.goal']);
+
+/** Whether a commentary line reports a goal, which the report highlights and the scoreboard lists. */
+export function isGoalCommentary(templateKey: string): boolean {
+  return GOAL_TEMPLATES.has(templateKey);
+}
+
 /** Formats a published scoreline, e.g. `2–1`. */
 export function scoreLine(home: number, away: number): string {
   return `${home}\u2013${away}`;
@@ -157,6 +165,134 @@ export function matchStatisticRows(
   ];
 }
 
+/** The outcome codes that mean the ball was struck at goal. */
+const SHOT_OUTCOMES = new Set([
+  'goal',
+  'penalty_goal',
+  'penalty_missed',
+  'free_kick_shot',
+  'woodwork',
+  'saved',
+  'blocked',
+  'off_target',
+  'chance',
+]);
+
+/** The action tags the engine writes on the keyframe where the ball is struck at goal. */
+const STRIKE_ACTIONS = new Set(['shot', 'penalty', 'free_kick']);
+
+/** Whether an outcome code means a shot at goal, which is what the shot map plots. */
+export function isShotOutcome(code: string): boolean {
+  return SHOT_OUTCOMES.has(code);
+}
+
+/** One shot on the shot map: where it was struck from and who struck it. */
+export interface ShotMapEntry {
+  readonly sourceEventSequence: number;
+  readonly side: 'home' | 'away';
+  readonly x: number;
+  readonly y: number;
+  readonly outcomeCode: string;
+  readonly minute: number;
+  readonly stoppageMinute: number;
+}
+
+/**
+ * Every shot worth plotting, derived from the highlights themselves.
+ *
+ * Since `replay-v2` the shooter's own track carries a keyframe tagged with the strike, and its coordinates
+ * are the exact spot the ball was struck from — so the map is the replay's own geometry rather than an
+ * estimate. A `replay-v1` highlight carries no action tags, so it falls back to where the ball came to
+ * rest and reads the side from the pitch half, which is the best a tagless presentation can support.
+ *
+ * The engine's axis is fixed: the home side attacks towards the higher X, so a fallback shot in the
+ * defending half would be read as the wrong side. That is the honest trade — a map that omits a vintage
+ * shot would be emptier than one that can occasionally colour it wrong, and the fallback only exists for
+ * matches recorded before the tags did.
+ */
+export function shotMapEntries(highlights: readonly Highlight[]): readonly ShotMapEntry[] {
+  const entries: ShotMapEntry[] = [];
+
+  for (const highlight of highlights) {
+    if (!isShotOutcome(highlight.outcomeCode)) {
+      continue;
+    }
+
+    const strike = strikePoint(highlight);
+
+    if (strike === null) {
+      continue;
+    }
+
+    entries.push({
+      sourceEventSequence: highlight.sourceEventSequence,
+      side: strike.side,
+      x: strike.x,
+      y: strike.y,
+      outcomeCode: highlight.outcomeCode,
+      minute: highlight.minute,
+      stoppageMinute: highlight.stoppageMinute,
+    });
+  }
+
+  return entries;
+}
+
+/** Where a highlight's shot was struck from, or null when nothing in it says. */
+function strikePoint(highlight: Highlight): { side: 'home' | 'away'; x: number; y: number } | null {
+  const sides = new Map<string, 'home' | 'away'>();
+
+  for (const entity of highlight.entities) {
+    if (entity.side === 'home' || entity.side === 'away') {
+      sides.set(entity.entityId, entity.side);
+    }
+  }
+
+  for (const track of highlight.tracks) {
+    const side = sides.get(track.entityId);
+
+    if (side === undefined) {
+      continue;
+    }
+
+    const strike = track.keyframes.find(
+      (keyframe) =>
+        keyframe.action !== null &&
+        keyframe.action !== undefined &&
+        STRIKE_ACTIONS.has(keyframe.action),
+    );
+
+    if (strike !== undefined) {
+      return { side, x: strike.x, y: strike.y };
+    }
+  }
+
+  const ball = highlight.tracks.find((track) => track.entityId === 'ball')?.keyframes.at(-1);
+
+  return ball === undefined
+    ? null
+    : { side: ball.x >= 5_000 ? 'home' : 'away', x: ball.x, y: ball.y };
+}
+
+/** Returns the Football Manager style colour class for a player's condition, e.g. a green bar for a fresh player. */
+export function conditionColorClass(basisPoints: number): string {
+  const percent = Math.max(0, Math.min(100, basisPoints / 100));
+
+  if (percent >= 75) {
+    return 'bg-emerald-500';
+  }
+
+  if (percent >= 55) {
+    return 'bg-lime-500';
+  }
+
+  if (percent >= 35) {
+    return 'bg-amber-500';
+  }
+
+  return 'bg-rose-500';
+}
+
 /**
  * The highlight a commentary line can be shown as, or -1 when the line has none.
  *
@@ -212,4 +348,3 @@ export function ratingColorClass(basisPoints: number): string {
 
   return 'bg-rose-500/20 text-rose-400 border-rose-500/40';
 }
-

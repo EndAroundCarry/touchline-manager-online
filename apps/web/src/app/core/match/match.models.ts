@@ -203,4 +203,3 @@ export interface MatchPresentation {
   readonly playback?: readonly PlaybackSegment[] | null;
   readonly totalPlaybackMilliseconds?: number;
 }
-

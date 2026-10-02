@@ -126,24 +126,28 @@ test.describe('the matchday', () => {
 
     await expect(page.getByRole('heading', { level: 1 })).toContainText(scoreline);
 
-    // The timeline narrates the match from kick-off to full time, and the statistics reconcile with the
+    // The report narrates the match from kick-off to full time, and the statistics reconcile with the
     // score (MAT-5, MAT-8).
-    await expect(page.getByRole('heading', { name: 'Commentary' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Report' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Full Match Commentary' })).toBeVisible();
     await expect(page.locator('ol li').first()).toBeVisible();
 
-    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
-    await expect(page.getByRole('rowheader', { name: 'Goals', exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'Statistics' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Match Statistics' })).toBeVisible();
+    await expect(page.getByText('Goals', { exact: true }).first()).toBeVisible();
 
     // The replay itself: every goal is highlighted, so a match with a goal offers a player to drive
     // (§9.2). Press Play and the control becomes Pause — the animation loop is running off the playback.
-    await expect(page.getByRole('heading', { name: 'Highlights' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Replay' }).click();
 
-    const play = page.getByRole('button', { name: 'Play', exact: true });
+    const play = page.getByRole('button', { name: 'Play replay' });
 
     if ((await play.count()) > 0) {
       await play.click();
-      await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
-      await expect(page.getByRole('img')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Pause replay' })).toBeVisible();
+      await expect(page.locator('canvas[role="img"]')).toBeVisible();
     } else {
       await expect(page.getByText(/This match has no highlights to replay/)).toBeVisible();
     }

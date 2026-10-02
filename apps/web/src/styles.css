@@ -46,6 +46,27 @@ canvas.pitch,
   -webkit-user-select: none;
 }
 
+/*
+ * The match ticker overwrites line by line as a passage's own commentary reaches its offsets. A short
+ * fade makes a new line read as a new line rather than a flicker; the global reduced-motion rule below
+ * collapses the duration for anyone who asks for less movement.
+ */
+.ticker-text {
+  animation: ticker-line 240ms ease-out;
+}
+
+@keyframes ticker-line {
+  from {
+    opacity: 0.35;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* A visible focus ring is a WCAG 2.2 AA requirement, so it is set once for the whole app. */
 :focus-visible {
   outline: 2px solid var(--p-primary-color, #2563eb);

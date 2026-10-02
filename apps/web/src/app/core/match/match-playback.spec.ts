@@ -1,5 +1,5 @@
-import { Highlight } from './match.models';
-import { MatchPlayback } from './match-playback';
+import { Bridge, Highlight, HighlightEntity } from './match.models';
+import { MatchPlayback, PLAYBACK_SPEEDS } from './match-playback';
 
 /**
  * The replay's playback guarantees (`§9.4`).
@@ -20,6 +20,23 @@ function highlight(sequence: number, durationMilliseconds = 1_000, minute = 10):
     awayColour: '#8c2f39',
     entities: [],
     tracks: [],
+  };
+}
+
+function bridge(afterEventSequence: number, durationMilliseconds = 2_000): Bridge {
+  return { afterEventSequence, durationMilliseconds, tracks: [] };
+}
+
+function entity(entityId: string): HighlightEntity {
+  return {
+    entityId,
+    isBall: false,
+    side: entityId.startsWith('H') ? 'home' : 'away',
+    participantId: null,
+    shirtNumber: 0,
+    family: null,
+    x: 5_000,
+    y: 3_500,
   };
 }
 
@@ -151,5 +168,91 @@ describe('MatchPlayback', () => {
     playback.pause();
 
     expect(playback.currentState).toBe('paused');
+  });
+
+  it('plays the recycling passage before the highlight it leads into, and nothing before the first', () => {
+    const playback = new MatchPlayback([highlight(1), highlight(2)], [bridge(2, 2_000)]);
+
+    expect(playback.count).toBe(3);
+    expect(playback.highlightCount).toBe(2);
+    expect(playback.activePassageKind).toBe('highlight');
+
+    playback.play();
+
+    // The first highlight runs for a second, then the bridge is the active passage — still counted as
+    // leading into the second highlight, which is the index the timeline and panels speak.
+    expect(playback.advance(1_000)).toBe(true);
+    expect(playback.activePassageKind).toBe('bridge');
+    expect(playback.activeHighlightIndex).toBe(1);
+
+    expect(playback.advance(2_000)).toBe(true);
+    expect(playback.activePassageKind).toBe('highlight');
+    expect(playback.active?.sourceEventSequence).toBe(2);
+    expect(playback.activeHighlightIndex).toBe(1);
+  });
+
+  it('gives a bridge the highlight-shaped body the renderer draws, filled in from its neighbours', () => {
+    const first = { ...highlight(1), entities: [entity('H9')] };
+    const second = { ...highlight(2), entities: [entity('H9'), entity('A4')] };
+    const crossing: Bridge = {
+      afterEventSequence: 2,
+      durationMilliseconds: 2_000,
+      tracks: [
+        {
+          entityId: 'H9',
+          keyframes: [
+            { timeMilliseconds: 0, x: 1_000, y: 2_000 },
+            { timeMilliseconds: 2_000, x: 3_000, y: 4_000 },
+          ],
+        },
+      ],
+    };
+
+    const playback = new MatchPlayback([first, second], [crossing]);
+
+    playback.play();
+    playback.advance(1_000);
+
+    const body = playback.active!;
+
+    expect(playback.activePassageKind).toBe('bridge');
+    expect(body.outcomeCode).toBe('bridge');
+    expect(body.durationMilliseconds).toBe(2_000);
+    expect(body.tracks).toHaveLength(1);
+    expect(body.entities.map((item) => item.entityId)).toEqual(['H9', 'A4']);
+  });
+
+  it('skips over the recycling to the next highlight', () => {
+    const playback = new MatchPlayback([highlight(1), highlight(2)], [bridge(2)]);
+
+    playback.play();
+    playback.skipCurrent();
+
+    expect(playback.activePassageKind).toBe('highlight');
+    expect(playback.active?.sourceEventSequence).toBe(2);
+  });
+
+  it('seeks to a highlight rather than to the bridge that leads into it', () => {
+    const playback = new MatchPlayback([highlight(1), highlight(2)], [bridge(2)]);
+
+    playback.seekTo(1);
+
+    expect(playback.activePassageKind).toBe('highlight');
+    expect(playback.active?.sourceEventSequence).toBe(2);
+
+    expect(playback.seekToEvent(2)).toBe(true);
+    expect(playback.activePassageKind).toBe('highlight');
+  });
+
+  it("offers the plan's speeds and scales the playhead at eight times", () => {
+    expect(PLAYBACK_SPEEDS).toEqual([1, 2, 4, 8]);
+
+    const playback = new MatchPlayback([highlight(1, 10_000)]);
+
+    playback.play();
+    playback.setSpeed(8);
+    playback.advance(100);
+
+    expect(playback.positionMs).toBe(800);
   });
 });

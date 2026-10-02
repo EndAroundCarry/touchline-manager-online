@@ -1,15 +1,19 @@
 import {
   commentarySideLabel,
+  conditionColorClass,
   highlightIndexForLine,
   highlightTitle,
+  isGoalCommentary,
   isGoalOutcome,
+  isShotOutcome,
   matchClockLabel,
   matchStatisticRows,
   outcomeLabel,
   possessionPercent,
   scoreLine,
+  shotMapEntries,
 } from './match-presentation';
-import { CommentaryLine, Highlight, MatchStatistics } from './match.models';
+import { CommentaryLine, Highlight, HighlightKeyframe, MatchStatistics } from './match.models';
 
 /** The match center's pure formatting guarantees. */
 
@@ -48,6 +52,64 @@ function highlight(sequence: number): Highlight {
     awayColour: '#8c2f39',
     entities: [],
     tracks: [],
+  };
+}
+
+function shot(overrides: {
+  sequence: number;
+  outcomeCode: string;
+  side?: 'home' | 'away';
+  action?: string;
+  ball?: HighlightKeyframe;
+}): Highlight {
+  const side = overrides.side ?? 'home';
+
+  return {
+    ...highlight(overrides.sequence),
+    outcomeCode: overrides.outcomeCode,
+    entities: [
+      {
+        entityId: 'H9',
+        isBall: false,
+        side,
+        participantId: 'p1',
+        shirtNumber: 9,
+        family: 'attack',
+        x: 7_000,
+        y: 3_500,
+      },
+      {
+        entityId: 'ball',
+        isBall: true,
+        side: null,
+        participantId: null,
+        shirtNumber: 0,
+        family: null,
+        x: 7_000,
+        y: 3_500,
+      },
+    ],
+    tracks: [
+      {
+        entityId: 'H9',
+        keyframes: [
+          { timeMilliseconds: 0, x: 6_000, y: 3_000 },
+          {
+            timeMilliseconds: 5_000,
+            x: 7_400,
+            y: 3_600,
+            action: overrides.action ?? 'shot',
+          },
+        ],
+      },
+      {
+        entityId: 'ball',
+        keyframes: [
+          { timeMilliseconds: 0, x: 5_000, y: 3_500 },
+          overrides.ball ?? { timeMilliseconds: 8_000, x: 7_800, y: 3_600 },
+        ],
+      },
+    ],
   };
 }
 
@@ -110,5 +172,43 @@ describe('match presentation helpers', () => {
   it('finds the highlight a commentary line can be shown as, or -1', () => {
     expect(highlightIndexForLine([highlight(4), highlight(9)], line(9))).toBe(1);
     expect(highlightIndexForLine([highlight(4)], line(5))).toBe(-1);
+  });
+
+  it('knows the commentary templates that report a goal', () => {
+    expect(isGoalCommentary('match.goal')).toBe(true);
+    expect(isGoalCommentary('match.penalty.goal')).toBe(true);
+    expect(isGoalCommentary('match.shot.saved')).toBe(false);
+  });
+
+  it('colours a condition bar green through red as a player tires', () => {
+    expect(conditionColorClass(9_500)).toBe('bg-emerald-500');
+    expect(conditionColorClass(6_000)).toBe('bg-lime-500');
+    expect(conditionColorClass(4_500)).toBe('bg-amber-500');
+    expect(conditionColorClass(1_500)).toBe('bg-rose-500');
+  });
+
+  it('plots a shot where its own track says the ball was struck from', () => {
+    const entries = shotMapEntries([
+      shot({ sequence: 3, outcomeCode: 'saved' }),
+      shot({ sequence: 4, outcomeCode: 'goal', side: 'away', action: 'penalty' }),
+      highlight(5),
+    ]);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ sourceEventSequence: 3, side: 'home', x: 7_400, y: 3_600 });
+    expect(entries[1]).toMatchObject({ sourceEventSequence: 4, side: 'away', x: 7_400, y: 3_600 });
+  });
+
+  it('plots a tagless vintage shot where the ball came to rest, on the half it finished in', () => {
+    const entries = shotMapEntries([shot({ sequence: 3, outcomeCode: 'blocked', action: 'run' })]);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ side: 'home', x: 7_800, y: 3_600 });
+  });
+
+  it('plots nothing for a highlight that is not a shot at all', () => {
+    expect(isShotOutcome('goal')).toBe(true);
+    expect(isShotOutcome('bridge')).toBe(false);
+    expect(shotMapEntries([{ ...highlight(1), outcomeCode: 'bridge' }])).toHaveLength(0);
   });
 });
