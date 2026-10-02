@@ -25,7 +25,18 @@ internal static class LaboratoryFixtures
     /// <summary>Builds two evenly matched sides.</summary>
     /// <param name="seed">The match seed.</param>
     public static MatchInputV1 EvenlyMatched(ulong seed) =>
-        Build(seed, 13, 13, new MatchInstructionsV1(), new MatchInstructionsV1());
+        EvenlyMatched(seed, EngineRulesV2.Default);
+
+    /// <summary>Builds two evenly matched sides under an explicit rules set.</summary>
+    /// <remarks>
+    /// A rules-set override is how the calibration neutralizes home advantage: the snapshot must carry the
+    /// hash of the rules it is simulated under, so a counterfactual run needs its fixture built against the
+    /// counterfactual rules rather than the shipped ones.
+    /// </remarks>
+    /// <param name="seed">The match seed.</param>
+    /// <param name="rules">The rules in force.</param>
+    public static MatchInputV1 EvenlyMatched(ulong seed, EngineRulesV2 rules) =>
+        Build(seed, 13, 13, new MatchInstructionsV1(), new MatchInstructionsV1(), rules);
 
     /// <summary>Builds a snapshot with the given ability, shape, and instructions.</summary>
     /// <param name="seed">The match seed.</param>
@@ -33,12 +44,14 @@ internal static class LaboratoryFixtures
     /// <param name="awayAbility">The away side's uniform attribute value.</param>
     /// <param name="home">The home side's instructions.</param>
     /// <param name="away">The away side's instructions.</param>
+    /// <param name="rules">The rules in force, or null for the shipped set.</param>
     public static MatchInputV1 Build(
         ulong seed,
         int homeAbility,
         int awayAbility,
         MatchInstructionsV1 home,
-        MatchInstructionsV1 away) =>
+        MatchInstructionsV1 away,
+        EngineRulesV2? rules = null) =>
         new()
         {
             FixtureId = Guid.Parse("018f0000-0000-7000-8000-0000000000f1"),
@@ -46,8 +59,8 @@ internal static class LaboratoryFixtures
             SeasonId = Guid.Parse("018f0000-0000-7000-8000-0000000000f3"),
             EngineVersion = EngineVersions.EngineLabel,
             RuleSetVersion = EngineVersions.RuleSetLabel,
-            HomeAdvantageBasisPoints = EngineRulesV2.Default.HomeAdvantageBasisPoints,
-            FormulaConfigurationHash = EngineConfiguration.HashOf(EngineRulesV2.Default),
+            HomeAdvantageBasisPoints = (rules ?? EngineRulesV2.Default).HomeAdvantageBasisPoints,
+            FormulaConfigurationHash = EngineConfiguration.HashOf(rules ?? EngineRulesV2.Default),
             Seed = seed,
             Home = Side(1, "Home", homeAbility, home),
             Away = Side(2, "Away", awayAbility, away),

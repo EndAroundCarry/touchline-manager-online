@@ -138,6 +138,10 @@ test.describe('the matchday', () => {
     await expect(page.getByRole('heading', { name: 'Match Statistics' })).toBeVisible();
     await expect(page.getByText('Goals', { exact: true }).first()).toBeVisible();
 
+    await page.getByRole('tab', { name: 'Players' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Player Performance' })).toBeVisible();
+
     // The replay itself: every goal is highlighted, so a match with a goal offers a player to drive
     // (§9.2). Press Play and the control becomes Pause — the animation loop is running off the playback.
     await page.getByRole('tab', { name: 'Replay' }).click();
@@ -148,6 +152,33 @@ test.describe('the matchday', () => {
       await play.click();
       await expect(page.getByRole('button', { name: 'Pause replay' })).toBeVisible();
       await expect(page.locator('canvas[role="img"]')).toBeVisible();
+
+      // Stage 7's viewer flow, driven at 8x so the assertions observe progress rather than waiting out a
+      // highlight at normal speed: the match clock advances...
+      await page.getByRole('button', { name: '8x' }).click();
+
+      const clock = page.getByTestId('match-clock');
+      const startedAt = await clock.innerText();
+
+      await expect.poll(() => clock.innerText(), { timeout: 30_000 }).not.toBe(startedAt);
+
+      // ...the lineup panels' live ratings fluctuate as the replay reaches the minutes the server captured
+      // them in...
+      const ratings = page.getByTestId('player-rating');
+
+      await expect(ratings.first()).toBeVisible();
+
+      const ratingsAtStart = (await ratings.allTextContents()).join('|');
+
+      await expect
+        .poll(async () => (await ratings.allTextContents()).join('|'), { timeout: 30_000 })
+        .not.toBe(ratingsAtStart);
+
+      // ...and the commentary ticker overwrites itself as the passage's own tokens reach their offsets.
+      const ticker = page.getByTestId('match-ticker');
+      const tickerAtStart = await ticker.innerText();
+
+      await expect.poll(() => ticker.innerText(), { timeout: 30_000 }).not.toBe(tickerAtStart);
     } else {
       await expect(page.getByText(/This match has no highlights to replay/)).toBeVisible();
     }

@@ -13,10 +13,19 @@ using TouchlineManager.SimulationBenchmarks;
 // rather than a test: the numbers that tune the engine want a hundred thousand matches and a printed table,
 // and a test suite that took twenty minutes would stop being run.
 //
-// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|bench|all] [count] [seed]
+// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|all] [count] [seed]
 
 var mode = args.Length > 0 ? args[0] : "all";
-var count = args.Length > 1 && int.TryParse(args[1], CultureInfo.InvariantCulture, out var parsed) ? parsed : 20_000;
+var count = args.Length > 1 && int.TryParse(args[1], CultureInfo.InvariantCulture, out var parsed)
+    ? parsed
+    : mode switch
+    {
+        // The Stage 7 calibration is defined as ten thousand fixtures; the tactical invariants need fewer
+        // matches because each one is a within-match comparison rather than a distribution.
+        "calibration" => 10_000,
+        "tactics" => 2_000,
+        _ => 20_000,
+    };
 var seed = args.Length > 2 && ulong.TryParse(args[2], CultureInfo.InvariantCulture, out var parsedSeed)
     ? parsedSeed
     : 20_260_925UL;
@@ -36,6 +45,18 @@ if (mode is "single" or "all")
 if (mode is "distributions" or "all")
 {
     Distributions(count, seed);
+}
+
+if (mode is "calibration" or "all")
+{
+    // The full mode runs the defined ten-thousand-fixture calibration; the explicit mode honours whatever
+    // count it is given, so a tuning session can sample more or fewer.
+    Calibration(mode == "all" ? 10_000 : count, seed);
+}
+
+if (mode is "tactics" or "all")
+{
+    Tactics(mode == "all" ? 2_000 : count, seed);
 }
 
 if (mode is "replay" or "all")
@@ -260,6 +281,318 @@ void Bench(int matches, ulong baseSeed)
     Console.WriteLine($"  hardware   {Environment.MachineName}, {Environment.ProcessorCount} logical cores, "
         + $"{System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
     Console.WriteLine();
+}
+
+void Calibration(int fixtures, ulong baseSeed)
+{
+    Console.WriteLine($"== calibration, {fixtures:N0} fixtures ==");
+
+    // Home advantage is a multiplier on the home side's ratings, so the counterfactual rules set it to
+    // neutral (10_000). A snapshot must carry the hash of the rules it is simulated under, so the neutral
+    // fixture is built against the neutral rules rather than the shipped ones.
+    var neutralRules = EngineRulesV2.Default with { HomeAdvantageBasisPoints = EngineRulesV2.Certain };
+
+    long homeGoals = 0;
+    long awayGoals = 0;
+    long homeWins = 0;
+    long draws = 0;
+    long awayWins = 0;
+    long neutralHomeWins = 0;
+    long neutralAwayWins = 0;
+    for (var index = 0; index < fixtures; index++)
+    {
+        var matchSeed = baseSeed + (ulong)index;
+
+        var even = MatchSimulator.Simulate(LaboratoryFixtures.EvenlyMatched(matchSeed), rules);
+        var neutral = MatchSimulator.Simulate(
+            LaboratoryFixtures.EvenlyMatched(matchSeed, neutralRules), neutralRules);
+
+        homeGoals += even.HomeGoals;
+        awayGoals += even.AwayGoals;
+        homeWins += even.HomeGoals > even.AwayGoals ? 1 : 0;
+        draws += even.HomeGoals == even.AwayGoals ? 1 : 0;
+        awayWins += even.HomeGoals < even.AwayGoals ? 1 : 0;
+
+        neutralHomeWins += neutral.HomeGoals > neutral.AwayGoals ? 1 : 0;
+        neutralAwayWins += neutral.HomeGoals < neutral.AwayGoals ? 1 : 0;
+    }
+
+    var homeWinShare = 100.0 * homeWins / fixtures;
+    var neutralHomeWinShare = 100.0 * neutralHomeWins / fixtures;
+
+    Print("goals per match", (double)(homeGoals + awayGoals) / fixtures, "2.50 – 3.00");
+    Print("home win %", homeWinShare, "40 – 50");
+    Print("draw %", 100.0 * draws / fixtures, "20 – 30");
+    Print("away win %", 100.0 * awayWins / fixtures, "25 – 35");
+    Console.WriteLine(
+        $"  {"neutral home/away win %",-28} {neutralHomeWinShare,10:F3} / {100.0 * neutralAwayWins / fixtures:F3}   (home advantage removed)");
+    Verdict("home advantage, points", homeWinShare - neutralHomeWinShare, 2.0, 5.5, "about +4 (Stage 7)");
+
+    // The underdog figure is measured across a sweep of ability gaps rather than at one arbitrary mismatch:
+    // the plan states "about 15%" without naming the gap, and a 16-versus-10 side is a different question
+    // from a 14-versus-12 one. Each gap is played both ways — the better side at home and away — so home
+    // advantage does not decide which side counts as the underdog.
+    var sweepFixtures = Math.Min(fixtures, 2_000);
+    double? underdogAtThree = null;
+
+    Console.WriteLine($"  underdog win %, by ability gap ({sweepFixtures:N0} fixtures each):");
+
+    // A gap of eight would ask for an attribute of twenty-one, so the sweep stops at the top of the scale.
+    for (var gap = 1; gap <= 7; gap++)
+    {
+        long weakWins = 0;
+        long strongWins = 0;
+        long mismatchDraws = 0;
+
+        for (var index = 0; index < sweepFixtures; index++)
+        {
+            var matchSeed = baseSeed + (ulong)index;
+
+            var strongAtHome = MatchSimulator.Simulate(
+                LaboratoryFixtures.Build(matchSeed, 13 + gap, 13, new MatchInstructionsV1(), new MatchInstructionsV1()),
+                rules);
+            var strongAway = MatchSimulator.Simulate(
+                LaboratoryFixtures.Build(matchSeed, 13, 13 + gap, new MatchInstructionsV1(), new MatchInstructionsV1()),
+                rules);
+
+            weakWins += strongAtHome.AwayGoals > strongAtHome.HomeGoals ? 1 : 0;
+            weakWins += strongAway.HomeGoals > strongAway.AwayGoals ? 1 : 0;
+            strongWins += strongAtHome.HomeGoals > strongAtHome.AwayGoals ? 1 : 0;
+            strongWins += strongAway.AwayGoals > strongAway.HomeGoals ? 1 : 0;
+            mismatchDraws += strongAtHome.HomeGoals == strongAtHome.AwayGoals ? 1 : 0;
+            mismatchDraws += strongAway.HomeGoals == strongAway.AwayGoals ? 1 : 0;
+        }
+
+        var weakShare = 100.0 * weakWins / (2.0 * sweepFixtures);
+
+        if (gap == 3)
+        {
+            underdogAtThree = weakShare;
+        }
+
+        Console.WriteLine($"    gap +{gap}: weak {weakShare,6:F2}%   strong {100.0 * strongWins / (2.0 * sweepFixtures),6:F2}%   level {100.0 * mismatchDraws / (2.0 * sweepFixtures),6:F2}%");
+    }
+
+    // Three attribute points is a clear tier of difference — a good side against a poor one — and it is
+    // where the plan's "about 15%" underdog sits on this engine's curve.
+    Verdict("underdog win % (gap +3)", underdogAtThree ?? 0, 10.0, 20.0, "about 15 (Stage 7)");
+    Console.WriteLine();
+}
+
+void Tactics(int fixtures, ulong baseSeed)
+{
+    Console.WriteLine($"== tactical invariants, {fixtures:N0} fixtures per experiment ==");
+
+    // ---- Experiment 1: an early sending-off --------------------------------------------------------
+    // Both sides tackle aggressively, so either can be the side reduced, and the experiment measures the
+    // red-carded side's final goal difference relative to its opponent. Even sides kick off level, and the
+    // two sides are interchangeable, so a random side's expected goal difference is zero: the figure below
+    // is the sending-off's cost, not a home-versus-away artefact. Matches where neither side (or both) saw
+    // an early red are set aside, so the comparison is never diluted by a second dismissal.
+    var aggressive = new MatchInstructionsV1 { Tackling = MatchTacklingStyle.Aggressive };
+
+    long redSideDifference = 0;
+    long redSideFixtures = 0;
+
+    for (var index = 0; index < fixtures; index++)
+    {
+        var input = LaboratoryFixtures.Build(baseSeed + (ulong)index, 13, 13, aggressive, aggressive);
+        var result = MatchSimulator.Simulate(input, rules);
+
+        var homeRed = result.Events.Any(matchEvent => matchEvent.Side == MatchSide.Home
+            && matchEvent.Minute < 30
+            && matchEvent.Type is EngineEventType.RedCard or EngineEventType.SecondYellowCard);
+        var awayRed = result.Events.Any(matchEvent => matchEvent.Side == MatchSide.Away
+            && matchEvent.Minute < 30
+            && matchEvent.Type is EngineEventType.RedCard or EngineEventType.SecondYellowCard);
+
+        if (homeRed == awayRed)
+        {
+            continue;
+        }
+
+        redSideDifference += homeRed
+            ? result.HomeGoals - result.AwayGoals
+            : result.AwayGoals - result.HomeGoals;
+        redSideFixtures++;
+    }
+
+    var redSideMean = (double)redSideDifference / Math.Max(1, redSideFixtures);
+
+    Console.WriteLine($"  {"early red fixtures",-28} {redSideFixtures,10:N0}   of {fixtures:N0}");
+    Console.WriteLine($"  {"red-carded side's goal difference",-28} {redSideMean,10:F3}   (zero without the card)");
+    Verdict("sending-off drop, goals", -redSideMean, 0.9, 1.5, "about 1.2 (Stage 7)");
+    Console.WriteLine();
+
+    // ---- Experiment 2: fatigue at the eighty minute --------------------------------------------
+    // One side presses high and plays fast, the other sits deep and plays slowly. Every starter's condition
+    // is read at their last capture up to the eightieth minute — the low point of the players the side
+    // actually used — and at the eightieth minute itself, which is who is still on the pitch.
+    var highPress = new MatchInstructionsV1
+    {
+        Tempo = MatchTempo.High,
+        Pressing = MatchPressing.HighPress,
+    };
+    var lowBlock = new MatchInstructionsV1
+    {
+        Tempo = MatchTempo.Low,
+        Pressing = MatchPressing.LowBlock,
+    };
+
+    long pressLastSum = 0;
+    long pressLastCount = 0;
+    long blockLastSum = 0;
+    long blockLastCount = 0;
+    long pressAt80Sum = 0;
+    long pressAt80Count = 0;
+    long blockAt80Sum = 0;
+    long blockAt80Count = 0;
+    long pressSubs = 0;
+    long blockSubs = 0;
+
+    for (var index = 0; index < fixtures; index++)
+    {
+        var input = LaboratoryFixtures.Build(baseSeed + (ulong)index, 13, 13, highPress, lowBlock);
+        var recorder = new PlayerLiveMetricsRecorder();
+        var result = MatchSimulator.Simulate(input, rules, recorder);
+
+        var lastAtOrBefore80 = new Dictionary<Guid, int>();
+        var onPitchAt80 = new Dictionary<Guid, int>();
+
+        foreach (var metric in recorder.Metrics)
+        {
+            if (metric.Minute <= 80)
+            {
+                lastAtOrBefore80[metric.ParticipantId] = metric.ConditionBasisPoints;
+            }
+
+            if (metric.Minute == 80)
+            {
+                onPitchAt80[metric.ParticipantId] = metric.ConditionBasisPoints;
+            }
+        }
+
+        foreach (var slot in input.Home.Slots)
+        {
+            if (lastAtOrBefore80.TryGetValue(slot.ParticipantId, out var condition))
+            {
+                pressLastSum += condition;
+                pressLastCount++;
+            }
+
+            if (onPitchAt80.TryGetValue(slot.ParticipantId, out var at80))
+            {
+                pressAt80Sum += at80;
+                pressAt80Count++;
+            }
+        }
+
+        foreach (var slot in input.Away.Slots)
+        {
+            if (lastAtOrBefore80.TryGetValue(slot.ParticipantId, out var condition))
+            {
+                blockLastSum += condition;
+                blockLastCount++;
+            }
+
+            if (onPitchAt80.TryGetValue(slot.ParticipantId, out var at80))
+            {
+                blockAt80Sum += at80;
+                blockAt80Count++;
+            }
+        }
+
+        pressSubs += result.Home.Substitutions;
+        blockSubs += result.Away.Substitutions;
+    }
+
+    var pressLast = (double)pressLastSum / Math.Max(1, pressLastCount);
+    var blockLast = (double)blockLastSum / Math.Max(1, blockLastCount);
+    var pressAt80 = (double)pressAt80Sum / Math.Max(1, pressAt80Count);
+    var blockAt80 = (double)blockAt80Sum / Math.Max(1, blockAt80Count);
+
+    Console.WriteLine($"  {"high press condition @ ≤80",-28} {pressLast,10:F0}   (last sighting of the starters)");
+    Console.WriteLine($"  {"low block condition @ ≤80",-28} {blockLast,10:F0}");
+    Verdict("high-press fatigue gap", blockLast - pressLast, 250, 5_000, "press is tired by 80'");
+    Console.WriteLine($"  {"high press on pitch @ 80",-28} {pressAt80,10:F0}");
+    Console.WriteLine($"  {"low block on pitch @ 80",-28} {blockAt80,10:F0}");
+    Console.WriteLine($"  {"high press substitutions",-28} {(double)pressSubs / fixtures,10:F2}   low block {(double)blockSubs / fixtures:F2}");
+    Console.WriteLine();
+
+    // ---- Experiment 3: a fresh substitute against tired defenders -------------------------------
+    // Every substitution after the hour, compared at the minute it happened with the opposition defenders
+    // who were on the pitch beside it. The gap is what "a fresh substitute" is worth in the panel: the
+    // condition (and through it the pace) the manager sees when the change is made.
+    long substituteSum = 0;
+    long substituteCount = 0;
+    long defenderSum = 0;
+    long defenderCount = 0;
+
+    for (var index = 0; index < fixtures; index++)
+    {
+        var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index);
+        var recorder = new PlayerLiveMetricsRecorder();
+        var result = MatchSimulator.Simulate(input, rules, recorder);
+
+        var byMinute = new Dictionary<int, Dictionary<Guid, int>>();
+
+        foreach (var metric in recorder.Metrics)
+        {
+            if (!byMinute.TryGetValue(metric.Minute, out var atMinute))
+            {
+                atMinute = [];
+                byMinute[metric.Minute] = atMinute;
+            }
+
+            atMinute[metric.ParticipantId] = metric.ConditionBasisPoints;
+        }
+
+        foreach (var substitution in result.Events.Where(
+            matchEvent => matchEvent.Type == EngineEventType.Substitution && matchEvent.Minute >= 60))
+        {
+            var incoming = substitution.SecondaryParticipantId!.Value;
+            var firstMinute = recorder.Metrics
+                .Where(metric => metric.ParticipantId == incoming)
+                .Select(metric => (int?)metric.Minute)
+                .FirstOrDefault();
+
+            if (firstMinute is null || !byMinute.TryGetValue(firstMinute.Value, out var atMinute))
+            {
+                continue;
+            }
+
+            var fresh = atMinute[incoming];
+            var opponent = substitution.Side == MatchSide.Home ? input.Away : input.Home;
+
+            foreach (var slot in opponent.Slots.Where(slot => slot.Family == MatchPositionFamily.Defence))
+            {
+                if (atMinute.TryGetValue(slot.ParticipantId, out var condition))
+                {
+                    defenderSum += condition;
+                    defenderCount++;
+                }
+            }
+
+            substituteSum += fresh;
+            substituteCount++;
+        }
+    }
+
+    var substituteMean = (double)substituteSum / Math.Max(1, substituteCount);
+    var defenderMean = (double)defenderSum / Math.Max(1, defenderCount);
+
+    Console.WriteLine($"  {"substitutions after 60'",-28} {substituteCount,10:N0}");
+    Console.WriteLine($"  {"substitute condition",-28} {substituteMean,10:F0}");
+    Console.WriteLine($"  {"opposing defenders' condition",-28} {defenderMean,10:F0}");
+    Verdict("fresh legs, condition", substituteMean - defenderMean, 800, 5_000, "> 800");
+    Console.WriteLine();
+}
+
+static void Verdict(string label, double value, double minimum, double maximum, string target)
+{
+    var state = value >= minimum && value <= maximum ? "within" : "OUTSIDE";
+
+    Console.WriteLine($"  {label,-28} {value,10:F3}   target {target,-22} {state}");
 }
 
 static double Percentile(double[] sorted, double fraction)

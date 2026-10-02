@@ -24,7 +24,7 @@
     <!-- SCOREBOARD HEADER -->
     <header class="border-b border-slate-800 bg-[#0c1220] shadow-2xl">
       <div class="px-4 py-3">
-        <p class="mb-2 text-center text-[10px] tracking-widest text-slate-500 uppercase">
+        <p class="mb-2 text-center text-[10px] tracking-widest text-slate-400 uppercase">
           {{ result.divisionName }} &middot; Tier {{ result.tierNumber }} &middot; Round
           {{ result.roundNumber }} &middot; {{ kickoff(result.kickoffAt) }}
         </p>
@@ -35,7 +35,7 @@
               <span class="text-lg font-bold tracking-wide text-slate-100">{{
                 result.home.name
               }}</span>
-              <span class="text-xs text-slate-500">{{ result.home.shortName }}</span>
+              <span class="text-xs text-slate-400">{{ result.home.shortName }}</span>
             </div>
             <!-- The kit swatch: the club's own two generated colours, the identity the pitch draws it in. -->
             <span
@@ -57,7 +57,7 @@
                   [class]="homeGoalAnimation() ? 'text-emerald-400' : 'text-slate-100'"
                   >{{ view.homeGoals }}</span
                 >
-                <span class="mx-2 font-mono text-2xl font-light text-slate-600">-</span>
+                <span class="mx-2 font-mono text-2xl font-light text-slate-400">-</span>
                 <span
                   class="font-mono text-4xl font-black tracking-tighter"
                   [class]="awayGoalAnimation() ? 'text-emerald-400' : 'text-slate-100'"
@@ -65,10 +65,12 @@
                 >
               </div>
               <div class="rounded border border-slate-700 bg-slate-800/60 px-3 py-1 text-center">
-                <span class="block font-mono text-base font-bold text-emerald-400">{{
-                  clock()
-                }}</span>
-                <span class="block text-[9px] tracking-widest text-slate-500 uppercase">
+                <span
+                  data-testid="match-clock"
+                  class="block font-mono text-base font-bold text-emerald-400"
+                  >{{ clock() }}</span
+                >
+                <span class="block text-[9px] tracking-widest text-slate-400 uppercase">
                   {{ state() === 'playing' ? 'LIVE' : state() === 'paused' ? 'PAUSED' : 'END' }}
                 </span>
               </div>
@@ -76,11 +78,11 @@
               <div
                 class="flex min-w-[110px] items-center justify-center rounded-lg bg-[#0f172a] px-5 py-2"
               >
-                <span class="font-mono text-4xl font-black text-slate-700">{{
+                <span class="font-mono text-4xl font-black text-slate-400">{{
                   result.home.goals
                 }}</span>
-                <span class="mx-2 font-mono text-2xl text-slate-700">-</span>
-                <span class="font-mono text-4xl font-black text-slate-700">{{
+                <span class="mx-2 font-mono text-2xl text-slate-400">-</span>
+                <span class="font-mono text-4xl font-black text-slate-400">{{
                   result.away.goals
                 }}</span>
               </div>
@@ -98,7 +100,7 @@
               <span class="text-lg font-bold tracking-wide text-slate-100">{{
                 result.away.name
               }}</span>
-              <span class="text-xs text-slate-500">{{ result.away.shortName }}</span>
+              <span class="text-xs text-slate-400">{{ result.away.shortName }}</span>
             </div>
           </div>
         </div>
@@ -236,7 +238,7 @@
             [class]="
               activeTab() === tab.id
                 ? 'text-emerald-400 border-b-2 border-emerald-500'
-                : 'text-slate-500 hover:text-slate-300'
+                : 'text-slate-400 hover:text-slate-200'
             "
             (click)="setTab(tab.id)"
           >
@@ -259,7 +261,7 @@
           @if (presentation(); as view) {
             @if (view.highlights.length === 0) {
               <div class="flex flex-1 items-center justify-center">
-                <p class="text-sm text-slate-500">This match has no highlights to replay.</p>
+                <p class="text-sm text-slate-400">This match has no highlights to replay.</p>
               </div>
             } @else {
               <div class="grid flex-1 overflow-hidden lg:grid-cols-[260px_1fr_260px]">
@@ -275,7 +277,7 @@
                         >
                           {{ lineup.shortName }}
                         </h2>
-                        <span class="text-[9px] text-slate-600">{{ lineup.formation }}</span>
+                        <span class="text-[9px] text-slate-400">{{ lineup.formation }}</span>
                       </div>
                       <table class="w-full text-xs" aria-label="Home team lineup">
                         <thead class="sr-only">
@@ -293,7 +295,7 @@
                               class="group border-b border-slate-800/50 transition hover:bg-slate-800/40"
                               [class.opacity-50]="player.sentOff"
                             >
-                              <td class="py-1 pr-1 text-right tabular-nums text-slate-600">
+                              <td class="py-1 pr-1 text-right tabular-nums text-slate-400">
                                 {{ player.shirtNumber }}
                               </td>
                               <td class="px-1 py-1">
@@ -316,7 +318,7 @@
                                   <span class="ml-1 text-orange-400" aria-label="Injured">+</span>
                                 }
                                 @if (player.subbedOutMinute !== null) {
-                                  <span class="ml-1 text-[9px] text-slate-500"
+                                  <span class="ml-1 text-[9px] text-slate-400"
                                     >{{ player.subbedOutMinute }}'&#8595;</span
                                   >
                                 }
@@ -332,6 +334,12 @@
                                       liveConditionPercent(liveCondition(player.participantId))
                                     "
                                     role="meter"
+                                    [attr.aria-label]="player.name + ' condition'"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    [attr.aria-valuenow]="
+                                      liveConditionMeterValue(player.participantId)
+                                    "
                                   ></div>
                                 </div>
                               </td>
@@ -339,6 +347,7 @@
                                 <span
                                   class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
                                   [class]="ratingBadgeClass(liveRating(player.participantId))"
+                                  data-testid="player-rating"
                                 >
                                   {{ formatRating(liveRating(player.participantId)) }}
                                 </span>
@@ -349,12 +358,12 @@
                       </table>
                       @if (lineup.bench.length > 0) {
                         <div class="mt-3 border-t border-slate-800 pt-2">
-                          <p class="mb-1 text-[9px] tracking-widest text-slate-600 uppercase">
+                          <p class="mb-1 text-[9px] tracking-widest text-slate-400 uppercase">
                             Bench
                           </p>
                           @for (player of lineup.bench; track player.participantId) {
-                            <div class="flex items-center gap-1 py-0.5 text-xs text-slate-500">
-                              <span class="w-4 text-right tabular-nums text-slate-700">{{
+                            <div class="flex items-center gap-1 py-0.5 text-xs text-slate-400">
+                              <span class="w-4 text-right tabular-nums text-slate-400">{{
                                 player.shirtNumber
                               }}</span>
                               <span class="truncate font-medium">{{ player.name }}</span>
@@ -376,7 +385,7 @@
                       }
                     </div>
                   } @else {
-                    <div class="p-3 text-xs text-slate-600">Lineup not available</div>
+                    <div class="p-3 text-xs text-slate-400">Lineup not available</div>
                   }
                 </aside>
 
@@ -422,7 +431,7 @@
                       </div>
                     </div>
                     @if (reduced()) {
-                      <p class="px-3 pb-1 text-center text-[10px] text-slate-600">
+                      <p class="px-3 pb-1 text-center text-[10px] text-slate-400">
                         Reduced motion - press Play to animate.
                       </p>
                     }
@@ -432,7 +441,7 @@
                     >
                       <p class="text-sm text-slate-400">Text-only mode</p>
                       @if (activeHighlight(); as highlight) {
-                        <p class="text-xs text-slate-500">{{ highlight.narration }}</p>
+                        <p class="text-xs text-slate-400">{{ highlight.narration }}</p>
                       }
                     </div>
                   }
@@ -473,7 +482,7 @@
                   @if (view.awayLineup; as lineup) {
                     <div class="p-3">
                       <div class="mb-2 flex items-center justify-between">
-                        <span class="text-[9px] text-slate-600">{{ lineup.formation }}</span>
+                        <span class="text-[9px] text-slate-400">{{ lineup.formation }}</span>
                         <h2
                           class="text-[10px] font-semibold tracking-widest text-slate-400 uppercase"
                         >
@@ -500,6 +509,7 @@
                                 <span
                                   class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
                                   [class]="ratingBadgeClass(liveRating(player.participantId))"
+                                  data-testid="player-rating"
                                 >
                                   {{ formatRating(liveRating(player.participantId)) }}
                                 </span>
@@ -515,12 +525,18 @@
                                       liveConditionPercent(liveCondition(player.participantId))
                                     "
                                     role="meter"
+                                    [attr.aria-label]="player.name + ' condition'"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    [attr.aria-valuenow]="
+                                      liveConditionMeterValue(player.participantId)
+                                    "
                                   ></div>
                                 </div>
                               </td>
                               <td class="truncate px-1 py-1 text-right font-medium text-slate-200">
                                 @if (player.subbedOutMinute !== null) {
-                                  <span class="mr-1 text-[9px] text-slate-500"
+                                  <span class="mr-1 text-[9px] text-slate-400"
                                     >{{ player.subbedOutMinute }}'&#8595;</span
                                   >
                                 }
@@ -543,7 +559,7 @@
                                   >{{ player.position }}</span
                                 >
                               </td>
-                              <td class="py-1 pl-1 text-left tabular-nums text-slate-600">
+                              <td class="py-1 pl-1 text-left tabular-nums text-slate-400">
                                 {{ player.shirtNumber }}
                               </td>
                             </tr>
@@ -552,14 +568,14 @@
                       </table>
                       @if (lineup.bench.length > 0) {
                         <div class="mt-3 border-t border-slate-800 pt-2">
-                          <p class="mb-1 text-[9px] tracking-widest text-slate-600 uppercase">
+                          <p class="mb-1 text-[9px] tracking-widest text-slate-400 uppercase">
                             Bench
                           </p>
                           @for (player of lineup.bench; track player.participantId) {
                             <div
-                              class="flex flex-row-reverse items-center gap-1 py-0.5 text-xs text-slate-500"
+                              class="flex flex-row-reverse items-center gap-1 py-0.5 text-xs text-slate-400"
                             >
-                              <span class="w-4 text-left tabular-nums text-slate-700">{{
+                              <span class="w-4 text-left tabular-nums text-slate-400">{{
                                 player.shirtNumber
                               }}</span>
                               <span class="truncate font-medium">{{ player.name }}</span>
@@ -581,7 +597,7 @@
                       }
                     </div>
                   } @else {
-                    <div class="p-3 text-xs text-slate-600">Lineup not available</div>
+                    <div class="p-3 text-xs text-slate-400">Lineup not available</div>
                   }
                 </aside>
               </div>
@@ -601,7 +617,10 @@
                     The line is iterated rather than bound so each new line is a new element and the CSS
                     fade runs again; a bound span would only animate once, on first render.
                   -->
-                  <span class="ticker-text flex-1 truncate text-xs text-slate-300">
+                  <span
+                    data-testid="match-ticker"
+                    class="ticker-text flex-1 truncate text-xs text-slate-300"
+                  >
                     @for (line of [tickerText()]; track line) {
                       {{ line }}
                     }
@@ -612,10 +631,10 @@
           } @else {
             <div class="flex flex-1 items-center justify-center">
               <div class="text-center">
-                <p class="mb-2 text-2xl font-bold text-slate-600">
+                <p class="mb-2 text-2xl font-bold text-slate-400">
                   {{ result.home.goals }}-{{ result.away.goals }}
                 </p>
-                <p class="text-sm text-slate-500">Loading presentation...</p>
+                <p class="text-sm text-slate-400">Loading presentation...</p>
               </div>
             </div>
           }
@@ -641,7 +660,7 @@
                   [class.bg-emerald-900/20]="isGoalCommentaryLine(line)"
                 >
                   <span
-                    class="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-slate-500"
+                    class="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-slate-400"
                     >{{ minute(line.minute, line.stoppageMinute) }}</span
                   >
                   <span
@@ -667,7 +686,7 @@
               }
             </ol>
           } @else {
-            <p class="text-sm text-slate-500">Commentary not available.</p>
+            <p class="text-sm text-slate-400">Commentary not available.</p>
           }
         </div>
       }
@@ -684,7 +703,7 @@
             Match Statistics
           </h2>
           <div class="mx-auto max-w-lg">
-            <div class="mb-4 grid grid-cols-3 text-center text-xs font-medium text-slate-500">
+            <div class="mb-4 grid grid-cols-3 text-center text-xs font-medium text-slate-400">
               <span class="pr-4 text-right">{{ result.home.shortName }}</span>
               <span></span>
               <span class="pl-4 text-left">{{ result.away.shortName }}</span>
@@ -695,7 +714,7 @@
                   <span class="pr-3 text-right tabular-nums font-medium text-slate-200">{{
                     row.home
                   }}</span>
-                  <span class="text-[10px] text-slate-500">{{ row.label }}</span>
+                  <span class="text-[10px] text-slate-400">{{ row.label }}</span>
                   <span class="pl-3 text-left tabular-nums font-medium text-slate-200">{{
                     row.away
                   }}</span>
@@ -724,7 +743,7 @@
               Shot Map
             </h3>
             @if (shotMap().length === 0) {
-              <p class="text-xs text-slate-500">No shots to plot.</p>
+              <p class="text-xs text-slate-400">No shots to plot.</p>
             } @else {
               <div class="mb-2 flex items-center justify-center gap-4 text-[10px] text-slate-400">
                 <span class="flex items-center gap-1.5">
@@ -808,7 +827,7 @@
                   <h3 class="mb-2 text-xs font-semibold text-slate-400">{{ lineup.clubName }}</h3>
                   <table class="w-full text-xs" aria-label="Home team player stats">
                     <thead>
-                      <tr class="border-b border-slate-800 text-[10px] text-slate-500">
+                      <tr class="border-b border-slate-800 text-[10px] text-slate-400">
                         <th scope="col" class="pb-1 text-left">#</th>
                         <th scope="col" class="pb-1 text-left">Player</th>
                         <th scope="col" class="pb-1 text-center">Pos</th>
@@ -820,7 +839,7 @@
                     <tbody>
                       @for (player of lineup.starters; track player.participantId) {
                         <tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
-                          <td class="py-1.5 pr-2 tabular-nums text-slate-600">
+                          <td class="py-1.5 pr-2 tabular-nums text-slate-400">
                             {{ player.shirtNumber }}
                           </td>
                           <td class="py-1.5 font-medium text-slate-200">
@@ -832,7 +851,7 @@
                               <span class="text-yellow-400">Y</span>
                             }
                           </td>
-                          <td class="py-1.5 text-center text-slate-500">{{ player.position }}</td>
+                          <td class="py-1.5 text-center text-slate-400">{{ player.position }}</td>
                           <td class="py-1.5 text-center tabular-nums text-slate-300">
                             {{ player.goals || '-' }}
                           </td>
@@ -843,6 +862,7 @@
                             <span
                               class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
                               [class]="ratingBadgeClass(liveRating(player.participantId))"
+                              data-testid="player-rating"
                             >
                               {{ formatRating(liveRating(player.participantId)) }}
                             </span>
@@ -858,7 +878,7 @@
                   <h3 class="mb-2 text-xs font-semibold text-slate-400">{{ lineup.clubName }}</h3>
                   <table class="w-full text-xs" aria-label="Away team player stats">
                     <thead>
-                      <tr class="border-b border-slate-800 text-[10px] text-slate-500">
+                      <tr class="border-b border-slate-800 text-[10px] text-slate-400">
                         <th scope="col" class="pb-1 text-left">#</th>
                         <th scope="col" class="pb-1 text-left">Player</th>
                         <th scope="col" class="pb-1 text-center">Pos</th>
@@ -870,7 +890,7 @@
                     <tbody>
                       @for (player of lineup.starters; track player.participantId) {
                         <tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
-                          <td class="py-1.5 pr-2 tabular-nums text-slate-600">
+                          <td class="py-1.5 pr-2 tabular-nums text-slate-400">
                             {{ player.shirtNumber }}
                           </td>
                           <td class="py-1.5 font-medium text-slate-200">
@@ -882,7 +902,7 @@
                               <span class="text-yellow-400">Y</span>
                             }
                           </td>
-                          <td class="py-1.5 text-center text-slate-500">{{ player.position }}</td>
+                          <td class="py-1.5 text-center text-slate-400">{{ player.position }}</td>
                           <td class="py-1.5 text-center tabular-nums text-slate-300">
                             {{ player.goals || '-' }}
                           </td>
@@ -893,6 +913,7 @@
                             <span
                               class="inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
                               [class]="ratingBadgeClass(liveRating(player.participantId))"
+                              data-testid="player-rating"
                             >
                               {{ formatRating(liveRating(player.participantId)) }}
                             </span>
@@ -905,7 +926,7 @@
               }
             </div>
           } @else {
-            <p class="text-sm text-slate-500">Player stats not available.</p>
+            <p class="text-sm text-slate-400">Player stats not available.</p>
           }
         </div>
       }

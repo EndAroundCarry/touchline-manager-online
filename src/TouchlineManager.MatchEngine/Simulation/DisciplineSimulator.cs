@@ -125,7 +125,8 @@ internal static class DisciplineSimulator
         if (roll >= straightRed + booking)
         {
             return new CardResult(Shown: false, SecondYellow: false, StraightRed: false);
-        }        var foulerId = fouler.Participant.ParticipantId;
+        }
+        var foulerId = fouler.Participant.ParticipantId;
 
         var second = defender.Book(foulerId);
 

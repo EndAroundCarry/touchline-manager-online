@@ -128,72 +128,72 @@ internal static class MatchResultBuilder
                 subbedIn[incoming] = matchEvent.Minute;
             }
 
-        foreach (var participant in state.Input.SideOf(side).Squad)
-        {
-            var id = participant.ParticipantId;
-            var started = starters.Contains(id);
-
-            int? entered;
-
-            if (runtime.EnteredMinute.TryGetValue(id, out var cameOn))
+            foreach (var participant in state.Input.SideOf(side).Squad)
             {
-                entered = cameOn;
+                var id = participant.ParticipantId;
+                var started = starters.Contains(id);
+
+                int? entered;
+
+                if (runtime.EnteredMinute.TryGetValue(id, out var cameOn))
+                {
+                    entered = cameOn;
+                }
+                else
+                {
+                    // A starter who was never substituted on has no entry recorded; they were on from kickoff.
+                    entered = started ? 0 : null;
+                }
+
+                var left = runtime.LeftMinute.TryGetValue(id, out var wentOff)
+                    ? wentOff
+                    : state.TotalMinutesPlayed;
+
+                var minutes = entered is int fromMinute ? Math.Max(0, left - fromMinute) : 0;
+                var goals = runtime.Goals.TryGetValue(id, out var scored) ? scored : 0;
+                var assists = runtime.Assists.TryGetValue(id, out var setUp) ? setUp : 0;
+                var yellows = runtime.Yellows.TryGetValue(id, out var bookings) ? bookings : 0;
+                var sentOff = runtime.SentOff.Contains(id);
+                var injured = runtime.AbsenceFixtures.ContainsKey(id);
+
+                // A substitute who never came on has no live rating, because a rating is what a player earned
+                // on the pitch. An unused bench player's line still exists for the squad's continuity records.
+                int? liveRating = runtime.LiveRatings.TryGetValue(id, out var rating)
+                    ? rating
+                    : null;
+
+                lines.Add(new MatchPlayerLineV1
+                {
+                    ParticipantId = id,
+                    ClubId = participant.ClubId,
+                    Side = side,
+                    Started = started,
+                    MinutesPlayed = minutes,
+                    Goals = goals,
+                    Assists = assists,
+                    YellowCards = yellows,
+                    SentOff = sentOff,
+                    AbsenceFixtures = runtime.AbsenceFixtures.TryGetValue(id, out var absence) ? absence : 0,
+                    RatingBasisPoints = PlayerRatingCalculator.Calculate(
+                        state.Rules,
+                        new PlayerMatchFacts(
+                            minutes,
+                            goals,
+                            assists,
+                            yellows,
+                            sentOff,
+                            saves.TryGetValue(id, out var made) ? made : 0,
+                            won,
+                            drew)),
+                    FinalConditionBasisPoints = runtime.FinalConditions.TryGetValue(id, out var condition)
+                        ? condition
+                        : participant.State.ConditionBasisPoints,
+                    SubbedOutMinute = subbedOut.TryGetValue(id, out var outMinute) ? outMinute : null,
+                    SubbedInMinute = subbedIn.TryGetValue(id, out var inMinute) ? inMinute : null,
+                    IsInjured = injured,
+                    LiveRatingBasisPoints = liveRating ?? 0,
+                });
             }
-            else
-            {
-                // A starter who was never substituted on has no entry recorded; they were on from kickoff.
-                entered = started ? 0 : null;
-            }
-
-            var left = runtime.LeftMinute.TryGetValue(id, out var wentOff)
-                ? wentOff
-                : state.TotalMinutesPlayed;
-
-            var minutes = entered is int fromMinute ? Math.Max(0, left - fromMinute) : 0;
-            var goals = runtime.Goals.TryGetValue(id, out var scored) ? scored : 0;
-            var assists = runtime.Assists.TryGetValue(id, out var setUp) ? setUp : 0;
-            var yellows = runtime.Yellows.TryGetValue(id, out var bookings) ? bookings : 0;
-            var sentOff = runtime.SentOff.Contains(id);
-            var injured = runtime.AbsenceFixtures.ContainsKey(id);
-
-            // A substitute who never came on has no live rating, because a rating is what a player earned
-            // on the pitch. An unused bench player's line still exists for the squad's continuity records.
-            int? liveRating = runtime.LiveRatings.TryGetValue(id, out var rating)
-                ? rating
-                : null;
-
-            lines.Add(new MatchPlayerLineV1
-            {
-                ParticipantId = id,
-                ClubId = participant.ClubId,
-                Side = side,
-                Started = started,
-                MinutesPlayed = minutes,
-                Goals = goals,
-                Assists = assists,
-                YellowCards = yellows,
-                SentOff = sentOff,
-                AbsenceFixtures = runtime.AbsenceFixtures.TryGetValue(id, out var absence) ? absence : 0,
-                RatingBasisPoints = PlayerRatingCalculator.Calculate(
-                    state.Rules,
-                    new PlayerMatchFacts(
-                        minutes,
-                        goals,
-                        assists,
-                        yellows,
-                        sentOff,
-                        saves.TryGetValue(id, out var made) ? made : 0,
-                        won,
-                        drew)),
-                FinalConditionBasisPoints = runtime.FinalConditions.TryGetValue(id, out var condition)
-                    ? condition
-                    : participant.State.ConditionBasisPoints,
-                SubbedOutMinute = subbedOut.TryGetValue(id, out var outMinute) ? outMinute : null,
-                SubbedInMinute = subbedIn.TryGetValue(id, out var inMinute) ? inMinute : null,
-                IsInjured = injured,
-                LiveRatingBasisPoints = liveRating ?? 0,
-            });
-        }
         }
 
         // One fixed order, so the canonical output hash does not depend on the order the squads arrived in.

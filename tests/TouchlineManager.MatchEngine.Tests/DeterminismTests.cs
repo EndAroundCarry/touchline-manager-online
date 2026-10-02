@@ -103,14 +103,15 @@ public sealed class DeterminismTests
     public void The_golden_hash_for_a_known_snapshot_is_pinned()
     {
         // The most important test in the project. If this fails, an engine change has altered what a historical
-        // match would replay as, and the engine version must be bumped rather than the hash updated. Never
-        // change this value without a new engine version and a new labelled constant.
+        // match would replay as. Engine version 3 was still unreleased when the Stage 7 calibration re-pinned
+        // these values, so no played match was rewritten; from its release onward, any change requires a new
+        // engine version and a new labelled constant rather than an updated hash.
         var result = MatchSimulator.Simulate(TestMatchFactory.Even());
 
         result.OutputHash.Should().Be(GoldenOutputHash);
         result.InputHash.Should().Be(GoldenInputHash);
         result.HomeGoals.Should().Be(3);
-        result.AwayGoals.Should().Be(1);
+        result.AwayGoals.Should().Be(0);
     }
 
     [Fact]
@@ -119,7 +120,7 @@ public sealed class DeterminismTests
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
         EngineConfiguration.HashOf(EngineRulesV2.Default)
-            .Should().Be("04af03d0df04bb530b758cb084b9898fb16bd9e5a6a163219f602db89e6c1688");
+            .Should().Be("714a92fa000192a235bb48c591f658dcfb88143ffa8a016a07797153ca4ce50e");
     }
 
     [Fact]
@@ -159,8 +160,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "d592171047dce546c8eafad5ece4d5a9d6bd73939e54a5464c3a46c8c8e6a7e9";
+        "53914805e817aaffa1d317ea7c00d108faf07ca4ead444cd3be93c3d69c72ee9";
 
     private const string GoldenOutputHash =
-        "b15babad2733275780fb20b4e445e5fc1a0d0242fdad08c84bb5c7828f4083df";
+        "cb056dab19433b58f2f4ccd2afc6d94137fc8535a9811967c0e7de470b60712c";
 }

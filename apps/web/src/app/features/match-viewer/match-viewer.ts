@@ -545,6 +545,17 @@ export class MatchViewer implements OnDestroy {
     return formatConditionPercent(basisPoints);
   }
 
+  /**
+   * A player's condition as the whole percentage the condition meter exposes.
+   *
+   * The bar is decorative; the meter is what a screen reader reads, and `aria-valuenow` must be a number
+   * while the drawn label is a formatted string. Both floor and ceiling are fixed at 0 and 100, so only
+   * the current value is bound here.
+   */
+  protected liveConditionMeterValue(participantId: string): number {
+    return Math.round(this.liveCondition(participantId) / 100);
+  }
+
   /** The colour class for a condition bar, green through red as a player tires. */
   protected conditionBarClass(basisPoints: number): string {
     return conditionColorClass(basisPoints);

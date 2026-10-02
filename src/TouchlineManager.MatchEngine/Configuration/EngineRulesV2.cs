@@ -193,12 +193,12 @@ public sealed record EngineRulesV2
     /// The baseline goal probability of an average chance from an inside channel.
     /// </summary>
     /// <remarks>
-    /// Calibrated with the laboratory to about 2.8–2.9 goals a match. The mean is what sets the shape of the
-    /// score tail — a higher mean thickens it faster than any game-state effect thins it — so this constant and
-    /// <see cref="GameStateMarginThresholdGoals"/> were tuned together against a measured distribution rather
-    /// than guessed at.
+    /// Calibrated with the laboratory to about 2.7–2.8 goals a match under the spatial play model
+    /// (Stage 7). The mean is what sets the shape of the score tail — a higher mean thickens it faster than
+    /// any game-state effect thins it — so this constant and <see cref="GameStateMarginThresholdGoals"/> were
+    /// tuned together against a measured distribution rather than guessed at.
     /// </remarks>
-    public int BaseShotGoalBasisPoints { get; init; } = 760;
+    public int BaseShotGoalBasisPoints { get; init; } = 845;
 
     /// <summary>How much a maximal finishing-versus-goalkeeping differential moves the goal probability.</summary>
     public int ShotQualitySwingBasisPoints { get; init; } = 1_900;
@@ -618,12 +618,20 @@ public sealed record EngineRulesV2
     /// What each player below eleven multiplies the whole side's ratings by, so being a man down costs
     /// more than simply averaging over ten players (master plan §8.5).
     /// </summary>
-    public int ShortHandedPenaltyBasisPoints { get; init; } = 8_600;
+    /// <remarks>
+    /// Deepened by the Stage 7 calibration: at the previous 8_600 a side sent off before the half hour
+    /// finished only about two-fifths of a goal worse off, where the plan asks for about one and a quarter.
+    /// </remarks>
+    public int ShortHandedPenaltyBasisPoints { get; init; } = 6_400;
 
     // ---- Set-piece and home advantage ------------------------------------------------------------
 
     /// <summary>Home advantage, applied to the home side's ratings (master plan §8.5). Small and configurable.</summary>
-    public int HomeAdvantageBasisPoints { get; init; } = 10_300;
+    /// <remarks>
+    /// Calibrated with the laboratory to about four win-share points over the neutral venue (Stage 7), on
+    /// top of the duel and possession bonuses the crowd contributes separately.
+    /// </remarks>
+    public int HomeAdvantageBasisPoints { get; init; } = 10_380;
 
     /// <summary>
     /// Describes every constant canonically, for the configuration hash a result records.
