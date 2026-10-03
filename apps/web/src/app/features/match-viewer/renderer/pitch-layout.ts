@@ -54,6 +54,16 @@ export function toCanvasPoint(point: PitchPoint, rect: PitchRect): PitchPoint {
   };
 }
 
+/** Maps a normalized X onto canvas pixels, without making a point, for the per-frame drawing. */
+export function canvasX(x: number, rect: PitchRect): number {
+  return rect.x + (x / PITCH_COORDINATE_SCALE) * rect.width;
+}
+
+/** Maps a normalized Y onto canvas pixels, without making a point, for the per-frame drawing. */
+export function canvasY(y: number, rect: PitchRect): number {
+  return rect.y + (y / PITCH_COORDINATE_SCALE) * rect.height;
+}
+
 /** Whether a normalized position is inside the pitch, which a stored track always should be. */
 export function isOnPitch(point: PitchPoint): boolean {
   return (

@@ -21,7 +21,7 @@ export interface FilmPassage {
 }
 
 /** A contiguous window of film time the active playlist plays (`replay-v3`). */
-interface PlaylistWindow {
+export interface PlaylistWindow {
   readonly startMilliseconds: number;
   readonly endMilliseconds: number;
 }
@@ -51,6 +51,7 @@ export class MatchPlayback {
   private mode: PlaybackMode;
   private windowIndex = 0;
   private position = 0;
+  private activeCursor = 0;
   private state: PlaybackState = 'idle';
   private playbackSpeed: PlaybackSpeed = 1;
 
@@ -68,7 +69,7 @@ export class MatchPlayback {
     reel: readonly ReelClip[] = [],
     mode: PlaybackMode = 'full',
   ) {
-    this.film = filmFrom(passages, playback);
+    this.film = placePassages(passages, playback);
     this.filmMilliseconds =
       this.film.length === 0
         ? 0
@@ -108,6 +109,20 @@ export class MatchPlayback {
     return this.mode;
   }
 
+  /** How long the whole film runs for, in milliseconds, whichever playlist is playing. */
+  get filmDurationMs(): number {
+    return this.filmMilliseconds;
+  }
+
+  /**
+   * The windows the active playlist plays, in playback order.
+   *
+   * The film jumps between them on the highlights playlist, which is what the viewer fades over.
+   */
+  get windows(): readonly PlaylistWindow[] {
+    return this.playlist;
+  }
+
   /** The windows the active playlist plays, in playback order. */
   private get playlist(): readonly PlaylistWindow[] {
     return this.mode === 'reel' && this.reelWindows.length > 0
@@ -125,17 +140,36 @@ export class MatchPlayback {
     return this.film[this.activeIndex] ?? null;
   }
 
-  /** The index of the passage being played, which is what the timeline and panels address. */
+  /**
+   * The index of the passage being played, which is what the narration and the report address.
+   *
+   * The playhead moves forward a frame at a time, so the last answer is almost always still right and is
+   * checked first; a seek falls back to a search.
+   */
   get activeIndex(): number {
+    const cached = this.film[this.activeCursor];
+
+    if (
+      cached !== undefined &&
+      this.position >= cached.startMilliseconds &&
+      this.position < cached.startMilliseconds + cached.durationMilliseconds
+    ) {
+      return this.activeCursor;
+    }
+
     for (let index = 0; index < this.film.length; index += 1) {
       const item = this.film[index];
 
       if (this.position < item.startMilliseconds + item.durationMilliseconds) {
+        this.activeCursor = index;
+
         return index;
       }
     }
 
-    return Math.max(0, this.film.length - 1);
+    this.activeCursor = Math.max(0, this.film.length - 1);
+
+    return this.activeCursor;
   }
 
   /** How far into the active passage the playhead stands, in film milliseconds. */
@@ -451,8 +485,13 @@ export class MatchPlayback {
   }
 }
 
-/** Places the passages on the film clock, using the schedule's offsets where it agrees on the count. */
-function filmFrom(
+/**
+ * Places the passages on the film clock, using the schedule's offsets where it agrees on the count.
+ *
+ * Shared with the film timeline, so the playhead and the film it plays can never disagree about where a
+ * passage starts.
+ */
+export function placePassages(
   passages: readonly Passage[],
   playback: readonly PlaybackSegment[],
 ): readonly FilmPassage[] {

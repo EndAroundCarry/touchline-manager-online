@@ -43,7 +43,7 @@ public sealed class SettleSquadContinuityTests
     }
 
     [Fact]
-    public async Task A_human_clubs_expiring_player_leaves_but_an_ai_clubs_is_renewed()
+    public async Task The_board_renews_a_human_clubs_expiring_player_as_it_does_an_ai_clubs()
     {
         var seasonId = Guid.CreateVersion7();
         var humanClub = Guid.CreateVersion7();
@@ -60,12 +60,15 @@ public sealed class SettleSquadContinuityTests
                 Club(aiClub, attentive: false, Row(ai, endSeason: 1, announced: false))),
             squad);
 
-        result.Released.Should().Be(1);
-        result.Renewed.Should().Be(1);
+        result.Released.Should().Be(0, "no manager loses a player to an expiring contract (CON-11)");
+        result.Renewed.Should().Be(2);
 
-        human.Contract.ClosedReason.Should().Be(PlayerContractCloseReasons.Expired);
-        human.Player.Status.Should().Be(PlayerStatus.FreeAgent);
-        human.Registration.Status.Should().Be(RegistrationStatus.Ended);
+        human.Contract.ClosedReason.Should().Be(PlayerContractCloseReasons.Renewed);
+        human.Player.Status.Should().Be(PlayerStatus.Active);
+        human.Registration.Status.Should().NotBe(RegistrationStatus.Ended);
+
+        squad.AddedContracts.Should().ContainSingle(contract => contract.PlayerId == human.Player.Id)
+            .Which.StartSeasonNumber.Should().Be(2);
 
         ai.Contract.ClosedReason.Should().Be(PlayerContractCloseReasons.Renewed);
         ai.Player.Status.Should().Be(PlayerStatus.Active);

@@ -1,13 +1,12 @@
-import { Passage } from '../../../core/match/match.models';
 import { SHADOW_MIN_ALTITUDE } from './pitch-layout';
-import { ClashPoint, FrameEntity } from './renderer.models';
+import { FrameEntity } from './renderer.models';
 
 /**
  * What a frame's action effects are decided from (`replay-v3`).
  *
  * The renderer asks these questions every frame, so the answers live here as pure functions over a frame
  * rather than inside the drawing code: a test can assert that two players five metres apart with the ball
- * between them are a duel, and that a frame with the ball in the net is a celebration, without a canvas.
+ * between them are a duel, and that a struck ball earns a trail, without a canvas.
  */
 
 /** The action tags the engine writes where the ball is struck at goal. */
@@ -26,18 +25,6 @@ const TACKLE_ACTIONS = new Set(['tackle', 'duel', 'interception']);
 
 /** The action tags a goalkeeper's lateral save or dive carries. */
 const DIVE_ACTIONS = new Set(['save', 'dive']);
-
-/** The commentary templates that report a goal, which is what pins the celebration to a moment. */
-const GOAL_TEMPLATES = new Set(['match.goal', 'match.penalty.goal']);
-
-/** The outcome codes that mean the ball finished in the net. */
-const GOAL_OUTCOMES = new Set(['goal', 'penalty_goal']);
-
-/** How close two opposing players must be to read as contesting the ball, in normalized units (~4 m). */
-export const DUEL_DISTANCE = 380;
-
-/** How close the duel must be to the ball to matter, in normalized units (~9 m). */
-export const DUEL_BALL_DISTANCE = 900;
 
 /** How close a player must be to the ball to be shown as in possession, in normalized units (~9 m). */
 export const POSSESSION_DISTANCE = 900;
@@ -65,69 +52,14 @@ export function isDiveAction(action: string | null | undefined): boolean {
   return action !== null && action !== undefined && DIVE_ACTIONS.has(action);
 }
 
-/**
- * The duels a frame shows, as the point between each pair of contesting players.
- *
- * A duel is read from the geometry the engine already sent rather than from an event: two players of
- * opposite sides inside a few metres, with the ball between them. A tag on either player's keyframe counts
- * too, so a presentation that names its duels is drawn even when the players are a stride apart.
- */
-export function duelClashes(
-  frame: readonly FrameEntity[],
-  maxDistance = DUEL_DISTANCE,
-  ballDistance = DUEL_BALL_DISTANCE,
-): readonly ClashPoint[] {
-  const ball = frame.find((item) => item.entity.isBall);
-  const players = frame.filter((item) => !item.entity.isBall && item.entity.side !== null);
-  const clashes: ClashPoint[] = [];
-
-  for (let first = 0; first < players.length; first += 1) {
-    for (let second = first + 1; second < players.length; second += 1) {
-      const one = players[first];
-      const other = players[second];
-
-      if (one.entity.side === other.entity.side) {
-        continue;
-      }
-
-      const midpoint = {
-        x: (one.position.x + other.position.x) / 2,
-        y: (one.position.y + other.position.y) / 2,
-      };
-      const tagged = isTackleAction(one.action) || isTackleAction(other.action);
-      const separation = Math.hypot(
-        one.position.x - other.position.x,
-        one.position.y - other.position.y,
-      );
-
-      if (!tagged && separation > maxDistance) {
-        continue;
-      }
-
-      if (ball !== undefined && distance(midpoint, ball.position) > ballDistance) {
-        continue;
-      }
-
-      clashes.push({
-        x: midpoint.x,
-        y: midpoint.y,
-        // A stable offset per duel, so two contests on opposite flanks are not drawn pulsing in lockstep.
-        phase: (Math.round(midpoint.x) + Math.round(midpoint.y)) % 1_000,
-      });
-    }
-  }
-
-  return clashes;
-}
-
 /** The player the ball is at, which is the one whose name tag is worth showing. */
 export function nearestPlayerToBall(
   frame: readonly FrameEntity[],
   maxDistance = POSSESSION_DISTANCE,
 ): FrameEntity | null {
-  const ball = frame.find((item) => item.entity.isBall);
+  const ball = ballOf(frame);
 
-  if (ball === undefined) {
+  if (ball === null) {
     return null;
   }
 
@@ -175,20 +107,14 @@ export function wantsTrail(action: string | null | undefined, z: number, speed: 
   return z >= SHADOW_MIN_ALTITUDE && trailStrength(z, speed) > 0.4;
 }
 
-/**
- * When a goal's celebration begins, in animation milliseconds, or null when the passage is not a goal.
- *
- * The synchronized commentary already pins the outcome to a moment, so the flash is drawn from the beat the
- * narration says the ball went in — which is where the ball is in the net rather than the passage's start.
- */
-export function celebrationStartMilliseconds(passage: Passage): number | null {
-  if (!GOAL_OUTCOMES.has(passage.outcomeCode)) {
-    return null;
+function ballOf(frame: readonly FrameEntity[]): FrameEntity | null {
+  for (const item of frame) {
+    if (item.entity.isBall) {
+      return item;
+    }
   }
 
-  const outcome = (passage.commentary ?? []).find((line) => GOAL_TEMPLATES.has(line.templateKey));
-
-  return outcome?.timeMilliseconds ?? Math.round(passage.durationMilliseconds * 0.7);
+  return null;
 }
 
 function distance(

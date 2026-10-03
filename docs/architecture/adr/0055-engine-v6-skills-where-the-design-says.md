@@ -1,4 +1,4 @@
-# ADR-0054: Engine-v6 puts skills where the design says they are
+# ADR-0055: Engine-v6 puts skills where the design says they are
 
 - **Status:** Accepted
 - **Date:** 2026-10-03

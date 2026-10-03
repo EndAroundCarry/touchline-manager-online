@@ -175,30 +175,123 @@ internal static class TestMatchFactory
     }
 
     /// <summary>
-    /// Whether the reel carries the passage an event belongs to.
+    /// Simulates a snapshot with both replay recorders attached and builds its presentation along with the
+    /// measurements of the film it describes.
+    /// </summary>
+    /// <param name="input">The snapshot.</param>
+    /// <param name="options">The film's pacing and caps, or the defaults.</param>
+    public static (MatchResultV1 Result, FilmBuild Build) Analyse(
+        MatchInputV1 input,
+        HighlightOptionsV1? options = null)
+    {
+        var liveMetrics = new PlayerLiveMetricsRecorder();
+        var passages = new MatchPassageRecorder();
+        var result = MatchSimulator.Simulate(input, Rules, liveMetrics, passages);
+
+        return (result, ReplayDirector.Analyse(input, result, passages.Passages, options, liveMetrics.Metrics));
+    }
+
+    /// <summary>
+    /// Simulates a snapshot and returns what the film is going to show, before it is timed or moved.
+    /// </summary>
+    /// <param name="input">The snapshot.</param>
+    public static (MatchResultV1 Result, IReadOnlyList<MatchPassageV1> Passages, FilmScriptResult Script) Script(MatchInputV1 input)
+    {
+        var passages = new MatchPassageRecorder();
+        var result = MatchSimulator.Simulate(input, Rules, null, passages);
+
+        return (result, passages.Passages, ReplayDirector.ScriptOf(input, result, passages.Passages));
+    }
+
+    /// <summary>The template key that narrates the outcome of an event in a passage's commentary, or null for one that is not narrated there.</summary>
+    /// <param name="type">The event type.</param>
+    public static string? OutcomeTemplate(EngineEventType type) => type switch
+    {
+        EngineEventType.Goal => "match.goal",
+        EngineEventType.PenaltyGoal => "match.penalty.goal",
+        EngineEventType.PenaltyMissed => "match.penalty.missed",
+        EngineEventType.ShotSaved => "match.shot.saved",
+        EngineEventType.ShotBlocked => "match.shot.blocked",
+        EngineEventType.ShotOffTarget => "match.shot.off_target",
+        EngineEventType.Woodwork => "match.shot.woodwork",
+        EngineEventType.FreeKickShot => "match.free_kick.struck",
+        _ => null,
+    };
+
+    /// <summary>
+    /// Gets the film time an event is shown at: the start of its passage plus the moment its line is read.
     /// </summary>
     /// <param name="presentation">The built presentation.</param>
-    /// <param name="eventSequence">The event whose passage must be on the reel.</param>
-    /// <remarks>
-    /// Clips that overlap are merged, so a merged clip no longer names every chance it holds; the guarantee
-    /// the reel makes is coverage of the film, which is what this checks.
-    /// </remarks>
-    public static bool ReelCovers(MatchPresentationV1 presentation, int eventSequence)
+    /// <param name="matchEvent">The event.</param>
+    /// <returns>The film time in milliseconds, or null when the event is in no passage.</returns>
+    /// <param name="events">
+    /// The match's events. A passage can hold several strikes of one kind, and a line does not say which event it
+    /// narrates, so the event's place among its kind in the passage picks its line; without them the first line is read.
+    /// </param>
+    public static int? MomentOf(MatchPresentationV1 presentation, EngineEventV1 matchEvent, IReadOnlyList<EngineEventV1>? events = null)
     {
         for (var index = 0; index < presentation.Passages.Count; index++)
         {
-            if (!presentation.Passages[index].EventSequences.Contains(eventSequence))
+            var passage = presentation.Passages[index];
+
+            if (!passage.EventSequences.Contains(matchEvent.Sequence))
             {
                 continue;
             }
 
-            var start = presentation.Playback[index].StartMilliseconds;
-            var end = start + presentation.Playback[index].DurationMilliseconds;
+            var key = OutcomeTemplate(matchEvent.Type);
+            var lines = key is null ? [] : passage.Commentary.Where(candidate => candidate.TemplateKey == key).OrderBy(candidate => candidate.TimeMilliseconds).ToList();
+            var rank = events is null
+                ? 0
+                : events.Count(other => other.Type == matchEvent.Type && other.Sequence < matchEvent.Sequence && passage.EventSequences.Contains(other.Sequence));
+            var line = lines.Count == 0 ? null : lines[Math.Min(rank, lines.Count - 1)];
 
-            return presentation.Reel.Any(clip => clip.StartMilliseconds <= start && clip.EndMilliseconds >= end);
+            return presentation.Playback[index].StartMilliseconds + (line?.TimeMilliseconds ?? 0);
         }
 
-        return false;
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the reel shows a chance: a clip that is running at the moment its outcome is read.
+    /// </summary>
+    /// <param name="presentation">The built presentation.</param>
+    /// <param name="matchEvent">The chance.</param>
+    public static bool ReelCovers(MatchPresentationV1 presentation, EngineEventV1 matchEvent)
+    {
+        var moment = MomentOf(presentation, matchEvent);
+
+        return moment is int at
+            && presentation.Reel.Any(clip => clip.StartMilliseconds <= at && clip.EndMilliseconds >= at);
+    }
+
+    /// <summary>Gets the match second a passage's clock reads at a moment inside it.</summary>
+    /// <param name="passage">The passage.</param>
+    /// <param name="relativeMilliseconds">The moment, from the passage's start.</param>
+    public static int ClockAt(PassageV1 passage, int relativeMilliseconds)
+    {
+        var clock = passage.Clock;
+
+        if (relativeMilliseconds <= clock[0].TimeMilliseconds)
+        {
+            return clock[0].MatchSecond;
+        }
+
+        for (var index = 1; index < clock.Count; index++)
+        {
+            if (relativeMilliseconds > clock[index].TimeMilliseconds)
+            {
+                continue;
+            }
+
+            var from = clock[index - 1];
+            var to = clock[index];
+            var span = Math.Max(1, to.TimeMilliseconds - from.TimeMilliseconds);
+
+            return from.MatchSecond + (int)((long)(to.MatchSecond - from.MatchSecond) * (relativeMilliseconds - from.TimeMilliseconds) / span);
+        }
+
+        return clock[^1].MatchSecond;
     }
 
     /// <summary>A four-four-two, which is the shape the domain's first preset describes.</summary>

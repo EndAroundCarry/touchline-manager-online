@@ -164,12 +164,27 @@ export interface PlayerLiveMetric {
   readonly ratingBasisPoints: number;
 }
 
+/** One point of a passage's match clock: the match second it reads at a moment inside the passage (`replay-v4`). */
+export interface ClockKeyframe {
+  readonly timeMilliseconds: number;
+  readonly matchSecond: number;
+}
+
+/** A cut in the film: the moment the players and the ball are put somewhere new (`replay-v4`). */
+export interface PassageCut {
+  readonly timeMilliseconds: number;
+  readonly durationMilliseconds: number;
+  /** Why the film cuts: `kick_off` after a goal, or `half_time`. */
+  readonly kind: string;
+}
+
 /**
- * One immutable, replayable film passage: a slice of a continuous match (`replay-v3`).
+ * One immutable, replayable film passage: a slice of a continuous match (`replay-v3`, `replay-v4`).
  *
  * Carries no frames and no video: the client interpolates between keyframes at its own refresh rate. The
  * match window (`startMatchSecond`…`endMatchSecond`) is what the continuous clock reads, and the event
- * sequences are what the report's "watch" seeks by.
+ * sequences are what the report's "watch" seeks by. From `replay-v4` each half runs on its own clock, so
+ * the match second restarts at forty-five minutes in the second half and `period` says which half it is.
  */
 export interface Passage {
   readonly sourceEventSequence: number;
@@ -186,6 +201,12 @@ export interface Passage {
   readonly entities: readonly HighlightEntity[];
   readonly tracks: readonly HighlightTrack[];
   readonly commentary?: readonly HighlightCommentary[] | null;
+  /** The half the passage is played in, 1 or 2 (`replay-v4`). */
+  readonly period?: number;
+  /** How the match clock runs through the passage, on the half's own clock (`replay-v4`). */
+  readonly clock?: readonly ClockKeyframe[] | null;
+  /** The cuts inside the passage (`replay-v4`). */
+  readonly cuts?: readonly PassageCut[] | null;
 }
 
 /** One clip of the highlights reel: a window of the film around a chance (`replay-v3`). */
@@ -214,4 +235,6 @@ export interface MatchPresentation {
   readonly liveMetrics?: readonly PlayerLiveMetric[] | null;
   readonly playback?: readonly PlaybackSegment[] | null;
   readonly totalPlaybackMilliseconds?: number;
+  /** The one pace the whole film plays at, in thousandths of real time: 2200 is 2.2 times (`replay-v4`). */
+  readonly paceMilli?: number;
 }

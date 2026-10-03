@@ -42,3 +42,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# The fluidity harness's photographs (.preview/capture.mjs): regenerated on every run.
+/.preview/shots/

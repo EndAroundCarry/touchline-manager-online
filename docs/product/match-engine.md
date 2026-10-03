@@ -3,7 +3,7 @@
 > **Status:** Executable specification for `engine-v5` / `engine-rules-v5`, implemented in
 > `src/TouchlineManager.MatchEngine`.
 > **Applies to:** engine version `5`, engine rules version `5`, rating weights `engine-ratings-v1`,
-> tactical modifiers `engine-tactical-v1`, commentary `commentary-v3`, replay `replay-v3`.
+> tactical modifiers `engine-tactical-v1`, commentary `commentary-v3`, replay `replay-v4`.
 > **Version 2** added the assists and the per-player match rating to a result's player lines (§8.1).
 > **Version 3** made the play spatial: a possession resolves a loose-ball scramble, a 1v1 ground duel,
 > and set pieces against player attributes on a normalised pitch, and samples a live condition and rating
@@ -25,7 +25,8 @@
 > (integer arithmetic, the scoreline effect), [ADR-0051](../architecture/adr/0051-engine-v4-continuous-passages.md)
 > (continuous passages, the passage recorder), [ADR-0052](../architecture/adr/0052-replay-v3-film-and-reel.md)
 > (the film and the reel), [ADR-0053](../architecture/adr/0053-engine-v5-half-time-clock-and-restart-ownership.md)
-> (the half-time clock, restart ownership, the complete recorder).
+> (the half-time clock, restart ownership, the complete recorder), [ADR-0054](../architecture/adr/0054-replay-v4-constant-pace-film.md)
+> (the constant-pace film).
 
 Every constant named below lives in `EngineRulesV2` and is covered by the rules hash, so a result can
 always be explained by the configuration that produced it. **Changing any value, formula, draw order, or
@@ -172,7 +173,7 @@ against a plan version keeps referring to the same eleven positions.
 
 Six ratings, each a weighted mean of attributes over the players a weighting table says do that job.
 `engine-v6` removed the Set pieces, Fitness, and Cohesion ratings: they were computed on every refresh and
-read by nothing (see ADR-0054). Corners, free kicks, and tiredness now run on the individual players (§7.9).
+read by nothing (see ADR-0055). Corners, free kicks, and tiredness now run on the individual players (§7.9).
 
 ### 6.1 The weighting tables (`UnitRatingWeights`, `engine-ratings-v2`)
 
@@ -357,7 +358,7 @@ goalChance      = clamp(base + swing(contest, ShotQualitySwingBasisPoints = 1_90
 
 Through `engine-v5` the swing was applied per 1,000 — the rating-scale reference — to a gap of at most 19 on
 the attribute scale, so the whole skill range moved a shot by about a third of a percentage point.
-`ShotContestReference` is the shot's own reference (ADR-0054), shared by the save and free-kick contests and
+`ShotContestReference` is the shot's own reference (ADR-0055), shared by the save and free-kick contests and
 the penalty.
 
 One draw resolves the goal. If it does not score, one further draw splits the failure:
@@ -495,7 +496,7 @@ and without it (`PassageTests.Recording_the_film_never_changes_the_result`). Sin
 
 ### 7.9 The skill model (`engine-v6`)
 
-*(ADR-0054.)* Every duel and every rating reads **effective skill** (§6.3): sheet value × position fit × the
+*(ADR-0055.)* Every duel and every rating reads **effective skill** (§6.3): sheet value × position fit × the
 tiredness drop for its family × fatigue, morale, and sharpness.
 
 - **Duels read effective skills.** Scores are built in hundredths of an attribute point and the reference is
@@ -592,41 +593,86 @@ the tests hold an allowlist of parameter names.
 
 ---
 
-## 10. Replay: the film and the reel (`replay-v3`)
+## 10. Replay: the film and the reel (`replay-v4`)
 
 `ReplayDirector.Build(input, result, passages, options, liveMetrics)` re-derives the whole presentation
-from the frozen snapshot, the result, the recorded passages (ADR-0051), and the optional live metric curve.
-It is a pure function of those inputs and consumes no draw; the presentation is **never stored**, which is
-why a replay revision is a clean contract change rather than a migration (ADR-0052).
+from the frozen snapshot, the result, the recorded passages (ADR-0051, ADR-0053), and the optional live metric
+curve. It is a pure function of those inputs and consumes no draw; the presentation is **never stored**, which is
+why a replay revision is a clean contract change rather than a migration (ADR-0052). `replay-v4` replaced the
+time warp and the anchor tracks of `replay-v3` (ADR-0054). Every constant below is a field of
+`HighlightOptionsV1`: the film's pace is a presentation decision, so none of it can move a result.
 
-**One film.** The recorded possessions are merged into film passages of roughly equal playback length
-(`TargetPassageMilliseconds` = 9 s, capped at `MaxPassages` = 75), split at substitutions, half-time, and
-bookings so a passage's eleven is stable. A time warp fits the match into the nine-to-eleven-minute window —
-`targetFilmMilliseconds = clamp(totalMatchSeconds * 1_000 / 9, 9:30, 11:00)` — weighting each passage (×2.0 a
-goal, ×1.5 a shot, ×1.25 a final-third entry, ×0.8 a middle-third turnover) so chances are readable. The
-ball's track is the recorded path; each player's track is the shape `TacticalFormationResolver` gives them
-over that path, overwritten by their recorded touches. Boundary frames are copied exactly, so the film
-joins rather than cuts. Every passage carries the current eleven and the ball, its `StartMatchSecond`/
-`EndMatchSecond` window, its `OutcomeCode`, its event sequences, and synchronized commentary.
+**One film at one pace.** `FilmScript` turns each possession into *beats* — carry, pass, lofted pass, cross,
+header, shot, clearance, duel, save, placement, and dead-ball holds (restart, goal, card, substitution,
+half-time card) — from the recorder's `Outcome`, `Restart`, waypoints, touches and events. An intermediate pass
+goes to the teammate who can reach the reception point soonest in the current shape; the participants the engine
+named take precedence at their beats; a ground move of 12 m or more becomes *receive → carry 3–10 m → pass*
+(the carry's length weighted by Dribbling through a stable hash); a cross is drawn only from a wide final-third
+position into the box, and anything else is a lofted pass. A possession that starts away from where the last one
+ended without a restart gets a transition beat at physical speed.
+
+`FilmTiming` gives each move its natural real-time length — its distance at the speed of its kind plus
+`ControlSeconds` = 0.3 (pass 15 m/s, lofted 20, cross 21, clearance 24, shot 27, header 14, carry 5–7 by
+Dribbling, placement 8) — and each hold a fixed film length (kick-off 1.2 s, goal kick 0.8, quick free kick
+0.6, set piece 1.2, goal and celebration 4.0, card 1.0, substitution 1.0, half-time card 3.0), and solves **one
+pace** for the whole film: `p = motionSeconds / (targetSeconds − holdSeconds)`.
+
+- `targetSeconds = clamp(playedSeconds / 10, 9:30, 11:00)` (`FilmMatchSecondsPerFilmSecond` = 10). **11:00 is a
+  hard ceiling** that includes the half-time card; a test enforces it, and a busy match raises the pace before
+  it lengthens the film.
+- The pace's band is 1.8–2.9× (`MinPaceMilli`, `MaxPaceMilli`). Above `CondensePaceMilli` = 2.3× the *quietest*
+  possessions are condensed first — no event, ending outside the final third, not within two possessions of a
+  chance — by merging consecutive ground moves by one side into one. Only then may the pace rise, to a 3.0×
+  ceiling (`CeilingPaceMilli`), and only then are the holds shortened (to no less than half). Below the floor the
+  pace stops at 1.8× and the holds lengthen (to at most twice) toward the target.
+- The pace is solved again after the motion is simulated, because a move is lengthened when a player cannot
+  reach a constraint at bounded speed; the settling is bounded and deterministic.
+
+**Motion.** `FilmMotion` samples the ball along the beats — a ground pass eases out; a lofted pass, a cross and
+a clearance get a parabolic height; a shot's height depends on its outcome — and simulates each player in
+real-time units at a 0.1 s step under a speed cap (shape 5.5 m/s, sprint 8, a keeper's dive 10) and an
+acceleration cap (4.5 m/s²). `FilmShape` gives each player a target from `TacticalFormationResolver.Orient` using
+the side's **real instructions**, shifted toward the ball (about 40% along the pitch, 30% across), compact out of
+possession, with one or two pressers on the carrier and the keeper on the line between the ball and the goal.
+**Hard constraints override the shape**: the carrier is at the ball, the receiver at the reception point when the
+ball arrives, the shooter, the header pair and the fouler and fouled player at their touches, the keeper at the
+save point, and set-piece and celebration formations. If a constrained player cannot arrive in time, the
+preceding move is lengthened; **no speed cap is ever exceeded**. The only discontinuities are *cuts* — the
+kick-off after a goal and the half-time reset — listed in the presentation and played as a 300 ms crossfade.
+
+**Passages and the clock.** The film is cut into passages of about 8–12 s of film (at most `MaxPassages` = 75), split
+at personnel changes and at half-time, with boundary keyframes copied exactly. A passage carries its `Period`,
+its `Cuts`, and `Clock` keyframes mapping film time to the match second on that half's own clock (second-half
+seconds start at 45:00), so the displayed minute at an event is the event's stamped minute. The presentation
+carries `PaceMilli`. Players are sampled every 200 ms and the ball every 100 ms while it is in the air.
+
+**Commentary.** A line is read when its beat happens — the pass when it is played, the cross when it is delivered,
+the shot when it is struck — and the outcome line 0.6 s after the strike. Build-up lines are at least 2.5 s of film
+apart; events always get theirs. The templates are `commentary-v3`'s.
 
 **One reel.** `ReelBuilder` selects the chance clips: **goals always**, plus the best chances by
 `QualityBasisPoints` above `MinQualityForShotBasisPoints` = 700, count-capped at `MaxReelClips` = 12 with
-goals excepted. Each clip reaches back over a lead-in of up to `ReelLeadInMatchSeconds` = 600 match-seconds
-of film (~65 s, clamped to 25–70 s), and overlapping clips are merged. If the reel would exceed
-`MaxReelMilliseconds` = 12:00 the lead-ins are shortened to their floor first, then the lowest-quality
-non-goal clips are dropped; **goals survive both**, because a result a manager cannot watch is a worse
-failure than a large download.
+goals excepted. Each clip's lead-in reaches back `ReelLeadInMatchSeconds` = 600 *match* seconds, never across
+half-time, and is then clamped to 25–70 s of film; a clip ends 1.5 s after its outcome (a goal's clip runs through
+its celebration), and overlapping clips merge. If the reel would exceed `MaxReelMilliseconds` = 12:00 the lead-ins
+are shortened to their floor first, then the lowest-quality non-goal clips are dropped; **goals survive both**.
 
-**Payload.** `EstimatedPayloadBytes` counts entities (×48), keyframes (×24), narration, commentary,
-schedule segments (×48), both lineups, and the live metrics (×64). If it exceeds
-`PayloadBudgetBytes` = 750 KB (ADR-0006) the director recompresses the tracks at widening tolerances
-(32 → 40 → 48) and sampling intervals (400 → 600 → 800 ms) until it fits — deterministic, so the same match
-always lands on the same rung.
+**Payload.** `EstimatedPayloadBytes` counts entities (×48), keyframes (×24), narration, commentary, schedule
+segments (×48), both lineups, and the live metrics (×64). Each entity is compressed with one tolerance (the ball
+20, the players on a ladder) and action keyframes are always kept. If the estimate exceeds `PayloadBudgetBytes` =
+750 KB (ADR-0006) the director recompresses the players at widening tolerances (50 → 70 → 90 → 120 → 160) and
+sampling intervals (200 → 300 → 400 → 500 → 600 ms) until it fits — deterministic, so the same match always lands
+on the same rung.
 
 Entities and tracks are ordered by identifier. The narration names the player and the clock, so the Canvas
 is not the only way to follow it; the colours come from a fixed generated palette chosen by club identity,
 so no real club's identity can leak (`WORLD-3`). Shirt numbers and sides are on every player entity, which
 is what lets a client distinguish teams by more than colour.
+
+**The viewer.** `FilmTimeline` (client) builds a presentation's passages into one continuous track per entity,
+roster stints for substitutions and dismissals, a half-aware clock (`45+2'`, `HT`, `46'`, `90+N'`), and the feed,
+cards, markers and cuts. One renderer draws global film time for the whole presentation; players follow a
+monotone cubic Hermite (Fritsch–Carlson) spline, the ball a straight line, and nothing is blended across a cut.
 
 ---
 
@@ -867,21 +913,33 @@ kick-offs (4.9). By outcome: open-play shots 24.0 a match, corners 9.0 (1.5 head
 crossed 3.5, penalties 0.3, offsides 4.8, quick free kicks 16.0, and turnovers (scramble, progression, creation)
 134 a match.
 
-The replay over **10,000 matches** (ADR-0052; `replay-v3` measured on `engine-v4`):
+The replay over **2,000 matches** (ADR-0054; `replay-v4` on `engine-v5`, `simulation-benchmarks -- replay 2000`):
 
 | Measure | p05 | p50 | p95 | min / max |
 |---|---|---|---|---|
-| Passages per match | 54 | 57 | 66 | — / 71 |
-| Film minutes | 10.5 | 10.7 | 10.9 | 10.5 / 11.0 |
-| Reel minutes | 6.6 | 8.3 | 9.6 | — / 10.9 |
-| Payload (KB) | 500.0 | 518.6 | 539.6 | — / 573.9 |
+| Passages per match | 60 | 63 | 66 | — / 69 |
+| **Film minutes** | 9.90 | **10.12** | 10.41 | 9.74 / **10.74** |
+| Reel minutes | 5.61 | 6.95 | 8.13 | — / 9.11 |
+| **Pace** (× real time) | 2.28 | **2.53** | 2.83 | — / 3.00 |
+| Real-time motion (min) | 20.6 | 22.5 | 24.8 | — |
+| Holds (min of film) | — | 1.23 | 1.58 | — |
+| Payload estimate (KB) | — | 722.0 | 746.8 | — / 750.0 |
+| Payload JSON (KB, `System.Text.Json`) | — | 2,095 | 2,172 | — / 2,190 |
 
-**100%** of films land inside the 9:30–11:00 window and **0.00%** exceed eleven minutes; the reel is always
-inside its 12:00 cap, and the payload estimate is comfortably inside the 750 KB budget. Re-run on `engine-v5`
-over 2,000 matches, `replay-v3` still holds all three: 58 passages (p50), a film of 11.0 minutes (min 10.8, max
-11.0), a reel of 8.4 minutes (max 10.7), and a payload of 545 KB (max 590). The film now sits at the ceiling
-for almost every match because a match is about 101 clock minutes with its stoppage; the next presentation
-version paces the film from the ball's motion instead of from the clock.
+**100%** of films land inside 9:00–11:00 and **0.00%** exceed eleven minutes; **98.2%** are played inside the
+1.8–2.9× band; the reel is always inside its 12:00 cap. Outside the cuts (3.8 a match) there are **0 teleports**
+in 2,000 matches, the ball stands still for a median 2.5% of the film outside the holds (p95 3.3%), and no
+player moves faster than the sprint cap times the pace (keepers at most 0.80 of the dive cap). Quiet play is
+condensed in every match — 41.5% of possessions at the median (p95 49.2%) — and a move is lengthened to meet a
+constraint by a median 18.4% (p95 21.4%). The ball moves at a median of 23 m/s of film in a pass (p95 39), 37 in a
+lofted pass, 45 in a cross, 44 in a shot. The payload sits on the third rung of the ladder in 78% of matches and
+the fourth in 19%; the estimate reaches the budget at the maximum and leaves little headroom. A match takes 96 ms
+end to end (simulate, film, serialise) on the benchmark machine.
+
+*Why the pace is 2.5× and not 2.2×.* A match's moves add up to about 26 minutes of real time before any is condensed
+(22.5 after), and a ten-minute film has about 8.8 minutes left once its holds are paid for. Holding 2.2× would
+make the film 11:26 even with the quiet play condensed. The film's length and its pace are one trade-off, set by
+`FilmMatchSecondsPerFilmSecond` and `CondensePaceMilli` (ADR-0054).
 
 Performance, 5,000 matches after a warm-up (`engine-v5`):
 
@@ -921,7 +979,8 @@ a test that is switched off catches nothing.
 | `PassageTests` | One passage per possession; waypoints and touches on the pitch and in fraction order; every shot in the attacking third and free-kick shots in range; touches naming match participants; recorder determinism; the with/without-recorder hash equality. Since `engine-v5`: the possessions tile each half; events ordered and positioned; an outcome that tells the truth; a goal inside the goal mouth, a save at the keeper, a miss out of play, the woodwork and its rebound, a block two to six metres out, a penalty placement, a corner's path, a free kick's placement, the fouler and the fouled player, the scramble contestants, and the header pair. |
 | `HalfTimeClockTests` | `MAT-3`: the second half kicks off at 46'; each half plays its own regulation and stoppage; event minutes are 1'…45'+N and 46'…90'+N; `TotalMinutesPlayed` counts only the stoppage the clock used; substitutions at the planner's windows; the live metrics cover every minute. |
 | `RestartOwnershipTests` | `MAT-12`: the right side kicks each half off; every dead ball is taken by the side that owns it and by nobody else; a goal is followed by the conceding side's kick-off; a save is the keeper's ball and a miss a goal kick; a foul or offside gives the free kick to the right side; a loose ball is not a restart; a goal-area start only ever follows a keeper's ball or a goal kick; possessions join except at a placement. |
-| `ReplayDirectorTests` | One passage per film segment and a contiguous schedule; the nine-to-eleven-minute film; passage windows in order; boundary-frame continuity; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe passage commentary; the reel carrying every goal; determinism; the payload budget. |
+| `ReplayDirectorTests` | `replay-v4`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
+| `FilmScriptTests`, `FilmMotionTests` | Every possession scripted into contiguous beats that join except at a cut; a cross only from a wide position into the box; restarts taken by the owning side; the players the engine named at their beats; a goal followed by its celebration and a cut; no teleports; receivers at the ball when it arrives; a carrier at the ball; the keeper at a save; a goal ending in the goal mouth; the ball never left standing outside the holds; fixed hold lengths; quiet play condensed before the pace rises. |
 | `HighlightTests` | Reel selection: goals always shown, the quality floor, the count cap and its goal exception. |
 | `EnginePurityTests` | No clock, no `System.Random`, no IO; exactly one source of randomness. |
 | `DistributionTests` | The statistical bands, over two thousand matches. |

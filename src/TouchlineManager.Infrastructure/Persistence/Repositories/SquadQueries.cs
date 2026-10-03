@@ -3,6 +3,7 @@ using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad;
+using MatchEventType = TouchlineManager.Domain.Match.MatchEventType;
 
 namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 
@@ -281,6 +282,117 @@ internal sealed class SquadQueries : ISquadQueries
             stat.RatedAppearances == 0
                 ? null
                 : (int?)(stat.RatingBasisPointsTotal / stat.RatedAppearances));
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<SquadPlayerMatchSource>> GetPlayerMatchesAsync(
+        Guid playerId,
+        CancellationToken cancellationToken)
+    {
+        // The division-seasons and clubs the player has a season line for bound the search to the fixtures
+        // they can have played in: a club's season is a few dozen fixtures, not the whole world's.
+        var played = await _dbContext.PlayerSeasonStats
+            .Where(stat => stat.PlayerId == playerId)
+            .Select(stat => new { stat.DivisionSeasonId, stat.ClubId })
+            .ToListAsync(cancellationToken);
+
+        if (played.Count == 0)
+        {
+            return [];
+        }
+
+        var divisionSeasonIds = played.Select(item => item.DivisionSeasonId).Distinct().ToList();
+        var clubIds = played.Select(item => item.ClubId).Distinct().ToList();
+
+        var fixtures = await (
+            from fixture in _dbContext.Fixtures
+            join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
+            join divisionSeason in _dbContext.DivisionSeasons on matchday.DivisionSeasonId equals divisionSeason.Id
+            join season in _dbContext.Seasons on divisionSeason.SeasonId equals season.Id
+            join match in _dbContext.Matches on fixture.Id equals match.FixtureId
+            join home in _dbContext.Clubs on fixture.HomeClubId equals home.Id
+            join away in _dbContext.Clubs on fixture.AwayClubId equals away.Id
+            where divisionSeasonIds.Contains(matchday.DivisionSeasonId)
+                && fixture.Status == FixtureStatus.Published
+                && (clubIds.Contains(fixture.HomeClubId) || clubIds.Contains(fixture.AwayClubId))
+            orderby season.SequenceNumber descending, matchday.RoundNumber descending
+            select new
+            {
+                FixtureId = fixture.Id,
+                MatchId = match.Id,
+                SeasonNumber = season.SequenceNumber,
+                SeasonLabel = season.DisplayLabel,
+                RoundNumber = matchday.RoundNumber,
+                KickoffAt = fixture.KickoffAt,
+                HomeClubId = fixture.HomeClubId,
+                HomeClubName = home.Name,
+                AwayClubId = fixture.AwayClubId,
+                AwayClubName = away.Name,
+                HomeGoals = fixture.HomeScore ?? 0,
+                AwayGoals = fixture.AwayScore ?? 0,
+                StatisticsJson = match.StatisticsJson,
+            })
+            .ToListAsync(cancellationToken);
+
+        if (fixtures.Count == 0)
+        {
+            return [];
+        }
+
+        var matchIds = fixtures.Select(item => item.MatchId).ToList();
+
+        // The player's own shot and save events, counted the way the season statistics count them: a shot
+        // names its taker as the principal participant and a save names the goalkeeper as the secondary one.
+        var events = await _dbContext.MatchEvents
+            .Where(matchEvent => matchIds.Contains(matchEvent.MatchId)
+                && (matchEvent.ParticipantId == playerId || matchEvent.SecondaryParticipantId == playerId)
+                && (matchEvent.Type == MatchEventType.Goal
+                    || matchEvent.Type == MatchEventType.PenaltyGoal
+                    || matchEvent.Type == MatchEventType.PenaltyMissed
+                    || matchEvent.Type == MatchEventType.ShotSaved
+                    || matchEvent.Type == MatchEventType.ShotBlocked
+                    || matchEvent.Type == MatchEventType.ShotOffTarget
+                    || matchEvent.Type == MatchEventType.Woodwork))
+            .Select(matchEvent => new
+            {
+                matchEvent.MatchId,
+                matchEvent.Type,
+                matchEvent.ParticipantId,
+                matchEvent.SecondaryParticipantId,
+            })
+            .ToListAsync(cancellationToken);
+
+        var byMatch = events.ToLookup(matchEvent => matchEvent.MatchId);
+
+        return
+        [
+            .. fixtures.Select(item =>
+            {
+                var own = byMatch[item.MatchId].ToList();
+                var shots = own.Where(matchEvent => matchEvent.ParticipantId == playerId).ToList();
+
+                return new SquadPlayerMatchSource(
+                    item.FixtureId,
+                    item.SeasonNumber,
+                    item.SeasonLabel,
+                    item.RoundNumber,
+                    item.KickoffAt,
+                    item.HomeClubId,
+                    item.HomeClubName,
+                    item.AwayClubId,
+                    item.AwayClubName,
+                    item.HomeGoals,
+                    item.AwayGoals,
+                    item.StatisticsJson,
+                    shots.Count,
+                    shots.Count(matchEvent => matchEvent.Type
+                        is MatchEventType.Goal
+                        or MatchEventType.PenaltyGoal
+                        or MatchEventType.ShotSaved),
+                    own.Count(matchEvent => matchEvent.Type == MatchEventType.ShotSaved
+                        && matchEvent.SecondaryParticipantId == playerId));
+            }),
+        ];
+    }
 
     /// <inheritdoc />
     public async Task<ContractsSnapshot?> GetContractsAsync(Guid clubId, CancellationToken cancellationToken)

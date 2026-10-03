@@ -52,7 +52,7 @@ public sealed record HighlightCommentaryResponse(
     string Text);
 
 /// <summary>
-/// One segment of the film playback clock: a passage (`replay-v3`).
+/// One segment of the film playback clock: a passage (`replay-v3`, `replay-v4`).
 /// </summary>
 /// <param name="Kind">What the segment is: <c>passage</c>.</param>
 /// <param name="SourceEventSequence">The passage's principal event sequence, or zero when it has none.</param>
@@ -63,6 +63,29 @@ public sealed record PlaybackSegmentResponse(
     int SourceEventSequence,
     int StartMilliseconds,
     int DurationMilliseconds);
+
+/// <summary>
+/// One point of a passage's match clock: where the match clock stands at one moment of the film (`replay-v4`).
+/// </summary>
+/// <remarks>
+/// Match seconds are the half's own clock, so they restart at 45:00 in the second half, and the passage's
+/// <c>Period</c> says which half they belong to. Between two points the clock runs linearly.
+/// </remarks>
+/// <param name="TimeMilliseconds">Milliseconds from the start of the passage.</param>
+/// <param name="MatchSecond">The match second on the half's own clock.</param>
+public sealed record ClockKeyframeResponse(int TimeMilliseconds, int MatchSecond);
+
+/// <summary>
+/// A cut in the film: a moment at which the players and the ball are put somewhere new (`replay-v4`).
+/// </summary>
+/// <remarks>
+/// The film moves at bounded speed everywhere except at a cut, which is played as a short crossfade under an
+/// overlay. A client never interpolates across one.
+/// </remarks>
+/// <param name="TimeMilliseconds">Milliseconds from the start of the passage at which the film jumps.</param>
+/// <param name="DurationMilliseconds">How long the crossfade lasts.</param>
+/// <param name="Kind">Why the film cuts: <c>kick_off</c> or <c>half_time</c>.</param>
+public sealed record PassageCutResponse(int TimeMilliseconds, int DurationMilliseconds, string Kind);
 
 /// <summary>One position at one moment, normalized to the pitch.</summary>
 /// <param name="TimeMilliseconds">Milliseconds from the start of the highlight.</param>
@@ -150,7 +173,7 @@ public sealed record PlayerLiveMetricResponse(
     int RatingBasisPoints);
 
 /// <summary>
-/// One film passage: an immutable, replayable slice of a continuous match (`replay-v3`).
+/// One film passage: an immutable, replayable slice of a continuous match (`replay-v3`, `replay-v4`).
 /// </summary>
 /// <remarks>
 /// Carries no frames and no video: the client interpolates between keyframes at its own refresh rate, so
@@ -172,6 +195,9 @@ public sealed record PlayerLiveMetricResponse(
 /// <param name="Entities">Every entity, including the ball.</param>
 /// <param name="Tracks">One track per entity, ordered by entity identifier.</param>
 /// <param name="Commentary">The passage's synchronized commentary, ordered by offset.</param>
+/// <param name="Period">The half the passage is played in: 1 or 2 (`replay-v4`).</param>
+/// <param name="Clock">How the match clock runs through the passage, on the half's own clock (`replay-v4`).</param>
+/// <param name="Cuts">The cuts inside the passage (`replay-v4`).</param>
 public sealed record PassageResponse(
     int SourceEventSequence,
     int Minute,
@@ -186,7 +212,10 @@ public sealed record PassageResponse(
     IReadOnlyList<int> EventSequences,
     IReadOnlyList<HighlightEntityResponse> Entities,
     IReadOnlyList<HighlightTrackResponse> Tracks,
-    IReadOnlyList<HighlightCommentaryResponse>? Commentary = null);
+    IReadOnlyList<HighlightCommentaryResponse>? Commentary = null,
+    int Period = 1,
+    IReadOnlyList<ClockKeyframeResponse>? Clock = null,
+    IReadOnlyList<PassageCutResponse>? Cuts = null);
 
 /// <summary>
 /// One clip of the highlights reel: a window of the film to watch, around a chance (`replay-v3`).
@@ -228,6 +257,10 @@ public sealed record ReelClipResponse(
 /// <param name="LiveMetrics">Minute-by-minute condition and ratings for all players.</param>
 /// <param name="Playback">The film playback schedule, in the order the segments play (`replay-v3`).</param>
 /// <param name="TotalPlaybackMilliseconds">How long the film runs for, in milliseconds.</param>
+/// <param name="PaceMilli">
+/// The one pace the whole film is played at, in thousandths of real time: 2,200 is 2.2 times the speed it would be
+/// run at (`replay-v4`).
+/// </param>
 public sealed record MatchPresentationResponse(
     Guid MatchId,
     string PresentationVersion,
@@ -242,5 +275,6 @@ public sealed record MatchPresentationResponse(
     MatchLineupResponse? AwayLineup = null,
     IReadOnlyList<PlayerLiveMetricResponse>? LiveMetrics = null,
     IReadOnlyList<PlaybackSegmentResponse>? Playback = null,
-    int TotalPlaybackMilliseconds = 0);
+    int TotalPlaybackMilliseconds = 0,
+    int PaceMilli = 0);
 

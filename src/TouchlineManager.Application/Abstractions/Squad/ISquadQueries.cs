@@ -115,6 +115,47 @@ public sealed record SquadCareer(
     int SeasonsPlayed,
     IReadOnlyList<SquadCareerSeasonRow> Seasons);
 
+/// <summary>
+/// One published match of a player's club, as the player's match history reads it (`STA-2`).
+/// </summary>
+/// <remarks>
+/// Carries the stored result document rather than a parsed line, so the application layer parses one shape in
+/// one place (like <c>FixtureMatchLoadRow</c>). The shot and save counts are the player's own, counted from the
+/// match's events the way the season statistics count them. A club's fixture the player did not play in comes
+/// back too, and the use case drops it because the result document has no line for them.
+/// </remarks>
+/// <param name="FixtureId">The fixture.</param>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="RoundNumber">The matchday round.</param>
+/// <param name="KickoffAt">The kick-off instant.</param>
+/// <param name="HomeClubId">The host club.</param>
+/// <param name="HomeClubName">The host club's name.</param>
+/// <param name="AwayClubId">The visiting club.</param>
+/// <param name="AwayClubName">The visiting club's name.</param>
+/// <param name="HomeGoals">The host's goals.</param>
+/// <param name="AwayGoals">The visitor's goals.</param>
+/// <param name="StatisticsJson">The stored result document, which carries the player lines.</param>
+/// <param name="Shots">Shots the player took in the match.</param>
+/// <param name="ShotsOnTarget">Shots on target the player took in the match.</param>
+/// <param name="Saves">Saves the player made in the match.</param>
+public sealed record SquadPlayerMatchSource(
+    Guid FixtureId,
+    int SeasonNumber,
+    string SeasonLabel,
+    int RoundNumber,
+    DateTimeOffset KickoffAt,
+    Guid HomeClubId,
+    string HomeClubName,
+    Guid AwayClubId,
+    string AwayClubName,
+    int HomeGoals,
+    int AwayGoals,
+    string StatisticsJson,
+    int Shots,
+    int ShotsOnTarget,
+    int Saves);
+
 /// <summary>One player in a club's squad, as stored.</summary>
 /// <remarks>
 /// Carries domain values rather than transport shapes — positions as <see cref="PlayerPosition"/>,
@@ -309,6 +350,16 @@ public interface ISquadQueries
     /// <param name="playerId">The player to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<PlayerSnapshot?> GetPlayerAsync(Guid playerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the published matches of the clubs a player has appeared for, most recent first, with the player's
+    /// own shot and save counts (`STA-2`).
+    /// </summary>
+    /// <param name="playerId">The player.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<SquadPlayerMatchSource>> GetPlayerMatchesAsync(
+        Guid playerId,
+        CancellationToken cancellationToken);
 
     /// <summary>Reads a club's active contracts, or returns null if the club is unknown.</summary>
     /// <param name="clubId">The club to read.</param>
