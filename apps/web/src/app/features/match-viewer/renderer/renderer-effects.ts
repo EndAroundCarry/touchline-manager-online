@@ -1,6 +1,6 @@
 import { Passage } from '../../../core/match/match.models';
 import { SHADOW_MIN_ALTITUDE } from './pitch-layout';
-import { ClashPoint, FrameEntity } from './renderer.models';
+import { FrameEntity } from './renderer.models';
 
 /**
  * What a frame's action effects are decided from (`replay-v3`).
@@ -33,12 +33,6 @@ const GOAL_TEMPLATES = new Set(['match.goal', 'match.penalty.goal']);
 /** The outcome codes that mean the ball finished in the net. */
 const GOAL_OUTCOMES = new Set(['goal', 'penalty_goal']);
 
-/** How close two opposing players must be to read as contesting the ball, in normalized units (~4 m). */
-export const DUEL_DISTANCE = 380;
-
-/** How close the duel must be to the ball to matter, in normalized units (~9 m). */
-export const DUEL_BALL_DISTANCE = 900;
-
 /** How close a player must be to the ball to be shown as in possession, in normalized units (~9 m). */
 export const POSSESSION_DISTANCE = 900;
 
@@ -63,61 +57,6 @@ export function isTrailAction(action: string | null | undefined): boolean {
 /** Whether an action tag means a goalkeeper's dive or save. */
 export function isDiveAction(action: string | null | undefined): boolean {
   return action !== null && action !== undefined && DIVE_ACTIONS.has(action);
-}
-
-/**
- * The duels a frame shows, as the point between each pair of contesting players.
- *
- * A duel is read from the geometry the engine already sent rather than from an event: two players of
- * opposite sides inside a few metres, with the ball between them. A tag on either player's keyframe counts
- * too, so a presentation that names its duels is drawn even when the players are a stride apart.
- */
-export function duelClashes(
-  frame: readonly FrameEntity[],
-  maxDistance = DUEL_DISTANCE,
-  ballDistance = DUEL_BALL_DISTANCE,
-): readonly ClashPoint[] {
-  const ball = frame.find((item) => item.entity.isBall);
-  const players = frame.filter((item) => !item.entity.isBall && item.entity.side !== null);
-  const clashes: ClashPoint[] = [];
-
-  for (let first = 0; first < players.length; first += 1) {
-    for (let second = first + 1; second < players.length; second += 1) {
-      const one = players[first];
-      const other = players[second];
-
-      if (one.entity.side === other.entity.side) {
-        continue;
-      }
-
-      const midpoint = {
-        x: (one.position.x + other.position.x) / 2,
-        y: (one.position.y + other.position.y) / 2,
-      };
-      const tagged = isTackleAction(one.action) || isTackleAction(other.action);
-      const separation = Math.hypot(
-        one.position.x - other.position.x,
-        one.position.y - other.position.y,
-      );
-
-      if (!tagged && separation > maxDistance) {
-        continue;
-      }
-
-      if (ball !== undefined && distance(midpoint, ball.position) > ballDistance) {
-        continue;
-      }
-
-      clashes.push({
-        x: midpoint.x,
-        y: midpoint.y,
-        // A stable offset per duel, so two contests on opposite flanks are not drawn pulsing in lockstep.
-        phase: (Math.round(midpoint.x) + Math.round(midpoint.y)) % 1_000,
-      });
-    }
-  }
-
-  return clashes;
 }
 
 /** The player the ball is at, which is the one whose name tag is worth showing. */

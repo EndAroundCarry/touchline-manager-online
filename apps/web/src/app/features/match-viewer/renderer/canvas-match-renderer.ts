@@ -11,7 +11,6 @@ import {
 } from './pitch-layout';
 import {
   celebrationStartMilliseconds,
-  duelClashes,
   isDiveAction,
   isStrikeAction,
   nearestPlayerToBall,
@@ -42,7 +41,7 @@ import {
  *
  * Stage 6 fills the picture in: a mown pitch with the markings a real one has, kit-coloured tokens with
  * shirt numbers and name tags, distinct goalkeeper kits, a ball that lifts off its own shadow by the
- * altitude the engine sent, and the action effects — a duel's clash ring, a shot's projectile streak, a
+ * altitude the engine sent, and the action effects — a shot's projectile streak, a
  * booking's card, a goal's pulsating flash. Teams are distinguished by shape as well as colour (a circle
  * for the home side, a square for the away side) and every player carries their shirt number, because the
  * requirement is explicit that colour is never the only signal (`§9.4`, `§11.3`).
@@ -118,18 +117,13 @@ export class CanvasMatchRenderer {
     const frame = frameAt(this.entities, this.tracks, timeMs);
     const players = frame.filter((item) => !item.entity.isBall);
     const ball = frame.find((item) => item.entity.isBall);
-    const clashes = duelClashes(frame);
     const possession = nearestPlayerToBall(frame);
-    let effects = clashes.length;
+    let effects = 0;
 
     const radius = playerRadius(rect);
 
     for (const player of players) {
       this.drawPlayer(rect, player, radius, ball);
-    }
-
-    for (const clash of clashes) {
-      this.drawClash(rect, clash.x, clash.y, clash.phase);
     }
 
     if (ball !== undefined) {
@@ -461,22 +455,6 @@ export class CanvasMatchRenderer {
     context.restore();
   }
 
-  /** Draws a ripple where two players are contesting the ball. */
-  private drawClash(rect: PitchRect, x: number, y: number, phase: number): void {
-    const context = this.context;
-    const point = toCanvasPoint({ x, y }, rect);
-    const cycle = ((this.lastTimeMs + phase) % CLASH_PERIOD) / CLASH_PERIOD;
-    const radius = 5 + cycle * 9;
-
-    context.save();
-    context.strokeStyle = `rgba(255, 255, 255, ${(0.55 * (1 - cycle)).toFixed(3)})`;
-    context.lineWidth = 1.5;
-    context.beginPath();
-    context.arc(point.x, point.y, radius, 0, Math.PI * 2);
-    context.stroke();
-    context.restore();
-  }
-
   /** Draws the ball at its altitude, above its own shadow, with the aerial trail behind it. */
   private drawBall(rect: PitchRect, ball: FrameEntity): void {
     const context = this.context;
@@ -756,7 +734,6 @@ const BALL_PATCH_COLOUR = '#111827';
 const TAG_BACKGROUND = 'rgba(2, 6, 23, 0.85)';
 const TAG_BORDER = 'rgba(248, 250, 252, 0.3)';
 const CARD_COLOURS: Record<CardKind, string> = { yellow: '#facc15', red: '#ef4444' };
-const CLASH_PERIOD = 620;
 const CELEBRATION_MILLISECONDS = 4_000;
 const DEFAULT_KEEPER_TRIM = '#f8fafc';
 

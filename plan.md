@@ -191,7 +191,6 @@ Stage 7: Calibration, Validation Suite & Final Polish
    - Dynamic altitude scaling: ball expands and rises above shadow during crosses, high shots, and aerial clearances.
    - Motion trail during high-velocity shots.
 3. **Visual Action Indicators**:
-   - **Tackling**: Subtle clash ring ripple when two players contest a duel.
    - **Shot on Goal**: Dynamic projectile line.
    - **Referee Cards**: Yellow/red card badge floating above offending player token.
    - **Goal Celebration**: Pulsating flash and "GOAL!" badge overlay.

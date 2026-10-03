@@ -1,7 +1,6 @@
 import { Passage } from '../../../core/match/match.models';
 import {
   celebrationStartMilliseconds,
-  duelClashes,
   isDiveAction,
   isStrikeAction,
   isTackleAction,
@@ -118,52 +117,6 @@ describe('wantsTrail', () => {
   it('streaks a genuinely airborne ball even without a tag', () => {
     expect(wantsTrail(null, 60, 200)).toBe(true);
     expect(wantsTrail(null, 4, 200)).toBe(false);
-  });
-});
-
-describe('duelClashes', () => {
-  it('marks an opposing pair contesting the ball, between them', () => {
-    const frame = [
-      player('H9', 'home', 5_000, 5_000),
-      player('A5', 'away', 5_200, 5_000),
-      ball(5_100, 5_000),
-    ];
-
-    const clashes = duelClashes(frame);
-
-    expect(clashes).toHaveLength(1);
-    expect(clashes[0].x).toBeCloseTo(5_100, 5);
-    expect(clashes[0].y).toBeCloseTo(5_000, 5);
-  });
-
-  it('ignores two team-mates standing together', () => {
-    const frame = [
-      player('H9', 'home', 5_000, 5_000),
-      player('H10', 'home', 5_100, 5_000),
-      ball(5_050, 5_000),
-    ];
-
-    expect(duelClashes(frame)).toHaveLength(0);
-  });
-
-  it('ignores a contest away from the ball', () => {
-    const frame = [
-      player('H9', 'home', 1_000, 1_000),
-      player('A5', 'away', 1_200, 1_000),
-      ball(9_000, 9_000),
-    ];
-
-    expect(duelClashes(frame)).toHaveLength(0);
-  });
-
-  it('draws a tagged duel even when the players are a stride apart', () => {
-    const frame = [
-      player('H9', 'home', 5_000, 5_000, 'tackle'),
-      player('A5', 'away', 5_900, 5_000),
-      ball(5_500, 5_000),
-    ];
-
-    expect(duelClashes(frame)).toHaveLength(1);
   });
 });
 

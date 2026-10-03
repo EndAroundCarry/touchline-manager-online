@@ -73,14 +73,6 @@ export interface FrameMetrics {
   readonly milliseconds: number;
 }
 
-/** One duel the renderer marks, at the point between the two players contesting it. */
-export interface ClashPoint {
-  readonly x: number;
-  readonly y: number;
-  /** A per-duel offset so two duels do not pulse in lockstep. */
-  readonly phase: number;
-}
-
 /** What the renderer needs beyond the highlight itself. */
 export interface RendererOptions {
   readonly kits?: Partial<TeamKits>;
