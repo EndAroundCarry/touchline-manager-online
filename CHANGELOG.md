@@ -11,9 +11,10 @@ engine version.
 - **The squad's player names open the player page.** The name in the roster table and on each phone card is
   the link; the separate "View" links are gone.
 - **The player page is four tabs: Attributes (default), Training report, Statistics, Contract.** Attributes
-  are the four category squares (Goalkeeping, Technical, Mental, Physical) side by side, each listing its
-  attributes in small type so all four fit the screen width with no scrolling; the band word is read out by
-  assistive technology and a legend above the squares gives the colour bands. The Training report
+  are laid out like a scouting sheet: four columns (Goalkeeping, Technical, Mental, Physical) side by side,
+  each a list of attribute name on the left and number plus band word on the right, in type small enough
+  that all four fit a phone's width with no scrolling (the band word shows from the `sm` breakpoint up and
+  is always read out by assistive technology; a legend above the columns gives the colour bands). The Training report
   shows clearly-labelled sample data until the training rework. Statistics shows the current season with a
   drop-down for earlier ones. Contract shows the deal, its expiry and salary, with "Start negotiation"
   disabled and marked coming soon.

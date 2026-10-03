@@ -146,7 +146,7 @@ describe('PlayerProfile', () => {
     expect(root.querySelectorAll('app-attribute-value')).toHaveLength(28);
   });
 
-  it('lays the attributes out as four category squares side by side', () => {
+  it('lays the attributes out as four columns side by side', () => {
     const grid = root.querySelector('[data-testid="attribute-rows"]')!;
 
     expect(grid.classList.contains('grid-cols-4')).toBe(true);
