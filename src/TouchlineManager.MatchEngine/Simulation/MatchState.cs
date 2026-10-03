@@ -19,6 +19,7 @@ internal sealed class MatchState
     private int _halfEventStoppageSeconds;
     private int _halfStoppageJitterSeconds;
     private int _metricMinute = -1;
+    private int _ratingMinute = -1;
     private int _metricStart;
 
     /// <summary>Initializes the state for one match.</summary>
@@ -428,6 +429,37 @@ internal sealed class MatchState
     public int TotalMinutesPlayed =>
         Rules.RegulationMinutes
         + ((FirstHalfStoppageSeconds + SecondHalfStoppageSeconds) / Rules.SecondsPerMinute);
+
+    /// <summary>
+    /// Refreshes both sides' unit ratings, once per minute of play (`engine-v6`).
+    /// </summary>
+    /// <remarks>
+    /// Ratings used to be calculated at kick-off and again only at a substitution or a sending-off, so the cost
+    /// of tiredness, morale, and being a man down mostly never reached them, and a side's first change made
+    /// all its ratings jump to their tired state while its opponent's stayed frozen. Both sides are now
+    /// refreshed together, and the score is read at the same moment so a situational time-wasting
+    /// instruction follows the scoreline.
+    /// </remarks>
+    public void RefreshRatings()
+    {
+        var played = ClockSeconds / Rules.SecondsPerMinute;
+
+        if (played == _ratingMinute)
+        {
+            return;
+        }
+
+        _ratingMinute = played;
+
+        var homeGoals = GoalsOf(MatchSide.Home);
+        var awayGoals = GoalsOf(MatchSide.Away);
+
+        Home.Leading = homeGoals > awayGoals;
+        Away.Leading = awayGoals > homeGoals;
+
+        Home.RecalculateRatings(Rules);
+        Away.RecalculateRatings(Rules);
+    }
 
     /// <summary>Gets the goals scored by a side, read from the events (MAT-5).</summary>
     /// <param name="side">Which end.</param>

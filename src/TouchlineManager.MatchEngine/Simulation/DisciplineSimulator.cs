@@ -73,6 +73,8 @@ internal static class DisciplineSimulator
             rules.BaseFoulBasisPoints,
             TacklingMultiplier(defender.Instructions.Tackling, rules));
 
+        foulChance = Probability.Apply(foulChance, SideFoulSkillMultiplier(defender, rules));
+
         if (!state.Random.RollBasisPoints(foulChance))
         {
             return new FoulRoll(Committed: false, Fouler: null, CardRoll: 0);
@@ -80,7 +82,7 @@ internal static class DisciplineSimulator
 
         var fouler = WeightedPick.From(
             defender.Outfield,
-            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.Aggression),
+            slot => EffectiveSkill.Hundredths(slot, MatchAttributeName.Aggression, rules),
             state.Random);
 
         if (fouler is null)
@@ -89,6 +91,69 @@ internal static class DisciplineSimulator
         }
 
         return new FoulRoll(Committed: true, fouler, state.Random.NextBasisPoints());
+    }
+
+    /// <summary>
+    /// Rolls the card for a foul a ground duel has already decided was committed (`engine-v6`).
+    /// </summary>
+    /// <remarks>
+    /// The duel rolled whether there was a foul; what is left to draw is the card, which is taken here so the
+    /// stream's order is the same as for a foul rolled per possession: the card draw follows the foul.
+    /// </remarks>
+    /// <param name="state">The match state.</param>
+    /// <param name="defendingSide">The side not in possession.</param>
+    /// <param name="foulerId">The defender who committed the foul.</param>
+    public static FoulRoll RollDuelFoul(MatchState state, MatchSide defendingSide, Guid foulerId)
+    {
+        var fouler = state.SideOf(defendingSide).Active.FirstOrDefault(slot => slot.Participant.ParticipantId == foulerId);
+
+        return new FoulRoll(Committed: true, fouler, fouler is null ? 0 : state.Random.NextBasisPoints());
+    }
+
+    /// <summary>
+    /// Gets how a side's Aggression and Tackling scale how often it fouls (`engine-v6`): aggressive sides foul
+    /// more, clean tacklers less, both bounded.
+    /// </summary>
+    /// <param name="defender">The defending side.</param>
+    /// <param name="rules">The rules in force.</param>
+    private static int SideFoulSkillMultiplier(SideRuntime defender, EngineRulesV2 rules)
+    {
+        var outfield = defender.Outfield;
+
+        if (outfield.Count == 0)
+        {
+            return EngineRulesV2.Certain;
+        }
+
+        long aggression = 0;
+        long tackling = 0;
+
+        foreach (var slot in outfield)
+        {
+            aggression += EffectiveSkill.Hundredths(slot, MatchAttributeName.Aggression, rules);
+            tackling += EffectiveSkill.Hundredths(slot, MatchAttributeName.Tackling, rules);
+        }
+
+        return FoulSkillMultiplier((int)(aggression / outfield.Count), (int)(tackling / outfield.Count), rules);
+    }
+
+    /// <summary>
+    /// Converts an Aggression and a Tackling, in hundredths of an attribute point, into a multiplier on a foul chance.
+    /// </summary>
+    /// <param name="aggressionHundredths">The Aggression of a player, or the average of a side.</param>
+    /// <param name="tacklingHundredths">The Tackling of a player, or the average of a side.</param>
+    /// <param name="rules">The rules in force.</param>
+    internal static int FoulSkillMultiplier(int aggressionHundredths, int tacklingHundredths, EngineRulesV2 rules)
+    {
+        var reference = rules.FoulSkillReference * EffectiveSkill.Scale;
+
+        var adjustment =
+            (((aggressionHundredths - reference) * rules.AggressionFoulStepBasisPoints)
+                - ((tacklingHundredths - reference) * rules.TacklingFoulStepBasisPoints))
+            / EffectiveSkill.Scale;
+
+        return EngineRulesV2.Certain
+            + int.Clamp(adjustment, -rules.MaxFoulSkillAdjustBasisPoints, rules.MaxFoulSkillAdjustBasisPoints);
     }
 
     /// <summary>

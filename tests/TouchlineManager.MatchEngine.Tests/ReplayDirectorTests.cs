@@ -290,11 +290,14 @@ public sealed class ReplayDirectorTests
                 var scorer = input.SideOf(goal.Side).Squad
                     .Single(participant => participant.ParticipantId == goal.ParticipantId);
                 var key = goal.Type == EngineEventType.Goal ? "match.goal" : "match.penalty.goal";
-                var line = passage.Commentary.SingleOrDefault(candidate => candidate.TemplateKey == key);
 
-                line.Should().NotBeNull("a goal is narrated with the log's own wording");
-                line!.Text.Should().Contain(scorer.DisplayName);
-                line.TimeMilliseconds.Should().BeGreaterThanOrEqualTo(0);
+                // A film passage can hold two possessions, so back-to-back goals can share one: the scorer's
+                // own line has to be among its goal lines rather than the only one.
+                var line = passage.Commentary.SingleOrDefault(candidate =>
+                    candidate.TemplateKey == key && candidate.Text.Contains(scorer.DisplayName, StringComparison.Ordinal));
+
+                line.Should().NotBeNull("a goal is narrated with the log's own wording, naming the scorer");
+                line!.TimeMilliseconds.Should().BeGreaterThanOrEqualTo(0);
             }
 
             presentation.Passages

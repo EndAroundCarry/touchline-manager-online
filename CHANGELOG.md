@@ -4,6 +4,31 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine-v6 — skills where the design says they are
+
+Follows the match-engine audit. No formula was wrong; several skills and instructions did not reach the result as
+designed. `engine-v6` / `engine-rules-v6` changes every output hash, so a database seeded under `engine-v5` must be
+archived and reseeded. Monte Carlo over 20,000 matches holds every band: goals **2.90**, shots 27.2, fouls 21.4,
+yellows 3.40, reds 0.28, penalties 0.24, home advantage **+4.0** points. See
+[`ADR-0054`](docs/architecture/adr/0054-engine-v6-skills-where-the-design-says.md).
+
+### Changed
+
+- **Tiredness lowers skills** (physical −40%, technical −20%, mental −10% at zero condition; goalkeepers exempt),
+  read by the ratings and by every duel; **Stamina** scales a player's condition loss; ratings refresh every minute.
+- **Shot, save, penalty, and free-kick contests** use their own `ShotContestReference` (150), so finishing and
+  goalkeeping count at the shot.
+- **Duels** read position fit, tiredness, and a man down, and pick their players by band; a lost duel can end in a
+  foul; Aggression and Tackling set a side's foul rate.
+- **Penalties** depend on taker and keeper; **corners** have a taker; **Leadership** scales morale shifts; **time
+  wasting** follows the score and lengthens possessions.
+
+### Removed
+
+- The unused Set pieces, Fitness, and Cohesion ratings, the dead penalty and corner-header code, and seven unread
+  constants. Duel weights, the duel clamp, the tackling nudge, the shot-zone mix, and the penalty band are now
+  rules constants.
+
 ## Engine-v5 — the half-time clock, restart ownership, and a complete passage recorder
 
 The first milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). `engine-v4` built the

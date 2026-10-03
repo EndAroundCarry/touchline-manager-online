@@ -123,12 +123,28 @@ internal sealed class SideRuntime
     public ActiveSlot? Goalkeeper =>
         Active.FirstOrDefault(slot => slot.Slot.Family == MatchPositionFamily.Goalkeeper);
 
+    /// <summary>
+    /// Gets or sets whether the side led when its ratings were last refreshed, which is what makes a
+    /// situational time-wasting instruction apply (`engine-v6`).
+    /// </summary>
+    public bool Leading { get; set; }
+
+    /// <summary>Gets whether the side's time-wasting instruction is in force: always when on, only while ahead when situational.</summary>
+    public bool WastingTime => Instructions.TimeWasting switch
+    {
+        MatchTimeWasting.On => true,
+        MatchTimeWasting.Situational => Leading,
+        _ => false,
+    };
+
     /// <summary>Recalculates the side's ratings from its current occupancy and condition.</summary>
     /// <param name="rules">The rules in force.</param>
     public void RecalculateRatings(EngineRulesV2 rules) =>
         Ratings = UnitRatingCalculator.Calculate(
             Active,
-            Instructions,
+            Instructions.TimeWasting == MatchTimeWasting.Situational && !Leading
+                ? Instructions with { TimeWasting = MatchTimeWasting.Off }
+                : Instructions,
             Which == MatchSide.Home,
             rules);
 
@@ -214,8 +230,26 @@ internal sealed class SideRuntime
     /// </summary>
     /// <param name="delta">The shift, which may be negative.</param>
     /// <param name="maxDriftBasisPoints">How far morale may move from its baseline.</param>
-    public void ShiftMorale(int delta, int maxDriftBasisPoints)
+    /// <param name="rules">The rules in force, which say how far the best leader on the pitch changes the shift.</param>
+    public void ShiftMorale(int delta, int maxDriftBasisPoints, EngineRulesV2 rules)
     {
+        // The best leader on the pitch sharpens a lift and softens a blow (engine-v6), within a bound.
+        var bestLeader = 0;
+
+        foreach (var slot in Active)
+        {
+            bestLeader = Math.Max(bestLeader, slot.Participant.Attributes.ValueOf(MatchAttributeName.Leadership));
+        }
+
+        var leadership = int.Clamp(
+            EngineRulesV2.Certain + ((bestLeader - rules.LeadershipReference) * rules.LeadershipMoraleStepBasisPoints),
+            rules.MinLeadershipMoraleMultiplierBasisPoints,
+            rules.MaxLeadershipMoraleMultiplierBasisPoints);
+
+        delta = delta >= 0
+            ? Probability.Apply(delta, leadership)
+            : -Probability.Apply(-delta, (2 * EngineRulesV2.Certain) - leadership);
+
         for (var index = 0; index < Active.Count; index++)
         {
             var slot = Active[index];
@@ -279,10 +313,22 @@ internal sealed class SideRuntime
         {
             var slot = Active[index];
 
+            // A player's own Stamina sets how fast he tires (engine-v6); the goalkeeper's legs are not modelled.
+            var playerLoss = slot.Slot.Family == MatchPositionFamily.Goalkeeper
+                ? conditionLoss
+                : Probability.Apply(
+                    conditionLoss,
+                    int.Clamp(
+                        EngineRulesV2.Certain
+                            - ((slot.Participant.Attributes.ValueOf(MatchAttributeName.Stamina) - rules.StaminaReference)
+                                * rules.StaminaConditionLossStepBasisPoints),
+                        rules.MinStaminaConditionLossMultiplierBasisPoints,
+                        rules.MaxStaminaConditionLossMultiplierBasisPoints));
+
             Active[index] = slot with
             {
                 Condition = slot.Condition
-                    .WithConditionDelta(-conditionLoss)
+                    .WithConditionDelta(-playerLoss)
                     .WithFatigueDelta(fatigueGain)
                     .WithSharpnessDelta(rules.SharpnessGainPerPossessionBasisPoints),
             };

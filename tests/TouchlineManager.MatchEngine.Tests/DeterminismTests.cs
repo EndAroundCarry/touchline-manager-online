@@ -103,8 +103,9 @@ public sealed class DeterminismTests
     public void The_golden_hash_for_a_known_snapshot_is_pinned()
     {
         // The most important test in the project. If this fails, an engine change has altered what a historical
-        // match would replay as. Engine version 5 re-pinned it (the half-time clock, restart ownership, and the
-        // complete passage recorder), and the engine-v4 values were retired with their version. From a
+        // match would replay as. Engine version 6 re-pinned it (skills on the scale they are measured on, tiredness
+        // that lowers skills, per-minute ratings, duel fouls), and the engine-v5 values were retired with their
+        // version. From a
         // version's release onward, any change requires a new engine version and a new labelled constant
         // rather than an updated hash.
         var result = MatchSimulator.Simulate(TestMatchFactory.Even());
@@ -112,7 +113,7 @@ public sealed class DeterminismTests
         result.OutputHash.Should().Be(GoldenOutputHash);
         result.InputHash.Should().Be(GoldenInputHash);
         result.HomeGoals.Should().Be(2);
-        result.AwayGoals.Should().Be(3);
+        result.AwayGoals.Should().Be(2);
     }
 
     [Fact]
@@ -121,7 +122,7 @@ public sealed class DeterminismTests
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
         EngineConfiguration.HashOf(EngineRulesV2.Default)
-            .Should().Be("7b89da8621426b63bf48f716501dda0351ceece3747f699102eaf61f4f95f0ea");
+            .Should().Be("e090db395679a2c6756fe1a7a88c44488949d9b956771490f1d289138dbb60ab");
     }
 
     [Fact]
@@ -163,8 +164,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "1a701fc6ecb18249953068ad13a9bd7026e0ac52a30fe5f5cc0e4e9c393ff44c";
+        "9672318ee3012cd042368e83181f42e0bd7d32699dec26e156a073b893abd9ad";
 
     private const string GoldenOutputHash =
-        "6d23c036e12ac0c2a42815b8896adcb37f2001ce8f02bab2c5b1ceb05d004cb1";
+        "9985b9587fb900232f8ed887bb88a5abedf2c8c60e53330914983710c10e93a9";
 }

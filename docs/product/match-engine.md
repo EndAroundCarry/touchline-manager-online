@@ -1,4 +1,4 @@
-# Match engine version 5
+# Match engine version 6
 
 > **Status:** Executable specification for `engine-v5` / `engine-rules-v5`, implemented in
 > `src/TouchlineManager.MatchEngine`.
@@ -170,10 +170,11 @@ against a plan version keeps referring to the same eleven positions.
 
 ## 6. Unit ratings (master plan §8.4)
 
-Nine ratings. Eight are weighted means of attributes over the players a weighting table says do that job;
-`Cohesion` measures fit rather than quality and is computed from familiarity instead.
+Six ratings, each a weighted mean of attributes over the players a weighting table says do that job.
+`engine-v6` removed the Set pieces, Fitness, and Cohesion ratings: they were computed on every refresh and
+read by nothing (see ADR-0054). Corners, free kicks, and tiredness now run on the individual players (§7.9).
 
-### 6.1 The weighting tables (`UnitRatingWeights`, `engine-ratings-v1`)
+### 6.1 The weighting tables (`UnitRatingWeights`, `engine-ratings-v2`)
 
 | Unit | Attributes (weight) | Bands (weight) |
 |---|---|---|
@@ -183,8 +184,6 @@ Nine ratings. Eight are weighted means of attributes over the players a weightin
 | Defensive pressure | Tackling 6, Work rate 5, Aggression 4, Stamina 4, Anticipation 4, Pace 3 | DEF 5, MID 5, ATT 1 |
 | Defensive shape | Marking 6, Positioning 6, Anticipation 4, Decisions 4, Tackling 3, Strength 2 | GK 1, DEF 6, MID 4 |
 | Goalkeeping | Handling 6, Reflexes 6, One-on-ones 4, Aerial ability 4, Positioning 4, Composure 2 | GK 1 |
-| Set pieces | Set pieces 7, Crossing 5, Heading 4, Jumping reach 4, Technique 3 | DEF 3, MID 4, ATT 4 |
-| Fitness | Stamina 7, Work rate 6, Pace 4, Strength 3, Agility 3 | GK 1, DEF 4, MID 5, ATT 4 |
 
 Two rules shape the table. **No single attribute dominates a unit** — each spreads across five or six, so
 a striker with one outstanding attribute is not automatically the best striker. **The weights say who does
@@ -200,7 +199,7 @@ weight, or a unit nobody contributes to fails the first match simulated rather t
 For each unit, over the players on the pitch (whoever is still on — a sending-off removes one):
 
 ```text
-playerRating  = Σ(weight × attribute × AttributeRatingFactor) / Σ(weight)
+playerRating  = Σ(weight × attribute × AttributeRatingFactor × tirednessFactor(attribute)) / Σ(weight)
 effective     = playerRating × familiarity / 10_000 × stateMultiplier / 10_000
 unitRating    = Σ(bandWeight × effective) / Σ(bandWeight)
 unitRating    = unitRating × tacticalModifier / 10_000
@@ -208,27 +207,31 @@ unitRating    = unitRating × homeAdvantage? × shortHandedPenalty^missing
 unitRating    = clamp(unitRating, 0, MaxUnitRating = 1_150)
 ```
 
-### 6.3 The state multiplier
+### 6.3 Effective skill: tiredness and the state multiplier
 
-Each of the four state values is a linear interpolation between its floor and ceiling, and they compose
-multiplicatively. At the worst possible state a player is worth about a quarter less — roughly five
-attribute points: enough to prefer a fresh substitute, not enough to make a good player bad.
+`EffectiveSkill` is the one definition of what a player can do *now*, read by the unit ratings and by every
+duel (§7.9). Position fit, tiredness, and the state multiplier scale each skill.
+
+**Tiredness lowers skills, by family.** The drop grows linearly with the condition lost — none when fresh, the
+figure below at zero condition — and physical skills fall furthest, then technical, then mental. Goalkeepers
+(and the goalkeeping skills) are exempt.
+
+| Family | Drop at zero condition | At the 60% condition a match typically ends on |
+|---|---|---|
+| Physical | `TiredPhysicalDropBasisPoints` = 4_000 | −16% |
+| Technical | `TiredTechnicalDropBasisPoints` = 2_000 | −8% |
+| Mental | `TiredMentalDropBasisPoints` = 1_000 | −4% |
+
+**The state multiplier** covers the other three state values. Each is a linear interpolation between its floor
+and ceiling, and they compose multiplicatively. Condition is no longer one of them: it is the drop above.
 
 | Input | Floor | Ceiling |
 |---|---|---|
-| Condition | 8_500 | 10_500 |
 | Fatigue (inverted: freshness) | 8_750 | 10_000 |
 | Morale | 9_500 | 10_000 |
 | Sharpness | 9_600 | 10_000 |
 
-### 6.4 Cohesion
-
-The mean familiarity of the players on the pitch, less `OutOfPositionCohesionPenaltyBasisPoints` = 1_400
-for each makeshift player, expressed on the rating scale. A side where everyone fits is worth a
-maximum-attribute player; a side of misfits is worth correspondingly less. It takes no tactical modifier,
-because no instruction changes how well a player suits a job.
-
-### 6.5 Tactical modifiers (`engine-tactical-v1`)
+### 6.5 Tactical modifiers (`engine-tactical-v2`)
 
 Every instruction has a cost as well as a benefit, and this is where that is enforced. Each unit's
 modifier is the sum of the applicable deltas, then clamped to `MinTacticalModifierBasisPoints` = 8_800 …
@@ -237,16 +240,16 @@ three attribute points.
 
 | Instruction | Effect on units |
 |---|---|
-| Mentality | Attacking: +creation, +finishing, −defensive shape, −fitness. Defensive: the reverse. |
-| Tempo | High: +creation, −fitness, shorter possessions, faster fatigue. Low: the reverse. |
+| Mentality | Attacking: +creation, +finishing, −defensive shape. Defensive: the reverse. |
+| Tempo | High: +creation, shorter possessions, faster fatigue. Low: the reverse. |
 | Passing | Short: +build-up. Direct: −build-up, slightly +creation. |
-| Width | Wide: +creation, +set pieces, −defensive shape, −build-up. Narrow: the reverse. |
-| Pressing | High press: +defensive pressure, +creation, −defensive shape, −fitness, faster fatigue. Low block: the reverse. |
+| Width | Wide: +creation, −defensive shape, −build-up. Narrow: the reverse. |
+| Pressing | High press: +defensive pressure, +creation, −defensive shape, faster fatigue. Low block: the reverse. |
 | Defensive line | High: +build-up, +defensive pressure, −defensive shape. Deep: the reverse. |
 | Tackling | Aggressive: +defensive pressure, −defensive shape, **and more fouls, more cards, more suspensions** (see §7.3). Stay on feet: the reverse. |
-| Time wasting | Costs creation, buys defensive shape. |
+| Time wasting | Costs creation, buys defensive shape; while it applies (on, or situational and ahead) possessions run longer (§7.9). |
 
-Goalkeeping and cohesion take no tactical modifier. The bound is what keeps attributes dominant
+Goalkeeping takes no tactical modifier. The bound is what keeps attributes dominant
 (`INS-9`): the worst possible instruction set does not overturn a whole division of quality — a 16-ability
 side under the most hampering instructions still out-rates a 9-ability side under the best ones
 (`UnitRatingTests.The_bounds_leave_attributes_in_charge`).
@@ -297,15 +300,18 @@ three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` onc
    `BuildUp − opponent.DefensivePressure`. The home share is
    `5_000 + swing(4000 per 1000 differential) + 120`, clamped to **2_000…8_000** so neither side is ever
    shut out of a match.
-2. **The clock advances** — its start was read first — and both sides pay the load (§7.5).
+2. **The clock advances** — its start was read first — and both sides pay the load (§7.5). Once a minute of
+   play, both sides' unit ratings are refreshed together, so tiredness, morale, the scoreline, and a man
+   down reach them (`MatchState.RefreshRatings`, `engine-v6`).
 3. **The substitution planner runs** (§7.6).
 4. **The passage is planned.** The possession starts at the restart's spot, or at `MatchState.Ball` — where
    the previous possession left it. `PassagePlanner` draws 3–8 touches that advance the ball toward the far
    goal with lateral drift, so the approach runs from the start to the possession's **pressure point** (the
    middle-to-attacking third), plus every point an outcome could need: the final-third entry point, the box,
    the corner, and the strike targets (§7.3).
-5. **The defending side's foul** (`BaseFoulBasisPoints` = 1_100 per possession, ×13_500 aggressive /
-   ×8_200 stay-on-feet). A foul ends the possession. 120 bp of fouls are **penalties**: the attack is played
+5. **The defending side's foul** (`BaseFoulBasisPoints` = 780 per possession, ×13_500 aggressive /
+   ×8_200 stay-on-feet, and ±15% at most for the side's Aggression and Tackling, §7.9). A foul ends the
+   possession. 40 bp of fouls are **penalties**: the attack is played
    into the box, the defender brings the attacker down, and the ball is set on the spot (§7.3). A foul from
    `FreeKickShootingRangeX` (6_500) onwards becomes a **direct free kick** 4_500 bp of the time
    (`FreeKickAwardBasisPoints`); in range (`FreeKickAttemptBasisPoints` = 3_000) it is struck at goal, and
@@ -320,15 +326,17 @@ three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` onc
    (`OffsideShareOfTurnoverBasisPoints` = 800) — a through ball to the offside line, ahead of the ball, and a
    free kick for the defending side — or a plain turnover, cleared towards the middle third.
 8. **The carrier's 1v1 ground duel** (engine-v3), at the final-third entry point: the carrier is drawn by
-   dribbling and the tackler by tackling, and the winner buys (or loses) `DribbleCreationBonusBasisPoints` =
-   1_200 of creation. A lost duel does not end the passage; a tackled attack regrouping is the ordinary rhythm.
+   dribbling and the tackler by tackling, each weighted by his band (§7.9), and the winner buys (or loses)
+   `DribbleCreationBonusBasisPoints` = 1_200 of creation. A lost duel does not end the passage unless the
+   defender fouled (`engine-v6`): a foul brings a free kick, a penalty (`DuelFoulPenaltyBasisPoints` = 300), or
+   a card, and ends the possession.
 9. **Creation**: `2_400 ± swing(2800)` against
    `(Creation + Finishing/2) − (DefensiveShape + Goalkeeping/2)`, plus the duel bonus, clamped to
    **1_100…6_200**, then multiplied by the scoreline effect (§7.4). A failure is a corner
    (`CornerShareOfFailedCreationBasisPoints` = 1_200) — the ball goes out over the goal line, is set down at
    the flag, and is delivered into the box — or a turnover, cleared towards the middle third. A corner becomes a
-   headed chance 3_400 bp of the time; the aerial duel then decides whether the attacker gets a shot, and a
-   delivery that is not headed at goal is cleared.
+   headed chance 3_400 bp of the time, moved by the corner taker's delivery (§7.9); the aerial duel then
+   decides whether the attacker gets a shot, and a delivery that is not headed at goal is cleared.
 10. **The chance** (§7.3). The ball is played on to the shot point and struck from there; the event is
     stamped where the shot was taken from.
 11. **The possession ends.** The injury roll is taken, the ball is placed at the restart's spot when one is
@@ -336,16 +344,21 @@ three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` onc
 
 ### 7.3 Shot resolution
 
-The shooter is drawn weighted by the attribute the chance asks for — `Finishing` in open play, `Heading`
-from a corner — over the outfield players in slot order. The penalty taker is not drawn: it is the best
-finisher on the pitch, ties broken by identity.
+The shooter is drawn weighted by the effective skill the chance asks for — `Finishing` in open play,
+`Heading` from a corner — over the outfield players in slot order. The penalty taker is not drawn: it is the
+best finisher on the pitch, ties broken by identity.
 
 ```text
 zoneMultiplier  = central 15_000 | inside 10_000 | wide 8_000
-base            = BaseShotGoalBasisPoints (845) × zoneMultiplier / 10_000
-contest         = shooterAttribute − (opponent Goalkeeping rating / AttributeRatingFactor)
-goalChance      = clamp(base + swing(contest, 1900 per 1000), 220, 5_600)
+base            = BaseShotGoalBasisPoints (865) × zoneMultiplier / 10_000
+contest         = shooter's effective skill − (opponent Goalkeeping rating / AttributeRatingFactor)   (hundredths of an attribute point)
+goalChance      = clamp(base + swing(contest, ShotQualitySwingBasisPoints = 1_900 per ShotContestReference = 150 points), 220, 5_600)
 ```
+
+Through `engine-v5` the swing was applied per 1,000 — the rating-scale reference — to a gap of at most 19 on
+the attribute scale, so the whole skill range moved a shot by about a third of a percentage point.
+`ShotContestReference` is the shot's own reference (ADR-0054), shared by the save and free-kick contests and
+the penalty.
 
 One draw resolves the goal. If it does not score, one further draw splits the failure:
 
@@ -356,7 +369,9 @@ One draw resolves the goal. If it does not score, one further draw splits the fa
 | Saved | `BaseSaveBasisPoints` = 5_000 ± swing, clamped to 2_500…7_500 | `ShotSaved` |
 | Off target | the remainder | `ShotOffTarget` |
 
-A penalty is 7_600 bp and is its own event pair: `PenaltyAwarded`, then `PenaltyGoal` or `PenaltyMissed`. It
+A penalty is `PenaltyGoalBasisPoints` = 7_600 bp for an average taker and keeper, moved by the taker's
+Finishing and Composure against the goalkeeper's Reflexes (`PenaltyQualitySwingBasisPoints` = 3_000 per
+reference), clamped to 5_500…9_400, and is its own event pair: `PenaltyAwarded`, then `PenaltyGoal` or `PenaltyMissed`. It
 is a *placement* — the ball is set on the spot — and then a strike. The engine records a miss as
 `PenaltyMissed` and no more; whether it is shown being saved or put wide is the geometry stream's choice
 (`PenaltySavedShareBasisPoints` = 6_000) and cannot move a result.
@@ -376,8 +391,8 @@ the possession's geometry draws, so the outcome picks one and the draws place it
 A **direct free kick** in range is its own resolution (engine-v4). The taker is the best set-piece/finishing
 player on the pitch; the ball is placed at the pressure point where the foul was committed, so
 `attackingX >= FreeKickShootingRangeX` is genuinely reachable — a foul deep in the attacking third can now
-produce a `free_kick_shot`. Its baseline is `FreeKickGoalBasisPoints` = 900, moved by the set-piece-versus-
-goalkeeping differential (`FreeKickQualitySwingBasisPoints` = 1_400); a non-goal is saved
+produce a `free_kick_shot`. Its baseline is `FreeKickGoalBasisPoints` = 900, moved by the taker's Set pieces against the goalkeeper's
+Reflexes on the shot reference (`FreeKickQualitySwingBasisPoints` = 1_400); a non-goal is saved
 (`FreeKickSavedShareBasisPoints` = 4_500), blocked (`FreeKickBlockedShareBasisPoints` = 2_500), or hits the
 woodwork (`FreeKickWoodworkShareBasisPoints` = 800). A free kick that is not struck directly is crossed
 into the box. Measured on even sides it occurs about **1.5 times per match**, with the goal and shot bands
@@ -403,7 +418,13 @@ cap is deliberate — a settled game should finish 3-1 rather than 6-1, not beco
 Every possession, every player on the pitch loses condition and gains fatigue, scaled by their side's own
 instructions (high tempo ×12_000, low ×8_500, high press ×11_500, low block ×8_000) and gains sharpness.
 Half-time gives back 900 bp of condition and sheds 1_200 bp of fatigue. Morale drifts with the scoreline —
-+90 bp per goal scored, −70 per goal conceded — bounded to ±600 bp from its kickoff value.
++90 bp per goal scored, −70 per goal conceded — bounded to ±600 bp from its kickoff value. The best
+**Leadership** on the pitch scales the shift (`engine-v6`): 400 bp per point above `LeadershipReference` = 13,
+bounded to 6_000…14_000, so a strong leader sharpens a lift and softens a blow.
+
+Each outfield player's condition loss is also scaled by his own **Stamina** (`engine-v6`): 350 bp per point
+from `StaminaReference` = 13, so a 20 tires about 25% slower and a 6 about 25% faster, bounded to 6_000…15_000.
+Goalkeepers are exempt. What the lost condition costs is in §6.3.
 
 Condition loss is calibrated so a player who stays on ends near 55–60% and the planner has somebody to
 replace. Recovery and load are tuned together: a half-time recovery that undoes a whole half leaves a side
@@ -471,6 +492,36 @@ and without it (`PassageTests.Recording_the_film_never_changes_the_result`). Sin
   player, the winner and the loser of an aerial duel, and the player caught offside.
 
 ---
+
+### 7.9 The skill model (`engine-v6`)
+
+*(ADR-0054.)* Every duel and every rating reads **effective skill** (§6.3): sheet value × position fit × the
+tiredness drop for its family × fatigue, morale, and sharpness.
+
+- **Duels read effective skills.** Scores are built in hundredths of an attribute point and the reference is
+  scaled to match, so a duel's curve is unchanged for fresh players in position. A player a man short is worth
+  `DuelShortHandedPenaltyBasisPoints` = 9_800 per missing player — much milder than the ratings'. The duel's
+  weights, the 15%–85% clamp, and the tackling nudge (+6 aggressive, −4 on feet) are rules constants.
+- **Duels pick their players by band.** The carrier is drawn by Dribbling × a band weight (defence 1,
+  midfield 3, attack 4) and the tackler by Tackling × (defence 4, midfield 3, attack 1), so a striker is rarely
+  the tackler. A `DuelContender` carries the player and how many of his side are missing.
+- **A lost duel can end in a foul.** The defender's foul chance is `DuelFoulBasisPoints` = 1_200 (×16_000
+  aggressive, ×6_000 on feet), moved by his Aggression and Tackling. The possession ends as a penalty
+  (`DuelFoulPenaltyBasisPoints` = 300), a free kick in range, or a quick restart, and a card is drawn after.
+  The per-possession foul chance was lowered from 1_100 to 780 so a match still has about 21 fouls.
+- **Aggression and Tackling set the foul rate.** A side's average Aggression above 13 raises its foul chance
+  100 bp a point and its average Tackling above 13 lowers it 100 bp a point, bounded to ±1_500 bp.
+- **Corners have a taker.** Drawn from the outfield by (Set pieces + Crossing) / 2. His delivery edge over
+  `CornerDeliveryBaseline` = 13 adds to the header contest (`CornerDeliveryAerialWeight` = 4) and moves the
+  chance a corner is headed at goal (60 bp a point, 1_500…6_000).
+- **Time wasting follows the score and the clock.** Situational applies only while the side leads, on applies
+  always (the rating penalty is applied at the minute refresh); while it applies the side's possessions run
+  `TimeWastingPossessionSecondsMultiplierBasisPoints` = 12_500 longer, so it has fewer of them.
+
+**What `engine-v6` retuned.** Removing the 1.05 condition ceiling made every rating about 5% smaller and so
+every rating differential smaller; `RatingDifferentialReference` 1_000 → 950 restores the ability curve and
+`HomeAdvantageBasisPoints` 10_380 → 10_420 the home edge. `BaseShotGoalBasisPoints` 845 → 865 puts goals back
+at 2.90, and `ShortHandedPenaltyBasisPoints` 6_400 → 6_700 keeps a sending-off at about 1.4 goals.
 
 ## 8. Output
 
@@ -625,7 +676,8 @@ stays on the pitch).
 | `TrailingCreationStepBasisPoints` | 600 | |
 | `MaxGameStateModifierBasisPoints` | 3_000 | The bound on the scoreline effect. |
 | `MinShotGoalBasisPoints` / `Max` | 220 / 5_600 | No chance is impossible or a formality. |
-| `BaseShotGoalBasisPoints` | 845 | An average chance, inside channel. |
+| `BaseShotGoalBasisPoints` | 865 | An average chance, inside channel. |
+| `ShotContestReference` | 150 | The attribute-scale gap at which a shot, save, free-kick, or penalty swing is applied in full. |
 | `ShotQualitySwingBasisPoints` | 1_900 | Per full reference differential. |
 | `CentralZoneMultiplierBasisPoints` | 15_000 | |
 | `InsideZoneMultiplierBasisPoints` | 10_000 | The reference case. |
@@ -634,7 +686,11 @@ stays on the pitch).
 | `BlockedShareBasisPoints` | 2_600 | |
 | `BaseSaveBasisPoints` | 5_000 | |
 | `MinSaveBasisPoints` / `Max` | 2_500 / 7_500 | |
-| `PenaltyGoalBasisPoints` | 7_600 | |
+| `PenaltyGoalBasisPoints` | 7_600 | For an average taker and keeper. |
+| `PenaltyQualitySwingBasisPoints` / `PenaltyMinGoalBasisPoints` / `Max` | 3_000 / 5_500 / 9_400 | The taker-versus-keeper swing and its bounds. |
+| `CornerDeliveryBaseline` / `CornerDeliveryAerialWeight` / `CornerDeliveryChanceStepBasisPoints` | 13 / 4 / 60 | A corner taker's delivery edge. |
+| `CornerChanceMinBasisPoints` / `Max` | 1_500 / 6_000 | Bounds on a corner becoming a headed chance. |
+| `ShotZoneCentralPercent` / `InsidePercent` / `WidePercent` | 40 / 20 / 10 | The open-play shot zones: one central, two inside, two wide. |
 | `MinPassageTouches` / `Max` | 3 / 8 | Touches a possession's passage is built from. |
 | `MinTouchAdvanceBasisPoints` / `Max` | 350 / 1_700 | How far one touch advances the ball. |
 | `MaxTouchLateralDriftBasisPoints` | 1_600 | How far a touch may drift across the pitch. |
@@ -657,7 +713,6 @@ stays on the pitch).
 | `FreeKickSavedShareBasisPoints` | 4_500 | Of non-goal free kicks. |
 | `FreeKickBlockedShareBasisPoints` | 2_500 | |
 | `FreeKickWoodworkShareBasisPoints` | 800 | |
-| `FreeKickFoulCardBasisPoints` | 2_200 | A free-kick foul is booked slightly more often. |
 | `ScrambleCutMinBasisPoints` / `Max` | 500 / 2_500 | How far along its approach a lost scramble is cut (`engine-v5`). |
 | `ProgressionCutMinBasisPoints` / `Max` | 4_000 / 8_000 | How far along its approach a failed progression is cut. |
 | `EntryFractionMinBasisPoints` / `Max` | 3_000 / 7_000 | Where, between the pressure point and the shot point, the ball enters the final third. |
@@ -687,10 +742,16 @@ stays on the pitch).
 | `DuelFoulBasisPoints` | 1_200 | Chance a lost ground duel is a foul. |
 | `AggressiveTacklingDuelFoulMultiplierBasisPoints` | 16_000 | |
 | `StayOnFeetDuelFoulMultiplierBasisPoints` | 6_000 | |
-| `DuelYellowCardBasisPoints` | 1_800 | |
-| `DuelRedCardBasisPoints` | 150 | |
+| `DuelMinWinBasisPoints` / `Max` | 1_500 / 8_500 | The clamp on every duel. |
+| `AggressiveTacklingDuelScoreBonus` / `StayOnFeetDuelScorePenalty` | 6 / 4 | The tackling nudge, in attribute points. |
+| `GroundDuel*Weight`, `AerialDuel*Weight`, `Scramble*Weight` | 4/3/3, 4/3/3, 5/3/2, 3/3/2 | The skills each duel reads. |
+| `DuelTackler*Weight` / `DuelCarrier*Weight` | 4/3/1, 1/3/4 | Band weights (defence/midfield/attack) in drawing the two players. |
+| `DuelShortHandedPenaltyBasisPoints` | 9_800 | Per missing player, on a duel skill. |
+| `DuelFoulPenaltyBasisPoints` | 300 | A duel foul that is a penalty. |
 | `ShorthandedConditionLossMultiplierBasisPoints` | 12_500 | Per man short, as cover tires. |
-| `BaseFoulBasisPoints` | 1_100 | Per possession, by the defending side. |
+| `BaseFoulBasisPoints` | 780 | Per possession, by the defending side. |
+| `FoulSkillReference` / `AggressionFoulStepBasisPoints` / `TacklingFoulStepBasisPoints` / `MaxFoulSkillAdjustBasisPoints` | 13 / 100 / 100 / 1_500 | How Aggression and Tackling move the foul rate. |
+| `TimeWastingPossessionSecondsMultiplierBasisPoints` | 12_500 | Longer possessions while time wasting applies. |
 | `AggressiveTacklingFoulMultiplierBasisPoints` | 13_500 | |
 | `StayOnFeetFoulMultiplierBasisPoints` | 8_200 | |
 | `YellowCardPerFoulBasisPoints` | 1_600 | |
@@ -717,19 +778,20 @@ stays on the pitch).
 | `ConditionSubstitutionThresholdBasisPoints` | 6_800 | |
 | `MinimumConditionAdvantageBasisPoints` | 1_200 | |
 | `AttributeRatingFactor` | 50 | Rating units per attribute point. |
-| `ConditionFactorFloorBasisPoints` / `Ceiling` | 8_500 / 10_500 | |
+| `TiredPhysicalDropBasisPoints` / `Technical` / `Mental` | 4_000 / 2_000 / 1_000 | The drop in a skill at zero condition. |
+| `StaminaReference` / `StaminaConditionLossStepBasisPoints` | 13 / 350 | How Stamina scales condition loss, bounded 6_000…15_000. |
+| `LeadershipReference` / `LeadershipMoraleStepBasisPoints` | 13 / 400 | How the best leader scales morale shifts, bounded 6_000…14_000. |
 | `FatigueFactorFloorBasisPoints` / `Ceiling` | 8_750 / 10_000 | |
 | `MoraleFactorFloorBasisPoints` / `Ceiling` | 9_500 / 10_000 | |
 | `SharpnessFactorFloorBasisPoints` / `Ceiling` | 9_600 / 10_000 | |
 | `MaxUnitRating` | 1_150 | |
-| `RatingDifferentialReference` | 1_000 | The differential at which a swing is applied in full. |
+| `RatingDifferentialReference` | 950 | The rating differential at which a swing is applied in full. |
 | `MaxTacticalModifierBasisPoints` / `Min` | 11_500 / 8_800 | `INS-9`. |
 | `OutOfPositionPenaltyBasisPoints` | 8_800 | `INS-10`. |
 | `SecondaryPositionPenaltyBasisPoints` | 9_600 | |
 | `UnfamiliarRolePenaltyBasisPoints` | 9_400 | |
-| `OutOfPositionCohesionPenaltyBasisPoints` | 1_400 | Subtracted from cohesion, not a multiplier. |
-| `ShortHandedPenaltyBasisPoints` | 6_400 | Per player below eleven. |
-| `HomeAdvantageBasisPoints` | 10_380 | A ~4% multiplier on the home side's ratings. |
+| `ShortHandedPenaltyBasisPoints` | 6_700 | Per player below eleven. |
+| `HomeAdvantageBasisPoints` | 10_420 | A ~4% multiplier on the home side's ratings. |
 | `RatingBaseBasisPoints` | 6_000 | Where a player's match rating starts. |
 | `RatingWinBonusBasisPoints` / `RatingDrawBonusBasisPoints` / `RatingLossPenaltyBasisPoints` | 600 / 120 / 350 | The result's contribution, weighted by minutes. |
 | `RatingGoalBonusBasisPoints` / `RatingAssistBonusBasisPoints` | 1_000 / 450 | Per goal and per assist. |
@@ -737,15 +799,12 @@ stays on the pitch).
 | `RatingYellowPenaltyBasisPoints` / `RatingRedPenaltyBasisPoints` | 350 / 1_400 | Per booking and per sending-off. |
 | `RatingMinBasisPoints` / `RatingMaxBasisPoints` | 1_000 / 10_000 | The clamp on a rating. |
 | `LiveRatingBaseBasisPoints` | 6_000 | Where a player's live rating starts (`engine-v3`). |
-| `LiveRatingPassBonusBasisPoints` / `KeyPassBonusBasisPoints` | 30 / 300 | A completed pass and a chance-creating one. |
 | `LiveRatingTackleBonusBasisPoints` / `TackleLostPenaltyBasisPoints` | 120 / 80 | A tackle won and lost. |
-| `LiveRatingInterceptionBonusBasisPoints` | 80 | An interception. |
 | `LiveRatingAerialBonusBasisPoints` / `AerialLostPenaltyBasisPoints` | 80 / 50 | An aerial duel won and lost. |
 | `LiveRatingShotBonusBasisPoints` / `ShotMissPenaltyBasisPoints` | 100 / 40 | A shot on and off target. |
 | `LiveRatingGoalBonusBasisPoints` / `AssistBonusBasisPoints` | 800 / 450 | A goal and an assist. |
 | `LiveRatingSaveBonusBasisPoints` / `GoalConcededPenaltyBasisPoints` | 250 / 250 | A save and a goal conceded. |
 | `LiveRatingYellowPenaltyBasisPoints` / `RedPenaltyBasisPoints` | 200 / 1_200 | A booking and a sending-off. |
-| `LiveRatingErrorPenaltyBasisPoints` | 600 | An error leading to a goal. |
 | `MinLiveRatingBasisPoints` / `MaxLiveRatingBasisPoints` | 3_000 / 10_000 | The live-rating clamp (pinned constants). |
 
 Two constants are deliberately **not** fields on the rules, because they are contract values rather than
@@ -762,30 +821,34 @@ dotnet run --project tools/simulation-benchmarks -c Release -- all 20000
 ```
 
 Run over **20,000 matches** between evenly matched 13/20 sides, on a 16-logical-core Windows machine
-(`engine-v5`, rules hash `7b89da86…`):
+(`engine-v6`, rules hash `e090db39…`):
 
 | Measure | Measured | Target |
 |---|---|---|
 | Goals per match | 2.90 | 2.5 – 3.0 |
-| Home / away goals | 1.56 / 1.34 | 1.3 – 1.9 / 1.0 – 1.5 |
-| Home win / draw / away win | 42.9% / 24.7% / 32.4% | 40 – 50 / 20 – 30 / 25 – 35 |
-| Shots per match | 27.4 | 20 – 32 |
-| Home possession | 52.0% | 50 – 54 |
-| Fouls per match | 21.2 | 18 – 26 |
-| Yellows per match | 3.39 | 3.0 – 5.0 |
+| Home / away goals | 1.58 / 1.32 | 1.3 – 1.9 / 1.0 – 1.5 |
+| Home win / draw / away win | 43.6% / 24.7% / 31.8% | 40 – 50 / 20 – 30 / 25 – 35 |
+| Shots per match | 27.2 | 20 – 32 |
+| Home possession | 52.1% | 50 – 54 |
+| Fouls per match | 21.4 | 18 – 26 |
+| Yellows per match | 3.40 | 3.0 – 5.0 |
 | Reds per match | 0.28 | 0.10 – 0.35 |
 | Injuries per match | 0.43 | 0.20 – 0.60 |
-| Penalties per match | 0.25 | 0.15 – 0.40 |
+| Penalties per match | 0.24 | 0.15 – 0.40 |
 | Substitutions per match | 7.7 | 4.0 – 10.0 |
 | p99 total goals | 7 | 6 – 8 |
-| Matches with 7+ goals | 2.80% | < 3.0% |
+| Matches with 7+ goals | 2.79% | < 3.0% |
 
-Calibration invariants (10,000 fixtures): home advantage worth **+4.2 points** (target ~+4); a three-ability-
-point favourite upset **16.4%** of the time (target ~15); a side sent off early finishes **1.37 goals** worse
-(target ~1.2, measured over 10,000 fixtures — `engine-v4` measures 1.37 on the same sample; the 1.16 quoted
-before was a 2,000-fixture estimate); a high-pressing side is measurably more tired by the 80th minute (gap
-~1,730 bp) and a fresh substitute measurably fresher than the tired defenders (~1,783 bp). Free kicks in
-shooting range occur about **1.5 per match**, with the goal and shot bands held.
+Calibration invariants (10,000 fixtures): home advantage worth **+4.0 points** (target ~+4); a three-ability-
+point favourite upset **17.2%** of the time (target ~15; `engine-v5` measured 16.4% on the same sample size,
+a standard error of about 0.8 points); a side sent off early finishes **1.45 goals** worse (target ~1.2,
+band 0.9 – 1.5, measured over 2,000 fixtures); a high-pressing side is measurably more tired by the 80th
+minute (gap ~1,730 bp) and a fresh substitute measurably fresher than the tired defenders (~1,783 bp). Free
+kicks in shooting range occur about **1.5 per match** and fouls in the final third now come from the duel.
+
+The `engine-v6` run holds every `engine-v5` band, and the shape changed where the audit said it should: a
+better finisher or goalkeeper counts at the shot, a tired player is worse, and a poor tackler fouls more.
+`engine-v6` retuning is in §7.9.
 
 **What `engine-v5` retuned, and why.** Giving the second half its true length, and letting the fouled side keep
 the ball after a foul, raised every volume statistic about five per cent over `engine-v4` — goals 3.05 and

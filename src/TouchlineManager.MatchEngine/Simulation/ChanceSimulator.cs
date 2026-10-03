@@ -83,7 +83,10 @@ internal static class ChanceSimulator
 
         var goalkeeper = defender.Goalkeeper?.Participant.ParticipantId;
 
-        if (state.Random.RollBasisPoints(state.Rules.PenaltyGoalBasisPoints))
+        // The taker's finishing and composure against the keeper's reflexes (engine-v6); before it was a flat 76%.
+        var penaltyChance = SetPieceDirector.PenaltyGoalChance(taker, defender.Goalkeeper, state.Rules);
+
+        if (state.Random.RollBasisPoints(penaltyChance))
         {
             Score(state, side, taker);
 
@@ -94,7 +97,7 @@ internal static class ChanceSimulator
                 taker.Participant.ParticipantId,
                 goalkeeper,
                 ShotZone.Central,
-                state.Rules.PenaltyGoalBasisPoints,
+                penaltyChance,
                 at: strike.Origin);
 
             // The conversion and the beaten keeper, on the live scale (engine-v3).
@@ -127,7 +130,7 @@ internal static class ChanceSimulator
                 taker.Participant.ParticipantId,
                 goalkeeper,
                 ShotZone.Central,
-                state.Rules.PenaltyGoalBasisPoints,
+                penaltyChance,
                 at: strike.Origin);
 
             // A missed penalty is a shot that did not test anybody worth naming (engine-v3).
@@ -137,6 +140,31 @@ internal static class ChanceSimulator
             state.RestartFromGoalArea(defender.Which, saved ? PassageRestartKind.KeeperBall : PassageRestartKind.GoalKick);
         }
     }
+
+    /// <summary>
+    /// Chooses who takes a corner: the side's outfield players, weighted by their set pieces and crossing
+    /// (`engine-v6`).
+    /// </summary>
+    /// <param name="state">The match state.</param>
+    /// <param name="side">The side taking the corner.</param>
+    /// <returns>The taker, or null when the side has nobody to take it.</returns>
+    public static ActiveSlot? ChooseCornerTaker(MatchState state, MatchSide side) =>
+        WeightedPick.From(
+            state.SideOf(side).Outfield,
+            slot => DeliveryOf(slot, state.Rules),
+            state.Random);
+
+    /// <summary>
+    /// Gets how much better than the baseline a corner taker's delivery is, in hundredths of an attribute point.
+    /// </summary>
+    /// <param name="taker">The corner taker.</param>
+    /// <param name="rules">The rules in force.</param>
+    public static int CornerDeliveryEdge(ActiveSlot taker, EngineRulesV2 rules) =>
+        DeliveryOf(taker, rules) - (rules.CornerDeliveryBaseline * EffectiveSkill.Scale);
+
+    private static int DeliveryOf(ActiveSlot slot, EngineRulesV2 rules) =>
+        (EffectiveSkill.Hundredths(slot, MatchAttributeName.SetPieces, rules)
+            + EffectiveSkill.Hundredths(slot, MatchAttributeName.Crossing, rules)) / 2;
 
     /// <summary>
     /// Resolves a header from a corner, contested with the defender marking it (engine-v3).
@@ -149,15 +177,16 @@ internal static class ChanceSimulator
     /// <param name="state">The match state.</param>
     /// <param name="side">The side taking the corner.</param>
     /// <param name="strike">Where the header finishes, for each outcome it could have.</param>
+    /// <param name="deliveryEdge">How much better than the baseline the taker's delivery was, in hundredths of an attribute point.</param>
     /// <returns>Whether the attacker won the header and it became a chance on goal.</returns>
-    public static bool ResolveCorner(MatchState state, MatchSide side, StrikePlan strike)
+    public static bool ResolveCorner(MatchState state, MatchSide side, StrikePlan strike, int deliveryEdge)
     {
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
         var headerer = ChooseShooter(state, attacker, MatchAttributeName.Heading);
         var marker = WeightedPick.From(
             defender.Outfield,
-            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.Heading),
+            slot => EffectiveSkill.Hundredths(slot, MatchAttributeName.Heading, state.Rules),
             state.Random);
 
         if (headerer is null || marker is null)
@@ -165,10 +194,13 @@ internal static class ChanceSimulator
             return false;
         }
 
+        // A good delivery puts the ball where the header can be won: the taker's edge is added to the
+        // attacker's aerial score (engine-v6).
         var aerial = DuelResolver.ResolveAerialDuel(
-            headerer.Participant,
-            marker.Participant,
+            DuelContender.Of(attacker, headerer),
+            DuelContender.Of(defender, marker),
             side == MatchSide.Home,
+            deliveryEdge * state.Rules.CornerDeliveryAerialWeight,
             state.Rules,
             state.Random);
 
@@ -261,7 +293,7 @@ internal static class ChanceSimulator
         }
 
         var quality = Probability.Differential(
-            shooter.Participant.Attributes.ValueOf(MatchAttributeName.Finishing),
+            EffectiveSkill.Hundredths(shooter, MatchAttributeName.Finishing, state.Rules),
             KeeperQuality(opponent, state.Rules));
 
         var saveChance = Probability.Band(
@@ -269,7 +301,7 @@ internal static class ChanceSimulator
                 + Probability.Swing(
                     quality,
                     state.Rules.ShotQualitySwingBasisPoints,
-                    state.Rules.RatingDifferentialReference),
+                    state.Rules.ShotContestReference * EffectiveSkill.Scale),
             state.Rules.MinSaveBasisPoints,
             state.Rules.MaxSaveBasisPoints);
 
@@ -322,10 +354,10 @@ internal static class ChanceSimulator
         state.AddGoalStoppage();
 
         // Scoring lifts the scorers and drops the conceders, bounded so a rout cannot empty a side's morale.
-        runtime.ShiftMorale(state.Rules.MoraleGainPerGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints);
+        runtime.ShiftMorale(state.Rules.MoraleGainPerGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints, state.Rules);
         state
             .OpponentOf(side)
-            .ShiftMorale(-state.Rules.MoraleLossPerConcededGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints);
+            .ShiftMorale(-state.Rules.MoraleLossPerConcededGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints, state.Rules);
     }
 
     /// <summary>
@@ -352,16 +384,12 @@ internal static class ChanceSimulator
 
         var baseChance = Probability.Apply(rules.BaseShotGoalBasisPoints, zoneMultiplier);
 
-        var contest = headed
-            ? Probability.Differential(
-                shooter.Participant.Attributes.ValueOf(MatchAttributeName.Heading),
-                KeeperQuality(defender, rules))
-            : Probability.Differential(
-                shooter.Participant.Attributes.ValueOf(MatchAttributeName.Finishing),
-                KeeperQuality(defender, rules));
+        var contest = Probability.Differential(
+            EffectiveSkill.Hundredths(shooter, headed ? MatchAttributeName.Heading : MatchAttributeName.Finishing, rules),
+            KeeperQuality(defender, rules));
 
         return Probability.Band(
-            baseChance + Probability.Swing(contest, rules.ShotQualitySwingBasisPoints, rules.RatingDifferentialReference),
+            baseChance + Probability.Swing(contest, rules.ShotQualitySwingBasisPoints, rules.ShotContestReference * EffectiveSkill.Scale),
             rules.MinShotGoalBasisPoints,
             rules.MaxShotGoalBasisPoints);
     }
@@ -370,8 +398,8 @@ internal static class ChanceSimulator
     /// Reads the defending side's goalkeeping as a single attribute-scale value.
     /// </summary>
     /// <remarks>
-    /// The Goalkeeping unit rating divided back down to the attribute scale, so it can be compared against a
-    /// shooter's own attribute. One measure for every shot is deliberate: the alternative — reading specific
+    /// The Goalkeeping unit rating divided back down to the attribute scale, in hundredths of an attribute point
+    /// like <see cref="EffectiveSkill.Hundredths"/>, so it can be compared against a shooter's own skill. One measure for every shot is deliberate: the alternative — reading specific
     /// goalkeeper attributes per shot type — would let a headed chance and a placed shot disagree about how
     /// good the same goalkeeper is.
     /// <para>
@@ -381,7 +409,7 @@ internal static class ChanceSimulator
     /// </para>
     /// </remarks>
     private static int KeeperQuality(SideRuntime defender, EngineRulesV2 rules) =>
-        defender.Ratings.Goalkeeping / rules.AttributeRatingFactor;
+        defender.Ratings.Goalkeeping * EffectiveSkill.Scale / rules.AttributeRatingFactor;
 
     /// <summary>
     /// Chooses the shooter, weighted by the attribute the chance asks for.
@@ -398,7 +426,7 @@ internal static class ChanceSimulator
 
         return WeightedPick.From(
             outfield,
-            slot => slot.Participant.Attributes.ValueOf(attribute),
+            slot => EffectiveSkill.Hundredths(slot, attribute, state.Rules),
             state.Random);
     }
 

@@ -175,7 +175,7 @@ public sealed record EngineRulesV2
     public int CornerChanceBasisPoints { get; init; } = 3_400;
 
     /// <summary>The chance a foul is committed inside the box and becomes a penalty.</summary>
-    public int PenaltyFromFoulBasisPoints { get; init; } = 120;
+    public int PenaltyFromFoulBasisPoints { get; init; } = 40;
 
     /// <summary>
     /// The margin at which a settled scoreline starts to change how a side plays.
@@ -214,7 +214,7 @@ public sealed record EngineRulesV2
     /// any game-state effect thins it — so this constant and <see cref="GameStateMarginThresholdGoals"/> were
     /// tuned together against a measured distribution rather than guessed at.
     /// </remarks>
-    public int BaseShotGoalBasisPoints { get; init; } = 845;
+    public int BaseShotGoalBasisPoints { get; init; } = 865;
 
     /// <summary>How much a maximal finishing-versus-goalkeeping differential moves the goal probability.</summary>
     public int ShotQualitySwingBasisPoints { get; init; } = 1_900;
@@ -245,6 +245,52 @@ public sealed record EngineRulesV2
 
     /// <summary>The goal probability of a penalty.</summary>
     public int PenaltyGoalBasisPoints { get; init; } = 7_600;
+
+    /// <summary>
+    /// The attribute-scale gap at which a shot, a save, a penalty, or a free kick contest's swing is applied in
+    /// full (`engine-v6`).
+    /// </summary>
+    /// <remarks>
+    /// These contests compare a shooter's attribute (1–20) with the goalkeeper's rating divided back down to
+    /// the same scale. Through `engine-v5` they converted that gap with <see cref="RatingDifferentialReference"/>,
+    /// which is meant for gaps in the hundreds, so the whole skill range moved a shot by about a third of a
+    /// percentage point. This constant is the shot's own reference, so finishing and goalkeeping can be tuned
+    /// without touching the duel curve.
+    /// </remarks>
+    public int ShotContestReference { get; init; } = 150;
+
+    /// <summary>How far a maximal taker-versus-keeper gap moves a penalty's goal chance.</summary>
+    public int PenaltyQualitySwingBasisPoints { get; init; } = 3_000;
+
+    /// <summary>The floor on a penalty's goal chance, so a penalty can never be hopeless.</summary>
+    public int PenaltyMinGoalBasisPoints { get; init; } = 5_500;
+
+    /// <summary>The ceiling on a penalty's goal chance, so a penalty can never be a formality.</summary>
+    public int PenaltyMaxGoalBasisPoints { get; init; } = 9_400;
+
+    /// <summary>The attribute a corner taker's delivery is measured against, so an average taker adds nothing.</summary>
+    public int CornerDeliveryBaseline { get; init; } = 13;
+
+    /// <summary>How much of a corner taker's delivery edge is added to the header contest's attacking score.</summary>
+    public int CornerDeliveryAerialWeight { get; init; } = 4;
+
+    /// <summary>How far each point of a corner taker's delivery edge moves the chance a corner is headed at goal.</summary>
+    public int CornerDeliveryChanceStepBasisPoints { get; init; } = 60;
+
+    /// <summary>The floor on the chance a corner produces a headed chance, after the taker's delivery.</summary>
+    public int CornerChanceMinBasisPoints { get; init; } = 1_500;
+
+    /// <summary>The ceiling on the chance a corner produces a headed chance, after the taker's delivery.</summary>
+    public int CornerChanceMaxBasisPoints { get; init; } = 6_000;
+
+    /// <summary>The share of open-play shots taken from the central zone, in percent.</summary>
+    public int ShotZoneCentralPercent { get; init; } = 40;
+
+    /// <summary>The share of open-play shots taken from each inside channel, in percent.</summary>
+    public int ShotZoneInsidePercent { get; init; } = 20;
+
+    /// <summary>The share of open-play shots taken from each wide zone, in percent.</summary>
+    public int ShotZoneWidePercent { get; init; } = 10;
 
     // ---- Spatial play (engine-v3) ----------------------------------------------------------------
 
@@ -307,6 +353,78 @@ public sealed record EngineRulesV2
     /// </remarks>
     public int UnderdogVarianceBasisPoints { get; init; } = 1_200;
 
+    /// <summary>The floor on any duel's win chance, so no duel is certain.</summary>
+    public int DuelMinWinBasisPoints { get; init; } = 1_500;
+
+    /// <summary>The ceiling on any duel's win chance.</summary>
+    public int DuelMaxWinBasisPoints { get; init; } = 8_500;
+
+    /// <summary>What aggressive tackling adds to the defender's duel score, in attribute points.</summary>
+    public int AggressiveTacklingDuelScoreBonus { get; init; } = 6;
+
+    /// <summary>What staying on your feet takes from the defender's duel score, in attribute points.</summary>
+    public int StayOnFeetDuelScorePenalty { get; init; } = 4;
+
+    /// <summary>Weight of Dribbling in the carrier's ground duel score.</summary>
+    public int GroundDuelDribblingWeight { get; init; } = 4;
+
+    /// <summary>Weight of Agility in the carrier's ground duel score.</summary>
+    public int GroundDuelAgilityWeight { get; init; } = 3;
+
+    /// <summary>Weight of Pace in the carrier's ground duel score.</summary>
+    public int GroundDuelPaceWeight { get; init; } = 3;
+
+    /// <summary>Weight of Tackling in the defender's ground duel score.</summary>
+    public int GroundDuelTacklingWeight { get; init; } = 4;
+
+    /// <summary>Weight of Positioning in the defender's ground duel score.</summary>
+    public int GroundDuelPositioningWeight { get; init; } = 3;
+
+    /// <summary>Weight of Strength in the defender's ground duel score.</summary>
+    public int GroundDuelStrengthWeight { get; init; } = 3;
+
+    /// <summary>Weight of Jumping reach in both sides' aerial duel score.</summary>
+    public int AerialDuelJumpingReachWeight { get; init; } = 5;
+
+    /// <summary>Weight of Heading in both sides' aerial duel score.</summary>
+    public int AerialDuelHeadingWeight { get; init; } = 3;
+
+    /// <summary>Weight of Strength in both sides' aerial duel score.</summary>
+    public int AerialDuelStrengthWeight { get; init; } = 2;
+
+    /// <summary>Weight of Pace in both sides' scramble score.</summary>
+    public int ScramblePaceWeight { get; init; } = 3;
+
+    /// <summary>Weight of Acceleration in both sides' scramble score.</summary>
+    public int ScrambleAccelerationWeight { get; init; } = 3;
+
+    /// <summary>Weight of Work rate in both sides' scramble score.</summary>
+    public int ScrambleWorkRateWeight { get; init; } = 2;
+
+    /// <summary>How likely a defender is to be the one in the ground duel, by band: a defender's weight.</summary>
+    public int DuelTacklerDefenceWeight { get; init; } = 4;
+
+    /// <summary>How likely a defender is to be the one in the ground duel, by band: a midfielder's weight.</summary>
+    public int DuelTacklerMidfieldWeight { get; init; } = 3;
+
+    /// <summary>How likely a defender is to be the one in the ground duel, by band: an attacker's weight.</summary>
+    public int DuelTacklerAttackWeight { get; init; } = 1;
+
+    /// <summary>How likely a carrier is to be the one in the ground duel, by band: a defender's weight.</summary>
+    public int DuelCarrierDefenceWeight { get; init; } = 1;
+
+    /// <summary>How likely a carrier is to be the one in the ground duel, by band: a midfielder's weight.</summary>
+    public int DuelCarrierMidfieldWeight { get; init; } = 3;
+
+    /// <summary>How likely a carrier is to be the one in the ground duel, by band: an attacker's weight.</summary>
+    public int DuelCarrierAttackWeight { get; init; } = 4;
+
+    /// <summary>What each missing player multiplies a player's duel skills by, a milder cost than the ratings'.</summary>
+    public int DuelShortHandedPenaltyBasisPoints { get; init; } = 9_800;
+
+    /// <summary>The chance a foul committed in a ground duel, at the edge of the box, is a penalty.</summary>
+    public int DuelFoulPenaltyBasisPoints { get; init; } = 300;
+
     /// <summary>The chance a lost ground duel becomes a foul by the defender.</summary>
     public int DuelFoulBasisPoints { get; init; } = 1_200;
 
@@ -315,12 +433,6 @@ public sealed record EngineRulesV2
 
     /// <summary>What staying on your feet multiplies the duel's foul chance by.</summary>
     public int StayOnFeetDuelFoulMultiplierBasisPoints { get; init; } = 6_000;
-
-    /// <summary>The chance a duel foul is booked.</summary>
-    public int DuelYellowCardBasisPoints { get; init; } = 1_800;
-
-    /// <summary>The chance a duel foul is a straight red.</summary>
-    public int DuelRedCardBasisPoints { get; init; } = 150;
 
     /// <summary>What each man short multiplies the side's condition loss by, as covering teammates tire (Stage 2).</summary>
     public int ShorthandedConditionLossMultiplierBasisPoints { get; init; } = 12_500;
@@ -436,9 +548,6 @@ public sealed record EngineRulesV2
     /// </remarks>
     public int FreeKickShootingRangeX { get; init; } = 6_500;
 
-    /// <summary>The chance a free-kick foul is booked, slightly above an open-play duel's.</summary>
-    public int FreeKickFoulCardBasisPoints { get; init; } = 2_200;
-
     // ---- Restarts and strikes (engine-v5) --------------------------------------------------------
 
     /// <summary>
@@ -545,7 +654,7 @@ public sealed record EngineRulesV2
     // ---- Discipline ------------------------------------------------------------------------------
 
     /// <summary>The baseline chance a possession contains a foul by the defending side.</summary>
-    public int BaseFoulBasisPoints { get; init; } = 1_100;
+    public int BaseFoulBasisPoints { get; init; } = 780;
 
     /// <summary>What aggressive tackling multiplies the foul chance by.</summary>
     public int AggressiveTacklingFoulMultiplierBasisPoints { get; init; } = 13_500;
@@ -561,6 +670,21 @@ public sealed record EngineRulesV2
 
     /// <summary>How much an aggressive side's bookings rise.</summary>
     public int AggressiveTacklingCardMultiplierBasisPoints { get; init; } = 12_500;
+
+    /// <summary>The attribute a side's Aggression and Tackling are measured against when setting its foul rate.</summary>
+    public int FoulSkillReference { get; init; } = 13;
+
+    /// <summary>How far each point of Aggression above the reference raises a foul chance.</summary>
+    public int AggressionFoulStepBasisPoints { get; init; } = 100;
+
+    /// <summary>How far each point of Tackling above the reference lowers a foul chance.</summary>
+    public int TacklingFoulStepBasisPoints { get; init; } = 100;
+
+    /// <summary>The most Aggression and Tackling can move a foul chance, either way.</summary>
+    public int MaxFoulSkillAdjustBasisPoints { get; init; } = 1_500;
+
+    /// <summary>What a side that is wasting time multiplies the length of its possessions by.</summary>
+    public int TimeWastingPossessionSecondsMultiplierBasisPoints { get; init; } = 12_500;
 
     // ---- Fitness ---------------------------------------------------------------------------------
 
@@ -587,6 +711,34 @@ public sealed record EngineRulesV2
     /// <summary>What a low block multiplies condition loss by.</summary>
     public int LowBlockConditionLossMultiplierBasisPoints { get; init; } = 8_000;
 
+    /// <summary>
+    /// The most a player's physical skills fall at zero condition, in basis points (`engine-v6`).
+    /// </summary>
+    /// <remarks>
+    /// A tired player plays below his sheet, and the drop grows linearly with the condition he has lost: none
+    /// when fresh, this much at empty. Physical skills fall furthest, then technical, then mental. Goalkeepers
+    /// are exempt.
+    /// </remarks>
+    public int TiredPhysicalDropBasisPoints { get; init; } = 4_000;
+
+    /// <summary>The most a player's technical skills fall at zero condition, in basis points.</summary>
+    public int TiredTechnicalDropBasisPoints { get; init; } = 2_000;
+
+    /// <summary>The most a player's mental skills fall at zero condition, in basis points.</summary>
+    public int TiredMentalDropBasisPoints { get; init; } = 1_000;
+
+    /// <summary>The Stamina at which a player tires at the normal rate.</summary>
+    public int StaminaReference { get; init; } = 13;
+
+    /// <summary>How much each point of Stamina above the reference slows a player's condition loss.</summary>
+    public int StaminaConditionLossStepBasisPoints { get; init; } = 350;
+
+    /// <summary>The least a player's condition loss can be multiplied by, at the highest Stamina.</summary>
+    public int MinStaminaConditionLossMultiplierBasisPoints { get; init; } = 6_000;
+
+    /// <summary>The most a player's condition loss can be multiplied by, at the lowest Stamina.</summary>
+    public int MaxStaminaConditionLossMultiplierBasisPoints { get; init; } = 15_000;
+
     /// <summary>Fatigue gained per possession at a normal tempo and a normal block, in basis points.</summary>
     public int FatigueGainPerPossessionBasisPoints { get; init; } = 7;
 
@@ -607,6 +759,21 @@ public sealed record EngineRulesV2
 
     /// <summary>Morale lost per goal by the conceding side, in basis points.</summary>
     public int MoraleLossPerConcededGoalBasisPoints { get; init; } = 70;
+
+    /// <summary>The Leadership of the best leader on the pitch at which morale moves at its normal rate.</summary>
+    public int LeadershipReference { get; init; } = 13;
+
+    /// <summary>
+    /// How much each point of the best leader's Leadership above the reference softens a morale loss and
+    /// sharpens a morale gain.
+    /// </summary>
+    public int LeadershipMoraleStepBasisPoints { get; init; } = 400;
+
+    /// <summary>The least a morale shift can be scaled by.</summary>
+    public int MinLeadershipMoraleMultiplierBasisPoints { get; init; } = 6_000;
+
+    /// <summary>The most a morale shift can be scaled by.</summary>
+    public int MaxLeadershipMoraleMultiplierBasisPoints { get; init; } = 14_000;
 
     // ---- Injuries --------------------------------------------------------------------------------
 
@@ -649,12 +816,6 @@ public sealed record EngineRulesV2
     /// 1000, so a rating is a weighted mean of these values.
     /// </summary>
     public int AttributeRatingFactor { get; init; } = 50;
-
-    /// <summary>What a player at zero condition multiplies their ratings by.</summary>
-    public int ConditionFactorFloorBasisPoints { get; init; } = 8_500;
-
-    /// <summary>What a player at full condition multiplies their ratings by.</summary>
-    public int ConditionFactorCeilingBasisPoints { get; init; } = 10_500;
 
     /// <summary>What a player at maximum fatigue multiplies their ratings by.</summary>
     public int FatigueFactorFloorBasisPoints { get; init; } = 8_750;
@@ -732,20 +893,11 @@ public sealed record EngineRulesV2
     /// <summary>The highest a live rating can reach during a match, as a pinned constant of the scale.</summary>
     public const int MaxLiveRatingBasisPoints = 10_000;
 
-    /// <summary>What a completed pass adds to the passer's live rating.</summary>
-    public int LiveRatingPassBonusBasisPoints { get; init; } = 30;
-
-    /// <summary>What a key pass — one that creates a chance — adds.</summary>
-    public int LiveRatingKeyPassBonusBasisPoints { get; init; } = 300;
-
     /// <summary>What a tackle won adds, and what a tackle lost takes.</summary>
     public int LiveRatingTackleBonusBasisPoints { get; init; } = 120;
 
     /// <summary>What a tackle lost takes from the tackler's live rating.</summary>
     public int LiveRatingTackleLostPenaltyBasisPoints { get; init; } = 80;
-
-    /// <summary>What an interception adds.</summary>
-    public int LiveRatingInterceptionBonusBasisPoints { get; init; } = 80;
 
     /// <summary>What an aerial duel won adds.</summary>
     public int LiveRatingAerialBonusBasisPoints { get; init; } = 80;
@@ -777,15 +929,12 @@ public sealed record EngineRulesV2
     /// <summary>What a sending-off takes.</summary>
     public int LiveRatingRedPenaltyBasisPoints { get; init; } = 1_200;
 
-    /// <summary>What an error leading to a goal takes.</summary>
-    public int LiveRatingErrorPenaltyBasisPoints { get; init; } = 600;
-
     /// <summary>
     /// The rating difference at which a swing is applied in full, so the probability formulas can express
     /// "how much a difference of this size moves the chance" rather than a raw per-point coefficient.
     /// Roughly the gap between a mid-table side and a good one.
     /// </summary>
-    public int RatingDifferentialReference { get; init; } = 1_000;
+    public int RatingDifferentialReference { get; init; } = 950;
 
     // ---- Tactical bounds -------------------------------------------------------------------------
 
@@ -807,9 +956,6 @@ public sealed record EngineRulesV2
     /// <summary>What a player in an unfamiliar role within their own family multiplies their ratings by.</summary>
     public int UnfamiliarRolePenaltyBasisPoints { get; init; } = 9_400;
 
-    /// <summary>What playing a player at a role outside their family costs in cohesion.</summary>
-    public int OutOfPositionCohesionPenaltyBasisPoints { get; init; } = 1_400;
-
     /// <summary>
     /// What each player below eleven multiplies the whole side's ratings by, so being a man down costs
     /// more than simply averaging over ten players (master plan §8.5).
@@ -818,7 +964,7 @@ public sealed record EngineRulesV2
     /// Deepened by the Stage 7 calibration: at the previous 8_600 a side sent off before the half hour
     /// finished only about two-fifths of a goal worse off, where the plan asks for about one and a quarter.
     /// </remarks>
-    public int ShortHandedPenaltyBasisPoints { get; init; } = 6_400;
+    public int ShortHandedPenaltyBasisPoints { get; init; } = 6_700;
 
     // ---- Set-piece and home advantage ------------------------------------------------------------
 
@@ -827,7 +973,7 @@ public sealed record EngineRulesV2
     /// Calibrated with the laboratory to about four win-share points over the neutral venue (Stage 7), on
     /// top of the duel and possession bonuses the crowd contributes separately.
     /// </remarks>
-    public int HomeAdvantageBasisPoints { get; init; } = 10_380;
+    public int HomeAdvantageBasisPoints { get; init; } = 10_420;
 
     /// <summary>
     /// Describes every constant canonically, for the configuration hash a result records.
@@ -995,14 +1141,22 @@ public sealed record EngineRulesV2
             problems.Add("The tactical modifier bounds must admit 10000 (no modifier).");
         }
 
-        // A subtractive penalty is not a multiplier: it is taken off a cohesion figure, so it is bounded by
-        // certainty rather than by the multiplier band. Filing it with the multipliers is exactly the mistake
-        // this check exists to catch.
-        if (OutOfPositionCohesionPenaltyBasisPoints is < 0 or > Certain)
+        if (ShotContestReference < 1 || DuelDifferentialReference < 1)
+        {
+            problems.Add("ShotContestReference and DuelDifferentialReference must be positive.");
+        }
+
+        if (ShotZoneCentralPercent + (2 * ShotZoneInsidePercent) + (2 * ShotZoneWidePercent) != 100)
         {
             problems.Add(
-                "OutOfPositionCohesionPenaltyBasisPoints must be subtractable from a cohesion figure in "
-                + $"0..{Certain}, was {OutOfPositionCohesionPenaltyBasisPoints}.");
+                "The shot zone shares must sum to 100: one central, two inside channels, two wide zones, "
+                + $"were {ShotZoneCentralPercent} + 2 x {ShotZoneInsidePercent} + 2 x {ShotZoneWidePercent}.");
+        }
+
+        if (MinLeadershipMoraleMultiplierBasisPoints > MaxLeadershipMoraleMultiplierBasisPoints
+            || MinStaminaConditionLossMultiplierBasisPoints > MaxStaminaConditionLossMultiplierBasisPoints)
+        {
+            problems.Add("The leadership and stamina multiplier bounds must be ordered pairs.");
         }
 
         if (MaxSubstitutions < 0 || MaxSubstitutions > 11)
@@ -1175,9 +1329,6 @@ public sealed record EngineRulesV2
         yield return (nameof(FreeKickBlockedShareBasisPoints), FreeKickBlockedShareBasisPoints);
         yield return (nameof(FreeKickWoodworkShareBasisPoints), FreeKickWoodworkShareBasisPoints);
         yield return (nameof(DuelFoulBasisPoints), DuelFoulBasisPoints);
-        yield return (nameof(DuelYellowCardBasisPoints), DuelYellowCardBasisPoints);
-        yield return (nameof(DuelRedCardBasisPoints), DuelRedCardBasisPoints);
-        yield return (nameof(FreeKickFoulCardBasisPoints), FreeKickFoulCardBasisPoints);
 
         // A spatial threshold on the normalized pitch, checked on the same 0..10000 scale it lives on.
         yield return (nameof(FreeKickShootingRangeX), FreeKickShootingRangeX);
@@ -1200,6 +1351,17 @@ public sealed record EngineRulesV2
         yield return (nameof(MissOverShareBasisPoints), MissOverShareBasisPoints);
         yield return (nameof(PostShareOfWoodworkBasisPoints), PostShareOfWoodworkBasisPoints);
         yield return (nameof(PenaltySavedShareBasisPoints), PenaltySavedShareBasisPoints);
+        yield return (nameof(PenaltyQualitySwingBasisPoints), PenaltyQualitySwingBasisPoints);
+        yield return (nameof(CornerDeliveryChanceStepBasisPoints), CornerDeliveryChanceStepBasisPoints);
+        yield return (nameof(DuelFoulPenaltyBasisPoints), DuelFoulPenaltyBasisPoints);
+        yield return (nameof(AggressionFoulStepBasisPoints), AggressionFoulStepBasisPoints);
+        yield return (nameof(TacklingFoulStepBasisPoints), TacklingFoulStepBasisPoints);
+        yield return (nameof(MaxFoulSkillAdjustBasisPoints), MaxFoulSkillAdjustBasisPoints);
+        yield return (nameof(TiredPhysicalDropBasisPoints), TiredPhysicalDropBasisPoints);
+        yield return (nameof(TiredTechnicalDropBasisPoints), TiredTechnicalDropBasisPoints);
+        yield return (nameof(TiredMentalDropBasisPoints), TiredMentalDropBasisPoints);
+        yield return (nameof(StaminaConditionLossStepBasisPoints), StaminaConditionLossStepBasisPoints);
+        yield return (nameof(LeadershipMoraleStepBasisPoints), LeadershipMoraleStepBasisPoints);
     }
 
     private IEnumerable<(string Name, int Value)> MultiplierConstants()
@@ -1227,6 +1389,12 @@ public sealed record EngineRulesV2
         yield return (nameof(AggressiveTacklingDuelFoulMultiplierBasisPoints), AggressiveTacklingDuelFoulMultiplierBasisPoints);
         yield return (nameof(StayOnFeetDuelFoulMultiplierBasisPoints), StayOnFeetDuelFoulMultiplierBasisPoints);
         yield return (nameof(ShorthandedConditionLossMultiplierBasisPoints), ShorthandedConditionLossMultiplierBasisPoints);
+        yield return (nameof(DuelShortHandedPenaltyBasisPoints), DuelShortHandedPenaltyBasisPoints);
+        yield return (nameof(TimeWastingPossessionSecondsMultiplierBasisPoints), TimeWastingPossessionSecondsMultiplierBasisPoints);
+        yield return (nameof(MinStaminaConditionLossMultiplierBasisPoints), MinStaminaConditionLossMultiplierBasisPoints);
+        yield return (nameof(MaxStaminaConditionLossMultiplierBasisPoints), MaxStaminaConditionLossMultiplierBasisPoints);
+        yield return (nameof(MinLeadershipMoraleMultiplierBasisPoints), MinLeadershipMoraleMultiplierBasisPoints);
+        yield return (nameof(MaxLeadershipMoraleMultiplierBasisPoints), MaxLeadershipMoraleMultiplierBasisPoints);
     }
 
     private IEnumerable<(string Name, int Value)> RatingConstants()
@@ -1244,11 +1412,8 @@ public sealed record EngineRulesV2
         yield return (nameof(RatingMinBasisPoints), RatingMinBasisPoints);
         yield return (nameof(RatingMaxBasisPoints), RatingMaxBasisPoints);
         yield return (nameof(LiveRatingBaseBasisPoints), LiveRatingBaseBasisPoints);
-        yield return (nameof(LiveRatingPassBonusBasisPoints), LiveRatingPassBonusBasisPoints);
-        yield return (nameof(LiveRatingKeyPassBonusBasisPoints), LiveRatingKeyPassBonusBasisPoints);
         yield return (nameof(LiveRatingTackleBonusBasisPoints), LiveRatingTackleBonusBasisPoints);
         yield return (nameof(LiveRatingTackleLostPenaltyBasisPoints), LiveRatingTackleLostPenaltyBasisPoints);
-        yield return (nameof(LiveRatingInterceptionBonusBasisPoints), LiveRatingInterceptionBonusBasisPoints);
         yield return (nameof(LiveRatingAerialBonusBasisPoints), LiveRatingAerialBonusBasisPoints);
         yield return (nameof(LiveRatingAerialLostPenaltyBasisPoints), LiveRatingAerialLostPenaltyBasisPoints);
         yield return (nameof(LiveRatingShotBonusBasisPoints), LiveRatingShotBonusBasisPoints);
@@ -1259,7 +1424,6 @@ public sealed record EngineRulesV2
         yield return (nameof(LiveRatingGoalConcededPenaltyBasisPoints), LiveRatingGoalConcededPenaltyBasisPoints);
         yield return (nameof(LiveRatingYellowPenaltyBasisPoints), LiveRatingYellowPenaltyBasisPoints);
         yield return (nameof(LiveRatingRedPenaltyBasisPoints), LiveRatingRedPenaltyBasisPoints);
-        yield return (nameof(LiveRatingErrorPenaltyBasisPoints), LiveRatingErrorPenaltyBasisPoints);
     }
 
     private IEnumerable<(string Name, int Min, int Max)> OrderedTriples()
@@ -1268,6 +1432,9 @@ public sealed record EngineRulesV2
         yield return (nameof(MinCreationBasisPoints), MinCreationBasisPoints, MaxCreationBasisPoints);
         yield return (nameof(MinShotGoalBasisPoints), MinShotGoalBasisPoints, MaxShotGoalBasisPoints);
         yield return (nameof(MinSaveBasisPoints), MinSaveBasisPoints, MaxSaveBasisPoints);
+        yield return (nameof(PenaltyMinGoalBasisPoints), PenaltyMinGoalBasisPoints, PenaltyMaxGoalBasisPoints);
+        yield return (nameof(CornerChanceMinBasisPoints), CornerChanceMinBasisPoints, CornerChanceMaxBasisPoints);
+        yield return (nameof(DuelMinWinBasisPoints), DuelMinWinBasisPoints, DuelMaxWinBasisPoints);
         yield return (nameof(MinTouchAdvanceBasisPoints), MinTouchAdvanceBasisPoints, MaxTouchAdvanceBasisPoints);
         yield return (nameof(PressurePointXMinBasisPoints), PressurePointXMinBasisPoints, PressurePointXMaxBasisPoints);
         yield return (nameof(ShotFinalThirdXMinBasisPoints), ShotFinalThirdXMinBasisPoints, ShotFinalThirdXMaxBasisPoints);
@@ -1287,7 +1454,6 @@ public sealed record EngineRulesV2
 
     private IEnumerable<(string Name, int Floor, int Ceiling)> FactorPairs()
     {
-        yield return (nameof(ConditionFactorFloorBasisPoints), ConditionFactorFloorBasisPoints, ConditionFactorCeilingBasisPoints);
         yield return (nameof(FatigueFactorFloorBasisPoints), FatigueFactorFloorBasisPoints, FatigueFactorCeilingBasisPoints);
         yield return (nameof(MoraleFactorFloorBasisPoints), MoraleFactorFloorBasisPoints, MoraleFactorCeilingBasisPoints);
         yield return (nameof(SharpnessFactorFloorBasisPoints), SharpnessFactorFloorBasisPoints, SharpnessFactorCeilingBasisPoints);
