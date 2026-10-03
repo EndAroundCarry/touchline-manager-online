@@ -400,8 +400,8 @@ public sealed record HighlightOptionsV1
 
     // ---- How long the film runs ------------------------------------------------------------------------------
 
-    /// <summary>Gets the divisor that maps match seconds onto film seconds (nine to one).</summary>
-    public int FilmMatchSecondsPerFilmSecond { get; init; } = 9;
+    /// <summary>Gets the divisor that maps match seconds onto film seconds (ten to one).</summary>
+    public int FilmMatchSecondsPerFilmSecond { get; init; } = 10;
 
     /// <summary>Gets the shortest the film is aimed at, in milliseconds (9:30).</summary>
     public int MinFilmMilliseconds { get; init; } = (9 * 60 * 1_000) + 30_000;
@@ -412,8 +412,11 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets the slowest pace the film is allowed to settle at, in thousandths of real time (1.8×).</summary>
     public int MinPaceMilli { get; init; } = 1_800;
 
-    /// <summary>Gets the fastest pace the film settles at before quiet play is condensed (2.6×).</summary>
-    public int MaxPaceMilli { get; init; } = 2_600;
+    /// <summary>Gets the fastest pace the film is expected to settle at (2.9×).</summary>
+    public int MaxPaceMilli { get; init; } = 2_900;
+
+    /// <summary>Gets the pace quiet play is condensed down to when the film would be played faster than this (2.3×).</summary>
+    public int CondensePaceMilli { get; init; } = 2_300;
 
     /// <summary>Gets the fastest pace allowed before the holds are shortened (3.0×).</summary>
     public int CeilingPaceMilli { get; init; } = 3_000;

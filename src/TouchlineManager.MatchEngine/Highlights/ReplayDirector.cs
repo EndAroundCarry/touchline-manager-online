@@ -151,7 +151,7 @@ public static class ReplayDirector
             var measured = natural <= 0 ? 0.0 : Math.Max(0.0, (motion.MotionSeconds / natural) - 1.0);
 
             // The quiet play is condensed again when the lengthened moves have pushed the pace out of its band.
-            if (solved.Pace > settings.MaxPaceMilli / 1_000.0 && run < MaxSettlingRuns - 1)
+            if (solved.Pace > settings.CondensePaceMilli / 1_000.0 && run < MaxSettlingRuns - 1)
             {
                 var more = FilmTiming.Condense(context, ref script, target, measured);
 

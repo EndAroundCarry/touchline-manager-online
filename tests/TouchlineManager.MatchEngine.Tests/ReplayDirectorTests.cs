@@ -61,6 +61,29 @@ public sealed class ReplayDirectorTests
     }
 
     [Fact]
+    public void The_median_film_is_about_ten_minutes()
+    {
+        // The calibration: a match is about 101 clock minutes with its stoppage, ten to one makes that about ten
+        // minutes, and the quiet play is condensed so the pace that takes stays near the top of its band.
+        var lengths = new List<int>();
+        var paces = new List<int>();
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var (_, presentation) = TestMatchFactory.Play(TestMatchFactory.Even(seed));
+
+            lengths.Add(presentation.TotalPlaybackMilliseconds);
+            paces.Add(presentation.PaceMilli);
+        }
+
+        lengths.Sort();
+        paces.Sort();
+
+        lengths[lengths.Count / 2].Should().BeInRange(9 * 60_000 + 40_000, 10 * 60_000 + 30_000, "the median match is about ten minutes");
+        paces[paces.Count / 2].Should().BeInRange(Defaults.MinPaceMilli, Defaults.MaxPaceMilli, "and is played inside the pace band");
+    }
+
+    [Fact]
     public void A_busy_match_raises_the_pace_before_it_ever_lengthens_the_film()
     {
         // The ceiling is enforced whatever the match: a film that is given six minutes is played faster, not longer.

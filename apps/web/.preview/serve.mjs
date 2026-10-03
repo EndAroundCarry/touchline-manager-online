@@ -49,7 +49,8 @@ export async function startServer({ presentation, port = 0 }) {
   const presentationPath = resolve(presentation);
 
   const server = createServer(async (request, response) => {
-    const path = normalize(decodeURIComponent((request.url ?? '/').split('?')[0]));
+    // Forward slashes on every platform, so the comparisons below read the same on Windows.
+    const path = normalize(decodeURIComponent((request.url ?? '/').split('?')[0])).replaceAll('\\', '/');
 
     try {
       if (path === '/film-harness.js') {

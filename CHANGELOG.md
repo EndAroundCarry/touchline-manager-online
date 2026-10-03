@@ -4,6 +4,90 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Replay-v4 calibration, ADR-0054 and the documentation (M4; presentation only, results unchanged)
+
+The last milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). The first three milestones
+built the engine facts, the constant-pace film and the continuous viewer; this one measures the film over 2,000
+matches, settles the constants the plan left to calibration, and writes the decision down
+([ADR-0054](docs/architecture/adr/0054-replay-v4-constant-pace-film.md), which supersedes decisions 2 and 3 of
+ADR-0052). Presentation only: the engine, its results and its hashes are untouched, and `engine-v5` needs no
+reseed beyond the one M1 already required.
+
+### Changed
+
+- **The film now runs about ten minutes, not eleven.** M2 left almost every film at the 11:00 ceiling (median
+  10:59) because the target was `played ÷ 9` and a match is about 101 clock minutes once its stoppage is played.
+  It is `played ÷ 10` now (`FilmMatchSecondsPerFilmSecond` 9 → 10), so the median film is **10:07** (p05 9:54, p95
+  10:25, max 10:44) and the 11:00 ceiling is left for matches that really run long.
+- **Condensing aims at a pace of its own** (`CondensePaceMilli` = 2,300, new), instead of at the top of the band.
+  Before, quiet play was condensed only enough to scrape inside 2.6×; now it is condensed whenever the film would
+  be played faster than 2.3×, and it stops when the quiet possessions run out. At ten minutes this condenses 41.5%
+  of possessions at the median (p95 49.2%) and takes the median pace from 2.91× to **2.53×**.
+- **The pace band is 1.8–2.9×** (`MaxPaceMilli` 2,600 → 2,900). The band's top is where a ten-minute film actually
+  sits (p95 2.83×, max 3.0×); 2.6× was written before the measurement. 98.2% of films are inside it.
+- **The benchmark's `replay` mode** also prints the real-time motion and the holds, so the pace can be read as
+  what it is: `motion ÷ (film − holds)`.
+
+### Measured (2,000 matches, `simulation-benchmarks -- replay 2000`)
+
+| | M2 (11:00) | M4 |
+|---|---|---|
+| Film p05 / p50 / p95 / max | — / 10:59 / — / 11:00 | 9:54 / **10:07** / 10:25 / **10:44** |
+| Over 11:00 | 0 | 0 |
+| Pace p05 / p50 / p95 / max | — / 2.56 / — / — | 2.28 / **2.53** / 2.83 / 3.00 |
+| Inside the pace band | 94.7% (of 1.8–2.6) | 98.2% (of 1.8–2.9) |
+| Reel p50 / max | 7:25 / 9:44 | 6:57 / 9:07 |
+| Teleports outside cuts | **0** | **0** (3.8 cuts a match) |
+| Ball still outside holds p50 / p95 | 2.3% / 3.0% | 2.5% / 3.3% |
+| Player speed / (sprint × pace), max | 1.000 | 1.000 (keeper 0.80 of the dive cap) |
+| Payload estimate p50 / p95 / max (budget 750 KB) | 724 / — / 749.9 | 722 / 747 / 750.0 |
+| Payload JSON p50 (System.Text.Json) | 2,096 KB | 2,095 KB |
+| Real-time motion p50 / holds p50 | — | 22.5 min / 1.23 min |
+| Moves lengthened for a constraint p50 / p95 | 16.5% / 19.7% | 18.4% / 21.4% |
+
+### Checked in the harness
+
+Two real dumps with the final constants (seeds 3 and 8: films of 9:53 and about 10:20, paces 2.29× and about 2.5×) were
+played through the fluidity harness in headless Chromium: **60 fps** at 1x, across half-time, at 8x, and in the
+reel; **0 jumps** above the speed caps in about 150,000 comparisons of consecutive drawn frames; **12/12** goals and
+cards at their stamped minute; the clock reads `45+3'`/`45+5'`, then `HT`, then `46'`, and ends at `90+6'`/`90+7'`.
+The ball moves at most 0.9 m between two drawn frames at 1x and a player 0.4 m. It stands still for 10–12% of the film
+counting the dead-ball holds. `serve.mjs` is now portable to Windows (it compared a backslash path with `/`).
+
+### Documentation
+
+- **ADR-0054** (replay-v4 constant-pace film). ADR-0052 is marked *decisions 2 and 3 superseded by ADR-0054*; the
+  ADR index follows.
+- `docs/product/match-engine.md` §10 describes the film as `replay-v4` (beats, one pace, motion, passages and the
+  clock, commentary, the reel, the payload ladder, the viewer) and §12 carries the numbers above.
+- `docs/product/game-rules.md` §18: `replay_version` = `replay-v4`, `match_film_seconds` is now
+  `clamp(played ÷ 10, 570, 660)`, and `match_film_pace` is new.
+- `docs/architecture/data-model.md`: the `presentation_version` and the `engine-v5` reseed note.
+- `README.md` status and `plan.md`.
+
+### Tests
+
+- `The_median_film_is_about_ten_minutes` guards the calibration: over 24 matches the median film is 9:40–10:30 and
+  its pace is inside the band.
+- `MatchTests.A_passage_is_a_semantic_keyframe_payload_built_for_interpolation` failed on `HEAD` since M2: it
+  asserted `OnlyContain` over a passage's cuts and commentary, which FluentAssertions refuses when the collection
+  is empty, and most passages have no cut and some are quiet. It asserts the same properties with `All` now.
+- `A_pace_that_has_to_rise_condenses_quiet_play_first` squeezes `CondensePaceMilli` (the knob that drives condensing
+  now) and tolerates 1% where the settling stops.
+
+### Known
+
+- **A ten-minute film is a 2.5× film.** The plan expected a pace of about 2.2× at ten minutes; the measurement is
+  that a match's moves add up to about 26 minutes of real time (22.5 after condensing), so 2.2× would be an 11:26
+  film. Length and pace are one trade-off, set by `FilmMatchSecondsPerFilmSecond` and `CondensePaceMilli`.
+- **The payload has no headroom**: the estimate reaches 750.0 KB at the maximum, on the third (78% of matches) or
+  fourth (19%) rung of a five-rung ladder, and the real JSON is about 2.1 MB with nothing compressing it. Compressing
+  `GET /api/v1/matches/{id}/presentation` (BREACH-safe, because it is not an auth response) is the open item that
+  would remove the pressure.
+- `Highlights` can merge neighbouring chances into one very long window.
+- Carried from M3: the initial web bundle is 2.09 kB over its budget, 17 files already fail `npm run lint`
+  (prettier) on `HEAD`, and the matchday journey fails its closing axe scan identically on `HEAD`.
+
 ## Replay-v4 viewer — one continuous timeline (client; results unchanged)
 
 The third milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). The server's film is cut

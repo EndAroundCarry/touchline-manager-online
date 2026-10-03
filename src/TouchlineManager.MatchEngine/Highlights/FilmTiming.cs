@@ -174,7 +174,7 @@ internal static class FilmTiming
     public static int Condense(FilmContext context, ref FilmScriptResult script, double target, double allowance)
     {
         var options = context.Options;
-        var max = options.MaxPaceMilli / 1_000.0;
+        var max = options.CondensePaceMilli / 1_000.0;
 
         var current = Solve(context, script.Beats, target, allowance, 0);
 

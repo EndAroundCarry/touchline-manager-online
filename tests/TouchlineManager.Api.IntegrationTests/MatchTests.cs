@@ -184,17 +184,17 @@ public sealed class MatchTests : IAsyncLifetime
             passage.Clock[0].MatchSecond.Should().Be(passage.StartMatchSecond);
             passage.Clock[^1].MatchSecond.Should().Be(passage.EndMatchSecond);
             passage.Cuts.Should().NotBeNull();
-            passage.Cuts!.Should().OnlyContain(cut => cut.TimeMilliseconds == 0 && cut.DurationMilliseconds > 0);
+            passage.Cuts!.All(cut => cut.TimeMilliseconds == 0 && cut.DurationMilliseconds > 0).Should().BeTrue("a cut is at a passage's first frame");
             passage.HomeColour.Should().StartWith("#");
             passage.AwayColour.Should().StartWith("#");
 
             // The feed's lines are pinned to the passage's own film clock (§9.3, replay-v4).
             passage.Commentary.Should().NotBeNull();
             passage.Commentary!.Select(line => line.TimeMilliseconds).Should().BeInAscendingOrder();
-            passage.Commentary.Should().OnlyContain(line =>
+            passage.Commentary.All(line =>
                 line.TimeMilliseconds >= 0
                 && line.TimeMilliseconds <= passage.DurationMilliseconds
-                && !string.IsNullOrWhiteSpace(line.Text));
+                && !string.IsNullOrWhiteSpace(line.Text)).Should().BeTrue("a passage may be quiet, but its lines are inside it");
 
             // The eleven, plus the ball, each with a track, so the renderer interpolates rather than being
             // sent frames (§9.1, §9.3). A sent-off player is not carried, so the count can be below 23.

@@ -216,6 +216,8 @@ void Replay(int matches, ulong baseSeed, string? dump)
     var bytes = new double[matches];
     var condensedShare = new double[matches];
     var stillShare = new double[matches];
+    var motionMinutes = new double[matches];
+    var holdMinutes = new double[matches];
     var extensionShare = new double[matches];
     var playerSpeedRatio = new double[matches];
     var keeperSpeedRatio = new double[matches];
@@ -257,6 +259,8 @@ void Replay(int matches, ulong baseSeed, string? dump)
         bytes[index] = serialized.Length;
         condensedShare[index] = film.Possessions == 0 ? 0 : (double)film.CondensedPossessions / film.Possessions;
         stillShare[index] = film.StillBallShare;
+        motionMinutes[index] = film.Pace * (film.FilmMilliseconds - film.HoldMilliseconds) / 60_000.0;
+        holdMinutes[index] = film.HoldMilliseconds / 60_000.0;
         extensionShare[index] = film.ExtensionShare;
         playerSpeedRatio[index] = film.MaxPlayerFilmSpeed / (options.SprintMetresPerSecond * film.Pace);
         keeperSpeedRatio[index] = film.MaxKeeperFilmSpeed / (options.DiveMetresPerSecond * film.Pace);
@@ -297,7 +301,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
         }
     }
 
-    foreach (var series in new[] { passageCounts, paces, filmDurations, reelDurations, estimates, bytes, condensedShare, stillShare, extensionShare, playerSpeedRatio, keeperSpeedRatio })
+    foreach (var series in new[] { passageCounts, paces, filmDurations, reelDurations, estimates, bytes, condensedShare, stillShare, motionMinutes, holdMinutes, extensionShare, playerSpeedRatio, keeperSpeedRatio })
     {
         Array.Sort(series);
     }
@@ -307,6 +311,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
     Console.WriteLine($"  {"film minutes p05/p50/p95",-30} {Percentile(filmDurations, 0.05) / 60_000.0,7:F2}       {Percentile(filmDurations, 0.50) / 60_000.0,7:F2}       {Percentile(filmDurations, 0.95) / 60_000.0,7:F2}       min {filmDurations[0] / 60_000.0:F2}  max {filmDurations[^1] / 60_000.0:F2}");
     Console.WriteLine($"  {"reel minutes p05/p50/p95",-30} {Percentile(reelDurations, 0.05) / 60_000.0,7:F2}       {Percentile(reelDurations, 0.50) / 60_000.0,7:F2}       {Percentile(reelDurations, 0.95) / 60_000.0,7:F2}       max {reelDurations[^1] / 60_000.0:F2}");
     Console.WriteLine($"  {"inside 9:00-11:00",-30} {100.0 * inWindow / matches,7:F1}%   over 11 min {100.0 * overCeiling / matches:F2}%");
+    Console.WriteLine($"  {"real-time motion / holds, min",-30} motion p50 {Percentile(motionMinutes, 0.50),5:F1} (p05 {Percentile(motionMinutes, 0.05):F1}, p95 {Percentile(motionMinutes, 0.95):F1})   holds p50 {Percentile(holdMinutes, 0.50),4:F2} (p95 {Percentile(holdMinutes, 0.95):F2})");
     Console.WriteLine($"  {"condensed possessions",-30} {100.0 * condensedMatches / matches,7:F1}% of matches   share of possessions p50 {100 * Percentile(condensedShare, 0.50):F1}% p95 {100 * Percentile(condensedShare, 0.95):F1}%");
     Console.WriteLine($"  {"moves lengthened for constraints",-30} p50 {100 * Percentile(extensionShare, 0.50):F1}%   p95 {100 * Percentile(extensionShare, 0.95):F1}%");
     Console.WriteLine($"  {"teleports (outside cuts)",-30} {teleports,7}   cuts per match {(double)cuts / matches:F1}");
