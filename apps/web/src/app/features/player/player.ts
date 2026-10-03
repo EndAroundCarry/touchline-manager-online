@@ -8,7 +8,8 @@ import {
   footLabel,
   positionLabel,
   ratioLabel,
-  seasonStatRows,
+  statCells,
+  STAT_COLUMNS,
   seasonsPlayedLabel,
   squadStatusLabel,
   stateRows,
@@ -74,18 +75,24 @@ export class PlayerProfile implements OnInit {
     return player === null ? [] : stateRows(player.state);
   });
 
-  /** This season's summary lines, or an empty list before the player has appeared (`STA-2`). */
-  protected readonly seasonStats = computed(() => {
-    const stats = this.player()?.seasonStats;
+  /** The columns of the season table (`STA-2`). */
+  protected readonly statColumns = STAT_COLUMNS;
 
-    return stats === null || stats === undefined ? [] : seasonStatRows(stats);
-  });
+  /** One table row per season the player has a line for, most recent first (`STA-2`). */
+  protected readonly seasonTableRows = computed(() =>
+    this.careerSeasons().map((season) => ({
+      key: `${season.seasonNumber}-${season.clubId}`,
+      season: season.seasonLabel,
+      club: season.clubName,
+      cells: statCells(season.stats),
+    })),
+  );
 
-  /** The player's career totals as summary lines, or an empty list before they have ever appeared (`STA-2`). */
-  protected readonly careerTotals = computed(() => {
+  /** The career row that closes the table, or null before the player has ever appeared (`STA-2`). */
+  protected readonly careerRow = computed(() => {
     const career = this.player()?.careerStats;
 
-    return career === null || career === undefined ? [] : seasonStatRows(career.totals);
+    return career === null || career === undefined ? null : statCells(career.totals);
   });
 
   /** The player's seasons, most recent first, or an empty list (`STA-2`). */
@@ -141,19 +148,6 @@ export class PlayerProfile implements OnInit {
       label: `${season.seasonLabel} · ${season.clubName}`,
     })),
   ]);
-
-  /** The statistic lines for the chosen season, or an empty list when the player has none for it. */
-  protected readonly selectedStats = computed(() => {
-    const choice = this.selectedSeason();
-
-    if (choice === CURRENT_SEASON) {
-      return this.seasonStats();
-    }
-
-    const season = this.careerSeasons().find((item) => `${item.seasonNumber}` === choice);
-
-    return season === undefined ? [] : seasonStatRows(season.stats);
-  });
 
   protected readonly matchesLoading = signal(true);
   protected readonly matchesError = signal<string | null>(null);

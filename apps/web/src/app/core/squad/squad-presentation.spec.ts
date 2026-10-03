@@ -8,7 +8,8 @@ import {
   footLabel,
   positionFamilyOf,
   positionLabel,
-  seasonStatRows,
+  STAT_COLUMNS,
+  statCells,
   seasonsPlayedLabel,
   squadStatusLabel,
   stateBand,
@@ -223,7 +224,7 @@ describe('squad presentation', () => {
     });
   });
 
-  describe('seasonStatRows', () => {
+  describe('statCells', () => {
     const stats: PlayerSeasonStats = {
       appearances: 3,
       starts: 2,
@@ -242,57 +243,55 @@ describe('squad presentation', () => {
       averageRating: 7.5,
     };
 
-    it('summarises the season as labelled values, in the order a manager reads them (STA-2)', () => {
-      const rows = seasonStatRows(stats);
+    const cell = (label: string, line: PlayerSeasonStats = stats): string | undefined =>
+      statCells(line)[STAT_COLUMNS.findIndex((column) => column.label === label)];
 
-      expect(rows.map((row) => row.label)).toEqual([
-        'Appearances',
+    it('lays the season out as columns, in the order a manager reads them (STA-2)', () => {
+      expect(STAT_COLUMNS.map((column) => column.label)).toEqual([
+        'Apps',
         'Starts',
-        'Minutes',
+        'Min',
         'Goals',
         'Assists',
-        'Shots',
-        'Shots on target',
-        'Saves',
         'Passes',
-        'Pass accuracy',
-        'Dribbles won',
-        'Dribble success',
-        'Yellow cards',
-        'Red cards',
-        'Average rating',
+        'Pass %',
+        'Dribbles',
+        'Dribble %',
+        'Shots',
+        'On tgt',
+        'Saves',
+        'Yellow',
+        'Red',
+        'Rating',
       ]);
-      expect(rows.find((row) => row.label === 'Goals')?.value).toBe('2');
-      expect(rows.find((row) => row.label === 'Minutes')?.value).toBe('200');
-      expect(rows.find((row) => row.label === 'Average rating')?.value).toBe('7.5');
+      expect(statCells(stats)).toHaveLength(STAT_COLUMNS.length);
+      expect(cell('Goals')).toBe('2');
+      expect(cell('Min')).toBe('200');
+      expect(cell('Rating')).toBe('7.5');
     });
 
     it('shows the passes and dribbles as a count and a rate (engine-v7)', () => {
-      const rows = seasonStatRows(stats);
-
-      expect(rows.find((row) => row.label === 'Passes')?.value).toBe('96 / 120');
-      expect(rows.find((row) => row.label === 'Pass accuracy')?.value).toBe('80%');
-      expect(rows.find((row) => row.label === 'Dribbles won')?.value).toBe('7 / 14');
-      expect(rows.find((row) => row.label === 'Dribble success')?.value).toBe('50%');
+      expect(cell('Passes')).toBe('96 / 120');
+      expect(cell('Pass %')).toBe('80%');
+      expect(cell('Dribbles')).toBe('7 / 14');
+      expect(cell('Dribble %')).toBe('50%');
     });
 
     it('shows a dash rather than a zero rate when nothing was attempted (engine-v7)', () => {
-      const idle = seasonStatRows({
+      const idle = {
         ...stats,
         passesAttempted: 0,
         passesCompleted: 0,
         dribblesAttempted: 0,
         dribblesCompleted: 0,
-      });
+      };
 
-      expect(idle.find((row) => row.label === 'Pass accuracy')?.value).toBe('\u2014');
-      expect(idle.find((row) => row.label === 'Dribble success')?.value).toBe('\u2014');
+      expect(cell('Pass %', idle)).toBe('\u2014');
+      expect(cell('Dribble %', idle)).toBe('\u2014');
     });
 
     it('shows a dash for the rating before the player has been rated (TRN-8)', () => {
-      const unrated = seasonStatRows({ ...stats, averageRating: null });
-
-      expect(unrated.find((row) => row.label === 'Average rating')?.value).toBe('\u2014');
+      expect(cell('Rating', { ...stats, averageRating: null })).toBe('\u2014');
     });
   });
 

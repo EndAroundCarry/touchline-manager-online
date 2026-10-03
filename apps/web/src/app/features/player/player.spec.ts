@@ -204,6 +204,33 @@ describe('PlayerProfile', () => {
     expect(root.querySelectorAll('#player-panel-training tbody tr').length).toBeGreaterThan(0);
   });
 
+  it('shows the seasons as a table with the career total and the passes and dribbles', async () => {
+    await openTab('Statistics');
+
+    const table = root.querySelector('[data-testid="season-stats"] table')!;
+    const headings = Array.from(table.querySelectorAll('thead th')).map((cell) =>
+      cell.textContent?.trim(),
+    );
+
+    expect(headings).toEqual(
+      expect.arrayContaining([
+        'Season',
+        'Club',
+        'Goals',
+        'Assists',
+        'Passes',
+        'Pass %',
+        'Dribbles',
+      ]),
+    );
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(table.querySelector('tbody tr')!.textContent).toContain('Ashvale United');
+    expect(table.querySelector('tbody tr')!.textContent).toContain('320 / 400');
+    expect(table.querySelector('tbody tr')!.textContent).toContain('80%');
+    expect(table.querySelector('tfoot tr')!.textContent).toContain('Career');
+    expect(table.querySelector('tfoot tr')!.textContent).toContain('20 / 50');
+  });
+
   it('shows the current season first and an earlier season on request', async () => {
     await openTab('Statistics');
 
@@ -211,7 +238,6 @@ describe('PlayerProfile', () => {
 
     expect(select.options).toHaveLength(2);
     expect(select.options[0].textContent).toContain('Current season');
-    expect(root.querySelector('#player-panel-statistics dl')?.textContent).toContain('7');
 
     const rowCount = () => root.querySelectorAll('[data-testid="match-stats"] tbody tr').length;
 
@@ -236,8 +262,6 @@ describe('PlayerProfile', () => {
     await fixture.whenStable();
 
     expect(rowCount()).toBe(1);
-    expect(root.querySelector('#player-panel-statistics dl')?.textContent).toContain('5');
-    expect(root.querySelector('#player-panel-statistics dl')?.textContent).not.toContain('Goals7');
   });
 
   it('shows the contract with the negotiation switched off and marked as coming soon', async () => {
