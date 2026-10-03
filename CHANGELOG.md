@@ -4,6 +4,136 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Replay-v4 viewer — one continuous timeline (client; results unchanged)
+
+The third milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). The server's film is cut
+into passages of about ten seconds so it can be cached, compressed and seeked by event, and the viewer used to
+treat each one as a separate replay: at every boundary it rebuilt its renderer and drew the old one at the new
+passage's first moment, which is where the picture flickered. The viewer now builds a presentation's passages
+into **one timeline**, makes **one renderer** for it, and draws global film time, so a passage boundary is a
+number nothing on screen can see. Presentation only: nothing server-side changed and nothing needs reseeding.
+ADR-0054 and the documentation are M4.
+
+### Added
+
+- **`FilmTimeline`** (`core/match/film-timeline.ts`), built once per presentation. Every entity's movement is one
+  continuous track over the whole film, with the boundary frame two passages share kept once and kept twice —
+  as a *step* — where the film cut between them. Each slot has roster stints: a substitution switches the name
+  and number on the same token, and a player sent off is simply no longer in their slot. `clockAt` reads both
+  halves on their own clocks: `45+2'`, `HT`, `46'`, `90+N'`. It also builds the commentary feed, the goal and
+  shot markers (at the strike, not at the start of the passage), the cards, the goals and the cuts, and
+  resolves a commentary identity as a participant *or* a player (the engine names participants; the application
+  makes them the same, and the benchmark's synthetic input does not).
+- **A fade over cuts and reel jumps** (`core/match/film-fade.ts`). The screen dips to dark and back over about
+  200 ms of *real* time at the kick-off after a goal, at the second half, and between the clips of the
+  highlights reel — real time, because the eye measures the dip and not the match, so at 8x it spans eight
+  times the film.
+- **A half-time card** on the pitch while the film holds at the interval.
+- **The fluidity harness** (`apps/web/.preview`, replacing the Stage 6 demo). `node .preview/capture.mjs
+  <presentation.json>` plays a dump from `simulation-benchmarks replay --dump` through the real playback, loop,
+  fade and renderer in headless Chromium and reports the frame rate, how far every token moved between two
+  *drawn* frames outside the cuts and whether that was faster than the film's speed caps allow, whether the
+  clock at each goal and card reads the minute the engine stamped, and how long the ball stands still; it
+  photographs the moments worth looking at and exits non-zero on a jump.
+
+### Changed
+
+- **One renderer per presentation.** `MatchViewer` makes a `CanvasMatchRenderer` over the whole film and rebuilds
+  it only when the film, the canvas, the kits, the text-only preference or the reduced-motion preference
+  change — never when the playhead moves into the next passage. The clock, the feed, the cards, the goal flash
+  on the scoreboard and the live panels are all read from film time; the goal flash lasts as long as the
+  pitch's own `GOAL!` badge instead of a real-time timer, and a seek into a celebration shows both. A paused or
+  idle replay shows the playhead's own frame — the kick-off formation before play — rather than the end of the
+  first passage that reduced motion used to draw.
+- **Players move on a monotone cubic Hermite spline (Fritsch–Carlson) that knows how far apart in time its
+  keyframes are**, in place of a uniform Catmull-Rom that overshot corners and wobbled after a long gap. The
+  ball moves in straight lines, because the server pre-samples flights. Each track has a cursor, and nothing is
+  interpolated across a step, so the film never blends two places at a cut.
+- **The render loop and the renderer.** A frame is never reported as longer than 100 ms, so a stall costs a
+  moment of film and not a teleport. The pitch is drawn once onto an offscreen layer and copied each frame, and
+  redrawn only when a `ResizeObserver` reports a new size or the pixel ratio changes; a frame never reads the
+  page's layout. Tokens, the frame list and the effect lists are made once and reused, and the timeline's
+  per-frame lookups allocate nothing beyond the clock reading that changes once a second.
+- **`MatchPlayback`** keeps its modes, windows and speeds, and now exposes the windows of the active playlist
+  and the film's length; the active passage is found from a cursor instead of a scan. Its schedule logic is
+  shared with the timeline, so the playhead and the film can never disagree about where a passage starts.
+- **The matchday end-to-end journey** watches the clock through the interval — HT, then 46' on the second half's
+  own clock, never backwards within a half — checks that every feed row carries a valid clock, and that the
+  highlights reel is a shorter playlist over the same film.
+
+### Fixed
+
+- A booking was only drawn from the passage *after* the one that produced it. It is drawn from the moment its
+  beat is narrated now, which is when the feed shows it.
+- The lineup index answers to either identity a commentary line may carry. The application makes a participant
+  the underlying player, so nothing differed in production, but input where they differ (the benchmark's) used
+  to lose every card, every feed row's side, and every goalscorer's name.
+
+### Tests
+
+- 489 web tests (it was 402), including the timeline (continuity, steps at cuts, roster switching, the clock at
+  every seam, cards, markers, celebrations), the interpolator (no overshoot, one velocity where segments meet,
+  no blending across a step), the renderer (one picture across a boundary, a substitution on the same token, a
+  sent-off player vanishing, the pitch layer, resize, no layout reads on a frame, the fade overlay), the loop's
+  clamp, the fade, the playback's windows and cursor, and the viewer (one renderer across every boundary — a
+  mutant that rebuilds per passage makes five — and the half-aware clock through the scrubber).
+
+### Measured (real dumps, headless Chromium)
+
+Six real matches from `simulation-benchmarks replay 1 <seed> --dump` (seeds 3–8), each played through the real
+playback, loop, fade and renderer in headless Chromium (software rendering, no GPU), by `capture.mjs --seconds 6`:
+a kick-off run, a goal and its celebration, across the half-time cut, eight times speed through the match, and the
+highlights reel at 1x and at 8x. Two more matches (seeds 1 and 2) were run by the same harness while it was being
+written and gave the same verdict.
+
+| match | film | reel | pace | goals/cards/subs | min fps | dropped | jumps | cuts crossed | reel jumps | clock at events | ball still (all / outside holds) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 3 | 10:58 | 7:15 | 2.30x | 2/0/6 | 59.4 | 4 | 0 | 1 | 0 | 2/2 | 10.6% / 8.7% |
+| 4 | 10:58 | 7:34 | 2.48x | 1/3/10 | 60.0 | 0 | 0 | 1 | 1 | 4/4 | 10.7% / 9.5% |
+| 5 | 10:59 | 8:34 | 2.52x | 2/1/8 | 60.0 | 0 | 0 | 1 | 1 | 3/3 | 10.9% / 9.0% |
+| 6 | 10:58 | 7:47 | 2.59x | 2/4/8 | 60.0 | 0 | 0 | 1 | 1 | 6/6 | 12.0% / 10.2% |
+| 7 | 10:58 | 6:37 | 2.54x | 0/2/10 | 60.0 | 1 | 0 | 2 | 1 | 2/2 | 10.2% / 9.7% |
+| 8 | 10:59 | 7:52 | 2.58x | 4/6/8 | 59.7 | 1 | 0 | 6 | 1 | 10/10 | 14.4% / 11.4% |
+
+- **0 jumps** — no token moved faster between two drawn frames than the film's speed caps allow, across every run
+  and every cut and reel jump; **27 of 27** goals and cards read exactly the minute the engine stamped on them.
+- **60 fps** held in every run (the slowest averaged 59.4). Across the 35 runs 6 frames took longer than 25 ms —
+  four of them in match 3, which ran while a package was installing on the same machine — and the loop reports a
+  long frame as at most 100 ms of film.
+- At 1x the ball moves between 0.49 and 0.86 m between two drawn frames at the 99th percentile, and an outfield
+  player between 0.27 and 0.40 m: the film's 2.3–2.6x pace made visible. The largest single-frame moves were
+  1.82 m (ball) and 1.12 m (player), each from a frame longer than 16.7 ms and each within the speed cap for the
+  film it covered.
+- The ball stands still for 10–14% of the film including every dead-ball hold (restarts, cards, substitutions,
+  the interval, celebrations) and 9–11% outside the interval, celebrations and cuts. The server's own count,
+  which also leaves out the restarts, cards and substitutions the page cannot see, was 2.3%.
+- **The real Angular viewer**, built with `ng build` and served over a mocked API from a real dump, passes a
+  script that makes the checks `matchday.spec.ts` now makes — HT and 46' through the interval, `45+N'` in
+  first-half stoppage, no clock running backwards, every feed row labelled, the reel shorter than the film, the
+  canvas redrawn on resize — and **`HEAD` fails the same checks** (it reads `43' 44' 45'` through the first
+  half and never shows `HT`).
+
+### Known, for M4
+
+- The film runs 10:58–10:59 in every match measured, so the 10:00 median the plan asks for is still a
+  calibration decision on the target formula and the pace band (M2's note stands).
+- `Highlights` can merge neighbouring chances into one very long clip: match 1's first reel clip is a single
+  225-second window.
+- Compression of `GET /matches/{id}/presentation` (the plan's optional item) is not done: the response is about
+  2 MB of JSON, and nothing compresses it yet.
+- The initial bundle is over its 550 kB budget on `HEAD` already (by 2.30 kB) and by 2.09 kB after this change;
+  the lazy `match-viewer` chunk grew from 69.2 to 79.9 kB raw (16.9 to 20.1 kB transfer).
+- 17 files under `apps/web/src` already fail `npm run lint` (prettier) on `HEAD`; none is touched here.
+- The matchday end-to-end journey was run for real here (API, worker, PostgreSQL 16 on the compose port, a
+  stand-in for the mail catcher; Docker is not available in this environment). Every new replay assertion passes
+  and the journey reaches its closing axe scan, which fails — and fails identically on `HEAD`. axe (WCAG 2.2 AA)
+  reports serious findings that are in markup this milestone did not touch: the commentary feed and the two
+  lineup panels are scrollable regions that cannot take keyboard focus (`scrollable-region-focusable`), and the
+  scrubber's 10 px goal and shot markers overlap the scrubber and are under the 24 px target size
+  (`target-size`); a match with a sent-off player adds a contrast failure on that player's dimmed lineup row
+  (`color-contrast`). `npm run test:e2e:a11y` was not run (it needs the same stack and covers screens this
+  milestone does not touch).
+
 ## Replay-v4 — the constant-pace film (server; results unchanged)
 
 The second milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). The film is built

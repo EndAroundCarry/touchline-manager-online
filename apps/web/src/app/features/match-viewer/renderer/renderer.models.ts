@@ -1,5 +1,3 @@
-import { HighlightKeyframe } from '../../../core/match/match.models';
-
 /** Which end an entity belongs to. */
 export type MatchSide = 'home' | 'away';
 
@@ -17,7 +15,12 @@ export interface PitchRect {
   readonly height: number;
 }
 
-/** One entity the renderer draws: a player or the ball. */
+/**
+ * One entity the renderer draws: a player or the ball.
+ *
+ * It is who the token *is* at a moment, not where it is: a substitution changes the entity in a slot while the
+ * slot's movement carries on, which is how a new name and number appear on the same token.
+ */
 export interface RendererEntity {
   readonly id: string;
   readonly isBall: boolean;
@@ -26,13 +29,6 @@ export interface RendererEntity {
   readonly shirtNumber: number;
   readonly family: string | null;
   readonly name: string | null;
-  readonly anchor: PitchPoint;
-}
-
-/** One entity's movement, as the keyframes the renderer interpolates between. */
-export interface RendererTrack {
-  readonly entityId: string;
-  readonly keyframes: readonly HighlightKeyframe[];
 }
 
 /**
@@ -62,7 +58,7 @@ export interface TeamKits {
   readonly away: TeamKit;
 }
 
-/** A card a player carries into the passage being drawn. */
+/** A card a player carries. */
 export type CardKind = 'yellow' | 'red';
 
 /** How much the renderer drew in the last frame, which the payload and performance budgets read. */
@@ -81,11 +77,14 @@ export interface ClashPoint {
   readonly phase: number;
 }
 
-/** What the renderer needs beyond the highlight itself. */
+/** What the renderer needs beyond the film itself. */
 export interface RendererOptions {
   readonly kits?: Partial<TeamKits>;
-  /** Cards by participant: what the player carries at the minute being drawn. */
-  readonly cards?: ReadonlyMap<string, CardKind>;
   /** When set, a paused frame is drawn without its time-based pulses, for `prefers-reduced-motion`. */
   readonly reducedMotion?: boolean;
+  /**
+   * Makes the surface the pitch is drawn onto once, so a frame copies it rather than redrawing every line.
+   * Returns null where there is none, and the pitch is then drawn straight onto the canvas each frame.
+   */
+  readonly createPitchLayer?: () => HTMLCanvasElement | null;
 }

@@ -1,4 +1,4 @@
-import { RenderLoop } from './render-loop';
+import { MAX_FRAME_DELTA_MS, RenderLoop } from './render-loop';
 
 /**
  * The animation loop's lifetime guarantees (master plan `§9.4`, ADR-0006).
@@ -63,6 +63,36 @@ describe('RenderLoop', () => {
     frame(140);
 
     expect(deltas).toEqual([0, 16, 24]);
+  });
+
+  it('never reports a frame longer than the clamp, so a stall costs a moment of film and not a teleport', () => {
+    const deltas: number[] = [];
+    const loop = new RenderLoop((delta) => deltas.push(delta));
+
+    loop.start();
+
+    frame(1_000);
+    frame(1_016);
+    // A garbage collection, a throttled tab coming back, a debugger: two and a half seconds between frames.
+    frame(3_500);
+    frame(3_516);
+
+    expect(MAX_FRAME_DELTA_MS).toBe(100);
+    expect(deltas).toEqual([0, 16, MAX_FRAME_DELTA_MS, 16]);
+  });
+
+  it('lets a frame at exactly the clamp through unchanged, and never reports a negative one', () => {
+    const deltas: number[] = [];
+    const loop = new RenderLoop((delta) => deltas.push(delta));
+
+    loop.start();
+
+    frame(500);
+    frame(500 + MAX_FRAME_DELTA_MS);
+    // A timestamp that goes backwards must not run the film backwards.
+    frame(500);
+
+    expect(deltas).toEqual([0, MAX_FRAME_DELTA_MS, 0]);
   });
 
   it('does not schedule a second frame when it is started while already running', () => {
