@@ -271,9 +271,9 @@ describe('squad presentation', () => {
     });
 
     it('shows the passes and dribbles as a count and a rate (engine-v7)', () => {
-      expect(cell('Passes')).toBe('96 / 120');
+      expect(cell('Passes')).toBe('96/120');
       expect(cell('Pass %')).toBe('80%');
-      expect(cell('Dribbles')).toBe('7 / 14');
+      expect(cell('Dribbles')).toBe('7/14');
       expect(cell('Dribble %')).toBe('50%');
     });
 

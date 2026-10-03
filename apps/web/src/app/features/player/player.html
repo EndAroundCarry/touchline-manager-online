@@ -188,22 +188,32 @@
           </p>
 
           <div
-            class="mt-3 overflow-x-auto rounded border border-slate-200 bg-white"
-            tabindex="0"
+            class="mt-3 rounded border border-slate-200 bg-white"
             role="group"
             aria-label="Season statistics"
             data-testid="season-stats"
           >
-            <table class="min-w-full border-collapse text-sm">
+            <table class="w-full table-fixed border-collapse text-[11px] sm:text-xs xl:text-sm">
               <caption class="sr-only">
                 Season-by-season statistics, most recent first, with the career total.
               </caption>
               <thead>
                 <tr class="border-b border-slate-200 text-slate-600">
-                  <th scope="col" class="px-3 py-2 text-left font-medium">Season</th>
-                  <th scope="col" class="px-3 py-2 text-left font-medium">Club</th>
-                  @for (column of statColumns; track column.label) {
-                    <th scope="col" class="px-3 py-2 text-right font-medium">
+                  <th scope="col" class="w-[14%] px-1.5 py-2 text-left font-medium md:w-[9%]">
+                    Season
+                  </th>
+                  <th scope="col" class="w-[16%] px-1.5 py-2 text-left font-medium md:w-[14%]">
+                    Club
+                  </th>
+                  @for (column of statColumns; track column.label; let index = $index) {
+                    <th
+                      scope="col"
+                      [class]="
+                        statCellClass(index) +
+                        ' font-medium' +
+                        (column.wide ? ' w-[17%] md:w-[9%]' : '')
+                      "
+                    >
                       <abbr [title]="column.title">{{ column.label }}</abbr>
                     </th>
                   }
@@ -212,19 +222,19 @@
               <tbody>
                 @for (row of seasonTableRows(); track row.key) {
                   <tr class="border-b border-slate-100">
-                    <th scope="row" class="px-3 py-2 text-left font-medium whitespace-nowrap">
+                    <th scope="row" class="px-1.5 py-2 text-left font-medium">
                       {{ row.season }}
                     </th>
-                    <td class="px-3 py-2 text-left whitespace-nowrap">{{ row.club }}</td>
+                    <td class="px-1.5 py-2 text-left">{{ row.club }}</td>
                     @for (cell of row.cells; track $index) {
-                      <td class="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+                      <td [class]="statCellClass($index) + ' tabular-nums'">
                         {{ cell }}
                       </td>
                     }
                   </tr>
                 } @empty {
                   <tr>
-                    <td [attr.colspan]="statColumns.length + 2" class="px-3 py-3 text-slate-600">
+                    <td [attr.colspan]="statColumns.length + 2" class="px-2 py-3 text-slate-600">
                       This player has not taken the pitch yet, so there are no season statistics.
                     </td>
                   </tr>
@@ -233,11 +243,11 @@
               @if (careerRow(); as career) {
                 <tfoot>
                   <tr class="border-t border-slate-300 bg-slate-50 font-semibold">
-                    <th scope="row" class="px-3 py-2 text-left" colspan="2">
+                    <th scope="row" class="px-1.5 py-2 text-left" colspan="2">
                       Career ({{ seasonsPlayed() }})
                     </th>
                     @for (cell of career; track $index) {
-                      <td class="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+                      <td [class]="statCellClass($index) + ' tabular-nums'">
                         {{ cell }}
                       </td>
                     }
@@ -276,73 +286,92 @@
             </p>
 
             <div
-              class="mt-3 overflow-x-auto rounded border border-slate-200 bg-white"
-              tabindex="0"
+              class="mt-3 rounded border border-slate-200 bg-white"
               role="group"
               aria-label="Match statistics"
               data-testid="match-stats"
             >
-              <table class="min-w-full border-collapse text-sm">
+              <table class="w-full table-fixed border-collapse text-[11px] sm:text-xs xl:text-sm">
                 <caption class="sr-only">
                   Match-by-match statistics, most recent first.
                 </caption>
                 <thead>
                   <tr class="border-b border-slate-200 text-slate-600">
-                    <th scope="col" class="px-3 py-2 text-left font-medium">Rd</th>
-                    <th scope="col" class="px-3 py-2 text-left font-medium">Match</th>
-                    <th scope="col" class="px-3 py-2 text-left font-medium">Result</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">
+                    <th scope="col" class="w-[6%] px-1.5 py-2 text-left font-medium">Rd</th>
+                    <th scope="col" class="w-[18%] px-1.5 py-2 text-left font-medium">Match</th>
+                    <th scope="col" class="w-[9%] px-1.5 py-2 text-left font-medium">Result</th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium max-md:hidden">
                       <abbr title="Minutes played">Min</abbr>
                     </th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Goals</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Assists</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium">Goals</th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium">Assists</th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium">
                       <abbr title="Passes completed / attempted">Passes</abbr>
                     </th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium">
                       <abbr title="Dribbles won / attempted">Dribbles</abbr>
                     </th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Shots</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium max-md:hidden">
+                      Shots
+                    </th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium max-lg:hidden">
                       <abbr title="Shots on target">On tgt</abbr>
                     </th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Saves</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Yellow</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Red</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Rating</th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium max-lg:hidden">
+                      Saves
+                    </th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium max-md:hidden">
+                      Yellow
+                    </th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium max-lg:hidden">
+                      Red
+                    </th>
+                    <th scope="col" class="px-1.5 py-2 text-right font-medium">Rating</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (match of matchRows(); track match.fixtureId) {
                     <tr class="border-b border-slate-100 last:border-b-0">
-                      <td class="px-3 py-2 tabular-nums">{{ match.round }}</td>
-                      <td class="px-3 py-2 whitespace-nowrap">
+                      <td class="px-1.5 py-2 tabular-nums">{{ match.round }}</td>
+                      <td class="px-1.5 py-2">
                         {{ match.home ? 'vs' : 'at' }} {{ match.opponentName }}
                       </td>
-                      <td class="px-3 py-2 whitespace-nowrap tabular-nums">
+                      <td class="px-1.5 py-2 tabular-nums">
                         {{ match.goalsFor }}&ndash;{{ match.goalsAgainst }}
                       </td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.minutesPlayed }}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.goals }}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.assists }}</td>
-                      <td class="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+                      <td class="px-1.5 py-2 text-right tabular-nums max-md:hidden">
+                        {{ match.minutesPlayed }}
+                      </td>
+                      <td class="px-1.5 py-2 text-right tabular-nums">{{ match.goals }}</td>
+                      <td class="px-1.5 py-2 text-right tabular-nums">{{ match.assists }}</td>
+                      <td class="px-1.5 py-2 text-right tabular-nums">
                         {{ ratio(match.passesCompleted, match.passesAttempted) }}
                       </td>
-                      <td class="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+                      <td class="px-1.5 py-2 text-right tabular-nums">
                         {{ ratio(match.dribblesCompleted, match.dribblesAttempted) }}
                       </td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.shots }}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.shotsOnTarget }}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.saves }}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.yellowCards }}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{{ match.redCards }}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">
+                      <td class="px-1.5 py-2 text-right tabular-nums max-md:hidden">
+                        {{ match.shots }}
+                      </td>
+                      <td class="px-1.5 py-2 text-right tabular-nums max-lg:hidden">
+                        {{ match.shotsOnTarget }}
+                      </td>
+                      <td class="px-1.5 py-2 text-right tabular-nums max-lg:hidden">
+                        {{ match.saves }}
+                      </td>
+                      <td class="px-1.5 py-2 text-right tabular-nums max-md:hidden">
+                        {{ match.yellowCards }}
+                      </td>
+                      <td class="px-1.5 py-2 text-right tabular-nums max-lg:hidden">
+                        {{ match.redCards }}
+                      </td>
+                      <td class="px-1.5 py-2 text-right tabular-nums">
                         {{ matchRating(match.rating) }}
                       </td>
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="14" class="px-3 py-3 text-slate-600">
+                      <td colspan="14" class="px-2 py-3 text-slate-600">
                         This player has no matches for that season: they have not taken the pitch in
                         it.
                       </td>

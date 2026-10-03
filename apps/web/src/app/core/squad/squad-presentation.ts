@@ -308,6 +308,15 @@ export interface StatColumn {
 
   /** Formats the column's cell from a season line. */
   readonly value: (stats: PlayerSeasonStats) => string;
+
+  /**
+   * How much room the column needs to be worth showing: 1 is always shown, 2 from a tablet's width up, and 3
+   * from a laptop's, so the table fits the width it has without scrolling sideways.
+   */
+  readonly tier: 1 | 2 | 3;
+
+  /** Whether the column holds a `completed/attempted` pair, which needs a wider column than a single count. */
+  readonly wide?: boolean;
 }
 
 /**
@@ -317,40 +326,67 @@ export interface StatColumn {
  * differently, and the passes and take-ons read as `completed / attempted` with their rate beside them.
  */
 export const STAT_COLUMNS: readonly StatColumn[] = [
-  { label: 'Apps', title: 'Appearances', value: (stats) => `${stats.appearances}` },
-  { label: 'Starts', title: 'Starts', value: (stats) => `${stats.starts}` },
-  { label: 'Min', title: 'Minutes played', value: (stats) => `${stats.minutesPlayed}` },
-  { label: 'Goals', title: 'Goals', value: (stats) => `${stats.goals}` },
-  { label: 'Assists', title: 'Assists', value: (stats) => `${stats.assists}` },
+  {
+    label: 'Apps',
+    title: 'Appearances',
+    value: (stats) => `${stats.appearances}`,
+    tier: 2,
+  },
+  { label: 'Starts', title: 'Starts', value: (stats) => `${stats.starts}`, tier: 3 },
+  {
+    label: 'Min',
+    title: 'Minutes played',
+    value: (stats) => `${stats.minutesPlayed}`,
+    tier: 2,
+  },
+  { label: 'Goals', title: 'Goals', value: (stats) => `${stats.goals}`, tier: 1 },
+  { label: 'Assists', title: 'Assists', value: (stats) => `${stats.assists}`, tier: 1 },
   {
     label: 'Passes',
     title: 'Passes completed / attempted',
     value: (stats) => ratioLabel(stats.passesCompleted, stats.passesAttempted),
+    tier: 1,
+    wide: true,
   },
   {
     label: 'Pass %',
     title: 'Pass accuracy',
     value: (stats) => percentageLabel(stats.passesCompleted, stats.passesAttempted),
+    tier: 2,
   },
   {
     label: 'Dribbles',
     title: 'Dribbles won / attempted',
     value: (stats) => ratioLabel(stats.dribblesCompleted, stats.dribblesAttempted),
+    tier: 1,
+    wide: true,
   },
   {
     label: 'Dribble %',
     title: 'Dribble success',
     value: (stats) => percentageLabel(stats.dribblesCompleted, stats.dribblesAttempted),
+    tier: 3,
   },
-  { label: 'Shots', title: 'Shots', value: (stats) => `${stats.shots}` },
-  { label: 'On tgt', title: 'Shots on target', value: (stats) => `${stats.shotsOnTarget}` },
-  { label: 'Saves', title: 'Saves', value: (stats) => `${stats.saves}` },
-  { label: 'Yellow', title: 'Yellow cards', value: (stats) => `${stats.yellowCards}` },
-  { label: 'Red', title: 'Red cards', value: (stats) => `${stats.redCards}` },
+  { label: 'Shots', title: 'Shots', value: (stats) => `${stats.shots}`, tier: 2 },
+  {
+    label: 'On tgt',
+    title: 'Shots on target',
+    value: (stats) => `${stats.shotsOnTarget}`,
+    tier: 3,
+  },
+  { label: 'Saves', title: 'Saves', value: (stats) => `${stats.saves}`, tier: 3 },
+  {
+    label: 'Yellow',
+    title: 'Yellow cards',
+    value: (stats) => `${stats.yellowCards}`,
+    tier: 2,
+  },
+  { label: 'Red', title: 'Red cards', value: (stats) => `${stats.redCards}`, tier: 3 },
   {
     label: 'Rating',
     title: 'Average rating',
     value: (stats) => averageRatingLabel(stats.averageRating),
+    tier: 1,
   },
 ];
 
@@ -361,7 +397,7 @@ export function statCells(stats: PlayerSeasonStats): readonly string[] {
 
 /** A completed count against an attempted one, as `completed / attempted` (`engine-v7`). */
 export function ratioLabel(completed: number, attempted: number): string {
-  return `${completed} / ${attempted}`;
+  return `${completed}/${attempted}`;
 }
 
 /**

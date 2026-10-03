@@ -225,10 +225,10 @@ describe('PlayerProfile', () => {
     );
     expect(table.querySelectorAll('tbody tr')).toHaveLength(1);
     expect(table.querySelector('tbody tr')!.textContent).toContain('Ashvale United');
-    expect(table.querySelector('tbody tr')!.textContent).toContain('320 / 400');
+    expect(table.querySelector('tbody tr')!.textContent).toContain('320/400');
     expect(table.querySelector('tbody tr')!.textContent).toContain('80%');
     expect(table.querySelector('tfoot tr')!.textContent).toContain('Career');
-    expect(table.querySelector('tfoot tr')!.textContent).toContain('20 / 50');
+    expect(table.querySelector('tfoot tr')!.textContent).toContain('20/50');
   });
 
   it('shows the current season first and an earlier season on request', async () => {
@@ -251,8 +251,8 @@ describe('PlayerProfile', () => {
     // The engine counts passes and take-ons now, so a row shows them as completed out of attempted.
     const firstRow = root.querySelector('[data-testid="match-stats"] tbody tr')!.textContent;
 
-    expect(firstRow).toContain('32 / 40');
-    expect(firstRow).toContain('3 / 6');
+    expect(firstRow).toContain('32/40');
+    expect(firstRow).toContain('3/6');
     expect(root.querySelector('[data-testid="match-stats"]')?.textContent).not.toContain(
       'not tracked yet',
     );

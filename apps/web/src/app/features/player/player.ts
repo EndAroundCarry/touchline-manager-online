@@ -78,6 +78,18 @@ export class PlayerProfile implements OnInit {
   /** The columns of the season table (`STA-2`). */
   protected readonly statColumns = STAT_COLUMNS;
 
+  /** The classes of a season-table cell or heading: a lower-priority column gives way on a narrower screen. */
+  protected statCellClass(index: number): string {
+    const base = 'px-1.5 py-2 text-right';
+    const tier = this.statColumns[index].tier;
+
+    if (tier === 3) {
+      return `${base} max-lg:hidden`;
+    }
+
+    return tier === 2 ? `${base} max-md:hidden` : base;
+  }
+
   /** One table row per season the player has a line for, most recent first (`STA-2`). */
   protected readonly seasonTableRows = computed(() =>
     this.careerSeasons().map((season) => ({
