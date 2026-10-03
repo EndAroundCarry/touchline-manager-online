@@ -466,10 +466,11 @@ version. The value and band constants are in §18.
 
 Detailed engine formulas (unit ratings, possession and chance resolution, the continuous passage, bounded
 tactical modifiers, and all versioned constants) live in `docs/product/match-engine.md`, which covers
-engine version 4. A possession is played as a real passage — a chain of touches from where the last one
+engine version 5. A possession is played as a real passage — a chain of touches from where the last one
 left the ball into the attacking third — so a shot, a foul, a free kick, a corner, and every other event
 carries the pitch coordinates it actually happened at (ADR-0051). The replay is one continuous film of the
-whole match with a companion highlights reel over the same data (ADR-0052).
+whole match, played at one constant pace in about ten minutes, with a companion highlights reel over the same
+data (ADR-0052, ADR-0054).
 
 ### 15.1 Player statistics
 
@@ -655,9 +656,10 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `retirement_forced_announcement_age` | 36 outfield / 38 goalkeeper | CON-10 (balancing) |
 | `retirement_forced_age` | 37 outfield / 39 goalkeeper | CON-10 (balancing) |
 | `refresh_token_lifetime_minutes` | 15 (access) | ADR-0002 |
-| `replay_version` | `replay-v3` (the presentation is re-derived from the frozen snapshot, never stored) | MAT-8 (FIC-8) |
+| `replay_version` | `replay-v4` (the presentation is re-derived from the frozen snapshot, never stored) | MAT-8 (FIC-8) |
 | `commentary_version` | `commentary-v3` | MAT-8 (FIC-8) |
-| `match_film_seconds` | 570–660 (9:30 target floor, 11:00 hard ceiling) | ADR-0006, ADR-0052 |
+| `match_film_seconds` | `clamp(played seconds ÷ 10, 570, 660)` (9:30 target floor, 11:00 hard ceiling that includes the half-time card); median 10:07 | ADR-0006, ADR-0054 |
+| `match_film_pace` | 1.8–2.9× real time, one value for the whole film (median 2.53×); quiet play is condensed above 2.3×, the pace may rise to 3.0× before holds are shortened | ADR-0054 |
 | `reel_seconds_max` | 720 (12:00) | ADR-0052 |
 | `reel_clips_max` | 12 (goals excepted) | ADR-0052 |
 | `reel_lead_in_match_seconds` | 600 | ADR-0052 |

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Film fluidity harness</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        background: #090d16;
+        color: #e2e8f0;
+        font: 13px/1.5 system-ui, sans-serif;
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin: 0 0 12px;
+      }
+
+      #pitch {
+        display: block;
+        width: 100%;
+        max-width: 1120px;
+        aspect-ratio: 105 / 68;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+        background: #0b1220;
+      }
+
+      #status {
+        margin: 10px 0;
+        color: #64748b;
+        font-family: ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Film fluidity harness — a dumped presentation, played by the real playback, loop and renderer</h1>
+    <canvas id="pitch" role="img" aria-label="The film"></canvas>
+    <div id="status">loading…</div>
+    <script type="module" src="./film-harness.js"></script>
+  </body>
+</html>

@@ -1,186 +1,313 @@
-import { HighlightKeyframe } from '../../../core/match/match.models';
-import { FrameEntity, PitchPoint, RendererEntity, RendererTrack } from './renderer.models';
+import { FilmTrack } from '../../../core/match/film-timeline';
 
 /**
- * Turns semantic keyframes into a position at an arbitrary moment (`§9.1`, `§9.4`).
+ * Turns a film track into a position at an arbitrary moment (`§9.1`, `§9.4`, `replay-v4`).
  *
- * The client interpolates rather than being sent frames, so the payload is a few kilobytes and the replay
- * is identical on a 60 Hz and a 144 Hz display. Everything here is pure and takes the animation time it is
- * given, so a test can ask for any moment without a canvas or a clock.
+ * The client interpolates rather than being sent frames, so the payload is a couple of megabytes instead of
+ * hundreds and the replay is identical on a 60 Hz and a 144 Hz display. Everything here is pure and takes the
+ * animation time it is given, so a test can ask for any moment without a canvas or a clock.
  *
- * Movement is drawn with a Catmull-Rom spline through the keyframes (Stage 6): the compressed track keeps
- * only the samples where the velocity or the direction changed, and a spline through those samples rounds
- * the corner a straight line would leave, which is what makes a run and a flight read as movement rather
- * than as a chain of straight segments. The spline is *interpolating* — it passes exactly through every
- * keyframe — so a semantic anchor (the strike, the dive) still lands at the moment the engine authored it.
- * Altitude is splined the same way and then clamped, so a ball can neither sink under the pitch nor leave
- * the altitude band the contract gives it. A two-keyframe track has no neighbouring samples to bend around,
- * so it stays a straight line: inventing a curve between two points is inventing movement that was never
- * recorded.
+ * **Players** move on a monotone cubic Hermite spline (Fritsch–Carlson) that is aware of *time*: the server
+ * keeps only the samples where a run changed, so they are not evenly spaced, and a spline that assumed they
+ * were — the Catmull-Rom this replaces — overshot a corner and wobbled after a slow stretch. A monotone spline
+ * never leaves the range of the two keyframes it joins, so a player cannot swing past where they were going,
+ * and it has one velocity at every keyframe, so a run is smooth where two segments meet. It is still an
+ * *interpolating* spline: it passes through every keyframe, so a strike or a dive lands when it was authored.
+ *
+ * **The ball** is linear. The server samples a flight every hundred milliseconds already, and a curve through
+ * those samples would invent a bend in a pass that is a straight line.
+ *
+ * A **step** — two keyframes at one instant, which is what a cut is — is never interpolated across: the entity
+ * is at the first until the instant and at the second from it. Each track keeps a cursor, so a frame does not
+ * scan the keyframes or allocate anything; it moves the cursor on by a segment, or searches after a seek.
  */
-
-/** The normalized coordinate scale the engine speaks. */
-const PITCH_SCALE = 10_000;
-
-/** The altitude band the contract gives `z`. */
-const ALTITUDE_SCALE = 100;
 
 /** One entity's state at one moment: where it is, how high it is, and what it is doing. */
 export interface KeyframeSample {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
-  readonly speed: number;
-  readonly action: string | null;
+  x: number;
+  y: number;
+  z: number;
+  speed: number;
+  action: string | null;
 }
 
-/** The Catmull-Rom basis at `t`, through the four control values (`0…1` between `p1` and `p2`). */
-export function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
-  const t2 = t * t;
-  const t3 = t2 * t;
-
-  return (
-    0.5 *
-    (2 * p1 +
-      (-p0 + p2) * t +
-      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-      (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
-  );
+/** Creates a sample to be filled in, so a caller can keep one and reuse it every frame. */
+export function emptySample(): KeyframeSample {
+  return { x: 0, y: 0, z: 0, speed: 0, action: null };
 }
 
 /**
- * One entity's state at a moment, interpolated between the two keyframes that bracket it.
+ * The tangents of a monotone cubic Hermite spline through `(times[i], values[i])`, in value units per
+ * millisecond (Fritsch–Carlson, for spacing that is not even).
  *
- * Before the first keyframe and after the last it holds, rather than extrapolating: a track is the movement
- * the engine decided on, and inventing movement past its ends would show something that never happened.
+ * Two keyframes at one instant are a break: the spline on either side of it is built from its own side only,
+ * and the tangents at the break come from the segment next to them.
  */
-export function sampleAt(
-  keyframes: readonly HighlightKeyframe[],
-  timeMs: number,
-): KeyframeSample | null {
-  if (keyframes.length === 0) {
-    return null;
+export function monotoneTangents(
+  times: ArrayLike<number>,
+  values: ArrayLike<number>,
+): Float64Array {
+  const count = times.length;
+  const tangents = new Float64Array(count);
+
+  if (count < 2) {
+    return tangents;
   }
 
-  const first = keyframes[0];
-  const last = keyframes[keyframes.length - 1];
+  const spans = new Float64Array(count - 1);
+  const secants = new Float64Array(count - 1);
 
-  if (timeMs <= first.timeMilliseconds) {
-    return sampleFrom(first);
+  for (let index = 0; index < count - 1; index += 1) {
+    spans[index] = times[index + 1] - times[index];
+    secants[index] = spans[index] > 0 ? (values[index + 1] - values[index]) / spans[index] : 0;
   }
 
-  if (timeMs >= last.timeMilliseconds) {
-    return sampleFrom(last);
+  for (let index = 0; index < count; index += 1) {
+    const hasLeft = index > 0 && spans[index - 1] > 0;
+    const hasRight = index < count - 1 && spans[index] > 0;
+
+    if (hasLeft && hasRight) {
+      const left = secants[index - 1];
+      const right = secants[index];
+
+      // A turning point or a stop: the velocity is zero there, which is what keeps the curve inside its
+      // keyframes. Otherwise the three-point slope for uneven spacing.
+      tangents[index] =
+        left * right <= 0
+          ? 0
+          : (spans[index] * left + spans[index - 1] * right) / (spans[index - 1] + spans[index]);
+    } else if (hasLeft) {
+      tangents[index] = secants[index - 1];
+    } else if (hasRight) {
+      tangents[index] = secants[index];
+    }
   }
 
-  for (let index = 1; index < keyframes.length; index += 1) {
-    const to = keyframes[index];
-
-    if (timeMs > to.timeMilliseconds) {
+  for (let index = 0; index < count - 1; index += 1) {
+    if (spans[index] <= 0) {
       continue;
     }
 
-    const from = keyframes[index - 1];
-    const span = to.timeMilliseconds - from.timeMilliseconds;
+    if (secants[index] === 0) {
+      tangents[index] = 0;
+      tangents[index + 1] = 0;
 
-    if (span <= 0) {
-      return sampleFrom(to);
+      continue;
     }
 
-    const progress = (timeMs - from.timeMilliseconds) / span;
+    const alpha = tangents[index] / secants[index];
+    const beta = tangents[index + 1] / secants[index];
+    const size = alpha * alpha + beta * beta;
 
-    // Two keyframes have no neighbours to bend around, so the segment is the straight line they describe.
-    if (keyframes.length === 2) {
-      return {
-        x: from.x + (to.x - from.x) * progress,
-        y: from.y + (to.y - from.y) * progress,
-        z: clampAltitude(altitudeOf(from) + (altitudeOf(to) - altitudeOf(from)) * progress),
-        speed: from.speed ?? 0,
-        action: from.action ?? null,
-      };
+    // Outside the circle of radius three the spline would overshoot its keyframes, so the tangents are
+    // brought back onto it.
+    if (size > 9) {
+      const scale = 3 / Math.sqrt(size);
+
+      tangents[index] = scale * alpha * secants[index];
+      tangents[index + 1] = scale * beta * secants[index];
     }
-
-    const before = keyframes[index - 2] ?? from;
-    const after = keyframes[index + 1] ?? to;
-
-    return {
-      x: clampCoordinate(catmullRom(before.x, from.x, to.x, after.x, progress)),
-      y: clampCoordinate(catmullRom(before.y, from.y, to.y, after.y, progress)),
-      z: clampAltitude(
-        catmullRom(
-          altitudeOf(before),
-          altitudeOf(from),
-          altitudeOf(to),
-          altitudeOf(after),
-          progress,
-        ),
-      ),
-      // The speed and the action belong to the keyframe the segment starts on: the strike is a moment the
-      // shooter reached, and the effect it triggers plays out over the movement that follows it.
-      speed: from.speed ?? 0,
-      action: from.action ?? null,
-    };
   }
 
-  return sampleFrom(last);
+  return tangents;
 }
 
-/** One entity's ground position at a moment, which is what the trail and the existing geometry use. */
-export function positionAt(
-  keyframes: readonly HighlightKeyframe[],
-  timeMs: number,
-): PitchPoint | null {
-  const sample = sampleAt(keyframes, timeMs);
+/** The cubic Hermite basis at `fraction` (0…1) between two values with their tangents and the span between them. */
+export function hermite(
+  from: number,
+  to: number,
+  fromTangent: number,
+  toTangent: number,
+  span: number,
+  fraction: number,
+): number {
+  const squared = fraction * fraction;
+  const cubed = squared * fraction;
 
-  return sample === null ? null : { x: sample.x, y: sample.y };
+  return (
+    (2 * cubed - 3 * squared + 1) * from +
+    (cubed - 2 * squared + fraction) * span * fromTangent +
+    (-2 * cubed + 3 * squared) * to +
+    (cubed - squared) * span * toTangent
+  );
 }
 
-/**
- * Every entity's state at a moment, ready to draw.
- *
- * An entity with no track holds its anchor, which is what the engine sends for a player who is not involved
- * in the passage — two keyframes rather than a frame per animation tick (`§9.3`).
- */
-export function frameAt(
-  entities: readonly RendererEntity[],
-  tracks: readonly RendererTrack[],
-  timeMs: number,
-): readonly FrameEntity[] {
-  const byId = new Map(tracks.map((track) => [track.entityId, track.keyframes]));
+/** Samples one film track, with a cursor so that playing forward costs a comparison a frame. */
+export class TrackInterpolator {
+  private readonly xTangents: Float64Array;
+  private readonly yTangents: Float64Array;
+  private readonly zTangents: Float64Array;
+  private cursor = 0;
 
-  return entities.map((entity) => {
-    const sample = sampleAt(byId.get(entity.id) ?? [], timeMs);
+  /**
+   * Initializes the interpolator over a track.
+   *
+   * @param track The track.
+   * @param smooth Whether to curve between keyframes (a player) or join them with straight lines (the ball).
+   */
+  constructor(
+    private readonly track: FilmTrack,
+    private readonly smooth: boolean,
+  ) {
+    const empty = new Float64Array(0);
 
-    return sample === null
-      ? { entity, position: entity.anchor, z: 0, speed: 0, action: null }
-      : {
-          entity,
-          position: { x: sample.x, y: sample.y },
-          z: sample.z,
-          speed: sample.speed,
-          action: sample.action,
-        };
-  });
+    this.xTangents = smooth ? monotoneTangents(track.times, track.xs) : empty;
+    this.yTangents = smooth ? monotoneTangents(track.times, track.ys) : empty;
+    this.zTangents = smooth ? monotoneTangents(track.times, track.zs) : empty;
+  }
+
+  /** How many keyframes the track has. */
+  get length(): number {
+    return this.track.length;
+  }
+
+  /**
+   * Writes the state at a moment into `out`, moving the cursor to the segment the moment falls in.
+   *
+   * Before the first keyframe and after the last it holds, rather than extrapolating: a track is the movement
+   * the film decided on, and inventing movement past its ends would show something that never happened.
+   *
+   * @returns Whether the track has anything to sample.
+   */
+  sample(timeMs: number, out: KeyframeSample): boolean {
+    if (this.track.length === 0) {
+      return false;
+    }
+
+    this.cursor = this.locate(timeMs, this.cursor);
+    this.write(this.cursor, timeMs, out);
+
+    return true;
+  }
+
+  /**
+   * Writes the state at a moment into `out` without moving the cursor, for looking *back* along a track — a
+   * ball's trail, a strike's streak — while the cursor follows the playhead.
+   */
+  sampleAt(timeMs: number, out: KeyframeSample): boolean {
+    if (this.track.length === 0) {
+      return false;
+    }
+
+    this.write(this.locate(timeMs, -1), timeMs, out);
+
+    return true;
+  }
+
+  /**
+   * The index of the keyframe the segment containing a moment starts on, or the last keyframe at or after the
+   * track's end. Two keyframes at one instant are skipped past, so a moment at a step is on the far side of it.
+   */
+  private locate(timeMs: number, hint: number): number {
+    const { times, length } = this.track;
+    const last = length - 1;
+
+    if (timeMs >= times[last]) {
+      return last;
+    }
+
+    if (timeMs < times[0]) {
+      return 0;
+    }
+
+    if (hint >= 0 && hint < last) {
+      if (times[hint] <= timeMs && timeMs < times[hint + 1]) {
+        return hint;
+      }
+
+      // Playing forward moves on by one segment, so that is the next thing worth trying.
+      if (hint + 1 < last && times[hint + 1] <= timeMs && timeMs < times[hint + 2]) {
+        return hint + 1;
+      }
+    }
+
+    let low = 0;
+    let high = length;
+
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+
+      if (times[middle] <= timeMs) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+
+    return Math.min(last, low - 1);
+  }
+
+  private write(index: number, timeMs: number, out: KeyframeSample): void {
+    const { times, xs, ys, zs, speeds, actions, length } = this.track;
+
+    // The speed and the action belong to the keyframe the segment starts on: a strike is a moment the shooter
+    // reached, and the effect it triggers plays out over the movement that follows it.
+    out.speed = speeds[index];
+    out.action = actions[index];
+
+    if (index >= length - 1 || timeMs <= times[index]) {
+      out.x = xs[index];
+      out.y = ys[index];
+      out.z = zs[index];
+
+      return;
+    }
+
+    const span = times[index + 1] - times[index];
+    const fraction = (timeMs - times[index]) / span;
+
+    if (!this.smooth) {
+      out.x = xs[index] + (xs[index + 1] - xs[index]) * fraction;
+      out.y = ys[index] + (ys[index + 1] - ys[index]) * fraction;
+      out.z = zs[index] + (zs[index + 1] - zs[index]) * fraction;
+
+      return;
+    }
+
+    out.x = within(
+      hermite(
+        xs[index],
+        xs[index + 1],
+        this.xTangents[index],
+        this.xTangents[index + 1],
+        span,
+        fraction,
+      ),
+      xs[index],
+      xs[index + 1],
+    );
+    out.y = within(
+      hermite(
+        ys[index],
+        ys[index + 1],
+        this.yTangents[index],
+        this.yTangents[index + 1],
+        span,
+        fraction,
+      ),
+      ys[index],
+      ys[index + 1],
+    );
+    out.z = within(
+      hermite(
+        zs[index],
+        zs[index + 1],
+        this.zTangents[index],
+        this.zTangents[index + 1],
+        span,
+        fraction,
+      ),
+      zs[index],
+      zs[index + 1],
+    );
+  }
 }
 
-function sampleFrom(keyframe: HighlightKeyframe): KeyframeSample {
-  return {
-    x: keyframe.x,
-    y: keyframe.y,
-    z: altitudeOf(keyframe),
-    speed: keyframe.speed ?? 0,
-    action: keyframe.action ?? null,
-  };
-}
-
-function altitudeOf(keyframe: HighlightKeyframe): number {
-  return keyframe.z ?? 0;
-}
-
-function clampCoordinate(value: number): number {
-  return Math.min(PITCH_SCALE, Math.max(0, value));
-}
-
-function clampAltitude(value: number): number {
-  return Math.min(ALTITUDE_SCALE, Math.max(0, value));
+/** Keeps a value between two others, which a monotone spline already guarantees up to rounding. */
+function within(value: number, one: number, other: number): number {
+  return value < Math.min(one, other)
+    ? Math.min(one, other)
+    : value > Math.max(one, other)
+      ? Math.max(one, other)
+      : value;
 }
