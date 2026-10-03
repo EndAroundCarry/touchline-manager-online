@@ -66,7 +66,7 @@ internal static class AssistPlanner
 
         // The ball that set the goal up is a completed pass: the possession's own creating pass when it had
         // one, which the tally credits to this player when the possession ends, and otherwise the delivery
-        // that no phase of the approach counts, a corner's (`engine-v6`).
+        // that no phase of the approach counts, a corner's (`engine-v7`).
         if (state.Passing.FinalLegCreatedShot)
         {
             state.Passing.AssistedBy = id;

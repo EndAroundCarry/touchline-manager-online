@@ -5,6 +5,7 @@ namespace TouchlineManager.Contracts.Squad;
 /// Bounded to <c>SQ-3</c>'s 25 players, which is what makes a single unpaged response the right shape.
 /// Rows deliberately do not carry the twenty-eight-attribute block: the squad table is about selection
 /// readiness — availability, condition, contract — and the attribute grid belongs to the player profile.
+/// They carry only the four family means, so the stronger player can be spotted at a glance.
 /// </remarks>
 /// <param name="ClubId">The club the squad belongs to.</param>
 /// <param name="ClubName">The generated club name.</param>
@@ -49,6 +50,7 @@ public sealed record SquadSummaryResponse(
 /// <param name="State">Condition, fatigue, morale, and sharpness.</param>
 /// <param name="Contract">The active contract, or null if the player has none (`SQ-6`).</param>
 /// <param name="Availability">Every open injury and suspension, empty when the player is available.</param>
+/// <param name="AttributeAverages">The mean of each attribute family, for scanning the squad at a glance.</param>
 public sealed record SquadPlayerResponse(
     Guid Id,
     string FullName,
@@ -60,7 +62,22 @@ public sealed record SquadPlayerResponse(
     IReadOnlyList<string> SecondaryPositions,
     PlayerStateResponse State,
     PlayerContractSummaryResponse? Contract,
-    IReadOnlyList<PlayerAvailabilityResponse> Availability);
+    IReadOnlyList<PlayerAvailabilityResponse> Availability,
+    AttributeAveragesResponse AttributeAverages);
+
+/// <summary>The mean of each attribute family, on the 1–20 attribute scale, to one decimal.</summary>
+/// <remarks>
+/// Four family means rather than an overall: no single number is authoritative for a player.
+/// </remarks>
+/// <param name="Goalkeeping">Mean of the four goalkeeping attributes.</param>
+/// <param name="Technical">Mean of the ten technical attributes.</param>
+/// <param name="Mental">Mean of the eight mental attributes.</param>
+/// <param name="Physical">Mean of the six physical attributes.</param>
+public sealed record AttributeAveragesResponse(
+    decimal Goalkeeping,
+    decimal Technical,
+    decimal Mental,
+    decimal Physical);
 
 /// <summary>
 /// A player's condition, fatigue, morale, and match sharpness, as user-facing values (`TRN-8`).
@@ -372,4 +389,70 @@ public sealed record ContractsResponse(
     int SeasonNumber,
     long WeeklyWageTotalMinor,
     IReadOnlyList<PlayerContractResponse> Contracts,
+    DateTimeOffset ServerTime);
+
+/// <summary>One match of a player's own history, with the line they had in it (`STA-2`, master plan §11.1).</summary>
+/// <remarks>
+/// Read from the stored match: the player's line (minutes, goals, assists, cards, rating) comes from the
+/// result document and the shots and saves from the match's events, which is what the season totals are summed
+/// from, so the rows add up to the season line. The passes and take-ons are the engine's own counts, carried on
+/// the same line (`engine-v7`).
+/// </remarks>
+/// <param name="FixtureId">The fixture that was played.</param>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="Round">The matchday round within the season.</param>
+/// <param name="PlayedAt">The kick-off instant.</param>
+/// <param name="OpponentClubId">The opposing club.</param>
+/// <param name="OpponentName">The opposing club's generated name.</param>
+/// <param name="Home">Whether the player's club was the host.</param>
+/// <param name="GoalsFor">The player's side's goals.</param>
+/// <param name="GoalsAgainst">The opposing side's goals.</param>
+/// <param name="Started">Whether the player was in the eleven.</param>
+/// <param name="MinutesPlayed">Minutes on the pitch.</param>
+/// <param name="Goals">Goals scored.</param>
+/// <param name="Assists">Goals set up.</param>
+/// <param name="Shots">Shots taken.</param>
+/// <param name="ShotsOnTarget">Shots on target.</param>
+/// <param name="Saves">Saves made.</param>
+/// <param name="PassesAttempted">Passes attempted in open play.</param>
+/// <param name="PassesCompleted">Passes that found a teammate.</param>
+/// <param name="DribblesAttempted">Take-ons attempted.</param>
+/// <param name="DribblesCompleted">Take-ons won.</param>
+/// <param name="YellowCards">Bookings received.</param>
+/// <param name="RedCards">Sendings-off.</param>
+/// <param name="Rating">The match rating on a 0.0–10.0 scale, or null when the player was not rated (`TRN-8`).</param>
+public sealed record PlayerMatchStatResponse(
+    Guid FixtureId,
+    int SeasonNumber,
+    string SeasonLabel,
+    int Round,
+    DateTimeOffset PlayedAt,
+    Guid OpponentClubId,
+    string OpponentName,
+    bool Home,
+    int GoalsFor,
+    int GoalsAgainst,
+    bool Started,
+    int MinutesPlayed,
+    int Goals,
+    int Assists,
+    int Shots,
+    int ShotsOnTarget,
+    int Saves,
+    int PassesAttempted,
+    int PassesCompleted,
+    int DribblesAttempted,
+    int DribblesCompleted,
+    int YellowCards,
+    int RedCards,
+    decimal? Rating);
+
+/// <summary>A player's matches, most recent first, across every season they have appeared in.</summary>
+/// <param name="PlayerId">The player.</param>
+/// <param name="Matches">One row per match the player took the pitch in.</param>
+/// <param name="ServerTime">The instant the response was produced.</param>
+public sealed record PlayerMatchesResponse(
+    Guid PlayerId,
+    IReadOnlyList<PlayerMatchStatResponse> Matches,
     DateTimeOffset ServerTime);

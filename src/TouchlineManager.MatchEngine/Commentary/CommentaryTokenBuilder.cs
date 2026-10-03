@@ -121,6 +121,15 @@ public enum PassageBeatKind
 
     /// <summary>An event, rendered from the full match log's own template for its type.</summary>
     Event = 9,
+
+    /// <summary>A goal kick is about to be taken (`commentary-v4`).</summary>
+    GoalKick = 10,
+
+    /// <summary>The goalkeeper has the ball and is about to play it (`commentary-v4`).</summary>
+    KeeperBall = 11,
+
+    /// <summary>A free kick is taken quickly, with no shot in it (`commentary-v4`).</summary>
+    FreeKick = 12,
 }
 
 /// <summary>
@@ -164,7 +173,7 @@ public sealed record PassageBeatV1(
 public static class CommentaryTokenBuilder
 {
     /// <summary>The version label of this template set.</summary>
-    public const string Version = "commentary-v3";
+    public const string Version = "commentary-v4";
 
     /// <summary>The delay between a strike and the line that reports where it ended up.</summary>
     private const int OutcomeDelayMilliseconds = 900;
@@ -349,6 +358,9 @@ public static class CommentaryTokenBuilder
         PassageBeatKind.Interception => BuildTemplates["interception"],
         PassageBeatKind.Save => BuildTemplates["save"],
         PassageBeatKind.Chance => BuildTemplates["chance"],
+        PassageBeatKind.GoalKick => BuildTemplates["goal_kick"],
+        PassageBeatKind.KeeperBall => BuildTemplates["keeper_ball"],
+        PassageBeatKind.FreeKick => BuildTemplates["free_kick"],
         _ => null,
     };
 
@@ -648,6 +660,29 @@ public static class CommentaryTokenBuilder
                 "{player} lets fly.",
                 "The chance falls to {player}.",
                 "{player} goes for goal.",
+            ]),
+
+        // The restarts a continuous film shows (`commentary-v4`).
+        ["goal_kick"] = new(
+            "match.restart.goal_kick",
+            [
+                "{player} takes the goal kick for {club}.",
+                "Goal kick, and {player} sends it long for {club}.",
+                "{player} restarts for {club} from the goal kick.",
+            ]),
+        ["keeper_ball"] = new(
+            "match.restart.keeper_ball",
+            [
+                "{player} has it, and {club} start again from the back.",
+                "{player} collects it and rolls it out for {club}.",
+                "The keeper, {player}, gets {club} going again.",
+            ]),
+        ["free_kick"] = new(
+            "match.restart.free_kick",
+            [
+                "{player} takes the free kick quickly for {club}.",
+                "A free kick to {club}, and {player} wastes no time.",
+                "{player} plays the free kick on.",
             ]),
     };
 

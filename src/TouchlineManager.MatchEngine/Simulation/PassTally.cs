@@ -4,7 +4,7 @@ using TouchlineManager.MatchEngine.Randomness;
 namespace TouchlineManager.MatchEngine.Simulation;
 
 /// <summary>
-/// The passes one possession made, as its phases add them up (`engine-v6`).
+/// The passes one possession made, as its phases add them up (`engine-v7`).
 /// </summary>
 /// <remarks>
 /// The simulation plays a possession as a handful of phases rather than as individual passes, so there is
@@ -61,7 +61,7 @@ internal sealed class PossessionPassing(MatchSide Side)
 }
 
 /// <summary>
-/// Credits a possession's passes to the players who made them (`engine-v6`).
+/// Credits a possession's passes to the players who made them (`engine-v7`).
 /// </summary>
 /// <remarks>
 /// <para>

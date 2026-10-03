@@ -25,7 +25,7 @@ namespace TouchlineManager.MatchEngine.Ratings;
 public static class TacticalModifiers
 {
     /// <summary>The version label of this modifier table, versioned with the engine.</summary>
-    public const string Version = "engine-tactical-v1";
+    public const string Version = "engine-tactical-v2";
 
     /// <summary>Computes one unit's modifier for a side's instructions.</summary>
     /// <param name="unit">The unit.</param>
@@ -84,19 +84,6 @@ public static class TacticalModifiers
 
         // Stopping shots is the goalkeeper's own business; no team instruction changes it.
         MatchUnit.Goalkeeping => 0,
-
-        MatchUnit.SetPieces =>
-            Width(instructions.Width, narrow: -60, wide: 100)
-            + Mentality(instructions.Mentality, attacking: 100, defensive: -60),
-
-        // Freshness is bought directly: an instruction that covers more ground costs condition.
-        MatchUnit.Fitness =>
-            Tempo(instructions.Tempo, low: 250, high: -300)
-            + Pressing(instructions.Pressing, lowBlock: 250, highPress: -300)
-            + Mentality(instructions.Mentality, defensive: 100, attacking: -150),
-
-        // Cohesion is about how well the eleven fit their jobs, which no instruction changes.
-        MatchUnit.Cohesion => 0,
 
         _ => throw new ArgumentOutOfRangeException(nameof(unit), unit, "Unknown unit."),
     };

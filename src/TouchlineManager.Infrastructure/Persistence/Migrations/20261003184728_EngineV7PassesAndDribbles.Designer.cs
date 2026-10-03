@@ -12,8 +12,8 @@ using TouchlineManager.Infrastructure.Persistence;
 namespace TouchlineManager.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TouchlineManagerDbContext))]
-    [Migration("20261003184728_EngineV6PassesAndDribbles")]
-    partial class EngineV6PassesAndDribbles
+    [Migration("20261003184728_EngineV7PassesAndDribbles")]
+    partial class EngineV7PassesAndDribbles
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

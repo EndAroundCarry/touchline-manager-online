@@ -99,7 +99,7 @@ public sealed record MatchPlayerLineV1
     /// </remarks>
     public required int Assists { get; init; }
 
-    /// <summary>Gets the passes the player attempted in open play (`engine-v6`).</summary>
+    /// <summary>Gets the passes the player attempted in open play (`engine-v7`).</summary>
     /// <remarks>
     /// Counted by the simulation as the possessions are played, for the reason assists are: the event stream
     /// carries no pass, so a pass is a fact the engine decided and it lives on the line. Set pieces other than
@@ -107,13 +107,13 @@ public sealed record MatchPlayerLineV1
     /// </remarks>
     public int PassesAttempted { get; init; }
 
-    /// <summary>Gets the passes that found a teammate, a subset of <see cref="PassesAttempted"/> (`engine-v6`).</summary>
+    /// <summary>Gets the passes that found a teammate, a subset of <see cref="PassesAttempted"/> (`engine-v7`).</summary>
     public int PassesCompleted { get; init; }
 
-    /// <summary>Gets the take-ons the player attempted: the 1v1 duels they carried the ball into (`engine-v6`).</summary>
+    /// <summary>Gets the take-ons the player attempted: the 1v1 duels they carried the ball into (`engine-v7`).</summary>
     public int DribblesAttempted { get; init; }
 
-    /// <summary>Gets the take-ons the player won, a subset of <see cref="DribblesAttempted"/> (`engine-v6`).</summary>
+    /// <summary>Gets the take-ons the player won, a subset of <see cref="DribblesAttempted"/> (`engine-v7`).</summary>
     public int DribblesCompleted { get; init; }
 
     /// <summary>Gets yellow cards received.</summary>

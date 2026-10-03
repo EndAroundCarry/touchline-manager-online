@@ -73,7 +73,7 @@
     >
       <p-table
         [value]="players()"
-        [tableStyle]="{ 'min-width': '52rem' }"
+        [tableStyle]="{ 'min-width': '72rem' }"
         [pt]="{ table: { 'aria-label': 'Squad roster' } }"
       >
         <ng-template #header>
@@ -89,18 +89,35 @@
             <th scope="col" pSortableColumn="state.fatigue">
               Fatigue <p-sort-icon field="state.fatigue" />
             </th>
+            <th scope="col" pSortableColumn="attributeAverages.goalkeeping">
+              Avg goalkeeping <p-sort-icon field="attributeAverages.goalkeeping" />
+            </th>
+            <th scope="col" pSortableColumn="attributeAverages.technical">
+              Avg technical <p-sort-icon field="attributeAverages.technical" />
+            </th>
+            <th scope="col" pSortableColumn="attributeAverages.mental">
+              Avg mental <p-sort-icon field="attributeAverages.mental" />
+            </th>
+            <th scope="col" pSortableColumn="attributeAverages.physical">
+              Avg physical <p-sort-icon field="attributeAverages.physical" />
+            </th>
             <th scope="col" pSortableColumn="contract.endSeasonNumber">
               Contract <p-sort-icon field="contract.endSeasonNumber" />
             </th>
             <th scope="col">Status</th>
-            <th scope="col"><span class="sr-only">Player profile</span></th>
           </tr>
         </ng-template>
 
         <ng-template #body let-player>
           <tr>
             <th scope="row" class="text-left font-medium text-slate-900">
-              {{ player.fullName }}
+              <a
+                [routerLink]="['/players', player.id]"
+                [class]="linkClass"
+                [attr.aria-label]="'Open ' + player.fullName"
+              >
+                {{ player.fullName }}
+              </a>
               <span class="block text-xs font-normal text-slate-500">
                 {{ player.shortName }} · {{ player.nationalityCode }}
               </span>
@@ -121,6 +138,10 @@
                 {{ fatigueWord(player.state.fatigue) }}
               </span>
             </td>
+            <td>{{ player.attributeAverages.goalkeeping | number: '1.1-1' }}</td>
+            <td>{{ player.attributeAverages.technical | number: '1.1-1' }}</td>
+            <td>{{ player.attributeAverages.mental | number: '1.1-1' }}</td>
+            <td>{{ player.attributeAverages.physical | number: '1.1-1' }}</td>
             <td>
               @if (player.contract; as contract) {
                 <span class="block">to season {{ contract.endSeasonNumber }}</span>
@@ -142,21 +163,12 @@
                 }
               }
             </td>
-            <td>
-              <a
-                [routerLink]="['/players', player.id]"
-                [class]="linkClass"
-                [attr.aria-label]="'Open ' + player.fullName"
-              >
-                View
-              </a>
-            </td>
           </tr>
         </ng-template>
 
         <ng-template #emptymessage>
           <tr>
-            <td colspan="8" class="text-sm text-slate-600">No player matches the filter.</td>
+            <td colspan="11" class="text-sm text-slate-600">No player matches the filter.</td>
           </tr>
         </ng-template>
       </p-table>
@@ -171,7 +183,15 @@
       @for (player of players(); track player.id) {
         <li class="rounded border border-slate-200 bg-white p-3">
           <div class="flex flex-wrap items-baseline justify-between gap-x-2">
-            <h3 class="text-sm font-semibold text-slate-900">{{ player.fullName }}</h3>
+            <h3 class="text-sm font-semibold text-slate-900">
+              <a
+                [routerLink]="['/players', player.id]"
+                [class]="linkClass"
+                [attr.aria-label]="'Open ' + player.fullName"
+              >
+                {{ player.fullName }}
+              </a>
+            </h3>
             <span class="text-xs text-slate-500">
               {{ player.shortName }} · {{ player.nationalityCode }}
             </span>
@@ -196,6 +216,28 @@
               <dt class="text-slate-500">Fatigue</dt>
               <dd [class]="fatigueClass(player.state.fatigue)">
                 {{ player.state.fatigue }} {{ fatigueWord(player.state.fatigue) }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg goalkeeping</dt>
+              <dd class="text-slate-800">
+                {{ player.attributeAverages.goalkeeping | number: '1.1-1' }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg technical</dt>
+              <dd class="text-slate-800">
+                {{ player.attributeAverages.technical | number: '1.1-1' }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg mental</dt>
+              <dd class="text-slate-800">{{ player.attributeAverages.mental | number: '1.1-1' }}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg physical</dt>
+              <dd class="text-slate-800">
+                {{ player.attributeAverages.physical | number: '1.1-1' }}
               </dd>
             </div>
             <div class="col-span-2 flex justify-between gap-2">
@@ -224,14 +266,6 @@
               </dd>
             </div>
           </dl>
-
-          <a
-            [routerLink]="['/players', player.id]"
-            [class]="linkClass"
-            [attr.aria-label]="'Open ' + player.fullName"
-          >
-            View profile
-          </a>
         </li>
       } @empty {
         <li class="rounded border border-slate-200 bg-white p-3 text-sm text-slate-600">

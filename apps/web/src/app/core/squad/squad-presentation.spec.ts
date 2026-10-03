@@ -42,6 +42,7 @@ function squadPlayer(
     state: { condition: 100, fatigue: 0, morale: 50, matchSharpness: 50 },
     contract: null,
     availability: [],
+    attributeAverages: { goalkeeping: 5, technical: 10, mental: 10, physical: 10 },
     ...overrides,
   };
 }
@@ -266,7 +267,7 @@ describe('squad presentation', () => {
       expect(rows.find((row) => row.label === 'Average rating')?.value).toBe('7.5');
     });
 
-    it('shows the passes and dribbles as a count and a rate (engine-v6)', () => {
+    it('shows the passes and dribbles as a count and a rate (engine-v7)', () => {
       const rows = seasonStatRows(stats);
 
       expect(rows.find((row) => row.label === 'Passes')?.value).toBe('96 / 120');
@@ -275,7 +276,7 @@ describe('squad presentation', () => {
       expect(rows.find((row) => row.label === 'Dribble success')?.value).toBe('50%');
     });
 
-    it('shows a dash rather than a zero rate when nothing was attempted (engine-v6)', () => {
+    it('shows a dash rather than a zero rate when nothing was attempted (engine-v7)', () => {
       const idle = seasonStatRows({
         ...stats,
         passesAttempted: 0,

@@ -1,203 +1,206 @@
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startServer } from './serve.mjs';
 
 /**
- * Drives the Stage 6 harness in headless Chromium: seeks to the moments worth looking at, writes a PNG of
- * each, and reports the frame rate, the renderer's own per-frame cost, and heap growth over a long run.
+ * Drives the film fluidity harness in headless Chromium and says whether the film is fluid (`replay-v4`, M3).
+ *
+ *   node apps/web/.preview/capture.mjs <presentation.json> [--out <dir>] [--seconds <n>] [--min-fps <n>]
+ *
+ * The presentation is a dump from `dotnet run --project tools/simulation-benchmarks -- replay 1 <seed> --dump
+ * <file>`. It is played through the real playback, render loop, fade and renderer; this script reports
+ *
+ *   - the frame rate and the frame times, and how many frames dropped;
+ *   - how far the ball, the outfield players and the keepers moved between two *drawn* frames, outside the cuts,
+ *     and how many of those moves were faster than the film's own speed caps allow (a jump);
+ *   - how much of the film the ball stands still for;
+ *
+ * and photographs the moments worth looking at. It exits non-zero if there is a jump, or if the frame rate is
+ * under the floor — which is the plan's "no frame jumps outside cuts, and at least 58 FPS on a desktop".
+ * A headless browser without a GPU is slower than a desktop one, so the floor is an option.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(here, '../../../tests/web-e2e/package.json'));
 const { chromium } = require('playwright');
 
-const url = process.argv[2] ?? 'http://127.0.0.1:8123/stage6-demo.html';
-const outputDirectory = join(here, 'shots');
+const args = process.argv.slice(2);
+const option = (name, fallback) => {
+  const at = args.indexOf(name);
+
+  return at >= 0 && args[at + 1] !== undefined ? args[at + 1] : fallback;
+};
+const presentation = args.find((value, index) => !value.startsWith('--') && !args[index - 1]?.startsWith('--'));
+
+if (!presentation) {
+  console.error('usage: node capture.mjs <presentation.json> [--out <dir>] [--seconds <n>] [--min-fps <n>]');
+  process.exit(2);
+}
+
+const outputDirectory = resolve(option('--out', join(here, 'shots')));
+const seconds = Number(option('--seconds', 12));
+const minimumFps = Number(option('--min-fps', 58));
 
 await mkdir(outputDirectory, { recursive: true });
 
-const browser = await chromium.launch();
+const { url, close } = await startServer({ presentation });
+
+// The browsers this container carries are pre-installed rather than fetched for a pinned version, so a
+// version mismatch falls back to the installed binary instead of failing.
+const executable = process.env.PW_CHROMIUM ?? ['/opt/pw-browsers/chromium'].find((path) => existsSync(path));
+let browser;
+
+try {
+  browser = await chromium.launch();
+} catch {
+  browser = await chromium.launch({ executablePath: executable });
+}
+
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+const problems = [];
+
+page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+page.on('console', (message) => {
+  if (message.type() === 'error') {
+    problems.push(`console error: ${message.text()}`);
+  }
+});
 
 await page.goto(url, { waitUntil: 'load' });
-await page.waitForTimeout(1500);
+await page.waitForFunction(() => window.film !== undefined, undefined, { timeout: 30_000 });
 
-// Measure the real frame rate for two seconds, the way the 60 FPS checkpoint asks.
-const frameRate = await page.evaluate(
-  () =>
-    new Promise((resolve) => {
-      let frames = 0;
-      const start = performance.now();
+const info = await page.evaluate(() => window.film.info());
+const clock = (milliseconds) => page.evaluate((value) => window.film.clockAt(value), milliseconds);
+const minutes = (milliseconds) => `${Math.floor(milliseconds / 60_000)}:${String(Math.floor((milliseconds % 60_000) / 1_000)).padStart(2, '0')}`;
 
-      function tick(now) {
-        frames += 1;
-
-        if (now - start >= 2000) {
-          resolve({ frames, milliseconds: now - start, fps: (frames * 1000) / (now - start) });
-          return;
-        }
-
-        requestAnimationFrame(tick);
-      }
-
-      requestAnimationFrame(tick);
-    }),
+console.log(`\n== ${presentation} ==`);
+console.log(
+  `film ${minutes(info.durationMilliseconds)}  reel ${minutes(info.reelMilliseconds)}  pace ${info.paceMilli === null ? '?' : (info.paceMilli / 1000).toFixed(2) + 'x'}  ` +
+    `passages ${info.passages}  cuts ${info.cuts.map((cut) => `${cut.kind}@${minutes(cut.startMilliseconds)}`).join(', ') || 'none'}`,
+);
+console.log(
+  `goals ${info.goals.length}  shots ${info.markers.filter((marker) => marker.kind === 'shot').length}  cards ${info.cards.length}  slots with a substitute ${info.substitutions}  half-time ${info.halfTimes.map((interval) => minutes(interval.startMilliseconds)).join(', ') || 'none'}`,
 );
 
-const heapBefore = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0);
+// ---- Photographs ------------------------------------------------------------------------------------------
 
+const firstShot = info.markers.find((marker) => marker.kind === 'shot' || marker.kind === 'goal');
+const halfTime = info.halfTimes[0];
 const moments = [
-  { name: 'kickoff', at: 2000 },
-  { name: 'strike', at: 11000 },
-  { name: 'flight', at: 11800 },
-  { name: 'celebration', at: 12600 },
-  { name: 'recovered', at: 17500 },
+  { name: 'kickoff', at: 0 },
+  { name: 'boundary', at: info.passageStarts[Math.min(8, info.passageStarts.length - 1)] },
+  ...(firstShot ? [{ name: 'strike', at: firstShot.filmMilliseconds }] : []),
+  ...(info.goals[0] ? [{ name: 'goal', at: info.goals[0].filmMilliseconds + 900 }] : []),
+  ...(info.cards[0] ? [{ name: 'card', at: info.cards[0].filmMilliseconds + 600 }] : []),
+  ...(halfTime ? [{ name: 'halftime', at: halfTime.startMilliseconds + 1_200 }] : []),
+  ...(halfTime ? [{ name: 'secondhalf', at: halfTime.endMilliseconds + 1_800 }] : []),
 ];
-
-const stats = [];
 const canvas = page.locator('#pitch');
 
 for (const moment of moments) {
-  const metrics = await page.evaluate(async (at) => {
-    window.stage6.render(at);
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    const element = document.getElementById('pitch');
-    const context = element.getContext('2d');
-    const image = context.getImageData(0, 0, element.width, element.height).data;
-    const counts = { grass: 0, light: 0, homeKit: 0, awayKit: 0, shot: 0, card: 0, badge: 0 };
-    let samples = 0;
-
-    for (let index = 0; index < image.length; index += 16) {
-      const red = image[index];
-      const green = image[index + 1];
-      const blue = image[index + 2];
-
-      samples += 1;
-
-      if (green > 90 && green > red * 1.6 && green > blue * 1.6) counts.grass += 1;
-      if (red < 60 && green > 110 && blue < 90) counts.light += 1;
-      if (near(red, green, blue, 31, 78, 121)) counts.homeKit += 1;
-      if (near(red, green, blue, 140, 47, 57)) counts.awayKit += 1;
-      if (red > 180 && green > 160 && blue < 110) counts.shot += 1;
-      if (red > 200 && green > 150 && green < 220 && blue < 90) counts.card += 1;
-      if (red < 80 && green > 150 && blue > 100 && blue < 200) counts.badge += 1;
-    }
-
-    return { counts, samples, metrics: window.stage6.metrics(), ascii: ascii(element, context) };
-
-    function near(red, green, blue, targetRed, targetGreen, targetBlue) {
-      return (
-        Math.abs(red - targetRed) < 40 &&
-        Math.abs(green - targetGreen) < 40 &&
-        Math.abs(blue - targetBlue) < 40
-      );
-    }
-
-    function ascii(element, context) {
-      const columns = 96;
-      const rows = 30;
-      const image = context.getImageData(0, 0, element.width, element.height).data;
-      const cellWidth = element.width / columns;
-      const cellHeight = element.height / rows;
-      const lines = [];
-
-      for (let row = 0; row < rows; row += 1) {
-        let line = '';
-
-        for (let column = 0; column < columns; column += 1) {
-          let home = 0;
-          let away = 0;
-          let yellow = 0;
-          let teal = 0;
-          let white = 0;
-          let grass = 0;
-
-          for (let y = Math.floor(row * cellHeight); y < Math.floor((row + 1) * cellHeight); y += 1) {
-            for (let x = Math.floor(column * cellWidth); x < Math.floor((column + 1) * cellWidth); x += 1) {
-              const index = (y * element.width + x) * 4;
-              const red = image[index];
-              const green = image[index + 1];
-              const blue = image[index + 2];
-
-              if (red < 80 && green > 150 && blue > 100 && blue < 200) teal += 1;
-              else if (red > 180 && green > 160 && blue < 110) yellow += 1;
-              else if (near(red, green, blue, 31, 78, 121)) home += 1;
-              else if (near(red, green, blue, 140, 47, 57)) away += 1;
-              else if (red > 210 && green > 210 && blue > 200) white += 1;
-              else if (green > 90 && green > red * 1.6 && green > blue * 1.6) grass += 1;
-            }
-          }
-
-          line +=
-            teal > 2
-              ? '#'
-              : yellow > 2
-                ? 'Y'
-                : home > 2 && home > away
-                  ? 'H'
-                  : away > 2
-                    ? 'A'
-                    : white > 1
-                      ? '+'
-                      : grass > 0
-                        ? '.'
-                        : ' ';
-        }
-
-        lines.push(line);
-      }
-
-      return lines.join('\n');
-    }
-  }, moment.at);
-
+  await page.evaluate((at) => window.film.show(at), moment.at);
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done())));
   await canvas.screenshot({ path: join(outputDirectory, `${moment.name}.png`) });
-
-  if (moment.name === 'strike' || moment.name === 'celebration') {
-    console.log(`\n--- ${moment.name} ---\n${metrics.ascii}\n`);
-  }
-
-  stats.push({
-    moment: moment.name,
-    at: moment.at,
-    grass: metrics.counts.grass,
-    asciiRows: metrics.ascii.split('\n').length,
-    homeKit: metrics.counts.homeKit,
-    awayKit: metrics.counts.awayKit,
-    shot: metrics.counts.shot,
-    card: metrics.counts.card,
-    badge: metrics.counts.badge,
-    renderMs: Number(metrics.metrics.milliseconds.toFixed(2)),
-  });
+  console.log(`  photographed ${moment.name.padEnd(10)} at ${minutes(moment.at)}  clock ${await clock(moment.at)}`);
 }
 
-// Play for twenty seconds at 8x, then compare the heap: a loop that leaked a listener or a frame would show.
-await page.evaluate(() => {
-  window.stage6.render(0);
-  document.querySelector('button[data-speed="8"]').click();
-  document.getElementById('play').click();
-});
-await page.waitForTimeout(20000);
-await page.evaluate(() => {
-  document.getElementById('play').click();
-});
+// ---- The clock at the seams ------------------------------------------------------------------------------------
 
-const heapAfter = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0);
+if (halfTime) {
+  console.log(
+    `clock: before HT ${await clock(halfTime.startMilliseconds - 500)}  at HT ${await clock(halfTime.startMilliseconds + 500)}  ` +
+      `after ${await clock(halfTime.endMilliseconds + 500)}  at the end ${await clock(info.durationMilliseconds)}`,
+  );
+}
+
+// ---- The clock against the events -------------------------------------------------------------------------------
+
+const clockChecks = await page.evaluate(() => window.film.clockChecks());
 
 console.log(
-  JSON.stringify(
-    {
-      fps: Number(frameRate.fps.toFixed(1)),
-      frames: frameRate.frames,
-      heapMegabytesBefore: Number((heapBefore / 1048576).toFixed(1)),
-      heapMegabytesAfter: Number((heapAfter / 1048576).toFixed(1)),
-      stats,
-    },
-    null,
-    2,
-  ),
+  `clock at events: ${clockChecks.checked - clockChecks.mismatches.length}/${clockChecks.checked} goals and cards read the minute the engine stamped on them` +
+    (clockChecks.mismatches.length > 0
+      ? `\n  mismatches: ${clockChecks.mismatches.map((mismatch) => `${mismatch.what} stamped ${mismatch.stamped} shown ${mismatch.shown}`).join('; ')}`
+      : ''),
 );
 
+// ---- The ball standing still -------------------------------------------------------------------------------------
+
+const still = await page.evaluate(() => window.film.still());
+
+console.log(
+  `ball still: ${(still.allShare * 100).toFixed(1)}% of the whole film, ${(still.outsideHoldsShare * 100).toFixed(1)}% outside half-time, celebrations and cuts; longest stretch ${still.longestStillSeconds.toFixed(1)} s`,
+);
+
+// ---- Real-time runs ----------------------------------------------------------------------------------------------
+
+const runs = [
+  { label: 'kick-off, 1x', fromMilliseconds: 0, seconds, speed: 1 },
+  ...(info.goals[0]
+    ? [{ label: 'a goal and its celebration, 1x', fromMilliseconds: Math.max(0, info.goals[0].filmMilliseconds - 5_000), seconds, speed: 1 }]
+    : []),
+  ...(halfTime
+    ? [{ label: 'across the half-time cut, 1x', fromMilliseconds: Math.max(0, halfTime.startMilliseconds - 3_000), seconds: Math.max(seconds, 9), speed: 1 }]
+    : []),
+  { label: 'eight times speed through the match', fromMilliseconds: 30_000, seconds: Math.max(seconds, 30), speed: 8 },
+  { label: 'the highlights reel, 1x', fromMilliseconds: 0, seconds, speed: 1, mode: 'reel' },
+  // At 8x the reel plays on through its clip boundaries, which is where the screen dips and the playhead jumps.
+  { label: 'the highlights reel across its clips, 8x', fromMilliseconds: 0, seconds: Math.max(seconds, 25), speed: 8, mode: 'reel' },
+];
+
+let totalJumps = 0;
+let worstFps = Infinity;
+const format = (value, digits = 2) => value.toFixed(digits);
+
+console.log('');
+
+for (const run of runs) {
+  const report = await page.evaluate((options) => window.film.run(options), run);
+
+  totalJumps += report.jumps;
+  worstFps = Math.min(worstFps, report.fps);
+
+  console.log(`-- ${run.label} (from ${minutes(report.fromMilliseconds)}, ${format(report.realSeconds, 1)} s real = ${format(report.filmSeconds, 1)} s of film)`);
+  console.log(
+    `   ${format(report.fps, 1)} fps  frame ms p50 ${format(report.frameMilliseconds.p50, 1)} p95 ${format(report.frameMilliseconds.p95, 1)} max ${format(report.frameMilliseconds.max, 1)}  dropped ${report.droppedFrames}  draw ms p50 ${format(report.drawMilliseconds.p50)} p95 ${format(report.drawMilliseconds.p95)} max ${format(report.drawMilliseconds.max)}`,
+  );
+  console.log(
+    `   per drawn frame (m): ball p99 ${format(report.ballMetresPerFrame.p99)} max ${format(report.ballMetresPerFrame.max)} | players p99 ${format(report.playerMetresPerFrame.p99)} max ${format(report.playerMetresPerFrame.max)} | keepers max ${format(report.keeperMetresPerFrame.max)}  (${report.comparedFrames} comparisons, ${report.cutsCrossed} cuts crossed, ${report.jumpsSkipped} reel jumps)`,
+  );
+  console.log(`   jumps above the speed caps: ${report.jumps}${report.jumps > 0 ? `  worst: ${report.worstJump}` : ''}`);
+}
+
+await canvas.screenshot({ path: join(outputDirectory, 'last-frame.png') });
+
+console.log(`\nshots in ${outputDirectory}`);
+
+if (problems.length > 0) {
+  console.log(`\n${problems.length} problem(s) in the page:\n  ${[...new Set(problems)].join('\n  ')}`);
+}
+
 await browser.close();
+await close();
+
+const failures = [];
+
+if (totalJumps > 0) {
+  failures.push(`${totalJumps} frame jump(s) outside the cuts`);
+}
+
+if (worstFps < minimumFps) {
+  failures.push(`the slowest run was ${format(worstFps, 1)} fps, under the ${minimumFps} fps floor`);
+}
+
+if (clockChecks.mismatches.length > 0) {
+  failures.push(`${clockChecks.mismatches.length} event(s) read a different minute from the one the engine stamped`);
+}
+
+if (problems.length > 0) {
+  failures.push('the page reported errors');
+}
+
+console.log(failures.length === 0 ? '\nFLUID: no jumps outside cuts, and the frame rate holds.' : `\nNOT FLUID: ${failures.join('; ')}.`);
+process.exit(failures.length === 0 ? 0 : 1);

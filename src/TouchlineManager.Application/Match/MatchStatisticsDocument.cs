@@ -42,7 +42,7 @@ public static class MatchStatisticsDocument
     /// Version 2 added the player lines; version 3 added the assists and the match rating those lines now
     /// carry (`engine-v2`); version 4 adds each player's final condition, substitution minutes, injury flag,
     /// and live rating (`engine-v3`), which the match center reads; version 5 adds the passes and take-ons each
-    /// line counts (`engine-v6`), which the season statistics sum. The version is bumped rather than read
+    /// line counts (`engine-v7`), which the season statistics sum. The version is bumped rather than read
     /// leniently for the same reason each time: a document of an older shape would be accepted with a field
     /// missing, so a reader that cannot honour it refuses it by name instead (`JSN-5`).
     /// </remarks>

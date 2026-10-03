@@ -1,4 +1,5 @@
 using TouchlineManager.Application.Abstractions.Squad;
+using TouchlineManager.Application.Match;
 using TouchlineManager.Contracts.Squad;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad;
@@ -122,6 +123,53 @@ public static class SquadMapping
             stat.AverageRatingBasisPoints is null
                 ? null
                 : Math.Round(stat.AverageRatingBasisPoints.Value / 1000m, 1, MidpointRounding.AwayFromZero));
+    }
+
+    /// <summary>Projects one stored match into the player's line of it, or null when they did not take the pitch.</summary>
+    /// <param name="source">The stored match.</param>
+    /// <param name="playerId">The player.</param>
+    public static PlayerMatchStatResponse? ToMatchResponse(this SquadPlayerMatchSource source, Guid playerId)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var line = MatchStatisticsDocument.Read(source.StatisticsJson).PlayerLines
+            .FirstOrDefault(candidate => candidate.ParticipantId == playerId && candidate.MinutesPlayed > 0);
+
+        if (line is null)
+        {
+            return null;
+        }
+
+        var home = line.ClubId == source.HomeClubId;
+
+        return new PlayerMatchStatResponse(
+            source.FixtureId,
+            source.SeasonNumber,
+            source.SeasonLabel,
+            source.RoundNumber,
+            source.KickoffAt,
+            home ? source.AwayClubId : source.HomeClubId,
+            home ? source.AwayClubName : source.HomeClubName,
+            home,
+            home ? source.HomeGoals : source.AwayGoals,
+            home ? source.AwayGoals : source.HomeGoals,
+            line.Started,
+            line.MinutesPlayed,
+            line.Goals,
+            line.Assists,
+            source.Shots,
+            source.ShotsOnTarget,
+            source.Saves,
+            line.PassesAttempted,
+            line.PassesCompleted,
+            line.DribblesAttempted,
+            line.DribblesCompleted,
+            line.YellowCards,
+            line.SentOff ? 1 : 0,
+            // Converted here like the season line, to the tenth of a point; zero means not rated (TRN-8).
+            line.RatingBasisPoints > 0
+                ? Math.Round(line.RatingBasisPoints / 1000m, 1, MidpointRounding.AwayFromZero)
+                : null);
     }
 
     /// <summary>Projects a player's whole career (`STA-2`).</summary>
@@ -316,7 +364,31 @@ public static class SquadMapping
             [.. player.SecondaryPositions.Select(position => position.ToCode())],
             player.State.ToResponse(),
             player.Contract.ToSummary(currentSeasonNumber),
-            [.. player.Availability.Select(record => record.ToResponse())]);
+            [.. player.Availability.Select(record => record.ToResponse())],
+            player.Attributes.ToAverages());
+
+    /// <summary>
+    /// Averages each attribute family, so the squad table can be scanned for the stronger player at a
+    /// glance without carrying the twenty-eight-attribute block.
+    /// </summary>
+    /// <remarks>
+    /// Four separate means, not one: there is still no single "overall" (see
+    /// <see cref="PlayerAttributesResponse"/>). Rounded to one decimal on the 1–20 scale the attributes use.
+    /// </remarks>
+    /// <param name="attributes">The stored attributes.</param>
+    public static AttributeAveragesResponse ToAverages(this PlayerAttributeSet attributes)
+    {
+        ArgumentNullException.ThrowIfNull(attributes);
+
+        return new AttributeAveragesResponse(
+            Mean(attributes.Goalkeeping),
+            Mean(attributes.Technical),
+            Mean(attributes.Mental),
+            Mean(attributes.Physical));
+    }
+
+    private static decimal Mean(IReadOnlyList<int> values) =>
+        Math.Round((decimal)values.Sum() / values.Count, 1, MidpointRounding.AwayFromZero);
 
     private static PlayerContractResponse ToResponse(
         ContractRow contract,

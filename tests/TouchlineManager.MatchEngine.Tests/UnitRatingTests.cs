@@ -157,8 +157,8 @@ public sealed class UnitRatingTests
         var freshRatings = UnitRatingCalculator.Calculate(fresh, instructions, isHome: false, rules);
         var tiredRatings = UnitRatingCalculator.Calculate(tired, instructions, isHome: false, rules);
 
-        tiredRatings.Fitness.Should().BeLessThan(freshRatings.Fitness);
         tiredRatings.Creation.Should().BeLessThan(freshRatings.Creation);
+        tiredRatings.DefensivePressure.Should().BeLessThan(freshRatings.DefensivePressure);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class UnitRatingTests
     }
 
     [Fact]
-    public void An_out_of_position_player_costs_ratings_and_cohesion()
+    public void An_out_of_position_player_costs_ratings()
     {
         var rules = EngineRulesV2.Default;
         var instructions = new MatchInstructionsV1();
@@ -207,7 +207,6 @@ public sealed class UnitRatingTests
         var weakened = UnitRatingCalculator.Calculate(makeshift, instructions, isHome: false, rules);
 
         weakened.Finishing.Should().BeLessThan(natural.Finishing);
-        weakened.Cohesion.Should().BeLessThan(natural.Cohesion);
     }
 
     [Fact]

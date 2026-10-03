@@ -208,7 +208,7 @@ internal static class PassagePlanner
 
         var (approach, approachEndsInCross) = Approach(derived, rules, start, startAttackX, startAttackY, pressureAttackX, pressureAttackY, isHome);
 
-        var zone = ChooseZone(derived);
+        var zone = ChooseZone(derived, rules);
         var shotAttackX = derived.NextRange(rules.ShotFinalThirdXMinBasisPoints, rules.ShotFinalThirdXMaxBasisPoints);
         var shotAttackY = ZoneY(zone, derived, rules);
         var shotPoint = FromAttack(shotAttackX, shotAttackY, isHome);
@@ -523,18 +523,32 @@ internal static class PassagePlanner
     }
 
     /// <summary>Chooses the shot zone, weighted towards the middle of the pitch as before.</summary>
-    private static ShotZone ChooseZone(Pcg32 derived)
+    private static ShotZone ChooseZone(Pcg32 derived, EngineRulesV2 rules)
     {
+        // One central zone, two inside channels, two wide zones, in the shares the rules give them (engine-v6
+        // moved the 40/20/20/10/10 mix here from the code).
         var roll = derived.NextInt(100);
+        var central = rules.ShotZoneCentralPercent;
+        var insideLeft = central + rules.ShotZoneInsidePercent;
+        var insideRight = insideLeft + rules.ShotZoneInsidePercent;
+        var wideLeft = insideRight + rules.ShotZoneWidePercent;
 
-        return roll switch
+        if (roll < central)
         {
-            < 40 => ShotZone.Central,
-            < 60 => ShotZone.InsideLeft,
-            < 80 => ShotZone.InsideRight,
-            < 90 => ShotZone.WideLeft,
-            _ => ShotZone.WideRight,
-        };
+            return ShotZone.Central;
+        }
+
+        if (roll < insideLeft)
+        {
+            return ShotZone.InsideLeft;
+        }
+
+        if (roll < insideRight)
+        {
+            return ShotZone.InsideRight;
+        }
+
+        return roll < wideLeft ? ShotZone.WideLeft : ShotZone.WideRight;
     }
 
     /// <summary>Places a shot across the pitch inside its zone's band.</summary>

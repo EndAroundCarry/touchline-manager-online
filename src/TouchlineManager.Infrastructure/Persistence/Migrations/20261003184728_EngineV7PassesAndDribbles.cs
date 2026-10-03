@@ -5,7 +5,7 @@
 namespace TouchlineManager.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class EngineV6PassesAndDribbles : Migration
+    public partial class EngineV7PassesAndDribbles : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

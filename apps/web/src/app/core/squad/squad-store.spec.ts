@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { SquadApi } from './squad-api';
 import { SquadStore } from './squad-store';
-import { ContractList, Player, Squad } from './squad.models';
+import { ContractList, Player, PlayerMatches, Squad } from './squad.models';
 
 /**
  * The squad store's guarantees.
@@ -28,12 +28,17 @@ const quote = {
   serverTime: '2026-09-28T00:00:00Z',
 };
 
-const renewedPlayer = { id: 'player-1', fullName: 'Alaric Alderwick', contract: { id: 'contract-2' } } as unknown as Player;
+const renewedPlayer = {
+  id: 'player-1',
+  fullName: 'Alaric Alderwick',
+  contract: { id: 'contract-2' },
+} as unknown as Player;
 
 function createSquadApiStub() {
   return {
     squad: vi.fn(),
     player: vi.fn(),
+    playerMatches: vi.fn(),
     contracts: vi.fn(),
     renewalQuote: vi.fn(),
     renew: vi.fn(),
@@ -81,6 +86,21 @@ describe('SquadStore', () => {
 
     expect(store.player()).toBe(player);
     expect(store.contracts()).toBe(contracts);
+  });
+
+  it('publishes the player match history it read, and forgets it on clear', async () => {
+    const matches = { playerId: 'player-1', matches: [] } as unknown as PlayerMatches;
+
+    api.playerMatches.mockReturnValue(of(matches));
+
+    await firstValueFrom(store.loadPlayerMatches('player-1'));
+
+    expect(api.playerMatches).toHaveBeenCalledWith('player-1');
+    expect(store.playerMatches()).toBe(matches);
+
+    store.clear();
+
+    expect(store.playerMatches()).toBeNull();
   });
 
   it('propagates a refusal rather than storing an empty squad', async () => {

@@ -89,6 +89,14 @@ export interface PlayerContractSummary {
   readonly status: string;
 }
 
+/** The mean of each attribute family on the 1–20 scale, to one decimal; there is no overall. */
+export interface AttributeAverages {
+  readonly goalkeeping: number;
+  readonly technical: number;
+  readonly mental: number;
+  readonly physical: number;
+}
+
 /** One player as the squad table shows them. */
 export interface SquadPlayer {
   readonly id: string;
@@ -102,6 +110,7 @@ export interface SquadPlayer {
   readonly state: PlayerState;
   readonly contract: PlayerContractSummary | null;
   readonly availability: readonly PlayerAvailability[];
+  readonly attributeAverages: AttributeAverages;
 }
 
 /** The squad's size and legality, so the screen can warn without recomputing (`SQ-2`, `SQ-9`). */
@@ -149,7 +158,7 @@ export interface PlayerSeasonStats {
   readonly shotsOnTarget: number;
   readonly saves: number;
 
-  /** Passes attempted in open play (`engine-v6`). */
+  /** Passes attempted in open play (`engine-v7`). */
   readonly passesAttempted: number;
 
   /** Passes that found a teammate, a subset of those attempted. */
@@ -262,5 +271,55 @@ export interface ContractList {
   readonly seasonNumber: number;
   readonly weeklyWageTotalMinor: number;
   readonly contracts: readonly PlayerContractRow[];
+  readonly serverTime: string;
+}
+
+/**
+ * One match of a player's own history (`STA-2`).
+ *
+ * Read from the stored match, so the rows add up to the season line. The passes and take-ons are the match
+ * engine's own counts (`engine-v7`), carried on the player's line of the stored result.
+ */
+export interface PlayerMatchStat {
+  readonly fixtureId: string;
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly round: number;
+  readonly playedAt: string;
+  readonly opponentClubId: string;
+  readonly opponentName: string;
+  readonly home: boolean;
+  readonly goalsFor: number;
+  readonly goalsAgainst: number;
+  readonly started: boolean;
+  readonly minutesPlayed: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly shotsOnTarget: number;
+  readonly saves: number;
+
+  /** Passes attempted in open play. */
+  readonly passesAttempted: number;
+
+  /** Passes that found a teammate, a subset of those attempted. */
+  readonly passesCompleted: number;
+
+  /** Take-ons attempted. */
+  readonly dribblesAttempted: number;
+
+  /** Take-ons won, a subset of those attempted. */
+  readonly dribblesCompleted: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
+
+  /** The match rating on a 0.0–10.0 scale, or null when the player was not rated (`TRN-8`). */
+  readonly rating: number | null;
+}
+
+/** A player's matches, most recent first, across every season they have appeared in. */
+export interface PlayerMatches {
+  readonly playerId: string;
+  readonly matches: readonly PlayerMatchStat[];
   readonly serverTime: string;
 }

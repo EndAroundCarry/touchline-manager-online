@@ -85,16 +85,6 @@ public sealed class EngineRulesTests
     }
 
     [Fact]
-    public void A_subtractive_penalty_is_not_judged_as_a_multiplier()
-    {
-        var rules = EngineRulesV2.Default with { OutOfPositionCohesionPenaltyBasisPoints = 1_400 };
-
-        var act = rules.Validate;
-
-        act.Should().NotThrow();
-    }
-
-    [Fact]
     public void Inverted_bounds_are_refused()
     {
         var rules = EngineRulesV2.Default with { MinProgressBasisPoints = 9_000, MaxProgressBasisPoints = 1_000 };
@@ -127,9 +117,9 @@ public sealed class EngineRulesTests
     [Fact]
     public void The_engine_and_rules_versions_are_labelled()
     {
-        EngineVersions.EngineLabel.Should().Be("engine-v6");
-        EngineVersions.RuleSetLabel.Should().Be("engine-rules-v5");
-        EngineVersions.Engine.Should().Be(6);
-        EngineVersions.RuleSet.Should().Be(5);
+        EngineVersions.EngineLabel.Should().Be("engine-v7");
+        EngineVersions.RuleSetLabel.Should().Be("engine-rules-v6");
+        EngineVersions.Engine.Should().Be(7);
+        EngineVersions.RuleSet.Should().Be(6);
     }
 }

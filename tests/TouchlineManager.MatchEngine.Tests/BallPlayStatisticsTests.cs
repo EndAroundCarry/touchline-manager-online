@@ -4,7 +4,7 @@ using TouchlineManager.MatchEngine.Model;
 namespace TouchlineManager.MatchEngine.Tests;
 
 /// <summary>
-/// The passes and take-ons a player line carries (`engine-v6`).
+/// The passes and take-ons a player line carries (`engine-v7`).
 /// </summary>
 /// <remarks>
 /// Like the assists beside them, these are facts the simulation decided, so the engine is where their

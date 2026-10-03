@@ -1,6 +1,7 @@
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Randomness;
+using TouchlineManager.MatchEngine.Ratings;
 using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Simulation;
@@ -23,8 +24,8 @@ public readonly record struct SetPieceOutcome(
     ShotZone Zone);
 
 /// <summary>
-/// Simulates set pieces: penalties with the keeper's dive, direct free kicks against a wall, and the
-/// contested headers a corner produces (master plan Stage 2).
+/// Resolves the skill-dependent parts of set pieces: how likely a penalty is to go in, and how a direct free kick
+/// fares against a wall (master plan Stage 2).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,63 +35,41 @@ public readonly record struct SetPieceOutcome(
 /// </para>
 /// <para>
 /// Every chance is bounded: a penalty can never be a formality, and a direct free kick can never be
-/// impossible. The goalkeeper is read on the attribute scale, like every other contest in the engine, so
-/// a great keeper shows up here the same way they show up in open play.
+/// impossible. Players are read through their effective skills (<see cref="EffectiveSkill"/>), and the contests
+/// use <see cref="EngineRulesV2.ShotContestReference"/>, so a taker's skill against the goalkeeper's counts as
+/// much here as it does in an open-play shot.
 /// </para>
 /// </remarks>
 public static class SetPieceDirector
 {
-    /// <summary>Simulates a penalty kick with the goalkeeper's dive.</summary>
+    /// <summary>
+    /// Computes the chance a penalty goes in: the taker's finishing and composure against the goalkeeper's reflexes.
+    /// </summary>
     /// <param name="taker">The penalty taker.</param>
     /// <param name="goalkeeper">The goalkeeper, when the defending side still has one.</param>
-    /// <param name="takerIsHome">Whether the taker's side is at home.</param>
     /// <param name="rules">The rules in force.</param>
-    /// <param name="random">The generator.</param>
-    public static SetPieceOutcome ResolvePenalty(
-        MatchParticipantV1 taker,
-        MatchParticipantV1? goalkeeper,
-        bool takerIsHome,
-        EngineRulesV2 rules,
-        Pcg32 random)
+    /// <returns>The goal chance, in basis points.</returns>
+    public static int PenaltyGoalChance(ActiveSlot taker, ActiveSlot? goalkeeper, EngineRulesV2 rules)
     {
         ArgumentNullException.ThrowIfNull(taker);
         ArgumentNullException.ThrowIfNull(rules);
-        ArgumentNullException.ThrowIfNull(random);
 
         var goalChance = rules.PenaltyGoalBasisPoints;
 
         if (goalkeeper is not null)
         {
-            // Composure under pressure against reflexes on the line, on the attribute scale.
-            var contest = ((taker.Attributes.ValueOf(MatchAttributeName.Finishing)
-                    + taker.Attributes.ValueOf(MatchAttributeName.Composure)) / 2)
-                - goalkeeper.Attributes.ValueOf(MatchAttributeName.Reflexes);
+            // Composure under pressure against reflexes on the line.
+            var contest = ((EffectiveSkill.Hundredths(taker, MatchAttributeName.Finishing, rules)
+                    + EffectiveSkill.Hundredths(taker, MatchAttributeName.Composure, rules)) / 2)
+                - EffectiveSkill.Hundredths(goalkeeper, MatchAttributeName.Reflexes, rules);
 
-            goalChance += Probability.Swing(contest, rules.ShotQualitySwingBasisPoints / 2, rules.RatingDifferentialReference);
+            goalChance += Probability.Swing(
+                contest,
+                rules.PenaltyQualitySwingBasisPoints,
+                rules.ShotContestReference * EffectiveSkill.Scale);
         }
 
-        goalChance = Probability.Band(goalChance, 5_500, 9_400);
-
-        var isGoal = random.RollBasisPoints(goalChance);
-        var wasSaved = false;
-        var hitWoodwork = false;
-
-        if (!isGoal)
-        {
-            // Most penalties that do not go in are stopped; the rest are missed or strike the frame.
-            var roll = random.NextBasisPoints();
-
-            if (roll < rules.BaseSaveBasisPoints)
-            {
-                wasSaved = true;
-            }
-            else if (roll < rules.BaseSaveBasisPoints + rules.WoodworkShareBasisPoints)
-            {
-                hitWoodwork = true;
-            }
-        }
-
-        return new SetPieceOutcome(Attempted: true, isGoal, wasSaved, hitWoodwork, taker.ParticipantId, goalkeeper?.ParticipantId, ShotZone.Central);
+        return Probability.Band(goalChance, rules.PenaltyMinGoalBasisPoints, rules.PenaltyMaxGoalBasisPoints);
     }
 
     /// <summary>
@@ -107,16 +86,18 @@ public static class SetPieceDirector
     /// and the caller resolves what the cross produced.
     /// </returns>
     public static SetPieceOutcome ResolveDirectFreeKick(
-        MatchParticipantV1 taker,
-        MatchParticipantV1? goalkeeper,
+        ActiveSlot taker,
+        ActiveSlot? goalkeeper,
         int attackingX,
-        bool takerIsHome,
         EngineRulesV2 rules,
         Pcg32 random)
     {
         ArgumentNullException.ThrowIfNull(taker);
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(random);
+
+        var takerId = taker.Participant.ParticipantId;
+        var keeperId = goalkeeper?.Participant.ParticipantId;
 
         if (attackingX < rules.FreeKickShootingRangeX || !random.RollBasisPoints(rules.FreeKickAttemptBasisPoints))
         {
@@ -125,17 +106,23 @@ public static class SetPieceDirector
                 IsGoal: false,
                 WasSaved: false,
                 HitWoodwork: false,
-                taker.ParticipantId,
-                goalkeeper?.ParticipantId,
+                takerId,
+                keeperId,
                 Zone: ShotZone.WideLeft);
         }
 
-        var contest = taker.Attributes.ValueOf(MatchAttributeName.SetPieces)
-            - (goalkeeper is null ? 1 : goalkeeper.Attributes.ValueOf(MatchAttributeName.Reflexes));
+        var keeperSkill = goalkeeper is null
+            ? EffectiveSkill.Scale
+            : EffectiveSkill.Hundredths(goalkeeper, MatchAttributeName.Reflexes, rules);
+
+        var contest = EffectiveSkill.Hundredths(taker, MatchAttributeName.SetPieces, rules) - keeperSkill;
 
         var goalChance = Probability.Band(
             rules.FreeKickGoalBasisPoints
-            + Probability.Swing(contest, rules.FreeKickQualitySwingBasisPoints, rules.RatingDifferentialReference),
+            + Probability.Swing(
+                contest,
+                rules.FreeKickQualitySwingBasisPoints,
+                rules.ShotContestReference * EffectiveSkill.Scale),
             rules.MinShotGoalBasisPoints,
             rules.MaxShotGoalBasisPoints);
 
@@ -156,32 +143,6 @@ public static class SetPieceDirector
             hitWoodwork = roll >= blockedShare && roll < woodworkShare;
         }
 
-        return new SetPieceOutcome(Attempted: true, isGoal, wasSaved, hitWoodwork, taker.ParticipantId, goalkeeper?.ParticipantId, ShotZone.Central);
-    }
-
-    /// <summary>
-    /// Resolves the contested header a corner delivers: whether the attacker beats the defender to it.
-    /// </summary>
-    /// <param name="attacker">The attacking runner.</param>
-    /// <param name="defender">The defender marking them.</param>
-    /// <param name="attackerIsHome">Whether the attacking side is at home.</param>
-    /// <param name="rules">The rules in force.</param>
-    /// <param name="random">The generator.</param>
-    /// <returns>Whether the attacker won the header and the corner became a chance.</returns>
-    public static bool ResolveCornerHeader(
-        MatchParticipantV1 attacker,
-        MatchParticipantV1 defender,
-        bool attackerIsHome,
-        EngineRulesV2 rules,
-        Pcg32 random)
-    {
-        ArgumentNullException.ThrowIfNull(attacker);
-        ArgumentNullException.ThrowIfNull(defender);
-        ArgumentNullException.ThrowIfNull(rules);
-        ArgumentNullException.ThrowIfNull(random);
-
-        return DuelResolver
-            .ResolveAerialDuel(attacker, defender, attackerIsHome, rules, random)
-            .AttackerWon;
+        return new SetPieceOutcome(Attempted: true, isGoal, wasSaved, hitWoodwork, takerId, keeperId, ShotZone.Central);
     }
 }

@@ -31,7 +31,7 @@ namespace TouchlineManager.Application.Match;
 public static class SeasonStatisticsCalculator
 {
     /// <summary>A stable version for the rule, so a change to what is counted is a named change.</summary>
-    /// <remarks>Version 2 adds the passes and take-ons the engine's player line carries (`engine-v6`).</remarks>
+    /// <remarks>Version 2 adds the passes and take-ons the engine's player line carries (`engine-v7`).</remarks>
     public const string Version = "season-stats-v2";
 
     /// <summary>Aggregates a matchday's results per player.</summary>

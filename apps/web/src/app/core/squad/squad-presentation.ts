@@ -340,14 +340,14 @@ export function seasonStatRows(stats: PlayerSeasonStats): readonly SeasonStatRow
   ];
 }
 
-/** A completed count against an attempted one, as `completed / attempted` (`engine-v6`). */
-function ratioLabel(completed: number, attempted: number): string {
+/** A completed count against an attempted one, as `completed / attempted` (`engine-v7`). */
+export function ratioLabel(completed: number, attempted: number): string {
   return `${completed} / ${attempted}`;
 }
 
 /**
  * A completed count as a whole percentage of an attempted one, or a dash when nothing was attempted — a
- * player who never took a dribble has no success rate rather than a rate of zero (`engine-v6`).
+ * player who never took a dribble has no success rate rather than a rate of zero (`engine-v7`).
  */
 function percentageLabel(completed: number, attempted: number): string {
   return attempted === 0 ? '\u2014' : `${Math.round((completed / attempted) * 100)}%`;
