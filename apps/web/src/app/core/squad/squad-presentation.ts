@@ -173,9 +173,6 @@ export interface AttributeRow {
   /** The attribute's name. */
   readonly label: string;
 
-  /** A two-to-four letter form of the name, for the compact attribute tiles. */
-  readonly shortLabel: string;
-
   /** The displayed value, 1–20. */
   readonly value: number;
 }
@@ -205,52 +202,52 @@ export function attributeGroups(attributes: PlayerAttributes): readonly Attribut
       key: 'goalkeeping',
       label: 'Goalkeeping',
       rows: [
-        { label: 'Handling', shortLabel: 'Han', value: attributes.goalkeeping.handling },
-        { label: 'Reflexes', shortLabel: 'Ref', value: attributes.goalkeeping.reflexes },
-        { label: 'One-on-ones', shortLabel: '1v1', value: attributes.goalkeeping.oneOnOnes },
-        { label: 'Aerial ability', shortLabel: 'Aer', value: attributes.goalkeeping.aerialAbility },
+        { label: 'Handling', value: attributes.goalkeeping.handling },
+        { label: 'Reflexes', value: attributes.goalkeeping.reflexes },
+        { label: 'One-on-ones', value: attributes.goalkeeping.oneOnOnes },
+        { label: 'Aerial ability', value: attributes.goalkeeping.aerialAbility },
       ],
     },
     {
       key: 'technical',
       label: 'Technical',
       rows: [
-        { label: 'Finishing', shortLabel: 'Fin', value: attributes.technical.finishing },
-        { label: 'Passing', shortLabel: 'Pas', value: attributes.technical.passing },
-        { label: 'Crossing', shortLabel: 'Cro', value: attributes.technical.crossing },
-        { label: 'Dribbling', shortLabel: 'Dri', value: attributes.technical.dribbling },
-        { label: 'First touch', shortLabel: 'Tou', value: attributes.technical.firstTouch },
-        { label: 'Tackling', shortLabel: 'Tck', value: attributes.technical.tackling },
-        { label: 'Marking', shortLabel: 'Mar', value: attributes.technical.marking },
-        { label: 'Heading', shortLabel: 'Hea', value: attributes.technical.heading },
-        { label: 'Technique', shortLabel: 'Tec', value: attributes.technical.technique },
-        { label: 'Set pieces', shortLabel: 'SP', value: attributes.technical.setPieces },
+        { label: 'Finishing', value: attributes.technical.finishing },
+        { label: 'Passing', value: attributes.technical.passing },
+        { label: 'Crossing', value: attributes.technical.crossing },
+        { label: 'Dribbling', value: attributes.technical.dribbling },
+        { label: 'First touch', value: attributes.technical.firstTouch },
+        { label: 'Tackling', value: attributes.technical.tackling },
+        { label: 'Marking', value: attributes.technical.marking },
+        { label: 'Heading', value: attributes.technical.heading },
+        { label: 'Technique', value: attributes.technical.technique },
+        { label: 'Set pieces', value: attributes.technical.setPieces },
       ],
     },
     {
       key: 'mental',
       label: 'Mental',
       rows: [
-        { label: 'Decisions', shortLabel: 'Dec', value: attributes.mental.decisions },
-        { label: 'Vision', shortLabel: 'Vis', value: attributes.mental.vision },
-        { label: 'Positioning', shortLabel: 'Pos', value: attributes.mental.positioning },
-        { label: 'Composure', shortLabel: 'Cmp', value: attributes.mental.composure },
-        { label: 'Anticipation', shortLabel: 'Ant', value: attributes.mental.anticipation },
-        { label: 'Work rate', shortLabel: 'WR', value: attributes.mental.workRate },
-        { label: 'Aggression', shortLabel: 'Agg', value: attributes.mental.aggression },
-        { label: 'Leadership', shortLabel: 'Ldr', value: attributes.mental.leadership },
+        { label: 'Decisions', value: attributes.mental.decisions },
+        { label: 'Vision', value: attributes.mental.vision },
+        { label: 'Positioning', value: attributes.mental.positioning },
+        { label: 'Composure', value: attributes.mental.composure },
+        { label: 'Anticipation', value: attributes.mental.anticipation },
+        { label: 'Work rate', value: attributes.mental.workRate },
+        { label: 'Aggression', value: attributes.mental.aggression },
+        { label: 'Leadership', value: attributes.mental.leadership },
       ],
     },
     {
       key: 'physical',
       label: 'Physical',
       rows: [
-        { label: 'Pace', shortLabel: 'Pac', value: attributes.physical.pace },
-        { label: 'Acceleration', shortLabel: 'Acc', value: attributes.physical.acceleration },
-        { label: 'Stamina', shortLabel: 'Sta', value: attributes.physical.stamina },
-        { label: 'Strength', shortLabel: 'Str', value: attributes.physical.strength },
-        { label: 'Agility', shortLabel: 'Agi', value: attributes.physical.agility },
-        { label: 'Jumping reach', shortLabel: 'Jmp', value: attributes.physical.jumpingReach },
+        { label: 'Pace', value: attributes.physical.pace },
+        { label: 'Acceleration', value: attributes.physical.acceleration },
+        { label: 'Stamina', value: attributes.physical.stamina },
+        { label: 'Strength', value: attributes.physical.strength },
+        { label: 'Agility', value: attributes.physical.agility },
+        { label: 'Jumping reach', value: attributes.physical.jumpingReach },
       ],
     },
   ];

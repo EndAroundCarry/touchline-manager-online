@@ -146,10 +146,11 @@ describe('PlayerProfile', () => {
     expect(root.querySelectorAll('app-attribute-value')).toHaveLength(28);
   });
 
-  it('lays each attribute family out as one row of tiles', () => {
-    const rows = root.querySelectorAll('[data-testid="attribute-rows"] .grid');
+  it('lays the attributes out as four category squares side by side', () => {
+    const grid = root.querySelector('[data-testid="attribute-rows"]')!;
 
-    expect(rows).toHaveLength(4);
+    expect(grid.classList.contains('grid-cols-4')).toBe(true);
+    expect(grid.querySelectorAll(':scope > section')).toHaveLength(4);
   });
 
   it('shows the training report with its placeholder notice', async () => {

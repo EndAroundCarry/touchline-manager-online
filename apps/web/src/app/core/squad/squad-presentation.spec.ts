@@ -198,8 +198,8 @@ describe('squad presentation', () => {
       ]);
       expect(groups.reduce((total, group) => total + group.rows.length, 0)).toBe(28);
       expect(groups.every((group) => group.rows.every((row) => row.label.length > 0))).toBe(true);
-      expect(groups[1].rows[0]).toEqual({ label: 'Finishing', shortLabel: 'Fin', value: 10 });
-      expect(groups[0].rows[0]).toEqual({ label: 'Handling', shortLabel: 'Han', value: 1 });
+      expect(groups[1].rows[0]).toEqual({ label: 'Finishing', value: 10 });
+      expect(groups[0].rows[0]).toEqual({ label: 'Handling', value: 1 });
     });
   });
 
