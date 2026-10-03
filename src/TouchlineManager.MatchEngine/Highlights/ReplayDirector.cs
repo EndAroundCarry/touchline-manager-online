@@ -1,55 +1,44 @@
-using System.Globalization;
-using TouchlineManager.MatchEngine.Commentary;
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
-using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Highlights;
 
 /// <summary>
-/// Turns a simulated match and its recorded passages into one continuous condensed film and a highlights
-/// reel over the same data (`replay-v3`, master plan §9.2–§9.3, ADR-0006).
+/// Turns a simulated match and its recorded possessions into one constant-pace film and a highlights reel over
+/// the same data (`replay-v4`, master plan §9.2–§9.3, ADR-0006, ADR-0054).
 /// </summary>
 /// <remarks>
 /// <para>
-/// A possession in `engine-v4` is a real passage of play: the ball starts where the last one left it, moves
-/// through a chain of touches, and ends at an outcome-appropriate point. This director merges those recorded
-/// possessions into film passages of roughly equal playback length — splitting at substitutions, half-time,
-/// and bookings of personnel so a passage's eleven is stable — and lays them on a single playback clock. The
-/// time warp compresses ninety minutes into a ten-minute film, weighted so chances are readable and dull
-/// spells fly by.
+/// A possession in `engine-v5` is a real passage of play with real start and end times: the ball starts where the
+/// last one left it, moves through a chain of touches, and ends at an outcome-appropriate point. The director
+/// scripts each one into beats — passes between players, carries, a cross only from a wide position into the box,
+/// a strike that reaches the goal or the keeper — gives every move its natural length, and solves the one pace the
+/// whole film is played at. Nothing is warped: a quiet spell is shorter in the film only because there is less
+/// ball movement in it, and the quietest play is condensed first when a busy match would otherwise push the pace
+/// past its band.
 /// </para>
 /// <para>
-/// The ball's track is the recorded path, and the eleven's tracks are the shape the tactical resolver gives
-/// them over that real path, overwritten where a recorded touch names them (the carrier, the passer, the
-/// shooter, the keeper). Boundary frames are copied exactly between consecutive passages, so the film joins
-/// seamlessly rather than cutting. The reel is a server-side playlist of chance clips over the same passages,
-/// so a viewer can watch the whole match or just the chances that decided it.
+/// The players are simulated at bounded speed and acceleration around the shape the side's real instructions
+/// give, with the players the engine named, and the receiver of every pass, held to the ball. The film is cut
+/// into passages of about ten seconds with continuous tracks, so a boundary is only a place the data is chunked,
+/// and an explicit cut is the only place anything jumps. The reel is a server-side playlist of chance clips over
+/// the same film, each reaching back about ten match-minutes into the same half.
 /// </para>
 /// </remarks>
 public static class ReplayDirector
 {
     /// <summary>The version label of this presentation.</summary>
-    public const string Version = "replay-v3";
+    public const string Version = "replay-v4";
 
-    /// <summary>The pitch coordinate scale the presentation speaks, on both axes.</summary>
-    private const int Pitch = 10_000;
-
-    /// <summary>How far a deterministic per-player jitter may move an uninvolved token, in normalized units.</summary>
-    private const int JitterMagnitude = 60;
-
-    /// <summary>The pitch coordinate scale a pitch Y is normalized from.</summary>
-    private const int PitchWidth = SpatialPitch.PitchWidth;
-
-    /// <summary>The ball's entity identifier.</summary>
-    private const string BallEntityId = "ball";
+    /// <summary>The most times the film is played again to let its pace settle.</summary>
+    private const int MaxSettlingRuns = 4;
 
     /// <summary>Builds the match's presentation from the passages recorded while it was simulated.</summary>
     /// <param name="input">The frozen snapshot, which supplies the eleven and their positions.</param>
     /// <param name="result">The simulated result.</param>
     /// <param name="passages">
-    /// The recorded possessions, in order. The film is built by merging them; a caller that recorded nothing
-    /// gets an empty presentation rather than an invented one.
+    /// The recorded possessions, in order. The film is built from them; a caller that recorded nothing gets an
+    /// empty presentation rather than an invented one.
     /// </param>
     /// <param name="options">How much is worth showing, and the film's pacing.</param>
     /// <param name="liveMetrics">The minute-by-minute condition and rating curve, or null.</param>
@@ -58,7 +47,53 @@ public static class ReplayDirector
         MatchResultV1 result,
         IReadOnlyList<MatchPassageV1> passages,
         HighlightOptionsV1? options = null,
-        IReadOnlyList<PlayerLiveMetricV1>? liveMetrics = null)
+        IReadOnlyList<PlayerLiveMetricV1>? liveMetrics = null) =>
+        BuildFilm(input, result, passages, options, liveMetrics, diagnose: false).Presentation;
+
+    /// <summary>
+    /// Builds the presentation and measures the film it describes: its pace, how much was condensed, how fast the
+    /// ball moves, and whether anything jumps. For tests and the replay benchmark.
+    /// </summary>
+    /// <param name="input">The frozen snapshot.</param>
+    /// <param name="result">The simulated result.</param>
+    /// <param name="passages">The recorded possessions, in order.</param>
+    /// <param name="options">How much is worth showing, and the film's pacing.</param>
+    /// <param name="liveMetrics">The minute-by-minute condition and rating curve, or null.</param>
+    public static FilmBuild Analyse(
+        MatchInputV1 input,
+        MatchResultV1 result,
+        IReadOnlyList<MatchPassageV1> passages,
+        HighlightOptionsV1? options = null,
+        IReadOnlyList<PlayerLiveMetricV1>? liveMetrics = null) =>
+        BuildFilm(input, result, passages, options, liveMetrics, diagnose: true);
+
+    /// <summary>
+    /// Scripts a match into beats without playing them (tests only): what the film is going to show, before it is
+    /// timed or moved.
+    /// </summary>
+    /// <param name="input">The frozen snapshot.</param>
+    /// <param name="result">The simulated result.</param>
+    /// <param name="passages">The recorded possessions, in order.</param>
+    internal static FilmScriptResult ScriptOf(MatchInputV1 input, MatchResultV1 result, IReadOnlyList<MatchPassageV1> passages)
+    {
+        var context = new FilmContext(input, result, EngineRulesV2.Default, new HighlightOptionsV1());
+        var changes = PersonnelChanges(context, passages);
+        var rosters = RostersFor(context, passages.Count, changes);
+
+        var script = FilmScript.Build(context, new FilmShape(context), passages, rosters, changes);
+
+        FilmTiming.Assign(context, script.Beats);
+
+        return script;
+    }
+
+    private static FilmBuild BuildFilm(
+        MatchInputV1 input,
+        MatchResultV1 result,
+        IReadOnlyList<MatchPassageV1> passages,
+        HighlightOptionsV1? options,
+        IReadOnlyList<PlayerLiveMetricV1>? liveMetrics,
+        bool diagnose)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(result);
@@ -66,82 +101,118 @@ public static class ReplayDirector
 
         var settings = options ?? new HighlightOptionsV1();
         var rules = EngineRulesV2.Default;
-        var names = Names(input);
         var homeLineup = MatchLineupBuilder.Build(input, result, MatchSide.Home);
         var awayLineup = MatchLineupBuilder.Build(input, result, MatchSide.Away);
-        var colours = Colours(input);
 
         if (passages.Count == 0)
         {
-            return new MatchPresentationV1
+            return new FilmBuild(
+                new MatchPresentationV1
+                {
+                    PresentationVersion = Version,
+                    EngineVersion = result.EngineVersion,
+                    HomeGoals = result.HomeGoals,
+                    AwayGoals = result.AwayGoals,
+                    Passages = [],
+                    Reel = [],
+                    Playback = [],
+                    HomeLineup = homeLineup,
+                    AwayLineup = awayLineup,
+                    LiveMetrics = liveMetrics,
+                },
+                null);
+        }
+
+        var context = new FilmContext(input, result, rules, settings);
+        var changes = PersonnelChanges(context, passages);
+        var rosters = RostersFor(context, passages.Count, changes);
+        var shape = new FilmShape(context);
+
+        var script = FilmScript.Build(context, shape, passages, rosters, changes);
+
+        FilmTiming.Assign(context, script.Beats);
+
+        var target = FilmTiming.TargetSeconds(context, passages);
+        var allowance = 0.15;
+        var condensed = FilmTiming.Condense(context, ref script, target, allowance);
+
+        var pace = FilmTiming.Solve(context, script.Beats, target, allowance, condensed);
+        var holds = script.Beats.Where(beat => beat.IsHold).Sum(beat => beat.HoldFilmSeconds);
+        var natural = script.Beats.Where(beat => !beat.IsHold).Sum(beat => beat.NaturalSeconds);
+        FilmMotionResult motion;
+        var used = pace;
+
+        for (var run = 0; ; run++)
+        {
+            used = pace;
+            motion = new FilmMotion(context, shape, rosters).Run(script.Beats, used.Pace, used.HoldScale);
+
+            var solved = FilmTiming.SolveFor(settings, motion.MotionSeconds, holds, target, condensed);
+            var measured = natural <= 0 ? 0.0 : Math.Max(0.0, (motion.MotionSeconds / natural) - 1.0);
+
+            // The quiet play is condensed again when the lengthened moves have pushed the pace out of its band.
+            if (solved.Pace > settings.MaxPaceMilli / 1_000.0 && run < MaxSettlingRuns - 1)
             {
-                PresentationVersion = Version,
-                EngineVersion = result.EngineVersion,
-                HomeGoals = result.HomeGoals,
-                AwayGoals = result.AwayGoals,
-                Passages = [],
-                Reel = [],
-                Playback = [],
-                HomeLineup = homeLineup,
-                AwayLineup = awayLineup,
-                LiveMetrics = liveMetrics,
-            };
+                var more = FilmTiming.Condense(context, ref script, target, measured);
+
+                if (more > 0)
+                {
+                    condensed += more;
+                    natural = script.Beats.Where(beat => !beat.IsHold).Sum(beat => beat.NaturalSeconds);
+                    pace = FilmTiming.Solve(context, script.Beats, target, measured, condensed);
+
+                    continue;
+                }
+            }
+
+            var settled = Math.Abs(solved.Pace - used.Pace) <= 0.004 * used.Pace
+                && Math.Abs(solved.HoldScale - used.HoldScale) <= 0.01;
+
+            if (settled || run >= MaxSettlingRuns - 1)
+            {
+                pace = solved;
+
+                break;
+            }
+
+            pace = solved;
         }
 
-        // Match seconds restart at the second half since engine-v5, so the director reads them on a continuous
-        // clock — the second half's seconds carry on from where the first half's stoppage left off — which is
-        // what the film, its personnel changes, and the viewer's clock have always assumed.
-        var secondHalfShift = SecondHalfShiftSeconds(passages, rules);
+        // The film never runs past its ceiling: if the holds were paid for at a pace that has since moved, the
+        // pace is raised until it fits.
+        var ceilingSeconds = settings.MaxFilmMilliseconds / 1_000.0 - 0.05;
 
-        passages = OnContinuousClock(passages, secondHalfShift);
-
-        var bySequence = result.Events.ToDictionary(matchEvent => matchEvent.Sequence);
-        var changes = PersonnelChanges(result.Events, rules, secondHalfShift);
-        var totalMatchSeconds = Math.Max(1, passages[^1].EndClockSeconds);
-
-        var targetFilmMilliseconds = int.Clamp(
-            (int)((long)totalMatchSeconds * 1_000 / Math.Max(1, settings.FilmMatchSecondsPerFilmSecond)),
-            settings.MinFilmMilliseconds,
-            settings.MaxFilmMilliseconds);
-
-        var groups = Merge(passages, bySequence, rules, settings, targetFilmMilliseconds, changes);
-        var durations = Allocate(groups, targetFilmMilliseconds, settings);
-
-        var authored = new List<AuthoredPassage>(groups.Count);
-        Dictionary<string, HighlightKeyframeV1>? previousEnds = null;
-
-        for (var index = 0; index < groups.Count; index++)
+        for (var guard = 0; guard < 3; guard++)
         {
-            var group = groups[index];
-            var occupants = OccupantsAt(input, changes, group.StartSecond);
-            var passage = AuthorPassage(
-                input,
-                group,
-                bySequence,
-                names,
-                colours,
-                rules,
-                occupants,
-                durations[index],
-                previousEnds,
-                index,
-                secondHalfShift);
+            var length = (motion.MotionSeconds / used.Pace) + used.HoldSeconds;
 
-            authored.Add(passage);
-            previousEnds = passage.Ends;
+            if (length <= ceilingSeconds)
+            {
+                break;
+            }
+
+            var raised = used.Pace * (length / ceilingSeconds) * 1.002;
+
+            used = used with { Pace = raised };
+            motion = new FilmMotion(context, shape, rosters).Run(script.Beats, used.Pace, used.HoldScale);
         }
 
-        var playback = Schedule(authored, durations);
-        var reel = ReelBuilder.Build(Candidates(authored, bySequence, playback, settings), settings);
+        var assembler = new FilmAssembler(context, script, motion, rosters, used.Pace);
+        var plans = assembler.Plan();
+        var playback = Schedule(plans);
+        var reel = ReelBuilder.Build(Candidates(context, script, assembler, plans, settings), settings);
 
-        var built = new List<PassageV1>(authored.Count);
+        var built = new List<PassageV1>(plans.Count);
+        var rung = 0;
 
-        for (var rung = 0; rung < settings.TrackTolerances.Count; rung++)
+        var (homeColour, awayColour) = FilmLabels.Colours(input);
+
+        for (; rung < settings.PlayerTolerances.Count; rung++)
         {
-            var tolerance = settings.TrackTolerances[rung];
-            var interval = settings.TrackSampleIntervals[Math.Min(rung, settings.TrackSampleIntervals.Count - 1)];
+            var tolerance = settings.PlayerTolerances[rung];
+            var interval = settings.PlayerSampleIntervals[Math.Min(rung, settings.PlayerSampleIntervals.Count - 1)];
 
-            built = [.. authored.Select(passage => passage.Compress(tolerance, interval))];
+            built = [.. plans.Select(plan => ToPassage(plan, assembler.Tracks(plan, interval, tolerance), homeColour, awayColour))];
 
             if (Estimate(built, reel, playback, homeLineup, awayLineup, liveMetrics) <= settings.PayloadBudgetBytes)
             {
@@ -149,7 +220,7 @@ public static class ReplayDirector
             }
         }
 
-        return new MatchPresentationV1
+        var presentation = new MatchPresentationV1
         {
             PresentationVersion = Version,
             EngineVersion = result.EngineVersion,
@@ -161,189 +232,243 @@ public static class ReplayDirector
             HomeLineup = homeLineup,
             AwayLineup = awayLineup,
             LiveMetrics = liveMetrics,
+            PaceMilli = (int)Math.Round(used.Pace * 1_000.0),
         };
+
+        var diagnostics = diagnose
+            ? FilmMeasure.Measure(context, script, motion, rosters, used, target, assembler.TotalMs, Math.Min(rung, settings.PlayerTolerances.Count - 1))
+            : null;
+
+        return new FilmBuild(presentation, diagnostics);
     }
 
+    // ---- Personnel --------------------------------------------------------------------------------------------
+
     /// <summary>
-    /// Merges recorded possessions into film passages of roughly equal playback weight.
+    /// Finds the substitutions and the players who leave the pitch, and the possession each is effective before.
     /// </summary>
     /// <remarks>
-    /// Passages are split at substitutions, half-time, and bookings of personnel so a passage's eleven is
-    /// stable, and otherwise accumulated until the group is worth about one passage of film. That is what
-    /// takes a few hundred possessions down to the fifty-odd passages the per-passage entity overhead and the
-    /// ten-minute film both want.
+    /// A substitution is stamped with the minute the next possession ends in, but made before it begins. It is
+    /// placed in the window of possessions the event sequence leaves it, and in the first one whose end falls in
+    /// the minute it was stamped in. Placing a change early is harmless and placing it late would show a player
+    /// who has not come on yet, so where the window is ambiguous the first possession of it is taken.
     /// </remarks>
-    private static List<FilmPassage> Merge(
-        IReadOnlyList<MatchPassageV1> passages,
-        Dictionary<int, EngineEventV1> bySequence,
-        EngineRulesV2 rules,
-        HighlightOptionsV1 settings,
-        int targetFilmMilliseconds,
-        List<(int Second, MatchSide Side, Guid Off, Guid? On)> changes)
+    private static List<PersonnelChange> PersonnelChanges(FilmContext context, IReadOnlyList<MatchPassageV1> possessions)
     {
-        var weights = passages.ToDictionary(passage => passage.Ordinal, passage => WeightOf(passage, bySequence, rules));
-        var totalWeight = Math.Max(1, weights.Values.Sum());
+        var rules = context.Rules;
+        var changes = new List<PersonnelChange>();
+        var lowest = new int[possessions.Count];
+        var highest = new int[possessions.Count];
 
-        var desired = (int)Math.Clamp(
-            targetFilmMilliseconds / Math.Max(1, settings.TargetPassageMilliseconds),
-            1,
-            settings.MaxPassages);
-        desired = Math.Min(desired, passages.Count);
-
-        var perPassage = (double)totalWeight / desired;
-        var changeSeconds = changes.Select(change => change.Second).Distinct().OrderBy(second => second).ToList();
-
-        var groups = new List<FilmPassage>();
-        var current = new List<MatchPassageV1>();
-        long currentWeight = 0;
-
-        foreach (var possession in passages)
+        for (var index = 0; index < possessions.Count; index++)
         {
-            if (current.Count > 0)
-            {
-                var last = current[^1];
-                var personnel = ChangeBetween(changeSeconds, last.EndClockSeconds, possession.StartClockSeconds);
-
-                // A film passage never straddles half-time: the period says so, where the clock cannot.
-                var crossedHalf = last.Period != possession.Period;
-
-                if (personnel || crossedHalf || currentWeight >= perPassage)
-                {
-                    groups.Add(Flush(current, currentWeight));
-                    current = [];
-                    currentWeight = 0;
-                }
-            }
-
-            current.Add(possession);
-            currentWeight += weights[possession.Ordinal];
+            lowest[index] = possessions[index].Events.Count == 0 ? int.MaxValue : possessions[index].Events.Min(recorded => recorded.Sequence);
+            highest[index] = possessions[index].Events.Count == 0 ? int.MinValue : possessions[index].Events.Max(recorded => recorded.Sequence);
         }
 
-        if (current.Count > 0)
+        var substituted = context.Result.Events
+            .Where(matchEvent => matchEvent.Type == EngineEventType.Substitution)
+            .Select(matchEvent => matchEvent.ParticipantId)
+            .ToHashSet();
+
+        foreach (var matchEvent in context.Result.Events.OrderBy(matchEvent => matchEvent.Sequence))
         {
-            groups.Add(Flush(current, currentWeight));
-        }
-
-        return groups;
-    }
-
-    private static FilmPassage Flush(List<MatchPassageV1> possessions, long weight) => new(
-        [.. possessions],
-        possessions[0].StartClockSeconds,
-        possessions[^1].EndClockSeconds,
-        possessions[0].Side,
-        weight,
-        possessions[0].Period);
-
-    /// <summary>
-    /// Gets how long the first half's stoppage ran past regulation, which is how far the second half's seconds
-    /// are moved on to sit after it on the continuous clock.
-    /// </summary>
-    private static int SecondHalfShiftSeconds(IReadOnlyList<MatchPassageV1> passages, EngineRulesV2 rules)
-    {
-        var firstHalfEnd = 0;
-
-        foreach (var passage in passages)
-        {
-            if (passage.Period == 1)
+            switch (matchEvent.Type)
             {
-                firstHalfEnd = Math.Max(firstHalfEnd, passage.EndClockSeconds);
+                case EngineEventType.Substitution when matchEvent.ParticipantId is Guid off:
+                    {
+                        var before = SubstitutionPossession(matchEvent, possessions, lowest, highest, rules);
+
+                        changes.Add(new PersonnelChange(before, matchEvent.Side, off, matchEvent.SecondaryParticipantId, matchEvent));
+                        break;
+                    }
+
+                case EngineEventType.RedCard or EngineEventType.SecondYellowCard when matchEvent.ParticipantId is Guid sent:
+                    changes.Add(new PersonnelChange(PossessionAfter(matchEvent, possessions) + 0, matchEvent.Side, sent, null, null));
+                    break;
+
+                case EngineEventType.Injury when matchEvent.ParticipantId is Guid hurt && !substituted.Contains(hurt):
+                    // An injured player nobody can replace still cannot continue: the side finishes a player short.
+                    changes.Add(new PersonnelChange(PossessionAfter(matchEvent, possessions), matchEvent.Side, hurt, null, null));
+                    break;
+
+                default:
+                    break;
             }
         }
 
-        return Math.Max(0, firstHalfEnd - (rules.HalfTimeMinute * rules.SecondsPerMinute));
+        return [.. changes.Where(change => change.BeforePossession < possessions.Count)];
     }
 
-    /// <summary>Moves the second half's possessions on to the continuous clock.</summary>
-    private static IReadOnlyList<MatchPassageV1> OnContinuousClock(IReadOnlyList<MatchPassageV1> passages, int secondHalfShift) =>
-        secondHalfShift == 0
-            ? passages
-            : [.. passages.Select(passage => passage.Period == 2
-                ? passage with
-                {
-                    StartClockSeconds = passage.StartClockSeconds + secondHalfShift,
-                    EndClockSeconds = passage.EndClockSeconds + secondHalfShift,
-                }
-                : passage)];
-
-    /// <summary>How much film time each passage is worth, normalised to the target with a floor.</summary>
-    private static List<int> Allocate(List<FilmPassage> groups, int targetFilmMilliseconds, HighlightOptionsV1 settings)
+    /// <summary>Gets the index of the possession after the one an event was recorded in.</summary>
+    private static int PossessionAfter(EngineEventV1 matchEvent, IReadOnlyList<MatchPassageV1> possessions)
     {
-        var totalWeight = Math.Max(1, groups.Sum(group => group.Weight));
-        var durations = groups
-            .Select(group => Math.Max(
-                settings.MinPassageMilliseconds,
-                (int)((long)targetFilmMilliseconds * group.Weight / totalWeight)))
-            .ToList();
-
-        // The floor can push the total past the ceiling on a match with very many short passages, so any
-        // excess is taken back from the passages that are still above the floor.
-        var excess = durations.Sum() - settings.MaxFilmMilliseconds;
-        var index = 0;
-
-        while (excess > 0 && index < durations.Count)
+        for (var index = 0; index < possessions.Count; index++)
         {
-            var room = durations[index] - settings.MinPassageMilliseconds;
-
-            if (room > 0)
+            if (possessions[index].Events.Any(recorded => recorded.Sequence == matchEvent.Sequence))
             {
-                var take = Math.Min(room, excess);
-                durations[index] -= take;
-                excess -= take;
+                return index + 1;
+            }
+        }
+
+        // Not in any possession: the event was emitted between two, and the player leaves before the next one.
+        for (var index = 0; index < possessions.Count; index++)
+        {
+            if (possessions[index].Events.Any(recorded => recorded.Sequence > matchEvent.Sequence))
+            {
+                return index;
+            }
+        }
+
+        return possessions.Count;
+    }
+
+    private static int SubstitutionPossession(
+        EngineEventV1 matchEvent,
+        IReadOnlyList<MatchPassageV1> possessions,
+        int[] lowest,
+        int[] highest,
+        EngineRulesV2 rules)
+    {
+        var lo = -1;
+        var hi = possessions.Count;
+
+        for (var index = 0; index < possessions.Count; index++)
+        {
+            // A possession with no event says nothing about where in the sequence a change was made.
+            if (possessions[index].Events.Count == 0)
+            {
+                continue;
             }
 
-            index++;
+            if (highest[index] < matchEvent.Sequence)
+            {
+                lo = index;
+            }
+
+            if (lowest[index] > matchEvent.Sequence && hi == possessions.Count)
+            {
+                hi = index;
+            }
         }
 
-        return durations;
-    }
+        var period = matchEvent.Minute > rules.HalfTimeMinute ? 2 : 1;
+        var regulation = period == 1 ? rules.HalfTimeMinute : rules.RegulationMinutes;
+        var floor = (matchEvent.StoppageMinute > 0 ? regulation + matchEvent.StoppageMinute - 1 : matchEvent.Minute - 1) * rules.SecondsPerMinute;
+        var first = Math.Min(possessions.Count - 1, lo + 1);
 
-    /// <summary>Lays the passages out on one contiguous film clock, one segment per passage.</summary>
-    private static List<PlaybackSegmentV1> Schedule(IReadOnlyList<AuthoredPassage> passages, List<int> durations)
-    {
-        var schedule = new List<PlaybackSegmentV1>(passages.Count);
-        var cursor = 0;
-
-        for (var index = 0; index < passages.Count; index++)
+        for (var index = lo + 1; index <= Math.Min(hi, possessions.Count - 1); index++)
         {
-            schedule.Add(new PlaybackSegmentV1("passage", passages[index].SourceEventSequence, cursor, durations[index]));
-            cursor += durations[index];
+            var possession = possessions[index];
+
+            if (possession.Period == period
+                && possession.EndClockSeconds >= floor
+                && possession.EndClockSeconds < floor + rules.SecondsPerMinute)
+            {
+                return index;
+            }
         }
 
-        return schedule;
+        return Math.Max(0, first);
     }
+
+    /// <summary>Gets who is on the pitch for each possession, sharing one roster between possessions with no change.</summary>
+    private static FilmRoster[] RostersFor(FilmContext context, int count, List<PersonnelChange> changes)
+    {
+        var rosters = new FilmRoster[count];
+        var roster = context.Starters;
+
+        for (var index = 0; index < count; index++)
+        {
+            foreach (var change in changes.Where(change => change.BeforePossession == index).OrderBy(change => change.Event?.Sequence ?? int.MaxValue))
+            {
+                roster = roster.With(change.Off, change.On);
+            }
+
+            rosters[index] = roster;
+        }
+
+        return rosters;
+    }
+
+    // ---- The schedule, the reel, and the payload ----------------------------------------------------------------
+
+    private static List<PlaybackSegmentV1> Schedule(List<FilmPassagePlan> plans) =>
+    [
+        .. plans.Select(plan => new PlaybackSegmentV1("passage", plan.SourceEventSequence, plan.StartMs, plan.DurationMs)),
+    ];
 
     /// <summary>The chance candidates the reel is built from, located on the film clock.</summary>
     private static List<ReelCandidateV1> Candidates(
-        IReadOnlyList<AuthoredPassage> passages,
-        Dictionary<int, EngineEventV1> bySequence,
-        List<PlaybackSegmentV1> playback,
+        FilmContext context,
+        FilmScriptResult script,
+        FilmAssembler assembler,
+        List<FilmPassagePlan> plans,
         HighlightOptionsV1 settings)
     {
         var candidates = new List<ReelCandidateV1>();
+        var rules = context.Rules;
+        var secondHalfStart = 0;
 
-        for (var index = 0; index < passages.Count; index++)
+        for (var index = 0; index < script.Beats.Count; index++)
         {
-            var passage = passages[index];
-
-            foreach (var sequence in passage.EventSequences)
+            if (script.Beats[index].Hold == HoldKind.HalfTime)
             {
-                if (!bySequence.TryGetValue(sequence, out var matchEvent) || !IsWorthShowing(matchEvent, settings))
-                {
-                    continue;
-                }
-
-                candidates.Add(new ReelCandidateV1(
-                    sequence,
-                    OutcomeCode(matchEvent.Type),
-                    matchEvent.Minute,
-                    matchEvent.StoppageMinute,
-                    playback[index].StartMilliseconds,
-                    playback[index].StartMilliseconds + playback[index].DurationMilliseconds,
-                    matchEvent.QualityBasisPoints ?? 0,
-                    matchEvent.IsGoal));
+                secondHalfStart = assembler.BeatEndMs(index);
             }
         }
+
+        foreach (var possession in script.Possessions)
+        {
+            var owned = Enumerable.Range(possession.FirstBeat, possession.LastBeat - possession.FirstBeat + 1)
+                .Where(index => script.Beats[index].Possession == possession.Index)
+                .ToList();
+
+            foreach (var index in owned)
+            {
+                foreach (var recorded in script.Beats[index].Events)
+                {
+                    if (!context.EventsBySequence.TryGetValue(recorded.Sequence, out var matchEvent) || !IsWorthShowing(matchEvent, settings))
+                    {
+                        continue;
+                    }
+
+                    var period = possession.Source.Period;
+                    var periodStartMs = period == 1 ? 0 : secondHalfStart;
+                    var periodStartSecond = period == 1 ? 0 : rules.HalfTimeMinute * rules.SecondsPerMinute;
+                    var filmStart = assembler.BeatStartMs(owned[0]);
+                    var eventMs = assembler.EventMs(index, recorded);
+                    var end = eventMs + settings.ReelReactionMilliseconds;
+
+                    // A goal runs on through its celebration, whether the event is on the strike or on the hold after it.
+                    if (script.Beats[index].Hold == HoldKind.Goal)
+                    {
+                        end = Math.Max(end, assembler.BeatEndMs(index));
+                    }
+                    else if (index + 1 < script.Beats.Count && script.Beats[index + 1].Hold == HoldKind.Goal)
+                    {
+                        end = Math.Max(end, assembler.BeatEndMs(index + 1));
+                    }
+
+                    var leadSecond = Math.Max(periodStartSecond, possession.Source.EndClockSeconds - settings.ReelLeadInMatchSeconds);
+                    var leadStartMs = assembler.Clock.FilmAt(period, leadSecond);
+
+                    candidates.Add(new ReelCandidateV1(
+                        recorded.Sequence,
+                        FilmLabels.OutcomeCode(matchEvent.Type),
+                        matchEvent.Minute,
+                        matchEvent.StoppageMinute,
+                        filmStart,
+                        Math.Min(end, assembler.TotalMs),
+                        matchEvent.QualityBasisPoints ?? 0,
+                        matchEvent.IsGoal,
+                        Math.Max(0, filmStart - Math.Max(leadStartMs, periodStartMs)),
+                        periodStartMs));
+                }
+            }
+        }
+
+        _ = plans;
 
         return candidates;
     }
@@ -366,548 +491,31 @@ public static class ReplayDirector
         _ => false,
     };
 
-    private static long WeightOf(
-        MatchPassageV1 passage,
-        Dictionary<int, EngineEventV1> bySequence,
-        EngineRulesV2 rules)
-    {
-        var events = passage.EventSequences
-            .Where(bySequence.ContainsKey)
-            .Select(sequence => bySequence[sequence])
-            .ToList();
-
-        if (events.Any(matchEvent => matchEvent.IsGoal))
+    private static PassageV1 ToPassage(
+        FilmPassagePlan plan,
+        List<HighlightTrackV1> tracks,
+        string homeColour,
+        string awayColour) => new()
         {
-            return 200;
-        }
-
-        if (events.Any(matchEvent => IsShot(matchEvent.Type)))
-        {
-            return 150;
-        }
-
-        return passage.AttackingEndX >= rules.ShotFinalThirdXMinBasisPoints ? 125 : 80;
-    }
-
-    private static bool IsShot(EngineEventType type) => type is
-        EngineEventType.Goal or EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed
-        or EngineEventType.ShotSaved or EngineEventType.ShotBlocked or EngineEventType.ShotOffTarget
-        or EngineEventType.Woodwork or EngineEventType.FreeKickShot;
-
-    /// <summary>Authorises one film passage: its eleven, the ball path, the players' tracks, and the beats.</summary>
-    private static AuthoredPassage AuthorPassage(
-        MatchInputV1 input,
-        FilmPassage group,
-        Dictionary<int, EngineEventV1> bySequence,
-        Dictionary<Guid, string> names,
-        (string Home, string Away) colours,
-        EngineRulesV2 rules,
-        Dictionary<MatchSide, Dictionary<int, Guid>> occupants,
-        int durationMilliseconds,
-        Dictionary<string, HighlightKeyframeV1>? previousEnds,
-        int ordinal,
-        int secondHalfShift)
-    {
-        var windows = Windows(group, durationMilliseconds);
-        var events = group.Possessions
-            .SelectMany(possession => possession.EventSequences)
-            .Where(bySequence.ContainsKey)
-            .Select(sequence => bySequence[sequence])
-            .OrderBy(matchEvent => matchEvent.Sequence)
-            .ToList();
-
-        var principal = events.FirstOrDefault(matchEvent => matchEvent.IsGoal)
-            ?? events.FirstOrDefault(matchEvent => IsShot(matchEvent.Type))
-            ?? events.FirstOrDefault();
-
-        var (minute, stoppage) = ClockOf(group, events, rules, secondHalfShift);
-        var homeColour = colours.Home;
-        var awayColour = colours.Away;
-
-        var entities = new List<HighlightEntityV1>();
-        var entitiesBySide = new Dictionary<MatchSide, Dictionary<Guid, int>>();
-        var slotBySide = new Dictionary<MatchSide, Dictionary<int, MatchSlotV1>>();
-
-        foreach (var side in new[] { MatchSide.Home, MatchSide.Away })
-        {
-            var frozen = input.SideOf(side);
-            var isHome = side == MatchSide.Home;
-            var squad = frozen.Squad.ToDictionary(participant => participant.ParticipantId);
-            var bySlot = frozen.Slots.ToDictionary(slot => slot.SlotNumber);
-            var slotOfParticipant = new Dictionary<Guid, int>();
-            slotBySide[side] = bySlot;
-
-            foreach (var slot in frozen.Slots.OrderBy(slot => slot.SlotNumber))
-            {
-                if (!occupants[side].TryGetValue(slot.SlotNumber, out var participantId)
-                    || !squad.TryGetValue(participantId, out var participant))
-                {
-                    continue;
-                }
-
-                var anchor = Anchor(slot, isHome, group.PrimarySide == side, 0, windows, rules, 0, 0);
-
-                entities.Add(new HighlightEntityV1
-                {
-                    EntityId = EntityId(isHome, slot.SlotNumber),
-                    IsBall = false,
-                    Side = side,
-                    ParticipantId = participantId,
-                    ShirtNumber = participant.ShirtNumber,
-                    Family = slot.Family,
-                    X = anchor.X,
-                    Y = anchor.Y,
-                    Name = names.TryGetValue(participantId, out var name) ? name : null,
-                    Position = PositionCode(slot),
-                });
-
-                slotOfParticipant[participantId] = slot.SlotNumber;
-            }
-
-            entitiesBySide[side] = slotOfParticipant;
-        }
-
-        var ballStart = BallAt(0, windows);
-        entities.Add(new HighlightEntityV1
-        {
-            EntityId = BallEntityId,
-            IsBall = true,
-            X = NormalizeX(ballStart.X),
-            Y = NormalizeY(ballStart.Y),
-        });
-
-        var ballWaypoints = BallWaypoints(windows, durationMilliseconds, previousEnds);
-        var waypoints = new Dictionary<string, IReadOnlyList<HighlightKeyframeV1>>(StringComparer.Ordinal)
-        {
-            [BallEntityId] = ballWaypoints,
+            PresentationVersion = Version,
+            SourceEventSequence = plan.SourceEventSequence,
+            Minute = plan.Minute,
+            StoppageMinute = plan.StoppageMinute,
+            Period = plan.Period,
+            StartMatchSecond = plan.StartMatchSecond,
+            EndMatchSecond = plan.EndMatchSecond,
+            DurationMilliseconds = plan.DurationMs,
+            OutcomeCode = plan.OutcomeCode,
+            Narration = plan.Narration,
+            HomeColour = homeColour,
+            AwayColour = awayColour,
+            EventSequences = plan.EventSequences,
+            Entities = plan.Entities,
+            Tracks = tracks,
+            Commentary = plan.Commentary,
+            Clock = plan.Clock,
+            Cuts = plan.Cuts,
         };
-
-        foreach (var entity in entities.Where(entity => !entity.IsBall))
-        {
-            var side = entity.Side!.Value;
-            var isHome = side == MatchSide.Home;
-            var slot = slotBySide[side][int.Parse(entity.EntityId[1..], CultureInfo.InvariantCulture)];
-            var touches = Touches(windows, entity.ParticipantId!.Value, durationMilliseconds);
-
-            waypoints[entity.EntityId] = PlayerWaypoints(
-                slot,
-                isHome,
-                group,
-                windows,
-                durationMilliseconds,
-                touches,
-                previousEnds,
-                ordinal,
-                entity.EntityId,
-                rules);
-        }
-
-        var beats = Beats(group, windows, events, entitiesBySide, durationMilliseconds, ordinal, rules, secondHalfShift);
-
-        return new AuthoredPassage(
-            Version,
-            principal?.Sequence ?? 0,
-            minute,
-            stoppage,
-            group.StartSecond,
-            group.EndSecond,
-            durationMilliseconds,
-            principal is null ? "play" : OutcomeCode(principal.Type),
-            Narration(principal, names, minute, stoppage),
-            homeColour,
-            awayColour,
-            [.. events.Select(matchEvent => matchEvent.Sequence)],
-            [.. entities.OrderBy(entity => entity.EntityId, StringComparer.Ordinal)],
-            waypoints,
-            CommentaryTokenBuilder.BuildPassageCommentary(input, beats, durationMilliseconds));
-    }
-
-    /// <summary>The film windows, in the passage, of each recorded possession it merged.</summary>
-    private static List<(MatchPassageV1 Possession, int Start, int Length)> Windows(FilmPassage group, int duration)
-    {
-        var total = Math.Max(1, group.EndSecond - group.StartSecond);
-        var windows = new List<(MatchPassageV1, int, int)>(group.Possessions.Count);
-        var elapsed = 0;
-
-        foreach (var possession in group.Possessions)
-        {
-            var span = Math.Max(1, possession.EndClockSeconds - possession.StartClockSeconds);
-            var start = (int)((long)elapsed * duration / total);
-            var length = Math.Max(1, (int)((long)span * duration / total));
-
-            windows.Add((possession, start, length));
-            elapsed += span;
-        }
-
-        return windows;
-    }
-
-    /// <summary>Builds the ball's track from the recorded waypoints, at their film times.</summary>
-    private static List<HighlightKeyframeV1> BallWaypoints(
-        IReadOnlyList<(MatchPassageV1 Possession, int Start, int Length)> windows,
-        int duration,
-        Dictionary<string, HighlightKeyframeV1>? previousEnds)
-    {
-        var waypoints = new List<HighlightKeyframeV1>();
-
-        foreach (var (possession, start, length) in windows)
-        {
-            foreach (var waypoint in possession.Waypoints)
-            {
-                var time = start + (int)((long)waypoint.FractionBasisPoints * length / EngineRulesV2.Certain);
-
-                waypoints.Add(new HighlightKeyframeV1(
-                    time,
-                    Clamp(NormalizeX(waypoint.X)),
-                    Clamp(NormalizeY(waypoint.Y)),
-                    int.Clamp(waypoint.Z, 0, 100),
-                    Action: waypoint.Kind.Code()));
-            }
-        }
-
-        if (waypoints.Count == 0)
-        {
-            waypoints.Add(new HighlightKeyframeV1(0, Pitch / 2, Pitch / 2));
-        }
-
-        if (previousEnds is not null && previousEnds.TryGetValue(BallEntityId, out var previous))
-        {
-            waypoints[0] = new HighlightKeyframeV1(0, previous.X, previous.Y, previous.Z, Action: waypoints[0].Action);
-        }
-
-        return Order(waypoints, duration, (Pitch / 2, Pitch / 2));
-    }
-
-    /// <summary>Builds one player's track: the shape over the ball's real path, plus their recorded touches.</summary>
-    private static List<HighlightKeyframeV1> PlayerWaypoints(
-        MatchSlotV1 slot,
-        bool isHome,
-        FilmPassage group,
-        IReadOnlyList<(MatchPassageV1 Possession, int Start, int Length)> windows,
-        int duration,
-        IReadOnlyList<HighlightKeyframeV1> touches,
-        Dictionary<string, HighlightKeyframeV1>? previousEnds,
-        int ordinal,
-        string entityId,
-        EngineRulesV2 rules)
-    {
-        var hasPossession = group.PrimarySide == (isHome ? MatchSide.Home : MatchSide.Away);
-        var (jitterX, jitterY) = Jitter($"{ordinal}:{entityId}");
-
-        var waypoints = new List<HighlightKeyframeV1>
-        {
-            Anchor(slot, isHome, hasPossession, 0, windows, rules, jitterX, jitterY),
-            Anchor(slot, isHome, hasPossession, duration / 2, windows, rules, jitterX, jitterY),
-            Anchor(slot, isHome, hasPossession, duration, windows, rules, jitterX, jitterY),
-        };
-
-        waypoints.AddRange(touches);
-
-        if (previousEnds is not null && previousEnds.TryGetValue(entityId, out var previous))
-        {
-            waypoints[0] = new HighlightKeyframeV1(0, previous.X, previous.Y, previous.Z, Action: waypoints[0].Action);
-        }
-
-        return Order(waypoints, duration, (waypoints[0].X, waypoints[0].Y));
-    }
-
-    /// <summary>Resolves a slot's presentation position at one film time, over the real ball path.</summary>
-    private static HighlightKeyframeV1 Anchor(
-        MatchSlotV1 slot,
-        bool isHome,
-        bool hasPossession,
-        int time,
-        IReadOnlyList<(MatchPassageV1 Possession, int Start, int Length)> windows,
-        EngineRulesV2 rules,
-        int jitterX,
-        int jitterY)
-    {
-        var ball = BallAt(time, windows);
-        var resolved = TacticalFormationResolver.ResolvePosition(
-            slot,
-            isHome,
-            hasPossession,
-            new SpatialPoint(ball.X, ball.Y),
-            new MatchInstructionsV1(),
-            rules);
-
-        return new HighlightKeyframeV1(
-            time,
-            Clamp(NormalizeX(resolved.X) + jitterX),
-            Clamp(NormalizeY(resolved.Y) + jitterY));
-    }
-
-    /// <summary>The recorded touches of one player, mapped to their film times.</summary>
-    private static List<HighlightKeyframeV1> Touches(
-        IReadOnlyList<(MatchPassageV1 Possession, int Start, int Length)> windows,
-        Guid participantId,
-        int duration)
-    {
-        var touches = new List<HighlightKeyframeV1>();
-
-        foreach (var (possession, start, length) in windows)
-        {
-            foreach (var touch in possession.Touches)
-            {
-                if (touch.ParticipantId != participantId)
-                {
-                    continue;
-                }
-
-                var time = start + (int)((long)touch.FractionBasisPoints * length / EngineRulesV2.Certain);
-
-                touches.Add(new HighlightKeyframeV1(
-                    Math.Min(time, duration),
-                    Clamp(NormalizeX(touch.X)),
-                    Clamp(NormalizeY(touch.Y)),
-                    int.Clamp(touch.Z, 0, 100),
-                    Action: touch.Action.Code()));
-            }
-        }
-
-        return touches;
-    }
-
-    /// <summary>The narrated beats of one passage: its build-up touches and its events, on the film clock.</summary>
-    private static List<PassageBeatV1> Beats(
-        FilmPassage group,
-        IReadOnlyList<(MatchPassageV1 Possession, int Start, int Length)> windows,
-        List<EngineEventV1> events,
-        Dictionary<MatchSide, Dictionary<Guid, int>> entitiesBySide,
-        int duration,
-        int ordinal,
-        EngineRulesV2 rules,
-        int secondHalfShift)
-    {
-        var beats = new List<PassageBeatV1>();
-        var sideOfParticipant = new Dictionary<Guid, MatchSide>();
-
-        foreach (var (side, slots) in entitiesBySide)
-        {
-            foreach (var participant in slots.Keys)
-            {
-                sideOfParticipant[participant] = side;
-            }
-        }
-
-        var seed = ordinal * 100;
-
-        foreach (var (possession, start, length) in windows)
-        {
-            foreach (var touch in possession.Touches)
-            {
-                var kind = CommentaryTokenBuilder.KindOf(touch.Action);
-
-                if (kind is null || !sideOfParticipant.TryGetValue(touch.ParticipantId, out var side))
-                {
-                    continue;
-                }
-
-                var time = start + (int)((long)touch.FractionBasisPoints * length / EngineRulesV2.Certain);
-                beats.Add(new PassageBeatV1(Math.Min(time, duration), side, touch.ParticipantId, kind.Value, null, seed++));
-            }
-        }
-
-        foreach (var matchEvent in events)
-        {
-            var time = FilmTimeForSecond(EventSecond(matchEvent, rules, secondHalfShift), group, duration);
-            beats.Add(new PassageBeatV1(time, matchEvent.Side, matchEvent.ParticipantId, PassageBeatKind.Event, matchEvent, matchEvent.Sequence));
-        }
-
-        return beats;
-    }
-
-    private static (int Minute, int Stoppage) ClockOf(
-        FilmPassage group,
-        List<EngineEventV1> events,
-        EngineRulesV2 rules,
-        int secondHalfShift)
-    {
-        if (events.Count > 0)
-        {
-            return (events[0].Minute, events[0].StoppageMinute);
-        }
-
-        // A passage with no event is labelled the way the engine labels the minute it began in: from the
-        // half's own clock, which is the continuous one less the shift in the second half.
-        var halfSeconds = group.Period == 2 ? group.StartSecond - secondHalfShift : group.StartSecond;
-        var played = halfSeconds / Math.Max(1, rules.SecondsPerMinute);
-        var regulation = group.Period == 2 ? rules.RegulationMinutes : rules.HalfTimeMinute;
-
-        return (
-            int.Clamp(played + 1, 1, regulation),
-            Math.Max(0, played + 1 - regulation));
-    }
-
-    /// <summary>
-    /// Gets the continuous-clock second an event is stamped at: its minute, read on the same clock the passages
-    /// are, so a substitution lands in the passage it happened in.
-    /// </summary>
-    private static int EventSecond(EngineEventV1 matchEvent, EngineRulesV2 rules, int secondHalfShift) =>
-        ((matchEvent.Minute + matchEvent.StoppageMinute) * rules.SecondsPerMinute)
-        + (matchEvent.Minute > rules.HalfTimeMinute ? secondHalfShift : 0);
-
-    private static int FilmTimeForSecond(int second, FilmPassage group, int duration)
-    {
-        var total = Math.Max(1, group.EndSecond - group.StartSecond);
-
-        return int.Clamp((int)((long)(second - group.StartSecond) * duration / total), 0, duration);
-    }
-
-    /// <summary>The ball's pitch position at one film time, interpolated over the recorded path.</summary>
-    private static (int X, int Y) BallAt(
-        int time,
-        IReadOnlyList<(MatchPassageV1 Possession, int Start, int Length)> windows)
-    {
-        (int X, int Y)? previous = null;
-        var previousTime = 0;
-
-        foreach (var (possession, start, length) in windows)
-        {
-            foreach (var waypoint in possession.Waypoints)
-            {
-                var at = start + (int)((long)waypoint.FractionBasisPoints * length / EngineRulesV2.Certain);
-
-                if (at >= time)
-                {
-                    if (previous is null || at == previousTime)
-                    {
-                        return (waypoint.X, waypoint.Y);
-                    }
-
-                    var span = at - previousTime;
-                    var ratio = span <= 0 ? 0 : (time - previousTime) / (double)span;
-
-                    return (
-                        (int)(previous.Value.X + ((waypoint.X - previous.Value.X) * ratio)),
-                        (int)(previous.Value.Y + ((waypoint.Y - previous.Value.Y) * ratio)));
-                }
-
-                previous = (waypoint.X, waypoint.Y);
-                previousTime = at;
-            }
-        }
-
-        return previous ?? (SpatialPitch.PitchLength / 2, SpatialPitch.PitchWidth / 2);
-    }
-
-    /// <summary>The eleven, with substitutions and dismissals applied, as they stood at one match second.</summary>
-    private static Dictionary<MatchSide, Dictionary<int, Guid>> OccupantsAt(
-        MatchInputV1 input,
-        List<(int Second, MatchSide Side, Guid Off, Guid? On)> changes,
-        int second)
-    {
-        var occupants = new Dictionary<MatchSide, Dictionary<int, Guid>>();
-
-        foreach (var side in new[] { MatchSide.Home, MatchSide.Away })
-        {
-            occupants[side] = input.SideOf(side).Slots.ToDictionary(slot => slot.SlotNumber, slot => slot.ParticipantId);
-        }
-
-        foreach (var (at, side, off, on) in changes.OrderBy(change => change.Second))
-        {
-            if (at > second)
-            {
-                break;
-            }
-
-            var slots = occupants[side];
-            var slot = slots.FirstOrDefault(pair => pair.Value == off).Key;
-
-            if (slot == 0)
-            {
-                continue;
-            }
-
-            if (on is Guid incoming)
-            {
-                slots[slot] = incoming;
-            }
-            else
-            {
-                slots.Remove(slot);
-            }
-        }
-
-        return occupants;
-    }
-
-    /// <summary>Substitutions and dismissals, which change who is on the pitch and split a film passage.</summary>
-    private static List<(int Second, MatchSide Side, Guid Off, Guid? On)> PersonnelChanges(
-        IReadOnlyList<EngineEventV1> events,
-        EngineRulesV2 rules,
-        int secondHalfShift)
-    {
-        var changes = new List<(int Second, MatchSide Side, Guid Off, Guid? On)>();
-
-        foreach (var matchEvent in events.OrderBy(matchEvent => matchEvent.Sequence))
-        {
-            switch (matchEvent.Type)
-            {
-                case EngineEventType.Substitution when matchEvent.ParticipantId is Guid off:
-                    changes.Add((EventSecond(matchEvent, rules, secondHalfShift), matchEvent.Side, off, matchEvent.SecondaryParticipantId));
-                    break;
-
-                case EngineEventType.RedCard or EngineEventType.SecondYellowCard when matchEvent.ParticipantId is Guid sent:
-                    changes.Add((EventSecond(matchEvent, rules, secondHalfShift), matchEvent.Side, sent, null));
-                    break;
-
-                default:
-                    break;
-            }
-        }
-
-        return changes;
-    }
-
-    /// <summary>Whether any personnel change fell in the gap between two consecutive possessions.</summary>
-    private static bool ChangeBetween(List<int> changeSeconds, int fromExclusive, int toInclusive) =>
-        changeSeconds.Any(second => second > fromExclusive && second <= toInclusive);
-
-    /// <summary>Ensures a track's keyframes are ordered, strictly increasing, and span the whole passage.</summary>
-    private static List<HighlightKeyframeV1> Order(
-        List<HighlightKeyframeV1> waypoints,
-        int duration,
-        (int X, int Y) fallback)
-    {
-        var ordered = waypoints
-            .OrderBy(keyframe => keyframe.TimeMilliseconds)
-            .ThenBy(keyframe => keyframe.Action is null ? 0 : 1)
-            .ToList();
-
-        var result = new List<HighlightKeyframeV1>(ordered.Count);
-        var previous = -1;
-
-        foreach (var keyframe in ordered)
-        {
-            var time = int.Clamp(keyframe.TimeMilliseconds, 0, Math.Max(0, duration - 1));
-
-            if (time <= previous)
-            {
-                time = previous + 1;
-            }
-
-            if (time >= duration && result.Count > 0)
-            {
-                time = Math.Max(0, duration - 1);
-            }
-
-            result.Add(keyframe with { TimeMilliseconds = time });
-            previous = time;
-        }
-
-        if (result.Count == 0)
-        {
-            result.Add(new HighlightKeyframeV1(0, fallback.X, fallback.Y));
-        }
-
-        if (result[^1].TimeMilliseconds != duration)
-        {
-            result.Add(new HighlightKeyframeV1(duration, result[^1].X, result[^1].Y));
-        }
-
-        return result;
-    }
 
     private static int Estimate(
         IReadOnlyList<PassageV1> passages,
@@ -922,163 +530,93 @@ public static class ReplayDirector
         + homeLineup.EstimatedPayloadBytes
         + awayLineup.EstimatedPayloadBytes
         + ((liveMetrics?.Count ?? 0) * MatchPresentationV1.LiveMetricBytes);
+}
 
-    private static int NormalizeX(int pitchX) => Clamp(pitchX);
+/// <summary>A presentation, and what was measured of the film it describes (`replay-v4`).</summary>
+/// <param name="Presentation">The presentation.</param>
+/// <param name="Diagnostics">The measurements, when they were asked for.</param>
+public sealed record FilmBuild(MatchPresentationV1 Presentation, FilmDiagnostics? Diagnostics);
 
-    private static int NormalizeY(int pitchY) => Clamp((pitchY * Pitch) / PitchWidth);
+/// <summary>How fast the ball moves in one kind of beat, in metres per second of film (`replay-v4`).</summary>
+/// <param name="Median">The median speed.</param>
+/// <param name="Percentile95">The ninety-fifth percentile.</param>
+public sealed record BallSpeedSummary(double Median, double Percentile95);
 
-    private static int Clamp(int value) => int.Clamp(value, 0, Pitch);
+/// <summary>
+/// What a film is, measured rather than described (`replay-v4`): its pace, how much was condensed, whether the ball
+/// jumps, and how fast everything moves. Used by the tests and the replay benchmark; never sent to a client.
+/// </summary>
+public sealed record FilmDiagnostics
+{
+    /// <summary>Gets the one pace the film is played at.</summary>
+    public required double Pace { get; init; }
 
-    private static string EntityId(bool isHome, int slotNumber) => $"{(isHome ? "H" : "A")}{slotNumber}";
+    /// <summary>Gets the factor the holds were scaled by.</summary>
+    public required double HoldScale { get; init; }
 
-    private static (int X, int Y) Jitter(string seed)
-    {
-        var hash = StableHash(seed);
-        var span = (2 * JitterMagnitude) + 1;
+    /// <summary>Gets the film length aimed at, in milliseconds.</summary>
+    public required int TargetMilliseconds { get; init; }
 
-        return ((int)(hash % span) - JitterMagnitude, (int)((hash / span) % span) - JitterMagnitude);
-    }
+    /// <summary>Gets the film length, in milliseconds.</summary>
+    public required int FilmMilliseconds { get; init; }
 
-    private static uint StableHash(string value)
-    {
-        var hash = 2166136261u;
+    /// <summary>Gets how much of the film is holds, in milliseconds.</summary>
+    public required int HoldMilliseconds { get; init; }
 
-        foreach (var character in value)
-        {
-            hash ^= character;
-            hash *= 16777619u;
-        }
+    /// <summary>Gets how many possessions had their ground moves merged to fit.</summary>
+    public required int CondensedPossessions { get; init; }
 
-        return hash;
-    }
+    /// <summary>Gets how many possessions the film has.</summary>
+    public required int Possessions { get; init; }
 
-    private static string OutcomeCode(EngineEventType type) => type switch
-    {
-        EngineEventType.Goal => "goal",
-        EngineEventType.PenaltyGoal => "penalty_goal",
-        EngineEventType.PenaltyMissed => "penalty_missed",
-        EngineEventType.FreeKickShot => "free_kick_shot",
-        EngineEventType.Woodwork => "woodwork",
-        EngineEventType.ShotSaved => "saved",
-        EngineEventType.ShotBlocked => "blocked",
-        EngineEventType.ShotOffTarget => "off_target",
-        _ => "play",
-    };
+    /// <summary>Gets how much longer than their natural length the moves were played, as a share.</summary>
+    public required double ExtensionShare { get; init; }
 
-    private static string Narration(EngineEventV1? matchEvent, Dictionary<Guid, string> names, int minute, int stoppage)
-    {
-        if (matchEvent is null)
-        {
-            return $"Play continues, {ClockLabel(minute, stoppage)}.";
-        }
+    /// <summary>Gets the number of cuts.</summary>
+    public required int Cuts { get; init; }
 
-        var player = matchEvent.ParticipantId is Guid id && names.TryGetValue(id, out var name)
-            ? name
-            : "the attacker";
+    /// <summary>Gets how many steps the ball moved further than any ball can, outside the cuts.</summary>
+    public required int Teleports { get; init; }
 
-        var outcome = matchEvent.Type switch
-        {
-            EngineEventType.Goal => "Goal",
-            EngineEventType.PenaltyGoal => "Penalty scored",
-            EngineEventType.PenaltyMissed => "Penalty missed",
-            EngineEventType.FreeKickShot => "Free kick struck",
-            EngineEventType.Woodwork => "Shot against the woodwork",
-            EngineEventType.ShotSaved => "Shot saved",
-            EngineEventType.ShotBlocked => "Shot blocked",
-            EngineEventType.ShotOffTarget => "Shot off target",
-            _ => "Chance",
-        };
+    /// <summary>Gets the share of the film outside the holds in which the ball is still.</summary>
+    public required double StillBallShare { get; init; }
 
-        return $"{outcome} — {player}, {ClockLabel(matchEvent.Minute, matchEvent.StoppageMinute)}.";
-    }
+    /// <summary>Gets the fastest an outfield player moves, in metres per second of film.</summary>
+    public required double MaxPlayerFilmSpeed { get; init; }
 
-    private static string ClockLabel(int minute, int stoppage) =>
-        stoppage > 0 ? $"{minute}+{stoppage}" : minute.ToString(CultureInfo.InvariantCulture);
+    /// <summary>Gets the fastest a goalkeeper moves, in metres per second of film.</summary>
+    public required double MaxKeeperFilmSpeed { get; init; }
 
-    private static string PositionCode(MatchSlotV1 slot) => slot.Family switch
-    {
-        MatchPositionFamily.Goalkeeper => "GK",
-        MatchPositionFamily.Defence => "DF",
-        MatchPositionFamily.Midfield => "MF",
-        MatchPositionFamily.Attack => "FW",
-        _ => string.Empty,
-    };
+    /// <summary>Gets the ball's speed in each kind of beat, in metres per second of film.</summary>
+    public required IReadOnlyDictionary<string, BallSpeedSummary> BallSpeeds { get; init; }
 
-    private static Dictionary<Guid, string> Names(MatchInputV1 input)
-    {
-        var names = new Dictionary<Guid, string>();
+    /// <summary>Gets which rung of the payload ladder the film was compressed at.</summary>
+    public required int PayloadRung { get; init; }
 
-        foreach (var side in new[] { input.Home, input.Away })
-        {
-            foreach (var participant in side.Squad)
-            {
-                names[participant.ParticipantId] = participant.DisplayName;
-            }
-        }
+    /// <summary>Gets how many moves had a player drive the ball.</summary>
+    public required int CarryBeats { get; init; }
 
-        return names;
-    }
+    /// <summary>Gets how many of those ended with the driver within a metre and a half of the ball.</summary>
+    public required int CarriesWithBall { get; init; }
 
-    private static (string Home, string Away) Colours(MatchInputV1 input) =>
-        (ClubPalette.PrimaryOf(input.Home.ClubId), ClubPalette.PrimaryOf(input.Away.ClubId));
+    /// <summary>Gets how many passes, crosses and lofted balls were received by a player on the pitch.</summary>
+    public required int Receptions { get; init; }
 
-    /// <summary>One film passage, before its tracks are compressed to the payload ladder's rung.</summary>
-    private sealed record AuthoredPassage(
-        string PresentationVersion,
-        int SourceEventSequence,
-        int Minute,
-        int StoppageMinute,
-        int StartMatchSecond,
-        int EndMatchSecond,
-        int DurationMilliseconds,
-        string OutcomeCode,
-        string Narration,
-        string HomeColour,
-        string AwayColour,
-        IReadOnlyList<int> EventSequences,
-        IReadOnlyList<HighlightEntityV1> Entities,
-        IReadOnlyDictionary<string, IReadOnlyList<HighlightKeyframeV1>> Waypoints,
-        IReadOnlyList<HighlightCommentaryV1> Commentary)
-    {
-        /// <summary>Gets the last authored keyframe of each entity, for the next passage to join onto.</summary>
-        public Dictionary<string, HighlightKeyframeV1> Ends =>
-            Waypoints.ToDictionary(pair => pair.Key, pair => pair.Value[^1], StringComparer.Ordinal);
+    /// <summary>Gets how many of those were received with the receiver within a metre and a half of the ball.</summary>
+    public required int ReceiversAtBall { get; init; }
 
-        /// <summary>Compresses the tracks at one rung of the payload ladder.</summary>
-        public PassageV1 Compress(int tolerance, int sampleInterval) => new()
-        {
-            PresentationVersion = PresentationVersion,
-            SourceEventSequence = SourceEventSequence,
-            Minute = Minute,
-            StoppageMinute = StoppageMinute,
-            StartMatchSecond = StartMatchSecond,
-            EndMatchSecond = EndMatchSecond,
-            DurationMilliseconds = DurationMilliseconds,
-            OutcomeCode = OutcomeCode,
-            Narration = Narration,
-            HomeColour = HomeColour,
-            AwayColour = AwayColour,
-            EventSequences = EventSequences,
-            Entities = Entities,
-            Tracks =
-            [
-                .. Waypoints
-                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Select(pair => new HighlightTrackV1(
-                        pair.Key,
-                        KeyframeCompressor.Compress(
-                            KeyframeCompressor.Sample(pair.Value, sampleInterval),
-                            tolerance))),
-            ],
-            Commentary = Commentary,
-        };
-    }
+    /// <summary>Gets the furthest a receiver was from the ball as it arrived, in metres.</summary>
+    public required double WorstReceiverGap { get; init; }
 
-    private sealed record FilmPassage(
-        IReadOnlyList<MatchPassageV1> Possessions,
-        int StartSecond,
-        int EndSecond,
-        MatchSide PrimarySide,
-        long Weight,
-        int Period);
+    /// <summary>Gets how many saves were made.</summary>
+    public required int Saves { get; init; }
+
+    /// <summary>Gets the furthest the goalkeeper was from the ball as he saved it, in metres.</summary>
+    public required double WorstKeeperGap { get; init; }
+
+    /// <summary>Gets how many strikes ended in a goal.</summary>
+    public required int GoalStrikes { get; init; }
+
+    /// <summary>Gets how many of those ended inside the goal mouth, on the line.</summary>
+    public required int GoalsInNet { get; init; }
 }

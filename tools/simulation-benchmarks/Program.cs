@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json;
+using TouchlineManager.Application.Match;
 using TouchlineManager.MatchEngine;
 using TouchlineManager.MatchEngine.Commentary;
 using TouchlineManager.MatchEngine.Configuration;
@@ -13,10 +15,17 @@ using TouchlineManager.SimulationBenchmarks;
 // rather than a test: the numbers that tune the engine want a hundred thousand matches and a printed table,
 // and a test suite that took twenty minutes would stop being run.
 //
-// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|all] [count] [seed]
+// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|all] [count] [seed] [--dump file]
+//
+// `--dump file` writes the first replayed match's presentation, as the API returns it, to a file: the fluidity
+// harness in apps/web/.preview plays it back in a browser (replay-v4).
 
-var mode = args.Length > 0 ? args[0] : "all";
-var count = args.Length > 1 && int.TryParse(args[1], CultureInfo.InvariantCulture, out var parsed)
+var dumpAt = Array.IndexOf(args, "--dump");
+var dumpPath = dumpAt >= 0 && dumpAt + 1 < args.Length ? args[dumpAt + 1] : null;
+var positional = args.Where((_, position) => dumpAt < 0 || (position != dumpAt && position != dumpAt + 1)).ToArray();
+
+var mode = positional.Length > 0 ? positional[0] : "all";
+var count = positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var parsed)
     ? parsed
     : mode switch
     {
@@ -26,7 +35,7 @@ var count = args.Length > 1 && int.TryParse(args[1], CultureInfo.InvariantCultur
         "tactics" => 2_000,
         _ => 20_000,
     };
-var seed = args.Length > 2 && ulong.TryParse(args[2], CultureInfo.InvariantCulture, out var parsedSeed)
+var seed = positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var parsedSeed)
     ? parsedSeed
     : 20_260_925UL;
 
@@ -61,7 +70,7 @@ if (mode is "tactics" or "all")
 
 if (mode is "replay" or "all")
 {
-    Replay(Math.Min(count, 10_000), seed);
+    Replay(Math.Min(count, 10_000), seed, dumpPath);
 }
 
 if (mode is "bench" or "all")
@@ -97,6 +106,7 @@ void SingleMatch(ulong matchSeed)
     Console.WriteLine($"  commentary lines {commentary.Count}");
     Console.WriteLine($"  live metrics     {liveMetrics.Metrics.Count}");
     Console.WriteLine($"  passages         {presentation.Passages.Count}"
+        + $", pace {presentation.PaceMilli / 1_000.0:F2}x"
         + $", film {presentation.TotalPlaybackMilliseconds / 60_000.0:F1} min"
         + $", reel {presentation.Reel.Sum(clip => clip.DurationMilliseconds) / 60_000.0:F1} min"
         + $", ~{presentation.EstimatedPayloadBytes / 1024.0:F1} KB");
@@ -193,16 +203,32 @@ void Distributions(int matches, ulong baseSeed)
     Console.WriteLine();
 }
 
-void Replay(int matches, ulong baseSeed)
+void Replay(int matches, ulong baseSeed, string? dump)
 {
-    Console.WriteLine($"== replay-v3 film and reel, {matches:N0} matches ==");
+    Console.WriteLine($"== replay-v4 constant-pace film and reel, {matches:N0} matches ==");
 
+    var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
     var passageCounts = new double[matches];
+    var paces = new double[matches];
     var filmDurations = new double[matches];
     var reelDurations = new double[matches];
-    var payloads = new double[matches];
+    var estimates = new double[matches];
+    var bytes = new double[matches];
+    var condensedShare = new double[matches];
+    var stillShare = new double[matches];
+    var extensionShare = new double[matches];
+    var playerSpeedRatio = new double[matches];
+    var keeperSpeedRatio = new double[matches];
+    var ballByKind = new Dictionary<string, (List<double> Median, List<double> P95)>(StringComparer.Ordinal);
     var inWindow = 0;
     var overCeiling = 0;
+    var inBand = 0;
+    var condensedMatches = 0;
+    var teleports = 0L;
+    var cuts = 0L;
+    var rungs = new int[4];
+    var options = new HighlightOptionsV1();
+    var elapsed = Stopwatch.StartNew();
 
     for (var index = 0; index < matches; index++)
     {
@@ -210,12 +236,55 @@ void Replay(int matches, ulong baseSeed)
         var liveMetrics = new PlayerLiveMetricsRecorder();
         var passages = new MatchPassageRecorder();
         var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
-        var presentation = ReplayDirector.Build(input, result, passages.Passages, liveMetrics: liveMetrics.Metrics);
+        var built = ReplayDirector.Analyse(input, result, passages.Passages, options, liveMetrics.Metrics);
+        var presentation = built.Presentation;
+        var film = built.Diagnostics!;
+
+        var response = presentation.ToResponse(Guid.Empty, CommentaryTokenBuilder.Build(input, result));
+        var serialized = JsonSerializer.SerializeToUtf8Bytes(response, json);
+
+        if (index == 0 && dump is not null)
+        {
+            File.WriteAllBytes(dump, serialized);
+            Console.WriteLine($"  dumped match {baseSeed} to {dump} ({serialized.Length / 1024.0:F0} KB)");
+        }
 
         passageCounts[index] = presentation.Passages.Count;
+        paces[index] = film.Pace;
         filmDurations[index] = presentation.TotalPlaybackMilliseconds;
         reelDurations[index] = presentation.Reel.Sum(clip => clip.DurationMilliseconds);
-        payloads[index] = presentation.EstimatedPayloadBytes;
+        estimates[index] = presentation.EstimatedPayloadBytes;
+        bytes[index] = serialized.Length;
+        condensedShare[index] = film.Possessions == 0 ? 0 : (double)film.CondensedPossessions / film.Possessions;
+        stillShare[index] = film.StillBallShare;
+        extensionShare[index] = film.ExtensionShare;
+        playerSpeedRatio[index] = film.MaxPlayerFilmSpeed / (options.SprintMetresPerSecond * film.Pace);
+        keeperSpeedRatio[index] = film.MaxKeeperFilmSpeed / (options.DiveMetresPerSecond * film.Pace);
+        teleports += film.Teleports;
+        cuts += film.Cuts;
+        rungs[Math.Min(film.PayloadRung, rungs.Length - 1)]++;
+
+        if (film.CondensedPossessions > 0)
+        {
+            condensedMatches++;
+        }
+
+        if (film.Pace >= options.MinPaceMilli / 1_000.0 - 0.005 && film.Pace <= options.MaxPaceMilli / 1_000.0 + 0.005)
+        {
+            inBand++;
+        }
+
+        foreach (var (kind, summary) in film.BallSpeeds)
+        {
+            if (!ballByKind.TryGetValue(kind, out var lists))
+            {
+                lists = ([], []);
+                ballByKind[kind] = lists;
+            }
+
+            lists.Median.Add(summary.Median);
+            lists.P95.Add(summary.Percentile95);
+        }
 
         if (presentation.TotalPlaybackMilliseconds is >= (9 * 60 * 1000) and <= (11 * 60 * 1000))
         {
@@ -228,16 +297,36 @@ void Replay(int matches, ulong baseSeed)
         }
     }
 
-    Array.Sort(passageCounts);
-    Array.Sort(filmDurations);
-    Array.Sort(reelDurations);
-    Array.Sort(payloads);
+    foreach (var series in new[] { passageCounts, paces, filmDurations, reelDurations, estimates, bytes, condensedShare, stillShare, extensionShare, playerSpeedRatio, keeperSpeedRatio })
+    {
+        Array.Sort(series);
+    }
 
-    Console.WriteLine($"  {"passages per match",-28} {Percentile(passageCounts, 0.50),7} p50   {Percentile(passageCounts, 0.05),7} p05   {Percentile(passageCounts, 0.95),7} p95   max {passageCounts[^1]}");
-    Console.WriteLine($"  {"film minutes p05/p50/p95",-28} {Percentile(filmDurations, 0.05) / 60_000.0,7:F1}       {Percentile(filmDurations, 0.50) / 60_000.0,7:F1}       {Percentile(filmDurations, 0.95) / 60_000.0,7:F1}   min {filmDurations[0] / 60_000.0:F1}  max {filmDurations[^1] / 60_000.0:F1}");
-    Console.WriteLine($"  {"reel minutes p05/p50/p95",-28} {Percentile(reelDurations, 0.05) / 60_000.0,7:F1}       {Percentile(reelDurations, 0.50) / 60_000.0,7:F1}       {Percentile(reelDurations, 0.95) / 60_000.0,7:F1}   max {reelDurations[^1] / 60_000.0:F1}");
-    Console.WriteLine($"  {"payload KB p05/p50/p95",-28} {Percentile(payloads, 0.05) / 1024.0,7:F1}       {Percentile(payloads, 0.50) / 1024.0,7:F1}       {Percentile(payloads, 0.95) / 1024.0,7:F1}   max {payloads[^1] / 1024.0:F1}");
-    Console.WriteLine($"  {"inside 9:30-11:00",-28} {100.0 * inWindow / matches,7:F1}%   over 11 min {100.0 * overCeiling / matches:F2}%");
+    Console.WriteLine($"  {"passages per match",-30} {Percentile(passageCounts, 0.50),7} p50   {Percentile(passageCounts, 0.05),7} p05   {Percentile(passageCounts, 0.95),7} p95   max {passageCounts[^1]}");
+    Console.WriteLine($"  {"pace p05/p50/p95",-30} {Percentile(paces, 0.05),7:F2}x      {Percentile(paces, 0.50),7:F2}x      {Percentile(paces, 0.95),7:F2}x      max {paces[^1]:F2}x   inside {options.MinPaceMilli / 1000.0:F1}-{options.MaxPaceMilli / 1000.0:F1}x {100.0 * inBand / matches:F1}%");
+    Console.WriteLine($"  {"film minutes p05/p50/p95",-30} {Percentile(filmDurations, 0.05) / 60_000.0,7:F2}       {Percentile(filmDurations, 0.50) / 60_000.0,7:F2}       {Percentile(filmDurations, 0.95) / 60_000.0,7:F2}       min {filmDurations[0] / 60_000.0:F2}  max {filmDurations[^1] / 60_000.0:F2}");
+    Console.WriteLine($"  {"reel minutes p05/p50/p95",-30} {Percentile(reelDurations, 0.05) / 60_000.0,7:F2}       {Percentile(reelDurations, 0.50) / 60_000.0,7:F2}       {Percentile(reelDurations, 0.95) / 60_000.0,7:F2}       max {reelDurations[^1] / 60_000.0:F2}");
+    Console.WriteLine($"  {"inside 9:00-11:00",-30} {100.0 * inWindow / matches,7:F1}%   over 11 min {100.0 * overCeiling / matches:F2}%");
+    Console.WriteLine($"  {"condensed possessions",-30} {100.0 * condensedMatches / matches,7:F1}% of matches   share of possessions p50 {100 * Percentile(condensedShare, 0.50):F1}% p95 {100 * Percentile(condensedShare, 0.95):F1}%");
+    Console.WriteLine($"  {"moves lengthened for constraints",-30} p50 {100 * Percentile(extensionShare, 0.50):F1}%   p95 {100 * Percentile(extensionShare, 0.95):F1}%");
+    Console.WriteLine($"  {"teleports (outside cuts)",-30} {teleports,7}   cuts per match {(double)cuts / matches:F1}");
+    Console.WriteLine($"  {"ball still outside holds",-30} p50 {100 * Percentile(stillShare, 0.50):F1}%   p95 {100 * Percentile(stillShare, 0.95):F1}%   target <= 5%");
+    Console.WriteLine($"  {"player speed / (sprint x pace)",-30} max {playerSpeedRatio[^1]:F3}   keeper / (dive x pace) max {keeperSpeedRatio[^1]:F3}   (1.000 is the cap)");
+    Console.WriteLine($"  {"payload estimate KB p50/p95",-30} {Percentile(estimates, 0.50) / 1024.0,7:F1}       {Percentile(estimates, 0.95) / 1024.0,7:F1}       max {estimates[^1] / 1024.0:F1}   budget {options.PayloadBudgetBytes / 1024}");
+    Console.WriteLine($"  {"payload JSON KB p50/p95",-30} {Percentile(bytes, 0.50) / 1024.0,7:F1}       {Percentile(bytes, 0.95) / 1024.0,7:F1}       max {bytes[^1] / 1024.0:F1}   (System.Text.Json, the API's own shape)");
+    Console.WriteLine($"  {"payload ladder rungs",-30} {string.Join("  ", rungs.Select((rung, position) => $"{position}: {rung}"))}");
+
+    Console.WriteLine("  ball speed by beat, metres per second of film (median over matches of p50 / p95):");
+
+    foreach (var (kind, lists) in ballByKind.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+    {
+        lists.Median.Sort();
+        lists.P95.Sort();
+
+        Console.WriteLine($"    {kind,-12} {lists.Median[lists.Median.Count / 2],6:F1} / {lists.P95[lists.P95.Count / 2],6:F1}");
+    }
+
+    Console.WriteLine($"  {elapsed.Elapsed.TotalSeconds / matches * 1000:F0} ms per match (simulate, film, serialize)");
     Console.WriteLine();
 }
 

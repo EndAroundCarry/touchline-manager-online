@@ -77,11 +77,24 @@ public static class MatchMapping
         IReadOnlyList<CommentaryToken> commentary)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+
+        return presentation.ToResponse(snapshot.MatchId, commentary);
+    }
+
+    /// <summary>Projects a presentation and its commentary to the replay the API returns.</summary>
+    /// <param name="presentation">The presentation.</param>
+    /// <param name="matchId">The match it presents.</param>
+    /// <param name="commentary">The commentary, in event order.</param>
+    public static MatchPresentationResponse ToResponse(
+        this MatchPresentationV1 presentation,
+        Guid matchId,
+        IReadOnlyList<CommentaryToken> commentary)
+    {
         ArgumentNullException.ThrowIfNull(presentation);
         ArgumentNullException.ThrowIfNull(commentary);
 
         return new MatchPresentationResponse(
-            snapshot.MatchId,
+            matchId,
             presentation.PresentationVersion,
             presentation.EngineVersion,
             presentation.HomeGoals,
@@ -94,7 +107,8 @@ public static class MatchMapping
             presentation.AwayLineup is { } awayLineup ? ToResponse(awayLineup) : null,
             presentation.LiveMetrics is { } metrics ? [.. metrics.Select(ToResponse)] : null,
             presentation.Playback.Count > 0 ? [.. presentation.Playback.Select(ToResponse)] : null,
-            presentation.TotalPlaybackMilliseconds);
+            presentation.TotalPlaybackMilliseconds,
+            presentation.PaceMilli);
     }
 
     /// <summary>Projects one playback segment.</summary>
@@ -162,7 +176,10 @@ public static class MatchMapping
             passage.EventSequences,
             [.. passage.Entities.Select(ToResponse)],
             [.. passage.Tracks.Select(ToResponse)],
-            [.. passage.Commentary.Select(ToResponse)]);
+            [.. passage.Commentary.Select(ToResponse)],
+            passage.Period,
+            [.. passage.Clock.Select(clock => new ClockKeyframeResponse(clock.TimeMilliseconds, clock.MatchSecond))],
+            [.. passage.Cuts.Select(cut => new PassageCutResponse(cut.TimeMilliseconds, cut.DurationMilliseconds, cut.Kind))]);
     }
 
     /// <summary>Projects one synchronized passage commentary line.</summary>
