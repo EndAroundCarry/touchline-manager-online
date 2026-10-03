@@ -14,7 +14,7 @@ namespace TouchlineManager.Contracts.Squad;
 /// a slot's family, role, and coordinates — and is omitted when the plan should simply be laid out from
 /// its <see cref="FormationPreset"/>. <see cref="Lineup"/> is who occupies which slot, so picking
 /// players without moving anything stays one small body. The server owns the preset's default
-/// arrangement (`TAC-1`…`TAC-6`), so a client never has to reproduce it.
+/// arrangement (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`), so a client never has to reproduce it.
 /// </para>
 /// </remarks>
 public sealed record SaveTacticalPlanRequest
@@ -22,7 +22,7 @@ public sealed record SaveTacticalPlanRequest
     /// <summary>Gets the manager-facing plan name.</summary>
     public required string Name { get; init; }
 
-    /// <summary>Gets the formation preset code, e.g. <c>4-4-2</c> (`TAC-1`…`TAC-6`).</summary>
+    /// <summary>Gets the formation preset code, e.g. <c>4-4-2</c> (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`).</summary>
     public required string FormationPreset { get; init; }
 
     /// <summary>Gets the mentality code (`INS-1`).</summary>

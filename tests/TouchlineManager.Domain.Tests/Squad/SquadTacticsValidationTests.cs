@@ -19,7 +19,7 @@ public sealed class SquadTacticsValidationTests
     [Fact]
     public void Every_preset_lays_out_eleven_slots_led_by_a_goalkeeper()
     {
-        FormationPresets.All.Should().HaveCount(6, "TAC-1..TAC-6");
+        FormationPresets.All.Should().HaveCount(13, "TAC-1..TAC-6, TAC-11..TAC-17");
 
         foreach (var preset in FormationPresets.All)
         {
@@ -39,6 +39,40 @@ public sealed class SquadTacticsValidationTests
                 && slot.NormalizedY >= WorldRuleSet.SlotCoordinateMin
                 && slot.NormalizedY <= WorldRuleSet.SlotCoordinateMax, "TAC-9");
         }
+    }
+
+    [Fact]
+    public void Every_preset_has_a_unique_code_that_parses_back_and_a_distinct_role_sequence()
+    {
+        FormationPresets.All.Select(preset => preset.ToCode()).Should().OnlyHaveUniqueItems();
+        FormationPresets.All.Select(preset => preset.ToCode().Length)
+            .Should().OnlyContain(length => length <= FormationPresets.MaxCodeLength);
+
+        foreach (var preset in FormationPresets.All)
+        {
+            FormationPresets.FromCode(preset.ToCode()).Should().Be(preset);
+        }
+
+        // The match center names a side's shape from its roles, so two presets sharing a role sequence
+        // would be indistinguishable once played.
+        FormationPresets.All
+            .Select(preset => string.Join(',', FormationLayouts.DefaultSlots(preset).Select(slot => slot.Role)))
+            .Should().OnlyHaveUniqueItems();
+
+        // Each slot of a preset stands on its own point (TAC-7).
+        foreach (var preset in FormationPresets.All)
+        {
+            FormationLayouts.DefaultSlots(preset)
+                .Select(slot => (slot.NormalizedX, slot.NormalizedY))
+                .Should().OnlyHaveUniqueItems($"{preset.ToCode()} has no overlapping slots");
+        }
+    }
+
+    [Fact]
+    public void The_ai_pool_keeps_to_the_original_six_presets()
+    {
+        FormationPresets.AiPool.Should().HaveCount(6);
+        FormationPresets.AiPool.Should().BeSubsetOf(FormationPresets.All);
     }
 
     [Fact]

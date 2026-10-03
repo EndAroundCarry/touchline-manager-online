@@ -79,7 +79,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     summary:
       'Pick a shape, fill all eleven places, and give the side its instructions before the lock.',
     points: [
-      'Six formations are in this version. A plan names exactly eleven places, and a saved side is either complete or empty, so you never take the pitch a player short by accident.',
+      'Thirteen formations are in this version. A plan names exactly eleven places, and a saved side is either complete or empty, so you never take the pitch a player short by accident.',
       'Every place has a position family and a role. A player used out of position carries a familiarity penalty, so the right player in the right place is worth more than the best player in any place.',
       'Eight team instructions set your mentality, tempo, passing, width, pressing, defensive line, tackling and time wasting. Each has a bounded effect and a cost, so an aggressive setting buys you something and gives something up.',
       'You can move a place with the arrow keys as well as by dragging it, so the board is usable from the keyboard.',

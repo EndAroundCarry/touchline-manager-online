@@ -15,7 +15,7 @@ namespace TouchlineManager.Contracts.Squad;
 /// <param name="SeasonNumber">The season the plans are read against.</param>
 /// <param name="Plans">The saved plans, the default first.</param>
 /// <param name="SelectablePlayers">The players who may be assigned to a slot.</param>
-/// <param name="Formations">Every formation preset and its default arrangement (`TAC-1`…`TAC-6`).</param>
+/// <param name="Formations">Every formation preset and its default arrangement (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`).</param>
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record TacticsResponse(
     Guid ClubId,
@@ -121,7 +121,7 @@ public sealed record SelectablePlayerResponse(
     string PositionFamily,
     bool IsUnavailable);
 
-/// <summary>A formation preset and its default arrangement (`TAC-1`…`TAC-6`).</summary>
+/// <summary>A formation preset and its default arrangement (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`).</summary>
 /// <param name="Code">The preset's stable code, e.g. <c>4-4-2</c>.</param>
 /// <param name="Slots">The eleven default slots.</param>
 public sealed record FormationPresetResponse(

@@ -192,6 +192,15 @@ season it opens are distinct rows, so a finished season's membership, results, a
 | TAC-4 | 4-1-4-1 |
 | TAC-5 | 3-5-2 |
 | TAC-6 | 5-3-2 |
+| TAC-11 | 4-4-1-1 |
+| TAC-12 | 4-5-1 |
+| TAC-13 | 4-3-2-1 |
+| TAC-14 | 4-2-2-2 |
+| TAC-15 | 3-4-3 |
+| TAC-16 | 3-4-2-1 |
+| TAC-17 | 5-4-1 |
+
+AI clubs keep choosing from `TAC-1`…`TAC-6`; the later presets are for human managers.
 
 | Ref | Rule |
 |---|---|

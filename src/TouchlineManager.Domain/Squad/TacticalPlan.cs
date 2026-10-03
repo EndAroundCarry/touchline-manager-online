@@ -1,7 +1,7 @@
 namespace TouchlineManager.Domain.Squad;
 
 /// <summary>
-/// The formation shape a plan starts from (`TAC-1`…`TAC-6`).
+/// The formation shape a plan starts from (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`).
 /// </summary>
 /// <remarks>
 /// A preset names the shape, not the exact coordinates: the slots carry their own normalized positions
@@ -26,6 +26,27 @@ public enum FormationPreset
 
     /// <summary>Five-three-two (`TAC-6`).</summary>
     FiveThreeTwo = 5,
+
+    /// <summary>Four-four-one-one (`TAC-11`).</summary>
+    FourFourOneOne = 6,
+
+    /// <summary>Four-five-one (`TAC-12`).</summary>
+    FourFiveOne = 7,
+
+    /// <summary>Four-three-two-one (`TAC-13`).</summary>
+    FourThreeTwoOne = 8,
+
+    /// <summary>Four-two-two-two (`TAC-14`).</summary>
+    FourTwoTwoTwo = 9,
+
+    /// <summary>Three-four-three (`TAC-15`).</summary>
+    ThreeFourThree = 10,
+
+    /// <summary>Three-four-two-one (`TAC-16`).</summary>
+    ThreeFourTwoOne = 11,
+
+    /// <summary>Five-four-one (`TAC-17`).</summary>
+    FiveFourOne = 12,
 }
 
 /// <summary>Stable codes and storage representation for <see cref="FormationPreset"/>.</summary>
@@ -36,6 +57,31 @@ public static class FormationPresets
 
     /// <summary>Every preset, in declaration order.</summary>
     public static readonly IReadOnlyList<FormationPreset> All =
+    [
+        FormationPreset.FourFourTwo,
+        FormationPreset.FourThreeThree,
+        FormationPreset.FourTwoThreeOne,
+        FormationPreset.FourOneFourOne,
+        FormationPreset.ThreeFiveTwo,
+        FormationPreset.FiveThreeTwo,
+        FormationPreset.FourFourOneOne,
+        FormationPreset.FourFiveOne,
+        FormationPreset.FourThreeTwoOne,
+        FormationPreset.FourTwoTwoTwo,
+        FormationPreset.ThreeFourThree,
+        FormationPreset.ThreeFourTwoOne,
+        FormationPreset.FiveFourOne,
+    ];
+
+    /// <summary>
+    /// The original six presets, which the AI clubs choose from.
+    /// </summary>
+    /// <remarks>
+    /// The AI's formation is a deterministic draw over this list, so growing <see cref="All"/> must not move
+    /// the draw: a seeded world keeps the shapes its clubs were given, and only a human manager reaches the
+    /// newer presets.
+    /// </remarks>
+    public static readonly IReadOnlyList<FormationPreset> AiPool =
     [
         FormationPreset.FourFourTwo,
         FormationPreset.FourThreeThree,
@@ -55,6 +101,13 @@ public static class FormationPresets
         FormationPreset.FourOneFourOne => "4-1-4-1",
         FormationPreset.ThreeFiveTwo => "3-5-2",
         FormationPreset.FiveThreeTwo => "5-3-2",
+        FormationPreset.FourFourOneOne => "4-4-1-1",
+        FormationPreset.FourFiveOne => "4-5-1",
+        FormationPreset.FourThreeTwoOne => "4-3-2-1",
+        FormationPreset.FourTwoTwoTwo => "4-2-2-2",
+        FormationPreset.ThreeFourThree => "3-4-3",
+        FormationPreset.ThreeFourTwoOne => "3-4-2-1",
+        FormationPreset.FiveFourOne => "5-4-1",
         _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unknown formation preset."),
     };
 
@@ -68,6 +121,13 @@ public static class FormationPresets
         "4-1-4-1" => FormationPreset.FourOneFourOne,
         "3-5-2" => FormationPreset.ThreeFiveTwo,
         "5-3-2" => FormationPreset.FiveThreeTwo,
+        "4-4-1-1" => FormationPreset.FourFourOneOne,
+        "4-5-1" => FormationPreset.FourFiveOne,
+        "4-3-2-1" => FormationPreset.FourThreeTwoOne,
+        "4-2-2-2" => FormationPreset.FourTwoTwoTwo,
+        "3-4-3" => FormationPreset.ThreeFourThree,
+        "3-4-2-1" => FormationPreset.ThreeFourTwoOne,
+        "5-4-1" => FormationPreset.FiveFourOne,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown formation preset code."),
     };
 }

@@ -66,10 +66,14 @@ public sealed class TacticsTests : IAsyncLifetime
         tactics.Plans.Should().OnlyContain(plan => plan.Slots.Count == FormationLayouts.SlotCount);
         tactics.Plans.Should().OnlyContain(plan => plan.Version >= 1);
 
-        tactics.Formations.Should().HaveCount(6, "TAC-1..TAC-6");
+        tactics.Formations.Should().HaveCount(13, "TAC-1..TAC-6, TAC-11..TAC-17");
         tactics.Formations.Should().OnlyContain(formation => formation.Slots.Count == 11);
         tactics.Formations.Select(formation => formation.Code)
-            .Should().BeEquivalentTo(["4-4-2", "4-3-3", "4-2-3-1", "4-1-4-1", "3-5-2", "5-3-2"]);
+            .Should().BeEquivalentTo(
+                [
+                    "4-4-2", "4-3-3", "4-2-3-1", "4-1-4-1", "3-5-2", "5-3-2",
+                    "4-4-1-1", "4-5-1", "4-3-2-1", "4-2-2-2", "3-4-3", "3-4-2-1", "5-4-1",
+                ]);
 
         await client.PostAsync("/api/v1/club-tenure/resign", content: null);
     }

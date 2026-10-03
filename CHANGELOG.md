@@ -4,6 +4,19 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## More formations
+
+The tactics page offered six presets. It now offers thirteen: **4-4-1-1**, **4-5-1**, **4-3-2-1**,
+**4-2-2-2**, **3-4-3**, **3-4-2-1** and **5-4-1** join the original six (`TAC-11`…`TAC-17` in
+[`game-rules.md`](docs/product/game-rules.md) §9.1).
+
+- Each preset has its own layout in `FormationLayouts`, and a role sequence no other preset shares, so the
+  match center still names the shape a side played exactly (`MatchLineupBuilder` knows all thirteen).
+- Migration `MoreFormationPresets` widens `ck_tactical_plans_formation` to the new codes; the column width
+  already fits them.
+- AI clubs keep drawing from the original six (`FormationPresets.AiPool`), so a seeded world's AI shapes and
+  hashes do not move. Only a human manager reaches the new presets.
+
 ## Engine-v5 — the half-time clock, restart ownership, and a complete passage recorder
 
 The first milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). `engine-v4` built the
