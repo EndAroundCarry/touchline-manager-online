@@ -4,6 +4,17 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Unreleased
+
+### Changed
+
+- **Tactics slots are fixed by the formation** (`TAC-7`). A manager can no longer drag a slot around the board
+  or nudge it with the arrow keys; where each player stands is whatever the chosen formation dictates, and
+  picking a different formation is the only way to change it. Dragging a player onto a slot, and the
+  select-based assignment table, are unchanged. The server enforces the same rule: saving a plan lays its
+  slots out from the preset's coordinates whatever the request carries. A plan saved earlier with a custom
+  position keeps it until its formation is picked again and saved.
+
 ## Engine-v5 — the half-time clock, restart ownership, and a complete passage recorder
 
 The first milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). `engine-v4` built the

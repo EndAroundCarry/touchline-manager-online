@@ -195,7 +195,7 @@ season it opens are distinct rows, so a finished season's membership, results, a
 
 | Ref | Rule |
 |---|---|
-| TAC-7 | Managers may drag slots within validated tactical zones but cannot create overlapping or out-of-bounds positions. |
+| TAC-7 | Slot positions are fixed by the chosen formation. Managers cannot drag slots; changing the formation is the only way to change where players stand. |
 | TAC-8 | Every slot has a position family and a role. |
 | TAC-9 | Slot coordinates are stored as scaled integers normalized to 0–10,000. |
 | TAC-10 | A plan names exactly eleven slots. Its default lineup names either nobody or all eleven: a plan with some but not all of its slots filled is refused, so a saved side is never short (see `SQ-4`). The client's `If-Match` version is required to save. |

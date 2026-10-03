@@ -12,7 +12,6 @@ import {
   withAssignment,
   withFormation,
   withInstruction,
-  withMovedSlot,
   withName,
   withRole,
 } from './tactics-draft';
@@ -213,11 +212,6 @@ export class TacticsStore {
   /** Changes the role one slot asks for (`TAC-8`). */
   setRole(slotNumber: number, role: string): void {
     this.edit((draft) => withRole(draft, slotNumber, role));
-  }
-
-  /** Moves a slot on the pitch (`TAC-7`). */
-  moveSlot(slotNumber: number, normalizedX: number, normalizedY: number): void {
-    this.edit((draft) => withMovedSlot(draft, slotNumber, normalizedX, normalizedY));
   }
 
   /**

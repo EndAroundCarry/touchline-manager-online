@@ -10,7 +10,6 @@ import {
   withAssignment,
   withFormation,
   withInstruction,
-  withMovedSlot,
   withName,
   withRole,
 } from './tactics-draft';
@@ -142,17 +141,18 @@ describe('tactics draft', () => {
     expect(switched.slots.find((slot) => slot.slotNumber === 5)?.playerId).toBe('p5');
   });
 
-  it('changes one slot at a time — assignment, role, and position', () => {
+  it('changes one slot at a time — assignment and role, never position', () => {
     const base = draftFromFormation(formation('4-4-2'));
     const assigned = withAssignment(base, 9, 'p9');
     const cleared = withAssignment(assigned, 9, null);
     const role = withRole(assigned, 9, 'striker');
-    const moved = withMovedSlot(assigned, 9, 9_500, 500);
 
     expect(assigned.slots.find((slot) => slot.slotNumber === 9)?.playerId).toBe('p9');
     expect(cleared.slots.find((slot) => slot.slotNumber === 9)?.playerId).toBeNull();
     expect(role.slots.find((slot) => slot.slotNumber === 9)?.role).toBe('striker');
-    expect(moved.slots.find((slot) => slot.slotNumber === 9)?.normalizedX).toBe(9_500);
+    expect(role.slots.find((slot) => slot.slotNumber === 9)?.normalizedX).toBe(
+      base.slots.find((slot) => slot.slotNumber === 9)?.normalizedX,
+    );
   });
 
   it('changes one instruction without disturbing the others (INS-1..INS-8)', () => {

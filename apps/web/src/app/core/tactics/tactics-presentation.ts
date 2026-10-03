@@ -173,9 +173,6 @@ export function rolesForFamily(family: string): readonly SelectOption[] {
   return roles.map((role) => ({ value: role, label: roleLabel(role) }));
 }
 
-/** The tallest the pitch coordinate axis is, and the scale `TAC-9` stores positions on. */
-const PITCH_MAX = 10_000;
-
 /** The percentage of an axis a normalized coordinate sits at. */
 function percent(value: number): string {
   return `${(value / 100).toFixed(2)}%`;
@@ -193,15 +190,6 @@ export function pitchStyle(slot: {
   normalizedY: number;
 }): Record<string, string> {
   return { bottom: percent(slot.normalizedX), left: percent(slot.normalizedY) };
-}
-
-/** Clamps a dropped position back inside the pitch (`TAC-9`). */
-export function clampPitchCoordinate(value: number): number {
-  if (Number.isNaN(value)) {
-    return 0;
-  }
-
-  return Math.min(PITCH_MAX, Math.max(0, Math.round(value)));
 }
 
 /** Describes a validation issue in words, given the squad so a player can be named (`§10.4`). */

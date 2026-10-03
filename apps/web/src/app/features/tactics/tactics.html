@@ -118,15 +118,12 @@
         <div>
           <h2 class="text-lg font-semibold text-slate-900">Formation</h2>
           <p class="mt-1 text-sm text-slate-600">
-            Drag a player onto a slot to pick them, or drag a slot to move it. Selecting a slot and
-            then choosing a player on the right assigns them without dragging, and the arrow keys
-            move the selected slot.
+            Positions are set by the formation. Drag a player onto a slot to pick them, or select a
+            slot and then choose a player on the right to assign them without dragging.
           </p>
 
           <div
             class="relative mt-3 aspect-[3/4] w-full max-w-sm overflow-hidden rounded-lg border-2 border-white/70 bg-emerald-700"
-            (dragover)="onPitchDragOver($event)"
-            (drop)="onPitchDrop($event)"
           >
             <div
               class="pointer-events-none absolute left-0 right-0 top-1/2 border-t border-white/50"
@@ -141,15 +138,12 @@
             @for (slot of slotViews(); track slot.slotNumber) {
               <button
                 type="button"
-                draggable="true"
                 [class]="slotClasses(slot)"
                 [style.left]="slot.style['left']"
                 [style.bottom]="slot.style['bottom']"
                 [attr.aria-pressed]="slot.isSelected"
                 [attr.aria-label]="slotLabel(slot)"
                 (click)="selectSlot(slot.slotNumber)"
-                (keydown)="onSlotKeydown($event, slot.slotNumber)"
-                (dragstart)="onSlotDragStart($event, slot.slotNumber)"
                 (dragover)="onSlotDragOver($event)"
                 (drop)="onSlotDrop($event, slot.slotNumber)"
               >
@@ -170,8 +164,7 @@
 
           @if (selectedSlot() > 0) {
             <p class="mt-3 text-sm text-slate-600" role="status">
-              Slot {{ selectedSlot() }} is selected at {{ selectedPosition() }}. Choose a player on
-              the right, or
+              Slot {{ selectedSlot() }} is selected. Choose a player on the right, or
               <button type="button" [class]="linkClass" (click)="clearSlot(selectedSlot())">
                 empty it</button
               >.

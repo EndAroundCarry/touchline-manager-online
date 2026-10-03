@@ -7,8 +7,7 @@ namespace TouchlineManager.Domain.Squad;
 /// </summary>
 /// <remarks>
 /// The blueprint a <see cref="TacticalSlot"/> is placed from. Coordinates are the same scaled
-/// 0–10,000 axis the entity stores (`TAC-9`), so a preset and a manager's dragged slot are the same
-/// kind of value and a plan laid out from a preset needs no conversion.
+/// 0–10,000 axis the entity stores (`TAC-9`), so a plan laid out from a preset needs no conversion.
 /// </remarks>
 /// <param name="SlotNumber">The slot number, 1–11. Slot 1 is the goalkeeper.</param>
 /// <param name="PositionFamily">The family the slot asks for (`TAC-8`).</param>
@@ -27,11 +26,11 @@ public sealed record FormationSlot(
 /// </summary>
 /// <remarks>
 /// <para>
-/// A preset is a starting shape, not a cage: the manager may drag a slot afterwards
-/// (<see cref="TacticalSlot.MoveTo"/>), so these tables are what a new plan is laid out from and what
-/// the client renders as the preset's own arrangement. Keeping them here rather than in the API or the
-/// web client means the server stays the authority on what a preset means, and the same numbers reach
-/// the renderer, the snapshot hash, and the engine (`TAC-9`).
+/// A preset dictates where its slots stand: a manager chooses a formation, not a position, and saving a
+/// plan lays its slots out from these tables whatever coordinates the client sent. They are what a new plan
+/// is laid out from and what the client renders. Keeping them here rather than in the API or the web
+/// client means the server stays the authority on what a preset means, and the same numbers reach the
+/// renderer, the snapshot hash, and the engine (`TAC-9`).
 /// </para>
 /// <para>
 /// Coordinates use <c>x</c> for depth along the pitch — 0 at the club's own goal line, 10,000 at the
