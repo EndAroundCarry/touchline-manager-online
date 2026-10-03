@@ -87,7 +87,7 @@ export class TacticsStore {
   /** The players who may be assigned to a slot. */
   readonly selectablePlayers = computed(() => this.tacticsSignal()?.selectablePlayers ?? []);
 
-  /** Every formation preset and its default arrangement (`TAC-1`…`TAC-6`). */
+  /** Every formation preset and its default arrangement (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`). */
   readonly formations = computed(() => this.tacticsSignal()?.formations ?? []);
 
   /** The saved plan the draft belongs to, or null while a new plan is being built. */

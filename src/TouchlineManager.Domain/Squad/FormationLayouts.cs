@@ -22,7 +22,7 @@ public sealed record FormationSlot(
     int NormalizedY);
 
 /// <summary>
-/// The eleven default slots of each formation preset (`TAC-1`…`TAC-6`).
+/// The eleven default slots of each formation preset (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -133,6 +133,111 @@ public static class FormationLayouts
         new(11, PositionFamily.Attack, PlayerRole.Striker, 8_300, 3_800),
     ];
 
+    private static readonly FormationSlot[] FourFourOneOne =
+    [
+        new(1, PositionFamily.Goalkeeper, PlayerRole.Goalkeeper, 500, 5_000),
+        new(2, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 8_000),
+        new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 6_000),
+        new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 4_000),
+        new(5, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 2_000),
+        new(6, PositionFamily.Attack, PlayerRole.Winger, 5_800, 8_300),
+        new(7, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_200, 6_200),
+        new(8, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_200, 3_800),
+        new(9, PositionFamily.Attack, PlayerRole.Winger, 5_800, 1_700),
+        new(10, PositionFamily.Midfield, PlayerRole.AttackingMidfielder, 7_200, 5_000),
+        new(11, PositionFamily.Attack, PlayerRole.Striker, 8_600, 5_000),
+    ];
+
+    private static readonly FormationSlot[] FourFiveOne =
+    [
+        new(1, PositionFamily.Goalkeeper, PlayerRole.Goalkeeper, 500, 5_000),
+        new(2, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 8_000),
+        new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 6_000),
+        new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 4_000),
+        new(5, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 2_000),
+        new(6, PositionFamily.Attack, PlayerRole.Winger, 5_800, 8_400),
+        new(7, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_000, 6_500),
+        new(8, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 4_800, 5_000),
+        new(9, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_000, 3_500),
+        new(10, PositionFamily.Attack, PlayerRole.Winger, 5_800, 1_600),
+        new(11, PositionFamily.Attack, PlayerRole.Striker, 8_400, 5_000),
+    ];
+
+    private static readonly FormationSlot[] FourThreeTwoOne =
+    [
+        new(1, PositionFamily.Goalkeeper, PlayerRole.Goalkeeper, 500, 5_000),
+        new(2, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 8_000),
+        new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 6_000),
+        new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 4_000),
+        new(5, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 2_000),
+        new(6, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 4_800, 6_800),
+        new(7, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 4_600, 5_000),
+        new(8, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 4_800, 3_200),
+        new(9, PositionFamily.Midfield, PlayerRole.AttackingMidfielder, 6_800, 6_600),
+        new(10, PositionFamily.Midfield, PlayerRole.AttackingMidfielder, 6_800, 3_400),
+        new(11, PositionFamily.Attack, PlayerRole.Striker, 8_600, 5_000),
+    ];
+
+    private static readonly FormationSlot[] FourTwoTwoTwo =
+    [
+        new(1, PositionFamily.Goalkeeper, PlayerRole.Goalkeeper, 500, 5_000),
+        new(2, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 8_000),
+        new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 6_000),
+        new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 4_000),
+        new(5, PositionFamily.Defence, PlayerRole.FullBack, 2_000, 2_000),
+        new(6, PositionFamily.Midfield, PlayerRole.DefensiveMidfielder, 4_000, 6_200),
+        new(7, PositionFamily.Midfield, PlayerRole.DefensiveMidfielder, 4_000, 3_800),
+        new(8, PositionFamily.Midfield, PlayerRole.AttackingMidfielder, 6_400, 7_200),
+        new(9, PositionFamily.Midfield, PlayerRole.AttackingMidfielder, 6_400, 2_800),
+        new(10, PositionFamily.Attack, PlayerRole.Striker, 8_300, 6_200),
+        new(11, PositionFamily.Attack, PlayerRole.Striker, 8_300, 3_800),
+    ];
+
+    private static readonly FormationSlot[] ThreeFourThree =
+    [
+        new(1, PositionFamily.Goalkeeper, PlayerRole.Goalkeeper, 500, 5_000),
+        new(2, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 7_200),
+        new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_700, 5_000),
+        new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 2_800),
+        new(5, PositionFamily.Defence, PlayerRole.WingBack, 4_200, 9_200),
+        new(6, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_400, 6_200),
+        new(7, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_400, 3_800),
+        new(8, PositionFamily.Attack, PlayerRole.Winger, 8_000, 8_200),
+        new(9, PositionFamily.Defence, PlayerRole.WingBack, 4_200, 800),
+        new(10, PositionFamily.Attack, PlayerRole.Striker, 8_600, 5_000),
+        new(11, PositionFamily.Attack, PlayerRole.Winger, 8_000, 1_800),
+    ];
+
+    private static readonly FormationSlot[] ThreeFourTwoOne =
+    [
+        new(1, PositionFamily.Goalkeeper, PlayerRole.Goalkeeper, 500, 5_000),
+        new(2, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 7_200),
+        new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_700, 5_000),
+        new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 2_800),
+        new(5, PositionFamily.Defence, PlayerRole.WingBack, 4_200, 9_200),
+        new(6, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_200, 6_200),
+        new(7, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_200, 3_800),
+        new(8, PositionFamily.Midfield, PlayerRole.AttackingMidfielder, 6_800, 7_000),
+        new(9, PositionFamily.Defence, PlayerRole.WingBack, 4_200, 800),
+        new(10, PositionFamily.Midfield, PlayerRole.AttackingMidfielder, 6_800, 3_000),
+        new(11, PositionFamily.Attack, PlayerRole.Striker, 8_600, 5_000),
+    ];
+
+    private static readonly FormationSlot[] FiveFourOne =
+    [
+        new(1, PositionFamily.Goalkeeper, PlayerRole.Goalkeeper, 500, 5_000),
+        new(2, PositionFamily.Defence, PlayerRole.WingBack, 2_600, 9_000),
+        new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 6_600),
+        new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_700, 5_000),
+        new(5, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 3_400),
+        new(6, PositionFamily.Defence, PlayerRole.WingBack, 2_600, 1_000),
+        new(7, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_400, 7_400),
+        new(8, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_200, 5_800),
+        new(9, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_200, 4_200),
+        new(10, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_400, 2_600),
+        new(11, PositionFamily.Attack, PlayerRole.Striker, 8_400, 5_000),
+    ];
+
     static FormationLayouts()
     {
         // Authoring guard: a preset that is not eleven slots, that repeats a slot number, that puts a
@@ -145,7 +250,7 @@ public static class FormationLayouts
             if (slots.Count != SlotCount)
             {
                 throw new InvalidOperationException(
-                    $"Formation preset {preset.ToCode()} names {slots.Count} slots; TAC-1\u2013TAC-6 require {SlotCount}.");
+                    $"Formation preset {preset.ToCode()} names {slots.Count} slots; TAC-1\u2013TAC-6 and TAC-11\u2013TAC-17 require {SlotCount}.");
             }
 
             if (slots.Select(slot => slot.SlotNumber).Distinct().Count() != SlotCount)
@@ -183,6 +288,13 @@ public static class FormationLayouts
         FormationPreset.FourOneFourOne => FourOneFourOne,
         FormationPreset.ThreeFiveTwo => ThreeFiveTwo,
         FormationPreset.FiveThreeTwo => FiveThreeTwo,
+        FormationPreset.FourFourOneOne => FourFourOneOne,
+        FormationPreset.FourFiveOne => FourFiveOne,
+        FormationPreset.FourThreeTwoOne => FourThreeTwoOne,
+        FormationPreset.FourTwoTwoTwo => FourTwoTwoTwo,
+        FormationPreset.ThreeFourThree => ThreeFourThree,
+        FormationPreset.ThreeFourTwoOne => ThreeFourTwoOne,
+        FormationPreset.FiveFourOne => FiveFourOne,
         _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unknown formation preset."),
     };
 }

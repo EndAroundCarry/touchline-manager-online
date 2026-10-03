@@ -52,7 +52,7 @@ public sealed record AiSlotAssignment(
     Guid? AssignedPlayerId);
 
 /// <summary>Everything the AI decides for one club: its tactics, its default eleven, and its training.</summary>
-/// <param name="Formation">The formation preset the side plays (`TAC-1`…`TAC-6`).</param>
+/// <param name="Formation">The formation preset the side plays (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`).</param>
 /// <param name="Instructions">The eight team instructions (`INS-1`…`INS-8`).</param>
 /// <param name="Slots">The eleven slots, in slot order, with the picked player where one was chosen.</param>
 /// <param name="TrainingFocus">The club-wide training emphasis (`TRN-1`).</param>
@@ -113,7 +113,7 @@ public static class AiClubPolicy
 
         var draws = new Pcg32(DeterministicDigest.SeedOf(AiPolicyVersions.Version, clubId.ToString("D")));
 
-        var formation = Pick(draws, FormationPresets.All);
+        var formation = Pick(draws, FormationPresets.AiPool);
 
         var instructions = new TeamInstructionSet
         {

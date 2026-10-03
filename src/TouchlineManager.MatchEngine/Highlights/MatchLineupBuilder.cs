@@ -142,7 +142,7 @@ public static class MatchLineupBuilder
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The six standard shapes are matched by the roles their slots ask for, in slot order, rather than by
+    /// The thirteen standard shapes are matched by the roles their slots ask for, in slot order, rather than by
     /// their coordinates. Two of them — a four-three-three and a four-one-four-one — differ only in how
     /// close the holding midfielder stands to the two in front of him, so a coordinate rule that named one
     /// correctly renamed the other; the roles a manager assigned are the shape they chose, and are exact.
@@ -168,7 +168,7 @@ public static class MatchLineupBuilder
         return ClusterFormationOf(slots);
     }
 
-    /// <summary>The six standard shapes, as the role each slot asks for in slot order.</summary>
+    /// <summary>The thirteen standard shapes, as the role each slot asks for in slot order.</summary>
     private static readonly (string Code, MatchRole[] Roles)[] Formations =
     [
         ("4-4-2",
@@ -253,6 +253,104 @@ public static class MatchLineupBuilder
             MatchRole.CentralMidfielder,
             MatchRole.CentralMidfielder,
             MatchRole.Striker,
+            MatchRole.Striker,
+        ]),
+        ("4-4-1-1",
+        [
+            MatchRole.Goalkeeper,
+            MatchRole.FullBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.FullBack,
+            MatchRole.Winger,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.Winger,
+            MatchRole.AttackingMidfielder,
+            MatchRole.Striker,
+        ]),
+        ("4-5-1",
+        [
+            MatchRole.Goalkeeper,
+            MatchRole.FullBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.FullBack,
+            MatchRole.Winger,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.Winger,
+            MatchRole.Striker,
+        ]),
+        ("4-3-2-1",
+        [
+            MatchRole.Goalkeeper,
+            MatchRole.FullBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.FullBack,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.AttackingMidfielder,
+            MatchRole.AttackingMidfielder,
+            MatchRole.Striker,
+        ]),
+        ("4-2-2-2",
+        [
+            MatchRole.Goalkeeper,
+            MatchRole.FullBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.FullBack,
+            MatchRole.DefensiveMidfielder,
+            MatchRole.DefensiveMidfielder,
+            MatchRole.AttackingMidfielder,
+            MatchRole.AttackingMidfielder,
+            MatchRole.Striker,
+            MatchRole.Striker,
+        ]),
+        ("3-4-3",
+        [
+            MatchRole.Goalkeeper,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.WingBack,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.Winger,
+            MatchRole.WingBack,
+            MatchRole.Striker,
+            MatchRole.Winger,
+        ]),
+        ("3-4-2-1",
+        [
+            MatchRole.Goalkeeper,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.WingBack,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.AttackingMidfielder,
+            MatchRole.WingBack,
+            MatchRole.AttackingMidfielder,
+            MatchRole.Striker,
+        ]),
+        ("5-4-1",
+        [
+            MatchRole.Goalkeeper,
+            MatchRole.WingBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.CentreBack,
+            MatchRole.WingBack,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
+            MatchRole.CentralMidfielder,
             MatchRole.Striker,
         ]),
     ];

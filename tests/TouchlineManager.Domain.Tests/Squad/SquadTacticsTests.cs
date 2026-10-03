@@ -14,7 +14,7 @@ public sealed class SquadTacticsTests
     [Fact]
     public void Every_formation_preset_round_trips_through_its_code()
     {
-        FormationPresets.All.Should().HaveCount(6, "TAC-1..TAC-6");
+        FormationPresets.All.Should().HaveCount(13, "TAC-1..TAC-6, TAC-11..TAC-17");
 
         foreach (var preset in FormationPresets.All)
         {

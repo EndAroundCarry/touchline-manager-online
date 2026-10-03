@@ -75,7 +75,7 @@ export interface FormationSlot {
   readonly normalizedY: number;
 }
 
-/** A formation preset and its default arrangement (`TAC-1`…`TAC-6`). */
+/** A formation preset and its default arrangement (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`). */
 export interface FormationPreset {
   readonly code: string;
   readonly slots: readonly FormationSlot[];
