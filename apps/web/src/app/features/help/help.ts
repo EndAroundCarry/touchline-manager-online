@@ -38,7 +38,7 @@ export interface HelpTopic {
  * - deadlines: `CAL-2`, `CAL-3`, `CAL-4`
  * - tactics: `TAC-1`-`TAC-6`, `TAC-8`, `TAC-10`, `INS-1`-`INS-10`
  * - market: `SCT-1`, `SCT-3`, `TRF-2`-`TRF-7`, `TRF-13`, `FIN-10`, `FIN-15`, `INS-12`
- * - season: `CAL-1`, `CAL-6`, `PR-4`, `PR-7`, `CON-6`, `CON-8`, `CON-10`
+ * - season: `CAL-1`, `CAL-6`, `PR-4`, `PR-7`, `CON-6`, `CON-8`, `CON-10`, `CON-11`
  *
  * The wording obeys `docs/product/content-and-fictional-data-policy.md`: second person, present tense,
  * fact then consequence then action (`VOI-2`, `VOI-3`), deadlines stated as absolute moments (`VOI-4`),
@@ -82,7 +82,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       'Thirteen formations are in this version. A plan names exactly eleven places, and a saved side is either complete or empty, so you never take the pitch a player short by accident.',
       'Every place has a position family and a role. A player used out of position carries a familiarity penalty, so the right player in the right place is worth more than the best player in any place.',
       'Eight team instructions set your mentality, tempo, passing, width, pressing, defensive line, tackling and time wasting. Each has a bounded effect and a cost, so an aggressive setting buys you something and gives something up.',
-      'You can move a place with the arrow keys as well as by dragging it, so the board is usable from the keyboard.',
+      'Where each place stands is set by the formation, so choose a different formation to change the shape. You can fill a place by dragging a player onto it, or by selecting it and choosing a player, so the board is usable from the keyboard.',
     ],
     links: [{ label: 'Open your tactics board', path: '/tactics' }],
   },
@@ -110,7 +110,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     points: [
       'A season runs its 34 matchdays, then the game takes seven days to close the season and open the next one.',
       'Promotion and relegation are applied only at the rollover, once every result and every table is final. A club that moves keeps its squad, its contracts, its cash and its history.',
-      'Contracts advance a year at the rollover rather than on a real-world anniversary. A contract you do not renew expires at the rollover and the player becomes a free agent.',
+      'Contracts advance a year at the rollover rather than on a real-world anniversary. The board automatically renews every expiring contract at the rollover, so you never lose a player when a deal runs out.',
       'An older player may announce that the coming season is their last. The announcement reaches your inbox, so you can plan for the place it leaves.',
       "Finished seasons are kept. Your club's earlier seasons stay readable, with the division it played in and where it finished.",
     ],

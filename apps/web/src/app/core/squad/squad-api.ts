@@ -1,7 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
-import { ContractList, ContractRenewal, Player, RenewalQuote, Squad } from './squad.models';
+import {
+  ContractList,
+  ContractRenewal,
+  Player,
+  PlayerMatches,
+  RenewalQuote,
+  Squad,
+} from './squad.models';
 
 /**
  * The squad module's HTTP surface (master plan §10.3).
@@ -23,6 +30,11 @@ export class SquadApi {
   /** Reads one player's profile. */
   player(playerId: string): Observable<Player> {
     return this.api.get<Player>(`/players/${playerId}`);
+  }
+
+  /** Reads one player's match-by-match statistics across their seasons. */
+  playerMatches(playerId: string): Observable<PlayerMatches> {
+    return this.api.get<PlayerMatches>(`/players/${playerId}/matches`);
   }
 
   /** Reads the contracts of the club the caller holds. */

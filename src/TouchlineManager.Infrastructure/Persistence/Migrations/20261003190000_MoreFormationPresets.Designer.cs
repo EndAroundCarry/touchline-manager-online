@@ -12,7 +12,7 @@ using TouchlineManager.Infrastructure.Persistence;
 namespace TouchlineManager.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TouchlineManagerDbContext))]
-    [Migration("20261003090000_MoreFormationPresets")]
+    [Migration("20261003190000_MoreFormationPresets")]
     partial class MoreFormationPresets
     {
         /// <inheritdoc />
@@ -1014,6 +1014,14 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("division_season_id");
 
+                    b.Property<int>("DribblesAttempted")
+                        .HasColumnType("integer")
+                        .HasColumnName("dribbles_attempted");
+
+                    b.Property<int>("DribblesCompleted")
+                        .HasColumnType("integer")
+                        .HasColumnName("dribbles_completed");
+
                     b.Property<int>("Goals")
                         .HasColumnType("integer")
                         .HasColumnName("goals");
@@ -1021,6 +1029,14 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                     b.Property<int>("MinutesPlayed")
                         .HasColumnType("integer")
                         .HasColumnName("minutes_played");
+
+                    b.Property<int>("PassesAttempted")
+                        .HasColumnType("integer")
+                        .HasColumnName("passes_attempted");
+
+                    b.Property<int>("PassesCompleted")
+                        .HasColumnType("integer")
+                        .HasColumnName("passes_completed");
 
                     b.Property<Guid>("PlayerId")
                         .HasColumnType("uuid")
@@ -1081,7 +1097,7 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("player_season_stats", "competition", t =>
                         {
-                            t.HasCheckConstraint("ck_player_season_stats_counts", "appearances >= 0 and starts >= 0 and starts <= appearances and minutes_played >= 0 and goals >= 0 and assists >= 0 and shots >= 0 and shots_on_target >= 0 and shots_on_target <= shots and saves >= 0 and yellow_cards >= 0 and red_cards >= 0 and rating_basis_points_total >= 0 and rated_appearances >= 0");
+                            t.HasCheckConstraint("ck_player_season_stats_counts", "appearances >= 0 and starts >= 0 and starts <= appearances and minutes_played >= 0 and goals >= 0 and assists >= 0 and shots >= 0 and shots_on_target >= 0 and shots_on_target <= shots and saves >= 0 and yellow_cards >= 0 and red_cards >= 0 and rating_basis_points_total >= 0 and rated_appearances >= 0 and passes_attempted >= 0 and passes_completed >= 0 and passes_completed <= passes_attempted and dribbles_attempted >= 0 and dribbles_completed >= 0 and dribbles_completed <= dribbles_attempted");
 
                             t.HasCheckConstraint("ck_player_season_stats_rating", "case when rated_appearances = 0 then 0 else rating_basis_points_total / rated_appearances end between 0 and 10000");
                         });

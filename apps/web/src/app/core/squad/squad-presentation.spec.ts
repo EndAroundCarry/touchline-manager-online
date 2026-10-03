@@ -8,7 +8,8 @@ import {
   footLabel,
   positionFamilyOf,
   positionLabel,
-  seasonStatRows,
+  STAT_COLUMNS,
+  statCells,
   seasonsPlayedLabel,
   squadStatusLabel,
   stateBand,
@@ -42,6 +43,7 @@ function squadPlayer(
     state: { condition: 100, fatigue: 0, morale: 50, matchSharpness: 50 },
     contract: null,
     availability: [],
+    attributeAverages: { goalkeeping: 5, technical: 10, mental: 10, physical: 10 },
     ...overrides,
   };
 }
@@ -222,7 +224,7 @@ describe('squad presentation', () => {
     });
   });
 
-  describe('seasonStatRows', () => {
+  describe('statCells', () => {
     const stats: PlayerSeasonStats = {
       appearances: 3,
       starts: 2,
@@ -232,36 +234,64 @@ describe('squad presentation', () => {
       shots: 6,
       shotsOnTarget: 3,
       saves: 0,
+      passesAttempted: 120,
+      passesCompleted: 96,
+      dribblesAttempted: 14,
+      dribblesCompleted: 7,
       yellowCards: 1,
       redCards: 0,
       averageRating: 7.5,
     };
 
-    it('summarises the season as labelled values, in the order a manager reads them (STA-2)', () => {
-      const rows = seasonStatRows(stats);
+    const cell = (label: string, line: PlayerSeasonStats = stats): string | undefined =>
+      statCells(line)[STAT_COLUMNS.findIndex((column) => column.label === label)];
 
-      expect(rows.map((row) => row.label)).toEqual([
-        'Appearances',
+    it('lays the season out as columns, in the order a manager reads them (STA-2)', () => {
+      expect(STAT_COLUMNS.map((column) => column.label)).toEqual([
+        'Apps',
         'Starts',
-        'Minutes',
+        'Min',
         'Goals',
         'Assists',
+        'Passes',
+        'Pass %',
+        'Dribbles',
+        'Dribble %',
         'Shots',
-        'Shots on target',
+        'On tgt',
         'Saves',
-        'Yellow cards',
-        'Red cards',
-        'Average rating',
+        'Yellow',
+        'Red',
+        'Rating',
       ]);
-      expect(rows.find((row) => row.label === 'Goals')?.value).toBe('2');
-      expect(rows.find((row) => row.label === 'Minutes')?.value).toBe('200');
-      expect(rows.find((row) => row.label === 'Average rating')?.value).toBe('7.5');
+      expect(statCells(stats)).toHaveLength(STAT_COLUMNS.length);
+      expect(cell('Goals')).toBe('2');
+      expect(cell('Min')).toBe('200');
+      expect(cell('Rating')).toBe('7.5');
+    });
+
+    it('shows the passes and dribbles as a count and a rate (engine-v7)', () => {
+      expect(cell('Passes')).toBe('96 / 120');
+      expect(cell('Pass %')).toBe('80%');
+      expect(cell('Dribbles')).toBe('7 / 14');
+      expect(cell('Dribble %')).toBe('50%');
+    });
+
+    it('shows a dash rather than a zero rate when nothing was attempted (engine-v7)', () => {
+      const idle = {
+        ...stats,
+        passesAttempted: 0,
+        passesCompleted: 0,
+        dribblesAttempted: 0,
+        dribblesCompleted: 0,
+      };
+
+      expect(cell('Pass %', idle)).toBe('\u2014');
+      expect(cell('Dribble %', idle)).toBe('\u2014');
     });
 
     it('shows a dash for the rating before the player has been rated (TRN-8)', () => {
-      const unrated = seasonStatRows({ ...stats, averageRating: null });
-
-      expect(unrated.find((row) => row.label === 'Average rating')?.value).toBe('\u2014');
+      expect(cell('Rating', { ...stats, averageRating: null })).toBe('\u2014');
     });
   });
 

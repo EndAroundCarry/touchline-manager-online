@@ -50,6 +50,13 @@ internal static class SquadEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/players/{playerId:guid}/matches", GetPlayerMatchesAsync)
+            .WithName("GetPlayerMatches")
+            .WithSummary("Reads a player's match-by-match statistics across the seasons they have played.")
+            .Produces<PlayerMatchesResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/contracts", ListContractsAsync)
             .WithName("ListContracts")
             .WithSummary("Lists the contracts of the club the manager holds.")
@@ -111,6 +118,24 @@ internal static class SquadEndpoints
 
         return result.Outcome == SquadReadOutcome.Found
             ? Results.Ok(result.Player)
+            : Refusal(result.Outcome);
+    }
+
+    private static async Task<IResult> GetPlayerMatchesAsync(
+        HttpContext httpContext,
+        Guid playerId,
+        GetPlayerMatches query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, playerId, cancellationToken);
+
+        return result.Outcome == SquadReadOutcome.Found
+            ? Results.Ok(result.Matches)
             : Refusal(result.Outcome);
     }
 

@@ -118,6 +118,9 @@ internal static class PossessionSimulator
         state.Home.ApplyLoad(rules);
         state.Away.ApplyLoad(rules);
 
+        // Ratings follow the players' legs, morale, and the scoreline, a minute at a time (engine-v6).
+        state.RefreshRatings();
+
         SubstitutionPlanner.ConsiderBothSides(state);
 
         // The possession is played along a real passage now: the ball starts where the last one left it — or
@@ -183,20 +186,45 @@ internal static class PossessionSimulator
             // A penalty is a foul in the box, so the attack is played in there before the defender brings the
             // attacker down.
             state.MoveBallAndRecord(plan.BoxFoulPoint, PassageWaypointKind.Pass);
+            state.Passing.Completed(1);
         }
 
-        // The two players the foul is between are both at the ball when it is committed: the fouler the engine
-        // named, and the player fouled, drawn from the geometry stream so naming him cannot move a draw.
-        var fouled = PickOutfield(state, side, possession.Derived, MatchAttributeName.Dribbling);
+        AwardFromFoul(state, possession, foul, penalty, freeKick, fouledId: null);
+    }
+
+    /// <summary>
+    /// Puts a foul on the pitch and resolves what it gave the attacking side: a penalty, a free kick struck or
+    /// crossed, or a quick restart.
+    /// </summary>
+    /// <remarks>
+    /// Shared by the foul rolled before a possession develops and the foul a ground duel decides (engine-v6).
+    /// A duel names the player it fouled; the other foul draws him from the geometry stream, so naming him
+    /// cannot move a play draw.
+    /// </remarks>
+    private static void AwardFromFoul(
+        MatchState state,
+        Possession possession,
+        DisciplineSimulator.FoulRoll foul,
+        bool penalty,
+        bool freeKick,
+        Guid? fouledId)
+    {
+        var rules = state.Rules;
+        var plan = possession.Plan;
+        var side = possession.Side;
+
+        // The two players the foul is between are both at the ball when it is committed: the fouler the
+        // engine named, and the player fouled.
+        var fouled = fouledId ?? PickOutfield(state, side, possession.Derived, MatchAttributeName.Dribbling);
 
         if (foul.Fouler is { } fouler)
         {
             state.RecordTouch(fouler.Participant.ParticipantId, PassageAction.Tackle);
         }
 
-        if (fouled is Guid fouledId)
+        if (fouled is Guid carrierId)
         {
-            state.RecordTouch(fouledId, PassageAction.Carry);
+            state.RecordTouch(carrierId, PassageAction.Carry);
         }
 
         var outcome = DisciplineSimulator.ApplyFoul(state, possession.Defending, foul);
@@ -221,6 +249,37 @@ internal static class PossessionSimulator
         // A foul with no shot in it is a free kick for the side that was fouled, taken where it was committed.
         state.RestartWithFreeKick(side, state.Ball.GroundPoint);
         Finish(state, PassageOutcome.Foul);
+    }
+
+    /// <summary>
+    /// Plays a possession that ends in a foul the final-third ground duel decided (`engine-v6`).
+    /// </summary>
+    /// <remarks>
+    /// The defender who lost the duel brought the carrier down at the edge of the box, so a penalty is far more
+    /// likely than for a foul rolled before the move developed, and a free kick in range is certain to be in
+    /// range. The draws are the same as ever: the penalty, the free kick award, then the card.
+    /// </remarks>
+    private static void PlayDuelFoul(MatchState state, Possession possession, Guid defenderId, Guid carrierId)
+    {
+        var rules = state.Rules;
+        var plan = possession.Plan;
+        var side = possession.Side;
+
+        var penalty = state.Random.RollBasisPoints(rules.DuelFoulPenaltyBasisPoints);
+        var attackingX = AttackingX(state.Ball.GroundPoint, side);
+
+        var freeKick = !penalty
+            && attackingX >= rules.FreeKickShootingRangeX
+            && state.Random.RollBasisPoints(rules.FreeKickAwardBasisPoints);
+
+        var foul = DisciplineSimulator.RollDuelFoul(state, possession.Defending, defenderId);
+
+        if (penalty)
+        {
+            state.MoveBallAndRecord(plan.BoxFoulPoint, PassageWaypointKind.Pass);
+        }
+
+        AwardFromFoul(state, possession, foul, penalty, freeKick, carrierId);
     }
 
     /// <summary>
@@ -286,6 +345,10 @@ internal static class PossessionSimulator
                 passer: true,
                 scramble);
 
+            // The ball was lost on the last pass of the approach: the one an interception or an offside
+            // flag ended (`engine-v7`).
+            state.Passing.LostApproach();
+
             Finish(state, ResolveFailedProgression(state, possession, attacker));
 
             return;
@@ -302,11 +365,19 @@ internal static class PossessionSimulator
 
         // The 1v1 the carrier fights to reach the creation phase: a beat man makes the chance more likely,
         // a tackle shuts the passage down.
-        var duelBonus = ResolveGroundDuel(state, side);
+        var duel = ResolveGroundDuel(state, side);
+
+        if (duel.FoulerId is Guid foulerId)
+        {
+            // The defender brought him down: the move ends in a free kick, a penalty, or a card.
+            PlayDuelFoul(state, possession, foulerId, duel.FouledId!.Value);
+
+            return;
+        }
 
         var creationChance = Probability.Band(
             rules.BaseCreationBasisPoints
-                + duelBonus
+                + duel.CreationBonus
                 + Probability.Swing(
                     creation,
                     rules.CreationSwingBasisPoints,
@@ -325,6 +396,7 @@ internal static class PossessionSimulator
 
         // The attack breaks through: the ball is played on to the shot point and struck from there.
         state.MoveBallAndRecord(plan.ShotPoint, PassageWaypointKind.Pass);
+        state.Passing.CreatedShot();
         ChanceSimulator.ResolveOpenPlay(state, side, plan.Zone, PassagePlanner.StrikeFrom(plan, plan.ShotPoint, rules));
         Finish(state, PassageOutcome.OpenPlayShot);
     }
@@ -339,6 +411,9 @@ internal static class PossessionSimulator
     /// </remarks>
     private static void Finish(MatchState state, PassageOutcome outcome)
     {
+        // The possession's passes are credited before an injury can take a passer off the pitch (`engine-v7`).
+        PassTally.Settle(state);
+
         InjurySimulator.TryResolveInjury(state);
 
         if (state.NextRestart is { } restart)
@@ -399,6 +474,12 @@ internal static class PossessionSimulator
             state.MoveBallAndRecord(points[index], kind, altitude);
         }
 
+        // Every leg after the first waypoint was a pass, unless the ball was lost before anybody played it on.
+        if (passer)
+        {
+            state.Passing.Completed(points.Count - 1);
+        }
+
         // Where the path ends is where the ball is received into the final beat of the build-up.
         var passerId = PickOutfield(state, side, derived, MatchAttributeName.Passing);
 
@@ -455,12 +536,12 @@ internal static class PossessionSimulator
     {
         var attacker = WeightedPick.From(
             state.SideOf(possessionSide).Outfield,
-            slot => ScrambleWeight(slot.Participant),
+            slot => ScrambleWeight(slot, state.Rules),
             state.Random);
 
         var defender = WeightedPick.From(
             state.OpponentOf(possessionSide).Outfield,
-            slot => ScrambleWeight(slot.Participant),
+            slot => ScrambleWeight(slot, state.Rules),
             state.Random);
 
         if (attacker is null || defender is null)
@@ -469,8 +550,8 @@ internal static class PossessionSimulator
         }
 
         var kept = DuelResolver.ResolveScramble(
-            attacker.Participant,
-            defender.Participant,
+            DuelContender.Of(state.SideOf(possessionSide), attacker),
+            DuelContender.Of(state.OpponentOf(possessionSide), defender),
             possessionSide == MatchSide.Home,
             state.Rules,
             state.Random);
@@ -490,10 +571,10 @@ internal static class PossessionSimulator
         return new Scramble(!kept, attacker.Participant.ParticipantId, defender.Participant.ParticipantId);
     }
 
-    private static int ScrambleWeight(MatchParticipantV1 participant) =>
-        participant.Attributes.ValueOf(MatchAttributeName.Pace)
-        + participant.Attributes.ValueOf(MatchAttributeName.Acceleration)
-        + participant.Attributes.ValueOf(MatchAttributeName.WorkRate);
+    private static int ScrambleWeight(ActiveSlot slot, EngineRulesV2 rules) =>
+        EffectiveSkill.Hundredths(slot, MatchAttributeName.Pace, rules)
+        + EffectiveSkill.Hundredths(slot, MatchAttributeName.Acceleration, rules)
+        + EffectiveSkill.Hundredths(slot, MatchAttributeName.WorkRate, rules);
 
     /// <summary>
     /// Resolves a direct free kick awarded in the attacking half: the placement, the award event, the strike,
@@ -509,8 +590,8 @@ internal static class PossessionSimulator
 
         var taker = WeightedPick.From(
             attacker.Outfield,
-            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.SetPieces)
-                + slot.Participant.Attributes.ValueOf(MatchAttributeName.Finishing),
+            slot => EffectiveSkill.Hundredths(slot, MatchAttributeName.SetPieces, rules)
+                + EffectiveSkill.Hundredths(slot, MatchAttributeName.Finishing, rules),
             state.Random);
 
         var spot = state.Ball.GroundPoint;
@@ -529,10 +610,9 @@ internal static class PossessionSimulator
         state.Emit(side, EngineEventType.FreeKickWon, taker.Participant.ParticipantId);
 
         var outcome = SetPieceDirector.ResolveDirectFreeKick(
-            taker.Participant,
-            defender.Goalkeeper?.Participant,
+            taker,
+            defender.Goalkeeper,
             AttackingX(spot, side),
-            side == MatchSide.Home,
             rules,
             state.Random);
 
@@ -619,10 +699,10 @@ internal static class PossessionSimulator
 
         state.AddGoalStoppage();
 
-        runtime.ShiftMorale(state.Rules.MoraleGainPerGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints);
+        runtime.ShiftMorale(state.Rules.MoraleGainPerGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints, state.Rules);
         state
             .OpponentOf(side)
-            .ShiftMorale(-state.Rules.MoraleLossPerConcededGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints);
+            .ShiftMorale(-state.Rules.MoraleLossPerConcededGoalBasisPoints, state.Rules.MaxMoraleDriftBasisPoints, state.Rules);
 
         runtime.AdjustLiveRating(scorerId, state.Rules.LiveRatingGoalBonusBasisPoints);
 
@@ -651,59 +731,95 @@ internal static class PossessionSimulator
         }
     }
 
+    /// <summary>What the final-third ground duel decided: the creation bonus, and a foul if the defender gave one.</summary>
+    /// <param name="CreationBonus">The signed creation bonus the duel earned the attacking side, in basis points.</param>
+    /// <param name="FoulerId">The defender who fouled the carrier, or null when there was no foul.</param>
+    /// <param name="FouledId">The carrier who was fouled, or null when there was no foul.</param>
+    private readonly record struct GroundDuelResult(int CreationBonus, Guid? FoulerId, Guid? FouledId);
+
     /// <summary>
     /// Resolves the 1v1 ground duel the carrier fights once the possession has progressed (engine-v3).
     /// </summary>
     /// <remarks>
     /// Winning the duel buys the creation that follows a beat man — the rules' dribble bonus — and losing
-    /// it hands the initiative back, which is the same bonus taken away. The possession is not ended by a
-    /// lost duel: the scramble already decides hard turnovers, and a tackled attack regrouping is the
-    /// ordinary rhythm of a match.
+    /// it hands the initiative back, which is the same bonus taken away. A lost duel does not end the
+    /// possession unless the defender fouled (engine-v6): the scramble already decides hard turnovers, and a
+    /// tackled attack regrouping is the ordinary rhythm of a match. The two players are drawn by band: the
+    /// carrier mostly from midfield and attack, the defender mostly from defence and midfield, so a striker is
+    /// rarely the tackler (engine-v6).
     /// </remarks>
-    /// <returns>The signed creation bonus the duel earned the attacking side, in basis points.</returns>
-    private static int ResolveGroundDuel(MatchState state, MatchSide possessionSide)
+    private static GroundDuelResult ResolveGroundDuel(MatchState state, MatchSide possessionSide)
     {
+        var rules = state.Rules;
+        var attackers = state.SideOf(possessionSide);
+        var defenders = state.OpponentOf(possessionSide);
+
         var carrier = WeightedPick.From(
-            state.SideOf(possessionSide).Outfield,
-            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.Dribbling),
+            attackers.Outfield,
+            slot => EffectiveSkill.Hundredths(slot, MatchAttributeName.Dribbling, rules)
+                * BandWeight(slot, rules.DuelCarrierDefenceWeight, rules.DuelCarrierMidfieldWeight, rules.DuelCarrierAttackWeight),
             state.Random);
 
         var tackler = WeightedPick.From(
-            state.OpponentOf(possessionSide).Outfield,
-            slot => slot.Participant.Attributes.ValueOf(MatchAttributeName.Tackling),
+            defenders.Outfield,
+            slot => EffectiveSkill.Hundredths(slot, MatchAttributeName.Tackling, rules)
+                * BandWeight(slot, rules.DuelTacklerDefenceWeight, rules.DuelTacklerMidfieldWeight, rules.DuelTacklerAttackWeight),
             state.Random);
 
         if (carrier is null || tackler is null)
         {
-            return 0;
+            return new GroundDuelResult(0, null, null);
         }
 
         var duel = DuelResolver.ResolveGroundDuel(
-            carrier.Participant,
-            tackler.Participant,
+            DuelContender.Of(attackers, carrier),
+            DuelContender.Of(defenders, tackler),
             possessionSide == MatchSide.Home,
-            state.OpponentOf(possessionSide).Instructions.Tackling,
-            state.Rules,
+            defenders.Instructions.Tackling,
+            rules,
             state.Random);
 
         // The carrier and the defender are the participants the duel actually picked, so the replay can name
-        // them (engine-v4).
-        state.RecordTouch(duel.AttackerId, PassageAction.Carry);
-        state.RecordTouch(duel.DefenderId, PassageAction.Tackle);
+        // them (engine-v4). A foul records them itself, where it was committed.
+        if (!duel.WasFoul)
+        {
+            state.RecordTouch(duel.AttackerId, PassageAction.Carry);
+            state.RecordTouch(duel.DefenderId, PassageAction.Tackle);
+        }
+
+        // The take-on is a dribble attempted by the carrier, and a dribble completed when he beat the man. A
+        // duel the defender ended with a foul is neither: the carrier was brought down, not dispossessed
+        // (`engine-v7`).
+        if (!duel.WasFoul)
+        {
+            PassTally.RecordDribble(attackers, duel.AttackerId, duel.AttackerWon);
+        }
 
         if (duel.AttackerWon)
         {
-            state.SideOf(possessionSide).AdjustLiveRating(duel.AttackerId, state.Rules.LiveRatingTackleBonusBasisPoints);
-            state.OpponentOf(possessionSide).AdjustLiveRating(duel.DefenderId, -state.Rules.LiveRatingTackleLostPenaltyBasisPoints);
+            attackers.AdjustLiveRating(duel.AttackerId, rules.LiveRatingTackleBonusBasisPoints);
+            defenders.AdjustLiveRating(duel.DefenderId, -rules.LiveRatingTackleLostPenaltyBasisPoints);
 
-            return state.Rules.DribbleCreationBonusBasisPoints;
+            return new GroundDuelResult(rules.DribbleCreationBonusBasisPoints, null, null);
         }
 
-        state.SideOf(possessionSide).AdjustLiveRating(duel.AttackerId, -state.Rules.LiveRatingTackleLostPenaltyBasisPoints);
-        state.OpponentOf(possessionSide).AdjustLiveRating(duel.DefenderId, state.Rules.LiveRatingTackleBonusBasisPoints);
+        attackers.AdjustLiveRating(duel.AttackerId, -rules.LiveRatingTackleLostPenaltyBasisPoints);
+        defenders.AdjustLiveRating(duel.DefenderId, rules.LiveRatingTackleBonusBasisPoints);
 
-        return -state.Rules.DribbleCreationBonusBasisPoints;
+        return new GroundDuelResult(
+            -rules.DribbleCreationBonusBasisPoints,
+            duel.WasFoul ? duel.DefenderId : null,
+            duel.WasFoul ? duel.AttackerId : null);
     }
+
+    /// <summary>Gets the weight of a player's band in a duel's draw: how likely his job is to put him in it.</summary>
+    private static int BandWeight(ActiveSlot slot, int defence, int midfield, int attack) => slot.Slot.Family switch
+    {
+        MatchPositionFamily.Defence => defence,
+        MatchPositionFamily.Midfield => midfield,
+        MatchPositionFamily.Attack => attack,
+        _ => 1,
+    };
 
     /// <summary>
     /// Resolves a possession that could not be progressed: either an offside or a plain turnover.
@@ -753,6 +869,10 @@ internal static class PossessionSimulator
         var rules = state.Rules;
         var plan = possession.Plan;
 
+        // The ball that would have broken the defence was stopped, whether it went behind for a corner or was
+        // cleared (`engine-v7`).
+        state.Passing.LostCreation();
+
         if (!state.Random.RollBasisPoints(rules.CornerShareOfFailedCreationBasisPoints))
         {
             // The attack broke down without a corner: the ball is cleared into the middle third (engine-v4).
@@ -765,11 +885,29 @@ internal static class PossessionSimulator
         // box whatever comes of it (engine-v5).
         state.MoveBallAndRecord(plan.CornerOutPoint, PassageWaypointKind.Pass);
         state.MoveBallAndRecord(plan.CornerPoint, PassageWaypointKind.Restart);
+
+        // Somebody takes it (engine-v6): the better his set pieces and crossing, the likelier the delivery is
+        // headed at goal and the likelier the header is won.
+        var taker = ChanceSimulator.ChooseCornerTaker(state, possession.Side);
+        var deliveryEdge = 0;
+
+        if (taker is not null)
+        {
+            state.RecordTouch(taker.Participant.ParticipantId, PassageAction.Cross);
+            deliveryEdge = ChanceSimulator.CornerDeliveryEdge(taker, rules);
+        }
+
         state.Emit(possession.Side, EngineEventType.Corner);
         state.MoveBallAndRecord(plan.HeaderPoint, PassageWaypointKind.Cross, rules.HeaderAltitude);
 
-        if (state.Random.RollBasisPoints(rules.CornerChanceBasisPoints)
-            && ChanceSimulator.ResolveCorner(state, possession.Side, PassagePlanner.StrikeFrom(plan, plan.HeaderPoint, rules)))
+        var cornerChance = Probability.Band(
+            rules.CornerChanceBasisPoints
+                + (deliveryEdge * rules.CornerDeliveryChanceStepBasisPoints / EffectiveSkill.Scale),
+            rules.CornerChanceMinBasisPoints,
+            rules.CornerChanceMaxBasisPoints);
+
+        if (state.Random.RollBasisPoints(cornerChance)
+            && ChanceSimulator.ResolveCorner(state, possession.Side, PassagePlanner.StrikeFrom(plan, plan.HeaderPoint, rules), deliveryEdge))
         {
             // The header was won and struck at goal, so what happens next is the shot's outcome: a goal, a
             // save, a miss, a block, or the woodwork. There is no clearance after any of them.
@@ -882,6 +1020,12 @@ internal static class PossessionSimulator
             MatchTempo.Low => rules.LowTempoPossessionSecondsMultiplierBasisPoints,
             _ => EngineRulesV2.Certain,
         };
+
+        // A side that is wasting time keeps the ball longer, so there is less football in the match (engine-v6).
+        if (attacker.WastingTime)
+        {
+            multiplier = Probability.Apply(multiplier, rules.TimeWastingPossessionSecondsMultiplierBasisPoints);
+        }
 
         return Math.Max(rules.MinEffectivePossessionSeconds, Probability.Apply(seconds, multiplier));
     }

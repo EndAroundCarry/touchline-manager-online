@@ -867,6 +867,17 @@ erDiagram
 > `updated_at`, `version`). Nothing else changes; the row exists only while a stepped clock does, and no
 > existing table is touched (`TIME-7`, ADR-0049).
 >
+> **Engine roadmap status (engine-v5 / replay-v4). No schema change:** the half-time clock, restart
+> ownership and the complete passage recorder (ADR-0053) and the constant-pace film (ADR-0054) are engine and
+> presentation changes only. `match.input_snapshots` now records `engine_version` = `engine-v5` and
+> `rule_set_version` = `engine-rules-v5`, and `match.matches.presentation_version` reads `replay-v4`; the
+> presentation ETag is still `{output_hash}:{presentation_version}`, so a client's cached `replay-v3` payload
+> is refetched once. The presentation gains `Period`, `Clock`, `Cuts` and `PaceMilli` on the wire only: it is
+> re-derived on read and never stored. **Reseed note:** a version-5 match cannot re-simulate a version-4
+> result (`MatchSimulator.VerifyVersionAgreement`), so a database seeded under `engine-v4` is archived
+> (`ALTER DATABASE touchline RENAME TO touchline_engine_v4_backup`, never dropped) and reseeded with
+> `npm run migrate` and `npm run seed`. No column, index, or constraint is touched.
+>
 > **Engine roadmap status (engine-v4 / replay-v3). No schema change:** the continuous passage (ADR-0051)
 > and the film/reel presentation (ADR-0052) are engine and presentation changes only. `match.input_snapshots`
 > now records `engine_version` = `engine-v4` and `rule_set_version` = `engine-rules-v4`, and

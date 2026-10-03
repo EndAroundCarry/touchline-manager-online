@@ -61,7 +61,7 @@ public sealed class MatchTests : IAsyncLifetime
         summary.RoundNumber.Should().BeGreaterThan(0);
         summary.SeasonLabel.Should().NotBeEmpty();
         summary.EngineVersion.Should().NotBeEmpty();
-        summary.PresentationVersion.Should().Be("replay-v3");
+        summary.PresentationVersion.Should().Be("replay-v4");
         summary.ServerTime.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2), "TIME-5");
 
         // Possession is a share, so the two sides' shares are complementary.
@@ -83,7 +83,7 @@ public sealed class MatchTests : IAsyncLifetime
             $"/api/v1/matches/{matchId}/presentation"))!;
 
         presentation.MatchId.Should().Be(matchId);
-        presentation.PresentationVersion.Should().Be("replay-v3");
+        presentation.PresentationVersion.Should().Be("replay-v4");
         presentation.Commentary.Should().NotBeEmpty();
         presentation.Commentary.Select(line => line.TemplateKey).Should()
             .Contain(["match.kickoff", "match.full_time"], "a match is narrated from kick-off to full time");
@@ -126,10 +126,16 @@ public sealed class MatchTests : IAsyncLifetime
                 .Should().BeOneOf("goal", "penalty_goal", "MAT-5: a goal is narrated as one");
         }
 
-        presentation.Passages.Should().BeInAscendingOrder(passage => passage.StartMatchSecond);
+        // Each half runs on its own clock (replay-v4): the match second only ever goes forward within a half.
+        presentation.Passages.Select(passage => passage.Period).Should().BeInAscendingOrder().And.OnlyContain(period => period == 1 || period == 2);
+
+        foreach (var half in presentation.Passages.GroupBy(passage => passage.Period))
+        {
+            half.Select(passage => passage.StartMatchSecond).Should().BeInAscendingOrder();
+        }
 
         // The film is one contiguous schedule; the client plays a single list, and the total is the plan's
-        // viewing window rather than ninety minutes (replay-v3).
+        // viewing window rather than ninety minutes (replay-v4).
         presentation.Playback.Should().NotBeNull().And.NotBeEmpty();
         presentation.Playback![0].StartMilliseconds.Should().Be(0);
         presentation.Playback.Should().HaveCount(presentation.Passages.Count);
@@ -161,23 +167,34 @@ public sealed class MatchTests : IAsyncLifetime
         var presentation = (await client.GetFromJsonAsync<MatchPresentationResponse>(
             $"/api/v1/matches/{matchId}/presentation"))!;
 
-        presentation.Passages.Should().NotBeEmpty("replay-v3: every match is watchable");
+        presentation.Passages.Should().NotBeEmpty("replay-v4: every match is watchable");
 
         foreach (var passage in presentation.Passages)
         {
             passage.Narration.Should().NotBeEmpty("§9.4: the Canvas is not the only way to follow a passage");
             passage.DurationMilliseconds.Should().BeGreaterThan(0);
             passage.EndMatchSecond.Should().BeGreaterThanOrEqualTo(passage.StartMatchSecond);
+            passage.Period.Should().BeOneOf(1, 2);
+
+            // The match clock keyframes run from the passage's first frame to its last (replay-v4).
+            passage.Clock.Should().NotBeNullOrEmpty();
+            passage.Clock![0].TimeMilliseconds.Should().Be(0);
+            passage.Clock[^1].TimeMilliseconds.Should().Be(passage.DurationMilliseconds);
+            passage.Clock.Select(point => point.MatchSecond).Should().BeInAscendingOrder();
+            passage.Clock[0].MatchSecond.Should().Be(passage.StartMatchSecond);
+            passage.Clock[^1].MatchSecond.Should().Be(passage.EndMatchSecond);
+            passage.Cuts.Should().NotBeNull();
+            passage.Cuts!.All(cut => cut.TimeMilliseconds == 0 && cut.DurationMilliseconds > 0).Should().BeTrue("a cut is at a passage's first frame");
             passage.HomeColour.Should().StartWith("#");
             passage.AwayColour.Should().StartWith("#");
 
-            // The feed's lines are pinned to the passage's own film clock (§9.3, replay-v3).
+            // The feed's lines are pinned to the passage's own film clock (§9.3, replay-v4).
             passage.Commentary.Should().NotBeNull();
             passage.Commentary!.Select(line => line.TimeMilliseconds).Should().BeInAscendingOrder();
-            passage.Commentary.Should().OnlyContain(line =>
+            passage.Commentary.All(line =>
                 line.TimeMilliseconds >= 0
                 && line.TimeMilliseconds <= passage.DurationMilliseconds
-                && !string.IsNullOrWhiteSpace(line.Text));
+                && !string.IsNullOrWhiteSpace(line.Text)).Should().BeTrue("a passage may be quiet, but its lines are inside it");
 
             // The eleven, plus the ball, each with a track, so the renderer interpolates rather than being
             // sent frames (§9.1, §9.3). A sent-off player is not carried, so the count can be below 23.

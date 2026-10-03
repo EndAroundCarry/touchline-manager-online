@@ -68,8 +68,11 @@ the system is shaped the way it is.
 | [0049](0049-non-production-stepped-game-clock.md) | A non-production stepped game clock, advanced by an operator | Accepted |
 | [0050](0050-public-information-pages-and-status.md) | Player-facing information pages and a public service status | Accepted |
 | [0051](0051-engine-v4-continuous-passages.md) | Engine-v4 plays a possession along a continuous passage, and records the film as a side channel | Accepted |
-| [0052](0052-replay-v3-film-and-reel.md) | Replay-v3 turns a match into one continuous film with a companion highlights reel | Accepted |
+| [0052](0052-replay-v3-film-and-reel.md) | Replay-v3 turns a match into one continuous film with a companion highlights reel | Accepted (decisions 2 and 3 superseded by ADR-0054) |
 | [0053](0053-engine-v5-half-time-clock-and-restart-ownership.md) | Engine-v5 resets the half-time clock, gives every dead ball an owner, and completes the passage record | Accepted |
+| [0055](0055-engine-v6-skills-where-the-design-says.md) | Engine-v6 puts skills where the design says they are: tiredness, shot contest scale, duel fouls, corner takers | Accepted |
+| [0054](0054-replay-v4-constant-pace-film.md) | Replay-v4 plays the whole match as one constant-pace film on one continuous timeline | Accepted |
+| [0056](0056-engine-v7-passes-and-take-ons.md) | Engine-v7 counts passes and take-ons on the player line, and the season statistics store them | Accepted |
 
 ## Rules for changing an ADR
 

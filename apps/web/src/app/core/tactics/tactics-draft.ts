@@ -139,21 +139,6 @@ export function withRole(draft: PlanDraft, slotNumber: number, role: string): Pl
   };
 }
 
-/** Moves a slot to a new validated position (`TAC-7`). */
-export function withMovedSlot(
-  draft: PlanDraft,
-  slotNumber: number,
-  normalizedX: number,
-  normalizedY: number,
-): PlanDraft {
-  return {
-    ...draft,
-    slots: draft.slots.map((slot) =>
-      slot.slotNumber === slotNumber ? { ...slot, normalizedX, normalizedY } : slot,
-    ),
-  };
-}
-
 /** Changes one team instruction (`INS-1`…`INS-8`). */
 export function withInstruction(
   draft: PlanDraft,

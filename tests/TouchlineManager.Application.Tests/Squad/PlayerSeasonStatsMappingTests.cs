@@ -26,6 +26,10 @@ public sealed class PlayerSeasonStatsMappingTests
             Shots: 6,
             ShotsOnTarget: 3,
             Saves: 0,
+            PassesAttempted: 120,
+            PassesCompleted: 96,
+            DribblesAttempted: 14,
+            DribblesCompleted: 7,
             YellowCards: 1,
             RedCards: 0,
             AverageRatingBasisPoints: 7_500);
@@ -35,13 +39,17 @@ public sealed class PlayerSeasonStatsMappingTests
         response.Appearances.Should().Be(3);
         response.Goals.Should().Be(2);
         response.YellowCards.Should().Be(1);
+        response.PassesAttempted.Should().Be(120);
+        response.PassesCompleted.Should().Be(96);
+        response.DribblesAttempted.Should().Be(14);
+        response.DribblesCompleted.Should().Be(7);
         response.AverageRating.Should().Be(7.5m, "TRN-8: the rating crosses the wire on its display scale");
     }
 
     [Fact]
     public void An_unrated_player_has_no_average_rather_than_a_zero()
     {
-        var stat = new SquadSeasonStatRow(1, 1, 90, 0, 0, 0, 0, 0, 0, 0, AverageRatingBasisPoints: null);
+        var stat = new SquadSeasonStatRow(1, 1, 90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, AverageRatingBasisPoints: null);
 
         stat.ToResponse().AverageRating.Should().BeNull("STA-5: a player with no rated appearance has no average");
     }

@@ -5,7 +5,6 @@ import {
   INSTRUCTION_FIELDS,
   POSITION_FAMILY_ORDER,
   SelectOption,
-  clampPitchCoordinate,
   familyLabel,
   issueMessage,
   pitchStyle,
@@ -25,19 +24,8 @@ import {
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
 
-/** The drag payload for a player chip, so a drop can tell an assignment from a move. */
+/** The drag payload for a player chip, so a drop on a slot can assign them. */
 const PLAYER_MIME = 'application/x-touchline-player';
-
-/** The drag payload for a slot marker, so a drop on the pitch repositions rather than assigns. */
-const SLOT_MIME = 'application/x-touchline-slot';
-
-/** How far an arrow key nudges a slot, as a share of the 0–10,000 pitch axis (`TAC-7`). */
-const KEYBOARD_MOVE_STEP = 500;
-
-/** A normalized pitch coordinate as the whole-number percentage a manager reads. */
-function percent(value: number): number {
-  return Math.round(value / 100);
-}
 
 /** One slot as the board draws it: the layout, its occupant, and how both should read. */
 interface SlotView {
@@ -55,11 +43,12 @@ interface SlotView {
 /**
  * The tactics screen (master plan §11.1, F-19).
  *
- * A formation board with the eleven slots at their normalized positions (`TAC-9`), the eight team
- * instructions, and the default lineup. A player is assigned by dragging their chip onto a slot, or — the
- * accessible alternative §11.3 requires — by picking them in the assignment table, where a keyboard or a
- * screen reader reaches every slot without dragging anything. The pitch and the table are two views of one
- * draft, so a slot moved on the board reads the same in the table.
+ * A formation board with the eleven slots at the positions the chosen formation dictates (`TAC-9`), the
+ * eight team instructions, and the default lineup. The slots are fixed: choosing a different formation is
+ * the only way to change where they stand. A player is assigned by dragging their chip onto a slot, or —
+ * the accessible alternative §11.3 requires — by picking them in the assignment table, where a keyboard or
+ * a screen reader reaches every slot without dragging anything. The pitch and the table are two views of
+ * one draft.
  *
  * The plan's version is the ETag (`CONC-1`). A save that loses a race is answered `412`; the board keeps
  * the manager's edits, pulls the server's state, and offers an explicit reapply (§11.2) rather than
@@ -162,16 +151,6 @@ export class Tactics {
     );
 
     return validation.issues.map((issue) => issueMessage(issue, names));
-  });
-
-  /** Where the selected slot sits, in the words a manager reads, so a keyboard move can be announced. */
-  protected readonly selectedPosition = computed(() => {
-    const selected = this.selectedSlot();
-    const slot = this.draft()?.slots.find((candidate) => candidate.slotNumber === selected) ?? null;
-
-    return slot === null
-      ? null
-      : `${percent(slot.normalizedX)}% depth, ${percent(slot.normalizedY)}% width`;
   });
 
   constructor() {
@@ -351,15 +330,6 @@ export class Tactics {
     }
   }
 
-  /** Starts moving a slot on the board. */
-  protected onSlotDragStart(event: DragEvent, slotNumber: number): void {
-    event.dataTransfer?.setData(SLOT_MIME, String(slotNumber));
-
-    if (event.dataTransfer !== null) {
-      event.dataTransfer.effectAllowed = 'move';
-    }
-  }
-
   /** Allows a player chip to be dropped on a slot, and nothing else. */
   protected onSlotDragOver(event: DragEvent): void {
     if (event.dataTransfer?.types.includes(PLAYER_MIME) === true) {
@@ -378,85 +348,6 @@ export class Tactics {
     event.preventDefault();
     event.stopPropagation();
     this.store.assignPlayer(slotNumber, playerId);
-    this.selectedSlot.set(slotNumber);
-  }
-
-  /** Allows a dragged slot to be dropped on the pitch. */
-  protected onPitchDragOver(event: DragEvent): void {
-    if (event.dataTransfer?.types.includes(SLOT_MIME) === true) {
-      event.preventDefault();
-    }
-  }
-
-  /**
-   * Moves the dragged slot to where it was dropped (`TAC-7`).
-   *
-   * The board draws depth upward, so the vertical drop position is inverted before it becomes the stored
-   * `x` — the number the engine will hash is the number this writes, not a display-only approximation.
-   */
-  protected onPitchDrop(event: DragEvent): void {
-    const raw = event.dataTransfer?.getData(SLOT_MIME) ?? '';
-    const slotNumber = Number.parseInt(raw, 10);
-
-    if (Number.isNaN(slotNumber)) {
-      return;
-    }
-
-    event.preventDefault();
-
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-
-    if (rect.height === 0 || rect.width === 0) {
-      return;
-    }
-
-    const normalizedX = clampPitchCoordinate(
-      (1 - (event.clientY - rect.top) / rect.height) * 10_000,
-    );
-    const normalizedY = clampPitchCoordinate(((event.clientX - rect.left) / rect.width) * 10_000);
-
-    this.store.moveSlot(slotNumber, normalizedX, normalizedY);
-    this.selectedSlot.set(slotNumber);
-  }
-
-  /**
-   * Moves the focused slot with the arrow keys (`TAC-7`, §11.3).
-   *
-   * Repositioning a slot was drag-only, which a keyboard or screen-reader manager could not do; assigning
-   * a player and a role already had the assignment table, but the slot's own position did not. The marker
-   * is already a focusable button, so the arrow keys nudge it by a fixed step, bounded to the pitch. The
-   * depth axis is drawn upward, so up increases depth, and the selection status line announces the result.
-   */
-  protected onSlotKeydown(event: KeyboardEvent, slotNumber: number): void {
-    const slot =
-      this.draft()?.slots.find((candidate) => candidate.slotNumber === slotNumber) ?? null;
-
-    if (slot === null) {
-      return;
-    }
-
-    let x = slot.normalizedX;
-    let y = slot.normalizedY;
-
-    switch (event.key) {
-      case 'ArrowUp':
-        x += KEYBOARD_MOVE_STEP;
-        break;
-      case 'ArrowDown':
-        x -= KEYBOARD_MOVE_STEP;
-        break;
-      case 'ArrowLeft':
-        y -= KEYBOARD_MOVE_STEP;
-        break;
-      case 'ArrowRight':
-        y += KEYBOARD_MOVE_STEP;
-        break;
-      default:
-        return;
-    }
-
-    event.preventDefault();
-    this.store.moveSlot(slotNumber, clampPitchCoordinate(x), clampPitchCoordinate(y));
     this.selectedSlot.set(slotNumber);
   }
 }

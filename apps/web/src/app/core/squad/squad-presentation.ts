@@ -298,44 +298,81 @@ export function stateRows(state: PlayerState): readonly StateRow[] {
   ];
 }
 
-/** One label-and-value line of a player's season summary. */
-export interface SeasonStatRow {
-  /** The statistic's name. */
+/** One column of the Statistics tab's season table (`STA-2`). */
+export interface StatColumn {
+  /** The short heading. */
   readonly label: string;
 
-  /** The value, already formatted for display. */
-  readonly value: string;
+  /** The full name, read out and shown on hover where the heading is abbreviated. */
+  readonly title: string;
+
+  /** Formats the column's cell from a season line. */
+  readonly value: (stats: PlayerSeasonStats) => string;
 }
 
 /**
- * Builds the player profile's season summary (`STA-2`).
+ * The columns of the season table, in the order a manager reads them: how much, what they did, what it cost.
  *
- * The order is the product's — how much they played, then what they did, then what it cost them — and the
- * numbers are formatted here so the screen renders text and the rating is read to the tenth of a point its
- * one definition uses (`TRN-8`).
+ * One definition drives both the season rows and the career row, so the two cannot format a number
+ * differently, and the passes and take-ons read as `completed / attempted` with their rate beside them.
  */
-export function seasonStatRows(stats: PlayerSeasonStats): readonly SeasonStatRow[] {
-  return [
-    { label: 'Appearances', value: `${stats.appearances}` },
-    { label: 'Starts', value: `${stats.starts}` },
-    { label: 'Minutes', value: `${stats.minutesPlayed}` },
-    { label: 'Goals', value: `${stats.goals}` },
-    { label: 'Assists', value: `${stats.assists}` },
-    { label: 'Shots', value: `${stats.shots}` },
-    { label: 'Shots on target', value: `${stats.shotsOnTarget}` },
-    { label: 'Saves', value: `${stats.saves}` },
-    { label: 'Yellow cards', value: `${stats.yellowCards}` },
-    { label: 'Red cards', value: `${stats.redCards}` },
-    { label: 'Average rating', value: averageRatingLabel(stats.averageRating) },
-  ];
+export const STAT_COLUMNS: readonly StatColumn[] = [
+  { label: 'Apps', title: 'Appearances', value: (stats) => `${stats.appearances}` },
+  { label: 'Starts', title: 'Starts', value: (stats) => `${stats.starts}` },
+  { label: 'Min', title: 'Minutes played', value: (stats) => `${stats.minutesPlayed}` },
+  { label: 'Goals', title: 'Goals', value: (stats) => `${stats.goals}` },
+  { label: 'Assists', title: 'Assists', value: (stats) => `${stats.assists}` },
+  {
+    label: 'Passes',
+    title: 'Passes completed / attempted',
+    value: (stats) => ratioLabel(stats.passesCompleted, stats.passesAttempted),
+  },
+  {
+    label: 'Pass %',
+    title: 'Pass accuracy',
+    value: (stats) => percentageLabel(stats.passesCompleted, stats.passesAttempted),
+  },
+  {
+    label: 'Dribbles',
+    title: 'Dribbles won / attempted',
+    value: (stats) => ratioLabel(stats.dribblesCompleted, stats.dribblesAttempted),
+  },
+  {
+    label: 'Dribble %',
+    title: 'Dribble success',
+    value: (stats) => percentageLabel(stats.dribblesCompleted, stats.dribblesAttempted),
+  },
+  { label: 'Shots', title: 'Shots', value: (stats) => `${stats.shots}` },
+  { label: 'On tgt', title: 'Shots on target', value: (stats) => `${stats.shotsOnTarget}` },
+  { label: 'Saves', title: 'Saves', value: (stats) => `${stats.saves}` },
+  { label: 'Yellow', title: 'Yellow cards', value: (stats) => `${stats.yellowCards}` },
+  { label: 'Red', title: 'Red cards', value: (stats) => `${stats.redCards}` },
+  {
+    label: 'Rating',
+    title: 'Average rating',
+    value: (stats) => averageRatingLabel(stats.averageRating),
+  },
+];
+
+/** The cells of one season line, in the order of {@link STAT_COLUMNS}. */
+export function statCells(stats: PlayerSeasonStats): readonly string[] {
+  return STAT_COLUMNS.map((column) => column.value(stats));
+}
+
+/** A completed count against an attempted one, as `completed / attempted` (`engine-v7`). */
+export function ratioLabel(completed: number, attempted: number): string {
+  return `${completed} / ${attempted}`;
 }
 
 /**
- * The number of seasons a player has appeared in, as a label (`STA-2`).
- *
- * The career totals are otherwise rendered with the same `seasonStatRows` the season summary uses, so the
- * two cannot format a number differently.
+ * A completed count as a whole percentage of an attempted one, or a dash when nothing was attempted — a
+ * player who never took a dribble has no success rate rather than a rate of zero (`engine-v7`).
  */
+function percentageLabel(completed: number, attempted: number): string {
+  return attempted === 0 ? '\u2014' : `${Math.round((completed / attempted) * 100)}%`;
+}
+
+/** The number of seasons a player has appeared in, as a label (`STA-2`). */
 export function seasonsPlayedLabel(seasonsPlayed: number): string {
   return `${seasonsPlayed} ${seasonsPlayed === 1 ? 'season' : 'seasons'}`;
 }

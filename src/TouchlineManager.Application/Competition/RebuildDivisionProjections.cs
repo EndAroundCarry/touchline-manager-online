@@ -263,6 +263,10 @@ public sealed class RebuildDivisionProjections
         || stat.Shots != line.Shots
         || stat.ShotsOnTarget != line.ShotsOnTarget
         || stat.Saves != line.Saves
+        || stat.PassesAttempted != line.PassesAttempted
+        || stat.PassesCompleted != line.PassesCompleted
+        || stat.DribblesAttempted != line.DribblesAttempted
+        || stat.DribblesCompleted != line.DribblesCompleted
         || stat.YellowCards != line.YellowCards
         || stat.RedCards != line.RedCards
         || stat.RatingBasisPointsTotal != line.RatingBasisPointsTotal

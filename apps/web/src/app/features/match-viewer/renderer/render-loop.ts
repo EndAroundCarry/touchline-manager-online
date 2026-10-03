@@ -1,3 +1,6 @@
+/** The longest frame the loop reports, in milliseconds. */
+export const MAX_FRAME_DELTA_MS = 100;
+
 /**
  * The animation loop's lifetime (`§9.4`).
  *
@@ -8,6 +11,11 @@
  *
  * It reads no clock of its own — the browser passes the frame timestamp — so a frame's cost is the only
  * thing that can make a frame long, and the player scales the delta it is given.
+ *
+ * A frame is never reported as longer than `MAX_FRAME_DELTA_MS`. After a slow frame — a garbage collection,
+ * a throttled tab coming back, a debugger — the film would otherwise jump by however long the stall was,
+ * times the playback speed, and a ball would cross the pitch between two draws. A long stall costs the
+ * replay a moment of film rather than showing a teleport.
  */
 export class RenderLoop {
   private handle: number | null = null;
@@ -34,7 +42,10 @@ export class RenderLoop {
       // than the one already in flight.
       this.handle = requestAnimationFrame(tick);
 
-      const delta = this.previous === null ? 0 : timestamp - this.previous;
+      const delta =
+        this.previous === null
+          ? 0
+          : Math.min(MAX_FRAME_DELTA_MS, Math.max(0, timestamp - this.previous));
 
       this.previous = timestamp;
 

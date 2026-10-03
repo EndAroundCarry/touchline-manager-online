@@ -95,7 +95,11 @@ kick-off. The server decides results; a client can never simulate or influence o
 > turns a recorded match into one continuous condensed film of the whole match, joined rather than cut,
 > with a companion highlights reel that gives every chance a genuine lead-in, and the match center plays
 > it with a continuous clock, a scrolling commentary feed, and a scrubber (`MAT-8`, `MAT-11`, ADR-0051,
-> ADR-0052).
+> ADR-0052). The film has since been rebuilt on `engine-v5` / `engine-rules-v5` — the second half now kicks off
+> at 46', every dead ball has an owner, and a shot reaches the goal (`MAT-3`, `MAT-12`, ADR-0053) — as the
+> `replay-v4` constant-pace film: the whole match in about ten minutes at 1x (never more than eleven), every
+> move at one pace, players that never exceed a sprint, passes that go player to player, and one continuous
+> timeline in the viewer with a single renderer (ADR-0054).
 
 ---
 

@@ -214,14 +214,19 @@ public sealed class SaveTacticalPlan
     {
         var preset = FormationPresets.FromCode(request.FormationPreset);
 
+        // Where a slot stands is the formation's to decide: a submitted layout keeps the family and role the
+        // manager picked, but its coordinates are replaced by the preset's, so a client cannot store a
+        // position the formation does not dictate.
+        var presetSlots = FormationLayouts.DefaultSlots(preset).ToDictionary(slot => slot.SlotNumber);
+
         var layout = request.Slots is not null
             ? request.Slots
                 .Select(slot => new TacticalSlotDefinition(
                     slot.SlotNumber,
                     PositionFamilies.FromCode(slot.PositionFamily),
                     PlayerRoles.FromCode(slot.Role),
-                    slot.NormalizedX,
-                    slot.NormalizedY,
+                    presetSlots[slot.SlotNumber].NormalizedX,
+                    presetSlots[slot.SlotNumber].NormalizedY,
                     null))
                 .ToList()
             : FormationLayouts.DefaultSlots(preset)

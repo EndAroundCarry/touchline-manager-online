@@ -47,6 +47,19 @@ public sealed class SeasonStatisticsCalculatorTests
     }
 
     [Fact]
+    public void The_line_carries_the_passes_and_take_ons_the_result_recorded()
+    {
+        var lines = SeasonStatisticsCalculator.Calculate([Row()], []);
+
+        var striker = lines.Single(line => line.PlayerId == Striker);
+
+        striker.PassesAttempted.Should().Be(50);
+        striker.PassesCompleted.Should().Be(41);
+        striker.DribblesAttempted.Should().Be(6);
+        striker.DribblesCompleted.Should().Be(3);
+    }
+
+    [Fact]
     public void Shots_and_saves_are_counted_from_the_event_stream()
     {
         MatchStatEvent[] events =
@@ -128,6 +141,20 @@ public sealed class SeasonStatisticsCalculatorTests
     }
 
     [Fact]
+    public void Aggregate_sums_the_passes_and_take_ons_across_matches()
+    {
+        var lines = SeasonStatisticsCalculator.Aggregate(
+        [
+            MatchLine(Striker, ClubId, minutes: 90, goals: 0, rating: 7_000, passes: 50),
+            MatchLine(Striker, ClubId, minutes: 90, goals: 0, rating: 7_000, passes: 30),
+        ]);
+
+        lines.Should().ContainSingle();
+        lines[0].PassesAttempted.Should().Be(80);
+        lines[0].PassesCompleted.Should().Be(40 + 24);
+    }
+
+    [Fact]
     public void Aggregate_counts_only_rated_appearances()
     {
         var lines = SeasonStatisticsCalculator.Aggregate(
@@ -142,7 +169,7 @@ public sealed class SeasonStatisticsCalculatorTests
     }
 
     /// <summary>One player's contribution to one match, as the calculator would produce it.</summary>
-    private static PlayerMatchStatLine MatchLine(Guid playerId, Guid clubId, int minutes, int goals, int rating) => new()
+    private static PlayerMatchStatLine MatchLine(Guid playerId, Guid clubId, int minutes, int goals, int rating, int passes = 0) => new()
     {
         PlayerId = playerId,
         ClubId = clubId,
@@ -154,6 +181,10 @@ public sealed class SeasonStatisticsCalculatorTests
         Shots = 0,
         ShotsOnTarget = 0,
         Saves = 0,
+        PassesAttempted = passes,
+        PassesCompleted = passes * 4 / 5,
+        DribblesAttempted = 0,
+        DribblesCompleted = 0,
         YellowCards = 0,
         RedCards = 0,
         RatingBasisPoints = rating,
@@ -210,6 +241,10 @@ public sealed class SeasonStatisticsCalculatorTests
             AbsenceFixtures = 0,
             RatingBasisPoints = rating,
             FinalConditionBasisPoints = 6_000,
+            PassesAttempted = minutes == 0 ? 0 : 50,
+            PassesCompleted = minutes == 0 ? 0 : 41,
+            DribblesAttempted = minutes == 0 ? 0 : 6,
+            DribblesCompleted = minutes == 0 ? 0 : 3,
         };
 
     private static MatchStatisticsV1 Statistics() => new()

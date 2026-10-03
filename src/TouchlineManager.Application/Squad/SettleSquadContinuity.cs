@@ -40,7 +40,7 @@ public sealed record SquadContinuityResult(
 /// <para>
 /// The order is deliberate. Retirements come first, so a player who announced last season leaves before
 /// expiry can offer them a new deal; then announced players are kept for their final season; then expiring
-/// contracts are renewed or released; then any club left below the minimum is repaired. A manager who
+/// contracts are renewed (always, by the board, for a present manager) or released (an unmanaged club's surplus); then any club left below the minimum is repaired. A manager who
 /// renewed during the season is unaffected, because their contract no longer expires.
 /// </para>
 /// </remarks>
@@ -57,6 +57,9 @@ public sealed partial class SettleSquadContinuity
         PlayerPosition.DefensiveMidfielder,
         PlayerPosition.AttackingMidfielder,
     ];
+
+    /// <summary>The length, in seasons, of the deal the board gives a present manager's expiring player (`CON-11`).</summary>
+    private const int BoardRenewalSeasons = 2;
 
     private readonly IContractContinuityQueries _continuity;
     private readonly ISquadRepository _squad;
@@ -199,12 +202,12 @@ public sealed partial class SettleSquadContinuity
 
             if (club.AttentiveManager)
             {
-                // A manager who is present chose not to renew: the players leave for free agency (`CON-6`).
+                // The board renews every expiring player of a present manager, so no manager loses a player
+                // to an expiring contract (`CON-6`, `CON-11`). The terms are the deterministic renewal quote.
                 foreach (var row in expiring.OrderBy(row => row.PlayerId))
                 {
-                    Release(row);
-                    gone.Add(row.PlayerId);
-                    released++;
+                    Renew(club, row, BoardRenewalSeasons);
+                    renewed++;
                 }
             }
             else

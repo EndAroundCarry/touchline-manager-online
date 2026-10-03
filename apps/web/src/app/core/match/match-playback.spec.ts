@@ -1,5 +1,5 @@
 import { Passage, PlaybackSegment, ReelClip } from './match.models';
-import { MatchPlayback, PLAYBACK_SPEEDS } from './match-playback';
+import { MatchPlayback, PLAYBACK_SPEEDS, placePassages } from './match-playback';
 
 /**
  * The film playback guarantees (`replay-v3`).
@@ -363,5 +363,110 @@ describe('MatchPlayback', () => {
     expect(playback.positionMs).toBe(3_500);
     expect(playback.activeIndex).toBe(3);
     expect(playback.currentState).toBe('playing');
+  });
+});
+
+describe('MatchPlayback: film time', () => {
+  it('exposes the film moment the renderer draws, whichever playlist is playing', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000), passage(4, 1_000)];
+    const playback = new MatchPlayback(items, schedule(items), [clip(4, 3_000, 4_000)]);
+
+    playback.play();
+    playback.advance(2_500);
+
+    expect(playback.positionMs).toBe(2_500);
+    expect(playback.filmDurationMs).toBe(4_000);
+
+    playback.setMode('reel');
+
+    // The reel is a playlist over the same film, so the film moment is a film moment still.
+    expect(playback.positionMs).toBe(3_000);
+    expect(playback.filmDurationMs).toBe(4_000);
+    expect(playback.totalMilliseconds).toBe(1_000);
+  });
+
+  it('exposes the windows of the active playlist, which is where the picture is faded between', () => {
+    const items = [passage(1, 1_000), passage(2, 1_000), passage(3, 1_000), passage(4, 1_000)];
+    const playback = new MatchPlayback(items, schedule(items), [
+      clip(2, 1_000, 2_000),
+      clip(4, 3_000, 4_000),
+    ]);
+
+    expect(playback.windows).toEqual([{ startMilliseconds: 0, endMilliseconds: 4_000 }]);
+
+    playback.setMode('reel');
+
+    expect(playback.windows).toEqual([
+      { startMilliseconds: 1_000, endMilliseconds: 2_000 },
+      { startMilliseconds: 3_000, endMilliseconds: 4_000 },
+    ]);
+  });
+
+  it('finds the passage the playhead is in after seeking forward and back, not just walking on', () => {
+    const items = [
+      passage(1, 1_000),
+      passage(2, 2_000),
+      passage(3, 1_500),
+      passage(4, 1_000),
+      passage(5, 500),
+    ];
+    const playback = new MatchPlayback(items);
+
+    playback.play();
+
+    // Walk the cursor forward a frame at a time, then jump about the film: the answer must always be the
+    // passage that holds the playhead.
+    const starts = [0, 1_000, 3_000, 4_500, 5_500];
+    const moments = [
+      0, 999, 1_000, 2_999, 3_000, 5_499, 5_500, 5_999, 100, 4_499, 4_500, 1_500, 5_000,
+    ];
+
+    for (const moment of moments) {
+      playback.seekToMilliseconds(moment);
+
+      const expected = starts.filter((start) => start <= moment).length - 1;
+
+      expect(playback.activeIndex, `the passage at ${moment} ms`).toBe(expected);
+    }
+  });
+
+  it('keeps the passage time and the playhead agreeing at a passage boundary', () => {
+    const playback = new MatchPlayback([passage(1, 1_000), passage(2, 1_000)]);
+
+    playback.seekToMilliseconds(1_000);
+
+    expect(playback.activeIndex).toBe(1);
+    expect(playback.passageTimeMs).toBe(0);
+  });
+});
+
+describe('placePassages', () => {
+  it('lays passages end to end when there is no schedule', () => {
+    const placed = placePassages([passage(1, 1_000), passage(2, 2_000)], []);
+
+    expect(placed.map((item) => item.startMilliseconds)).toEqual([0, 1_000]);
+    expect(placed.map((item) => item.durationMilliseconds)).toEqual([1_000, 2_000]);
+  });
+
+  it('uses the schedule where it has a passage segment, and carries on from it otherwise', () => {
+    const placed = placePassages(
+      [passage(1, 1_000), passage(2, 2_000), passage(3, 500)],
+      [
+        {
+          kind: 'passage',
+          sourceEventSequence: 1,
+          startMilliseconds: 250,
+          durationMilliseconds: 1_000,
+        },
+        {
+          kind: 'title',
+          sourceEventSequence: 0,
+          startMilliseconds: 1_250,
+          durationMilliseconds: 800,
+        },
+      ],
+    );
+
+    expect(placed.map((item) => item.startMilliseconds)).toEqual([250, 1_250, 3_250]);
   });
 });

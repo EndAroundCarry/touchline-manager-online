@@ -104,6 +104,10 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
                     Shots = 20,
                     ShotsOnTarget = 10,
                     Saves = 0,
+                    PassesAttempted = 300,
+                    PassesCompleted = 240,
+                    DribblesAttempted = 40,
+                    DribblesCompleted = 18,
                     YellowCards = 1,
                     RedCards = 0,
                     RatingBasisPointsTotal = 72_000,
@@ -126,6 +130,10 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
                     Shots = 18,
                     ShotsOnTarget = 12,
                     Saves = 0,
+                    PassesAttempted = 200,
+                    PassesCompleted = 170,
+                    DribblesAttempted = 30,
+                    DribblesCompleted = 15,
                     YellowCards = 0,
                     RedCards = 0,
                     RatingBasisPointsTotal = 64_000,
@@ -150,6 +158,10 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
             career.Totals.Appearances.Should().Be(18);
             career.Totals.Goals.Should().Be(10);
             career.Totals.MinutesPlayed.Should().Be(1_500);
+            career.Totals.PassesAttempted.Should().Be(500);
+            career.Totals.PassesCompleted.Should().Be(410);
+            career.Totals.DribblesAttempted.Should().Be(70);
+            career.Totals.DribblesCompleted.Should().Be(33);
 
             // The rating is recomputed from the summed basis points and rated appearances, not averaged from
             // the season averages (TRN-8).
@@ -158,6 +170,7 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
             career.Seasons.Should().HaveCount(2);
             career.Seasons[0].SeasonNumber.Should().Be(2, "the most recent season is first");
             career.Seasons[0].Stats.Goals.Should().Be(6);
+            career.Seasons[0].Stats.PassesCompleted.Should().Be(170);
             career.Seasons[0].ClubName.Should().NotBeNullOrWhiteSpace();
             career.Seasons[1].SeasonNumber.Should().Be(1);
             career.Seasons[1].Stats.Goals.Should().Be(4);

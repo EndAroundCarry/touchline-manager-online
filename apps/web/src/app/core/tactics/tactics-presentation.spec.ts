@@ -1,6 +1,5 @@
 import {
   INSTRUCTION_FIELDS,
-  clampPitchCoordinate,
   familyLabel,
   issueMessage,
   pitchStyle,
@@ -93,13 +92,6 @@ describe('tactics presentation', () => {
         bottom: '100.00%',
         left: '0.00%',
       });
-    });
-
-    it('clamps a dropped position back inside the pitch, rounding to a whole unit', () => {
-      expect(clampPitchCoordinate(-50)).toBe(0);
-      expect(clampPitchCoordinate(10_500)).toBe(10_000);
-      expect(clampPitchCoordinate(1_234.6)).toBe(1_235);
-      expect(clampPitchCoordinate(Number.NaN)).toBe(0);
     });
   });
 

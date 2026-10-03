@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 5;
+    public const int Engine = 7;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,12 +30,32 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 5;
+    public const int RuleSet = 6;
 
-    /// <summary>The stable label for engine version 5, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 7, used in hashes and diagnostics.</summary>
     /// <remarks>
     /// <para>
-    /// Version 5 completes the continuous passage model that version 4 introduced. The clock is reset at
+    /// Version 7 counts what a player does with the ball. Each player's line carries the passes they attempted
+    /// and completed and the take-ons they attempted and won, beside the goals and assists it already held. No
+    /// play draw moves: the passes are credited from a stream derived from the seed and the possession, and
+    /// the take-ons are the 1v1 duels the engine already resolved, so every scoreline, event, and passage is
+    /// the one `engine-v6` produced and only the player lines, the canonical serialization, and the hashes
+    /// change.
+    /// </para>
+    /// <para>
+    /// Version 6 puts the engine's skills where its design said they were. Shots, saves, penalties, and free
+    /// kicks compare a skill with the goalkeeper on the scale they are measured on, so finishing and
+    /// goalkeeping now count at the moment of the shot. A tired player plays below his sheet, physical skills
+    /// first, and both the team ratings and every duel read that effective skill; Stamina sets how fast a
+    /// player tires, and ratings are refreshed every minute. Duels read position fit and playing short, and
+    /// pick their players by band. A lost final-third duel can end in a foul, and a side's Aggression and
+    /// Tackling set how often it fouls. Corners have a taker, penalties depend on taker and keeper, Leadership
+    /// steadies morale, and time wasting follows the score and lengthens possessions. The Set pieces, Fitness,
+    /// and Cohesion ratings, which nothing read, are gone, and the duel and shot-zone constants moved into the
+    /// rules.
+    /// </para>
+    /// <para>
+    /// Version 5 completed the continuous passage model that version 4 introduced. The clock is reset at
     /// half-time, so the second half is played from 45:00 with its own stoppage rather than starting a few
     /// minutes late and finishing a few minutes early. A dead ball belongs to somebody: a kick-off, a goal
     /// kick, a keeper's ball, a free kick, or an offside is taken by the side the rules give it to, from where
@@ -49,11 +69,11 @@ public static class EngineVersions
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v5";
+    public const string EngineLabel = "engine-v7";
 
-    /// <summary>The stable label for engine rules version 5.</summary>
-    public const string RuleSetLabel = "engine-rules-v5";
+    /// <summary>The stable label for engine rules version 6.</summary>
+    public const string RuleSetLabel = "engine-rules-v6";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
-    public const string RatingWeightsLabel = "engine-ratings-v1";
+    public const string RatingWeightsLabel = "engine-ratings-v2";
 }

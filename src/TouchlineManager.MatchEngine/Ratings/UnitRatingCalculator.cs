@@ -4,7 +4,7 @@ using TouchlineManager.MatchEngine.Model;
 namespace TouchlineManager.MatchEngine.Ratings;
 
 /// <summary>
-/// Computes a side's nine unit ratings from the players currently on the pitch (master plan §8.4).
+/// Computes a side's six unit ratings from the players currently on the pitch (master plan §8.4).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -14,7 +14,7 @@ namespace TouchlineManager.MatchEngine.Ratings;
 /// </para>
 /// <para>
 /// Ratings are recomputed rather than cached, because the inputs change on every sending-off, substitution,
-/// and minute of fatigue, and a cached rating that was one event stale would be wrong in exactly the moments
+/// and minute of fatigue (the match refreshes both sides every minute), and a cached rating that was one event stale would be wrong in exactly the moments
 /// that decide a match. The cost is a few hundred integer operations per possession, which is nothing
 /// beside the clarity of every consumer reading the same number.
 /// </para>
@@ -44,51 +44,7 @@ public static class UnitRatingCalculator
             DefensivePressure = Unit(activeSlots, MatchUnit.DefensivePressure, instructions, isHome, rules),
             DefensiveShape = Unit(activeSlots, MatchUnit.DefensiveShape, instructions, isHome, rules),
             Goalkeeping = Unit(activeSlots, MatchUnit.Goalkeeping, instructions, isHome, rules),
-            SetPieces = Unit(activeSlots, MatchUnit.SetPieces, instructions, isHome, rules),
-            Fitness = Unit(activeSlots, MatchUnit.Fitness, instructions, isHome, rules),
-            Cohesion = Cohesion(activeSlots, isHome, rules),
         };
-    }
-
-    /// <summary>
-    /// Computes how well a side's eleven fit their jobs, as a rating on the same scale as the others.
-    /// </summary>
-    /// <remarks>
-    /// Not an attribute mean. A side of excellent players all playing out of position is a bad side, and a
-    /// mean over their attributes would call it a good one. This reads the familiarity already resolved per
-    /// slot instead, so it measures fit rather than quality, and it takes no tactical modifier because no
-    /// instruction changes how well a player suits a job.
-    /// </remarks>
-    private static int Cohesion(IReadOnlyList<ActiveSlot> slots, bool isHome, EngineRulesV2 rules)
-    {
-        if (slots.Count == 0)
-        {
-            return 0;
-        }
-
-        long familiarityTotal = 0;
-        var makeshift = 0;
-
-        foreach (var slot in slots)
-        {
-            familiarityTotal += slot.FamiliarityBasisPoints;
-
-            if (slot.FamiliarityBasisPoints < rules.UnfamiliarRolePenaltyBasisPoints)
-            {
-                makeshift++;
-            }
-        }
-
-        var average = (int)(familiarityTotal / slots.Count);
-
-        average -= makeshift * rules.OutOfPositionCohesionPenaltyBasisPoints;
-        average = int.Clamp(average, 0, EngineRulesV2.Certain);
-
-        // Put onto the rating scale so cohesion can be compared with the other units: a side where everyone
-        // fits is worth a maximum-attribute player, and a side of misfits is worth correspondingly less.
-        var rating = average * (rules.AttributeRatingFactor * MatchAttributeNames.Max) / EngineRulesV2.Certain;
-
-        return int.Clamp(ApplySideContext(rating, slots.Count, isHome, rules), 0, rules.MaxUnitRating);
     }
 
     private static int Unit(
@@ -116,18 +72,22 @@ public static class UnitRatingCalculator
             // The player's own rating for this unit, before anything about the situation.
             long attributeMean = 0;
 
+            // A tired player plays below his sheet, skill by skill (engine-v6): physical most, then technical,
+            // then mental, and a goalkeeper not at all.
             foreach (var attribute in weighting.Attributes)
             {
                 attributeMean += (long)attribute.Weight
                     * slot.Participant.Attributes.ValueOf(attribute.Attribute)
-                    * rules.AttributeRatingFactor;
+                    * rules.AttributeRatingFactor
+                    * EffectiveSkill.TirednessFactor(slot, attribute.Attribute, rules)
+                    / EngineRulesV2.Certain;
             }
 
             attributeMean /= attributeTotal;
 
-            // Then how well they suit the slot, and how fresh they are.
+            // Then how well they suit the slot, and their fatigue, morale, and sharpness.
             var effective = attributeMean * slot.FamiliarityBasisPoints / EngineRulesV2.Certain;
-            effective = effective * StateMultiplier(slot.Condition, rules) / EngineRulesV2.Certain;
+            effective = effective * EffectiveSkill.StateFactor(slot.Condition, rules) / EngineRulesV2.Certain;
 
             contributions += familyWeight * effective;
             familyTotal += familyWeight;
@@ -161,47 +121,5 @@ public static class UnitRatingCalculator
         }
 
         return rating;
-    }
-
-    /// <summary>
-    /// Combines condition, fatigue, morale, and sharpness into one multiplier on a player's contribution.
-    /// </summary>
-    /// <remarks>
-    /// Each is a linear interpolation between the rules' floor and ceiling, and they compose
-    /// multiplicatively, so a tired, unfit, unhappy player is worse than any one of those alone. The bounds
-    /// keep the effect real but never decisive: at the worst possible state a player is worth about a
-    /// quarter less, which is roughly five attribute points — enough to prefer a fresh substitute, not
-    /// enough to make a good player bad.
-    /// </remarks>
-    private static int StateMultiplier(PlayerCondition condition, EngineRulesV2 rules)
-    {
-        var multiplier = Interpolate(
-            rules.ConditionFactorFloorBasisPoints,
-            rules.ConditionFactorCeilingBasisPoints,
-            condition.ConditionBasisPoints);
-
-        multiplier = multiplier * Interpolate(
-            rules.FatigueFactorFloorBasisPoints,
-            rules.FatigueFactorCeilingBasisPoints,
-            EngineRulesV2.Certain - condition.FatigueBasisPoints) / EngineRulesV2.Certain;
-
-        multiplier = multiplier * Interpolate(
-            rules.MoraleFactorFloorBasisPoints,
-            rules.MoraleFactorCeilingBasisPoints,
-            condition.MoraleBasisPoints) / EngineRulesV2.Certain;
-
-        multiplier = multiplier * Interpolate(
-            rules.SharpnessFactorFloorBasisPoints,
-            rules.SharpnessFactorCeilingBasisPoints,
-            condition.SharpnessBasisPoints) / EngineRulesV2.Certain;
-
-        return multiplier;
-    }
-
-    private static int Interpolate(int floor, int ceiling, int valueBasisPoints)
-    {
-        var bounded = int.Clamp(valueBasisPoints, 0, EngineRulesV2.Certain);
-
-        return floor + (int)(((long)(ceiling - floor) * bounded) / EngineRulesV2.Certain);
     }
 }

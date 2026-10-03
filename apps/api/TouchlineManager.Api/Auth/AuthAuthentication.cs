@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using TouchlineManager.Api.Http;
+using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
 using TouchlineManager.Contracts.Auth;
 using TouchlineManager.Contracts.Http;
@@ -72,6 +73,26 @@ internal static class AuthAuthentication
                     OnTokenValidated = ValidateSecurityStampAsync,
                     OnChallenge = WriteUnauthenticatedProblemAsync,
                     OnForbidden = WriteForbiddenProblemAsync,
+                };
+            });
+
+        // Token lifetimes are issued from the game clock (TIME-2), so they must be judged against it. The
+        // default validator reads the system clock, which disagrees with a stepped or compressed clock
+        // (ADR-0015, ADR-0049): a token issued at a game instant ahead of real time is "not yet valid", and
+        // under a frozen clock every token would expire after its lifetime in real time. In System mode the
+        // two clocks are the same, so behaviour there is unchanged.
+        services
+            .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IClock>((options, clock) =>
+            {
+                var skew = options.TokenValidationParameters.ClockSkew;
+
+                options.TokenValidationParameters.LifetimeValidator = (notBefore, expires, _, _) =>
+                {
+                    var now = clock.UtcNow.UtcDateTime;
+
+                    return (notBefore is null || notBefore.Value <= now + skew)
+                        && (expires is null || expires.Value >= now - skew);
                 };
             });
 
