@@ -27,7 +27,8 @@ internal static class ChanceSimulator
     /// <param name="state">The match state.</param>
     /// <param name="side">The side attacking.</param>
     /// <param name="zone">The shot zone the possession's passage was aimed at (`engine-v4`).</param>
-    public static void ResolveOpenPlay(MatchState state, MatchSide side, ShotZone zone)
+    /// <param name="strike">Where the strike finishes, for each outcome it could have (`engine-v5`).</param>
+    public static void ResolveOpenPlay(MatchState state, MatchSide side, ShotZone zone, StrikePlan strike)
     {
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
@@ -45,19 +46,28 @@ internal static class ChanceSimulator
 
         var goalChance = GoalChance(state, defender, shooter, zone, headed: false);
 
-        Resolve(state, side, shooter, zone, goalChance);
+        Resolve(state, side, shooter, zone, goalChance, strike);
     }
 
     /// <summary>
     /// Resolves a penalty, which is its own event pair: the award, then the outcome.
     /// </summary>
+    /// <remarks>
+    /// The ball is placed on the spot, the taker steps up, and the kick travels to the target its outcome
+    /// decides (`engine-v5`). A goal is a kick-off for the other side; a miss, saved or put wide, is the
+    /// defending side's restart from its goal area.
+    /// </remarks>
     /// <param name="state">The match state.</param>
     /// <param name="side">The side awarded the penalty.</param>
-    public static void ResolvePenalty(MatchState state, MatchSide side)
+    /// <param name="strike">Where the kick finishes, for each outcome it could have.</param>
+    public static void ResolvePenalty(MatchState state, MatchSide side, StrikePlan strike)
     {
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
         var taker = PenaltyTaker(attacker);
+
+        // A penalty is a placement and then a strike: the ball is set down on the spot, not played to it.
+        state.MoveBallAndRecord(strike.Origin, PassageWaypointKind.Restart);
 
         if (taker is not null)
         {
@@ -76,13 +86,16 @@ internal static class ChanceSimulator
         if (state.Random.RollBasisPoints(state.Rules.PenaltyGoalBasisPoints))
         {
             Score(state, side, taker);
+
+            state.MoveBallAndRecord(strike.GoalTarget, PassageWaypointKind.Shot, strike.GoalAltitude);
             state.Emit(
                 side,
                 EngineEventType.PenaltyGoal,
                 taker.Participant.ParticipantId,
                 goalkeeper,
                 ShotZone.Central,
-                state.Rules.PenaltyGoalBasisPoints);
+                state.Rules.PenaltyGoalBasisPoints,
+                at: strike.Origin);
 
             // The conversion and the beaten keeper, on the live scale (engine-v3).
             state.SideOf(side).AdjustLiveRating(taker.Participant.ParticipantId, state.Rules.LiveRatingGoalBonusBasisPoints);
@@ -94,19 +107,34 @@ internal static class ChanceSimulator
         }
         else
         {
+            // The engine records only that it was missed; whether the keeper is shown stopping it or the taker
+            // putting it wide is the geometry stream's choice, and cannot move a result.
+            var saved = strike.PenaltySaved && goalkeeper is not null;
+
+            if (saved)
+            {
+                state.MoveBallAndRecord(strike.SaveTarget, PassageWaypointKind.Shot, strike.SaveAltitude);
+                state.RecordTouch(goalkeeper!.Value, PassageAction.Save);
+            }
+            else
+            {
+                state.MoveBallAndRecord(strike.MissTarget, PassageWaypointKind.Shot, strike.MissAltitude);
+            }
+
             state.Emit(
                 side,
                 EngineEventType.PenaltyMissed,
                 taker.Participant.ParticipantId,
                 goalkeeper,
                 ShotZone.Central,
-                state.Rules.PenaltyGoalBasisPoints);
+                state.Rules.PenaltyGoalBasisPoints,
+                at: strike.Origin);
 
             // A missed penalty is a shot that did not test anybody worth naming (engine-v3).
             state.SideOf(side).AdjustLiveRating(taker.Participant.ParticipantId, -state.Rules.LiveRatingShotMissPenaltyBasisPoints);
 
-            // Whether it was saved or put wide, the defending side restarts from its own goal area (engine-v4).
-            state.GoalAreaRestartSide = MatchInputV1.OpponentOf(side);
+            // Whether it was saved or put wide, the defending side restarts from its own goal area.
+            state.RestartFromGoalArea(defender.Which, saved ? PassageRestartKind.KeeperBall : PassageRestartKind.GoalKick);
         }
     }
 
@@ -115,11 +143,14 @@ internal static class ChanceSimulator
     /// </summary>
     /// <remarks>
     /// The corner becomes a chance only when the attacker wins the aerial duel; a lost header ends the
-    /// passage with the defence heading clear. Both players' live ratings record the contest.
+    /// passage with the defence heading clear. Both players' live ratings record the contest, and both players
+    /// are recorded at the ball: the one who won it with a header, the other as having gone for it (`engine-v5`).
     /// </remarks>
     /// <param name="state">The match state.</param>
     /// <param name="side">The side taking the corner.</param>
-    public static void ResolveCorner(MatchState state, MatchSide side)
+    /// <param name="strike">Where the header finishes, for each outcome it could have.</param>
+    /// <returns>Whether the attacker won the header and it became a chance on goal.</returns>
+    public static bool ResolveCorner(MatchState state, MatchSide side, StrikePlan strike)
     {
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
@@ -131,11 +162,8 @@ internal static class ChanceSimulator
 
         if (headerer is null || marker is null)
         {
-            return;
+            return false;
         }
-
-        // The corner's contestant is the participant the simulation picked to attack the delivery (engine-v4).
-        state.RecordTouch(headerer.Participant.ParticipantId, PassageAction.Header);
 
         var aerial = DuelResolver.ResolveAerialDuel(
             headerer.Participant,
@@ -151,14 +179,23 @@ internal static class ChanceSimulator
             aerial.DefenderId,
             aerial.AttackerWon ? -state.Rules.LiveRatingAerialLostPenaltyBasisPoints : state.Rules.LiveRatingAerialBonusBasisPoints);
 
+        // Both jumpers are named by the simulation, so both are at the ball: whoever won it headed it.
+        var winner = aerial.AttackerWon ? headerer : marker;
+        var loser = aerial.AttackerWon ? marker : headerer;
+
+        state.RecordTouch(winner.Participant.ParticipantId, PassageAction.Header);
+        state.RecordTouch(loser.Participant.ParticipantId, PassageAction.Run);
+
         if (!aerial.AttackerWon)
         {
-            return;
+            return false;
         }
 
         var goalChance = GoalChance(state, defender, headerer, ShotZone.Central, headed: true);
 
-        Resolve(state, side, headerer, ShotZone.Central, goalChance);
+        Resolve(state, side, headerer, ShotZone.Central, goalChance, strike);
+
+        return true;
     }
 
     private static void Resolve(
@@ -166,16 +203,21 @@ internal static class ChanceSimulator
         MatchSide side,
         ActiveSlot shooter,
         ShotZone zone,
-        int goalChance)
+        int goalChance,
+        StrikePlan strike)
     {
         var opponent = state.OpponentOf(side);
         var goalkeeper = opponent.Goalkeeper?.Participant.ParticipantId;
         var shooterId = shooter.Participant.ParticipantId;
 
+        // The strike travels to where its outcome puts it, and the event follows the ball there: it is
+        // positioned after the waypoint that ends the strike, and stamped where the strike was taken from.
         if (state.Random.RollBasisPoints(goalChance))
         {
             Score(state, side, shooter);
-            var goal = state.Emit(side, EngineEventType.Goal, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+
+            state.MoveBallAndRecord(strike.GoalTarget, PassageWaypointKind.Shot, strike.GoalAltitude);
+            var goal = state.Emit(side, EngineEventType.Goal, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance, at: strike.Origin);
 
             // The assister is the last thing a goal decides, and it is decided from a stream of its own so
             // that crediting one cannot move a single draw of the play (see AssistPlanner).
@@ -199,18 +241,22 @@ internal static class ChanceSimulator
 
         if (roll < woodwork)
         {
-            state.Emit(side, EngineEventType.Woodwork, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+            state.MoveBallAndRecord(strike.WoodworkTarget, PassageWaypointKind.Shot, strike.WoodworkAltitude);
+            state.Emit(side, EngineEventType.Woodwork, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance, at: strike.Origin);
+
+            // The frame sends it back into the box, where it is loose: nobody owns a rebound, so the next
+            // possession is contested.
+            state.MoveBallAndRecord(strike.ReboundPoint, PassageWaypointKind.Clearance, strike.GoalAltitude);
 
             return;
         }
 
         if (roll < woodwork + state.Rules.BlockedShareBasisPoints)
         {
-            state.Emit(side, EngineEventType.ShotBlocked, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+            state.MoveBallAndRecord(strike.BlockPoint, PassageWaypointKind.Shot);
+            state.Emit(side, EngineEventType.ShotBlocked, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance, at: strike.Origin);
 
-            // A block is cleared by the defending side, which restarts from its own goal area (engine-v4).
-            state.GoalAreaRestartSide = state.OpponentOf(side).Which;
-
+            // A block is a loose ball where it was stopped, and the next possession is contested.
             return;
         }
 
@@ -229,28 +275,36 @@ internal static class ChanceSimulator
 
         if (state.Random.RollBasisPoints(saveChance))
         {
-            state.Emit(side, EngineEventType.ShotSaved, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+            // The goalkeeper gets to it near the line, and the save is where he is, not where it was struck from.
+            state.MoveBallAndRecord(strike.SaveTarget, PassageWaypointKind.Shot, strike.SaveAltitude);
+
+            if (goalkeeper is Guid savingKeeper)
+            {
+                state.RecordTouch(savingKeeper, PassageAction.Save);
+            }
+
+            state.Emit(side, EngineEventType.ShotSaved, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance, at: strike.Origin);
 
             // An effort that tested the goalkeeper is worth something; a miss is not (engine-v3).
             state.SideOf(side).AdjustLiveRating(shooterId, state.Rules.LiveRatingShotBonusBasisPoints);
 
-            if (goalkeeper is Guid savingKeeper)
+            if (goalkeeper is Guid ratedKeeper)
             {
-                state.OpponentOf(side).AdjustLiveRating(savingKeeper, state.Rules.LiveRatingSaveBonusBasisPoints);
-                state.RecordTouch(savingKeeper, PassageAction.Save);
+                state.OpponentOf(side).AdjustLiveRating(ratedKeeper, state.Rules.LiveRatingSaveBonusBasisPoints);
             }
 
-            // A keeper who stops it holds it, and the defence restarts from the back (engine-v4).
-            state.GoalAreaRestartSide = state.OpponentOf(side).Which;
+            // A keeper who stops it holds it, and the defence restarts from its goal area (engine-v5).
+            state.RestartFromGoalArea(opponent.Which, PassageRestartKind.KeeperBall);
         }
         else
         {
-            state.Emit(side, EngineEventType.ShotOffTarget, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance);
+            state.MoveBallAndRecord(strike.MissTarget, PassageWaypointKind.Shot, strike.MissAltitude);
+            state.Emit(side, EngineEventType.ShotOffTarget, shooterId, goalkeeper, zone, qualityBasisPoints: goalChance, at: strike.Origin);
 
             state.SideOf(side).AdjustLiveRating(shooterId, -state.Rules.LiveRatingShotMissPenaltyBasisPoints);
 
-            // A miss goes out for a goal kick (engine-v4).
-            state.GoalAreaRestartSide = state.OpponentOf(side).Which;
+            // A miss goes out for a goal kick (engine-v5).
+            state.RestartFromGoalArea(opponent.Which, PassageRestartKind.GoalKick);
         }
     }
 
@@ -262,8 +316,8 @@ internal static class ChanceSimulator
         runtime.Goals.TryGetValue(scorerId, out var goals);
         runtime.Goals[scorerId] = goals + 1;
 
-        // A goal is a restart: the next possession begins at the centre spot (engine-v4).
-        state.RestartFromCentre = true;
+        // A goal is a restart: the side that conceded kicks off from the centre spot (engine-v5).
+        state.RestartAfterGoal(side);
 
         state.AddGoalStoppage();
 

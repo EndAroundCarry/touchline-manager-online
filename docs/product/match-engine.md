@@ -1,8 +1,8 @@
-# Match engine version 4
+# Match engine version 5
 
-> **Status:** Executable specification for `engine-v4` / `engine-rules-v4`, implemented in
+> **Status:** Executable specification for `engine-v5` / `engine-rules-v5`, implemented in
 > `src/TouchlineManager.MatchEngine`.
-> **Applies to:** engine version `4`, engine rules version `4`, rating weights `engine-ratings-v1`,
+> **Applies to:** engine version `5`, engine rules version `5`, rating weights `engine-ratings-v1`,
 > tactical modifiers `engine-tactical-v1`, commentary `commentary-v3`, replay `replay-v3`.
 > **Version 2** added the assists and the per-player match rating to a result's player lines (§8.1).
 > **Version 3** made the play spatial: a possession resolves a loose-ball scramble, a 1v1 ground duel,
@@ -12,13 +12,20 @@
 > third, and ends at an outcome-appropriate point, so event coordinates, shot maps, direct free kicks,
 > and the continuous film are meaningful (§7.2, §7.3). The outcome formulas and their calibrated
 > distributions are unchanged from version 3 and were re-validated, not re-invented (§12).
+> **Version 5** completes the passage. The clock is reset at half-time, so the second half is played from
+> 45:00 with its own stoppage (§7.1); a dead ball belongs to somebody, so a kick-off, a goal kick, a keeper's
+> ball, and a free kick are each taken by the side the rules name, from where the rules put it, and are
+> consumed by the very next possession (`MAT-12`, §7.8); a shot travels to a target its outcome decides
+> (§7.3); and the passage recorder carries the half, how the possession ended, the restart it began with, and
+> where each event sits (§7.8). Two constants were retuned so the calibrated distributions are unchanged (§12).
 > **Behavioural rules:** [`game-rules.md`](game-rules.md) §15 (`MAT-*`) is normative for *what* a match
-> must be. This document is normative for *how* version 4 computes it.
+> must be. This document is normative for *how* version 5 computes it.
 > **Decisions:** [ADR-0004](../architecture/adr/0004-deterministic-match-engine.md) (purity, versioning,
 > reproducibility), [ADR-0013](../architecture/adr/0013-engine-arithmetic-and-scoreline-effect.md)
 > (integer arithmetic, the scoreline effect), [ADR-0051](../architecture/adr/0051-engine-v4-continuous-passages.md)
 > (continuous passages, the passage recorder), [ADR-0052](../architecture/adr/0052-replay-v3-film-and-reel.md)
-> (the film and the reel).
+> (the film and the reel), [ADR-0053](../architecture/adr/0053-engine-v5-half-time-clock-and-restart-ownership.md)
+> (the half-time clock, restart ownership, the complete recorder).
 
 Every constant named below lives in `EngineRulesV2` and is covered by the rules hash, so a result can
 always be explained by the configuration that produced it. **Changing any value, formula, draw order, or
@@ -251,13 +258,24 @@ side under the most hampering instructions still out-rates a 9-ability side unde
 ### 7.1 The clock
 
 90 regulation minutes plus stoppage, played as a sequence of possessions (`MAT-3`). A possession consumes
-`PossessionSecondsMin`…`Max` = 16…44 seconds, multiplied by 8_000 at a high tempo or 12_000 at a low one,
+`PossessionSecondsMin`…`Max` = 17…46 seconds, multiplied by 8_000 at a high tempo or 12_000 at a low one,
 floored at `MinEffectivePossessionSeconds` = 6 so the clock always advances. A match is therefore roughly
-180 possessions — about 90 per side.
+190 possessions — about 95 per side.
+
+**Each half has its own clock.** The first half runs from 0:00. The second half is begun at 45:00
+(`MatchState.BeginHalf` sets `ClockSeconds = HalfTimeMinute × SecondsPerMinute`), so it is played 46'…90' and
+then its own stoppage. Carrying the first half's clock across half-time — what versions 1–4 did — started the
+second half at about 48', ended its regulation three to five minutes early, and made `TotalMinutesPlayed`
+count the first half's stoppage twice. A possession's start is read **before** the clock advances, so the
+possessions tile each half with no gap and every one has a positive length. Match seconds therefore restart at
+the second half; a recorded possession carries its `Period` for exactly that reason.
 
 Stoppage is drawn per half — `StoppageBaseSeconds` = 150 plus up to `StoppageJitterSeconds` = 60 — and
 accumulates as the half is played: 20 s per goal, 25 s per card, 15 s per substitution, 60 s per injury.
-It is clamped to 1–10 minutes and the half ends when the clock reaches regulation plus stoppage.
+It is clamped to 1–10 minutes and the half ends when the clock reaches regulation plus stoppage, at the end of
+the possession that crosses it. Measured on even sides the two halves are given 10.4 minutes of stoppage
+between them (p05 8, p95 13): about 4 in the first half and 6 in the second, which carries the substitution
+windows and most of the cards.
 
 ### 7.2 One possession, in order
 
@@ -267,46 +285,54 @@ stream; the **geometry** — the ball's path and the participants of the generic
 per-possession derived stream, `new Pcg32(seed * 1_000_003 + ordinal)`, the same pattern `AssistPlanner`
 uses. The geometry can therefore never advance an outcome draw or move a distribution (ADR-0051).
 
-1. **Possession is chosen** from the two sides' control, where a side's control is
+Since `engine-v5` a possession **decides first and records second**: the play draws that decide how it
+ends — the foul, the scramble, the progression — are taken before the ball's path is written down, so a
+possession that ends early records an approach that ends early, and a foul that gives a penalty is recorded
+in the box. The only change to the play stream's draw order from version 4 is that a possession that begins
+from a restart takes no possession draw (step 1); the foul, the fouler and the card are still the first
+three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` once the foul's place is known.
+
+1. **The side is named or chosen.** A pending restart (§7.8) names the side, with no draw. Otherwise the
+   possession is chosen from the two sides' control, where a side's control is
    `BuildUp − opponent.DefensivePressure`. The home share is
-   `5_000 + swing(2400 per 1000 differential) + 120`, clamped to **2_000…8_000** so neither side is ever
+   `5_000 + swing(4000 per 1000 differential) + 120`, clamped to **2_000…8_000** so neither side is ever
    shut out of a match.
-2. **The clock advances** and both sides pay the load (§7.5).
+2. **The clock advances** — its start was read first — and both sides pay the load (§7.5).
 3. **The substitution planner runs** (§7.6).
-4. **The passage is planned and the ball moves.** The possession starts at `MatchState.Ball` — where the
-   previous possession left it — except at a restart: the centre spot after kick-off, half-time, and a
-   goal; the goal area after a keeper claim or parry. `PassagePlanner` draws 3–8 touches that advance the
-   ball toward the far goal with lateral drift, so the approach runs from the start to the possession's
-   **pressure point** (the middle-to-attacking third), and `state.MoveBallAndRecord` plays them. The
-   carrier who receives and the passer who plays the final ball are drawn from that same derived stream.
+4. **The passage is planned.** The possession starts at the restart's spot, or at `MatchState.Ball` — where
+   the previous possession left it. `PassagePlanner` draws 3–8 touches that advance the ball toward the far
+   goal with lateral drift, so the approach runs from the start to the possession's **pressure point** (the
+   middle-to-attacking third), plus every point an outcome could need: the final-third entry point, the box,
+   the corner, and the strike targets (§7.3).
 5. **The defending side's foul** (`BaseFoulBasisPoints` = 1_100 per possession, ×13_500 aggressive /
-   ×8_200 stay-on-feet). A foul ends the possession, ball at the pressure point. 120 bp of fouls are
-   penalties — the ball moves to the penalty spot (§7.3). A foul in the attacking half from
+   ×8_200 stay-on-feet). A foul ends the possession. 120 bp of fouls are **penalties**: the attack is played
+   into the box, the defender brings the attacker down, and the ball is set on the spot (§7.3). A foul from
    `FreeKickShootingRangeX` (6_500) onwards becomes a **direct free kick** 4_500 bp of the time
    (`FreeKickAwardBasisPoints`); in range (`FreeKickAttemptBasisPoints` = 3_000) it is struck at goal, and
-   otherwise crossed. Either way the discipline flow records the foul and its card.
+   otherwise crossed into the box. Any other foul is a quick free kick for the fouled side. The fouler and the
+   fouled player are both recorded at the ball.
 6. **A loose-ball scramble opens only a share of passages.** `ScrambleOpeningBasisPoints` = 1_500 of
    possessions begin with a genuine 50/50, contested by the players the scramble asks for (pace,
-   acceleration, work rate). Losing it is a hard turnover: the ball is cleared into the middle third.
+   acceleration, work rate). Winning it, the side carries on; losing it is a hard turnover — the approach is cut
+   5–25% of the way along, the defender has the ball, and the defence clears it.
 7. **Progression**: `6_200 ± swing(2400)` against the control differential, clamped to **3_400…9_000**. A
-   failure is an offside (`OffsideShareOfTurnoverBasisPoints` = 800) — the ball is placed on the offside
-   line — or a plain turnover, cleared into the middle third.
-8. **The carrier's 1v1 ground duel** (engine-v3): the carrier is drawn by dribbling and the tackler by
-   tackling, and the winner buys (or loses) `DribbleCreationBonusBasisPoints` = 1_200 of creation. A lost
-   duel does not end the passage; a tackled attack regrouping is the ordinary rhythm.
+   failure cuts the approach 40–80% of the way along. It is an offside
+   (`OffsideShareOfTurnoverBasisPoints` = 800) — a through ball to the offside line, ahead of the ball, and a
+   free kick for the defending side — or a plain turnover, cleared towards the middle third.
+8. **The carrier's 1v1 ground duel** (engine-v3), at the final-third entry point: the carrier is drawn by
+   dribbling and the tackler by tackling, and the winner buys (or loses) `DribbleCreationBonusBasisPoints` =
+   1_200 of creation. A lost duel does not end the passage; a tackled attack regrouping is the ordinary rhythm.
 9. **Creation**: `2_400 ± swing(2800)` against
    `(Creation + Finishing/2) − (DefensiveShape + Goalkeeping/2)`, plus the duel bonus, clamped to
    **1_100…6_200**, then multiplied by the scoreline effect (§7.4). A failure is a corner
-   (`CornerShareOfFailedCreationBasisPoints` = 1_200) — the ball is placed at the corner flag — or a
-   turnover, cleared into the middle third; a corner becomes a headed chance 3_400 bp of the time.
-10. **The chance** (§7.3). The ball is placed at the shot point before it is resolved, so the event's
-    coordinates are the shot's real location in the final third.
-
-The geometry ends every possession at a point its outcome names: the final third across the shot's zone
-band for an open-play shot, the penalty spot, the pressure point for a foul, the corner flag, the offside
-line, or the middle third for a turnover. `state.MoveBall` is called along the passage and **before every
-`Emit`**, so an event's x/y is where it actually happened; crosses, headers, shots, and clearances carry an
-altitude, ground passes and carries do not.
+   (`CornerShareOfFailedCreationBasisPoints` = 1_200) — the ball goes out over the goal line, is set down at
+   the flag, and is delivered into the box — or a turnover, cleared towards the middle third. A corner becomes a
+   headed chance 3_400 bp of the time; the aerial duel then decides whether the attacker gets a shot, and a
+   delivery that is not headed at goal is cleared.
+10. **The chance** (§7.3). The ball is played on to the shot point and struck from there; the event is
+    stamped where the shot was taken from.
+11. **The possession ends.** The injury roll is taken, the ball is placed at the restart's spot when one is
+    pending (§7.8), and the passage is closed with its outcome.
 
 ### 7.3 Shot resolution
 
@@ -316,7 +342,7 @@ finisher on the pitch, ties broken by identity.
 
 ```text
 zoneMultiplier  = central 15_000 | inside 10_000 | wide 8_000
-base            = BaseShotGoalBasisPoints (760) × zoneMultiplier / 10_000
+base            = BaseShotGoalBasisPoints (845) × zoneMultiplier / 10_000
 contest         = shooterAttribute − (opponent Goalkeeping rating / AttributeRatingFactor)
 goalChance      = clamp(base + swing(contest, 1900 per 1000), 220, 5_600)
 ```
@@ -330,7 +356,22 @@ One draw resolves the goal. If it does not score, one further draw splits the fa
 | Saved | `BaseSaveBasisPoints` = 5_000 ± swing, clamped to 2_500…7_500 | `ShotSaved` |
 | Off target | the remainder | `ShotOffTarget` |
 
-A penalty is 7_600 bp and is its own event pair: `PenaltyAwarded`, then `PenaltyGoal` or `PenaltyMissed`.
+A penalty is 7_600 bp and is its own event pair: `PenaltyAwarded`, then `PenaltyGoal` or `PenaltyMissed`. It
+is a *placement* — the ball is set on the spot — and then a strike. The engine records a miss as
+`PenaltyMissed` and no more; whether it is shown being saved or put wide is the geometry stream's choice
+(`PenaltySavedShareBasisPoints` = 6_000) and cannot move a result.
+
+**Where the strike goes (`engine-v5`).** The strike is a `Shot` waypoint from where it was taken to a target
+its outcome decides, and the outcome event is positioned after that waypoint. Every target is a function of
+the possession's geometry draws, so the outcome picks one and the draws place it.
+
+| Outcome | The strike ends at |
+|---|---|
+| Goal | Inside the goal mouth: between the posts, 100 units in, under the bar (altitude < `ShotAltitude`) |
+| Saved | The goalkeeper, 120–450 units off the line and between the posts — never behind where the shot was struck from; the keeper's `Save` touch is there |
+| Off target | Out of play on the goal line: 150–1_250 beyond a post, or over the bar (`MissOverShareBasisPoints` = 3_500) |
+| Woodwork | A post (`PostShareOfWoodworkBasisPoints` = 7_000) or the crossbar, then a rebound 600–1_400 out into the box |
+| Blocked | 190–570 units — two to six metres — in front of the shooter |
 
 A **direct free kick** in range is its own resolution (engine-v4). The taker is the best set-piece/finishing
 player on the pitch; the ball is placed at the pressure point where the foul was committed, so
@@ -393,6 +434,41 @@ An injury is rolled once per possession across both sides. The chance is
 `BaseInjuryPerPossessionBasisPoints` = 12 scaled by the average fatigue multiplier (up to ×21_000 at full
 fatigue), capped at `MaxInjuryProbabilityBasisPoints` = 90. The victim is drawn weighted by their own
 fatigue, and their absence is 1–6 fixtures (`DIS-1`, `TRN-12`).
+
+### 7.8 Restarts and the passage record (`engine-v5`)
+
+**A dead ball belongs to somebody (`MAT-12`).** One `state.NextRestart` value — side, kind, spot — is set by
+every outcome that stops play and **cleared by the very next possession**, which takes its side without a
+possession draw:
+
+| Outcome | Next possession | Taken by, from |
+|---|---|---|
+| Kick-off (start of a half) | `KickOff` | Home in the first half, away in the second; the centre spot |
+| Goal (open play, penalty, free kick, corner header) | `KickOff` | The conceding side; the centre spot |
+| Saved shot | `KeeperBall` | The defending side; its goal area (`GoalAreaXBasisPoints` = 1_200) |
+| Shot off target | `GoalKick` | The defending side; its goal area |
+| Missed penalty | `GoalKick` or `KeeperBall` | The defending side; its goal area |
+| Foul with no shot | `FreeKick` | The fouled side; where the foul was committed |
+| Offside | `FreeKick` | The defending side; where the offside was given |
+| Blocked shot, woodwork rebound, cleared corner, crossed free kick, scramble lost, failed progression or creation | none | Contested (step 1), from where the ball is |
+
+A restart never survives its possession: the old model left a goal-area flag pending until that side next had
+the ball, so the ball could teleport to a goal area several possessions later. `state.Ball` ends where play
+actually continues — the block point, the rebound point, the goal area, or the centre after a goal.
+
+**The recorder** captures each possession as a `MatchPassageV1` and is still a by-product of the same run: it
+reads no random draw, writes nothing to the match, and is never hashed, so the output hash is identical with
+and without it (`PassageTests.Recording_the_film_never_changes_the_result`). Since `engine-v5` it records:
+
+- `Period` (1 or 2) and a real `StartClockSeconds`/`EndClockSeconds` — the possessions tile each half;
+- `Outcome` — scramble lost, progression failed, creation failed, offside, foul, penalty, free kick struck or
+  crossed, corner cleared or headed, open-play shot — and `Restart`, the kind of restart it began with;
+- `Events` as `(Sequence, FractionBasisPoints)`: an event takes the fraction of the waypoint or touch recorded
+  last, so it sits where the ball was when it happened (`EventSequences` stays, derived);
+- waypoints of kind `Carry`, `Pass`, `Cross`, `Shot`, `Clearance`, and the new `Restart` (a placement, not a
+  movement); and touches for every participant the engine names — the carrier, the passer, the duel pair, the
+  shooter, the keeper, the free-kick and penalty takers, both scramble contestants, the fouler and the fouled
+  player, the winner and the loser of an aerial duel, and the player caught offside.
 
 ---
 
@@ -508,10 +584,11 @@ is what lets a client distinguish teams by more than colour.
 Every value below is a field on `EngineRulesV2`, covered by the rules hash. The validation rules are the
 engine's own: a probability must lie in `0…10_000`, a multiplier in `5_000…25_000`, an ordered pair must
 be ordered, and a rating scale must be able to hold a maximum-attribute player. The **Spatial play
-(engine-v3)** and **Passage progression (engine-v4)** blocks are the constants the pitch model and the
-continuous passage added; they are re-validated by their own shape checks (a bounded touch count, a
-pressure band that reaches the free-kick range, a shot band wholly inside the final third, altitudes on the
-ball's 0–100 scale).
+(engine-v3)**, **Passage progression (engine-v4)**, and **Restarts and strikes (engine-v5)** blocks are the
+constants the pitch model, the continuous passage, and the complete recorder added; they are re-validated by
+their own shape checks (a bounded touch count, a pressure band that reaches the free-kick range, a shot band
+wholly inside the final third, altitudes on the ball's 0–100 scale that straddle the crossbar, a miss that
+stays on the pitch).
 
 | Constant | Value | Meaning |
 |---|---|---|
@@ -525,12 +602,12 @@ ball's 0–100 scale).
 | `StoppageSecondsPerCard` | 25 | |
 | `StoppageSecondsPerSubstitution` | 15 | |
 | `StoppageSecondsPerInjury` | 60 | |
-| `PossessionSecondsMin` / `Max` | 16 / 44 | Time one possession takes. |
+| `PossessionSecondsMin` / `Max` | 17 / 46 | Time one possession takes (16 / 44 before `engine-v5`; §12). |
 | `HighTempoPossessionSecondsMultiplierBasisPoints` | 8_000 | High tempo shortens possessions. |
 | `LowTempoPossessionSecondsMultiplierBasisPoints` | 12_000 | Low tempo lengthens them. |
 | `MinEffectivePossessionSeconds` | 6 | Clock-advance floor. |
 | `BasePossessionBasisPoints` | 5_000 | Even split. |
-| `PossessionControlSwingBasisPoints` | 2_400 | Swing at a full reference differential. |
+| `PossessionControlSwingBasisPoints` | 4_000 | Swing at a full reference differential (2_400 before `engine-v5`; §12). |
 | `PossessionHomeBonusBasisPoints` | 120 | Possession's own home bonus. |
 | `MinPossessionBasisPoints` / `Max` | 2_000 / 8_000 | Neither side is ever shut out. |
 | `BaseProgressBasisPoints` | 6_200 | Baseline progression out of build-up. |
@@ -568,10 +645,10 @@ ball's 0–100 scale).
 | `ShotWideBandYMinBasisPoints` / `Max` | 500 / 6_500 | A wide shooting band. |
 | `OffsideLineXBasisPoints` | 7_400 | Where an offside is given. |
 | `TurnoverMiddleThirdXBasisPoints` | 4_800 | Where a plain turnover leaves the ball. |
-| `GoalAreaXBasisPoints` | 1_200 | A goal-area restart after a keeper claim. |
+| `GoalAreaXBasisPoints` | 1_200 | The goal area a keeper's ball or goal kick is taken from. |
 | `CrossShareOfPassageBasisPoints` | 2_800 | Share of the final approach that is crossed. |
 | `CrossAltitude` / `HeaderAltitude` | 70 / 80 | Ball altitude at a cross and a header. |
-| `ShotAltitude` / `ClearanceAltitude` | 30 / 55 | Ball altitude at a shot and a clearance. |
+| `ShotAltitude` / `ClearanceAltitude` | 30 / 55 | Ball altitude at a shot (and the height of the crossbar) and at a clearance. |
 | `FreeKickShootingRangeX` | 6_500 | Distance beyond which a free kick is worth striking. |
 | `FreeKickAwardBasisPoints` | 4_500 | Chance an attacking-half foul is a direct free kick. |
 | `FreeKickAttemptBasisPoints` | 3_000 | Chance a free kick in range is struck at goal. |
@@ -581,6 +658,21 @@ ball's 0–100 scale).
 | `FreeKickBlockedShareBasisPoints` | 2_500 | |
 | `FreeKickWoodworkShareBasisPoints` | 800 | |
 | `FreeKickFoulCardBasisPoints` | 2_200 | A free-kick foul is booked slightly more often. |
+| `ScrambleCutMinBasisPoints` / `Max` | 500 / 2_500 | How far along its approach a lost scramble is cut (`engine-v5`). |
+| `ProgressionCutMinBasisPoints` / `Max` | 4_000 / 8_000 | How far along its approach a failed progression is cut. |
+| `EntryFractionMinBasisPoints` / `Max` | 3_000 / 7_000 | Where, between the pressure point and the shot point, the ball enters the final third. |
+| `FinalThirdEntryXBasisPoints` | 6_700 | The least far up the pitch that entry is. |
+| `MinClearanceDistanceBasisPoints` | 600 | The shortest clearance worth recording. |
+| `BoxXMinBasisPoints` / `Max`, `BoxYMinBasisPoints` / `Max` | 8_700 / 9_400, 2_400 / 4_600 | The penalty-area band a box foul and a delivery are placed in. |
+| `CornerOutOfPlayMinBasisPoints` / `Max` | 300 / 1_500 | How far from the flag, along the goal line, a corner goes out. |
+| `SaveDepthMinBasisPoints` / `Max` | 120 / 450 | How far off the line the keeper gets to a shot. |
+| `MissWideMinBasisPoints` / `Max` | 150 / 1_250 | How far beyond a post a wide miss crosses the line. |
+| `MissOverShareBasisPoints` | 3_500 | Share of off-target strikes that go over the bar. |
+| `PostShareOfWoodworkBasisPoints` | 7_000 | Share of woodwork hits that strike a post rather than the bar. |
+| `PenaltySavedShareBasisPoints` | 6_000 | Share of missed penalties shown being saved (presentation only). |
+| `BlockDistanceMinBasisPoints` / `Max` | 190 / 570 | How far in front of the shooter a block is made (two to six metres). |
+| `ReboundDistanceMinBasisPoints` / `Max` | 600 / 1_400 | How far out from the line a ball rebounds off the woodwork. |
+| `StrikeLowAltitudeMax` / `OverBarAltitudeMax` | 18 / 75 | Highest altitude of a strike under the bar, and of one over it. |
 | `BaseGroundDuelBasisPoints` | 5_000 | A 1v1 ground duel, before attributes. |
 | `GroundDuelSwingBasisPoints` | 3_500 | Per full dribble-vs-tackling differential. |
 | `BaseAerialDuelBasisPoints` | 5_000 | An aerial contest, before attributes. |
@@ -670,31 +762,49 @@ dotnet run --project tools/simulation-benchmarks -c Release -- all 20000
 ```
 
 Run over **20,000 matches** between evenly matched 13/20 sides, on a 16-logical-core Windows machine
-(`engine-v4`, rules hash `c0f6aaf3…`):
+(`engine-v5`, rules hash `7b89da86…`):
 
 | Measure | Measured | Target |
 |---|---|---|
-| Goals per match | 2.89 | 2.5 – 3.0 |
-| Home / away goals | 1.58 / 1.31 | 1.3 – 1.9 / 1.0 – 1.5 |
-| Home win / draw / away win | 44.1% / 24.0% / 31.8% | 40 – 50 / 20 – 30 / 25 – 35 |
-| Shots per match | 27.3 | 20 – 32 |
-| Home possession | 52.3% | 50 – 54 |
+| Goals per match | 2.90 | 2.5 – 3.0 |
+| Home / away goals | 1.56 / 1.34 | 1.3 – 1.9 / 1.0 – 1.5 |
+| Home win / draw / away win | 42.9% / 24.7% / 32.4% | 40 – 50 / 20 – 30 / 25 – 35 |
+| Shots per match | 27.4 | 20 – 32 |
+| Home possession | 52.0% | 50 – 54 |
 | Fouls per match | 21.2 | 18 – 26 |
-| Yellows per match | 3.40 | 3.0 – 5.0 |
+| Yellows per match | 3.39 | 3.0 – 5.0 |
 | Reds per match | 0.28 | 0.10 – 0.35 |
 | Injuries per match | 0.43 | 0.20 – 0.60 |
 | Penalties per match | 0.25 | 0.15 – 0.40 |
-| Substitutions per match | 7.0 | 4.0 – 10.0 |
+| Substitutions per match | 7.7 | 4.0 – 10.0 |
 | p99 total goals | 7 | 6 – 8 |
-| Matches with 7+ goals | 2.76% | < 3.0% |
+| Matches with 7+ goals | 2.80% | < 3.0% |
 
-Calibration invariants: home advantage worth **+3.9 points** (target ~+4); a three-ability-point favourite
-upset **16.1%** of the time (target ~15); a side sent off early finishes **1.16 goals** worse (target ~1.2);
-a high-pressing side is measurably more tired by the 80th minute (gap ~1,678 bp) and a fresh substitute
-measurably fresher than the tired defenders (~1,762 bp). Free kicks in shooting range — dead code before
-engine-v4 — now occur about **1.5 per match**, with the goal and shot bands held.
+Calibration invariants (10,000 fixtures): home advantage worth **+4.2 points** (target ~+4); a three-ability-
+point favourite upset **16.4%** of the time (target ~15); a side sent off early finishes **1.37 goals** worse
+(target ~1.2, measured over 10,000 fixtures — `engine-v4` measures 1.37 on the same sample; the 1.16 quoted
+before was a 2,000-fixture estimate); a high-pressing side is measurably more tired by the 80th minute (gap
+~1,730 bp) and a fresh substitute measurably fresher than the tired defenders (~1,783 bp). Free kicks in
+shooting range occur about **1.5 per match**, with the goal and shot bands held.
 
-The replay over **10,000 matches** (ADR-0052):
+**What `engine-v5` retuned, and why.** Giving the second half its true length, and letting the fouled side keep
+the ball after a foul, raised every volume statistic about five per cent over `engine-v4` — goals 3.05 and
+shots 28.8 per match, 3.7% of matches with seven or more goals — while goals per shot stayed at 10.6%: two bands
+had moved. Dead-ball ownership also flattened the ability curve, because a saved shot now hands the ball to the
+defender by rule instead of by a draw that favoured the stronger side (a three-point underdog won 18.7%). Two
+constants restore the calibration without touching an outcome probability: `PossessionSecondsMin`/`Max`
+16/44 → 17/46 keeps the number of possessions in a match where the calibration put it (about 193 now), and `PossessionControlSwingBasisPoints` 2,400 → 4,000 gives the stronger side its
+possession edge back. Substitutions per match rise from 7.0 to 7.7, inside the band either way: the window minutes are the same,
+but the first half's stoppage is now played before the second half's windows instead of being counted inside
+them.
+
+What the matches are made of (2,000 matches, `engine-v5`): about **193 possessions** a match, of which 78% begin
+from play, 11% are free kicks (20.5 a match), 4.3% each goal kicks and keeper's balls (8.3 a match each), and 2.5%
+kick-offs (4.9). By outcome: open-play shots 24.0 a match, corners 9.0 (1.5 headed), free kicks struck 1.5 and
+crossed 3.5, penalties 0.3, offsides 4.8, quick free kicks 16.0, and turnovers (scramble, progression, creation)
+134 a match.
+
+The replay over **10,000 matches** (ADR-0052; `replay-v3` measured on `engine-v4`):
 
 | Measure | p05 | p50 | p95 | min / max |
 |---|---|---|---|---|
@@ -704,20 +814,24 @@ The replay over **10,000 matches** (ADR-0052):
 | Payload (KB) | 500.0 | 518.6 | 539.6 | — / 573.9 |
 
 **100%** of films land inside the 9:30–11:00 window and **0.00%** exceed eleven minutes; the reel is always
-inside its 12:00 cap, and the payload estimate is comfortably inside the 750 KB budget.
+inside its 12:00 cap, and the payload estimate is comfortably inside the 750 KB budget. Re-run on `engine-v5`
+over 2,000 matches, `replay-v3` still holds all three: 58 passages (p50), a film of 11.0 minutes (min 10.8, max
+11.0), a reel of 8.4 minutes (max 10.7), and a payload of 545 KB (max 590). The film now sits at the ceiling
+for almost every match because a match is about 101 clock minutes with its stoppage; the next presentation
+version paces the film from the ball's motion instead of from the clock.
 
-Performance, 5,000 matches after a warm-up:
+Performance, 5,000 matches after a warm-up (`engine-v5`):
 
 | Measure | Value |
 |---|---|
-| p50 per match | 1.00 ms |
-| **p95 per match** | **5.73 ms** (budget: 100 ms) |
-| p99 per match | 16.9 ms |
-| Mean per match | 1.61 ms |
-| Allocated | ~2.9 MB per match |
-| Throughput | ~621 matches/sec, single-threaded |
+| p50 per match | 0.76 ms |
+| **p95 per match** | **4.07 ms** (budget: 100 ms) |
+| p99 per match | 8.1 ms |
+| Mean per match | 1.32 ms |
+| Allocated | ~3.0 MB per match |
+| Throughput | ~759 matches/sec, single-threaded |
 
-A nine-fixture division matchday is therefore about 15 ms of simulation at the mean and about 52 ms at the
+A nine-fixture division matchday is therefore about 12 ms of simulation at the mean and about 37 ms at the
 p95, well inside the per-match budget. Throughput comes from running *independent* fixtures concurrently;
 one match is always simulated single-threaded (ADR-0004).
 
@@ -741,7 +855,9 @@ a test that is switched off catches nothing.
 | `MatchInvariantTests` | Score equals goals, statistics reconcile, times ordered, substitutions legal, degraded paths. |
 | `UnitRatingTests` | All 10,935 instruction combinations bounded; attributes dominate; freshness, home advantage, ten men, out of position. |
 | `CommentaryTests` | One line per event, variant rotation, build-up families, no hidden value by allowlist. |
-| `PassageTests` | One passage per possession; waypoints and touches on the pitch and in fraction order; continuity (or a restart) between possessions; every shot in the attacking third and free-kick shots in range; touches naming match participants; recorder determinism; the with/without-recorder hash equality. |
+| `PassageTests` | One passage per possession; waypoints and touches on the pitch and in fraction order; every shot in the attacking third and free-kick shots in range; touches naming match participants; recorder determinism; the with/without-recorder hash equality. Since `engine-v5`: the possessions tile each half; events ordered and positioned; an outcome that tells the truth; a goal inside the goal mouth, a save at the keeper, a miss out of play, the woodwork and its rebound, a block two to six metres out, a penalty placement, a corner's path, a free kick's placement, the fouler and the fouled player, the scramble contestants, and the header pair. |
+| `HalfTimeClockTests` | `MAT-3`: the second half kicks off at 46'; each half plays its own regulation and stoppage; event minutes are 1'…45'+N and 46'…90'+N; `TotalMinutesPlayed` counts only the stoppage the clock used; substitutions at the planner's windows; the live metrics cover every minute. |
+| `RestartOwnershipTests` | `MAT-12`: the right side kicks each half off; every dead ball is taken by the side that owns it and by nobody else; a goal is followed by the conceding side's kick-off; a save is the keeper's ball and a miss a goal kick; a foul or offside gives the free kick to the right side; a loose ball is not a restart; a goal-area start only ever follows a keeper's ball or a goal kick; possessions join except at a placement. |
 | `ReplayDirectorTests` | One passage per film segment and a contiguous schedule; the nine-to-eleven-minute film; passage windows in order; boundary-frame continuity; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe passage commentary; the reel carrying every goal; determinism; the payload budget. |
 | `HighlightTests` | Reel selection: goals always shown, the quality floor, the count cap and its goal exception. |
 | `EnginePurityTests` | No clock, no `System.Random`, no IO; exactly one source of randomness. |

@@ -37,18 +37,34 @@ internal static class DisciplineSimulator
         bool StraightRed);
 
     /// <summary>
-    /// Rolls the defending side's foul for one possession and resolves the card the foul drew.
+    /// What the defending side's foul roll decided, before any of it has happened on the pitch (`engine-v5`).
+    /// </summary>
+    /// <param name="Committed">Whether a foul was committed.</param>
+    /// <param name="Fouler">The player who fouled, when there was one.</param>
+    /// <param name="CardRoll">The draw that decides the card, taken with the foul so the stream's order is fixed.</param>
+    public readonly record struct FoulRoll(bool Committed, ActiveSlot? Fouler, int CardRoll);
+
+    /// <summary>
+    /// Rolls the defending side's foul for one possession: whether there is one, who commits it, and the card
+    /// it would draw (`engine-v5`).
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Draws, in order: the foul, the fouler, and the card. That is the order the foul has always consumed
+    /// them in, and it is the contract — what changed in `engine-v5` is only that none of it is <em>emitted</em>
+    /// here. The caller records where the foul happened first (the film needs the fouler and the fouled
+    /// player at the right place, and a foul that gives a penalty has to be committed in the box), and then
+    /// calls <see cref="ApplyFoul"/> to put it on the event log.
+    /// </para>
+    /// <para>
     /// What the foul <em>gives</em> the attacking side — a penalty, or a free kick in a promising position —
-    /// is resolved by the possession flow that called this, because that flow knows where the ball was and
-    /// who was attacking; the discipline flow owns only the foul and its card. The card's stoppage, event,
-    /// and removal are still handled here, as they always were.
+    /// is resolved by the possession flow, because that flow knows where the ball was and who was attacking;
+    /// the discipline flow owns only the foul and its card.
+    /// </para>
     /// </remarks>
     /// <param name="state">The match state.</param>
     /// <param name="defendingSide">The side not in possession.</param>
-    /// <returns>Whether a foul happened, which ends the possession.</returns>
-    public static FoulOutcome TryResolveFoul(MatchState state, MatchSide defendingSide)
+    public static FoulRoll RollFoul(MatchState state, MatchSide defendingSide)
     {
         var defender = state.SideOf(defendingSide);
         var rules = state.Rules;
@@ -59,7 +75,7 @@ internal static class DisciplineSimulator
 
         if (!state.Random.RollBasisPoints(foulChance))
         {
-            return new FoulOutcome(FoulCommitted: false, null, CardShown: false, SecondYellow: false, StraightRed: false);
+            return new FoulRoll(Committed: false, Fouler: null, CardRoll: 0);
         }
 
         var fouler = WeightedPick.From(
@@ -69,6 +85,32 @@ internal static class DisciplineSimulator
 
         if (fouler is null)
         {
+            return new FoulRoll(Committed: true, Fouler: null, CardRoll: 0);
+        }
+
+        return new FoulRoll(Committed: true, fouler, state.Random.NextBasisPoints());
+    }
+
+    /// <summary>
+    /// Puts a rolled foul on the event log and resolves the card it drew.
+    /// </summary>
+    /// <remarks>
+    /// Takes no draw: everything that was random was decided by <see cref="RollFoul"/>. The card's stoppage,
+    /// event, and removal are handled here, as they always were.
+    /// </remarks>
+    /// <param name="state">The match state.</param>
+    /// <param name="defendingSide">The side not in possession.</param>
+    /// <param name="roll">What <see cref="RollFoul"/> decided.</param>
+    /// <returns>What the foul produced, for the caller that resolves what it gave.</returns>
+    public static FoulOutcome ApplyFoul(MatchState state, MatchSide defendingSide, FoulRoll roll)
+    {
+        if (!roll.Committed)
+        {
+            return new FoulOutcome(FoulCommitted: false, null, CardShown: false, SecondYellow: false, StraightRed: false);
+        }
+
+        if (roll.Fouler is not { } fouler)
+        {
             return new FoulOutcome(FoulCommitted: true, null, CardShown: false, SecondYellow: false, StraightRed: false);
         }
 
@@ -76,7 +118,7 @@ internal static class DisciplineSimulator
 
         state.Emit(defendingSide, EngineEventType.Foul, foulerId);
 
-        var card = ApplyCard(state, defendingSide, defender, fouler, rules);
+        var card = ApplyCard(state, defendingSide, state.SideOf(defendingSide), fouler, state.Rules, roll.CardRoll);
 
         return new FoulOutcome(
             FoulCommitted: true,
@@ -86,8 +128,14 @@ internal static class DisciplineSimulator
             card.StraightRed);
     }
 
+    /// <summary>What the card decision showed.</summary>
+    /// <param name="Shown">Whether any card came out.</param>
+    /// <param name="SecondYellow">Whether it was a second booking.</param>
+    /// <param name="StraightRed">Whether it was a straight red.</param>
+    private readonly record struct CardResult(bool Shown, bool SecondYellow, bool StraightRed);
+
     /// <summary>
-    /// Decides whether a foul is booked, sent off, or let go, consuming exactly one draw either way.
+    /// Decides whether a foul is booked, sent off, or let go, from the one draw taken for the whole decision.
     /// </summary>
     /// <remarks>
     /// One draw for the whole decision rather than one per possible card, so the random stream advances by the
@@ -95,24 +143,18 @@ internal static class DisciplineSimulator
     /// it makes every later decision depend on how many cards happened to fall, which makes a golden hash
     /// change for reasons nobody can see in the diff.
     /// </remarks>
-    /// <summary>What the card decision showed.</summary>
-    /// <param name="Shown">Whether any card came out.</param>
-    /// <param name="SecondYellow">Whether it was a second booking.</param>
-    /// <param name="StraightRed">Whether it was a straight red.</param>
-    private readonly record struct CardResult(bool Shown, bool SecondYellow, bool StraightRed);
-
     private static CardResult ApplyCard(
         MatchState state,
         MatchSide defendingSide,
         SideRuntime defender,
         ActiveSlot fouler,
-        EngineRulesV2 rules)
+        EngineRulesV2 rules,
+        int roll)
     {
         var booking = Probability.Apply(
             rules.YellowCardPerFoulBasisPoints,
             TacklingCardMultiplier(defender.Instructions.Tackling, rules));
 
-        var roll = state.Random.NextBasisPoints();
         var straightRed = rules.StraightRedPerFoulBasisPoints;
 
         if (roll < straightRed)

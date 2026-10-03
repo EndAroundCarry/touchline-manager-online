@@ -6,8 +6,11 @@ This document outlines the complete specification, mathematical modeling, and st
 > are delivered and stage 7's tuning and validation is the ongoing work. The engine has since advanced to
 > `engine-v4` / `engine-rules-v4` and the replay to `replay-v3`: a possession is now played along a real
 > passage, and the replay is one continuous film with a companion highlights reel (ADR-0051, ADR-0052). The
-> current milestone plan is [`engine-v4-continuous-match-replay.md`](engine-v4-continuous-match-replay.md);
-> where a stage below names `engine-v3` or `replay-v2`, read the version the engine roadmap records.
+> previous milestone's plan is [`engine-v4-continuous-match-replay.md`](engine-v4-continuous-match-replay.md).
+> The next milestone — `engine-v5` (the half-time clock, restart ownership, and a complete passage recorder)
+> followed by the `replay-v4` constant-pace film and a continuous viewer timeline — is planned in
+> [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). Where a stage below names `engine-v3` or
+> `replay-v2`, read the version the engine roadmap records.
 
 ---
 

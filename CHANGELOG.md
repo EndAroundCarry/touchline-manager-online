@@ -4,6 +4,68 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine-v5 — the half-time clock, restart ownership, and a complete passage recorder
+
+The first milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). `engine-v4` built the
+right architecture but had defects that change *results*, so they are fixed in the engine rather than hidden
+by the presentation: the second half kicked off at about 48', a goal-area restart could survive several
+possessions, and a dead ball belonged to nobody. `engine-v5` / `engine-rules-v5` changes every output hash,
+so a database seeded under `engine-v4` must be archived and reseeded.
+
+Monte Carlo at scale — 20,000 matches between evenly matched sides, 10,000 calibration fixtures — holds
+every band with the `engine-v4` values: goals **2.90** a match on **27.4** shots (v4: 2.89 on 27.3), fouls
+21.2, yellows 3.39, home advantage **+4.2** points, a three-point favourite upset **16.4%** of the time (v4:
+16.1%), and a side sent off early finishes 1.37 goals worse (identical to v4 on the same 10,000 fixtures).
+
+### Added
+
+- **`MAT-12` and `state.NextRestart`.** A dead ball belongs to somebody: the conceding side kicks off after a
+  goal (home the first half, away the second); the defending side restarts from its own goal area after a
+  save, a miss off target, or a missed penalty; the fouled side takes the free kick for a foul with no shot;
+  the defending side takes the free kick for an offside. One value — side, kind, spot — replaces
+  `RestartFromCentre` and `GoalAreaRestartSide`, and the very next possession consumes it without a
+  possession draw. Loose balls (a block, a rebound, a cleared corner, a turnover) stay contested.
+- **A shot travels to its target.** The strike is a `Shot` waypoint to the goal mouth (goal), the goalkeeper a
+  few metres off the line (save, with the keeper's `Save` touch there), out of play wide of a post or over the
+  bar (miss), a post or the bar and a rebound (woodwork), or two to six metres in front of the shooter
+  (block). A penalty and a free kick are a placement (new `PassageWaypointKind.Restart`) and then a strike;
+  a corner goes out of play, is set down at the flag, is delivered and headed, with no clearance after a goal.
+  Open play reaches a final-third entry point instead of one fixed point.
+- **A complete recorder.** `MatchPassageV1` gains `Period`, `Outcome` (`PassageOutcome`), `Restart`
+  (`PassageRestartKind`), and `Events` as `(Sequence, FractionBasisPoints)` with `EventSequences` derived.
+  Start and end are real (the start is read before the clock advances, so the possessions tile each half), and
+  the touches now name both scramble contestants, the fouler and the fouled player, both jumpers in an aerial
+  duel, and the player caught offside. None of it is hashed.
+- **`ADR-0053`** records the decision and the evidence; `docs/product/match-engine.md` gains §7.8 and the new
+  constants block, and `game-rules.md` gains `MAT-12`.
+
+### Changed
+
+- **The clock is reset at half-time (`MAT-3`).** The second half runs 46'…90' with its own stoppage;
+  `TotalMinutesPlayed` is the minutes the clock really ran. Match seconds restart at the second half, so a
+  passage's `Period` orders two possessions across it. The substitution windows, player minutes, and the live
+  metric curve (now 1…90 with no gap) all describe the same match.
+- **Decide first, record second.** The foul is split into `DisciplineSimulator.RollFoul` (the foul, the fouler,
+  and the card draw, in the order they have always been taken) and `ApplyFoul` (the events), so a foul that
+  gives a penalty is recorded in the box and a possession that ends early records an approach that ends early.
+- **Two constants retuned, no band widened.** A true-length second half and the fouled side keeping the ball
+  raised every volume statistic about five per cent (goals 3.05, 7+ goal matches 3.7%), and dead-ball
+  ownership flattened the ability curve (a three-point underdog won 18.7%). `PossessionSecondsMin`/`Max`
+  16/44 → 17/46 and `PossessionControlSwingBasisPoints` 2,400 → 4,000 restore both; no outcome probability
+  moved.
+- **`replay-v3` keeps working on the new data** by reading the second half on a continuous clock, and splits
+  film passages at half-time by `Period`. It is replaced wholesale by the next milestone.
+- **Versions.** `EngineVersions.Engine`/`RuleSet` = 5, `engine-v5`/`engine-rules-v5`; the golden input, output,
+  and rules hashes are re-pinned.
+
+### Tests
+
+- `HalfTimeClockTests` (`MAT-3`), `RestartOwnershipTests` (`MAT-12`), and an extended `PassageTests` — 29 new
+  behavioural tests — pin the half-time clock, restart ownership, the tiling of each half, the position of
+  events, the truthfulness of a passage's outcome, and where every kind of strike ends. The engine suite is
+  692 tests, and the Application, Domain, Architecture, Infrastructure, API integration, and Worker integration
+  suites are green. The with/without-recorder hash equality still holds.
+
 ## Engine-v4 and replay-v3 — calibration, ADRs, and documentation
 
 The milestone's final stage measures the engine and the replay, records the decision behind the

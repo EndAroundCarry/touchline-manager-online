@@ -70,16 +70,34 @@ internal sealed class MatchState
     internal int PossessionOrdinal { get; set; }
 
     /// <summary>
-    /// Gets or sets whether the next possession restarts from the centre spot (`engine-v4`).
+    /// Gets or sets the dead ball the next possession must be played from, when there is one (`engine-v5`).
     /// </summary>
-    /// <remarks>Set at kick-off, at the second-half restart, and after a goal, then consumed by the next passage.</remarks>
-    internal bool RestartFromCentre { get; set; }
+    /// <remarks>
+    /// Set by the kick-offs and by every outcome that stops play — a goal, a save, a miss, a foul, an offside —
+    /// and cleared by the very next possession, which takes the restart's side without drawing one. It replaces
+    /// the two engine-v4 flags, which left a goal-area restart pending until that side next had the ball.
+    /// </remarks>
+    internal PendingRestart? NextRestart { get; set; }
+
+    /// <summary>Sets the kick-off the conceding side takes from the centre spot after a goal (`engine-v5`).</summary>
+    /// <param name="scorer">The side that scored.</param>
+    public void RestartAfterGoal(MatchSide scorer) =>
+        NextRestart = new PendingRestart(MatchInputV1.OpponentOf(scorer), PassageRestartKind.KickOff, SpatialPoint.Center);
 
     /// <summary>
-    /// Gets or sets the side that restarts from its own goal area, when a keeper has just claimed or parried
-    /// the ball (`engine-v4`).
+    /// Sets the keeper's ball or goal kick the defending side takes from its own goal area after a save or a
+    /// miss (`engine-v5`).
     /// </summary>
-    internal MatchSide? GoalAreaRestartSide { get; set; }
+    /// <param name="defendingSide">The side restarting.</param>
+    /// <param name="kind">Whether the keeper has the ball or it went out for a goal kick.</param>
+    public void RestartFromGoalArea(MatchSide defendingSide, PassageRestartKind kind) =>
+        NextRestart = new PendingRestart(defendingSide, kind, PassagePlanner.GoalAreaSpot(defendingSide, Rules));
+
+    /// <summary>Sets the free kick a side takes where play was stopped for a foul or an offside (`engine-v5`).</summary>
+    /// <param name="takingSide">The side taking the free kick.</param>
+    /// <param name="spot">Where it is taken from.</param>
+    public void RestartWithFreeKick(MatchSide takingSide, SpatialPoint spot) =>
+        NextRestart = new PendingRestart(takingSide, PassageRestartKind.FreeKick, spot);
 
     private PassageAccumulator? _passage;
 
@@ -161,8 +179,18 @@ internal sealed class MatchState
 
     /// <summary>Opens a new passage for the possession that is about to be played (`engine-v4`).</summary>
     /// <param name="side">The side in possession.</param>
-    public void BeginPassage(MatchSide side) =>
-        _passage = new PassageAccumulator(PossessionOrdinal, side, ClockSeconds);
+    /// <param name="startClockSeconds">
+    /// The match second the possession started at, which the caller reads before the clock advances so that
+    /// the possessions tile each half (`engine-v5`).
+    /// </param>
+    /// <param name="restart">The dead-ball restart the possession began with, or none.</param>
+    public void BeginPassage(MatchSide side, int startClockSeconds, PassageRestartKind restart) =>
+        _passage = new PassageAccumulator(
+            PossessionOrdinal,
+            side,
+            InFirstHalf ? 1 : 2,
+            startClockSeconds,
+            restart);
 
     /// <summary>
     /// Closes the current passage and hands it to the recorder, when one is attached (`engine-v4`).
@@ -171,14 +199,15 @@ internal sealed class MatchState
     /// Called once per possession, after the ball has reached the point the possession ends at, so the next
     /// passage can begin where this one left it.
     /// </remarks>
-    public void EndPassage()
+    /// <param name="outcome">How the possession ended (`engine-v5`).</param>
+    public void EndPassage(PassageOutcome outcome)
     {
         if (_passage is null)
         {
             return;
         }
 
-        Passages?.Add(_passage.Build(ClockSeconds));
+        Passages?.Add(_passage.Build(ClockSeconds, outcome));
         _passage = null;
     }
 
@@ -245,12 +274,23 @@ internal sealed class MatchState
     /// <summary>
     /// Begins a half, drawing the stoppage jitter that makes two halves end differently.
     /// </summary>
+    /// <remarks>
+    /// The second half starts from the half-time minute, not from wherever the first half's stoppage left the
+    /// clock (`engine-v5`, `MAT-3`). Each half has its own stoppage on top of its own regulation time, so the
+    /// second half runs 46'…90' and then its own added time; carrying the clock across instead started the
+    /// half at about 48' and ended its regulation a few minutes early.
+    /// </remarks>
     /// <param name="firstHalf">Whether the half beginning is the first.</param>
     public void BeginHalf(bool firstHalf)
     {
         InFirstHalf = firstHalf;
         _halfEventStoppageSeconds = 0;
         _halfStoppageJitterSeconds = Random.NextInt(Rules.StoppageJitterSeconds + 1);
+
+        if (!firstHalf)
+        {
+            ClockSeconds = Rules.HalfTimeMinute * Rules.SecondsPerMinute;
+        }
     }
 
     /// <summary>
@@ -296,6 +336,10 @@ internal sealed class MatchState
     /// <param name="qualityBasisPoints">How good a chance it was, on shot events.</param>
     /// <param name="absenceFixtures">How long an injury rules a player out, if it was an injury.</param>
     /// <param name="substitutionReason">Why a substitution was made, if it was one.</param>
+    /// <param name="at">
+    /// Where the event happened when that is not where the ball is now (`engine-v5`): a shot event is stamped
+    /// where the shot was struck from, although by the time it is emitted the ball has travelled to its target.
+    /// </param>
     /// <returns>The event, so a caller can count it without re-reading the log.</returns>
     public EngineEventV1 Emit(
         MatchSide side,
@@ -305,7 +349,8 @@ internal sealed class MatchState
         ShotZone? zone = null,
         int? qualityBasisPoints = null,
         int? absenceFixtures = null,
-        MatchSubstitutionReason? substitutionReason = null)
+        MatchSubstitutionReason? substitutionReason = null,
+        SpatialPoint? at = null)
     {
         var matchEvent = new EngineEventV1
         {
@@ -321,8 +366,8 @@ internal sealed class MatchState
             QualityBasisPoints = qualityBasisPoints,
             AbsenceFixtures = absenceFixtures,
             SubstitutionReason = substitutionReason,
-            X = Ball.X,
-            Y = Ball.Y,
+            X = at?.X ?? Ball.X,
+            Y = at?.Y ?? Ball.Y,
         };
 
         Events.Add(matchEvent);
@@ -393,10 +438,11 @@ internal sealed class MatchState
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Waypoints and touches are stamped with a monotonic tick rather than a clock reading, because a
+    /// Waypoints, touches and events are stamped with a monotonic tick rather than a clock reading, because a
     /// possession's seconds are drawn up front and the clock does not move again until it is over. The tick
     /// is the order the ball reached each fact in, and the finished passage maps it evenly onto the 0…10,000
-    /// fraction a replay measures playback against.
+    /// fraction a replay measures playback against. An event takes the tick of the item recorded last, so it
+    /// sits where the ball was when it happened.
     /// </para>
     /// <para>
     /// The accumulator never reads the random stream and never writes to the match, so a recorder attached to
@@ -405,19 +451,28 @@ internal sealed class MatchState
     /// </remarks>
     private sealed class PassageAccumulator
     {
-        private readonly List<int> _events = [];
+        private readonly List<(int Sequence, int Tick)> _events = [];
         private readonly List<(int Tick, PassageWaypointV1 Waypoint)> _waypoints = [];
         private readonly List<(int Tick, PassageTouchV1 Touch)> _touches = [];
         private readonly int _ordinal;
         private readonly MatchSide _side;
+        private readonly int _period;
         private readonly int _startClockSeconds;
+        private readonly PassageRestartKind _restart;
         private int _nextTick;
 
-        public PassageAccumulator(int ordinal, MatchSide side, int startClockSeconds)
+        public PassageAccumulator(
+            int ordinal,
+            MatchSide side,
+            int period,
+            int startClockSeconds,
+            PassageRestartKind restart)
         {
             _ordinal = ordinal;
             _side = side;
+            _period = period;
             _startClockSeconds = startClockSeconds;
+            _restart = restart;
         }
 
         public void AddWaypoint(int x, int y, int z, PassageWaypointKind kind) =>
@@ -426,9 +481,9 @@ internal sealed class MatchState
         public void AddTouch(Guid participantId, PassageAction action, int x, int y, int z) =>
             _touches.Add((_nextTick++, new PassageTouchV1(0, participantId, action, x, y, z)));
 
-        public void AddEvent(int sequence) => _events.Add(sequence);
+        public void AddEvent(int sequence) => _events.Add((sequence, Math.Max(0, _nextTick - 1)));
 
-        public MatchPassageV1 Build(int endClockSeconds)
+        public MatchPassageV1 Build(int endClockSeconds, PassageOutcome outcome)
         {
             var span = Math.Max(1, _nextTick - 1);
 
@@ -436,9 +491,17 @@ internal sealed class MatchState
             {
                 Ordinal = _ordinal,
                 Side = _side,
+                Period = _period,
                 StartClockSeconds = _startClockSeconds,
                 EndClockSeconds = endClockSeconds,
-                EventSequences = [.. _events],
+                Outcome = outcome,
+                Restart = _restart,
+                Events =
+                [
+                    .. _events.Select(pair => new PassageEventV1(
+                        pair.Sequence,
+                        pair.Tick * EngineRulesV2.Certain / span)),
+                ],
                 Waypoints =
                 [
                     .. _waypoints.Select(pair => pair.Waypoint with

@@ -26,6 +26,83 @@ public enum PassageWaypointKind
 
     /// <summary>The ball was cleared out of danger.</summary>
     Clearance = 4,
+
+    /// <summary>
+    /// The ball was placed for a dead-ball restart: a kick-off, a goal kick, a free kick, a penalty, or a
+    /// corner (`engine-v5`).
+    /// </summary>
+    /// <remarks>A placement is not a movement of the ball, so a replay holds the play and sets the ball down.</remarks>
+    Restart = 5,
+}
+
+/// <summary>
+/// How a possession began, when it began with a dead ball (`engine-v5`).
+/// </summary>
+/// <remarks>
+/// A restart belongs to somebody: the rules decide which side takes it and from where, instead of the next
+/// possession being drawn afresh (`MAT-12`). The kind is a display fact — it never appears in the canonical
+/// output hash — and is what lets the replay hold the play and place the ball.
+/// </remarks>
+public enum PassageRestartKind
+{
+    /// <summary>The possession began from play: the ball was loose or already under control.</summary>
+    None = 0,
+
+    /// <summary>A kick-off from the centre spot: the start of a half, or after a goal.</summary>
+    KickOff = 1,
+
+    /// <summary>A goal kick, after a shot went out of play.</summary>
+    GoalKick = 2,
+
+    /// <summary>The goalkeeper's ball, after a save or a missed penalty the keeper stopped.</summary>
+    KeeperBall = 3,
+
+    /// <summary>A free kick for a foul with no shot, or for an offside, taken from where it was given.</summary>
+    FreeKick = 4,
+}
+
+/// <summary>
+/// How a possession ended (`engine-v5`).
+/// </summary>
+/// <remarks>
+/// What the replay reads to know what kind of passage it is turning into a film: the events say what happened
+/// to a shot, and the outcome says what the possession was. Like every recorder field it is a display fact and
+/// never appears in the canonical output hash.
+/// </remarks>
+public enum PassageOutcome
+{
+    /// <summary>The contested loose ball that opened the possession was lost.</summary>
+    ScrambleLost = 0,
+
+    /// <summary>The attack could not be progressed and the ball was turned over.</summary>
+    ProgressionFailed = 1,
+
+    /// <summary>The attack was stopped by an offside.</summary>
+    Offside = 2,
+
+    /// <summary>The attack reached the final third but created nothing, and the ball was cleared.</summary>
+    CreationFailed = 3,
+
+    /// <summary>A foul by the defending side stopped play and the free kick was taken quickly, with no shot.</summary>
+    Foul = 4,
+
+    /// <summary>A foul in the box gave a penalty.</summary>
+    Penalty = 5,
+
+    /// <summary>A foul gave a direct free kick that was struck at goal.</summary>
+    FreeKickStruck = 6,
+
+    /// <summary>A foul gave a free kick that was delivered into the box instead of struck.</summary>
+    FreeKickCrossed = 7,
+
+    /// <summary>A corner that came to nothing: the delivery was cleared, or the header was lost.</summary>
+    CornerCleared = 8,
+
+    /// <summary>A corner that produced a header at goal.</summary>
+    CornerHeaded = 9,
+
+    /// <summary>An attack that created a shot from open play, whatever the shot became.</summary>
+    OpenPlayShot = 10,
 }
 
 /// <summary>
@@ -93,6 +170,7 @@ public static class PassageVocabulary
         PassageWaypointKind.Cross => "cross",
         PassageWaypointKind.Shot => "shot",
         PassageWaypointKind.Clearance => "clearance",
+        PassageWaypointKind.Restart => "restart",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown waypoint kind."),
     };
 
@@ -162,8 +240,20 @@ public readonly record struct PassageTouchV1(
     int Z);
 
 /// <summary>
+/// Where an event sits among the facts of a possession (`engine-v5`).
+/// </summary>
+/// <remarks>
+/// An event is positioned by the item it follows: the same fraction as the waypoint or touch recorded last
+/// when the event was emitted. A reader that merges waypoints, touches and events by fraction therefore puts
+/// an event after the item it shares a fraction with.
+/// </remarks>
+/// <param name="Sequence">The event's sequence number.</param>
+/// <param name="FractionBasisPoints">Where in the possession the event happened, 0…10,000.</param>
+public readonly record struct PassageEventV1(int Sequence, int FractionBasisPoints);
+
+/// <summary>
 /// One possession as the replay reads it: where the ball started and ended, how it got there, and which
-/// events it produced (`engine-v4`).
+/// events it produced (`engine-v4`, completed in `engine-v5`).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -175,6 +265,12 @@ public readonly record struct PassageTouchV1(
 /// A possession that produced no event still has a passage, because the film needs the ball to move through
 /// it: the away side's midfield recycling from kick-off is part of the match even when nothing happened.
 /// </para>
+/// <para>
+/// Since `engine-v5` the record is complete: a possession's start and end are real moments of the match clock
+/// (the possessions tile each half), and the period, the way it ended, the restart it began with, and the
+/// position of each event among the ball's waypoints and the touches are all recorded. Match seconds restart
+/// at the second half, so <see cref="Period"/> is what orders two possessions across half-time.
+/// </para>
 /// </remarks>
 public sealed record MatchPassageV1
 {
@@ -184,14 +280,29 @@ public sealed record MatchPassageV1
     /// <summary>Gets the side in possession.</summary>
     public required MatchSide Side { get; init; }
 
-    /// <summary>Gets the match second the possession started at.</summary>
+    /// <summary>Gets the half the possession was played in: 1 or 2 (`engine-v5`).</summary>
+    public required int Period { get; init; }
+
+    /// <summary>Gets the match second the possession started at, read before the clock advanced.</summary>
     public required int StartClockSeconds { get; init; }
 
-    /// <summary>Gets the match second the possession ended at.</summary>
+    /// <summary>Gets the match second the possession ended at, which is always after it started.</summary>
     public required int EndClockSeconds { get; init; }
 
+    /// <summary>Gets how the possession ended (`engine-v5`).</summary>
+    public required PassageOutcome Outcome { get; init; }
+
+    /// <summary>Gets the dead-ball restart the possession began with, or none when it began from play (`engine-v5`).</summary>
+    public required PassageRestartKind Restart { get; init; }
+
+    /// <summary>
+    /// Gets the events the possession produced, in order, each positioned among the waypoints and touches;
+    /// empty when it produced none (`engine-v5`).
+    /// </summary>
+    public required IReadOnlyList<PassageEventV1> Events { get; init; }
+
     /// <summary>Gets the event sequences the possession produced, in order; empty when it produced none.</summary>
-    public required IReadOnlyList<int> EventSequences { get; init; }
+    public IReadOnlyList<int> EventSequences => [.. Events.Select(matchEvent => matchEvent.Sequence)];
 
     /// <summary>Gets the ball's waypoints, in order, beginning at the possession's start point.</summary>
     public required IReadOnlyList<PassageWaypointV1> Waypoints { get; init; }

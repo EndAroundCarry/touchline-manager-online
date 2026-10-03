@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 4;
+    public const int Engine = 5;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,22 +30,29 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 4;
+    public const int RuleSet = 5;
 
-    /// <summary>The stable label for engine version 4, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 5, used in hashes and diagnostics.</summary>
     /// <remarks>
-    /// Version 4 is the continuous passage model: a possession no longer teleports to an absolute random
-    /// point in its own half, but is played along a real chain of touches that begins where the last one
-    /// left the ball — or at a restart — progresses into the attacking third, and ends at an
-    /// outcome-appropriate point, so event coordinates, shots, and direct free kicks are meaningful. The
-    /// geometry is drawn from a per-possession stream of its own, so the outcome formulas and their
-    /// distributions are comparable to version 3 while the ball finally moves like football. An optional
-    /// passage recorder captures the film for the replay without touching the result.
+    /// <para>
+    /// Version 5 completes the continuous passage model that version 4 introduced. The clock is reset at
+    /// half-time, so the second half is played from 45:00 with its own stoppage rather than starting a few
+    /// minutes late and finishing a few minutes early. A dead ball belongs to somebody: a kick-off, a goal
+    /// kick, a keeper's ball, a free kick, or an offside is taken by the side the rules give it to, from where
+    /// the rules put it, and is consumed by the very next possession instead of being drawn afresh or left
+    /// pending for a later one (`MAT-12`). The ball ends where play actually continues.
+    /// </para>
+    /// <para>
+    /// The passage recorder gained the facts a film needs — the half, how the possession ended, the restart it
+    /// began with, where each event sits, and real start and end times — and a shot now travels to a target
+    /// the outcome decides: the goal mouth, the goalkeeper, wide or over, the woodwork, or a block. Everything
+    /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
+    /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v4";
+    public const string EngineLabel = "engine-v5";
 
-    /// <summary>The stable label for engine rules version 4.</summary>
-    public const string RuleSetLabel = "engine-rules-v4";
+    /// <summary>The stable label for engine rules version 5.</summary>
+    public const string RuleSetLabel = "engine-rules-v5";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v1";

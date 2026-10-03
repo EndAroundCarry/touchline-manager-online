@@ -1,4 +1,5 @@
 using System.Globalization;
+using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Configuration;
 
@@ -92,10 +93,17 @@ public sealed record EngineRulesV2
     public int StoppageSecondsPerInjury { get; init; } = 60;
 
     /// <summary>The least time one possession can consume, in seconds.</summary>
-    public int PossessionSecondsMin { get; init; } = 16;
+    /// <remarks>
+    /// Retuned from 16 in `engine-v5`. The half-time clock fix gave the second half its true length, about four
+    /// per cent more football than `engine-v4` played, and every per-possession probability was calibrated
+    /// against the shorter match. Lengthening a possession by the same four to five per cent keeps the number of
+    /// possessions in a match where the calibration put it, so goals, shots, fouls, and cards come out as they
+    /// did without touching a single probability.
+    /// </remarks>
+    public int PossessionSecondsMin { get; init; } = 17;
 
-    /// <summary>The most time one possession can consume, in seconds.</summary>
-    public int PossessionSecondsMax { get; init; } = 44;
+    /// <summary>The most time one possession can consume, in seconds (44 before `engine-v5`).</summary>
+    public int PossessionSecondsMax { get; init; } = 46;
 
     /// <summary>What a high tempo multiplies the time a possession takes by, so play is more end-to-end.</summary>
     public int HighTempoPossessionSecondsMultiplierBasisPoints { get; init; } = 8_000;
@@ -112,7 +120,15 @@ public sealed record EngineRulesV2
     public int BasePossessionBasisPoints { get; init; } = 5_000;
 
     /// <summary>How far a maximal control differential can swing possession away from an even split.</summary>
-    public int PossessionControlSwingBasisPoints { get; init; } = 2_400;
+    /// <remarks>
+    /// Retuned from 2,400 in `engine-v5`. A dead ball now belongs to somebody (`MAT-12`), so the possession draw
+    /// only decides the possessions that begin from play, and the stronger side's edge in it was diluted: after
+    /// its shot was saved the ball went to the defender by rule. Widening the swing gives that edge back — the
+    /// ability curve (an underdog three points down wins 16.4% of the time) and home advantage (+4.2 points)
+    /// land where `engine-v4` had them. The possession share itself stays inside <see cref="MinPossessionBasisPoints"/>
+    /// and <see cref="MaxPossessionBasisPoints"/>, so a maximal mismatch is clamped well before the swing is spent.
+    /// </remarks>
+    public int PossessionControlSwingBasisPoints { get; init; } = 4_000;
 
     /// <summary>Possession's small, fixed home bonus, separate from home advantage on the ratings.</summary>
     public int PossessionHomeBonusBasisPoints { get; init; } = 120;
@@ -377,7 +393,13 @@ public sealed record EngineRulesV2
     /// <summary>The ball's altitude at a cross, 0…100.</summary>
     public int CrossAltitude { get; init; } = 70;
 
-    /// <summary>The ball's altitude at a shot, 0…100.</summary>
+    /// <summary>
+    /// The ball's altitude at a shot, 0…100, which is also the height of the crossbar (`engine-v5`).
+    /// </summary>
+    /// <remarks>
+    /// A strike that arrives at the goal line below this altitude and between the posts is on target; one that
+    /// arrives above it is over the bar.
+    /// </remarks>
     public int ShotAltitude { get; init; } = 30;
 
     /// <summary>The ball's altitude at a header, 0…100.</summary>
@@ -416,6 +438,109 @@ public sealed record EngineRulesV2
 
     /// <summary>The chance a free-kick foul is booked, slightly above an open-play duel's.</summary>
     public int FreeKickFoulCardBasisPoints { get; init; } = 2_200;
+
+    // ---- Restarts and strikes (engine-v5) --------------------------------------------------------
+
+    /// <summary>
+    /// How far along its approach, at least, a possession that loses its opening scramble is cut, as a share
+    /// of the approach's length (`engine-v5`).
+    /// </summary>
+    /// <remarks>
+    /// The geometry constants below shape where the ball is when something ends, so they are rules: a
+    /// possession that loses the ball early leaves it somewhere different from one that loses it late, and
+    /// where the ball is decides how deep the next possession starts.
+    /// </remarks>
+    public int ScrambleCutMinBasisPoints { get; init; } = 500;
+
+    /// <summary>How far along its approach, at most, a lost scramble is cut.</summary>
+    public int ScrambleCutMaxBasisPoints { get; init; } = 2_500;
+
+    /// <summary>How far along its approach, at least, a failed progression is cut.</summary>
+    public int ProgressionCutMinBasisPoints { get; init; } = 4_000;
+
+    /// <summary>How far along its approach, at most, a failed progression is cut.</summary>
+    public int ProgressionCutMaxBasisPoints { get; init; } = 8_000;
+
+    /// <summary>
+    /// How far from the pressure point to the shot point, at least, the ball enters the final third
+    /// (`engine-v5`).
+    /// </summary>
+    public int EntryFractionMinBasisPoints { get; init; } = 3_000;
+
+    /// <summary>How far from the pressure point to the shot point, at most, the ball enters the final third.</summary>
+    public int EntryFractionMaxBasisPoints { get; init; } = 7_000;
+
+    /// <summary>The least far up the pitch an open-play entry into the final third is, on the attacker's scale.</summary>
+    public int FinalThirdEntryXBasisPoints { get; init; } = 6_700;
+
+    /// <summary>
+    /// The shortest clearance worth recording (`engine-v5`): a ball that would be cleared less far than this
+    /// is left where it was won, and the film shows no kick.
+    /// </summary>
+    public int MinClearanceDistanceBasisPoints { get; init; } = 600;
+
+    /// <summary>How far up the pitch the penalty area band begins, on the attacker's scale.</summary>
+    public int BoxXMinBasisPoints { get; init; } = 8_700;
+
+    /// <summary>How far up the pitch the penalty area band ends, on the attacker's scale.</summary>
+    public int BoxXMaxBasisPoints { get; init; } = 9_400;
+
+    /// <summary>The low edge of the penalty area band across the pitch.</summary>
+    public int BoxYMinBasisPoints { get; init; } = 2_400;
+
+    /// <summary>The high edge of the penalty area band across the pitch.</summary>
+    public int BoxYMaxBasisPoints { get; init; } = 4_600;
+
+    /// <summary>How far from the corner flag along the goal line, at least, a ball goes out for a corner.</summary>
+    public int CornerOutOfPlayMinBasisPoints { get; init; } = 300;
+
+    /// <summary>How far from the corner flag along the goal line, at most, a ball goes out for a corner.</summary>
+    public int CornerOutOfPlayMaxBasisPoints { get; init; } = 1_500;
+
+    /// <summary>How far in front of the goal line, at least, the goalkeeper is when he gets to a shot.</summary>
+    public int SaveDepthMinBasisPoints { get; init; } = 120;
+
+    /// <summary>How far in front of the goal line, at most, the goalkeeper is when he gets to a shot.</summary>
+    public int SaveDepthMaxBasisPoints { get; init; } = 450;
+
+    /// <summary>How far beyond a post, at least, a wide miss crosses the goal line.</summary>
+    public int MissWideMinBasisPoints { get; init; } = 150;
+
+    /// <summary>How far beyond a post, at most, a wide miss crosses the goal line.</summary>
+    public int MissWideMaxBasisPoints { get; init; } = 1_250;
+
+    /// <summary>The share of off-target strikes that go over the bar rather than wide of a post.</summary>
+    public int MissOverShareBasisPoints { get; init; } = 3_500;
+
+    /// <summary>The share of woodwork hits that strike a post rather than the crossbar.</summary>
+    public int PostShareOfWoodworkBasisPoints { get; init; } = 7_000;
+
+    /// <summary>
+    /// The share of missed penalties the goalkeeper is shown stopping, rather than the taker putting wide.
+    /// </summary>
+    /// <remarks>
+    /// Presentation only: the event is <c>PenaltyMissed</c> either way and the defending side restarts from
+    /// its goal area either way, so the choice cannot move a result.
+    /// </remarks>
+    public int PenaltySavedShareBasisPoints { get; init; } = 6_000;
+
+    /// <summary>How far in front of the shooter, at least, a blocked shot is stopped (about two metres).</summary>
+    public int BlockDistanceMinBasisPoints { get; init; } = 190;
+
+    /// <summary>How far in front of the shooter, at most, a blocked shot is stopped (about six metres).</summary>
+    public int BlockDistanceMaxBasisPoints { get; init; } = 570;
+
+    /// <summary>How far out from the goal line, at least, a ball rebounds from the woodwork.</summary>
+    public int ReboundDistanceMinBasisPoints { get; init; } = 600;
+
+    /// <summary>How far out from the goal line, at most, a ball rebounds from the woodwork.</summary>
+    public int ReboundDistanceMaxBasisPoints { get; init; } = 1_400;
+
+    /// <summary>The highest altitude a strike that is under the bar arrives at, 0…100.</summary>
+    public int StrikeLowAltitudeMax { get; init; } = 18;
+
+    /// <summary>The highest altitude a strike that goes over the bar arrives at, 0…100.</summary>
+    public int OverBarAltitudeMax { get; init; } = 75;
 
     // ---- Discipline ------------------------------------------------------------------------------
 
@@ -950,6 +1075,8 @@ public sealed record EngineRulesV2
                      (nameof(OffsideLineXBasisPoints), OffsideLineXBasisPoints),
                      (nameof(TurnoverMiddleThirdXBasisPoints), TurnoverMiddleThirdXBasisPoints),
                      (nameof(GoalAreaXBasisPoints), GoalAreaXBasisPoints),
+                     (nameof(FinalThirdEntryXBasisPoints), FinalThirdEntryXBasisPoints),
+                     (nameof(MinClearanceDistanceBasisPoints), MinClearanceDistanceBasisPoints),
                  })
         {
             if (value is < 0 or > Certain)
@@ -964,12 +1091,38 @@ public sealed record EngineRulesV2
                      (nameof(ShotAltitude), ShotAltitude),
                      (nameof(HeaderAltitude), HeaderAltitude),
                      (nameof(ClearanceAltitude), ClearanceAltitude),
+                     (nameof(StrikeLowAltitudeMax), StrikeLowAltitudeMax),
+                     (nameof(OverBarAltitudeMax), OverBarAltitudeMax),
                  })
         {
             if (value is < 0 or > 100)
             {
                 problems.Add($"{name} must be a ball altitude in 0..100, was {value}.");
             }
+        }
+
+        // The crossbar is the shot altitude: a strike under the bar must be able to stay under it, and one over
+        // the bar must be able to clear it by enough to read as over rather than as a graze.
+        if (StrikeLowAltitudeMax >= ShotAltitude || OverBarAltitudeMax <= ShotAltitude + 10)
+        {
+            problems.Add(
+                $"The strike altitudes must straddle the crossbar: {StrikeLowAltitudeMax} < {ShotAltitude} "
+                + $"< {OverBarAltitudeMax} - 10.");
+        }
+
+        if (BoxYMinBasisPoints < 0 || BoxYMaxBasisPoints > SpatialPitch.PitchWidth || BoxYMinBasisPoints > BoxYMaxBasisPoints)
+        {
+            problems.Add(
+                $"The penalty area band must be an ordered pair inside 0..{SpatialPitch.PitchWidth}, "
+                + $"was {BoxYMinBasisPoints}..{BoxYMaxBasisPoints}.");
+        }
+
+        // The wide miss has to be able to stay on the pitch beside the goal: the goal mouth sits between the
+        // posts, and a strike that lands beyond the touchline is a different kind of miss.
+        if (SpatialPitch.GoalYMin - MissWideMaxBasisPoints < 0
+            || SpatialPitch.GoalYMax + MissWideMaxBasisPoints > SpatialPitch.PitchWidth)
+        {
+            problems.Add($"MissWideMaxBasisPoints ({MissWideMaxBasisPoints}) would carry a miss off the pitch.");
         }
 
         if (problems.Count > 0)
@@ -1044,6 +1197,9 @@ public sealed record EngineRulesV2
         yield return (nameof(ConditionSubstitutionThresholdBasisPoints), ConditionSubstitutionThresholdBasisPoints);
         yield return (nameof(MinimumConditionAdvantageBasisPoints), MinimumConditionAdvantageBasisPoints);
         yield return (nameof(CrossShareOfPassageBasisPoints), CrossShareOfPassageBasisPoints);
+        yield return (nameof(MissOverShareBasisPoints), MissOverShareBasisPoints);
+        yield return (nameof(PostShareOfWoodworkBasisPoints), PostShareOfWoodworkBasisPoints);
+        yield return (nameof(PenaltySavedShareBasisPoints), PenaltySavedShareBasisPoints);
     }
 
     private IEnumerable<(string Name, int Value)> MultiplierConstants()
@@ -1118,6 +1274,15 @@ public sealed record EngineRulesV2
         yield return (nameof(ShotCentralBandYMinBasisPoints), ShotCentralBandYMinBasisPoints, ShotCentralBandYMaxBasisPoints);
         yield return (nameof(ShotInsideBandYMinBasisPoints), ShotInsideBandYMinBasisPoints, ShotInsideBandYMaxBasisPoints);
         yield return (nameof(ShotWideBandYMinBasisPoints), ShotWideBandYMinBasisPoints, ShotWideBandYMaxBasisPoints);
+        yield return (nameof(ScrambleCutMinBasisPoints), ScrambleCutMinBasisPoints, ScrambleCutMaxBasisPoints);
+        yield return (nameof(ProgressionCutMinBasisPoints), ProgressionCutMinBasisPoints, ProgressionCutMaxBasisPoints);
+        yield return (nameof(EntryFractionMinBasisPoints), EntryFractionMinBasisPoints, EntryFractionMaxBasisPoints);
+        yield return (nameof(BoxXMinBasisPoints), BoxXMinBasisPoints, BoxXMaxBasisPoints);
+        yield return (nameof(CornerOutOfPlayMinBasisPoints), CornerOutOfPlayMinBasisPoints, CornerOutOfPlayMaxBasisPoints);
+        yield return (nameof(SaveDepthMinBasisPoints), SaveDepthMinBasisPoints, SaveDepthMaxBasisPoints);
+        yield return (nameof(MissWideMinBasisPoints), MissWideMinBasisPoints, MissWideMaxBasisPoints);
+        yield return (nameof(BlockDistanceMinBasisPoints), BlockDistanceMinBasisPoints, BlockDistanceMaxBasisPoints);
+        yield return (nameof(ReboundDistanceMinBasisPoints), ReboundDistanceMinBasisPoints, ReboundDistanceMaxBasisPoints);
     }
 
     private IEnumerable<(string Name, int Floor, int Ceiling)> FactorPairs()

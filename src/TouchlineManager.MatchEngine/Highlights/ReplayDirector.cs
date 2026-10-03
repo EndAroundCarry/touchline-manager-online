@@ -88,8 +88,15 @@ public static class ReplayDirector
             };
         }
 
+        // Match seconds restart at the second half since engine-v5, so the director reads them on a continuous
+        // clock — the second half's seconds carry on from where the first half's stoppage left off — which is
+        // what the film, its personnel changes, and the viewer's clock have always assumed.
+        var secondHalfShift = SecondHalfShiftSeconds(passages, rules);
+
+        passages = OnContinuousClock(passages, secondHalfShift);
+
         var bySequence = result.Events.ToDictionary(matchEvent => matchEvent.Sequence);
-        var changes = PersonnelChanges(result.Events, rules);
+        var changes = PersonnelChanges(result.Events, rules, secondHalfShift);
         var totalMatchSeconds = Math.Max(1, passages[^1].EndClockSeconds);
 
         var targetFilmMilliseconds = int.Clamp(
@@ -117,7 +124,8 @@ public static class ReplayDirector
                 occupants,
                 durations[index],
                 previousEnds,
-                index);
+                index,
+                secondHalfShift);
 
             authored.Add(passage);
             previousEnds = passage.Ends;
@@ -183,7 +191,6 @@ public static class ReplayDirector
         desired = Math.Min(desired, passages.Count);
 
         var perPassage = (double)totalWeight / desired;
-        var halfBoundary = rules.HalfTimeMinute * rules.SecondsPerMinute;
         var changeSeconds = changes.Select(change => change.Second).Distinct().OrderBy(second => second).ToList();
 
         var groups = new List<FilmPassage>();
@@ -196,7 +203,9 @@ public static class ReplayDirector
             {
                 var last = current[^1];
                 var personnel = ChangeBetween(changeSeconds, last.EndClockSeconds, possession.StartClockSeconds);
-                var crossedHalf = last.EndClockSeconds < halfBoundary && possession.StartClockSeconds >= halfBoundary;
+
+                // A film passage never straddles half-time: the period says so, where the clock cannot.
+                var crossedHalf = last.Period != possession.Period;
 
                 if (personnel || crossedHalf || currentWeight >= perPassage)
                 {
@@ -223,7 +232,39 @@ public static class ReplayDirector
         possessions[0].StartClockSeconds,
         possessions[^1].EndClockSeconds,
         possessions[0].Side,
-        weight);
+        weight,
+        possessions[0].Period);
+
+    /// <summary>
+    /// Gets how long the first half's stoppage ran past regulation, which is how far the second half's seconds
+    /// are moved on to sit after it on the continuous clock.
+    /// </summary>
+    private static int SecondHalfShiftSeconds(IReadOnlyList<MatchPassageV1> passages, EngineRulesV2 rules)
+    {
+        var firstHalfEnd = 0;
+
+        foreach (var passage in passages)
+        {
+            if (passage.Period == 1)
+            {
+                firstHalfEnd = Math.Max(firstHalfEnd, passage.EndClockSeconds);
+            }
+        }
+
+        return Math.Max(0, firstHalfEnd - (rules.HalfTimeMinute * rules.SecondsPerMinute));
+    }
+
+    /// <summary>Moves the second half's possessions on to the continuous clock.</summary>
+    private static IReadOnlyList<MatchPassageV1> OnContinuousClock(IReadOnlyList<MatchPassageV1> passages, int secondHalfShift) =>
+        secondHalfShift == 0
+            ? passages
+            : [.. passages.Select(passage => passage.Period == 2
+                ? passage with
+                {
+                    StartClockSeconds = passage.StartClockSeconds + secondHalfShift,
+                    EndClockSeconds = passage.EndClockSeconds + secondHalfShift,
+                }
+                : passage)];
 
     /// <summary>How much film time each passage is worth, normalised to the target with a floor.</summary>
     private static List<int> Allocate(List<FilmPassage> groups, int targetFilmMilliseconds, HighlightOptionsV1 settings)
@@ -364,7 +405,8 @@ public static class ReplayDirector
         Dictionary<MatchSide, Dictionary<int, Guid>> occupants,
         int durationMilliseconds,
         Dictionary<string, HighlightKeyframeV1>? previousEnds,
-        int ordinal)
+        int ordinal,
+        int secondHalfShift)
     {
         var windows = Windows(group, durationMilliseconds);
         var events = group.Possessions
@@ -378,7 +420,7 @@ public static class ReplayDirector
             ?? events.FirstOrDefault(matchEvent => IsShot(matchEvent.Type))
             ?? events.FirstOrDefault();
 
-        var (minute, stoppage) = ClockOf(group, events, rules);
+        var (minute, stoppage) = ClockOf(group, events, rules, secondHalfShift);
         var homeColour = colours.Home;
         var awayColour = colours.Away;
 
@@ -460,7 +502,7 @@ public static class ReplayDirector
                 rules);
         }
 
-        var beats = Beats(group, windows, events, entitiesBySide, durationMilliseconds, ordinal, rules);
+        var beats = Beats(group, windows, events, entitiesBySide, durationMilliseconds, ordinal, rules, secondHalfShift);
 
         return new AuthoredPassage(
             Version,
@@ -634,7 +676,8 @@ public static class ReplayDirector
         Dictionary<MatchSide, Dictionary<Guid, int>> entitiesBySide,
         int duration,
         int ordinal,
-        EngineRulesV2 rules)
+        EngineRulesV2 rules,
+        int secondHalfShift)
     {
         var beats = new List<PassageBeatV1>();
         var sideOfParticipant = new Dictionary<Guid, MatchSide>();
@@ -667,29 +710,42 @@ public static class ReplayDirector
 
         foreach (var matchEvent in events)
         {
-            var time = FilmTimeForSecond(EventSecond(matchEvent, rules), group, duration);
+            var time = FilmTimeForSecond(EventSecond(matchEvent, rules, secondHalfShift), group, duration);
             beats.Add(new PassageBeatV1(time, matchEvent.Side, matchEvent.ParticipantId, PassageBeatKind.Event, matchEvent, matchEvent.Sequence));
         }
 
         return beats;
     }
 
-    private static (int Minute, int Stoppage) ClockOf(FilmPassage group, List<EngineEventV1> events, EngineRulesV2 rules)
+    private static (int Minute, int Stoppage) ClockOf(
+        FilmPassage group,
+        List<EngineEventV1> events,
+        EngineRulesV2 rules,
+        int secondHalfShift)
     {
         if (events.Count > 0)
         {
             return (events[0].Minute, events[0].StoppageMinute);
         }
 
-        var minute = group.StartSecond / Math.Max(1, rules.SecondsPerMinute);
+        // A passage with no event is labelled the way the engine labels the minute it began in: from the
+        // half's own clock, which is the continuous one less the shift in the second half.
+        var halfSeconds = group.Period == 2 ? group.StartSecond - secondHalfShift : group.StartSecond;
+        var played = halfSeconds / Math.Max(1, rules.SecondsPerMinute);
+        var regulation = group.Period == 2 ? rules.RegulationMinutes : rules.HalfTimeMinute;
 
         return (
-            int.Clamp(minute + 1, 1, rules.RegulationMinutes),
-            Math.Max(0, minute + 1 - rules.RegulationMinutes));
+            int.Clamp(played + 1, 1, regulation),
+            Math.Max(0, played + 1 - regulation));
     }
 
-    private static int EventSecond(EngineEventV1 matchEvent, EngineRulesV2 rules) =>
-        (matchEvent.Minute + matchEvent.StoppageMinute) * rules.SecondsPerMinute;
+    /// <summary>
+    /// Gets the continuous-clock second an event is stamped at: its minute, read on the same clock the passages
+    /// are, so a substitution lands in the passage it happened in.
+    /// </summary>
+    private static int EventSecond(EngineEventV1 matchEvent, EngineRulesV2 rules, int secondHalfShift) =>
+        ((matchEvent.Minute + matchEvent.StoppageMinute) * rules.SecondsPerMinute)
+        + (matchEvent.Minute > rules.HalfTimeMinute ? secondHalfShift : 0);
 
     private static int FilmTimeForSecond(int second, FilmPassage group, int duration)
     {
@@ -779,7 +835,8 @@ public static class ReplayDirector
     /// <summary>Substitutions and dismissals, which change who is on the pitch and split a film passage.</summary>
     private static List<(int Second, MatchSide Side, Guid Off, Guid? On)> PersonnelChanges(
         IReadOnlyList<EngineEventV1> events,
-        EngineRulesV2 rules)
+        EngineRulesV2 rules,
+        int secondHalfShift)
     {
         var changes = new List<(int Second, MatchSide Side, Guid Off, Guid? On)>();
 
@@ -788,11 +845,11 @@ public static class ReplayDirector
             switch (matchEvent.Type)
             {
                 case EngineEventType.Substitution when matchEvent.ParticipantId is Guid off:
-                    changes.Add((EventSecond(matchEvent, rules), matchEvent.Side, off, matchEvent.SecondaryParticipantId));
+                    changes.Add((EventSecond(matchEvent, rules, secondHalfShift), matchEvent.Side, off, matchEvent.SecondaryParticipantId));
                     break;
 
                 case EngineEventType.RedCard or EngineEventType.SecondYellowCard when matchEvent.ParticipantId is Guid sent:
-                    changes.Add((EventSecond(matchEvent, rules), matchEvent.Side, sent, null));
+                    changes.Add((EventSecond(matchEvent, rules, secondHalfShift), matchEvent.Side, sent, null));
                     break;
 
                 default:
@@ -1022,5 +1079,6 @@ public static class ReplayDirector
         int StartSecond,
         int EndSecond,
         MatchSide PrimarySide,
-        long Weight);
+        long Weight,
+        int Period);
 }

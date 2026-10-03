@@ -22,15 +22,40 @@ namespace TouchlineManager.MatchEngine.Simulation;
 /// slot-ordered list of players on the pitch. A refactor that changed any of that would change every
 /// historical replay, which is why the golden hash tests exist (ADR-0004).
 /// </para>
+/// <para>
+/// Since `engine-v5` a possession is also recorded completely: what the play drew is decided first — the foul,
+/// the scramble, the progression — and only then is the ball's path written down, so a possession that ends
+/// early records an approach that ends early. The record never reads the play stream and never writes to the
+/// match, so it cannot move a result.
+/// </para>
 /// </remarks>
 internal static class PossessionSimulator
 {
+    /// <summary>What one possession is being played with, so the phases do not each take eight parameters.</summary>
+    /// <param name="Side">The side in possession.</param>
+    /// <param name="Defending">The side defending.</param>
+    /// <param name="Restart">The restart the possession began with.</param>
+    /// <param name="Plan">The possession's planned geometry.</param>
+    /// <param name="Derived">The possession's geometry stream.</param>
+    private sealed record Possession(
+        MatchSide Side,
+        MatchSide Defending,
+        PassageRestartKind Restart,
+        PlannedPassage Plan,
+        Pcg32 Derived);
+
+    /// <summary>The contested loose ball that opens some possessions, and who contested it (`engine-v5`).</summary>
+    /// <param name="Lost">Whether the side in possession lost it.</param>
+    /// <param name="AttackerId">The player from the side in possession.</param>
+    /// <param name="DefenderId">The player from the side defending.</param>
+    private readonly record struct Scramble(bool Lost, Guid AttackerId, Guid DefenderId);
+
     /// <summary>Plays both halves and stoppage.</summary>
     /// <param name="state">The match state.</param>
     public static void Run(MatchState state)
     {
         state.BeginHalf(firstHalf: true);
-        state.RestartFromCentre = true;
+        state.NextRestart = new PendingRestart(MatchSide.Home, PassageRestartKind.KickOff, SpatialPoint.Center);
         state.Emit(MatchSide.Home, EngineEventType.KickOff);
         state.CaptureLiveMetrics();
         RunHalf(state);
@@ -40,8 +65,11 @@ internal static class PossessionSimulator
         state.Home.ApplyHalfTimeRecovery(state.Rules);
         state.Away.ApplyHalfTimeRecovery(state.Rules);
 
+        // The sides change ends' kick-off: the away side takes the second half's, from the centre spot, and
+        // whatever dead ball the first half ended on is forgotten (`MAT-12`).
         state.BeginHalf(firstHalf: false);
-        state.RestartFromCentre = true;
+        state.MoveBall(SpatialPoint.Center);
+        state.NextRestart = new PendingRestart(MatchSide.Away, PassageRestartKind.KickOff, SpatialPoint.Center);
         state.Emit(MatchSide.Away, EngineEventType.SecondHalfStart);
         state.CaptureLiveMetrics();
         RunHalf(state);
@@ -69,10 +97,18 @@ internal static class PossessionSimulator
     private static void PlayPossession(MatchState state)
     {
         var rules = state.Rules;
-        var possessionSide = ChoosePossession(state);
-        var attacker = state.SideOf(possessionSide);
-        var defender = state.OpponentOf(possessionSide);
 
+        // A dead ball belongs to the side the rules give it to, and the possession it is taken in is the very
+        // next one: it is read and cleared here, so nothing is left pending for a later possession (`MAT-12`).
+        var restart = state.NextRestart;
+        state.NextRestart = null;
+
+        var possessionSide = restart?.Side ?? ChoosePossession(state);
+        var attacker = state.SideOf(possessionSide);
+
+        // The possession starts at the moment the clock is read, before it advances, so the possessions tile
+        // each half rather than every one of them being zero seconds long (`engine-v5`).
+        var startSeconds = state.ClockSeconds;
         var seconds = DrawPossessionSeconds(state, attacker);
 
         state.ClockSeconds += seconds;
@@ -91,56 +127,139 @@ internal static class PossessionSimulator
         state.PossessionOrdinal++;
 
         var derived = PassagePlanner.CreateStream(state);
-        var plan = PassagePlanner.Plan(state, possessionSide, derived);
+        var plan = PassagePlanner.Plan(state, possessionSide, derived, restart);
 
-        state.BeginPassage(possessionSide);
-        RecordApproach(state, possessionSide, plan, derived);
+        var possession = new Possession(
+            possessionSide,
+            MatchInputV1.OpponentOf(possessionSide),
+            restart?.Kind ?? PassageRestartKind.None,
+            plan,
+            derived);
+
+        state.BeginPassage(possessionSide, startSeconds, possession.Restart);
 
         // The defending side's foul comes first: a foul ends the passage of play before it develops, which is
-        // what makes it the defending side's event rather than a consequence of the attack. What the foul
-        // gives — a penalty, or a direct free kick in range — is resolved here, where the ball's location is
-        // known; the discipline flow recorded only the foul and its card.
-        var foul = DisciplineSimulator.TryResolveFoul(state, MatchInputV1.OpponentOf(possessionSide));
+        // what makes it the defending side's event rather than a consequence of the attack. It is only rolled
+        // here; it is put on the pitch once the possession knows where it happened (`engine-v5`).
+        var foul = DisciplineSimulator.RollFoul(state, possession.Defending);
 
-        if (foul.FoulCommitted)
+        if (foul.Committed)
         {
-            ApplyFoulLiveRatings(state, possessionSide, foul);
-
-            if (state.Random.RollBasisPoints(rules.PenaltyFromFoulBasisPoints))
-            {
-                state.MoveBallAndRecord(plan.PenaltySpot, PassageWaypointKind.Shot, rules.ShotAltitude);
-                ChanceSimulator.ResolvePenalty(state, possessionSide);
-                InjurySimulator.TryResolveInjury(state);
-                state.EndPassage();
-
-                return;
-            }
-
-            var attackingX = AttackingX(state, possessionSide);
-
-            if (attackingX >= rules.FreeKickShootingRangeX && state.Random.RollBasisPoints(rules.FreeKickAwardBasisPoints))
-            {
-                state.MoveBallAndRecord(plan.PressurePoint, PassageWaypointKind.Shot, rules.ShotAltitude);
-                ResolveFreeKick(state, possessionSide, attackingX);
-                InjurySimulator.TryResolveInjury(state);
-                state.EndPassage();
-
-                return;
-            }
-
-            InjurySimulator.TryResolveInjury(state);
-            state.EndPassage();
+            PlayFoul(state, possession, foul);
 
             return;
         }
 
+        PlayOpen(state, possession);
+    }
+
+    /// <summary>
+    /// Plays a possession the defending side fouled in: a penalty, a free kick struck or crossed, or a quick
+    /// free kick with no shot in it.
+    /// </summary>
+    /// <remarks>
+    /// What the foul gives is decided before the ball's path is written down, because it decides where the
+    /// foul was: a penalty is a foul in the box, and a free kick in range is a foul in the attacking third. The
+    /// draws are taken in the order they always were — the foul, the fouler, the card, the penalty, the free
+    /// kick award — so the result is the same whatever is recorded.
+    /// </remarks>
+    private static void PlayFoul(MatchState state, Possession possession, DisciplineSimulator.FoulRoll foul)
+    {
+        var rules = state.Rules;
+        var plan = possession.Plan;
+        var side = possession.Side;
+
+        var penalty = state.Random.RollBasisPoints(rules.PenaltyFromFoulBasisPoints);
+        var attackingX = AttackingX(plan.PressurePoint, side);
+
+        var freeKick = !penalty
+            && attackingX >= rules.FreeKickShootingRangeX
+            && state.Random.RollBasisPoints(rules.FreeKickAwardBasisPoints);
+
+        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, scramble: null);
+
+        if (penalty)
+        {
+            // A penalty is a foul in the box, so the attack is played in there before the defender brings the
+            // attacker down.
+            state.MoveBallAndRecord(plan.BoxFoulPoint, PassageWaypointKind.Pass);
+        }
+
+        // The two players the foul is between are both at the ball when it is committed: the fouler the engine
+        // named, and the player fouled, drawn from the geometry stream so naming him cannot move a draw.
+        var fouled = PickOutfield(state, side, possession.Derived, MatchAttributeName.Dribbling);
+
+        if (foul.Fouler is { } fouler)
+        {
+            state.RecordTouch(fouler.Participant.ParticipantId, PassageAction.Tackle);
+        }
+
+        if (fouled is Guid fouledId)
+        {
+            state.RecordTouch(fouledId, PassageAction.Carry);
+        }
+
+        var outcome = DisciplineSimulator.ApplyFoul(state, possession.Defending, foul);
+
+        ApplyFoulLiveRatings(state, side, outcome);
+
+        if (penalty)
+        {
+            ChanceSimulator.ResolvePenalty(state, side, PassagePlanner.StrikeFrom(plan, plan.PenaltySpot, rules));
+            Finish(state, PassageOutcome.Penalty);
+
+            return;
+        }
+
+        if (freeKick)
+        {
+            Finish(state, ResolveFreeKick(state, possession));
+
+            return;
+        }
+
+        // A foul with no shot in it is a free kick for the side that was fouled, taken where it was committed.
+        state.RestartWithFreeKick(side, state.Ball.GroundPoint);
+        Finish(state, PassageOutcome.Foul);
+    }
+
+    /// <summary>
+    /// Plays a possession that was not fouled in: the scramble, the progression, creation, and the chance.
+    /// </summary>
+    private static void PlayOpen(MatchState state, Possession possession)
+    {
+        var rules = state.Rules;
+        var plan = possession.Plan;
+        var side = possession.Side;
+        var attacker = state.SideOf(side);
+        var defender = state.OpponentOf(side);
+
         // A loose ball opens only a share of passages: most possessions begin with the ball already under
         // control, and the contested 50/50 is the exception rather than the tax on every attack.
-        if (state.Random.RollBasisPoints(rules.ScrambleOpeningBasisPoints) && ResolveScramble(state, possessionSide))
+        Scramble? scramble = null;
+
+        if (state.Random.RollBasisPoints(rules.ScrambleOpeningBasisPoints))
         {
-            state.MoveBallAndRecord(plan.TurnoverPoint, PassageWaypointKind.Clearance, rules.ClearanceAltitude);
-            InjurySimulator.TryResolveInjury(state);
-            state.EndPassage();
+            scramble = ResolveScramble(state, side);
+        }
+
+        if (scramble is { Lost: true } lostScramble)
+        {
+            // The ball is lost close to where it began: the approach is cut short, the defender has it, and
+            // the defence clears.
+            RecordApproach(
+                state,
+                possession,
+                PassagePlanner.CutApproach(plan, plan.ScrambleCutBasisPoints),
+                endsInCross: false,
+                passer: false,
+                scramble: null);
+
+            state.RecordTouch(lostScramble.AttackerId, PassageAction.Run);
+            state.RecordTouch(lostScramble.DefenderId, PassageAction.Interception);
+
+            ClearBall(state, plan);
+            Finish(state, PassageOutcome.ScrambleLost);
 
             return;
         }
@@ -158,15 +277,24 @@ internal static class PossessionSimulator
 
         if (!state.Random.RollBasisPoints(progressChance))
         {
-            ResolveFailedProgression(state, possessionSide, attacker, plan);
-            InjurySimulator.TryResolveInjury(state);
-            state.EndPassage();
+            // The attack breaks down part of the way up the pitch, not after it has arrived.
+            RecordApproach(
+                state,
+                possession,
+                PassagePlanner.CutApproach(plan, plan.ProgressionCutBasisPoints),
+                endsInCross: false,
+                passer: true,
+                scramble);
+
+            Finish(state, ResolveFailedProgression(state, possession, attacker));
 
             return;
         }
 
-        // The carrier takes the ball into the box, where the last defender engages.
-        state.MoveBallAndRecord(plan.HeaderPoint, PassageWaypointKind.Pass);
+        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, scramble);
+
+        // The carrier takes the ball into the final third, where the last defender engages.
+        state.MoveBallAndRecord(plan.EntryPoint, PassageWaypointKind.Pass);
 
         var creation = Probability.Differential(
             attacker.Ratings.Creation + (attacker.Ratings.Finishing / 2),
@@ -174,7 +302,7 @@ internal static class PossessionSimulator
 
         // The 1v1 the carrier fights to reach the creation phase: a beat man makes the chance more likely,
         // a tackle shuts the passage down.
-        var duelBonus = ResolveGroundDuel(state, possessionSide);
+        var duelBonus = ResolveGroundDuel(state, side);
 
         var creationChance = Probability.Band(
             rules.BaseCreationBasisPoints
@@ -186,41 +314,78 @@ internal static class PossessionSimulator
             rules.MinCreationBasisPoints,
             rules.MaxCreationBasisPoints);
 
-        creationChance = Probability.Apply(creationChance, GameStateModifier(state, possessionSide));
+        creationChance = Probability.Apply(creationChance, GameStateModifier(state, side));
 
         if (!state.Random.RollBasisPoints(creationChance))
         {
-            ResolveFailedCreation(state, possessionSide, plan);
-            InjurySimulator.TryResolveInjury(state);
-            state.EndPassage();
+            Finish(state, ResolveFailedCreation(state, possession));
 
             return;
         }
 
-        state.MoveBallAndRecord(plan.ShotPoint, PassageWaypointKind.Shot, rules.ShotAltitude);
-        ChanceSimulator.ResolveOpenPlay(state, possessionSide, plan.Zone);
-        InjurySimulator.TryResolveInjury(state);
-        state.EndPassage();
+        // The attack breaks through: the ball is played on to the shot point and struck from there.
+        state.MoveBallAndRecord(plan.ShotPoint, PassageWaypointKind.Pass);
+        ChanceSimulator.ResolveOpenPlay(state, side, plan.Zone, PassagePlanner.StrikeFrom(plan, plan.ShotPoint, rules));
+        Finish(state, PassageOutcome.OpenPlayShot);
     }
 
     /// <summary>
-    /// Moves the ball along the possession's approach, from the start to the pressure point, recording the
-    /// waypoints and the carrier's and passer's touches (`engine-v4`).
+    /// Ends a possession: the injury roll, the ball placed where play continues, and the passage handed on.
     /// </summary>
+    /// <remarks>
+    /// A dead ball is taken from its spot, so when a restart is pending the ball is placed there; a loose ball
+    /// — a block, a rebound, a clearance — is already where play continues. Moving the ball here, and not where
+    /// the outcome was recorded, keeps the strike's last waypoint where the strike ended.
+    /// </remarks>
+    private static void Finish(MatchState state, PassageOutcome outcome)
+    {
+        InjurySimulator.TryResolveInjury(state);
+
+        if (state.NextRestart is { } restart)
+        {
+            state.MoveBall(restart.Spot);
+        }
+
+        state.EndPassage(outcome);
+    }
+
+    /// <summary>
+    /// Writes down the possession's approach: the ball's waypoints from the start, and the carrier's and
+    /// passer's touches (`engine-v4`).
+    /// </summary>
+    /// <param name="state">The match state.</param>
+    /// <param name="possession">The possession.</param>
+    /// <param name="points">The path the ball took: the whole approach, or the part of it that was played.</param>
+    /// <param name="endsInCross">Whether the path ends in a cross, which only the whole approach can.</param>
+    /// <param name="passer">Whether a player plays the ball on from where the path ends.</param>
+    /// <param name="scramble">The scramble the side in possession won at the start, if there was one.</param>
     private static void RecordApproach(
         MatchState state,
-        MatchSide side,
-        PlannedPassage plan,
-        Pcg32 derived)
+        Possession possession,
+        IReadOnlyList<SpatialPoint> points,
+        bool endsInCross,
+        bool passer,
+        Scramble? scramble)
     {
-        var points = plan.Approach;
+        var side = possession.Side;
+        var derived = possession.Derived;
 
-        // The first waypoint is the possession's start, and the carrier who receives there.
-        state.MoveBallAndRecord(points[0], PassageWaypointKind.Carry);
+        // The first waypoint is the possession's start: a dead ball set down, or the loose ball picked up
+        // where it lay — and the carrier who receives there.
+        state.MoveBallAndRecord(
+            points[0],
+            possession.Restart == PassageRestartKind.None ? PassageWaypointKind.Carry : PassageWaypointKind.Restart);
 
         var carrier = PickOutfield(state, side, derived, MatchAttributeName.Dribbling);
 
-        if (carrier is Guid carrierId)
+        if (scramble is { } won)
+        {
+            // The contested loose ball is where the possession begins, and the side that won it carries on
+            // from there: both contestants are at the ball.
+            state.RecordTouch(won.AttackerId, PassageAction.Carry);
+            state.RecordTouch(won.DefenderId, PassageAction.Run);
+        }
+        else if (carrier is Guid carrierId)
         {
             state.RecordTouch(carrierId, PassageAction.Carry);
         }
@@ -228,18 +393,18 @@ internal static class PossessionSimulator
         for (var index = 1; index < points.Count; index++)
         {
             var last = index == points.Count - 1;
-            var kind = last && plan.ApproachEndsInCross ? PassageWaypointKind.Cross : PassageWaypointKind.Pass;
+            var kind = last && endsInCross ? PassageWaypointKind.Cross : PassageWaypointKind.Pass;
             var altitude = kind == PassageWaypointKind.Cross ? state.Rules.CrossAltitude : 0;
 
             state.MoveBallAndRecord(points[index], kind, altitude);
         }
 
-        // The pressure point is where the ball is received into the final beat of the build-up.
-        var passer = PickOutfield(state, side, derived, MatchAttributeName.Passing);
+        // Where the path ends is where the ball is received into the final beat of the build-up.
+        var passerId = PickOutfield(state, side, derived, MatchAttributeName.Passing);
 
-        if (passer is Guid passerId)
+        if (passer && passerId is Guid playerId)
         {
-            state.RecordTouch(passerId, plan.ApproachEndsInCross ? PassageAction.Cross : PassageAction.Pass);
+            state.RecordTouch(playerId, endsInCross ? PassageAction.Cross : PassageAction.Pass);
         }
     }
 
@@ -258,23 +423,35 @@ internal static class PossessionSimulator
         return pick?.Participant.ParticipantId;
     }
 
-    /// <summary>Gets how far up the pitch the ball is from the attacking side's own goal.</summary>
-    private static int AttackingX(MatchState state, MatchSide possessionSide)
-    {
-        var x = state.Ball.GroundPoint.X;
+    /// <summary>Gets how far up the pitch a point is from the attacking side's own goal.</summary>
+    private static int AttackingX(SpatialPoint point, MatchSide possessionSide) =>
+        possessionSide == MatchSide.Home ? point.X : SpatialPitch.PitchLength - point.X;
 
-        return possessionSide == MatchSide.Home ? x : SpatialPitch.PitchLength - x;
+    /// <summary>
+    /// Clears a ball the defence has won back towards the middle third, when it is far enough from there for a
+    /// kick to be worth showing (`engine-v5`).
+    /// </summary>
+    private static void ClearBall(MatchState state, PlannedPassage plan)
+    {
+        var from = state.Ball.GroundPoint;
+        var target = PassagePlanner.ClearanceTarget(plan, from, state.Rules);
+
+        if (target != from)
+        {
+            state.MoveBallAndRecord(target, PassageWaypointKind.Clearance, state.Rules.ClearanceAltitude);
+        }
     }
 
     /// <summary>
     /// Resolves the loose-ball scramble that opens a passage: whether the possession side keeps the ball.
     /// </summary>
     /// <remarks>
-    /// Returns <see langword="true"/> when the scramble is <em>lost</em>, which ends the possession with a
-    /// turnover. The nearest players from each side contest it, chosen by the legs a scramble asks for
-    /// (engine-v3).
+    /// The nearest players from each side contest it, chosen by the legs a scramble asks for (engine-v3). When
+    /// either side has nobody to contest it there is no scramble, which is the same as the side in possession
+    /// keeping the ball.
     /// </remarks>
-    private static bool ResolveScramble(MatchState state, MatchSide possessionSide)
+    /// <returns>The scramble and who contested it, or null when there was nobody to contest it.</returns>
+    private static Scramble? ResolveScramble(MatchState state, MatchSide possessionSide)
     {
         var attacker = WeightedPick.From(
             state.SideOf(possessionSide).Outfield,
@@ -288,7 +465,7 @@ internal static class PossessionSimulator
 
         if (attacker is null || defender is null)
         {
-            return false;
+            return null;
         }
 
         var kept = DuelResolver.ResolveScramble(
@@ -310,7 +487,7 @@ internal static class PossessionSimulator
             state.OpponentOf(possessionSide).AdjustLiveRating(defender.Participant.ParticipantId, state.Rules.LiveRatingTackleBonusBasisPoints);
         }
 
-        return !kept;
+        return new Scramble(!kept, attacker.Participant.ParticipantId, defender.Participant.ParticipantId);
     }
 
     private static int ScrambleWeight(MatchParticipantV1 participant) =>
@@ -319,11 +496,14 @@ internal static class PossessionSimulator
         + participant.Attributes.ValueOf(MatchAttributeName.WorkRate);
 
     /// <summary>
-    /// Resolves a direct free kick awarded in the attacking half: the award event, the strike, and what it
-    /// produced (engine-v3).
+    /// Resolves a direct free kick awarded in the attacking half: the placement, the award event, the strike,
+    /// and what it produced (engine-v3, completed in engine-v5).
     /// </summary>
-    private static void ResolveFreeKick(MatchState state, MatchSide side, int attackingX)
+    /// <returns>How the possession ended: the free kick struck, or crossed rather than struck.</returns>
+    private static PassageOutcome ResolveFreeKick(MatchState state, Possession possession)
     {
+        var rules = state.Rules;
+        var side = possession.Side;
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
 
@@ -333,26 +513,35 @@ internal static class PossessionSimulator
                 + slot.Participant.Attributes.ValueOf(MatchAttributeName.Finishing),
             state.Random);
 
+        var spot = state.Ball.GroundPoint;
+
         if (taker is null)
         {
-            return;
+            // Nobody to take it, so it is a quick free kick like any other foul.
+            state.RestartWithFreeKick(side, spot);
+
+            return PassageOutcome.Foul;
         }
 
+        // The ball is set down where the foul was committed, and the taker stands over it.
+        state.MoveBallAndRecord(spot, PassageWaypointKind.Restart);
         state.RecordTouch(taker.Participant.ParticipantId, PassageAction.FreeKick);
         state.Emit(side, EngineEventType.FreeKickWon, taker.Participant.ParticipantId);
 
         var outcome = SetPieceDirector.ResolveDirectFreeKick(
             taker.Participant,
             defender.Goalkeeper?.Participant,
-            attackingX,
+            AttackingX(spot, side),
             side == MatchSide.Home,
-            state.Rules,
+            rules,
             state.Random);
 
         if (!outcome.Attempted)
         {
             // Crossed rather than struck: the passage ends with the ball delivered into the box.
-            return;
+            state.MoveBallAndRecord(possession.Plan.HeaderPoint, PassageWaypointKind.Cross, rules.HeaderAltitude);
+
+            return PassageOutcome.FreeKickCrossed;
         }
 
         state.Emit(
@@ -361,41 +550,63 @@ internal static class PossessionSimulator
             outcome.TakerId,
             outcome.GoalkeeperId,
             outcome.Zone,
-            state.Rules.FreeKickGoalBasisPoints);
+            rules.FreeKickGoalBasisPoints);
+
+        var strike = PassagePlanner.StrikeFrom(possession.Plan, spot, rules);
 
         if (outcome.IsGoal)
         {
-            ScoreFromSetPiece(state, side, outcome.TakerId, EngineEventType.Goal);
-            return;
+            state.MoveBallAndRecord(strike.GoalTarget, PassageWaypointKind.Shot, strike.GoalAltitude);
+            ScoreFromSetPiece(state, side, outcome.TakerId, EngineEventType.Goal, spot);
+
+            return PassageOutcome.FreeKickStruck;
         }
 
         // The strike missed: attribute it, saved, blocked, woodwork, or off target, like an open-play shot.
         if (outcome.WasSaved)
         {
-            state.Emit(side, EngineEventType.ShotSaved, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, state.Rules.FreeKickGoalBasisPoints);
+            state.MoveBallAndRecord(strike.SaveTarget, PassageWaypointKind.Shot, strike.SaveAltitude);
 
             if (outcome.GoalkeeperId is Guid keeper)
             {
-                defender.AdjustLiveRating(keeper, state.Rules.LiveRatingSaveBonusBasisPoints);
+                state.RecordTouch(keeper, PassageAction.Save);
             }
+
+            state.Emit(side, EngineEventType.ShotSaved, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, rules.FreeKickGoalBasisPoints, at: spot);
+
+            if (outcome.GoalkeeperId is Guid ratedKeeper)
+            {
+                defender.AdjustLiveRating(ratedKeeper, rules.LiveRatingSaveBonusBasisPoints);
+            }
+
+            state.RestartFromGoalArea(possession.Defending, PassageRestartKind.KeeperBall);
         }
         else if (outcome.HitWoodwork)
         {
-            state.Emit(side, EngineEventType.Woodwork, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, state.Rules.FreeKickGoalBasisPoints);
+            state.MoveBallAndRecord(strike.WoodworkTarget, PassageWaypointKind.Shot, strike.WoodworkAltitude);
+            state.Emit(side, EngineEventType.Woodwork, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, rules.FreeKickGoalBasisPoints, at: spot);
+
+            // The frame sends it back into play, where it is loose.
+            state.MoveBallAndRecord(strike.ReboundPoint, PassageWaypointKind.Clearance, strike.GoalAltitude);
         }
         else
         {
-            state.Emit(side, EngineEventType.ShotOffTarget, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, state.Rules.FreeKickGoalBasisPoints);
+            state.MoveBallAndRecord(strike.MissTarget, PassageWaypointKind.Shot, strike.MissAltitude);
+            state.Emit(side, EngineEventType.ShotOffTarget, outcome.TakerId, outcome.GoalkeeperId, outcome.Zone, rules.FreeKickGoalBasisPoints, at: spot);
+
+            state.RestartFromGoalArea(possession.Defending, PassageRestartKind.GoalKick);
         }
 
-        attacker.AdjustLiveRating(outcome.TakerId, -state.Rules.LiveRatingShotMissPenaltyBasisPoints);
+        attacker.AdjustLiveRating(outcome.TakerId, -rules.LiveRatingShotMissPenaltyBasisPoints);
+
+        return PassageOutcome.FreeKickStruck;
     }
 
     /// <summary>
     /// Scores a goal from a set piece and records everything the open-play scorer records, minus the assist
     /// a set piece does not model.
     /// </summary>
-    private static void ScoreFromSetPiece(MatchState state, MatchSide side, Guid scorerId, EngineEventType type)
+    private static void ScoreFromSetPiece(MatchState state, MatchSide side, Guid scorerId, EngineEventType type, SpatialPoint at)
     {
         var runtime = state.SideOf(side);
         var goalkeeper = state.OpponentOf(side).Goalkeeper?.Participant.ParticipantId;
@@ -403,8 +614,8 @@ internal static class PossessionSimulator
         runtime.Goals.TryGetValue(scorerId, out var goals);
         runtime.Goals[scorerId] = goals + 1;
 
-        // A goal is a restart: the next possession begins at the centre spot (engine-v4).
-        state.RestartFromCentre = true;
+        // A goal is a restart: the side that conceded kicks off from the centre spot (engine-v5).
+        state.RestartAfterGoal(side);
 
         state.AddGoalStoppage();
 
@@ -420,7 +631,7 @@ internal static class PossessionSimulator
             state.OpponentOf(side).AdjustLiveRating(keeper, -state.Rules.LiveRatingGoalConcededPenaltyBasisPoints);
         }
 
-        state.Emit(side, type, scorerId, goalkeeper, ShotZone.Central, state.Rules.FreeKickGoalBasisPoints);
+        state.Emit(side, type, scorerId, goalkeeper, ShotZone.Central, state.Rules.FreeKickGoalBasisPoints, at: at);
     }
 
     /// <summary>
@@ -500,23 +711,24 @@ internal static class PossessionSimulator
     /// <remarks>
     /// Fouls are not here, because the defending side's foul was already rolled before the progression
     /// attempt. The two failure modes left are the attacking side's own: caught offside, or simply losing the
-    /// ball.
+    /// ball. Either way the approach was cut short, so the ball is lost where it had got to (`engine-v5`).
     /// </remarks>
-    private static void ResolveFailedProgression(
-        MatchState state,
-        MatchSide side,
-        SideRuntime attacker,
-        PlannedPassage plan)
+    private static PassageOutcome ResolveFailedProgression(MatchState state, Possession possession, SideRuntime attacker)
     {
+        var plan = possession.Plan;
+
         if (!state.Random.RollBasisPoints(state.Rules.OffsideShareOfTurnoverBasisPoints))
         {
-            // A plain turnover: the defence clears the ball out towards the middle third (engine-v4).
-            state.MoveBallAndRecord(plan.TurnoverPoint, PassageWaypointKind.Clearance, state.Rules.ClearanceAltitude);
+            // A plain turnover: the defence wins the ball and clears it out towards the middle third.
+            ClearBall(state, plan);
 
-            return;
+            return PassageOutcome.ProgressionFailed;
         }
 
-        state.MoveBallAndRecord(plan.OffsidePoint, PassageWaypointKind.Pass);
+        // The last pass was played through to a player who was offside.
+        var offsidePoint = PassagePlanner.OffsideTarget(plan, state.Ball.GroundPoint, state.Rules);
+
+        state.MoveBallAndRecord(offsidePoint, PassageWaypointKind.Pass);
 
         var caught = WeightedPick.From(
             attacker.Outfield,
@@ -525,34 +737,49 @@ internal static class PossessionSimulator
 
         if (caught is not null)
         {
-            state.Emit(side, EngineEventType.Offside, caught.Participant.ParticipantId);
+            state.RecordTouch(caught.Participant.ParticipantId, PassageAction.Run);
+            state.Emit(possession.Side, EngineEventType.Offside, caught.Participant.ParticipantId);
+
+            // The free kick is the defending side's, from where the offside was given.
+            state.RestartWithFreeKick(possession.Defending, offsidePoint);
         }
+
+        return PassageOutcome.Offside;
     }
 
     /// <summary>Resolves a possession that created nothing: a corner, or a plain turnover.</summary>
-    private static void ResolveFailedCreation(MatchState state, MatchSide side, PlannedPassage plan)
+    private static PassageOutcome ResolveFailedCreation(MatchState state, Possession possession)
     {
-        if (!state.Random.RollBasisPoints(state.Rules.CornerShareOfFailedCreationBasisPoints))
+        var rules = state.Rules;
+        var plan = possession.Plan;
+
+        if (!state.Random.RollBasisPoints(rules.CornerShareOfFailedCreationBasisPoints))
         {
             // The attack broke down without a corner: the ball is cleared into the middle third (engine-v4).
-            state.MoveBallAndRecord(plan.TurnoverPoint, PassageWaypointKind.Clearance, state.Rules.ClearanceAltitude);
+            ClearBall(state, plan);
 
-            return;
+            return PassageOutcome.CreationFailed;
         }
 
-        // A corner is taken from the flag, so the Corner event carries the corner flag's coordinates
-        // (engine-v4).
-        state.MoveBallAndRecord(plan.CornerPoint, PassageWaypointKind.Cross, state.Rules.CrossAltitude);
-        state.Emit(side, EngineEventType.Corner);
+        // A corner: the ball goes out over the goal line, is set down at the flag, and is delivered into the
+        // box whatever comes of it (engine-v5).
+        state.MoveBallAndRecord(plan.CornerOutPoint, PassageWaypointKind.Pass);
+        state.MoveBallAndRecord(plan.CornerPoint, PassageWaypointKind.Restart);
+        state.Emit(possession.Side, EngineEventType.Corner);
+        state.MoveBallAndRecord(plan.HeaderPoint, PassageWaypointKind.Cross, rules.HeaderAltitude);
 
-        if (state.Random.RollBasisPoints(state.Rules.CornerChanceBasisPoints))
+        if (state.Random.RollBasisPoints(rules.CornerChanceBasisPoints)
+            && ChanceSimulator.ResolveCorner(state, possession.Side, PassagePlanner.StrikeFrom(plan, plan.HeaderPoint, rules)))
         {
-            state.MoveBallAndRecord(plan.HeaderPoint, PassageWaypointKind.Cross, state.Rules.HeaderAltitude);
-            ChanceSimulator.ResolveCorner(state, side);
+            // The header was won and struck at goal, so what happens next is the shot's outcome: a goal, a
+            // save, a miss, a block, or the woodwork. There is no clearance after any of them.
+            return PassageOutcome.CornerHeaded;
         }
 
-        // The corner is cleared whether or not it produced a header, so the passage ends deeper.
-        state.MoveBallAndRecord(plan.TurnoverPoint, PassageWaypointKind.Clearance, state.Rules.ClearanceAltitude);
+        // Nobody got a header on it, or the defence won it: the corner is cleared.
+        ClearBall(state, plan);
+
+        return PassageOutcome.CornerCleared;
     }
 
     /// <summary>
@@ -561,7 +788,8 @@ internal static class PossessionSimulator
     /// <remarks>
     /// A side's control is what it can do with the ball against what the opponent can do about it, and the
     /// share is bounded so that neither side is ever shut out of the match however lopsided the ratings are.
-    /// A twenty-minute spell without the ball is a thing that happens; never touching it is not.
+    /// A twenty-minute spell without the ball is a thing that happens; never touching it is not. It is only
+    /// asked of a possession that begins from play: a dead ball already has its side (`engine-v5`).
     /// </remarks>
     private static MatchSide ChoosePossession(MatchState state)
     {
