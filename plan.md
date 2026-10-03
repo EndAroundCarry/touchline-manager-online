@@ -4,12 +4,12 @@ This document outlines the complete specification, mathematical modeling, and st
 
 > **Status:** This is the original seven-stage plan that built the engine and the match center. Stages 1–6
 > are delivered and stage 7's tuning and validation is the ongoing work. The engine has since advanced to
-> `engine-v4` / `engine-rules-v4` and the replay to `replay-v3`: a possession is now played along a real
+> `engine-v4` / `engine-rules-v4` and the replay to `replay-v3`, and then: a possession is now played along a real
 > passage, and the replay is one continuous film with a companion highlights reel (ADR-0051, ADR-0052). The
 > previous milestone's plan is [`engine-v4-continuous-match-replay.md`](engine-v4-continuous-match-replay.md).
-> The next milestone — `engine-v5` (the half-time clock, restart ownership, and a complete passage recorder)
-> followed by the `replay-v4` constant-pace film and a continuous viewer timeline — is planned in
-> [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). Where a stage below names `engine-v3` or
+> That milestone has since been delivered as `engine-v5` / `engine-rules-v5` (the half-time clock, restart
+> ownership, and a complete passage recorder; ADR-0053) and the `replay-v4` constant-pace film with a continuous
+> viewer timeline (ADR-0054); its plan is [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). Where a stage below names `engine-v3` or
 > `replay-v2`, read the version the engine roadmap records.
 
 ---
@@ -30,7 +30,7 @@ This document outlines the complete specification, mathematical modeling, and st
   - Dynamic live player match ratings (6.0 baseline, fluctuating in real time based on on-pitch actions).
 - **Match Viewer UI (FM / CM Look & Feel)**:
   - **Top**: Scoreboard with club kits, crests, digital match clock (00:00 to 90:00+), live event summary, and playback controls.
-  - **Center**: 2D grass pitch with alternating cut stripes, 22 player tokens with shirt numbers & kit colors, dynamic ball with altitude scaling/shadow, and visual clash/shot/card effects.
+  - **Center**: 2D grass pitch with alternating cut stripes, 22 player tokens with shirt numbers & kit colors, dynamic ball with altitude scaling/shadow, and visual shot/card effects.
   - **Left Panel**: Home team lineup with positions, live condition % bars, dynamic color-coded ratings, cards, and bench.
   - **Right Panel**: Away team lineup with identical live metrics.
   - **Bottom Ticker**: Authentic Championship Manager single-line commentary ticker that smoothly overwrites line by line as the action unfolds.

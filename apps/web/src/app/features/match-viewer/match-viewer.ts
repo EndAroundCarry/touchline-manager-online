@@ -10,6 +10,9 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { FadeEdge, fadeAlpha, fadeEdgesFor } from '../../core/match/film-fade';
+import { FilmTimeline, buildFilmTimeline } from '../../core/match/film-timeline';
+import { lineupIndexOf } from '../../core/match/match-lineups';
 import {
   MatchPlayback,
   PLAYBACK_SPEEDS,
@@ -18,20 +21,16 @@ import {
   PlaybackState,
 } from '../../core/match/match-playback';
 import {
-  cardKindFor,
   commentarySideLabel,
   conditionColorClass,
   formatConditionPercent,
   formatMatchRating,
   isGoalCommentary,
   isGoalOutcome,
-  isShotOutcome,
-  matchClockFromSeconds,
   matchClockLabel,
   matchStatisticRows,
   outcomeLabel,
   passageIndexForLine,
-  passageTitle,
   playbackClockLabel,
   ratingColorClass,
   scoreLine,
@@ -40,16 +39,13 @@ import {
 } from '../../core/match/match-presentation';
 import {
   CommentaryLine,
-  HighlightCommentary,
   MatchLineupPlayer,
   MatchPresentation,
-  Passage,
   PlayerLiveMetric,
 } from '../../core/match/match.models';
 import { MatchStore } from '../../core/match/match-store';
 import { formatInstant } from '../../core/world/presentation';
 import { CanvasMatchRenderer } from './renderer/canvas-match-renderer';
-import { CardKind } from './renderer/renderer.models';
 import { RenderLoop } from './renderer/render-loop';
 
 /** The match center's sections, in the order a manager reads them. */
@@ -63,36 +59,25 @@ const TABS = [
 /** One of the match center's tabs. */
 type TabId = (typeof TABS)[number]['id'];
 
-/** How long the scoreboard's goal highlight stays up, in milliseconds. */
-const GOAL_FLASH_MILLISECONDS = 2_500;
-
 /** The normalized scale the pitch speaks on both axes. */
 const PITCH_SCALE = 10_000;
 
 /** How coarsely the scrubber's elapsed time is published, so a 60 Hz frame does not drive change detection. */
 const ELAPSED_QUANTUM_MILLISECONDS = 250;
 
-/** One row of the replay feed: a passage's commentary beat at a film moment. */
-interface FeedRow {
-  readonly key: string;
-  readonly filmMilliseconds: number;
-  readonly clock: string;
-  readonly side: string;
-  readonly text: string;
-  readonly isGoal: boolean;
-}
-
 /** One marker on the progress scrubber: a goal or a shot. */
 interface ReplayMarker {
   readonly key: string;
   readonly kind: 'goal' | 'shot';
+  /** Where the dot sits on the scrubber: the moment the ball is struck. */
   readonly percent: number;
+  /** Where clicking it seeks to: the start of the passage that builds to the strike. */
   readonly milliseconds: number;
   readonly label: string;
 }
 
 /**
- * The FM/CM-style match center (master plan §9.5, §11.1, `replay-v3`).
+ * The FM/CM-style match center (master plan §9.5, §11.1, `replay-v3`, `replay-v4`).
  *
  * A result and its replay. The summary is the scoreboard and the scoreline; the replay is one continuous
  * film of the whole match, played beside the two lineups with a scrolling commentary feed under it and a
@@ -104,11 +89,17 @@ interface ReplayMarker {
  * clips over the same film clock, so a chance is always preceded by the move that produced it. Both are the
  * same data; the toggle only chooses which windows of film time play.
  *
+ * The film is *one* thing on screen (`replay-v4`). The presentation's passages are built into a
+ * `FilmTimeline` once, and the viewer makes one renderer for it and draws global film time: the passage the
+ * playhead is in is not something the picture knows about, so nothing is rebuilt or redrawn at a stale time
+ * when it moves on. The clock, the feed, the cards and the live panels are all read from the same film moment.
+ * The screen dips to dark over a cut and over a jump in the highlights reel.
+ *
  * The animation is deliberately independent of Angular change detection: the render loop draws from the
- * playback state every frame, and signals are written only when something discrete changes — the passage,
- * the play state, the clock label, the feed's length — so a 60 Hz animation does not re-evaluate the
- * commentary list 60 times a second. The loop is stopped on pause, on the tab going hidden, and on
- * destruction, so no callback outlives the canvas it draws to.
+ * playback state every frame, and signals are written only when something discrete changes — the play
+ * state, the clock label, the feed's length — so a 60 Hz animation does not re-evaluate the commentary list
+ * 60 times a second. The loop is stopped on pause, on the tab going hidden, and on destruction, so no
+ * callback outlives the canvas it draws to.
  */
 @Component({
   selector: 'app-match-viewer',
@@ -126,8 +117,8 @@ export class MatchViewer implements OnDestroy {
   /** The presentation the current playback was built from, so a load rebuilds it once. */
   private builtFrom: MatchPresentation | null = null;
 
-  private flashTimer: ReturnType<typeof setTimeout> | null = null;
-  private flashedSequence: number | null = null;
+  /** Where the screen dips to dark, for the playlist being played. */
+  private fadeEdges: readonly FadeEdge[] = [];
 
   private readonly loop = new RenderLoop((delta) => this.onFrame(delta));
   private readonly motionQuery = mediaQuery('(prefers-reduced-motion: reduce)');
@@ -143,11 +134,11 @@ export class MatchViewer implements OnDestroy {
   protected readonly loading = this.store.loading;
   protected readonly loadError = this.store.error;
 
-  /** The active passage's index, published when it changes rather than every frame. */
-  protected readonly activeIndex = signal(0);
+  /** The film the presentation plays as, built once per presentation. */
+  private readonly film = signal<FilmTimeline>(buildFilmTimeline(null));
 
-  /** What the renderer draws: the passage the playhead stands in. */
-  protected readonly passage = signal<Passage | null>(null);
+  /** The active passage's index, which the narration follows, published when it changes rather than every frame. */
+  protected readonly activeIndex = signal(0);
 
   /** The play state, published when it changes rather than every frame. */
   protected readonly state = signal<PlaybackState>(this.playback.currentState);
@@ -167,7 +158,7 @@ export class MatchViewer implements OnDestroy {
   /** The active tab. */
   protected readonly activeTab = signal<TabId>('replay');
 
-  /** The continuous scoreboard clock, written only when the label changes. */
+  /** The continuous scoreboard clock, read from the film's half-aware clock and written only when it changes. */
   protected readonly clockLabel = signal('');
 
   /** The minute the continuous clock shows, which the live panels follow. */
@@ -181,9 +172,6 @@ export class MatchViewer implements OnDestroy {
 
   /** How many feed rows the playhead has reached. */
   protected readonly feedCount = signal(0);
-
-  /** The feed's rows, built once per presentation. */
-  private readonly feedEntries = signal<readonly FeedRow[]>([]);
 
   /** Whether the feed is scrolled to its newest row. */
   protected readonly feedPinned = signal(true);
@@ -203,7 +191,7 @@ export class MatchViewer implements OnDestroy {
   protected readonly totalLabel = computed(() => playbackClockLabel(this.totalMs()));
 
   /** The feed rows the playhead has reached, oldest first. */
-  protected readonly feed = computed(() => this.feedEntries().slice(0, this.feedCount()));
+  protected readonly feed = computed(() => this.film().feed.slice(0, this.feedCount()));
 
   /** The goal and shot markers the scrubber draws. */
   protected readonly markers = computed<readonly ReplayMarker[]>(() => {
@@ -218,29 +206,24 @@ export class MatchViewer implements OnDestroy {
 
     const markers: ReplayMarker[] = [];
 
-    this.playback.passages.forEach((passage, index) => {
-      const kind = markerKind(passage.outcomeCode);
+    for (const marker of this.film().markers) {
+      const struck = this.playback.playlistMillisecondsForFilm(marker.filmMilliseconds);
 
-      if (kind === null) {
-        return;
-      }
-
-      const milliseconds = this.playback.playlistMillisecondsForFilm(
-        this.playback.filmStartOf(index),
-      );
-
-      if (milliseconds === null) {
-        return;
+      if (struck === null) {
+        continue;
       }
 
       markers.push({
-        key: `${kind}-${index}`,
-        kind,
-        percent: (milliseconds / total) * 100,
-        milliseconds,
-        label: passageTitle(passage),
+        key: marker.key,
+        kind: marker.kind,
+        percent: (struck / total) * 100,
+        // The build-up is what a manager wants to see, so a click starts where the passage did, and where
+        // the playlist does not carry that — a reel clip that opens mid-passage — at the strike itself.
+        milliseconds:
+          this.playback.playlistMillisecondsForFilm(marker.passageStartMilliseconds) ?? struck,
+        label: marker.label,
       });
-    });
+    }
 
     return markers;
   });
@@ -316,89 +299,11 @@ export class MatchViewer implements OnDestroy {
   /**
    * Every lineup player by participant, and every name and side by player.
    *
-   * The panels ask about 22 players on every change-detection pass, so both lookups are built once per
-   * presentation rather than searched per draw. The side maps are what let a feed row carry the right
-   * accent without reading a rendered sentence.
+   * The panels ask about 22 players on every change-detection pass, so the lookups are built once per
+   * presentation rather than searched per draw. The film timeline reads the same index to put a feed row on
+   * the right side and a card on the right token.
    */
-  private readonly lineupIndex = computed(() => {
-    const byParticipant = new Map<string, MatchLineupPlayer>();
-    const nameByPlayerId = new Map<string, string>();
-    const participantByPlayerId = new Map<string, string>();
-    const sideByPlayerId = new Map<string, string>();
-    const sideByParticipant = new Map<string, string>();
-    const view = this.presentation();
-
-    for (const [side, lineup] of [
-      ['home', view?.homeLineup],
-      ['away', view?.awayLineup],
-    ] as const) {
-      if (lineup === null || lineup === undefined) {
-        continue;
-      }
-
-      for (const player of [...lineup.starters, ...lineup.bench]) {
-        byParticipant.set(player.participantId, player);
-        nameByPlayerId.set(player.playerId, player.name);
-        participantByPlayerId.set(player.playerId, player.participantId);
-        sideByPlayerId.set(player.playerId, side);
-        sideByParticipant.set(player.participantId, side);
-      }
-    }
-
-    return {
-      byParticipant,
-      nameByPlayerId,
-      participantByPlayerId,
-      sideByPlayerId,
-      sideByParticipant,
-    };
-  });
-
-  /**
-   * The card each player carries at the shown minute, which the pitch draws above their token.
-   *
-   * A booking is a state a player keeps for the rest of the match, so the badge appears once the film
-   * reaches the passage that produced it: the card lines before the active passage's own event are read
-   * from the same commentary the report lists, and the player they name is resolved through the lineups.
-   */
-  private readonly cardState = computed(() => {
-    const view = this.presentation();
-    const passage = this.activePassage();
-    const cards = new Map<string, CardKind>();
-
-    if (view === null || passage === null || this.state() === 'idle') {
-      return cards;
-    }
-
-    const participants = this.lineupIndex().participantByPlayerId;
-    const boundary =
-      passage.sourceEventSequence > 0
-        ? passage.sourceEventSequence
-        : (passage.eventSequences[0] ?? Number.MAX_SAFE_INTEGER);
-
-    for (const line of view.commentary) {
-      // Commentary is in event order, so once a line belongs to the passage being shown — or to anything
-      // after it — no later line can have happened yet.
-      if (line.sequence >= boundary) {
-        break;
-      }
-
-      const card = cardKindFor(line.templateKey);
-
-      if (card === null) {
-        continue;
-      }
-
-      const playerId = line.parameters.find((parameter) => parameter.name === 'playerId')?.value;
-      const participantId = playerId === undefined ? undefined : participants.get(playerId);
-
-      if (participantId !== undefined) {
-        cards.set(participantId, card);
-      }
-    }
-
-    return cards;
-  });
+  private readonly lineupIndex = computed(() => lineupIndexOf(this.presentation()));
 
   /** The match minute the live panels show: kickoff before the replay starts, the film's clock after. */
   private readonly metricMinute = computed(() =>
@@ -455,7 +360,9 @@ export class MatchViewer implements OnDestroy {
       }
 
       this.builtFrom = presentation;
-      this.feedEntries.set(this.buildFeed(presentation));
+
+      const timeline = buildFilmTimeline(presentation);
+
       this.feedCount.set(0);
       this.feedPinned.set(true);
 
@@ -466,37 +373,34 @@ export class MatchViewer implements OnDestroy {
         untracked(() => this.mode()),
       );
 
+      this.film.set(timeline);
+      this.refreshFadeEdges();
       this.loop.stop();
       this.publishAll();
     });
 
-    // The renderer is (re)built when the drawn passage, the canvas, or the text-only preference changes —
-    // not on every frame, which is what keeps the animation off the change-detection path.
+    // The renderer is made once for the film, and again only when the film, the canvas, the kits, the
+    // text-only preference or the reduced-motion preference change — never when the playhead moves into the
+    // next passage, which is what keeps the picture continuous and the animation off the change-detection path.
     effect(() => {
-      const passage = this.passage();
+      const film = this.film();
       const canvas = this.canvas();
       const textOnly = this.textOnly();
-      const cards = this.cardState();
-      // Reduced motion shows the passage as a still frame at its end rather than animating it. It is the
-      // *idle* state that is drawn still, so a pause mid-passage keeps the frame the manager paused on.
-      const still = this.reduced() && this.state() === 'idle';
+      const kits = {
+        home: { primary: this.homeColour(), secondary: this.homeSecondaryColour() },
+        away: { primary: this.awayColour(), secondary: this.awaySecondaryColour() },
+      };
+      const reducedMotion = this.reduced();
 
       this.renderer?.dispose();
       this.renderer = null;
 
-      if (passage === null || canvas === undefined || textOnly) {
+      if (film.isEmpty || canvas === undefined || textOnly) {
         return;
       }
 
-      this.renderer = new CanvasMatchRenderer(canvas.nativeElement, passage, {
-        kits: {
-          home: { primary: this.homeColour(), secondary: this.homeSecondaryColour() },
-          away: { primary: this.awayColour(), secondary: this.awaySecondaryColour() },
-        },
-        cards,
-        reducedMotion: this.reduced(),
-      });
-      this.renderer.render(still ? passage.durationMilliseconds : this.playback.passageTimeMs);
+      this.renderer = new CanvasMatchRenderer(canvas.nativeElement, film, { kits, reducedMotion });
+      this.renderFrame();
     });
   }
 
@@ -505,11 +409,6 @@ export class MatchViewer implements OnDestroy {
     this.loop.dispose();
     this.renderer?.dispose();
     this.renderer = null;
-
-    if (this.flashTimer !== null) {
-      clearTimeout(this.flashTimer);
-      this.flashTimer = null;
-    }
 
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.visibilityListener);
@@ -553,6 +452,7 @@ export class MatchViewer implements OnDestroy {
 
     this.mode.set(mode);
     this.playback.setMode(mode);
+    this.refreshFadeEdges();
     this.apply();
   }
 
@@ -616,6 +516,7 @@ export class MatchViewer implements OnDestroy {
     if (!this.playback.seekToEvent(line.sequence) && this.mode() === 'reel') {
       this.mode.set('full');
       this.playback.setMode('full');
+      this.refreshFadeEdges();
       this.playback.seekToEvent(line.sequence);
     }
 
@@ -778,8 +679,9 @@ export class MatchViewer implements OnDestroy {
 
     this.updateClock();
     this.updateFeed();
+    this.updateGoal();
     this.updateProgress();
-    this.renderer?.render(this.playback.passageTimeMs);
+    this.renderFrame();
 
     if (this.playback.currentState !== 'playing') {
       this.loop.stop();
@@ -791,13 +693,14 @@ export class MatchViewer implements OnDestroy {
     this.publish();
     this.updateClock();
     this.updateFeed();
+    this.updateGoal();
     this.updateProgress();
 
     if (this.playback.currentState === 'playing') {
       this.loop.start();
     } else {
       this.loop.stop();
-      this.renderer?.render(this.playback.passageTimeMs);
+      this.renderFrame();
     }
   }
 
@@ -806,32 +709,41 @@ export class MatchViewer implements OnDestroy {
     this.publish();
     this.updateClock();
     this.updateFeed();
+    this.updateGoal();
     this.updateProgress();
   }
 
-  /** Publishes what the playback is showing, flashing the scoreboard when a goal comes up. */
+  /** Publishes what the playback is showing: the passage the narration follows, and the play state. */
   private publish(): void {
-    const passage = this.playback.active;
-
     this.activeIndex.set(this.playback.activeIndex);
-    this.passage.set(passage);
     this.state.set(this.playback.currentState);
+  }
 
-    if (passage !== null && isGoalOutcome(passage.outcomeCode)) {
-      this.flashGoal(passage);
-    }
+  /** Draws the film at the playhead, dipped to dark where a cut or a jump in the reel is being faded over. */
+  private renderFrame(): void {
+    const position = this.playback.positionMs;
+    const overlay =
+      this.playback.currentState === 'playing'
+        ? fadeAlpha(this.fadeEdges, position, this.playback.speed)
+        : 0;
+
+    this.renderer?.render(position, overlay);
+  }
+
+  /** Works out where the screen dips to dark: at every cut, and between the windows of the reel. */
+  private refreshFadeEdges(): void {
+    this.fadeEdges = fadeEdgesFor(this.film().cuts, this.playback.windows);
   }
 
   /**
-   * Advances the scoreboard clock over the active passage's match window.
+   * Publishes the scoreboard clock for the playhead.
    *
-   * The engine records a match second as `(minute + stoppage) * 60`, so a passage's window can be walked
-   * continuously and the label only written when it actually changes.
+   * Each half runs on its own clock, so the film reads `45+2'` through the first half's stoppage, `HT` at
+   * the interval, `46'` as the second half begins, and `90+N'` in its stoppage; the label is only written
+   * when it changes.
    */
   private updateClock(): void {
-    const active = this.playback.activePassage;
-
-    if (active === null) {
+    if (!this.playback.hasPassages) {
       if (this.clockLabel() !== '') {
         this.clockLabel.set('');
         this.clockMinute.set(0);
@@ -840,33 +752,17 @@ export class MatchViewer implements OnDestroy {
       return;
     }
 
-    const span = active.passage.endMatchSecond - active.passage.startMatchSecond;
-    const fraction =
-      active.durationMilliseconds > 0
-        ? this.playback.passageTimeMs / active.durationMilliseconds
-        : 0;
-    const clock = matchClockFromSeconds(active.passage.startMatchSecond + fraction * span);
-    const label = matchClockLabel(clock.minute, clock.stoppageMinute);
+    const clock = this.film().clockAt(this.playback.positionMs);
 
-    if (label !== this.clockLabel()) {
-      this.clockLabel.set(label);
+    if (clock.label !== this.clockLabel()) {
+      this.clockLabel.set(clock.label);
       this.clockMinute.set(clock.minute);
     }
   }
 
   /** Publishes the feed's visible length as the playhead passes each row's film time. */
   private updateFeed(): void {
-    const position = this.playback.positionMs;
-    const entries = this.feedEntries();
-    let count = 0;
-
-    for (const entry of entries) {
-      if (entry.filmMilliseconds > position) {
-        break;
-      }
-
-      count += 1;
-    }
+    const count = this.film().feedCountAt(this.playback.positionMs);
 
     if (count !== this.feedCount()) {
       this.feedCount.set(count);
@@ -874,6 +770,20 @@ export class MatchViewer implements OnDestroy {
       if (this.feedPinned()) {
         setTimeout(() => this.scrollFeedToBottom(), 0);
       }
+    }
+  }
+
+  /**
+   * Lights the scoreboard for the goal being celebrated at the playhead.
+   *
+   * The highlight follows the film rather than a timer, so it lasts as long as the pitch's own GOAL! badge
+   * does at whatever speed is playing, and a seek into a celebration shows both.
+   */
+  private updateGoal(): void {
+    const side = this.film().activeGoalAt(this.playback.positionMs)?.side ?? null;
+
+    if (side !== this.scoringSide()) {
+      this.scoringSide.set(side);
     }
   }
 
@@ -901,130 +811,6 @@ export class MatchViewer implements OnDestroy {
       element.scrollTop = element.scrollHeight;
     }
   }
-
-  /** Builds every feed row a presentation offers, in film order. */
-  private buildFeed(presentation: MatchPresentation | null): readonly FeedRow[] {
-    if (presentation === null) {
-      return [];
-    }
-
-    const starts = filmStarts(presentation);
-    const index = this.lineupIndex();
-    const rows: FeedRow[] = [];
-
-    presentation.passages.forEach((passage, passageIndex) => {
-      let tokenIndex = 0;
-
-      for (const token of passage.commentary ?? []) {
-        rows.push({
-          key: `${passageIndex}:${tokenIndex}`,
-          filmMilliseconds: starts[passageIndex] + token.timeMilliseconds,
-          clock: tokenClock(passage, token),
-          side: tokenSide(token, index),
-          text: token.text,
-          isGoal: isGoalCommentary(token.templateKey),
-        });
-
-        tokenIndex += 1;
-      }
-    });
-
-    return rows.sort((one, other) => one.filmMilliseconds - other.filmMilliseconds);
-  }
-
-  /** Flashes the scoreboard for a goal, once per passage. */
-  private flashGoal(passage: Passage): void {
-    if (this.flashedSequence === passage.sourceEventSequence) {
-      return;
-    }
-
-    const side = this.goalSide(passage);
-
-    if (side === null) {
-      return;
-    }
-
-    this.flashedSequence = passage.sourceEventSequence;
-    this.scoringSide.set(side);
-
-    if (this.flashTimer !== null) {
-      clearTimeout(this.flashTimer);
-    }
-
-    this.flashTimer = setTimeout(() => {
-      this.flashTimer = null;
-      this.flashedSequence = null;
-      this.scoringSide.set(null);
-    }, GOAL_FLASH_MILLISECONDS);
-  }
-
-  /** Which side scored the passage's goal, read from the commentary line that narrates it. */
-  private goalSide(passage: Passage): 'home' | 'away' | null {
-    const line = this.presentation()?.commentary.find(
-      (candidate) => candidate.sequence === passage.sourceEventSequence,
-    );
-
-    return line === undefined || (line.side !== 'home' && line.side !== 'away') ? null : line.side;
-  }
-}
-
-/** The film offset of each passage, from the presentation's own schedule. */
-function filmStarts(presentation: MatchPresentation): readonly number[] {
-  let cursor = 0;
-
-  return presentation.passages.map((passage, index) => {
-    const schedule = presentation.playback?.[index];
-    const start =
-      schedule !== undefined && schedule.kind === 'passage' ? schedule.startMilliseconds : cursor;
-
-    cursor =
-      start +
-      (schedule !== undefined && schedule.kind === 'passage'
-        ? schedule.durationMilliseconds
-        : passage.durationMilliseconds);
-
-    return start;
-  });
-}
-
-/** A feed token's clock, walked continuously over its passage's match window. */
-function tokenClock(passage: Passage, token: HighlightCommentary): string {
-  const span = passage.endMatchSecond - passage.startMatchSecond;
-  const fraction =
-    passage.durationMilliseconds > 0 ? token.timeMilliseconds / passage.durationMilliseconds : 0;
-  const clock = matchClockFromSeconds(passage.startMatchSecond + fraction * span);
-
-  return matchClockLabel(clock.minute, clock.stoppageMinute);
-}
-
-/** Which side a feed token belongs to, from its own facts rather than a rendered sentence. */
-function tokenSide(
-  token: HighlightCommentary,
-  index: {
-    readonly sideByPlayerId: ReadonlyMap<string, string>;
-    readonly sideByParticipant: ReadonlyMap<string, string>;
-  },
-): string {
-  const playerId = token.parameters.find((parameter) => parameter.name === 'playerId')?.value;
-
-  if (playerId !== undefined) {
-    return index.sideByPlayerId.get(playerId) ?? '';
-  }
-
-  const participantId = token.parameters.find(
-    (parameter) => parameter.name === 'participantId',
-  )?.value;
-
-  return participantId === undefined ? '' : (index.sideByParticipant.get(participantId) ?? '');
-}
-
-/** Whether a passage's outcome earns a scrubber marker, and which. */
-function markerKind(outcomeCode: string): 'goal' | 'shot' | null {
-  if (isGoalOutcome(outcomeCode)) {
-    return 'goal';
-  }
-
-  return isShotOutcome(outcomeCode) ? 'shot' : null;
 }
 
 /** Builds a media-query list where the platform has one, and nothing where it does not. */

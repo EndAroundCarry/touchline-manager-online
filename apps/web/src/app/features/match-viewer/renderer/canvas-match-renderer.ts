@@ -1,16 +1,16 @@
-import { HighlightEntity, HighlightKeyframe, Passage } from '../../../core/match/match.models';
-import { frameAt, sampleAt } from './keyframe-interpolator';
+import { FilmTimeline } from '../../../core/match/film-timeline';
+import { KeyframeSample, TrackInterpolator, emptySample } from './keyframe-interpolator';
 import {
   PitchGeometry,
   SHADOW_MIN_ALTITUDE,
   altitudeLift,
   altitudeScale,
+  canvasX,
+  canvasY,
   pitchGeometry,
   pitchRect,
-  toCanvasPoint,
 } from './pitch-layout';
 import {
-  celebrationStartMilliseconds,
   isDiveAction,
   isStrikeAction,
   nearestPlayerToBall,
@@ -21,48 +21,75 @@ import {
   CardKind,
   FrameEntity,
   FrameMetrics,
-  PitchPoint,
   PitchRect,
   RendererEntity,
   RendererOptions,
-  RendererTrack,
   TeamKit,
   TeamKits,
 } from './renderer.models';
 
 /**
- * Draws one highlight on a canvas, interpolating the server's keyframes (`§9.1`, `§9.4`).
+ * Draws one whole film on a canvas, interpolating the timeline's tracks (`§9.1`, `§9.4`, `replay-v4`).
  *
- * Framework-neutral: it knows a canvas and a highlight and nothing about Angular, so the renderer can be
+ * Framework-neutral: it knows a canvas and a film timeline and nothing about Angular, so the renderer can be
  * reused by a later native client and tested without a component. It scales to the device pixel ratio
  * without touching normalized geometry, and it keeps no timers of its own — whoever owns the animation loop
  * decides when a frame is drawn, which is what makes "stop on pause, route change, tab hidden,
  * destruction" something the caller can guarantee.
  *
- * Stage 6 fills the picture in: a mown pitch with the markings a real one has, kit-coloured tokens with
+ * There is **one renderer for a presentation**. It is given the whole film and drawn at a film moment, so a
+ * passage boundary is invisible to it: nothing is rebuilt, nothing is drawn at a stale time. A player is a
+ * slot on the pitch whose occupant the timeline's roster names, so a substitution changes the name and the
+ * number on the token and a player sent off stops being drawn.
+ *
+ * The pitch is drawn **once** onto an offscreen layer and copied to the canvas each frame, and redrawn only
+ * when the canvas changes size, which a `ResizeObserver` reports; a frame never reads the page's layout. The
+ * entities, the list of who is visible, and the effect lists are made once and reused, so a frame allocates
+ * next to nothing.
+ *
+ * Stage 6 filled the picture in: a mown pitch with the markings a real one has, kit-coloured tokens with
  * shirt numbers and name tags, distinct goalkeeper kits, a ball that lifts off its own shadow by the
  * altitude the engine sent, and the action effects — a shot's projectile streak, a
- * booking's card, a goal's pulsating flash. Teams are distinguished by shape as well as colour (a circle
- * for the home side, a square for the away side) and every player carries their shirt number, because the
- * requirement is explicit that colour is never the only signal (`§9.4`, `§11.3`).
+ * booking's card, a goal's pulsating flash. Teams are distinguished by border as well as colour and every
+ * player carries their shirt number, because the requirement is explicit that colour is never the only signal
+ * (`§9.4`, `§11.3`).
  *
  * The only work it does outside a frame is the pointer listener that makes hovering a player raise their
- * name; that listener draws a single frame and touches no Angular state, so hovering never enters change
- * detection.
+ * name, and the resize observer; each draws a single frame and touches no Angular state, so neither enters
+ * change detection.
  */
 export class CanvasMatchRenderer {
   private readonly context: CanvasRenderingContext2D;
-  private readonly entities: readonly RendererEntity[];
-  private readonly tracks: readonly RendererTrack[];
-  private readonly ballTrack: readonly HighlightKeyframe[] | null;
   private readonly kits: TeamKits;
-  private readonly cards: ReadonlyMap<string, CardKind>;
+  private readonly inks: KitInks;
   private readonly reducedMotion: boolean;
-  private readonly celebrateStart: number | null;
+  private readonly interpolators: readonly TrackInterpolator[];
+  private readonly ballInterpolator: TrackInterpolator;
+  private readonly live: readonly LiveEntity[];
+  private readonly liveBall: LiveEntity;
+  private readonly createPitchLayer: () => HTMLCanvasElement | null;
 
-  private cssWidth = 0;
-  private cssHeight = 0;
+  // What the last frame saw, reused by the next so the hot path allocates nothing.
+  private readonly frame: LiveEntity[] = [];
+  private readonly players: LiveEntity[] = [];
+  private readonly scratch: KeyframeSample = emptySample();
+  private readonly trailFrom: KeyframeSample = emptySample();
+  private readonly trailTo: KeyframeSample = emptySample();
+  private ball: LiveEntity | null = null;
+
+  private observer: ResizeObserver | null = null;
+  private layer: HTMLCanvasElement | null = null;
+  private layerContext: CanvasRenderingContext2D | null = null;
+  private layoutDirty = true;
+  private cssWidth: number;
+  private cssHeight: number;
+  private ratio = 1;
+  private rect: PitchRect = { x: 0, y: 0, width: 0, height: 0 };
+  private numberFont = '';
+  private numberFontRadius = 0;
   private lastTimeMs = 0;
+  private lastOverlay = 0;
+  private hasRendered = false;
   private hoveredEntityId: string | null = null;
   private metricsValue: FrameMetrics = {
     entities: 0,
@@ -71,33 +98,48 @@ export class CanvasMatchRenderer {
     milliseconds: 0,
   };
 
-  /** Initializes the renderer for one passage on one canvas. */
+  /** Initializes the renderer for one film on one canvas. */
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    passage: Passage,
+    private readonly timeline: FilmTimeline,
     options: RendererOptions = {},
   ) {
     const context = canvas.getContext('2d');
 
     if (context === null) {
-      throw new Error('A passage cannot be drawn: the canvas has no 2D context.');
+      throw new Error('A film cannot be drawn: the canvas has no 2D context.');
     }
 
     this.context = context;
-    this.entities = toRendererEntities(passage.entities);
-    this.tracks = toRendererTracks(passage.tracks);
-    this.ballTrack =
-      passage.tracks.find((track) => track.entityId === BALL_ENTITY_ID)?.keyframes ?? null;
     this.kits = {
-      home: kitFor(options.kits?.home, passage.homeColour),
-      away: kitFor(options.kits?.away, passage.awayColour),
+      home: kitFor(options.kits?.home, timeline.homeColour),
+      away: kitFor(options.kits?.away, timeline.awayColour),
     };
-    this.cards = options.cards ?? new Map<string, CardKind>();
+    this.inks = {
+      homePrimary: readableInk(this.kits.home.primary),
+      homeSecondary: readableInk(this.kits.home.secondary),
+      awayPrimary: readableInk(this.kits.away.primary),
+      awaySecondary: readableInk(this.kits.away.secondary),
+    };
     this.reducedMotion = options.reducedMotion ?? false;
-    this.celebrateStart = celebrationStartMilliseconds(passage);
+    this.createPitchLayer = options.createPitchLayer ?? defaultPitchLayer;
+    this.interpolators = timeline.slots.map((slot) => new TrackInterpolator(slot.track, true));
+    this.ballInterpolator = new TrackInterpolator(timeline.ball, false);
+    this.live = timeline.slots.map(() => liveEntity(timeline.ballEntity));
+    this.liveBall = liveEntity(timeline.ballEntity);
+
+    // The size is read once, here; after that the observer says when it changes, so a frame never asks the
+    // page for its layout.
+    this.cssWidth = canvas.clientWidth || canvas.width || 640;
+    this.cssHeight = canvas.clientHeight || canvas.height || 416;
 
     this.canvas.addEventListener('pointermove', this.pointerListener);
     this.canvas.addEventListener('pointerleave', this.pointerLeaveListener);
+
+    if (typeof ResizeObserver !== 'undefined') {
+      this.observer = new ResizeObserver((entries) => this.onResize(entries));
+      this.observer.observe(canvas);
+    }
   }
 
   /** Gets how much the last frame drew, for the renderer's own instrumentation. */
@@ -105,34 +147,59 @@ export class CanvasMatchRenderer {
     return this.metricsValue;
   }
 
-  /** Draws the highlight at an animation moment. */
-  render(timeMs: number): void {
+  /**
+   * Gets what the last frame drew — every visible player, then the ball — for instrumentation.
+   *
+   * These are the renderer's own reused entries, overwritten by the next frame, so a reader copies what it
+   * needs. The fluidity harness reads them to measure how far each token moved between two drawn frames.
+   */
+  get drawn(): readonly FrameEntity[] {
+    return this.frame;
+  }
+
+  /**
+   * Draws the film at a film moment.
+   *
+   * @param timeMs The film moment, in milliseconds from kick-off.
+   * @param overlayAlpha How much of a dark overlay to lay over the picture, 0…1, which is how the viewer
+   *   fades over a cut or a jump in the highlights reel.
+   */
+  render(timeMs: number, overlayAlpha = 0): void {
     const started = now();
-    const rect = this.resize();
+    const context = this.context;
+
+    this.ensureLayout();
+
+    const rect = this.rect;
 
     this.lastTimeMs = timeMs;
-    this.context.clearRect(0, 0, this.cssWidth, this.cssHeight);
-    this.drawPitch(rect);
+    this.lastOverlay = overlayAlpha;
+    this.hasRendered = true;
 
-    const frame = frameAt(this.entities, this.tracks, timeMs);
-    const players = frame.filter((item) => !item.entity.isBall);
-    const ball = frame.find((item) => item.entity.isBall);
+    context.clearRect(0, 0, this.cssWidth, this.cssHeight);
+    this.drawPitchLayer(rect);
+    this.sampleFrame(timeMs);
+
+    const frame = this.frame;
+    const ball = this.ball;
     const possession = nearestPlayerToBall(frame);
+    const cards = this.timeline.cardsAt(timeMs);
+    const radius = playerRadius(rect);
     let effects = 0;
 
-    const radius = playerRadius(rect);
+    this.numberFont = this.fontFor(radius);
 
-    for (const player of players) {
-      this.drawPlayer(rect, player, radius, ball);
+    for (const player of this.players) {
+      this.drawPlayer(rect, player, radius, ball, cards);
     }
 
-    if (ball !== undefined) {
+    if (ball !== null) {
       if (wantsTrail(ball.action, ball.z, ball.speed)) {
         this.drawTrail(rect, Math.max(0.4, trailStrength(ball.z, ball.speed)));
         effects += 1;
       }
 
-      if (this.isStriking(ball, players)) {
+      if (this.isStriking(ball)) {
         this.drawShotLine(rect, ball, timeMs);
         effects += 1;
       }
@@ -147,63 +214,181 @@ export class CanvasMatchRenderer {
     }
 
     if (this.hoveredEntityId !== null) {
-      const hovered = players.find((item) => item.entity.id === this.hoveredEntityId);
+      for (const player of this.players) {
+        if (player.entity.id === this.hoveredEntityId) {
+          this.drawHover(rect, player, radius);
 
-      if (hovered !== undefined) {
-        this.drawHover(rect, hovered, radius);
+          break;
+        }
       }
     }
 
-    if (this.celebrateStart !== null && timeMs >= this.celebrateStart) {
-      this.drawCelebration(rect, timeMs - this.celebrateStart);
+    const celebrating = this.timeline.celebrationAt(timeMs);
+
+    if (celebrating >= 0) {
+      this.drawCelebration(rect, celebrating);
       effects += 1;
+    }
+
+    if (this.timeline.isHalfTimeAt(timeMs)) {
+      this.drawHalfTime(rect);
+      effects += 1;
+    }
+
+    if (overlayAlpha > 0) {
+      this.drawOverlay(overlayAlpha);
     }
 
     this.metricsValue = {
       entities: frame.length,
-      interpolated: this.tracks.length,
+      interpolated: frame.length,
       effects,
       milliseconds: now() - started,
     };
   }
 
-  /** Clears the canvas, releases the pointer listeners, so nothing it drew or held outlives the component. */
+  /** Clears the canvas, releases the listeners and the observer, so nothing it drew or held outlives the component. */
   dispose(): void {
     this.context.clearRect(0, 0, this.cssWidth, this.cssHeight);
     this.canvas.removeEventListener('pointermove', this.pointerListener);
     this.canvas.removeEventListener('pointerleave', this.pointerLeaveListener);
+    this.observer?.disconnect();
+    this.observer = null;
+    this.layer = null;
+    this.layerContext = null;
     this.hoveredEntityId = null;
+    this.hasRendered = false;
+  }
+
+  /** Takes the size the page reports, and draws the frame again so a resize never leaves a stretched picture. */
+  private onResize(entries: readonly ResizeObserverEntry[]): void {
+    const box = entries[entries.length - 1]?.contentRect;
+
+    // A canvas that is not laid out — the text-only view — reports nothing worth resizing to.
+    if (box === undefined || box.width <= 0 || box.height <= 0) {
+      return;
+    }
+
+    if (box.width === this.cssWidth && box.height === this.cssHeight) {
+      return;
+    }
+
+    this.cssWidth = box.width;
+    this.cssHeight = box.height;
+    this.layoutDirty = true;
+
+    if (this.hasRendered) {
+      this.render(this.lastTimeMs, this.lastOverlay);
+    }
   }
 
   /**
-   * Sizes the backing store to the device pixel ratio and returns the pitch's rectangle in CSS pixels.
+   * Sizes the backing store to the device pixel ratio and redraws the pitch layer, but only when the size or
+   * the ratio changed since the last frame.
    *
-   * Geometry stays in normalized coordinates and only the transform changes, so the same highlight is drawn
-   * the same way on a 1x and a 3x screen (`§9.4`).
+   * Geometry stays in normalized coordinates and only the transform changes, so the same film is drawn the
+   * same way on a 1x and a 3x screen (`§9.4`).
    */
-  private resize(): PitchRect {
-    const cssWidth = this.canvas.clientWidth || this.canvas.width || 640;
-    const cssHeight = this.canvas.clientHeight || this.canvas.height || 416;
+  private ensureLayout(): void {
     const ratio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-    const pixelWidth = Math.max(1, Math.round(cssWidth * ratio));
-    const pixelHeight = Math.max(1, Math.round(cssHeight * ratio));
+
+    if (!this.layoutDirty && ratio === this.ratio) {
+      return;
+    }
+
+    const pixelWidth = Math.max(1, Math.round(this.cssWidth * ratio));
+    const pixelHeight = Math.max(1, Math.round(this.cssHeight * ratio));
 
     if (this.canvas.width !== pixelWidth || this.canvas.height !== pixelHeight) {
       this.canvas.width = pixelWidth;
       this.canvas.height = pixelHeight;
     }
 
+    this.ratio = ratio;
+    this.rect = pitchRect(this.cssWidth, this.cssHeight);
+    this.layoutDirty = false;
     this.context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    this.redrawPitchLayer(pixelWidth, pixelHeight);
+  }
 
-    this.cssWidth = cssWidth;
-    this.cssHeight = cssHeight;
+  /** Draws the pitch onto its own surface, where there is one to draw it onto. */
+  private redrawPitchLayer(pixelWidth: number, pixelHeight: number): void {
+    this.layer ??= this.createPitchLayer();
+    this.layerContext ??= this.layer?.getContext('2d') ?? null;
 
-    return pitchRect(cssWidth, cssHeight);
+    const layer = this.layer;
+    const layerContext = this.layerContext;
+
+    if (layer === null || layerContext === null) {
+      return;
+    }
+
+    if (layer.width !== pixelWidth || layer.height !== pixelHeight) {
+      layer.width = pixelWidth;
+      layer.height = pixelHeight;
+    }
+
+    layerContext.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
+    layerContext.clearRect(0, 0, this.cssWidth, this.cssHeight);
+    this.drawPitch(layerContext, this.rect);
+  }
+
+  /** Puts the pitch on the canvas: a copy of the layer, or — with no layer — the pitch drawn in place. */
+  private drawPitchLayer(rect: PitchRect): void {
+    if (this.layer !== null && this.layerContext !== null) {
+      const context = this.context;
+
+      // The layer is in device pixels, so it is copied under the identity transform.
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.drawImage(this.layer, 0, 0);
+      context.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
+
+      return;
+    }
+
+    this.drawPitch(this.context, rect);
+  }
+
+  /** Reads every visible slot and the ball at a film moment into the frame, in the order they are drawn. */
+  private sampleFrame(timeMs: number): void {
+    this.frame.length = 0;
+    this.players.length = 0;
+    this.ball = null;
+
+    for (let slot = 0; slot < this.live.length; slot += 1) {
+      const stint = this.timeline.stintAt(slot, timeMs);
+
+      if (stint === null || !this.interpolators[slot].sample(timeMs, this.scratch)) {
+        continue;
+      }
+
+      const entity = this.live[slot];
+
+      entity.entity = stint.entity;
+      fillEntity(entity, this.scratch);
+      this.frame.push(entity);
+      this.players.push(entity);
+    }
+
+    if (this.ballInterpolator.sample(timeMs, this.scratch)) {
+      fillEntity(this.liveBall, this.scratch);
+      this.frame.push(this.liveBall);
+      this.ball = this.liveBall;
+    }
+  }
+
+  /** The font a shirt number is drawn in, rebuilt only when the token's size changes. */
+  private fontFor(radius: number): string {
+    if (radius !== this.numberFontRadius) {
+      this.numberFontRadius = radius;
+      this.numberFont = `600 ${Math.max(7, Math.round(radius * 1.15))}px system-ui, sans-serif`;
+    }
+
+    return this.numberFont;
   }
 
   /** Draws the pitch: mown stripes, every law-of-the-game marking, and both goals with their nets. */
-  private drawPitch(rect: PitchRect): void {
-    const context = this.context;
+  private drawPitch(context: CanvasRenderingContext2D, rect: PitchRect): void {
     const geometry = pitchGeometry(rect);
 
     context.save();
@@ -246,8 +431,8 @@ export class CanvasMatchRenderer {
     context.arc(geometry.centreX, geometry.centreY, geometry.centreSpotRadius, 0, Math.PI * 2);
     context.fill();
 
-    this.drawEndMarkings(rect, geometry, true);
-    this.drawEndMarkings(rect, geometry, false);
+    this.drawEndMarkings(context, rect, geometry, true);
+    this.drawEndMarkings(context, rect, geometry, false);
 
     // The corner arcs, quarter circles struck from each corner flag.
     const corners: readonly (readonly [number, number, number, number])[] = [
@@ -263,14 +448,18 @@ export class CanvasMatchRenderer {
       context.stroke();
     }
 
-    this.drawGoal(rect, geometry, true);
-    this.drawGoal(rect, geometry, false);
+    this.drawGoal(context, rect, geometry, true);
+    this.drawGoal(context, rect, geometry, false);
     context.restore();
   }
 
   /** Draws one end's penalty area, six-yard box, penalty spot, and the penalty arc outside the box. */
-  private drawEndMarkings(rect: PitchRect, geometry: PitchGeometry, isLeft: boolean): void {
-    const context = this.context;
+  private drawEndMarkings(
+    context: CanvasRenderingContext2D,
+    rect: PitchRect,
+    geometry: PitchGeometry,
+    isLeft: boolean,
+  ): void {
     const boxX = isLeft ? rect.x : rect.x + rect.width - geometry.penaltyBoxDepth;
     const boxY = geometry.centreY - geometry.penaltyBoxHeight / 2;
     const sixYardX = isLeft ? rect.x : rect.x + rect.width - geometry.sixYardBoxDepth;
@@ -314,8 +503,12 @@ export class CanvasMatchRenderer {
   }
 
   /** Draws one goal and its net, outside the goal line. */
-  private drawGoal(rect: PitchRect, geometry: PitchGeometry, isLeft: boolean): void {
-    const context = this.context;
+  private drawGoal(
+    context: CanvasRenderingContext2D,
+    rect: PitchRect,
+    geometry: PitchGeometry,
+    isLeft: boolean,
+  ): void {
     const top = geometry.centreY - geometry.goalWidth / 2;
     const x = isLeft ? rect.x - geometry.goalDepth : rect.x + rect.width;
     const lineWidth = geometry.lineWidth;
@@ -351,29 +544,38 @@ export class CanvasMatchRenderer {
   /** Draws one player: a kit-coloured dot, a contrasting border, the shirt number, and any card. */
   private drawPlayer(
     rect: PitchRect,
-    item: FrameEntity,
+    item: LiveEntity,
     radius: number,
-    ball: FrameEntity | undefined,
+    ball: LiveEntity | null,
+    cards: ReadonlyMap<string, CardKind>,
   ): void {
     const context = this.context;
     const isHome = item.entity.side !== 'away';
-    const kit = isHome ? this.kits.home : this.kits.away;
     const isKeeper = item.entity.family === 'goalkeeper';
     // A keeper wears the club's second colour, which is how a goalkeeper is told apart at a glance without
     // either side's outfield kit being touched.
+    const kit = isHome ? this.kits.home : this.kits.away;
     const fill = isKeeper ? kit.secondary : kit.primary;
+    const ink = isHome
+      ? isKeeper
+        ? this.inks.homeSecondary
+        : this.inks.homePrimary
+      : isKeeper
+        ? this.inks.awaySecondary
+        : this.inks.awayPrimary;
     // Both teams are dots. They are told apart by kit colour and by a border — the home side white, the away
     // side dark ink — rather than by shape, which the product owner overrode for `replay-v3`.
     const border = isHome ? '#ffffff' : AWAY_INK;
     const diving = isDiveAction(item.action);
-    const ground = toCanvasPoint(item.position, rect);
+    const groundX = canvasX(item.position.x, rect);
+    const groundY = canvasY(item.position.y, rect);
     const lift = item.z > 0 ? altitudeLift(rect, item.z) : 0;
-    const point = { x: ground.x, y: ground.y - lift };
+    const pointY = groundY - lift;
 
     // A jumping player lifts off a short ground shadow; a keeper going down has none, because a dive is a
     // lateral move rather than a leap and the ball is the thing with height.
     if (lift > 1 && !diving) {
-      this.drawGroundShadow(ground, radius);
+      this.drawGroundShadow(groundX, groundY, radius);
     }
 
     context.save();
@@ -381,70 +583,62 @@ export class CanvasMatchRenderer {
     context.strokeStyle = border;
     context.lineWidth = 2;
     context.beginPath();
-    context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    context.arc(groundX, pointY, radius, 0, Math.PI * 2);
     context.fill();
     context.stroke();
 
-    context.fillStyle = readableInk(fill);
-    context.font = `600 ${Math.max(7, Math.round(radius * 1.15))}px system-ui, sans-serif`;
+    context.fillStyle = ink;
+    context.font = this.numberFont;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText(`${item.entity.shirtNumber}`, point.x, point.y + 0.5);
+    context.fillText(`${item.entity.shirtNumber}`, groundX, pointY + 0.5);
     context.restore();
 
     if (diving) {
-      this.drawDiveStreak(ground, radius, diveDirection(item, ball));
+      this.drawDiveStreak(groundX, groundY, radius, diveDirection(item, ball));
     }
 
     const card =
-      item.entity.participantId === null ? undefined : this.cards.get(item.entity.participantId);
+      item.entity.participantId === null ? undefined : cards.get(item.entity.participantId);
 
     if (card !== undefined) {
-      this.drawCard(point, radius, card);
+      this.drawCard(groundX, pointY, radius, card);
     }
   }
 
   /** A short shadow on the grass under a player who has jumped. */
-  private drawGroundShadow(ground: PitchPoint, radius: number): void {
+  private drawGroundShadow(x: number, y: number, radius: number): void {
     const context = this.context;
 
     context.save();
     context.fillStyle = 'rgba(2, 6, 23, 0.28)';
     context.beginPath();
-    context.ellipse(
-      ground.x,
-      ground.y + radius * 0.55,
-      radius * 0.9,
-      radius * 0.34,
-      0,
-      0,
-      Math.PI * 2,
-    );
+    context.ellipse(x, y + radius * 0.55, radius * 0.9, radius * 0.34, 0, 0, Math.PI * 2);
     context.fill();
     context.restore();
   }
 
   /** A short streak toward the ball where a keeper is going down, standing in for the missing shadow. */
-  private drawDiveStreak(ground: PitchPoint, radius: number, direction: number): void {
+  private drawDiveStreak(x: number, y: number, radius: number, direction: number): void {
     const context = this.context;
 
     context.save();
     context.strokeStyle = 'rgba(248, 250, 252, 0.55)';
     context.lineWidth = Math.max(1.5, radius * 0.35);
     context.beginPath();
-    context.moveTo(ground.x - direction * radius * 0.6, ground.y + radius * 0.7);
-    context.lineTo(ground.x + direction * radius * 2.4, ground.y + radius * 0.7);
+    context.moveTo(x - direction * radius * 0.6, y + radius * 0.7);
+    context.lineTo(x + direction * radius * 2.4, y + radius * 0.7);
     context.stroke();
     context.restore();
   }
 
   /** Draws a booking as a small card floating above the offending player's token. */
-  private drawCard(point: PitchPoint, radius: number, card: CardKind): void {
+  private drawCard(pointX: number, pointY: number, radius: number, card: CardKind): void {
     const context = this.context;
     const width = Math.max(5, radius * 0.7);
     const height = width * 1.4;
-    const x = point.x + radius * 0.7;
-    const y = point.y - radius - height - 2;
+    const x = pointX + radius * 0.7;
+    const y = pointY - radius - height - 2;
 
     context.save();
     context.fillStyle = CARD_COLOURS[card];
@@ -456,12 +650,14 @@ export class CanvasMatchRenderer {
   }
 
   /** Draws the ball at its altitude, above its own shadow, with the aerial trail behind it. */
-  private drawBall(rect: PitchRect, ball: FrameEntity): void {
+  private drawBall(rect: PitchRect, ball: LiveEntity): void {
     const context = this.context;
-    const ground = toCanvasPoint(ball.position, rect);
+    const groundX = canvasX(ball.position.x, rect);
+    const groundY = canvasY(ball.position.y, rect);
     const lift = altitudeLift(rect, ball.z);
     const radius = ballRadius(rect) * altitudeScale(ball.z);
-    const centre = { x: ground.x, y: ground.y - lift };
+    const centreX = groundX;
+    const centreY = groundY - lift;
 
     // A ball on the grass — a rolled pass — casts no shadow at all; one in the air casts a small ellipse
     // that shrinks and fades as it climbs, which is what sells the height (`replay-v3`).
@@ -470,8 +666,8 @@ export class CanvasMatchRenderer {
       context.fillStyle = `rgba(2, 6, 23, ${(0.32 - (ball.z / 100) * 0.14).toFixed(3)})`;
       context.beginPath();
       context.ellipse(
-        ground.x,
-        ground.y,
+        groundX,
+        groundY,
         radius * (0.95 - (ball.z / 100) * 0.3),
         radius * 0.36,
         0,
@@ -485,7 +681,7 @@ export class CanvasMatchRenderer {
     // A white ball with dark patches, so it reads as a football rather than a dot.
     context.save();
     context.beginPath();
-    context.arc(centre.x, centre.y, radius, 0, Math.PI * 2);
+    context.arc(centreX, centreY, radius, 0, Math.PI * 2);
     context.fillStyle = BALL_COLOUR;
     context.fill();
     context.clip();
@@ -495,8 +691,8 @@ export class CanvasMatchRenderer {
 
     for (let corner = 0; corner < 5; corner += 1) {
       const angle = -Math.PI / 2 + (corner * Math.PI * 2) / 5;
-      const x = centre.x + Math.cos(angle) * radius * 0.34;
-      const y = centre.y + Math.sin(angle) * radius * 0.34;
+      const x = centreX + Math.cos(angle) * radius * 0.34;
+      const y = centreY + Math.sin(angle) * radius * 0.34;
 
       if (corner === 0) {
         context.moveTo(x, y);
@@ -509,15 +705,17 @@ export class CanvasMatchRenderer {
     context.fill();
 
     // Four short spokes towards the rim, which is what a white ball with dark panels reads as at token size.
-    for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+    for (let spoke = 0; spoke < 4; spoke += 1) {
+      const angle = (spoke * Math.PI) / 2;
+
       context.lineWidth = Math.max(0.8, radius * 0.16);
       context.strokeStyle = BALL_PATCH_COLOUR;
       context.beginPath();
       context.moveTo(
-        centre.x + Math.cos(angle) * radius * 0.42,
-        centre.y + Math.sin(angle) * radius * 0.42,
+        centreX + Math.cos(angle) * radius * 0.42,
+        centreY + Math.sin(angle) * radius * 0.42,
       );
-      context.lineTo(centre.x + Math.cos(angle) * radius, centre.y + Math.sin(angle) * radius);
+      context.lineTo(centreX + Math.cos(angle) * radius, centreY + Math.sin(angle) * radius);
       context.stroke();
     }
 
@@ -525,7 +723,7 @@ export class CanvasMatchRenderer {
 
     context.save();
     context.beginPath();
-    context.arc(centre.x, centre.y, radius, 0, Math.PI * 2);
+    context.arc(centreX, centreY, radius, 0, Math.PI * 2);
     context.strokeStyle = BALL_PATCH_COLOUR;
     context.lineWidth = 1.2;
     context.stroke();
@@ -537,14 +735,16 @@ export class CanvasMatchRenderer {
     const context = this.context;
     const span = 380;
     const steps = 6;
+    const from = this.trailFrom;
+    const to = this.trailTo;
 
     context.save();
 
     for (let step = steps; step >= 2; step -= 1) {
-      const from = sampleAt(this.ballTrack ?? [], this.lastTimeMs - (span * step) / steps);
-      const to = sampleAt(this.ballTrack ?? [], this.lastTimeMs - (span * (step - 1)) / steps);
-
-      if (from === null || to === null) {
+      if (
+        !this.ballInterpolator.sampleAt(this.lastTimeMs - (span * step) / steps, from) ||
+        !this.ballInterpolator.sampleAt(this.lastTimeMs - (span * (step - 1)) / steps, to)
+      ) {
         continue;
       }
 
@@ -553,14 +753,8 @@ export class CanvasMatchRenderer {
       context.strokeStyle = `rgba(248, 250, 252, ${alpha.toFixed(3)})`;
       context.lineWidth = 1.5;
       context.beginPath();
-      context.moveTo(
-        toCanvasPoint(from, rect).x,
-        toCanvasPoint(from, rect).y - altitudeLift(rect, from.z),
-      );
-      context.lineTo(
-        toCanvasPoint(to, rect).x,
-        toCanvasPoint(to, rect).y - altitudeLift(rect, to.z),
-      );
+      context.moveTo(canvasX(from.x, rect), canvasY(from.y, rect) - altitudeLift(rect, from.z));
+      context.lineTo(canvasX(to.x, rect), canvasY(to.y, rect) - altitudeLift(rect, to.z));
       context.stroke();
     }
 
@@ -568,30 +762,30 @@ export class CanvasMatchRenderer {
   }
 
   /** Draws the bright projectile streak a struck ball leaves behind it. */
-  private drawShotLine(rect: PitchRect, ball: FrameEntity, timeMs: number): void {
+  private drawShotLine(rect: PitchRect, ball: LiveEntity, timeMs: number): void {
     const context = this.context;
-    const from = sampleAt(this.ballTrack ?? [], timeMs - 240);
+    const from = this.trailFrom;
 
-    if (from === null) {
+    if (!this.ballInterpolator.sampleAt(timeMs - 240, from)) {
       return;
     }
 
-    const start = toCanvasPoint(from, rect);
-    const end = toCanvasPoint(ball.position, rect);
-    const endY = end.y - altitudeLift(rect, ball.z);
-    const startY = start.y - altitudeLift(rect, from.z);
+    const startX = canvasX(from.x, rect);
+    const startY = canvasY(from.y, rect) - altitudeLift(rect, from.z);
+    const endX = canvasX(ball.position.x, rect);
+    const endY = canvasY(ball.position.y, rect) - altitudeLift(rect, ball.z);
 
     context.save();
     context.strokeStyle = 'rgba(253, 224, 71, 0.85)';
     context.lineWidth = 2;
     context.beginPath();
-    context.moveTo(start.x, startY);
-    context.lineTo(end.x, endY);
+    context.moveTo(startX, startY);
+    context.lineTo(endX, endY);
     context.stroke();
 
     context.fillStyle = 'rgba(253, 224, 71, 0.9)';
     context.beginPath();
-    context.arc(end.x, endY, 2.4, 0, Math.PI * 2);
+    context.arc(endX, endY, 2.4, 0, Math.PI * 2);
     context.fill();
     context.restore();
   }
@@ -604,37 +798,36 @@ export class CanvasMatchRenderer {
       return;
     }
 
-    const point = toCanvasPoint(item.position, rect);
-
-    this.drawTag(point, radius, name);
+    this.drawTag(canvasX(item.position.x, rect), canvasY(item.position.y, rect), radius, name);
   }
 
   /** Draws the pointer's own highlight and name tag over a player. */
   private drawHover(rect: PitchRect, item: FrameEntity, radius: number): void {
     const context = this.context;
-    const point = toCanvasPoint(item.position, rect);
+    const x = canvasX(item.position.x, rect);
+    const y = canvasY(item.position.y, rect);
 
     context.save();
     context.strokeStyle = 'rgba(250, 204, 21, 0.9)';
     context.lineWidth = 2;
     context.beginPath();
-    context.arc(point.x, point.y, radius + 3, 0, Math.PI * 2);
+    context.arc(x, y, radius + 3, 0, Math.PI * 2);
     context.stroke();
     context.restore();
 
     if (item.entity.name !== null && item.entity.name.length > 0) {
-      this.drawTag(point, radius + 3, item.entity.name);
+      this.drawTag(x, y, radius + 3, item.entity.name);
     }
   }
 
   /** Draws a player's name in a dark pill just above their token. */
-  private drawTag(point: PitchPoint, radius: number, name: string): void {
+  private drawTag(pointX: number, pointY: number, radius: number, name: string): void {
     const context = this.context;
-    const label = name.length > 18 ? `${name.slice(0, 17)}\u2026` : name;
+    const label = name.length > 18 ? `${name.slice(0, 17)}…` : name;
     const width = label.length * 5.2 + 10;
     const height = 13;
-    const x = point.x - width / 2;
-    const y = point.y - radius - height - 6;
+    const x = pointX - width / 2;
+    const y = pointY - radius - height - 6;
 
     context.save();
     context.fillStyle = TAG_BACKGROUND;
@@ -646,13 +839,13 @@ export class CanvasMatchRenderer {
     context.font = '600 9px system-ui, sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText(label, point.x, y + height / 2 + 0.5);
+    context.fillText(label, pointX, y + height / 2 + 0.5);
     context.restore();
   }
 
   /** Draws the goal celebration: a pulsating flash and the GOAL! badge. */
   private drawCelebration(rect: PitchRect, elapsed: number): void {
-    const fade = Math.max(0, 1 - elapsed / CELEBRATION_MILLISECONDS);
+    const fade = Math.max(0, 1 - elapsed / CELEBRATION_FADE_MILLISECONDS);
 
     if (fade <= 0) {
       return;
@@ -684,28 +877,74 @@ export class CanvasMatchRenderer {
     context.restore();
   }
 
+  /** Draws the half-time card over the pitch while the film holds at the interval. */
+  private drawHalfTime(rect: PitchRect): void {
+    const context = this.context;
+    const size = Math.max(16, Math.min(34, rect.height / 14));
+    const x = rect.x + rect.width / 2;
+    const y = rect.y + rect.height * 0.3;
+    const width = size * 6.4;
+    const height = size * 1.9;
+
+    context.save();
+    context.fillStyle = 'rgba(15, 23, 42, 0.82)';
+    context.fillRect(x - width / 2, y - height / 2, width, height);
+    context.strokeStyle = 'rgba(148, 163, 184, 0.9)';
+    context.lineWidth = 2;
+    context.strokeRect(x - width / 2, y - height / 2, width, height);
+    context.fillStyle = '#e2e8f0';
+    context.font = `800 ${Math.round(size)}px system-ui, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('HALF TIME', x, y + size * 0.04);
+    context.restore();
+  }
+
+  /** Lays a dark overlay over the whole canvas, which is how a cut is faded over. */
+  private drawOverlay(alpha: number): void {
+    const context = this.context;
+
+    context.save();
+    context.fillStyle = `rgba(2, 6, 23, ${Math.min(1, alpha).toFixed(3)})`;
+    context.fillRect(0, 0, this.cssWidth, this.cssHeight);
+    context.restore();
+  }
+
   /** Whether any player or the ball itself is tagged as striking the ball at goal. */
-  private isStriking(ball: FrameEntity, players: readonly FrameEntity[]): boolean {
-    return isStrikeAction(ball.action) || players.some((player) => isStrikeAction(player.action));
+  private isStriking(ball: LiveEntity): boolean {
+    if (isStrikeAction(ball.action)) {
+      return true;
+    }
+
+    for (const player of this.players) {
+      if (isStrikeAction(player.action)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /** Finds the entity under the pointer, so hovering raises a name. */
   private readonly pointerListener = (event: PointerEvent): void => {
-    if (this.tracks.length === 0) {
+    if (this.players.length === 0) {
       return;
     }
 
     const bounds = this.canvas.getBoundingClientRect();
-    const pointer = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-    const rect = pitchRect(this.cssWidth || 640, this.cssHeight || 416);
+    const pointerX = event.clientX - bounds.left;
+    const pointerY = event.clientY - bounds.top;
+    const rect = pitchRect(this.cssWidth, this.cssHeight);
     const radius = playerRadius(rect) + 4;
     let hovered: string | null = null;
 
-    for (const item of frameAt(this.entities, this.tracks, this.lastTimeMs)) {
-      const point = toCanvasPoint(item.position, rect);
+    // The frame the last render drew is where the tokens are, so there is nothing to sample again.
+    for (const player of this.players) {
+      const x = canvasX(player.position.x, rect);
+      const y = canvasY(player.position.y, rect);
 
-      if (Math.hypot(point.x - pointer.x, point.y - pointer.y) <= radius) {
-        hovered = item.entity.id;
+      if (Math.hypot(x - pointerX, y - pointerY) <= radius) {
+        hovered = player.entity.id;
 
         break;
       }
@@ -713,19 +952,35 @@ export class CanvasMatchRenderer {
 
     if (hovered !== this.hoveredEntityId) {
       this.hoveredEntityId = hovered;
-      this.render(this.lastTimeMs);
+      this.render(this.lastTimeMs, this.lastOverlay);
     }
   };
 
   private readonly pointerLeaveListener = (): void => {
     if (this.hoveredEntityId !== null) {
       this.hoveredEntityId = null;
-      this.render(this.lastTimeMs);
+      this.render(this.lastTimeMs, this.lastOverlay);
     }
   };
 }
 
-const BALL_ENTITY_ID = 'ball';
+/** A token the renderer keeps and refills each frame, rather than making one per entity per frame. */
+interface LiveEntity {
+  entity: RendererEntity;
+  position: { x: number; y: number };
+  z: number;
+  speed: number;
+  action: string | null;
+}
+
+/** The ink each kit colour is read in, worked out once rather than for every token on every frame. */
+interface KitInks {
+  readonly homePrimary: string;
+  readonly homeSecondary: string;
+  readonly awayPrimary: string;
+  readonly awaySecondary: string;
+}
+
 const GRASS_DARK = '#15632f';
 const GRASS_LIGHT = '#1a7d3c';
 const LINE_COLOUR = 'rgba(255, 255, 255, 0.78)';
@@ -734,38 +989,27 @@ const BALL_PATCH_COLOUR = '#111827';
 const TAG_BACKGROUND = 'rgba(2, 6, 23, 0.85)';
 const TAG_BORDER = 'rgba(248, 250, 252, 0.3)';
 const CARD_COLOURS: Record<CardKind, string> = { yellow: '#facc15', red: '#ef4444' };
-const CELEBRATION_MILLISECONDS = 4_000;
+const CELEBRATION_FADE_MILLISECONDS = 4_000;
 const DEFAULT_KEEPER_TRIM = '#f8fafc';
 
 /** The away side's border: dark ink against the home side's white, so the two dots are told apart. */
 const AWAY_INK = '#0f172a';
 
-/** Maps a passage's entities to the renderer's shape. */
-export function toRendererEntities(
-  entities: readonly HighlightEntity[],
-): readonly RendererEntity[] {
-  return entities.map((entity) => ({
-    id: entity.entityId,
-    isBall: entity.isBall,
-    side: entity.side === 'home' || entity.side === 'away' ? entity.side : null,
-    participantId: entity.participantId ?? null,
-    shirtNumber: entity.shirtNumber,
-    family: entity.family,
-    name: entity.name ?? null,
-    anchor: { x: entity.x, y: entity.y },
-  }));
+/** Makes the offscreen surface the pitch is drawn onto, where the platform has a document to make one in. */
+function defaultPitchLayer(): HTMLCanvasElement | null {
+  return typeof document === 'undefined' ? null : document.createElement('canvas');
 }
 
-/** Maps a passage's tracks to the renderer's shape, dropping any that name no entity. */
-export function toRendererTracks(
-  tracks: readonly {
-    readonly entityId: string;
-    readonly keyframes: readonly HighlightKeyframe[];
-  }[],
-): readonly RendererTrack[] {
-  return tracks
-    .filter((track) => track.keyframes.length > 0)
-    .map((track) => ({ entityId: track.entityId, keyframes: track.keyframes }));
+function liveEntity(entity: RendererEntity): LiveEntity {
+  return { entity, position: { x: 0, y: 0 }, z: 0, speed: 0, action: null };
+}
+
+function fillEntity(entity: LiveEntity, sample: KeyframeSample): void {
+  entity.position.x = sample.x;
+  entity.position.y = sample.y;
+  entity.z = sample.z;
+  entity.speed = sample.speed;
+  entity.action = sample.action;
 }
 
 /** The ink that stays readable on a kit colour, dark on light kits and light on dark ones. */
@@ -808,8 +1052,8 @@ function ballRadius(rect: PitchRect): number {
 }
 
 /** Which way a keeper is going down: toward the ball, or a fixed way when the ball is not there. */
-function diveDirection(item: FrameEntity, ball: FrameEntity | undefined): number {
-  if (ball === undefined) {
+function diveDirection(item: LiveEntity, ball: LiveEntity | null): number {
+  if (ball === null) {
     return 1;
   }
 
@@ -818,7 +1062,7 @@ function diveDirection(item: FrameEntity, ball: FrameEntity | undefined): number
   return away === 0 ? 1 : away;
 }
 
-/** The kit the renderer draws a side in, preferring the complete kit and falling back to the passage. */
+/** The kit the renderer draws a side in, preferring the complete kit and falling back to the film's colour. */
 function kitFor(kit: TeamKit | undefined, primary: string): TeamKit {
   return {
     primary: kit?.primary ?? primary,

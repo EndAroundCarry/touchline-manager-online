@@ -218,6 +218,11 @@ const SHOT_OUTCOMES = new Set([
 /** The action tags the engine writes on the keyframe where the ball is struck at goal. */
 const STRIKE_ACTIONS = new Set(['shot', 'penalty', 'free_kick']);
 
+/** Whether an action tag on a keyframe means the ball is struck at goal. */
+export function isStrikeTag(action: string | null | undefined): boolean {
+  return action !== null && action !== undefined && STRIKE_ACTIONS.has(action);
+}
+
 /** Whether an outcome code means a shot at goal, which is what the shot map plots. */
 export function isShotOutcome(code: string): boolean {
   return SHOT_OUTCOMES.has(code);
