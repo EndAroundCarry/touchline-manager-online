@@ -13,7 +13,6 @@ import {
   stateRows,
 } from '../../core/squad/squad-presentation';
 import { SquadStore } from '../../core/squad/squad-store';
-import { sampleMatchStats } from '../../core/squad/match-history';
 import { sampleTrainingHistory } from '../../core/training/training-history';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
@@ -155,22 +154,22 @@ export class PlayerProfile implements OnInit {
     return season === undefined ? [] : seasonStatRows(season.stats);
   });
 
-  /** The per-match rows for the chosen season. Placeholder until the server exposes them (see the model). */
+  protected readonly matchesLoading = signal(true);
+  protected readonly matchesError = signal<string | null>(null);
+
+  /** The per-match rows for the chosen season, newest first (`STA-2`). */
   protected readonly matchRows = computed(() => {
-    const player = this.player();
+    const history = this.store.playerMatches();
     const choice = this.selectedSeason();
 
-    if (player === null) {
+    // The store holds the last player read, so a row set that is not this player's is ignored.
+    if (history === null || history.playerId !== this.id()) {
       return [];
     }
 
-    const appearances =
-      choice === CURRENT_SEASON
-        ? (player.seasonStats?.appearances ?? 0)
-        : (this.careerSeasons().find((item) => `${item.seasonNumber}` === choice)?.stats
-            .appearances ?? 0);
+    const season = choice === CURRENT_SEASON ? this.currentSeasonNumber() : Number(choice);
 
-    return sampleMatchStats(player.id, choice, appearances);
+    return history.matches.filter((match) => match.seasonNumber === season);
   });
 
   protected readonly pageHeadingClass = PAGE_HEADING;
@@ -196,6 +195,24 @@ export class PlayerProfile implements OnInit {
         );
       },
     });
+
+    this.matchesLoading.set(true);
+    this.matchesError.set(null);
+
+    this.store.loadPlayerMatches(playerId).subscribe({
+      next: () => this.matchesLoading.set(false),
+      error: (error: unknown) => {
+        this.matchesLoading.set(false);
+        this.matchesError.set(
+          error instanceof ApiError ? error.detail : 'The match statistics could not be loaded.',
+        );
+      },
+    });
+  }
+
+  /** Formats a match rating to one decimal, or a dash when the player was not rated (`TRN-8`). */
+  protected matchRating(value: number | null): string {
+    return value === null ? '—' : value.toFixed(1);
   }
 
   /** Formats an amount for display. */

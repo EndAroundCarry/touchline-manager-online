@@ -365,3 +365,60 @@ public sealed record ContractsResponse(
     long WeeklyWageTotalMinor,
     IReadOnlyList<PlayerContractResponse> Contracts,
     DateTimeOffset ServerTime);
+
+/// <summary>One match of a player's own history, with the line they had in it (`STA-2`, master plan §11.1).</summary>
+/// <remarks>
+/// Read from the stored match: the player's line (minutes, goals, assists, cards, rating) comes from the
+/// result document and the shots and saves from the match's events, which is what the season totals are summed
+/// from, so the rows add up to the season line. Passes are absent because the match engine does not count them.
+/// </remarks>
+/// <param name="FixtureId">The fixture that was played.</param>
+/// <param name="SeasonNumber">The season's ordinal in the world.</param>
+/// <param name="SeasonLabel">The season's display label.</param>
+/// <param name="Round">The matchday round within the season.</param>
+/// <param name="PlayedAt">The kick-off instant.</param>
+/// <param name="OpponentClubId">The opposing club.</param>
+/// <param name="OpponentName">The opposing club's generated name.</param>
+/// <param name="Home">Whether the player's club was the host.</param>
+/// <param name="GoalsFor">The player's side's goals.</param>
+/// <param name="GoalsAgainst">The opposing side's goals.</param>
+/// <param name="Started">Whether the player was in the eleven.</param>
+/// <param name="MinutesPlayed">Minutes on the pitch.</param>
+/// <param name="Goals">Goals scored.</param>
+/// <param name="Assists">Goals set up.</param>
+/// <param name="Shots">Shots taken.</param>
+/// <param name="ShotsOnTarget">Shots on target.</param>
+/// <param name="Saves">Saves made.</param>
+/// <param name="YellowCards">Bookings received.</param>
+/// <param name="RedCards">Sendings-off.</param>
+/// <param name="Rating">The match rating on a 0.0–10.0 scale, or null when the player was not rated (`TRN-8`).</param>
+public sealed record PlayerMatchStatResponse(
+    Guid FixtureId,
+    int SeasonNumber,
+    string SeasonLabel,
+    int Round,
+    DateTimeOffset PlayedAt,
+    Guid OpponentClubId,
+    string OpponentName,
+    bool Home,
+    int GoalsFor,
+    int GoalsAgainst,
+    bool Started,
+    int MinutesPlayed,
+    int Goals,
+    int Assists,
+    int Shots,
+    int ShotsOnTarget,
+    int Saves,
+    int YellowCards,
+    int RedCards,
+    decimal? Rating);
+
+/// <summary>A player's matches, most recent first, across every season they have appeared in.</summary>
+/// <param name="PlayerId">The player.</param>
+/// <param name="Matches">One row per match the player took the pitch in.</param>
+/// <param name="ServerTime">The instant the response was produced.</param>
+public sealed record PlayerMatchesResponse(
+    Guid PlayerId,
+    IReadOnlyList<PlayerMatchStatResponse> Matches,
+    DateTimeOffset ServerTime);

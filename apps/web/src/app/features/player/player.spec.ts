@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { Player, PlayerSeasonStats } from '../../core/squad/squad.models';
+import { Player, PlayerMatchStat, PlayerSeasonStats } from '../../core/squad/squad.models';
 import { SquadStore } from '../../core/squad/squad-store';
 import { PlayerProfile } from './player';
 
@@ -28,6 +28,37 @@ function stats(goals: number): PlayerSeasonStats {
     averageRating: 7.1,
   };
 }
+
+function match(fixtureId: string, seasonNumber: number, round: number): PlayerMatchStat {
+  return {
+    fixtureId,
+    seasonNumber,
+    seasonLabel: `Season ${seasonNumber}`,
+    round,
+    playedAt: '2026-09-28T14:00:00Z',
+    opponentClubId: 'club-2',
+    opponentName: 'Vale Rovers',
+    home: true,
+    goalsFor: 2,
+    goalsAgainst: 1,
+    started: true,
+    minutesPlayed: 90,
+    goals: 1,
+    assists: 0,
+    shots: 3,
+    shotsOnTarget: 2,
+    saves: 0,
+    yellowCards: 0,
+    redCards: 0,
+    rating: 7.5,
+  };
+}
+
+const matches = {
+  playerId: 'player-1',
+  matches: [match('f3', 3, 2), match('f2', 3, 1), match('f1', 2, 5)],
+  serverTime: '2026-09-28T00:00:00Z',
+};
 
 const player: Player = {
   id: 'player-1',
@@ -110,7 +141,12 @@ describe('PlayerProfile', () => {
   let root: HTMLElement;
 
   beforeEach(async () => {
-    const store = { player: signal(player), loadPlayer: () => of(player) };
+    const store = {
+      player: signal(player),
+      playerMatches: signal(matches),
+      loadPlayer: () => of(player),
+      loadPlayerMatches: () => of(matches),
+    };
 
     await TestBed.configureTestingModule({
       imports: [PlayerProfile],
@@ -171,19 +207,21 @@ describe('PlayerProfile', () => {
 
     const rowCount = () => root.querySelectorAll('[data-testid="match-stats"] tbody tr').length;
 
-    expect(rowCount()).toBe(10);
+    expect(rowCount()).toBe(2);
     expect(
       Array.from(root.querySelectorAll('[data-testid="match-stats"] th')).map((cell) =>
         cell.textContent?.trim(),
       ),
-    ).toEqual(expect.arrayContaining(['Goals', 'Passes', 'Yellow', 'Red', 'Rating']));
+    ).toEqual(expect.arrayContaining(['Goals', 'Yellow', 'Red', 'Rating']));
+    expect(root.querySelector('[data-testid="match-stats"]')?.textContent).toContain(
+      'not tracked yet',
+    );
 
     select.value = '2';
     select.dispatchEvent(new Event('change'));
     await fixture.whenStable();
 
-    expect(rowCount()).toBe(10);
-
+    expect(rowCount()).toBe(1);
     expect(root.querySelector('#player-panel-statistics dl')?.textContent).toContain('5');
     expect(root.querySelector('#player-panel-statistics dl')?.textContent).not.toContain('Goals7');
   });

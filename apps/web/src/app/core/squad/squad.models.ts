@@ -252,3 +252,41 @@ export interface ContractList {
   readonly contracts: readonly PlayerContractRow[];
   readonly serverTime: string;
 }
+
+/**
+ * One match of a player's own history (`STA-2`).
+ *
+ * Read from the stored match, so the rows add up to the season line. There is no passes field: the match
+ * engine does not count passes yet, and the screen says so rather than inventing a number.
+ */
+export interface PlayerMatchStat {
+  readonly fixtureId: string;
+  readonly seasonNumber: number;
+  readonly seasonLabel: string;
+  readonly round: number;
+  readonly playedAt: string;
+  readonly opponentClubId: string;
+  readonly opponentName: string;
+  readonly home: boolean;
+  readonly goalsFor: number;
+  readonly goalsAgainst: number;
+  readonly started: boolean;
+  readonly minutesPlayed: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly shotsOnTarget: number;
+  readonly saves: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
+
+  /** The match rating on a 0.0–10.0 scale, or null when the player was not rated (`TRN-8`). */
+  readonly rating: number | null;
+}
+
+/** A player's matches, most recent first, across every season they have appeared in. */
+export interface PlayerMatches {
+  readonly playerId: string;
+  readonly matches: readonly PlayerMatchStat[];
+  readonly serverTime: string;
+}

@@ -1183,6 +1183,7 @@ GET    /api/v1/clubs/{clubId}
 GET    /api/v1/clubs/{clubId}/dashboard
 GET    /api/v1/clubs/{clubId}/squad
 GET    /api/v1/players/{playerId}
+GET    /api/v1/players/{playerId}/matches
 GET    /api/v1/contracts
 POST   /api/v1/contracts/{contractId}/renewal-quote
 POST   /api/v1/contracts/{contractId}/renew

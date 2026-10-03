@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, switchMap, tap } from 'rxjs';
 import { SquadApi } from './squad-api';
-import { ContractList, Player, RenewalQuote, Squad } from './squad.models';
+import { ContractList, Player, PlayerMatches, RenewalQuote, Squad } from './squad.models';
 
 /**
  * The squad module's view state.
@@ -18,6 +18,7 @@ export class SquadStore {
 
   private readonly squadSignal = signal<Squad | null>(null);
   private readonly playerSignal = signal<Player | null>(null);
+  private readonly playerMatchesSignal = signal<PlayerMatches | null>(null);
   private readonly contractsSignal = signal<ContractList | null>(null);
   private readonly renewalQuoteSignal = signal<RenewalQuote | null>(null);
 
@@ -26,6 +27,9 @@ export class SquadStore {
 
   /** The player profile last read. */
   readonly player = this.playerSignal.asReadonly();
+
+  /** The match-by-match history last read for a player. */
+  readonly playerMatches = this.playerMatchesSignal.asReadonly();
 
   /** The contract list last read. */
   readonly contracts = this.contractsSignal.asReadonly();
@@ -41,6 +45,13 @@ export class SquadStore {
   /** Reads one player's profile. */
   loadPlayer(playerId: string): Observable<Player> {
     return this.api.player(playerId).pipe(tap((player) => this.playerSignal.set(player)));
+  }
+
+  /** Reads one player's match-by-match statistics. */
+  loadPlayerMatches(playerId: string): Observable<PlayerMatches> {
+    return this.api
+      .playerMatches(playerId)
+      .pipe(tap((matches) => this.playerMatchesSignal.set(matches)));
   }
 
   /** Reads the contracts of the club the account holds. */
@@ -83,6 +94,7 @@ export class SquadStore {
   clear(): void {
     this.squadSignal.set(null);
     this.playerSignal.set(null);
+    this.playerMatchesSignal.set(null);
     this.contractsSignal.set(null);
     this.renewalQuoteSignal.set(null);
   }
