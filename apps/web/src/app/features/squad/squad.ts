@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TableModule } from 'primeng/table';
@@ -38,7 +39,7 @@ import {
  */
 @Component({
   selector: 'app-squad',
-  imports: [RouterLink, TableModule],
+  imports: [DecimalPipe, RouterLink, TableModule],
   templateUrl: './squad.html',
 })
 export class Squad {

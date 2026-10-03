@@ -42,6 +42,7 @@ function squadPlayer(
     state: { condition: 100, fatigue: 0, morale: 50, matchSharpness: 50 },
     contract: null,
     availability: [],
+    attributeAverages: { goalkeeping: 5, technical: 10, mental: 10, physical: 10 },
     ...overrides,
   };
 }

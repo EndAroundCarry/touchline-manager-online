@@ -55,9 +55,10 @@ internal sealed class SquadQueries : ISquadQueries
             from contract in _dbContext.PlayerContracts
             join player in _dbContext.Players on contract.PlayerId equals player.Id
             join state in _dbContext.PlayerStates on player.Id equals state.PlayerId
+            join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
             where contract.ClubId == clubId && contract.Status == ContractStatus.Active
             orderby player.FullName
-            select new { Player = player, Contract = contract, State = state })
+            select new { Player = player, Contract = contract, State = state, Attributes = attributes })
             .Take(WorldRuleSet.SquadMaximumRegistered)
             .ToListAsync(cancellationToken);
 
@@ -86,7 +87,8 @@ internal sealed class SquadQueries : ISquadQueries
                     row.Contract.WeeklyWageMinor,
                     row.Contract.SquadStatus,
                     row.Contract.Status),
-                availability.GetValueOrDefault(row.Player.Id, [])))
+                availability.GetValueOrDefault(row.Player.Id, []),
+                row.Attributes.ToSet()))
             // Goalkeepers first and then by position, which the stored code cannot express because it orders
             // alphabetically. Twenty-five rows at most, so sorting them here costs nothing.
             .OrderBy(player => (int)player.PrimaryPosition)

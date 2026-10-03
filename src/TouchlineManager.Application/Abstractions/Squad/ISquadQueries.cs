@@ -173,6 +173,7 @@ public sealed record SquadPlayerMatchSource(
 /// <param name="State">The player's state.</param>
 /// <param name="Contract">The player's active contract.</param>
 /// <param name="Availability">Every open injury and suspension.</param>
+/// <param name="Attributes">The player's attributes, read so the mapper can average each family; they never reach the client.</param>
 public sealed record SquadPlayerRow(
     Guid Id,
     string FullName,
@@ -184,7 +185,8 @@ public sealed record SquadPlayerRow(
     IReadOnlyList<PlayerPosition> SecondaryPositions,
     SquadStateRow State,
     SquadContractRow Contract,
-    IReadOnlyList<SquadAvailabilityRow> Availability);
+    IReadOnlyList<SquadAvailabilityRow> Availability,
+    PlayerAttributeSet Attributes);
 
 /// <summary>Everything the squad screen reads (master plan §10.3).</summary>
 /// <param name="ClubId">The club.</param>

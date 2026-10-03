@@ -5,6 +5,7 @@ namespace TouchlineManager.Contracts.Squad;
 /// Bounded to <c>SQ-3</c>'s 25 players, which is what makes a single unpaged response the right shape.
 /// Rows deliberately do not carry the twenty-eight-attribute block: the squad table is about selection
 /// readiness — availability, condition, contract — and the attribute grid belongs to the player profile.
+/// They carry only the four family means, so the stronger player can be spotted at a glance.
 /// </remarks>
 /// <param name="ClubId">The club the squad belongs to.</param>
 /// <param name="ClubName">The generated club name.</param>
@@ -49,6 +50,7 @@ public sealed record SquadSummaryResponse(
 /// <param name="State">Condition, fatigue, morale, and sharpness.</param>
 /// <param name="Contract">The active contract, or null if the player has none (`SQ-6`).</param>
 /// <param name="Availability">Every open injury and suspension, empty when the player is available.</param>
+/// <param name="AttributeAverages">The mean of each attribute family, for scanning the squad at a glance.</param>
 public sealed record SquadPlayerResponse(
     Guid Id,
     string FullName,
@@ -60,7 +62,22 @@ public sealed record SquadPlayerResponse(
     IReadOnlyList<string> SecondaryPositions,
     PlayerStateResponse State,
     PlayerContractSummaryResponse? Contract,
-    IReadOnlyList<PlayerAvailabilityResponse> Availability);
+    IReadOnlyList<PlayerAvailabilityResponse> Availability,
+    AttributeAveragesResponse AttributeAverages);
+
+/// <summary>The mean of each attribute family, on the 1–20 attribute scale, to one decimal.</summary>
+/// <remarks>
+/// Four family means rather than an overall: no single number is authoritative for a player.
+/// </remarks>
+/// <param name="Goalkeeping">Mean of the four goalkeeping attributes.</param>
+/// <param name="Technical">Mean of the ten technical attributes.</param>
+/// <param name="Mental">Mean of the eight mental attributes.</param>
+/// <param name="Physical">Mean of the six physical attributes.</param>
+public sealed record AttributeAveragesResponse(
+    decimal Goalkeeping,
+    decimal Technical,
+    decimal Mental,
+    decimal Physical);
 
 /// <summary>
 /// A player's condition, fatigue, morale, and match sharpness, as user-facing values (`TRN-8`).

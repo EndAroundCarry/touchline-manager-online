@@ -73,7 +73,7 @@
     >
       <p-table
         [value]="players()"
-        [tableStyle]="{ 'min-width': '52rem' }"
+        [tableStyle]="{ 'min-width': '72rem' }"
         [pt]="{ table: { 'aria-label': 'Squad roster' } }"
       >
         <ng-template #header>
@@ -88,6 +88,18 @@
             </th>
             <th scope="col" pSortableColumn="state.fatigue">
               Fatigue <p-sort-icon field="state.fatigue" />
+            </th>
+            <th scope="col" pSortableColumn="attributeAverages.goalkeeping">
+              Avg goalkeeping <p-sort-icon field="attributeAverages.goalkeeping" />
+            </th>
+            <th scope="col" pSortableColumn="attributeAverages.technical">
+              Avg technical <p-sort-icon field="attributeAverages.technical" />
+            </th>
+            <th scope="col" pSortableColumn="attributeAverages.mental">
+              Avg mental <p-sort-icon field="attributeAverages.mental" />
+            </th>
+            <th scope="col" pSortableColumn="attributeAverages.physical">
+              Avg physical <p-sort-icon field="attributeAverages.physical" />
             </th>
             <th scope="col" pSortableColumn="contract.endSeasonNumber">
               Contract <p-sort-icon field="contract.endSeasonNumber" />
@@ -126,6 +138,10 @@
                 {{ fatigueWord(player.state.fatigue) }}
               </span>
             </td>
+            <td>{{ player.attributeAverages.goalkeeping | number: '1.1-1' }}</td>
+            <td>{{ player.attributeAverages.technical | number: '1.1-1' }}</td>
+            <td>{{ player.attributeAverages.mental | number: '1.1-1' }}</td>
+            <td>{{ player.attributeAverages.physical | number: '1.1-1' }}</td>
             <td>
               @if (player.contract; as contract) {
                 <span class="block">to season {{ contract.endSeasonNumber }}</span>
@@ -152,7 +168,7 @@
 
         <ng-template #emptymessage>
           <tr>
-            <td colspan="7" class="text-sm text-slate-600">No player matches the filter.</td>
+            <td colspan="11" class="text-sm text-slate-600">No player matches the filter.</td>
           </tr>
         </ng-template>
       </p-table>
@@ -200,6 +216,28 @@
               <dt class="text-slate-500">Fatigue</dt>
               <dd [class]="fatigueClass(player.state.fatigue)">
                 {{ player.state.fatigue }} {{ fatigueWord(player.state.fatigue) }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg goalkeeping</dt>
+              <dd class="text-slate-800">
+                {{ player.attributeAverages.goalkeeping | number: '1.1-1' }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg technical</dt>
+              <dd class="text-slate-800">
+                {{ player.attributeAverages.technical | number: '1.1-1' }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg mental</dt>
+              <dd class="text-slate-800">{{ player.attributeAverages.mental | number: '1.1-1' }}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Avg physical</dt>
+              <dd class="text-slate-800">
+                {{ player.attributeAverages.physical | number: '1.1-1' }}
               </dd>
             </div>
             <div class="col-span-2 flex justify-between gap-2">
