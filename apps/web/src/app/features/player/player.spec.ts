@@ -169,9 +169,20 @@ describe('PlayerProfile', () => {
     expect(select.options[0].textContent).toContain('Current season');
     expect(root.querySelector('#player-panel-statistics dl')?.textContent).toContain('7');
 
+    const rowCount = () => root.querySelectorAll('[data-testid="match-stats"] tbody tr').length;
+
+    expect(rowCount()).toBe(10);
+    expect(
+      Array.from(root.querySelectorAll('[data-testid="match-stats"] th')).map((cell) =>
+        cell.textContent?.trim(),
+      ),
+    ).toEqual(expect.arrayContaining(['Goals', 'Passes', 'Yellow', 'Red', 'Rating']));
+
     select.value = '2';
     select.dispatchEvent(new Event('change'));
     await fixture.whenStable();
+
+    expect(rowCount()).toBe(10);
 
     expect(root.querySelector('#player-panel-statistics dl')?.textContent).toContain('5');
     expect(root.querySelector('#player-panel-statistics dl')?.textContent).not.toContain('Goals7');

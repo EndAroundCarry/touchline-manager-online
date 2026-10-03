@@ -13,6 +13,7 @@ import {
   stateRows,
 } from '../../core/squad/squad-presentation';
 import { SquadStore } from '../../core/squad/squad-store';
+import { sampleMatchStats } from '../../core/squad/match-history';
 import { sampleTrainingHistory } from '../../core/training/training-history';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
@@ -152,6 +153,24 @@ export class PlayerProfile implements OnInit {
     const season = this.careerSeasons().find((item) => `${item.seasonNumber}` === choice);
 
     return season === undefined ? [] : seasonStatRows(season.stats);
+  });
+
+  /** The per-match rows for the chosen season. Placeholder until the server exposes them (see the model). */
+  protected readonly matchRows = computed(() => {
+    const player = this.player();
+    const choice = this.selectedSeason();
+
+    if (player === null) {
+      return [];
+    }
+
+    const appearances =
+      choice === CURRENT_SEASON
+        ? (player.seasonStats?.appearances ?? 0)
+        : (this.careerSeasons().find((item) => `${item.seasonNumber}` === choice)?.stats
+            .appearances ?? 0);
+
+    return sampleMatchStats(player.id, choice, appearances);
   });
 
   protected readonly pageHeadingClass = PAGE_HEADING;

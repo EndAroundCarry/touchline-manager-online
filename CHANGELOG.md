@@ -15,8 +15,9 @@ engine version.
   each a list of attribute name on the left and number plus band word on the right, in type small enough
   that all four fit a phone's width with no scrolling (the band word shows from the `sm` breakpoint up and
   is always read out by assistive technology; a legend above the columns gives the colour bands). The Training report
-  shows clearly-labelled sample data until the training rework. Statistics shows the current season with a
-  drop-down for earlier ones. Contract shows the deal, its expiry and salary, with "Start negotiation"
+  shows clearly-labelled sample data until the training rework. Statistics is a per-match table (round, match, result, minutes,
+  goals, assists, passes, shots, cards, rating) with a season drop-down; the rows are sample data until the
+  server exposes match-by-match lines and the engine counts passes. Contract shows the deal, its expiry and salary, with "Start negotiation"
   disabled and marked coming soon.
 - **`CON-11`: the board renews every expiring contract of a present manager at rollover** (two seasons, on the
   deterministic quote), so no manager loses a player to expiry. Clubs nobody manages keep the `CON-9` policy.
