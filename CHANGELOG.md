@@ -4,6 +4,53 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Replay-v4 — the constant-pace film (server; results unchanged)
+
+The second milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). The film is built
+from the `engine-v5` possession recorder and played at **one pace for the whole match**, so no stretch of play
+is rushed to make room for another. Presentation only: the engine, its results and its hashes are untouched,
+so nothing needs reseeding. The calibration constants, ADR-0054 and the documentation are M4.
+
+### Added
+
+- **A film script, a timing, a motion.** `FilmScript` turns possessions into beats (carry, pass, cross, header,
+  shot, clearance, duel, save, and dead-ball holds). `FilmTiming` solves one global pace in the 1.8–2.6× band,
+  condensing the quietest possessions first, with the 11:00 ceiling enforced by a test. `FilmMotion` simulates
+  the ball and the players in metres under speed caps, with hard constraints (a goal ends in the goal mouth, a
+  save at the keeper, a pass at its receiver), and `FilmShape` holds team shape and set-piece formations. Cuts
+  happen only at a kick-off after a goal and at half-time.
+- **Passages with a clock.** The film is cut into passages of about 8–12 s (at most 75). `PassageV1` and
+  `PassageResponse` gain `Period`, `Clock` (match-second keyframes on each half's own clock, so the second half
+  starts at 45:00) and `Cuts`; the presentation gains `PaceMilli`. `MatchMapping`, the contract and the web
+  `match.models.ts` follow, with the new fields optional on the client.
+- **Commentary timing.** A line is read when its beat happens and the outcome follows the strike by 0.6 s;
+  chunking holds a split until the strike has had that time, and a forced break (half-time, a change of
+  players, a cut, the end of the film) reads the line as the passage ends, with the clock held until then.
+- **The reel measures its lead-in in match time** (about 600 s, never across half-time, clamped to 25–70 s of
+  film); a goal's clip runs through its celebration.
+- **Benchmark `replay` mode** with `--dump <file>` for the viewer harness in M3.
+
+### Measured (2,000 matches)
+
+| | |
+|---|---|
+| Teleports outside cuts | **0** (3.8 cuts a match) |
+| Ball still outside holds | p50 **2.3%**, p95 3.0% |
+| Film length | **10:59** median, max **11:00**, none over |
+| Pace | p50 2.56×, 94.7% inside 1.8–2.6× |
+| Reel | median 7:25, max 9:44 |
+| Moves lengthened to meet a constraint | p50 16.5% |
+| Payload estimate | p50 724 KB, max **749.9 KB** (budget 750); real JSON about 2.1 MB |
+
+### Known, for M4
+
+- The film sits at the 11:00 ceiling in almost every match: the played time with stoppage, about 101 minutes,
+  divided by nine is more than 11:00, so the target clamps. A 10:00 median needs a pace near 2.9×, so the target
+  formula and the band are calibration decisions.
+- The plan's three payload rungs reach about 783 KB, so the ladder has five; the budget holds with almost no
+  headroom.
+- The interim web viewer's clock label is wrong for first-half stoppage until M3 moves it onto `Clock`.
+
 ## Engine-v5 — the half-time clock, restart ownership, and a complete passage recorder
 
 The first milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). `engine-v4` built the
