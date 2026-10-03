@@ -148,6 +148,18 @@ export interface PlayerSeasonStats {
   readonly shots: number;
   readonly shotsOnTarget: number;
   readonly saves: number;
+
+  /** Passes attempted in open play (`engine-v6`). */
+  readonly passesAttempted: number;
+
+  /** Passes that found a teammate, a subset of those attempted. */
+  readonly passesCompleted: number;
+
+  /** Take-ons attempted: the 1v1 duels the player carried the ball into. */
+  readonly dribblesAttempted: number;
+
+  /** Take-ons won, a subset of those attempted. */
+  readonly dribblesCompleted: number;
   readonly yellowCards: number;
   readonly redCards: number;
 

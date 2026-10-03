@@ -103,8 +103,9 @@ public sealed class DeterminismTests
     public void The_golden_hash_for_a_known_snapshot_is_pinned()
     {
         // The most important test in the project. If this fails, an engine change has altered what a historical
-        // match would replay as. Engine version 5 re-pinned it (the half-time clock, restart ownership, and the
-        // complete passage recorder), and the engine-v4 values were retired with their version. From a
+        // match would replay as. Engine version 6 re-pinned it (the player line gained passes and take-ons; the
+        // scoreline and every event are the engine-v5 ones), and the engine-v5 values were retired with their
+        // version. From a
         // version's release onward, any change requires a new engine version and a new labelled constant
         // rather than an updated hash.
         var result = MatchSimulator.Simulate(TestMatchFactory.Even());
@@ -163,8 +164,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "1a701fc6ecb18249953068ad13a9bd7026e0ac52a30fe5f5cc0e4e9c393ff44c";
+        "2ca2ffd129c2d63290d9ddeef261d87b34cfce8db83e87842c00035ec7844002";
 
     private const string GoldenOutputHash =
-        "6d23c036e12ac0c2a42815b8896adcb37f2001ce8f02bab2c5b1ceb05d004cb1";
+        "a7ad769a6b5a321b895a0a12eb832243f3f08bfa305eb1660facdfbccc4f18e3";
 }

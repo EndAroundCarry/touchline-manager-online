@@ -183,6 +183,7 @@ internal static class PossessionSimulator
             // A penalty is a foul in the box, so the attack is played in there before the defender brings the
             // attacker down.
             state.MoveBallAndRecord(plan.BoxFoulPoint, PassageWaypointKind.Pass);
+            state.Passing.Completed(1);
         }
 
         // The two players the foul is between are both at the ball when it is committed: the fouler the engine
@@ -286,6 +287,10 @@ internal static class PossessionSimulator
                 passer: true,
                 scramble);
 
+            // The ball was lost on the last pass of the approach: the one an interception or an offside
+            // flag ended (`engine-v6`).
+            state.Passing.LostApproach();
+
             Finish(state, ResolveFailedProgression(state, possession, attacker));
 
             return;
@@ -325,6 +330,7 @@ internal static class PossessionSimulator
 
         // The attack breaks through: the ball is played on to the shot point and struck from there.
         state.MoveBallAndRecord(plan.ShotPoint, PassageWaypointKind.Pass);
+        state.Passing.CreatedShot();
         ChanceSimulator.ResolveOpenPlay(state, side, plan.Zone, PassagePlanner.StrikeFrom(plan, plan.ShotPoint, rules));
         Finish(state, PassageOutcome.OpenPlayShot);
     }
@@ -339,6 +345,9 @@ internal static class PossessionSimulator
     /// </remarks>
     private static void Finish(MatchState state, PassageOutcome outcome)
     {
+        // The possession's passes are credited before an injury can take a passer off the pitch (`engine-v6`).
+        PassTally.Settle(state);
+
         InjurySimulator.TryResolveInjury(state);
 
         if (state.NextRestart is { } restart)
@@ -397,6 +406,12 @@ internal static class PossessionSimulator
             var altitude = kind == PassageWaypointKind.Cross ? state.Rules.CrossAltitude : 0;
 
             state.MoveBallAndRecord(points[index], kind, altitude);
+        }
+
+        // Every leg after the first waypoint was a pass, unless the ball was lost before anybody played it on.
+        if (passer)
+        {
+            state.Passing.Completed(points.Count - 1);
         }
 
         // Where the path ends is where the ball is received into the final beat of the build-up.
@@ -691,6 +706,10 @@ internal static class PossessionSimulator
         state.RecordTouch(duel.AttackerId, PassageAction.Carry);
         state.RecordTouch(duel.DefenderId, PassageAction.Tackle);
 
+        // The take-on is a dribble attempted by the carrier, and a dribble completed when he beat the man
+        // (`engine-v6`).
+        PassTally.RecordDribble(state.SideOf(possessionSide), duel.AttackerId, duel.AttackerWon);
+
         if (duel.AttackerWon)
         {
             state.SideOf(possessionSide).AdjustLiveRating(duel.AttackerId, state.Rules.LiveRatingTackleBonusBasisPoints);
@@ -752,6 +771,10 @@ internal static class PossessionSimulator
     {
         var rules = state.Rules;
         var plan = possession.Plan;
+
+        // The ball that would have broken the defence was stopped, whether it went behind for a corner or was
+        // cleared (`engine-v6`).
+        state.Passing.LostCreation();
 
         if (!state.Random.RollBasisPoints(rules.CornerShareOfFailedCreationBasisPoints))
         {

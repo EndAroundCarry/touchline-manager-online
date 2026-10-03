@@ -324,10 +324,33 @@ export function seasonStatRows(stats: PlayerSeasonStats): readonly SeasonStatRow
     { label: 'Shots', value: `${stats.shots}` },
     { label: 'Shots on target', value: `${stats.shotsOnTarget}` },
     { label: 'Saves', value: `${stats.saves}` },
+    { label: 'Passes', value: ratioLabel(stats.passesCompleted, stats.passesAttempted) },
+    {
+      label: 'Pass accuracy',
+      value: percentageLabel(stats.passesCompleted, stats.passesAttempted),
+    },
+    { label: 'Dribbles won', value: ratioLabel(stats.dribblesCompleted, stats.dribblesAttempted) },
+    {
+      label: 'Dribble success',
+      value: percentageLabel(stats.dribblesCompleted, stats.dribblesAttempted),
+    },
     { label: 'Yellow cards', value: `${stats.yellowCards}` },
     { label: 'Red cards', value: `${stats.redCards}` },
     { label: 'Average rating', value: averageRatingLabel(stats.averageRating) },
   ];
+}
+
+/** A completed count against an attempted one, as `completed / attempted` (`engine-v6`). */
+function ratioLabel(completed: number, attempted: number): string {
+  return `${completed} / ${attempted}`;
+}
+
+/**
+ * A completed count as a whole percentage of an attempted one, or a dash when nothing was attempted — a
+ * player who never took a dribble has no success rate rather than a rate of zero (`engine-v6`).
+ */
+function percentageLabel(completed: number, attempted: number): string {
+  return attempted === 0 ? '\u2014' : `${Math.round((completed / attempted) * 100)}%`;
 }
 
 /**

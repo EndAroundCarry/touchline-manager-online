@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 5;
+    public const int Engine = 6;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -32,10 +32,10 @@ public static class EngineVersions
     /// </remarks>
     public const int RuleSet = 5;
 
-    /// <summary>The stable label for engine version 5, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 6, used in hashes and diagnostics.</summary>
     /// <remarks>
     /// <para>
-    /// Version 5 completes the continuous passage model that version 4 introduced. The clock is reset at
+    /// Version 5 completed the continuous passage model that version 4 introduced. The clock is reset at
     /// half-time, so the second half is played from 45:00 with its own stoppage rather than starting a few
     /// minutes late and finishing a few minutes early. A dead ball belongs to somebody: a kick-off, a goal
     /// kick, a keeper's ball, a free kick, or an offside is taken by the side the rules give it to, from where
@@ -48,8 +48,16 @@ public static class EngineVersions
     /// the outcome decides: the goal mouth, the goalkeeper, wide or over, the woodwork, or a block. Everything
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
+    /// <para>
+    /// Version 6 counts what a player does with the ball. Each player's line carries the passes they attempted
+    /// and completed and the take-ons they attempted and won, beside the goals and assists it already held. No
+    /// play draw moves: the passes are credited from a stream derived from the seed and the possession, and
+    /// the take-ons are the 1v1 duels the engine already resolved, so every scoreline, event, and passage is
+    /// the one `engine-v5` produced and only the player lines, the canonical serialization, and the hashes
+    /// change.
+    /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v5";
+    public const string EngineLabel = "engine-v6";
 
     /// <summary>The stable label for engine rules version 5.</summary>
     public const string RuleSetLabel = "engine-rules-v5";

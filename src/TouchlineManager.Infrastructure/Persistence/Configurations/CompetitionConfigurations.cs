@@ -465,8 +465,9 @@ internal sealed class DisciplineRecordConfiguration : IEntityTypeConfiguration<D
 /// </para>
 /// <para>
 /// The consistency checks are here as well as in the aggregate, because a manager reads these totals
-/// directly: nobody has a negative count of anything, a start is a subset of an appearance, and shots on
-/// target are a subset of shots. The average rating is not stored — it is computed from the total and the
+/// directly: nobody has a negative count of anything, a start is a subset of an appearance, shots on
+/// target are a subset of shots, and completed passes and dribbles are subsets of those attempted. The
+/// average rating is not stored — it is computed from the total and the
 /// count — so the check only keeps the average of what is stored inside the scale.
 /// </para>
 /// </remarks>
@@ -484,7 +485,10 @@ internal sealed class PlayerSeasonStatConfiguration : IEntityTypeConfiguration<P
                 "appearances >= 0 and starts >= 0 and starts <= appearances and minutes_played >= 0 "
                 + "and goals >= 0 and assists >= 0 and shots >= 0 and shots_on_target >= 0 "
                 + "and shots_on_target <= shots and saves >= 0 and yellow_cards >= 0 and red_cards >= 0 "
-                + "and rating_basis_points_total >= 0 and rated_appearances >= 0");
+                + "and rating_basis_points_total >= 0 and rated_appearances >= 0 "
+                + "and passes_attempted >= 0 and passes_completed >= 0 and passes_completed <= passes_attempted "
+                + "and dribbles_attempted >= 0 and dribbles_completed >= 0 "
+                + "and dribbles_completed <= dribbles_attempted");
             table.HasCheckConstraint(
                 "ck_player_season_stats_rating",
                 "case when rated_appearances = 0 then 0 "
@@ -504,6 +508,10 @@ internal sealed class PlayerSeasonStatConfiguration : IEntityTypeConfiguration<P
         builder.Property(stat => stat.Shots).HasColumnName("shots").IsRequired();
         builder.Property(stat => stat.ShotsOnTarget).HasColumnName("shots_on_target").IsRequired();
         builder.Property(stat => stat.Saves).HasColumnName("saves").IsRequired();
+        builder.Property(stat => stat.PassesAttempted).HasColumnName("passes_attempted").IsRequired();
+        builder.Property(stat => stat.PassesCompleted).HasColumnName("passes_completed").IsRequired();
+        builder.Property(stat => stat.DribblesAttempted).HasColumnName("dribbles_attempted").IsRequired();
+        builder.Property(stat => stat.DribblesCompleted).HasColumnName("dribbles_completed").IsRequired();
         builder.Property(stat => stat.YellowCards).HasColumnName("yellow_cards").IsRequired();
         builder.Property(stat => stat.RedCards).HasColumnName("red_cards").IsRequired();
         builder.Property(stat => stat.RatingBasisPointsTotal)

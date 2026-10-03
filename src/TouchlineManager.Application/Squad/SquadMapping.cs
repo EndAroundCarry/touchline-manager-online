@@ -111,6 +111,10 @@ public static class SquadMapping
             stat.Shots,
             stat.ShotsOnTarget,
             stat.Saves,
+            stat.PassesAttempted,
+            stat.PassesCompleted,
+            stat.DribblesAttempted,
+            stat.DribblesCompleted,
             stat.YellowCards,
             stat.RedCards,
             // Converted here and nowhere else, so the basis points the line is stored in never reach a

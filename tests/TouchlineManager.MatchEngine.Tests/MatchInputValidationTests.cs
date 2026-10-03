@@ -212,7 +212,7 @@ public sealed class MatchInputValidationTests
 
         var act = () => MatchSimulator.Simulate(input);
 
-        act.Should().Throw<InvalidMatchInputException>().WithMessage("*engine-v5*");
+        act.Should().Throw<InvalidMatchInputException>().WithMessage("*engine-v6*");
     }
 
     [Fact]

@@ -38,6 +38,18 @@ public sealed record PlayerMatchStatLine
     /// <summary>Gets the saves made.</summary>
     public required int Saves { get; init; }
 
+    /// <summary>Gets the passes attempted.</summary>
+    public required int PassesAttempted { get; init; }
+
+    /// <summary>Gets the passes that found a teammate (a subset of those attempted).</summary>
+    public required int PassesCompleted { get; init; }
+
+    /// <summary>Gets the take-ons attempted.</summary>
+    public required int DribblesAttempted { get; init; }
+
+    /// <summary>Gets the take-ons won (a subset of those attempted).</summary>
+    public required int DribblesCompleted { get; init; }
+
     /// <summary>Gets the bookings received, counting a second yellow as the booking it was.</summary>
     public required int YellowCards { get; init; }
 
@@ -89,6 +101,18 @@ public sealed record PlayerSeasonStatLine
 
     /// <summary>Gets the saves made.</summary>
     public required int Saves { get; init; }
+
+    /// <summary>Gets the passes attempted.</summary>
+    public required int PassesAttempted { get; init; }
+
+    /// <summary>Gets the passes that found a teammate (a subset of those attempted).</summary>
+    public required int PassesCompleted { get; init; }
+
+    /// <summary>Gets the take-ons attempted.</summary>
+    public required int DribblesAttempted { get; init; }
+
+    /// <summary>Gets the take-ons won (a subset of those attempted).</summary>
+    public required int DribblesCompleted { get; init; }
 
     /// <summary>Gets the league bookings accumulated.</summary>
     public required int YellowCards { get; init; }
@@ -165,6 +189,18 @@ public sealed class PlayerSeasonStat
 
     /// <summary>Gets the saves made.</summary>
     public int Saves { get; private set; }
+
+    /// <summary>Gets the passes attempted.</summary>
+    public int PassesAttempted { get; private set; }
+
+    /// <summary>Gets the passes that found a teammate.</summary>
+    public int PassesCompleted { get; private set; }
+
+    /// <summary>Gets the take-ons attempted.</summary>
+    public int DribblesAttempted { get; private set; }
+
+    /// <summary>Gets the take-ons won.</summary>
+    public int DribblesCompleted { get; private set; }
 
     /// <summary>Gets the league bookings accumulated.</summary>
     public int YellowCards { get; private set; }
@@ -325,6 +361,10 @@ public sealed class PlayerSeasonStat
         Shots += line.Shots;
         ShotsOnTarget += line.ShotsOnTarget;
         Saves += line.Saves;
+        PassesAttempted += line.PassesAttempted;
+        PassesCompleted += line.PassesCompleted;
+        DribblesAttempted += line.DribblesAttempted;
+        DribblesCompleted += line.DribblesCompleted;
         YellowCards += line.YellowCards;
         RedCards += line.RedCards;
 
@@ -351,6 +391,10 @@ public sealed class PlayerSeasonStat
         Shots = line.Shots;
         ShotsOnTarget = line.ShotsOnTarget;
         Saves = line.Saves;
+        PassesAttempted = line.PassesAttempted;
+        PassesCompleted = line.PassesCompleted;
+        DribblesAttempted = line.DribblesAttempted;
+        DribblesCompleted = line.DribblesCompleted;
         YellowCards = line.YellowCards;
         RedCards = line.RedCards;
         RatingBasisPointsTotal = line.RatingBasisPointsTotal;
@@ -372,6 +416,10 @@ public sealed class PlayerSeasonStat
             (nameof(line.Shots), line.Shots),
             (nameof(line.ShotsOnTarget), line.ShotsOnTarget),
             (nameof(line.Saves), line.Saves),
+            (nameof(line.PassesAttempted), line.PassesAttempted),
+            (nameof(line.PassesCompleted), line.PassesCompleted),
+            (nameof(line.DribblesAttempted), line.DribblesAttempted),
+            (nameof(line.DribblesCompleted), line.DribblesCompleted),
             (nameof(line.YellowCards), line.YellowCards),
             (nameof(line.RedCards), line.RedCards),
             (nameof(line.RatingBasisPointsTotal), line.RatingBasisPointsTotal),
@@ -407,6 +455,16 @@ public sealed class PlayerSeasonStat
             throw new ArgumentException("Shots on target are a subset of shots.", nameof(line));
         }
 
+        if (line.PassesCompleted > line.PassesAttempted)
+        {
+            throw new ArgumentException("Completed passes are a subset of attempted passes.", nameof(line));
+        }
+
+        if (line.DribblesCompleted > line.DribblesAttempted)
+        {
+            throw new ArgumentException("Successful dribbles are a subset of attempted dribbles.", nameof(line));
+        }
+
         if (line.RatedAppearances > line.Appearances)
         {
             throw new ArgumentException("A rating belongs to an appearance.", nameof(line));
@@ -432,6 +490,10 @@ public sealed class PlayerSeasonStat
             (nameof(line.Shots), line.Shots),
             (nameof(line.ShotsOnTarget), line.ShotsOnTarget),
             (nameof(line.Saves), line.Saves),
+            (nameof(line.PassesAttempted), line.PassesAttempted),
+            (nameof(line.PassesCompleted), line.PassesCompleted),
+            (nameof(line.DribblesAttempted), line.DribblesAttempted),
+            (nameof(line.DribblesCompleted), line.DribblesCompleted),
             (nameof(line.YellowCards), line.YellowCards),
             (nameof(line.RedCards), line.RedCards),
             (nameof(line.RatingBasisPoints), line.RatingBasisPoints),
@@ -465,6 +527,16 @@ public sealed class PlayerSeasonStat
         if (line.ShotsOnTarget > line.Shots)
         {
             throw new ArgumentException("Shots on target are a subset of shots.", nameof(line));
+        }
+
+        if (line.PassesCompleted > line.PassesAttempted)
+        {
+            throw new ArgumentException("Completed passes are a subset of attempted passes.", nameof(line));
+        }
+
+        if (line.DribblesCompleted > line.DribblesAttempted)
+        {
+            throw new ArgumentException("Successful dribbles are a subset of attempted dribbles.", nameof(line));
         }
 
         if (line.RatingBasisPoints > 10_000)

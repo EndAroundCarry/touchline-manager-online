@@ -64,6 +64,18 @@ internal static class AssistPlanner
         runtime.Assists.TryGetValue(id, out var assists);
         runtime.Assists[id] = assists + 1;
 
+        // The ball that set the goal up is a completed pass: the possession's own creating pass when it had
+        // one, which the tally credits to this player when the possession ends, and otherwise the delivery
+        // that no phase of the approach counts, a corner's (`engine-v6`).
+        if (state.Passing.FinalLegCreatedShot)
+        {
+            state.Passing.AssistedBy = id;
+        }
+        else
+        {
+            PassTally.RecordDelivery(runtime, id);
+        }
+
         // The assist the crowd saw is also on the live scale, the moment the goal is credited (engine-v3).
         runtime.AdjustLiveRating(id, state.Rules.LiveRatingAssistBonusBasisPoints);
     }

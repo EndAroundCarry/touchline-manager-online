@@ -218,6 +218,10 @@ public sealed record PlayerResponse(
 /// <param name="Shots">Shots taken.</param>
 /// <param name="ShotsOnTarget">Shots on target.</param>
 /// <param name="Saves">Saves made.</param>
+/// <param name="PassesAttempted">Passes attempted in open play.</param>
+/// <param name="PassesCompleted">Passes that found a teammate.</param>
+/// <param name="DribblesAttempted">Take-ons attempted.</param>
+/// <param name="DribblesCompleted">Take-ons won.</param>
 /// <param name="YellowCards">Bookings accumulated (`DIS-2`).</param>
 /// <param name="RedCards">Sendings-off accumulated (`DIS-4`).</param>
 /// <param name="AverageRating">
@@ -233,6 +237,10 @@ public sealed record PlayerSeasonStatsResponse(
     int Shots,
     int ShotsOnTarget,
     int Saves,
+    int PassesAttempted,
+    int PassesCompleted,
+    int DribblesAttempted,
+    int DribblesCompleted,
     int YellowCards,
     int RedCards,
     decimal? AverageRating);

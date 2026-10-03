@@ -184,13 +184,25 @@ internal sealed class MatchState
     /// the possessions tile each half (`engine-v5`).
     /// </param>
     /// <param name="restart">The dead-ball restart the possession began with, or none.</param>
-    public void BeginPassage(MatchSide side, int startClockSeconds, PassageRestartKind restart) =>
+    public void BeginPassage(MatchSide side, int startClockSeconds, PassageRestartKind restart)
+    {
         _passage = new PassageAccumulator(
             PossessionOrdinal,
             side,
             InFirstHalf ? 1 : 2,
             startClockSeconds,
             restart);
+
+        // The possession's pass ledger starts empty whether or not a recorder is attached (`engine-v6`).
+        Passing = new PossessionPassing(side);
+    }
+
+    /// <summary>Gets the passes the possession being played has made so far (`engine-v6`).</summary>
+    /// <remarks>
+    /// A tally the possession's phases add to and <see cref="PassTally"/> settles into players when it ends.
+    /// It is bookkeeping only: it reads no draw and writes nothing the match depends on.
+    /// </remarks>
+    internal PossessionPassing Passing { get; private set; } = new(MatchSide.Home);
 
     /// <summary>
     /// Closes the current passage and hands it to the recorder, when one is attached (`engine-v4`).

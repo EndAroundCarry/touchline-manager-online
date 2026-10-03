@@ -87,6 +87,52 @@ public sealed class PlayerSeasonStatTests
     }
 
     [Fact]
+    public void More_completed_passes_than_attempted_is_refused()
+    {
+        var act = () => Open().Accumulate(Line() with { PassesAttempted = 10, PassesCompleted = 11 }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void More_successful_dribbles_than_attempted_is_refused()
+    {
+        var act = () => Open().Accumulate(Line() with { DribblesAttempted = 2, DribblesCompleted = 3 }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void A_negative_pass_count_is_refused()
+    {
+        var act = () => Open().Accumulate(Line() with { PassesAttempted = -1, PassesCompleted = -1 }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void A_season_line_with_more_completed_passes_than_attempted_is_refused()
+    {
+        var act = () => Open().Rebuild(SeasonLine() with { PassesAttempted = 5, PassesCompleted = 6 }, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Accumulating_sums_the_passes_and_take_ons()
+    {
+        var stat = Open();
+
+        stat.Accumulate(Line() with { PassesAttempted = 40, PassesCompleted = 30, DribblesAttempted = 6, DribblesCompleted = 3 }, Now);
+        stat.Accumulate(Line() with { PassesAttempted = 20, PassesCompleted = 19, DribblesAttempted = 2, DribblesCompleted = 2 }, Now);
+
+        stat.PassesAttempted.Should().Be(60);
+        stat.PassesCompleted.Should().Be(49);
+        stat.DribblesAttempted.Should().Be(8);
+        stat.DribblesCompleted.Should().Be(5);
+    }
+
+    [Fact]
     public void Accumulating_sums_the_totals_and_averages_the_ratings()
     {
         var stat = Open();
@@ -207,6 +253,10 @@ public sealed class PlayerSeasonStatTests
         Shots = 2,
         ShotsOnTarget = 1,
         Saves = 0,
+        PassesAttempted = 40,
+        PassesCompleted = 32,
+        DribblesAttempted = 5,
+        DribblesCompleted = 2,
         YellowCards = 0,
         RedCards = 0,
         RatingBasisPoints = 7_000,
@@ -224,6 +274,10 @@ public sealed class PlayerSeasonStatTests
         Shots = 20,
         ShotsOnTarget = 10,
         Saves = 0,
+        PassesAttempted = 400,
+        PassesCompleted = 320,
+        DribblesAttempted = 50,
+        DribblesCompleted = 20,
         YellowCards = 2,
         RedCards = 0,
         RatingBasisPointsTotal = 70_000,

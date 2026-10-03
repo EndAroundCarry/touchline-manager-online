@@ -166,6 +166,10 @@ internal sealed class SquadQueries : ISquadQueries
                 stat.Shots,
                 stat.ShotsOnTarget,
                 stat.Saves,
+                stat.PassesAttempted,
+                stat.PassesCompleted,
+                stat.DribblesAttempted,
+                stat.DribblesCompleted,
                 stat.YellowCards,
                 stat.RedCards,
                 stat.RatedAppearances == 0
@@ -220,6 +224,10 @@ internal sealed class SquadQueries : ISquadQueries
                 careerLines.Sum(line => line.Stat.Shots),
                 careerLines.Sum(line => line.Stat.ShotsOnTarget),
                 careerLines.Sum(line => line.Stat.Saves),
+                careerLines.Sum(line => line.Stat.PassesAttempted),
+                careerLines.Sum(line => line.Stat.PassesCompleted),
+                careerLines.Sum(line => line.Stat.DribblesAttempted),
+                careerLines.Sum(line => line.Stat.DribblesCompleted),
                 careerLines.Sum(line => line.Stat.YellowCards),
                 careerLines.Sum(line => line.Stat.RedCards),
                 ratedAppearances == 0 ? null : (int?)(ratingBasisPoints / ratedAppearances));
@@ -276,6 +284,10 @@ internal sealed class SquadQueries : ISquadQueries
             stat.Shots,
             stat.ShotsOnTarget,
             stat.Saves,
+            stat.PassesAttempted,
+            stat.PassesCompleted,
+            stat.DribblesAttempted,
+            stat.DribblesCompleted,
             stat.YellowCards,
             stat.RedCards,
             stat.RatedAppearances == 0

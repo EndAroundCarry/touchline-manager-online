@@ -480,7 +480,7 @@ re-simulated.
 | Ref | Rule |
 |---|---|
 | STA-1 | A player's season statistics are advanced by the matchday publication, in the same transaction that publishes the round (`MAT-7`). A republished round advances no line twice. |
-| STA-2 | The line is appearances, starts, minutes, goals, assists, shots, shots on target, saves, yellow cards, red cards, and average rating, keyed on `(division-season, player, club)`. |
+| STA-2 | The line is appearances, starts, minutes, goals, assists, shots, shots on target, saves, passes attempted and completed, dribbles attempted and completed, yellow cards, red cards, and average rating, keyed on `(division-season, player, club)`. |
 | STA-3 | Goals, assists, minutes, cards, and the match rating are the engine's player line; shots and saves are counted from the match's events. The match rating is the engine's own and is never recomputed by the projection. |
 | STA-4 | A player who did not take the pitch produces no line. A penalty has no assister; every other goal has exactly one. |
 | STA-5 | A match rating is stored in basis points (0–10,000) and exposed on a 0.0–10.0 scale (`TRN-8`). A player who did not appear is given no rating. |
@@ -598,8 +598,8 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `training_progression_version` | `training-v1` | TRN-9 (FIC-8) |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
-| `match_statistics_schema` | `match-statistics-v3` (carries the player lines, the assists, and the rating) | JSN-1, TRN-11 |
-| `season_stats_version` | `season-stats-v1` | STA-1 (FIC-8) |
+| `match_statistics_schema` | `match-statistics-v5` (carries the player lines, the assists, the rating, and the passes and take-ons) | JSN-1, TRN-11 |
+| `season_stats_version` | `season-stats-v2` | STA-1 (FIC-8) |
 | `match_rating_scale` | 0–10,000 basis points (displayed 0.0–10.0) | TRN-8, STA-2 |
 | `match_rating_base_bp` | 6,000 | STA-5 (balancing) |
 | `match_rating_win_bp` / `_draw_bp` / `_loss_bp` | 600 / 120 / 350 | STA-5 (balancing) |

@@ -70,6 +70,7 @@ the system is shaped the way it is.
 | [0051](0051-engine-v4-continuous-passages.md) | Engine-v4 plays a possession along a continuous passage, and records the film as a side channel | Accepted |
 | [0052](0052-replay-v3-film-and-reel.md) | Replay-v3 turns a match into one continuous film with a companion highlights reel | Accepted |
 | [0053](0053-engine-v5-half-time-clock-and-restart-ownership.md) | Engine-v5 resets the half-time clock, gives every dead ball an owner, and completes the passage record | Accepted |
+| [0054](0054-engine-v6-passes-and-take-ons.md) | Engine-v6 counts passes and take-ons on the player line, and the season statistics store them | Accepted |
 
 ## Rules for changing an ADR
 

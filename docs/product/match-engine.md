@@ -505,6 +505,27 @@ by playing time; every other term is absolute. The rating is a display value der
 a hidden player value (`MAT-11`), and it is produced once with the result so a season's average has one
 definition.
 
+### 8.2 Passes and take-ons (`engine-v6`)
+
+Two more facts the player line carries, because no event carries them either (`ADR-0054`).
+
+**Take-ons.** The 1v1 ground duel a carrier fights once a possession has progressed (§7.2) is a dribble
+attempted by the carrier, and a dribble completed when he wins it. No draw is added.
+
+**Passes.** A possession is played as phases, so its passes follow from what the phases decided: every leg of
+the recorded approach is a pass; a possession that fails to progress ends on a lost pass (the last leg played,
+or the first when none was; a scramble lost is a lost 50/50, not a pass); the ball played on to the shot point
+is a completed pass when the attack breaks through and a lost one when creation fails; a penalty's run into
+the box is a completed pass. Set pieces, a goalkeeper's distribution, and the entry carry are not counted, and
+a corner that sets a goal up is the assister's completed delivery. `PassTally` draws each leg's passer from a
+stream derived from the match seed and the possession ordinal — **never the play stream** — weighted by
+`Passing` for a completed pass and by the complement of `Passing` for the lost one, so the better passer has
+the ball more and loses it less. The ball that creates a goal is the assister's, so `Assists <= PassesCompleted`.
+
+Measured over 400 even matches: 333 passes a side at 79.8% completion; 49.5 take-ons a side, 50.1% won.
+Counting them moves no event, scoreline, or assist; it changes the player lines, the canonical serialization,
+and so the hashes.
+
 Events carry **facts, never prose**. A shot event carries its `QualityBasisPoints` — the goal probability
 it was resolved against — so highlight selection can tell a good chance from a bad one. That is a fact
 about a shot, derived from attributes the owning manager can already see, and emphatically not a hidden
@@ -858,6 +879,7 @@ a test that is switched off catches nothing.
 | `PassageTests` | One passage per possession; waypoints and touches on the pitch and in fraction order; every shot in the attacking third and free-kick shots in range; touches naming match participants; recorder determinism; the with/without-recorder hash equality. Since `engine-v5`: the possessions tile each half; events ordered and positioned; an outcome that tells the truth; a goal inside the goal mouth, a save at the keeper, a miss out of play, the woodwork and its rebound, a block two to six metres out, a penalty placement, a corner's path, a free kick's placement, the fouler and the fouled player, the scramble contestants, and the header pair. |
 | `HalfTimeClockTests` | `MAT-3`: the second half kicks off at 46'; each half plays its own regulation and stoppage; event minutes are 1'…45'+N and 46'…90'+N; `TotalMinutesPlayed` counts only the stoppage the clock used; substitutions at the planner's windows; the live metrics cover every minute. |
 | `RestartOwnershipTests` | `MAT-12`: the right side kicks each half off; every dead ball is taken by the side that owns it and by nobody else; a goal is followed by the conceding side's kick-off; a save is the keeper's ball and a miss a goal kick; a foul or offside gives the free kick to the right side; a loose ball is not a restart; a goal-area start only ever follows a keeper's ball or a goal kick; possessions join except at a placement. |
+| `BallPlayStatisticsTests` | `engine-v6` (§8.2): a completed count is a nonnegative subset of its attempted one; nobody who did not take the pitch passed or dribbled; an assist is a completed pass; counting is repeatable; a side's volumes and completion rates read like football; a better passer has the ball more and completes a higher share. |
 | `ReplayDirectorTests` | One passage per film segment and a contiguous schedule; the nine-to-eleven-minute film; passage windows in order; boundary-frame continuity; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe passage commentary; the reel carrying every goal; determinism; the payload budget. |
 | `HighlightTests` | Reel selection: goals always shown, the quality floor, the count cap and its goal exception. |
 | `EnginePurityTests` | No clock, no `System.Random`, no IO; exactly one source of randomness. |

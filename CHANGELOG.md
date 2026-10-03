@@ -4,6 +4,41 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine-v6 — passes and take-ons on the player line, stored in the season statistics
+
+Counts what a player does with the ball, and stores it so the profile can show it. Recorded in
+[`ADR-0054`](docs/architecture/adr/0054-engine-v6-passes-and-take-ons.md). `engine-v6` changes every output
+hash (the player line is hashed), so a database seeded under `engine-v5` must be archived and reseeded. The
+rules are untouched: `engine-rules-v5` and its hash are unchanged.
+
+**No play moves.** The events, scorelines, and assists of 80 seeds are identical to `engine-v5`'s, and the
+golden match is still 2–3. Passes are credited from a stream derived from the seed and the possession, and a
+take-on is the 1v1 duel the engine already resolved.
+
+### Added
+
+- **`MatchPlayerLineV1`** gains `PassesAttempted`, `PassesCompleted`, `DribblesAttempted`, and
+  `DribblesCompleted`. A take-on is the carrier's ground duel, completed when he wins it. A pass is a leg of
+  the possession's approach, with the lost pass being the one a failed progression or a failed creation ended
+  on; the passer is drawn weighted by `Passing`, the player who loses the ball by its complement, and the ball
+  that creates a goal is the assister's (`PassTally`, `PossessionPassing`). Measured over 400 even matches: 333
+  passes a side at 79.8% completion, 49.5 take-ons a side, 50.1% won.
+- **Season statistics.** `PlayerMatchStatLine`, `PlayerSeasonStatLine`, and `PlayerSeasonStat` carry the four
+  counts, advanced by the matchday publication and rebuilt (and drift-checked) by `RebuildDivisionProjections`.
+  Migration `EngineV6PassesAndDribbles` adds four `integer not null default 0` columns to
+  `competition.player_season_stats` and extends `ck_player_season_stats_counts` so a completed count never
+  exceeds its attempted one.
+- **The profile.** `PlayerSeasonStatsResponse` carries the four counts, and the player page's season summary
+  and career totals show passes (completed / attempted), pass accuracy, dribbles won, and dribble success,
+  with a dash instead of a zero rate when nothing was attempted.
+- **Tests.** `BallPlayStatisticsTests` (engine), and the calculator, domain, mapping, and career tests cover
+  the new counts.
+
+### Changed
+
+- **Versions.** `EngineVersions.Engine` = 6 (`engine-v6`); `match-statistics-v5` replaces v4 (an older
+  document is refused by name); `season-stats-v2`. The golden input and output hashes are re-pinned.
+
 ## Engine-v5 — the half-time clock, restart ownership, and a complete passage recorder
 
 The first milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). `engine-v4` built the

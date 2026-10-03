@@ -50,6 +50,22 @@ internal sealed class SideRuntime
     /// </remarks>
     public Dictionary<Guid, int> Assists { get; } = [];
 
+    /// <summary>Gets the passes each participant has attempted (`engine-v6`).</summary>
+    /// <remarks>
+    /// Like the assists, kept as a fact the simulation decided rather than re-derived from the events, which
+    /// carry no pass: <see cref="PassTally"/> settles each possession's passes onto players when it ends.
+    /// </remarks>
+    public Dictionary<Guid, int> PassesAttempted { get; } = [];
+
+    /// <summary>Gets the passes each participant has completed, a subset of those attempted (`engine-v6`).</summary>
+    public Dictionary<Guid, int> PassesCompleted { get; } = [];
+
+    /// <summary>Gets the take-ons each participant has attempted: the 1v1 duels they carried the ball into (`engine-v6`).</summary>
+    public Dictionary<Guid, int> DribblesAttempted { get; } = [];
+
+    /// <summary>Gets the take-ons each participant has won, a subset of those attempted (`engine-v6`).</summary>
+    public Dictionary<Guid, int> DribblesCompleted { get; } = [];
+
     /// <summary>
     /// Gets each participant's morale at kickoff, which is the baseline the scoreline's drift is measured
     /// from. Without it, "morale may only drift so far" has nothing to be a drift from, and a heavy defeat
