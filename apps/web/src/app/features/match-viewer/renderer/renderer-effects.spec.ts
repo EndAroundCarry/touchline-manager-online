@@ -1,7 +1,4 @@
-import { Passage } from '../../../core/match/match.models';
 import {
-  celebrationStartMilliseconds,
-  duelClashes,
   isDiveAction,
   isStrikeAction,
   isTackleAction,
@@ -30,7 +27,6 @@ function player(
       shirtNumber: 9,
       family: 'attack',
       name: id,
-      anchor: { x, y },
     },
     position: { x, y },
     z: 0,
@@ -49,32 +45,11 @@ function ball(x: number, y: number): FrameEntity {
       shirtNumber: 0,
       family: null,
       name: null,
-      anchor: { x, y },
     },
     position: { x, y },
     z: 0,
     speed: 0,
     action: null,
-  };
-}
-
-function highlight(overrides: Partial<Passage> = {}): Passage {
-  return {
-    sourceEventSequence: 7,
-    minute: 36,
-    stoppageMinute: 0,
-    startMatchSecond: 2_160,
-    endMatchSecond: 2_220,
-    durationMilliseconds: 20_000,
-    outcomeCode: 'goal',
-    narration: 'Goal.',
-    homeColour: '#1f4e79',
-    awayColour: '#8c2f39',
-    eventSequences: [7],
-    entities: [],
-    tracks: [],
-    commentary: null,
-    ...overrides,
   };
 }
 
@@ -121,52 +96,6 @@ describe('wantsTrail', () => {
   });
 });
 
-describe('duelClashes', () => {
-  it('marks an opposing pair contesting the ball, between them', () => {
-    const frame = [
-      player('H9', 'home', 5_000, 5_000),
-      player('A5', 'away', 5_200, 5_000),
-      ball(5_100, 5_000),
-    ];
-
-    const clashes = duelClashes(frame);
-
-    expect(clashes).toHaveLength(1);
-    expect(clashes[0].x).toBeCloseTo(5_100, 5);
-    expect(clashes[0].y).toBeCloseTo(5_000, 5);
-  });
-
-  it('ignores two team-mates standing together', () => {
-    const frame = [
-      player('H9', 'home', 5_000, 5_000),
-      player('H10', 'home', 5_100, 5_000),
-      ball(5_050, 5_000),
-    ];
-
-    expect(duelClashes(frame)).toHaveLength(0);
-  });
-
-  it('ignores a contest away from the ball', () => {
-    const frame = [
-      player('H9', 'home', 1_000, 1_000),
-      player('A5', 'away', 1_200, 1_000),
-      ball(9_000, 9_000),
-    ];
-
-    expect(duelClashes(frame)).toHaveLength(0);
-  });
-
-  it('draws a tagged duel even when the players are a stride apart', () => {
-    const frame = [
-      player('H9', 'home', 5_000, 5_000, 'tackle'),
-      player('A5', 'away', 5_900, 5_000),
-      ball(5_500, 5_000),
-    ];
-
-    expect(duelClashes(frame)).toHaveLength(1);
-  });
-});
-
 describe('nearestPlayerToBall', () => {
   it('picks the closest player when the ball is at one', () => {
     const frame = [
@@ -201,40 +130,5 @@ describe('trailStrength', () => {
 
   it('counts altitude too, so a lofted cross is not mistaken for a slow pass', () => {
     expect(trailStrength(60, 0)).toBeCloseTo(1, 5);
-  });
-});
-
-describe('celebrationStartMilliseconds', () => {
-  it('is nothing for a chance that was not a goal', () => {
-    expect(celebrationStartMilliseconds(highlight({ outcomeCode: 'saved' }))).toBeNull();
-  });
-
-  it('starts at the beat the synchronized commentary reports the goal', () => {
-    const start = celebrationStartMilliseconds(
-      highlight({
-        commentary: [
-          {
-            timeMilliseconds: 0,
-            templateKey: 'match.passage.build_up',
-            variantKey: 'match.passage.build_up.v1',
-            parameters: [],
-            text: 'Build-up.',
-          },
-          {
-            timeMilliseconds: 14_600,
-            templateKey: 'match.goal',
-            variantKey: 'match.goal.v1',
-            parameters: [],
-            text: 'Goal!',
-          },
-        ],
-      }),
-    );
-
-    expect(start).toBe(14_600);
-  });
-
-  it('falls back to the back end of the passage when there is no synchronized commentary', () => {
-    expect(celebrationStartMilliseconds(highlight({ commentary: null }))).toBe(14_000);
   });
 });

@@ -42,6 +42,7 @@ function squadPlayer(
     state: { condition: 100, fatigue: 0, morale: 50, matchSharpness: 50 },
     contract: null,
     availability: [],
+    attributeAverages: { goalkeeping: 5, technical: 10, mental: 10, physical: 10 },
     ...overrides,
   };
 }
@@ -232,6 +233,10 @@ describe('squad presentation', () => {
       shots: 6,
       shotsOnTarget: 3,
       saves: 0,
+      passesAttempted: 120,
+      passesCompleted: 96,
+      dribblesAttempted: 14,
+      dribblesCompleted: 7,
       yellowCards: 1,
       redCards: 0,
       averageRating: 7.5,
@@ -249,6 +254,10 @@ describe('squad presentation', () => {
         'Shots',
         'Shots on target',
         'Saves',
+        'Passes',
+        'Pass accuracy',
+        'Dribbles won',
+        'Dribble success',
         'Yellow cards',
         'Red cards',
         'Average rating',
@@ -256,6 +265,28 @@ describe('squad presentation', () => {
       expect(rows.find((row) => row.label === 'Goals')?.value).toBe('2');
       expect(rows.find((row) => row.label === 'Minutes')?.value).toBe('200');
       expect(rows.find((row) => row.label === 'Average rating')?.value).toBe('7.5');
+    });
+
+    it('shows the passes and dribbles as a count and a rate (engine-v7)', () => {
+      const rows = seasonStatRows(stats);
+
+      expect(rows.find((row) => row.label === 'Passes')?.value).toBe('96 / 120');
+      expect(rows.find((row) => row.label === 'Pass accuracy')?.value).toBe('80%');
+      expect(rows.find((row) => row.label === 'Dribbles won')?.value).toBe('7 / 14');
+      expect(rows.find((row) => row.label === 'Dribble success')?.value).toBe('50%');
+    });
+
+    it('shows a dash rather than a zero rate when nothing was attempted (engine-v7)', () => {
+      const idle = seasonStatRows({
+        ...stats,
+        passesAttempted: 0,
+        passesCompleted: 0,
+        dribblesAttempted: 0,
+        dribblesCompleted: 0,
+      });
+
+      expect(idle.find((row) => row.label === 'Pass accuracy')?.value).toBe('\u2014');
+      expect(idle.find((row) => row.label === 'Dribble success')?.value).toBe('\u2014');
     });
 
     it('shows a dash for the rating before the player has been rated (TRN-8)', () => {

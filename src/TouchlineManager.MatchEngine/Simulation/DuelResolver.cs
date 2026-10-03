@@ -24,20 +24,36 @@ public readonly record struct DuelOutcome(
     Guid DefenderId);
 
 /// <summary>
+/// One player in a contest, with how many of his side are missing from the pitch (`engine-v6`).
+/// </summary>
+/// <param name="Slot">The player on the pitch, with the live condition his skills are read through.</param>
+/// <param name="PlayersDown">How many players his side is short of eleven.</param>
+public readonly record struct DuelContender(ActiveSlot Slot, int PlayersDown)
+{
+    /// <summary>Gets the player's identity.</summary>
+    public Guid ParticipantId => Slot.Participant.ParticipantId;
+
+    /// <summary>Builds a contender from a player of a side.</summary>
+    /// <param name="side">The player's side, which says how many are missing.</param>
+    /// <param name="slot">The player.</param>
+    internal static DuelContender Of(SideRuntime side, ActiveSlot slot) => new(slot, side.ShorthandedCount);
+}
+
+/// <summary>
 /// Resolves the on-pitch contests of a possession: 1v1 ground duels, aerial duels, and loose-ball
 /// scrambles (master plan Stage 2).
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every contest is the same shape: a baseline chance, moved by a bounded attribute differential on the
-/// attribute scale, nudged by home advantage, rolled inside a small underdog-variance band. The shape is
-/// written once here, so the duel constants in <see cref="EngineRulesV2"/> mean the same thing wherever a
-/// contest is resolved.
+/// Every contest is the same shape: a baseline chance, moved by a bounded skill differential, nudged by home
+/// advantage, rolled inside a small underdog-variance band. The shape is written once here, so the duel
+/// constants in <see cref="EngineRulesV2"/> mean the same thing wherever a contest is resolved.
 /// </para>
 /// <para>
-/// Attributes are read on the attribute scale (1–20) rather than the unit-rating scale, which is what
-/// lets the swing constants be calibrated directly: a swing of 3,500 basis points is "a maximal
-/// differential at the reference distance moves the contest this far".
+/// Since `engine-v6` a contest reads each player's effective skills (<see cref="EffectiveSkill"/>): position
+/// fit, tiredness, morale, and playing a man down all count, exactly as they do in the team ratings. Scores are
+/// built in hundredths of an attribute point, and the contest's reference is scaled to match, so a score gap of
+/// 150 attribute points means the same thing it always did.
 /// </para>
 /// </remarks>
 public static class DuelResolver
@@ -50,43 +66,41 @@ public static class DuelResolver
     /// <param name="rules">The rules in force.</param>
     /// <param name="random">The generator.</param>
     public static DuelOutcome ResolveGroundDuel(
-        MatchParticipantV1 attacker,
-        MatchParticipantV1 defender,
+        DuelContender attacker,
+        DuelContender defender,
         bool attackerIsHome,
         MatchTacklingStyle tacklingStyle,
         EngineRulesV2 rules,
         Pcg32 random)
     {
-        ArgumentNullException.ThrowIfNull(attacker);
-        ArgumentNullException.ThrowIfNull(defender);
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(random);
 
-        var dribble = AttackScore(
+        var dribble = Score(
             attacker,
-            isHome: attackerIsHome,
-            rules,
-            (MatchAttributeName.Dribbling, 4),
-            (MatchAttributeName.Agility, 3),
-            (MatchAttributeName.Pace, 3));
-
-        var tackle = DefendScore(
-            defender,
             attackerIsHome,
             rules,
-            (MatchAttributeName.Tackling, 4),
-            (MatchAttributeName.Positioning, 3),
-            (MatchAttributeName.Strength, 3));
+            (MatchAttributeName.Dribbling, rules.GroundDuelDribblingWeight),
+            (MatchAttributeName.Agility, rules.GroundDuelAgilityWeight),
+            (MatchAttributeName.Pace, rules.GroundDuelPaceWeight));
+
+        var tackle = Score(
+            defender,
+            !attackerIsHome,
+            rules,
+            (MatchAttributeName.Tackling, rules.GroundDuelTacklingWeight),
+            (MatchAttributeName.Positioning, rules.GroundDuelPositioningWeight),
+            (MatchAttributeName.Strength, rules.GroundDuelStrengthWeight));
 
         // Tackling style is a trade the defending side has already chosen: committing to the challenge
         // wins more ball and gives away more fouls; staying on feet does the reverse.
         if (tacklingStyle == MatchTacklingStyle.Aggressive)
         {
-            tackle += 6;
+            tackle += rules.AggressiveTacklingDuelScoreBonus * EffectiveSkill.Scale;
         }
         else if (tacklingStyle == MatchTacklingStyle.StayOnFeet)
         {
-            tackle -= 4;
+            tackle -= rules.StayOnFeetDuelScorePenalty * EffectiveSkill.Scale;
         }
 
         var winChance = ContestChance(dribble - tackle, rules.BaseGroundDuelBasisPoints, rules.GroundDuelSwingBasisPoints, rules, random);
@@ -106,6 +120,14 @@ public static class DuelResolver
                 _ => foulChance,
             };
 
+            // A defender who is aggressive and a poor tackler gives away more fouls; a clean tackler fewer.
+            foulChance = Probability.Apply(
+                foulChance,
+                DisciplineSimulator.FoulSkillMultiplier(
+                    EffectiveSkill.Hundredths(defender.Slot, MatchAttributeName.Aggression, rules),
+                    EffectiveSkill.Hundredths(defender.Slot, MatchAttributeName.Tackling, rules),
+                    rules));
+
             wasFoul = random.RollBasisPoints(foulChance);
         }
 
@@ -116,35 +138,35 @@ public static class DuelResolver
     /// <param name="attacker">The attacking player.</param>
     /// <param name="defender">The defending player.</param>
     /// <param name="attackerIsHome">Whether the attacking player's side is at home.</param>
+    /// <param name="attackerBonus">A bonus to the attacker's score, in hundredths of an attribute point (a corner's delivery).</param>
     /// <param name="rules">The rules in force.</param>
     /// <param name="random">The generator.</param>
     public static DuelOutcome ResolveAerialDuel(
-        MatchParticipantV1 attacker,
-        MatchParticipantV1 defender,
+        DuelContender attacker,
+        DuelContender defender,
         bool attackerIsHome,
+        int attackerBonus,
         EngineRulesV2 rules,
         Pcg32 random)
     {
-        ArgumentNullException.ThrowIfNull(attacker);
-        ArgumentNullException.ThrowIfNull(defender);
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(random);
 
-        var attack = AttackScore(
+        var attack = Score(
             attacker,
             attackerIsHome,
             rules,
-            (MatchAttributeName.JumpingReach, 5),
-            (MatchAttributeName.Heading, 3),
-            (MatchAttributeName.Strength, 2));
+            (MatchAttributeName.JumpingReach, rules.AerialDuelJumpingReachWeight),
+            (MatchAttributeName.Heading, rules.AerialDuelHeadingWeight),
+            (MatchAttributeName.Strength, rules.AerialDuelStrengthWeight)) + attackerBonus;
 
-        var defence = DefendScore(
+        var defence = Score(
             defender,
-            attackerIsHome,
+            !attackerIsHome,
             rules,
-            (MatchAttributeName.JumpingReach, 5),
-            (MatchAttributeName.Heading, 3),
-            (MatchAttributeName.Strength, 2));
+            (MatchAttributeName.JumpingReach, rules.AerialDuelJumpingReachWeight),
+            (MatchAttributeName.Heading, rules.AerialDuelHeadingWeight),
+            (MatchAttributeName.Strength, rules.AerialDuelStrengthWeight));
 
         var winChance = ContestChance(attack - defence, rules.BaseAerialDuelBasisPoints, rules.AerialDuelSwingBasisPoints, rules, random);
 
@@ -169,32 +191,30 @@ public static class DuelResolver
     /// <param name="random">The generator.</param>
     /// <returns>Whether the possession side kept the ball.</returns>
     public static bool ResolveScramble(
-        MatchParticipantV1 attacker,
-        MatchParticipantV1 defender,
+        DuelContender attacker,
+        DuelContender defender,
         bool attackerIsHome,
         EngineRulesV2 rules,
         Pcg32 random)
     {
-        ArgumentNullException.ThrowIfNull(attacker);
-        ArgumentNullException.ThrowIfNull(defender);
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(random);
 
-        var attack = AttackScore(
+        var attack = Score(
             attacker,
             attackerIsHome,
             rules,
-            (MatchAttributeName.Pace, 3),
-            (MatchAttributeName.Acceleration, 3),
-            (MatchAttributeName.WorkRate, 2));
+            (MatchAttributeName.Pace, rules.ScramblePaceWeight),
+            (MatchAttributeName.Acceleration, rules.ScrambleAccelerationWeight),
+            (MatchAttributeName.WorkRate, rules.ScrambleWorkRateWeight));
 
-        var defence = DefendScore(
+        var defence = Score(
             defender,
-            attackerIsHome,
+            !attackerIsHome,
             rules,
-            (MatchAttributeName.Pace, 3),
-            (MatchAttributeName.Acceleration, 3),
-            (MatchAttributeName.WorkRate, 2));
+            (MatchAttributeName.Pace, rules.ScramblePaceWeight),
+            (MatchAttributeName.Acceleration, rules.ScrambleAccelerationWeight),
+            (MatchAttributeName.WorkRate, rules.ScrambleWorkRateWeight));
 
         var keepChance = ContestChance(
             attack - defence,
@@ -206,42 +226,41 @@ public static class DuelResolver
         return random.RollBasisPoints(keepChance);
     }
 
-    /// <summary>Builds the attacking side of a contest and applies home advantage to it.</summary>
-    private static int AttackScore(
-        MatchParticipantV1 player,
+    /// <summary>
+    /// Builds one player's score in a contest, in hundredths of an attribute point weighted by the contest's
+    /// skills: his effective skills, less what playing short costs him, plus home advantage.
+    /// </summary>
+    private static int Score(
+        DuelContender contender,
         bool isHome,
         EngineRulesV2 rules,
         params (MatchAttributeName Name, int Weight)[] attributes)
     {
-        var score = 0;
+        long score = 0;
 
         foreach (var (name, weight) in attributes)
         {
-            score += player.Attributes.ValueOf(name) * weight;
+            score += (long)EffectiveSkill.Hundredths(contender.Slot, name, rules) * weight;
+        }
+
+        // A side playing a man short has somebody covering a job nobody is left to do.
+        for (var missing = contender.PlayersDown; missing > 0; missing--)
+        {
+            score = score * rules.DuelShortHandedPenaltyBasisPoints / EngineRulesV2.Certain;
         }
 
         if (isHome)
         {
             // The crowd bonus is the plan's +4% duel success, applied as a bounded lift on the score rather
             // than as a second probability, so it composes with the swing instead of fighting it.
-            score = Probability.Apply(score, EngineRulesV2.Certain + rules.DuelHomeBonusBasisPoints);
+            score = score * (EngineRulesV2.Certain + rules.DuelHomeBonusBasisPoints) / EngineRulesV2.Certain;
         }
 
-        return score;
-    }
-
-    /// <summary>Builds the defending side of a contest, applying home advantage when the defender is at home.</summary>
-    private static int DefendScore(
-        MatchParticipantV1 player,
-        bool attackerIsHome,
-        EngineRulesV2 rules,
-        params (MatchAttributeName Name, int Weight)[] attributes)
-    {
-        return AttackScore(player, isHome: !attackerIsHome, rules, attributes);
+        return (int)score;
     }
 
     /// <summary>
-    /// Converts a differential into a contest probability: baseline, swung by the attribute differential,
+    /// Converts a differential into a contest probability: baseline, swung by the skill differential,
     /// jittered by the underdog band, and clamped so no contest is certain either way.
     /// </summary>
     /// <remarks>
@@ -257,9 +276,9 @@ public static class DuelResolver
         EngineRulesV2 rules,
         Pcg32 random)
     {
-        var swing = Probability.Swing(differential, swingBasisPoints, rules.DuelDifferentialReference);
+        var swing = Probability.Swing(differential, swingBasisPoints, rules.DuelDifferentialReference * EffectiveSkill.Scale);
         var jitter = random.NextInt(rules.UnderdogVarianceBasisPoints + 1) - (rules.UnderdogVarianceBasisPoints / 2);
 
-        return Probability.Band(baselineBasisPoints + swing + jitter, 1_500, 8_500);
+        return Probability.Band(baselineBasisPoints + swing + jitter, rules.DuelMinWinBasisPoints, rules.DuelMaxWinBasisPoints);
     }
 }

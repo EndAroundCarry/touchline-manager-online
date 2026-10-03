@@ -31,7 +31,8 @@ namespace TouchlineManager.Application.Match;
 public static class SeasonStatisticsCalculator
 {
     /// <summary>A stable version for the rule, so a change to what is counted is a named change.</summary>
-    public const string Version = "season-stats-v1";
+    /// <remarks>Version 2 adds the passes and take-ons the engine's player line carries (`engine-v7`).</remarks>
+    public const string Version = "season-stats-v2";
 
     /// <summary>Aggregates a matchday's results per player.</summary>
     /// <param name="matches">The published fixtures of the round, with their stored result documents.</param>
@@ -81,6 +82,10 @@ public static class SeasonStatisticsCalculator
                     Shots = shot.Shots,
                     ShotsOnTarget = shot.OnTarget,
                     Saves = saves.TryGetValue(line.ParticipantId, out var made) ? made : 0,
+                    PassesAttempted = line.PassesAttempted,
+                    PassesCompleted = line.PassesCompleted,
+                    DribblesAttempted = line.DribblesAttempted,
+                    DribblesCompleted = line.DribblesCompleted,
                     YellowCards = line.YellowCards,
                     RedCards = line.SentOff ? 1 : 0,
                     RatingBasisPoints = line.RatingBasisPoints,
@@ -128,6 +133,10 @@ public static class SeasonStatisticsCalculator
                     Shots = group.Sum(line => line.Shots),
                     ShotsOnTarget = group.Sum(line => line.ShotsOnTarget),
                     Saves = group.Sum(line => line.Saves),
+                    PassesAttempted = group.Sum(line => line.PassesAttempted),
+                    PassesCompleted = group.Sum(line => line.PassesCompleted),
+                    DribblesAttempted = group.Sum(line => line.DribblesAttempted),
+                    DribblesCompleted = group.Sum(line => line.DribblesCompleted),
                     YellowCards = group.Sum(line => line.YellowCards),
                     RedCards = group.Sum(line => line.RedCards),
                     RatingBasisPointsTotal = group.Sum(line => (long)line.RatingBasisPoints),

@@ -143,7 +143,7 @@ public sealed record ActiveSlot
 }
 
 /// <summary>
-/// A side's nine unit ratings (master plan §8.4).
+/// A side's six unit ratings (master plan §8.4).
 /// </summary>
 /// <remarks>
 /// On the rating scale, where an average attribute of 13 is about 650. The simulation never compares a
@@ -170,15 +170,6 @@ public sealed record MatchUnitRatings
     /// <summary>Gets goalkeeping.</summary>
     public required int Goalkeeping { get; init; }
 
-    /// <summary>Gets set pieces.</summary>
-    public required int SetPieces { get; init; }
-
-    /// <summary>Gets fitness.</summary>
-    public required int Fitness { get; init; }
-
-    /// <summary>Gets cohesion.</summary>
-    public required int Cohesion { get; init; }
-
     /// <summary>
     /// Gets the ratings a side has before any player has been read, which is where a side starts before
     /// its first calculation rather than a rating any side is expected to play at.
@@ -191,9 +182,6 @@ public sealed record MatchUnitRatings
         DefensivePressure = 0,
         DefensiveShape = 0,
         Goalkeeping = 0,
-        SetPieces = 0,
-        Fitness = 0,
-        Cohesion = 0,
     };
 
     /// <summary>Gets one unit's rating.</summary>
@@ -206,9 +194,6 @@ public sealed record MatchUnitRatings
         MatchUnit.DefensivePressure => DefensivePressure,
         MatchUnit.DefensiveShape => DefensiveShape,
         MatchUnit.Goalkeeping => Goalkeeping,
-        MatchUnit.SetPieces => SetPieces,
-        MatchUnit.Fitness => Fitness,
-        MatchUnit.Cohesion => Cohesion,
         _ => throw new ArgumentOutOfRangeException(nameof(unit), unit, "Unknown unit."),
     };
 }

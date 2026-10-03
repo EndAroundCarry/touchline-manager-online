@@ -2,6 +2,7 @@ using FluentAssertions;
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Randomness;
+using TouchlineManager.MatchEngine.Ratings;
 using TouchlineManager.MatchEngine.Simulation;
 using TouchlineManager.MatchEngine.Spatial;
 
@@ -102,7 +103,7 @@ public sealed class SpatialPlayTests
         for (var attempt = 0; attempt < 2_000; attempt++)
         {
             if (DuelResolver.ResolveGroundDuel(
-                    attacker, defender, attackerIsHome: false,
+                    Contend(attacker), Contend(defender), attackerIsHome: false,
                     MatchTacklingStyle.Normal, EngineRulesV2.Default, random).AttackerWon)
             {
                 won++;
@@ -133,7 +134,7 @@ public sealed class SpatialPlayTests
         for (var attempt = 0; attempt < 4_000; attempt++)
         {
             if (DuelResolver.ResolveGroundDuel(
-                    attacker, defender, attackerIsHome,
+                    Contend(attacker), Contend(defender), attackerIsHome,
                     MatchTacklingStyle.Normal, EngineRulesV2.Default, random).AttackerWon)
             {
                 won++;
@@ -170,7 +171,7 @@ public sealed class SpatialPlayTests
         for (var attempt = 0; attempt < attempts; attempt++)
         {
             // Only a duel the attacker wins goes to ground cleanly; the foul roll follows a lost duel.
-            if (!DuelResolver.ResolveGroundDuel(attacker, defender, false, style, rules, random).WasFoul)
+            if (!DuelResolver.ResolveGroundDuel(Contend(attacker), Contend(defender), false, style, rules, random).WasFoul)
             {
                 continue;
             }
@@ -192,7 +193,7 @@ public sealed class SpatialPlayTests
 
         for (var attempt = 0; attempt < 2_000; attempt++)
         {
-            if (DuelResolver.ResolveScramble(quick, slow, attackerIsHome: false, EngineRulesV2.Default, random))
+            if (DuelResolver.ResolveScramble(Contend(quick), Contend(slow), attackerIsHome: false, EngineRulesV2.Default, random))
             {
                 kept++;
             }
@@ -204,26 +205,18 @@ public sealed class SpatialPlayTests
     // ---- Set pieces ------------------------------------------------------------------------------
 
     [Fact]
-    public void A_penalty_is_scored_far_more_often_than_it_is_saved()
+    public void A_penalty_is_the_takers_to_lose_and_depends_on_taker_and_keeper()
     {
-        var taker = Participant(finishing: 16, composure: 16, otherwise: 10);
-        var goalkeeper = Participant(reflexes: 12, otherwise: 10);
-        var random = new Pcg32(424_242UL);
         var rules = EngineRulesV2.Default;
 
-        var goals = 0;
-        var saves = 0;
+        var good = SetPieceDirector.PenaltyGoalChance(Slot(Participant(finishing: 16, composure: 16, otherwise: 10)), Slot(Participant(reflexes: 12, otherwise: 10)), rules);
+        var poorTaker = SetPieceDirector.PenaltyGoalChance(Slot(Participant(finishing: 6, composure: 6, otherwise: 10)), Slot(Participant(reflexes: 12, otherwise: 10)), rules);
+        var greatKeeper = SetPieceDirector.PenaltyGoalChance(Slot(Participant(finishing: 16, composure: 16, otherwise: 10)), Slot(Participant(reflexes: 20, otherwise: 10)), rules);
 
-        for (var attempt = 0; attempt < 4_000; attempt++)
-        {
-            var outcome = SetPieceDirector.ResolvePenalty(taker, goalkeeper, takerIsHome: true, rules, random);
-
-            goals += outcome.IsGoal ? 1 : 0;
-            saves += outcome.WasSaved ? 1 : 0;
-        }
-
-        goals.Should().BeGreaterThan(2_000, "a penalty is the taker's to lose");
-        saves.Should().BeLessThan(goals / 2);
+        good.Should().BeGreaterThan(6_000, "a penalty is the taker's to lose");
+        poorTaker.Should().BeLessThan(good, "a poor finisher converts fewer");
+        greatKeeper.Should().BeLessThan(good, "a great goalkeeper saves more");
+        good.Should().BeInRange(rules.PenaltyMinGoalBasisPoints, rules.PenaltyMaxGoalBasisPoints);
     }
 
     [Fact]
@@ -236,7 +229,7 @@ public sealed class SpatialPlayTests
         var rules = EngineRulesV2.Default with { FreeKickAttemptBasisPoints = 10_000 };
 
         SetPieceDirector
-            .ResolveDirectFreeKick(taker, goalkeeper, attackingX: 1_000, takerIsHome: true, rules, random)
+            .ResolveDirectFreeKick(Slot(taker), Slot(goalkeeper), attackingX: 1_000, rules, random)
             .Attempted
             .Should().BeFalse("a strike from the halfway line is not football");
     }
@@ -255,7 +248,7 @@ public sealed class SpatialPlayTests
         for (var attempt = 0; attempt < attempts; attempt++)
         {
             var outcome = SetPieceDirector.ResolveDirectFreeKick(
-                taker, goalkeeper, attackingX: 9_000, takerIsHome: true, rules, random);
+                Slot(taker), Slot(goalkeeper), attackingX: 9_000, rules, random);
 
             if (outcome.Attempted && outcome.IsGoal)
             {
@@ -279,7 +272,7 @@ public sealed class SpatialPlayTests
 
         for (var attempt = 0; attempt < 2_000; attempt++)
         {
-            if (SetPieceDirector.ResolveCornerHeader(attacker, defender, attackerIsHome: false, EngineRulesV2.Default, random))
+            if (DuelResolver.ResolveAerialDuel(Contend(attacker), Contend(defender), attackerIsHome: false, 0, EngineRulesV2.Default, random).AttackerWon)
             {
                 won++;
             }
@@ -389,6 +382,25 @@ public sealed class SpatialPlayTests
                     "the pitch spends condition the bench does not");
         }
     }
+
+    private static ActiveSlot Slot(MatchParticipantV1 participant, MatchPositionFamily family = MatchPositionFamily.Midfield) =>
+        new()
+        {
+            Slot = new MatchSlotV1
+            {
+                SlotNumber = 6,
+                Family = family,
+                Role = MatchRole.CentralMidfielder,
+                X = 5_000,
+                Y = 5_000,
+                ParticipantId = participant.ParticipantId,
+            },
+            Participant = participant,
+            FamiliarityBasisPoints = EngineRulesV2.Certain,
+            Condition = PlayerCondition.From(participant.State),
+        };
+
+    private static DuelContender Contend(MatchParticipantV1 participant) => new(Slot(participant), PlayersDown: 0);
 
     private static MatchParticipantV1 Participant(
         int otherwise,

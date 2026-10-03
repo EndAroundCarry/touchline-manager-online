@@ -1,6 +1,6 @@
 # ADR-0052: Replay-v3 turns a match into one continuous film with a companion highlights reel
 
-- **Status:** Accepted
+- **Status:** Accepted (decisions 2 and 3 superseded by [ADR-0054](0054-replay-v4-constant-pace-film.md))
 - **Date:** 2026-10-02
 - **Stage:** Engine roadmap, continuous replay milestone (M2 of `engine-v4-continuous-match-replay.md`)
 - **Related:** [ADR-0004](0004-deterministic-match-engine.md), [ADR-0006](0006-semantic-highlight-keyframes.md), [ADR-0014](0014-matchday-lock-resolution-and-publication.md), [ADR-0051](0051-engine-v4-continuous-passages.md), master plan §9.1–§9.3, game rules `MAT-8`, `MAT-11`, `JSN-1`

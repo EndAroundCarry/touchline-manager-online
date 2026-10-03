@@ -373,15 +373,17 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
             entries.Sum(entry => entry.ReservedDeltaMinor).Should().Be(account.ReservedMinor);
         }
 
-        // The human/AI mix did what the rules say: unmanaged clubs renewed, a present manager's lapse expired.
+        // The human/AI mix did what the rules say: unmanaged clubs renewed, and the board renewed a present manager's expiring players.
         (await db.PlayerContracts.CountAsync(contract => contract.Status == ContractStatus.Closed
             && contract.ClosedReason == PlayerContractCloseReasons.Renewed))
             .Should()
             .BeGreaterThan(0, "CON-6: an unmanaged club renews its expiring players");
         (await db.PlayerContracts.CountAsync(contract => contract.Status == ContractStatus.Closed
-            && contract.ClosedReason == PlayerContractCloseReasons.Expired))
+            && contract.ClosedReason == PlayerContractCloseReasons.Expired
+            && db.ClubTenures.Any(tenure => tenure.ClubId == contract.ClubId
+                && tenure.ControlStatus == ClubTenureControlStatus.Active)))
             .Should()
-            .BeGreaterThan(0, "CON-6: a present manager's unrenewed player expires");
+            .Be(0, "CON-11: the board renews a present manager's expiring player, so none is lost");
 
         // Every AI club still has the default side the AI supplied (INS-12); the two held clubs are the
         // manager's, and the run created no new clubs, so the plans written before it survive it.

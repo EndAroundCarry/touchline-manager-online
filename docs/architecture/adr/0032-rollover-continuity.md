@@ -36,6 +36,9 @@ was not renewed **expires**: the contract closes `expired`, its registration end
 so an expired player is out of the world's squads for now. This is the rule as written, and the emergency
 replacement path is what keeps the club legal afterwards.
 
+> **Amended (`CON-11`):** a present manager's expiring contracts are now renewed by the board for two seasons, so no
+> manager loses a player to expiry. Release to free agency applies only to the surplus of clubs nobody manages.
+
 **3. A club nobody manages renews by a pure, versioned policy.**
 `AiContractPolicy` (`ai-contract-v1`) is a deterministic function of a squad's shape: it renews the best
 expiring players up to `AiContractTargetSquadSize`, then extends renewals only as far as legality requires

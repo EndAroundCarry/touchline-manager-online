@@ -3,7 +3,7 @@ using TouchlineManager.MatchEngine.Model;
 namespace TouchlineManager.MatchEngine.Ratings;
 
 /// <summary>
-/// The nine things the engine rates a side on (master plan §8.4).
+/// The six things the engine rates a side on (master plan §8.4).
 /// </summary>
 /// <remarks>
 /// Eight of them are weighted means of player attributes; <see cref="Cohesion"/> is about how well the
@@ -29,15 +29,6 @@ public enum MatchUnit
 
     /// <summary>Stopping shots.</summary>
     Goalkeeping = 5,
-
-    /// <summary>Corners and free kicks, at both ends.</summary>
-    SetPieces = 6,
-
-    /// <summary>Lasting the ninety and repeating the effort.</summary>
-    Fitness = 7,
-
-    /// <summary>How well the eleven fit their jobs.</summary>
-    Cohesion = 8,
 }
 
 /// <summary>One attribute's contribution to a unit rating.</summary>
@@ -227,35 +218,6 @@ public static class UnitRatingWeights
                 [
                     new(MatchPositionFamily.Goalkeeper, 1),
                 ]),
-
-            [MatchUnit.SetPieces] = new(
-                [
-                    new(MatchAttributeName.SetPieces, 7),
-                    new(MatchAttributeName.Crossing, 5),
-                    new(MatchAttributeName.Heading, 4),
-                    new(MatchAttributeName.JumpingReach, 4),
-                    new(MatchAttributeName.Technique, 3),
-                ],
-                [
-                    new(MatchPositionFamily.Defence, 3),
-                    new(MatchPositionFamily.Midfield, 4),
-                    new(MatchPositionFamily.Attack, 4),
-                ]),
-
-            [MatchUnit.Fitness] = new(
-                [
-                    new(MatchAttributeName.Stamina, 7),
-                    new(MatchAttributeName.WorkRate, 6),
-                    new(MatchAttributeName.Pace, 4),
-                    new(MatchAttributeName.Strength, 3),
-                    new(MatchAttributeName.Agility, 3),
-                ],
-                [
-                    new(MatchPositionFamily.Goalkeeper, 1),
-                    new(MatchPositionFamily.Defence, 4),
-                    new(MatchPositionFamily.Midfield, 5),
-                    new(MatchPositionFamily.Attack, 4),
-                ]),
         };
 
         return table;
@@ -275,11 +237,6 @@ public static class UnitRatingWeights
     {
         foreach (var unit in Enum.GetValues<MatchUnit>())
         {
-            if (unit == MatchUnit.Cohesion)
-            {
-                continue;
-            }
-
             if (!table.TryGetValue(unit, out var weighting))
             {
                 throw new InvalidOperationException($"The rating table has no weighting for {unit}.");

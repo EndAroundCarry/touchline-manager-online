@@ -309,6 +309,7 @@ public static class DependencyInjection
         services.AddScoped<ResolveOwnedClub>();
         services.AddScoped<GetSquad>();
         services.AddScoped<GetPlayer>();
+        services.AddScoped<GetPlayerMatches>();
         services.AddScoped<ListContracts>();
         services.AddScoped<GetTactics>();
         services.AddScoped<SaveTacticalPlan>();

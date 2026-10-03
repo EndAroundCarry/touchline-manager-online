@@ -1,0 +1,1107 @@
+using TouchlineManager.MatchEngine.Model;
+
+namespace TouchlineManager.MatchEngine.Highlights;
+
+/// <summary>Where one beat sits in the motion record (`replay-v4`).</summary>
+/// <param name="FirstRecord">The index of the record the beat starts at.</param>
+/// <param name="LastRecord">The index of the record the beat ends at.</param>
+/// <param name="StartSeconds">When the beat starts, in seconds of real time since the first whistle.</param>
+/// <param name="EndSeconds">When the beat ends.</param>
+internal readonly record struct BeatSpan(int FirstRecord, int LastRecord, double StartSeconds, double EndSeconds)
+{
+    /// <summary>Gets how long the beat runs for, in seconds of real time.</summary>
+    public double Seconds => EndSeconds - StartSeconds;
+}
+
+/// <summary>
+/// The whole film's motion: every player and the ball, in real time, at a fine step (`replay-v4`).
+/// </summary>
+/// <remarks>
+/// Positions are metres and times are seconds of real time. The film plays them back at the one pace the timing
+/// solved, which is a division and nothing more — so the bounds the players were simulated under are the bounds the
+/// viewer sees, multiplied by that pace.
+/// </remarks>
+internal sealed class FilmMotionResult
+{
+    private double[] _time = new double[4096];
+    private float[] _playerX = new float[4096 * FilmRoster.Size];
+    private float[] _playerY = new float[4096 * FilmRoster.Size];
+    private float[] _ballX = new float[4096];
+    private float[] _ballY = new float[4096];
+    private float[] _ballZ = new float[4096];
+
+    /// <summary>Gets how many records there are.</summary>
+    public int Count { get; private set; }
+
+    /// <summary>Gets where each beat sits in the record.</summary>
+    public BeatSpan[] Spans { get; set; } = [];
+
+    /// <summary>Gets or sets the real-time length of the whole film, holds included.</summary>
+    public double TotalSeconds { get; set; }
+
+    /// <summary>Gets or sets the real time that moves had to be lengthened by to meet their constraints.</summary>
+    public double ExtensionSeconds { get; set; }
+
+    /// <summary>Gets or sets the real-time length of the moves, holds excluded.</summary>
+    public double MotionSeconds { get; set; }
+
+    /// <summary>Gets the time of a record.</summary>
+    /// <param name="record">The record.</param>
+    public double TimeOf(int record) => _time[record];
+
+    /// <summary>Gets a player's X at a record.</summary>
+    public float PlayerX(int record, int entity) => _playerX[(record * FilmRoster.Size) + entity];
+
+    /// <summary>Gets a player's Y at a record.</summary>
+    public float PlayerY(int record, int entity) => _playerY[(record * FilmRoster.Size) + entity];
+
+    /// <summary>Gets the ball's X at a record.</summary>
+    public float BallX(int record) => _ballX[record];
+
+    /// <summary>Gets the ball's Y at a record.</summary>
+    public float BallY(int record) => _ballY[record];
+
+    /// <summary>Gets the ball's altitude at a record.</summary>
+    public float BallZ(int record) => _ballZ[record];
+
+    /// <summary>Appends a record.</summary>
+    internal int Add(double time, double[] px, double[] py, double ballX, double ballY, double ballZ)
+    {
+        if (Count == _time.Length)
+        {
+            Grow();
+        }
+
+        _time[Count] = time;
+
+        var offset = Count * FilmRoster.Size;
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            _playerX[offset + entity] = (float)px[entity];
+            _playerY[offset + entity] = (float)py[entity];
+        }
+
+        _ballX[Count] = (float)ballX;
+        _ballY[Count] = (float)ballY;
+        _ballZ[Count] = (float)ballZ;
+
+        return Count++;
+    }
+
+    /// <summary>Drops every record from an index on, to retry a beat that needed longer.</summary>
+    internal void Truncate(int count) => Count = count;
+
+    private void Grow()
+    {
+        var size = _time.Length * 2;
+
+        Array.Resize(ref _time, size);
+        Array.Resize(ref _playerX, size * FilmRoster.Size);
+        Array.Resize(ref _playerY, size * FilmRoster.Size);
+        Array.Resize(ref _ballX, size);
+        Array.Resize(ref _ballY, size);
+        Array.Resize(ref _ballZ, size);
+    }
+}
+
+/// <summary>
+/// Moves the ball and the twenty-two players through the beats, at bounded speed (`replay-v4`).
+/// </summary>
+/// <remarks>
+/// <para>
+/// The ball follows its beat: a ground pass eases out, a lofted ball, a cross and a clearance arc, a strike goes
+/// where its outcome sent it. A ball that is being driven is carried by the player driving it instead, so he is at
+/// it by construction.
+/// </para>
+/// <para>
+/// The players are simulated in real-time units at a fine step. Each steers towards one target at a time — a point
+/// he has to be at when a beat ends, the ball if he is pressing it, a support position beside it, or his place in
+/// the shape — limited by a top speed and by how quickly he can change speed. Whoever receives a pass the engine
+/// did not name is chosen as the beat approaches, from where the players actually are: the team-mate who can reach
+/// the ball soonest. When a player who has to be somewhere cannot be there in time, the beat is lengthened and
+/// played again; no cap is ever exceeded to make up the time. The film then plays all of it back at the one pace the
+/// timing solved.
+/// </para>
+/// </remarks>
+internal sealed class FilmMotion
+{
+    /// <summary>How quickly the focus the block follows catches up with the ball, in seconds.</summary>
+    private const double FocusSeconds = 3.0;
+
+    /// <summary>How far ahead of a driving player the ball is kept, in metres.</summary>
+    private const double CarryLead = 0.8;
+
+    /// <summary>How near the ball a driver has to be for it to be his, in metres.</summary>
+    private const double AttachDistance = 1.5;
+
+    /// <summary>How long a ball takes to settle onto the player driving it, in seconds.</summary>
+    private const double SettleSeconds = 0.4;
+
+    /// <summary>How long before a deadline a pinned player aims to be there, in seconds.</summary>
+    private const double Margin = 0.3;
+
+    /// <summary>How far a goalkeeper can dive towards a strike, in metres.</summary>
+    private const double DiveReach = 3.5;
+
+    /// <summary>How far ahead, in seconds of real time, a player starts making for a place he will have to be.</summary>
+    private const double Lookahead = 12.0;
+
+    /// <summary>How near a place a player has to get to be there, in metres.</summary>
+    private const double HardTolerance = 1.2;
+
+    /// <summary>How near a driven ball's end a player has to be: he is moving, so it is looser.</summary>
+    private const double SoftTolerance = 1.8;
+
+    /// <summary>How far from his place in the shape a player has to be before he sets off for it, in metres.</summary>
+    private const double SetOffDistance = 8.0;
+
+    /// <summary>How near his place in the shape a player has to get before he stops, in metres.</summary>
+    private const double SettleDistance = 1.0;
+
+    /// <summary>The roles that are kept from one beat to the next: two pressers and one supporter.</summary>
+    private const int RoleSlots = 3;
+
+    /// <summary>How far the play can move from a presser or supporter before somebody else takes the role, in metres.</summary>
+    private const double RoleRadius = 16.0;
+
+    /// <summary>How far the shape can run from the place a player is walking to before he turns for the new one, in metres.</summary>
+    private const double RelatchDistance = 10.0;
+
+    /// <summary>How many beats ahead the player who will receive the ball is chosen, so that he has time to get there.</summary>
+    private const int Foresight = 4;
+
+    /// <summary>How often a beat that needs longer is tried again.</summary>
+    private const int MaxRetries = 6;
+
+    /// <summary>How fast a goalkeeper may change speed in a dive, in metres per second per second.</summary>
+    private const double DiveAcceleration = 20.0;
+
+    private readonly FilmContext _context;
+    private readonly FilmShape _shape;
+    private readonly IReadOnlyList<FilmRoster> _rosters;
+    private readonly HighlightOptionsV1 _options;
+
+    private readonly double[] _px = new double[FilmRoster.Size];
+    private readonly double[] _py = new double[FilmRoster.Size];
+    private readonly double[] _vx = new double[FilmRoster.Size];
+    private readonly double[] _vy = new double[FilmRoster.Size];
+    private readonly bool[] _walking = new bool[FilmRoster.Size];
+    private readonly bool[] _savedWalking = new bool[FilmRoster.Size];
+    private readonly Vec[] _destinations = new Vec[FilmRoster.Size];
+    private readonly Vec[] _savedDestinations = new Vec[FilmRoster.Size];
+
+    // Who is pressing and who is supporting, kept from one beat to the next while the play stays near them.
+    private readonly int[] _roles = new int[RoleSlots];
+    private readonly int[] _savedRoles = new int[RoleSlots];
+    private readonly Vec[] _targets = new Vec[FilmRoster.Size];
+    private readonly Task[] _tasks = new Task[FilmRoster.Size];
+    private readonly List<Pin> _pins = [];
+    private readonly List<Pin> _endPins = [];
+
+    private readonly double[] _savedPx = new double[FilmRoster.Size];
+    private readonly double[] _savedPy = new double[FilmRoster.Size];
+    private readonly double[] _savedVx = new double[FilmRoster.Size];
+    private readonly double[] _savedVy = new double[FilmRoster.Size];
+
+    private Vec _ball;
+    private double _ballZ;
+    private Vec _focus;
+    private Vec _savedBall;
+    private double _savedBallZ;
+    private Vec _savedFocus;
+    private Vec _setPieceAnchor = FilmSpace.Centre;
+    private Vec _celebration = FilmSpace.Centre;
+    private FilmRoster _roster;
+
+    /// <summary>Initializes the motion.</summary>
+    /// <param name="context">The film's context.</param>
+    /// <param name="shape">Where the players want to be.</param>
+    /// <param name="rosters">Who is on the pitch for each possession.</param>
+    public FilmMotion(FilmContext context, FilmShape shape, IReadOnlyList<FilmRoster> rosters)
+    {
+        _context = context;
+        _shape = shape;
+        _rosters = rosters;
+        _options = context.Options;
+        _roster = context.Starters;
+    }
+
+    /// <summary>Plays the beats through, at the given pace.</summary>
+    /// <param name="beats">The beats, with their natural lengths.</param>
+    /// <param name="pace">The one pace the film is played at.</param>
+    /// <param name="holdScale">The factor the holds are scaled by.</param>
+    public FilmMotionResult Run(IReadOnlyList<FilmBeat> beats, double pace, double holdScale)
+    {
+        var result = new FilmMotionResult();
+        var spans = new BeatSpan[beats.Count];
+        var time = 0.0;
+        var extension = 0.0;
+        var motion = 0.0;
+
+        if (beats.Count == 0)
+        {
+            return result;
+        }
+
+        ForgetChoices(beats);
+
+        _roster = RosterOf(beats[0]);
+        Reset(beats, 0);
+
+        for (var index = 0; index < beats.Count; index++)
+        {
+            var beat = beats[index];
+
+            _roster = RosterOf(beat);
+
+            var cut = beat.Cut && index > 0;
+
+            if (cut)
+            {
+                Reset(beats, index);
+            }
+
+            ResolveChoices(beats, index);
+
+            if (beat.IsHold && beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.Penalty)
+            {
+                _setPieceAnchor = beat.To;
+            }
+
+            // The ball is where it is, whatever the plan said: the move is as long as the ground it has to cover.
+            var scripted = beat.NaturalSeconds;
+            var planned = beat.IsHold
+                ? beat.HoldFilmSeconds * holdScale * pace
+                : FilmTiming.NaturalSeconds(_context, beat, _ball.DistanceTo(beat.To));
+
+            var firstRecord = result.Count == 0 || cut ? result.Add(time, _px, _py, _ball.X, _ball.Y, _ballZ) : result.Count - 1;
+            var duration = Simulate(beats, index, planned, time, result);
+
+            spans[index] = new BeatSpan(firstRecord, result.Count - 1, time, time + duration);
+            time += duration;
+
+            if (beat.IsHold)
+            {
+                continue;
+            }
+
+            motion += duration;
+            extension += duration - scripted;
+        }
+
+        result.Spans = spans;
+        result.TotalSeconds = time;
+        result.MotionSeconds = motion;
+        result.ExtensionSeconds = extension;
+
+        return result;
+    }
+
+    private FilmRoster RosterOf(FilmBeat beat) => beat.Possession >= 0 ? _rosters[beat.Possession] : _roster;
+
+    // ---- Cuts and set-ups ------------------------------------------------------------------------------------
+
+    /// <summary>Puts everybody at their kick-off places: the start of the film, a kick-off after a goal, the second half.</summary>
+    private void Reset(IReadOnlyList<FilmBeat> beats, int index)
+    {
+        var kickOff = FindKickOff(beats, index);
+        var side = kickOff?.Side ?? beats[index].Side;
+        var spot = kickOff?.To ?? FilmSpace.Centre;
+        var state = new ShapeState(FormationMode.KickOff, side, spot);
+
+        _shape.Fill(_roster, state, spot, _targets);
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!_roster.IsOccupied(entity))
+            {
+                continue;
+            }
+
+            _px[entity] = _targets[entity].X;
+            _py[entity] = _targets[entity].Y;
+            _vx[entity] = 0;
+            _vy[entity] = 0;
+            _walking[entity] = false;
+        }
+
+        Array.Fill(_roles, -1);
+
+        // The taker stands at the ball.
+        var taker = kickOff?.Actor is Guid actor ? _roster.EntityOf(actor) : -1;
+
+        if (taker >= 0)
+        {
+            _px[taker] = spot.X - (FilmSpace.Direction(side) * 0.6);
+            _py[taker] = spot.Y;
+        }
+
+        _ball = kickOff is not null ? spot : beats[index].From;
+        _ballZ = 0;
+        _focus = _ball;
+    }
+
+    private static FilmBeat? FindKickOff(IReadOnlyList<FilmBeat> beats, int index)
+    {
+        for (var next = index; next < beats.Count && next < index + 4; next++)
+        {
+            if (beats[next].Hold == HoldKind.KickOff)
+            {
+                return beats[next];
+            }
+        }
+
+        return null;
+    }
+
+    // ---- Who plays and who receives -------------------------------------------------------------------------
+
+    /// <summary>Forgets who the motion chose last time, so that every run starts from the script.</summary>
+    private static void ForgetChoices(IReadOnlyList<FilmBeat> beats)
+    {
+        foreach (var beat in beats)
+        {
+            if (beat.ActorSource != ActorSource.Named)
+            {
+                beat.Actor = null;
+            }
+
+            if (beat.ReceiverPending || beat.ReceiverIsActor)
+            {
+                beat.Receiver = null;
+            }
+        }
+    }
+
+    /// <summary>Chooses the players the script left open for this beat and the next, from where everybody is now.</summary>
+    private void ResolveChoices(IReadOnlyList<FilmBeat> beats, int index)
+    {
+        for (var k = index; k < beats.Count && k <= index + Foresight; k++)
+        {
+            var beat = beats[k];
+
+            if (k > index && beat.Cut)
+            {
+                break;
+            }
+
+            ResolveActor(beats, k);
+            ResolveReceiver(beats, k);
+        }
+    }
+
+    private void ResolveActor(IReadOnlyList<FilmBeat> beats, int k)
+    {
+        var beat = beats[k];
+
+        if (beat.Actor is null && beat.ActorSource == ActorSource.PreviousReceiver && k > 0)
+        {
+            beat.Actor = beats[k - 1].Receiver;
+        }
+
+        if (beat.Actor is null && beat.ActorSource != ActorSource.Named)
+        {
+            var near = k == 0 || beats[k - 1].IsHold ? beat.From : beats[k - 1].To;
+
+            beat.Actor = Nearest(beat.Side, near, beat, k, beats);
+        }
+
+        if (beat.ReceiverIsActor)
+        {
+            beat.Receiver = beat.Actor;
+        }
+    }
+
+    private void ResolveReceiver(IReadOnlyList<FilmBeat> beats, int k)
+    {
+        var beat = beats[k];
+
+        if (!beat.ReceiverPending || beat.Receiver is not null)
+        {
+            return;
+        }
+
+        beat.Receiver = Nearest(beat.Side, beat.To, beat, k, beats) ?? beat.Actor;
+    }
+
+    /// <summary>
+    /// Gets the player of a side who can reach a point soonest from where he is, keeping clear of the players the
+    /// engine has already given a part in the next few beats.
+    /// </summary>
+    private Guid? Nearest(MatchSide side, Vec point, FilmBeat beat, int k, IReadOnlyList<FilmBeat> beats)
+    {
+        var best = -1;
+        var bestTime = double.MaxValue;
+
+        for (var slot = 1; slot <= 11; slot++)
+        {
+            var entity = FilmRoster.Index(side, slot);
+
+            if (!_roster.IsOccupied(entity) || _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var occupant = _roster.Occupants[entity];
+
+            if (occupant == beat.Actor || IsEngaged(occupant, beats, k))
+            {
+                continue;
+            }
+
+            var seconds = new Vec(_px[entity], _py[entity]).DistanceTo(point) / _options.SprintMetresPerSecond;
+
+            if (seconds < bestTime - 1e-9)
+            {
+                bestTime = seconds;
+                best = entity;
+            }
+        }
+
+        return best < 0 ? null : _roster.Occupants[best];
+    }
+
+    /// <summary>Whether a player already has a named part in the beats around this one.</summary>
+    private static bool IsEngaged(Guid participant, IReadOnlyList<FilmBeat> beats, int k)
+    {
+        for (var m = Math.Max(0, k - 1); m <= Math.Min(beats.Count - 1, k + 2); m++)
+        {
+            var other = beats[m];
+
+            if (m != k && (other.Actor == participant || other.Receiver == participant))
+            {
+                return true;
+            }
+
+            if (other.Opponent == participant)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ---- One beat ---------------------------------------------------------------------------------------------
+
+    private double Simulate(IReadOnlyList<FilmBeat> beats, int index, double planned, double start, FilmMotionResult result)
+    {
+        var beat = beats[index];
+        var firstUnsaved = result.Count;
+
+        Save();
+
+        var duration = planned;
+
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            Restore();
+            result.Truncate(firstUnsaved);
+            PlanTasks(beats, index, duration);
+
+            Steps(beat, duration, start, result);
+
+            if (beat.IsHold || attempt == MaxRetries)
+            {
+                break;
+            }
+
+            var shortfall = Shortfall(beat);
+
+            if (shortfall <= 0)
+            {
+                break;
+            }
+
+            duration += shortfall;
+        }
+
+        return duration;
+    }
+
+    private void Save()
+    {
+        Array.Copy(_px, _savedPx, FilmRoster.Size);
+        Array.Copy(_py, _savedPy, FilmRoster.Size);
+        Array.Copy(_vx, _savedVx, FilmRoster.Size);
+        Array.Copy(_vy, _savedVy, FilmRoster.Size);
+        Array.Copy(_walking, _savedWalking, FilmRoster.Size);
+        Array.Copy(_destinations, _savedDestinations, FilmRoster.Size);
+        Array.Copy(_roles, _savedRoles, RoleSlots);
+
+        _savedBall = _ball;
+        _savedBallZ = _ballZ;
+        _savedFocus = _focus;
+    }
+
+    private void Restore()
+    {
+        Array.Copy(_savedPx, _px, FilmRoster.Size);
+        Array.Copy(_savedPy, _py, FilmRoster.Size);
+        Array.Copy(_savedVx, _vx, FilmRoster.Size);
+        Array.Copy(_savedVy, _vy, FilmRoster.Size);
+        Array.Copy(_savedWalking, _walking, FilmRoster.Size);
+        Array.Copy(_savedDestinations, _destinations, FilmRoster.Size);
+        Array.Copy(_savedRoles, _roles, RoleSlots);
+
+        _ball = _savedBall;
+        _ballZ = _savedBallZ;
+        _focus = _savedFocus;
+    }
+
+    /// <summary>How much longer the beat has to be for everyone who has to be somewhere to be there, or zero.</summary>
+    private double Shortfall(FilmBeat beat)
+    {
+        var worst = 0.0;
+
+        foreach (var pin in _endPins)
+        {
+            var entity = _roster.EntityOf(pin.Participant);
+
+            if (entity < 0 || pin.Soft)
+            {
+                continue;
+            }
+
+            var distance = new Vec(_px[entity], _py[entity]).DistanceTo(pin.Point);
+
+            if (distance <= pin.Tolerance)
+            {
+                continue;
+            }
+
+            var speed = IsKeeperDive(beat, entity) ? _options.DiveMetresPerSecond : _options.SprintMetresPerSecond;
+
+            worst = Math.Max(worst, ((distance - (pin.Tolerance * 0.5)) / speed) + 0.25);
+        }
+
+        return worst;
+    }
+
+    // ---- What everyone is doing in a beat ------------------------------------------------------------------------
+
+    private void PlanTasks(IReadOnlyList<FilmBeat> beats, int index, double duration)
+    {
+        var beat = beats[index];
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            _tasks[entity] = default;
+        }
+
+        _endPins.Clear();
+        CollectPins(beats, index, _endPins);
+
+        foreach (var pin in _endPins)
+        {
+            Assign(pin, duration);
+        }
+
+        // Whoever has to be somewhere in the beats to come starts making their way as soon as they should.
+        var elapsed = duration;
+
+        for (var k = index + 1; k < beats.Count && elapsed < Lookahead && !beats[k].Cut; k++)
+        {
+            elapsed += beats[k].IsHold ? beats[k].HoldFilmSeconds * 2.0 : beats[k].NaturalSeconds;
+
+            _pins.Clear();
+            CollectPins(beats, k, _pins);
+
+            foreach (var pin in _pins)
+            {
+                Assign(pin, elapsed);
+            }
+        }
+
+        AssignRoles(beat);
+        AssignDive(beat);
+    }
+
+    private void Assign(Pin pin, double deadline)
+    {
+        var entity = _roster.EntityOf(pin.Participant);
+
+        if (entity >= 0 && _tasks[entity].Kind == TaskKind.None)
+        {
+            _tasks[entity] = new Task(pin.Soft ? TaskKind.Carry : TaskKind.Pin, pin.Point, deadline);
+        }
+    }
+
+    /// <summary>
+    /// Lists who has to be where when a beat ends: the player who receives the ball, whoever plays the next beat at
+    /// the place the ball will be, and whoever contests it.
+    /// </summary>
+    private void CollectPins(IReadOnlyList<FilmBeat> beats, int k, List<Pin> pins)
+    {
+        var beat = beats[k];
+
+        if (beat.Receiver is Guid receiver)
+        {
+            var carrier = beat.Kind is BeatKind.Carry or BeatKind.Duel && beat.Receiver == beat.Actor;
+
+            pins.Add(new Pin(receiver, CarryPoint(beat, carrier), carrier ? SoftTolerance : HardTolerance, carrier));
+        }
+
+        if (k + 1 >= beats.Count || beats[k + 1].Cut)
+        {
+            return;
+        }
+
+        var next = beats[k + 1];
+
+        if (next.Possession < 0 || next.Hold is HoldKind.Goal or HoldKind.Card or HoldKind.Substitution or HoldKind.HalfTime)
+        {
+            return;
+        }
+
+        if (next.Actor is Guid actor && actor != beat.Receiver)
+        {
+            pins.Add(new Pin(actor, beat.To, HardTolerance));
+        }
+
+        if (next.Kind is BeatKind.Duel or BeatKind.Header && next.Opponent is Guid opponent && opponent != beat.Receiver)
+        {
+            var side = _context.SideOf(opponent) ?? MatchSide.Home;
+
+            pins.Add(new Pin(opponent, beat.To + ((FilmSpace.OwnGoal(side) - beat.To).Unit() * 0.9), 1.5));
+        }
+    }
+
+    /// <summary>Where a pinned player stands: at the point, or just behind the ball if he is the one driving it.</summary>
+    private static Vec CarryPoint(FilmBeat beat, bool carrier)
+    {
+        if (carrier && beat.Distance > 0.5)
+        {
+            return beat.To - ((beat.To - beat.From).Unit() * CarryLead);
+        }
+
+        return beat.To;
+    }
+
+    /// <summary>Picks who presses the ball and who supports the player on it, for a beat in open play.</summary>
+    private void AssignRoles(FilmBeat beat)
+    {
+        if (beat.IsHold || beat.Kind is BeatKind.Shot or BeatKind.Cross or BeatKind.Clearance or BeatKind.Header or BeatKind.Save)
+        {
+            return;
+        }
+
+        var attacking = beat.Side;
+        var defending = MatchInputV1.OpponentOf(attacking);
+        var focus = beat.To;
+
+        var pressers = beat.Kind == BeatKind.Placement ? 0 : PressersFor(defending, focus);
+
+        // Each takes a place for the whole beat — a press closes down the point the ball is going to, and support
+        // stands off it — so that a player runs straight there instead of chasing a ball that moves faster than he
+        // does; and keeps the role while the play stays near him, so that two players do not swap every pass.
+        for (var slot = 0; slot < RoleSlots; slot++)
+        {
+            var kind = slot < 2 ? TaskKind.Press : TaskKind.Support;
+            var side = slot < 2 ? defending : attacking;
+            var wanted = slot < 2 ? slot < pressers : true;
+            var index = slot < 2 ? slot : 0;
+
+            if (!wanted)
+            {
+                _roles[slot] = -1;
+
+                continue;
+            }
+
+            var holder = _roles[slot];
+
+            var keep = holder >= 0
+                && _roster.IsOccupied(holder)
+                && FilmRoster.SideOf(holder) == side
+                && _tasks[holder].Kind == TaskKind.None
+                && new Vec(_px[holder], _py[holder]).DistanceTo(focus) <= RoleRadius;
+
+            if (!keep)
+            {
+                holder = NearestFree(side, focus);
+            }
+
+            _roles[slot] = holder;
+
+            if (holder >= 0)
+            {
+                _tasks[holder] = new Task(kind, RolePoint(side, kind, focus, index), index);
+            }
+        }
+    }
+
+    private int PressersFor(MatchSide defending, Vec ball)
+    {
+        var highPress = _context.InstructionsOf(defending).Pressing == MatchPressing.HighPress;
+        var ownHalf = FilmSpace.Attacking(ball, MatchInputV1.OpponentOf(defending)) >= FilmSpace.Length / 2;
+
+        // One player closes the ball down; a second joins when the ball is in the defenders' own half, or the
+        // instruction is to press high.
+        return ownHalf || highPress ? 2 : 1;
+    }
+
+    /// <summary>Gets the outfield player of a side with nothing to do who is nearest a point, or -1.</summary>
+    private int NearestFree(MatchSide side, Vec point)
+    {
+        var best = -1;
+        var bestDistance = double.MaxValue;
+
+        for (var slot = 1; slot <= 11; slot++)
+        {
+            var entity = FilmRoster.Index(side, slot);
+
+            if (!_roster.IsOccupied(entity)
+                || _tasks[entity].Kind != TaskKind.None
+                || _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper
+                || Array.IndexOf(_roles, entity) >= 0)
+            {
+                continue;
+            }
+
+            var distance = new Vec(_px[entity], _py[entity]).DistanceTo(point);
+
+            if (distance < bestDistance - 1e-9)
+            {
+                bestDistance = distance;
+                best = entity;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Gets where a presser or a supporter stands for a beat, relative to where the ball is going.</summary>
+    private static Vec RolePoint(MatchSide side, TaskKind kind, Vec ball, int index)
+    {
+        if (kind == TaskKind.Press)
+        {
+            return FilmSpace.Clamp(ball + ((FilmSpace.OwnGoal(side) - ball).Unit() * (1.5 + (index * 2.5))), 1.5);
+        }
+
+        var lateral = index == 0 ? 8.0 : -8.0;
+
+        return FilmSpace.Clamp(ball + new Vec(FilmSpace.Direction(side) * 4.0, lateral), 1.5);
+    }
+
+    /// <summary>A goalkeeper facing a strike dives at it: to the save if he makes one, towards it if he does not.</summary>
+    private void AssignDive(FilmBeat beat)
+    {
+        if (beat.Kind != BeatKind.Shot || beat.Strike is StrikeResult.None or StrikeResult.Blocked or StrikeResult.OffTarget)
+        {
+            return;
+        }
+
+        if (beat.Opponent is not Guid keeperId)
+        {
+            return;
+        }
+
+        var keeper = _roster.EntityOf(keeperId);
+
+        if (keeper < 0 || _tasks[keeper].Kind == TaskKind.Pin)
+        {
+            return;
+        }
+
+        var position = new Vec(_px[keeper], _py[keeper]);
+        var toward = beat.To - position;
+        var reach = Math.Min(DiveReach, toward.Length);
+
+        _tasks[keeper] = new Task(TaskKind.Dive, position + (toward.Unit() * reach), 0);
+    }
+
+    private bool IsKeeperDive(FilmBeat beat, int entity) =>
+        beat.Kind == BeatKind.Shot
+        && beat.Strike != StrikeResult.None
+        && _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper;
+
+    // ---- Stepping ---------------------------------------------------------------------------------------------
+
+    private void Steps(FilmBeat beat, double duration, double start, FilmMotionResult result)
+    {
+        var steps = Math.Max(1, (int)Math.Ceiling((duration / _options.StepSeconds) - 1e-9));
+        var dt = duration / steps;
+        var blend = 1.0 - Math.Exp(-dt / FocusSeconds);
+
+        var state = StateFor(beat);
+        var ballStart = _ball;
+        var zStart = _ballZ;
+        var carrier = CarrierOf(beat);
+        var carryDirection = (beat.To - ballStart).Unit();
+
+        // A driven ball is the driver's once he is at it. If he is not yet — he was late to it — the ball waits where
+        // it is for him, rather than being dragged across the pitch to him.
+        var attached = carrier >= 0 && new Vec(_px[carrier], _py[carrier]).DistanceTo(ballStart) <= AttachDistance;
+        var carryOffset = attached ? ballStart - new Vec(_px[carrier], _py[carrier]) : Vec.Zero;
+        var attachedAt = 0.0;
+
+        for (var step = 1; step <= steps; step++)
+        {
+            var tau = step * dt;
+
+            _shape.Fill(_roster, state, _focus, _targets);
+
+            for (var entity = 0; entity < FilmRoster.Size; entity++)
+            {
+                if (_roster.IsOccupied(entity))
+                {
+                    Steer(beat, entity, tau, dt);
+                }
+            }
+
+            if (carrier >= 0)
+            {
+                var driver = new Vec(_px[carrier], _py[carrier]);
+
+                if (!attached && driver.DistanceTo(_ball) <= AttachDistance)
+                {
+                    attached = true;
+                    attachedAt = tau;
+                    carryOffset = _ball - driver;
+                }
+
+                if (attached)
+                {
+                    var settle = Smooth(Math.Min(1.0, (tau - attachedAt) / SettleSeconds));
+                    var offset = carryOffset.Lerp(carryDirection * CarryLead, settle);
+
+                    _ball = driver + offset;
+                }
+
+                _ballZ = 0;
+            }
+            else
+            {
+                var u = tau / duration;
+
+                _ball = BallAt(beat, ballStart, u);
+                _ballZ = AltitudeAt(beat, zStart, u);
+            }
+
+            _focus = _focus.Lerp(_ball, blend);
+
+            result.Add(start + tau, _px, _py, _ball.X, _ball.Y, _ballZ);
+        }
+    }
+
+    private ShapeState StateFor(FilmBeat beat)
+    {
+        switch (beat.Formation)
+        {
+            case FormationMode.Celebration:
+                if (beat.IsHold)
+                {
+                    _celebration = CelebrationSpot(beat);
+                }
+
+                return new ShapeState(
+                    FormationMode.Celebration,
+                    beat.Side,
+                    _celebration,
+                    beat.Actor is Guid scorer ? _roster.EntityOf(scorer) : -1);
+
+            case FormationMode.Corner:
+            case FormationMode.FreeKickShot:
+            case FormationMode.Penalty:
+                return new ShapeState(beat.Formation, beat.Side, _setPieceAnchor);
+
+            case FormationMode.KickOff:
+                return new ShapeState(FormationMode.KickOff, beat.Side, beat.To);
+
+            default:
+                return new ShapeState(FormationMode.Open, beat.Side, beat.To);
+        }
+    }
+
+    /// <summary>Gets where the scorer runs to: a few metres off the goal line, towards the nearer touchline.</summary>
+    private static Vec CelebrationSpot(FilmBeat beat)
+    {
+        var towardsTop = beat.To.Y < FilmSpace.Width / 2;
+        var along = beat.Side == MatchSide.Home ? FilmSpace.Length - 9.0 : 9.0;
+
+        return new Vec(along, towardsTop ? 6.0 : FilmSpace.Width - 6.0);
+    }
+
+    /// <summary>Gets the entity driving the ball for the beat, or -1 when the ball follows a path of its own.</summary>
+    private int CarrierOf(FilmBeat beat)
+    {
+        if (beat.Kind is not (BeatKind.Carry or BeatKind.Duel) || beat.Receiver != beat.Actor)
+        {
+            return -1;
+        }
+
+        return beat.Receiver is Guid id ? _roster.EntityOf(id) : -1;
+    }
+
+    private void Steer(FilmBeat beat, int entity, double tau, double dt)
+    {
+        var task = _tasks[entity];
+        var position = new Vec(_px[entity], _py[entity]);
+        var velocity = new Vec(_vx[entity], _vy[entity]);
+
+        Vec target;
+        var cap = _options.ShapeMetresPerSecond;
+        var accel = _options.AccelerationMetresPerSecondSquared;
+        var stopping = false;
+        var deadline = double.NaN;
+
+        switch (task.Kind)
+        {
+            case TaskKind.Pin:
+                target = task.Point;
+                cap = _options.SprintMetresPerSecond;
+                deadline = task.Value - tau;
+                stopping = true;
+                break;
+
+            case TaskKind.Carry:
+                target = task.Point;
+                cap = _options.SprintMetresPerSecond;
+                deadline = task.Value - tau;
+                break;
+
+            case TaskKind.Press:
+                target = task.Point;
+                cap = _options.SprintMetresPerSecond;
+                break;
+
+            case TaskKind.Support:
+                target = task.Point;
+                cap = _options.ShapeMetresPerSecond * 1.15;
+                break;
+
+            case TaskKind.Dive:
+                target = task.Point;
+                cap = _options.DiveMetresPerSecond;
+                accel = DiveAcceleration;
+                break;
+
+            default:
+                {
+                    // A player holds his place until the shape has moved far enough from him to be worth the walk.
+                    // He then walks to where it is, in a straight line, and stops: runs and rests, not a drift after
+                    // every small shift of the block. It is also what a viewer expects of a player off the ball.
+                    var wanted = _targets[entity];
+                    var here = new Vec(_px[entity], _py[entity]);
+
+                    if (_walking[entity])
+                    {
+                        // The destination is kept unless the shape has run off somewhere else altogether.
+                        if (_destinations[entity].DistanceTo(wanted) > RelatchDistance)
+                        {
+                            _destinations[entity] = wanted;
+                        }
+
+                        _walking[entity] = here.DistanceTo(_destinations[entity]) > SettleDistance;
+                    }
+                    else if (here.DistanceTo(wanted) > SetOffDistance)
+                    {
+                        _walking[entity] = true;
+                        _destinations[entity] = wanted;
+                    }
+
+                    target = _walking[entity] ? _destinations[entity] : here;
+                    break;
+                }
+        }
+
+        // A keeper going for a save dives, too.
+        if (task.Kind == TaskKind.Pin && IsKeeperDive(beat, entity))
+        {
+            cap = _options.DiveMetresPerSecond;
+            accel = DiveAcceleration;
+        }
+
+        var toTarget = target - position;
+        var distance = toTarget.Length;
+        double speed;
+
+        if (!double.IsNaN(deadline))
+        {
+            // Arrive in time: the speed that covers what is left in what is left, no faster than he can run.
+            var needed = distance / Math.Max(deadline - Margin, 0.1);
+
+            speed = Math.Min(cap, needed);
+
+            if (stopping)
+            {
+                // And be able to stop there: never faster than he could brake from.
+                speed = Math.Min(speed, Math.Sqrt(2.0 * accel * Math.Max(0.0, distance - 0.1)));
+            }
+        }
+        else
+        {
+            // Close in smoothly on a target with no deadline, rather than overshooting it.
+            speed = Math.Min(cap, distance * 1.5);
+        }
+
+        var desired = toTarget.Unit() * speed;
+        var change = desired - velocity;
+        var limit = accel * dt;
+        var length = change.Length;
+
+        if (length > limit)
+        {
+            change *= limit / length;
+        }
+
+        velocity += change;
+
+        // Whatever the steering asked, nobody ever exceeds the cap.
+        var top = velocity.Length;
+
+        if (top > cap)
+        {
+            velocity *= cap / top;
+        }
+
+        _vx[entity] = velocity.X;
+        _vy[entity] = velocity.Y;
+
+        var moved = position + (velocity * dt);
+
+        _px[entity] = moved.X;
+        _py[entity] = moved.Y;
+    }
+
+    // ---- The ball ---------------------------------------------------------------------------------------------
+
+    private static Vec BallAt(FilmBeat beat, Vec start, double u)
+    {
+        if (beat.IsHold || beat.Kind is BeatKind.Header or BeatKind.Save)
+        {
+            return start;
+        }
+
+        var progress = beat.Kind == BeatKind.Pass ? u * (1.4 - (0.4 * u)) : u;
+
+        return start.Lerp(beat.To, progress);
+    }
+
+    private static double AltitudeAt(FilmBeat beat, double start, double u)
+    {
+        var end = beat.IsHold ? start : beat.ZTo;
+
+        return Math.Max(0.0, start + ((end - start) * u) + (4.0 * beat.ZArc * u * (1.0 - u)));
+    }
+
+    private static double Smooth(double t) => t * t * (3.0 - (2.0 * t));
+
+    private enum TaskKind
+    {
+        None = 0,
+        Pin = 1,
+        Carry = 2,
+        Press = 3,
+        Support = 4,
+        Dive = 5,
+    }
+
+    /// <summary>What one player is doing for the beat.</summary>
+    /// <param name="Kind">The kind of task; none means the shape.</param>
+    /// <param name="Point">Where he is going.</param>
+    /// <param name="Value">A deadline in seconds for a pin, or an index for a press or support role.</param>
+    private readonly record struct Task(TaskKind Kind, Vec Point, double Value);
+}

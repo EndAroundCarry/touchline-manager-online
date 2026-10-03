@@ -1,37 +1,45 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
-import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { averageRatingLabel } from '../../core/competition/competition-presentation';
 import {
   attributeGroups,
   availabilityLabel,
   footLabel,
   positionLabel,
+  ratioLabel,
   seasonStatRows,
   seasonsPlayedLabel,
   squadStatusLabel,
   stateRows,
 } from '../../core/squad/squad-presentation';
 import { SquadStore } from '../../core/squad/squad-store';
+import { sampleTrainingHistory } from '../../core/training/training-history';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
 import {
   FORM_ERROR,
   LINK,
   PAGE_HEADING,
-  PRIMARY_BUTTON,
   SECONDARY_BUTTON,
+  SELECT_INPUT,
   STATUS_MESSAGE,
-  TEXT_INPUT,
 } from '../../shared/forms/control-styles';
 
+/** The profile's tabs. */
+export type PlayerTab = 'attributes' | 'training' | 'statistics' | 'contract';
+
+/** The statistics drop-down's value for the season in progress. */
+const CURRENT_SEASON = 'current';
+
 /**
- * The player profile (master plan §11.1, F-17).
+ * The player profile (master plan §11.1, F-17), in four tabs: Attributes (the default), Training report,
+ * Statistics, and Contract.
  *
- * The attribute grid is the reason this screen exists, and it is rendered through `AttributeValue` so
- * every attribute carries its number *and* the word for its band — §11.3 forbids a colour being the only
- * signal, and a test asserts both halves render.
+ * The attribute grid is the reason this screen exists. Each family is one row of compact tiles that fits
+ * the screen width, rendered through `AttributeValue` so every attribute carries its number and, for
+ * assistive technology, the word for its band — §11.3 forbids a colour being the only signal, and a test
+ * asserts both halves render.
  *
  * The season summary is the player's line of the division leaderboard's projection (`STA-2`), read with
  * the profile rather than recomputed; a player who has not taken the pitch has none, and the screen says so
@@ -47,14 +55,10 @@ export class PlayerProfile implements OnInit {
   readonly id = input.required<string>();
 
   private readonly store = inject(SquadStore);
-  private readonly maintenance = inject(MaintenanceStore);
 
   protected readonly player = this.store.player;
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
-
-  /** Whether a write is allowed; offline or read-only a quote and a renewal are both refused. */
-  protected readonly canMutate = this.maintenance.canMutate;
 
   /** The attribute families, in the order the profile shows them. */
   protected readonly attributeFamilies = computed(() => {
@@ -94,26 +98,86 @@ export class PlayerProfile implements OnInit {
     return career === null || career === undefined ? '' : seasonsPlayedLabel(career.seasonsPlayed);
   });
 
-  /** The renewal quote last requested, or null (`CON-3`). */
-  protected readonly renewalQuote = this.store.renewalQuote;
+  /** The tabs, in the order they are shown. Attributes is the default (F-17). */
+  protected readonly tabs: readonly { readonly key: PlayerTab; readonly label: string }[] = [
+    { key: 'attributes', label: 'Attributes' },
+    { key: 'training', label: 'Training report' },
+    { key: 'statistics', label: 'Statistics' },
+    { key: 'contract', label: 'Contract' },
+  ];
 
-  /** The term the manager is asking for, in seasons (`CON-1`). */
-  protected readonly renewalSeasons = signal(3);
+  /** The tab currently open. */
+  protected readonly activeTab = signal<PlayerTab>('attributes');
 
-  /** The lengths a manager may offer. */
-  protected readonly termOptions = [1, 2, 3];
+  /** The statistics season chosen in the drop-down: `current` or a past season's number. */
+  protected readonly selectedSeason = signal<string>(CURRENT_SEASON);
 
-  protected readonly quoting = signal(false);
-  protected readonly signing = signal(false);
-  protected readonly renewalError = signal<string | null>(null);
-  protected readonly renewalMessage = signal<string | null>(null);
+  /** The season the manager is in, derived from the contract when there is one. */
+  protected readonly currentSeasonNumber = computed(() => {
+    const player = this.player();
+    const contract = player?.contract;
+
+    if (contract !== null && contract !== undefined && contract.seasonsRemaining > 0) {
+      return contract.endSeasonNumber - contract.seasonsRemaining + 1;
+    }
+
+    const seasons = player?.careerStats?.seasons ?? [];
+
+    return seasons.reduce((latest, season) => Math.max(latest, season.seasonNumber), 0) + 1;
+  });
+
+  /** The sample training history, newest first. Placeholder until the training rework (see the model). */
+  protected readonly trainingHistory = computed(() => {
+    const player = this.player();
+
+    return player === null ? [] : sampleTrainingHistory(player.id, this.currentSeasonNumber());
+  });
+
+  /** The drop-down's choices: this season, then each earlier season the player has a line for. */
+  protected readonly seasonOptions = computed(() => [
+    { value: CURRENT_SEASON, label: `Current season (${this.currentSeasonNumber()})` },
+    ...this.careerSeasons().map((season) => ({
+      value: `${season.seasonNumber}`,
+      label: `${season.seasonLabel} · ${season.clubName}`,
+    })),
+  ]);
+
+  /** The statistic lines for the chosen season, or an empty list when the player has none for it. */
+  protected readonly selectedStats = computed(() => {
+    const choice = this.selectedSeason();
+
+    if (choice === CURRENT_SEASON) {
+      return this.seasonStats();
+    }
+
+    const season = this.careerSeasons().find((item) => `${item.seasonNumber}` === choice);
+
+    return season === undefined ? [] : seasonStatRows(season.stats);
+  });
+
+  protected readonly matchesLoading = signal(true);
+  protected readonly matchesError = signal<string | null>(null);
+
+  /** The per-match rows for the chosen season, newest first (`STA-2`). */
+  protected readonly matchRows = computed(() => {
+    const history = this.store.playerMatches();
+    const choice = this.selectedSeason();
+
+    // The store holds the last player read, so a row set that is not this player's is ignored.
+    if (history === null || history.playerId !== this.id()) {
+      return [];
+    }
+
+    const season = choice === CURRENT_SEASON ? this.currentSeasonNumber() : Number(choice);
+
+    return history.matches.filter((match) => match.seasonNumber === season);
+  });
 
   protected readonly pageHeadingClass = PAGE_HEADING;
-  protected readonly primaryButtonClass = PRIMARY_BUTTON;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
-  protected readonly inputClass = TEXT_INPUT;
+  protected readonly selectClass = SELECT_INPUT;
   protected readonly linkClass = LINK;
 
   /** Reads the profile for the player the route names. */
@@ -132,6 +196,29 @@ export class PlayerProfile implements OnInit {
         );
       },
     });
+
+    this.matchesLoading.set(true);
+    this.matchesError.set(null);
+
+    this.store.loadPlayerMatches(playerId).subscribe({
+      next: () => this.matchesLoading.set(false),
+      error: (error: unknown) => {
+        this.matchesLoading.set(false);
+        this.matchesError.set(
+          error instanceof ApiError ? error.detail : 'The match statistics could not be loaded.',
+        );
+      },
+    });
+  }
+
+  /** Formats a completed count against an attempted one for the match table (`engine-v7`). */
+  protected ratio(completed: number, attempted: number): string {
+    return ratioLabel(completed, attempted);
+  }
+
+  /** Formats a match rating to one decimal, or a dash when the player was not rated (`TRN-8`). */
+  protected matchRating(value: number | null): string {
+    return value === null ? '—' : value.toFixed(1);
   }
 
   /** Formats an amount for display. */
@@ -169,69 +256,36 @@ export class PlayerProfile implements OnInit {
     return availabilityLabel(type, remainingFixtures);
   }
 
-  /** Changes the offered term and forgets any quote for the old one. */
-  protected setSeasons(value: number): void {
-    this.renewalSeasons.set(value);
-    this.store.clearRenewalQuote();
-    this.renewalError.set(null);
-    this.renewalMessage.set(null);
+  /** Opens a tab. */
+  protected selectTab(tab: PlayerTab): void {
+    this.activeTab.set(tab);
   }
 
-  /** Asks the server for the deterministic quote for the chosen term (`CON-3`). */
-  protected quoteRenewal(): void {
-    const contract = this.player()?.contract;
+  /** Moves between tabs with the arrow keys, Home and End, as the tabs pattern expects. */
+  protected onTabKeydown(event: KeyboardEvent, index: number): void {
+    const last = this.tabs.length - 1;
+    const target =
+      event.key === 'ArrowRight'
+        ? (index + 1) % this.tabs.length
+        : event.key === 'ArrowLeft'
+          ? (index + last) % this.tabs.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : -1;
 
-    if (contract === null || contract === undefined || this.quoting()) {
+    if (target < 0) {
       return;
     }
 
-    this.quoting.set(true);
-    this.renewalError.set(null);
-    this.renewalMessage.set(null);
-
-    this.store.quoteRenewal(contract.id, this.renewalSeasons()).subscribe({
-      next: () => this.quoting.set(false),
-      error: (error: unknown) => {
-        this.quoting.set(false);
-        this.renewalError.set(
-          error instanceof ApiError ? error.detail : 'A renewal quote could not be requested.',
-        );
-      },
-    });
+    event.preventDefault();
+    this.selectTab(this.tabs[target].key);
+    (document.getElementById(`player-tab-${this.tabs[target].key}`) as HTMLElement | null)?.focus();
   }
 
-  /** Accepts the quoted renewal (`CON-4`), conditional on the version the quote carried. */
-  protected signRenewal(): void {
-    const player = this.player();
-    const quote = this.renewalQuote();
-
-    if (player === null || player.contract === null || quote === null || this.signing()) {
-      return;
-    }
-
-    this.signing.set(true);
-    this.renewalError.set(null);
-    this.renewalMessage.set(null);
-
-    this.store
-      .renewContract(player.contract.id, player.id, this.renewalSeasons(), quote.contractVersion)
-      .subscribe({
-        next: () => {
-          this.signing.set(false);
-          this.renewalMessage.set(`${player.fullName} has been re-signed.`);
-        },
-        error: (error: unknown) => {
-          this.signing.set(false);
-
-          // A stale quote is dropped rather than shown, so the manager asks again against current state.
-          if (error instanceof ApiError && error.isPreconditionFailed) {
-            this.store.clearRenewalQuote();
-          }
-
-          this.renewalError.set(
-            error instanceof ApiError ? error.detail : 'The renewal could not be signed.',
-          );
-        },
-      });
+  /** Chooses the season whose statistics are shown. */
+  protected selectSeason(value: string): void {
+    this.selectedSeason.set(value);
   }
 }
