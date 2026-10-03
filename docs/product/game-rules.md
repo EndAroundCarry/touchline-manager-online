@@ -292,7 +292,8 @@ neither the ordering nor the counts are stored a second time.
 | CON-6 | Expired players become free agents at rollover unless renewed. | — |
 | CON-7 | Free-agent signing beyond emergency replacements is post-MVP, unless it proves necessary to keep the transfer market healthy. If enabled it uses the same timed-auction mechanism with a zero seller fee and an explicit signing wage. | — |
 | CON-8 | Contract years advance at **season rollover**, never on the real-world anniversary. | — |
-| CON-9 | At rollover, a club nobody manages (no tenure, or an inactive one) renews its best expiring players up to the AI target and releases the rest; a present manager's unrenewed contracts expire to free agency (`CON-6`). | — |
+| CON-9 | At rollover, a club nobody manages (no tenure, or an inactive one) renews its best expiring players up to the AI target and releases the rest; a present manager's expiring contracts are renewed by the board (`CON-11`). | — |
+| CON-11 | The board automatically renews every expiring contract of a club with a present manager at rollover, for a two-season deal on the deterministic renewal quote, so no manager loses a player to an expiring contract. Expiry to free agency remains for the surplus of clubs nobody manages (`CON-9`). | — |
 | CON-10 | **Announce-then-play retirement**: from **32** a player may announce that the coming season is their last; the chance rises each season and is gated by ability and fitness, with a forced announcement age and a forced retirement age capping it. An announced player plays one final season. | — |
 
 The retirement rule's numbers are a hidden mechanic: a manager knows an announcement is possible from the

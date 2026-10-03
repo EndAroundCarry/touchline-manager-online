@@ -4,6 +4,22 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Player detail tabs and board renewals
+
+### Changed
+
+- **The squad's player names open the player page.** The name in the roster table and on each phone card is
+  the link; the separate "View" links are gone.
+- **The player page is four tabs: Attributes (default), Training report, Statistics, Contract.** Attributes
+  are compact tiles, one row per family, sized to fit the screen width with no scrolling; the band word is
+  read out by assistive technology and a legend above the tiles gives the colour bands. The Training report
+  shows clearly-labelled sample data until the training rework. Statistics shows the current season with a
+  drop-down for earlier ones. Contract shows the deal, its expiry and salary, with "Start negotiation"
+  disabled and marked coming soon.
+- **`CON-11`: the board renews every expiring contract of a present manager at rollover** (two seasons, on the
+  deterministic quote), so no manager loses a player to expiry. Clubs nobody manages keep the `CON-9` policy.
+  The manager-initiated renewal controls were removed from the player page with the negotiation rework.
+
 ## Engine-v5 — the half-time clock, restart ownership, and a complete passage recorder
 
 The first milestone of [`engine-v5-fluid-match-film.md`](engine-v5-fluid-match-film.md). `engine-v4` built the
