@@ -1,0 +1,20 @@
+@if (!settled()) {
+  <p class="p-3.5 text-sm text-muted" role="status">Checking your results…</p>
+} @else {
+  <div class="p-3.5 text-sm" data-testid="result-hidden">
+    <p class="text-ink-2">
+      {{ subject() }} would give away
+      {{ unseenCount() === 1 ? 'the result of your latest match' : 'results you have not seen' }}.
+      Watch {{ unseenCount() === 1 ? 'it' : 'them' }}, or show
+      {{ unseenCount() === 1 ? 'the result' : 'the results' }}.
+    </p>
+    <div class="mt-2 flex flex-wrap items-center gap-3">
+      @if (watchLink(); as link) {
+        <a [routerLink]="link" [class]="linkClass">Watch the match</a>
+      }
+      <button type="button" [class]="buttonClass" (click)="showResults()">
+        {{ unseenCount() === 1 ? 'Show result' : 'Show results' }}
+      </button>
+    </div>
+  </div>
+}

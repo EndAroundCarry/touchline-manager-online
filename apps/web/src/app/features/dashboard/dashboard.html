@@ -197,7 +197,9 @@
 
         <section class="panel flex flex-col" aria-labelledby="league-table">
           <h2 id="league-table" class="panel-title">League table</h2>
-          @if (hasTable()) {
+          @if (resultsHeldBack()) {
+            <app-result-hidden subject="The league table" />
+          } @else if (hasTable()) {
             <table class="data-table">
               <thead>
                 <tr>
@@ -238,7 +240,11 @@
         <section class="panel flex flex-col" aria-labelledby="club-record">
           <h2 id="club-record" class="panel-title">Club</h2>
           <dl class="flex-1 divide-y divide-line-soft text-sm">
-            @if (ownRow(); as record) {
+            @if (resultsHeldBack()) {
+              <div>
+                <app-result-hidden subject="Your record" />
+              </div>
+            } @else if (ownRow(); as record) {
               <div class="flex justify-between px-3.5 py-1.5">
                 <dt class="text-ink-2">Position</dt>
                 <dd class="font-semibold">{{ record.rank }}</dd>
@@ -414,7 +420,9 @@
         <section class="panel flex flex-col" aria-labelledby="player-stats">
           <h2 id="player-stats" class="panel-title">Player stats</h2>
           <div class="flex-1 p-3.5 text-sm">
-            @if (!hasStatistics()) {
+            @if (resultsHeldBack()) {
+              <app-result-hidden subject="The leaders" />
+            } @else if (!hasStatistics()) {
               <p class="text-muted" role="status">Loading the division's leaders…</p>
             } @else if (leaders().length === 0) {
               <p class="text-ink-2">Nobody has played yet, so there are no leaders.</p>

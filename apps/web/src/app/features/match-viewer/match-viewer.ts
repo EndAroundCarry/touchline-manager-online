@@ -44,6 +44,7 @@ import {
   PlayerLiveMetric,
 } from '../../core/match/match.models';
 import { MatchStore } from '../../core/match/match-store';
+import { ResultRevealStore } from '../../core/match/result-reveal-store';
 import { formatInstant } from '../../core/world/presentation';
 import { CanvasMatchRenderer } from './renderer/canvas-match-renderer';
 import { RenderLoop } from './renderer/render-loop';
@@ -110,6 +111,8 @@ interface ReplayMarker {
 export class MatchViewer implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(MatchStore);
+  private readonly reveals = inject(ResultRevealStore);
+  private readonly matchId = this.route.snapshot.paramMap.get('matchId');
   private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('pitch');
   private readonly feedScroll = viewChild<ElementRef<HTMLElement>>('feedScroll');
 
@@ -130,6 +133,13 @@ export class MatchViewer implements OnDestroy {
       this.pause();
     }
   };
+
+  /**
+   * Whether the manager has seen the result: they watched the match to its end, skipped to the end, or asked
+   * for it. Until then the screen keeps the score, the scorers, the goal markers and the post-match panels
+   * back, so the match is a game to watch rather than a result to be told.
+   */
+  protected readonly revealed = computed(() => this.reveals.isRevealed(this.matchId));
 
   protected readonly match = this.store.match;
   protected readonly presentation = this.store.presentation;
@@ -178,6 +188,26 @@ export class MatchViewer implements OnDestroy {
   /** Whether the feed is scrolled to its newest row. */
   protected readonly feedPinned = signal(true);
 
+  /** The goals struck so far at the playhead, home and away: what the scoreboard shows while the film plays. */
+  private readonly liveScore = signal<{ home: number; away: number }>({ home: 0, away: 0 });
+
+  /**
+   * The home goals the scoreboard shows. The count follows the playhead, so a goal is seen when it is scored;
+   * a match whose result the manager already has, and has not started again, shows its final score.
+   */
+  protected readonly homeScore = computed(() =>
+    this.state() === 'idle' && this.revealed()
+      ? (this.presentation()?.homeGoals ?? 0)
+      : this.liveScore().home,
+  );
+
+  /** The away goals the scoreboard shows, on the same terms as the home goals. */
+  protected readonly awayScore = computed(() =>
+    this.state() === 'idle' && this.revealed()
+      ? (this.presentation()?.awayGoals ?? 0)
+      : this.liveScore().away,
+  );
+
   /** Which side just scored, for the scoreboard's own flash. */
   protected readonly scoringSide = signal<'home' | 'away' | null>(null);
 
@@ -209,6 +239,11 @@ export class MatchViewer implements OnDestroy {
     const markers: ReplayMarker[] = [];
 
     for (const marker of this.film().markers) {
+      // A goal marker is a spoiler: where it sits on the scrubber says that a goal comes, and when.
+      if (marker.kind === 'goal' && !this.revealed()) {
+        continue;
+      }
+
       const struck = this.playback.playlistMillisecondsForFilm(marker.filmMilliseconds);
 
       if (struck === null) {
@@ -340,10 +375,8 @@ export class MatchViewer implements OnDestroy {
   });
 
   constructor() {
-    const matchId = this.route.snapshot.paramMap.get('matchId');
-
-    if (matchId !== null && matchId.length > 0) {
-      this.store.load(matchId);
+    if (this.matchId !== null && this.matchId.length > 0) {
+      this.store.load(this.matchId);
     }
 
     if (typeof document !== 'undefined') {
@@ -417,6 +450,11 @@ export class MatchViewer implements OnDestroy {
     }
 
     this.motionQuery?.removeEventListener('change', this.motionListener);
+  }
+
+  /** Shows the result without watching the match. */
+  protected revealResult(): void {
+    this.reveals.reveal(this.matchId);
   }
 
   /** Starts or resumes the replay. */
@@ -719,6 +757,11 @@ export class MatchViewer implements OnDestroy {
   private publish(): void {
     this.activeIndex.set(this.playback.activeIndex);
     this.state.set(this.playback.currentState);
+
+    // Having watched the match to its end, or skipped there, the manager has seen the result.
+    if (this.playback.currentState === 'finished') {
+      this.revealResult();
+    }
   }
 
   /** Draws the film at the playhead, dipped to dark where a cut or a jump in the reel is being faded over. */
@@ -782,6 +825,12 @@ export class MatchViewer implements OnDestroy {
    * does at whatever speed is playing, and a seek into a celebration shows both.
    */
   private updateGoal(): void {
+    const score = this.film().scoreAt(this.playback.positionMs);
+
+    if (score.home !== this.liveScore().home || score.away !== this.liveScore().away) {
+      this.liveScore.set(score);
+    }
+
     const side = this.film().activeGoalAt(this.playback.positionMs)?.side ?? null;
 
     if (side !== this.scoringSide()) {

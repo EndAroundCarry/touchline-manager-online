@@ -14,6 +14,8 @@ function item(overrides: Partial<NewsItem> = {}): NewsItem {
     title: 'A result',
     body: 'A body.',
     publishedAt: '2026-10-06T19:00:00Z',
+    spoiler: null,
+    matchId: null,
     ...overrides,
   };
 }

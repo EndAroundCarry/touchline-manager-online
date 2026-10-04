@@ -20,6 +20,12 @@ export interface InboxMessage {
   readonly isRead: boolean;
   readonly createdAt: string;
   readonly readAt: string | null;
+  /**
+   * What the title and body hold back because it gives a match away: the score, the outcome, the table move.
+   * Null when the message has nothing to hide. The screen shows it only when the manager asks, or has
+   * already seen the match.
+   */
+  readonly spoiler: string | null;
 }
 
 /** One page of the manager's inbox, newest first (`§10.7`). */

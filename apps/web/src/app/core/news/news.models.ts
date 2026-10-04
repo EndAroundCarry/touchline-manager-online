@@ -7,6 +7,10 @@ export interface NewsItem {
   readonly title: string;
   readonly body: string;
   readonly publishedAt: string;
+  /** What the title and body hold back because it gives a match away: the score. Null when nothing is held back. */
+  readonly spoiler: string | null;
+  /** The match a result item reports, which remembers a shown result under it. Null when it names none. */
+  readonly matchId: string | null;
 }
 
 /** One page of the news feed. */

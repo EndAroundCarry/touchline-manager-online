@@ -3,6 +3,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { Player, PlayerMatchStat, PlayerSeasonStats } from '../../core/squad/squad.models';
+import { CompetitionStore } from '../../core/competition/competition-store';
+import { MyFixtures } from '../../core/competition/competition.models';
 import { SquadStore } from '../../core/squad/squad-store';
 import { PlayerTrainingStore } from '../../core/training/player-training-store';
 import { PlayerProfile } from './player';
@@ -145,9 +147,25 @@ const player: Player = {
   serverTime: '2026-09-28T00:00:00Z',
 };
 
+/** A manager's season in which nothing has been played, so there is no result to keep back. */
+const NOTHING_PLAYED: MyFixtures = {
+  clubId: 'club-1',
+  clubName: 'Ashvale United',
+  clubShortName: 'ASH',
+  divisionId: 'division-1',
+  divisionName: 'English Tier 1',
+  tierNumber: 1,
+  seasonNumber: 1,
+  seasonLabel: '2026/27',
+  nextFixtureId: null,
+  fixtures: [],
+  serverTime: '2026-10-07T12:00:00Z',
+};
+
 describe('PlayerProfile', () => {
   let fixture: ComponentFixture<PlayerProfile>;
   let root: HTMLElement;
+  let mine: WritableSignal<MyFixtures | null>;
   let trainingStore: {
     history: WritableSignal<null>;
     loading: WritableSignal<boolean>;
@@ -156,6 +174,9 @@ describe('PlayerProfile', () => {
   };
 
   beforeEach(async () => {
+    localStorage.clear();
+    mine = signal<MyFixtures | null>(NOTHING_PLAYED);
+
     const store = {
       player: signal(player),
       playerMatches: signal(matches),
@@ -176,6 +197,15 @@ describe('PlayerProfile', () => {
         provideRouter([]),
         { provide: SquadStore, useValue: store },
         { provide: PlayerTrainingStore, useValue: trainingStore },
+        {
+          provide: CompetitionStore,
+          useValue: {
+            fixtures: mine,
+            fixturesLoading: signal(false),
+            fixturesError: signal<string | null>(null),
+            loadFixtures: vi.fn(),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -223,6 +253,59 @@ describe('PlayerProfile', () => {
     expect(panel.querySelector('app-player-training')).not.toBeNull();
     expect(panel.textContent).not.toContain('Sample data');
     expect(trainingStore.load).toHaveBeenCalledWith('player-1');
+  });
+
+  describe("while a result of the manager's own is unseen", () => {
+    beforeEach(() => {
+      mine.set({
+        ...NOTHING_PLAYED,
+        fixtures: [
+          {
+            id: 'fixture-0',
+            roundNumber: 1,
+            venue: 'home',
+            opponentClubId: 'club-2',
+            opponentName: 'Vale Athletic',
+            opponentShortName: 'VAL',
+            kickoffAt: '2026-10-06T19:00:00Z',
+            lockAt: '2026-10-06T18:00:00Z',
+            status: 'published',
+            homeScore: 2,
+            awayScore: 1,
+            matchId: 'match-0',
+            outcome: 'win',
+          },
+        ],
+      });
+    });
+
+    it("holds the statistics back, since a player's figures count the goals of the match", async () => {
+      await openTab('Statistics');
+
+      expect(root.querySelector('[data-testid="result-hidden"]')).not.toBeNull();
+      expect(root.querySelector('[data-testid="season-stats"]')).toBeNull();
+      expect(root.querySelector('[data-testid="match-stats"]')).toBeNull();
+    });
+
+    it('shows them once the result has been asked for', async () => {
+      await openTab('Statistics');
+
+      Array.from(root.querySelectorAll('button'))
+        .find((button) => button.textContent?.trim() === 'Show result')!
+        .click();
+      await fixture.whenStable();
+
+      expect(root.querySelector('[data-testid="result-hidden"]')).toBeNull();
+      expect(root.querySelector('[data-testid="season-stats"]')).not.toBeNull();
+    });
+
+    it('leaves the attributes and the contract alone', async () => {
+      expect(root.querySelectorAll('app-attribute-value')).toHaveLength(28);
+
+      await openTab('Contract');
+
+      expect(root.querySelector('#player-panel-contract')).not.toBeNull();
+    });
   });
 
   it('shows the seasons as a table with the career total and the passes and dribbles', async () => {

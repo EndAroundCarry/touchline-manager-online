@@ -10,6 +10,7 @@ import {
   Passage,
 } from '../../core/match/match.models';
 import { MatchStore } from '../../core/match/match-store';
+import { RESULT_REVEAL_STORAGE_KEY } from '../../core/match/result-reveal-store';
 import { MatchViewer } from './match-viewer';
 
 /**
@@ -251,6 +252,8 @@ describe('MatchViewer', () => {
   };
 
   beforeEach(async () => {
+    localStorage.clear();
+
     store = {
       match: signal<Match | null>(null),
       presentation: signal<MatchPresentation | null>(null),
@@ -362,6 +365,9 @@ describe('MatchViewer', () => {
   it('keeps a screen-reader scoreline and switches between the report, statistics, and player tabs', async () => {
     const native = await load();
 
+    buttonByText(native, 'Show result')!.click();
+    await fixture.whenStable();
+
     expect(native.querySelector('h1')?.textContent).toContain('1\u20130');
 
     buttonByText(native, 'Statistics')!.click();
@@ -376,6 +382,121 @@ describe('MatchViewer', () => {
 
     expect(native.textContent).toContain('Player Performance');
     expect(native.textContent).toContain('A Scorer');
+  });
+
+  describe('the result is kept back until it has been seen', () => {
+    it('names the sides but not the score or the scorers before anything has been watched', async () => {
+      const native = await load();
+
+      expect(native.querySelector('h1')?.textContent).toContain('versus');
+      expect(native.querySelector('h1')?.textContent).not.toContain('1\u20130');
+      expect(native.textContent, "the scorers' line waits for the result").not.toContain(
+        "A Scorer 8'",
+      );
+      expect(native.querySelector('#mv-reveal'), 'a manager can ask for it').not.toBeNull();
+    });
+
+    it('shows no goals on the scoreboard until the film reaches them, and the final score once it has', async () => {
+      const native = await load();
+      const board = () =>
+        [...native.querySelectorAll('header span.font-mono.text-4xl')].map((node) =>
+          node.textContent?.trim(),
+        );
+
+      expect(board(), 'nothing has been scored before the film starts').toEqual(['0', '0']);
+
+      buttonByText(native, 'Skip all')!.click();
+      await fixture.whenStable();
+
+      expect(board(), 'the whole match has been watched').toEqual(['1', '0']);
+    });
+
+    it('draws no goal marker on the scrubber, so the film does not announce where a goal comes', async () => {
+      const native = await load();
+
+      const goalMarkers = [...native.querySelectorAll('button[aria-label^="Seek to"]')].filter(
+        (marker) => marker.classList.contains('bg-emerald-400'),
+      );
+
+      expect(goalMarkers).toHaveLength(0);
+
+      buttonByText(native, 'Show result')!.click();
+      await fixture.whenStable();
+
+      expect(
+        [...native.querySelectorAll('button[aria-label^="Seek to"]')].some((marker) =>
+          marker.classList.contains('bg-emerald-400'),
+        ),
+        'the goal markers come back with the result',
+      ).toBe(true);
+    });
+
+    it('holds the report, statistics and players tabs back behind a prompt', async () => {
+      const native = await load();
+
+      for (const tab of ['Report', 'Statistics', 'Players']) {
+        buttonByText(native, tab)!.click();
+        await fixture.whenStable();
+
+        expect(native.querySelector('#panel-hidden'), `${tab} waits for the result`).not.toBeNull();
+        expect(native.textContent).not.toContain('Match Statistics');
+        expect(native.textContent).not.toContain('Player Performance');
+      }
+    });
+
+    it('shows everything once the result is asked for, and remembers that it was', async () => {
+      const native = await load();
+
+      buttonByText(native, 'Statistics')!.click();
+      await fixture.whenStable();
+      buttonByText(native, 'Show result')!.click();
+      await fixture.whenStable();
+
+      expect(native.querySelector('#panel-hidden')).toBeNull();
+      expect(native.textContent).toContain('Match Statistics');
+      expect(JSON.parse(localStorage.getItem(RESULT_REVEAL_STORAGE_KEY) ?? '[]')).toContain('m1');
+    });
+
+    it('shows the result once the match is skipped to its end', async () => {
+      const native = await load();
+
+      buttonByText(native, 'Skip all')!.click();
+      await fixture.whenStable();
+
+      expect(native.querySelector('h1')?.textContent).toContain('1\u20130');
+      expect(native.querySelector('#mv-reveal')).toBeNull();
+    });
+
+    it('does not show the result for a replay that has only been started', async () => {
+      const native = await load();
+
+      (native.querySelector('button[aria-label="Play replay"]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+
+      expect(native.querySelector('h1')?.textContent).not.toContain('1\u20130');
+      expect(native.querySelector('#mv-reveal')).not.toBeNull();
+    });
+
+    it('opens already revealed when the result was shown elsewhere, such as the inbox', async () => {
+      localStorage.setItem(RESULT_REVEAL_STORAGE_KEY, JSON.stringify(['m1']));
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [MatchViewer],
+        providers: [
+          { provide: MatchStore, useValue: store },
+          {
+            provide: ActivatedRoute,
+            useValue: { snapshot: { paramMap: new Map([['matchId', 'm1']]) } },
+          },
+        ],
+      }).compileComponents();
+      fixture = TestBed.createComponent(MatchViewer);
+
+      const native = await load();
+
+      expect(native.querySelector('h1')?.textContent).toContain('1\u20130');
+      expect(native.querySelector('#mv-reveal')).toBeNull();
+    });
   });
 
   it('offers the full match by default and switches to the highlights reel on request', async () => {
@@ -585,6 +706,9 @@ describe('MatchViewer: one continuous film', () => {
   let nextFrame: number;
 
   beforeEach(async () => {
+    localStorage.clear();
+    // These tests are about the film, not the spoiler gate, so the result is already seen.
+    localStorage.setItem(RESULT_REVEAL_STORAGE_KEY, JSON.stringify(['m1']));
     frames = new Map();
     nextFrame = 1;
 

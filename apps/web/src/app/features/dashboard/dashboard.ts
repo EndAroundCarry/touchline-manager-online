@@ -8,6 +8,7 @@ import {
   venueLabel,
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { ResultGate } from '../../core/match/result-gate';
 import { FinanceStore } from '../../core/finance/finance-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
 import { SquadStore } from '../../core/squad/squad-store';
@@ -37,6 +38,7 @@ import {
   statLeaders,
   tableWindow,
 } from './dashboard-presentation';
+import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
 /**
  * The club dashboard (master plan §11.1).
@@ -56,12 +58,13 @@ import {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink],
+  imports: [RouterLink, ResultHidden],
   templateUrl: './dashboard.html',
 })
 export class Dashboard {
   private readonly store = inject(OnboardingStore);
   private readonly competition = inject(CompetitionStore);
+  private readonly gate = inject(ResultGate);
   private readonly finance = inject(FinanceStore);
   private readonly squadStore = inject(SquadStore);
   private readonly transfers = inject(TransfersStore);
@@ -99,6 +102,12 @@ export class Dashboard {
 
   /** The finance summary, for the club widget's funds and the warnings. */
   protected readonly financeSummary = this.finance.summary;
+
+  /**
+   * Whether the table, the club's record, and the division's leaders are held back: each of them would give away
+   * a result of the manager's own that they have not yet watched or asked to see.
+   */
+  protected readonly resultsHeldBack = this.gate.hiding;
 
   /** The rows of the division table around the manager's club, for the league-table widget. */
   protected readonly tableRows = computed(() =>

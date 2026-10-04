@@ -62,7 +62,14 @@
       </ul>
     }
 
-    <h2 class="mt-8 text-lg font-semibold">Results</h2>
+    <div class="mt-8 flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-lg font-semibold">Results</h2>
+      @if (hiddenCount() > 1) {
+        <button type="button" [class]="secondaryButtonClass" (click)="showAll()">
+          Show all results
+        </button>
+      }
+    </div>
     @if (results().length === 0) {
       <p class="mt-2 text-sm text-ink-2">No matches have been played yet.</p>
     } @else {
@@ -74,8 +81,19 @@
               <span class="ml-2 text-sm text-ink-2">{{ round(fixture.roundNumber) }}</span>
             </div>
             <div class="text-sm text-ink-2">
-              <span class="font-semibold">{{ score(fixture) }}</span>
-              <span class="ml-2">{{ outcome(fixture) }}</span>
+              @if (hidden(fixture)) {
+                <button
+                  type="button"
+                  [class]="linkClass"
+                  [attr.aria-label]="'Show the result of the match against ' + fixture.opponentName"
+                  (click)="show(fixture)"
+                >
+                  Show result
+                </button>
+              } @else {
+                <span class="font-semibold">{{ score(fixture) }}</span>
+                <span class="ml-2">{{ outcome(fixture) }}</span>
+              }
             </div>
             @if (fixture.matchId; as matchId) {
               <a

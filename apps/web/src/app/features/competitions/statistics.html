@@ -18,7 +18,11 @@
       </a>
     </p>
 
-    @if (competition.rows.length === 0) {
+    @if (holdsBack(competition.divisionId)) {
+      <div class="mt-6 rounded border border-line bg-panel">
+        <app-result-hidden subject="The player statistics" />
+      </div>
+    } @else if (competition.rows.length === 0) {
       <p [class]="statusMessageClass" role="status">
         No matchday has been played yet, so there are no player statistics to show.
       </p>

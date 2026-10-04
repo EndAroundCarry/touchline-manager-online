@@ -2,8 +2,10 @@ import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { goalDifferenceLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { ResultGate } from '../../core/match/result-gate';
 import { formatInstant } from '../../core/world/presentation';
 import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/control-styles';
+import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
 /**
  * The division table screen (master plan §11.1, §10.5).
@@ -19,12 +21,13 @@ import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/con
  */
 @Component({
   selector: 'app-competition-table',
-  imports: [RouterLink],
+  imports: [RouterLink, ResultHidden],
   templateUrl: './table.html',
 })
 export class CompetitionTable {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(CompetitionStore);
+  private readonly gate = inject(ResultGate);
 
   protected readonly table = this.store.divisionTable;
   protected readonly loading = this.store.tableLoading;
@@ -49,6 +52,8 @@ export class CompetitionTable {
   protected readonly statusMessageClass = STATUS_MESSAGE;
 
   constructor() {
+    this.gate.refresh();
+
     const divisionId = this.route.snapshot.paramMap.get('divisionId');
 
     if (divisionId !== null && divisionId.length > 0) {
@@ -56,6 +61,14 @@ export class CompetitionTable {
     } else {
       this.store.loadMyDivisionTable();
     }
+  }
+
+  /**
+   * Whether the table is held back because it would give the manager's latest result away. It is, for the
+   * manager's own division, until they have watched the match or asked for the result.
+   */
+  protected holdsBack(divisionId: string): boolean {
+    return this.gate.holdsBack(divisionId);
   }
 
   /** Whether a row is the manager's own club, marked in words as well as weight (§11.3). */

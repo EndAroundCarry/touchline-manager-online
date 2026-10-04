@@ -20,6 +20,11 @@ namespace TouchlineManager.Contracts.Comms;
 /// <param name="IsRead">Whether the manager has read it.</param>
 /// <param name="CreatedAt">When it was written.</param>
 /// <param name="ReadAt">When it was read, or null while unread.</param>
+/// <param name="Spoiler">
+/// What <paramref name="Title"/> and <paramref name="Body"/> hold back because it gives a match away — the
+/// score, the outcome, the table move — or null. The client shows it only when the manager asks, or has watched
+/// the match, so a result never arrives already told.
+/// </param>
 public sealed record InboxMessageResponse(
     Guid Id,
     string Category,
@@ -29,7 +34,8 @@ public sealed record InboxMessageResponse(
     Guid? RelatedEntityId,
     bool IsRead,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ReadAt);
+    DateTimeOffset? ReadAt,
+    string? Spoiler = null);
 
 /// <summary>One page of a manager's inbox (master plan §10.7).</summary>
 /// <param name="Messages">The page, newest first.</param>

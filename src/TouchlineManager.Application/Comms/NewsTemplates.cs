@@ -85,17 +85,21 @@ public static class NewsTemplates
     /// <param name="awayClubName">The visitor.</param>
     /// <param name="awayGoals">The visitor's goals.</param>
     /// <param name="divisionId">The division, which scopes the item.</param>
+    /// <param name="matchId">
+    /// The played match, so that watching it shows the result here; null for an item that is not tied to one.
+    /// </param>
     public static NewsDraft Round(
         int roundNumber,
         string homeClubName,
         int homeGoals,
         string awayClubName,
         int awayGoals,
-        Guid divisionId) =>
+        Guid divisionId,
+        Guid? matchId = null) =>
         Write(
             NewsCategory.Result,
             ResultPublished,
-            new ResultParameters(roundNumber, homeClubName, homeGoals, awayClubName, awayGoals),
+            new ResultParameters(roundNumber, homeClubName, homeGoals, awayClubName, awayGoals, matchId),
             countryId: null,
             divisionId);
 
@@ -152,7 +156,8 @@ public static class NewsTemplates
         string HomeClubName,
         int HomeGoals,
         string AwayClubName,
-        int AwayGoals);
+        int AwayGoals,
+        Guid? MatchId = null);
 
     internal sealed record AnnouncementParameters(string Title, string Body);
 }

@@ -11,6 +11,7 @@ import {
   venueLabel,
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { ResultGate } from '../../core/match/result-gate';
 import { formatDeadline, formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
@@ -39,6 +40,7 @@ import {
 })
 export class Fixtures implements OnDestroy {
   private readonly store = inject(CompetitionStore);
+  private readonly gate = inject(ResultGate);
   private readonly timer: ReturnType<typeof setInterval>;
 
   /** The clock the countdown is measured against, advanced on an interval. */
@@ -61,6 +63,11 @@ export class Fixtures implements OnDestroy {
   /** The fixtures that have published a result. */
   protected readonly results = computed(() =>
     (this.fixtures()?.fixtures ?? []).filter((fixture) => fixture.status === 'published'),
+  );
+
+  /** How many of the results listed are still held back, for the "show all" shortcut. */
+  protected readonly hiddenCount = computed(
+    () => this.results().filter((fixture) => this.gate.isHidden(fixture.matchId)).length,
   );
 
   protected readonly pageHeadingClass = PAGE_HEADING;
@@ -104,6 +111,25 @@ export class Fixtures implements OnDestroy {
   /** Formats a published scoreline. */
   protected score(fixture: ClubFixture): string {
     return scoreLabel(fixture.homeScore, fixture.awayScore);
+  }
+
+  /**
+   * Whether a result is held back until the manager has watched the match or asks for it.
+   *
+   * The scoreline and the outcome are what a match would give away, so neither is shown while this is true.
+   */
+  protected hidden(fixture: ClubFixture): boolean {
+    return this.gate.isHidden(fixture.matchId);
+  }
+
+  /** Shows one result. */
+  protected show(fixture: ClubFixture): void {
+    this.gate.reveal(fixture.matchId);
+  }
+
+  /** Shows every result that is held back. */
+  protected showAll(): void {
+    this.gate.revealAll();
   }
 
   /** Names a published result from the manager's club's point of view. */

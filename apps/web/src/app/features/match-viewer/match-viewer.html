@@ -19,7 +19,9 @@
 } @else if (match(); as result) {
   <div class="flex min-h-screen flex-col bg-[#090d16] text-slate-100">
     <!-- The page's own heading, read out by a screen reader and asserted by the end-to-end flow (§11.3). -->
-    <h1 class="sr-only">{{ result.home.name }} {{ score() }} {{ result.away.name }}</h1>
+    <h1 class="sr-only">
+      {{ result.home.name }} {{ revealed() ? score() : 'versus' }} {{ result.away.name }}
+    </h1>
 
     <!-- SCOREBOARD HEADER -->
     <header class="border-b border-slate-800 bg-[#0c1220] shadow-2xl">
@@ -55,13 +57,13 @@
                 <span
                   class="font-mono text-4xl font-black tracking-tighter"
                   [class]="homeGoalAnimation() ? 'text-emerald-400' : 'text-slate-100'"
-                  >{{ view.homeGoals }}</span
+                  >{{ homeScore() }}</span
                 >
                 <span class="mx-2 font-mono text-2xl font-light text-slate-400">-</span>
                 <span
                   class="font-mono text-4xl font-black tracking-tighter"
                   [class]="awayGoalAnimation() ? 'text-emerald-400' : 'text-slate-100'"
-                  >{{ view.awayGoals }}</span
+                  >{{ awayScore() }}</span
                 >
               </div>
               <div class="rounded border border-slate-700 bg-slate-800/60 px-3 py-1 text-center">
@@ -79,11 +81,11 @@
                 class="flex min-w-[110px] items-center justify-center rounded-lg bg-[#0f172a] px-5 py-2"
               >
                 <span class="font-mono text-4xl font-black text-slate-400">{{
-                  result.home.goals
+                  revealed() ? result.home.goals : '?'
                 }}</span>
                 <span class="mx-2 font-mono text-2xl text-slate-400">-</span>
                 <span class="font-mono text-4xl font-black text-slate-400">{{
-                  result.away.goals
+                  revealed() ? result.away.goals : '?'
                 }}</span>
               </div>
             }
@@ -105,7 +107,21 @@
           </div>
         </div>
 
-        @if (scorers().length > 0) {
+        @if (!revealed()) {
+          <p class="mt-1 text-center text-xs text-slate-400">
+            The result stays hidden until you have seen the match.
+            <button
+              id="mv-reveal"
+              type="button"
+              class="ml-1 rounded border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-xs text-slate-300 transition hover:border-slate-600 hover:bg-slate-700/60"
+              (click)="revealResult()"
+            >
+              Show result
+            </button>
+          </p>
+        }
+
+        @if (revealed() && scorers().length > 0) {
           <p class="mt-1 text-center text-xs text-slate-400">
             @for (scorer of scorers(); track scorer) {
               <span class="mx-2">{{ scorer }}</span>
@@ -376,7 +392,7 @@
                           }
                         </div>
                       }
-                      @if (teamGoalScorers(lineup.starters).length > 0) {
+                      @if (revealed() && teamGoalScorers(lineup.starters).length > 0) {
                         <div class="mt-3 border-t border-slate-800 pt-2">
                           @for (entry of teamGoalScorers(lineup.starters); track entry) {
                             <p class="text-[10px] text-emerald-500">Goal: {{ entry }}</p>
@@ -593,7 +609,7 @@
                           }
                         </div>
                       }
-                      @if (teamGoalScorers(lineup.starters).length > 0) {
+                      @if (revealed() && teamGoalScorers(lineup.starters).length > 0) {
                         <div class="mt-3 border-t border-slate-800 pt-2">
                           @for (entry of teamGoalScorers(lineup.starters); track entry) {
                             <p class="text-right text-[10px] text-emerald-500">{{ entry }} Goal</p>
@@ -653,7 +669,7 @@
             <div class="flex flex-1 items-center justify-center">
               <div class="text-center">
                 <p class="mb-2 text-2xl font-bold text-slate-400">
-                  {{ result.home.goals }}-{{ result.away.goals }}
+                  {{ revealed() ? result.home.goals + '-' + result.away.goals : '? - ?' }}
                 </p>
                 <p class="text-sm text-slate-400">Loading presentation...</p>
               </div>
@@ -662,8 +678,32 @@
         </div>
       }
 
+      <!-- The post-match tabs list the goals, the scorers and the final figures, so they wait for the result. -->
+      @if (activeTab() !== 'replay' && !revealed()) {
+        <div
+          id="panel-hidden"
+          role="tabpanel"
+          [attr.aria-labelledby]="'tab-' + activeTab()"
+          class="flex flex-1 items-center justify-center px-6"
+        >
+          <div class="max-w-md text-center">
+            <p class="text-sm text-slate-300">
+              This section would give the result away. Watch the match, skip to the end, or show the
+              result.
+            </p>
+            <button
+              type="button"
+              class="mt-3 rounded border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-sm text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/60"
+              (click)="revealResult()"
+            >
+              Show result
+            </button>
+          </div>
+        </div>
+      }
+
       <!-- TAB: Full Match Report -->
-      @if (activeTab() === 'report') {
+      @if (activeTab() === 'report' && revealed()) {
         <div
           id="panel-report"
           role="tabpanel"
@@ -713,7 +753,7 @@
       }
 
       <!-- TAB: Match Statistics -->
-      @if (activeTab() === 'stats') {
+      @if (activeTab() === 'stats' && revealed()) {
         <div
           id="panel-stats"
           role="tabpanel"
@@ -831,7 +871,7 @@
       }
 
       <!-- TAB: Player Performance -->
-      @if (activeTab() === 'players') {
+      @if (activeTab() === 'players' && revealed()) {
         <div
           id="panel-players"
           role="tabpanel"

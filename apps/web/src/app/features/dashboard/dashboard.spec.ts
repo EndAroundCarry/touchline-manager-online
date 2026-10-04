@@ -6,6 +6,7 @@ import { ClubFixture, MyFixtures } from '../../core/competition/competition.mode
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { FinanceStore } from '../../core/finance/finance-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
+import { ResultRevealStore } from '../../core/match/result-reveal-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { TransfersStore } from '../../core/transfers/transfers-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
@@ -104,6 +105,18 @@ const NEXT_FIXTURE: ClubFixture = {
   outcome: null,
 };
 
+/** A match the manager's club has played, whose result they have not yet seen. */
+const PLAYED_FIXTURE: ClubFixture = {
+  ...NEXT_FIXTURE,
+  id: 'fixture-0',
+  roundNumber: 1,
+  status: 'published',
+  homeScore: 2,
+  awayScore: 1,
+  matchId: 'match-0',
+  outcome: 'win',
+};
+
 const FIXTURES: MyFixtures = {
   clubId: 'club-1',
   clubName: 'Ashfield Rovers',
@@ -123,6 +136,7 @@ describe('Dashboard', () => {
   let fixtures: WritableSignal<MyFixtures | null>;
 
   beforeEach(async () => {
+    localStorage.clear();
     fixtures = signal<MyFixtures | null>(FIXTURES);
 
     await TestBed.configureTestingModule({
@@ -142,6 +156,8 @@ describe('Dashboard', () => {
           provide: CompetitionStore,
           useValue: {
             fixtures,
+            fixturesLoading: signal(false),
+            fixturesError: signal(null),
             loadFixtures: vi.fn(),
             divisionTable: signal(null),
             loadMyDivisionTable: vi.fn(),
@@ -232,6 +248,50 @@ describe('Dashboard', () => {
 
     expect(element.textContent).toContain('Barrow Town');
     expect(element.textContent).toContain('Calendar');
+  });
+
+  describe("while a result of the manager's own is unseen", () => {
+    function notices(element: HTMLElement): number {
+      return element.querySelectorAll('[data-testid="result-hidden"]').length;
+    }
+
+    it('holds the table, the club record and the leaders back, which would each give the result away', async () => {
+      fixtures.set({ ...FIXTURES, fixtures: [PLAYED_FIXTURE, NEXT_FIXTURE] });
+
+      const element = await render();
+
+      expect(notices(element)).toBe(3);
+      expect(element.textContent).toContain('would give away the result of your latest match');
+      expect(element.textContent).not.toContain('Won \u00b7 drawn \u00b7 lost');
+    });
+
+    it('shows them once the result has been asked for', async () => {
+      fixtures.set({ ...FIXTURES, fixtures: [PLAYED_FIXTURE, NEXT_FIXTURE] });
+
+      const element = await render();
+
+      [...element.querySelectorAll('button')]
+        .find((button) => button.textContent?.trim() === 'Show result')!
+        .click();
+      await fixture.whenStable();
+
+      expect(notices(element)).toBe(0);
+    });
+
+    it('shows them to a manager whose results have all been seen', async () => {
+      TestBed.inject(ResultRevealStore).reveal('match-0');
+      fixtures.set({ ...FIXTURES, fixtures: [PLAYED_FIXTURE, NEXT_FIXTURE] });
+
+      const element = await render();
+
+      expect(notices(element)).toBe(0);
+    });
+
+    it('is not in the way of a manager with nothing played', async () => {
+      const element = await render();
+
+      expect(notices(element)).toBe(0);
+    });
   });
 
   it('hides the guidance on dismissal and moves focus off the removed control', async () => {

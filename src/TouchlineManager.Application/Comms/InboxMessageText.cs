@@ -9,7 +9,12 @@ namespace TouchlineManager.Application.Comms;
 /// <summary>The English a stored message renders to: a headline and a sentence (`MAT-8`, master plan §8.6).</summary>
 /// <param name="Title">The headline.</param>
 /// <param name="Body">The detail.</param>
-public sealed record InboxText(string Title, string Body);
+/// <param name="Spoiler">
+/// What the headline and detail leave out because it would give a match away — the score, who won, where the
+/// table moved — or null when the message holds nothing a manager has yet to watch. A client keeps it hidden
+/// until the manager asks for it, or has watched the match.
+/// </param>
+public sealed record InboxText(string Title, string Body, string? Spoiler = null);
 
 /// <summary>
 /// Renders a stored inbox message's template and parameters into English (master plan §8.6, F-41).
@@ -96,9 +101,9 @@ public static class InboxMessageText
     {
         var verb = parameters.Outcome switch
         {
-            InboxTemplates.WinOutcome => "won",
-            InboxTemplates.LossOutcome => "lost",
-            _ => "drew",
+            InboxTemplates.WinOutcome => "Won",
+            InboxTemplates.LossOutcome => "Lost",
+            _ => "Drew",
         };
 
         var venue = parameters.IsHome
@@ -107,21 +112,26 @@ public static class InboxMessageText
 
         var score = string.Create(
             CultureInfo.InvariantCulture,
-            $"{parameters.GoalsFor}\u2013{parameters.GoalsAgainst}");
+            $"{parameters.GoalsFor}–{parameters.GoalsAgainst}");
 
+        // The score, the outcome, and the table position all give the match away, so none of them is in the
+        // headline or the detail: a manager watches the game first, or asks for the result.
         return new InboxText(
-            $"Round {parameters.RoundNumber}: {verb} {score}",
-            $"{venue}. You are {Ordinal(parameters.Position)} in the table after round {parameters.RoundNumber}.");
+            $"Round {parameters.RoundNumber}: {venue}",
+            "The result is in. Watch the match, or show the result.",
+            $"{verb} {score}. You are {Ordinal(parameters.Position)} in the table after round {parameters.RoundNumber}.");
     }
 
     private static InboxText Table(InboxTemplates.TableParameters parameters)
     {
         var direction = parameters.Position < parameters.PreviousPosition ? "up" : "down";
 
+        // Which way the table moved is the result in another form, so it is held back as well.
         return new InboxText(
-            $"You are {Ordinal(parameters.Position)}",
-            $"After round {parameters.RoundNumber} you moved {direction} to {Ordinal(parameters.Position)} "
-            + $"from {Ordinal(parameters.PreviousPosition)}.");
+            $"Round {parameters.RoundNumber}: your league position has changed",
+            "Watch your match, or show the result.",
+            $"You are {Ordinal(parameters.Position)}. After round {parameters.RoundNumber} you moved {direction} to "
+            + $"{Ordinal(parameters.Position)} from {Ordinal(parameters.PreviousPosition)}.");
     }
 
     private static InboxText Suspension(InboxTemplates.SuspensionParameters parameters)

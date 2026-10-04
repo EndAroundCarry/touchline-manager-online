@@ -332,7 +332,8 @@ public sealed class MatchdayNotifications
             fixture.HomeGoals,
             awayName,
             fixture.AwayGoals,
-            divisionId);
+            divisionId,
+            fixture.MatchId);
 
         _news.Add(NewsItem.Publish(
             Guid.CreateVersion7(),

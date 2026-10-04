@@ -12,6 +12,14 @@
       What is happening across the game: new tiers, completed transfers, and published results.
     </p>
 
+    @if (hiddenCount() > 1) {
+      <div class="mt-4">
+        <button type="button" [class]="secondaryButtonClass" (click)="showAll()">
+          Show all results
+        </button>
+      </div>
+    }
+
     @if (items().length === 0) {
       <p class="mt-6 text-sm text-ink-2" role="status">
         No news yet. New tiers, completed transfers, and published results arrive here as the world
@@ -35,6 +43,22 @@
               </div>
 
               <p class="mt-1 text-sm text-ink-2">{{ item.body }}</p>
+
+              @if (item.spoiler; as spoiler) {
+                @if (hidden(item)) {
+                  <button
+                    type="button"
+                    [class]="linkClass"
+                    class="mt-1"
+                    [attr.aria-label]="'Show the result: ' + item.title"
+                    (click)="show(item)"
+                  >
+                    Show result
+                  </button>
+                } @else {
+                  <p class="mt-1 text-sm font-semibold text-ink">{{ spoiler }}</p>
+                }
+              }
             </article>
           </li>
         }

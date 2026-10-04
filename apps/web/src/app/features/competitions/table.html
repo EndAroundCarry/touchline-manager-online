@@ -10,7 +10,11 @@
       {{ competition.seasonLabel }}
     </p>
 
-    @if (competition.rows.length === 0) {
+    @if (holdsBack(competition.divisionId)) {
+      <div class="mt-6 rounded border border-line bg-panel">
+        <app-result-hidden subject="The league table" />
+      </div>
+    } @else if (competition.rows.length === 0) {
       <p [class]="statusMessageClass" role="status">This division has no clubs in its table yet.</p>
     } @else {
       @if (!hasPlayedAny()) {

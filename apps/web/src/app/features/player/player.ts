@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, input, signal } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
 import { averageRatingLabel } from '../../core/competition/competition-presentation';
+import { ResultGate } from '../../core/match/result-gate';
 import {
   attributeGroups,
   availabilityLabel,
@@ -25,6 +26,7 @@ import {
   SECONDARY_BUTTON,
   SELECT_INPUT,
 } from '../../shared/forms/control-styles';
+import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
 /** The profile's tabs. */
 export type PlayerTab = 'attributes' | 'training' | 'statistics' | 'contract';
@@ -47,7 +49,7 @@ const CURRENT_SEASON = 'current';
  */
 @Component({
   selector: 'app-player',
-  imports: [RouterLink, AttributeValue, PlayerTraining],
+  imports: [RouterLink, AttributeValue, PlayerTraining, ResultHidden],
   templateUrl: './player.html',
 })
 export class PlayerProfile implements OnInit {
@@ -55,8 +57,15 @@ export class PlayerProfile implements OnInit {
   readonly id = input.required<string>();
 
   private readonly store = inject(SquadStore);
+  private readonly gate = inject(ResultGate);
 
   protected readonly player = this.store.player;
+
+  /**
+   * Whether the statistics are held back. A player's season and match figures count the goals and results of
+   * every match they played, so while a result of the manager's own is unseen they could give it away.
+   */
+  protected readonly resultsHeldBack = this.gate.hiding;
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
 
@@ -180,6 +189,8 @@ export class PlayerProfile implements OnInit {
   /** Reads the profile for the player the route names. */
   ngOnInit(): void {
     const playerId = this.id();
+
+    this.gate.refresh();
 
     this.loading.set(true);
     this.loadError.set(null);

@@ -347,6 +347,31 @@ export class FilmTimeline {
     return null;
   }
 
+  /**
+   * The score at a film moment: the goals struck at or before it, home and away.
+   *
+   * This is what a scoreboard shows while the film plays, so the match is watched rather than read off a
+   * final tally shown from the first second. A goal that names no side is counted for neither.
+   */
+  scoreAt(filmMilliseconds: number): { readonly home: number; readonly away: number } {
+    let home = 0;
+    let away = 0;
+
+    for (const goal of this.goals) {
+      if (goal.filmMilliseconds > filmMilliseconds) {
+        break;
+      }
+
+      if (goal.side === 'home') {
+        home += 1;
+      } else if (goal.side === 'away') {
+        away += 1;
+      }
+    }
+
+    return { home, away };
+  }
+
   /** How far into a goal's celebration a film moment is, or -1 when none is being celebrated. */
   celebrationAt(filmMilliseconds: number): number {
     const goal = this.activeGoalAt(filmMilliseconds);

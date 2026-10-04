@@ -1,4 +1,5 @@
-import { categoryLabel, messageLink } from './inbox-presentation';
+import { messageRevealKey } from '../match/result-reveal-store';
+import { categoryLabel, linkLabel, messageLink, revealKeyFor } from './inbox-presentation';
 
 /**
  * The inbox's presentation helpers (`F-41`, `§11.1`).
@@ -30,5 +31,22 @@ describe('inbox presentation', () => {
     expect(messageLink('table', 'anything')).toBeNull();
     expect(messageLink('result', null)).toBeNull();
     expect(messageLink('future', 'id')).toBeNull();
+  });
+
+  it('remembers a result under its match and anything else under the message', () => {
+    expect(revealKeyFor({ id: 'm1', category: 'result', relatedEntityId: 'match-1' })).toBe(
+      'match-1',
+    );
+    expect(revealKeyFor({ id: 'm2', category: 'table', relatedEntityId: null })).toBe(
+      messageRevealKey('m2'),
+    );
+    expect(revealKeyFor({ id: 'm3', category: 'result', relatedEntityId: null })).toBe(
+      messageRevealKey('m3'),
+    );
+  });
+
+  it('words the link to a match as watching it', () => {
+    expect(linkLabel('result')).toBe('Watch the match');
+    expect(linkLabel('injury')).toBe('View');
   });
 });

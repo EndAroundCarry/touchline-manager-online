@@ -63,7 +63,7 @@ public sealed class InboxPersistenceTests
             .ToList();
 
         texts.Should().Contain(
-            text => text.Body.Contains(opponent, StringComparison.Ordinal),
+            text => text.Title.Contains(opponent, StringComparison.Ordinal),
             "the result names the opponent");
     }
 

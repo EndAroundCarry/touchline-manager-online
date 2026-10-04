@@ -58,6 +58,38 @@ Restyles the whole web client as a management-sim workspace. Recorded in
 - **Training heat-map tints and chart colours** were retuned for a dark panel; their specs were updated.
 - **The Transfers entry** in the rail uses a PrimeIcons glyph that exists (`pi-arrow-right-arrow-left`).
 
+## Results are a surprise — spoiler protection in the inbox and the match viewer
+
+A result no longer arrives already told. The match viewer and the inbox keep the score, the outcome and the table
+move back until the manager has watched the match, skipped to its end, or asked to see the result.
+
+### Changed
+
+- **Inbox.** A result message names the round and the opponent and says the result is in; the score, who won and
+  the table position are the message's `spoiler`, a new field on `InboxMessageResponse`, shown on **Show result**.
+  A table-move message no longer says which way the table moved. The link into a result reads "Watch the match".
+- **Match viewer.** The scoreboard now counts goals as the film reaches them (it showed the final score from the
+  first second). The scorers, the goal markers on the scrubber, the lineup goal lists and the report, statistics
+  and players tabs wait for the result; a **Show result** button is on the scoreboard. Finishing the replay or
+  skipping to its end reveals it.
+- **One memory for both.** A result is remembered under its match, in this browser's local storage, so showing it
+  in the inbox shows it in the viewer and watching the match shows it in the inbox. It is a viewing preference
+  and is not stored on the server, so it does not follow a manager to another device.
+- **Fixtures.** Each played match lists the opponent and offers **Show result**; the scoreline and the outcome appear
+  on request. **Show all results** clears a backlog. The way to watch the match stays beside it.
+- **News.** A result item names the round and the two sides; the score is the item's `spoiler`, shown on request. An
+  item that names its match (`matchId`, new on `NewsItemResponse`) is shown once that match has been watched. Only the
+  manager's own matches are protected: another club's result is shown as before. An item stored before the match was
+  recorded on it cannot be told from the manager's own, so it waits for **Show result**.
+- **League table, player statistics, club record and leaders.** These count every match, the manager's own included,
+  so for the manager's own division they are replaced by a notice with **Watch the match** and **Show result** while
+  any of the manager's own results is unseen. Another division's table is never held back. A player's statistics tab is
+  held back in the same way.
+- **One gate.** `ResultGate` decides from the manager's own fixture list and hides until that list has been read, so a
+  result is never shown first and hidden after.
+- **Still showing results:** the discipline page (cards and suspensions), and the aggregates of other divisions'
+  players that happen to include a match against the manager's club.
+
 ## Engine-v8 — the pass focus (engine layer)
 
 Adds a team instruction that steers where the ball goes: the centre alone, the centre and the left or right

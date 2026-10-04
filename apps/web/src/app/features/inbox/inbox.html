@@ -70,9 +70,19 @@
 
               <p class="mt-1 text-sm text-ink-2">{{ message.body }}</p>
 
+              @if (message.spoiler; as spoiler) {
+                @if (isRevealed(message)) {
+                  <p class="mt-1 text-sm font-semibold text-ink">{{ spoiler }}</p>
+                } @else {
+                  <button type="button" [class]="linkClass" class="mt-1" (click)="reveal(message)">
+                    Show result
+                  </button>
+                }
+              }
+
               <div class="mt-2 flex flex-wrap items-center gap-3">
                 @if (link(message.category, message.relatedEntityId); as target) {
-                  <a [routerLink]="target" [class]="linkClass">View</a>
+                  <a [routerLink]="target" [class]="linkClass">{{ linkText(message.category) }}</a>
                 }
 
                 @if (!message.isRead) {

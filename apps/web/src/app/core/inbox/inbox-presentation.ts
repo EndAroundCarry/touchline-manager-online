@@ -1,3 +1,5 @@
+import { messageRevealKey } from '../match/result-reveal-store';
+
 /**
  * Client-side presentation helpers for the inbox (`F-41`, master plan §11.1).
  *
@@ -48,4 +50,26 @@ export function messageLink(category: string, relatedEntityId: string | null): s
     default:
       return null;
   }
+}
+
+/**
+ * What a message's hidden result is remembered under.
+ *
+ * A result is remembered under its match, which is what the viewer reads too, so showing it here shows it
+ * there and watching the match shows it here. A message that names no match, a table move, is remembered
+ * under its own id.
+ */
+export function revealKeyFor(message: {
+  readonly id: string;
+  readonly category: string;
+  readonly relatedEntityId: string | null;
+}): string {
+  return message.category === 'result' && message.relatedEntityId !== null
+    ? message.relatedEntityId
+    : messageRevealKey(message.id);
+}
+
+/** The words of the link into a message's entity: a result is watched, anything else is viewed. */
+export function linkLabel(category: string): string {
+  return category === 'result' ? 'Watch the match' : 'View';
 }

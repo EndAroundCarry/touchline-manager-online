@@ -49,6 +49,7 @@ public static class InboxMapping
             row.RelatedEntityId,
             row.ReadAt is not null,
             row.CreatedAt,
-            row.ReadAt);
+            row.ReadAt,
+            text.Spoiler);
     }
 }

@@ -24,6 +24,7 @@ function message(overrides: Partial<InboxMessage> = {}): InboxMessage {
     isRead: false,
     createdAt: '2026-10-06T19:00:00Z',
     readAt: null,
+    spoiler: null,
     ...overrides,
   };
 }

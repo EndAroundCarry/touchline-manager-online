@@ -119,10 +119,17 @@ test.describe('the matchday', () => {
 
     const played = await waitForFixturePublished(request, token, fixtureId);
 
-    // The result is on the fixtures screen, with the score and a link to the replay.
+    // The result is on the fixtures screen, held back: a manager watches the match before being told how it
+    // went, so the screen offers the result rather than showing it, beside a link to the replay.
+    const scoreline = `${played.homeScore}\u2013${played.awayScore}`;
+
     await page.goto('/fixtures');
 
     await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Show the result of the match against/ }).first(),
+    ).toBeVisible();
+    await expect(page.getByText(scoreline)).toHaveCount(0);
 
     const watch = page.getByRole('link', { name: /Watch the highlights of the match against/ }).first();
 
@@ -131,8 +138,11 @@ test.describe('the matchday', () => {
 
     await expect(page).toHaveURL(new RegExp(`/matches/${played.matchId}$`));
 
-    // The match center shows the scoreline the server published, not something the client inferred.
-    const scoreline = `${played.homeScore}\u2013${played.awayScore}`;
+    // The match center keeps the result back until it is asked for, then shows the scoreline the server
+    // published, not something the client inferred.
+    await expect(page.getByRole('heading', { level: 1 })).not.toContainText(scoreline);
+
+    await page.locator('#mv-reveal').click();
 
     await expect(page.getByRole('heading', { level: 1 })).toContainText(scoreline);
 

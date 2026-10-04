@@ -14,6 +14,14 @@ namespace TouchlineManager.Contracts.Comms;
 /// <param name="Title">The rendered headline.</param>
 /// <param name="Body">The rendered detail.</param>
 /// <param name="PublishedAt">When it was published.</param>
+/// <param name="Spoiler">
+/// What <paramref name="Title"/> and <paramref name="Body"/> hold back because it gives a match away — the score —
+/// or null. The client shows it only when the manager asks, or has watched the match.
+/// </param>
+/// <param name="MatchId">
+/// The match a result item reports, or null. A client remembers a shown result under it, so watching the match
+/// shows the result here and showing it here shows it in the match viewer.
+/// </param>
 public sealed record NewsItemResponse(
     Guid Id,
     string Category,
@@ -21,7 +29,9 @@ public sealed record NewsItemResponse(
     Guid? DivisionId,
     string Title,
     string Body,
-    DateTimeOffset PublishedAt);
+    DateTimeOffset PublishedAt,
+    string? Spoiler = null,
+    Guid? MatchId = null);
 
 /// <summary>One page of the news feed (`COM-1`).</summary>
 /// <param name="Items">The page, newest first.</param>

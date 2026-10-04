@@ -62,10 +62,16 @@ public sealed class InboxTests
 
         result.Should().NotBeEmpty("a club that played is told its result");
         result.Should().Contain(
-            message => message.Body.Contains(opponent, StringComparison.Ordinal),
+            message => message.Title.Contains(opponent, StringComparison.Ordinal),
             "the result names the opponent");
         result.Should().OnlyContain(message => message.RelatedEntityId != null, "a result links to its match");
         result.Should().OnlyContain(message => !string.IsNullOrWhiteSpace(message.Title));
+        result.Should().OnlyContain(
+            message => !string.IsNullOrWhiteSpace(message.Spoiler),
+            "the outcome is held back for the manager to ask for");
+        result.Should().OnlyContain(
+            message => !message.Title.Contains('–') && !message.Body.Contains('–'),
+            "the score is not in what the manager sees first");
 
         var before = (await client.GetFromJsonAsync<SyncResponse>("/api/v1/sync"))!;
 

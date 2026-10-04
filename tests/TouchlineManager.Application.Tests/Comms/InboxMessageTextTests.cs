@@ -13,7 +13,7 @@ public sealed class InboxMessageTextTests
     private static readonly Guid MatchId = Guid.CreateVersion7();
 
     [Fact]
-    public void A_home_win_reads_as_a_win_with_the_new_position()
+    public void A_home_win_keeps_the_score_and_position_out_of_the_message()
     {
         var draft = InboxTemplates.Result(
             roundNumber: 5,
@@ -27,12 +27,13 @@ public sealed class InboxMessageTextTests
 
         var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
 
-        text.Title.Should().Be("Round 5: won 2\u20131");
-        text.Body.Should().Be("At home to Vale Athletic. You are 3rd in the table after round 5.");
+        text.Title.Should().Be("Round 5: At home to Vale Athletic");
+        text.Body.Should().Be("The result is in. Watch the match, or show the result.");
+        text.Spoiler.Should().Be("Won 2–1. You are 3rd in the table after round 5.");
     }
 
     [Fact]
-    public void An_away_defeat_reads_as_a_defeat_and_a_cameo_position_is_ordinal()
+    public void An_away_defeat_holds_its_outcome_back_and_a_position_is_ordinal()
     {
         var draft = InboxTemplates.Result(
             roundNumber: 11,
@@ -46,21 +47,55 @@ public sealed class InboxMessageTextTests
 
         var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
 
-        text.Title.Should().Be("Round 11: lost 0\u20132");
-        text.Body.Should().Be("Away to Northfield. You are 12th in the table after round 11.");
+        text.Title.Should().Be("Round 11: Away to Northfield");
+        text.Spoiler.Should().Be("Lost 0–2. You are 12th in the table after round 11.");
+    }
+
+    [Theory]
+    [InlineData(InboxTemplates.WinOutcome, "Won")]
+    [InlineData(InboxTemplates.LossOutcome, "Lost")]
+    [InlineData(InboxTemplates.DrawOutcome, "Drew")]
+    public void Nothing_a_manager_sees_before_asking_names_the_outcome(string outcome, string verb)
+    {
+        var draft = InboxTemplates.Result(
+            roundNumber: 2,
+            opponentName: "Harbour Town",
+            isHome: true,
+            goalsFor: 1,
+            goalsAgainst: 1,
+            outcome: outcome,
+            position: 7,
+            MatchId);
+
+        var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+        var shown = $"{text.Title} {text.Body}";
+
+        shown.Should().NotContainAny("won", "lost", "drew", "1–1", "7th", "Won", "Lost", "Drew");
+        text.Spoiler.Should().StartWith(verb);
     }
 
     [Fact]
-    public void A_table_move_names_both_positions()
+    public void A_table_move_holds_back_which_way_it_went()
     {
         var rising = InboxTemplates.Table(roundNumber: 6, position: 4, previousPosition: 7);
         var falling = InboxTemplates.Table(roundNumber: 6, position: 9, previousPosition: 8);
 
-        InboxMessageText.Render(rising.TemplateKey, rising.ParametersJson).Body
-            .Should().Be("After round 6 you moved up to 4th from 7th.");
+        var shownRising = InboxMessageText.Render(rising.TemplateKey, rising.ParametersJson);
+        var shownFalling = InboxMessageText.Render(falling.TemplateKey, falling.ParametersJson);
 
-        InboxMessageText.Render(falling.TemplateKey, falling.ParametersJson).Body
-            .Should().Be("After round 6 you moved down to 9th from 8th.");
+        shownRising.Title.Should().Be(shownFalling.Title);
+        shownRising.Body.Should().Be(shownFalling.Body);
+        shownRising.Title.Should().NotContainAny("up", "down", "4th", "9th");
+        shownRising.Spoiler.Should().Be("You are 4th. After round 6 you moved up to 4th from 7th.");
+        shownFalling.Spoiler.Should().Be("You are 9th. After round 6 you moved down to 9th from 8th.");
+    }
+
+    [Fact]
+    public void A_message_with_nothing_to_give_away_has_no_spoiler()
+    {
+        var draft = InboxTemplates.Suspension("Ion Popescu", [InboxTemplates.RedCardReason], 3, Guid.CreateVersion7());
+
+        InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson).Spoiler.Should().BeNull();
     }
 
     [Fact]

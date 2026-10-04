@@ -2,8 +2,10 @@ import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { averageRatingLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { ResultGate } from '../../core/match/result-gate';
 import { formatInstant } from '../../core/world/presentation';
 import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/control-styles';
+import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
 /**
  * The division statistics screen (master plan §11.1, §10.5).
@@ -16,12 +18,13 @@ import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/con
  */
 @Component({
   selector: 'app-competition-statistics',
-  imports: [RouterLink],
+  imports: [RouterLink, ResultHidden],
   templateUrl: './statistics.html',
 })
 export class CompetitionStatistics {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(CompetitionStore);
+  private readonly gate = inject(ResultGate);
 
   protected readonly statistics = this.store.divisionStatistics;
   protected readonly loading = this.store.statisticsLoading;
@@ -41,11 +44,21 @@ export class CompetitionStatistics {
   protected readonly statusMessageClass = STATUS_MESSAGE;
 
   constructor() {
+    this.gate.refresh();
+
     const divisionId = this.route.snapshot.paramMap.get('divisionId');
 
     if (divisionId !== null && divisionId.length > 0) {
       this.store.loadDivisionStatistics(divisionId);
     }
+  }
+
+  /**
+   * Whether the statistics are held back because they would give the manager's latest result away: they count
+   * the goals of every match in the division, the manager's own included.
+   */
+  protected holdsBack(divisionId: string): boolean {
+    return this.gate.holdsBack(divisionId);
   }
 
   /** Formats a player's average rating, or a dash before they have one (`TRN-8`). */

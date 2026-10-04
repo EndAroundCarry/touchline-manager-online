@@ -37,14 +37,53 @@ public sealed class NewsMessageTextTests
     }
 
     [Fact]
-    public void A_published_round_names_both_sides_and_the_score()
+    public void A_published_round_names_both_sides_and_holds_the_score_back()
     {
-        var draft = NewsTemplates.Round(9, "Vale Athletic", 2, "Northfield", 1, Guid.CreateVersion7());
+        var matchId = Guid.CreateVersion7();
+        var draft = NewsTemplates.Round(9, "Vale Athletic", 2, "Northfield", 1, Guid.CreateVersion7(), matchId);
 
         var text = NewsMessageText.Render(draft.TemplateKey, draft.ParametersJson);
 
-        text.Title.Should().Be("Round 9: Vale Athletic 2\u20131 Northfield");
-        text.Body.Should().Be("Vale Athletic 2, Northfield 1.");
+        text.Title.Should().Be("Round 9: Vale Athletic v Northfield");
+        text.Body.Should().Be("The result is in.");
+        text.Spoiler.Should().Be("Vale Athletic 2\u20131 Northfield");
+        text.MatchId.Should().Be(matchId, "watching the match shows the result in the feed");
+    }
+
+    [Fact]
+    public void Nothing_shown_before_asking_gives_a_round_away()
+    {
+        var draft = NewsTemplates.Round(9, "Vale Athletic", 3, "Northfield", 0, Guid.CreateVersion7());
+
+        var text = NewsMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+        var shown = $"{text.Title} {text.Body}";
+
+        shown.Should().NotContain("3").And.NotContain("0").And.NotContain("\u2013");
+        text.MatchId.Should().BeNull("an item published without its match cannot be tied to one");
+    }
+
+    [Fact]
+    public void An_item_stored_before_the_match_was_recorded_still_renders_and_holds_its_score_back()
+    {
+        const string stored =
+            "{\"roundNumber\":4,\"homeClubName\":\"Vale Athletic\",\"homeGoals\":1,\"awayClubName\":\"Northfield\",\"awayGoals\":1}";
+
+        var text = NewsMessageText.Render(NewsTemplates.ResultPublished, stored);
+
+        text.Title.Should().Be("Round 4: Vale Athletic v Northfield");
+        text.Spoiler.Should().Be("Vale Athletic 1\u20131 Northfield");
+        text.MatchId.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_news_item_with_nothing_to_give_away_has_no_spoiler()
+    {
+        var draft = NewsTemplates.Transfer("Ion Popescu", 12_500_000, "Vale Athletic", "Northfield");
+
+        var text = NewsMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Spoiler.Should().BeNull();
+        text.MatchId.Should().BeNull();
     }
 
     [Fact]

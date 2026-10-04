@@ -51,12 +51,12 @@ public sealed class MatchdayNotificationsTests
         inbox.Added.Should().HaveCount(2, "the table did not move, so there is nothing else to say");
 
         var hostText = inbox.TextsFor(host);
-        hostText.Should().ContainSingle().Which.Title.Should().Be("Round 4: won 2\u20131");
-        hostText[0].Body.Should().Contain("At home to Away FC");
+        hostText.Should().ContainSingle().Which.Title.Should().Be("Round 4: At home to Away FC");
+        hostText[0].Spoiler.Should().StartWith("Won 2\u20131");
 
         var awayText = inbox.TextsFor(away);
-        awayText.Should().ContainSingle().Which.Title.Should().Be("Round 4: lost 1\u20132");
-        awayText[0].Body.Should().Contain("Away to Host FC");
+        awayText.Should().ContainSingle().Which.Title.Should().Be("Round 4: Away to Host FC");
+        awayText[0].Spoiler.Should().StartWith("Lost 1\u20132");
     }
 
     [Fact]
@@ -87,7 +87,8 @@ public sealed class MatchdayNotificationsTests
             .ToList();
 
         table.Should().ContainSingle();
-        table[0].Title.Should().Be("You are 5th");
+        table[0].Title.Should().Be("Round 9: your league position has changed");
+        table[0].Spoiler.Should().StartWith("You are 5th");
     }
 
     [Fact]
@@ -161,7 +162,7 @@ public sealed class MatchdayNotificationsTests
         inbox.Added.Should().ContainSingle()
             .Which.RecipientManagerId.Should().NotBe(Guid.Empty);
 
-        inbox.TextsFor(managed).Single().Body.Should().Contain("At home to AI FC");
+        inbox.TextsFor(managed).Single().Title.Should().Contain("At home to AI FC");
     }
 
     [Fact]

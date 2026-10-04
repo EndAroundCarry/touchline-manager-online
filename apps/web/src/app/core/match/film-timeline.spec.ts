@@ -702,6 +702,52 @@ describe('buildFilmTimeline: goals, shots and the interval', () => {
     expect(timeline.activeGoalAt(8_000)).toBeNull();
   });
 
+  it('counts the score at a film moment, so a scoreboard follows the film instead of showing the final tally', () => {
+    const timeline = buildFilmTimeline(
+      presentation(
+        [
+          passage({
+            duration: 6_000,
+            outcome: 'goal',
+            source: 5,
+            commentary: [
+              {
+                timeMilliseconds: 3_000,
+                templateKey: 'match.goal',
+                variantKey: 'v1',
+                parameters: [],
+                text: 'Goal!',
+              },
+            ],
+          }),
+        ],
+        {
+          commentary: [
+            {
+              sequence: 5,
+              minute: 8,
+              stoppageMinute: 0,
+              side: 'home',
+              templateKey: 'match.goal',
+              variantKey: 'v1',
+              parameters: [],
+              text: 'Goal.',
+            },
+          ],
+        },
+      ),
+    );
+
+    expect(timeline.scoreAt(0)).toEqual({ home: 0, away: 0 });
+    expect(timeline.scoreAt(2_999)).toEqual({ home: 0, away: 0 });
+    expect(timeline.scoreAt(3_000)).toEqual({ home: 1, away: 0 });
+    expect(timeline.scoreAt(1_000_000)).toEqual({ home: 1, away: 0 });
+  });
+
+  it('has no score for an empty film', () => {
+    expect(buildFilmTimeline(null).scoreAt(5_000)).toEqual({ home: 0, away: 0 });
+  });
+
   it('falls back to most of the way through the passage when no line narrates the goal', () => {
     const timeline = buildFilmTimeline(
       presentation([passage({ duration: 20_000, outcome: 'goal', source: 5, commentary: [] })]),

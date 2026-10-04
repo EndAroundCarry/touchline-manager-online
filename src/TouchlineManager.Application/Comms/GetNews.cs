@@ -101,6 +101,8 @@ internal static class NewsMapping
             item.DivisionId,
             text.Title,
             text.Body,
-            item.PublishedAt);
+            item.PublishedAt,
+            text.Spoiler,
+            text.MatchId);
     }
 }
