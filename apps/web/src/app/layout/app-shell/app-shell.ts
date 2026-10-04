@@ -13,6 +13,7 @@ import { SessionsStore } from '../../core/sessions/sessions-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
+import { PlayerTrainingStore } from '../../core/training/player-training-store';
 import { TrainingStore } from '../../core/training/training-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { GameClockBar } from '../game-clock-bar/game-clock-bar';
@@ -39,6 +40,7 @@ export class AppShell implements OnDestroy {
   private readonly squad = inject(SquadStore);
   private readonly tactics = inject(TacticsStore);
   private readonly training = inject(TrainingStore);
+  private readonly playerTraining = inject(PlayerTrainingStore);
   private readonly competition = inject(CompetitionStore);
   private readonly inbox = inject(InboxStore);
   private readonly news = inject(NewsStore);
@@ -140,6 +142,7 @@ export class AppShell implements OnDestroy {
       this.squad.clear();
       this.tactics.clear();
       this.training.clear();
+      this.playerTraining.clear();
       this.competition.clear();
       this.inbox.clear();
       this.news.clear();

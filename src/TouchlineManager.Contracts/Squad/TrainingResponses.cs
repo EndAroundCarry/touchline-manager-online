@@ -157,12 +157,14 @@ public sealed record PlayerTrainingAttributeChangeResponse(string Attribute, int
 
 /// <summary>What one programme did for a player across the days returned.</summary>
 /// <param name="Programme">The programme code.</param>
+/// <param name="Label">The programme's display name, so a client can name a regime it has no catalogue for.</param>
 /// <param name="Days">How many of the returned days the player trained it.</param>
 /// <param name="PointsGained">The whole points gained across those days.</param>
 /// <param name="PointsLost">The whole points lost across those days.</param>
 /// <param name="Net">Points gained less points lost.</param>
 public sealed record PlayerTrainingSummaryResponse(
     string Programme,
+    string Label,
     int Days,
     int PointsGained,
     int PointsLost,

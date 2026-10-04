@@ -1,0 +1,199 @@
+<h2 class="text-lg font-semibold text-slate-900">Training</h2>
+
+@if (loadError(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+} @else if (history(); as training) {
+  <section
+    class="mt-3 rounded border border-slate-200 bg-white p-4"
+    aria-labelledby="training-regime-heading"
+    data-testid="training-regime"
+  >
+    <h3 id="training-regime-heading" class="text-base font-semibold text-slate-900">
+      Current regime
+    </h3>
+    <p class="mt-1 text-sm text-slate-900">
+      <span class="font-medium">{{ training.regime.label }}</span>
+      @if (training.regime.isDefaultProgramme) {
+        <span class="text-slate-600"> · the default for this position</span>
+      } @else {
+        <span class="text-slate-600"> · chosen by you</span>
+      }
+      <span class="text-slate-600">
+        · {{ intensityName(training.regime.intensity) }} intensity</span
+      >
+    </p>
+    <p class="mt-1 text-sm text-slate-600">{{ training.regime.description }}</p>
+
+    @if (trainedSkills().length > 0) {
+      <ul class="mt-3 flex flex-wrap gap-2" aria-label="Skills this programme trains">
+        @for (skill of trainedSkills(); track skill.key) {
+          <li
+            class="rounded px-2 py-0.5 text-xs font-medium text-slate-900"
+            [class]="skill.tintClass"
+          >
+            {{ skill.label }}
+            <span aria-hidden="true" class="ml-1 text-[0.5rem]">{{ skill.marker }}</span>
+            <span class="sr-only">, {{ skill.weight.toLowerCase() }} focus</span>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="mt-3 text-sm text-slate-600">This programme trains no attributes.</p>
+    }
+
+    <p class="mt-3 text-sm">
+      <a routerLink="/training" [class]="linkClass">Change programmes</a>
+    </p>
+  </section>
+
+  @if (training.days.length === 0) {
+    <p class="mt-4 text-sm text-slate-600" role="status" data-testid="training-empty">
+      History builds up as daily training runs.
+    </p>
+  } @else if (chart(); as plot) {
+    <h3 class="mt-6 text-base font-semibold text-slate-900">What training has done</h3>
+    <p class="mt-1 text-sm text-slate-600">
+      One line per regime, so a change of programme shows as a new line. Daily is the net points
+      each day; cumulative is what each regime has delivered so far.
+    </p>
+
+    <div class="mt-3 flex flex-wrap items-end gap-x-4 gap-y-2" data-testid="training-controls">
+      <label class="block">
+        <span class="text-sm font-medium text-slate-700">Regime</span>
+        <select [class]="selectClass" (change)="onRegimeChange($event)">
+          @for (option of regimeOptions(); track option.value) {
+            <option [value]="option.value" [selected]="option.value === regime()">
+              {{ option.label }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="text-sm font-medium text-slate-700">Range</span>
+        <select [class]="selectClass" (change)="onRangeChange($event)">
+          @for (option of rangeOptions; track option.value) {
+            <option [value]="option.value" [selected]="option.value === range()">
+              {{ option.label }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <div role="group" aria-label="Chart values" class="flex">
+        <button
+          type="button"
+          class="min-h-11 rounded-l border px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          [class]="
+            mode() === 'daily'
+              ? 'border-slate-900 bg-slate-900 text-white'
+              : 'border-slate-300 bg-white text-slate-900'
+          "
+          [attr.aria-pressed]="mode() === 'daily'"
+          (click)="setMode('daily')"
+        >
+          Daily rate
+        </button>
+        <button
+          type="button"
+          class="-ml-px min-h-11 rounded-r border px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          [class]="
+            mode() === 'cumulative'
+              ? 'border-slate-900 bg-slate-900 text-white'
+              : 'border-slate-300 bg-white text-slate-900'
+          "
+          [attr.aria-pressed]="mode() === 'cumulative'"
+          (click)="setMode('cumulative')"
+        >
+          Cumulative
+        </button>
+      </div>
+    </div>
+
+    @if (plot.days.length === 0) {
+      <p class="mt-4 text-sm text-slate-600" role="status" data-testid="training-no-days">
+        No training days for that regime in this range.
+      </p>
+    } @else {
+      <div class="mt-3 rounded border border-slate-200 bg-white p-3" data-testid="training-chart">
+        <app-line-chart
+          [labels]="plot.labels"
+          [series]="plot.series"
+          [ariaLabel]="chartLabel()"
+          [yTitle]="yTitle()"
+        />
+      </div>
+    }
+
+    <h3 class="mt-6 text-base font-semibold text-slate-900">By regime</h3>
+    <div
+      class="mt-2 overflow-x-auto rounded border border-slate-200 bg-white"
+      tabindex="0"
+      role="group"
+      aria-label="Training results by regime"
+    >
+      <table class="min-w-full border-collapse text-sm" data-testid="training-summary">
+        <caption class="sr-only">
+          What each regime has done for this player across the recorded days.
+        </caption>
+        <thead>
+          <tr class="border-b border-slate-200 text-slate-600">
+            <th scope="col" class="px-3 py-2 text-left font-medium">Regime</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">Days</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">Points gained</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">Points lost</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of training.summary; track line.programme) {
+            <tr class="border-b border-slate-100 last:border-b-0">
+              <th scope="row" class="px-3 py-2 text-left font-medium">{{ line.label }}</th>
+              <td class="px-3 py-2 text-right tabular-nums">{{ line.days }}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{{ line.pointsGained }}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{{ line.pointsLost }}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{{ signed(line.net) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <details class="mt-4 rounded border border-slate-200 bg-white px-3">
+      <summary class="flex min-h-11 cursor-pointer items-center text-sm font-medium text-slate-900">
+        Data table of the plotted points
+      </summary>
+      <div class="overflow-x-auto pb-3" tabindex="0" role="group" aria-label="Plotted points">
+        <table class="min-w-full border-collapse text-sm" data-testid="training-points">
+          <caption class="sr-only">
+            Every point on the chart: the day, the regime, the value, and the attributes that moved.
+          </caption>
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-600">
+              <th scope="col" class="px-3 py-2 text-left font-medium">Day</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium">Regime</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">
+                {{ mode() === 'daily' ? 'Net points' : 'Net points so far' }}
+              </th>
+              <th scope="col" class="px-3 py-2 text-left font-medium">Attributes that moved</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of plot.rows; track row.day + row.programme) {
+              <tr class="border-b border-slate-100 last:border-b-0">
+                <th scope="row" class="px-3 py-1 text-left font-normal tabular-nums">
+                  {{ row.day }}
+                </th>
+                <td class="px-3 py-1">{{ row.label }}</td>
+                <td class="px-3 py-1 text-right tabular-nums">{{ row.value.toFixed(3) }}</td>
+                <td class="px-3 py-1">{{ row.changes }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </details>
+  }
+} @else if (loading()) {
+  <p class="mt-3 text-sm text-slate-600" role="status">Loading this player's training…</p>
+}

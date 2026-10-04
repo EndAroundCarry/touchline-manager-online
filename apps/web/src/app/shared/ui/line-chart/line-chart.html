@@ -1,0 +1,52 @@
+<div class="relative h-72 min-w-0 max-w-full">
+  <canvas #canvas role="img" [attr.aria-label]="ariaLabel()"></canvas>
+</div>
+
+@if (legend().length > 0) {
+  <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700" aria-label="Legend">
+    @for (entry of legend(); track entry.label) {
+      <li class="flex items-center gap-2">
+        <svg width="28" height="12" viewBox="0 0 28 12" aria-hidden="true" focusable="false">
+          <line
+            x1="0"
+            y1="6"
+            x2="28"
+            y2="6"
+            [attr.stroke]="entry.color"
+            stroke-width="2"
+            [attr.stroke-dasharray]="entry.dash || null"
+          />
+          @switch (entry.pointStyle) {
+            @case ('triangle') {
+              <polygon points="14,2 18,9 10,9" [attr.fill]="entry.color" />
+            }
+            @case ('rect') {
+              <rect x="11" y="3" width="6" height="6" [attr.fill]="entry.color" />
+            }
+            @case ('rectRot') {
+              <polygon points="14,1.5 18.5,6 14,10.5 9.5,6" [attr.fill]="entry.color" />
+            }
+            @case ('cross') {
+              <path
+                d="M14 1.5 V10.5 M9.5 6 H18.5"
+                [attr.stroke]="entry.color"
+                stroke-width="2"
+                fill="none"
+              />
+            }
+            @case ('star') {
+              <polygon
+                points="14,1 15.7,4.6 19.5,5.1 16.7,7.7 17.4,11.5 14,9.6 10.6,11.5 11.3,7.7 8.5,5.1 12.3,4.6"
+                [attr.fill]="entry.color"
+              />
+            }
+            @default {
+              <circle cx="14" cy="6" r="3.5" [attr.fill]="entry.color" />
+            }
+          }
+        </svg>
+        {{ entry.label }}
+      </li>
+    }
+  </ul>
+}

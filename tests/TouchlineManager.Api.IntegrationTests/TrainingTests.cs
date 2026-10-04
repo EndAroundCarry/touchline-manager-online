@@ -313,6 +313,7 @@ public sealed class TrainingTests : IAsyncLifetime
 
         var summary = history.Summary.Single(line => line.Programme == "winger");
 
+        summary.Label.Should().Be("Winger");
         summary.Net.Should().Be(summary.PointsGained - summary.PointsLost);
         summary.Days.Should().Be(history.Days.Count(entry => entry.Programme == "winger"));
 

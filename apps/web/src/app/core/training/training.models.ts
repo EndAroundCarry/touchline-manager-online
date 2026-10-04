@@ -109,3 +109,63 @@ export interface PlayerTrainingProgramme {
 export interface SetPlayerTrainingProgrammeRequest {
   readonly programme: string | null;
 }
+
+/** The training a player is on now: their programme, the club intensity, and what the programme trains. */
+export interface PlayerTrainingRegime {
+  readonly programme: string;
+  readonly label: string;
+  readonly description: string;
+  readonly isDefaultProgramme: boolean;
+  readonly intensity: string;
+
+  /** Heaviest first; empty for recovery. */
+  readonly attributes: readonly TrainingProgrammeAttribute[];
+}
+
+/** One attribute's change on a progression day. */
+export interface PlayerTrainingAttributeChange {
+  /** The attribute code, e.g. `finishing`. */
+  readonly attribute: string;
+
+  /** The whole-point change: positive for growth, negative for decline. */
+  readonly delta: number;
+}
+
+/** One progression day in a player's training history. */
+export interface PlayerTrainingDay {
+  /** The progression day, as an ISO date. */
+  readonly day: string;
+  readonly programme: string;
+  readonly intensity: string;
+
+  /** The net points accrued that day (development less decline), to three decimals. */
+  readonly growth: number;
+  readonly pointsGained: number;
+  readonly pointsLost: number;
+
+  /** Which attributes moved; empty on most days. */
+  readonly attributeChanges: readonly PlayerTrainingAttributeChange[];
+}
+
+/** What one programme did for a player across the days returned. */
+export interface PlayerTrainingSummary {
+  readonly programme: string;
+  readonly label: string;
+  readonly days: number;
+  readonly pointsGained: number;
+  readonly pointsLost: number;
+  readonly net: number;
+}
+
+/** A player's training regime and how it has changed them over the progression days so far (`TRN-17`). */
+export interface PlayerTraining {
+  readonly playerId: string;
+  readonly regime: PlayerTrainingRegime;
+
+  /** The recorded days, oldest first. */
+  readonly days: readonly PlayerTrainingDay[];
+
+  /** One line per programme that appears in `days`, in the order the player first trained it. */
+  readonly summary: readonly PlayerTrainingSummary[];
+  readonly serverTime: string;
+}

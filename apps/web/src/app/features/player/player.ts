@@ -15,16 +15,15 @@ import {
   stateRows,
 } from '../../core/squad/squad-presentation';
 import { SquadStore } from '../../core/squad/squad-store';
-import { sampleTrainingHistory } from '../../core/training/training-history';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
+import { PlayerTraining } from './player-training/player-training';
 import {
   FORM_ERROR,
   LINK,
   PAGE_HEADING,
   SECONDARY_BUTTON,
   SELECT_INPUT,
-  STATUS_MESSAGE,
 } from '../../shared/forms/control-styles';
 
 /** The profile's tabs. */
@@ -34,7 +33,7 @@ export type PlayerTab = 'attributes' | 'training' | 'statistics' | 'contract';
 const CURRENT_SEASON = 'current';
 
 /**
- * The player profile (master plan §11.1, F-17), in four tabs: Attributes (the default), Training report,
+ * The player profile (master plan §11.1, F-17), in four tabs: Attributes (the default), Training,
  * Statistics, and Contract.
  *
  * The attribute grid is the reason this screen exists. Each family is one row of compact tiles that fits
@@ -48,7 +47,7 @@ const CURRENT_SEASON = 'current';
  */
 @Component({
   selector: 'app-player',
-  imports: [RouterLink, AttributeValue],
+  imports: [RouterLink, AttributeValue, PlayerTraining],
   templateUrl: './player.html',
 })
 export class PlayerProfile implements OnInit {
@@ -120,7 +119,7 @@ export class PlayerProfile implements OnInit {
   /** The tabs, in the order they are shown. Attributes is the default (F-17). */
   protected readonly tabs: readonly { readonly key: PlayerTab; readonly label: string }[] = [
     { key: 'attributes', label: 'Attributes' },
-    { key: 'training', label: 'Training report' },
+    { key: 'training', label: 'Training' },
     { key: 'statistics', label: 'Statistics' },
     { key: 'contract', label: 'Contract' },
   ];
@@ -143,13 +142,6 @@ export class PlayerProfile implements OnInit {
     const seasons = player?.careerStats?.seasons ?? [];
 
     return seasons.reduce((latest, season) => Math.max(latest, season.seasonNumber), 0) + 1;
-  });
-
-  /** The sample training history, newest first. Placeholder until the training rework (see the model). */
-  protected readonly trainingHistory = computed(() => {
-    const player = this.player();
-
-    return player === null ? [] : sampleTrainingHistory(player.id, this.currentSeasonNumber());
   });
 
   /** The drop-down's choices: this season, then each earlier season the player has a line for. */
@@ -182,7 +174,6 @@ export class PlayerProfile implements OnInit {
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
-  protected readonly statusMessageClass = STATUS_MESSAGE;
   protected readonly selectClass = SELECT_INPUT;
   protected readonly linkClass = LINK;
 

@@ -106,6 +106,7 @@ public static class TrainingMapping
             .GroupBy(day => day.Programme)
             .Select(group => new PlayerTrainingSummaryResponse(
                 group.Key.ToCode(),
+                TrainingProgrammes.Of(group.Key).Label,
                 group.Count(),
                 group.Sum(day => day.PointsGained),
                 group.Sum(day => day.PointsLost),

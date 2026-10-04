@@ -1,9 +1,10 @@
-import { signal } from '@angular/core';
+import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { Player, PlayerMatchStat, PlayerSeasonStats } from '../../core/squad/squad.models';
 import { SquadStore } from '../../core/squad/squad-store';
+import { PlayerTrainingStore } from '../../core/training/player-training-store';
 import { PlayerProfile } from './player';
 
 /**
@@ -147,6 +148,12 @@ const player: Player = {
 describe('PlayerProfile', () => {
   let fixture: ComponentFixture<PlayerProfile>;
   let root: HTMLElement;
+  let trainingStore: {
+    history: WritableSignal<null>;
+    loading: WritableSignal<boolean>;
+    error: WritableSignal<null>;
+    load: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     const store = {
@@ -156,9 +163,20 @@ describe('PlayerProfile', () => {
       loadPlayerMatches: () => of(matches),
     };
 
+    trainingStore = {
+      history: signal(null),
+      loading: signal(false),
+      error: signal(null),
+      load: vi.fn(),
+    };
+
     await TestBed.configureTestingModule({
       imports: [PlayerProfile],
-      providers: [provideRouter([]), { provide: SquadStore, useValue: store }],
+      providers: [
+        provideRouter([]),
+        { provide: SquadStore, useValue: store },
+        { provide: PlayerTrainingStore, useValue: trainingStore },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(PlayerProfile);
@@ -182,7 +200,7 @@ describe('PlayerProfile', () => {
 
     expect(tabs.map((tab) => tab.textContent?.trim())).toEqual([
       'Attributes',
-      'Training report',
+      'Training',
       'Statistics',
       'Contract',
     ]);
@@ -197,11 +215,14 @@ describe('PlayerProfile', () => {
     expect(grid.querySelectorAll(':scope > section')).toHaveLength(4);
   });
 
-  it('shows the training report with its placeholder notice', async () => {
-    await openTab('Training report');
+  it('hands the Training tab to the training component, which reads the player’s history', async () => {
+    await openTab('Training');
 
-    expect(root.textContent).toContain('Sample data');
-    expect(root.querySelectorAll('#player-panel-training tbody tr').length).toBeGreaterThan(0);
+    const panel = root.querySelector('#player-panel-training')!;
+
+    expect(panel.querySelector('app-player-training')).not.toBeNull();
+    expect(panel.textContent).not.toContain('Sample data');
+    expect(trainingStore.load).toHaveBeenCalledWith('player-1');
   });
 
   it('shows the seasons as a table with the career total and the passes and dribbles', async () => {

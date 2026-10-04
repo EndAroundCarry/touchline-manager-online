@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
+  PlayerTraining,
   PlayerTrainingProgramme,
   SaveTrainingRequest,
   SetPlayerTrainingProgrammeRequest,
@@ -33,6 +34,11 @@ export class TrainingApi {
    */
   save(request: SaveTrainingRequest, etag: string | undefined): Observable<Training> {
     return this.api.put<Training, SaveTrainingRequest>('/training', request, options(etag));
+  }
+
+  /** Reads a player's regime and their most recent progression days (the server clamps `days`). */
+  playerTraining(playerId: string, days: number): Observable<PlayerTraining> {
+    return this.api.get<PlayerTraining>(`/players/${playerId}/training?days=${days}`);
   }
 
   /**
