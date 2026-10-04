@@ -152,8 +152,13 @@
           <p [class]="formErrorClass" role="alert">{{ message }}</p>
         }
 
+        <!--
+          `relative` is what keeps the cells' screen-reader text inside the scroll box: an absolutely positioned
+          `sr-only` span is clipped only by a positioned ancestor, so without it the 28 columns of read-outs
+          escape the box and make the page itself scroll sideways.
+        -->
         <div
-          class="mt-3 hidden overflow-x-auto md:block"
+          class="relative mt-3 hidden overflow-x-auto md:block"
           data-testid="training-table"
           tabindex="0"
           role="group"
