@@ -1,25 +1,24 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
 import { TrainingApi } from './training-api';
-import { Training, TrainingDraft } from './training.models';
-import {
-  focusOptions as buildFocusOptions,
-  intensityOptions as buildIntensityOptions,
-  teamFocusOptions as buildTeamFocusOptions,
-} from './training-presentation';
+import { PlayerTrainingProgramme, Training, TrainingDraft } from './training.models';
+import { intensityOptions as buildIntensityOptions, trainingRows } from './training-presentation';
 
 /**
  * The training module's view state (master plan §11.1, F-20).
  *
  * A feature-scoped store following `TacticsStore`. It holds the read response and an editable *draft* of the
  * plan, so the screen never edits a response object and "is there anything to save" is one comparison. The
- * roster's individual focuses are written straight into the read model, because each is a single value on a
- * single player rather than a document to draft.
+ * plan is the club's intensity alone; what each player trains is a programme, written straight into the read
+ * model, because each is a single value on a single player rather than a document to draft.
+ *
+ * The store holds every player's attributes, so it is cleared when the session ends (`signOut`), like the
+ * squad store.
  *
  * The concurrency contract: a revise sends the plan's `version` in `If-Match` (a first plan sends none,
  * because there is nothing to be conditional against). A `412` keeps the manager's edits, reloads the
- * server's state, and offers an explicit reapply (§11.2). A player's focus carries the same contract on its
- * own version.
+ * server's state, and offers an explicit reapply (§11.2). A player's programme override carries the same
+ * contract on its own version.
  */
 @Injectable({ providedIn: 'root' })
 export class TrainingStore {
@@ -33,8 +32,8 @@ export class TrainingStore {
   private readonly saveErrorSignal = signal<string | null>(null);
   private readonly savedMessageSignal = signal<string | null>(null);
   private readonly conflictSignal = signal(false);
-  private readonly focusErrorSignal = signal<string | null>(null);
-  private readonly savingFocusPlayerIdSignal = signal<string | null>(null);
+  private readonly programmeErrorSignal = signal<string | null>(null);
+  private readonly savingProgrammePlayerIdSignal = signal<string | null>(null);
 
   /** The training screen's read. */
   readonly training = this.trainingSignal.asReadonly();
@@ -60,26 +59,26 @@ export class TrainingStore {
   /** Whether the plan changed underneath the client, so an explicit reapply is needed (`CONC-1`). */
   readonly hasConflict = this.conflictSignal.asReadonly();
 
-  /** Why the last individual-focus write failed, announced beside the roster. */
-  readonly focusError = this.focusErrorSignal.asReadonly();
+  /** Why the last programme write failed, announced beside the roster. */
+  readonly programmeError = this.programmeErrorSignal.asReadonly();
 
-  /** The player whose focus is mid-flight, so only that row's control is disabled. */
-  readonly savingFocusPlayerId = this.savingFocusPlayerIdSignal.asReadonly();
+  /** The player whose programme is mid-flight, so only that row's control is disabled. */
+  readonly savingProgrammePlayerId = this.savingProgrammePlayerIdSignal.asReadonly();
 
-  /** The club-wide focus choices, labelled and in the server's order (`TRN-1`). */
-  readonly teamFocusOptions = computed(() =>
-    buildTeamFocusOptions(this.trainingSignal()?.teamFocusOptions ?? []),
-  );
+  /** The programme catalogue the server sent: what each programme trains and how strongly (`TRN-1`). */
+  readonly programmes = computed(() => this.trainingSignal()?.programmes ?? []);
 
   /** The intensity choices, labelled. */
   readonly intensityOptions = computed(() =>
     buildIntensityOptions(this.trainingSignal()?.intensityOptions ?? []),
   );
 
-  /** The individual-focus choices, with the team plan first (`TRN-2`). */
-  readonly focusOptions = computed(() =>
-    buildFocusOptions(this.trainingSignal()?.focusFamilyOptions ?? []),
-  );
+  /** The squad as table rows: each player's attributes, marked by what their programme trains (`TRN-4`). */
+  readonly rows = computed(() => {
+    const training = this.trainingSignal();
+
+    return training === null ? [] : trainingRows(training.players, training.programmes);
+  });
 
   /** Whether the draft differs from the plan in force, so there is something to save. */
   readonly isDirty = computed(() => {
@@ -90,7 +89,7 @@ export class TrainingStore {
       return false;
     }
 
-    return draft.teamFocus !== training.teamFocus || draft.intensity !== training.intensity;
+    return draft.intensity !== training.intensity;
   });
 
   /** Reads the club's training state and starts editing the plan. */
@@ -112,11 +111,6 @@ export class TrainingStore {
         );
       },
     });
-  }
-
-  /** Changes the club-wide focus (`TRN-1`). */
-  setTeamFocus(code: string): void {
-    this.edit((draft) => ({ ...draft, teamFocus: code }));
   }
 
   /** Changes how hard the club trains. */
@@ -176,56 +170,65 @@ export class TrainingStore {
   }
 
   /**
-   * Sets or clears one player's individual focus (`TRN-2`).
+   * Sets or clears one player's training programme (`TRN-1`, `TRN-2`).
    *
-   * A null family clears the focus and returns the player to the team plan. When a focus already exists its
-   * version is sent in `If-Match`; a stale one is refused rather than overwriting a change made elsewhere.
+   * A null programme clears the override and returns the player to the programme for their position. When an
+   * override already exists its version is sent in `If-Match`; a stale one is refused rather than
+   * overwriting a change made elsewhere.
    */
-  setPlayerFocus(playerId: string, focusFamily: string | null): void {
+  setPlayerProgramme(playerId: string, programme: string | null): void {
     const training = this.trainingSignal();
     const player = training?.players.find((candidate) => candidate.id === playerId);
 
-    if (training === null || player === undefined || this.savingFocusPlayerIdSignal() !== null) {
+    if (
+      training === null ||
+      player === undefined ||
+      this.savingProgrammePlayerIdSignal() !== null
+    ) {
       return;
     }
 
-    if (player.focusFamily === focusFamily) {
+    // Choosing what the player already trains changes nothing. Naming their default programme while they
+    // hold no override is still a change: it pins the choice rather than following the position.
+    const unchanged =
+      programme === null
+        ? player.isDefaultProgramme
+        : !player.isDefaultProgramme && player.programme === programme;
+
+    if (unchanged) {
       return;
     }
 
-    const etag =
-      player.focusFamily !== null && player.focusVersion !== null
-        ? entityTag(player.focusVersion)
-        : undefined;
+    const etag = player.focusVersion === null ? undefined : entityTag(player.focusVersion);
 
-    this.savingFocusPlayerIdSignal.set(playerId);
-    this.focusErrorSignal.set(null);
+    this.savingProgrammePlayerIdSignal.set(playerId);
+    this.programmeErrorSignal.set(null);
     this.savedMessageSignal.set(null);
 
-    this.api.setFocus(playerId, focusFamily, etag).subscribe({
-      next: (focus) => {
-        this.savingFocusPlayerIdSignal.set(null);
-        this.applyFocus(playerId, focus.focusFamily, focus.version);
+    this.api.setProgramme(playerId, programme, etag).subscribe({
+      next: (saved) => {
+        this.savingProgrammePlayerIdSignal.set(null);
+        this.applyProgramme(playerId, saved);
         this.savedMessageSignal.set(
-          focusFamily === null
-            ? `${player.fullName} now trains with the team.`
-            : `${player.fullName}'s focus was updated.`,
+          saved.isDefaultProgramme
+            ? `${player.fullName} now trains the position default.`
+            : `${player.fullName}'s programme was updated.`,
         );
       },
       error: (error: unknown) => {
-        this.savingFocusPlayerIdSignal.set(null);
+        this.savingProgrammePlayerIdSignal.set(null);
 
         if (error instanceof ApiError && error.isPreconditionFailed) {
-          this.focusErrorSignal.set(
-            'That player changed on another device. The list was refreshed — set the focus again.',
+          this.programmeErrorSignal.set(
+            'That player changed on another device. The list was refreshed — choose the programme again.',
           );
           this.reload();
 
           return;
         }
 
-        this.focusErrorSignal.set(
-          error instanceof ApiError ? error.detail : "That player's focus could not be saved.",
+        this.programmeErrorSignal.set(
+          error instanceof ApiError ? error.detail : "That player's programme could not be saved.",
         );
       },
     });
@@ -237,7 +240,7 @@ export class TrainingStore {
     this.draftSignal.set(null);
     this.loadingSignal.set(false);
     this.savingSignal.set(false);
-    this.savingFocusPlayerIdSignal.set(null);
+    this.savingProgrammePlayerIdSignal.set(null);
     this.clearMessages();
   }
 
@@ -278,7 +281,7 @@ export class TrainingStore {
     this.saveErrorSignal.set(error.detail);
   }
 
-  /** Re-reads the training state without touching the draft, for a conflict or a stale focus. */
+  /** Re-reads the training state without touching the draft, for a conflict or a stale override. */
   private reload(): void {
     this.api.get().subscribe({
       next: (training) => this.trainingSignal.set(training),
@@ -289,7 +292,7 @@ export class TrainingStore {
     });
   }
 
-  private applyFocus(playerId: string, focusFamily: string | null, version: number): void {
+  private applyProgramme(playerId: string, saved: PlayerTrainingProgramme): void {
     const training = this.trainingSignal();
 
     if (training === null) {
@@ -300,7 +303,13 @@ export class TrainingStore {
       ...training,
       players: training.players.map((player) =>
         player.id === playerId
-          ? { ...player, focusFamily, focusVersion: version === 0 ? null : version }
+          ? {
+              ...player,
+              programme: saved.programme,
+              isDefaultProgramme: saved.isDefaultProgramme,
+              defaultProgramme: saved.defaultProgramme,
+              focusVersion: saved.version === 0 ? null : saved.version,
+            }
           : player,
       ),
     });
@@ -309,14 +318,14 @@ export class TrainingStore {
   private clearMessages(): void {
     this.saveErrorSignal.set(null);
     this.savedMessageSignal.set(null);
-    this.focusErrorSignal.set(null);
+    this.programmeErrorSignal.set(null);
     this.conflictSignal.set(false);
   }
 }
 
 /** The editable draft of a read response's plan. */
 function draftOf(training: Training): TrainingDraft {
-  return { teamFocus: training.teamFocus, intensity: training.intensity };
+  return { intensity: training.intensity };
 }
 
 /** Formats a version as the strong entity tag the precondition expects (`CONC-1`). */

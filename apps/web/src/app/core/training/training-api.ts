@@ -2,9 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
-  PlayerTrainingFocus,
+  PlayerTrainingProgramme,
   SaveTrainingRequest,
-  SetPlayerTrainingFocusRequest,
+  SetPlayerTrainingProgrammeRequest,
   Training,
 } from './training.models';
 
@@ -20,7 +20,7 @@ import {
 export class TrainingApi {
   private readonly api = inject(ApiClient);
 
-  /** Reads the club's training plan, the squad it applies to, and the option lists. */
+  /** Reads the club's training plan, the programme catalogue, and the squad with its attributes. */
   get(): Observable<Training> {
     return this.api.get<Training>('/training');
   }
@@ -35,16 +35,20 @@ export class TrainingApi {
     return this.api.put<Training, SaveTrainingRequest>('/training', request, options(etag));
   }
 
-  /** Sets or clears one player's individual focus, conditional on the focus's version when one is set. */
-  setFocus(
+  /**
+   * Sets or clears one player's training programme, conditional on the override's version when one is set.
+   *
+   * A null programme clears the override, returning the player to the programme matching their position.
+   */
+  setProgramme(
     playerId: string,
-    focusFamily: string | null,
+    programme: string | null,
     etag: string | undefined,
-  ): Observable<PlayerTrainingFocus> {
-    const body: SetPlayerTrainingFocusRequest = { focusFamily };
+  ): Observable<PlayerTrainingProgramme> {
+    const body: SetPlayerTrainingProgrammeRequest = { programme };
 
-    return this.api.put<PlayerTrainingFocus, SetPlayerTrainingFocusRequest>(
-      `/players/${playerId}/training-focus`,
+    return this.api.put<PlayerTrainingProgramme, SetPlayerTrainingProgrammeRequest>(
+      `/players/${playerId}/training-programme`,
       body,
       options(etag),
     );

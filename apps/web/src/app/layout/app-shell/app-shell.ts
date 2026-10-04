@@ -13,6 +13,7 @@ import { SessionsStore } from '../../core/sessions/sessions-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
+import { TrainingStore } from '../../core/training/training-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { GameClockBar } from '../game-clock-bar/game-clock-bar';
 import { SystemNotices } from '../system-notices/system-notices';
@@ -37,6 +38,7 @@ export class AppShell implements OnDestroy {
   private readonly onboarding = inject(OnboardingStore);
   private readonly squad = inject(SquadStore);
   private readonly tactics = inject(TacticsStore);
+  private readonly training = inject(TrainingStore);
   private readonly competition = inject(CompetitionStore);
   private readonly inbox = inject(InboxStore);
   private readonly news = inject(NewsStore);
@@ -132,11 +134,12 @@ export class AppShell implements OnDestroy {
   protected signOut(): void {
     this.session.logout().subscribe(() => {
       // The onboarding and squad stores are dropped too, so a shared device does not keep the previous
-      // manager's club, players, plan, fixtures, or last match on screen for whoever signs in next. The
+      // manager's club, players, attributes, plan, fixtures, or last match on screen for whoever signs in next. The
       // sync count is dropped for the same reason: the badge must not outlive the session that produced it.
       this.onboarding.clear();
       this.squad.clear();
       this.tactics.clear();
+      this.training.clear();
       this.competition.clear();
       this.inbox.clear();
       this.news.clear();

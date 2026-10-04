@@ -1,4 +1,28 @@
-import { focusFamilyLabel, intensityLabel, teamFocusLabel } from './training-presentation';
+import { intensityLabel } from './training-presentation';
+
+// The club-wide focus and the attribute-family focus no longer exist (training-v2 replaced them with
+// programmes), so the placeholder carries its own words for them. It is removed with the Training tab rework.
+const TEAM_FOCUS_LABELS: Record<string, string> = {
+  balanced: 'Balanced',
+  recovery: 'Recovery',
+  fitness: 'Fitness',
+  technical: 'Technical',
+  tactical: 'Tactical',
+};
+
+const FOCUS_FAMILY_LABELS: Record<string, string> = {
+  technical: 'Technical',
+  mental: 'Mental',
+  physical: 'Physical',
+};
+
+function teamFocusLabel(code: string): string {
+  return TEAM_FOCUS_LABELS[code] ?? code;
+}
+
+function focusFamilyLabel(code: string): string {
+  return FOCUS_FAMILY_LABELS[code] ?? code;
+}
 
 /**
  * One session in a player's training history.
