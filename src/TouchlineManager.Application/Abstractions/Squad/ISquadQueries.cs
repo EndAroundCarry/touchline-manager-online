@@ -181,7 +181,7 @@ public sealed record SquadPlayerMatchSource(
 /// <param name="State">The player's state.</param>
 /// <param name="Contract">The player's active contract.</param>
 /// <param name="Availability">Every open injury and suspension.</param>
-/// <param name="Attributes">The player's attributes, read so the mapper can average each family; they never reach the client.</param>
+/// <param name="Attributes">The player's attributes, projected into the squad response so the client can rate the player for a position.</param>
 public sealed record SquadPlayerRow(
     Guid Id,
     string FullName,

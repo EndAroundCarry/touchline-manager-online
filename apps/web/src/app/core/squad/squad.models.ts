@@ -89,14 +89,6 @@ export interface PlayerContractSummary {
   readonly status: string;
 }
 
-/** The mean of each attribute family on the 1–20 scale, to one decimal; there is no overall. */
-export interface AttributeAverages {
-  readonly goalkeeping: number;
-  readonly technical: number;
-  readonly mental: number;
-  readonly physical: number;
-}
-
 /** One player as the squad table shows them. */
 export interface SquadPlayer {
   readonly id: string;
@@ -110,7 +102,9 @@ export interface SquadPlayer {
   readonly state: PlayerState;
   readonly contract: PlayerContractSummary | null;
   readonly availability: readonly PlayerAvailability[];
-  readonly attributeAverages: AttributeAverages;
+
+  /** The displayed attributes, which the client averages per position (`position-ratings.ts`). */
+  readonly attributes: PlayerAttributes;
 }
 
 /** The squad's size and legality, so the screen can warn without recomputing (`SQ-2`, `SQ-9`). */

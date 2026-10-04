@@ -152,7 +152,7 @@ and filters it, and opens a player profile — asserting that twenty-two players
 that an attribute shows its number **and** its band word. It gives its club back too.
 
 Stage 4 also added the tactics journey: a manager shapes an eleven through the board's accessible,
-non-drag assignment table, creates the plan, and then — with the API acting as a second device that
+non-drag path (select a slot, press a player in the table), creates the plan, and then — with the API acting as a second device that
 revises the same plan — survives a version conflict by reapplying rather than overwriting (`CONC-1`,
 §11.2). It gives its club back too.
 

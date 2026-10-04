@@ -12,8 +12,8 @@ import {
   squadStatusLabel,
   stateBand,
 } from '../../core/squad/squad-presentation';
+import { RatedPlayer, ratedAtPrimary } from '../../core/squad/position-ratings';
 import { SquadStore } from '../../core/squad/squad-store';
-import { SquadPlayer } from '../../core/squad/squad.models';
 import { formatFunds } from '../../core/world/presentation';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import {
@@ -57,8 +57,11 @@ export class Squad {
 
   protected readonly familyOptions = POSITION_FAMILY_OPTIONS;
 
-  /** The rows on screen: the squad with the filter applied. Sorting is the table's own. */
-  protected readonly players = computed<SquadPlayer[]>(() => {
+  /**
+   * The rows on screen: the squad with the filter applied, each rated for the position they are listed at.
+   * Sorting is the table's own.
+   */
+  protected readonly players = computed<RatedPlayer[]>(() => {
     const filter: SquadFilter = {
       name: this.nameFilter(),
       positionFamily: this.positionFilter(),
@@ -66,7 +69,7 @@ export class Squad {
     };
 
     // A fresh mutable array, because the table's `value` input takes one.
-    return [...filterSquad(this.squad()?.players ?? [], filter)];
+    return filterSquad(this.squad()?.players ?? [], filter).map(ratedAtPrimary);
   });
 
   /** Whether any filter is narrowing the table, so the count is worth showing. */

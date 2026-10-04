@@ -3,7 +3,7 @@ import {
   DivisionTableRow,
   MyFixtures,
 } from '../../core/competition/competition.models';
-import { SquadPlayer } from '../../core/squad/squad.models';
+import { PlayerAttributes, SquadPlayer } from '../../core/squad/squad.models';
 import { MyMarketBid, TransferListing } from '../../core/transfers/transfers.models';
 import { calendarEvents, squadStatus, statLeaders, tableWindow } from './dashboard-presentation';
 
@@ -58,6 +58,40 @@ describe('tableWindow', () => {
   });
 });
 
+const FLAT_ATTRIBUTES: PlayerAttributes = {
+  technical: {
+    finishing: 10,
+    passing: 10,
+    crossing: 10,
+    dribbling: 10,
+    firstTouch: 10,
+    tackling: 10,
+    marking: 10,
+    heading: 10,
+    technique: 10,
+    setPieces: 10,
+  },
+  mental: {
+    decisions: 10,
+    vision: 10,
+    positioning: 10,
+    composure: 10,
+    anticipation: 10,
+    workRate: 10,
+    aggression: 10,
+    leadership: 10,
+  },
+  physical: {
+    pace: 10,
+    acceleration: 10,
+    stamina: 10,
+    strength: 10,
+    agility: 10,
+    jumpingReach: 10,
+  },
+  goalkeeping: { handling: 1, reflexes: 1, oneOnOnes: 1, aerialAbility: 1 },
+};
+
 function player(
   id: string,
   overrides: Partial<{
@@ -92,7 +126,7 @@ function player(
             status: 'active',
           },
     availability: overrides.availability ?? [],
-    attributeAverages: { goalkeeping: 1, technical: 10, mental: 10, physical: 10 },
+    attributes: FLAT_ATTRIBUTES,
   };
 }
 

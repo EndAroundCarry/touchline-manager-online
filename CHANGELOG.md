@@ -4,6 +4,35 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tactics — a player table with position-weighted averages
+
+Replaces the tactics page's player chips and its assign-players table with one sortable player table, and
+replaces the squad's plain family means with averages weighted for the position. No game rule changed.
+
+### Added
+
+- **A player table on the tactics page**, dragged from onto the pitch: shirt number, name, position, goalkeeping,
+  technical, mental and physical averages, age, condition and fatigue. Hovering or focusing a row opens a popup with
+  all twenty-eight skills, each marked with the multiplier the position gives it. The table is rated for each
+  player's own position, or for the selected slot's while one is selected, so "who is best at centre back" is one sort.
+  The shirt number is the slot a player fills in the plan, which is the number the match gives them.
+- **Position-weighted averages** (`position-ratings.ts`, with a spec). Each position weights the twenty-eight
+  attributes on four tiers (×2, ×1.5, ×1, ×0.5), and a family's average is the *weighted mean*, dividing by the sum of
+  the weights rather than the count, so it never leaves 1–20.
+
+### Changed
+
+- **The Squad page** shows the same weighted averages, rated for each player's listed position.
+- **`GET /squad`** rows carry the player's `attributes` in place of `attributeAverages`; the averages are now the
+  client's, because they depend on the position being asked about.
+- **Team instructions** sit beside the player table on a wide screen, and under it on a narrower one.
+- **The tactics e2e journey** assigns the eleven by selecting a slot and pressing a player's name, the non-drag path.
+
+### Removed
+
+- The tactics page's **player chips** and its **assign-players table**. A slot's role is chosen under the pitch
+  when the slot is selected.
+
 ## Web client — a dark management workspace
 
 Restyles the whole web client as a management-sim workspace. Recorded in

@@ -3,9 +3,10 @@ namespace TouchlineManager.Contracts.Squad;
 /// <summary>The squad a manager has inherited, shaped for the squad screen (master plan §10.3, §11.1).</summary>
 /// <remarks>
 /// Bounded to <c>SQ-3</c>'s 25 players, which is what makes a single unpaged response the right shape.
-/// Rows deliberately do not carry the twenty-eight-attribute block: the squad table is about selection
-/// readiness — availability, condition, contract — and the attribute grid belongs to the player profile.
-/// They carry only the four family means, so the stronger player can be spotted at a glance.
+/// Rows carry the twenty-eight-attribute block, which is bounded by the same 25 players. The client
+/// averages it per position (the squad table, the tactics player table), so the weighting that makes an
+/// average mean something for a centre back or a striker lives in one place and the server never has to
+/// guess which position a manager is asking about.
 /// </remarks>
 /// <param name="ClubId">The club the squad belongs to.</param>
 /// <param name="ClubName">The generated club name.</param>
@@ -50,7 +51,7 @@ public sealed record SquadSummaryResponse(
 /// <param name="State">Condition, fatigue, morale, and sharpness.</param>
 /// <param name="Contract">The active contract, or null if the player has none (`SQ-6`).</param>
 /// <param name="Availability">Every open injury and suspension, empty when the player is available.</param>
-/// <param name="AttributeAverages">The mean of each attribute family, for scanning the squad at a glance.</param>
+/// <param name="Attributes">The player's displayed attributes, so the client can rate them for a position.</param>
 public sealed record SquadPlayerResponse(
     Guid Id,
     string FullName,
@@ -63,21 +64,7 @@ public sealed record SquadPlayerResponse(
     PlayerStateResponse State,
     PlayerContractSummaryResponse? Contract,
     IReadOnlyList<PlayerAvailabilityResponse> Availability,
-    AttributeAveragesResponse AttributeAverages);
-
-/// <summary>The mean of each attribute family, on the 1–20 attribute scale, to one decimal.</summary>
-/// <remarks>
-/// Four family means rather than an overall: no single number is authoritative for a player.
-/// </remarks>
-/// <param name="Goalkeeping">Mean of the four goalkeeping attributes.</param>
-/// <param name="Technical">Mean of the ten technical attributes.</param>
-/// <param name="Mental">Mean of the eight mental attributes.</param>
-/// <param name="Physical">Mean of the six physical attributes.</param>
-public sealed record AttributeAveragesResponse(
-    decimal Goalkeeping,
-    decimal Technical,
-    decimal Mental,
-    decimal Physical);
+    PlayerAttributesResponse Attributes);
 
 /// <summary>
 /// A player's condition, fatigue, morale, and match sharpness, as user-facing values (`TRN-8`).

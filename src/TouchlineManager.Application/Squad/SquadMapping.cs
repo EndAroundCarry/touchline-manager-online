@@ -365,30 +365,7 @@ public static class SquadMapping
             player.State.ToResponse(),
             player.Contract.ToSummary(currentSeasonNumber),
             [.. player.Availability.Select(record => record.ToResponse())],
-            player.Attributes.ToAverages());
-
-    /// <summary>
-    /// Averages each attribute family, so the squad table can be scanned for the stronger player at a
-    /// glance without carrying the twenty-eight-attribute block.
-    /// </summary>
-    /// <remarks>
-    /// Four separate means, not one: there is still no single "overall" (see
-    /// <see cref="PlayerAttributesResponse"/>). Rounded to one decimal on the 1–20 scale the attributes use.
-    /// </remarks>
-    /// <param name="attributes">The stored attributes.</param>
-    public static AttributeAveragesResponse ToAverages(this PlayerAttributeSet attributes)
-    {
-        ArgumentNullException.ThrowIfNull(attributes);
-
-        return new AttributeAveragesResponse(
-            Mean(attributes.Goalkeeping),
-            Mean(attributes.Technical),
-            Mean(attributes.Mental),
-            Mean(attributes.Physical));
-    }
-
-    private static decimal Mean(IReadOnlyList<int> values) =>
-        Math.Round((decimal)values.Sum() / values.Count, 1, MidpointRounding.AwayFromZero);
+            player.Attributes.ToResponse());
 
     private static PlayerContractResponse ToResponse(
         ContractRow contract,

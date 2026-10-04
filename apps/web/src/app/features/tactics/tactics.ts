@@ -1,17 +1,23 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TableModule } from 'primeng/table';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
+import { SkillGroup, skillGroups } from '../../core/squad/position-ratings';
+import { SquadStore } from '../../core/squad/squad-store';
+import { attributeBand, positionLabel, stateBand } from '../../core/squad/squad-presentation';
+import { Squad } from '../../core/squad/squad.models';
 import {
   INSTRUCTION_FIELDS,
-  POSITION_FAMILY_ORDER,
   SelectOption,
   familyLabel,
   issueMessage,
   pitchStyle,
+  positionForRole,
   roleLabel,
   rolesForFamily,
 } from '../../core/tactics/tactics-presentation';
-import { positionLabel } from '../../core/squad/squad-presentation';
+import { RosterRow, buildRoster } from '../../core/tactics/tactics-roster';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { SelectablePlayer, TeamInstructions } from '../../core/tactics/tactics.models';
 import {
@@ -24,8 +30,13 @@ import {
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
 
-/** The drag payload for a player chip, so a drop on a slot can assign them. */
+/** The drag payload for a player row, so a drop on a slot can assign them. */
 const PLAYER_MIME = 'application/x-touchline-player';
+
+/** The skills popup's size (`w-[34rem]` and its usual height), which its placement keeps inside the window. */
+const POPUP_WIDTH = 544;
+const POPUP_HEIGHT = 360;
+const POPUP_MARGIN = 8;
 
 /** One slot as the board draws it: the layout, its occupant, and how both should read. */
 interface SlotView {
@@ -40,15 +51,35 @@ interface SlotView {
   readonly issueCount: number;
 }
 
+/** What the skills popup is showing, and where. */
+interface SkillsPopup {
+  readonly row: RosterRow;
+  readonly groups: readonly SkillGroup[];
+  readonly basisLabel: string;
+  readonly left: number;
+  readonly top: number;
+}
+
+/** The position the table's ratings are weighted for while a slot is selected. */
+interface RatingBasis {
+  readonly position: string;
+  readonly slotNumber: number;
+  readonly roleLabel: string;
+}
+
 /**
  * The tactics screen (master plan §11.1, F-19).
  *
  * A formation board with the eleven slots at the positions the chosen formation dictates (`TAC-9`), the
  * eight team instructions, and the default lineup. The slots are fixed: choosing a different formation is
- * the only way to change where they stand. A player is assigned by dragging their chip onto a slot, or —
- * the accessible alternative §11.3 requires — by picking them in the assignment table, where a keyboard or
- * a screen reader reaches every slot without dragging anything. The pitch and the table are two views of
- * one draft.
+ * the only way to change where they stand. A player is assigned by dragging their row in the player table
+ * onto a slot, or — the accessible alternative §11.3 requires — by selecting a slot and pressing the
+ * player's name, so a keyboard or a screen reader reaches every slot without dragging anything. The pitch
+ * and the table are two views of one draft.
+ *
+ * The table rates every player for a position, so the better player for it is easy to see: their own
+ * position by default, and the selected slot's while one is selected. Hovering (or focusing) a row opens a
+ * popup with all twenty-eight skills, the ones that position weights most marked.
  *
  * The plan's version is the ETag (`CONC-1`). A save that loses a race is answered `412`; the board keeps
  * the manager's edits, pulls the server's state, and offers an explicit reapply (§11.2) rather than
@@ -56,12 +87,14 @@ interface SlotView {
  */
 @Component({
   selector: 'app-tactics',
-  imports: [RouterLink],
+  imports: [DecimalPipe, RouterLink, TableModule],
   templateUrl: './tactics.html',
 })
 export class Tactics {
   private readonly store = inject(TacticsStore);
+  private readonly squadStore = inject(SquadStore);
   private readonly maintenance = inject(MaintenanceStore);
+  private requestedClubId: string | null = null;
 
   protected readonly draft = this.store.draft;
   protected readonly plans = this.store.plans;
@@ -80,6 +113,18 @@ export class Tactics {
 
   /** The slot the manager has focused, or 0 when none is. Assigning a player needs a target slot. */
   protected readonly selectedSlot = signal(0);
+
+  /**
+   * The squad read for this club: who is how old and how fit, and every attribute. Held here rather than
+   * taken from the shared squad store, so the screen never shows another visit's, or another club's, state.
+   */
+  private readonly squad = signal<Squad | null>(null);
+
+  /** Whether the squad details could not be read, so the table can say what it is missing. */
+  protected readonly detailsError = signal(false);
+
+  /** The row whose skills are open in the popup, or null. */
+  protected readonly popup = signal<SkillsPopup | null>(null);
 
   /** Whether a write is allowed; offline or read-only the board stays editable but nothing is sent (Â§11.4). */
   protected readonly canMutate = this.maintenance.canMutate;
@@ -125,18 +170,30 @@ export class Tactics {
     });
   });
 
-  /** The squad grouped by position family, so a select offers a goalkeeper to a goalkeeper's slot first. */
-  protected readonly playerGroups = computed(() => {
-    const players = [...this.store.selectablePlayers()].sort((left, right) =>
-      left.fullName.localeCompare(right.fullName),
-    );
+  /** The slot being edited, for the role picker under the board. */
+  protected readonly selectedSlotView = computed(
+    () => this.slotViews().find((slot) => slot.isSelected) ?? null,
+  );
 
-    return POSITION_FAMILY_ORDER.map((family) => ({
-      family,
-      label: familyLabel(family),
-      players: players.filter((player) => player.positionFamily === family),
-    })).filter((group) => group.players.length > 0);
+  /** The position the ratings are weighted for: the selected slot's, or null for each player's own. */
+  protected readonly ratingBasis = computed<RatingBasis | null>(() => {
+    const slot = this.selectedSlotView();
+    const position = slot === null ? null : positionForRole(slot.role);
+
+    return slot === null || position === null
+      ? null
+      : { position, slotNumber: slot.slotNumber, roleLabel: roleLabel(slot.role) };
   });
+
+  /** The player table: everyone who may be picked, rated for the basis. */
+  protected readonly roster = computed<RosterRow[]>(() => [
+    ...buildRoster(
+      this.store.selectablePlayers(),
+      this.squad()?.players ?? [],
+      this.draft()?.slots ?? [],
+      this.ratingBasis()?.position ?? null,
+    ),
+  ]);
 
   /** The refusal's reasons in words, each naming its slot or player. */
   protected readonly issueMessages = computed(() => {
@@ -155,6 +212,21 @@ export class Tactics {
 
   constructor() {
     this.store.load();
+
+    // The squad read needs the club, which arrives with the tactics read. It is made once per visit.
+    effect(() => {
+      const clubId = this.tactics()?.clubId ?? null;
+
+      if (clubId === null || clubId === this.requestedClubId) {
+        return;
+      }
+
+      this.requestedClubId = clubId;
+      this.squadStore.loadSquad(clubId).subscribe({
+        next: (squad) => this.squad.set(squad),
+        error: () => this.detailsError.set(true),
+      });
+    });
   }
 
   /** Selects a slot, or clears the selection when it is already the focused one. */
@@ -162,12 +234,12 @@ export class Tactics {
     this.selectedSlot.update((current) => (current === slotNumber ? 0 : slotNumber));
   }
 
-  /** Assigns a player to the focused slot. Does nothing until a slot is chosen. */
-  protected assignToSelected(playerId: string): void {
+  /** Assigns a player to the focused slot. Does nothing until a slot is chosen, or for an unavailable player. */
+  protected assignToSelected(row: RosterRow): void {
     const slot = this.selectedSlot();
 
-    if (slot !== 0) {
-      this.store.assignPlayer(slot, playerId);
+    if (slot !== 0 && !row.isUnavailable) {
+      this.store.assignPlayer(slot, row.id);
     }
   }
 
@@ -211,22 +283,9 @@ export class Tactics {
     this.store.setInstruction(key, (event.target as HTMLSelectElement).value);
   }
 
-  /** Changes a slot's role from the assignment table (`TAC-8`). */
+  /** Changes a slot's role (`TAC-8`). */
   protected onRoleChange(slotNumber: number, event: Event): void {
     this.store.setRole(slotNumber, (event.target as HTMLSelectElement).value);
-  }
-
-  /** Assigns or clears a slot's occupant from the assignment table. */
-  protected onPlayerChange(slotNumber: number, event: Event): void {
-    const playerId = (event.target as HTMLSelectElement).value;
-
-    if (playerId.length === 0) {
-      this.store.clearSlot(slotNumber);
-
-      return;
-    }
-
-    this.store.assignPlayer(slotNumber, playerId);
   }
 
   /** Saves, or creates the plan when it has never been saved. */
@@ -321,16 +380,23 @@ export class Tactics {
     return `Slot ${slot.slotNumber}, ${position}: ${slot.player.fullName}${state}`;
   }
 
-  /** Starts dragging a player chip. */
-  protected onPlayerDragStart(event: DragEvent, playerId: string): void {
-    event.dataTransfer?.setData(PLAYER_MIME, playerId);
+  /** Starts dragging a player row. An unavailable player cannot be picked, so their row does not drag. */
+  protected onPlayerDragStart(event: DragEvent, row: RosterRow): void {
+    if (row.isUnavailable) {
+      event.preventDefault();
+
+      return;
+    }
+
+    this.popup.set(null);
+    event.dataTransfer?.setData(PLAYER_MIME, row.id);
 
     if (event.dataTransfer !== null) {
       event.dataTransfer.effectAllowed = 'move';
     }
   }
 
-  /** Allows a player chip to be dropped on a slot, and nothing else. */
+  /** Allows a player row to be dropped on a slot, and nothing else. */
   protected onSlotDragOver(event: DragEvent): void {
     if (event.dataTransfer?.types.includes(PLAYER_MIME) === true) {
       event.preventDefault();
@@ -349,5 +415,69 @@ export class Tactics {
     event.stopPropagation();
     this.store.assignPlayer(slotNumber, playerId);
     this.selectedSlot.set(slotNumber);
+  }
+
+  /** Opens the skills popup for a row, beside the pointer (or the row, for the keyboard). */
+  protected showSkills(event: MouseEvent | FocusEvent, row: RosterRow): void {
+    if (row.attributes === null) {
+      return;
+    }
+
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const pointerX = event instanceof MouseEvent ? event.clientX + 16 : rect.left + 16;
+    const fitsBelow = rect.bottom + POPUP_MARGIN + POPUP_HEIGHT < window.innerHeight;
+    const basis = this.ratingBasis();
+
+    this.popup.set({
+      row,
+      groups: skillGroups(row.attributes, row.ratedAs),
+      basisLabel: basis === null ? positionLabel(row.position) : basis.roleLabel,
+      left: Math.max(
+        POPUP_MARGIN,
+        Math.min(pointerX, window.innerWidth - POPUP_WIDTH - POPUP_MARGIN),
+      ),
+      top: Math.max(
+        POPUP_MARGIN,
+        fitsBelow ? rect.bottom + POPUP_MARGIN : rect.top - POPUP_HEIGHT - POPUP_MARGIN,
+      ),
+    });
+  }
+
+  /** Closes the skills popup. */
+  protected hideSkills(): void {
+    this.popup.set(null);
+  }
+
+  /** The tint for an attribute or an average, on the 1–20 scale. */
+  protected skillClass(value: number | null): string {
+    return value === null ? 'text-muted' : attributeBand(value).className;
+  }
+
+  /** The tint for a state value, which fatigue reads the other way round. */
+  protected stateClass(value: number | null, higherIsBetter: boolean): string {
+    return value === null ? 'text-muted' : stateBand(value, higherIsBetter).className;
+  }
+
+  /** The band word beside a state value, so colour is never the only signal (§11.3). */
+  protected stateWord(value: number | null, higherIsBetter: boolean): string {
+    return value === null ? '' : stateBand(value, higherIsBetter).label;
+  }
+
+  /** How a multiplier reads beside an attribute in the popup; nothing for the neutral ×1. */
+  protected multiplierLabel(weight: number): string {
+    return weight === 1 ? '' : `×${weight}`;
+  }
+
+  /** What pressing a row's name does, as the button's accessible name. */
+  protected pickLabel(row: RosterRow): string {
+    const slot = this.selectedSlot();
+
+    if (row.isUnavailable) {
+      return `${row.fullName}, unavailable`;
+    }
+
+    return slot === 0
+      ? `${row.fullName}. Select a slot on the pitch first to pick them.`
+      : `Pick ${row.fullName} for slot ${slot}`;
   }
 }

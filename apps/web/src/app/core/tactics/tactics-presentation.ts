@@ -2,7 +2,7 @@
  * Client-side presentation helpers for the tactics module.
  *
  * Small and pure, so the same labels, option lists, and issue wording are used by the pitch, the
- * accessible assignment table, and the instruction pickers — and so they can be unit tested without a
+ * player table, and the instruction pickers — and so they can be unit tested without a
  * component. The codes are the server's (master plan §10.4); this file only names them.
  */
 
@@ -123,7 +123,7 @@ const POSITION_FAMILY_LABELS: Record<string, string> = {
   attack: 'Attack',
 };
 
-/** The family order the pitch and the assignment table render, own goal first. */
+/** The family order the pitch and the player table render, own goal first. */
 export const POSITION_FAMILY_ORDER: readonly string[] = [
   'goalkeeper',
   'defence',
@@ -164,6 +164,29 @@ export function familyLabel(code: string): string {
 /** Names a role, falling back to the raw code. */
 export function roleLabel(code: string): string {
   return ROLE_LABELS[code] ?? code;
+}
+
+/**
+ * The position code a role is rated as.
+ *
+ * A slot names a role, not a position, and the two sides of the pitch weigh skills alike, so a full back or
+ * a wing back is rated as a right back and a winger as a right winger.
+ */
+const POSITION_BY_ROLE: Record<string, string> = {
+  goalkeeper: 'gk',
+  centre_back: 'cb',
+  full_back: 'rb',
+  wing_back: 'rb',
+  defensive_midfielder: 'dm',
+  central_midfielder: 'cm',
+  attacking_midfielder: 'am',
+  winger: 'rw',
+  striker: 'st',
+};
+
+/** The position code a slot's role is rated as, or null for a role the client does not know. */
+export function positionForRole(role: string): string | null {
+  return POSITION_BY_ROLE[role] ?? null;
 }
 
 /** The roles a family may name, as select options. */

@@ -64,8 +64,13 @@
       </p>
     }
 
+    <p class="mt-4 text-sm text-ink-2">
+      Averages are weighted for each player's position, so the skills that matter most there count
+      most. None is above 20.
+    </p>
+
     <div
-      class="mt-4 hidden overflow-x-auto md:block"
+      class="mt-2 hidden overflow-x-auto md:block"
       data-testid="squad-table"
       tabindex="0"
       role="group"
@@ -89,17 +94,17 @@
             <th scope="col" pSortableColumn="state.fatigue">
               Fatigue <p-sort-icon field="state.fatigue" />
             </th>
-            <th scope="col" pSortableColumn="attributeAverages.goalkeeping">
-              Avg goalkeeping <p-sort-icon field="attributeAverages.goalkeeping" />
+            <th scope="col" pSortableColumn="ratings.goalkeeping">
+              Avg goalkeeping <p-sort-icon field="ratings.goalkeeping" />
             </th>
-            <th scope="col" pSortableColumn="attributeAverages.technical">
-              Avg technical <p-sort-icon field="attributeAverages.technical" />
+            <th scope="col" pSortableColumn="ratings.technical">
+              Avg technical <p-sort-icon field="ratings.technical" />
             </th>
-            <th scope="col" pSortableColumn="attributeAverages.mental">
-              Avg mental <p-sort-icon field="attributeAverages.mental" />
+            <th scope="col" pSortableColumn="ratings.mental">
+              Avg mental <p-sort-icon field="ratings.mental" />
             </th>
-            <th scope="col" pSortableColumn="attributeAverages.physical">
-              Avg physical <p-sort-icon field="attributeAverages.physical" />
+            <th scope="col" pSortableColumn="ratings.physical">
+              Avg physical <p-sort-icon field="ratings.physical" />
             </th>
             <th scope="col" pSortableColumn="contract.endSeasonNumber">
               Contract <p-sort-icon field="contract.endSeasonNumber" />
@@ -138,10 +143,10 @@
                 {{ fatigueWord(player.state.fatigue) }}
               </span>
             </td>
-            <td>{{ player.attributeAverages.goalkeeping | number: '1.1-1' }}</td>
-            <td>{{ player.attributeAverages.technical | number: '1.1-1' }}</td>
-            <td>{{ player.attributeAverages.mental | number: '1.1-1' }}</td>
-            <td>{{ player.attributeAverages.physical | number: '1.1-1' }}</td>
+            <td>{{ player.ratings.goalkeeping | number: '1.1-1' }}</td>
+            <td>{{ player.ratings.technical | number: '1.1-1' }}</td>
+            <td>{{ player.ratings.mental | number: '1.1-1' }}</td>
+            <td>{{ player.ratings.physical | number: '1.1-1' }}</td>
             <td>
               @if (player.contract; as contract) {
                 <span class="block">to season {{ contract.endSeasonNumber }}</span>
@@ -221,23 +226,23 @@
             <div class="flex justify-between gap-2">
               <dt class="text-muted">Avg goalkeeping</dt>
               <dd class="text-ink">
-                {{ player.attributeAverages.goalkeeping | number: '1.1-1' }}
+                {{ player.ratings.goalkeeping | number: '1.1-1' }}
               </dd>
             </div>
             <div class="flex justify-between gap-2">
               <dt class="text-muted">Avg technical</dt>
               <dd class="text-ink">
-                {{ player.attributeAverages.technical | number: '1.1-1' }}
+                {{ player.ratings.technical | number: '1.1-1' }}
               </dd>
             </div>
             <div class="flex justify-between gap-2">
               <dt class="text-muted">Avg mental</dt>
-              <dd class="text-ink">{{ player.attributeAverages.mental | number: '1.1-1' }}</dd>
+              <dd class="text-ink">{{ player.ratings.mental | number: '1.1-1' }}</dd>
             </div>
             <div class="flex justify-between gap-2">
               <dt class="text-muted">Avg physical</dt>
               <dd class="text-ink">
-                {{ player.attributeAverages.physical | number: '1.1-1' }}
+                {{ player.ratings.physical | number: '1.1-1' }}
               </dd>
             </div>
             <div class="col-span-2 flex justify-between gap-2">

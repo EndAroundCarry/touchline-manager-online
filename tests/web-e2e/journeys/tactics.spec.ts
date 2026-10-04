@@ -6,8 +6,8 @@ import { navigateTo } from '../support/navigation';
 /**
  * The Stage 4 exit criteria for the tactics screen (F-19).
  *
- * A manager onboards, opens the tactics board, assigns an eleven through the accessible, non-drag
- * assignment table (§11.3), and creates the plan. Then a second client — the API, acting as another
+ * A manager onboards, opens the tactics board, assigns an eleven without dragging — select a slot, press a
+ * player in the table (§11.3) — and creates the plan. Then a second client — the API, acting as another
  * device — revises the same plan, and the manager's next save is refused with a version conflict. The
  * journey proves the one thing the API tests cannot: that the board keeps the manager's edits, shows the
  * conflict, and lets them reapply intentionally (§11.2, CONC-1).
@@ -64,30 +64,31 @@ interface PlanWrite {
   readonly lineup: readonly { readonly slotNumber: number; readonly playerId: string }[];
 }
 
-/** Assigns eleven distinct players through the table's selects, the non-drag alternative. */
+/**
+ * Assigns eleven distinct players without dragging: select a slot on the pitch, then press a player's name
+ * in the table. It is the keyboard and screen-reader path, so it is the one the journey drives.
+ */
 async function assignEleven(page: Page): Promise<void> {
   const used = new Set<string>();
 
   for (let slot = 1; slot <= 11; slot += 1) {
-    const select = page.getByLabel(`Player for slot ${slot}`, { exact: true });
+    await page.getByRole('button', { name: new RegExp(`^Slot ${slot},`) }).click();
 
-    const candidates = await select.locator('option').evaluateAll((options) =>
-      options
-        .map((option) => ({
-          value: option.getAttribute('value') ?? '',
-          disabled: option.hasAttribute('disabled'),
-        }))
-        .filter((option) => option.value.length > 0 && !option.disabled),
-    );
+    const labels = await page
+      .getByTestId('players-table')
+      .getByRole('button', { name: /^Pick .+ for slot \d+$/ })
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label') ?? ''));
 
-    const pick = candidates.find((candidate) => !used.has(candidate.value));
+    const pick = labels
+      .map((label) => ({ label, name: /^Pick (.+) for slot \d+$/.exec(label)?.[1] ?? '' }))
+      .find((candidate) => candidate.name.length > 0 && !used.has(candidate.name));
 
     if (pick === undefined) {
       throw new Error(`No selectable player was free for slot ${slot}.`);
     }
 
-    used.add(pick.value);
-    await select.selectOption(pick.value);
+    used.add(pick.name);
+    await page.getByRole('button', { name: pick.label, exact: true }).click();
   }
 }
 
@@ -160,9 +161,21 @@ test.describe('tactics', () => {
     await page.getByRole('combobox', { name: 'Formation' }).selectOption('4-3-3');
     await expect(page.getByRole('button', { name: /^Slot \d+/ })).toHaveCount(11);
 
+    // The player table carries the position-weighted averages a manager picks by.
+    await expect(page.getByRole('columnheader', { name: /Technical average/ })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /Physical average/ })).toBeVisible();
+
     // Assign an eleven without dragging anything, which is what a keyboard or screen reader needs.
     await assignEleven(page);
     await expect(page.getByText(/11 of 11 slots filled/)).toBeVisible();
+
+    // Hovering a player opens their skills, so the manager can see who suits the position.
+    await page
+      .getByTestId('players-table')
+      .getByRole('button', { name: /^Pick / })
+      .first()
+      .hover();
+    await expect(page.getByRole('tooltip')).toContainText('Technical');
 
     await page.getByRole('button', { name: 'Create plan' }).click();
     await expect(page.getByText('Your plan was created.')).toBeVisible();
