@@ -1,11 +1,13 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using TouchlineManager.Application.Abstractions.Squad;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad;
+using TouchlineManager.Domain.Squad.Training;
 using TouchlineManager.Domain.World;
 using TouchlineManager.Infrastructure.Persistence;
 
@@ -106,11 +108,11 @@ public sealed class TrainingPersistenceTests
                 DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
                 _fixture.Clock.UtcNow));
 
-            db.PlayerTrainingFocuses.Add(PlayerTrainingFocus.Set(
+            db.PlayerTrainingFocuses.Add(PlayerTrainingFocus.SetProgramme(
                 Guid.CreateVersion7(),
                 focusedId,
                 withPlanClubId,
-                AttributeFamily.Physical,
+                TrainingProgramme.Physical,
                 DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
                 _fixture.Clock.UtcNow));
 
@@ -127,8 +129,8 @@ public sealed class TrainingPersistenceTests
         withPlan.TeamFocus.Should().Be(TrainingFocus.Fitness, "the club's own plan is carried");
         withPlan.Intensity.Should().Be(TrainingIntensity.Light);
         withPlan.Players.Should().HaveCount(2);
-        withPlan.Players.Single(player => player.Player.Id == focusedId).IndividualFocus
-            .Should().Be(AttributeFamily.Physical, "TRN-2");
+        withPlan.Players.Single(player => player.Player.Id == focusedId).Programme
+            .Should().Be(TrainingProgramme.Physical, "the manager's override is carried (TRN-1)");
 
         // A club that has never set a plan still progresses, on the implicit default the mapper defines.
         var withoutPlan = rosters.Single(roster => roster.ClubId == withoutPlanClubId);
@@ -136,8 +138,202 @@ public sealed class TrainingPersistenceTests
         withoutPlan.TeamFocus.Should().Be(TrainingMapping.DefaultTeamFocus);
         withoutPlan.Intensity.Should().Be(TrainingMapping.DefaultIntensity);
         withoutPlan.Players.Should().NotBeEmpty();
-        withoutPlan.Players.Should().OnlyContain(player => player.IndividualFocus == null);
+        withoutPlan.Players.Should().OnlyContain(
+            player => player.Programme == null,
+            "a player with no override trains the position default");
     }
+
+    [Fact]
+    public async Task A_programme_override_survives_a_round_trip_and_replaces_a_legacy_family()
+    {
+        Guid clubId;
+        Guid playerId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (clubId, playerId, _) = await ArrangeAsync(seeding);
+
+            db.PlayerTrainingFocuses.Add(PlayerTrainingFocus.Set(
+                Guid.CreateVersion7(),
+                playerId,
+                clubId,
+                AttributeFamily.Technical,
+                DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
+                _fixture.Clock.UtcNow));
+
+            await db.SaveChangesAsync();
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            var focus = await db.PlayerTrainingFocuses.SingleAsync(row => row.PlayerId == playerId);
+
+            focus.Programme.Should().BeNull("a legacy family row has no programme");
+            focus.FocusFamily.Should().Be(AttributeFamily.Technical);
+
+            focus.ReviseProgramme(
+                TrainingProgramme.Winger,
+                DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
+                _fixture.Clock.UtcNow);
+
+            await db.SaveChangesAsync();
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            var focus = await db.PlayerTrainingFocuses.AsNoTracking().SingleAsync(row => row.PlayerId == playerId);
+
+            focus.Programme.Should().Be(TrainingProgramme.Winger);
+            focus.FocusFamily.Should().BeNull("the programme replaces the retired family");
+            focus.Version.Should().Be(2);
+        }
+    }
+
+    [Fact]
+    public async Task A_training_day_round_trips_and_a_player_has_one_row_per_day()
+    {
+        Guid playerId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (_, playerId, _) = await ArrangeAsync(seeding);
+
+            var day = new DateOnly(2026, 10, 1);
+
+            db.PlayerTrainingDays.Add(PlayerTrainingDay.Record(
+                Guid.CreateVersion7(),
+                playerId,
+                day,
+                TrainingProgramme.Defender,
+                TrainingIntensity.Intense,
+                Outcome(
+                    developmentMilli: 1_234,
+                    declineMilli: 56,
+                    new AttributeChange(AttributeName.Tackling, 1),
+                    new AttributeChange(AttributeName.Pace, -1),
+                    new AttributeChange(AttributeName.Heading, 2))));
+
+            await db.SaveChangesAsync();
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+            var row = await db.PlayerTrainingDays.AsNoTracking().SingleAsync(candidate => candidate.PlayerId == playerId);
+
+            row.Day.Should().Be(new DateOnly(2026, 10, 1));
+            row.Programme.Should().Be(TrainingProgramme.Defender);
+            row.Intensity.Should().Be(TrainingIntensity.Intense);
+            row.DevelopmentMilli.Should().Be(1_234);
+            row.DeclineMilli.Should().Be(56);
+            row.PointsGained.Should().Be(3);
+            row.PointsLost.Should().Be(1);
+            row.ParseChanges().Should().Equal(
+                new AttributeChange(AttributeName.Tackling, 1),
+                new AttributeChange(AttributeName.Pace, -1),
+                new AttributeChange(AttributeName.Heading, 2));
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            db.PlayerTrainingDays.Add(PlayerTrainingDay.Record(
+                Guid.CreateVersion7(),
+                playerId,
+                new DateOnly(2026, 10, 1),
+                TrainingProgramme.Defender,
+                TrainingIntensity.Normal,
+                Outcome(0, 0)));
+
+            var act = () => db.SaveChangesAsync();
+
+            var exception = await act.Should().ThrowAsync<DbUpdateException>();
+
+            (exception.Which.InnerException as PostgresException)?.ConstraintName
+                .Should().Be("ux_player_training_days_player_day", "a retried day cannot record twice");
+        }
+    }
+
+    [Fact]
+    public async Task The_database_refuses_an_unknown_programme_and_a_negative_amount()
+    {
+        Guid playerId;
+
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        (_, playerId, _) = await ArrangeAsync(scope);
+
+        var unknownProgramme = () => db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            insert into squad.player_training_days
+                (id, player_id, day, programme, intensity, development_milli, decline_milli, points_gained, points_lost, attribute_changes)
+            values ({Guid.CreateVersion7()}, {playerId}, {new DateOnly(2026, 10, 2)}, 'balanced', 'normal', 0, 0, 0, 0, '[]'::jsonb)
+            """);
+
+        var negativeAmount = () => db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            insert into squad.player_training_days
+                (id, player_id, day, programme, intensity, development_milli, decline_milli, points_gained, points_lost, attribute_changes)
+            values ({Guid.CreateVersion7()}, {playerId}, {new DateOnly(2026, 10, 3)}, 'forward', 'normal', -1, 0, 0, 0, '[]'::jsonb)
+            """);
+
+        (await unknownProgramme.Should().ThrowAsync<PostgresException>())
+            .Which.ConstraintName.Should().Be("ck_player_training_days_programme");
+        (await negativeAmount.Should().ThrowAsync<PostgresException>())
+            .Which.ConstraintName.Should().Be("ck_player_training_days_amounts");
+    }
+
+    [Fact]
+    public async Task The_decline_remainder_is_stored_with_the_player_state()
+    {
+        Guid playerId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (_, playerId, _) = await ArrangeAsync(seeding);
+
+            var state = await db.PlayerStates.SingleAsync(row => row.PlayerId == playerId);
+
+            state.DeclineRemainder.Should().Be(0, "a new state carries no decline");
+            state.ApplyProgression(8_000, 100, 5_000, 5_000, 250, 640, new DateOnly(2026, 10, 1));
+
+            await db.SaveChangesAsync();
+        }
+
+        await using var scope = _fixture.CreateScope();
+        var reloaded = await scope.ServiceProvider
+            .GetRequiredService<TouchlineManagerDbContext>()
+            .PlayerStates.AsNoTracking().SingleAsync(row => row.PlayerId == playerId);
+
+        reloaded.DevelopmentRemainder.Should().Be(250);
+        reloaded.DeclineRemainder.Should().Be(640, "TRN-16");
+    }
+
+    private static DailyProgressionOutcome Outcome(
+        int developmentMilli,
+        int declineMilli,
+        params AttributeChange[] changes) =>
+        new(
+            PlayerAttributeSet.FromValues([.. Enumerable.Repeat(10, AttributeNames.Count)]),
+            ConditionBp: 8_000,
+            FatigueBp: 100,
+            MoraleBp: 5_000,
+            MatchSharpnessBp: 5_000,
+            DevelopmentRemainder: 0,
+            DeclineRemainder: 0,
+            developmentMilli,
+            declineMilli,
+            changes);
 
     private Task<(Guid ClubId, Guid FocusedId, Guid PlainId)> ArrangeAsync(AsyncServiceScope scope) =>
         ArrangeClubAsync(scope, $"Training Vale {Guid.NewGuid():N}");

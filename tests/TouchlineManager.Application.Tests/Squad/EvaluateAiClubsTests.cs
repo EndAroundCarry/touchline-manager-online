@@ -272,6 +272,10 @@ public sealed class EvaluateAiClubsTests
         {
         }
 
+        public void AddTrainingDay(PlayerTrainingDay day)
+        {
+        }
+
         public Task<IReadOnlyList<ClubTrainingRoster>> LoadRostersAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ClubTrainingRoster>>([]);
     }

@@ -12,13 +12,15 @@ namespace TouchlineManager.Application.Abstractions.Squad;
 /// <param name="Attributes">The player's attributes, which development writes back.</param>
 /// <param name="State">The player's state, which recovery and development write back.</param>
 /// <param name="Potential">The hidden development ceiling (`TRN-9`).</param>
-/// <param name="IndividualFocus">The player's individual focus, when one is set (`TRN-2`).</param>
+/// <param name="Programme">
+/// The programme the manager chose for the player, or null to train the position default (`TRN-1`).
+/// </param>
 public sealed record ProgressablePlayer(
     Player Player,
     PlayerAttributes Attributes,
     PlayerState State,
     int Potential,
-    AttributeFamily? IndividualFocus);
+    TrainingProgramme? Programme);
 
 /// <summary>One club's training plan and the squad it applies to.</summary>
 /// <param name="ClubId">The club.</param>
@@ -77,6 +79,10 @@ public interface ITrainingRepository
     /// <summary>Removes an individual focus, returning the player to the team plan alone (`TRN-2`).</summary>
     /// <param name="focus">The focus to remove.</param>
     void RemovePlayerFocus(PlayerTrainingFocus focus);
+
+    /// <summary>Stages one player's training day in the history (`TRN-17`).</summary>
+    /// <param name="day">The day to record.</param>
+    void AddTrainingDay(PlayerTrainingDay day);
 
     /// <summary>
     /// Loads every club's training plan and its contracted players, for the daily progression run.

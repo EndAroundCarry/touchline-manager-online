@@ -193,6 +193,9 @@ internal sealed class PlayerStateConfiguration : IEntityTypeConfiguration<Player
             table.HasCheckConstraint(
                 "ck_player_state_development_remainder",
                 "development_remainder >= 0");
+            table.HasCheckConstraint(
+                "ck_player_state_decline_remainder",
+                "decline_remainder >= 0");
         });
 
         builder.HasKey(state => state.PlayerId);
@@ -202,9 +205,10 @@ internal sealed class PlayerStateConfiguration : IEntityTypeConfiguration<Player
         builder.Property(state => state.MoraleBp).HasColumnName("morale_bp").IsRequired();
         builder.Property(state => state.MatchSharpnessBp).HasColumnName("match_sharpness_bp").IsRequired();
         builder.Property(state => state.DevelopmentRemainder).HasColumnName("development_remainder").IsRequired();
-
-        // TODO(training-v2 milestone 2): map decline_remainder with the migration. Until then it is not persisted.
-        builder.Ignore(state => state.DeclineRemainder);
+        builder.Property(state => state.DeclineRemainder)
+            .HasColumnName("decline_remainder")
+            .HasDefaultValue(0)
+            .IsRequired();
         builder.Property(state => state.LastProgressionDate).HasColumnName("last_progression_date");
         builder.Property(state => state.Version).HasColumnName("version").IsRequired();
 
@@ -639,7 +643,13 @@ internal sealed class TrainingPlanConfiguration : IEntityTypeConfiguration<Train
     }
 }
 
-/// <summary>Maps <c>squad.player_training_focus</c>: the optional per-player focus (`TRN-2`).</summary>
+/// <summary>
+/// Maps <c>squad.player_training_focus</c>: the optional per-player training override (`TRN-1`, `TRN-2`).
+/// </summary>
+/// <remarks>
+/// The row now holds a programme. <c>focus_family</c> is the retired attribute-family focus, kept nullable
+/// until the contract migration drops it (`MIG-3`); a row with neither value trains the position default.
+/// </remarks>
 internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguration<PlayerTrainingFocus>
 {
     /// <inheritdoc />
@@ -647,9 +657,15 @@ internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguratio
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.ToTable("player_training_focus", "squad", table => table.HasCheckConstraint(
-            "ck_player_training_focus_family",
-            "focus_family in ('technical', 'mental', 'physical', 'goalkeeping')"));
+        builder.ToTable("player_training_focus", "squad", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_player_training_focus_family",
+                "focus_family in ('technical', 'mental', 'physical', 'goalkeeping')");
+            table.HasCheckConstraint(
+                "ck_player_training_focus_programme",
+                TrainingProgrammeCheck("programme"));
+        });
 
         builder.HasKey(focus => focus.Id);
         builder.Property(focus => focus.Id).HasColumnName("id").ValueGeneratedNever();
@@ -658,8 +674,11 @@ internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguratio
         builder.Property(focus => focus.FocusFamily)
             .HasColumnName("focus_family")
             .HasMaxLength(AttributeFamilies.MaxCodeLength)
-            .HasConversion(family => family.ToCode(), code => AttributeFamilies.FromCode(code))
-            .IsRequired();
+            .HasConversion(family => family!.Value.ToCode(), code => AttributeFamilies.FromCode(code));
+        builder.Property(focus => focus.Programme)
+            .HasColumnName("programme")
+            .HasMaxLength(TrainingProgrammes.MaxCodeLength)
+            .HasConversion(programme => programme!.Value.ToCode(), code => TrainingProgrammes.FromCode(code));
         builder.Property(focus => focus.EffectiveDate).HasColumnName("effective_date").IsRequired();
         builder.Property(focus => focus.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(focus => focus.UpdatedAt).HasColumnName("updated_at").IsRequired();
@@ -675,6 +694,76 @@ internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguratio
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(focus => focus.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+
+    /// <summary>
+    /// Builds the check that keeps a programme column to the catalogue's codes. Shared with the training
+    /// history table, so the two cannot drift apart.
+    /// </summary>
+    /// <param name="column">The column the check applies to.</param>
+    internal static string TrainingProgrammeCheck(string column) =>
+        $"{column} in ({string.Join(", ", TrainingProgrammes.All.Select(definition => $"'{definition.Code}'"))})";
+}
+
+/// <summary>
+/// Maps <c>squad.player_training_days</c>: one row per player per progression day, the history behind the
+/// player's training charts (`TRN-17`).
+/// </summary>
+/// <remarks>
+/// The unique <c>(player_id, day)</c> index is the database half of the run's idempotency. The foreign key is
+/// restrictive like every other player reference: a player row is never deleted.
+/// </remarks>
+internal sealed class PlayerTrainingDayConfiguration : IEntityTypeConfiguration<PlayerTrainingDay>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<PlayerTrainingDay> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("player_training_days", "squad", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_player_training_days_programme",
+                PlayerTrainingFocusConfiguration.TrainingProgrammeCheck("programme"));
+            table.HasCheckConstraint(
+                "ck_player_training_days_intensity",
+                "intensity in ('light', 'normal', 'intense')");
+            table.HasCheckConstraint(
+                "ck_player_training_days_amounts",
+                "development_milli >= 0 and decline_milli >= 0 and points_gained >= 0 and points_lost >= 0");
+        });
+
+        builder.HasKey(day => day.Id);
+        builder.Property(day => day.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(day => day.PlayerId).HasColumnName("player_id").IsRequired();
+        builder.Property(day => day.Day).HasColumnName("day").IsRequired();
+        builder.Property(day => day.Programme)
+            .HasColumnName("programme")
+            .HasMaxLength(TrainingProgrammes.MaxCodeLength)
+            .HasConversion(programme => programme.ToCode(), code => TrainingProgrammes.FromCode(code))
+            .IsRequired();
+        builder.Property(day => day.Intensity)
+            .HasColumnName("intensity")
+            .HasMaxLength(TrainingPlans.MaxIntensityCodeLength)
+            .HasConversion(intensity => intensity.ToCode(), code => TrainingPlans.IntensityFromCode(code))
+            .IsRequired();
+        builder.Property(day => day.DevelopmentMilli).HasColumnName("development_milli").IsRequired();
+        builder.Property(day => day.DeclineMilli).HasColumnName("decline_milli").IsRequired();
+        builder.Property(day => day.PointsGained).HasColumnName("points_gained").IsRequired();
+        builder.Property(day => day.PointsLost).HasColumnName("points_lost").IsRequired();
+        builder.Property(day => day.AttributeChangesJson)
+            .HasColumnName("attribute_changes")
+            .HasColumnType("jsonb")
+            .IsRequired();
+
+        builder.HasIndex(day => new { day.PlayerId, day.Day })
+            .IsUnique()
+            .HasDatabaseName("ux_player_training_days_player_day");
+
+        builder.HasOne<Player>()
+            .WithMany()
+            .HasForeignKey(day => day.PlayerId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

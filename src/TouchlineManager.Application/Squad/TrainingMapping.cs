@@ -71,7 +71,7 @@ public static class TrainingMapping
         DateTimeOffset serverTime) =>
         new(
             playerId,
-            focus?.FocusFamily.ToCode(),
+            focus?.FocusFamily?.ToCode(),
             focus?.Version ?? 0,
             serverTime);
 

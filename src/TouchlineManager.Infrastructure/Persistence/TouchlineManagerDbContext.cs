@@ -192,6 +192,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the squad module's per-player training focuses.</summary>
     public DbSet<PlayerTrainingFocus> PlayerTrainingFocuses => Set<PlayerTrainingFocus>();
 
+    /// <summary>Gets the squad module's per-player daily training history.</summary>
+    public DbSet<PlayerTrainingDay> PlayerTrainingDays => Set<PlayerTrainingDay>();
+
     /// <summary>Gets the squad module's fixture team sheets.</summary>
     public DbSet<FixtureTeamSheet> FixtureTeamSheets => Set<FixtureTeamSheet>();
 

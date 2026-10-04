@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.Squad;
+using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.Squad.Training;
 using TouchlineManager.Infrastructure.Persistence;
 using TouchlineManager.Infrastructure.Tests.World;
@@ -53,6 +54,7 @@ public sealed class DailyProgressionRunTests
         }
 
         await AssertProgressedAsync(day);
+        await AssertHistoryAsync(expectedRows: players, onlyDay: day);
 
         await using (var scope = _fixture.CreateScope())
         {
@@ -64,6 +66,8 @@ public sealed class DailyProgressionRunTests
             repeat.Players.Should().Be(0, "the run is idempotent for a day");
         }
 
+        await AssertHistoryAsync(expectedRows: players, onlyDay: day);
+
         await using (var scope = _fixture.CreateScope())
         {
             var tomorrow = await scope.ServiceProvider
@@ -72,6 +76,33 @@ public sealed class DailyProgressionRunTests
 
             tomorrow.Players.Should().Be(players, "the next day progresses everyone again");
         }
+
+        await AssertHistoryAsync(expectedRows: players * 2, onlyDay: null);
+    }
+
+    private async Task AssertHistoryAsync(int expectedRows, DateOnly? onlyDay)
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var rows = await db.PlayerTrainingDays.AsNoTracking().ToListAsync();
+
+        rows.Should().HaveCount(expectedRows, "one history row per player per progression day (TRN-17)");
+        rows.Select(row => (row.PlayerId, row.Day)).Should().OnlyHaveUniqueItems();
+
+        if (onlyDay is { } day)
+        {
+            rows.Should().OnlyContain(row => row.Day == day);
+        }
+
+        // Each player trained their position default: nobody in the seeded world has an override.
+        var positions = await db.Players.AsNoTracking().ToDictionaryAsync(player => player.Id, player => player.PrimaryPosition);
+
+        rows.Should().OnlyContain(
+            row => row.Programme == TrainingProgrammes.DefaultFor(positions[row.PlayerId]),
+            "the default programme follows the primary position (TRN-1)");
+        rows.Should().OnlyContain(row => row.Intensity == TrainingMapping.DefaultIntensity);
+        rows.Should().OnlyContain(row => row.PointsGained >= 0 && row.PointsLost >= 0);
     }
 
     private async Task AssertProgressedAsync(DateOnly day)
@@ -96,6 +127,9 @@ public sealed class DailyProgressionRunTests
 
         states.Should().OnlyContain(state => state.DevelopmentRemainder >= 0, "TRN-10");
         states.Should().OnlyContain(state => state.DevelopmentRemainder < DailyProgression.DevelopmentBasis);
+        states.Should().OnlyContain(
+            state => state.DeclineRemainder >= 0 && state.DeclineRemainder < DailyProgression.DevelopmentBasis,
+            "TRN-16");
     }
 }
 

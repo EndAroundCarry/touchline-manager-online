@@ -50,6 +50,9 @@ internal sealed class TrainingRepository : ITrainingRepository
         _dbContext.PlayerTrainingFocuses.Remove(focus);
 
     /// <inheritdoc />
+    public void AddTrainingDay(PlayerTrainingDay day) => _dbContext.PlayerTrainingDays.Add(day);
+
+    /// <inheritdoc />
     public async Task<Guid?> FindPlayerClubAsync(Guid playerId, CancellationToken cancellationToken) =>
         await _dbContext.PlayerContracts
             .Where(contract => contract.PlayerId == playerId && contract.Status == ContractStatus.Active)
@@ -124,7 +127,7 @@ internal sealed class TrainingRepository : ITrainingRepository
                     playerAttributes,
                     state,
                     player.Potential,
-                    focusesByPlayer.GetValueOrDefault(contract.PlayerId)?.FocusFamily));
+                    focusesByPlayer.GetValueOrDefault(contract.PlayerId)?.Programme));
             }
 
             rosters.Add(new ClubTrainingRoster(

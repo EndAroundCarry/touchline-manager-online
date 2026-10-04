@@ -57,13 +57,16 @@ public sealed class RunDailyProgression
                     continue;
                 }
 
+                var programme = member.Programme
+                    ?? TrainingProgrammes.DefaultFor(member.Player.PrimaryPosition);
+
                 var outcome = DailyProgression.Advance(new DailyProgressionInput(
                     member.Player.Id,
                     member.Player.AgeIn(roster.GameYear),
                     member.Attributes.ToSet(),
                     member.Potential,
                     TrainingAptitude.For(member.Player.Id),
-                    ProgrammeFor(roster, member),
+                    programme,
                     roster.Intensity,
                     member.State.ConditionBp,
                     member.State.FatigueBp,
@@ -84,6 +87,14 @@ public sealed class RunDailyProgression
 
                 member.Attributes.Apply(outcome.Attributes);
 
+                _repository.AddTrainingDay(PlayerTrainingDay.Record(
+                    Guid.CreateVersion7(),
+                    member.Player.Id,
+                    day,
+                    programme,
+                    roster.Intensity,
+                    outcome));
+
                 progressed++;
             }
         }
@@ -94,29 +105,5 @@ public sealed class RunDailyProgression
         }
 
         return new RunDailyProgressionResult(rosters.Count, progressed);
-    }
-
-    /// <summary>
-    /// Resolves the programme a player trains today.
-    /// </summary>
-    /// <remarks>
-    /// Temporary bridge for the persistence milestone: until the per-player programme override is stored, the
-    /// legacy club focus and family focus are translated onto the nearest programme, and every other player
-    /// trains the default for their primary position.
-    /// </remarks>
-    private static TrainingProgramme ProgrammeFor(ClubTrainingRoster roster, ProgressablePlayer member)
-    {
-        if (roster.TeamFocus == TrainingFocus.Recovery)
-        {
-            return TrainingProgramme.Recovery;
-        }
-
-        return member.IndividualFocus switch
-        {
-            AttributeFamily.Mental => TrainingProgramme.Mental,
-            AttributeFamily.Physical => TrainingProgramme.Physical,
-            AttributeFamily.Goalkeeping => TrainingProgramme.Goalkeeper,
-            _ => TrainingProgrammes.DefaultFor(member.Player.PrimaryPosition),
-        };
     }
 }

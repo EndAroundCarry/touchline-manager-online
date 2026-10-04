@@ -24,8 +24,14 @@ public sealed class PlayerTrainingFocus
     /// <summary>Gets the club the player belonged to when the focus was set.</summary>
     public Guid ClubId { get; private set; }
 
-    /// <summary>Gets the attribute family the player focuses on.</summary>
-    public AttributeFamily FocusFamily { get; private set; }
+    /// <summary>Gets the attribute family the player focuses on; null once the row holds a programme.</summary>
+    public AttributeFamily? FocusFamily { get; private set; }
+
+    /// <summary>
+    /// Gets the training programme the manager chose for the player, which overrides the position default.
+    /// Null means the position default (`TRN-1`).
+    /// </summary>
+    public TrainingProgramme? Programme { get; private set; }
 
     /// <summary>Gets the date the focus takes effect from.</summary>
     public DateOnly EffectiveDate { get; private set; }
@@ -64,6 +70,46 @@ public sealed class PlayerTrainingFocus
             Version = 1,
         };
 
+    /// <summary>Sets a player's training programme override (`TRN-1`).</summary>
+    /// <param name="id">A server-generated identity.</param>
+    /// <param name="playerId">The player the programme applies to.</param>
+    /// <param name="clubId">The club the player belongs to.</param>
+    /// <param name="programme">The programme to train.</param>
+    /// <param name="effectiveDate">The date the programme takes effect from.</param>
+    /// <param name="now">The current instant.</param>
+    public static PlayerTrainingFocus SetProgramme(
+        Guid id,
+        Guid playerId,
+        Guid clubId,
+        TrainingProgramme programme,
+        DateOnly effectiveDate,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            PlayerId = playerId,
+            ClubId = clubId,
+            FocusFamily = null,
+            Programme = programme,
+            EffectiveDate = effectiveDate,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = 1,
+        };
+
+    /// <summary>Changes the programme and effective date, dropping any legacy family.</summary>
+    /// <param name="programme">The programme to train.</param>
+    /// <param name="effectiveDate">The date the programme takes effect from.</param>
+    /// <param name="now">The current instant.</param>
+    public void ReviseProgramme(TrainingProgramme programme, DateOnly effectiveDate, DateTimeOffset now)
+    {
+        FocusFamily = null;
+        Programme = programme;
+        EffectiveDate = effectiveDate;
+
+        UpdatedAt = now;
+        Version++;
+    }
+
     /// <summary>Changes the family and effective date.</summary>
     /// <param name="focusFamily">The attribute family to focus on.</param>
     /// <param name="effectiveDate">The date the focus takes effect from.</param>
@@ -71,6 +117,7 @@ public sealed class PlayerTrainingFocus
     public void Revise(AttributeFamily focusFamily, DateOnly effectiveDate, DateTimeOffset now)
     {
         FocusFamily = focusFamily;
+        Programme = null;
         EffectiveDate = effectiveDate;
 
         UpdatedAt = now;
