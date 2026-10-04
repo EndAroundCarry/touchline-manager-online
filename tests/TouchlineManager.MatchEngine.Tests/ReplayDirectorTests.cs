@@ -404,6 +404,7 @@ public sealed class ReplayDirectorTests
             "absenceFixtures",
             "club",
             "clubId",
+            "goalkeeper",
             "opponent",
             "playerId",
             "second",
@@ -411,7 +412,7 @@ public sealed class ReplayDirectorTests
             "shotZone",
         };
 
-        string[] buildUp = ["match.build.pass", "match.build.carry", "match.build.interception"];
+        string[] buildUp = ["match.build.pass", "match.build.long_pass", "match.build.carry", "match.build.interception"];
 
         for (var seed = 1UL; seed <= Seeds; seed++)
         {

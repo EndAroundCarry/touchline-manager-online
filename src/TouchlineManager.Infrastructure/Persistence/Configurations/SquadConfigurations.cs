@@ -204,10 +204,23 @@ internal sealed class PlayerStateConfiguration : IEntityTypeConfiguration<Player
         builder.Property(state => state.FatigueBp).HasColumnName("fatigue_bp").IsRequired();
         builder.Property(state => state.MoraleBp).HasColumnName("morale_bp").IsRequired();
         builder.Property(state => state.MatchSharpnessBp).HasColumnName("match_sharpness_bp").IsRequired();
-        builder.Property(state => state.DevelopmentRemainder).HasColumnName("development_remainder").IsRequired();
-        builder.Property(state => state.DeclineRemainder)
+
+        // Retired: the two pooled remainders of `training-v2`, replaced by per-attribute progress. The columns
+        // stay, defaulted to zero and never written, until the contract migration drops them (`MIG-3`); shadow
+        // properties keep them in the model so the expand migration is only a default rather than a same-step
+        // drop.
+        builder.Property<int>("DevelopmentRemainder")
+            .HasColumnName("development_remainder")
+            .HasDefaultValue(0)
+            .IsRequired();
+        builder.Property<int>("DeclineRemainder")
             .HasColumnName("decline_remainder")
             .HasDefaultValue(0)
+            .IsRequired();
+        builder.Property(state => state.AttributeProgressJson)
+            .HasColumnName("attribute_progress")
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb")
             .IsRequired();
         builder.Property(state => state.LastProgressionDate).HasColumnName("last_progression_date");
         builder.Property(state => state.Version).HasColumnName("version").IsRequired();
@@ -755,6 +768,11 @@ internal sealed class PlayerTrainingDayConfiguration : IEntityTypeConfiguration<
         builder.Property(day => day.AttributeChangesJson)
             .HasColumnName("attribute_changes")
             .HasColumnType("jsonb")
+            .IsRequired();
+        builder.Property(day => day.AttributeProgressJson)
+            .HasColumnName("attribute_progress")
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb")
             .IsRequired();
 
         builder.HasIndex(day => new { day.PlayerId, day.Day })

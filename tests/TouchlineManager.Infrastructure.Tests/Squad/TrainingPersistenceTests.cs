@@ -290,6 +290,7 @@ public sealed class TrainingPersistenceTests
             TrainingProgramme.Mental,
             TrainingProgramme.Mental);
         snapshot.Days[0].AttributeChanges.Should().Equal(new AttributeChange(AttributeName.Composure, 1));
+        snapshot.Days[0].ProgressChanges.Should().Equal(new AttributeProgressChange(AttributeName.Composure, 250_000));
         snapshot.Days[0].DevelopmentMilli.Should().Be(300);
 
         var unknown = await queries.GetPlayerTrainingAsync(Guid.CreateVersion7(), days: 10, CancellationToken.None);
@@ -342,6 +343,10 @@ public sealed class TrainingPersistenceTests
                 new AttributeChange(AttributeName.Tackling, 1),
                 new AttributeChange(AttributeName.Pace, -1),
                 new AttributeChange(AttributeName.Heading, 2));
+            row.ParseProgress().Should().Equal(
+                new AttributeProgressChange(AttributeName.Tackling, 250_000),
+                new AttributeProgressChange(AttributeName.Heading, 250_000),
+                new AttributeProgressChange(AttributeName.Pace, -250_000));
         }
 
         await using (var scope = _fixture.CreateScope())
@@ -396,9 +401,13 @@ public sealed class TrainingPersistenceTests
     }
 
     [Fact]
-    public async Task The_decline_remainder_is_stored_with_the_player_state()
+    public async Task The_attribute_progress_is_stored_with_the_player_state()
     {
         Guid playerId;
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)AttributeName.Finishing] = 850_000;
+        progress[(int)AttributeName.Pace] = -400_000;
 
         await using (var seeding = _fixture.CreateScope())
         {
@@ -408,8 +417,8 @@ public sealed class TrainingPersistenceTests
 
             var state = await db.PlayerStates.SingleAsync(row => row.PlayerId == playerId);
 
-            state.DeclineRemainder.Should().Be(0, "a new state carries no decline");
-            state.ApplyProgression(8_000, 100, 5_000, 5_000, 250, 640, new DateOnly(2026, 10, 1));
+            state.AttributeProgress.Should().OnlyContain(value => value == 0, "a new state carries no progress");
+            state.ApplyProgression(8_000, 100, 5_000, 5_000, progress, new DateOnly(2026, 10, 1));
 
             await db.SaveChangesAsync();
         }
@@ -419,8 +428,7 @@ public sealed class TrainingPersistenceTests
             .GetRequiredService<TouchlineManagerDbContext>()
             .PlayerStates.AsNoTracking().SingleAsync(row => row.PlayerId == playerId);
 
-        reloaded.DevelopmentRemainder.Should().Be(250);
-        reloaded.DeclineRemainder.Should().Be(640, "TRN-16");
+        reloaded.AttributeProgress.Should().Equal(progress, "TRN-10, TRN-16");
     }
 
     private static DailyProgressionOutcome Outcome(
@@ -433,11 +441,12 @@ public sealed class TrainingPersistenceTests
             FatigueBp: 100,
             MoraleBp: 5_000,
             MatchSharpnessBp: 5_000,
-            DevelopmentRemainder: 0,
-            DeclineRemainder: 0,
+            AttributeProgress: AttributeProgress.None(),
             developmentMilli,
             declineMilli,
-            changes);
+            changes,
+            // A quarter of a point either way per change, so the round trip has a split to carry.
+            ProgressChanges: [.. changes.Select(change => new AttributeProgressChange(change.Attribute, 250_000 * Math.Sign(change.Delta)))]);
 
     private Task<(Guid ClubId, Guid FocusedId, Guid PlainId)> ArrangeAsync(AsyncServiceScope scope) =>
         ArrangeClubAsync(scope, $"Training Vale {Guid.NewGuid():N}");

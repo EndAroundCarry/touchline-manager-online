@@ -85,6 +85,7 @@ public sealed class CommentaryTests
             "absenceFixtures",
             "club",
             "clubId",
+            "goalkeeper",
             "opponent",
             "playerId",
             "second",

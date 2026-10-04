@@ -48,6 +48,12 @@ export interface TrainingPlayer {
   readonly state: PlayerState;
   readonly attributes: PlayerAttributes;
 
+  /**
+   * How far each attribute is towards its next point, keyed by attribute code, in points between -1 and 1:
+   * positive towards a gain, negative towards a loss. An attribute with no progress is left out (`TRN-10`).
+   */
+  readonly attributeProgress: Readonly<Record<string, number>>;
+
   /** The programme the player trains: the override, else the position default. */
   readonly programme: string;
 
@@ -131,6 +137,18 @@ export interface PlayerTrainingAttributeChange {
   readonly delta: number;
 }
 
+/** One attribute's share of a progression day's training. */
+export interface PlayerTrainingProgress {
+  /** The attribute code, e.g. `finishing`. */
+  readonly attribute: string;
+
+  /**
+   * How far the attribute's progress towards its next point moved, in points to three decimals: positive for
+   * the share of the day's development it earned, negative for decline.
+   */
+  readonly progress: number;
+}
+
 /** One progression day in a player's training history. */
 export interface PlayerTrainingDay {
   /** The progression day, as an ISO date. */
@@ -145,6 +163,12 @@ export interface PlayerTrainingDay {
 
   /** Which attributes moved; empty on most days. */
   readonly attributeChanges: readonly PlayerTrainingAttributeChange[];
+
+  /**
+   * How the day's training was split across the attributes, in canonical attribute order. Empty for a day
+   * recorded before progress was tracked per attribute.
+   */
+  readonly progressChanges: readonly PlayerTrainingProgress[];
 }
 
 /** What one programme did for a player across the days returned. */

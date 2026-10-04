@@ -175,6 +175,36 @@ export interface AttributeRow {
 
   /** The displayed value, 1–20. */
   readonly value: number;
+
+  /** How far the attribute is towards its next point, between -1 and 1; 0 when it has made none (`TRN-10`). */
+  readonly progress: number;
+}
+
+/**
+ * Words for an attribute's progress towards its next point: two decimals, never reaching a whole point,
+ * with a minus sign for progress towards a loss. Empty when there is none worth showing.
+ */
+export function progressText(progress: number): string {
+  const magnitude = Math.min(0.99, Math.round(Math.abs(progress) * 100) / 100);
+
+  if (magnitude === 0) {
+    return '';
+  }
+
+  return `${progress < 0 ? '−' : ''}${magnitude.toFixed(2)}`;
+}
+
+/** What a screen reader hears for an attribute's progress, or an empty string when it has none to show. */
+export function progressReadOut(progress: number, value: number): string {
+  const text = progressText(progress);
+
+  if (text === '') {
+    return '';
+  }
+
+  return progress > 0
+    ? `${text} of the way to ${value + 1}`
+    : `${text.slice(1)} of the way to dropping to ${value - 1}`;
 }
 
 /** One attribute family and its members, in the order the profile renders them (`TRN-2`). */
@@ -194,60 +224,69 @@ export interface AttributeGroup {
  *
  * The order is the product's, not the payload's: a profile is read family by family, and a goalkeeper's
  * goalkeeping attributes are the ones a manager looks at first even though set pieces come first in the
- * storage order.
+ * storage order. The progress map is the player's `attributeProgress`; an attribute missing from it has none.
  */
-export function attributeGroups(attributes: PlayerAttributes): readonly AttributeGroup[] {
+export function attributeGroups(
+  attributes: PlayerAttributes,
+  progress: Readonly<Record<string, number>> = {},
+): readonly AttributeGroup[] {
+  const row = (label: string, key: string, value: number): AttributeRow => ({
+    label,
+    value,
+    progress: progress[key] ?? 0,
+  });
+
   return [
     {
       key: 'goalkeeping',
       label: 'Goalkeeping',
       rows: [
-        { label: 'Handling', value: attributes.goalkeeping.handling },
-        { label: 'Reflexes', value: attributes.goalkeeping.reflexes },
-        { label: 'One-on-ones', value: attributes.goalkeeping.oneOnOnes },
-        { label: 'Aerial ability', value: attributes.goalkeeping.aerialAbility },
+        row('Handling', 'handling', attributes.goalkeeping.handling),
+        row('Reflexes', 'reflexes', attributes.goalkeeping.reflexes),
+        row('One-on-ones', 'oneOnOnes', attributes.goalkeeping.oneOnOnes),
+        row('Aerial ability', 'aerialAbility', attributes.goalkeeping.aerialAbility),
       ],
     },
     {
       key: 'technical',
       label: 'Technical',
       rows: [
-        { label: 'Finishing', value: attributes.technical.finishing },
-        { label: 'Passing', value: attributes.technical.passing },
-        { label: 'Crossing', value: attributes.technical.crossing },
-        { label: 'Dribbling', value: attributes.technical.dribbling },
-        { label: 'First touch', value: attributes.technical.firstTouch },
-        { label: 'Tackling', value: attributes.technical.tackling },
-        { label: 'Marking', value: attributes.technical.marking },
-        { label: 'Heading', value: attributes.technical.heading },
-        { label: 'Technique', value: attributes.technical.technique },
-        { label: 'Set pieces', value: attributes.technical.setPieces },
+        row('Finishing', 'finishing', attributes.technical.finishing),
+        row('Passing', 'passing', attributes.technical.passing),
+        row('Crossing', 'crossing', attributes.technical.crossing),
+        row('Dribbling', 'dribbling', attributes.technical.dribbling),
+        row('First touch', 'firstTouch', attributes.technical.firstTouch),
+        row('Tackling', 'tackling', attributes.technical.tackling),
+        row('Marking', 'marking', attributes.technical.marking),
+        row('Heading', 'heading', attributes.technical.heading),
+        row('Technique', 'technique', attributes.technical.technique),
+        row('Set pieces', 'setPieces', attributes.technical.setPieces),
       ],
     },
     {
       key: 'mental',
       label: 'Mental',
       rows: [
-        { label: 'Decisions', value: attributes.mental.decisions },
-        { label: 'Vision', value: attributes.mental.vision },
-        { label: 'Positioning', value: attributes.mental.positioning },
-        { label: 'Composure', value: attributes.mental.composure },
-        { label: 'Anticipation', value: attributes.mental.anticipation },
-        { label: 'Work rate', value: attributes.mental.workRate },
-        { label: 'Aggression', value: attributes.mental.aggression },
-        { label: 'Leadership', value: attributes.mental.leadership },
+        row('Decisions', 'decisions', attributes.mental.decisions),
+        row('Vision', 'vision', attributes.mental.vision),
+        row('Positioning', 'positioning', attributes.mental.positioning),
+        row('Composure', 'composure', attributes.mental.composure),
+        row('Anticipation', 'anticipation', attributes.mental.anticipation),
+        row('Work rate', 'workRate', attributes.mental.workRate),
+        row('Aggression', 'aggression', attributes.mental.aggression),
+        row('Leadership', 'leadership', attributes.mental.leadership),
       ],
     },
     {
       key: 'physical',
       label: 'Physical',
       rows: [
-        { label: 'Pace', value: attributes.physical.pace },
-        { label: 'Acceleration', value: attributes.physical.acceleration },
-        { label: 'Stamina', value: attributes.physical.stamina },
-        { label: 'Strength', value: attributes.physical.strength },
-        { label: 'Agility', value: attributes.physical.agility },
-        { label: 'Jumping reach', value: attributes.physical.jumpingReach },
+        row('Pace', 'pace', attributes.physical.pace),
+        row('Acceleration', 'acceleration', attributes.physical.acceleration),
+        row('Stamina', 'stamina', attributes.physical.stamina),
+        row('Strength', 'strength', attributes.physical.strength),
+        row('Agility', 'agility', attributes.physical.agility),
+        row('Jumping reach', 'jumpingReach', attributes.physical.jumpingReach),
       ],
     },
   ];

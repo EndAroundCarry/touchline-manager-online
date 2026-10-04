@@ -420,13 +420,54 @@
                       {{ activePassage()?.narration ?? '' }}
                     </p>
                   </div>
+                  <!-- Commentary feed: rows appended as the playhead passes their film time. -->
+                  <div class="relative border-b border-slate-800 bg-[#0c1220]">
+                    <div
+                      #feedScroll
+                      data-testid="match-feed"
+                      class="max-h-24 overflow-y-auto px-4 py-2"
+                      role="log"
+                      aria-live="polite"
+                      aria-label="Match commentary feed"
+                      (scroll)="onFeedScroll()"
+                    >
+                      <ol class="space-y-0.5">
+                        @for (row of feed(); track row.key) {
+                          <li class="flex items-start gap-3 text-xs leading-snug">
+                            <span
+                              class="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-slate-400"
+                              >{{ row.clock }}</span
+                            >
+                            <span
+                              class="flex-1"
+                              [class]="
+                                row.isGoal ? 'font-semibold text-emerald-400' : sideClass(row.side)
+                              "
+                              >{{ row.text }}</span
+                            >
+                          </li>
+                        } @empty {
+                          <li class="py-1 text-xs text-slate-500">Press play to follow the match.</li>
+                        }
+                      </ol>
+                    </div>
+                    @if (!feedPinned()) {
+                      <button
+                        type="button"
+                        class="absolute right-3 top-2 rounded border border-emerald-800 bg-[#0c1220] px-2 py-0.5 text-[10px] text-emerald-400 shadow transition hover:bg-emerald-900/40"
+                        (click)="jumpToLive()"
+                      >
+                        Jump to live
+                      </button>
+                    }
+                  </div>
                   @if (!textOnly()) {
                     <div
                       class="flex flex-1 items-center justify-center overflow-hidden bg-[#090d16] p-2"
                     >
                       <div
                         class="relative w-full overflow-hidden rounded-lg border border-slate-800 shadow-2xl"
-                        style="aspect-ratio: 105 / 68; max-height: calc(100vh - 320px)"
+                        style="aspect-ratio: 105 / 68; max-height: calc(100vh - 380px)"
                       >
                         <!--
                           Every effect on the pitch is drawn by the renderer itself (Stage 6), including a
@@ -621,48 +662,6 @@
                     <div class="p-3 text-xs text-slate-400">Lineup not available</div>
                   }
                 </aside>
-              </div>
-
-              <!-- Bottom commentary feed: rows appended as the playhead passes their film time. -->
-              <div class="relative border-t border-slate-800 bg-[#0c1220]">
-                <div
-                  #feedScroll
-                  data-testid="match-feed"
-                  class="max-h-44 overflow-y-auto px-4 py-2"
-                  role="log"
-                  aria-live="polite"
-                  aria-label="Match commentary feed"
-                  (scroll)="onFeedScroll()"
-                >
-                  <ol class="space-y-0.5">
-                    @for (row of feed(); track row.key) {
-                      <li class="flex items-start gap-3 text-xs leading-snug">
-                        <span
-                          class="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-slate-400"
-                          >{{ row.clock }}</span
-                        >
-                        <span
-                          class="flex-1"
-                          [class]="
-                            row.isGoal ? 'font-semibold text-emerald-400' : sideClass(row.side)
-                          "
-                          >{{ row.text }}</span
-                        >
-                      </li>
-                    } @empty {
-                      <li class="py-1 text-xs text-slate-500">Press play to follow the match.</li>
-                    }
-                  </ol>
-                </div>
-                @if (!feedPinned()) {
-                  <button
-                    type="button"
-                    class="absolute right-3 top-2 rounded border border-emerald-800 bg-[#0c1220] px-2 py-0.5 text-[10px] text-emerald-400 shadow transition hover:bg-emerald-900/40"
-                    (click)="jumpToLive()"
-                  >
-                    Jump to live
-                  </button>
-                }
               </div>
             }
           } @else {

@@ -6,7 +6,20 @@
   </span>
   <span class="flex shrink-0 items-baseline gap-2">
     <span [class]="valueClass()" aria-hidden="true">{{ value() }}</span>
+    @if (progressLabel(); as text) {
+      <span
+        class="-ml-1 text-[0.5rem] tabular-nums text-ink-2 sm:-ml-1.5 sm:text-xs"
+        aria-hidden="true"
+        data-testid="attribute-progress"
+        >({{ text }})</span
+      >
+    }
     <span [class]="wordClass()" aria-hidden="true">{{ band().label }}</span>
   </span>
-  <span class="sr-only">{{ value() }}, {{ band().label }}</span>
+  <span class="sr-only"
+    >{{ value() }}, {{ band().label }}
+    @if (progressSpoken(); as spoken) {
+      , {{ spoken }}
+    }
+  </span>
 </div>

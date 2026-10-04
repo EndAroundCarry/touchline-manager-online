@@ -293,7 +293,7 @@ public sealed class WorldSeedingTests : WorldTestBase
         var states = await db.PlayerStates.ToListAsync();
 
         states.Should().OnlyContain(row => row.ConditionBp <= WorldRuleSet.StateBasisPointsMax, "TRN-5");
-        states.Should().OnlyContain(row => row.DevelopmentRemainder == 0, "TRN-10");
+        states.Should().OnlyContain(row => row.AttributeProgress.All(progress => progress == 0), "TRN-10");
     }
 
     [Fact]

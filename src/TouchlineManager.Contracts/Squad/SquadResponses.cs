@@ -170,6 +170,11 @@ public sealed record PlayerRegistrationResponse(
 /// <param name="SecondaryPositions">The stable codes of the other positions the player covers.</param>
 /// <param name="Status">The stable code of the player's lifecycle state.</param>
 /// <param name="Attributes">The displayed attribute grid, grouped by family.</param>
+/// <param name="AttributeProgress">
+/// How far each attribute is towards its next point, keyed by attribute code, in points between -1 and 1:
+/// positive is progress towards a gain, negative towards a loss. Attributes with no progress are left out
+/// (`TRN-10`).
+/// </param>
 /// <param name="State">Condition, fatigue, morale, and sharpness.</param>
 /// <param name="Contract">The active contract, or null if the player has none.</param>
 /// <param name="Registration">The active registration, or null if the player has none.</param>
@@ -198,6 +203,7 @@ public sealed record PlayerResponse(
     IReadOnlyList<string> SecondaryPositions,
     string Status,
     PlayerAttributesResponse Attributes,
+    IReadOnlyDictionary<string, decimal> AttributeProgress,
     PlayerStateResponse State,
     PlayerContractSummaryResponse? Contract,
     PlayerRegistrationResponse? Registration,

@@ -8,6 +8,8 @@ import {
   footLabel,
   positionFamilyOf,
   positionLabel,
+  progressReadOut,
+  progressText,
   STAT_COLUMNS,
   statCells,
   seasonsPlayedLabel,
@@ -200,8 +202,44 @@ describe('squad presentation', () => {
       ]);
       expect(groups.reduce((total, group) => total + group.rows.length, 0)).toBe(28);
       expect(groups.every((group) => group.rows.every((row) => row.label.length > 0))).toBe(true);
-      expect(groups[1].rows[0]).toEqual({ label: 'Finishing', value: 10 });
-      expect(groups[0].rows[0]).toEqual({ label: 'Handling', value: 1 });
+      expect(groups[1].rows[0]).toEqual({ label: 'Finishing', value: 10, progress: 0 });
+      expect(groups[0].rows[0]).toEqual({ label: 'Handling', value: 1, progress: 0 });
+    });
+
+    it('carries each attribute’s progress towards its next point, by attribute code (TRN-10)', () => {
+      const groups = attributeGroups(attributes, { finishing: 0.85, oneOnOnes: -0.4, pace: 0.1 });
+      const progress = (label: string) =>
+        groups.flatMap((group) => group.rows).find((row) => row.label === label)?.progress;
+
+      expect(progress('Finishing')).toBe(0.85);
+      expect(progress('One-on-ones')).toBe(-0.4);
+      expect(progress('Pace')).toBe(0.1);
+      expect(progress('Passing')).toBe(0);
+    });
+  });
+
+  describe('progress words', () => {
+    it('shows two decimals, with a minus sign for progress towards a loss', () => {
+      expect(progressText(0.85)).toBe('0.85');
+      expect(progressText(0.5)).toBe('0.50');
+      expect(progressText(-0.4)).toBe('−0.40');
+    });
+
+    it('never shows a whole point, since a whole point has already been spent', () => {
+      expect(progressText(0.996)).toBe('0.99');
+      expect(progressText(-0.999)).toBe('−0.99');
+    });
+
+    it('shows nothing for no progress, or progress too small to read', () => {
+      expect(progressText(0)).toBe('');
+      expect(progressText(0.004)).toBe('');
+      expect(progressText(-0.003)).toBe('');
+    });
+
+    it('says in words which value the skill is heading for', () => {
+      expect(progressReadOut(0.85, 19)).toBe('0.85 of the way to 20');
+      expect(progressReadOut(-0.4, 12)).toBe('0.40 of the way to dropping to 11');
+      expect(progressReadOut(0, 12)).toBe('');
     });
   });
 

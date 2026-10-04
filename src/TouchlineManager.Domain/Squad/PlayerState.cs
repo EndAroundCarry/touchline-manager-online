@@ -12,9 +12,9 @@ namespace TouchlineManager.Domain.Squad;
 /// rounding ever reaches this table.
 /// </para>
 /// <para>
-/// <see cref="DevelopmentRemainder"/> is the carry-forward of a partial training gain (`TRN-10`). It is
-/// created at zero by the generator and is what stops a day's progress being lost to rounding: the
-/// daily progression job (Stage 4's later milestone) accumulates fractional growth here.
+/// <see cref="AttributeProgress"/> is each attribute's progress towards its next point (`TRN-10`, `TRN-16`).
+/// It is created empty by the generator and is what stops a day's progress being lost to rounding: the daily
+/// progression job accumulates each attribute's share of the day's growth, and its ageing, here.
 /// </para>
 /// </remarks>
 public sealed class PlayerState
@@ -42,11 +42,17 @@ public sealed class PlayerState
     /// <summary>Gets match sharpness, 0–10,000.</summary>
     public int MatchSharpnessBp { get; private set; }
 
-    /// <summary>Gets the partial development remainder carried across days (`TRN-10`).</summary>
-    public int DevelopmentRemainder { get; private set; }
+    /// <summary>
+    /// Gets each attribute's progress towards its next point as compact JSON (`TRN-10`, `TRN-16`); read it with
+    /// <see cref="AttributeProgress"/>.
+    /// </summary>
+    public string AttributeProgressJson { get; private set; } = Training.AttributeProgress.EmptyJson;
 
-    /// <summary>Gets the partial decline remainder carried across days (`TRN-16`).</summary>
-    public int DeclineRemainder { get; private set; }
+    /// <summary>
+    /// Gets each attribute's progress towards its next point, in millionths of a point and canonical attribute
+    /// order: positive towards a gain, negative towards a loss, always inside one point.
+    /// </summary>
+    public IReadOnlyList<int> AttributeProgress => Training.AttributeProgress.Parse(AttributeProgressJson);
 
     /// <summary>Gets the last day the progression job ran for this player, if it has run.</summary>
     public DateOnly? LastProgressionDate { get; private set; }
@@ -66,8 +72,7 @@ public sealed class PlayerState
         FatigueBp = WorldRuleSet.StateBasisPointsMin,
         MoraleBp = NeutralBasisPoints,
         MatchSharpnessBp = NeutralBasisPoints,
-        DevelopmentRemainder = 0,
-        DeclineRemainder = 0,
+        AttributeProgressJson = Training.AttributeProgress.EmptyJson,
         LastProgressionDate = null,
         Version = 1,
     };
@@ -78,38 +83,25 @@ public sealed class PlayerState
     /// <param name="fatigueBp">Fatigue in basis points.</param>
     /// <param name="moraleBp">Morale in basis points.</param>
     /// <param name="matchSharpnessBp">Match sharpness in basis points.</param>
-    /// <param name="developmentRemainder">The carried development remainder.</param>
     /// <param name="lastProgressionDate">The last progression day, if any.</param>
-    /// <param name="declineRemainder">The carried decline remainder (`TRN-16`).</param>
+    /// <param name="attributeProgress">Each attribute's progress towards its next point, or none (`TRN-10`).</param>
     public static PlayerState Create(
         Guid playerId,
         int conditionBp,
         int fatigueBp,
         int moraleBp,
         int matchSharpnessBp,
-        int developmentRemainder,
         DateOnly? lastProgressionDate,
-        int declineRemainder = 0)
+        IReadOnlyList<int>? attributeProgress = null)
     {
         EnsureBasisPoints(conditionBp, nameof(conditionBp));
         EnsureBasisPoints(fatigueBp, nameof(fatigueBp));
         EnsureBasisPoints(moraleBp, nameof(moraleBp));
         EnsureBasisPoints(matchSharpnessBp, nameof(matchSharpnessBp));
 
-        if (developmentRemainder < 0)
+        if (attributeProgress is not null)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(developmentRemainder),
-                developmentRemainder,
-                "A development remainder is never negative (TRN-10).");
-        }
-
-        if (declineRemainder < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(declineRemainder),
-                declineRemainder,
-                "A decline remainder is never negative (TRN-16).");
+            EnsureProgress(attributeProgress, nameof(attributeProgress));
         }
 
         return new PlayerState
@@ -119,8 +111,9 @@ public sealed class PlayerState
             FatigueBp = fatigueBp,
             MoraleBp = moraleBp,
             MatchSharpnessBp = matchSharpnessBp,
-            DevelopmentRemainder = developmentRemainder,
-            DeclineRemainder = declineRemainder,
+            AttributeProgressJson = attributeProgress is null
+                ? Training.AttributeProgress.EmptyJson
+                : Training.AttributeProgress.Serialize(attributeProgress),
             LastProgressionDate = lastProgressionDate,
             Version = 1,
         };
@@ -138,45 +131,27 @@ public sealed class PlayerState
     /// <param name="fatigueBp">The new fatigue in basis points.</param>
     /// <param name="moraleBp">The new morale in basis points.</param>
     /// <param name="matchSharpnessBp">The new match sharpness in basis points.</param>
-    /// <param name="developmentRemainder">The partial development carried into the next day (`TRN-10`).</param>
-    /// <param name="declineRemainder">The partial decline carried into the next day (`TRN-16`).</param>
+    /// <param name="attributeProgress">Each attribute's progress towards its next point, carried into the next day (`TRN-10`).</param>
     /// <param name="day">The day the progression was run for.</param>
     public void ApplyProgression(
         int conditionBp,
         int fatigueBp,
         int moraleBp,
         int matchSharpnessBp,
-        int developmentRemainder,
-        int declineRemainder,
+        IReadOnlyList<int> attributeProgress,
         DateOnly day)
     {
         EnsureBasisPoints(conditionBp, nameof(conditionBp));
         EnsureBasisPoints(fatigueBp, nameof(fatigueBp));
         EnsureBasisPoints(moraleBp, nameof(moraleBp));
         EnsureBasisPoints(matchSharpnessBp, nameof(matchSharpnessBp));
-
-        if (developmentRemainder < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(developmentRemainder),
-                developmentRemainder,
-                "A development remainder is never negative (TRN-10).");
-        }
-
-        if (declineRemainder < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(declineRemainder),
-                declineRemainder,
-                "A decline remainder is never negative (TRN-16).");
-        }
+        EnsureProgress(attributeProgress, nameof(attributeProgress));
 
         ConditionBp = conditionBp;
         FatigueBp = fatigueBp;
         MoraleBp = moraleBp;
         MatchSharpnessBp = matchSharpnessBp;
-        DevelopmentRemainder = developmentRemainder;
-        DeclineRemainder = declineRemainder;
+        AttributeProgressJson = Training.AttributeProgress.Serialize(attributeProgress);
         LastProgressionDate = day;
         Version++;
     }
@@ -209,6 +184,19 @@ public sealed class PlayerState
 
     private static int Clamp(int value) =>
         Math.Clamp(value, WorldRuleSet.StateBasisPointsMin, WorldRuleSet.StateBasisPointsMax);
+
+    private static void EnsureProgress(IReadOnlyList<int> progress, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(progress, parameterName);
+
+        if (!Training.AttributeProgress.IsValid(progress))
+        {
+            throw new ArgumentOutOfRangeException(
+                parameterName,
+                progress,
+                "Attribute progress is one value per attribute, each inside one point (TRN-10).");
+        }
+    }
 
     private static void EnsureBasisPoints(int value, string parameterName)
     {

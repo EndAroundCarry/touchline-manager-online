@@ -328,8 +328,7 @@ erDiagram
         int fatigue_bp
         int morale_bp
         int match_sharpness_bp
-        int development_remainder
-        int decline_remainder
+        jsonb attribute_progress
         date last_progression_date
         bigint version
     }
@@ -417,7 +416,8 @@ erDiagram
 | `unique (fixture_id, club_id)` | `fixture_team_sheets` | One sheet per club per fixture |
 | **Partial unique** one active scheduling record per club | `training_plans` | Latest plan wins |
 | `check (programme in (…))` on the nine programme codes; `team_focus` and `focus_family` nullable and unread until the contract migration | `player_training_focus` | `TRN-1`, `TRN-2`, `MIG-3` |
-| `unique (player_id, day)`; `check (decline_remainder >= 0)` on `player_state` | `player_training_days` | `TRN-16`, `TRN-17`; guards the progression run's idempotency |
+| `unique (player_id, day)` | `player_training_days` | `TRN-17`; guards the progression run's idempotency |
+| `attribute_progress` jsonb, `[[attributeIndex, micro], ...]`; `development_remainder` and `decline_remainder` kept, defaulted to zero and unread until the contract migration | `player_state` | `TRN-10`, `TRN-16`, `MIG-3` (ADR-0060) |
 | Trigram/full-text index on player name | `players` | Scouting search |
 | `unique (manager_id, player_id)` | `market.shortlists` | `SCT-3` (see §7 on the plan's internal conflict about this table's schema) |
 

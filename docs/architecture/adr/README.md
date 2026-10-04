@@ -73,9 +73,10 @@ the system is shaped the way it is.
 | [0055](0055-engine-v6-skills-where-the-design-says.md) | Engine-v6 puts skills where the design says they are: tiredness, shot contest scale, duel fouls, corner takers | Accepted |
 | [0054](0054-replay-v4-constant-pace-film.md) | Replay-v4 plays the whole match as one constant-pace film on one continuous timeline | Accepted |
 | [0056](0056-engine-v7-passes-and-take-ons.md) | Engine-v7 counts passes and take-ons on the player line, and the season statistics store them | Accepted |
-| [0057](0057-training-programmes-age-curve-and-hidden-aptitude.md) | Training programmes, an age curve, and hidden aptitude (`training-v2`) | Accepted |
+| [0057](0057-training-programmes-age-curve-and-hidden-aptitude.md) | Training programmes, an age curve, and hidden aptitude (`training-v2`) | Accepted (decisions 2, 4 and 6 superseded by ADR-0060) |
 | [0058](0058-engine-v8-pass-focus.md) | Engine-v8 lets a manager direct the ball through the centre and a flank (the pass focus) | Accepted |
 | [0059](0059-dark-management-workspace-ui.md) | The web client is a dark management workspace built on role tokens | Accepted |
+| [0060](0060-per-attribute-training-progress.md) | Training progress is held per attribute, and the day's budget is split by weight (`training-v3`) | Accepted |
 
 ## Rules for changing an ADR
 

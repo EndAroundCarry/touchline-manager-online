@@ -91,6 +91,7 @@ export function player(overrides: Partial<TrainingPlayer> = {}): TrainingPlayer 
     age: 24,
     state: { condition: 100, fatigue: 0, morale: 50, matchSharpness: 50 },
     attributes: attributes(10, { technical: { finishing: 17 }, mental: { composure: 5 } }),
+    attributeProgress: {},
     programme: 'forward',
     isDefaultProgramme: true,
     defaultProgramme: 'forward',

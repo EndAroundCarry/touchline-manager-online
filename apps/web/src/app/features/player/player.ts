@@ -73,7 +73,7 @@ export class PlayerProfile implements OnInit {
   protected readonly attributeFamilies = computed(() => {
     const player = this.player();
 
-    return player === null ? [] : attributeGroups(player.attributes);
+    return player === null ? [] : attributeGroups(player.attributes, player.attributeProgress);
   });
 
   /** The four state measures with their bands resolved. */

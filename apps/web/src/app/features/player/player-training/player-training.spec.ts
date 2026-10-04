@@ -45,6 +45,10 @@ const populated: PlayerTraining = {
       pointsGained: 1,
       pointsLost: 0,
       attributeChanges: [{ attribute: 'finishing', delta: 1 }],
+      progressChanges: [
+        { attribute: 'finishing', progress: 0.054 },
+        { attribute: 'composure', progress: 0.036 },
+      ],
     },
     {
       day: '2026-10-02',
@@ -54,6 +58,7 @@ const populated: PlayerTraining = {
       pointsGained: 0,
       pointsLost: 0,
       attributeChanges: [],
+      progressChanges: [],
     },
     {
       day: '2026-10-03',
@@ -63,6 +68,10 @@ const populated: PlayerTraining = {
       pointsGained: 0,
       pointsLost: 1,
       attributeChanges: [{ attribute: 'stamina', delta: -1 }],
+      progressChanges: [
+        { attribute: 'pace', progress: 0.05 },
+        { attribute: 'stamina', progress: -0.012 },
+      ],
     },
   ],
   summary: [
@@ -236,15 +245,15 @@ describe('PlayerTraining tab', () => {
       ]);
     });
 
-    it('lists every plotted point in a table, with the attributes that moved', () => {
+    it('lists every plotted point in a table, with how the day was split and what moved', () => {
       const rows = Array.from(
         root.querySelectorAll('[data-testid="training-points"] tbody tr'),
       ).map((row) => Array.from(row.children).map((cell) => cell.textContent?.trim()));
 
       expect(rows).toEqual([
-        ['2026-10-01', 'Forward', '0.400', '+1 Finishing'],
-        ['2026-10-02', 'Winger', '0.300', ''],
-        ['2026-10-03', 'Winger', '-0.100', '−1 Stamina'],
+        ['2026-10-01', 'Forward', '0.400', 'Finishing +0.054, Composure +0.036', '+1 Finishing'],
+        ['2026-10-02', 'Winger', '0.300', '', ''],
+        ['2026-10-03', 'Winger', '-0.100', 'Pace +0.050, Stamina −0.012', '−1 Stamina'],
       ]);
     });
 

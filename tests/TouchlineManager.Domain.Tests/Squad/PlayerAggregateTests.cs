@@ -171,14 +171,14 @@ public sealed class PlayerAggregateTests
         state.FatigueBp.Should().Be(WorldRuleSet.StateBasisPointsMin);
         state.MoraleBp.Should().Be(PlayerState.NeutralBasisPoints);
         state.MatchSharpnessBp.Should().Be(PlayerState.NeutralBasisPoints);
-        state.DevelopmentRemainder.Should().Be(0);
+        state.AttributeProgress.Should().HaveCount(AttributeNames.Count).And.OnlyContain(progress => progress == 0);
         state.LastProgressionDate.Should().BeNull();
     }
 
     [Fact]
     public void A_match_load_moves_condition_fatigue_and_morale_by_its_deltas()
     {
-        var state = PlayerState.Create(Guid.CreateVersion7(), 9_000, 200, 5_000, 5_000, 0, null);
+        var state = PlayerState.Create(Guid.CreateVersion7(), 9_000, 200, 5_000, 5_000, null);
 
         state.ApplyMatchLoad(conditionDeltaBp: -900, fatigueDeltaBp: 600, moraleDeltaBp: 350);
 
@@ -191,7 +191,7 @@ public sealed class PlayerAggregateTests
     [Fact]
     public void A_match_load_never_pushes_a_state_value_off_its_scale()
     {
-        var state = PlayerState.Create(Guid.CreateVersion7(), 100, 9_900, 9_900, 5_000, 0, null);
+        var state = PlayerState.Create(Guid.CreateVersion7(), 100, 9_900, 9_900, 5_000, null);
 
         state.ApplyMatchLoad(conditionDeltaBp: -5_000, fatigueDeltaBp: 5_000, moraleDeltaBp: 5_000);
 
@@ -203,15 +203,58 @@ public sealed class PlayerAggregateTests
     [Fact]
     public void A_state_value_outside_its_scale_is_rejected()
     {
-        var act = () => PlayerState.Create(Guid.CreateVersion7(), 10_001, 0, 0, 0, 0, null);
+        var act = () => PlayerState.Create(Guid.CreateVersion7(), 10_001, 0, 0, 0, null);
 
         act.Should().Throw<ArgumentOutOfRangeException>("TRN-5");
     }
 
     [Fact]
-    public void A_negative_development_remainder_is_rejected()
+    public void Attribute_progress_is_stored_and_read_back_per_attribute()
     {
-        var act = () => PlayerState.Create(Guid.CreateVersion7(), 0, 0, 0, 0, -1, null);
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)AttributeName.Finishing] = 850_000;
+        progress[(int)AttributeName.Pace] = -400_000;
+
+        var state = PlayerState.Create(Guid.CreateVersion7(), 9_000, 200, 5_000, 5_000, null, progress);
+
+        state.AttributeProgress.Should().Equal(progress);
+        state.AttributeProgressJson.Should().Be("[[0,850000],[18,-400000]]", "only attributes with progress are stored");
+    }
+
+    [Fact]
+    public void Applying_a_progression_replaces_the_attribute_progress()
+    {
+        var state = PlayerState.Open(Guid.CreateVersion7());
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)AttributeName.Composure] = 120_000;
+
+        state.ApplyProgression(8_000, 100, 5_000, 5_000, progress, new DateOnly(2026, 10, 1));
+
+        state.AttributeProgress.Should().Equal(progress);
+        state.LastProgressionDate.Should().Be(new DateOnly(2026, 10, 1));
+        state.Version.Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData(1_000_000)]
+    [InlineData(-1_000_000)]
+    public void Attribute_progress_of_a_whole_point_or_more_is_rejected(int value)
+    {
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)AttributeName.Finishing] = value;
+
+        var act = () => PlayerState.Create(Guid.CreateVersion7(), 0, 0, 0, 0, null, progress);
+
+        act.Should().Throw<ArgumentOutOfRangeException>("a whole point is spent, never stored (TRN-10)");
+    }
+
+    [Fact]
+    public void Attribute_progress_must_have_one_value_per_attribute()
+    {
+        var act = () => PlayerState.Create(Guid.CreateVersion7(), 0, 0, 0, 0, null, [1, 2, 3]);
 
         act.Should().Throw<ArgumentOutOfRangeException>("TRN-10");
     }

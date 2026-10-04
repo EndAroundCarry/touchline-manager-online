@@ -95,7 +95,8 @@ internal sealed class TrainingQueries : ITrainingQueries
                         row.State.ConditionBp,
                         row.State.FatigueBp,
                         row.State.MoraleBp,
-                        row.State.MatchSharpnessBp),
+                        row.State.MatchSharpnessBp,
+                        row.State.AttributeProgress),
                     row.Attributes.ToSet(),
                     focus?.Programme,
                     focus?.Version);
@@ -166,6 +167,7 @@ internal sealed class TrainingQueries : ITrainingQueries
                 day.DeclineMilli,
                 day.PointsGained,
                 day.PointsLost,
-                day.ParseChanges()))]);
+                day.ParseChanges(),
+                day.ParseProgress()))]);
     }
 }

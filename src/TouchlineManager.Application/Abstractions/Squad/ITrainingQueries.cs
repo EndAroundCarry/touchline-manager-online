@@ -90,6 +90,10 @@ public interface ITrainingQueries
 /// <param name="PointsGained">The whole points gained that day.</param>
 /// <param name="PointsLost">The whole points lost that day.</param>
 /// <param name="AttributeChanges">The per-attribute changes, in canonical attribute order.</param>
+/// <param name="ProgressChanges">
+/// How much each attribute's progress moved, in millionths of a point and canonical order; empty for a day
+/// recorded before progress was tracked per attribute.
+/// </param>
 public sealed record PlayerTrainingDayRow(
     DateOnly Day,
     TrainingProgramme Programme,
@@ -98,7 +102,8 @@ public sealed record PlayerTrainingDayRow(
     int DeclineMilli,
     int PointsGained,
     int PointsLost,
-    IReadOnlyList<AttributeChange> AttributeChanges);
+    IReadOnlyList<AttributeChange> AttributeChanges,
+    IReadOnlyList<AttributeProgressChange> ProgressChanges);
 
 /// <summary>One player's training regime and recent history as the player page reads it.</summary>
 /// <param name="PlayerId">The player.</param>

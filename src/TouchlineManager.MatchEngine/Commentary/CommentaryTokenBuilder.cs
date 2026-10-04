@@ -130,6 +130,9 @@ public enum PassageBeatKind
 
     /// <summary>A free kick is taken quickly, with no shot in it (`commentary-v4`).</summary>
     FreeKick = 12,
+
+    /// <summary>A ball played long through the air to a team-mate (`commentary-v5`).</summary>
+    LongPass = 13,
 }
 
 /// <summary>
@@ -146,13 +149,15 @@ public enum PassageBeatKind
 /// <param name="Kind">What kind of moment it is.</param>
 /// <param name="Event">The event to narrate when <paramref name="Kind"/> is <see cref="PassageBeatKind.Event"/>.</param>
 /// <param name="Seed">A stable seed that chooses the variant, so repeated lines can be told apart.</param>
+/// <param name="SecondParticipantId">The team-mate the ball is played to, when the beat has one (`commentary-v5`).</param>
 public sealed record PassageBeatV1(
     int TimeMilliseconds,
     MatchSide Side,
     Guid? ParticipantId,
     PassageBeatKind Kind,
     EngineEventV1? Event,
-    int Seed);
+    int Seed,
+    Guid? SecondParticipantId = null);
 
 /// <summary>
 /// Turns a simulated match into commentary tokens (master plan §8.6, `MAT-8`).
@@ -173,7 +178,7 @@ public sealed record PassageBeatV1(
 public static class CommentaryTokenBuilder
 {
     /// <summary>The version label of this template set.</summary>
-    public const string Version = "commentary-v4";
+    public const string Version = "commentary-v5";
 
     /// <summary>The delay between a strike and the line that reports where it ended up.</summary>
     private const int OutcomeDelayMilliseconds = 900;
@@ -198,7 +203,7 @@ public static class CommentaryTokenBuilder
             }
 
             var facts = Facts(input, matchEvent, names);
-            var variant = matchEvent.Sequence % template.Variants.Count;
+            var variant = ChooseVariant(template, facts, matchEvent.Sequence);
             var text = Render(template.Variants[variant], facts);
 
             tokens.Add(new CommentaryToken
@@ -209,13 +214,7 @@ public static class CommentaryTokenBuilder
                 Side = matchEvent.Side,
                 TemplateKey = template.Key,
                 VariantKey = $"{template.Key}.v{variant + 1}",
-                Parameters =
-                [
-                    .. facts
-                        .Where(fact => fact.Key != "clock" && fact.Key != "player" && fact.Key != "opponent")
-                        .OrderBy(fact => fact.Key, StringComparer.Ordinal)
-                        .Select(fact => new CommentaryParameter(fact.Key, fact.Value)),
-                ],
+                Parameters = DurableParameters(facts),
                 Text = text,
             });
         }
@@ -328,7 +327,7 @@ public static class CommentaryTokenBuilder
             }
 
             var facts = BeatFacts(input, names, beat);
-            var variant = ((beat.Seed % template.Variants.Count) + template.Variants.Count) % template.Variants.Count;
+            var variant = ChooseVariant(template, facts, beat.Seed);
 
             lines.Add(new HighlightCommentaryV1
             {
@@ -350,6 +349,7 @@ public static class CommentaryTokenBuilder
             ? template
             : null,
         PassageBeatKind.Pass => BuildTemplates["pass"],
+        PassageBeatKind.LongPass => BuildTemplates["long_pass"],
         PassageBeatKind.Carry => BuildTemplates["carry"],
         PassageBeatKind.Dribble => BuildTemplates["dribble"],
         PassageBeatKind.Cross => BuildTemplates["cross"],
@@ -391,6 +391,12 @@ public static class CommentaryTokenBuilder
             facts["playerId"] = player.ToString("D");
         }
 
+        if (beat.SecondParticipantId is Guid second && second != beat.ParticipantId)
+        {
+            facts["second"] = NameOf(names, second);
+            facts["secondId"] = second.ToString("D");
+        }
+
         return facts;
     }
 
@@ -398,7 +404,7 @@ public static class CommentaryTokenBuilder
     private static IReadOnlyList<CommentaryParameter> DurableParameters(IReadOnlyDictionary<string, string> facts) =>
     [
         .. facts
-            .Where(fact => fact.Key != "clock" && fact.Key != "player" && fact.Key != "opponent")
+            .Where(fact => fact.Key is not ("clock" or "stoppage" or "player" or "opponent"))
             .OrderBy(fact => fact.Key, StringComparer.Ordinal)
             .Select(fact => new CommentaryParameter(fact.Key, fact.Value)),
     ];
@@ -409,22 +415,62 @@ public static class CommentaryTokenBuilder
         int variantSeed,
         Dictionary<string, string> facts)
     {
-        var variant = ((variantSeed % template.Variants.Count) + template.Variants.Count) % template.Variants.Count;
+        var variant = ChooseVariant(template, facts, variantSeed);
 
         return new HighlightCommentaryV1
         {
             TimeMilliseconds = timeMilliseconds,
             TemplateKey = template.Key,
             VariantKey = $"{template.Key}.v{variant + 1}",
-            Parameters =
-            [
-                .. facts
-                    .Where(fact => fact.Key != "clock" && fact.Key != "player" && fact.Key != "opponent")
-                    .OrderBy(fact => fact.Key, StringComparer.Ordinal)
-                    .Select(fact => new CommentaryParameter(fact.Key, fact.Value)),
-            ],
+            Parameters = DurableParameters(facts),
             Text = Render(template.Variants[variant], facts),
         };
+    }
+
+    /// <summary>
+    /// Chooses which variant of a template to say, by seed, from the variants the facts can fill.
+    /// </summary>
+    /// <remarks>
+    /// A variant that names a team-mate, the keeper, or the stoppage clock is only eligible when that fact is
+    /// known, so a line never falls back to "a team-mate" while a sentence that needs no such fact was
+    /// available. The returned index is into the full variant list, which keeps the variant key stable.
+    /// </remarks>
+    private static int ChooseVariant(Template template, IReadOnlyDictionary<string, string> facts, int seed)
+    {
+        var eligible = new List<int>(template.Variants.Count);
+
+        for (var index = 0; index < template.Variants.Count; index++)
+        {
+            if (PlaceholdersOf(template.Variants[index]).All(facts.ContainsKey))
+            {
+                eligible.Add(index);
+            }
+        }
+
+        if (eligible.Count == 0)
+        {
+            return ((seed % template.Variants.Count) + template.Variants.Count) % template.Variants.Count;
+        }
+
+        return eligible[((seed % eligible.Count) + eligible.Count) % eligible.Count];
+    }
+
+    private static IEnumerable<string> PlaceholdersOf(string variant)
+    {
+        var start = variant.IndexOf('{', StringComparison.Ordinal);
+
+        while (start >= 0)
+        {
+            var end = variant.IndexOf('}', start);
+
+            if (end < 0)
+            {
+                yield break;
+            }
+
+            yield return variant.Substring(start + 1, end - start - 1);
+            start = variant.IndexOf('{', end);
+        }
     }
 
     private static Template PassageOpener(EngineEventType type) =>
@@ -457,6 +503,19 @@ public static class CommentaryTokenBuilder
             ["opponent"] = opponent.ClubName,
             ["clock"] = Clock(matchEvent),
         };
+
+        if (matchEvent.StoppageMinute > 0)
+        {
+            facts["stoppage"] = facts["clock"];
+        }
+
+        // The keeper the attack is against, which the shot and goal lines name.
+        var keeper = opponent.Starters().FirstOrDefault(participant => participant.IsGoalkeeper);
+
+        if (keeper is not null)
+        {
+            facts["goalkeeper"] = keeper.DisplayName;
+        }
 
         if (matchEvent.ParticipantId is Guid player)
         {
@@ -547,6 +606,7 @@ public static class CommentaryTokenBuilder
                 "{club} work the opening.",
                 "{club} build the move.",
                 "The ball is moved forward by {club}.",
+                "{club} are patiently stroking the ball around, looking for an opening in the defence.",
             ]),
         ["set_piece"] = new(
             "match.passage.set_piece",
@@ -596,6 +656,19 @@ public static class CommentaryTokenBuilder
                 "{player} finds a team-mate.",
                 "{player} moves it on.",
                 "{player} keeps the move going.",
+                "{player} plays a neat one-two with {second}.",
+                "{player} threads a delicate ball through to {second}.",
+                "{player} picks out {second} with a sharp pass.",
+                "{player} lays it off to {second}.",
+                "{player} looks up and finds {second}.",
+            ]),
+        ["long_pass"] = new(
+            "match.build.long_pass",
+            [
+                "{player} looks up and sprays a long diagonal pass out to {second}.",
+                "{player} sends a long ball towards {second}.",
+                "{player} goes long, looking for {second}.",
+                "{player} lofts it forward.",
             ]),
         ["carry"] = new(
             "match.build.carry",
@@ -620,6 +693,7 @@ public static class CommentaryTokenBuilder
                 "{player} delivers into the box.",
                 "{player} whips it in.",
                 "{player} sends a cross over.",
+                "{player} swings a cross in towards {second}.",
             ]),
         ["header"] = new(
             "match.build.header",
@@ -636,6 +710,7 @@ public static class CommentaryTokenBuilder
                 "{player} wins it back.",
                 "{player} slides in and takes it.",
                 "{player} dispossesses his man.",
+                "{player} comes in with a crunching tackle to break up the attack!",
             ]),
         ["interception"] = new(
             "match.build.interception",
@@ -652,6 +727,8 @@ public static class CommentaryTokenBuilder
                 "{player} gets a hand to it.",
                 "{player} keeps it out.",
                 "A save by {player}.",
+                "{player} reacts brilliantly to get across and stop it.",
+                "{player} gets down well to smother it.",
             ]),
         ["chance"] = new(
             "match.build.chance",
@@ -660,6 +737,9 @@ public static class CommentaryTokenBuilder
                 "{player} lets fly.",
                 "The chance falls to {player}.",
                 "{player} goes for goal.",
+                "{player} works some space and lets fly!",
+                "{player} pounces on the loose ball and shoots!",
+                "{player} strikes it with power...",
             ]),
 
         // The restarts a continuous film shows (`commentary-v4`).
@@ -716,6 +796,7 @@ public static class CommentaryTokenBuilder
                     "That is full time.",
                     "The referee ends it.",
                     "Full time at {club}.",
+                    "The referee checks his watch... and blows the final whistle!",
                 ]),
             [EngineEventType.Goal] = new(
                 "match.goal",
@@ -723,6 +804,10 @@ public static class CommentaryTokenBuilder
                     "Goal! {player} scores for {club}.",
                     "{player} finds the net for {club}.",
                     "It is in — {player} scores.",
+                    "{player} shoots... GOAL FOR {club}!",
+                    "{player} calmly slots it past {goalkeeper}!",
+                    "WHAT A STRIKE! {player} beats {goalkeeper} for {club}!",
+                    "DRAMA IN STOPPAGE TIME! {player} scores for {club} at {stoppage}!",
                 ]),
             [EngineEventType.PenaltyAwarded] = new(
                 "match.penalty.awarded",
@@ -730,6 +815,7 @@ public static class CommentaryTokenBuilder
                     "Penalty to {club}.",
                     "The referee points to the spot for {club}.",
                     "A penalty is given for {club}.",
+                    "THE REFEREE POINTS TO THE SPOT! Penalty to {club}!",
                 ]),
             [EngineEventType.PenaltyGoal] = new(
                 "match.penalty.goal",
@@ -737,6 +823,7 @@ public static class CommentaryTokenBuilder
                     "{player} converts the penalty.",
                     "It is a goal from the spot — {player} scores.",
                     "{player} scores from twelve yards.",
+                    "{player} steps up... AND CONVERTS THE PENALTY!",
                 ]),
             [EngineEventType.PenaltyMissed] = new(
                 "match.penalty.missed",
@@ -751,6 +838,8 @@ public static class CommentaryTokenBuilder
                     "Saved! {player} is denied by the goalkeeper.",
                     "A fine save keeps out {player}.",
                     "The goalkeeper gets to {player}'s effort.",
+                    "{goalkeeper} reacts brilliantly to keep out {player}'s effort.",
+                    "{goalkeeper} gets down well to smother the shot from {player}.",
                 ]),
             [EngineEventType.ShotBlocked] = new(
                 "match.shot.blocked",
@@ -758,6 +847,7 @@ public static class CommentaryTokenBuilder
                     "{player}'s shot is blocked.",
                     "A block denies {player}.",
                     "The effort from {player} is charged down.",
+                    "A crunching block stops {player} getting the shot away cleanly!",
                 ]),
             [EngineEventType.ShotOffTarget] = new(
                 "match.shot.off_target",
@@ -765,6 +855,9 @@ public static class CommentaryTokenBuilder
                     "{player} puts it off target.",
                     "{player} drags the shot wide.",
                     "That is off target from {player}.",
+                    "{player} tries his luck... HIGH AND WIDE!",
+                    "{player}'s shot trickles harmlessly wide.",
+                    "A momentary lapse leaves {player} free, but the effort is scuffed wide!",
                 ]),
             [EngineEventType.Woodwork] = new(
                 "match.shot.woodwork",
@@ -772,6 +865,7 @@ public static class CommentaryTokenBuilder
                     "{player} hits the woodwork!",
                     "Off the frame of the goal from {player}.",
                     "{player} strikes the post or bar.",
+                    "{player} strikes it with power... IT CRASHES AGAINST THE WOODWORK!",
                 ]),
             [EngineEventType.Foul] = new(
                 "match.foul",
@@ -779,6 +873,8 @@ public static class CommentaryTokenBuilder
                     "A foul by {player}.",
                     "Free kick given against {player}.",
                     "{player} gives away a foul.",
+                    "{player} goes in late... The referee blows his whistle.",
+                    "A reckless challenge by {player}! The referee blows for a foul.",
                 ]),
             [EngineEventType.YellowCard] = new(
                 "match.card.yellow",
@@ -786,6 +882,7 @@ public static class CommentaryTokenBuilder
                     "{player} is booked for {club}.",
                     "A yellow card for {player}.",
                     "{player} goes into the book.",
+                    "{player} receives a yellow card for that mistimed challenge.",
                 ]),
             [EngineEventType.SecondYellowCard] = new(
                 "match.card.second_yellow",
@@ -793,6 +890,7 @@ public static class CommentaryTokenBuilder
                     "A second booking — {player} is off for {club}.",
                     "{player} is booked again and sent off.",
                     "{player} is dismissed after a second caution.",
+                    "IT'S A SECOND YELLOW! {player} is sent off and {club} are down a man!",
                 ]),
             [EngineEventType.RedCard] = new(
                 "match.card.red",

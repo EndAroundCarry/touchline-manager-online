@@ -12,7 +12,7 @@ namespace TouchlineManager.Domain.Squad.Training;
 /// cap and scale growth and the calculator is deliberately pure: it takes them as values so a test can vary
 /// them.
 /// </remarks>
-/// <param name="PlayerId">The player's identity, which seeds the day's draw order (`TRN-9`).</param>
+/// <param name="PlayerId">The player's identity, which seeds the day's draw (`TRN-9`).</param>
 /// <param name="Age">The player's age in game years, which is the development curve.</param>
 /// <param name="Attributes">The player's current attributes.</param>
 /// <param name="Potential">The hidden development ceiling, on the displayed scale (`TRN-9`).</param>
@@ -23,8 +23,9 @@ namespace TouchlineManager.Domain.Squad.Training;
 /// <param name="FatigueBp">Fatigue in basis points (`TRN-6`).</param>
 /// <param name="MoraleBp">Morale in basis points (`TRN-7`).</param>
 /// <param name="MatchSharpnessBp">Match sharpness in basis points.</param>
-/// <param name="DevelopmentRemainder">The partial development carried over from earlier days (`TRN-10`).</param>
-/// <param name="DeclineRemainder">The partial decline carried over from earlier days (`TRN-16`).</param>
+/// <param name="AttributeProgress">
+/// Each attribute's progress towards its next point, in millionths, carried over from earlier days (`TRN-10`).
+/// </param>
 /// <param name="Day">The day being progressed, which is part of the draw's identity.</param>
 public sealed record DailyProgressionInput(
     Guid PlayerId,
@@ -38,8 +39,7 @@ public sealed record DailyProgressionInput(
     int FatigueBp,
     int MoraleBp,
     int MatchSharpnessBp,
-    int DevelopmentRemainder,
-    int DeclineRemainder,
+    IReadOnlyList<int> AttributeProgress,
     DateOnly Day);
 
 /// <summary>One attribute's net movement across a training day.</summary>
@@ -53,22 +53,25 @@ public sealed record AttributeChange(AttributeName Attribute, int Delta);
 /// <param name="FatigueBp">Fatigue in basis points.</param>
 /// <param name="MoraleBp">Morale in basis points.</param>
 /// <param name="MatchSharpnessBp">Match sharpness in basis points.</param>
-/// <param name="DevelopmentRemainder">The partial development carried into the next day (`TRN-10`).</param>
-/// <param name="DeclineRemainder">The partial decline carried into the next day (`TRN-16`).</param>
+/// <param name="AttributeProgress">Each attribute's progress towards its next point, carried into the next day.</param>
 /// <param name="DevelopmentMilli">The development the day earned, in thousandths of a point.</param>
 /// <param name="DeclineMilli">The decline the day incurred, in thousandths of a point.</param>
 /// <param name="AttributeChanges">Every attribute that moved by a whole point, in canonical order.</param>
+/// <param name="ProgressChanges">
+/// How much of the day's development each attribute earned and how much decline it incurred, net, in canonical
+/// order. This is the split of the day's budget; it is what moves <paramref name="AttributeProgress"/>.
+/// </param>
 public sealed record DailyProgressionOutcome(
     PlayerAttributeSet Attributes,
     int ConditionBp,
     int FatigueBp,
     int MoraleBp,
     int MatchSharpnessBp,
-    int DevelopmentRemainder,
-    int DeclineRemainder,
+    IReadOnlyList<int> AttributeProgress,
     int DevelopmentMilli,
     int DeclineMilli,
-    IReadOnlyList<AttributeChange> AttributeChanges);
+    IReadOnlyList<AttributeChange> AttributeChanges,
+    IReadOnlyList<AttributeProgressChange> ProgressChanges);
 
 /// <summary>
 /// One day of a player's training: recovery, bounded deterministic development, and ageing (`TRN-1`,
@@ -81,18 +84,19 @@ public sealed record DailyProgressionOutcome(
 /// the same day and the whole world's progression can be replayed from the seed (`TRN-9`).
 /// </para>
 /// <para>
-/// <b>Development.</b> The day's budget, in thousandths of an attribute point, is a base rate scaled by the
+/// <b>Development.</b> The day's budget, in millionths of an attribute point, is a base rate scaled by the
 /// player's age curve, hidden aptitude, the club's intensity, and a fatigue penalty. It does not depend on how
 /// many attributes the programme covers, so a narrow programme concentrates the same gain on fewer skills. The
-/// fraction is added to <see cref="PlayerState.DevelopmentRemainder"/> and every whole point is spent on one
-/// of the programme's attributes by a weighted draw, only where the value is below the player's potential
-/// (`TRN-4`, `TRN-10`).
+/// budget is split across the programme's attributes by their weights (3 core, 2 important, 1 supporting), and
+/// each attribute keeps its own progress towards its next point, so a core skill climbs faster than a
+/// supporting one and a manager can see how close each is. An attribute at the player's potential takes no
+/// share, and its share moves to the others (`TRN-4`, `TRN-10`).
 /// </para>
 /// <para>
 /// <b>Decline.</b> Each attribute ages from its own start age (see <see cref="TrainingAgeCurve"/>). The
-/// programme's attributes decline at half the rate, because training slows ageing. The fraction is carried in
-/// <see cref="PlayerState.DeclineRemainder"/> and each whole point is removed from one declining attribute by
-/// a draw weighted by its rate, never below the scale's floor.
+/// programme's attributes decline at half the rate, because training slows ageing. The decline comes off the
+/// same per-attribute progress, so a skill that is both trained and ageing nets the two, and it falls a point
+/// when its progress reaches minus one, never below the scale's floor.
 /// </para>
 /// <para>
 /// <b>Trade-off.</b> Intensity buys development and costs condition and fatigue, and fatigue in turn costs
@@ -112,7 +116,7 @@ public sealed record DailyProgressionOutcome(
 public static class DailyProgression
 {
     /// <summary>The progression version, bumped whenever a coefficient or the draw order changes.</summary>
-    public const string Version = "training-v2";
+    public const string Version = "training-v3";
 
     /// <summary>How many thousandths of an attribute point make one displayed point (`TRN-10`).</summary>
     public const int DevelopmentBasis = 1_000;
@@ -131,6 +135,7 @@ public static class DailyProgression
 
     private const int Permille = 1_000;
     private const long BudgetDenominator = 1_000_000_000_000_000L;
+    private const long MicroDenominator = BudgetDenominator / Permille;
     private const int JitterLowPermille = 900;
     private const int JitterSpanPermille = 201;
 
@@ -158,20 +163,32 @@ public static class DailyProgression
         var sharpness = Clamp(input.MatchSharpnessBp + SharpnessGainBp);
         var morale = Drift(input.MoraleBp, rng);
 
+        // The day's jitter is drawn whether or not anything is trained, so the draw does not depend on the branch.
+        var jitter = JitterLowPermille + rng.NextInt(JitterSpanPermille);
+
         var definition = TrainingProgrammes.Of(input.Programme);
         var values = input.Attributes.Values.ToArray();
-        var deltas = new int[AttributeNames.Count];
+        var movement = new int[AttributeNames.Count];
 
-        var (developmentMilli, developmentRemainder) = Develop(input, definition, rng, values, deltas);
-        var (declineMilli, declineRemainder) = Age(input, definition, rng, values, deltas);
+        var developmentMicro = Develop(input, definition, jitter, values, movement);
+        var declineMicro = Age(input, definition, values, movement);
+
+        var progress = input.AttributeProgress.ToArray();
+        var deltas = Settle(input, values, progress, movement);
 
         var changes = new List<AttributeChange>();
+        var progressChanges = new List<AttributeProgressChange>();
 
         foreach (var name in AttributeNames.All)
         {
             if (deltas[(int)name] != 0)
             {
                 changes.Add(new AttributeChange(name, deltas[(int)name]));
+            }
+
+            if (movement[(int)name] != 0)
+            {
+                progressChanges.Add(new AttributeProgressChange(name, movement[(int)name]));
             }
         }
 
@@ -183,11 +200,11 @@ public static class DailyProgression
             fatigue,
             morale,
             sharpness,
-            developmentRemainder,
-            declineRemainder,
-            developmentMilli,
-            declineMilli,
-            changes);
+            progress,
+            ToMilli(developmentMicro),
+            ToMilli(declineMicro),
+            changes,
+            progressChanges);
     }
 
     /// <summary>Gets the development budget a day earns before jitter, in thousandths of a point.</summary>
@@ -196,34 +213,43 @@ public static class DailyProgression
     /// <param name="intensity">The club's intensity.</param>
     /// <param name="fatigueBp">The player's fatigue in basis points.</param>
     public static int BudgetMilli(int age, int aptitudePermille, TrainingIntensity intensity, int fatigueBp) =>
-        Budget(age, aptitudePermille, intensity, fatigueBp, Permille);
+        (int)((BudgetNumerator(age, aptitudePermille, intensity, fatigueBp, Permille) + (BudgetDenominator / 2))
+            / BudgetDenominator);
 
-    private static int Budget(int age, int aptitudePermille, TrainingIntensity intensity, int fatigueBp, int jitter)
-    {
-        var numerator = (long)BaseDailyMilli
+    private static long BudgetNumerator(
+        int age,
+        int aptitudePermille,
+        TrainingIntensity intensity,
+        int fatigueBp,
+        int jitter) =>
+        (long)BaseDailyMilli
             * TrainingAgeCurve.GrowthPermille(age)
             * aptitudePermille
             * IntensityPermille(intensity)
             * FatigueFactorPermille(fatigueBp)
             * jitter;
 
-        return (int)((numerator + (BudgetDenominator / 2)) / BudgetDenominator);
-    }
+    /// <summary>The day's budget in millionths of a point, so a share is not lost to rounding.</summary>
+    private static int BudgetMicro(int age, int aptitudePermille, TrainingIntensity intensity, int fatigueBp, int jitter) =>
+        (int)((BudgetNumerator(age, aptitudePermille, intensity, fatigueBp, jitter) + (MicroDenominator / 2))
+            / MicroDenominator);
 
-    /// <summary>Spends the day's development and carries the fraction forward (`TRN-4`, `TRN-10`).</summary>
-    private static (int Milli, int Remainder) Develop(
+    private static int ToMilli(int micro) => (micro + (Permille / 2)) / Permille;
+
+    /// <summary>
+    /// Splits the day's development across the programme's attributes by weight (`TRN-4`, `TRN-10`), adding
+    /// each share to <paramref name="movement"/>, and returns what was spent in millionths of a point.
+    /// </summary>
+    private static int Develop(
         DailyProgressionInput input,
         TrainingProgrammeDefinition definition,
-        Pcg32 rng,
+        int jitter,
         int[] values,
-        int[] deltas)
+        int[] movement)
     {
-        // Drawn on every day, trained or not, so the rest of the day's draws do not depend on the branch.
-        var jitter = JitterLowPermille + rng.NextInt(JitterSpanPermille);
-
         if (definition.Attributes.Count == 0)
         {
-            return (0, input.DevelopmentRemainder);
+            return 0;
         }
 
         var capacity = Math.Min(WorldRuleSet.AttributeMax, input.Potential);
@@ -233,117 +259,104 @@ public static class DailyProgression
 
         if (eligible.Count == 0)
         {
-            return (0, input.DevelopmentRemainder);
+            return 0;
         }
 
-        var budget = Budget(input.Age, input.AptitudePermille, input.Intensity, input.FatigueBp, jitter);
-        var accumulated = input.DevelopmentRemainder + budget;
-        var points = accumulated / DevelopmentBasis;
-        var remainder = accumulated % DevelopmentBasis;
+        var budget = BudgetMicro(input.Age, input.AptitudePermille, input.Intensity, input.FatigueBp, jitter);
+        var totalWeight = eligible.Sum(entry => entry.Weight);
+        var spent = 0;
 
-        for (var point = 0; point < points && eligible.Count > 0; point++)
+        foreach (var entry in eligible)
         {
-            var pick = rng.NextInt(eligible.Sum(entry => entry.Weight));
-            var slot = 0;
+            var share = (int)((long)budget * entry.Weight / totalWeight);
 
-            while (pick >= eligible[slot].Weight)
-            {
-                pick -= eligible[slot].Weight;
-                slot++;
-            }
-
-            var index = (int)eligible[slot].Attribute;
-
-            values[index]++;
-            deltas[index]++;
-
-            if (values[index] >= capacity)
-            {
-                eligible.RemoveAt(slot);
-            }
+            movement[(int)entry.Attribute] += share;
+            spent += share;
         }
 
-        return (budget, remainder);
+        // The integer split leaves less than one micro-point per attribute. It goes to the heaviest attributes
+        // first, so the whole budget is spent and the split is the same on every replay.
+        for (var slot = 0; spent < budget; slot++, spent++)
+        {
+            movement[(int)eligible[slot % eligible.Count].Attribute]++;
+        }
+
+        return budget;
     }
 
-    /// <summary>Applies the day's ageing and carries the fraction forward (`TRN-16`).</summary>
-    private static (int Milli, int Remainder) Age(
+    /// <summary>
+    /// Takes each attribute's ageing off its progress (`TRN-16`), adding it to <paramref name="movement"/>, and
+    /// returns the total taken in millionths of a point.
+    /// </summary>
+    private static int Age(
         DailyProgressionInput input,
         TrainingProgrammeDefinition definition,
-        Pcg32 rng,
         int[] values,
-        int[] deltas)
+        int[] movement)
     {
-        // Micro-points per day, so a slow decline is not rounded away before it is summed.
-        var rates = new long[AttributeNames.Count];
-        var total = 0L;
+        var total = 0;
 
         foreach (var name in AttributeNames.All)
         {
             var annualMilli = TrainingAgeCurve.AnnualDeclineMilli(name, input.Age);
 
-            if (annualMilli == 0)
+            if (annualMilli == 0 || values[(int)name] <= WorldRuleSet.AttributeMin)
             {
                 continue;
             }
 
             var shield = definition.WeightOf(name) > 0 ? ShieldedDeclinePermille : Permille;
-            var rate = (long)annualMilli * shield / TrainingAgeCurve.TrainingDaysPerSeason;
 
-            rates[(int)name] = rate;
+            // Thousandths of a point a year, over the season's training days, in millionths of a point.
+            var rate = annualMilli * shield / TrainingAgeCurve.TrainingDaysPerSeason;
+
+            movement[(int)name] -= rate;
             total += rate;
         }
 
-        var milli = (int)((total + (Permille / 2)) / Permille);
+        return total;
+    }
 
-        if (milli == 0)
+    /// <summary>
+    /// Adds the day's movement to each attribute's progress and turns every whole point into a change of the
+    /// displayed value (`TRN-4`, `TRN-10`). Returns the whole-point change of each attribute.
+    /// </summary>
+    private static int[] Settle(DailyProgressionInput input, int[] values, int[] progress, int[] movement)
+    {
+        var capacity = Math.Min(WorldRuleSet.AttributeMax, input.Potential);
+        var deltas = new int[AttributeNames.Count];
+
+        for (var index = 0; index < progress.Length; index++)
         {
-            return (0, input.DeclineRemainder);
-        }
+            progress[index] += movement[index];
 
-        var accumulated = input.DeclineRemainder + milli;
-        var points = accumulated / DevelopmentBasis;
-        var remainder = accumulated % DevelopmentBasis;
-
-        for (var point = 0; point < points; point++)
-        {
-            var candidateTotal = 0L;
-
-            for (var index = 0; index < rates.Length; index++)
+            while (progress[index] >= AttributeProgress.Basis && values[index] < capacity)
             {
-                if (values[index] > WorldRuleSet.AttributeMin)
-                {
-                    candidateTotal += rates[index];
-                }
+                values[index]++;
+                deltas[index]++;
+                progress[index] -= AttributeProgress.Basis;
             }
 
-            if (candidateTotal == 0)
+            // An attribute at its ceiling holds no progress towards a point it cannot gain.
+            if (progress[index] > 0 && values[index] >= capacity)
             {
-                break;
+                progress[index] = 0;
             }
 
-            var pick = (long)(rng.NextUInt64() % (ulong)candidateTotal);
-
-            for (var index = 0; index < rates.Length; index++)
+            while (progress[index] <= -AttributeProgress.Basis && values[index] > WorldRuleSet.AttributeMin)
             {
-                if (values[index] <= WorldRuleSet.AttributeMin || rates[index] == 0)
-                {
-                    continue;
-                }
+                values[index]--;
+                deltas[index]--;
+                progress[index] += AttributeProgress.Basis;
+            }
 
-                if (pick < rates[index])
-                {
-                    values[index]--;
-                    deltas[index]--;
-
-                    break;
-                }
-
-                pick -= rates[index];
+            if (progress[index] < 0 && values[index] <= WorldRuleSet.AttributeMin)
+            {
+                progress[index] = 0;
             }
         }
 
-        return (milli, remainder);
+        return deltas;
     }
 
     private static void Validate(DailyProgressionInput input)
@@ -369,20 +382,14 @@ public static class DailyProgression
                 "An aptitude is positive (TRN-15).");
         }
 
-        if (input.DevelopmentRemainder < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(input),
-                input.DevelopmentRemainder,
-                "A development remainder is never negative (TRN-10).");
-        }
+        ArgumentNullException.ThrowIfNull(input.AttributeProgress);
 
-        if (input.DeclineRemainder < 0)
+        if (!AttributeProgress.IsValid(input.AttributeProgress))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(input),
-                input.DeclineRemainder,
-                "A decline remainder is never negative (TRN-16).");
+                input.AttributeProgress,
+                "Attribute progress is one value per attribute, each inside one point (TRN-10).");
         }
     }
 

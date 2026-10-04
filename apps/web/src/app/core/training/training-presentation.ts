@@ -8,7 +8,7 @@
  * one appears.
  */
 
-import { attributeBand } from '../squad/squad-presentation';
+import { attributeBand, progressReadOut, progressText } from '../squad/squad-presentation';
 import type { PerformanceBand } from '../squad/squad-presentation';
 import type { PlayerAttributes } from '../squad/squad.models';
 import type { TrainingPlayer, TrainingProgramme } from './training.models';
@@ -270,8 +270,11 @@ export interface AttributeCell {
   /** A mark repeating the weight without colour, or an empty string. */
   readonly marker: string;
 
-  /** What a screen reader hears: the value, its band, and, when trained, the weight. */
+  /** What a screen reader hears: the value, its band, the weight when trained, and the progress when any. */
   readonly readOut: string;
+
+  /** The progress towards the next point as shown, such as `0.85` or `−0.40`, or an empty string (`TRN-10`). */
+  readonly progress: string;
 }
 
 /** One family's cells, for the cards and for the table's group header. */
@@ -305,11 +308,14 @@ export interface TrainingRow {
 function attributeCell(
   attributeColumn: AttributeColumn,
   attributes: PlayerAttributes,
+  progress: Readonly<Record<string, number>>,
   trained: ReadonlyMap<string, number>,
 ): AttributeCell {
   const value = attributeColumn.value(attributes);
   const band = attributeBand(value);
   const style = weightStyle(trained.get(attributeColumn.key) ?? 0);
+  const raw = progress[attributeColumn.key] ?? 0;
+  const spoken = progressReadOut(raw, value);
 
   return {
     key: attributeColumn.key,
@@ -322,9 +328,11 @@ function attributeCell(
     tintClass: style?.tintClass ?? '',
     marker: style?.marker ?? '',
     readOut:
-      style === null
+      (style === null
         ? `${value}, ${band.label}`
-        : `${value}, ${band.label}, in training, ${style.label.toLowerCase()} focus`,
+        : `${value}, ${band.label}, in training, ${style.label.toLowerCase()} focus`) +
+      (spoken === '' ? '' : `, ${spoken}`),
+    progress: progressText(raw),
   };
 }
 
@@ -336,7 +344,7 @@ export function trainingRows(
   return players.map((player) => {
     const trained = trainedAttributes(programmes, player.programme);
     const cells = ATTRIBUTE_COLUMNS.map((attributeColumn) =>
-      attributeCell(attributeColumn, player.attributes, trained),
+      attributeCell(attributeColumn, player.attributes, player.attributeProgress, trained),
     );
 
     return {

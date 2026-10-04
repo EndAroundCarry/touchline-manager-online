@@ -4,6 +4,41 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Training — progress is held per skill (`training-v3`)
+
+Each skill now carries its own progress towards its next point, so a manager can see how close a player is to
+improving a skill, for example `Finishing 19 (0.85)`. Recorded in
+[`ADR-0060`](docs/architecture/adr/0060-per-attribute-training-progress.md); game rules `TRN-10` and `TRN-16` are
+updated.
+
+### Added
+
+- **Per-skill progress on the player page.** The Attributes tab shows how far each skill is towards its next point
+  in brackets beside the number; a minus sign means the skill is slipping towards a loss. The Training page shows the
+  same beside each skill in its table and cards.
+- **The day's split on the Training tab.** The plotted-points table has a "Where the day's training went" column,
+  for example `Finishing +0.054, Composure +0.036`, so each day shows how the budget was divided.
+- **`attributeProgress`** on `GET /players/{id}` and on each player of `GET /training`, keyed by attribute code, in
+  points to three decimals; and **`progressChanges`** on each day of `GET /players/{id}/training`.
+- Migration `PerAttributeTrainingProgress` (expand step): `attribute_progress` on `squad.player_state` and on
+  `squad.player_training_days`.
+
+### Changed
+
+- **The day's development is split by weight, not drawn.** The budget is unchanged, but it is divided across the
+  programme's skills in proportion to their weights (core 3, important 2, supporting 1) instead of giving each whole
+  point to a randomly drawn skill. A skill at the player's potential takes no share and its share moves to the others.
+- **Ageing comes off the same per-skill progress**, so a skill that is trained and ageing nets the two. A slow
+  decline now takes several seasons to cost a point, where the pooled draw sometimes cost one earlier by chance.
+- **`DailyProgression.Version` is `training-v3`.** A replay of an existing world gives different attributes from
+  `training-v2`.
+
+### Removed
+
+- The two pooled remainders. `development_remainder` and `decline_remainder` stay in the table, unread and defaulted
+  to zero, until a contract migration drops them (`MIG-3`). The partial points they held, under one point per player,
+  are not carried over.
+
 ## Tactics — a player table with position-weighted averages
 
 Replaces the tactics page's player chips and its assign-players table with one sortable player table, and

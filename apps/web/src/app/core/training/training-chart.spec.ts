@@ -6,6 +6,7 @@ import {
   changesLabel,
   dayLabel,
   daysInRange,
+  progressLabel,
   regimeStyle,
   regimesIn,
 } from './training-chart';
@@ -24,6 +25,7 @@ function day(
   programme: string,
   growth: number,
   changes: { attribute: string; delta: number }[] = [],
+  split: { attribute: string; progress: number }[] = [],
 ): PlayerTrainingDay {
   return {
     day: iso,
@@ -33,6 +35,7 @@ function day(
     pointsGained: changes.filter((change) => change.delta > 0).length,
     pointsLost: changes.filter((change) => change.delta < 0).length,
     attributeChanges: changes,
+    progressChanges: split,
   };
 }
 
@@ -95,6 +98,29 @@ describe('training chart', () => {
         ]),
       ).toBe('+1 Finishing, −2 First touch');
       expect(changesLabel([])).toBe('');
+    });
+  });
+
+  describe('progressLabel', () => {
+    it('words how the day was split, each skill with its sign and three decimals (TRN-10)', () => {
+      expect(
+        progressLabel([
+          { attribute: 'finishing', progress: 0.054 },
+          { attribute: 'firstTouch', progress: 0.036 },
+          { attribute: 'pace', progress: -0.012 },
+        ]),
+      ).toBe('Finishing +0.054, First touch +0.036, Pace −0.012');
+      expect(progressLabel([])).toBe('');
+    });
+
+    it('puts the split on the plotted rows, so the table shows where each day’s training went', () => {
+      const split = [
+        day('2026-10-01', 'winger', 0.4, [], [{ attribute: 'pace', progress: 0.25 }]),
+        day('2026-10-02', 'winger', 0.3),
+      ];
+      const chart = buildChart(split, summary, DEFAULT_CHART_FILTER, 'en-GB');
+
+      expect(chart.rows.map((row) => row.split)).toEqual(['Pace +0.250', '']);
     });
   });
 
@@ -240,6 +266,7 @@ describe('training chart', () => {
         label: 'Winger',
         value: 0.4,
         changes: '+1 Pace',
+        split: '',
       });
     });
 

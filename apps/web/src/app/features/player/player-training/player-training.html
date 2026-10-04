@@ -159,7 +159,8 @@
       <div class="overflow-x-auto pb-3" tabindex="0" role="group" aria-label="Plotted points">
         <table class="min-w-full border-collapse text-sm" data-testid="training-points">
           <caption class="sr-only">
-            Every point on the chart: the day, the regime, the value, and the attributes that moved.
+            Every point on the chart: the day, the regime, the value, how the day's training was
+            split across the skills, and the attributes that moved.
           </caption>
           <thead>
             <tr class="border-b border-line text-ink-2">
@@ -167,6 +168,9 @@
               <th scope="col" class="px-3 py-2 text-left font-medium">Regime</th>
               <th scope="col" class="px-3 py-2 text-right font-medium">
                 {{ mode() === 'daily' ? 'Net points' : 'Net points so far' }}
+              </th>
+              <th scope="col" class="px-3 py-2 text-left font-medium">
+                Where the day's training went
               </th>
               <th scope="col" class="px-3 py-2 text-left font-medium">Attributes that moved</th>
             </tr>
@@ -179,6 +183,7 @@
                 </th>
                 <td class="px-3 py-1">{{ row.label }}</td>
                 <td class="px-3 py-1 text-right tabular-nums">{{ row.value.toFixed(3) }}</td>
+                <td class="px-3 py-1" data-testid="training-split">{{ row.split }}</td>
                 <td class="px-3 py-1">{{ row.changes }}</td>
               </tr>
             }

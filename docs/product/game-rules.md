@@ -253,13 +253,13 @@ merely inactive (`OCC-8`) — is never considered.
 | TRN-7 | Morale | **0–10,000** basis points |
 | TRN-8 | APIs convert basis points into user-facing values; the database is authoritative in basis points. | — |
 | TRN-9 | Development and decline are deterministic from player identity, day, programme, intensity, age, fatigue, hidden potential, hidden aptitude, and the progression version. They are reproducible for the same inputs. Potential and aptitude are never sent to a client. | — |
-| TRN-10 | A partial development remainder carries forward across days so that progression is not lost to rounding. The daily budget does not depend on how many attributes a programme covers, so a narrow programme concentrates the same gain on fewer skills. | budget 140 thousandths of a point a day at peak age, neutral aptitude, normal intensity |
+| TRN-10 | **Per-attribute progress.** Each attribute carries its own progress towards its next point, in millionths of a point, so no day's progress is lost to rounding and a manager can see how close a skill is to rising. The daily budget does not depend on how many attributes a programme covers, so a narrow programme concentrates the same gain on fewer skills. It is split across the programme's attributes in proportion to their weights (core 3, important 2, supporting 1); an attribute at the player's potential takes no share and its share moves to the others. A point is gained when an attribute's progress reaches one. | budget 140 thousandths of a point a day at peak age, neutral aptitude, normal intensity |
 | TRN-11 | Matches consume condition and increase fatigue based on minutes, intensity, stamina, and tactics. Rest and recovery restore them. | — |
 | TRN-12 | Training injuries and match injuries create explicit unavailability records measured in **fixtures**, not wall-clock days. | — |
 | TRN-13 | Morale reacts to playing time, results, contracts, and transfers with bounded changes. | — |
 | TRN-14 | **Age growth curve.** The growth factor is 100% to age 19, falls 10 points a year to 40% at 25, then is multiplied by 0.75 a year with a floor of 2%, so a 30-year-old still improves a trained skill, very slowly. Intensity scales it (light 0.70, normal 1.00, intense 1.35) and fatigue above 60% reduces it linearly to 0.6 at 100%. | see description |
 | TRN-15 | **Hidden aptitude.** Each player has a training aptitude of 55%–145% (triangular around 100%) derived purely from their identity and never stored. It scales development, so two players of equal potential reach it at different speeds. | 550–1450 permille |
-| TRN-16 | **Decline.** Each attribute declines from its own start age by a yearly slope that grows each year past it: pace and acceleration from 28, agility from 29, stamina and jumping from 30, strength from 31, some technical skills from 29 and the rest from 32, work rate from 31, goalkeeper reflexes from 32 and the other goalkeeping skills from 34. Other mental attributes do not decline. An attribute the player's programme trains declines at half the rate. Decline carries in its own remainder and never takes an attribute below 1. | 86 progression days a season |
+| TRN-16 | **Decline.** Each attribute declines from its own start age by a yearly slope that grows each year past it: pace and acceleration from 28, agility from 29, stamina and jumping from 30, strength from 31, some technical skills from 29 and the rest from 32, work rate from 31, goalkeeper reflexes from 32 and the other goalkeeping skills from 34. Other mental attributes do not decline. An attribute the player's programme trains declines at half the rate. Decline comes off the same per-attribute progress as growth, so a skill that is trained and ageing nets the two; a point is lost when the progress reaches minus one, and an attribute never falls below 1. | 86 progression days a season |
 | TRN-17 | **History.** Every progression day records, per player, the programme and intensity in force, the development and decline earned, the whole points gained and lost, and which attributes moved. A manager reads it for their own players only. | kept in full |
 
 Match load is a pure, versioned rule (`match-load-v1`) over the frozen facts of a result — each player's
@@ -610,7 +610,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `schedule_generator_version` | `schedule-gen-v1` | CAL-8, PYR-14 |
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
-| `training_progression_version` | `training-v2` | TRN-9 (FIC-8) |
+| `training_progression_version` | `training-v3` | TRN-9 (FIC-8) |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
 | `match_statistics_schema` | `match-statistics-v5` (carries the player lines, the assists, the rating, and the passes and take-ons) | JSN-1, TRN-11 |

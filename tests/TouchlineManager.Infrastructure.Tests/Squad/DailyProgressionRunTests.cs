@@ -125,11 +125,9 @@ public sealed class DailyProgressionRunTests
 
         var states = await db.PlayerStates.ToListAsync();
 
-        states.Should().OnlyContain(state => state.DevelopmentRemainder >= 0, "TRN-10");
-        states.Should().OnlyContain(state => state.DevelopmentRemainder < DailyProgression.DevelopmentBasis);
         states.Should().OnlyContain(
-            state => state.DeclineRemainder >= 0 && state.DeclineRemainder < DailyProgression.DevelopmentBasis,
-            "TRN-16");
+            state => AttributeProgress.IsValid(state.AttributeProgress),
+            "every attribute's progress is inside one point (TRN-10, TRN-16)");
     }
 }
 

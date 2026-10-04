@@ -207,6 +207,12 @@ export interface Player {
   readonly secondaryPositions: readonly string[];
   readonly status: string;
   readonly attributes: PlayerAttributes;
+
+  /**
+   * How far each attribute is towards its next point, keyed by attribute code, in points between -1 and 1:
+   * positive towards a gain, negative towards a loss. An attribute with no progress is left out (`TRN-10`).
+   */
+  readonly attributeProgress: Readonly<Record<string, number>>;
   readonly state: PlayerState;
   readonly contract: PlayerContractSummary | null;
   readonly registration: PlayerRegistrationSummary | null;

@@ -177,6 +177,25 @@ describe('training presentation', () => {
       expect(cell('passing').readOut).toBe('10, Average');
     });
 
+    it('shows how far each attribute is towards its next point, and says it in words (TRN-10)', () => {
+      const [withProgress] = trainingRows(
+        [player({ attributeProgress: { finishing: 0.85, pace: -0.4 } })],
+        PROGRAMMES,
+      );
+      const progressed = (key: string) => withProgress.cells.find((c) => c.key === key)!;
+
+      expect(progressed('finishing').progress).toBe('0.85');
+      expect(progressed('finishing').readOut).toBe(
+        '17, Strong, in training, core focus, 0.85 of the way to 18',
+      );
+      expect(progressed('pace').progress).toBe('−0.40');
+      expect(progressed('pace').readOut).toBe(
+        '10, Average, in training, supporting focus, 0.40 of the way to dropping to 9',
+      );
+      expect(progressed('passing').progress).toBe('');
+      expect(progressed('passing').readOut).toBe('10, Average');
+    });
+
     it('selects the position default as the empty value, and an override by its code', () => {
       expect(row.selected).toBe('');
       expect(row.programmeLabel).toBe('Forward');

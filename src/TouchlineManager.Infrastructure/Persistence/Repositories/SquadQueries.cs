@@ -260,7 +260,8 @@ internal sealed class SquadQueries : ISquadQueries
                 row.State.ConditionBp,
                 row.State.FatigueBp,
                 row.State.MoraleBp,
-                row.State.MatchSharpnessBp),
+                row.State.MatchSharpnessBp,
+                row.State.AttributeProgress),
             new SquadContractRow(
                 row.Contract.Id,
                 row.Contract.StartSeasonNumber,

@@ -65,6 +65,11 @@ public sealed record TrainingProgrammeAttributeResponse(string Name, string Fami
 /// <param name="Age">The player's age in the current game year.</param>
 /// <param name="State">Condition, fatigue, morale, and sharpness (`TRN-5`…`TRN-8`).</param>
 /// <param name="Attributes">The player's twenty-eight attributes, grouped by family (`TRN-4`).</param>
+/// <param name="AttributeProgress">
+/// How far each attribute is towards its next point, keyed by attribute code, in points between -1 and 1:
+/// positive is progress towards a gain, negative towards a loss. Attributes with no progress are left out
+/// (`TRN-10`).
+/// </param>
 /// <param name="Programme">The code of the programme the player trains: the override, else the default.</param>
 /// <param name="IsDefaultProgramme">Whether <paramref name="Programme"/> is the position default rather than a choice.</param>
 /// <param name="DefaultProgramme">The code of the programme matching the player's position (`TRN-1`).</param>
@@ -78,6 +83,7 @@ public sealed record TrainingPlayerResponse(
     int Age,
     PlayerStateResponse State,
     PlayerAttributesResponse Attributes,
+    IReadOnlyDictionary<string, decimal> AttributeProgress,
     string Programme,
     bool IsDefaultProgramme,
     string DefaultProgramme,
@@ -141,6 +147,10 @@ public sealed record PlayerTrainingRegimeResponse(
 /// <param name="PointsGained">The whole attribute points gained that day.</param>
 /// <param name="PointsLost">The whole attribute points lost that day.</param>
 /// <param name="AttributeChanges">Which attributes moved, and by how much; empty on most days.</param>
+/// <param name="ProgressChanges">
+/// How the day's training was split: each attribute's share of the development it earned, less any decline,
+/// in points to three decimals. Empty for a day recorded before progress was tracked per attribute.
+/// </param>
 public sealed record PlayerTrainingDayResponse(
     DateOnly Day,
     string Programme,
@@ -148,12 +158,21 @@ public sealed record PlayerTrainingDayResponse(
     decimal Growth,
     int PointsGained,
     int PointsLost,
-    IReadOnlyList<PlayerTrainingAttributeChangeResponse> AttributeChanges);
+    IReadOnlyList<PlayerTrainingAttributeChangeResponse> AttributeChanges,
+    IReadOnlyList<PlayerTrainingProgressResponse> ProgressChanges);
 
 /// <summary>One attribute's change on a progression day.</summary>
 /// <param name="Attribute">The attribute code, e.g. <c>finishing</c>.</param>
 /// <param name="Delta">The whole-point change: positive for growth, negative for decline.</param>
 public sealed record PlayerTrainingAttributeChangeResponse(string Attribute, int Delta);
+
+/// <summary>One attribute's share of a progression day's training.</summary>
+/// <param name="Attribute">The attribute code, e.g. <c>finishing</c>.</param>
+/// <param name="Progress">
+/// The movement of the attribute's progress towards its next point, in points: positive for the share of the
+/// day's development it earned, negative for decline.
+/// </param>
+public sealed record PlayerTrainingProgressResponse(string Attribute, decimal Progress);
 
 /// <summary>What one programme did for a player across the days returned.</summary>
 /// <param name="Programme">The programme code.</param>

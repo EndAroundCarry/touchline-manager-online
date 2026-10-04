@@ -7,11 +7,16 @@ namespace TouchlineManager.Application.Abstractions.Squad;
 /// <param name="FatigueBp">Fatigue in basis points.</param>
 /// <param name="MoraleBp">Morale in basis points.</param>
 /// <param name="MatchSharpnessBp">Match sharpness in basis points.</param>
+/// <param name="AttributeProgress">
+/// Each attribute's progress towards its next point in millionths of a point (`TRN-10`), read only where a
+/// screen shows it; null elsewhere.
+/// </param>
 public sealed record SquadStateRow(
     int ConditionBp,
     int FatigueBp,
     int MoraleBp,
-    int MatchSharpnessBp);
+    int MatchSharpnessBp,
+    IReadOnlyList<int>? AttributeProgress = null);
 
 /// <summary>A player's active contract, as the squad and contract screens read it.</summary>
 /// <param name="Id">The contract identity.</param>

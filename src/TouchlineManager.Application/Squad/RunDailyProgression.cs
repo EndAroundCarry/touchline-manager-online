@@ -72,8 +72,7 @@ public sealed class RunDailyProgression
                     member.State.FatigueBp,
                     member.State.MoraleBp,
                     member.State.MatchSharpnessBp,
-                    member.State.DevelopmentRemainder,
-                    member.State.DeclineRemainder,
+                    member.State.AttributeProgress,
                     day));
 
                 member.State.ApplyProgression(
@@ -81,8 +80,7 @@ public sealed class RunDailyProgression
                     outcome.FatigueBp,
                     outcome.MoraleBp,
                     outcome.MatchSharpnessBp,
-                    outcome.DevelopmentRemainder,
-                    outcome.DeclineRemainder,
+                    outcome.AttributeProgress,
                     day);
 
                 member.Attributes.Apply(outcome.Attributes);

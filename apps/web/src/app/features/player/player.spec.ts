@@ -118,6 +118,7 @@ const player: Player = {
     },
     goalkeeping: { handling: 2, reflexes: 2, oneOnOnes: 2, aerialAbility: 2 },
   },
+  attributeProgress: { finishing: 0.85, stamina: -0.4 },
   state: { condition: 90, fatigue: 10, morale: 70, matchSharpness: 80 },
   contract: {
     id: 'contract-1',
@@ -236,6 +237,21 @@ describe('PlayerProfile', () => {
     ]);
     expect(tabs[0].getAttribute('aria-selected')).toBe('true');
     expect(root.querySelectorAll('app-attribute-value')).toHaveLength(28);
+  });
+
+  it('shows how close a skill is to its next point beside its value, as in Finishing 17 (0.85)', () => {
+    const rows = Array.from(root.querySelectorAll('app-attribute-value'));
+    const finishing = rows.find((row) => row.textContent?.includes('Finishing'))!;
+    const stamina = rows.find((row) => row.textContent?.includes('Stamina'))!;
+    const passing = rows.find((row) => row.textContent?.includes('Passing'))!;
+
+    expect(finishing.querySelector('[data-testid="attribute-progress"]')?.textContent?.trim()).toBe(
+      '(0.85)',
+    );
+    expect(stamina.querySelector('[data-testid="attribute-progress"]')?.textContent?.trim()).toBe(
+      '(−0.40)',
+    );
+    expect(passing.querySelector('[data-testid="attribute-progress"]')).toBeNull();
   });
 
   it('lays the attributes out as four columns side by side', () => {

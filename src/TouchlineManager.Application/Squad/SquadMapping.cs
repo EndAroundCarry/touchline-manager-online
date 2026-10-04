@@ -3,6 +3,7 @@ using TouchlineManager.Application.Match;
 using TouchlineManager.Contracts.Squad;
 using TouchlineManager.Domain.Rules;
 using TouchlineManager.Domain.Squad;
+using TouchlineManager.Domain.Squad.Training;
 
 namespace TouchlineManager.Application.Squad;
 
@@ -271,6 +272,25 @@ public static class SquadMapping
                 attributes.AerialAbility));
     }
 
+    /// <summary>
+    /// Projects each attribute's progress towards its next point, in points, leaving out attributes with none
+    /// (`TRN-10`).
+    /// </summary>
+    /// <param name="progress">The stored progress in millionths of a point, or null when it was not read.</param>
+    public static IReadOnlyDictionary<string, decimal> ToProgressResponse(this IReadOnlyList<int>? progress) =>
+        progress is null
+            ? new Dictionary<string, decimal>()
+            : AttributeNames.All
+                .Where(name => progress[(int)name] != 0)
+                .ToDictionary(
+                    AttributeNames.CodeOf,
+                    name => MicroToPoints(progress[(int)name]));
+
+    /// <summary>Converts millionths of a point to points, to the three decimals a client shows.</summary>
+    /// <param name="micro">The value in millionths of a point.</param>
+    public static decimal MicroToPoints(int micro) =>
+        Math.Round(micro / (decimal)AttributeProgress.Basis, 3, MidpointRounding.AwayFromZero);
+
     /// <summary>Projects a club's squad.</summary>
     /// <param name="squad">The stored squad.</param>
     /// <param name="serverTime">When the response was produced.</param>
@@ -324,6 +344,7 @@ public static class SquadMapping
             [.. player.SecondaryPositions.Select(position => position.ToCode())],
             player.Status.ToCode(),
             player.Attributes.ToResponse(),
+            player.State.AttributeProgress.ToProgressResponse(),
             player.State.ToResponse(),
             player.Contract?.ToSummary(player.SeasonNumber),
             player.Registration?.ToResponse(),

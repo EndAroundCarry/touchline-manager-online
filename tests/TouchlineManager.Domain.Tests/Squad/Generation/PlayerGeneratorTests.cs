@@ -114,7 +114,9 @@ public sealed class PlayerGeneratorTests
                 WorldRuleSet.StateBasisPointsMin,
                 WorldRuleSet.StateBasisPointsMax,
                 "TRN-7");
-            member.State.DevelopmentRemainder.Should().Be(0, "TRN-10 seeds the carry-forward at zero");
+            member.State.AttributeProgress.Should().OnlyContain(
+                progress => progress == 0,
+                "TRN-10 seeds every attribute's progress at zero");
         }
     }
 

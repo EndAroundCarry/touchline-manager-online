@@ -722,7 +722,13 @@ internal sealed class FilmAssembler
 
                 var who = narrated == PassageBeatKind.Interception && beat.Receiver is Guid interceptor ? interceptor : actor;
 
-                candidates.Add((start, priority, new PassageBeatV1(start, beat.Side, who, narrated, null, seed + index)));
+                // The team-mate a ball is played to, so the line can say who it was played to.
+                var target = narrated is PassageBeatKind.Pass or PassageBeatKind.LongPass or PassageBeatKind.Cross
+                    && !beat.ReceiverIsActor
+                    ? beat.Receiver
+                    : null;
+
+                candidates.Add((start, priority, new PassageBeatV1(start, beat.Side, who, narrated, null, seed + index, target)));
             }
         }
 
@@ -748,7 +754,8 @@ internal sealed class FilmAssembler
 
     private static PassageBeatKind? BuildUpKind(FilmBeat beat) => beat.Kind switch
     {
-        BeatKind.Pass or BeatKind.LoftedPass => PassageBeatKind.Pass,
+        BeatKind.Pass => PassageBeatKind.Pass,
+        BeatKind.LoftedPass => PassageBeatKind.LongPass,
         BeatKind.Carry => PassageBeatKind.Carry,
         BeatKind.Cross => PassageBeatKind.Cross,
         BeatKind.Header => PassageBeatKind.Header,

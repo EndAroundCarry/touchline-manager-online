@@ -98,7 +98,10 @@ public static class TrainingMapping
                 day.PointsLost,
                 [.. day.AttributeChanges.Select(change => new PlayerTrainingAttributeChangeResponse(
                     AttributeNames.CodeOf(change.Attribute),
-                    change.Delta))]))
+                    change.Delta))],
+                [.. day.ProgressChanges.Select(change => new PlayerTrainingProgressResponse(
+                    AttributeNames.CodeOf(change.Attribute),
+                    SquadMapping.MicroToPoints(change.DeltaMicro)))]))
             .ToList();
 
         // One line per programme, in the order the player first trained it, so the table reads as a history.
@@ -173,6 +176,7 @@ public static class TrainingMapping
             SquadMapping.AgeIn(player.BirthGameYear, gameYear),
             player.State.ToResponse(),
             player.Attributes.ToResponse(),
+            player.State.AttributeProgress.ToProgressResponse(),
             (player.Programme ?? defaultProgramme).ToCode(),
             player.Programme is null,
             defaultProgramme.ToCode(),

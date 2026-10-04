@@ -2,6 +2,7 @@ import { attributeLabel } from './training-presentation';
 import type {
   PlayerTrainingAttributeChange,
   PlayerTrainingDay,
+  PlayerTrainingProgress,
   PlayerTrainingSummary,
 } from './training.models';
 
@@ -56,6 +57,9 @@ export interface ChartSeries {
 
   /** One note per label, e.g. "+1 Finishing", or null when no attribute moved that day. */
   readonly notes: readonly (string | null)[];
+
+  /** One split per label, e.g. "Finishing +0.054", or null when the day recorded none (`TRN-10`). */
+  readonly splits: readonly (string | null)[];
 }
 
 /** One plotted point, for the data table. */
@@ -68,6 +72,9 @@ export interface ChartRow {
 
   /** Which attributes moved, or an empty string. */
   readonly changes: string;
+
+  /** How the day's training was split across the skills, or an empty string. */
+  readonly split: string;
 }
 
 /** Everything the chart and its table draw. */
@@ -171,6 +178,21 @@ export function changesLabel(changes: readonly PlayerTrainingAttributeChange[]):
     .join(', ');
 }
 
+/**
+ * Words for how a day's training was split across the skills: "Finishing +0.054, Composure +0.054". A share is
+ * what the skill earned towards its next point that day, less any decline, so a minus sign marks a skill that
+ * only aged (`TRN-10`). Empty when the day recorded no split.
+ */
+export function progressLabel(progress: readonly PlayerTrainingProgress[]): string {
+  return progress
+    .map((entry) => {
+      const sign = entry.progress < 0 ? '−' : '+';
+
+      return `${attributeLabel(entry.attribute)} ${sign}${Math.abs(entry.progress).toFixed(3)}`;
+    })
+    .join(', ');
+}
+
 /** A day as the x-axis shows it, in the viewer's locale; the raw value when it is not a date. */
 export function dayLabel(isoDate: string, locale: string): string {
   const date = new Date(`${isoDate}T00:00:00Z`);
@@ -214,7 +236,7 @@ export function buildChart(
       const day = own.get(iso);
 
       if (day === undefined) {
-        return { value: null, note: null };
+        return { value: null, note: null, split: null };
       }
 
       total = round(total + day.growth);
@@ -222,6 +244,7 @@ export function buildChart(
       return {
         value: filter.mode === 'daily' ? round(day.growth) : total,
         note: day.attributeChanges.length === 0 ? null : changesLabel(day.attributeChanges),
+        split: day.progressChanges.length === 0 ? null : progressLabel(day.progressChanges),
       };
     });
 
@@ -231,6 +254,7 @@ export function buildChart(
       ...regimeStyle(programme),
       data: points.map((point) => point.value),
       notes: points.map((point) => point.note),
+      splits: points.map((point) => point.split),
     };
   });
 
@@ -248,6 +272,7 @@ export function buildChart(
                 label: line.label,
                 value,
                 changes: line.notes[index] ?? '',
+                split: line.splits[index] ?? '',
               },
             ];
       }),

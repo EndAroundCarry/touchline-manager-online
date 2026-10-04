@@ -7,13 +7,13 @@ using Xunit.Abstractions;
 namespace TouchlineManager.Domain.Tests.Squad;
 
 /// <summary>
-/// The deterministic daily progression, `training-v2` (`TRN-1`, `TRN-4`, `TRN-9`, `TRN-10`, `TRN-14`…`TRN-16`).
+/// The deterministic daily progression, `training-v3` (`TRN-1`, `TRN-4`, `TRN-9`, `TRN-10`, `TRN-14`…`TRN-16`).
 /// </summary>
 /// <remarks>
 /// The calculator is a pure function, so these tests need neither a clock nor a database. What they pin is
 /// the contract the worker depends on: the same input reproduces the same day, development is bounded and
-/// spread over the programme's attributes, ageing and aptitude shape the pace, and a partial day is carried
-/// rather than lost.
+/// split over the programme's attributes by weight, ageing and aptitude shape the pace, and each attribute
+/// carries its own partial progress rather than losing it.
 /// </remarks>
 public sealed class DailyProgressionTests
 {
@@ -25,9 +25,9 @@ public sealed class DailyProgressionTests
     public DailyProgressionTests(ITestOutputHelper output) => _output = output;
 
     [Fact]
-    public void The_version_is_training_v2()
+    public void The_version_is_training_v3()
     {
-        DailyProgression.Version.Should().Be("training-v2");
+        DailyProgression.Version.Should().Be("training-v3");
     }
 
     [Fact]
@@ -42,8 +42,10 @@ public sealed class DailyProgressionTests
     [Fact]
     public void A_different_day_produces_a_different_development_chain()
     {
-        var fromEarly = Simulate(Input(day: Day), days: 120).Attributes.Values;
-        var fromLate = Simulate(Input(day: Day.AddDays(30)), days: 120).Attributes.Values;
+        // The jitter on each day's budget is what the day seeds, and it shows in the carried progress long
+        // before it moves a whole point.
+        var fromEarly = Simulate(Input(day: Day), days: 120).AttributeProgress;
+        var fromLate = Simulate(Input(day: Day.AddDays(30)), days: 120).AttributeProgress;
 
         fromEarly.Should().NotEqual(fromLate, "the day is part of the draw's identity");
     }
@@ -51,7 +53,7 @@ public sealed class DailyProgressionTests
     [Fact]
     public void Every_value_stays_inside_the_scale_and_basis_point_bounds_over_a_forty_year_career()
     {
-        var state = Input(age: 16, condition: 9_900, fatigue: 9_900, morale: 100, sharpness: 9_950, remainder: 999);
+        var state = Input(age: 16, condition: 9_900, fatigue: 9_900, morale: 100, sharpness: 9_950, progress: Progress(999_999));
 
         for (var day = 0; day < 40 * TrainingAgeCurve.TrainingDaysPerSeason; day++)
         {
@@ -73,8 +75,8 @@ public sealed class DailyProgressionTests
                 WorldRuleSet.StateBasisPointsMin, WorldRuleSet.StateBasisPointsMax, "TRN-7");
             outcome.MatchSharpnessBp.Should().BeInRange(
                 WorldRuleSet.StateBasisPointsMin, WorldRuleSet.StateBasisPointsMax);
-            outcome.DevelopmentRemainder.Should().BeInRange(0, DailyProgression.DevelopmentBasis - 1, "TRN-10");
-            outcome.DeclineRemainder.Should().BeInRange(0, DailyProgression.DevelopmentBasis - 1, "TRN-16");
+            AttributeProgress.IsValid(outcome.AttributeProgress).Should().BeTrue(
+                "every attribute's progress stays inside one point (TRN-10, TRN-16)");
 
             state = Carry(state, outcome);
         }
@@ -257,7 +259,9 @@ public sealed class DailyProgressionTests
     {
         // No programme, so nothing grows and nothing is shielded: the net change is pure decline.
         var start = Input(programme: TrainingProgramme.Recovery, age: 30);
-        var end = Simulate(start, days: 4 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false).Attributes;
+        // Six seasons at a fixed age: each technical attribute loses a fifth of a point a season, so it takes
+        // five seasons before the first of them is down a whole point.
+        var end = Simulate(start, days: 6 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false).Attributes;
 
         int Net(AttributeFamily family) => AttributeNames.All
             .Where(name => AttributeNames.FamilyOf(name) == family)
@@ -302,7 +306,7 @@ public sealed class DailyProgressionTests
         var outcome = DailyProgression.Advance(Input(age: 22));
 
         outcome.DeclineMilli.Should().Be(0);
-        outcome.DeclineRemainder.Should().Be(0);
+        outcome.ProgressChanges.Should().OnlyContain(change => change.DeltaMicro > 0, "nothing ages at 22");
     }
 
     [Fact]
@@ -328,15 +332,138 @@ public sealed class DailyProgressionTests
     }
 
     [Fact]
-    public void A_negative_remainder_or_out_of_scale_potential_is_a_programming_error()
+    public void An_invalid_progress_or_out_of_scale_potential_is_a_programming_error()
     {
         var potential = () => DailyProgression.Advance(Input(potential: 0));
-        var development = () => DailyProgression.Advance(Input(remainder: -1));
-        var decline = () => DailyProgression.Advance(Input(declineRemainder: -1));
+        var wholePoint = () => DailyProgression.Advance(Input(progress: Progress(AttributeProgress.Basis)));
+        var wholePointLost = () => DailyProgression.Advance(Input(progress: Progress(-AttributeProgress.Basis)));
+        var wrongLength = () => DailyProgression.Advance(Input(progress: [1, 2, 3]));
 
         potential.Should().Throw<ArgumentOutOfRangeException>("TRN-4");
-        development.Should().Throw<ArgumentOutOfRangeException>("TRN-10");
-        decline.Should().Throw<ArgumentOutOfRangeException>("TRN-16");
+        wholePoint.Should().Throw<ArgumentOutOfRangeException>("a whole point is spent, never carried (TRN-10)");
+        wholePointLost.Should().Throw<ArgumentOutOfRangeException>("TRN-16");
+        wrongLength.Should().Throw<ArgumentOutOfRangeException>("one value per attribute (TRN-10)");
+    }
+
+    [Fact]
+    public void The_days_development_is_split_across_the_programme_by_weight()
+    {
+        var outcome = DailyProgression.Advance(Input(programme: TrainingProgramme.Forward));
+        var forward = TrainingProgrammes.Of(TrainingProgramme.Forward);
+        var budget = outcome.ProgressChanges.Sum(change => change.DeltaMicro);
+        var totalWeight = forward.Attributes.Sum(entry => entry.Weight);
+
+        outcome.ProgressChanges.Select(change => change.Attribute).Should().BeEquivalentTo(
+            forward.Attributes.Select(entry => entry.Attribute),
+            "only the programme's attributes earn a share");
+
+        foreach (var change in outcome.ProgressChanges)
+        {
+            var expected = (double)budget * forward.WeightOf(change.Attribute) / totalWeight;
+
+            change.DeltaMicro.Should().BeInRange(
+                (int)Math.Floor(expected),
+                (int)Math.Ceiling(expected) + 1,
+                $"{change.Attribute} takes its weight's share of the day (TRN-10)");
+        }
+
+        budget.Should().BeInRange(
+            (outcome.DevelopmentMilli * 1_000) - 500,
+            (outcome.DevelopmentMilli * 1_000) + 500,
+            "the whole budget is spent, nothing is lost to the split");
+    }
+
+    [Fact]
+    public void A_core_attribute_earns_three_times_the_share_of_a_supporting_one()
+    {
+        var outcome = DailyProgression.Advance(Input(programme: TrainingProgramme.Forward));
+
+        int Share(AttributeName name) => outcome.ProgressChanges.Single(change => change.Attribute == name).DeltaMicro;
+
+        Share(AttributeName.Finishing).Should().BeCloseTo(3 * Share(AttributeName.Dribbling), 3, "3 core against 1 supporting");
+        Share(AttributeName.Positioning).Should().BeCloseTo(2 * Share(AttributeName.Pace), 2, "2 important against 1 supporting");
+    }
+
+    [Fact]
+    public void Each_attributes_progress_carries_from_day_to_day()
+    {
+        var first = DailyProgression.Advance(Input(programme: TrainingProgramme.Forward));
+        var second = DailyProgression.Advance(Input(programme: TrainingProgramme.Forward, progress: first.AttributeProgress));
+
+        first.AttributeProgress[(int)AttributeName.Finishing].Should().BeGreaterThan(0);
+        second.AttributeProgress[(int)AttributeName.Finishing].Should().BeGreaterThan(
+            first.AttributeProgress[(int)AttributeName.Finishing],
+            "a second day adds to the first day's progress");
+        first.AttributeProgress[(int)AttributeName.Handling].Should().Be(0, "a goalkeeping skill is not in the forward programme");
+    }
+
+    [Fact]
+    public void An_attribute_gains_a_point_when_its_own_progress_reaches_one()
+    {
+        var start = Input(programme: TrainingProgramme.Forward, progress: Progress(990_000));
+        var outcome = DailyProgression.Advance(start);
+        var share = outcome.ProgressChanges.Single(change => change.Attribute == AttributeName.Finishing).DeltaMicro;
+
+        share.Should().BeGreaterThan(10_000, "the day's share carries Finishing over the line");
+        outcome.Attributes.Finishing.Should().Be(start.Attributes.Finishing + 1);
+        outcome.AttributeChanges.Should().ContainSingle(change => change.Attribute == AttributeName.Finishing)
+            .Which.Delta.Should().Be(1);
+        outcome.AttributeProgress[(int)AttributeName.Finishing].Should().Be(
+            990_000 + share - AttributeProgress.Basis,
+            "the point is taken off and the rest is carried");
+    }
+
+    [Fact]
+    public void An_attribute_at_its_potential_takes_no_share_and_its_share_moves_to_the_others()
+    {
+        var values = new int[AttributeNames.Count];
+
+        Array.Fill(values, 10);
+        values[(int)AttributeName.Finishing] = 12;
+
+        var capped = DailyProgression.Advance(Input(values: values, potential: 12, progress: Progress(500_000)));
+        var open = DailyProgression.Advance(Input(values: [.. Enumerable.Repeat(10, AttributeNames.Count)], potential: 12));
+
+        capped.ProgressChanges.Select(change => change.Attribute).Should().NotContain(AttributeName.Finishing);
+        capped.AttributeProgress[(int)AttributeName.Finishing].Should().Be(0, "progress towards a point it cannot gain is dropped");
+        capped.ProgressChanges.Sum(change => change.DeltaMicro).Should().BeCloseTo(
+            open.ProgressChanges.Sum(change => change.DeltaMicro),
+            2,
+            "the budget does not shrink; the capped attribute's share moves to the others");
+        capped.ProgressChanges.Single(change => change.Attribute == AttributeName.Composure).DeltaMicro.Should().BeGreaterThan(
+            open.ProgressChanges.Single(change => change.Attribute == AttributeName.Composure).DeltaMicro);
+    }
+
+    [Fact]
+    public void An_ageing_attribute_loses_progress_and_falls_a_point_when_it_reaches_minus_one()
+    {
+        // Pace has been ageing since 28, so at 31 it loses progress every day.
+        var start = Input(programme: TrainingProgramme.Recovery, age: 31, progress: Progress(-999_999, AttributeName.Pace));
+        var outcome = DailyProgression.Advance(start);
+
+        outcome.ProgressChanges.Should().OnlyContain(change => change.DeltaMicro < 0, "nothing is trained, so everything only ages");
+
+        var fallen = outcome.AttributeChanges.Should().ContainSingle(change => change.Attribute == AttributeName.Pace).Which;
+
+        fallen.Delta.Should().Be(-1);
+        outcome.Attributes.Pace.Should().Be(start.Attributes.Pace - 1);
+        outcome.AttributeProgress[(int)AttributeName.Pace].Should().BeInRange(
+            -AttributeProgress.Basis + 1,
+            0,
+            "the point is taken off and the remainder carried");
+    }
+
+    [Fact]
+    public void A_trained_and_ageing_attribute_nets_its_growth_against_its_decline()
+    {
+        var trained = DailyProgression.Advance(Input(programme: TrainingProgramme.Physical, age: 31));
+        var idle = DailyProgression.Advance(Input(programme: TrainingProgramme.Recovery, age: 31));
+
+        int Pace(DailyProgressionOutcome outcome) =>
+            outcome.ProgressChanges.Single(change => change.Attribute == AttributeName.Pace).DeltaMicro;
+
+        Pace(idle).Should().BeNegative("an idle attribute only ages");
+        Pace(trained).Should().BeGreaterThan(Pace(idle), "training adds a share and halves the decline");
     }
 
     [Fact]
@@ -398,8 +525,7 @@ public sealed class DailyProgressionTests
             FatigueBp = outcome.FatigueBp,
             MoraleBp = outcome.MoraleBp,
             MatchSharpnessBp = outcome.MatchSharpnessBp,
-            DevelopmentRemainder = outcome.DevelopmentRemainder,
-            DeclineRemainder = outcome.DeclineRemainder,
+            AttributeProgress = outcome.AttributeProgress,
         };
 
     private static DailyProgressionInput Input(
@@ -413,8 +539,7 @@ public sealed class DailyProgressionTests
         int fatigue = 5_000,
         int morale = 5_000,
         int sharpness = 5_000,
-        int remainder = 0,
-        int declineRemainder = 0,
+        IReadOnlyList<int>? progress = null,
         DateOnly? day = null) =>
         new(
             PlayerId,
@@ -428,7 +553,16 @@ public sealed class DailyProgressionTests
             fatigue,
             morale,
             sharpness,
-            remainder,
-            declineRemainder,
+            progress ?? AttributeProgress.None(),
             day ?? Day);
+
+    /// <summary>Builds a progress set with a value on one attribute, Finishing unless another is named.</summary>
+    private static int[] Progress(int micro, AttributeName attribute = AttributeName.Finishing)
+    {
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)attribute] = micro;
+
+        return progress;
+    }
 }

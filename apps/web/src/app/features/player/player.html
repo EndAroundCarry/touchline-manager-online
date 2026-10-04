@@ -96,7 +96,9 @@
             never the only signal (TRN-4):
             <span class="font-medium text-red-300">Low 1&ndash;6</span>,
             <span class="font-medium text-amber-300">Average 7&ndash;13</span>,
-            <span class="font-medium text-emerald-200">Strong 14&ndash;20</span>.
+            <span class="font-medium text-emerald-200">Strong 14&ndash;20</span>. A figure in
+            brackets, such as <span class="font-medium text-ink">19 (0.85)</span>, is how far the
+            skill is towards its next point; a minus sign means it is slipping towards a loss.
           </p>
 
           <div
@@ -112,7 +114,11 @@
                 </h3>
                 <div class="mt-0.5 sm:mt-1">
                   @for (row of family.rows; track row.label) {
-                    <app-attribute-value [label]="row.label" [value]="row.value" />
+                    <app-attribute-value
+                      [label]="row.label"
+                      [value]="row.value"
+                      [progress]="row.progress"
+                    />
                   }
                 </div>
               </section>

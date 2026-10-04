@@ -46,4 +46,38 @@ describe('AttributeValue', () => {
 
     expect(text).toContain('Average');
   });
+
+  describe('progress towards the next point (TRN-10)', () => {
+    const progressElement = () =>
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="attribute-progress"]');
+
+    it('shows it in brackets beside the number, as in Finishing 19 (0.85)', async () => {
+      fixture.componentRef.setInput('progress', 0.85);
+      await render('Finishing', 19);
+
+      expect(progressElement()?.textContent?.trim()).toBe('(0.85)');
+    });
+
+    it('marks progress towards a loss with a minus sign rather than a colour', async () => {
+      fixture.componentRef.setInput('progress', -0.4);
+      await render('Pace', 12);
+
+      expect(progressElement()?.textContent?.trim()).toBe('(−0.40)');
+    });
+
+    it('says in words which value the skill is heading for, for a screen reader', async () => {
+      fixture.componentRef.setInput('progress', 0.85);
+      await render('Finishing', 19);
+
+      const spoken = (fixture.nativeElement as HTMLElement).querySelector('.sr-only')?.textContent;
+
+      expect(spoken?.replace(/\s+/g, ' ').trim()).toBe('19, Strong, 0.85 of the way to 20');
+    });
+
+    it('shows nothing when the skill has made no progress', async () => {
+      await render('Finishing', 19);
+
+      expect(progressElement()).toBeNull();
+    });
+  });
 });

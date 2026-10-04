@@ -16,7 +16,10 @@ namespace TouchlineManager.Domain.Squad;
 /// </para>
 /// <para>
 /// The attribute changes are stored as compact JSON, <c>[[attributeIndex, delta], ...]</c> in canonical
-/// attribute order, because the history is read whole for charting and never filtered by attribute.
+/// attribute order, because the history is read whole for charting and never filtered by attribute. The
+/// progress split is stored the same way, in millionths of a point: how much of the day's development each
+/// attribute earned, and how much decline it incurred, so the day shows where its training went even when no
+/// attribute reached a whole point.
 /// </para>
 /// </remarks>
 public sealed class PlayerTrainingDay
@@ -56,6 +59,12 @@ public sealed class PlayerTrainingDay
     /// <summary>Gets the per-attribute changes as compact JSON.</summary>
     public string AttributeChangesJson { get; private set; } = "[]";
 
+    /// <summary>
+    /// Gets the day's movement of each attribute's progress as compact JSON, in millionths of a point; empty
+    /// for a day recorded before progress was tracked per attribute.
+    /// </summary>
+    public string AttributeProgressJson { get; private set; } = Training.AttributeProgress.EmptyJson;
+
     /// <summary>Records one player's day from the calculator's outcome.</summary>
     /// <param name="id">A server-generated identity.</param>
     /// <param name="playerId">The player trained.</param>
@@ -85,11 +94,16 @@ public sealed class PlayerTrainingDay
             PointsGained = outcome.AttributeChanges.Where(change => change.Delta > 0).Sum(change => change.Delta),
             PointsLost = outcome.AttributeChanges.Where(change => change.Delta < 0).Sum(change => -change.Delta),
             AttributeChangesJson = Serialize(outcome.AttributeChanges),
+            AttributeProgressJson = Training.AttributeProgress.Serialize(outcome.ProgressChanges),
         };
     }
 
     /// <summary>Reads the stored per-attribute changes back.</summary>
     public IReadOnlyList<AttributeChange> ParseChanges() => Parse(AttributeChangesJson);
+
+    /// <summary>Reads the stored movement of each attribute's progress back.</summary>
+    public IReadOnlyList<AttributeProgressChange> ParseProgress() =>
+        Training.AttributeProgress.ParseChanges(AttributeProgressJson);
 
     /// <summary>Renders changes as <c>[[attributeIndex, delta], ...]</c>.</summary>
     /// <param name="changes">The changes, in canonical attribute order.</param>
