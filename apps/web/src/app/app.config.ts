@@ -25,6 +25,7 @@ export const appConfig: ApplicationConfig = {
     provideSessionBootstrap(),
 
     providePrimeNG({
+      license: 'eyJpZCI6IjU4ZDEzMmE4LTUzMzgtNDAzOS05ZjJmLTczYmU0NmE3YmQyOCIsInByb2R1Y3QiOiJwcmltZXVpIiwidGllciI6ImNvbW11bml0eSIsInR5cGUiOiJkZXYiLCJpYXQiOjE3OTA3NjU5NDQsImV4cCI6MTgyMjMwMTk0NH0.10IQx7ZBMNM0xeJerPld2Q4JkfrCtzVAdCVI-QIUGOcsyXBY2j-GSfbZxFONwqbLSmQZJwrYqXbNyLZg5KchCQ',
       theme: {
         preset: Aura,
         options: {
