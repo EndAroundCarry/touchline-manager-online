@@ -6,12 +6,12 @@ using TouchlineManager.Domain.Squad;
 namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 
 /// <summary>
-/// The squad module's write-side persistence for training plans, individual focuses, and the daily
+/// The squad module's write-side persistence for training plans, programme overrides, and the daily
 /// progression run (`TRN-1`, `TRN-2`, `TRN-9`).
 /// </summary>
 /// <remarks>
 /// <para>
-/// The plan and a player's focus are loaded as tracked aggregates because the commands that write them
+/// The plan and a player's programme override are loaded as tracked aggregates because the commands that write them
 /// revise in place, and the row is kept rather than replaced so its version advances through the same
 /// concurrency token the entity tag is built from.
 /// </para>
@@ -53,11 +53,12 @@ internal sealed class TrainingRepository : ITrainingRepository
     public void AddTrainingDay(PlayerTrainingDay day) => _dbContext.PlayerTrainingDays.Add(day);
 
     /// <inheritdoc />
-    public async Task<Guid?> FindPlayerClubAsync(Guid playerId, CancellationToken cancellationToken) =>
-        await _dbContext.PlayerContracts
-            .Where(contract => contract.PlayerId == playerId && contract.Status == ContractStatus.Active)
-            .Select(contract => (Guid?)contract.ClubId)
-            .FirstOrDefaultAsync(cancellationToken);
+    public Task<TrainablePlayer?> FindTrainablePlayerAsync(Guid playerId, CancellationToken cancellationToken) =>
+        (from contract in _dbContext.PlayerContracts
+         join player in _dbContext.Players on contract.PlayerId equals player.Id
+         where contract.PlayerId == playerId && contract.Status == ContractStatus.Active
+         select new TrainablePlayer(contract.ClubId, player.PrimaryPosition))
+        .FirstOrDefaultAsync(cancellationToken);
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<ClubTrainingRoster>> LoadRostersAsync(CancellationToken cancellationToken)
@@ -133,7 +134,6 @@ internal sealed class TrainingRepository : ITrainingRepository
             rosters.Add(new ClubTrainingRoster(
                 squad.Key,
                 season.GameYear,
-                plan?.TeamFocus ?? TrainingMapping.DefaultTeamFocus,
                 plan?.Intensity ?? TrainingMapping.DefaultIntensity,
                 members));
         }

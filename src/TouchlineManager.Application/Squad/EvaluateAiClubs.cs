@@ -107,7 +107,6 @@ public sealed class EvaluateAiClubs
                 _training.AddTrainingPlan(TrainingPlan.Set(
                     Guid.CreateVersion7(),
                     club.ClubId,
-                    decision.TrainingFocus,
                     decision.TrainingIntensity,
                     effectiveDate,
                     now));

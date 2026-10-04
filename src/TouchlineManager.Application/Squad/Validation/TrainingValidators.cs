@@ -8,8 +8,8 @@ namespace TouchlineManager.Application.Squad.Validation;
 /// Validates a submitted training plan's field-level shape (master plan §10.4; `TRN-1`).
 /// </summary>
 /// <remarks>
-/// Only the two codes need checking: everything else about a plan is server-decided (its club, its version,
-/// its effective date). Whether a code names a real focus or intensity is a field-level question, so it is
+/// Only the intensity code needs checking: everything else about a plan is server-decided (its club, its
+/// version, its effective date). Whether a code names a real intensity is a field-level question, so it is
 /// answered here rather than in the use case.
 /// </remarks>
 public sealed class SaveTrainingRequestValidator : AbstractValidator<SaveTrainingRequest>
@@ -17,16 +17,12 @@ public sealed class SaveTrainingRequestValidator : AbstractValidator<SaveTrainin
     /// <summary>Initializes the validator.</summary>
     public SaveTrainingRequestValidator()
     {
-        RuleFor(request => request.TeamFocus)
-            .Must(IsKnown(TrainingPlans.FromCode))
-            .WithMessage("Choose a supported training focus (TRN-1).");
-
         RuleFor(request => request.Intensity)
-            .Must(IsKnown(TrainingPlans.IntensityFromCode))
+            .Must(IsKnownIntensity)
             .WithMessage("Choose a supported training intensity.");
     }
 
-    private static Func<string?, bool> IsKnown<T>(Func<string, T> parse) => code =>
+    private static bool IsKnownIntensity(string? code)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -35,7 +31,7 @@ public sealed class SaveTrainingRequestValidator : AbstractValidator<SaveTrainin
 
         try
         {
-            parse(code);
+            TrainingPlans.IntensityFromCode(code);
 
             return true;
         }
@@ -43,41 +39,26 @@ public sealed class SaveTrainingRequestValidator : AbstractValidator<SaveTrainin
         {
             return false;
         }
-    };
+    }
 }
 
 /// <summary>
-/// Validates a submitted individual training focus's field-level shape (`TRN-2`).
+/// Validates a submitted training programme's field-level shape (`TRN-1`, `TRN-2`).
 /// </summary>
 /// <remarks>
-/// A null or empty family is valid: it clears the focus. Anything else must name one attribute family.
+/// A null or empty programme is valid: it clears the override. Anything else must name a programme in the
+/// catalogue.
 /// </remarks>
-public sealed class SetPlayerTrainingFocusRequestValidator : AbstractValidator<SetPlayerTrainingFocusRequest>
+public sealed class SetPlayerTrainingProgrammeRequestValidator : AbstractValidator<SetPlayerTrainingProgrammeRequest>
 {
     /// <summary>Initializes the validator.</summary>
-    public SetPlayerTrainingFocusRequestValidator()
+    public SetPlayerTrainingProgrammeRequestValidator()
     {
-        RuleFor(request => request.FocusFamily)
-            .Must(IsClearOrKnownFamily)
-            .WithMessage("Choose a supported attribute family, or send nothing to clear the focus (TRN-2).");
+        RuleFor(request => request.Programme)
+            .Must(IsClearOrKnownProgramme)
+            .WithMessage("Choose a supported training programme, or send nothing to use the position default (TRN-1).");
     }
 
-    private static bool IsClearOrKnownFamily(string? code)
-    {
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return true;
-        }
-
-        try
-        {
-            AttributeFamilies.FromCode(code);
-
-            return true;
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return false;
-        }
-    }
+    private static bool IsClearOrKnownProgramme(string? code) =>
+        string.IsNullOrWhiteSpace(code) || TrainingProgrammes.TryFromCode(code, out _);
 }

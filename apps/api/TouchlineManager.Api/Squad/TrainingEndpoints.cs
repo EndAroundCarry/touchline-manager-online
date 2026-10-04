@@ -10,15 +10,16 @@ using TouchlineManager.Contracts.World;
 namespace TouchlineManager.Api.Squad;
 
 /// <summary>
-/// The training HTTP surface (master plan §10.4, §11.1; `TRN-1`, `TRN-2`).
+/// The training HTTP surface (master plan §10.4, §11.1; `TRN-1`, `TRN-2`, `TRN-17`).
 /// </summary>
 /// <remarks>
 /// <para>
 /// Like the squad and tactics endpoints, these sit at the version root rather than under a module group,
-/// because §10.4 addresses them as <c>/training</c> and <c>/players/{playerId}/training-focus</c>. The
-/// training plan's <em>version</em> is the strong entity tag: a read returns it in the body, and a change
-/// to a set plan must send it back in <c>If-Match</c>, so two devices editing a club's training cannot
-/// silently overwrite each other (`CONC-1`, ADR-0009).
+/// because §10.4 addresses them as <c>/training</c>, <c>/players/{playerId}/training-programme</c>, and
+/// <c>/players/{playerId}/training</c>. The training plan's <em>version</em> is the strong entity tag: a read
+/// returns it in the body, and a change to a set plan must send it back in <c>If-Match</c>, so two devices
+/// editing a club's training cannot silently overwrite each other (`CONC-1`, ADR-0009). A player's programme
+/// override is versioned the same way.
 /// </para>
 /// <para>
 /// Handlers do three things: read the account, call one use case, and translate the outcome into a status
@@ -56,15 +57,22 @@ internal static class TrainingEndpoints
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesProblem(StatusCodes.Status428PreconditionRequired);
 
-        group.MapPut("/players/{playerId:guid}/training-focus", SetTrainingFocusAsync)
-            .WithName("SetPlayerTrainingFocus")
-            .WithSummary("Sets or clears one player's individual training focus. Requires If-Match when one is set.")
-            .Produces<PlayerTrainingFocusResponse>(StatusCodes.Status200OK)
+        group.MapPut("/players/{playerId:guid}/training-programme", SetTrainingProgrammeAsync)
+            .WithName("SetPlayerTrainingProgramme")
+            .WithSummary("Sets or clears one player's training programme. Requires If-Match when one is set.")
+            .Produces<PlayerTrainingProgrammeResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
+        group.MapGet("/players/{playerId:guid}/training", GetPlayerTrainingAsync)
+            .WithName("GetPlayerTraining")
+            .WithSummary("Reads a player's training regime and their recent progression days.")
+            .Produces<PlayerTrainingResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         return endpoints;
     }
@@ -124,12 +132,12 @@ internal static class TrainingEndpoints
         };
     }
 
-    private static async Task<IResult> SetTrainingFocusAsync(
+    private static async Task<IResult> SetTrainingProgrammeAsync(
         HttpContext httpContext,
         Guid playerId,
-        SetPlayerTrainingFocusRequest request,
-        IValidator<SetPlayerTrainingFocusRequest> validator,
-        SetPlayerTrainingFocus useCase,
+        SetPlayerTrainingProgrammeRequest request,
+        IValidator<SetPlayerTrainingProgrammeRequest> validator,
+        SetPlayerTrainingProgramme useCase,
         CancellationToken cancellationToken)
     {
         if (!TryGetUserId(httpContext, out var userId))
@@ -153,14 +161,33 @@ internal static class TrainingEndpoints
             request,
             cancellationToken);
 
-        if (result.Outcome is SetPlayerTrainingFocusOutcome.Set or SetPlayerTrainingFocusOutcome.Cleared)
+        if (result.Outcome is SetPlayerTrainingProgrammeOutcome.Set or SetPlayerTrainingProgrammeOutcome.Cleared)
         {
-            httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Focus!.Version);
+            httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Programme!.Version);
 
-            return Results.Ok(result.Focus);
+            return Results.Ok(result.Programme);
         }
 
-        return FocusRefusal(result.Outcome);
+        return ProgrammeRefusal(result.Outcome);
+    }
+
+    private static async Task<IResult> GetPlayerTrainingAsync(
+        HttpContext httpContext,
+        Guid playerId,
+        int? days,
+        GetPlayerTraining query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, playerId, days, cancellationToken);
+
+        return result.Outcome == SquadReadOutcome.Found
+            ? Results.Ok(result.Training)
+            : SquadEndpoints.Refusal(result.Outcome);
     }
 
     private static IResult Written(HttpContext httpContext, TrainingResponse training, bool created)
@@ -204,38 +231,38 @@ internal static class TrainingEndpoints
             "That club does not exist in this world."),
     };
 
-    /// <summary>Turns an individual-focus write refusal into a status and a stable code.</summary>
-    private static IResult FocusRefusal(SetPlayerTrainingFocusOutcome outcome) => outcome switch
+    /// <summary>Turns a programme write refusal into a status and a stable code.</summary>
+    private static IResult ProgrammeRefusal(SetPlayerTrainingProgrammeOutcome outcome) => outcome switch
     {
-        SetPlayerTrainingFocusOutcome.PreconditionRequired => PreconditionRequired(),
+        SetPlayerTrainingProgrammeOutcome.PreconditionRequired => PreconditionRequired(),
 
-        SetPlayerTrainingFocusOutcome.PreconditionFailed => PreconditionFailed(),
+        SetPlayerTrainingProgrammeOutcome.PreconditionFailed => PreconditionFailed(),
 
-        SetPlayerTrainingFocusOutcome.NoClub => ProblemResults.Code(
+        SetPlayerTrainingProgrammeOutcome.NoClub => ProblemResults.Code(
             StatusCodes.Status403Forbidden,
             SquadErrorCodes.NoClub,
             "No club.",
             "You do not manage a club yet, so there is no training to set."),
 
-        SetPlayerTrainingFocusOutcome.ClubNotManaged => ProblemResults.Code(
+        SetPlayerTrainingProgrammeOutcome.ClubNotManaged => ProblemResults.Code(
             StatusCodes.Status403Forbidden,
             SquadErrorCodes.ClubNotManaged,
             "Not your club.",
             "You do not manage that player's club."),
 
-        SetPlayerTrainingFocusOutcome.NoManagerProfile => ProblemResults.Code(
+        SetPlayerTrainingProgrammeOutcome.NoManagerProfile => ProblemResults.Code(
             StatusCodes.Status403Forbidden,
             WorldErrorCodes.ManagerProfileRequired,
             "No manager profile.",
             "Create your manager profile before managing a club."),
 
-        SetPlayerTrainingFocusOutcome.PlayerNotFound => ProblemResults.Code(
+        SetPlayerTrainingProgrammeOutcome.PlayerNotFound => ProblemResults.Code(
             StatusCodes.Status404NotFound,
             SquadErrorCodes.PlayerNotFound,
             "No such player.",
             "That player is not in a squad in this world."),
 
-        SetPlayerTrainingFocusOutcome.WorldNotSeeded => ProblemResults.Code(
+        SetPlayerTrainingProgrammeOutcome.WorldNotSeeded => ProblemResults.Code(
             StatusCodes.Status404NotFound,
             WorldErrorCodes.WorldNotSeeded,
             "No world yet.",

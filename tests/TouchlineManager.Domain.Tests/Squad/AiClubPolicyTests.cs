@@ -53,7 +53,6 @@ public sealed class AiClubPolicyTests
         second.Formation.Should().Be(first.Formation, "the draw is seeded from the club identity (INS-12)");
         second.Instructions.Should().Be(first.Instructions);
         second.Slots.Should().Equal(first.Slots);
-        second.TrainingFocus.Should().Be(first.TrainingFocus);
         second.TrainingIntensity.Should().Be(first.TrainingIntensity);
     }
 
@@ -162,13 +161,12 @@ public sealed class AiClubPolicyTests
     }
 
     [Fact]
-    public void Training_is_the_neutral_choice_for_every_club()
+    public void Training_is_normal_intensity_for_every_club()
     {
         for (var index = 0; index < 20; index++)
         {
             var plan = AiClubPolicy.Decide(ClubId(index), Squad());
 
-            plan.TrainingFocus.Should().Be(TrainingFocus.Balanced);
             plan.TrainingIntensity.Should().Be(TrainingIntensity.Normal);
         }
     }

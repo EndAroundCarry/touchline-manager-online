@@ -18,9 +18,10 @@ namespace TouchlineManager.Infrastructure.Tests.Squad;
 /// §7.2; `TRN-1`, `TRN-2`, `TRN-9`).
 /// </summary>
 /// <remarks>
-/// These prove the ports' SQL: that a club's plan and each player's focus come back together with the
-/// squad in one read, and that the progression roster falls back to the implicit default plan for a club
-/// that has not set one, so the daily run has something legal to apply.
+/// These prove the ports' SQL: that a club's plan and each player's programme and attributes come back
+/// together with the squad in one read, that a player's recent training days come back oldest first, and
+/// that the progression roster falls back to the implicit default plan for a club that has not set one, so
+/// the daily run has something legal to apply.
 /// </remarks>
 [Collection(PostgresCollection.Name)]
 public sealed class TrainingPersistenceTests
@@ -31,7 +32,7 @@ public sealed class TrainingPersistenceTests
     public TrainingPersistenceTests(PostgresFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task The_training_read_returns_the_plan_and_each_players_focus()
+    public async Task The_training_read_returns_the_plan_and_each_players_programme_and_attributes()
     {
         Guid clubId;
         Guid focusedId;
@@ -46,7 +47,6 @@ public sealed class TrainingPersistenceTests
             db.TrainingPlans.Add(TrainingPlan.Set(
                 Guid.CreateVersion7(),
                 clubId,
-                TrainingFocus.Tactical,
                 TrainingIntensity.Intense,
                 DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
                 _fixture.Clock.UtcNow));
@@ -55,7 +55,7 @@ public sealed class TrainingPersistenceTests
                 Guid.CreateVersion7(),
                 focusedId,
                 clubId,
-                AttributeFamily.Technical,
+                TrainingProgramme.Forward,
                 DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
                 _fixture.Clock.UtcNow));
 
@@ -70,18 +70,18 @@ public sealed class TrainingPersistenceTests
         snapshot.Should().NotBeNull();
         snapshot!.ClubId.Should().Be(clubId);
         snapshot.Plan.Should().NotBeNull();
-        snapshot.Plan!.TeamFocus.Should().Be(TrainingFocus.Tactical, "TRN-1");
-        snapshot.Plan.Intensity.Should().Be(TrainingIntensity.Intense);
+        snapshot.Plan!.Intensity.Should().Be(TrainingIntensity.Intense, "TRN-1");
         snapshot.Plan.Version.Should().Be(1);
 
         snapshot.Players.Should().HaveCount(2);
 
         var focused = snapshot.Players.Single(player => player.Id == focusedId);
-        focused.FocusFamily.Should().Be(AttributeFamily.Technical, "TRN-2");
+        focused.Programme.Should().Be(TrainingProgramme.Forward, "TRN-2");
         focused.FocusVersion.Should().Be(1);
+        focused.Attributes.Values.Should().HaveCount(AttributeNames.Count).And.OnlyContain(value => value == 10);
 
         var plain = snapshot.Players.Single(player => player.Id == plainId);
-        plain.FocusFamily.Should().BeNull("a player with no focus trains with the team");
+        plain.Programme.Should().BeNull("a player with no override trains the position default");
         plain.FocusVersion.Should().BeNull();
     }
 
@@ -103,12 +103,11 @@ public sealed class TrainingPersistenceTests
             db.TrainingPlans.Add(TrainingPlan.Set(
                 Guid.CreateVersion7(),
                 withPlanClubId,
-                TrainingFocus.Fitness,
                 TrainingIntensity.Light,
                 DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
                 _fixture.Clock.UtcNow));
 
-            db.PlayerTrainingFocuses.Add(PlayerTrainingFocus.SetProgramme(
+            db.PlayerTrainingFocuses.Add(PlayerTrainingFocus.Set(
                 Guid.CreateVersion7(),
                 focusedId,
                 withPlanClubId,
@@ -126,8 +125,7 @@ public sealed class TrainingPersistenceTests
 
         var withPlan = rosters.Single(roster => roster.ClubId == withPlanClubId);
 
-        withPlan.TeamFocus.Should().Be(TrainingFocus.Fitness, "the club's own plan is carried");
-        withPlan.Intensity.Should().Be(TrainingIntensity.Light);
+        withPlan.Intensity.Should().Be(TrainingIntensity.Light, "the club's own plan is carried");
         withPlan.Players.Should().HaveCount(2);
         withPlan.Players.Single(player => player.Player.Id == focusedId).Programme
             .Should().Be(TrainingProgramme.Physical, "the manager's override is carried (TRN-1)");
@@ -135,7 +133,6 @@ public sealed class TrainingPersistenceTests
         // A club that has never set a plan still progresses, on the implicit default the mapper defines.
         var withoutPlan = rosters.Single(roster => roster.ClubId == withoutPlanClubId);
 
-        withoutPlan.TeamFocus.Should().Be(TrainingMapping.DefaultTeamFocus);
         withoutPlan.Intensity.Should().Be(TrainingMapping.DefaultIntensity);
         withoutPlan.Players.Should().NotBeEmpty();
         withoutPlan.Players.Should().OnlyContain(
@@ -144,7 +141,7 @@ public sealed class TrainingPersistenceTests
     }
 
     [Fact]
-    public async Task A_programme_override_survives_a_round_trip_and_replaces_a_legacy_family()
+    public async Task A_programme_override_survives_a_round_trip_and_a_revision()
     {
         Guid clubId;
         Guid playerId;
@@ -159,7 +156,7 @@ public sealed class TrainingPersistenceTests
                 Guid.CreateVersion7(),
                 playerId,
                 clubId,
-                AttributeFamily.Technical,
+                TrainingProgramme.Forward,
                 DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
                 _fixture.Clock.UtcNow));
 
@@ -171,10 +168,9 @@ public sealed class TrainingPersistenceTests
             var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
             var focus = await db.PlayerTrainingFocuses.SingleAsync(row => row.PlayerId == playerId);
 
-            focus.Programme.Should().BeNull("a legacy family row has no programme");
-            focus.FocusFamily.Should().Be(AttributeFamily.Technical);
+            focus.Programme.Should().Be(TrainingProgramme.Forward);
 
-            focus.ReviseProgramme(
+            focus.Revise(
                 TrainingProgramme.Winger,
                 DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
                 _fixture.Clock.UtcNow);
@@ -188,9 +184,117 @@ public sealed class TrainingPersistenceTests
             var focus = await db.PlayerTrainingFocuses.AsNoTracking().SingleAsync(row => row.PlayerId == playerId);
 
             focus.Programme.Should().Be(TrainingProgramme.Winger);
-            focus.FocusFamily.Should().BeNull("the programme replaces the retired family");
             focus.Version.Should().Be(2);
+
+            var retiredFamily = await db.Database
+                .SqlQuery<bool>($"select focus_family is null as \"Value\" from squad.player_training_focus where player_id = {playerId}")
+                .SingleAsync();
+
+            retiredFamily.Should().BeTrue("the retired family column is never written");
         }
+    }
+
+    [Fact]
+    public async Task A_plan_is_stored_without_the_retired_team_focus()
+    {
+        Guid clubId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (clubId, _, _) = await ArrangeAsync(seeding);
+
+            db.TrainingPlans.Add(TrainingPlan.Set(
+                Guid.CreateVersion7(),
+                clubId,
+                TrainingIntensity.Intense,
+                DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
+                _fixture.Clock.UtcNow));
+
+            await db.SaveChangesAsync();
+        }
+
+        await using var scope = _fixture.CreateScope();
+        var scopedDb = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var teamFocusIsNull = await scopedDb.Database
+            .SqlQuery<bool>($"select team_focus is null as \"Value\" from squad.training_plans where club_id = {clubId}")
+            .SingleAsync();
+
+        teamFocusIsNull.Should().BeTrue("the plan holds only an intensity; the column awaits the contract migration");
+    }
+
+    [Fact]
+    public async Task The_player_training_read_returns_the_regime_and_the_latest_days_oldest_first()
+    {
+        Guid clubId;
+        Guid playerId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (clubId, playerId, _) = await ArrangeAsync(seeding);
+
+            db.TrainingPlans.Add(TrainingPlan.Set(
+                Guid.CreateVersion7(),
+                clubId,
+                TrainingIntensity.Intense,
+                DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
+                _fixture.Clock.UtcNow));
+
+            db.PlayerTrainingFocuses.Add(PlayerTrainingFocus.Set(
+                Guid.CreateVersion7(),
+                playerId,
+                clubId,
+                TrainingProgramme.Mental,
+                DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime),
+                _fixture.Clock.UtcNow));
+
+            // Inserted newest first, so the order the read returns is the query's and not the insert's.
+            for (var offset = 4; offset >= 0; offset--)
+            {
+                db.PlayerTrainingDays.Add(PlayerTrainingDay.Record(
+                    Guid.CreateVersion7(),
+                    playerId,
+                    new DateOnly(2026, 10, 1).AddDays(offset),
+                    offset >= 3 ? TrainingProgramme.Mental : TrainingProgramme.Defender,
+                    TrainingIntensity.Normal,
+                    Outcome(
+                        developmentMilli: 100 * (offset + 1),
+                        declineMilli: 0,
+                        new AttributeChange(AttributeName.Composure, 1))));
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        await using var scope = _fixture.CreateScope();
+        var queries = scope.ServiceProvider.GetRequiredService<ITrainingQueries>();
+
+        var snapshot = await queries.GetPlayerTrainingAsync(playerId, days: 3, CancellationToken.None);
+
+        snapshot.Should().NotBeNull();
+        snapshot!.ClubId.Should().Be(clubId, "the read is authorized against the player's own club");
+        snapshot.PrimaryPosition.Should().Be(PlayerPosition.CentreBack);
+        snapshot.Programme.Should().Be(TrainingProgramme.Mental);
+        snapshot.Intensity.Should().Be(TrainingIntensity.Intense);
+
+        snapshot.Days.Select(day => day.Day).Should().Equal(
+            new DateOnly(2026, 10, 3),
+            new DateOnly(2026, 10, 4),
+            new DateOnly(2026, 10, 5));
+        snapshot.Days.Select(day => day.Programme).Should().Equal(
+            TrainingProgramme.Defender,
+            TrainingProgramme.Mental,
+            TrainingProgramme.Mental);
+        snapshot.Days[0].AttributeChanges.Should().Equal(new AttributeChange(AttributeName.Composure, 1));
+        snapshot.Days[0].DevelopmentMilli.Should().Be(300);
+
+        var unknown = await queries.GetPlayerTrainingAsync(Guid.CreateVersion7(), days: 10, CancellationToken.None);
+
+        unknown.Should().BeNull("a player without an active contract has no training to read");
     }
 
     [Fact]

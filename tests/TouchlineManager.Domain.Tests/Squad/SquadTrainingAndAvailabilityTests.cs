@@ -14,11 +14,11 @@ public sealed class SquadTrainingAndAvailabilityTests
     private static readonly DateOnly EffectiveDate = new(2026, 9, 24);
 
     [Fact]
-    public void Every_training_focus_and_intensity_round_trips_through_its_code()
+    public void Every_training_intensity_programme_and_family_round_trips_through_its_code()
     {
-        foreach (var value in Enum.GetValues<TrainingFocus>())
+        foreach (var value in Enum.GetValues<TrainingProgramme>())
         {
-            TrainingPlans.FromCode(value.ToCode()).Should().Be(value);
+            TrainingProgrammes.FromCode(value.ToCode()).Should().Be(value);
         }
 
         foreach (var value in Enum.GetValues<TrainingIntensity>())
@@ -69,31 +69,30 @@ public sealed class SquadTrainingAndAvailabilityTests
     public void A_training_plan_can_be_set_and_revised()
     {
         var plan = TrainingPlan.Set(
-            Guid.CreateVersion7(), Guid.CreateVersion7(), TrainingFocus.Balanced, TrainingIntensity.Normal,
-            EffectiveDate, Now);
+            Guid.CreateVersion7(), Guid.CreateVersion7(), TrainingIntensity.Normal, EffectiveDate, Now);
 
-        plan.TeamFocus.Should().Be(TrainingFocus.Balanced, "TRN-1");
+        plan.Intensity.Should().Be(TrainingIntensity.Normal, "TRN-1");
         plan.Version.Should().Be(1);
 
-        plan.Revise(TrainingFocus.Recovery, TrainingIntensity.Light, EffectiveDate.AddDays(1), Now.AddDays(1));
+        plan.Revise(TrainingIntensity.Light, EffectiveDate.AddDays(1), Now.AddDays(1));
 
-        plan.TeamFocus.Should().Be(TrainingFocus.Recovery);
         plan.Intensity.Should().Be(TrainingIntensity.Light);
         plan.Version.Should().Be(2);
     }
 
     [Fact]
-    public void An_individual_focus_can_be_set_and_revised()
+    public void A_programme_override_can_be_set_and_revised()
     {
         var focus = PlayerTrainingFocus.Set(
-            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), AttributeFamily.Technical,
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), TrainingProgramme.Forward,
             EffectiveDate, Now);
 
-        focus.FocusFamily.Should().Be(AttributeFamily.Technical, "TRN-2");
+        focus.Programme.Should().Be(TrainingProgramme.Forward, "TRN-2");
+        focus.Version.Should().Be(1);
 
-        focus.Revise(AttributeFamily.Physical, EffectiveDate.AddDays(1), Now.AddDays(1));
+        focus.Revise(TrainingProgramme.Physical, EffectiveDate.AddDays(1), Now.AddDays(1));
 
-        focus.FocusFamily.Should().Be(AttributeFamily.Physical);
+        focus.Programme.Should().Be(TrainingProgramme.Physical);
         focus.Version.Should().Be(2);
     }
 

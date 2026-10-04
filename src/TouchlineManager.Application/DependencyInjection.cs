@@ -316,7 +316,8 @@ public static class DependencyInjection
         services.AddScoped<MakeTacticalPlanDefault>();
         services.AddScoped<GetTraining>();
         services.AddScoped<SaveTrainingPlan>();
-        services.AddScoped<SetPlayerTrainingFocus>();
+        services.AddScoped<SetPlayerTrainingProgramme>();
+        services.AddScoped<GetPlayerTraining>();
         services.AddScoped<RunDailyProgression>();
         services.AddScoped<EvaluateAiClubs>();
         services.AddScoped<SettleSquadContinuity>();
@@ -327,7 +328,7 @@ public static class DependencyInjection
 
         services.AddScoped<IValidator<SaveTacticalPlanRequest>, SaveTacticalPlanRequestValidator>();
         services.AddScoped<IValidator<SaveTrainingRequest>, SaveTrainingRequestValidator>();
-        services.AddScoped<IValidator<SetPlayerTrainingFocusRequest>, SetPlayerTrainingFocusRequestValidator>();
+        services.AddScoped<IValidator<SetPlayerTrainingProgrammeRequest>, SetPlayerTrainingProgrammeRequestValidator>();
         services.AddScoped<IValidator<SaveFixtureTeamSheetRequest>, SaveFixtureTeamSheetRequestValidator>();
         services.AddScoped<IValidator<RenewalQuoteRequest>, RenewalQuoteRequestValidator>();
         services.AddScoped<IValidator<RenewContractRequest>, RenewContractRequestValidator>();

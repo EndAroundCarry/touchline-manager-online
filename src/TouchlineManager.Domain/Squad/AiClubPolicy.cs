@@ -55,13 +55,11 @@ public sealed record AiSlotAssignment(
 /// <param name="Formation">The formation preset the side plays (`TAC-1`…`TAC-6`, `TAC-11`…`TAC-17`).</param>
 /// <param name="Instructions">The eight team instructions (`INS-1`…`INS-8`).</param>
 /// <param name="Slots">The eleven slots, in slot order, with the picked player where one was chosen.</param>
-/// <param name="TrainingFocus">The club-wide training emphasis (`TRN-1`).</param>
 /// <param name="TrainingIntensity">How hard the club trains (`TRN-1`).</param>
 public sealed record AiClubPlan(
     FormationPreset Formation,
     TeamInstructionSet Instructions,
     IReadOnlyList<AiSlotAssignment> Slots,
-    TrainingFocus TrainingFocus,
     TrainingIntensity TrainingIntensity);
 
 /// <summary>
@@ -83,19 +81,16 @@ public sealed record AiClubPlan(
 /// <para>
 /// The tactics vary by club, because a division of eighteen identical 4-4-2s is not a football league; the
 /// training does not, because the training choice is a persistent development path rather than a
-/// match-to-match lever, and a club permanently dealt a random focus would be a fairness problem rather
-/// than variety. The AI therefore trains at the neutral <see cref="TrainingFocus.Balanced"/> /
-/// <see cref="TrainingIntensity.Normal"/>, which is what the progression job already assumes for a club
-/// with no plan.
+/// match-to-match lever, and a club permanently dealt a random intensity would be a fairness problem
+/// rather than variety. The AI therefore trains at <see cref="TrainingIntensity.Normal"/> and gives no
+/// player a programme override, so each trains the programme matching their position
+/// (<see cref="TrainingProgrammes.DefaultFor"/>) — the same rules a manager's players follow (`INS-12`).
 /// </para>
 /// </remarks>
 public static class AiClubPolicy
 {
     /// <summary>The name an AI-authored plan carries, which a takeover inherits (`WORLD-9`).</summary>
     public const string PlanName = "Default";
-
-    /// <summary>The training focus every AI club trains at (`TRN-1`).</summary>
-    public const TrainingFocus DefaultTrainingFocus = TrainingFocus.Balanced;
 
     /// <summary>The training intensity every AI club trains at (`TRN-1`).</summary>
     public const TrainingIntensity DefaultTrainingIntensity = TrainingIntensity.Normal;
@@ -140,7 +135,6 @@ public static class AiClubPolicy
                 slot.NormalizedX,
                 slot.NormalizedY,
                 lineup.TryGetValue(slot.SlotNumber, out var playerId) ? playerId : null))],
-            DefaultTrainingFocus,
             DefaultTrainingIntensity);
     }
 

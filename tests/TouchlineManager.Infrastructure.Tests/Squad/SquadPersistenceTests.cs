@@ -125,11 +125,11 @@ public sealed class SquadPersistenceTests
         var today = DateOnly.FromDateTime(_fixture.Clock.UtcNow.UtcDateTime);
 
         db.TrainingPlans.Add(TrainingPlan.Set(
-            Guid.CreateVersion7(), clubId, TrainingFocus.Balanced, TrainingIntensity.Normal, today, _fixture.Clock.UtcNow));
+            Guid.CreateVersion7(), clubId, TrainingIntensity.Normal, today, _fixture.Clock.UtcNow));
         await db.SaveChangesAsync();
 
         db.TrainingPlans.Add(TrainingPlan.Set(
-            Guid.CreateVersion7(), clubId, TrainingFocus.Recovery, TrainingIntensity.Light, today, _fixture.Clock.UtcNow));
+            Guid.CreateVersion7(), clubId, TrainingIntensity.Light, today, _fixture.Clock.UtcNow));
 
         var act = async () => await db.SaveChangesAsync();
         var exception = await act.Should().ThrowAsync<DbUpdateException>();

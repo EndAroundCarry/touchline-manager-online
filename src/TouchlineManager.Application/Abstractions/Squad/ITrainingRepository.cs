@@ -22,21 +22,24 @@ public sealed record ProgressablePlayer(
     int Potential,
     TrainingProgramme? Programme);
 
+/// <summary>A player whose training a manager may set, with the club that decides it.</summary>
+/// <param name="ClubId">The club the player holds an active contract with.</param>
+/// <param name="PrimaryPosition">The player's position, which fixes their default programme.</param>
+public sealed record TrainablePlayer(Guid ClubId, PlayerPosition PrimaryPosition);
+
 /// <summary>One club's training plan and the squad it applies to.</summary>
 /// <param name="ClubId">The club.</param>
 /// <param name="GameYear">The season's game year, which fixes each player's age (`TIME-3`).</param>
-/// <param name="TeamFocus">The club's team focus, or the implicit default when it has no plan (`TRN-1`).</param>
 /// <param name="Intensity">The club's intensity, or the implicit default when it has no plan.</param>
 /// <param name="Players">The club's players with an active contract (`SQ-6`).</param>
 public sealed record ClubTrainingRoster(
     Guid ClubId,
     int GameYear,
-    TrainingFocus TeamFocus,
     TrainingIntensity Intensity,
     IReadOnlyList<ProgressablePlayer> Players);
 
 /// <summary>
-/// Persistence for the squad module's training plans, individual focuses, and the daily progression run
+/// Persistence for the squad module's training plans, programme overrides, and the daily progression run
 /// (`TRN-1`, `TRN-2`, `TRN-9`).
 /// </summary>
 /// <remarks>
@@ -56,27 +59,28 @@ public interface ITrainingRepository
     /// <param name="plan">The plan.</param>
     void AddTrainingPlan(TrainingPlan plan);
 
-    /// <summary>Loads one player's individual focus, or null when the player has none.</summary>
+    /// <summary>Loads one player's programme override, or null when the player has none.</summary>
     /// <param name="playerId">The player.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<PlayerTrainingFocus?> FindFocusAsync(Guid playerId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Finds the club a player is contracted to, or null when they hold no active contract.
+    /// Finds a player and the club they are contracted to, or null when they hold no active contract.
     /// </summary>
     /// <remarks>
-    /// The individual-focus command authorizes against the player's own club, exactly as the player read
-    /// does, so this resolves the club the request must be checked against (`SQ-6`).
+    /// The programme command authorizes against the player's own club, exactly as the player read
+    /// does, so this resolves the club the request must be checked against (`SQ-6`). The position comes
+    /// with it because it fixes the default programme the response reports.
     /// </remarks>
     /// <param name="playerId">The player.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<Guid?> FindPlayerClubAsync(Guid playerId, CancellationToken cancellationToken);
+    Task<TrainablePlayer?> FindTrainablePlayerAsync(Guid playerId, CancellationToken cancellationToken);
 
-    /// <summary>Stages a new individual focus.</summary>
+    /// <summary>Stages a new programme override.</summary>
     /// <param name="focus">The focus.</param>
     void AddPlayerFocus(PlayerTrainingFocus focus);
 
-    /// <summary>Removes an individual focus, returning the player to the team plan alone (`TRN-2`).</summary>
+    /// <summary>Removes a programme override, returning the player to their position default (`TRN-1`).</summary>
     /// <param name="focus">The focus to remove.</param>
     void RemovePlayerFocus(PlayerTrainingFocus focus);
 
@@ -90,7 +94,7 @@ public interface ITrainingRepository
     /// <remarks>
     /// The whole world is loaded because training is a world-scoped daily fact, not a club-scoped command:
     /// AI clubs and human clubs progress by the same rules, with no privileged path (`INS-12`, `TRN-9`).
-    /// Clubs with no plan still appear, carrying the implicit default focus.
+    /// Clubs with no plan still appear, carrying the implicit default intensity.
     /// </remarks>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<IReadOnlyList<ClubTrainingRoster>> LoadRostersAsync(CancellationToken cancellationToken);

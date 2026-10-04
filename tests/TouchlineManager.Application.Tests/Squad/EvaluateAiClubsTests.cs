@@ -39,7 +39,6 @@ public sealed class EvaluateAiClubsTests
         ValidatePlan(tactics.Slots).IsComplete.Should().BeTrue("a full squad always fields eleven");
 
         training.Plans.Should().ContainSingle();
-        training.Plans[0].TeamFocus.Should().Be(TrainingFocus.Balanced);
         training.Plans[0].Intensity.Should().Be(TrainingIntensity.Normal);
 
         unitOfWork.Saves.Should().Be(1, "a pass commits once, however many clubs it touched");
@@ -261,8 +260,8 @@ public sealed class EvaluateAiClubsTests
         public Task<PlayerTrainingFocus?> FindFocusAsync(Guid playerId, CancellationToken cancellationToken) =>
             Task.FromResult<PlayerTrainingFocus?>(null);
 
-        public Task<Guid?> FindPlayerClubAsync(Guid playerId, CancellationToken cancellationToken) =>
-            Task.FromResult<Guid?>(null);
+        public Task<TrainablePlayer?> FindTrainablePlayerAsync(Guid playerId, CancellationToken cancellationToken) =>
+            Task.FromResult<TrainablePlayer?>(null);
 
         public void AddPlayerFocus(PlayerTrainingFocus focus)
         {

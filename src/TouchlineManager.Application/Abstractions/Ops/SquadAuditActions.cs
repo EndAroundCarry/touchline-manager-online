@@ -25,11 +25,11 @@ public static class SquadAuditActions
     /// <summary>A club's training plan was revised.</summary>
     public const string TrainingPlanUpdated = "squad.training_plan.updated";
 
-    /// <summary>A player's individual training focus was set (`TRN-2`).</summary>
-    public const string PlayerTrainingFocusSet = "squad.player_training_focus.set";
+    /// <summary>A player's training programme override was set (`TRN-1`, `TRN-2`).</summary>
+    public const string PlayerTrainingProgrammeSet = "squad.player_training_programme.set";
 
-    /// <summary>A player's individual training focus was cleared (`TRN-2`).</summary>
-    public const string PlayerTrainingFocusCleared = "squad.player_training_focus.cleared";
+    /// <summary>A player's training programme override was cleared (`TRN-1`, `TRN-2`).</summary>
+    public const string PlayerTrainingProgrammeCleared = "squad.player_training_programme.cleared";
 
     /// <summary>A club prepared or replaced its side for a fixture (`SQ-4`, `CAL-3`).</summary>
     public const string FixtureTeamSheetSaved = "squad.fixture_team_sheet.saved";

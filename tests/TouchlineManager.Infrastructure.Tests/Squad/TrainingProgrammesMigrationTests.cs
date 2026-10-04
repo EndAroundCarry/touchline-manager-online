@@ -10,8 +10,8 @@ using TouchlineManager.Infrastructure.Persistence;
 namespace TouchlineManager.Infrastructure.Tests.Squad;
 
 /// <summary>
-/// The <c>TrainingProgrammesAndAging</c> migration's backfill and rollback, against real PostgreSQL
-/// (`MIG-1`…`MIG-7`).
+/// The <c>TrainingProgrammesAndAging</c> migration's backfill and rollback, and the follow-up that makes the
+/// programme required and the plan intensity-only, against real PostgreSQL (`MIG-1`…`MIG-7`).
 /// </summary>
 /// <remarks>
 /// Runs in a database of its own so that stepping the schema back and forth cannot disturb the collection's
@@ -23,6 +23,7 @@ public sealed class TrainingProgrammesMigrationTests
 {
     private const string Before = "20261003190000_MoreFormationPresets";
     private const string After = "20261004064854_TrainingProgrammesAndAging";
+    private const string Relaxed = "20261004071207_TrainingProgrammeRequiredAndPlanIntensityOnly";
 
     private readonly PostgresFixture _fixture;
 
@@ -32,19 +33,7 @@ public sealed class TrainingProgrammesMigrationTests
     [Fact]
     public async Task Legacy_family_focuses_move_onto_programmes_and_rolling_back_restores_a_family()
     {
-        var connectionString = new NpgsqlConnectionStringBuilder(_fixture.ConnectionString)
-        {
-            Database = $"training_migration_{Guid.NewGuid():N}",
-        }.ConnectionString;
-
-        await using (var admin = new NpgsqlConnection(_fixture.ConnectionString))
-        {
-            await admin.OpenAsync();
-            await using var create = new NpgsqlCommand(
-                $"create database \"{new NpgsqlConnectionStringBuilder(connectionString).Database}\"",
-                admin);
-            await create.ExecuteNonQueryAsync();
-        }
+        var connectionString = await CreateDatabaseAsync();
 
         await using var provider = BuildProvider(connectionString);
         await using var scope = provider.CreateAsyncScope();
@@ -95,6 +84,89 @@ public sealed class TrainingProgrammesMigrationTests
 
         rolledBack.Should().HaveCount(families.Length + 1);
         rolledBack.Should().OnlyContain(family => families.Contains(family), "every row has a legacy family again");
+    }
+
+    [Fact]
+    public async Task The_programme_becomes_required_the_plan_loses_its_team_focus_and_rolling_back_restores_both()
+    {
+        var connectionString = await CreateDatabaseAsync();
+
+        await using var provider = BuildProvider(connectionString);
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+        var migrator = db.GetService<IMigrator>();
+
+        await db.Database.OpenConnectionAsync();
+
+        await migrator.MigrateAsync(After);
+
+        // A technical focus has no programme (the previous migration leaves it null); a programme row is
+        // already in the new shape; a plan carries the retired team focus.
+        await db.Database.ExecuteSqlRawAsync("set session_replication_role = replica");
+        await InsertLegacyFocusAsync(db, "technical");
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            insert into squad.player_training_focus
+                (id, player_id, club_id, focus_family, programme, effective_date, created_at, updated_at, version)
+            values ({Guid.CreateVersion7()}, {Guid.CreateVersion7()}, {Guid.CreateVersion7()}, null, 'forward',
+                    {new DateOnly(2026, 10, 1)}, now(), now(), 1)
+            """);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            insert into squad.training_plans
+                (id, club_id, team_focus, intensity, effective_date, created_at, updated_at, version)
+            values ({Guid.CreateVersion7()}, {Guid.CreateVersion7()}, 'fitness', 'light',
+                    {new DateOnly(2026, 10, 1)}, now(), now(), 1)
+            """);
+
+        await migrator.MigrateAsync(Relaxed);
+
+        (await db.Database.SqlQueryRaw<string>("select programme as \"Value\" from squad.player_training_focus").ToListAsync())
+            .Should().Equal(["forward"], "the technical focus is deleted so the player trains the position default");
+
+        // A plan written now holds only an intensity.
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            insert into squad.training_plans
+                (id, club_id, team_focus, intensity, effective_date, created_at, updated_at, version)
+            values ({Guid.CreateVersion7()}, {Guid.CreateVersion7()}, null, 'normal',
+                    {new DateOnly(2026, 10, 1)}, now(), now(), 1)
+            """);
+
+        var withoutProgramme = () => db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            insert into squad.player_training_focus
+                (id, player_id, club_id, focus_family, programme, effective_date, created_at, updated_at, version)
+            values ({Guid.CreateVersion7()}, {Guid.CreateVersion7()}, {Guid.CreateVersion7()}, null, null,
+                    {new DateOnly(2026, 10, 1)}, now(), now(), 1)
+            """);
+
+        (await withoutProgramme.Should().ThrowAsync<PostgresException>())
+            .Which.SqlState.Should().Be(PostgresErrorCodes.NotNullViolation, "an override always names a programme");
+
+        await migrator.MigrateAsync(After);
+
+        (await db.Database.SqlQueryRaw<string>("select team_focus as \"Value\" from squad.training_plans order by team_focus").ToListAsync())
+            .Should().Equal(
+                ["balanced", "fitness"],
+                "rolling back keeps the stored focus and gives the plan written since a neutral one");
+    }
+
+    private async Task<string> CreateDatabaseAsync()
+    {
+        var connectionString = new NpgsqlConnectionStringBuilder(_fixture.ConnectionString)
+        {
+            Database = $"training_migration_{Guid.NewGuid():N}",
+        }.ConnectionString;
+
+        await using var admin = new NpgsqlConnection(_fixture.ConnectionString);
+        await admin.OpenAsync();
+        await using var create = new NpgsqlCommand(
+            $"create database \"{new NpgsqlConnectionStringBuilder(connectionString).Database}\"",
+            admin);
+        await create.ExecuteNonQueryAsync();
+
+        return connectionString;
     }
 
     private static async Task InsertLegacyFocusAsync(TouchlineManagerDbContext db, string family)

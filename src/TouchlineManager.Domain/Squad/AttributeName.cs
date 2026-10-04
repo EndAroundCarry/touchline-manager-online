@@ -104,6 +104,15 @@ public static class AttributeNames
     /// <summary>Every attribute, in canonical order.</summary>
     public static readonly IReadOnlyList<AttributeName> All = [.. Enum.GetValues<AttributeName>()];
 
+    private static readonly string[] Codes = [.. All.Select(name => CamelCase(name.ToString()))];
+
+    /// <summary>
+    /// Gets the stable code an attribute crosses the API as: its name in camel case, which is also the
+    /// property name it has in the attribute grid (for example <c>firstTouch</c>).
+    /// </summary>
+    /// <param name="name">The attribute.</param>
+    public static string CodeOf(AttributeName name) => Codes[(int)name];
+
     /// <summary>Gets the family an attribute belongs to (`TRN-2`).</summary>
     /// <param name="name">The attribute.</param>
     public static AttributeFamily FamilyOf(AttributeName name) => name switch
@@ -138,4 +147,6 @@ public static class AttributeNames
             or AttributeName.AerialAbility => AttributeFamily.Goalkeeping,
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown attribute."),
     };
+
+    private static string CamelCase(string name) => string.Concat(char.ToLowerInvariant(name[0]), name[1..]);
 }

@@ -24,7 +24,7 @@ namespace TouchlineManager.ArchitectureTests;
 public sealed class DataClassificationTests
 {
     /// <summary>The class C2 player values <c>data-classification.md</c> §1 names as never exposed.</summary>
-    private static readonly string[] HiddenPlayerValues = ["Potential", "Reputation"];
+    private static readonly string[] HiddenPlayerValues = ["Potential", "Reputation", "Aptitude", "DeclineRemainder"];
 
     private static IEnumerable<Type> SquadContracts =>
         typeof(SquadErrorCodes).Assembly

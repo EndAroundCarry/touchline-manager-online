@@ -9,15 +9,12 @@ namespace TouchlineManager.Application.Squad;
 /// </summary>
 /// <remarks>
 /// The same rules the squad mapper follows: state crosses as a user-facing value (`TRN-8`), enumerations
-/// cross as their stable codes, and the option lists the client renders are produced here from the enums
-/// rather than duplicated in each client.
+/// cross as their stable codes, and the programme catalogue the client renders is produced here from the
+/// domain catalogue rather than duplicated in each client. Aptitude and potential never cross (`TRN-9`).
 /// </remarks>
 public static class TrainingMapping
 {
-    /// <summary>The focus a club trains at when it has not set a plan, which is what the job assumes.</summary>
-    public const TrainingFocus DefaultTeamFocus = TrainingFocus.Balanced;
-
-    /// <summary>The intensity a club trains at when it has not set a plan.</summary>
+    /// <summary>The intensity a club trains at when it has not set a plan, which is what the job assumes.</summary>
     public const TrainingIntensity DefaultIntensity = TrainingIntensity.Normal;
 
     /// <summary>Projects a club's training plan and squad for the training screen.</summary>
@@ -31,7 +28,6 @@ public static class TrainingMapping
 
         return Build(
             snapshot,
-            plan?.TeamFocus ?? DefaultTeamFocus,
             plan?.Intensity ?? DefaultIntensity,
             plan?.EffectiveDate ?? DateOnly.FromDateTime(serverTime.UtcDateTime),
             plan?.Version ?? 0,
@@ -53,7 +49,6 @@ public static class TrainingMapping
 
         return Build(
             snapshot,
-            plan.TeamFocus,
             plan.Intensity,
             plan.EffectiveDate,
             plan.Version,
@@ -61,23 +56,78 @@ public static class TrainingMapping
             serverTime);
     }
 
-    /// <summary>Projects the outcome of setting or clearing one player's focus (`TRN-2`).</summary>
-    /// <param name="focus">The focus now in force, or null when it was cleared.</param>
-    /// <param name="playerId">The player the focus belongs to.</param>
+    /// <summary>Projects the outcome of setting or clearing one player's programme (`TRN-1`).</summary>
+    /// <param name="focus">The override now in force, or null when it was cleared.</param>
+    /// <param name="playerId">The player the programme belongs to.</param>
+    /// <param name="primaryPosition">The player's position, which fixes the default programme.</param>
     /// <param name="serverTime">When the response was produced.</param>
-    public static PlayerTrainingFocusResponse ToResponse(
+    public static PlayerTrainingProgrammeResponse ToResponse(
         this PlayerTrainingFocus? focus,
         Guid playerId,
-        DateTimeOffset serverTime) =>
-        new(
+        PlayerPosition primaryPosition,
+        DateTimeOffset serverTime)
+    {
+        var defaultProgramme = TrainingProgrammes.DefaultFor(primaryPosition);
+
+        return new PlayerTrainingProgrammeResponse(
             playerId,
-            focus?.FocusFamily?.ToCode(),
+            (focus?.Programme ?? defaultProgramme).ToCode(),
+            focus is null,
+            defaultProgramme.ToCode(),
             focus?.Version ?? 0,
             serverTime);
+    }
+
+    /// <summary>Projects a player's training regime and recent history for the player page (`TRN-17`).</summary>
+    /// <param name="snapshot">The stored regime and days.</param>
+    /// <param name="serverTime">When the response was produced.</param>
+    public static PlayerTrainingResponse ToResponse(this PlayerTrainingSnapshot snapshot, DateTimeOffset serverTime)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var programme = snapshot.Programme ?? TrainingProgrammes.DefaultFor(snapshot.PrimaryPosition);
+        var definition = TrainingProgrammes.Of(programme);
+
+        var days = snapshot.Days
+            .Select(day => new PlayerTrainingDayResponse(
+                day.Day,
+                day.Programme.ToCode(),
+                day.Intensity.ToCode(),
+                Math.Round((day.DevelopmentMilli - day.DeclineMilli) / 1000m, 3),
+                day.PointsGained,
+                day.PointsLost,
+                [.. day.AttributeChanges.Select(change => new PlayerTrainingAttributeChangeResponse(
+                    AttributeNames.CodeOf(change.Attribute),
+                    change.Delta))]))
+            .ToList();
+
+        // One line per programme, in the order the player first trained it, so the table reads as a history.
+        var summary = snapshot.Days
+            .GroupBy(day => day.Programme)
+            .Select(group => new PlayerTrainingSummaryResponse(
+                group.Key.ToCode(),
+                group.Count(),
+                group.Sum(day => day.PointsGained),
+                group.Sum(day => day.PointsLost),
+                group.Sum(day => day.PointsGained) - group.Sum(day => day.PointsLost)))
+            .ToList();
+
+        return new PlayerTrainingResponse(
+            snapshot.PlayerId,
+            new PlayerTrainingRegimeResponse(
+                definition.Code,
+                definition.Label,
+                definition.Description,
+                snapshot.Programme is null,
+                snapshot.Intensity.ToCode(),
+                definition.ToAttributeResponses()),
+            days,
+            summary,
+            serverTime);
+    }
 
     private static TrainingResponse Build(
         TrainingSnapshot snapshot,
-        TrainingFocus teamFocus,
         TrainingIntensity intensity,
         DateOnly effectiveDate,
         long version,
@@ -89,19 +139,31 @@ public static class TrainingMapping
             snapshot.ClubShortName,
             snapshot.CountryCode,
             snapshot.SeasonNumber,
-            teamFocus.ToCode(),
             intensity.ToCode(),
             effectiveDate,
             version,
             isConfigured,
-            [.. Enum.GetValues<TrainingFocus>().Select(focus => focus.ToCode())],
             [.. Enum.GetValues<TrainingIntensity>().Select(value => value.ToCode())],
-            [.. Enum.GetValues<AttributeFamily>().Select(family => family.ToCode())],
+            [.. TrainingProgrammes.All.Select(definition => new TrainingProgrammeResponse(
+                definition.Code,
+                definition.Label,
+                definition.Description,
+                definition.ToAttributeResponses()))],
             [.. snapshot.Players.Select(player => player.ToResponse(snapshot.GameYear))],
             serverTime);
 
-    private static TrainingPlayerResponse ToResponse(this TrainingPlayerRow player, int gameYear) =>
-        new(
+    private static IReadOnlyList<TrainingProgrammeAttributeResponse> ToAttributeResponses(
+        this TrainingProgrammeDefinition definition) =>
+        [.. definition.Attributes.Select(entry => new TrainingProgrammeAttributeResponse(
+            AttributeNames.CodeOf(entry.Attribute),
+            AttributeNames.FamilyOf(entry.Attribute).ToCode(),
+            entry.Weight))];
+
+    private static TrainingPlayerResponse ToResponse(this TrainingPlayerRow player, int gameYear)
+    {
+        var defaultProgramme = TrainingProgrammes.DefaultFor(player.PrimaryPosition);
+
+        return new TrainingPlayerResponse(
             player.Id,
             player.FullName,
             player.ShortName,
@@ -109,6 +171,10 @@ public static class TrainingMapping
             PlayerPositions.FamilyOf(player.PrimaryPosition).ToCode(),
             SquadMapping.AgeIn(player.BirthGameYear, gameYear),
             player.State.ToResponse(),
-            player.FocusFamily?.ToCode(),
+            player.Attributes.ToResponse(),
+            (player.Programme ?? defaultProgramme).ToCode(),
+            player.Programme is null,
+            defaultProgramme.ToCode(),
             player.FocusVersion);
+    }
 }

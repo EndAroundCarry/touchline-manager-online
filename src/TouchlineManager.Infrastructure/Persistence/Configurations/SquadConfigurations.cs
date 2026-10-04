@@ -598,7 +598,7 @@ internal sealed class TacticalSlotConfiguration : IEntityTypeConfiguration<Tacti
     }
 }
 
-/// <summary>Maps <c>squad.training_plans</c>: one current training plan per club.</summary>
+/// <summary>Maps <c>squad.training_plans</c>: one current training plan per club, holding its intensity.</summary>
 internal sealed class TrainingPlanConfiguration : IEntityTypeConfiguration<TrainingPlan>
 {
     /// <inheritdoc />
@@ -609,9 +609,6 @@ internal sealed class TrainingPlanConfiguration : IEntityTypeConfiguration<Train
         builder.ToTable("training_plans", "squad", table =>
         {
             table.HasCheckConstraint(
-                "ck_training_plans_focus",
-                "team_focus in ('balanced', 'recovery', 'fitness', 'attacking', 'defending', 'technical', 'tactical')");
-            table.HasCheckConstraint(
                 "ck_training_plans_intensity",
                 "intensity in ('light', 'normal', 'intense')");
         });
@@ -619,11 +616,14 @@ internal sealed class TrainingPlanConfiguration : IEntityTypeConfiguration<Train
         builder.HasKey(plan => plan.Id);
         builder.Property(plan => plan.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(plan => plan.ClubId).HasColumnName("club_id").IsRequired();
-        builder.Property(plan => plan.TeamFocus)
+
+        // Retired: the club-wide team focus. The column stays, nullable and never written, until the contract
+        // migration drops it (`MIG-3`); a shadow property keeps it in the model so the expand migration is
+        // only a relaxed constraint rather than a same-step drop.
+        builder.Property<string?>("TeamFocus")
             .HasColumnName("team_focus")
-            .HasMaxLength(TrainingPlans.MaxFocusCodeLength)
-            .HasConversion(focus => focus.ToCode(), code => TrainingPlans.FromCode(code))
-            .IsRequired();
+            .HasMaxLength(9);
+
         builder.Property(plan => plan.Intensity)
             .HasColumnName("intensity")
             .HasMaxLength(TrainingPlans.MaxIntensityCodeLength)
@@ -647,8 +647,8 @@ internal sealed class TrainingPlanConfiguration : IEntityTypeConfiguration<Train
 /// Maps <c>squad.player_training_focus</c>: the optional per-player training override (`TRN-1`, `TRN-2`).
 /// </summary>
 /// <remarks>
-/// The row now holds a programme. <c>focus_family</c> is the retired attribute-family focus, kept nullable
-/// until the contract migration drops it (`MIG-3`); a row with neither value trains the position default.
+/// The row holds the programme the manager chose; no row means the position default. <c>focus_family</c> is
+/// the retired attribute-family focus, kept nullable until the contract migration drops it (`MIG-3`).
 /// </remarks>
 internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguration<PlayerTrainingFocus>
 {
@@ -660,9 +660,6 @@ internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguratio
         builder.ToTable("player_training_focus", "squad", table =>
         {
             table.HasCheckConstraint(
-                "ck_player_training_focus_family",
-                "focus_family in ('technical', 'mental', 'physical', 'goalkeeping')");
-            table.HasCheckConstraint(
                 "ck_player_training_focus_programme",
                 TrainingProgrammeCheck("programme"));
         });
@@ -671,14 +668,17 @@ internal sealed class PlayerTrainingFocusConfiguration : IEntityTypeConfiguratio
         builder.Property(focus => focus.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(focus => focus.PlayerId).HasColumnName("player_id").IsRequired();
         builder.Property(focus => focus.ClubId).HasColumnName("club_id").IsRequired();
-        builder.Property(focus => focus.FocusFamily)
-            .HasColumnName("focus_family")
-            .HasMaxLength(AttributeFamilies.MaxCodeLength)
-            .HasConversion(family => family!.Value.ToCode(), code => AttributeFamilies.FromCode(code));
         builder.Property(focus => focus.Programme)
             .HasColumnName("programme")
             .HasMaxLength(TrainingProgrammes.MaxCodeLength)
-            .HasConversion(programme => programme!.Value.ToCode(), code => TrainingProgrammes.FromCode(code));
+            .HasConversion(programme => programme.ToCode(), code => TrainingProgrammes.FromCode(code))
+            .IsRequired();
+
+        // Retired: the attribute-family focus. Nullable and never written until the contract migration drops
+        // the column (`MIG-3`).
+        builder.Property<string?>("FocusFamily")
+            .HasColumnName("focus_family")
+            .HasMaxLength(11);
         builder.Property(focus => focus.EffectiveDate).HasColumnName("effective_date").IsRequired();
         builder.Property(focus => focus.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(focus => focus.UpdatedAt).HasColumnName("updated_at").IsRequired();

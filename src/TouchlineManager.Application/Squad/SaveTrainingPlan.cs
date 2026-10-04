@@ -132,14 +132,12 @@ public sealed class SaveTrainingPlan
         }
 
         var now = _clock.UtcNow;
-        var teamFocus = TrainingPlans.FromCode(request.TeamFocus);
         var intensity = TrainingPlans.IntensityFromCode(request.Intensity);
         var effectiveDate = DateOnly.FromDateTime(now.UtcDateTime);
 
         var plan = existing is null
-            ? TrainingPlan.Set(
-                Guid.CreateVersion7(), access.ClubId, teamFocus, intensity, effectiveDate, now)
-            : Revise(existing, teamFocus, intensity, effectiveDate, now);
+            ? TrainingPlan.Set(Guid.CreateVersion7(), access.ClubId, intensity, effectiveDate, now)
+            : Revise(existing, intensity, effectiveDate, now);
 
         if (existing is null)
         {
@@ -169,12 +167,11 @@ public sealed class SaveTrainingPlan
 
     private static TrainingPlan Revise(
         TrainingPlan plan,
-        TrainingFocus teamFocus,
         TrainingIntensity intensity,
         DateOnly effectiveDate,
         DateTimeOffset now)
     {
-        plan.Revise(teamFocus, intensity, effectiveDate, now);
+        plan.Revise(intensity, effectiveDate, now);
 
         return plan;
     }
