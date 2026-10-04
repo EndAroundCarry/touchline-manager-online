@@ -45,6 +45,9 @@ public sealed class PlayerState
     /// <summary>Gets the partial development remainder carried across days (`TRN-10`).</summary>
     public int DevelopmentRemainder { get; private set; }
 
+    /// <summary>Gets the partial decline remainder carried across days (`TRN-16`).</summary>
+    public int DeclineRemainder { get; private set; }
+
     /// <summary>Gets the last day the progression job ran for this player, if it has run.</summary>
     public DateOnly? LastProgressionDate { get; private set; }
 
@@ -64,6 +67,7 @@ public sealed class PlayerState
         MoraleBp = NeutralBasisPoints,
         MatchSharpnessBp = NeutralBasisPoints,
         DevelopmentRemainder = 0,
+        DeclineRemainder = 0,
         LastProgressionDate = null,
         Version = 1,
     };
@@ -76,6 +80,7 @@ public sealed class PlayerState
     /// <param name="matchSharpnessBp">Match sharpness in basis points.</param>
     /// <param name="developmentRemainder">The carried development remainder.</param>
     /// <param name="lastProgressionDate">The last progression day, if any.</param>
+    /// <param name="declineRemainder">The carried decline remainder (`TRN-16`).</param>
     public static PlayerState Create(
         Guid playerId,
         int conditionBp,
@@ -83,7 +88,8 @@ public sealed class PlayerState
         int moraleBp,
         int matchSharpnessBp,
         int developmentRemainder,
-        DateOnly? lastProgressionDate)
+        DateOnly? lastProgressionDate,
+        int declineRemainder = 0)
     {
         EnsureBasisPoints(conditionBp, nameof(conditionBp));
         EnsureBasisPoints(fatigueBp, nameof(fatigueBp));
@@ -98,6 +104,14 @@ public sealed class PlayerState
                 "A development remainder is never negative (TRN-10).");
         }
 
+        if (declineRemainder < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(declineRemainder),
+                declineRemainder,
+                "A decline remainder is never negative (TRN-16).");
+        }
+
         return new PlayerState
         {
             PlayerId = playerId,
@@ -106,6 +120,7 @@ public sealed class PlayerState
             MoraleBp = moraleBp,
             MatchSharpnessBp = matchSharpnessBp,
             DevelopmentRemainder = developmentRemainder,
+            DeclineRemainder = declineRemainder,
             LastProgressionDate = lastProgressionDate,
             Version = 1,
         };
@@ -124,6 +139,7 @@ public sealed class PlayerState
     /// <param name="moraleBp">The new morale in basis points.</param>
     /// <param name="matchSharpnessBp">The new match sharpness in basis points.</param>
     /// <param name="developmentRemainder">The partial development carried into the next day (`TRN-10`).</param>
+    /// <param name="declineRemainder">The partial decline carried into the next day (`TRN-16`).</param>
     /// <param name="day">The day the progression was run for.</param>
     public void ApplyProgression(
         int conditionBp,
@@ -131,6 +147,7 @@ public sealed class PlayerState
         int moraleBp,
         int matchSharpnessBp,
         int developmentRemainder,
+        int declineRemainder,
         DateOnly day)
     {
         EnsureBasisPoints(conditionBp, nameof(conditionBp));
@@ -146,11 +163,20 @@ public sealed class PlayerState
                 "A development remainder is never negative (TRN-10).");
         }
 
+        if (declineRemainder < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(declineRemainder),
+                declineRemainder,
+                "A decline remainder is never negative (TRN-16).");
+        }
+
         ConditionBp = conditionBp;
         FatigueBp = fatigueBp;
         MoraleBp = moraleBp;
         MatchSharpnessBp = matchSharpnessBp;
         DevelopmentRemainder = developmentRemainder;
+        DeclineRemainder = declineRemainder;
         LastProgressionDate = day;
         Version++;
     }

@@ -202,6 +202,9 @@ internal sealed class PlayerStateConfiguration : IEntityTypeConfiguration<Player
         builder.Property(state => state.MoraleBp).HasColumnName("morale_bp").IsRequired();
         builder.Property(state => state.MatchSharpnessBp).HasColumnName("match_sharpness_bp").IsRequired();
         builder.Property(state => state.DevelopmentRemainder).HasColumnName("development_remainder").IsRequired();
+
+        // TODO(training-v2 milestone 2): map decline_remainder with the migration. Until then it is not persisted.
+        builder.Ignore(state => state.DeclineRemainder);
         builder.Property(state => state.LastProgressionDate).HasColumnName("last_progression_date");
         builder.Property(state => state.Version).HasColumnName("version").IsRequired();
 

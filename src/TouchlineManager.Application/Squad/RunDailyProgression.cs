@@ -1,5 +1,6 @@
 using TouchlineManager.Application.Abstractions.Persistence;
 using TouchlineManager.Application.Abstractions.Squad;
+using TouchlineManager.Domain.Squad;
 using TouchlineManager.Domain.Squad.Training;
 
 namespace TouchlineManager.Application.Squad;
@@ -61,14 +62,15 @@ public sealed class RunDailyProgression
                     member.Player.AgeIn(roster.GameYear),
                     member.Attributes.ToSet(),
                     member.Potential,
-                    roster.TeamFocus,
+                    TrainingAptitude.For(member.Player.Id),
+                    ProgrammeFor(roster, member),
                     roster.Intensity,
-                    member.IndividualFocus,
                     member.State.ConditionBp,
                     member.State.FatigueBp,
                     member.State.MoraleBp,
                     member.State.MatchSharpnessBp,
                     member.State.DevelopmentRemainder,
+                    member.State.DeclineRemainder,
                     day));
 
                 member.State.ApplyProgression(
@@ -77,6 +79,7 @@ public sealed class RunDailyProgression
                     outcome.MoraleBp,
                     outcome.MatchSharpnessBp,
                     outcome.DevelopmentRemainder,
+                    outcome.DeclineRemainder,
                     day);
 
                 member.Attributes.Apply(outcome.Attributes);
@@ -91,5 +94,29 @@ public sealed class RunDailyProgression
         }
 
         return new RunDailyProgressionResult(rosters.Count, progressed);
+    }
+
+    /// <summary>
+    /// Resolves the programme a player trains today.
+    /// </summary>
+    /// <remarks>
+    /// Temporary bridge for the persistence milestone: until the per-player programme override is stored, the
+    /// legacy club focus and family focus are translated onto the nearest programme, and every other player
+    /// trains the default for their primary position.
+    /// </remarks>
+    private static TrainingProgramme ProgrammeFor(ClubTrainingRoster roster, ProgressablePlayer member)
+    {
+        if (roster.TeamFocus == TrainingFocus.Recovery)
+        {
+            return TrainingProgramme.Recovery;
+        }
+
+        return member.IndividualFocus switch
+        {
+            AttributeFamily.Mental => TrainingProgramme.Mental,
+            AttributeFamily.Physical => TrainingProgramme.Physical,
+            AttributeFamily.Goalkeeping => TrainingProgramme.Goalkeeper,
+            _ => TrainingProgrammes.DefaultFor(member.Player.PrimaryPosition),
+        };
     }
 }
