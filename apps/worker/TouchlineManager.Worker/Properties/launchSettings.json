@@ -5,7 +5,9 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
+        "DOTNET_ENVIRONMENT": "Development",
+        "Clock__Mode": "Stepped",
+        "Clock__InitialNowUtc": "2026-10-05T12:00:00Z"
       }
     }
   }
