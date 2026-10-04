@@ -2,14 +2,14 @@
   <div [class]="formCardClass">
     @if (registration(); as accepted) {
       <h1 [class]="pageHeadingClass">Check your email</h1>
-      <p class="mt-3 text-sm text-slate-700">
+      <p class="mt-3 text-sm text-ink-2">
         We sent a confirmation link to <strong>{{ accepted.email }}</strong
         >. Open it to activate your club.
       </p>
 
       @if (!accepted.verificationEmailSent) {
         <p
-          class="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          class="mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
           role="status"
         >
           The message could not be sent just now. Use the button below to try again.
@@ -34,7 +34,7 @@
       </div>
     } @else {
       <h1 [class]="pageHeadingClass">Create your account</h1>
-      <p class="mt-2 text-sm text-slate-600">
+      <p class="mt-2 text-sm text-ink-2">
         One account, one club. You start in the lowest division of the country you choose.
       </p>
 
@@ -44,7 +44,7 @@
 
       <form class="mt-6 space-y-4" [formGroup]="form" (ngSubmit)="submit()" novalidate>
         <div>
-          <label class="block text-sm font-medium text-slate-800" for="email">Email address</label>
+          <label class="block text-sm font-medium text-ink" for="email">Email address</label>
           <input
             id="email"
             type="email"
@@ -60,10 +60,8 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-800" for="displayName"
-            >Manager name</label
-          >
-          <p class="text-xs text-slate-500">Shown to other managers. 3 to 32 characters.</p>
+          <label class="block text-sm font-medium text-ink" for="displayName">Manager name</label>
+          <p class="text-xs text-muted">Shown to other managers. 3 to 32 characters.</p>
           <input
             id="displayName"
             type="text"
@@ -81,8 +79,8 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-800" for="password">Password</label>
-          <p class="text-xs text-slate-500">At least 12 characters.</p>
+          <label class="block text-sm font-medium text-ink" for="password">Password</label>
+          <p class="text-xs text-muted">At least 12 characters.</p>
           <input
             id="password"
             type="password"
@@ -111,10 +109,10 @@
             "
           />
           <div>
-            <label class="text-sm text-slate-800" for="acceptTerms">
+            <label class="text-sm text-ink" for="acceptTerms">
               I accept the terms of service and the privacy policy.
             </label>
-            <p class="text-xs text-slate-500">
+            <p class="text-xs text-muted">
               Read the <a routerLink="/terms" [class]="linkClass">terms of service</a> and the
               <a routerLink="/privacy" [class]="linkClass">privacy policy</a>.
             </p>
@@ -129,7 +127,7 @@
         </button>
       </form>
 
-      <p class="mt-6 text-sm text-slate-700">
+      <p class="mt-6 text-sm text-ink-2">
         Already have an account? <a routerLink="/login" [class]="linkClass">Sign in</a>
       </p>
     }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="app-dark">
   <head>
     <meta charset="utf-8" />
     <title>Touchline Manager</title>
@@ -9,10 +9,22 @@
       name="description"
       content="An online football management game: prepare your club, compete on fixed matchdays, and climb the table."
     />
-    <meta name="theme-color" content="#0f172a" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0b0f14" />
+    <meta name="color-scheme" content="dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Touchline" />
+    <script>
+      // Applies the stored colour theme before the first paint, so a manager who chose light never sees a dark flash.
+      // `ThemeStore` adopts the same value once the app starts.
+      try {
+        if (localStorage.getItem('touchline.theme') === 'light') {
+          document.documentElement.classList.remove('app-dark');
+          document.documentElement.classList.add('app-light');
+        }
+      } catch (error) {
+        /* storage unavailable: the default (dark) stands */
+      }
+    </script>
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192x192.png" />

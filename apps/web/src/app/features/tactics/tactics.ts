@@ -281,25 +281,25 @@ export class Tactics {
     const base =
       'absolute -translate-x-1/2 translate-y-1/2 flex h-12 w-12 flex-col items-center justify-center ' +
       'rounded-full border-2 text-center text-[10px] font-semibold leading-tight shadow ' +
-      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
+      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
 
     if (slot.issueCount > 0 || slot.isUnavailable) {
-      return `${base} border-red-500 bg-red-100 text-red-900`;
+      return `${base} border-red-400 bg-[#2a1416] text-red-200`;
     }
 
     if (slot.isSelected) {
-      return `${base} border-amber-400 bg-white text-slate-900 ring-2 ring-amber-300`;
+      return `${base} border-accent bg-panel text-ink ring-2 ring-accent`;
     }
 
     if (slot.player === null) {
-      return `${base} border-white/70 border-dashed bg-emerald-800 text-white`;
+      return `${base} border-white/70 border-dashed bg-black/30 text-white`;
     }
 
     if (slot.isOutOfPosition) {
-      return `${base} border-amber-300 bg-amber-50 text-amber-900`;
+      return `${base} border-amber-400 bg-[#2b2310] text-amber-200`;
     }
 
-    return `${base} border-white bg-white text-slate-900`;
+    return `${base} border-white/80 bg-panel text-ink`;
   }
 
   /** The accessible name of a slot marker, describing where it is, who is in it, and its state. */

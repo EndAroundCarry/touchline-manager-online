@@ -1,5 +1,5 @@
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading your inbox…</p>
+  <p class="text-sm text-ink-2" role="status">Loading your inbox…</p>
 } @else if (error(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
   <div class="mt-4">
@@ -8,13 +8,13 @@
 } @else {
   <section class="max-w-4xl">
     <h1 [class]="pageHeadingClass">Inbox</h1>
-    <p class="mt-1 text-sm text-slate-600">
+    <p class="mt-1 text-sm text-ink-2">
       What the game has told you: your results, your table moves, your players' cards and injuries,
       and any side the game had to repair before kick-off.
     </p>
 
     <div class="mt-4 flex flex-wrap items-center gap-3">
-      <p class="text-sm font-medium text-slate-700" role="status" aria-live="polite">
+      <p class="text-sm font-medium text-ink-2" role="status" aria-live="polite">
         {{ unreadCount() }} unread
       </p>
 
@@ -37,7 +37,7 @@
     }
 
     @if (messages().length === 0) {
-      <p class="mt-6 text-sm text-slate-600" role="status">
+      <p class="mt-6 text-sm text-ink-2" role="status">
         @if (unreadOnly()) {
           Nothing unread. Everything has been read.
         } @else {
@@ -50,25 +50,25 @@
         @for (message of messages(); track message.id) {
           <li
             class="rounded border px-3 py-3"
-            [class]="message.isRead ? 'border-slate-200 bg-white' : 'border-slate-400 bg-slate-50'"
+            [class]="message.isRead ? 'border-line bg-panel' : 'border-slate-400 bg-ground'"
           >
             <article [attr.aria-labelledby]="'message-' + message.id">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 [id]="'message-' + message.id" class="text-sm font-semibold text-slate-900">
+                <h2 [id]="'message-' + message.id" class="text-sm font-semibold text-ink">
                   {{ message.title }}
                 </h2>
-                <span class="text-xs uppercase tracking-wide text-slate-500">{{
+                <span class="text-xs uppercase tracking-wide text-muted">{{
                   category(message.category)
                 }}</span>
                 @if (!message.isRead) {
-                  <span class="text-xs font-semibold text-slate-900">Unread</span>
+                  <span class="text-xs font-semibold text-ink">Unread</span>
                 }
-                <time class="ml-auto text-xs text-slate-500" [attr.datetime]="message.createdAt">
+                <time class="ml-auto text-xs text-muted" [attr.datetime]="message.createdAt">
                   {{ time(message.createdAt) }}
                 </time>
               </div>
 
-              <p class="mt-1 text-sm text-slate-700">{{ message.body }}</p>
+              <p class="mt-1 text-sm text-ink-2">{{ message.body }}</p>
 
               <div class="mt-2 flex flex-wrap items-center gap-3">
                 @if (link(message.category, message.relatedEntityId); as target) {

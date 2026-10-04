@@ -1,7 +1,7 @@
 import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
-import { ClubFixture } from '../../core/competition/competition.models';
+import { ClubFixture, DivisionTableRow } from '../../core/competition/competition.models';
 import {
   lockCountdown,
   roundLabel,
@@ -9,8 +9,17 @@ import {
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { FinanceStore } from '../../core/finance/finance-store';
+import { InboxStore } from '../../core/inbox/inbox-store';
+import { SquadStore } from '../../core/squad/squad-store';
+import { TransfersStore } from '../../core/transfers/transfers-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
-import { formatDeadline, formatFunds, formatInstant } from '../../core/world/presentation';
+import {
+  formatDeadline,
+  formatFunds,
+  formatInstant,
+  preferredLocale,
+  preferredTimeZone,
+} from '../../core/world/presentation';
 import { ClubDashboard } from '../../core/world/world.models';
 import {
   DESTRUCTIVE_BUTTON,
@@ -21,9 +30,21 @@ import {
   SECONDARY_BUTTON,
   STATUS_MESSAGE,
 } from '../../shared/forms/control-styles';
+import {
+  CalendarEventKind,
+  calendarEvents,
+  squadStatus,
+  statLeaders,
+  tableWindow,
+} from './dashboard-presentation';
 
 /**
  * The club dashboard (master plan §11.1).
+ *
+ * With a club it is a grid of widgets, each answering one question a manager asks on arriving: the next match and the
+ * calendar around it, the league table, the club's record, the inbox, the squad's status, the market, and the
+ * division's leaders. Each widget reads its own store and fails on its own, so one slow or failed read leaves the rest
+ * of the screen intact.
  *
  * It is also the router for onboarding: with no manager profile it offers the profile step, with a profile
  * but no club it offers the country step, and with a club it shows what the manager inherited. Deciding
@@ -42,6 +63,9 @@ export class Dashboard {
   private readonly store = inject(OnboardingStore);
   private readonly competition = inject(CompetitionStore);
   private readonly finance = inject(FinanceStore);
+  private readonly squadStore = inject(SquadStore);
+  private readonly transfers = inject(TransfersStore);
+  private readonly inbox = inject(InboxStore);
 
   protected readonly state = this.store.state;
   protected readonly club = signal<ClubDashboard | null>(null);
@@ -72,6 +96,58 @@ export class Dashboard {
 
     return list.fixtures.find((fixture) => fixture.id === list.nextFixtureId) ?? null;
   });
+
+  /** The finance summary, for the club widget's funds and the warnings. */
+  protected readonly financeSummary = this.finance.summary;
+
+  /** The rows of the division table around the manager's club, for the league-table widget. */
+  protected readonly tableRows = computed(() =>
+    tableWindow(this.competition.divisionTable()?.rows ?? [], this.club()?.club.id ?? null, 12),
+  );
+
+  /** Whether the division table has been read, so the widget can tell "still loading" from "empty". */
+  protected readonly hasTable = computed(() => this.competition.divisionTable() !== null);
+
+  /** The manager's own row of the table: their record, position, goals and cards. */
+  protected readonly ownRow = computed<DivisionTableRow | null>(() => {
+    const clubId = this.club()?.club.id;
+
+    return this.competition.divisionTable()?.rows.find((row) => row.clubId === clubId) ?? null;
+  });
+
+  /** Why the squad could not be read, or null. */
+  protected readonly squadError = signal<string | null>(null);
+
+  /** The squad's concerns, grouped, for the squad-status widget. */
+  protected readonly squadGroups = computed(() =>
+    squadStatus(this.squadStore.squad()?.players ?? []),
+  );
+
+  /** The squad itself, once read. */
+  protected readonly squadRead = this.squadStore.squad;
+
+  /** The latest inbox messages, for the inbox widget. */
+  protected readonly latestMessages = computed(() => this.inbox.messages().slice(0, 4));
+  protected readonly unreadCount = this.inbox.unreadCount;
+  protected readonly inboxLoading = this.inbox.loading;
+  protected readonly inboxError = this.inbox.error;
+
+  /** The club's own market activity, for the pending-transfers widget. */
+  protected readonly myBids = this.transfers.myBids;
+  protected readonly myListings = this.transfers.myListings;
+  protected readonly marketLoading = this.transfers.loading;
+  protected readonly marketError = this.transfers.error;
+
+  /** The division's leaders, for the player-stats widget. */
+  protected readonly leaders = computed(() =>
+    statLeaders(this.competition.divisionStatistics()?.rows ?? []),
+  );
+  protected readonly hasStatistics = computed(() => this.competition.divisionStatistics() !== null);
+
+  /** What is next on the calendar: matches, the team-sheet deadline, and auctions closing. */
+  protected readonly calendar = computed(() =>
+    calendarEvents(this.fixtures(), this.myBids(), this.myListings(), new Date()),
+  );
 
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;
@@ -109,6 +185,20 @@ export class Dashboard {
             // the screen.
             this.competition.loadFixtures();
             this.finance.loadSummary();
+
+            // The widgets' own reads. They are independent of one another, and of the club that has just loaded,
+            // so none of them waits for another.
+            this.competition.loadMyDivisionTable();
+            this.competition.loadDivisionStatistics(dashboard.division.id);
+            this.inbox.load();
+            this.transfers.load();
+            this.squadError.set(null);
+            this.squadStore.loadSquad(dashboard.club.id).subscribe({
+              error: (error: unknown) =>
+                this.squadError.set(
+                  error instanceof ApiError ? error.detail : 'Your squad could not be read.',
+                ),
+            });
           },
           error: (error: unknown) => {
             this.loading.set(false);
@@ -125,6 +215,21 @@ export class Dashboard {
         );
       },
     });
+  }
+
+  /** The initials of a club, for the monogram badge: its short name, or the first letters of its name. */
+  protected badge(shortName: string): string {
+    return shortName.slice(0, 3).toUpperCase();
+  }
+
+  /** The icon for a calendar entry, so the kind is not told by colour alone. */
+  protected calendarIcon(kind: CalendarEventKind): string {
+    return kind === 'match' ? 'pi pi-flag' : kind === 'deadline' ? 'pi pi-clock' : 'pi pi-tag';
+  }
+
+  /** Formats a calendar entry's moment compactly: weekday, day, month and time. */
+  protected when(value: string): string {
+    return formatCalendarMoment(value);
   }
 
   /** Formats an amount for display. */
@@ -190,4 +295,16 @@ export class Dashboard {
       },
     });
   }
+}
+
+/** Weekday, day, month and time in the manager's locale and zone, which is how a calendar reads. */
+function formatCalendarMoment(value: string): string {
+  return new Intl.DateTimeFormat(preferredLocale(), {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: preferredTimeZone(),
+  }).format(new Date(value));
 }

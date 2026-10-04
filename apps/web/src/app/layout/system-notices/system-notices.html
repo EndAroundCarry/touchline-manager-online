@@ -1,6 +1,6 @@
 @if (readOnly()) {
   <p
-    class="bg-rose-100 px-4 py-2 text-center text-sm text-rose-900"
+    class="bg-rose-500/15 px-4 py-2 text-center text-sm text-rose-200"
     role="status"
     aria-live="polite"
   >
@@ -13,7 +13,7 @@
 
 @if (!isOnline()) {
   <p
-    class="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900"
+    class="bg-amber-500/15 px-4 py-2 text-center text-sm text-amber-200"
     role="status"
     aria-live="polite"
   >
@@ -25,7 +25,7 @@
 
 @if (showStale()) {
   <div
-    class="flex flex-wrap items-center justify-center gap-3 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+    class="flex flex-wrap items-center justify-center gap-3 bg-amber-500/10 px-4 py-2 text-sm text-amber-200"
   >
     <p role="status" aria-live="polite">
       We could not refresh just now, so you may be seeing older data.
@@ -39,7 +39,7 @@
 
 @if (showUpdate()) {
   <div
-    class="flex flex-wrap items-center justify-center gap-3 bg-sky-100 px-4 py-2 text-sm text-sky-900"
+    class="flex flex-wrap items-center justify-center gap-3 bg-sky-500/15 px-4 py-2 text-sm text-sky-200"
   >
     <p role="status" aria-live="polite">
       @if (unrecoverable()) {

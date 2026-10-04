@@ -1,6 +1,6 @@
 <section class="max-w-6xl">
   <h1 [class]="pageHeadingClass">Transfers</h1>
-  <p class="mt-1 text-sm text-slate-600">
+  <p class="mt-1 text-sm text-ink-2">
     List a player, bid for another club's, and watch the auctions close at their daily window.
   </p>
 
@@ -8,18 +8,16 @@
     <p [class]="formErrorClass" role="alert">{{ message }}</p>
   }
 
-  <section class="mt-6 rounded border border-slate-200 bg-white p-4">
+  <section class="mt-6 rounded border border-line bg-panel p-4">
     <h2 class="text-lg font-semibold">List a player</h2>
 
     @if (contracts(); as list) {
       @if (list.contracts.length === 0) {
-        <p class="mt-2 text-sm text-slate-600" role="status">
-          You have nobody under contract to sell.
-        </p>
+        <p class="mt-2 text-sm text-ink-2" role="status">You have nobody under contract to sell.</p>
       } @else {
         <form class="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" (submit)="onList($event)">
           <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-slate-700" for="list-player">Player</label>
+            <label class="block text-sm font-medium text-ink-2" for="list-player">Player</label>
             <select id="list-player" name="playerId" [class]="textInputClass">
               @for (contract of list.contracts; track contract.id) {
                 <option [value]="contract.playerId">
@@ -30,9 +28,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-slate-700" for="list-fee"
-              >Minimum fee</label
-            >
+            <label class="block text-sm font-medium text-ink-2" for="list-fee">Minimum fee</label>
             <input
               id="list-fee"
               name="minimumFeeMinor"
@@ -44,7 +40,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-slate-700" for="list-seasons"
+            <label class="block text-sm font-medium text-ink-2" for="list-seasons"
               >Buyer contract</label
             >
             <select id="list-seasons" name="seasons" [class]="textInputClass">
@@ -68,9 +64,9 @@
     <h2 class="text-lg font-semibold">Open listings</h2>
 
     @if (loading()) {
-      <p class="mt-2 text-sm text-slate-600" role="status">Loading the market…</p>
+      <p class="mt-2 text-sm text-ink-2" role="status">Loading the market…</p>
     } @else if (listings().length === 0) {
-      <p class="mt-2 text-sm text-slate-600" role="status">No players are listed right now.</p>
+      <p class="mt-2 text-sm text-ink-2" role="status">No players are listed right now.</p>
     } @else {
       <div
         class="mt-2 hidden overflow-x-auto md:block"
@@ -79,38 +75,38 @@
         role="group"
         aria-label="Transfer listings"
       >
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <table class="min-w-full divide-y divide-line text-sm">
           <caption class="sr-only">
             Open transfer listings
           </caption>
           <thead>
             <tr>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Player</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Seller</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Minimum</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Leading</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Bids</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Closes</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Your bid</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Player</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Seller</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Minimum</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Leading</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Bids</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Closes</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Your bid</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-line-soft">
             @for (listing of listings(); track listing.listingId) {
               <tr>
-                <td class="px-3 py-2 text-slate-900">{{ listing.playerName }}</td>
-                <td class="px-3 py-2 text-slate-700">{{ listing.sellerClubName }}</td>
-                <td class="px-3 py-2 text-right text-slate-700">
+                <td class="px-3 py-2 text-ink">{{ listing.playerName }}</td>
+                <td class="px-3 py-2 text-ink-2">{{ listing.sellerClubName }}</td>
+                <td class="px-3 py-2 text-right text-ink-2">
                   {{ funds(listing.minimumFeeMinor) }}
                 </td>
-                <td class="px-3 py-2 text-right font-medium text-slate-900">
+                <td class="px-3 py-2 text-right font-medium text-ink">
                   @if (listing.leadingAmountMinor; as leading) {
                     {{ funds(leading) }}
                   } @else {
                     No bids
                   }
                 </td>
-                <td class="px-3 py-2 text-right text-slate-700">{{ listing.bidderCount }}</td>
-                <td class="px-3 py-2 text-slate-700">{{ instant(listing.endsAt) }}</td>
+                <td class="px-3 py-2 text-right text-ink-2">{{ listing.bidderCount }}</td>
+                <td class="px-3 py-2 text-ink-2">{{ instant(listing.endsAt) }}</td>
                 <td class="px-3 py-2">
                   <form class="flex items-center gap-2" (submit)="onBid($event, listing.listingId)">
                     <label class="sr-only" [attr.for]="'bid-' + listing.listingId"
@@ -142,17 +138,17 @@
       -->
       <ul class="mt-2 flex flex-col gap-3 md:hidden" data-testid="listings-cards">
         @for (listing of listings(); track listing.listingId) {
-          <li class="rounded border border-slate-200 bg-white p-3">
-            <h3 class="text-sm font-semibold text-slate-900">{{ listing.playerName }}</h3>
-            <p class="text-sm text-slate-600">{{ listing.sellerClubName }}</p>
+          <li class="rounded border border-line bg-panel p-3">
+            <h3 class="text-sm font-semibold text-ink">{{ listing.playerName }}</h3>
+            <p class="text-sm text-ink-2">{{ listing.sellerClubName }}</p>
             <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
               <div class="flex justify-between gap-2">
-                <dt class="text-slate-500">Minimum</dt>
-                <dd class="text-slate-800">{{ funds(listing.minimumFeeMinor) }}</dd>
+                <dt class="text-muted">Minimum</dt>
+                <dd class="text-ink">{{ funds(listing.minimumFeeMinor) }}</dd>
               </div>
               <div class="flex justify-between gap-2">
-                <dt class="text-slate-500">Leading</dt>
-                <dd class="text-slate-800">
+                <dt class="text-muted">Leading</dt>
+                <dd class="text-ink">
                   @if (listing.leadingAmountMinor; as leading) {
                     {{ funds(leading) }}
                   } @else {
@@ -161,12 +157,12 @@
                 </dd>
               </div>
               <div class="flex justify-between gap-2">
-                <dt class="text-slate-500">Bids</dt>
-                <dd class="text-slate-800">{{ listing.bidderCount }}</dd>
+                <dt class="text-muted">Bids</dt>
+                <dd class="text-ink">{{ listing.bidderCount }}</dd>
               </div>
               <div class="flex justify-between gap-2">
-                <dt class="text-slate-500">Closes</dt>
-                <dd class="text-slate-800">{{ instant(listing.endsAt) }}</dd>
+                <dt class="text-muted">Closes</dt>
+                <dd class="text-ink">{{ instant(listing.endsAt) }}</dd>
               </div>
             </dl>
             <form class="mt-2 flex items-center gap-2" (submit)="onBid($event, listing.listingId)">
@@ -205,18 +201,18 @@
   </section>
 
   <div class="mt-8 grid gap-6 lg:grid-cols-2">
-    <section class="rounded border border-slate-200 bg-white p-4">
+    <section class="rounded border border-line bg-panel p-4">
       <h2 class="text-lg font-semibold">Your listings</h2>
 
       @if (myListings().length === 0) {
-        <p class="mt-2 text-sm text-slate-600" role="status">You have nobody listed.</p>
+        <p class="mt-2 text-sm text-ink-2" role="status">You have nobody listed.</p>
       } @else {
         <ul class="mt-2 flex flex-col gap-3">
           @for (listing of myListings(); track listing.listingId) {
             <li class="flex items-center justify-between gap-3">
               <div>
-                <p class="text-sm font-medium text-slate-900">{{ listing.playerName }}</p>
-                <p class="text-sm text-slate-600">
+                <p class="text-sm font-medium text-ink">{{ listing.playerName }}</p>
+                <p class="text-sm text-ink-2">
                   {{ listing.status }} &middot; minimum
                   {{ funds(listing.minimumFeeMinor) }} &middot; closes {{ instant(listing.endsAt) }}
                 </p>
@@ -237,17 +233,17 @@
       }
     </section>
 
-    <section class="rounded border border-slate-200 bg-white p-4">
+    <section class="rounded border border-line bg-panel p-4">
       <h2 class="text-lg font-semibold">Your bids</h2>
 
       @if (myBids().length === 0) {
-        <p class="mt-2 text-sm text-slate-600" role="status">You have no bids.</p>
+        <p class="mt-2 text-sm text-ink-2" role="status">You have no bids.</p>
       } @else {
         <ul class="mt-2 flex flex-col gap-3">
           @for (bid of myBids(); track bid.listingId) {
             <li>
-              <p class="text-sm font-medium text-slate-900">{{ bid.playerName }}</p>
-              <p class="text-sm text-slate-600">
+              <p class="text-sm font-medium text-ink">{{ bid.playerName }}</p>
+              <p class="text-sm text-ink-2">
                 {{ funds(bid.amountMinor) }} &middot; {{ bid.status }} &middot; closes
                 {{ instant(bid.endsAt) }}
               </p>
@@ -262,32 +258,32 @@
     <h2 class="text-lg font-semibold">Recent transfers</h2>
 
     @if (history().length === 0) {
-      <p class="mt-2 text-sm text-slate-600" role="status">No transfers have completed yet.</p>
+      <p class="mt-2 text-sm text-ink-2" role="status">No transfers have completed yet.</p>
     } @else {
       <div class="mt-2 overflow-x-auto" tabindex="0" role="group" aria-label="Recent transfers">
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <table class="min-w-full divide-y divide-line text-sm">
           <caption class="sr-only">
             Completed transfers
           </caption>
           <thead>
             <tr>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Player</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">From</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">To</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Fee</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">When</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Player</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">From</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">To</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Fee</th>
+              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">When</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-line-soft">
             @for (entry of history(); track entry.listingId) {
               <tr>
-                <td class="px-3 py-2 text-slate-900">{{ entry.playerName }}</td>
-                <td class="px-3 py-2 text-slate-700">{{ entry.sellerClubName }}</td>
-                <td class="px-3 py-2 text-slate-700">{{ entry.buyerClubName }}</td>
-                <td class="px-3 py-2 text-right font-medium text-slate-900">
+                <td class="px-3 py-2 text-ink">{{ entry.playerName }}</td>
+                <td class="px-3 py-2 text-ink-2">{{ entry.sellerClubName }}</td>
+                <td class="px-3 py-2 text-ink-2">{{ entry.buyerClubName }}</td>
+                <td class="px-3 py-2 text-right font-medium text-ink">
                   {{ funds(entry.feeMinor) }}
                 </td>
-                <td class="px-3 py-2 text-slate-700">{{ instant(entry.resolvedAt) }}</td>
+                <td class="px-3 py-2 text-ink-2">{{ instant(entry.resolvedAt) }}</td>
               </tr>
             }
           </tbody>

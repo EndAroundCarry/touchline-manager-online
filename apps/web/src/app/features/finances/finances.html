@@ -1,5 +1,5 @@
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading your finances…</p>
+  <p class="text-sm text-ink-2" role="status">Loading your finances…</p>
 } @else if (error(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
   <div class="mt-4">
@@ -8,89 +8,89 @@
 } @else if (summary(); as finances) {
   <section class="max-w-5xl">
     <h1 [class]="pageHeadingClass">Finances</h1>
-    <p class="mt-1 text-sm text-slate-600">
-      Every movement of your club's money is a ledger entry. The balances are the running total of the entries
-      below, so nothing here is an estimate.
+    <p class="mt-1 text-sm text-ink-2">
+      Every movement of your club's money is a ledger entry. The balances are the running total of
+      the entries below, so nothing here is an estimate.
     </p>
 
     <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <div class="rounded border border-slate-200 bg-white p-4">
-        <dt class="text-sm font-medium text-slate-500">Cash</dt>
+      <div class="rounded border border-line bg-panel p-4">
+        <dt class="text-sm font-medium text-muted">Cash</dt>
         <dd class="mt-1 text-xl font-semibold">{{ funds(finances.cashMinor) }}</dd>
       </div>
 
-      <div class="rounded border border-slate-200 bg-white p-4">
-        <dt class="text-sm font-medium text-slate-500">Reserved for bids</dt>
+      <div class="rounded border border-line bg-panel p-4">
+        <dt class="text-sm font-medium text-muted">Reserved for bids</dt>
         <dd class="mt-1 text-xl font-semibold">{{ funds(finances.reservedMinor) }}</dd>
       </div>
 
-      <div class="rounded border border-slate-200 bg-white p-4">
-        <dt class="text-sm font-medium text-slate-500">Available</dt>
+      <div class="rounded border border-line bg-panel p-4">
+        <dt class="text-sm font-medium text-muted">Available</dt>
         <dd class="mt-1 text-xl font-semibold">{{ funds(finances.availableMinor) }}</dd>
-        <dd class="text-sm text-slate-600">After existing reservations</dd>
+        <dd class="text-sm text-ink-2">After existing reservations</dd>
       </div>
 
-      <div class="rounded border border-slate-200 bg-white p-4">
-        <dt class="text-sm font-medium text-slate-500">Weekly wages</dt>
+      <div class="rounded border border-line bg-panel p-4">
+        <dt class="text-sm font-medium text-muted">Weekly wages</dt>
         <dd class="mt-1 text-xl font-semibold">{{ funds(finances.weeklyWageMinor) }}</dd>
-        <dd class="text-sm text-slate-600">
-          {{ finances.contractedPlayers }} players under contract
-        </dd>
+        <dd class="text-sm text-ink-2">{{ finances.contractedPlayers }} players under contract</dd>
       </div>
     </dl>
 
-    <section class="mt-6 rounded border border-slate-200 bg-white p-4">
-      <h2 class="text-sm font-medium text-slate-500">Every week</h2>
+    <section class="mt-6 rounded border border-line bg-panel p-4">
+      <h2 class="text-sm font-medium text-muted">Every week</h2>
       <dl class="mt-2 grid gap-3 sm:grid-cols-3">
         <div>
-          <dt class="text-sm text-slate-600">Sponsorship (tier {{ finances.tierNumber }})</dt>
+          <dt class="text-sm text-ink-2">Sponsorship (tier {{ finances.tierNumber }})</dt>
           <dd class="text-lg font-semibold">+{{ funds(finances.weeklySponsorshipMinor) }}</dd>
         </div>
         <div>
-          <dt class="text-sm text-slate-600">Wages</dt>
+          <dt class="text-sm text-ink-2">Wages</dt>
           <dd class="text-lg font-semibold">&minus;{{ funds(finances.weeklyWageMinor) }}</dd>
         </div>
         <div>
-          <dt class="text-sm text-slate-600">Operating cost</dt>
-          <dd class="text-lg font-semibold">&minus;{{ funds(finances.weeklyOperatingCostMinor) }}</dd>
+          <dt class="text-sm text-ink-2">Operating cost</dt>
+          <dd class="text-lg font-semibold">
+            &minus;{{ funds(finances.weeklyOperatingCostMinor) }}
+          </dd>
         </div>
       </dl>
     </section>
 
     <div class="mt-6 grid gap-4 lg:grid-cols-2">
-      <section class="rounded border border-slate-200 bg-white p-4">
-        <h2 class="text-sm font-medium text-slate-500">
+      <section class="rounded border border-line bg-panel p-4">
+        <h2 class="text-sm font-medium text-muted">
           Money in
           @if (finances.seasonLabel; as label) {
-            <span class="font-normal text-slate-500">&middot; {{ label }}</span>
+            <span class="font-normal text-muted">&middot; {{ label }}</span>
           }
         </h2>
 
         @if (credits().length === 0) {
-          <p class="mt-2 text-sm text-slate-600" role="status">Nothing yet this season.</p>
+          <p class="mt-2 text-sm text-ink-2" role="status">Nothing yet this season.</p>
         } @else {
           <dl class="mt-2 flex flex-col gap-1">
             @for (total of credits(); track total.label) {
               <div class="flex items-baseline justify-between gap-3">
-                <dt class="text-sm text-slate-700">{{ total.label }}</dt>
-                <dd class="text-sm font-semibold text-slate-900">{{ signed(total.amountMinor) }}</dd>
+                <dt class="text-sm text-ink-2">{{ total.label }}</dt>
+                <dd class="text-sm font-semibold text-ink">{{ signed(total.amountMinor) }}</dd>
               </div>
             }
           </dl>
         }
       </section>
 
-      <section class="rounded border border-slate-200 bg-white p-4">
-        <h2 class="text-sm font-medium text-slate-500">Money out</h2>
+      <section class="rounded border border-line bg-panel p-4">
+        <h2 class="text-sm font-medium text-muted">Money out</h2>
 
         @if (debits().length === 0) {
-          <p class="mt-2 text-sm text-slate-600" role="status">Nothing yet this season.</p>
+          <p class="mt-2 text-sm text-ink-2" role="status">Nothing yet this season.</p>
         } @else {
           <dl class="mt-2 flex flex-col gap-1">
             @for (total of debits(); track total.label) {
               <div class="flex items-baseline justify-between gap-3">
-                <dt class="text-sm text-slate-700">{{ total.label }}</dt>
-                <dd class="text-sm font-semibold text-slate-900">{{ signed(total.amountMinor) }}</dd>
+                <dt class="text-sm text-ink-2">{{ total.label }}</dt>
+                <dd class="text-sm font-semibold text-ink">{{ signed(total.amountMinor) }}</dd>
               </div>
             }
           </dl>
@@ -100,48 +100,45 @@
 
     <section class="mt-8">
       <h2 class="text-lg font-semibold">Ledger</h2>
-      <p class="mt-1 text-sm text-slate-600">
+      <p class="mt-1 text-sm text-ink-2">
         Newest first. Each entry names what moved and what it left behind.
       </p>
 
       @if (ledger().length === 0) {
-        <p class="mt-4 text-sm text-slate-600" role="status">
+        <p class="mt-4 text-sm text-ink-2" role="status">
           No entries yet. Gate receipts, wages, and costs arrive here as the season plays.
         </p>
       } @else {
-        <div
-          class="mt-4 overflow-x-auto"
-          tabindex="0"
-          role="group"
-          aria-label="Ledger entries"
-        >
-          <table class="min-w-full divide-y divide-slate-200 text-sm">
-            <caption class="sr-only">Your club's ledger, newest first</caption>
+        <div class="mt-4 overflow-x-auto" tabindex="0" role="group" aria-label="Ledger entries">
+          <table class="min-w-full divide-y divide-line text-sm">
+            <caption class="sr-only">
+              Your club's ledger, newest first
+            </caption>
             <thead>
               <tr>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">#</th>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Entry</th>
-                <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Cash</th>
-                <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Reserved</th>
-                <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Balance</th>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">When</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">#</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Entry</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Cash</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Reserved</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Balance</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">When</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-line-soft">
               @for (entry of ledger(); track entry.id) {
                 <tr>
-                  <td class="px-3 py-2 text-slate-500">{{ entry.sequence }}</td>
-                  <td class="px-3 py-2 text-slate-900">{{ entry.description }}</td>
-                  <td class="px-3 py-2 text-right font-medium text-slate-900">
+                  <td class="px-3 py-2 text-muted">{{ entry.sequence }}</td>
+                  <td class="px-3 py-2 text-ink">{{ entry.description }}</td>
+                  <td class="px-3 py-2 text-right font-medium text-ink">
                     {{ signed(entry.cashDeltaMinor) }}
                   </td>
-                  <td class="px-3 py-2 text-right text-slate-700">
+                  <td class="px-3 py-2 text-right text-ink-2">
                     {{ signed(entry.reservedDeltaMinor) }}
                   </td>
-                  <td class="px-3 py-2 text-right text-slate-900">
+                  <td class="px-3 py-2 text-right text-ink">
                     {{ funds(entry.resultingCashMinor) }}
                   </td>
-                  <td class="px-3 py-2 text-slate-600">{{ instant(entry.createdAt) }}</td>
+                  <td class="px-3 py-2 text-ink-2">{{ instant(entry.createdAt) }}</td>
                 </tr>
               }
             </tbody>
@@ -164,5 +161,5 @@
     </section>
   </section>
 } @else {
-  <p class="text-sm text-slate-600" role="status">Loading your finances…</p>
+  <p class="text-sm text-ink-2" role="status">Loading your finances…</p>
 }

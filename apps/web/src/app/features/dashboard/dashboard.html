@@ -1,12 +1,12 @@
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading your dashboard…</p>
+  <p class="text-sm text-ink-2" role="status">Loading your dashboard…</p>
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
 } @else if (state(); as position) {
   @if (position.manager === null) {
     <section class="max-w-2xl">
       <h1 [class]="pageHeadingClass">Welcome</h1>
-      <p class="mt-2 text-slate-700">
+      <p class="mt-2 text-ink-2">
         Your account is ready. Create your manager profile to take over a club — it carries your
         reputation and the time zone your deadlines are shown in.
       </p>
@@ -19,7 +19,7 @@
   } @else if (position.tenure === null) {
     <section class="max-w-2xl">
       <h1 [class]="pageHeadingClass">Choose a club</h1>
-      <p class="mt-2 text-slate-700">
+      <p class="mt-2 text-ink-2">
         Your manager profile is ready. Pick a country, then a club. You join the lowest division
         that country is running, and you inherit the club exactly as it stands.
       </p>
@@ -39,156 +39,436 @@
       </div>
     </section>
   } @else if (club(); as inherited) {
-    <section class="max-w-4xl">
+    <section>
       <h1 #clubHeading tabindex="-1" [class]="pageHeadingClass">{{ inherited.club.name }}</h1>
-      <p class="mt-1 text-sm text-slate-600">
+      <p class="mt-1 text-sm text-ink-2">
         {{ inherited.country.displayName }} · {{ inherited.division.displayName }} · tier
-        {{ inherited.division.tierNumber }} · {{ inherited.season.displayLabel }}
+        {{ inherited.division.tierNumber }} · {{ inherited.season.displayLabel }} ·
+        {{ inherited.club.city }}, {{ inherited.club.region }}
       </p>
 
       @if (resignError(); as message) {
         <p [class]="formErrorClass" role="alert">{{ message }}</p>
       }
 
-      @if (nextFixture(); as next) {
-        <div class="mt-6 rounded border border-slate-300 bg-white p-4">
-          <h2 class="text-sm font-medium text-slate-500">Next fixture</h2>
-          <p class="mt-1 text-lg font-semibold">
-            {{ venue(next.venue) }} v {{ next.opponentName }}
-          </p>
-          <p class="text-sm text-slate-600">
-            {{ round(next.roundNumber) }} · {{ instant(next.kickoffAt) }}
-          </p>
-          <p class="mt-1 text-sm font-medium text-slate-800" role="status">
-            {{ countdown(next.lockAt) }} — deadline {{ deadline(next.lockAt) }}
-          </p>
-          <div class="mt-4">
-            <a
-              routerLink="/fixtures/{{ next.id }}/prepare"
-              [class]="primaryButtonClass"
-              [attr.aria-label]="'Prepare your side for ' + next.opponentName"
-            >
-              Prepare your side
-            </a>
-          </div>
-        </div>
-      } @else if (fixtures(); as season) {
-        <p class="mt-6 text-sm text-slate-600" role="status">
-          {{ season.divisionName }} · {{ season.seasonLabel }} — no fixture is waiting.
-        </p>
-      }
-
       @if (warnings().length > 0) {
-        <section class="mt-6 rounded border border-amber-300 bg-amber-50 p-4" aria-labelledby="finance-warnings">
-          <h2 id="finance-warnings" class="text-sm font-medium text-amber-900">Worth your attention</h2>
-          <ul class="mt-2 list-disc pl-5 text-sm text-amber-900">
+        <section
+          class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-sm text-amber-200"
+          aria-labelledby="finance-warnings"
+        >
+          <h2
+            id="finance-warnings"
+            class="text-xs font-semibold uppercase tracking-widest text-amber-200"
+          >
+            Worth your attention
+          </h2>
+          <ul class="flex flex-wrap gap-x-4">
             @for (warning of warnings(); track warning.code) {
               <li>{{ warning.message }}</li>
             }
           </ul>
-          <p class="mt-2 text-sm">
-            <a routerLink="/finances" [class]="linkClass">Open your finances</a>
-          </p>
+          <a routerLink="/finances" [class]="linkClass">Open your finances</a>
         </section>
       }
 
       @if (inherited.control.status === 'inactive') {
         <section
-          class="mt-6 rounded border border-amber-300 bg-amber-50 p-4"
+          class="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10"
           aria-labelledby="ai-assisted"
         >
-          <h2 id="ai-assisted" class="text-sm font-medium text-amber-900">
+          <h2
+            id="ai-assisted"
+            class="border-b border-amber-500/30 px-3.5 py-2 text-xs font-semibold uppercase tracking-widest text-amber-200"
+          >
             The AI is covering for you
           </h2>
-          <p class="mt-2 text-sm text-amber-900">
+          <p class="px-3.5 py-3 text-sm text-amber-200">
             You have been away for a while, so the AI is making routine decisions with your club.
-            Keep playing to take back full control; a long enough absence ends the tenure and returns
-            the club to the AI.
+            Keep playing to take back full control; a long enough absence ends the tenure and
+            returns the club to the AI.
           </p>
         </section>
       }
 
-      @if (!firstStepsDismissed()) {
-        <section
-          class="mt-6 rounded border border-slate-300 bg-white p-4"
-          aria-labelledby="first-steps"
-        >
-          <h2 id="first-steps" class="text-sm font-medium text-slate-500">Your first steps</h2>
-          <ol class="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
-            <li><a routerLink="/help" [class]="linkClass">Read how the game works</a></li>
-            <li><a routerLink="/squad" [class]="linkClass">Check your squad is legal</a></li>
-            <li>
-              <a routerLink="/tactics" [class]="linkClass">Set your formation and instructions</a>
-            </li>
-            @if (nextFixture(); as next) {
-              <li>
-                <a routerLink="/fixtures/{{ next.id }}/prepare" [class]="linkClass">
-                  Prepare your next team sheet
-                </a>
-              </li>
+      <!--
+        The widget grid. Four columns on a wide screen, two on a tablet, one on a phone. Each widget is a panel with
+        a title strip and a link into the full screen it summarises, and each reads its own data, so one that is
+        slow or fails does not blank the others.
+      -->
+      <div class="mt-4 grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section class="panel flex flex-col md:col-span-2" aria-labelledby="next-match">
+          <h2 id="next-match" class="panel-title">Next match</h2>
+
+          @if (nextFixture(); as next) {
+            <div class="grid flex-1 gap-5 p-3.5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <div class="flex flex-col">
+                <p class="text-xs uppercase tracking-widest text-muted">
+                  {{ round(next.roundNumber) }} · {{ inherited.division.displayName }}
+                </p>
+
+                <div class="mt-4 flex items-center justify-center gap-5">
+                  <div class="flex w-24 flex-col items-center gap-2 text-center">
+                    <span
+                      class="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent bg-raised font-display text-xl font-bold"
+                      aria-hidden="true"
+                    >
+                      {{ badge(inherited.club.shortName) }}
+                    </span>
+                    <span class="text-xs text-ink-2">{{ inherited.club.name }}</span>
+                  </div>
+                  <span class="font-display text-2xl font-bold text-muted" aria-hidden="true">
+                    {{ next.venue === 'home' ? 'V' : '@' }}
+                  </span>
+                  <div class="flex w-24 flex-col items-center gap-2 text-center">
+                    <span
+                      class="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-line-strong bg-raised font-display text-xl font-bold"
+                      aria-hidden="true"
+                    >
+                      {{ badge(next.opponentShortName) }}
+                    </span>
+                    <span class="text-xs text-ink-2">{{ next.opponentName }}</span>
+                  </div>
+                </div>
+
+                <p class="mt-4 text-center font-display text-2xl font-semibold">
+                  {{ venue(next.venue) }} v {{ next.opponentName }}
+                </p>
+                <p class="text-center text-sm text-ink-2">{{ instant(next.kickoffAt) }}</p>
+                <p class="mt-2 text-center text-sm font-medium" role="status">
+                  {{ countdown(next.lockAt) }} — deadline {{ deadline(next.lockAt) }}
+                </p>
+                <div class="mt-auto flex justify-center pt-4">
+                  <a
+                    routerLink="/fixtures/{{ next.id }}/prepare"
+                    [class]="primaryButtonClass"
+                    [attr.aria-label]="'Prepare your side for ' + next.opponentName"
+                  >
+                    Prepare your side
+                  </a>
+                </div>
+              </div>
+
+              <div>
+                <h3
+                  class="border-b border-line pb-1.5 text-xs font-semibold uppercase tracking-widest text-muted"
+                >
+                  Calendar
+                </h3>
+                @if (calendar().length > 0) {
+                  <ol class="divide-y divide-line-soft text-sm">
+                    @for (event of calendar(); track event.at + event.title) {
+                      <li>
+                        <a
+                          [routerLink]="event.link"
+                          class="flex min-h-11 items-center gap-3 py-1.5 hover:text-accent"
+                        >
+                          <i
+                            [class]="calendarIcon(event.kind)"
+                            class="text-muted"
+                            aria-hidden="true"
+                          ></i>
+                          <span class="min-w-0 flex-1">
+                            <span class="block truncate font-medium">{{ event.title }}</span>
+                            <span class="block text-xs text-muted">
+                              {{ when(event.at) }} · {{ event.detail }}
+                            </span>
+                          </span>
+                        </a>
+                      </li>
+                    }
+                  </ol>
+                } @else {
+                  <p class="py-3 text-sm text-muted">Nothing is scheduled.</p>
+                }
+              </div>
+            </div>
+          } @else if (fixtures(); as season) {
+            <p class="p-3.5 text-sm text-ink-2" role="status">
+              {{ season.divisionName }} · {{ season.seasonLabel }} — no fixture is waiting.
+            </p>
+          } @else {
+            <p class="p-3.5 text-sm text-muted" role="status">Loading your fixtures…</p>
+          }
+
+          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+            <a routerLink="/fixtures" [class]="linkClass">Fixtures</a>
+          </div>
+        </section>
+
+        <section class="panel flex flex-col" aria-labelledby="league-table">
+          <h2 id="league-table" class="panel-title">League table</h2>
+          @if (hasTable()) {
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="w-8 text-right">#</th>
+                  <th scope="col">Club</th>
+                  <th scope="col" class="text-right">P</th>
+                  <th scope="col" class="text-right">GD</th>
+                  <th scope="col" class="text-right">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of tableRows(); track row.clubId) {
+                  <tr
+                    [class]="row.clubId === inherited.club.id ? 'bg-accent/15 font-semibold' : ''"
+                  >
+                    <td class="text-right text-muted">{{ row.rank }}</td>
+                    <td class="truncate">
+                      {{ row.clubShortName }}
+                      @if (row.clubId === inherited.club.id) {
+                        <span class="sr-only">(your club)</span>
+                      }
+                    </td>
+                    <td class="text-right">{{ row.played }}</td>
+                    <td class="text-right">{{ row.goalDifference }}</td>
+                    <td class="text-right font-semibold">{{ row.points }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="p-3.5 text-sm text-muted" role="status">Loading the table…</p>
+          }
+          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+            <a routerLink="/competitions" [class]="linkClass">League table</a>
+          </div>
+        </section>
+
+        <section class="panel flex flex-col" aria-labelledby="club-record">
+          <h2 id="club-record" class="panel-title">Club</h2>
+          <dl class="flex-1 divide-y divide-line-soft text-sm">
+            @if (ownRow(); as record) {
+              <div class="flex justify-between px-3.5 py-1.5">
+                <dt class="text-ink-2">Position</dt>
+                <dd class="font-semibold">{{ record.rank }}</dd>
+              </div>
+              <div class="flex justify-between px-3.5 py-1.5">
+                <dt class="text-ink-2">Played</dt>
+                <dd>{{ record.played }}</dd>
+              </div>
+              <div class="flex justify-between px-3.5 py-1.5">
+                <dt class="text-ink-2">Won · drawn · lost</dt>
+                <dd>{{ record.won }} · {{ record.drawn }} · {{ record.lost }}</dd>
+              </div>
+              <div class="flex justify-between px-3.5 py-1.5">
+                <dt class="text-ink-2">Goals for · against</dt>
+                <dd>{{ record.goalsFor }} · {{ record.goalsAgainst }}</dd>
+              </div>
+              <div class="flex justify-between px-3.5 py-1.5">
+                <dt class="text-ink-2">Yellow · red cards</dt>
+                <dd>{{ record.yellowCards }} · {{ record.redCards }}</dd>
+              </div>
             }
-          </ol>
-          <div class="mt-3">
-            <button type="button" [class]="secondaryButtonClass" (click)="dismissFirstSteps()">
-              Hide these first steps
-            </button>
+            <div class="flex justify-between px-3.5 py-1.5">
+              <dt class="text-ink-2">Club funds</dt>
+              <dd class="font-semibold">{{ funds(inherited.finances.cashMinor) }}</dd>
+            </div>
+            <div class="flex justify-between px-3.5 py-1.5">
+              <dt class="text-ink-2">Available to commit</dt>
+              <dd>{{ funds(inherited.finances.availableMinor) }}</dd>
+            </div>
+            <div class="flex justify-between px-3.5 py-1.5">
+              <dt class="text-ink-2">Reputation</dt>
+              <dd>{{ inherited.club.reputation }} / 100</dd>
+            </div>
+            <div class="flex justify-between px-3.5 py-1.5">
+              <dt class="text-ink-2">Stadium baseline</dt>
+              <dd>{{ funds(inherited.club.stadiumBaseline) }}</dd>
+            </div>
+            <div class="flex justify-between px-3.5 py-1.5">
+              <dt class="text-ink-2">Control</dt>
+              <dd>{{ inherited.control.status === 'active' ? 'Yours' : 'AI-assisted' }}</dd>
+            </div>
+          </dl>
+          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+            <a routerLink="/finances" [class]="linkClass">Finances</a>
+          </div>
+        </section>
+
+        <section class="panel flex flex-col" aria-labelledby="inbox-widget">
+          <h2 id="inbox-widget" class="panel-title">Inbox</h2>
+          <div class="flex-1 p-3.5 text-sm">
+            @if (inboxError(); as message) {
+              <p class="text-muted" role="status">{{ message }}</p>
+            } @else if (inboxLoading()) {
+              <p class="text-muted" role="status">Loading your messages…</p>
+            } @else {
+              <p
+                class="rounded border border-line bg-raised px-3 py-2 font-display text-lg font-semibold"
+                role="status"
+              >
+                {{ unreadCount() === 0 ? 'No unread messages' : unreadCount() + ' unread' }}
+              </p>
+              <ul class="mt-2 divide-y divide-line-soft">
+                @for (message of latestMessages(); track message.id) {
+                  <li>
+                    <a
+                      routerLink="/inbox"
+                      class="block py-1.5 hover:text-accent"
+                      [class.font-semibold]="!message.isRead"
+                    >
+                      {{ message.title }}
+                    </a>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+            <a routerLink="/inbox" [class]="linkClass">Inbox</a>
+          </div>
+        </section>
+
+        <section class="panel flex flex-col" aria-labelledby="squad-status">
+          <h2 id="squad-status" class="panel-title">Squad status</h2>
+          <div class="flex-1 p-3.5 text-sm">
+            @if (squadError(); as message) {
+              <p class="text-muted" role="status">{{ message }}</p>
+            } @else if (squadRead(); as squad) {
+              @if (squadGroups().length === 0) {
+                <p class="text-ink-2">
+                  All {{ squad.summary.playerCount }} players are fit and under contract.
+                </p>
+              }
+              @for (group of squadGroups(); track group.kind) {
+                <div class="mb-2 last:mb-0">
+                  <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">
+                    {{ group.label }}
+                  </h3>
+                  <ul>
+                    @for (item of group.players; track $index) {
+                      <li class="flex justify-between gap-2 py-0.5">
+                        <a [routerLink]="['/players', item.id]" class="hover:text-accent">
+                          {{ item.name }}
+                        </a>
+                        <span class="text-muted">{{ item.detail }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            } @else {
+              <p class="text-muted" role="status">Loading your squad…</p>
+            }
+          </div>
+          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+            <a routerLink="/squad" [class]="linkClass">Squad</a>
+          </div>
+        </section>
+
+        <section class="panel flex flex-col" aria-labelledby="pending-transfers">
+          <h2 id="pending-transfers" class="panel-title">Pending transfers</h2>
+          <div class="flex-1 p-3.5 text-sm">
+            @if (marketError(); as message) {
+              <p class="text-muted" role="status">{{ message }}</p>
+            } @else if (marketLoading() && myBids().length + myListings().length === 0) {
+              <p class="text-muted" role="status">Loading the market…</p>
+            } @else {
+              <p class="flex justify-between rounded border border-line bg-raised px-3 py-1.5">
+                <span class="text-ink-2">Available to commit</span>
+                <span class="font-semibold">{{ funds(inherited.finances.availableMinor) }}</span>
+              </p>
+              @if (myBids().length + myListings().length === 0) {
+                <p class="mt-2 text-ink-2">No bids or listings are open.</p>
+              }
+              @if (myBids().length > 0) {
+                <h3 class="mt-2 text-xs font-semibold uppercase tracking-widest text-muted">
+                  Your bids
+                </h3>
+                <ul>
+                  @for (bid of myBids(); track bid.listingId) {
+                    <li class="flex justify-between gap-2 py-0.5">
+                      <span>{{ bid.playerName }}</span>
+                      <span class="text-muted">{{ funds(bid.amountMinor) }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+              @if (myListings().length > 0) {
+                <h3 class="mt-2 text-xs font-semibold uppercase tracking-widest text-muted">
+                  Your listings
+                </h3>
+                <ul>
+                  @for (listing of myListings(); track listing.listingId) {
+                    <li class="flex justify-between gap-2 py-0.5">
+                      <span>{{ listing.playerShortName }}</span>
+                      <span class="text-muted">
+                        {{
+                          listing.leadingAmountMinor === null
+                            ? 'No bids'
+                            : funds(listing.leadingAmountMinor)
+                        }}
+                      </span>
+                    </li>
+                  }
+                </ul>
+              }
+            }
+          </div>
+          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+            <a routerLink="/transfers" [class]="linkClass">Transfers</a>
+          </div>
+        </section>
+
+        <section class="panel flex flex-col" aria-labelledby="player-stats">
+          <h2 id="player-stats" class="panel-title">Player stats</h2>
+          <div class="flex-1 p-3.5 text-sm">
+            @if (!hasStatistics()) {
+              <p class="text-muted" role="status">Loading the division's leaders…</p>
+            } @else if (leaders().length === 0) {
+              <p class="text-ink-2">Nobody has played yet, so there are no leaders.</p>
+            } @else {
+              <dl class="divide-y divide-line-soft">
+                @for (leader of leaders(); track leader.label) {
+                  <div class="py-1.5">
+                    <dt class="text-xs text-muted">{{ leader.label }}</dt>
+                    <dd class="flex justify-between gap-2">
+                      <span class="truncate">{{ leader.player }}</span>
+                      <span class="font-semibold">{{ leader.value }}</span>
+                    </dd>
+                  </div>
+                }
+              </dl>
+            }
+          </div>
+          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+            <a
+              [routerLink]="['/competitions', inherited.division.id, 'statistics']"
+              [class]="linkClass"
+            >
+              Statistics
+            </a>
+          </div>
+        </section>
+      </div>
+
+      @if (!firstStepsDismissed()) {
+        <section class="panel mt-4" aria-labelledby="first-steps">
+          <h2 id="first-steps" class="panel-title">Your first steps</h2>
+          <div class="panel-body">
+            <ol class="list-decimal space-y-1 pl-5 text-sm text-ink-2">
+              <li><a routerLink="/help" [class]="linkClass">Read how the game works</a></li>
+              <li><a routerLink="/squad" [class]="linkClass">Check your squad is legal</a></li>
+              <li>
+                <a routerLink="/tactics" [class]="linkClass">Set your formation and instructions</a>
+              </li>
+              @if (nextFixture(); as next) {
+                <li>
+                  <a routerLink="/fixtures/{{ next.id }}/prepare" [class]="linkClass">
+                    Prepare your next team sheet
+                  </a>
+                </li>
+              }
+            </ol>
+            <div class="mt-3">
+              <button type="button" [class]="secondaryButtonClass" (click)="dismissFirstSteps()">
+                Hide these first steps
+              </button>
+            </div>
           </div>
         </section>
       }
-
-      <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div class="rounded border border-slate-200 bg-white p-4">
-          <dt class="text-sm font-medium text-slate-500">Club funds</dt>
-          <dd class="mt-1 text-xl font-semibold">{{ funds(inherited.finances.cashMinor) }}</dd>
-          <dd class="text-sm text-slate-600">
-            {{ funds(inherited.finances.availableMinor) }} available to commit
-          </dd>
-        </div>
-
-        <div class="rounded border border-slate-200 bg-white p-4">
-          <dt class="text-sm font-medium text-slate-500">Reputation</dt>
-          <dd class="mt-1 text-xl font-semibold">{{ inherited.club.reputation }} / 100</dd>
-          <dd class="text-sm text-slate-600">Set by the tier you play in.</dd>
-        </div>
-
-        <div class="rounded border border-slate-200 bg-white p-4">
-          <dt class="text-sm font-medium text-slate-500">Stadium baseline</dt>
-          <dd class="mt-1 text-xl font-semibold">{{ funds(inherited.club.stadiumBaseline) }}</dd>
-          <dd class="text-sm text-slate-600">Gate revenue is scaled from this.</dd>
-        </div>
-
-        <div class="rounded border border-slate-200 bg-white p-4">
-          <dt class="text-sm font-medium text-slate-500">Control</dt>
-          <dd class="mt-1 text-xl font-semibold">
-            {{ inherited.control.status === 'active' ? 'Yours' : 'AI-assisted' }}
-          </dd>
-          <dd class="text-sm text-slate-600">
-            Since {{ instant(inherited.control.startedAt ?? inherited.serverTime) }}
-          </dd>
-        </div>
-
-        <div class="rounded border border-slate-200 bg-white p-4">
-          <dt class="text-sm font-medium text-slate-500">Season window</dt>
-          <dd class="mt-1 text-base font-semibold">{{ inherited.season.displayLabel }}</dd>
-          <dd class="text-sm text-slate-600">
-            {{ instant(inherited.season.startsAt) }} &ndash; {{ instant(inherited.season.endsAt) }}
-          </dd>
-        </div>
-
-        <div class="rounded border border-slate-200 bg-white p-4">
-          <dt class="text-sm font-medium text-slate-500">Home city</dt>
-          <dd class="mt-1 text-base font-semibold">{{ inherited.club.city }}</dd>
-          <dd class="text-sm text-slate-600">{{ inherited.club.region }}</dd>
-        </div>
-      </dl>
-
-      <p
-        class="mt-6 rounded border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-700"
-      >
-        Your club is already running: it has a squad under contract, a tactic to prepare from, and a
-        place in the season's calendar, and none of it resets when you take over. Results, the live
-        table, and the match viewer arrive with the stages that build them.
-      </p>
 
       <div class="mt-6">
         <button
@@ -203,5 +483,5 @@
     </section>
   }
 } @else {
-  <p class="text-sm text-slate-600" role="status">Loading your dashboard…</p>
+  <p class="text-sm text-ink-2" role="status">Loading your dashboard…</p>
 }

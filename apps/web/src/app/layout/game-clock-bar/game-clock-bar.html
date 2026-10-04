@@ -1,5 +1,5 @@
 @if (available()) {
-  <div class="border-b border-amber-300 bg-amber-50 text-amber-900">
+  <div class="border-b border-amber-500/40 bg-amber-500/10 text-amber-200">
     <div
       class="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 text-sm"
     >
@@ -10,12 +10,12 @@
         <time>{{ gameNowLabel() }}</time>
       </span>
 
-      <span class="hidden text-amber-800 sm:inline"> Next round: {{ nextMatchdayLabel() }} </span>
+      <span class="hidden text-amber-200 sm:inline"> Next round: {{ nextMatchdayLabel() }} </span>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <button
           type="button"
-          class="inline-flex min-h-11 items-center rounded border border-amber-400 bg-white px-3 font-semibold hover:bg-amber-100 disabled:opacity-50"
+          class="inline-flex min-h-11 items-center rounded border border-amber-500/50 bg-panel px-3 font-semibold hover:bg-amber-500/15 disabled:opacity-50"
           [disabled]="busy()"
           (click)="nextDay()"
         >
@@ -24,14 +24,14 @@
 
         <button
           type="button"
-          class="inline-flex min-h-11 items-center rounded border border-amber-400 bg-white px-3 font-semibold hover:bg-amber-100 disabled:opacity-50"
+          class="inline-flex min-h-11 items-center rounded border border-amber-500/50 bg-panel px-3 font-semibold hover:bg-amber-500/15 disabled:opacity-50"
           [disabled]="busy() || nextMatchdayAt() === null"
           (click)="nextMatchday()"
         >
           Next matchday
         </button>
 
-        <span role="status" class="text-amber-800">
+        <span role="status" class="text-amber-200">
           @if (busy()) {
             Processing…
           }
@@ -39,7 +39,7 @@
       </div>
 
       @if (error(); as failure) {
-        <p role="alert" class="w-full font-semibold text-red-700">{{ failure }}</p>
+        <p role="alert" class="w-full font-semibold text-red-300">{{ failure }}</p>
       }
     </div>
   </div>

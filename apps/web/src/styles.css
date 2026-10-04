@@ -3,13 +3,16 @@
  *
  *   tailwind-base        Tailwind's reset, so it can be overridden by everything below
  *   primeng              PrimeNG component and theme styles, registered by providePrimeNG()
+ *   app                  This file's own rules: the headings, the dense-table treatment and the other
+ *                        game-wide styling that is not a utility. After PrimeNG so it can refine a
+ *                        PrimeNG component, before the utilities so a utility can still beat it
  *   tailwind-utilities   Tailwind utilities last, so a utility class can beat a component style
  *                        without !important
  *
  * PrimeNG is told the same order through `theme.options.cssLayer` in app.config.ts. Changing one
  * side without the other silently changes which rules win.
  */
-@layer tailwind-base, primeng, tailwind-utilities;
+@layer tailwind-base, primeng, app, tailwind-utilities;
 
 @import 'tailwindcss/theme.css' layer(tailwind-base);
 @import 'tailwindcss/preflight.css' layer(tailwind-base);
@@ -17,69 +20,315 @@
 
 @import 'primeicons/primeicons.css';
 
-html,
-body {
-  height: 100%;
+/*
+ * Self-hosted type, so no request leaves for a font CDN (the privacy policy promises none) and the
+ * service worker can cache it with the rest of the shell. Latin subsets only: the game's copy is English.
+ */
+@import '@fontsource/barlow-semi-condensed/latin-500.css';
+@import '@fontsource/barlow-semi-condensed/latin-600.css';
+@import '@fontsource/barlow-semi-condensed/latin-700.css';
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+
+/*
+ * The design tokens (ADR-0059).
+ *
+ * The look is a dark management-sim workspace: a near-black ground, slightly lighter panels, thin
+ * borders, and one accent. Colour on screen is therefore reserved for data (the attribute bands, the
+ * condition bars, the form and result chips) because the chrome around it is neutral.
+ *
+ * Templates name a *role* (`bg-panel`, `text-muted`, `border-line`) rather than a palette step
+ * (`bg-white`, `text-slate-500`), so the whole look is retuned here and a new screen cannot drift back
+ * to a light page by accident. Every text token below clears 4.5:1 on every surface token it is used on.
+ *
+ *   ground   the page behind everything          rail         the navigation rail and the top bar
+ *   panel    a card, a table, a form             raised       a hovered row, a chip, a well in a panel
+ *   line     a panel border                      line-soft    a row divider inside a panel
+ *   line-strong  a control's border              ink          primary text
+ *   ink-2    secondary text                      muted        captions, labels and units
+ *   accent   the one interactive colour          on-accent    text on an accent fill
+ */
+@theme {
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Barlow Semi Condensed', 'Arial Narrow', 'IBM Plex Sans', system-ui, sans-serif;
+
+  --color-ground: #0f1318;
+  --color-rail: #0b0f14;
+  --color-panel: #171d25;
+  --color-raised: #1e2631;
+  --color-line: #2a3441;
+  --color-line-soft: #202a35;
+  --color-line-strong: #3d495a;
+  --color-ink: #e8ecf2;
+  --color-ink-2: #c7d0dc;
+  --color-muted: #98a4b5;
+  --color-accent: #7aa2ff;
+  --color-accent-strong: #a3bdff;
+  --color-on-accent: #0b1020;
 }
 
-body {
-  margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  /* Safe-area insets keep content clear of notches and home indicators on installed PWAs. */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
+@layer app {
+  /*
+   * The light theme (ADR-0059). Only the role tokens and the status shades change, so every screen follows without a
+   * template knowing which theme it is in. The status text shades are the dark-surface ones in the templates
+   * (`text-red-300`), so the light theme points those shades at darker values, which keeps their contrast on a
+   * white panel. Dark is the default; `app-light` on <html> selects this block (see `ThemeStore`).
+   */
+  html.app-light {
+    color-scheme: light;
+
+    --color-ground: #f1f4f8;
+    --color-rail: #e6ebf2;
+    --color-panel: #ffffff;
+    --color-raised: #eef2f7;
+    --color-line: #d5dce6;
+    --color-line-soft: #e6ebf2;
+    --color-line-strong: #8794a6;
+    --color-ink: #131a24;
+    --color-ink-2: #364354;
+    --color-muted: #566275;
+    --color-accent: #2f5fd0;
+    --color-accent-strong: #1f49ac;
+    --color-on-accent: #ffffff;
+
+    --color-red-200: #7f1d1d;
+    --color-red-300: #991b1b;
+    --color-red-400: #b91c1c;
+    --color-amber-200: #78350f;
+    --color-amber-300: #92400e;
+    --color-amber-400: #b45309;
+    --color-emerald-200: #064e3b;
+    --color-emerald-300: #065f46;
+    --color-emerald-400: #047857;
+    --color-sky-200: #0c4a6e;
+    --color-sky-300: #075985;
+    --color-sky-400: #0369a1;
+    --color-rose-200: #881337;
+    --color-rose-300: #9f1239;
+    --color-rose-400: #be123c;
+  }
+
+  /*
+   * A surface that is dark in both themes: the match viewer and the tactics pitch are drawn on dark ground in either
+   * theme, so inside them the tokens and the status shades go back to their dark values.
+   */
+  html.app-light .theme-dark {
+    --color-ground: #0f1318;
+    --color-rail: #0b0f14;
+    --color-panel: #171d25;
+    --color-raised: #1e2631;
+    --color-line: #2a3441;
+    --color-line-soft: #202a35;
+    --color-line-strong: #3d495a;
+    --color-ink: #e8ecf2;
+    --color-ink-2: #c7d0dc;
+    --color-muted: #98a4b5;
+    --color-accent: #7aa2ff;
+    --color-accent-strong: #a3bdff;
+    --color-on-accent: #0b1020;
+
+    --color-red-200: oklch(88.5% 0.062 18.334);
+    --color-red-300: oklch(80.8% 0.114 19.571);
+    --color-red-400: oklch(70.4% 0.191 22.216);
+    --color-amber-200: oklch(92.4% 0.12 95.746);
+    --color-amber-300: oklch(87.9% 0.169 91.605);
+    --color-amber-400: oklch(82.8% 0.189 84.429);
+    --color-emerald-200: oklch(90.5% 0.093 164.15);
+    --color-emerald-300: oklch(84.5% 0.143 164.978);
+    --color-emerald-400: oklch(76.5% 0.177 163.223);
+    --color-sky-200: oklch(90.1% 0.058 230.902);
+    --color-sky-300: oklch(82.8% 0.111 230.318);
+    --color-sky-400: oklch(74.6% 0.16 232.661);
+    --color-rose-200: oklch(89.2% 0.058 10.001);
+    --color-rose-300: oklch(81% 0.117 11.638);
+    --color-rose-400: oklch(71.2% 0.194 13.428);
+    color: var(--color-ink);
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    /* Safe-area insets keep content clear of notches and home indicators on installed PWAs. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+
+  /*
+   * Figures line up in a column. A management game is read as columns of numbers, so every digit is the
+   * same width everywhere rather than only where a template remembers to ask.
+   */
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Headings are the condensed display face; body copy stays in Plex. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: 0.005em;
+    color: var(--color-ink);
+  }
+
+  /*
+   * The dense table. Rows are about 36px tall with 13px type, so a squad of twenty fits one screen: the
+   * table is the hero of the screen and its chrome stays thin. The header is a quiet uppercase strip.
+   */
+  .p-datatable table {
+    font-size: 0.8125rem;
+  }
+
+  .p-datatable thead > tr > th {
+    padding: 0.5rem 0.75rem;
+    background: var(--color-rail);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .p-datatable tbody > tr > td,
+  .p-datatable tbody > tr > th {
+    padding: 0.375rem 0.75rem;
+  }
+
+  .p-datatable tbody > tr:hover {
+    background: var(--color-raised);
+  }
+
+  /* Plain tables in the game's own markup get the same treatment as the PrimeNG one. */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+
+  table.data-table th {
+    padding: 0.5rem 0.75rem;
+    background: var(--color-rail);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  table.data-table td {
+    padding: 0.375rem 0.75rem;
+    border-top: 1px solid var(--color-line-soft);
+  }
+
+  table.data-table tbody tr:hover {
+    background: var(--color-raised);
+  }
+
+  /*
+   * A panel is the unit of every overview screen: a bordered surface under a thin title strip that says what
+   * the panel is for. `panel-title` is the strip; the body is whatever the panel holds.
+   */
+  .panel {
+    border: 1px solid var(--color-line);
+    border-radius: 0.375rem;
+    background: var(--color-panel);
+  }
+
+  .panel-title {
+    margin: 0;
+    padding: 0.5rem 0.875rem;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-muted);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .panel-body {
+    padding: 0.75rem 0.875rem;
+  }
+
+  /*
+   * The pitch behind the tactics board: mown stripes in two dark greens, so the markers on it stay legible and
+   * the board does not outshine the data around it.
+   */
+  .pitch-surface {
+    background: repeating-linear-gradient(
+      180deg,
+      #1d3a2c 0,
+      #1d3a2c 12.5%,
+      #21422f 12.5%,
+      #21422f 25%
+    );
+  }
+
+  /*
+   * Text selection stays enabled everywhere. Disabling it globally is a common instinct and it
+   * breaks the ability to copy fixture times, player names, and amounts out of the game. It is
+   * restricted only on drag handles and the pitch canvas, where it would interfere with interaction.
+   */
+  canvas.pitch,
+  .drag-handle {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /*
+   * The match ticker overwrites line by line as a passage's own commentary reaches its offsets. A short
+   * fade makes a new line read as a new line rather than a flicker; the global reduced-motion rule below
+   * collapses the duration for anyone who asks for less movement.
+   */
+  .ticker-text {
+    animation: ticker-line 240ms ease-out;
+  }
+
+  @keyframes ticker-line {
+    from {
+      opacity: 0.35;
+      transform: translateY(2px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 /*
- * Text selection stays enabled everywhere. Disabling it globally is a common instinct and it
- * breaks the ability to copy fixture times, player names, and amounts out of the game. It is
- * restricted only on drag handles and the pitch canvas, where it would interfere with interaction.
+ * A visible focus ring is a WCAG 2.2 AA requirement, so it is set once for the whole app. It is deliberately
+ * outside every layer: an unlayered rule beats a layered one, which is what keeps a control's own
+ * `focus:outline-none` utility from removing the ring.
  */
-canvas.pitch,
-.drag-handle {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/*
- * The match ticker overwrites line by line as a passage's own commentary reaches its offsets. A short
- * fade makes a new line read as a new line rather than a flicker; the global reduced-motion rule below
- * collapses the duration for anyone who asks for less movement.
- */
-.ticker-text {
-  animation: ticker-line 240ms ease-out;
-}
-
-@keyframes ticker-line {
-  from {
-    opacity: 0.35;
-    transform: translateY(2px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* A visible focus ring is a WCAG 2.2 AA requirement, so it is set once for the whole app. */
 :focus-visible {
-  outline: 2px solid var(--p-primary-color, #2563eb);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
 }

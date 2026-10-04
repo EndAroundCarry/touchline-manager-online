@@ -4,6 +4,31 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Web client — a dark management workspace
+
+Restyles the whole web client as a management-sim workspace. Recorded in
+[`ADR-0059`](docs/architecture/adr/0059-dark-management-workspace-ui.md). No game rule, API, or data changed.
+
+### Added
+
+- **Role tokens** (`ground`, `panel`, `raised`, `line`, `ink`, `muted`, `accent`, …) in `styles.css`, and a new `app`
+  CSS layer between PrimeNG and the utilities for the headings, the dense-table treatment, and the `.panel` pair.
+- **A management shell:** a top bar with history arrows and a **Prepare** button for the next fixture (with its lock
+  countdown), a sticky left rail with the fourteen destinations in six labelled groups, and a full-width content area.
+- **A widget dashboard:** next match (with both badges and a calendar of matches, the team-sheet deadline and auctions closing), the league table around your club, the club's record and funds, the inbox, squad status (injured, suspended, tired, contracts ending), pending transfers, and the division's player leaders. Each widget reads its own store and fails on its own. The logic is in `dashboard-presentation.ts` with its own spec.
+- **Self-hosted fonts** (Barlow Semi Condensed, IBM Plex Sans) from `@fontsource`.
+- **A light theme and a toggle** in the top bar. The choice is kept on the device (`localStorage`), applied before first paint,
+  and followed by PrimeNG and the charts; the match viewer and the tactics pitch stay dark. A light-theme accessibility journey
+  runs axe over the same screens.
+
+### Changed
+
+- **Every template** moves from a light palette written into each class (`bg-white`, `text-slate-500`) to the role
+  tokens; the shared control styles follow. The dashboard is a panel grid; the tactics pitch is a dark striped pitch.
+- **PrimeNG** uses an Aura preset extended with the same accent and dark surface ramp.
+- **Training heat-map tints and chart colours** were retuned for a dark panel; their specs were updated.
+- **The Transfers entry** in the rail uses a PrimeIcons glyph that exists (`pi-arrow-right-arrow-left`).
+
 ## Training v2 — programmes, an age curve, hidden aptitude, and a growth history
 
 Replaces the club-wide training focus with a position-specific **programme per player**, adds an age curve with

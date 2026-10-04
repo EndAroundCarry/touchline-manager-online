@@ -1,16 +1,16 @@
 <section class="max-w-6xl">
   <h1 [class]="pageHeadingClass">Scouting</h1>
-  <p class="mt-1 text-sm text-slate-600">
+  <p class="mt-1 text-sm text-ink-2">
     Every player in the world, with their exact attributes. Keep the ones you are watching on your
     private shortlist.
   </p>
 
   <form
-    class="mt-6 grid gap-4 rounded border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3"
+    class="mt-6 grid gap-4 rounded border border-line bg-panel p-4 sm:grid-cols-2 lg:grid-cols-3"
     (submit)="onFilter($event)"
   >
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="scouting-name">Name</label>
+      <label class="block text-sm font-medium text-ink-2" for="scouting-name">Name</label>
       <input
         id="scouting-name"
         name="name"
@@ -21,9 +21,7 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="scouting-position"
-        >Position</label
-      >
+      <label class="block text-sm font-medium text-ink-2" for="scouting-position">Position</label>
       <select id="scouting-position" name="position" [class]="textInputClass">
         <option value="">Any</option>
         @for (family of families; track family) {
@@ -33,7 +31,7 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="scouting-sort">Order by</label>
+      <label class="block text-sm font-medium text-ink-2" for="scouting-sort">Order by</label>
       <select id="scouting-sort" name="sort" [class]="textInputClass">
         @for (sort of sorts; track sort.value) {
           <option [value]="sort.value">{{ sort.label }}</option>
@@ -42,7 +40,7 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="scouting-age-min"
+      <label class="block text-sm font-medium text-ink-2" for="scouting-age-min"
         >Youngest age</label
       >
       <input
@@ -56,9 +54,7 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="scouting-age-max"
-        >Oldest age</label
-      >
+      <label class="block text-sm font-medium text-ink-2" for="scouting-age-max">Oldest age</label>
       <input
         id="scouting-age-max"
         name="ageMax"
@@ -70,7 +66,7 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="scouting-ability"
+      <label class="block text-sm font-medium text-ink-2" for="scouting-ability"
         >Minimum ability</label
       >
       <input
@@ -97,9 +93,9 @@
       <h2 class="text-lg font-semibold">Players</h2>
 
       @if (loading()) {
-        <p class="mt-2 text-sm text-slate-600" role="status">Searching…</p>
+        <p class="mt-2 text-sm text-ink-2" role="status">Searching…</p>
       } @else if (results().length === 0) {
-        <p class="mt-2 text-sm text-slate-600" role="status">No players match those filters.</p>
+        <p class="mt-2 text-sm text-ink-2" role="status">No players match those filters.</p>
       } @else {
         <div
           class="mt-2 hidden overflow-x-auto md:block"
@@ -108,37 +104,35 @@
           role="group"
           aria-label="Scouting results"
         >
-          <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <table class="min-w-full divide-y divide-line text-sm">
             <caption class="sr-only">
               Scouting results, with exact public attributes
             </caption>
             <thead>
               <tr>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Player</th>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Position</th>
-                <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Age</th>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Club</th>
-                <th scope="col" class="px-3 py-2 text-right font-medium text-slate-500">Ability</th>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">Status</th>
-                <th scope="col" class="px-3 py-2 text-left font-medium text-slate-500">
-                  Shortlist
-                </th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Player</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Position</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Age</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Club</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Ability</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Status</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Shortlist</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-line-soft">
               @for (player of results(); track player.playerId) {
                 <tr>
-                  <td class="px-3 py-2 text-slate-900">
+                  <td class="px-3 py-2 text-ink">
                     {{ player.fullName }}
-                    <span class="text-slate-500">({{ player.shortName }})</span>
+                    <span class="text-muted">({{ player.shortName }})</span>
                   </td>
-                  <td class="px-3 py-2 text-slate-700">{{ player.primaryPosition }}</td>
-                  <td class="px-3 py-2 text-right text-slate-700">{{ player.age }}</td>
-                  <td class="px-3 py-2 text-slate-700">{{ player.clubName ?? 'Unattached' }}</td>
-                  <td class="px-3 py-2 text-right font-medium text-slate-900">
+                  <td class="px-3 py-2 text-ink-2">{{ player.primaryPosition }}</td>
+                  <td class="px-3 py-2 text-right text-ink-2">{{ player.age }}</td>
+                  <td class="px-3 py-2 text-ink-2">{{ player.clubName ?? 'Unattached' }}</td>
+                  <td class="px-3 py-2 text-right font-medium text-ink">
                     {{ abilityOf(player) }}
                   </td>
-                  <td class="px-3 py-2 text-slate-700">
+                  <td class="px-3 py-2 text-ink-2">
                     {{ player.isListed ? 'Listed for transfer' : 'Not listed' }}
                   </td>
                   <td class="px-3 py-2">
@@ -172,19 +166,19 @@
         -->
         <ul class="mt-2 flex flex-col gap-3 md:hidden" data-testid="scouting-cards">
           @for (player of results(); track player.playerId) {
-            <li class="rounded border border-slate-200 bg-white p-3">
+            <li class="rounded border border-line bg-panel p-3">
               <div class="flex flex-wrap items-baseline justify-between gap-x-2">
-                <h3 class="text-sm font-semibold text-slate-900">
+                <h3 class="text-sm font-semibold text-ink">
                   {{ player.fullName }}
-                  <span class="font-normal text-slate-500">({{ player.shortName }})</span>
+                  <span class="font-normal text-muted">({{ player.shortName }})</span>
                 </h3>
-                <span class="text-xs text-slate-500">Ability {{ abilityOf(player) }}</span>
+                <span class="text-xs text-muted">Ability {{ abilityOf(player) }}</span>
               </div>
-              <p class="mt-1 text-sm text-slate-700">
+              <p class="mt-1 text-sm text-ink-2">
                 {{ player.primaryPosition }} · age {{ player.age }} ·
                 {{ player.clubName ?? 'Unattached' }}
               </p>
-              <p class="mt-1 text-sm text-slate-600">
+              <p class="mt-1 text-sm text-ink-2">
                 {{ player.isListed ? 'Listed for transfer' : 'Not listed' }}
               </p>
               <div class="mt-2">
@@ -225,22 +219,22 @@
       }
     </section>
 
-    <section class="rounded border border-slate-200 bg-white p-4">
+    <section class="rounded border border-line bg-panel p-4">
       <h2 class="text-lg font-semibold">Your shortlist</h2>
 
       @if (shortlist().length === 0) {
-        <p class="mt-2 text-sm text-slate-600" role="status">You are not watching anybody yet.</p>
+        <p class="mt-2 text-sm text-ink-2" role="status">You are not watching anybody yet.</p>
       } @else {
         <ul class="mt-2 flex flex-col gap-3">
           @for (entry of shortlist(); track entry.playerId) {
             <li class="flex items-start justify-between gap-3">
               <div>
-                <p class="text-sm font-medium text-slate-900">{{ entry.playerName }}</p>
-                <p class="text-sm text-slate-600">
+                <p class="text-sm font-medium text-ink">{{ entry.playerName }}</p>
+                <p class="text-sm text-ink-2">
                   {{ entry.primaryPosition }} &middot; age {{ entry.age }}
                 </p>
                 @if (entry.notes; as notes) {
-                  <p class="mt-1 text-sm text-slate-700">{{ notes }}</p>
+                  <p class="mt-1 text-sm text-ink-2">{{ notes }}</p>
                 }
               </div>
               <button

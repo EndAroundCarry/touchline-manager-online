@@ -76,21 +76,21 @@ export interface WeightStyle {
  * The three weights, heaviest first.
  *
  * Tint is the background channel and the band colour is the text channel, so the two do not fight. The
- * tints stop at sky-300 on purpose: the text on a tinted cell is the 900 shade of its band colour
- * ({@link TRAINED_TEXT_CLASSES}), which keeps at least 5.4:1 against the darkest tint, where the 700 shade
- * the table uses elsewhere would fall below 4.5:1 on amber.
+ * tints are translucent sky blue over the dark panel and stop at 45% on purpose: the text on a tinted cell is
+ * the 200 shade of its band colour ({@link TRAINED_TEXT_CLASSES}), which keeps at least 5.4:1 against the
+ * strongest tint, where the 300 shade the table uses elsewhere would fall below 4.5:1.
  */
 export const WEIGHT_STYLES: readonly WeightStyle[] = [
-  { weight: 3, label: 'Core', tintClass: 'bg-sky-300', marker: '•••' },
-  { weight: 2, label: 'Important', tintClass: 'bg-sky-200', marker: '••' },
-  { weight: 1, label: 'Supporting', tintClass: 'bg-sky-100', marker: '•' },
+  { weight: 3, label: 'Core', tintClass: 'bg-sky-500/45', marker: '•••' },
+  { weight: 2, label: 'Important', tintClass: 'bg-sky-500/30', marker: '••' },
+  { weight: 1, label: 'Supporting', tintClass: 'bg-sky-500/15', marker: '•' },
 ];
 
-/** The text colour of a trained cell: the band's own hue, one step darker so it holds its contrast on a tint. */
+/** The text colour of a trained cell: the band's own hue, one step lighter so it holds its contrast on a tint. */
 const TRAINED_TEXT_CLASSES: Record<PerformanceBand, string> = {
-  low: 'text-red-900',
-  average: 'text-amber-900',
-  strong: 'text-emerald-900',
+  low: 'text-red-200',
+  average: 'text-amber-200',
+  strong: 'text-emerald-200',
 };
 
 /** Finds the style for a weight, or null for a weight of zero or one the client does not know. */

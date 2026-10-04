@@ -1,7 +1,7 @@
 <section class="mx-auto flex flex-col items-center py-8">
   <div [class]="formCardClass">
     <h1 [class]="pageHeadingClass">Sign in</h1>
-    <p class="mt-2 text-sm text-slate-600">
+    <p class="mt-2 text-sm text-ink-2">
       Matchdays are Tuesday, Thursday and Sunday. Prepare your club before the deadline.
     </p>
 
@@ -11,7 +11,7 @@
 
     <form class="mt-6 space-y-4" [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div>
-        <label class="block text-sm font-medium text-slate-800" for="email">Email address</label>
+        <label class="block text-sm font-medium text-ink" for="email">Email address</label>
         <input
           id="email"
           type="email"
@@ -22,12 +22,12 @@
           [attr.aria-describedby]="errorFor('email', 'Email') !== null ? idFor('email') : null"
         />
         @if (errorFor('email', 'Email'); as message) {
-          <p [id]="idFor('email')" class="mt-1 text-sm text-red-700">{{ message }}</p>
+          <p [id]="idFor('email')" class="mt-1 text-sm text-red-300">{{ message }}</p>
         }
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-slate-800" for="password">Password</label>
+        <label class="block text-sm font-medium text-ink" for="password">Password</label>
         <input
           id="password"
           type="password"
@@ -40,7 +40,7 @@
           "
         />
         @if (errorFor('password', 'Password'); as message) {
-          <p [id]="idFor('password')" class="mt-1 text-sm text-red-700">{{ message }}</p>
+          <p [id]="idFor('password')" class="mt-1 text-sm text-red-300">{{ message }}</p>
         }
       </div>
 
@@ -49,10 +49,10 @@
       </button>
     </form>
 
-    <p class="mt-6 text-sm text-slate-700">
+    <p class="mt-6 text-sm text-ink-2">
       <a routerLink="/forgot-password" [class]="linkClass">Forgotten your password?</a>
     </p>
-    <p class="mt-2 text-sm text-slate-700">
+    <p class="mt-2 text-sm text-ink-2">
       No account yet?
       <a routerLink="/register" [class]="linkClass">Create one</a>
     </p>

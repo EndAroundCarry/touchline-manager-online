@@ -5,6 +5,9 @@ import { of } from 'rxjs';
 import { ClubFixture, MyFixtures } from '../../core/competition/competition.models';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { FinanceStore } from '../../core/finance/finance-store';
+import { InboxStore } from '../../core/inbox/inbox-store';
+import { SquadStore } from '../../core/squad/squad-store';
+import { TransfersStore } from '../../core/transfers/transfers-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { ClubDashboard, OnboardingState } from '../../core/world/world.models';
 import { Dashboard } from './dashboard';
@@ -135,7 +138,38 @@ describe('Dashboard', () => {
             resign: () => of(DASHBOARD),
           },
         },
-        { provide: CompetitionStore, useValue: { fixtures, loadFixtures: vi.fn() } },
+        {
+          provide: CompetitionStore,
+          useValue: {
+            fixtures,
+            loadFixtures: vi.fn(),
+            divisionTable: signal(null),
+            loadMyDivisionTable: vi.fn(),
+            divisionStatistics: signal(null),
+            loadDivisionStatistics: vi.fn(),
+          },
+        },
+        {
+          provide: InboxStore,
+          useValue: {
+            messages: signal([]),
+            unreadCount: signal(0),
+            loading: signal(false),
+            error: signal(null),
+            load: vi.fn(),
+          },
+        },
+        { provide: SquadStore, useValue: { squad: signal(null), loadSquad: () => of(null) } },
+        {
+          provide: TransfersStore,
+          useValue: {
+            myBids: signal([]),
+            myListings: signal([]),
+            loading: signal(false),
+            error: signal(null),
+            load: vi.fn(),
+          },
+        },
         { provide: FinanceStore, useValue: { summary: signal(null), loadSummary: vi.fn() } },
       ],
     }).compileComponents();
@@ -178,6 +212,26 @@ describe('Dashboard', () => {
 
     expect(element.textContent).toContain('Your first steps');
     expect(element.textContent).not.toContain('Prepare your next team sheet');
+  });
+
+  it('shows the widgets a manager looks for on arriving', async () => {
+    const element = await render();
+    const titles = [...element.querySelectorAll('h2')].map((h) => h.textContent?.trim());
+
+    for (const title of [
+      'Next match',
+      'League table',
+      'Club',
+      'Inbox',
+      'Squad status',
+      'Pending transfers',
+      'Player stats',
+    ]) {
+      expect(titles).toContain(title);
+    }
+
+    expect(element.textContent).toContain('Barrow Town');
+    expect(element.textContent).toContain('Calendar');
   });
 
   it('hides the guidance on dismissal and moves focus off the removed control', async () => {

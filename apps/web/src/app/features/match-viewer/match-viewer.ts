@@ -104,6 +104,8 @@ interface ReplayMarker {
 @Component({
   selector: 'app-match-viewer',
   templateUrl: './match-viewer.html',
+  // The viewer is drawn on dark ground in either theme, so it keeps the dark tokens (`.theme-dark`, styles.css).
+  host: { class: 'theme-dark block' },
 })
 export class MatchViewer implements OnDestroy {
   private readonly route = inject(ActivatedRoute);

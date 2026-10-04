@@ -1,11 +1,11 @@
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading the table…</p>
+  <p class="text-sm text-ink-2" role="status">Loading the table…</p>
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
 } @else if (table(); as competition) {
   <section aria-labelledby="table-heading">
     <h1 id="table-heading" [class]="pageHeadingClass">{{ competition.divisionName }}</h1>
-    <p class="mt-1 text-sm text-slate-600">
+    <p class="mt-1 text-sm text-ink-2">
       {{ competition.countryName }} · tier {{ competition.tierNumber }} ·
       {{ competition.seasonLabel }}
     </p>
@@ -21,7 +21,7 @@
       }
 
       <div
-        class="mt-6 overflow-x-auto rounded border border-slate-200 bg-white"
+        class="mt-6 overflow-x-auto rounded border border-line bg-panel"
         tabindex="0"
         role="group"
         aria-label="Division table"
@@ -33,7 +33,7 @@
             }}
           </caption>
           <thead>
-            <tr class="border-b border-slate-200 text-slate-600">
+            <tr class="border-b border-line text-ink-2">
               <th scope="col" class="px-3 py-2 text-right font-medium">
                 <abbr title="Position">Pos</abbr>
               </th>
@@ -66,12 +66,12 @@
           </thead>
           <tbody>
             @for (row of competition.rows; track row.clubId) {
-              <tr class="border-b border-slate-100 last:border-b-0">
-                <td class="px-3 py-2 text-right tabular-nums text-slate-600">{{ row.rank }}</td>
+              <tr class="border-b border-line-soft last:border-b-0">
+                <td class="px-3 py-2 text-right tabular-nums text-ink-2">{{ row.rank }}</td>
                 <th scope="row" class="px-3 py-2 text-left font-medium">
                   <span [class.font-semibold]="isManaged(row.clubId)">{{ row.clubName }}</span>
                   @if (isManaged(row.clubId)) {
-                    <span class="ml-2 text-xs text-slate-600">(your club)</span>
+                    <span class="ml-2 text-xs text-ink-2">(your club)</span>
                   }
                 </th>
                 <td class="px-3 py-2 text-right tabular-nums">{{ row.played }}</td>
@@ -90,7 +90,7 @@
         </table>
       </div>
 
-      <p class="mt-3 text-xs text-slate-500">As of {{ instant(competition.serverTime) }}.</p>
+      <p class="mt-3 text-xs text-muted">As of {{ instant(competition.serverTime) }}.</p>
 
       <p class="mt-3 flex gap-4 text-sm">
         <a class="underline" [routerLink]="['/competitions', competition.divisionId, 'statistics']">

@@ -3,21 +3,21 @@
     <h1 [class]="pageHeadingClass">Your manager profile</h1>
 
     @if (loading()) {
-      <p class="mt-3 text-sm text-slate-600" role="status">Loading your profile…</p>
+      <p class="mt-3 text-sm text-ink-2" role="status">Loading your profile…</p>
     } @else if (loadError(); as message) {
       <p [class]="formErrorClass" role="alert">{{ message }}</p>
     } @else if (profile(); as created) {
-      <p class="mt-3 text-sm text-slate-700">
+      <p class="mt-3 text-sm text-ink-2">
         Your manager profile is ready. Deadlines are shown in the time zone below.
       </p>
 
       <dl class="mt-4 grid gap-2 text-sm">
         <div class="flex justify-between gap-4">
-          <dt class="text-slate-500">Locale</dt>
+          <dt class="text-muted">Locale</dt>
           <dd class="font-medium">{{ created.locale }}</dd>
         </div>
         <div class="flex justify-between gap-4">
-          <dt class="text-slate-500">Time zone</dt>
+          <dt class="text-muted">Time zone</dt>
           <dd class="font-medium">{{ created.timeZone }}</dd>
         </div>
       </dl>
@@ -28,7 +28,7 @@
         </button>
       </div>
     } @else {
-      <p class="mt-2 text-sm text-slate-600">
+      <p class="mt-2 text-sm text-ink-2">
         One profile per account. It carries your reputation and the time zone your deadlines are
         shown in, and it stays with you across clubs.
       </p>
@@ -39,8 +39,8 @@
 
       <form class="mt-6 space-y-4" [formGroup]="form" (ngSubmit)="submit()" novalidate>
         <div>
-          <label class="block text-sm font-medium text-slate-800" for="locale">Locale</label>
-          <p class="text-xs text-slate-500">Used for numbers and dates, such as en-GB.</p>
+          <label class="block text-sm font-medium text-ink" for="locale">Locale</label>
+          <p class="text-xs text-muted">Used for numbers and dates, such as en-GB.</p>
           <input
             id="locale"
             type="text"
@@ -56,8 +56,8 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-800" for="timeZone">Time zone</label>
-          <p class="text-xs text-slate-500">
+          <label class="block text-sm font-medium text-ink" for="timeZone">Time zone</label>
+          <p class="text-xs text-muted">
             An IANA zone such as Europe/London. Deadlines are stored in UTC and shown here.
           </p>
           <input
@@ -76,7 +76,11 @@
           }
         </div>
 
-        <button type="submit" [class]="primaryButtonClass" [disabled]="submitting() || !canMutate()">
+        <button
+          type="submit"
+          [class]="primaryButtonClass"
+          [disabled]="submitting() || !canMutate()"
+        >
           {{ submitting() ? 'Creating…' : 'Create my profile' }}
         </button>
       </form>

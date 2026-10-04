@@ -81,9 +81,10 @@ export interface TrainingChart {
   readonly rows: readonly ChartRow[];
 }
 
-// The Okabe-Ito colours that read on white, in the order the validator accepts. The seventh, yellow, is left
-// out because it is invisible on a white surface, and black because it reads as chart ink rather than a series.
-const COLORS = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9'];
+// Mid-tone hues that hold at least 3:1 against both the dark panel and the white one, so the series read in either
+// theme (ADR-0059). Blue, orange, green, pink, olive and violet differ in hue and in lightness, and each series also
+// has its own dash and point shape, so colour is never the only signal.
+const COLORS = ['#2E8FD6', '#D4781F', '#1FA37A', '#C8609F', '#9C8700', '#8A6FE0'];
 const DASHES: readonly (readonly number[])[] = [[], [6, 3], [2, 3], [8, 3, 2, 3]];
 const POINT_STYLES = ['circle', 'triangle', 'rect', 'rectRot', 'cross', 'star'];
 

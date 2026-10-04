@@ -1,5 +1,5 @@
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading your tactics…</p>
+  <p class="text-sm text-ink-2" role="status">Loading your tactics…</p>
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
   <div class="mt-4">
@@ -9,7 +9,7 @@
   @if (draft(); as plan) {
     <section class="max-w-6xl">
       <h1 [class]="pageHeadingClass">{{ club.clubName }} tactics</h1>
-      <p class="mt-1 text-sm text-slate-600">
+      <p class="mt-1 text-sm text-ink-2">
         {{ club.countryCode }} · season {{ club.seasonNumber }} · {{ plans().length }} saved
         {{ plans().length === 1 ? 'plan' : 'plans' }} · {{ assignedCount() }} of
         {{ plan.slots.length }} slots filled
@@ -17,7 +17,7 @@
 
       <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label class="block">
-          <span class="text-sm font-medium text-slate-700">Plan</span>
+          <span class="text-sm font-medium text-ink-2">Plan</span>
           <select
             [class]="textInputClass"
             [value]="selectedPlan()?.id ?? ''"
@@ -36,7 +36,7 @@
         </label>
 
         <label class="block">
-          <span class="text-sm font-medium text-slate-700">Plan name</span>
+          <span class="text-sm font-medium text-ink-2">Plan name</span>
           <input
             type="text"
             [class]="textInputClass"
@@ -47,7 +47,7 @@
         </label>
 
         <label class="block">
-          <span class="text-sm font-medium text-slate-700">Formation</span>
+          <span class="text-sm font-medium text-ink-2">Formation</span>
           <select
             [class]="textInputClass"
             [value]="plan.formationPreset"
@@ -66,7 +66,7 @@
 
       @if (hasConflict()) {
         <div
-          class="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          class="mt-4 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
           role="alert"
         >
           <p class="font-medium">
@@ -99,7 +99,7 @@
       @if (validation(); as preview) {
         @if (!preview.isValid) {
           <div
-            class="mt-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+            class="mt-4 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"
             role="alert"
           >
             <p class="font-medium">
@@ -116,14 +116,14 @@
 
       <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div>
-          <h2 class="text-lg font-semibold text-slate-900">Formation</h2>
-          <p class="mt-1 text-sm text-slate-600">
+          <h2 class="text-lg font-semibold text-ink">Formation</h2>
+          <p class="mt-1 text-sm text-ink-2">
             Positions are set by the formation. Drag a player onto a slot to pick them, or select a
             slot and then choose a player on the right to assign them without dragging.
           </p>
 
           <div
-            class="relative mt-3 aspect-[3/4] w-full max-w-sm overflow-hidden rounded-lg border-2 border-white/70 bg-emerald-700"
+            class="relative mt-3 aspect-[3/4] w-full max-w-sm theme-dark overflow-hidden rounded-lg border border-line pitch-surface"
           >
             <div
               class="pointer-events-none absolute left-0 right-0 top-1/2 border-t border-white/50"
@@ -163,7 +163,7 @@
           </div>
 
           @if (selectedSlot() > 0) {
-            <p class="mt-3 text-sm text-slate-600" role="status">
+            <p class="mt-3 text-sm text-ink-2" role="status">
               Slot {{ selectedSlot() }} is selected. Choose a player on the right, or
               <button type="button" [class]="linkClass" (click)="clearSlot(selectedSlot())">
                 empty it</button
@@ -173,15 +173,15 @@
         </div>
 
         <div>
-          <h2 class="text-lg font-semibold text-slate-900">Team instructions</h2>
-          <p class="mt-1 text-sm text-slate-600">
+          <h2 class="text-lg font-semibold text-ink">Team instructions</h2>
+          <p class="mt-1 text-sm text-ink-2">
             Every instruction has a bounded effect and a trade-off (INS-9).
           </p>
 
           <div class="mt-3 grid gap-3 sm:grid-cols-2">
             @for (field of instructionFields; track field.key) {
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">{{ field.label }}</span>
+                <span class="text-sm font-medium text-ink-2">{{ field.label }}</span>
                 <select
                   [class]="textInputClass"
                   [value]="plan.instructions[field.key]"
@@ -195,8 +195,8 @@
             }
           </div>
 
-          <h2 class="mt-8 text-lg font-semibold text-slate-900">Players</h2>
-          <p class="mt-1 text-sm text-slate-600">
+          <h2 class="mt-8 text-lg font-semibold text-ink">Players</h2>
+          <p class="mt-1 text-sm text-ink-2">
             Drag a chip onto a slot, or select a slot and press a player.
           </p>
 
@@ -207,13 +207,13 @@
                   <button
                     type="button"
                     draggable="true"
-                    class="min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-left text-xs text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="min-h-11 rounded border border-line-strong bg-panel px-2 py-1 text-left text-xs text-ink hover:bg-raised disabled:cursor-not-allowed disabled:opacity-60"
                     [disabled]="player.isUnavailable || selectedSlot() === 0"
                     (click)="assignToSelected(player.id)"
                     (dragstart)="onPlayerDragStart($event, player.id)"
                   >
                     {{ player.shortName }}
-                    <span class="block text-[10px] font-normal text-slate-500">
+                    <span class="block text-[10px] font-normal text-muted">
                       {{ position(player.primaryPosition) }}
                       @if (player.isUnavailable) {
                         &nbsp;· unavailable
@@ -228,8 +228,8 @@
       </div>
 
       <section class="mt-10">
-        <h2 class="text-lg font-semibold text-slate-900">Assign players</h2>
-        <p class="mt-1 text-sm text-slate-600">
+        <h2 class="text-lg font-semibold text-ink">Assign players</h2>
+        <p class="mt-1 text-sm text-ink-2">
           An alternative to dragging: pick a role and a player for each slot (TAC-8, INS-10).
         </p>
 
@@ -239,7 +239,7 @@
               Assign a role and a player to each of the eleven slots
             </caption>
             <thead>
-              <tr class="border-b border-slate-300">
+              <tr class="border-b border-line-strong">
                 <th scope="col" class="py-1 pr-4 font-semibold">Slot</th>
                 <th scope="col" class="py-1 pr-4 font-semibold">Position</th>
                 <th scope="col" class="py-1 pr-4 font-semibold">Role</th>
@@ -248,8 +248,8 @@
             </thead>
             <tbody>
               @for (slot of slotViews(); track slot.slotNumber) {
-                <tr class="border-b border-slate-200" [class.bg-red-50]="slot.issueCount > 0">
-                  <th scope="row" class="py-1 pr-4 text-left font-medium text-slate-900">
+                <tr class="border-b border-line" [class.bg-red-500/10]="slot.issueCount > 0">
+                  <th scope="row" class="py-1 pr-4 text-left font-medium text-ink">
                     {{ slot.slotNumber }}
                   </th>
                   <td class="py-1 pr-4">{{ family(slot.positionFamily) }}</td>
@@ -315,12 +315,12 @@
               Make default
             </button>
           } @else {
-            <span class="text-sm font-medium text-emerald-800">Default plan</span>
+            <span class="text-sm font-medium text-emerald-200">Default plan</span>
           }
         }
 
         @if (isDirty()) {
-          <span class="text-sm text-slate-600">Unsaved changes</span>
+          <span class="text-sm text-ink-2">Unsaved changes</span>
         }
 
         <a routerLink="/squad" [class]="linkClass">Back to the squad</a>

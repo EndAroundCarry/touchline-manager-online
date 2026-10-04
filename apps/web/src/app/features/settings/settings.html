@@ -2,7 +2,7 @@
   <h1 [class]="pageHeadingClass">Settings</h1>
 
   @if (loading()) {
-    <p class="mt-4 text-sm text-slate-600" role="status">Loading your profile…</p>
+    <p class="mt-4 text-sm text-ink-2" role="status">Loading your profile…</p>
   }
 
   @if (loadError(); as message) {
@@ -13,17 +13,17 @@
   }
 
   @if (user(); as profile) {
-    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+    <div class="mt-6 rounded border border-line bg-panel p-6">
       <h2 class="text-lg font-semibold">Profile</h2>
 
       <dl class="mt-4 grid gap-3 sm:grid-cols-2">
         <div>
-          <dt class="text-sm font-medium text-slate-500">Email</dt>
-          <dd class="mt-0.5 break-all text-sm text-slate-900">{{ profile.email }}</dd>
+          <dt class="text-sm font-medium text-muted">Email</dt>
+          <dd class="mt-0.5 break-all text-sm text-ink">{{ profile.email }}</dd>
         </div>
         <div>
-          <dt class="text-sm font-medium text-slate-500">Status</dt>
-          <dd class="mt-0.5 text-sm text-slate-900">
+          <dt class="text-sm font-medium text-muted">Status</dt>
+          <dd class="mt-0.5 text-sm text-ink">
             {{ profile.emailVerified ? 'Active' : 'Awaiting email confirmation' }}
           </dd>
         </div>
@@ -31,7 +31,7 @@
 
       @if (!isVerified()) {
         <p
-          class="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          class="mt-4 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
           role="status"
         >
           Confirm your email address before you can change your manager name.
@@ -56,10 +56,8 @@
 
       <form class="mt-6 space-y-4" [formGroup]="nameForm" (ngSubmit)="saveDisplayName()" novalidate>
         <div>
-          <label class="block text-sm font-medium text-slate-800" for="displayName"
-            >Manager name</label
-          >
-          <p class="text-xs text-slate-500">Shown to other managers. 3 to 32 characters.</p>
+          <label class="block text-sm font-medium text-ink" for="displayName">Manager name</label>
+          <p class="text-xs text-muted">Shown to other managers. 3 to 32 characters.</p>
           <input
             id="displayName"
             type="text"
@@ -84,9 +82,9 @@
       </form>
     </div>
 
-    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+    <div class="mt-6 rounded border border-line bg-panel p-6">
       <h2 class="text-lg font-semibold">Time zone and language</h2>
-      <p class="mt-2 text-sm text-slate-600">
+      <p class="mt-2 text-sm text-ink-2">
         Deadlines are shown in this time zone. The server's clock stays the authority, so changing
         this only changes what you see.
       </p>
@@ -114,7 +112,7 @@
           novalidate
         >
           <div>
-            <label class="block text-sm font-medium text-slate-800" for="timeZone">Time zone</label>
+            <label class="block text-sm font-medium text-ink" for="timeZone">Time zone</label>
             <select id="timeZone" formControlName="timeZone" [class]="selectClass">
               @for (zone of timeZoneOptions(); track zone) {
                 <option [value]="zone">{{ zone }}</option>
@@ -123,7 +121,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-slate-800" for="locale">Language</label>
+            <label class="block text-sm font-medium text-ink" for="locale">Language</label>
             <select id="locale" formControlName="locale" [class]="selectClass">
               @for (option of localeOptions(); track option) {
                 <option [value]="option">{{ option }}</option>
@@ -140,21 +138,21 @@
           </button>
         </form>
       } @else {
-        <p class="mt-4 text-sm text-slate-600" role="status">
+        <p class="mt-4 text-sm text-ink-2" role="status">
           Create your manager profile during onboarding to choose a time zone.
         </p>
       }
     </div>
 
-    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+    <div class="mt-6 rounded border border-line bg-panel p-6">
       <h2 class="text-lg font-semibold">Notifications</h2>
-      <p class="mt-2 text-sm text-slate-600">
+      <p class="mt-2 text-sm text-ink-2">
         Which emails the game sends you. Inbox messages always arrive; these switches govern email
         only.
       </p>
 
       @if (notificationsLoading()) {
-        <p class="mt-4 text-sm text-slate-600" role="status">Loading your notification settings…</p>
+        <p class="mt-4 text-sm text-ink-2" role="status">Loading your notification settings…</p>
       } @else {
         @if (notificationsSaved()) {
           <p [class]="statusMessageClass" role="status">
@@ -193,10 +191,10 @@
                 (change)="setNotification(option.field, $any($event.target).checked)"
               />
               <div>
-                <label class="text-sm font-medium text-slate-800" [for]="option.field">
+                <label class="text-sm font-medium text-ink" [for]="option.field">
                   {{ option.label }}
                 </label>
-                <p class="text-xs text-slate-500">{{ option.description }}</p>
+                <p class="text-xs text-muted">{{ option.description }}</p>
               </div>
             </div>
           }
@@ -214,9 +212,9 @@
       }
     </div>
 
-    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+    <div class="mt-6 rounded border border-line bg-panel p-6">
       <h2 class="text-lg font-semibold">Where you are signed in</h2>
-      <p class="mt-2 text-sm text-slate-600">
+      <p class="mt-2 text-sm text-ink-2">
         Every session that can still sign in. Signing one out ends it on that device; the one you
         are using is left alone.
       </p>
@@ -234,22 +232,21 @@
       }
 
       @if (sessionsLoading()) {
-        <p class="mt-4 text-sm text-slate-600" role="status">Loading your sessions…</p>
+        <p class="mt-4 text-sm text-ink-2" role="status">Loading your sessions…</p>
       } @else {
-        <ul class="mt-4 divide-y divide-slate-200">
+        <ul class="mt-4 divide-y divide-line">
           @for (session of sessions(); track session.id) {
             <li class="flex flex-wrap items-center justify-between gap-3 py-3">
               <div>
-                <p class="text-sm font-medium text-slate-800">
+                <p class="text-sm font-medium text-ink">
                   Started {{ sessionIssued(session) }}
                   @if (session.isCurrent) {
-                    <span
-                      class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
+                    <span class="ml-2 rounded bg-raised px-2 py-0.5 text-xs font-medium text-ink-2"
                       >This device</span
                     >
                   }
                 </p>
-                <p class="text-xs text-slate-500">Last used: {{ sessionLastUsed(session) }}</p>
+                <p class="text-xs text-muted">Last used: {{ sessionLastUsed(session) }}</p>
               </div>
 
               @if (!session.isCurrent) {
@@ -265,7 +262,7 @@
               }
             </li>
           } @empty {
-            <li class="py-3 text-sm text-slate-600" role="status">
+            <li class="py-3 text-sm text-ink-2" role="status">
               No active sessions were found. Sign in again if this looks wrong.
             </li>
           }
@@ -292,9 +289,9 @@
       </div>
     </div>
 
-    <div class="mt-6 rounded border border-slate-200 bg-white p-6">
+    <div class="mt-6 rounded border border-line bg-panel p-6">
       <h2 class="text-lg font-semibold">Export your data</h2>
-      <p class="mt-2 text-sm text-slate-600">
+      <p class="mt-2 text-sm text-ink-2">
         Download everything the game holds about your account — your profile, your clubs, your
         sessions, and your current club's ledger — as a JSON file.
       </p>
@@ -318,9 +315,9 @@
       </button>
     </div>
 
-    <div class="mt-6 rounded border border-red-200 bg-white p-6">
-      <h2 class="text-lg font-semibold text-red-800">Close your account</h2>
-      <p class="mt-2 text-sm text-slate-600">
+    <div class="mt-6 rounded border border-red-500/30 bg-panel p-6">
+      <h2 class="text-lg font-semibold text-red-200">Close your account</h2>
+      <p class="mt-2 text-sm text-ink-2">
         Access closes immediately and every session is revoked. Your match, transfer and financial
         history stays, because other managers played against it.
       </p>
@@ -331,7 +328,7 @@
 
       <form class="mt-4 space-y-4" [formGroup]="deleteForm" (ngSubmit)="deleteAccount()" novalidate>
         <div>
-          <label class="block text-sm font-medium text-slate-800" for="deletePassword">
+          <label class="block text-sm font-medium text-ink" for="deletePassword">
             Confirm with your password
           </label>
           <input
@@ -356,7 +353,7 @@
             id="confirmDeletion"
             type="checkbox"
             formControlName="confirm"
-            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-700 focus:ring-red-500"
+            class="mt-0.5 h-4 w-4 rounded border-line-strong text-red-300 focus:ring-red-500"
             [attr.aria-describedby]="
               deleteForm.controls.confirm.touched && deleteForm.controls.confirm.invalid
                 ? idFor('confirmDeletion')
@@ -364,7 +361,7 @@
             "
           />
           <div>
-            <label class="text-sm text-slate-800" for="confirmDeletion">
+            <label class="text-sm text-ink" for="confirmDeletion">
               I understand this closes my account.
             </label>
             @if (deleteForm.controls.confirm.touched && deleteForm.controls.confirm.invalid) {

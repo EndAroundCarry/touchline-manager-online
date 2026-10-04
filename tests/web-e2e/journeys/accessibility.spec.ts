@@ -140,3 +140,77 @@ test.describe('@a11y the manager screens meet WCAG 2.2 AA', () => {
     await expect(page.getByRole('heading', { name: 'Choose a club' })).toBeVisible();
   });
 });
+
+test.describe('@a11y the light theme meets WCAG 2.2 AA', () => {
+  test('the toggle switches the theme and the choice survives a reload', async ({ page }) => {
+    await page.goto('/welcome');
+
+    const root = page.locator('html');
+
+    await expect(root).toHaveClass(/app-dark/);
+
+    await page.getByRole('button', { name: 'Switch to light mode' }).click();
+
+    await expect(root).toHaveClass(/app-light/);
+    await expect(root).not.toHaveClass(/app-dark/);
+
+    await page.reload();
+
+    await expect(root).toHaveClass(/app-light/);
+    await expect(page.getByRole('button', { name: 'Switch to dark mode' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+
+    await expect(root).toHaveClass(/app-dark/);
+  });
+
+  test('no screen has an accessibility violation in the light theme', async ({ page, request }) => {
+    // The choice is stored before the first paint, exactly as a returning manager's would be.
+    await page.addInitScript(() => localStorage.setItem('touchline.theme', 'light'));
+
+    const audit = auditor(page);
+    const account = createAccount();
+
+    for (const path of ['/welcome', '/login', '/register', '/rules']) {
+      await page.goto(path);
+      await audit.scan(`${path} (light)`);
+    }
+
+    await createVerifiedManager(page, request, account);
+
+    await page.goto('/onboarding/manager');
+    await page.getByRole('button', { name: 'Create my profile' }).click();
+    await page.getByRole('button', { name: 'See the clubs' }).first().click();
+    await page.getByRole('button', { name: /^Take over/ }).first().click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+
+    await navigateTo(page, 'Squad');
+
+    const profileHref = await page
+      .getByRole('link', { name: /^Open / })
+      .first()
+      .getAttribute('href');
+
+    for (const route of [
+      '/dashboard',
+      '/squad',
+      profileHref!,
+      '/tactics',
+      '/training',
+      '/competitions',
+      '/fixtures',
+      '/finances',
+      '/inbox',
+      '/settings',
+    ]) {
+      await page.goto(route);
+      await audit.scan(`${route} (light)`);
+    }
+
+    audit.expectClean();
+
+    await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Resign from this club' }).click();
+    await expect(page.getByRole('heading', { name: 'Choose a club' })).toBeVisible();
+  });
+});

@@ -1,11 +1,11 @@
-<div class="flex min-h-dvh flex-col bg-slate-50 text-slate-900">
+<div class="flex min-h-dvh flex-col bg-ground text-ink">
   <!--
     A skip link is the first focusable element on the page. Without it a keyboard user has to tab
     through the whole navigation on every route change.
   -->
   <a
     href="#main-content"
-    class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:shadow"
+    class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent focus:shadow"
   >
     Skip to main content
   </a>
@@ -24,26 +24,12 @@
     <app-game-clock-bar />
   }
 
-  <header class="border-b border-slate-200 bg-white">
-    <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
-      <a
-        routerLink="/welcome"
-        class="flex items-center gap-2 text-lg font-semibold tracking-tight"
-        aria-label="Touchline Manager, home"
-      >
-        <span
-          class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white"
-          aria-hidden="true"
-        >
-          TM
-        </span>
-        Touchline Manager
-      </a>
-
+  <header class="border-b border-line bg-rail">
+    <div class="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
       @if (navItems().length > 0) {
         <button
           type="button"
-          class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-slate-300 text-slate-800 hover:bg-slate-100 md:hidden"
+          class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line-strong bg-panel text-ink hover:bg-raised md:hidden"
           [attr.aria-expanded]="mobileNavOpen()"
           [attr.aria-controls]="mobileNavOpen() ? 'mobile-main-nav' : null"
           aria-label="Menu"
@@ -51,16 +37,79 @@
         >
           <i [class]="mobileNavOpen() ? 'pi pi-times' : 'pi pi-bars'" aria-hidden="true"></i>
         </button>
+
+        <!-- History arrows: the control a manager reaches for after following a link into a profile. -->
+        <div class="hidden gap-1 md:flex">
+          <button
+            type="button"
+            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line bg-panel text-ink-2 hover:bg-raised hover:text-ink"
+            aria-label="Back"
+            (click)="back()"
+          >
+            <i class="pi pi-angle-left" aria-hidden="true"></i>
+          </button>
+          <button
+            type="button"
+            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line bg-panel text-ink-2 hover:bg-raised hover:text-ink"
+            aria-label="Forward"
+            (click)="forward()"
+          >
+            <i class="pi pi-angle-right" aria-hidden="true"></i>
+          </button>
+        </div>
       }
 
-      <div class="ml-auto flex items-center gap-3">
+      <a
+        routerLink="/welcome"
+        class="flex items-center gap-2.5 font-display text-xl font-semibold tracking-tight"
+        aria-label="Touchline Manager, home"
+      >
+        <span
+          class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent text-base font-bold text-on-accent"
+          aria-hidden="true"
+        >
+          TM
+        </span>
+        <span class="hidden sm:inline">Touchline Manager</span>
+      </a>
+
+      <div class="ml-auto flex flex-wrap items-center gap-3">
+        <!-- A pressed toggle rather than a "switch to X" button: the label stays, the state is what changes. -->
+        <button
+          type="button"
+          class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line bg-panel text-ink-2 hover:bg-raised hover:text-ink"
+          [attr.aria-label]="
+            themeMode() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+          "
+          (click)="toggleTheme()"
+        >
+          <i [class]="themeMode() === 'dark' ? 'pi pi-sun' : 'pi pi-moon'" aria-hidden="true"></i>
+        </button>
         @if (isAuthenticated()) {
-          <span class="text-sm text-slate-700">
+          @if (nextFixture(); as next) {
+            <!--
+              The management sim's "Continue", adapted to a game played on fixed matchdays: nothing is advanced
+              here, so the button points at the one thing a manager can still change, the next side.
+            -->
+            <a
+              [routerLink]="['/fixtures', next.id, 'prepare']"
+              class="inline-flex min-h-11 items-center rounded bg-accent px-4 py-1 text-on-accent hover:bg-accent-strong"
+              [attr.aria-label]="'Prepare your side: ' + next.label + '. ' + next.countdown"
+            >
+              <span class="flex flex-col leading-tight" aria-hidden="true">
+                <span class="font-display text-base font-bold uppercase tracking-wider"
+                  >Prepare</span
+                >
+                <span class="text-xs font-medium">{{ next.label }} · {{ next.countdown }}</span>
+              </span>
+            </a>
+          }
+          <span class="max-w-40 truncate text-sm text-ink-2">
             <span class="sr-only">Signed in as </span>{{ displayName() }}
           </span>
           <button
             type="button"
-            class="inline-flex min-h-11 items-center rounded border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            class="inline-flex min-h-11 items-center rounded border border-line-strong bg-transparent px-3 text-sm font-semibold text-ink hover:bg-raised"
             (click)="signOut()"
           >
             Sign out
@@ -68,13 +117,13 @@
         } @else {
           <a
             routerLink="/login"
-            class="inline-flex min-h-11 items-center rounded px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            class="inline-flex min-h-11 items-center rounded px-3 text-sm font-semibold text-ink hover:bg-raised"
           >
             Sign in
           </a>
           <a
             routerLink="/register"
-            class="inline-flex min-h-11 items-center rounded bg-slate-900 px-3 text-sm font-semibold text-white hover:bg-slate-700"
+            class="inline-flex min-h-11 items-center rounded bg-accent px-3 text-sm font-semibold text-on-accent hover:bg-accent-strong"
           >
             Create account
           </a>
@@ -83,55 +132,65 @@
     </div>
   </header>
 
-  <div class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 md:flex-row">
+  <div class="flex w-full flex-1 flex-col md:flex-row">
     @if (navItems().length > 0) {
       <!--
-        Desktop sidebar. Below `md` it is replaced by the header disclosure, so the fourteen
-        destinations are never a horizontal strip that scrolls off a phone with no affordance
-        (`F-44`, master plan §11.3).
+        Desktop rail. Below `md` it is replaced by the header disclosure, so the fourteen destinations are
+        never a horizontal strip that scrolls off a phone with no affordance (`F-44`, master plan §11.3).
+        Destinations sit under quiet group headings, so fourteen entries read as six short lists.
       -->
-      <nav aria-label="Main" class="hidden md:block md:w-56 md:shrink-0">
-        <ul class="flex flex-col gap-2">
-          @for (item of navItems(); track item.path) {
-            <li>
-              <a
-                [routerLink]="item.path"
-                routerLinkActive="bg-slate-900 text-white"
-                class="flex min-h-11 items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm font-medium hover:bg-slate-200"
-              >
-                <i [class]="item.icon" aria-hidden="true"></i>
-                {{ item.label }}
-                @if (item.path === '/inbox' && unreadInboxCount() > 0) {
-                  <span
-                    class="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-slate-900"
-                    [attr.aria-label]="unreadInboxCount() + ' unread messages'"
-                  >
-                    {{ unreadInboxCount() }}
-                  </span>
-                }
-              </a>
-            </li>
-          }
-        </ul>
+      <nav
+        aria-label="Main"
+        class="hidden border-r border-line bg-rail px-2 py-3 md:sticky md:top-0 md:block md:max-h-dvh md:w-60 md:shrink-0 md:self-start md:overflow-y-auto"
+      >
+        @for (group of railGroups(); track group.name) {
+          <p
+            class="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-widest text-muted first:pt-1"
+          >
+            {{ group.name }}
+          </p>
+          <ul class="flex flex-col gap-0.5" [attr.aria-label]="group.name">
+            @for (item of group.items; track item.path) {
+              <li>
+                <a
+                  [routerLink]="item.path"
+                  routerLinkActive="bg-accent/15 text-accent"
+                  class="flex min-h-11 items-center gap-3 whitespace-nowrap rounded px-3 py-2 font-display text-base font-semibold tracking-wide text-ink-2 hover:bg-raised hover:text-ink"
+                >
+                  <i [class]="item.icon" aria-hidden="true"></i>
+                  {{ item.label }}
+                  @if (item.path === '/inbox' && unreadInboxCount() > 0) {
+                    <span
+                      class="ml-auto rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-on-accent"
+                      [attr.aria-label]="unreadInboxCount() + ' unread messages'"
+                    >
+                      {{ unreadInboxCount() }}
+                    </span>
+                  }
+                </a>
+              </li>
+            }
+          </ul>
+        }
       </nav>
 
       <!-- Mobile navigation: the same destinations, shown only while the header menu is open. -->
       @if (mobileNavOpen()) {
-        <nav id="mobile-main-nav" aria-label="Main" class="md:hidden">
-          <ul class="flex flex-col gap-1 rounded border border-slate-200 bg-white p-2 shadow-sm">
+        <nav id="mobile-main-nav" aria-label="Main" class="px-4 pt-3 md:hidden">
+          <ul class="flex flex-col gap-1 rounded border border-line bg-panel p-2 shadow-sm">
             @for (item of navItems(); track item.path) {
               <li>
                 <a
                   [routerLink]="item.path"
-                  routerLinkActive="bg-slate-900 text-white"
-                  class="flex min-h-11 items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm font-medium hover:bg-slate-200"
+                  routerLinkActive="bg-accent/15 text-accent"
+                  class="flex min-h-11 items-center gap-3 whitespace-nowrap rounded px-3 py-2 font-display text-base font-semibold tracking-wide text-ink-2 hover:bg-raised hover:text-ink"
                   (click)="closeMobileNav()"
                 >
                   <i [class]="item.icon" aria-hidden="true"></i>
                   {{ item.label }}
                   @if (item.path === '/inbox' && unreadInboxCount() > 0) {
                     <span
-                      class="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-slate-900"
+                      class="ml-auto rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-on-accent"
                       [attr.aria-label]="unreadInboxCount() + ' unread messages'"
                     >
                       {{ unreadInboxCount() }}
@@ -145,27 +204,27 @@
       }
     }
 
-    <main id="main-content" tabindex="-1" class="min-w-0 flex-1">
+    <main id="main-content" tabindex="-1" class="min-w-0 flex-1 px-4 py-5 md:px-6 md:py-6">
       <router-outlet />
     </main>
   </div>
 
-  <footer class="border-t border-slate-200 bg-white">
+  <footer class="border-t border-line bg-rail">
     <div
-      class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-slate-500"
+      class="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-muted"
     >
       <nav aria-label="Information" class="flex flex-wrap gap-x-4 gap-y-1">
-        <a routerLink="/rules" class="underline underline-offset-2 hover:text-slate-700">Rules</a>
-        <a routerLink="/privacy" class="underline underline-offset-2 hover:text-slate-700">Privacy</a>
-        <a routerLink="/terms" class="underline underline-offset-2 hover:text-slate-700">Terms</a>
-        <a routerLink="/status" class="underline underline-offset-2 hover:text-slate-700">Status</a>
-        <a routerLink="/support" class="underline underline-offset-2 hover:text-slate-700">Support</a>
+        <a routerLink="/rules" class="underline underline-offset-2 hover:text-ink">Rules</a>
+        <a routerLink="/privacy" class="underline underline-offset-2 hover:text-ink">Privacy</a>
+        <a routerLink="/terms" class="underline underline-offset-2 hover:text-ink">Terms</a>
+        <a routerLink="/status" class="underline underline-offset-2 hover:text-ink">Status</a>
+        <a routerLink="/support" class="underline underline-offset-2 hover:text-ink">Support</a>
       </nav>
       <p>Matchdays: Tuesday, Thursday and Sunday at 19:00 UTC.</p>
       @if (correlationId(); as reference) {
         <p>
           Reference for support:
-          <code class="rounded bg-slate-100 px-1 py-0.5 text-slate-700">{{ reference }}</code>
+          <code class="rounded bg-raised px-1 py-0.5 text-ink-2">{{ reference }}</code>
         </p>
       }
     </div>

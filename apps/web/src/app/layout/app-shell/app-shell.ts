@@ -1,8 +1,18 @@
-import { Component, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Location } from '@angular/common';
+import {
+  Component,
+  HostListener,
+  OnDestroy,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
+import { lockCountdown, venueLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { GameClockStore } from '../../core/devtools/game-clock-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
@@ -12,13 +22,14 @@ import { NotificationPreferencesStore } from '../../core/notifications/notificat
 import { SessionsStore } from '../../core/sessions/sessions-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { SyncStore } from '../../core/sync/sync-store';
+import { ThemeStore } from '../../core/theme/theme-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { PlayerTrainingStore } from '../../core/training/player-training-store';
 import { TrainingStore } from '../../core/training/training-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { GameClockBar } from '../game-clock-bar/game-clock-bar';
 import { SystemNotices } from '../system-notices/system-notices';
-import { AVAILABLE_NAV_ITEMS } from '../navigation/nav-items';
+import { AVAILABLE_NAV_ITEMS, NavItem } from '../navigation/nav-items';
 
 /**
  * The responsive application shell.
@@ -50,6 +61,8 @@ export class AppShell implements OnDestroy {
   private readonly sync = inject(SyncStore);
   private readonly gameClock = inject(GameClockStore);
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
+  private readonly theme = inject(ThemeStore);
 
   /** The route-change subscription that moves focus to the main content (`§11.3`). */
   private readonly navigationSubscription: Subscription;
@@ -61,6 +74,20 @@ export class AppShell implements OnDestroy {
     // The poll starts with the shell and stops with it, so the badge is fresh on every screen and no timer
     // outlives the shell that owns it (§11.2).
     this.sync.start();
+
+    // The top bar's "Prepare" button needs the next fixture on every screen, not only on the dashboard. A signed-in
+    // manager's fixture list is read once, here, if no screen has read it; a failed read is not retried in a loop
+    // (a manager with no club has no list, and the dashboard says so).
+    effect(() => {
+      if (
+        this.session.isAuthenticated() &&
+        this.competition.fixtures() === null &&
+        !this.competition.fixturesLoading() &&
+        this.competition.fixturesError() === null
+      ) {
+        this.competition.loadFixtures();
+      }
+    });
 
     // A single-page app does not move focus when the view swaps, so a keyboard manager is left on the link
     // they pressed while the page under them changed (WCAG 2.4.3). Focus the main landmark on every
@@ -89,6 +116,51 @@ export class AppShell implements OnDestroy {
     this.session.isAuthenticated() ? AVAILABLE_NAV_ITEMS : [],
   );
 
+  /**
+   * The navigation grouped into the rail's sections: each is a labelled list under a quiet heading, so fourteen
+   * entries read as six short lists rather than one long one. Sections are the runs of consecutive entries that
+   * share a group (`nav-items.ts`).
+   */
+  protected readonly railGroups = computed(() => {
+    const groups: { name: string; items: NavItem[] }[] = [];
+
+    for (const item of this.navItems()) {
+      const last = groups[groups.length - 1];
+
+      if (last !== undefined && last.name === item.group) {
+        last.items.push(item);
+      } else {
+        groups.push({ name: item.group, items: [item] });
+      }
+    }
+
+    return groups;
+  });
+
+  /**
+   * The manager's next fixture, for the top bar's call to action, or null while there is none or the fixture
+   * list has not been read yet.
+   */
+  protected readonly nextFixture = computed(() => {
+    const list = this.competition.fixtures();
+
+    if (list === null || list.nextFixtureId === null) {
+      return null;
+    }
+
+    const fixture = list.fixtures.find((candidate) => candidate.id === list.nextFixtureId);
+
+    if (fixture === undefined) {
+      return null;
+    }
+
+    return {
+      id: fixture.id,
+      label: `${venueLabel(fixture.venue)} v ${fixture.opponentShortName}`,
+      countdown: lockCountdown(fixture.lockAt, new Date()),
+    };
+  });
+
   /** The most recent server correlation ID, for support. */
   protected readonly correlationId = this.correlation.correlationId;
 
@@ -113,6 +185,24 @@ export class AppShell implements OnDestroy {
   /** Opens or closes the mobile navigation panel. */
   protected toggleMobileNav(): void {
     this.mobileNavOpen.update((open) => !open);
+  }
+
+  /** The theme in force, for the toggle's label and icon. */
+  protected readonly themeMode = this.theme.mode;
+
+  /** Switches between the dark and the light theme. */
+  protected toggleTheme(): void {
+    this.theme.toggle();
+  }
+
+  /** Steps back through the browser history, like the arrows at the top of a management sim. */
+  protected back(): void {
+    this.location.back();
+  }
+
+  /** Steps forward through the browser history. */
+  protected forward(): void {
+    this.location.forward();
   }
 
   /** Closes the mobile navigation panel, e.g. after a destination is chosen. */

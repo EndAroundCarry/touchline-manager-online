@@ -9,7 +9,8 @@ import {
   input,
   viewChild,
 } from '@angular/core';
-import type { Chart, ChartConfiguration, ChartDataset } from 'chart.js';
+import type { Chart, ChartConfiguration, ChartDataset, ChartOptions } from 'chart.js';
+import { ThemeStore } from '../../../core/theme/theme-store';
 
 /** One line on the chart. */
 export interface LineChartSeries {
@@ -32,10 +33,27 @@ export interface LineChartSeries {
   readonly notes?: readonly (string | null)[];
 }
 
-/** The grid and tick colours: slate, so the chart ink matches the rest of the screen and the lines lead. */
-const GRID_COLOR = '#e2e8f0';
-const ZERO_LINE_COLOR = '#94a3b8';
-const TICK_COLOR = '#475569';
+/** The chart ink: the screen's own tokens, read from the page so the chart follows the theme (ADR-0059). */
+interface ChartInk {
+  readonly grid: string;
+  readonly zeroLine: string;
+  readonly tick: string;
+  readonly pointBorder: string;
+}
+
+/** Reads the ink from the CSS tokens now in force; the fallbacks are the dark theme's values. */
+function readInk(): ChartInk {
+  const style = typeof document === 'undefined' ? null : getComputedStyle(document.documentElement);
+  const token = (name: string, fallback: string): string =>
+    style?.getPropertyValue(name).trim() || fallback;
+
+  return {
+    grid: token('--color-line', '#2a3441'),
+    zeroLine: token('--color-line-strong', '#3d495a'),
+    tick: token('--color-muted', '#98a4b5'),
+    pointBorder: token('--color-panel', '#171d25'),
+  };
+}
 
 /**
  * A line chart drawn with Chart.js.
@@ -70,9 +88,17 @@ export class LineChart {
 
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly destroyRef = inject(DestroyRef);
+  private readonly theme = inject(ThemeStore);
 
   private chart: Chart<'line', (number | null)[], string> | null = null;
   private destroyed = false;
+
+  /** The chart ink, read again whenever the theme changes. */
+  private readonly ink = computed(() => {
+    this.theme.mode();
+
+    return readInk();
+  });
 
   /** The data in the shape Chart.js takes, recomputed when an input changes. */
   private readonly data = computed(() => ({
@@ -89,7 +115,7 @@ export class LineChart {
       pointHoverRadius: 5,
       pointHitRadius: 12,
       pointBackgroundColor: line.color,
-      pointBorderColor: '#ffffff',
+      pointBorderColor: this.ink().pointBorder,
       pointBorderWidth: 1,
       spanGaps: false,
       tension: 0,
@@ -116,7 +142,10 @@ export class LineChart {
     effect(() => {
       const data = this.data();
 
+      const ink = this.ink();
+
       if (this.chart !== null) {
+        this.chart.options = this.options(ink);
         this.chart.data.labels = data.labels;
         this.chart.data.datasets = data.datasets;
         this.chart.update();
@@ -152,39 +181,39 @@ export class LineChart {
   }
 
   private configuration(): ChartConfiguration<'line', (number | null)[], string> {
+    return { type: 'line', data: this.data(), options: this.options(this.ink()) };
+  }
+
+  /** The chart options in the given ink. Rebuilt when the theme changes so the axes and the grid follow it. */
+  private options(ink: ChartInk): ChartOptions<'line'> {
     const reducedMotion =
       typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const series = this.series();
 
     return {
-      type: 'line',
-      data: this.data(),
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: reducedMotion ? false : undefined,
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { color: TICK_COLOR, maxTicksLimit: 8, autoSkip: true },
-          },
-          y: {
-            title: { display: true, text: this.yTitle(), color: TICK_COLOR },
-            grid: {
-              color: (context) => (context.tick.value === 0 ? ZERO_LINE_COLOR : GRID_COLOR),
-            },
-            ticks: { color: TICK_COLOR },
-          },
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: reducedMotion ? false : undefined,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: ink.tick, maxTicksLimit: 8, autoSkip: true },
         },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.dataset.label}: ${context.formattedValue}`,
-              afterLabel: (context) =>
-                series[context.datasetIndex]?.notes?.[context.dataIndex] ?? '',
-            },
+        y: {
+          title: { display: true, text: this.yTitle(), color: ink.tick },
+          grid: {
+            color: (context) => (context.tick.value === 0 ? ink.zeroLine : ink.grid),
+          },
+          ticks: { color: ink.tick },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${context.formattedValue}`,
+            afterLabel: (context) => series[context.datasetIndex]?.notes?.[context.dataIndex] ?? '',
           },
         },
       },

@@ -154,21 +154,21 @@ describe('training presentation', () => {
         ['pace', 1],
       ]);
 
-      expect(cell('finishing').tintClass).toBe('bg-sky-300');
-      expect(cell('composure').tintClass).toBe('bg-sky-200');
-      expect(cell('pace').tintClass).toBe('bg-sky-100');
+      expect(cell('finishing').tintClass).toBe('bg-sky-500/45');
+      expect(cell('composure').tintClass).toBe('bg-sky-500/30');
+      expect(cell('pace').tintClass).toBe('bg-sky-500/15');
       expect(cell('passing').tintClass).toBe('');
       expect(cell('passing').marker).toBe('');
       expect(cell('finishing').marker).toBe('•••');
     });
 
-    it('keeps the band as the text colour: strong, low and average, darker on a tint', () => {
-      expect(cell('finishing').textClass).toBe('text-emerald-900');
-      expect(cell('composure').textClass).toBe('text-red-900');
-      expect(cell('pace').textClass).toBe('text-amber-900');
+    it('keeps the band as the text colour: strong, low and average, lighter on a tint', () => {
+      expect(cell('finishing').textClass).toBe('text-emerald-200');
+      expect(cell('composure').textClass).toBe('text-red-200');
+      expect(cell('pace').textClass).toBe('text-amber-200');
 
       // Untrained cells keep the band colours the squad profile uses.
-      expect(cell('passing').textClass).toBe('text-amber-700');
+      expect(cell('passing').textClass).toBe('text-amber-300');
     });
 
     it('says in words what colour says: the value, its band, and the weight when trained', () => {

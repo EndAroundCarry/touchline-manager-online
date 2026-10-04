@@ -1,5 +1,5 @@
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading your training…</p>
+  <p class="text-sm text-ink-2" role="status">Loading your training…</p>
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
   <div class="mt-4">
@@ -9,7 +9,7 @@
   @if (draft(); as plan) {
     <section>
       <h1 [class]="pageHeadingClass">{{ club.clubName }} training</h1>
-      <p class="mt-1 text-sm text-slate-600">
+      <p class="mt-1 text-sm text-ink-2">
         {{ club.countryCode }} · season {{ club.seasonNumber }} ·
         @if (club.isConfigured) {
           in force since {{ effective(club.effectiveDate) }}
@@ -19,8 +19,8 @@
         }
       </p>
 
-      <h2 class="mt-8 text-lg font-semibold text-slate-900">Intensity</h2>
-      <p class="mt-1 max-w-3xl text-sm text-slate-600">
+      <h2 class="mt-8 text-lg font-semibold text-ink">Intensity</h2>
+      <p class="mt-1 max-w-3xl text-sm text-ink-2">
         How hard the whole club trains. A plan takes effect from the day you save it (TRN-1);
         intensity buys development and costs condition and freshness, so every choice has a
         trade-off (TRN-3). What each player trains is their own programme, below.
@@ -28,7 +28,7 @@
 
       <div class="mt-3 grid max-w-3xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <label class="block">
-          <span class="text-sm font-medium text-slate-700">Intensity</span>
+          <span class="text-sm font-medium text-ink-2">Intensity</span>
           <select
             [class]="textInputClass"
             [value]="plan.intensity"
@@ -43,7 +43,7 @@
 
       @if (hasConflict()) {
         <div
-          class="mt-4 max-w-3xl rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          class="mt-4 max-w-3xl rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
           role="alert"
         >
           <p class="font-medium">
@@ -84,15 +84,15 @@
         </button>
 
         @if (isDirty()) {
-          <span class="text-sm text-slate-600">Unsaved changes</span>
+          <span class="text-sm text-ink-2">Unsaved changes</span>
         }
 
         <a routerLink="/squad" [class]="linkClass">Back to the squad</a>
       </div>
 
       <section class="mt-10">
-        <h2 class="text-lg font-semibold text-slate-900">Programmes</h2>
-        <p class="mt-1 max-w-3xl text-sm text-slate-600">
+        <h2 class="text-lg font-semibold text-ink">Programmes</h2>
+        <p class="mt-1 max-w-3xl text-sm text-ink-2">
           Each player trains one programme. Unless you choose otherwise it is the one that matches
           their position (TRN-1, TRN-2). A programme spreads the same daily development over the
           attributes it trains, so a narrower programme grows each of them faster; the younger the
@@ -100,23 +100,21 @@
           programme that trains an attribute slows its decline.
         </p>
 
-        <details class="mt-3 max-w-3xl rounded border border-slate-200 bg-white px-3">
-          <summary
-            class="flex min-h-11 cursor-pointer items-center text-sm font-medium text-slate-900"
-          >
+        <details class="mt-3 max-w-3xl rounded border border-line bg-panel px-3">
+          <summary class="flex min-h-11 cursor-pointer items-center text-sm font-medium text-ink">
             What each programme trains
           </summary>
           <ul class="grid gap-4 pb-3 sm:grid-cols-2" data-testid="programme-list">
             @for (programme of programmeList(); track programme.code) {
               <li>
-                <h3 class="text-sm font-semibold text-slate-900">{{ programme.label }}</h3>
-                <p class="text-xs text-slate-600">{{ programme.description }}</p>
+                <h3 class="text-sm font-semibold text-ink">{{ programme.label }}</h3>
+                <p class="text-xs text-ink-2">{{ programme.description }}</p>
                 @if (programme.groups.length === 0) {
-                  <p class="mt-1 text-xs text-slate-600">
+                  <p class="mt-1 text-xs text-ink-2">
                     Trains no attributes, and recovers more fatigue.
                   </p>
                 } @else {
-                  <dl class="mt-1 text-xs text-slate-700">
+                  <dl class="mt-1 text-xs text-ink-2">
                     @for (group of programme.groups; track group.label) {
                       <div class="mt-0.5">
                         <dt class="mr-1 inline font-medium">{{ group.label }}:</dt>
@@ -131,7 +129,7 @@
         </details>
 
         <ul
-          class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700"
+          class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2"
           aria-label="Legend: how strongly the programme trains an attribute"
         >
           <li class="font-medium">In training:</li>
@@ -139,7 +137,7 @@
             <li class="flex items-center gap-1">
               <span
                 aria-hidden="true"
-                class="inline-block min-w-8 rounded px-1 text-center font-bold text-slate-900"
+                class="inline-block min-w-8 rounded px-1 text-center font-bold text-ink"
                 [class]="style.tintClass"
                 >{{ style.marker }}</span
               >
@@ -174,28 +172,28 @@
                 <th
                   scope="col"
                   rowspan="2"
-                  class="sticky left-0 z-20 w-[8.5rem] min-w-[8.5rem] border-b border-slate-300 bg-white py-1 pr-2 align-bottom font-semibold"
+                  class="sticky left-0 z-20 w-[8.5rem] min-w-[8.5rem] border-b border-line-strong bg-panel py-1 pr-2 align-bottom font-semibold"
                 >
                   Player
                 </th>
                 <th
                   scope="col"
                   rowspan="2"
-                  class="z-20 w-12 min-w-12 border-b border-slate-300 bg-white py-1 pr-2 align-bottom font-semibold lg:sticky lg:left-[8.5rem]"
+                  class="z-20 w-12 min-w-12 border-b border-line-strong bg-panel py-1 pr-2 align-bottom font-semibold lg:sticky lg:left-[8.5rem]"
                 >
                   Pos
                 </th>
                 <th
                   scope="col"
                   rowspan="2"
-                  class="z-20 w-10 min-w-10 border-b border-slate-300 bg-white py-1 pr-2 align-bottom font-semibold lg:sticky lg:left-[11.5rem]"
+                  class="z-20 w-10 min-w-10 border-b border-line-strong bg-panel py-1 pr-2 align-bottom font-semibold lg:sticky lg:left-[11.5rem]"
                 >
                   Age
                 </th>
                 <th
                   scope="col"
                   rowspan="2"
-                  class="z-20 w-44 min-w-44 border-b border-r border-slate-300 bg-white py-1 pr-2 align-bottom font-semibold lg:sticky lg:left-[14rem]"
+                  class="z-20 w-44 min-w-44 border-b border-r border-line-strong bg-panel py-1 pr-2 align-bottom font-semibold lg:sticky lg:left-[14rem]"
                 >
                   Programme
                 </th>
@@ -203,7 +201,7 @@
                   <th
                     scope="colgroup"
                     [attr.colspan]="family.columns.length"
-                    class="border-b border-l border-slate-300 px-1 py-1 text-center font-semibold"
+                    class="border-b border-l border-line-strong px-1 py-1 text-center font-semibold"
                   >
                     {{ family.label }}
                   </th>
@@ -211,14 +209,14 @@
                 <th
                   scope="col"
                   rowspan="2"
-                  class="border-b border-l border-slate-300 px-2 py-1 align-bottom font-semibold"
+                  class="border-b border-l border-line-strong px-2 py-1 align-bottom font-semibold"
                 >
                   Condition
                 </th>
                 <th
                   scope="col"
                   rowspan="2"
-                  class="border-b border-slate-300 px-2 py-1 align-bottom font-semibold"
+                  class="border-b border-line-strong px-2 py-1 align-bottom font-semibold"
                 >
                   Fatigue
                 </th>
@@ -228,9 +226,9 @@
                   @for (column of family.columns; track column.key; let first = $first) {
                     <th
                       scope="col"
-                      class="w-9 min-w-9 border-b border-slate-300 px-0.5 py-1 text-center text-xs font-medium text-slate-700"
+                      class="w-9 min-w-9 border-b border-line-strong px-0.5 py-1 text-center text-xs font-medium text-ink-2"
                       [class.border-l]="first"
-                      [class.border-slate-300]="first"
+                      [class.border-line-strong]="first"
                     >
                       <abbr [title]="column.label" aria-hidden="true">{{ column.abbr }}</abbr>
                       <span class="sr-only">{{ column.label }}</span>
@@ -244,15 +242,15 @@
                 <tr>
                   <th
                     scope="row"
-                    class="sticky left-0 z-10 w-[8.5rem] min-w-[8.5rem] border-b border-slate-200 bg-white py-1 pr-2 text-left font-medium text-slate-900"
+                    class="sticky left-0 z-10 w-[8.5rem] min-w-[8.5rem] border-b border-line bg-panel py-1 pr-2 text-left font-medium text-ink"
                   >
                     {{ row.player.fullName }}
-                    <span class="block text-xs font-normal text-slate-500">{{
+                    <span class="block text-xs font-normal text-muted">{{
                       row.player.shortName
                     }}</span>
                   </th>
                   <td
-                    class="z-10 w-12 min-w-12 border-b border-slate-200 bg-white py-1 pr-2 lg:sticky lg:left-[8.5rem]"
+                    class="z-10 w-12 min-w-12 border-b border-line bg-panel py-1 pr-2 lg:sticky lg:left-[8.5rem]"
                   >
                     <abbr [title]="position(row.player.primaryPosition)" aria-hidden="true">{{
                       row.player.primaryPosition.toUpperCase()
@@ -260,12 +258,12 @@
                     <span class="sr-only">{{ position(row.player.primaryPosition) }}</span>
                   </td>
                   <td
-                    class="z-10 w-10 min-w-10 border-b border-slate-200 bg-white py-1 pr-2 lg:sticky lg:left-[11.5rem]"
+                    class="z-10 w-10 min-w-10 border-b border-line bg-panel py-1 pr-2 lg:sticky lg:left-[11.5rem]"
                   >
                     {{ row.player.age }}
                   </td>
                   <td
-                    class="z-10 w-44 min-w-44 border-b border-r border-slate-200 bg-white py-1 pr-2 lg:sticky lg:left-[14rem]"
+                    class="z-10 w-44 min-w-44 border-b border-r border-line bg-panel py-1 pr-2 lg:sticky lg:left-[14rem]"
                   >
                     <select
                       [class]="textInputClass"
@@ -285,7 +283,7 @@
                   </td>
                   @for (cell of row.cells; track cell.key; let first = $first) {
                     <td
-                      class="w-9 min-w-9 border-b border-slate-200 px-0.5 py-1 text-center text-xs tabular-nums"
+                      class="w-9 min-w-9 border-b border-line px-0.5 py-1 text-center text-xs tabular-nums"
                       [class]="cell.textClass + ' ' + cell.tintClass"
                       [attr.data-weight]="cell.weight"
                     >
@@ -300,7 +298,7 @@
                       <span class="sr-only">{{ cell.readOut }}</span>
                     </td>
                   }
-                  <td class="border-b border-l border-slate-200 px-2 py-1">
+                  <td class="border-b border-l border-line px-2 py-1">
                     <span [class]="conditionClass(row.player.state.condition)">
                       {{ row.player.state.condition }}
                     </span>
@@ -308,7 +306,7 @@
                       {{ conditionWord(row.player.state.condition) }}
                     </span>
                   </td>
-                  <td class="border-b border-slate-200 px-2 py-1">
+                  <td class="border-b border-line px-2 py-1">
                     <span [class]="fatigueClass(row.player.state.fatigue)">{{
                       row.player.state.fatigue
                     }}</span>
@@ -325,22 +323,22 @@
         <!-- The same squad as cards below `md`, with the programme select still on screen (`F-44`). -->
         <ul class="mt-3 flex flex-col gap-3 md:hidden" data-testid="training-cards">
           @for (row of rows(); track row.player.id) {
-            <li class="rounded border border-slate-200 bg-white p-3">
+            <li class="rounded border border-line bg-panel p-3">
               <div class="flex flex-wrap items-baseline justify-between gap-x-2">
-                <h3 class="text-sm font-semibold text-slate-900">{{ row.player.fullName }}</h3>
-                <span class="text-xs text-slate-500">
+                <h3 class="text-sm font-semibold text-ink">{{ row.player.fullName }}</h3>
+                <span class="text-xs text-muted">
                   {{ position(row.player.primaryPosition) }} · age {{ row.player.age }}
                 </span>
               </div>
 
               <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-                <span class="text-slate-500">
+                <span class="text-muted">
                   Condition
                   <span [class]="conditionClass(row.player.state.condition)">
                     {{ row.player.state.condition }} {{ conditionWord(row.player.state.condition) }}
                   </span>
                 </span>
-                <span class="text-slate-500">
+                <span class="text-muted">
                   Fatigue
                   <span [class]="fatigueClass(row.player.state.fatigue)">
                     {{ row.player.state.fatigue }} {{ fatigueWord(row.player.state.fatigue) }}
@@ -349,7 +347,7 @@
               </div>
 
               <div class="mt-2">
-                <span class="text-sm font-medium text-slate-700">Training programme</span>
+                <span class="text-sm font-medium text-ink-2">Training programme</span>
                 <select
                   [class]="textInputClass"
                   [attr.aria-label]="'Training programme for ' + row.player.fullName"
@@ -369,7 +367,7 @@
 
               @for (group of row.groups; track group.key) {
                 <section class="mt-3" [attr.aria-label]="group.label + ' attributes'">
-                  <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <h4 class="text-xs font-semibold uppercase tracking-wide text-ink-2">
                     {{ group.label }}
                   </h4>
                   <ul class="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
@@ -381,7 +379,7 @@
                       >
                         <span
                           aria-hidden="true"
-                          class="text-slate-800"
+                          class="text-ink"
                           [class.font-bold]="cell.weight > 0"
                           >{{ cell.label }}</span
                         >

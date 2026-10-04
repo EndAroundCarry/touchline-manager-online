@@ -26,9 +26,9 @@ export interface BandStyle {
 }
 
 const BAND_STYLES: Record<PerformanceBand, BandStyle> = {
-  low: { band: 'low', label: 'Low', className: 'text-red-700' },
-  average: { band: 'average', label: 'Average', className: 'text-amber-700' },
-  strong: { band: 'strong', label: 'Strong', className: 'text-emerald-800' },
+  low: { band: 'low', label: 'Low', className: 'text-red-300' },
+  average: { band: 'average', label: 'Average', className: 'text-amber-300' },
+  strong: { band: 'strong', label: 'Strong', className: 'text-emerald-300' },
 };
 
 /** The highest attribute value that still reads as weak (`TRN-4`'s scale is 1–20). */

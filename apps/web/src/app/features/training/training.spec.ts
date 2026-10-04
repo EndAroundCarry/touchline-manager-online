@@ -100,9 +100,9 @@ describe('Training screen', () => {
       Array.from(firstRow.querySelectorAll<HTMLElement>(`td[data-weight="${weight}"]`));
 
     expect(weights('3')).toHaveLength(1);
-    expect(weights('3')[0].classList.contains('bg-sky-300')).toBe(true);
-    expect(weights('2')[0].classList.contains('bg-sky-200')).toBe(true);
-    expect(weights('1')[0].classList.contains('bg-sky-100')).toBe(true);
+    expect(weights('3')[0].classList.contains('bg-sky-500/45')).toBe(true);
+    expect(weights('2')[0].classList.contains('bg-sky-500/30')).toBe(true);
+    expect(weights('1')[0].classList.contains('bg-sky-500/15')).toBe(true);
     expect(weights('0')).toHaveLength(25);
     expect(weights('0').some((cell) => /bg-sky/.test(cell.className))).toBe(false);
 

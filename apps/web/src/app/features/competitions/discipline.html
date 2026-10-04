@@ -1,11 +1,11 @@
 @if (loading()) {
-  <p class="text-sm text-slate-600" role="status">Loading the discipline…</p>
+  <p class="text-sm text-ink-2" role="status">Loading the discipline…</p>
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
 } @else if (discipline(); as competition) {
   <section aria-labelledby="discipline-heading">
     <h1 id="discipline-heading" [class]="pageHeadingClass">{{ competition.divisionName }}</h1>
-    <p class="mt-1 text-sm text-slate-600">
+    <p class="mt-1 text-sm text-ink-2">
       {{ competition.countryName }} · tier {{ competition.tierNumber }} ·
       {{ competition.seasonLabel }}
     </p>
@@ -18,7 +18,7 @@
       </a>
     </p>
 
-    <p class="mt-4 text-sm text-slate-700">
+    <p class="mt-4 text-sm text-ink-2">
       Every player the season's cards have touched, most sendings-off first. Five league bookings
       earn a one-fixture suspension and a sending-off earns one, served against the club's next
       fixtures (DIS-2, DIS-4, DIS-5).
@@ -28,7 +28,7 @@
       <p [class]="statusMessageClass" role="status">No player has been booked yet this season.</p>
     } @else {
       <div
-        class="mt-6 overflow-x-auto rounded border border-slate-200 bg-white"
+        class="mt-6 overflow-x-auto rounded border border-line bg-panel"
         tabindex="0"
         role="group"
         aria-label="Discipline records"
@@ -40,7 +40,7 @@
             }}
           </caption>
           <thead>
-            <tr class="border-b border-slate-200 text-slate-600">
+            <tr class="border-b border-line text-ink-2">
               <th scope="col" class="px-3 py-2 text-left font-medium">Player</th>
               <th scope="col" class="px-3 py-2 text-left font-medium">Club</th>
               <th scope="col" class="px-3 py-2 text-right font-medium">
@@ -56,7 +56,7 @@
           </thead>
           <tbody>
             @for (row of competition.rows; track row.playerId) {
-              <tr class="border-b border-slate-100 last:border-b-0">
+              <tr class="border-b border-line-soft last:border-b-0">
                 <th scope="row" class="px-3 py-2 text-left font-medium">{{ row.playerName }}</th>
                 <td class="px-3 py-2 text-left">
                   <abbr [title]="row.clubName">{{ row.clubShortName }}</abbr>
@@ -72,7 +72,7 @@
         </table>
       </div>
 
-      <p class="mt-3 text-xs text-slate-500">As of {{ instant(competition.serverTime) }}.</p>
+      <p class="mt-3 text-xs text-muted">As of {{ instant(competition.serverTime) }}.</p>
     }
   </section>
 }

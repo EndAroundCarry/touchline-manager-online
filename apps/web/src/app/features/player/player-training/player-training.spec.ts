@@ -149,8 +149,8 @@ describe('PlayerTraining tab', () => {
         'Pace •••, core focus',
         'First touch •, supporting focus',
       ]);
-      expect(skills[0].classList.contains('bg-sky-300')).toBe(true);
-      expect(skills[1].classList.contains('bg-sky-100')).toBe(true);
+      expect(skills[0].classList.contains('bg-sky-500/45')).toBe(true);
+      expect(skills[1].classList.contains('bg-sky-500/15')).toBe(true);
       expect(card.querySelector('a')?.getAttribute('href')).toBe('/training');
     });
 
