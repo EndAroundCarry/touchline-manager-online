@@ -117,9 +117,9 @@ public sealed class EngineRulesTests
     [Fact]
     public void The_engine_and_rules_versions_are_labelled()
     {
-        EngineVersions.EngineLabel.Should().Be("engine-v7");
-        EngineVersions.RuleSetLabel.Should().Be("engine-rules-v6");
-        EngineVersions.Engine.Should().Be(7);
-        EngineVersions.RuleSet.Should().Be(6);
+        EngineVersions.EngineLabel.Should().Be("engine-v8");
+        EngineVersions.RuleSetLabel.Should().Be("engine-rules-v7");
+        EngineVersions.Engine.Should().Be(8);
+        EngineVersions.RuleSet.Should().Be(7);
     }
 }

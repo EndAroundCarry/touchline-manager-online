@@ -29,6 +29,31 @@ Restyles the whole web client as a management-sim workspace. Recorded in
 - **Training heat-map tints and chart colours** were retuned for a dark panel; their specs were updated.
 - **The Transfers entry** in the rail uses a PrimeIcons glyph that exists (`pi-arrow-right-arrow-left`).
 
+## Engine-v8 — the pass focus (engine layer)
+
+Adds a team instruction that steers where the ball goes: the centre alone, the centre and the left or right
+flank, or both wings. Recorded in [`ADR-0058`](docs/architecture/adr/0058-engine-v8-pass-focus.md). **Only the
+engine knows it so far:** the application, API, persistence and tactics board do not carry the instruction, so
+every side the application builds plays `Balanced`, which replays as `engine-v7` did. **It does not change a
+result:** goals and shots are identical for every option, so the instruction is cosmetic until something in the
+engine reads the lane.
+
+### Added
+
+- **`MatchPassFocus` and `MatchInstructionsV1.PassFocus`** (`Balanced`, `Centre`, `CentreAndLeft`,
+  `CentreAndRight`, `Wings`), serialized per side.
+- **`PassagePlanner.FocusLateral`** remaps the lateral position of the pressure point and of each approach touch
+  into the favoured lanes without adding a draw. Nine new rules constants hold the lane edges and shares,
+  calibrated so the ball is measured at about 20/60/20 (centre), 39/22/39 (wings) and 37/44/20 (centre and left),
+  against 23/53/23 with no preference.
+- **`PassFocusTests`** measures the lane shares of the ball over seeded matches and pins each option.
+
+### Changed
+
+- **Versions.** `EngineVersions.Engine` = 8 (`engine-v8`), `RuleSet` = 7 (`engine-rules-v7`). The golden hashes and
+  the rules hash are re-pinned; the golden match is still 2-2. A database seeded under `engine-v7` must be
+  archived and reseeded.
+
 ## Training v2 — programmes, an age curve, hidden aptitude, and a growth history
 
 Replaces the club-wide training focus with a position-specific **programme per player**, adds an age curve with

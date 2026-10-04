@@ -120,6 +120,7 @@ public static class CanonicalMatchSerializer
         lines.Add(Field($"{label}.tempo", (int)side.Instructions.Tempo));
         lines.Add(Field($"{label}.passing", (int)side.Instructions.Passing));
         lines.Add(Field($"{label}.width", (int)side.Instructions.Width));
+        lines.Add(Field($"{label}.passFocus", (int)side.Instructions.PassFocus));
         lines.Add(Field($"{label}.pressing", (int)side.Instructions.Pressing));
         lines.Add(Field($"{label}.defensiveLine", (int)side.Instructions.DefensiveLine));
         lines.Add(Field($"{label}.tackling", (int)side.Instructions.Tackling));

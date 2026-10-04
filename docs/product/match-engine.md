@@ -524,6 +524,17 @@ every rating differential smaller; `RatingDifferentialReference` 1_000 → 950 r
 `HomeAdvantageBasisPoints` 10_380 → 10_420 the home edge. `BaseShotGoalBasisPoints` 845 → 865 puts goals back
 at 2.90, and `ShortHandedPenaltyBasisPoints` 6_400 → 6_700 keeps a sending-off at about 1.4 goals.
 
+### 7.x Pass focus (`engine-v8`)
+
+`MatchInstructionsV1.PassFocus` asks for the centre alone, the centre and a flank, or both wings (`ADR-0058`).
+`PassagePlanner.FocusLateral` remaps a uniform lateral position into three lanes in the rules' shares (centre
+alone 30/40/30; centre and a flank 42 favoured, 27 centre, 31 other; wings 46/8/46) and is applied to the
+pressure point and to each touch of the approach, so no draw is added and a `Balanced` side is unchanged. Left
+is the low end of the attacking side's own scale. The shares are calibrated, not read off: every possession
+starts where the last one ended, mostly in the middle, so the ball measures about 23/53/23 with no preference and
+about 20/60/20 (centre), 39/22/39 (wings) and 37/44/20 (centre and left) with a focus. The focus steers the ball
+only: goals and shots are identical for every option, and `PassTally` and the film's receiver choice do not read it.
+
 ## 8. Output
 
 `MatchResultV1` carries the score, per-side statistics, the ordered event stream, per-player lines, the
@@ -1004,6 +1015,7 @@ a test that is switched off catches nothing.
 | `ReplayDirectorTests` | `replay-v4`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
 | `FilmScriptTests`, `FilmMotionTests` | Every possession scripted into contiguous beats that join except at a cut; a cross only from a wide position into the box; restarts taken by the owning side; the players the engine named at their beats; a goal followed by its celebration and a cut; no teleports; receivers at the ball when it arrives; a carrier at the ball; the keeper at a save; a goal ending in the goal mouth; the ball never left standing outside the holds; fixed hold lengths; quiet play condensed before the pace rises. |
 | `BallPlayStatisticsTests` | `engine-v7` (§8.2): a completed count is a nonnegative subset of its attempted one; nobody who did not take the pitch passed or dribbled; an assist is a completed pass; counting is repeatable; a side's volumes and completion rates read like football; a better passer has the ball more and completes a higher share. |
+| `PassFocusTests` | `engine-v8` (§7.x): a `Balanced` draw is returned unchanged; a focused draw stays on the pitch and never moves backwards; a uniform draw lands in the rules' lane shares; the measured lane shares of the ball match each option's calibration, and both wings send more wide than a single flank; left and right mirror; the away side is steered to its own left; one side's focus does not steer the other's ball; a focus is part of the snapshot's identity. |
 | `HighlightTests` | Reel selection: goals always shown, the quality floor, the count cap and its goal exception. |
 | `EnginePurityTests` | No clock, no `System.Random`, no IO; exactly one source of randomness. |
 | `DistributionTests` | The statistical bands, over two thousand matches. |

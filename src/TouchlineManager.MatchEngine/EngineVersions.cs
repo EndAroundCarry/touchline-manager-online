@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 7;
+    public const int Engine = 8;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,10 +30,17 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 6;
+    public const int RuleSet = 7;
 
-    /// <summary>The stable label for engine version 7, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 8, used in hashes and diagnostics.</summary>
     /// <remarks>
+    /// <para>
+    /// Version 8 lets a manager direct the ball. A team instruction, the pass focus, asks for the centre alone,
+    /// or the centre and one flank, and the lateral position of each possession's pressure point follows it, so
+    /// the ball's approach is steered through those lanes. The draw that places the point is the one the engine
+    /// always took, so a side with no preference plays exactly as it did under `engine-v7`; only the canonical
+    /// serialization, the rules, and the hashes change for it.
+    /// </para>
     /// <para>
     /// Version 7 counts what a player does with the ball. Each player's line carries the passes they attempted
     /// and completed and the take-ons they attempted and won, beside the goals and assists it already held. No
@@ -69,10 +76,10 @@ public static class EngineVersions
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v7";
+    public const string EngineLabel = "engine-v8";
 
-    /// <summary>The stable label for engine rules version 6.</summary>
-    public const string RuleSetLabel = "engine-rules-v6";
+    /// <summary>The stable label for engine rules version 7.</summary>
+    public const string RuleSetLabel = "engine-rules-v7";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v2";

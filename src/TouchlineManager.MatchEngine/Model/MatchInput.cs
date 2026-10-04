@@ -174,6 +174,9 @@ public sealed record MatchInstructionsV1
     /// <summary>Gets how far the team spreads across the pitch.</summary>
     public MatchWidth Width { get; init; } = MatchWidth.Normal;
 
+    /// <summary>Gets which lanes of the pitch the team asks its passes to go through (`engine-v8`).</summary>
+    public MatchPassFocus PassFocus { get; init; } = MatchPassFocus.Balanced;
+
     /// <summary>Gets where the team begins to press.</summary>
     public MatchPressing Pressing { get; init; } = MatchPressing.MidBlock;
 

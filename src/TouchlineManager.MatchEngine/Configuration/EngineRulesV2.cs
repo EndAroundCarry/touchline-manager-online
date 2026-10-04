@@ -292,6 +292,38 @@ public sealed record EngineRulesV2
     /// <summary>The share of open-play shots taken from each wide zone, in percent.</summary>
     public int ShotZoneWidePercent { get; init; } = 10;
 
+    // ---- Pass focus (engine-v8) ------------------------------------------------------------------
+    // The shares below are shares of a uniform lateral draw, which the planner remaps into the lanes. The ball's
+    // measured shares sit nearer the middle, because every possession starts there; the values are calibrated so
+    // that the measured shares are about 20/60/20 (centre), 39/22/39 (wings), and 37/44/20 (centre and left).
+
+    /// <summary>Where the left lane ends, across the pitch on a side's own scale, 0…7,000.</summary>
+    public int PassLeftLaneMaxYBasisPoints { get; init; } = 2_333;
+
+    /// <summary>Where the right lane begins, across the pitch on a side's own scale, 0…7,000.</summary>
+    public int PassRightLaneMinYBasisPoints { get; init; } = 4_667;
+
+    /// <summary>The share of a uniform lateral draw that lands in the centre lane when the focus is the centre alone, in percent.</summary>
+    public int PassFocusCentreCentrePercent { get; init; } = 40;
+
+    /// <summary>The share in each flank when the focus is the centre alone, in percent.</summary>
+    public int PassFocusCentreFlankPercent { get; init; } = 30;
+
+    /// <summary>The share in the centre lane when the focus is the centre and a flank, in percent.</summary>
+    public int PassFocusPairCentrePercent { get; init; } = 27;
+
+    /// <summary>The share in the favoured flank when the focus is the centre and a flank, in percent.</summary>
+    public int PassFocusPairFlankPercent { get; init; } = 42;
+
+    /// <summary>The share in the other flank when the focus is the centre and a flank, in percent.</summary>
+    public int PassFocusPairOtherFlankPercent { get; init; } = 31;
+
+    /// <summary>The share in each flank when the focus is both wings, in percent.</summary>
+    public int PassFocusWingsFlankPercent { get; init; } = 46;
+
+    /// <summary>The share in the centre lane when the focus is both wings, in percent.</summary>
+    public int PassFocusWingsCentrePercent { get; init; } = 8;
+
     // ---- Spatial play (engine-v3) ----------------------------------------------------------------
 
     /// <summary>
@@ -1151,6 +1183,20 @@ public sealed record EngineRulesV2
             problems.Add(
                 "The shot zone shares must sum to 100: one central, two inside channels, two wide zones, "
                 + $"were {ShotZoneCentralPercent} + 2 x {ShotZoneInsidePercent} + 2 x {ShotZoneWidePercent}.");
+        }
+
+        if (PassLeftLaneMaxYBasisPoints < 1
+            || PassLeftLaneMaxYBasisPoints >= PassRightLaneMinYBasisPoints
+            || PassRightLaneMinYBasisPoints >= 7_000)
+        {
+            problems.Add("The pass lanes must be three non-empty bands across a 7,000-wide pitch: left, centre, right.");
+        }
+
+        if (PassFocusCentreCentrePercent + (2 * PassFocusCentreFlankPercent) != 100
+            || PassFocusPairCentrePercent + PassFocusPairFlankPercent + PassFocusPairOtherFlankPercent != 100
+            || PassFocusWingsCentrePercent + (2 * PassFocusWingsFlankPercent) != 100)
+        {
+            problems.Add("Each pass focus must share its destinations across the three lanes in percentages summing to 100.");
         }
 
         if (MinLeadershipMoraleMultiplierBasisPoints > MaxLeadershipMoraleMultiplierBasisPoints

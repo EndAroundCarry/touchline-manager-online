@@ -203,10 +203,22 @@ internal static class PassagePlanner
             derived.NextRange(rules.PressurePointXMinBasisPoints, rules.PressurePointXMaxBasisPoints),
             startAttackX,
             SpatialPitch.PitchLength);
-        var pressureAttackY = derived.NextRange(0, SpatialPitch.PitchWidth);
+        var pressureAttackY = FocusLateral(
+            derived.NextRange(0, SpatialPitch.PitchWidth),
+            state.SideOf(side).Instructions.PassFocus,
+            rules);
         var pressure = FromAttack(pressureAttackX, pressureAttackY, isHome);
 
-        var (approach, approachEndsInCross) = Approach(derived, rules, start, startAttackX, startAttackY, pressureAttackX, pressureAttackY, isHome);
+        var (approach, approachEndsInCross) = Approach(
+            derived,
+            rules,
+            start,
+            startAttackX,
+            startAttackY,
+            pressureAttackX,
+            pressureAttackY,
+            isHome,
+            state.SideOf(side).Instructions.PassFocus);
 
         var zone = ChooseZone(derived, rules);
         var shotAttackX = derived.NextRange(rules.ShotFinalThirdXMinBasisPoints, rules.ShotFinalThirdXMaxBasisPoints);
@@ -456,7 +468,8 @@ internal static class PassagePlanner
         int startAttackY,
         int pressureAttackX,
         int pressureAttackY,
-        bool isHome)
+        bool isHome,
+        MatchPassFocus focus)
     {
         var points = new List<SpatialPoint> { start };
 
@@ -478,12 +491,68 @@ internal static class PassagePlanner
             var x = Lerp(startAttackX, pressureAttackX, fraction);
             var y = Lerp(startAttackY, pressureAttackY, fraction) + LateralDrift(derived, rules);
 
+            // The touches between a middle start and a flank destination would otherwise all stay in the middle,
+            // so the focus moves them into the lanes too (`engine-v8`).
+            y = FocusLateral(int.Clamp(y, 0, SpatialPitch.PitchWidth - 1), focus, rules);
+
             points.Add(FromAttack(int.Clamp(x, 0, SpatialPitch.PitchLength), int.Clamp(y, 0, SpatialPitch.PitchWidth), isHome));
         }
 
         points.Add(FromAttack(pressureAttackX, pressureAttackY, isHome));
 
         return (points, endsInCross);
+    }
+
+    /// <summary>
+    /// Moves a uniform lateral draw so the ball's destinations fall in the lanes a side's pass focus favours
+    /// (`engine-v8`).
+    /// </summary>
+    /// <remarks>
+    /// The draw is already taken, so the focus consumes nothing from the stream: a side with no preference gets
+    /// its draw back unchanged and plays exactly as it did before the instruction existed. Otherwise the draw is
+    /// read as a position in the cumulative share of the three lanes and rescaled into the lane it falls in, in
+    /// integer arithmetic. Left is the low end of the attacking side's own scale, as in the shot zones.
+    /// </remarks>
+    /// <param name="draw">A uniform position across the pitch on the side's own scale, 0…7,000.</param>
+    /// <param name="focus">The side's pass focus.</param>
+    /// <param name="rules">The rules in force, which supply the lanes and the shares.</param>
+    /// <returns>The position, on the side's own scale.</returns>
+    internal static int FocusLateral(int draw, MatchPassFocus focus, EngineRulesV2 rules)
+    {
+        if (focus == MatchPassFocus.Balanced)
+        {
+            return draw;
+        }
+
+        var (left, centre, right) = focus switch
+        {
+            MatchPassFocus.Centre => (rules.PassFocusCentreFlankPercent, rules.PassFocusCentreCentrePercent, rules.PassFocusCentreFlankPercent),
+            MatchPassFocus.CentreAndLeft => (rules.PassFocusPairFlankPercent, rules.PassFocusPairCentrePercent, rules.PassFocusPairOtherFlankPercent),
+            MatchPassFocus.CentreAndRight => (rules.PassFocusPairOtherFlankPercent, rules.PassFocusPairCentrePercent, rules.PassFocusPairFlankPercent),
+            MatchPassFocus.Wings => (rules.PassFocusWingsFlankPercent, rules.PassFocusWingsCentrePercent, rules.PassFocusWingsFlankPercent),
+            _ => throw new ArgumentOutOfRangeException(nameof(focus), focus, "Unknown pass focus."),
+        };
+
+        var leftEnd = rules.PassLeftLaneMaxYBasisPoints;
+        var rightStart = rules.PassRightLaneMinYBasisPoints;
+        var width = (long)SpatialPitch.PitchWidth;
+
+        // Where the draw sits among all the shares, 0…width × 100, and the shares' upper bounds on that scale.
+        var position = (long)Math.Clamp(draw, 0, SpatialPitch.PitchWidth - 1) * 100;
+        var leftShare = left * width;
+        var centreShare = (left + centre) * width;
+
+        if (position < leftShare)
+        {
+            return (int)(position * leftEnd / leftShare);
+        }
+
+        if (position < centreShare)
+        {
+            return leftEnd + (int)((position - leftShare) * (rightStart - leftEnd) / (centre * width));
+        }
+
+        return rightStart + (int)((position - centreShare) * (SpatialPitch.PitchWidth - rightStart) / (right * width));
     }
 
     /// <summary>Maps a point on the attacking side's own scale to a pitch coordinate.</summary>

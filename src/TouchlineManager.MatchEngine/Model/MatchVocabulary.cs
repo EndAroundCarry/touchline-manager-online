@@ -297,6 +297,28 @@ public enum MatchPassingStyle
     DirectPassing = 2,
 }
 
+/// <summary>
+/// Which lanes of the pitch the team asks its passes to be directed through (`engine-v8`). Left and right are
+/// the attacking side's own: its left hand as it plays towards goal.
+/// </summary>
+public enum MatchPassFocus
+{
+    /// <summary>No preference: the ball travels through every lane alike.</summary>
+    Balanced = 0,
+
+    /// <summary>Through the middle, with the flanks a distant second.</summary>
+    Centre = 1,
+
+    /// <summary>Through the middle and down the left.</summary>
+    CentreAndLeft = 2,
+
+    /// <summary>Through the middle and down the right.</summary>
+    CentreAndRight = 3,
+
+    /// <summary>Out to both flanks, with the middle a distant second.</summary>
+    Wings = 4,
+}
+
 /// <summary>How far the team spreads across the pitch (`INS-4`).</summary>
 public enum MatchWidth
 {
