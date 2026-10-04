@@ -1,6 +1,6 @@
 # ADR-0018: A club nobody manages is set up by a pure, versioned policy run by the worker
 
-- **Status:** Accepted
+- **Status:** Accepted (decision 2's neutral `balanced`/`normal` training is superseded by [ADR-0057](0057-training-programmes-age-curve-and-hidden-aptitude.md): an AI club trains each player's position-default programme at normal intensity, by the same rules as a manager)
 - **Date:** 2026-09-27
 - **Stage:** 8
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0014](0014-matchday-lock-resolution-and-publication.md), master plan §7.2, §7.3, §16 (Stage 8), game rules `INS-9`, `INS-10`, `INS-11`, `INS-12`, `TRN-1`, `OCC-2`, `OCC-5`, `WORLD-7`, `WORLD-9`

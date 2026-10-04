@@ -6,10 +6,9 @@ import { isCompact, navigateTo } from '../support/navigation';
 /**
  * The Stage 4 exit criteria for the training screen (F-20).
  *
- * A manager onboards, opens training, sets the club's focus and intensity, points a player at an attribute
- * family and then returns them to the team plan, and survives a version conflict: a second client — the API,
- * acting as another device — revises the same plan, and the manager's next save is refused rather than
- * overwriting it. The journey proves the two things a unit test cannot: that the screen reaches the real
+ * A manager onboards, opens training, sets the club's intensity, gives a player a different programme and then
+ * returns them to the position default, and survives a version conflict: a second client — the API, acting as
+ * another device — revises the same plan, and the manager's next save is refused rather than overwriting it. The journey proves the two things a unit test cannot: that the screen reaches the real
  * endpoints, and that the plan's ETag contract holds through the browser (CONC-1, §11.2).
  *
  * Like the other journeys it gives its club back at the end, so the shared persistent world is left as it
@@ -21,7 +20,6 @@ const apiBaseUrl = process.env['E2E_API_URL'] ?? 'http://localhost:5080';
 interface TrainingRead {
   readonly version: number;
   readonly isConfigured: boolean;
-  readonly teamFocus: string;
   readonly intensity: string;
 }
 
@@ -66,17 +64,16 @@ test.describe('training', () => {
     await expect(page).toHaveURL(/\/training$/);
     await expect(page.getByRole('heading', { name: /training$/ })).toBeVisible();
 
-    // The roster is the inherited squad, each player with a labelled focus control (SQ-1, TRN-2).
+    // The roster is the inherited squad, each player with a labelled programme control (SQ-1, TRN-2).
     // Below `md` it is a card list rather than the table (`F-44`), so the controls are scoped to the
     // layout this breakpoint is showing — the other layout is present in the DOM but hidden.
     const compact = isCompact(page);
     const roster = compact ? page.getByTestId('training-cards') : page.getByTestId('training-table');
 
     await expect(roster).toBeVisible();
-    await expect(roster.getByLabel(/^Individual focus for /)).toHaveCount(22);
+    await expect(roster.getByLabel(/^Training programme for /)).toHaveCount(22);
 
-    // Set the club's plan and save it. A re-used club may already hold one, so either answer is correct.
-    await page.getByLabel('Team focus').selectOption('fitness');
+    // Set the club's intensity and save it. A re-used club may already hold a plan, so either answer is correct.
     await page.getByLabel('Intensity').selectOption('intense');
     await page.getByRole('button', { name: /(Set|Save) plan/ }).click();
     await expect(page.getByText(/Your training plan was (created|saved)\./)).toBeVisible();
@@ -93,7 +90,7 @@ test.describe('training', () => {
 
     const elsewhere = await request.put(`${apiBaseUrl}/api/v1/training`, {
       headers: { ...bearer, 'If-Match': `"${before.version}"` },
-      data: { teamFocus: 'recovery', intensity: 'light' },
+      data: { intensity: 'normal' },
     });
 
     expect(elsewhere.ok()).toBe(true);
@@ -110,18 +107,25 @@ test.describe('training', () => {
     await expect(page.getByText('Your training plan was saved.')).toBeVisible();
     await expect(page.getByText(/changed on another device/)).toHaveCount(0);
 
-    // Point a player at a family they are not already on, then return them to the team plan (TRN-2).
-    const focusSelect = roster.getByLabel(/^Individual focus for /).first();
-    const current = await focusSelect.inputValue();
-    const target =
-      ['technical', 'mental', 'physical', 'goalkeeping'].find((family) => family !== current) ??
-      'technical';
+    // The first player is a goalkeeper on the position default, so the attributes that programme trains are
+    // marked core in their row (TRN-1). Marking is by data attribute here; the colour and the read-out are
+    // the component spec's business.
+    const firstPlayer = compact ? roster.locator(':scope > li').first() : roster.locator('tbody tr').first();
+    const core = firstPlayer.locator('[data-weight="3"]');
 
-    await focusSelect.selectOption(target);
-    await expect(page.getByText(/focus was updated\./)).toBeVisible();
+    await expect(core).not.toHaveCount(0);
 
-    await focusSelect.selectOption('');
-    await expect(page.getByText(/now trains with the team\./)).toBeVisible();
+    // Give the player recovery, which trains no attributes, so nothing in their row stays marked (TRN-1).
+    const programmeSelect = firstPlayer.getByLabel(/^Training programme for /);
+
+    await programmeSelect.selectOption('recovery');
+    await expect(page.getByText(/programme was updated\./)).toBeVisible();
+    await expect(core).toHaveCount(0);
+
+    // Returning them to the position default marks the goalkeeper attributes again (TRN-2).
+    await programmeSelect.selectOption('');
+    await expect(page.getByText(/now trains the position default\./)).toBeVisible();
+    await expect(core).not.toHaveCount(0);
 
     // Give the club back, as the other journeys do.
     await page.goto('/dashboard');

@@ -232,7 +232,7 @@ AI clubs keep choosing from `TAC-1`…`TAC-6`; the later presets are for human m
 An AI-controlled club — one no manager holds — is set up by a pure, versioned policy (`ai-policy-v1`) run
 by the worker's daily evaluation job. The policy draws a formation and the eight instructions from the
 club's identity, picks its default eleven by position suitability, condition, ability, and stable player
-ID — the same ordering `DIS-6` repairs a side with — and trains at the neutral `balanced`/`normal`. Every
+ID — the same ordering `DIS-6` repairs a side with — and trains at `normal` intensity, giving every player the programme that matches their position (`TRN-1`). Every
 plan it produces is accepted by the same `TacticalPlanValidator` a manager's save goes through, so `INS-12`
 is enforced by the code path rather than by intention. It fills only a missing plan: a side or training
 plan a manager or an earlier pass set is left exactly as it is, and a club a manager holds — active or
@@ -244,19 +244,23 @@ merely inactive (`OCC-8`) — is never considered.
 
 | Ref | Rule | Value |
 |---|---|---|
-| TRN-1 | Team training focus values | balanced, recovery, fitness, attacking, defending, technical, tactical |
-| TRN-2 | Optional individual focus selects one attribute family. | — |
+| TRN-1 | A player trains one **programme**: a weighted list of attributes (3 core, 2 important, 1 supporting). The programmes are `goalkeeper`, `defender`, `wingback`, `midfielder`, `winger`, `forward`, `mental`, `physical`, and `recovery`. The catalogue is served by the API, never repeated by a client. `recovery` trains no attributes and recovers extra fatigue. | 9 programmes |
+| TRN-2 | Programmes are per player only; there is no club-wide programme. A player trains the programme that matches their primary position (gk → goalkeeper; cb → defender; rb, lb → wingback; dm, cm, am → midfielder; rw, lw → winger; st → forward) unless the manager sets an override, and clearing it returns them to that default. Intensity (light, normal, intense) is the one club-wide training setting. | — |
 | TRN-3 | Daily progression job runs | **02:00 UTC** |
-| TRN-4 | Attribute scale | **1–20** displayed; training can never push a displayed attribute outside 1–20 |
+| TRN-4 | Attribute scale | **1–20** displayed; neither development nor decline can push a displayed attribute outside 1–20, and development never lifts one above the player's hidden potential |
 | TRN-5 | Condition | **0–10,000** basis points |
 | TRN-6 | Fatigue | **0–10,000** basis points |
 | TRN-7 | Morale | **0–10,000** basis points |
 | TRN-8 | APIs convert basis points into user-facing values; the database is authoritative in basis points. | — |
-| TRN-9 | Development is deterministic from player identity, day, training plan, age curve, hidden potential, facilities baseline, and engine version. It is reproducible for the same inputs. | — |
-| TRN-10 | A partial development remainder carries forward across days so that progression is not lost to rounding. | — |
+| TRN-9 | Development and decline are deterministic from player identity, day, programme, intensity, age, fatigue, hidden potential, hidden aptitude, and the progression version. They are reproducible for the same inputs. Potential and aptitude are never sent to a client. | — |
+| TRN-10 | A partial development remainder carries forward across days so that progression is not lost to rounding. The daily budget does not depend on how many attributes a programme covers, so a narrow programme concentrates the same gain on fewer skills. | budget 140 thousandths of a point a day at peak age, neutral aptitude, normal intensity |
 | TRN-11 | Matches consume condition and increase fatigue based on minutes, intensity, stamina, and tactics. Rest and recovery restore them. | — |
 | TRN-12 | Training injuries and match injuries create explicit unavailability records measured in **fixtures**, not wall-clock days. | — |
 | TRN-13 | Morale reacts to playing time, results, contracts, and transfers with bounded changes. | — |
+| TRN-14 | **Age growth curve.** The growth factor is 100% to age 19, falls 10 points a year to 40% at 25, then is multiplied by 0.75 a year with a floor of 2%, so a 30-year-old still improves a trained skill, very slowly. Intensity scales it (light 0.70, normal 1.00, intense 1.35) and fatigue above 60% reduces it linearly to 0.6 at 100%. | see description |
+| TRN-15 | **Hidden aptitude.** Each player has a training aptitude of 55%–145% (triangular around 100%) derived purely from their identity and never stored. It scales development, so two players of equal potential reach it at different speeds. | 550–1450 permille |
+| TRN-16 | **Decline.** Each attribute declines from its own start age by a yearly slope that grows each year past it: pace and acceleration from 28, agility from 29, stamina and jumping from 30, strength from 31, some technical skills from 29 and the rest from 32, work rate from 31, goalkeeper reflexes from 32 and the other goalkeeping skills from 34. Other mental attributes do not decline. An attribute the player's programme trains declines at half the rate. Decline carries in its own remainder and never takes an attribute below 1. | 86 progression days a season |
+| TRN-17 | **History.** Every progression day records, per player, the programme and intensity in force, the development and decline earned, the whole points gained and lost, and which attributes moved. A manager reads it for their own players only. | kept in full |
 
 Match load is a pure, versioned rule (`match-load-v1`) over the frozen facts of a result — each player's
 minutes, their stamina, their side's instructions, and the scoreline — and it is applied by the matchday
@@ -606,7 +610,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `schedule_generator_version` | `schedule-gen-v1` | CAL-8, PYR-14 |
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
-| `training_progression_version` | `training-v1` | TRN-9 (FIC-8) |
+| `training_progression_version` | `training-v2` | TRN-9 (FIC-8) |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
 | `match_statistics_schema` | `match-statistics-v5` (carries the player lines, the assists, the rating, and the passes and take-ons) | JSN-1, TRN-11 |

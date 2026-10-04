@@ -28,13 +28,13 @@ the system is shaped the way it is.
 | [0009](0009-time-identity-and-concurrency.md) | Time, identity, and concurrency conventions | Accepted |
 | [0010](0010-club-takeover-serialisation.md) | Club takeover serialises with an advisory lock, not with `SERIALIZABLE` | Accepted |
 | [0011](0011-squad-schema-and-hidden-player-values.md) | Squad schema: hidden player values are server-only columns, and contract/registration agreement is an application invariant | Accepted |
-| [0012](0012-daily-progression-materialised-job.md) | The daily progression is a materialised, feature-gated world job | Accepted |
+| [0012](0012-daily-progression-materialised-job.md) | The daily progression is a materialised, feature-gated world job | Accepted (focus model and `training-v1` superseded by ADR-0057) |
 | [0013](0013-engine-arithmetic-and-scoreline-effect.md) | Integer basis-point arithmetic and a bounded scoreline effect in the engine | Accepted |
 | [0014](0014-matchday-lock-resolution-and-publication.md) | A matchday is locked, resolved, and published by three jobs, and its snapshot is a stored document | Accepted |
 | [0015](0015-compressed-test-clock.md) | A compressed test clock is chosen at composition and refused in Production | Accepted (decision 4 superseded by ADR-0049) |
 | [0016](0016-non-production-matchday-trigger.md) | A non-production matchday trigger for the end-to-end watch journey | Accepted |
 | [0017](0017-match-load-at-publication.md) | A match's load on the squad is derived from the stored result and applied at publication | Accepted |
-| [0018](0018-ai-club-policy.md) | A club nobody manages is set up by a pure, versioned policy run by the worker | Accepted |
+| [0018](0018-ai-club-policy.md) | A club nobody manages is set up by a pure, versioned policy run by the worker | Accepted (training choice superseded by ADR-0057) |
 | [0019](0019-engine-v2-and-season-statistics.md) | The player line carries assists and a rating, and season statistics are a projection of published results | Accepted |
 | [0020](0020-projection-rebuild-and-reconciliation.md) | Projections are reconciled and rebuilt by recomputing them from published results | Accepted |
 | [0021](0021-competition-rules-and-visible-draw.md) | The tie-break order and the season's draw are public, and the criteria have one definition | Accepted |
@@ -73,6 +73,7 @@ the system is shaped the way it is.
 | [0055](0055-engine-v6-skills-where-the-design-says.md) | Engine-v6 puts skills where the design says they are: tiredness, shot contest scale, duel fouls, corner takers | Accepted |
 | [0054](0054-replay-v4-constant-pace-film.md) | Replay-v4 plays the whole match as one constant-pace film on one continuous timeline | Accepted |
 | [0056](0056-engine-v7-passes-and-take-ons.md) | Engine-v7 counts passes and take-ons on the player line, and the season statistics store them | Accepted |
+| [0057](0057-training-programmes-age-curve-and-hidden-aptitude.md) | Training programmes, an age curve, and hidden aptitude (`training-v2`) | Accepted |
 
 ## Rules for changing an ADR
 

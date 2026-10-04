@@ -64,7 +64,9 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 | **Team sheet** | A club's selection for one specific fixture: exactly 11 starters and up to 7 substitutes (`SQ-4`). Either a fixture-specific draft or derived from the default plan at lock time. |
 | **Team sheet lock** | The moment 30 minutes before kickoff when selections are frozen. Writes after lock affect later fixtures only (`CAL-3`, master plan §7.3). |
 | **Snapshot** | The immutable, hashed input document for one fixture, containing frozen lineups, attributes, state, tactics, availability repairs, home advantage, and configuration hash (`MAT-1`). |
-| **Training plan** | A club's team focus plus optional per-player individual focus. Drives the deterministic daily progression job at 02:00 UTC (`TRN-1` … `TRN-3`). |
+| **Training plan** | A club's training intensity. Drives, with each player's programme, the deterministic daily progression job at 02:00 UTC (`TRN-1` … `TRN-3`). |
+| **Training programme** | A weighted list of attributes a player trains (core, important, supporting), chosen per player and defaulting to the one for their position. `recovery` trains none and recovers extra fatigue (`TRN-1`, `TRN-2`). |
+| **Training aptitude** | A hidden per-player multiplier on how fast training becomes improvement. Never shown (`TRN-15`). |
 
 ## Matches
 

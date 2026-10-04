@@ -229,11 +229,11 @@ Every instruction has a bounded effect and trade-off. No tactic may multiply a t
 
 ### 3.9 Training and player state
 
-- Club training focus: balanced, recovery, fitness, attacking, defending, technical, tactical.
-- Optional individual focus selects one attribute family.
+- Each player trains one position-specific programme (goalkeeper, defender, wing back, central midfielder, winger, forward, mental, physical, recovery): a weighted list of attributes. The default is the programme for the player's position and the manager can override any single player. There is no club-wide programme; intensity (light, normal, intense) is the one club-wide setting (ADR-0057).
 - A daily 02:00 UTC progression job updates development, fatigue, condition, morale, and training injury chance.
-- Development is deterministic from player, day, training plan, age curve, hidden potential, facilities baseline, and engine version.
-- Training cannot improve a displayed attribute above 20 or below 1.
+- Development is deterministic from player, day, programme, intensity, age curve, fatigue, hidden potential, hidden training aptitude, and the progression version. Players keep improving a trained skill, ever more slowly, and decline by attribute and age (physical first, mental last); a trained attribute declines more slowly.
+- Neither development nor decline can move a displayed attribute above 20 or below 1, and development never exceeds hidden potential.
+- Each progression day is recorded per player, so the player page can chart what training has done.
 - Condition is stored from 0–10,000 basis points; fatigue from 0–10,000; morale from 0–10,000. APIs convert to user-facing values.
 - Matches consume condition and increase fatigue based on minutes, intensity, stamina, and tactics. Rest and recovery restore them.
 - Training injuries and match injuries create explicit unavailability records measured in fixtures, not wall-clock days.
@@ -739,11 +739,15 @@ Use columns rather than JSONB because scouting filters and match formulas depend
 
 #### `squad.training_plans`
 
-- Club, team focus, intensity, effective date, version.
+- Club, intensity, effective date, version (the retired team focus column stays, unread, until the contract migration).
 
 #### `squad.player_training_focus`
 
-- Player, club, focus family, effective date.
+- Player, club, programme, effective date, version. A row is an override; no row means the position default.
+
+#### `squad.player_training_days`
+
+- Player, day, programme, intensity, development and decline (thousandths), points gained and lost, attribute changes (compact JSON). Unique player/day. Append-only, kept in full.
 
 #### `squad.shortlists`
 
@@ -1202,7 +1206,8 @@ GET    /api/v1/fixtures/{fixtureId}/team-sheet
 PUT    /api/v1/fixtures/{fixtureId}/team-sheet
 GET    /api/v1/training
 PUT    /api/v1/training
-PUT    /api/v1/players/{playerId}/training-focus
+PUT    /api/v1/players/{playerId}/training-programme
+GET    /api/v1/players/{playerId}/training?days=N
 ```
 
 Require ETag/`If-Match` for plan, sheet, and training updates. Return lock deadline and a validation preview.
@@ -1300,7 +1305,7 @@ Authenticated shell:
 - `/squad`: PrimeNG table, virtual scroll only if warranted, sorting/filtering, availability, contract and condition indicators.
 - `/players/:id`: attributes, state, history, contract, season stats, shortlist/market action.
 - `/tactics`: formation pitch, drag/drop slots, roles, instructions, validation, save/version conflict UX.
-- `/training`: team and individual focus.
+- `/training`: club intensity, and the squad as an attribute table with each player's programme and the attributes it trains highlighted by weight.
 - `/competitions/:divisionId/table`
 - `/competitions/:divisionId/fixtures`
 - `/fixtures/:fixtureId/prepare`: opponent summary, deadline, team sheet.

@@ -1,6 +1,6 @@
 # ADR-0012: The daily progression is a materialised, feature-gated world job
 
-- **Status:** Accepted
+- **Status:** Accepted (the focus model and the `training-v1` calculator are superseded by [ADR-0057](0057-training-programmes-age-curve-and-hidden-aptitude.md); the materialised, feature-gated job stands)
 - **Date:** 2026-09-25
 - **Stage:** 4
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), master plan §3.9, §7.2, §8.5, game rules `TRN-3`, `TRN-9`, `TRN-10`, `TRN-12`

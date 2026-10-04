@@ -101,6 +101,20 @@ test.describe('@responsive the app adapts to the breakpoint', () => {
     await expectTouchTarget(page.getByRole('button', { name: /(Set|Save) plan/ }));
     await expectNoHorizontalOverflow(page);
 
+    // The 28-attribute table is wider than any screen, so it must scroll inside its own box, never the page.
+    await expect(page.getByLabel(/^Training programme for /).first()).toBeVisible();
+
+    // A player's Training tab holds a chart and tables; none of them may push the page sideways either.
+    await navigateTo(page, 'Squad');
+    await page
+      .getByTestId(compact ? 'squad-cards' : 'squad-table')
+      .getByRole('link', { name: /^Open / })
+      .first()
+      .click();
+    await page.getByRole('tab', { name: 'Training' }).click();
+    await expect(page.getByTestId('training-regime')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
     // The read-heavy screens keep their tables, but the table scrolls inside its own box rather than
     // pushing the page sideways.
     for (const destination of ['Finances', 'Competitions', 'Transfers', 'Scouting', 'Inbox']) {

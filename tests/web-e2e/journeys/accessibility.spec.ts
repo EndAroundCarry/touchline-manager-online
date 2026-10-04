@@ -125,6 +125,13 @@ test.describe('@a11y the manager screens meet WCAG 2.2 AA', () => {
       await audit.scan(route);
     }
 
+    // The player's Training tab is a tab panel inside a route, so it is opened and scanned on its own: the
+    // regime card, the controls, and (once progression has run) the chart, its legend, and the data tables.
+    await page.goto(profileHref!);
+    await page.getByRole('tab', { name: 'Training' }).click();
+    await expect(page.getByTestId('training-regime')).toBeVisible();
+    await audit.scan('player: training tab');
+
     audit.expectClean();
 
     // Give the club back, as the other journeys do, so the shared world is left as it was found.

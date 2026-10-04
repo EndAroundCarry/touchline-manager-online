@@ -4,6 +4,59 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Training v2 — programmes, an age curve, hidden aptitude, and a growth history
+
+Replaces the club-wide training focus with a position-specific **programme per player**, adds an age curve with
+decline, a hidden per-player aptitude, and a day-by-day history charted on the player page. Recorded in
+[`ADR-0057`](docs/architecture/adr/0057-training-programmes-age-curve-and-hidden-aptitude.md); the rules are
+`TRN-1`, `TRN-2`, `TRN-4`, `TRN-9`, `TRN-10` (updated) and `TRN-14`…`TRN-17` (new) in
+[`game-rules.md`](docs/product/game-rules.md) §10.
+
+**The progression is `training-v2`, and attribute growth balance changed.** The mean attribute feeds valuation,
+renewal, and retirement, and it now moves differently: young players grow faster and veterans decline (pace and
+acceleration from 28, goalkeeping last). A world already running keeps its stored attributes and trains by the new
+rules from the next progression day; those downstream rules were tuned against `training-v1` and want watching.
+
+### Changed
+
+- **Programmes replace the team focus and the attribute-family focus.** Nine programmes (goalkeeper, defender,
+  wing back, central midfielder, winger, forward, mental, physical, recovery), each a weighted attribute list.
+  Each player trains the programme for their position unless the manager overrides it. The plan is now the
+  club's intensity alone.
+- **Development no longer rewards breadth.** The daily budget does not depend on how many attributes a programme
+  covers, so a narrow programme concentrates the same gain.
+- **API.** `PUT /training` takes `{ intensity }`; `GET /training` serves the programme catalogue and each
+  player's attributes and programme; `PUT /players/{id}/training-programme` replaces `training-focus`; new
+  `GET /players/{id}/training?days=N` serves the regime, the recent days, and a per-programme summary.
+- **AI clubs** train each player's position default at normal intensity, by the same rules (`INS-12`).
+- **The training page** is an intensity select and a squad attribute table (cards on a phone) with a programme
+  select per player; the attributes the programme trains are tinted by weight, with a bold value, a marker, and
+  a screen-reader suffix, so colour is never the only signal.
+- **The player page's Training tab** (renamed from Training report) shows the current regime, a line chart with
+  one series per regime (daily or cumulative, over 30 or 90 days or all), a per-regime summary table, and a table
+  of every plotted point. The placeholder history and its "Sample data" notice are gone.
+
+### Added
+
+- **Chart.js**, imported on demand into its own lazy chunk, so the initial bundle is unchanged.
+- **Migrations `TrainingProgrammesAndAging` and `TrainingProgrammeRequiredAndPlanIntensityOnly`** (expand
+  steps, `MIG-3`): `squad.player_training_focus.programme` (backfilled: mental→mental, physical→physical,
+  goalkeeping→goalkeeper, technical rows dropped so the player returns to the position default),
+  `squad.player_state.decline_remainder`, and the new `squad.player_training_days` history table, unique on
+  `(player_id, day)`. The retired `team_focus` and `focus_family` columns become nullable and unread; a later
+  contract migration drops them. Forward validation and rollback are described on each migration. Rolling back
+  the second restores the NOT NULL and constraints, but the dropped technical-focus rows are not restored.
+- **Hidden aptitude** is derived from the player id, stored nowhere, and never sent to a client, so there is no
+  player-generator change and no golden-digest change.
+
+### Notes
+
+- **History is kept in full**, about 200,000 rows a season for the seeded world. Pruning is recorded as a
+  follow-up in ADR-0057.
+- **The progression job is still off by default**, so the charts stay empty until it runs. To see them locally,
+  start the worker with `Training__EnableDailyProgression=true` and advance days with the stepped game clock
+  (ADR-0049).
+
 ## More formations
 
 The tactics page offered six presets. It now offers thirteen: **4-4-1-1**, **4-5-1**, **4-3-2-1**,

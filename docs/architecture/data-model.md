@@ -59,6 +59,7 @@ flowchart LR
         team_sheet_entries
         training_plans
         player_training_focus
+        player_training_days
     end
     subgraph competition[competition]
         seasons
@@ -264,6 +265,7 @@ erDiagram
     players ||--o{ player_registrations : "registers"
     players ||--o{ player_unavailability : "may have"
     players ||--o{ player_training_focus : "may have"
+    players ||--o{ player_training_days : "trains on"
     clubs ||--o{ tactical_plans : "owns"
     tactical_plans ||--|{ tactical_slots : "defines"
     clubs ||--o{ training_plans : "sets"
@@ -327,6 +329,7 @@ erDiagram
         int morale_bp
         int match_sharpness_bp
         int development_remainder
+        int decline_remainder
         date last_progression_date
         bigint version
     }
@@ -413,6 +416,8 @@ erDiagram
 | `check (normalized_x between 0 and 10000)` etc. | `tactical_slots` | `TAC-9` |
 | `unique (fixture_id, club_id)` | `fixture_team_sheets` | One sheet per club per fixture |
 | **Partial unique** one active scheduling record per club | `training_plans` | Latest plan wins |
+| `check (programme in (…))` on the nine programme codes; `team_focus` and `focus_family` nullable and unread until the contract migration | `player_training_focus` | `TRN-1`, `TRN-2`, `MIG-3` |
+| `unique (player_id, day)`; `check (decline_remainder >= 0)` on `player_state` | `player_training_days` | `TRN-16`, `TRN-17`; guards the progression run's idempotency |
 | Trigram/full-text index on player name | `players` | Scouting search |
 | `unique (manager_id, player_id)` | `market.shortlists` | `SCT-3` (see §7 on the plan's internal conflict about this table's schema) |
 
