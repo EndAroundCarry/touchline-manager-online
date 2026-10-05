@@ -23,7 +23,7 @@ public sealed class ReplayDirectorTests
         {
             var (_, presentation) = TestMatchFactory.Play(TestMatchFactory.Even(seed));
 
-            presentation.PresentationVersion.Should().Be("replay-v4");
+            presentation.PresentationVersion.Should().Be("replay-v5");
             presentation.Passages.Should().NotBeEmpty();
             presentation.Playback.Should().HaveCount(presentation.Passages.Count);
             presentation.Playback[0].StartMilliseconds.Should().Be(0);

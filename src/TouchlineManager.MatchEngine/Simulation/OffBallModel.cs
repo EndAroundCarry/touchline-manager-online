@@ -221,8 +221,10 @@ internal static class OffBallModel
     /// </para>
     /// <para>
     /// A defender is only a receiver while the holder is still building up, at or short of
-    /// <see cref="EngineRulesV2.DefenderReceiveMaxHolderX"/>: with the attack near the other box the ball does
-    /// not go back to a centre half on the halfway line. The goalkeeper is never given the ball here.
+    /// <see cref="EngineRulesV2.DefenderReceiveMaxHolderX"/>, and only where he takes it at or short of
+    /// <see cref="EngineRulesV2.DefenderReceiveMaxPointX"/>: with the attack near the other box the ball does
+    /// not go back to a centre half on the halfway line, and a long ball from the back is not played to one beyond
+    /// it. The goalkeeper is never given the ball here.
     /// </para>
     /// </remarks>
     /// <param name="family">The receiver's position family.</param>
@@ -251,7 +253,9 @@ internal static class OffBallModel
 
         if (depth <= rules.BackPassFreeDepth)
         {
-            return family != MatchPositionFamily.Defence || holderX <= rules.DefenderReceiveMaxHolderX;
+            return family != MatchPositionFamily.Defence
+                || (holderX <= rules.DefenderReceiveMaxHolderX
+                    && PassagePlanner.AttackingX(receivePoint.X, isHome) <= rules.DefenderReceiveMaxPointX);
         }
 
         return depth <= rules.BackPassMaxDepth

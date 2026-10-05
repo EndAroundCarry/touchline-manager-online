@@ -179,7 +179,7 @@ internal static class PossessionSimulator
             && attackingX >= rules.FreeKickShootingRangeX
             && state.Random.RollBasisPoints(rules.FreeKickAwardBasisPoints);
 
-        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, scramble: null);
+        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, lost: false, scramble: null);
 
         if (penalty)
         {
@@ -214,8 +214,11 @@ internal static class PossessionSimulator
         var side = possession.Side;
 
         // The two players the foul is between are both at the ball when it is committed: the fouler the
-        // engine named, and the player fouled.
-        var fouled = fouledId ?? PickOutfield(state, side, possession.Derived, MatchAttributeName.Dribbling);
+        // engine named, and the player fouled — who, when the approach was played through, is the one who has just
+        // been given the ball (`engine-v10`).
+        var fouled = fouledId
+            ?? state.Passing.ChainHolder
+            ?? PickOutfield(state, side, possession.Derived, MatchAttributeName.Dribbling);
 
         if (foul.Fouler is { } fouler)
         {
@@ -312,6 +315,7 @@ internal static class PossessionSimulator
                 PassagePlanner.CutApproach(plan, plan.ScrambleCutBasisPoints),
                 endsInCross: false,
                 passer: false,
+                lost: true,
                 scramble: null);
 
             state.RecordTouch(lostScramble.AttackerId, PassageAction.Run);
@@ -343,6 +347,7 @@ internal static class PossessionSimulator
                 PassagePlanner.CutApproach(plan, plan.ProgressionCutBasisPoints),
                 endsInCross: false,
                 passer: true,
+                lost: true,
                 scramble);
 
             // The ball was lost on the last pass of the approach: the one an interception or an offside
@@ -354,7 +359,7 @@ internal static class PossessionSimulator
             return;
         }
 
-        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, scramble);
+        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, lost: false, scramble);
 
         // The carrier takes the ball into the final third, where the last defender engages.
         state.MoveBallAndRecord(plan.EntryPoint, PassageWaypointKind.Pass);
@@ -430,14 +435,28 @@ internal static class PossessionSimulator
     }
 
     /// <summary>
-    /// Writes down the possession's approach: the ball's waypoints from the start, and the carrier's and
-    /// passer's touches (`engine-v4`).
+    /// Writes down the possession's approach: the ball's waypoints from the start, and who had it at each of them
+    /// (`engine-v4`, `engine-v10`).
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Since `engine-v10` a possession that is played through (<paramref name="passer"/>) has a person at each end
+    /// of every leg. The carrier has the ball at the start; at each touch the holder either plays it to a receiver
+    /// the chooser picked, which is a pass, or keeps it, which is a carry. The touches are written in the order they
+    /// happen: the holder plays, the ball arrives, the receiver takes it. Every touch but the last is moved
+    /// partway towards its receiver, and the last is where the plan put it.
+    /// </para>
+    /// <para>
+    /// When the ball was lost on the last leg (<paramref name="lost"/>) nobody takes it there: the receiver the pass
+    /// was meant for is only the one who ran onto it.
+    /// </para>
+    /// </remarks>
     /// <param name="state">The match state.</param>
     /// <param name="possession">The possession.</param>
     /// <param name="points">The path the ball took: the whole approach, or the part of it that was played.</param>
     /// <param name="endsInCross">Whether the path ends in a cross, which only the whole approach can.</param>
-    /// <param name="passer">Whether a player plays the ball on from where the path ends.</param>
+    /// <param name="passer">Whether the path was played through by passes, and so has a chain of receivers.</param>
+    /// <param name="lost">Whether the ball was lost at the end of the path.</param>
     /// <param name="scramble">The scramble the side in possession won at the start, if there was one.</param>
     private static void RecordApproach(
         MatchState state,
@@ -445,6 +464,7 @@ internal static class PossessionSimulator
         IReadOnlyList<SpatialPoint> points,
         bool endsInCross,
         bool passer,
+        bool lost,
         Scramble? scramble)
     {
         var side = possession.Side;
@@ -464,12 +484,61 @@ internal static class PossessionSimulator
             // from there: both contestants are at the ball.
             state.RecordTouch(won.AttackerId, PassageAction.Carry);
             state.RecordTouch(won.DefenderId, PassageAction.Run);
+            carrier = won.AttackerId;
         }
         else if (carrier is Guid carrierId)
         {
             state.RecordTouch(carrierId, PassageAction.Carry);
         }
 
+        var chain = passer && carrier is Guid first
+            ? ReceiverChooser.Choose(state, side, points, first, lost)
+            : null;
+
+        if (chain is null)
+        {
+            RecordUnnamed(state, points, endsInCross, passer);
+
+            return;
+        }
+
+        for (var index = 1; index < points.Count; index++)
+        {
+            var leg = chain.Legs[index - 1];
+            var last = index == points.Count - 1;
+            var cross = last && endsInCross && leg.IsPass;
+
+            if (leg.IsPass)
+            {
+                state.RecordTouch(leg.Passer, cross ? PassageAction.Cross : PassageAction.Pass);
+            }
+
+            state.MoveBallAndRecord(
+                leg.To,
+                !leg.IsPass ? PassageWaypointKind.Carry : cross ? PassageWaypointKind.Cross : PassageWaypointKind.Pass,
+                cross ? state.Rules.CrossAltitude : 0);
+
+            if (leg.Receiver is not Guid receiver)
+            {
+                state.RecordTouch(leg.Passer, PassageAction.Carry);
+            }
+            else
+            {
+                state.RecordTouch(receiver, lost && last ? PassageAction.Run : PassageAction.Receive);
+            }
+        }
+
+        // Every leg that was a pass was one, unless the ball was lost before anybody played it on.
+        state.Passing.Completed(chain.Passers.Count);
+        state.Passing.Chained(chain);
+    }
+
+    /// <summary>
+    /// Writes down an approach nobody is named in but its carrier, and a passer drawn without reference to where
+    /// anyone stands: a possession that was not played through, or one with nobody on the pitch to play it.
+    /// </summary>
+    private static void RecordUnnamed(MatchState state, IReadOnlyList<SpatialPoint> points, bool endsInCross, bool passer)
+    {
         for (var index = 1; index < points.Count; index++)
         {
             var last = index == points.Count - 1;
@@ -479,18 +548,9 @@ internal static class PossessionSimulator
             state.MoveBallAndRecord(points[index], kind, altitude);
         }
 
-        // Every leg after the first waypoint was a pass, unless the ball was lost before anybody played it on.
         if (passer)
         {
             state.Passing.Completed(points.Count - 1);
-        }
-
-        // Where the path ends is where the ball is received into the final beat of the build-up.
-        var passerId = PickOutfield(state, side, derived, MatchAttributeName.Passing);
-
-        if (passer && passerId is Guid playerId)
-        {
-            state.RecordTouch(playerId, endsInCross ? PassageAction.Cross : PassageAction.Pass);
         }
     }
 

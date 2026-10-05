@@ -32,6 +32,59 @@ internal sealed class PossessionPassing(MatchSide Side)
     /// <summary>Gets the player credited with the assist when the possession ended in a goal.</summary>
     public Guid? AssistedBy { get; set; }
 
+    /// <summary>
+    /// Gets the players who played the approach's passes, in order, when the approach was played through chosen
+    /// receivers (`engine-v10`); empty when it was not.
+    /// </summary>
+    public IReadOnlyList<Guid> ChainPassers { get; private set; } = [];
+
+    /// <summary>
+    /// Gets the player who has the ball when the approach ends (`engine-v10`): the one who plays on whatever the
+    /// phases after it add, so the ball that creates a shot and the one that is stopped are his.
+    /// </summary>
+    public Guid? ChainHolder { get; private set; }
+
+    /// <summary>Records who played the approach's passes and who has the ball at the end of it.</summary>
+    /// <param name="chain">The receivers the approach was played through.</param>
+    public void Chained(ReceiverChain chain)
+    {
+        ArgumentNullException.ThrowIfNull(chain);
+
+        ChainPassers = chain.Passers;
+        ChainHolder = chain.Holder;
+    }
+
+    /// <summary>
+    /// Gets who played one of the possession's passes, counting from 1, when the approach was played through
+    /// chosen receivers: the passer of the leg while it was in the approach, and the player on the ball at the end
+    /// of it for every pass after.
+    /// </summary>
+    /// <param name="leg">The pass, 1 for the first.</param>
+    /// <returns>The passer, or null when the approach had no chain.</returns>
+    public Guid? PasserOf(int leg) =>
+        ChainHolder is null ? null : leg <= ChainPassers.Count ? ChainPassers[leg - 1] : ChainHolder;
+
+    /// <summary>
+    /// Gets the player who set a shot up for a scorer, when the approach had a chain: the one on the ball at the end
+    /// of it, or the one who passed to him when he is the scorer.
+    /// </summary>
+    /// <param name="scorerId">The player who shot, who cannot assist his own goal.</param>
+    /// <returns>The creator, or null when there is nobody else to credit.</returns>
+    public Guid? CreatorFor(Guid scorerId)
+    {
+        if (ChainHolder is not Guid holder)
+        {
+            return null;
+        }
+
+        if (holder != scorerId)
+        {
+            return holder;
+        }
+
+        return ChainPassers.Count > 0 && ChainPassers[^1] != scorerId ? ChainPassers[^1] : null;
+    }
+
     /// <summary>Adds passes that found their man.</summary>
     /// <param name="legs">How many.</param>
     public void Completed(int legs) => Legs += Math.Max(0, legs);
@@ -65,7 +118,8 @@ internal sealed class PossessionPassing(MatchSide Side)
 /// </summary>
 /// <remarks>
 /// <para>
-/// Passes are drawn from a stream derived from the match seed and the possession's ordinal — never from the
+/// Passes are credited to the players of the approach's receiver chain (`engine-v10`), and where there is none,
+/// drawn from a stream derived from the match seed and the possession's ordinal — never from the
 /// play stream — for the reason <see cref="AssistPlanner"/> is: a draw taken from the play stream would shift
 /// every decision after it and move the scoreline distributions the engine was calibrated against. Counting
 /// a pass changes a player line and the output hash, and nothing else about the match.
@@ -119,6 +173,11 @@ internal static class PassTally
             {
                 // The ball that set a goal up is the assist, so it is the assister's pass.
                 passer = assister;
+            }
+            else if (passing.PasserOf(leg) is Guid played)
+            {
+                // The approach was played through named receivers, so the pass is its passer's (`engine-v10`).
+                passer = played;
             }
             else
             {

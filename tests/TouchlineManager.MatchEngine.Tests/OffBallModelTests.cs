@@ -277,6 +277,10 @@ public sealed class OffBallModelTests
     [InlineData(3_000, 2_200, MatchPositionFamily.Defence, true, false)]
     [InlineData(4_500, 4_500, MatchPositionFamily.Defence, false, true)]
     [InlineData(4_600, 4_600, MatchPositionFamily.Defence, false, false)]
+    [InlineData(4_400, 5_000, MatchPositionFamily.Defence, false, true)]
+    [InlineData(4_400, 5_200, MatchPositionFamily.Defence, false, false)]
+    [InlineData(3_000, 6_500, MatchPositionFamily.Defence, false, false)]
+    [InlineData(3_000, 6_500, MatchPositionFamily.Midfield, false, true)]
     [InlineData(3_000, 3_500, MatchPositionFamily.Goalkeeper, true, false)]
     public void The_depth_rule_says_who_may_be_given_the_ball(
         int holderX,
@@ -306,6 +310,8 @@ public sealed class OffBallModelTests
             .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*OffBallOpennessFullDistance*");
         (Rules with { DefenderReceiveMaxHolderX = -1 })
             .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*DefenderReceiveMaxHolderX*");
+        (Rules with { DefenderReceiveMaxPointX = EngineRulesV2.Certain + 1 })
+            .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*DefenderReceiveMaxPointX*");
     }
 
     private static OffBallPlayer Defender(SpatialPoint spot, int marking = 10, int positioning = 10) =>

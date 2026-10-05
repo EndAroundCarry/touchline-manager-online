@@ -119,6 +119,85 @@ away shapes in the replay lean the wrong way. M2 does not depend on it (`OffBall
 in the home frame and flips it back, and a test pins that both sides move up the pitch with the ball); fixing the
 resolver itself changes the film and belongs with the replay changes of M3, which bump `ReplayDirector.Version`.
 
+### M3: A receiver for each pass, credited to the people who made it (built)
+
+`ReceiverChooser` (`Simulation/`) puts a named player at each end of every leg of a possession's approach. For each
+leg the holder is the previous receiver (the carrier at the start):
+
+- **Seen.** A teammate is seen when a draw is under `SeeChance`: the holder's effective Vision, from
+  `ReceiverSeeLowestBasisPoints` = 3,500 to `ReceiverSeeHighestBasisPoints` = 9,800, less up to
+  `ReceiverSeeDistancePenaltyBasisPoints` = 3,500 for a teammate `ReceiverSeeFullDistance` = 6,000 or more away.
+- **Eligible.** He can reach the point he would take it at (`OffBallReachDistance`, now 4,000: measured over the
+  point the ball lands at, which a pull has brought towards him) and the M2 depth rule allows him.
+- **Score.** Openness, progress, reach and lane fit, weighted 4/3/2/2 (`Receiver*Weight`). The lane fit is the share of
+  the pass focus's lane the receiver stands in, over the favourite lane's, so a manager's lanes still steer the ball.
+- **Choice.** One weighted draw, the weight `100 + score² × gain`, where the gain runs from
+  `ReceiverChoiceGainLowest` = 2 (nearly flat) at Decisions 1 to `ReceiverChoiceGainHighest` = 24 (the best
+  placed is about 25 times likelier than the worst) at Decisions 20.
+- **Pull.** The planned touch moves `ReceiverPullBasisPoints` = 2,500 of the way towards the receiver's spot, but never
+  out of the lane it was planned in, so the v8/v9 lane shares are untouched. The last touch never moves, and neither
+  does the point a ball is lost at, so the pressure point, free-kick range, turnover and offside logic stand where the
+  plan put them.
+- **Nobody to play it to.** The holder keeps the ball for the leg (a carry). That is rare (2.6% of legs, 0.10 a
+  possession; 4.4% for a holder of Vision 1, 0.8% for one of Vision 20) and is only an artefact until M5 gives the
+  choice its logic.
+- **A defender is a receiver only** while the holder is at or short of `DefenderReceiveMaxHolderX` = 4,500 **and**
+  where he takes it at or short of `DefenderReceiveMaxPointX` = 5,000 (new in M3; the M2 rule on the holder alone let
+  a long ball from the back reach a centre half beyond halfway).
+
+The draws come from a stream derived from the seed and the possession's ordinal with its own stride (1,000,037), with a
+fixed number per leg (one for each outfield player, then the choice). It never touches the play stream. The recorded
+possession is now written in the order it happens (the passer's `Pass` or `Cross`, the ball's waypoint, the receiver's
+`Receive`); the film resolves a `Receive` to the holder of the station and shows the engine's receiver, and
+`ReplayDirector.Version` is `replay-v5`.
+
+**Credit.** `PassTally` credits each leg to its passer; a pass after the approach (the creating pass, the one the
+defence stopped, the ball played in for a penalty) is the player on the ball at the end of the chain's. The lost pass
+is the passer's of the lost leg. `AssistPlanner` credits an open-play goal to the player on the ball at the end of the
+chain, or to the one who passed to him when he took the shot himself; a set piece keeps its weighted draw.
+
+**Finding: the chain is the story of the outcome, not its cause.** The play draws decided whether a possession was
+lost before the chain was written, so a better passer is not yet less likely to lose the ball. The credit the chain
+replaced made that link (a lost pass was drawn against Passing), and a test pins it. The chain keeps it by
+conditioning: the receivers are weighted by Passing, and on a lost possession the player who held the ball for the
+lost pass is weighted by what is left of Passing instead, which is the same odds the old credit drew with. Passing
+making a pass fail less is M4's.
+
+| Reading | engine-v9 | M3 |
+|---|---|---|
+| Events and scorelines of 40 matches | | unchanged (pinned hash) |
+| Goals, shots per match (20,000) | 2.898, 27.22 | 2.899, 27.22 (as M1) |
+| Receptions past halfway by a Defence player, from the engine's own `Receive` touches | not recorded | 0.0% |
+| Receptions past halfway by a Defence player, from the film's marks | 31.7% | 9.0% |
+| Legs the holder kept | | 2.6% of legs, 0.10 per possession |
+| Film length (p05 / p50 / p95) | 9.90 / 10.13 / 10.42 min | 9.90 / 10.12 / 10.42, never above 11:00 |
+| Teleports outside cuts | 0 | 0 |
+| Film pace p50, inside the 1.8-2.9x band | 2.54x, 97.9% | 2.64x, 92.8% |
+| Moves lengthened for constraints | 18.4% | 19.7% |
+| Passes attempted per match, completion by family (Defence / Midfield / Attack) | | 622; 90% / 77% / 77% |
+
+Mean openness of the player the first ball goes to (0 to 10,000; 4,000 possessions a tier, the holder's other skill
+at 20):
+
+| Tier | 1 | 5 | 10 | 15 | 20 |
+|---|---|---|---|---|---|
+| By the holder's Decisions (Vision 20) | 7,319 | 7,420 | 7,495 | 7,516 | 7,538 |
+| By the holder's Vision (Decisions 20) | 7,305 | 7,387 | 7,483 | 7,518 | 7,538 |
+
+Both rise with the tier; the Vision effect is the smaller one in a possession's outcome, because it can only widen the
+choice, and it is the Decisions that pick well from it. Vision also decides how often a holder keeps the ball because he
+saw nobody (4.4% of legs at Vision 1, 0.8% at 20).
+
+The 9.0% left in the film is not the chain: it is the carrier of the final-third ground duel, drawn by the play stream
+(21.5% of those carries past halfway are a Defence player's), which the film shows receiving the ball at the entry
+point. Naming him from the chain moves a play draw, so it is M4's.
+
+The film pays a little for named receivers: the one the engine names is no longer always the one who can get there
+soonest, so a few more beats are stretched and the pace settles about 0.1x higher. It stays inside its band for
+93% of matches (the test asks for 90%). Quiet possessions the film condenses still merge their ground moves into one
+pass by design, so their intermediate receivers are not shown; every possession with a chance in it, and the two before
+it, keeps all of them.
+
 ## Consequences
 
 To be completed at the later gates with the measured tables.

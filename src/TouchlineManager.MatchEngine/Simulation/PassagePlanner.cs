@@ -529,14 +529,7 @@ internal static class PassagePlanner
             return draw;
         }
 
-        var (left, centre, right) = focus switch
-        {
-            MatchPassFocus.Centre => (rules.PassFocusCentreFlankPercent, rules.PassFocusCentreCentrePercent, rules.PassFocusCentreFlankPercent),
-            MatchPassFocus.CentreAndLeft => (rules.PassFocusPairFlankPercent, rules.PassFocusPairCentrePercent, rules.PassFocusPairOtherFlankPercent),
-            MatchPassFocus.CentreAndRight => (rules.PassFocusPairOtherFlankPercent, rules.PassFocusPairCentrePercent, rules.PassFocusPairFlankPercent),
-            MatchPassFocus.Wings => (rules.PassFocusWingsFlankPercent, rules.PassFocusWingsCentrePercent, rules.PassFocusWingsFlankPercent),
-            _ => throw new ArgumentOutOfRangeException(nameof(focus), focus, "Unknown pass focus."),
-        };
+        var (left, centre, right) = LaneShares(focus, rules);
 
         var leftEnd = rules.PassLeftLaneMaxYBasisPoints;
         var rightStart = rules.PassRightLaneMinYBasisPoints;
@@ -558,6 +551,43 @@ internal static class PassagePlanner
         }
 
         return rightStart + (int)((position - centreShare) * (SpatialPitch.PitchWidth - rightStart) / (right * width));
+    }
+
+    /// <summary>Gets the percent of passes the three lanes take, left to right on the side's own scale, for a pass focus.</summary>
+    /// <param name="focus">The side's pass focus, which must ask for a lane.</param>
+    /// <param name="rules">The rules in force.</param>
+    internal static (int Left, int Centre, int Right) LaneShares(MatchPassFocus focus, EngineRulesV2 rules) => focus switch
+    {
+        MatchPassFocus.Centre => (rules.PassFocusCentreFlankPercent, rules.PassFocusCentreCentrePercent, rules.PassFocusCentreFlankPercent),
+        MatchPassFocus.CentreAndLeft => (rules.PassFocusPairFlankPercent, rules.PassFocusPairCentrePercent, rules.PassFocusPairOtherFlankPercent),
+        MatchPassFocus.CentreAndRight => (rules.PassFocusPairOtherFlankPercent, rules.PassFocusPairCentrePercent, rules.PassFocusPairFlankPercent),
+        MatchPassFocus.Wings => (rules.PassFocusWingsFlankPercent, rules.PassFocusWingsCentrePercent, rules.PassFocusWingsFlankPercent),
+        _ => throw new ArgumentOutOfRangeException(nameof(focus), focus, "Unknown pass focus."),
+    };
+
+    /// <summary>
+    /// Gets how well a spot across the pitch fits the lanes a side's pass focus favours: 10,000 in its favourite
+    /// lane, less in the others in proportion to their share, and 10,000 everywhere for a side with no preference.
+    /// </summary>
+    /// <param name="spot">Where the player stands, in pitch coordinates.</param>
+    /// <param name="isHome">Whether the side attacks towards the high end of the pitch.</param>
+    /// <param name="focus">The side's pass focus.</param>
+    /// <param name="rules">The rules in force.</param>
+    internal static int LaneFit(SpatialPoint spot, bool isHome, MatchPassFocus focus, EngineRulesV2 rules)
+    {
+        if (focus == MatchPassFocus.Balanced)
+        {
+            return EngineRulesV2.Certain;
+        }
+
+        var (left, centre, right) = LaneShares(focus, rules);
+        var y = AttackingY(spot.Y, isHome);
+
+        var share = y < rules.PassLeftLaneMaxYBasisPoints
+            ? left
+            : y >= rules.PassRightLaneMinYBasisPoints ? right : centre;
+
+        return share * EngineRulesV2.Certain / Math.Max(1, Math.Max(left, Math.Max(centre, right)));
     }
 
     /// <summary>Maps a point on the attacking side's own scale to a pitch coordinate.</summary>

@@ -49,13 +49,72 @@ internal static class OffBallProbe
         var pastHalfway = 0L;
         var defencePastHalfway = 0L;
         var defenceDeepPastHalfway = 0L;
+        var passLegs = 0L;
+        var soloLegs = 0L;
+        var passages = 0L;
+        var chainReceives = 0L;
+        var chainDefenceReceives = 0L;
+        var carries = 0L;
+        var defenceCarries = 0L;
+        var families = new Dictionary<Guid, MatchPositionFamily>();
 
         for (var index = 0; index < matches; index++)
         {
             var input = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index);
-            var passages = new MatchPassageRecorder();
-            var result = MatchSimulator.Simulate(input, rules, null, passages);
-            var presentation = ReplayDirector.Analyse(input, result, passages.Passages, options, null).Presentation;
+            var recorder = new MatchPassageRecorder();
+            var result = MatchSimulator.Simulate(input, rules, null, recorder);
+            var presentation = ReplayDirector.Analyse(input, result, recorder.Passages, options, null).Presentation;
+
+            foreach (var slot in input.Home.Slots.Concat(input.Away.Slots))
+            {
+                families[slot.ParticipantId] = slot.Family;
+            }
+
+            // A leg the holder kept is recorded as a carry after the first waypoint; every other ground or lofted
+            // leg is a pass. The touches say who took the ball: the chain's receivers, and the carrier the ground duel
+            // draws, who is not part of the chain.
+            foreach (var passage in recorder.Passages)
+            {
+                passages++;
+
+                foreach (var touch in passage.Touches)
+                {
+                    if (touch.Action is not (PassageAction.Receive or PassageAction.Carry)
+                        || !families.TryGetValue(touch.ParticipantId, out var family)
+                        || AttackingX(touch.X, passage.Side) <= HalfwayX)
+                    {
+                        continue;
+                    }
+
+                    if (touch.Action == PassageAction.Receive)
+                    {
+                        chainReceives++;
+                        chainDefenceReceives += family == MatchPositionFamily.Defence ? 1 : 0;
+                    }
+                    else
+                    {
+                        carries++;
+                        defenceCarries += family == MatchPositionFamily.Defence ? 1 : 0;
+                    }
+                }
+
+                foreach (var waypoint in passage.Waypoints.Skip(1))
+                {
+                    switch (waypoint.Kind)
+                    {
+                        case PassageWaypointKind.Carry:
+                            soloLegs++;
+                            break;
+
+                        case PassageWaypointKind.Pass or PassageWaypointKind.Cross:
+                            passLegs++;
+                            break;
+
+                        default:
+                            break;
+                    }
+                }
+            }
 
             foreach (var passage in presentation.Passages)
             {
@@ -112,6 +171,9 @@ internal static class OffBallProbe
         Console.WriteLine($"    received past halfway           {(double)pastHalfway / matches,9:F1} per match");
         Console.WriteLine($"    ... by a Defence player         {Pct(defencePastHalfway, pastHalfway),8}%   target near zero");
         Console.WriteLine($"    ... by one beyond x 6,500       {Pct(defenceDeepPastHalfway, pastHalfway),8}%   target zero");
+        Console.WriteLine($"    by the engine's touches past halfway: chain receivers by a Defence player {Pct(chainDefenceReceives, chainReceives),6}% of {(double)chainReceives / matches:F1} per match;");
+        Console.WriteLine($"      ground-duel carriers (drawn by the play stream, not the chain) by a Defence player {Pct(defenceCarries, carries),6}% of {(double)carries / matches:F1} per match");
+        Console.WriteLine($"    legs the holder kept            {Pct(soloLegs, soloLegs + passLegs),8}%   of the carried and passed legs after each start, {(double)soloLegs / Math.Max(1, passages):F2} per possession");
         Console.WriteLine();
     }
 
@@ -201,6 +263,8 @@ internal static class OffBallProbe
         Console.WriteLine($"    goals per match, both sides      {((double)homeGoals + awayGoals) / matches:F3}");
         Console.WriteLine();
     }
+
+    private static int AttackingX(int x, MatchSide side) => side == MatchSide.Home ? x : 10_000 - x;
 
     private static MatchInputV1 Twins(MatchInputV1 input, out Guid highId, out Guid lowId)
     {

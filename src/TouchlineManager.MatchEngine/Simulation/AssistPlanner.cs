@@ -42,27 +42,35 @@ internal static class AssistPlanner
 
         var runtime = state.SideOf(side);
 
-        var candidates = runtime.Outfield
-            .Where(slot => slot.Participant.ParticipantId != scorerId)
-            .ToList();
+        // An open-play goal was set up by the player the ball was played to, who passed it on to the shooter or
+        // took the shot on himself, and then it is the man who passed it to him (`engine-v10`). Everything else keeps
+        // the draw: a set piece has no approach to credit.
+        var id = state.Passing.FinalLegCreatedShot ? state.Passing.CreatorFor(scorerId) : null;
 
-        if (candidates.Count == 0)
+        if (id is null)
         {
-            return;
+            var candidates = runtime.Outfield
+                .Where(slot => slot.Participant.ParticipantId != scorerId)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                return;
+            }
+
+            var stream = new Pcg32(unchecked((state.Input.Seed * StreamStride) + (ulong)sequence));
+            var assister = WeightedPick.From(candidates, slot => CreationWeight(slot.Participant.Attributes), stream);
+
+            if (assister is null)
+            {
+                return;
+            }
+
+            id = assister.Participant.ParticipantId;
         }
 
-        var stream = new Pcg32(unchecked((state.Input.Seed * StreamStride) + (ulong)sequence));
-        var assister = WeightedPick.From(candidates, slot => CreationWeight(slot.Participant.Attributes), stream);
-
-        if (assister is null)
-        {
-            return;
-        }
-
-        var id = assister.Participant.ParticipantId;
-
-        runtime.Assists.TryGetValue(id, out var assists);
-        runtime.Assists[id] = assists + 1;
+        runtime.Assists.TryGetValue(id.Value, out var assists);
+        runtime.Assists[id.Value] = assists + 1;
 
         // The ball that set the goal up is a completed pass: the possession's own creating pass when it had
         // one, which the tally credits to this player when the possession ends, and otherwise the delivery
@@ -73,11 +81,11 @@ internal static class AssistPlanner
         }
         else
         {
-            PassTally.RecordDelivery(runtime, id);
+            PassTally.RecordDelivery(runtime, id.Value);
         }
 
         // The assist the crowd saw is also on the live scale, the moment the goal is credited (engine-v3).
-        runtime.AdjustLiveRating(id, state.Rules.LiveRatingAssistBonusBasisPoints);
+        runtime.AdjustLiveRating(id.Value, state.Rules.LiveRatingAssistBonusBasisPoints);
     }
 
     /// <summary>The weight that makes a player likely to be the one who set the goal up.</summary>

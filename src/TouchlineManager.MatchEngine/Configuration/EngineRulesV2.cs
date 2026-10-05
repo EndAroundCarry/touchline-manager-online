@@ -498,7 +498,7 @@ public sealed record EngineRulesV2
     /// How far a receiver of neutral Positioning can get to a pass, in pitch units; a better-placed player
     /// covers more and a worse one less (`engine-v10`).
     /// </summary>
-    public int OffBallReachDistance { get; init; } = 3_000;
+    public int OffBallReachDistance { get; init; } = 4_000;
 
     /// <summary>
     /// How far up the pitch a pass must take the ball, in pitch units, to be worth the whole progress score
@@ -529,6 +529,71 @@ public sealed record EngineRulesV2
     /// it: past this the attack is in the other half, and a defender is no longer a receiver (`engine-v10`).
     /// </summary>
     public int DefenderReceiveMaxHolderX { get; init; } = 4_500;
+
+    /// <summary>
+    /// How far up the pitch, on the side's own scale, a defender may take a ball: past this he is not a receiver
+    /// however far back the holder was, so a long ball from the back is not played to a centre half beyond the halfway
+    /// line (`engine-v10`).
+    /// </summary>
+    public int DefenderReceiveMaxPointX { get; init; } = 5_000;
+
+    /// <summary>
+    /// The chance, in basis points, that a holder of the lowest effective Vision sees a teammate standing next to
+    /// him as a way to play the ball (`engine-v10`).
+    /// </summary>
+    public int ReceiverSeeLowestBasisPoints { get; init; } = 3_500;
+
+    /// <summary>
+    /// The chance, in basis points, that a holder of the highest effective Vision sees a teammate standing next to
+    /// him; it rises linearly from the lowest (`engine-v10`).
+    /// </summary>
+    public int ReceiverSeeHighestBasisPoints { get; init; } = 9_800;
+
+    /// <summary>
+    /// How far off a teammate is, in pitch units, when the chance of seeing him has fallen by the whole of
+    /// <see cref="ReceiverSeeDistancePenaltyBasisPoints"/>; it falls in a straight line from nothing at no
+    /// distance (`engine-v10`).
+    /// </summary>
+    public int ReceiverSeeFullDistance { get; init; } = 6_000;
+
+    /// <summary>
+    /// The share of the chance of seeing a teammate that is lost by the time he is
+    /// <see cref="ReceiverSeeFullDistance"/> away, in basis points (`engine-v10`).
+    /// </summary>
+    public int ReceiverSeeDistancePenaltyBasisPoints { get; init; } = 3_500;
+
+    /// <summary>
+    /// How far a planned touch moves towards the spot of the player who is given the ball, in basis points of
+    /// the distance between them; the last touch of an approach never moves (`engine-v10`).
+    /// </summary>
+    public int ReceiverPullBasisPoints { get; init; } = 2_500;
+
+    /// <summary>Weight of how open the receiver is, in the score the holder gives each teammate he sees (`engine-v10`).</summary>
+    public int ReceiverOpennessWeight { get; init; } = 4;
+
+    /// <summary>Weight of how far the pass takes the attack up the pitch, in a receiver's score (`engine-v10`).</summary>
+    public int ReceiverProgressWeight { get; init; } = 3;
+
+    /// <summary>Weight of how easily the receiver gets to the ball, in a receiver's score (`engine-v10`).</summary>
+    public int ReceiverReachWeight { get; init; } = 2;
+
+    /// <summary>
+    /// Weight of how well the receiver's lane fits the side's pass focus, in a receiver's score; it is how a
+    /// manager's lanes still steer the ball once a player is chosen (`engine-v10`).
+    /// </summary>
+    public int ReceiverLaneWeight { get; init; } = 2;
+
+    /// <summary>
+    /// How sharply a holder of the lowest effective Decisions favours the best-placed teammate: a gain on the
+    /// squared score, so a low gain is nearly a flat draw (`engine-v10`).
+    /// </summary>
+    public int ReceiverChoiceGainLowest { get; init; } = 2;
+
+    /// <summary>
+    /// How sharply a holder of the highest effective Decisions favours the best-placed teammate; the gain rises
+    /// linearly from the lowest (`engine-v10`).
+    /// </summary>
+    public int ReceiverChoiceGainHighest { get; init; } = 24;
 
     /// <summary>Weight of Pace in both sides' scramble score.</summary>
     public int ScramblePaceWeight { get; init; } = 3;
@@ -1432,6 +1497,38 @@ public sealed record EngineRulesV2
                 $"DefenderReceiveMaxHolderX must be a pitch coordinate in 0..{Certain}, was {DefenderReceiveMaxHolderX}.");
         }
 
+        if (DefenderReceiveMaxPointX is < 0 or > Certain)
+        {
+            problems.Add(
+                $"DefenderReceiveMaxPointX must be a pitch coordinate in 0..{Certain}, was {DefenderReceiveMaxPointX}.");
+        }
+
+        if (ReceiverSeeFullDistance < 1)
+        {
+            problems.Add($"ReceiverSeeFullDistance must be a positive pitch distance, was {ReceiverSeeFullDistance}.");
+        }
+
+        if (ReceiverSeeLowestBasisPoints > ReceiverSeeHighestBasisPoints)
+        {
+            problems.Add(
+                $"The receiver sight chances are inverted: lowest {ReceiverSeeLowestBasisPoints}, highest {ReceiverSeeHighestBasisPoints}.");
+        }
+
+        if (ReceiverOpennessWeight < 0
+            || ReceiverProgressWeight < 0
+            || ReceiverReachWeight < 0
+            || ReceiverLaneWeight < 0
+            || ReceiverOpennessWeight + ReceiverProgressWeight + ReceiverReachWeight + ReceiverLaneWeight < 1)
+        {
+            problems.Add("The receiver score weights must not be negative, and at least one must be positive.");
+        }
+
+        if (ReceiverChoiceGainLowest < 0 || ReceiverChoiceGainHighest < ReceiverChoiceGainLowest)
+        {
+            problems.Add(
+                $"The receiver choice gains are inverted: lowest {ReceiverChoiceGainLowest}, highest {ReceiverChoiceGainHighest}.");
+        }
+
         if (ShotFinalThirdXMinBasisPoints <= Certain / 2)
         {
             problems.Add(
@@ -1509,6 +1606,10 @@ public sealed record EngineRulesV2
 
     private IEnumerable<(string Name, int Value)> ProbabilityConstants()
     {
+        yield return (nameof(ReceiverSeeLowestBasisPoints), ReceiverSeeLowestBasisPoints);
+        yield return (nameof(ReceiverSeeHighestBasisPoints), ReceiverSeeHighestBasisPoints);
+        yield return (nameof(ReceiverSeeDistancePenaltyBasisPoints), ReceiverSeeDistancePenaltyBasisPoints);
+        yield return (nameof(ReceiverPullBasisPoints), ReceiverPullBasisPoints);
         yield return (nameof(BasePossessionBasisPoints), BasePossessionBasisPoints);
         yield return (nameof(PossessionControlSwingBasisPoints), PossessionControlSwingBasisPoints);
         yield return (nameof(PossessionHomeBonusBasisPoints), PossessionHomeBonusBasisPoints);

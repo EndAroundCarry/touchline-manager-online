@@ -20,7 +20,7 @@ using TouchlineManager.SimulationBenchmarks;
 // `offball` is not part of `all`: it reads who receives the ball and what Positioning does at the finish (engine-v10).
 //
 // `--dump file` writes the first replayed match's presentation, as the API returns it, to a file: the fluidity
-// harness in apps/web/.preview plays it back in a browser (replay-v4).
+// harness in apps/web/.preview plays it back in a browser (replay-v5).
 
 var dumpAt = Array.IndexOf(args, "--dump");
 var dumpPath = dumpAt >= 0 && dumpAt + 1 < args.Length ? args[dumpAt + 1] : null;
@@ -212,7 +212,7 @@ void Distributions(int matches, ulong baseSeed)
 
 void Replay(int matches, ulong baseSeed, string? dump)
 {
-    Console.WriteLine($"== replay-v4 constant-pace film and reel, {matches:N0} matches ==");
+    Console.WriteLine($"== {ReplayDirector.Version} constant-pace film and reel, {matches:N0} matches ==");
 
     var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
     var passageCounts = new double[matches];

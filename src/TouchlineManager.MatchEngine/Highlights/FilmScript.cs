@@ -989,7 +989,8 @@ internal static class FilmScript
                         break;
 
                     case PassageAction.Pass or PassageAction.Cross or PassageAction.Shot
-                        or PassageAction.Penalty or PassageAction.FreeKick or PassageAction.Save:
+                        or PassageAction.Penalty or PassageAction.FreeKick or PassageAction.Save
+                        or PassageAction.Receive:
                         Holder = touch.ParticipantId;
                         break;
 

@@ -22,6 +22,15 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
   is in the other half is not). Integer-only, no draw; seven rules constants (`OffBall*`, `BackPass*`,
   `DefenderReceiveMaxHolderX`); `OffBallModelTests`. The new constants change the rules hash, so the golden hashes
   are re-pinned again; the golden match is still 2-2.
+- **A receiver for each pass (M3).** The player on the ball looks round (Vision), weighs who is open, who the pass
+  takes forward, who can get there and whether he stands in the manager's lane, and chooses (Decisions): a sharp
+  holder usually gives it to the best-placed man, a poor one to anybody. The planned touch is pulled part of the way
+  towards him, inside its lane. The possession records who passed to whom; passes are credited to the people who
+  played them, and an open-play goal is assisted by the player the ball was played to or the one who played it to him.
+  No event, scoreline or lane share moves (pinned by a hash of 40 matches); only passes, assists and the film do. A
+  defender is never given the ball beyond halfway. The film shows the engine's receiver, and `ReplayDirector.Version`
+  is `replay-v5`. Twelve rules constants (`Receiver*`, `DefenderReceiveMaxPointX`); `ReceiverChooserTests`,
+  `NamedReceiverPassageTests`, `ReceiverChoiceRegressionTests`.
 - `PositioningEdgeTests`; three rules constants (`AerialDuelPositioningWeight`, `PositioningFloorBasisPoints`,
   `PositioningCeilingBasisPoints`); an `offball` mode in `tools/simulation-benchmarks`.
 
