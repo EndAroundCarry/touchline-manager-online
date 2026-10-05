@@ -133,6 +133,58 @@ public sealed class PassFocusShotsAndCrossesTests
     }
 
     [Fact]
+    public void A_centre_focus_crosses_from_the_middle_as_much_as_from_both_flanks_together()
+    {
+        // Measured about 24/52/24: the side plays in the middle, so a good part of its crosses come from there.
+        var lanes = Measure(MatchPassFocus.Centre).CrossLanes;
+
+        lanes[1].Should().BeInRange(46, 58);
+        lanes[0].Should().BeInRange(19, 30);
+        lanes[2].Should().BeInRange(19, 30);
+        lanes[0].Should().BeCloseTo(lanes[2], 5, "the centre favours neither flank");
+    }
+
+    [Fact]
+    public void A_left_focus_crosses_most_from_the_left_then_the_middle_and_least_from_the_right()
+    {
+        // Measured about 54/31/15.
+        var lanes = Measure(MatchPassFocus.CentreAndLeft).CrossLanes;
+
+        lanes[0].Should().BeInRange(48, 59);
+        lanes[1].Should().BeInRange(25, 36);
+        lanes[2].Should().BeInRange(10, 21);
+    }
+
+    [Fact]
+    public void A_right_focus_crosses_most_from_the_right_then_the_middle_and_least_from_the_left()
+    {
+        var lanes = Measure(MatchPassFocus.CentreAndRight).CrossLanes;
+
+        lanes[2].Should().BeInRange(48, 59);
+        lanes[1].Should().BeInRange(25, 36);
+        lanes[0].Should().BeInRange(10, 21);
+    }
+
+    [Fact]
+    public void The_share_crossed_follows_the_lane_and_the_focus_and_mirrors_for_left_and_right()
+    {
+        PassagePlanner.CrossShare(MatchPassFocus.Balanced, PassLane.Left, Rules).Should().Be(Rules.CrossShareFlankLaneBasisPoints);
+        PassagePlanner.CrossShare(MatchPassFocus.Balanced, PassLane.Centre, Rules).Should().Be(Rules.CrossShareCentreLaneBasisPoints);
+        PassagePlanner.CrossShare(MatchPassFocus.Wings, PassLane.Right, Rules).Should().Be(Rules.CrossShareFlankLaneBasisPoints);
+
+        foreach (var lane in Enum.GetValues<PassLane>())
+        {
+            var mirrored = lane switch { PassLane.Left => PassLane.Right, PassLane.Right => PassLane.Left, _ => PassLane.Centre };
+
+            PassagePlanner.CrossShare(MatchPassFocus.CentreAndLeft, lane, Rules)
+                .Should().Be(PassagePlanner.CrossShare(MatchPassFocus.CentreAndRight, mirrored, Rules), lane.ToString());
+        }
+
+        PassagePlanner.CrossShare(MatchPassFocus.Centre, PassLane.Centre, Rules)
+            .Should().BeGreaterThan(PassagePlanner.CrossShare(MatchPassFocus.Centre, PassLane.Left, Rules));
+    }
+
+    [Fact]
     public void A_centre_focus_does_not_cross_more_than_no_preference()
     {
         Measure(MatchPassFocus.Centre).CrossesPerMatch

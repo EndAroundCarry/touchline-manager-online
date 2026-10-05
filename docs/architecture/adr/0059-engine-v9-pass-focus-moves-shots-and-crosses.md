@@ -27,9 +27,15 @@ always taken from the middle, so the measured central share is about 13 points a
 crossed depends on the lane the ball arrives in: 38.5% in a flank lane (`CrossShareFlankLaneBasisPoints`) and 7%
 down the middle (`CrossShareCentreLaneBasisPoints`), chosen so a side with no preference crosses about as often
 as before (28% of approaches) but from the flanks, not from anywhere. The roll is the one the engine always
-took. The pass focus already decides which lane the ball arrives in, so the crosses follow it with no further
-rule: both wings cross about a quarter more often, almost only from the flanks; the centre and the left sends
-about 53% of its crosses down the left and 39% down the right.
+took. The pass focus already decides which lane the ball arrives in, so both wings cross about a quarter more
+often, almost only from the flanks.
+
+A side that plays through the middle crosses from the middle too, so the shares also depend on the focus. They were
+set to the cross lanes asked for, measured left/centre/right: the centre alone 24/52/24 (21% from a flank lane, 34%
+from the centre lane), the centre and left about 54/31/15 (37% from the left, 33% from the centre, 14% from the
+right). Both wings and a side with no preference keep the two lane shares above. The five focus shares are
+`CrossFocusCentreFlank`, `CrossFocusCentreCentre`, `CrossFocusPairFlank`, `CrossFocusPairCentre` and
+`CrossFocusPairOtherFlank`.
 
 **3. The focus pays for where it shoots.** A zone is not worth the same: the centre scores 1.5 times the base,
 an inside channel 1.0 and a wide zone 0.8. A side that moved its shots to the centre would simply score more,
@@ -40,23 +46,23 @@ The result is a choice of style, not an upgrade: the centre takes about 7% fewer
 conversion, the wings about 13% more at about 9.4%.
 
 **4. Versions.** `EngineVersions.Engine` = 9 (`engine-v9`), `RuleSet` = 8 (`engine-rules-v8`). The rules gain
-sixteen constants and lose `CrossShareOfPassageBasisPoints`, so the rules hash and the golden hashes are
+twenty-one constants and lose `CrossShareOfPassageBasisPoints`, so the rules hash and the golden hashes are
 re-pinned; the golden match is still 2-2. A side with no preference scores and shoots as it did
 under `engine-v8`; its crosses are the part that moves, from anywhere to the flanks. A snapshot frozen under
 `engine-v8` is refused by name, so the dev database is reseeded as with every earlier version.
 
 ## Evidence
 
-Over 2,000 matches each, the home side playing the focus against a side with no preference (events, with the
+Over 1,500 to 2,000 matches each (every cross of the approach, 1,500 for the crosses), the home side playing the focus against a side with no preference (events, with the
 corners, free kicks and penalties included in the shot lanes):
 
 | Focus | Goals | Shots | Conversion | Shot lanes L/C/R | Crosses per match | Cross lanes L/C/R |
 |---|---|---|---|---|---|---|
-| No preference | 1.57 – 1.33 | 14.9 – 12.3 | 10.6% | 26/47/26 | 14.0 | 46/8/45 |
-| Centre | 1.59 – 1.32 | 13.9 – 12.3 | 11.4% | 20/60/19 | 13.1 | 44/10/44 |
-| Centre and left | 1.58 – 1.34 | 15.3 – 12.4 | 10.3% | 38/41/20 | 15.0 | 53/6/39 |
-| Centre and right | 1.58 – 1.34 | 15.3 – 12.4 | 10.3% | 20/41/38 | 15.0 | 39/6/54 |
-| Wings | 1.58 – 1.36 | 16.8 – 12.6 | 9.4% | 39/21/39 | 17.6 | 49/1/48 |
+| No preference | 1.57 – 1.33 | 14.9 – 12.3 | 10.6% | 26/47/26 | 17.5 | 46/8/46 |
+| Centre | 1.59 – 1.32 | 13.9 – 12.3 | 11.4% | 20/60/19 | 16.4 | 24/52/24 |
+| Centre and left | 1.58 – 1.34 | 15.3 – 12.4 | 10.3% | 38/41/20 | 18.0 | 54/31/15 |
+| Centre and right | 1.58 – 1.34 | 15.3 – 12.4 | 10.3% | 20/41/38 | 18.0 | 15/31/54 |
+| Wings | 1.58 – 1.36 | 16.8 – 12.6 | 9.4% | 39/21/39 | 22.1 | 49/2/49 |
 
 `PassFocusShotsAndCrossesTests` pins the direction and the order of each: the zone shares sum to 100 and mirror
 for left and right; the centre takes most of its shots from the middle; a left focus shoots and crosses more

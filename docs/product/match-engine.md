@@ -545,10 +545,13 @@ From `engine-v9` the focus also moves the shots and the crosses (`ADR-0059`), wi
   which include the corners, free kicks and penalties taken from the middle, the shot lanes (left/centre/right) are
   about 26/47/26 with no preference, 20/60/19 (centre), 38/41/20 (centre and left) and 39/21/39 (wings).
 - **Crosses.** The share of a possession's final approach that is crossed depends on the lane the ball arrives in,
-  38.5% in a flank lane and 7% in the centre lane, for every side: about 28% overall, almost all from the flanks.
-  The focus decides the lane, so both wings cross about a quarter more often (17.6 a match against 14.0), and the
-  centre and left sends about 53% of its crosses down the left. A cross is shown on the film and in the
-  commentary; it does not change the chance that follows it.
+  38.5% in a flank lane and 7% in the centre lane for a side with no preference or both wings: about 28% overall,
+  almost all from the flanks. The focus decides the lane, so both wings cross about a quarter more often (22.1 a
+  match against 17.5). A side that favours the centre crosses from the middle too, in shares set to the lanes
+  asked for: the centre alone crosses 21% from a flank lane and 34% from the centre lane, which measures 24/52/24
+  (left/centre/right); the centre and a flank crosses 37% from its flank, 33% from the centre and 14% from the
+  other flank, which measures about 54/31/15. A cross is shown on the film and in the commentary; it does not
+  change the chance that follows it.
 - **Shot volume.** A zone is worth different amounts (central 1.5, inside 1.0, wide 0.8 times the base), so the
   focus also scales how often a progressed possession becomes a shot: the centre by 0.935, the centre and a flank
   by 1.03 and both wings by 1.16. Goals for stay within about 2% of a side with no preference; the centre takes

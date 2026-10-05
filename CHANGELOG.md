@@ -20,10 +20,11 @@ fewer, better shots. A side with no preference scores and shoots as before.
   about 7% fewer shots at about 11.4% conversion; both wings take about 13% more at about 9.4%. Goals for stay
   within about 2% of a side with no preference, so the focus is a choice of style rather than an upgrade.
 - **Crosses come from the flank.** The share of an approach that is crossed depends on the lane the ball arrives
-  in, 38.5% from a flank and 7% down the middle, so both wings cross 17.6 a match against 14.0, and the centre
-  and left sends about 53% of its crosses down the left.
-- `PassFocusShotsAndCrossesTests`; sixteen rules constants (`ShotFocus…Percent`, `ChanceVolume…BasisPoints`,
-  `CrossShareFlankLaneBasisPoints`, `CrossShareCentreLaneBasisPoints`).
+  in, 38.5% from a flank and 7% down the middle, so both wings cross 22.1 a match against 17.5, and the centre
+  and left sends about 54% of its crosses down the left, 31% through the middle and 15% down the right. A side that
+  favours the centre crosses from the middle too: its crosses measure 24/52/24.
+- `PassFocusShotsAndCrossesTests`; twenty-one rules constants (`ShotFocus…Percent`, `ChanceVolume…BasisPoints`,
+  `CrossShareFlankLaneBasisPoints`, `CrossShareCentreLaneBasisPoints`, and five `CrossFocus…BasisPoints`).
 
 ### Changed
 

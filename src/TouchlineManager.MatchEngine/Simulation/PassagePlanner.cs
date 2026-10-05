@@ -483,12 +483,12 @@ internal static class PassagePlanner
             ? 0
             : Math.Clamp((distance + advance - 1) / advance, minIntermediates, maxIntermediates);
 
-        // A cross is delivered from the flank: the ball that arrives in a flank lane is crossed far more often than
-        // one that arrives down the middle (`engine-v9`). The roll is the one the engine always took.
-        var arrivesWide = pressureAttackY < rules.PassLeftLaneMaxYBasisPoints
-            || pressureAttackY >= rules.PassRightLaneMinYBasisPoints;
-        var endsInCross = derived.RollBasisPoints(
-            arrivesWide ? rules.CrossShareFlankLaneBasisPoints : rules.CrossShareCentreLaneBasisPoints);
+        // A cross is delivered from the lane the ball arrives in, and how often depends on the lane and on the
+        // focus (`engine-v9`). The roll is the one the engine always took.
+        var arrivalLane = pressureAttackY < rules.PassLeftLaneMaxYBasisPoints
+            ? PassLane.Left
+            : pressureAttackY >= rules.PassRightLaneMinYBasisPoints ? PassLane.Right : PassLane.Centre;
+        var endsInCross = derived.RollBasisPoints(CrossShare(focus, arrivalLane, rules));
 
         for (var index = 1; index <= intermediates; index++)
         {
@@ -626,6 +626,38 @@ internal static class PassagePlanner
         return roll < wideLeftEnd ? ShotZone.WideLeft : ShotZone.WideRight;
     }
 
+    /// <summary>Gets the share of final approaches crossed, by the lane the ball arrives in (`engine-v9`).</summary>
+    /// <remarks>
+    /// A side with no preference, and one that plays both wings, crosses from the flanks and hardly ever from the
+    /// middle. A side that favours the centre plays in the middle lane, so it crosses from there too; one that
+    /// favours the centre and a flank crosses most from that flank and the middle, and least from the other flank.
+    /// </remarks>
+    /// <param name="focus">The side's pass focus.</param>
+    /// <param name="lane">The lane the ball arrives in, on the side's own scale.</param>
+    /// <param name="rules">The rules in force.</param>
+    internal static int CrossShare(MatchPassFocus focus, PassLane lane, EngineRulesV2 rules)
+    {
+        var flank = lane != PassLane.Centre;
+
+        return focus switch
+        {
+            MatchPassFocus.Centre => flank ? rules.CrossFocusCentreFlankBasisPoints : rules.CrossFocusCentreCentreBasisPoints,
+            MatchPassFocus.CentreAndLeft => lane switch
+            {
+                PassLane.Left => rules.CrossFocusPairFlankBasisPoints,
+                PassLane.Centre => rules.CrossFocusPairCentreBasisPoints,
+                _ => rules.CrossFocusPairOtherFlankBasisPoints,
+            },
+            MatchPassFocus.CentreAndRight => lane switch
+            {
+                PassLane.Right => rules.CrossFocusPairFlankBasisPoints,
+                PassLane.Centre => rules.CrossFocusPairCentreBasisPoints,
+                _ => rules.CrossFocusPairOtherFlankBasisPoints,
+            },
+            _ => flank ? rules.CrossShareFlankLaneBasisPoints : rules.CrossShareCentreLaneBasisPoints,
+        };
+    }
+
     /// <summary>Gets the percent of open-play shots taken from each zone, for a side's pass focus (`engine-v9`).</summary>
     /// <param name="focus">The side's pass focus.</param>
     /// <param name="rules">The rules in force.</param>
@@ -696,4 +728,17 @@ internal static class PassagePlanner
             _ => derived.NextRange(rules.ShotInsideBandYMaxBasisPoints, rules.ShotWideBandYMaxBasisPoints),
         };
     }
+}
+
+/// <summary>The three lanes across the pitch the pass focus speaks of, on a side's own scale (`engine-v9`).</summary>
+internal enum PassLane
+{
+    /// <summary>The left lane, the low end of the side's own scale.</summary>
+    Left = 0,
+
+    /// <summary>The centre lane.</summary>
+    Centre = 1,
+
+    /// <summary>The right lane.</summary>
+    Right = 2,
 }

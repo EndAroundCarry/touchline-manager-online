@@ -592,6 +592,25 @@ public sealed record EngineRulesV2
     /// </summary>
     public int CrossShareCentreLaneBasisPoints { get; init; } = 700;
 
+    // A side with no preference, or both wings, crosses by the two shares above. A side that favours the centre
+    // crosses from the middle as well, because that is the lane it plays in: the shares below are set so the
+    // crosses measure about 24/52/24 (centre) and 53/30/15 (centre and left), left, centre, right.
+
+    /// <summary>The share of approaches crossed from a flank lane when the focus is the centre alone (`engine-v9`).</summary>
+    public int CrossFocusCentreFlankBasisPoints { get; init; } = 2_080;
+
+    /// <summary>The share of approaches crossed from the centre lane when the focus is the centre alone (`engine-v9`).</summary>
+    public int CrossFocusCentreCentreBasisPoints { get; init; } = 3_380;
+
+    /// <summary>The share crossed from the favoured flank when the focus is the centre and a flank (`engine-v9`).</summary>
+    public int CrossFocusPairFlankBasisPoints { get; init; } = 3_710;
+
+    /// <summary>The share crossed from the centre lane when the focus is the centre and a flank (`engine-v9`).</summary>
+    public int CrossFocusPairCentreBasisPoints { get; init; } = 3_275;
+
+    /// <summary>The share crossed from the other flank when the focus is the centre and a flank (`engine-v9`).</summary>
+    public int CrossFocusPairOtherFlankBasisPoints { get; init; } = 1_410;
+
     /// <summary>The ball's altitude at a cross, 0…100.</summary>
     public int CrossAltitude { get; init; } = 70;
 
@@ -1468,6 +1487,11 @@ public sealed record EngineRulesV2
         yield return (nameof(MinimumConditionAdvantageBasisPoints), MinimumConditionAdvantageBasisPoints);
         yield return (nameof(CrossShareFlankLaneBasisPoints), CrossShareFlankLaneBasisPoints);
         yield return (nameof(CrossShareCentreLaneBasisPoints), CrossShareCentreLaneBasisPoints);
+        yield return (nameof(CrossFocusCentreFlankBasisPoints), CrossFocusCentreFlankBasisPoints);
+        yield return (nameof(CrossFocusCentreCentreBasisPoints), CrossFocusCentreCentreBasisPoints);
+        yield return (nameof(CrossFocusPairFlankBasisPoints), CrossFocusPairFlankBasisPoints);
+        yield return (nameof(CrossFocusPairCentreBasisPoints), CrossFocusPairCentreBasisPoints);
+        yield return (nameof(CrossFocusPairOtherFlankBasisPoints), CrossFocusPairOtherFlankBasisPoints);
         yield return (nameof(MissOverShareBasisPoints), MissOverShareBasisPoints);
         yield return (nameof(PostShareOfWoodworkBasisPoints), PostShareOfWoodworkBasisPoints);
         yield return (nameof(PenaltySavedShareBasisPoints), PenaltySavedShareBasisPoints);
