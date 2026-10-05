@@ -664,6 +664,19 @@ public sealed record EngineRulesV2
     public int ReachWeightFloorBasisPoints { get; init; } = 500;
 
     /// <summary>
+    /// How far, in basis points, a shooter's Finishing moves the chance his shot scores, at
+    /// <see cref="ShotContestReference"/> attribute points above or below <see cref="FinishingGoalReference"/>; it is
+    /// added to the contest of the shot's own skill against the goalkeeper, for headers too (`engine-v10`).
+    /// </summary>
+    public int FinishingGoalSwingBasisPoints { get; init; } = 3_500;
+
+    /// <summary>
+    /// The Finishing, in attribute points, at which a shooter moves the chance his shot scores neither way
+    /// (`engine-v10`).
+    /// </summary>
+    public int FinishingGoalReference { get; init; } = 11;
+
+    /// <summary>
     /// What a move that ended in a cross multiplies its chance of creating a shot by, in basis points: a cross is
     /// played into the box more readily than a ground ball is, and the header that follows decides how many of them
     /// are chances, so the shots from crosses stay what they were before the header was contested (`engine-v10`).
@@ -1622,6 +1635,11 @@ public sealed record EngineRulesV2
             problems.Add($"ReachWeightFloorBasisPoints must be in 0..{Certain}, was {ReachWeightFloorBasisPoints}.");
         }
 
+        if (FinishingGoalSwingBasisPoints < 0 || FinishingGoalReference is < 1 or > 20)
+        {
+            problems.Add("The Finishing goal swing must not be negative, and its reference must be an attribute value in 1..20.");
+        }
+
         if (CrossCreationMultiplierBasisPoints < Certain)
         {
             problems.Add($"CrossCreationMultiplierBasisPoints must not make a cross less likely to create a chance, was {CrossCreationMultiplierBasisPoints}.");
@@ -1718,6 +1736,7 @@ public sealed record EngineRulesV2
         yield return (nameof(ReceiverSeeHighestBasisPoints), ReceiverSeeHighestBasisPoints);
         yield return (nameof(ReceiverSeeDistancePenaltyBasisPoints), ReceiverSeeDistancePenaltyBasisPoints);
         yield return (nameof(ReceiverPullBasisPoints), ReceiverPullBasisPoints);
+        yield return (nameof(FinishingGoalSwingBasisPoints), FinishingGoalSwingBasisPoints);
         yield return (nameof(ChainProgressSwingBasisPoints), ChainProgressSwingBasisPoints);
         yield return (nameof(ChainCreationOpennessSwingBasisPoints), ChainCreationOpennessSwingBasisPoints);
         yield return (nameof(ChainCreationChoiceSwingBasisPoints), ChainCreationChoiceSwingBasisPoints);

@@ -339,6 +339,10 @@ public sealed class ChainDrivesOutcomeTests
             .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*CrossCreationMultiplierBasisPoints*");
         (Rules with { ReachWeightFloorBasisPoints = EngineRulesV2.Certain + 1 })
             .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*ReachWeightFloorBasisPoints*");
+        (Rules with { FinishingGoalSwingBasisPoints = -1 })
+            .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*Finishing goal swing*");
+        (Rules with { FinishingGoalReference = 21 })
+            .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*Finishing goal swing*");
         (Rules with { CrossHeaderDeliveryBaseline = 0 })
             .Invoking(rules => rules.Validate()).Should().Throw<InvalidOperationException>().WithMessage("*cross header*");
     }

@@ -506,8 +506,18 @@ internal static class ChanceSimulator
             EffectiveSkill.Hundredths(shooter, headed ? MatchAttributeName.Heading : MatchAttributeName.Finishing, rules),
             KeeperQuality(defender, rules));
 
+        // Finishing counts on every shot, a header included: a header decides how the ball is struck, and finishing
+        // whether it goes in. It is read against a reference skill, so a side of average finishers is untouched
+        // (`engine-v10`).
+        var finishing = Probability.Swing(
+            EffectiveSkill.Hundredths(shooter, MatchAttributeName.Finishing, rules) - (rules.FinishingGoalReference * EffectiveSkill.Scale),
+            rules.FinishingGoalSwingBasisPoints,
+            rules.ShotContestReference * EffectiveSkill.Scale);
+
         return Probability.Band(
-            baseChance + Probability.Swing(contest, rules.ShotQualitySwingBasisPoints, rules.ShotContestReference * EffectiveSkill.Scale),
+            baseChance
+                + Probability.Swing(contest, rules.ShotQualitySwingBasisPoints, rules.ShotContestReference * EffectiveSkill.Scale)
+                + finishing,
             rules.MinShotGoalBasisPoints,
             rules.MaxShotGoalBasisPoints);
     }

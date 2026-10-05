@@ -24,7 +24,7 @@ namespace TouchlineManager.MatchEngine.Tests;
 /// </remarks>
 public sealed class ReceiverChoiceRegressionTests
 {
-    private const string PinnedEventsHash = "fa77976d53b7f4cee20701218af53f555b4101753b3d11f44baeb7d50a387793";
+    private const string PinnedEventsHash = "9f6e2ad66089f8b4879c81e9453e72a9e4b482d02fb8ac77f7ef532bff57c8fc";
 
     [Fact]
     public void The_events_and_scorelines_of_forty_matches_are_what_they_were_when_the_chain_began_to_drive_the_outcome()

@@ -41,15 +41,16 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
   best-placed attacker (Heading, Positioning, how near the formation puts him) and the defender who can get to it, the
   attacker favoured (he wins 75%) and the crosser's Crossing helping. A won header is the shot; a lost one is
   cleared. About a quarter of open-play chances are headed. This supersedes ADR-0059's statement that a cross does not
-  change the chance that follows it. A header is decided by Heading, so Finishing is worth less (a side of
-  finishers scores 16% more than a side of strugglers, 24% at M3).
+  change the chance that follows it. A header is decided by Heading, so Finishing now has a term of its own on
+  every shot, headers included: a side of 20-Finishing players scores about 46% more than a side of 6s (it was 24%
+  at M3, and 16% with headers and no term).
 - **The man at the ball is the man nearest it.** The carrier who starts a possession, the two who contest a loose
   ball and the man who heads a cross are weighted by how near the formation puts them, and a defender is held to a
   small share beyond halfway. A defender carrying the ball past halfway falls from 21.5% to 3.4% of the engine's
   carries; the film's defender receptions past halfway from 9.0% to 3.5% (v9: 31.7%).
 - Twin strikers differing only in Positioning, 18 against 4, now take 2.2 against 0.9 shots a match: Positioning
   counts in being found as well as in the shot. See ADR-0061 for the knob if it is too much.
-- `ChainDrivesOutcomeTests`; twelve more rules constants (`Chain*`, `ShooterChainBonusBasisPoints`,
+- `ChainDrivesOutcomeTests`; fourteen more rules constants (`Finishing*`, `Chain*`, `ShooterChainBonusBasisPoints`,
   `CrossHeader*`, `CrossCreationMultiplierBasisPoints`, `ReachWeightFloorBasisPoints`).
 - `PositioningEdgeTests`; three rules constants (`AerialDuelPositioningWeight`, `PositioningFloorBasisPoints`,
   `PositioningCeilingBasisPoints`); an `offball` mode in `tools/simulation-benchmarks`.

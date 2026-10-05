@@ -154,10 +154,10 @@ public sealed class EngineV6SkillTests
         var finishers = Goals(All(20, MatchAttributeName.Finishing));
         var strugglers = Goals(All(6, MatchAttributeName.Finishing));
 
-        // About a quarter of the chances from open play are headers since engine-v10, and a header is decided by
-        // Heading, so Finishing is worth less than it was: over 3,000 matches the finishers score 16% more, where
-        // they scored 24% more before. The 200 matches here are noisy, hence the margin.
-        finishers.Should().BeGreaterThan(strugglers * 1.05, "a side of finishers scores clearly more than a side of strugglers");
+        // A side of 20s against a side of 6s: 20 is more than three times 6, and over 3,000 matches the finishers score
+        // about 46% more (engine-v10 gave Finishing its own term on every shot, headers included). The 200 matches here
+        // are noisy, about 9%, hence the margin under the 40% that is asked for.
+        finishers.Should().BeGreaterThan(strugglers * 1.30, "a side of finishers scores clearly more than a side of strugglers");
     }
 
     [Fact]

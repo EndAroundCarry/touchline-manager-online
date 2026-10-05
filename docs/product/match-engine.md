@@ -382,8 +382,16 @@ decides the chance:
 zoneMultiplier  = central 15_000 | inside 10_000 | wide 8_000
 base            = BaseShotGoalBasisPoints (865) × zoneMultiplier / 10_000
 contest         = shooter's effective skill − (opponent Goalkeeping rating / AttributeRatingFactor)   (hundredths of an attribute point)
-goalChance      = clamp(base + swing(contest, ShotQualitySwingBasisPoints = 1_900 per ShotContestReference = 150 points), 220, 5_600)
+goalChance      = clamp(base + swing(contest, ShotQualitySwingBasisPoints = 1_900 per ShotContestReference = 150 points)
+                       + finishing, 220, 5_600)
+finishing       = swing(shooter's effective Finishing − FinishingGoalReference (11) points, FinishingGoalSwingBasisPoints = 3_500 per 150 points)
 ```
+
+`finishing` is added to every shot, a header included (`engine-v10`): the contest above reads the skill the shot
+asks for (Heading for a header), and Finishing is whether it goes in. It is read against 11, not the lab's sheet value of 13,
+because effective skill is lower than the sheet (§6.3), so the lab's average side is untouched.
+A side of 20-Finishing players scores about 46% more than a side of 6s, over 4,000 matches (the requirement is
+at least 40%).
 
 Through `engine-v5` the swing was applied per 1,000 — the rating-scale reference — to a gap of at most 19 on
 the attribute scale, so the whole skill range moved a shot by about a third of a percentage point.
@@ -941,6 +949,7 @@ stays on the pitch).
 | `Receiver*` | see §7.10 | Sight, pull, the four score weights and the choice gains (§7.10, `engine-v10`). |
 | `ChainProgressSwingBasisPoints`, `ChainCreationOpennessSwingBasisPoints`, `ChainCreationChoiceSwingBasisPoints` | 700, 600, 500 | How far the chain's quality nudges progression and creation (`engine-v10`). |
 | `ChainWeakestOpennessReference`, `ChainFinalOpennessReference`, `ChainChoiceReference` | 5_200, 6_900, 6_200 | The measured means the nudges centre on (`engine-v10`). |
+| `FinishingGoalSwingBasisPoints` / `FinishingGoalReference` | 3_500 / 11 | How much the shooter's Finishing moves his chance of scoring, on every shot (§7.3, `engine-v10`). |
 | `ShooterChainBonusBasisPoints` | 25_000 | The player the ball was played in to multiplies his weight for the shot by this (`engine-v10`). |
 | `CrossHeaderAttackerBonus` / `CrossHeaderDeliveryBaseline` / `CrossHeaderDeliveryAerialWeight` | 13_000 / 13 / 3 | The aerial duel of an open-play cross (§7.3, `engine-v10`). |
 | `ReachWeightFloorBasisPoints` | 500 | What a player out of reach keeps of his weight to go up for a cross or pick the ball up (`engine-v10`). |

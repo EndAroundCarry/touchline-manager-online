@@ -244,10 +244,15 @@ a ground ball, so a crossed approach's creation chance is multiplied by `CrossCr
 12,300, which keeps the shots from crosses at what they were: 26.9% of open-play chances come from a crossed
 approach, 24.2% of all open-play chances are now headed.
 
-**Finding: Finishing is worth less.** A header is decided by Heading, so the quarter of open-play chances that are
-headers no longer read Finishing. Over 3,000 matches a side of 20-Finishing players scores 15.6% more than a side
-of 6s, where it scored 23.5% more at M3; `Finishing_counts_when_the_shot_is_taken` asked for 15% on 200 matches and
-now asks for 5% (the 200-match sample is worth about 9%).
+**Finding: Finishing was worth less, and is given its own term.** A header is decided by Heading, so the quarter of
+open-play chances that are headers stopped reading Finishing: over 3,000 matches a side of 20-Finishing players
+scored 15.6% more than a side of 6s, where it had scored 23.5% more at M3. A 20 is more than three times a 6, and the
+requirement is at least 40%. Finishing now has a term of its own on every shot, headers included
+(`FinishingGoalSwingBasisPoints` = 3,500 per 150 points, read against `FinishingGoalReference` = 11, the effective
+skill of the lab's average finisher: at 13 the term pulled the lab's goals down 4%). Over 4,000 matches the side of
+20s scores 1.844 goals and the side of 6s 1.263, **46% more**; goals per match over 20,000 are 2.881 (v9: 2.898), shots
+27.16, and 7+ goal matches 2.9%. `Finishing_counts_when_the_shot_is_taken` asks for 30% on its 200 matches, whose
+noise is about 9%. The swing is the knob if 46% is too much or too little.
 
 **Finding: position-aware picks, because the formation moves the whole block with the ball.** The formation resolver
 pushes defenders up with the ball, so by the formation alone a centre half is "near" a ball in the other box. Three
