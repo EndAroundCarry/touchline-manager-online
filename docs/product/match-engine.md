@@ -323,24 +323,28 @@ three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` onc
    possessions begin with a genuine 50/50, contested by the players the scramble asks for (pace,
    acceleration, work rate). Winning it, the side carries on; losing it is a hard turnover — the approach is cut
    5–25% of the way along, the defender has the ball, and the defence clears it.
-7. **Progression**: `6_200 ± swing(2400)` against the control differential, clamped to **3_400…9_000**. A
+7. **Progression**: `6_200 ± swing(2400)` against the control differential, plus the chain's nudge (§7.10,
+   at most `ChainProgressSwingBasisPoints` = 700 either way), clamped to **3_400…9_000**. A
    failure cuts the approach 40–80% of the way along. It is an offside
    (`OffsideShareOfTurnoverBasisPoints` = 800) — a through ball to the offside line, ahead of the ball, and a
    free kick for the defending side — or a plain turnover, cleared towards the middle third.
-8. **The carrier's 1v1 ground duel** (engine-v3), at the final-third entry point: the carrier is drawn by
-   dribbling and the tackler by tackling, each weighted by his band (§7.9), and the winner buys (or loses)
+8. **The carrier's 1v1 ground duel** (engine-v3), at the final-third entry point: the carrier is the player
+   the ball was played in to (§7.10; drawn by dribbling and his band when nobody was) and the tackler is drawn by
+   tackling, weighted by his band (§7.9), and the winner buys (or loses)
    `DribbleCreationBonusBasisPoints` = 1_200 of creation. A lost duel does not end the passage unless the
    defender fouled (`engine-v6`): a foul brings a free kick, a penalty (`DuelFoulPenaltyBasisPoints` = 300), or
    a card, and ends the possession.
 9. **Creation**: `2_400 ± swing(2800)` against
-   `(Creation + Finishing/2) − (DefensiveShape + Goalkeeping/2)`, plus the duel bonus, clamped to
-   **1_100…6_200**, then multiplied by the scoreline effect (§7.4). A failure is a corner
+   `(Creation + Finishing/2) − (DefensiveShape + Goalkeeping/2)`, plus the duel bonus and the chain's nudge
+   (§7.10, at most 1_100 either way), clamped to **1_100…6_200**, then multiplied by the scoreline effect (§7.4)
+   and, for an approach that ended in a cross, by `CrossCreationMultiplierBasisPoints` = 12_300. A failure is a corner
    (`CornerShareOfFailedCreationBasisPoints` = 1_200) — the ball goes out over the goal line, is set down at
    the flag, and is delivered into the box — or a turnover, cleared towards the middle third. A corner becomes a
    headed chance 3_400 bp of the time, moved by the corner taker's delivery (§7.9); the aerial duel then
    decides whether the attacker gets a shot, and a delivery that is not headed at goal is cleared.
-10. **The chance** (§7.3). The ball is played on to the shot point and struck from there; the event is
-    stamped where the shot was taken from.
+10. **The chance** (§7.3). The ball is played on to the shot point and struck from there, or, for an
+    approach that ended in a cross, delivered into the box and headed (§7.3); the event is stamped where the shot
+    was taken from.
 11. **The possession ends.** The injury roll is taken, the ball is placed at the restart's spot when one is
     pending (§7.8), and the passage is closed with its outcome.
 
@@ -348,7 +352,31 @@ three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` onc
 
 The shooter is drawn weighted by the effective skill the chance asks for — `Finishing` in open play,
 `Heading` from a corner — times his **Positioning edge** (`engine-v10`, §7.9), over the outfield players in slot
-order. The penalty taker is not drawn: it is the best finisher on the pitch, ties broken by identity.
+order. In open play the player the ball was played in to (§7.10) has his weight multiplied again by
+`ShooterChainBonusBasisPoints` = 25_000, because he has it, and the draw is still one. The penalty taker is not
+drawn: it is the best finisher on the pitch, ties broken by identity.
+
+**Crosses are headed** (`engine-v10`, ADR-0061; this supersedes the statement in ADR-0059 that a cross does not
+change the chance that follows it). When the approach ended in a cross and creation succeeded, the player the ball
+was played in to puts it into the box (a `Cross` waypoint at `HeaderPoint`, at `HeaderAltitude`) and an aerial duel
+decides the chance:
+
+- **Who goes up.** The attacker is drawn from the others (the crosser never heads his own ball), weighted by
+  Heading × his Positioning edge × how near the formation puts him to the ball; the marker is drawn the same way
+  from the defending side with the defender's edge (§7.9). How near is `ReachWeightFloorBasisPoints` = 500 at the
+  limit of his reach to all of his weight at the ball, falling off in a straight line, and a defender is
+  held to that floor for any ball beyond `DefenderReceiveMaxPointX`, however far the formation has pushed the block
+  up, so a centre half is a twentieth as likely to be the man in the box.
+- **The duel** is the corner's aerial duel (§7.9), with a bonus to the attacker of `CrossHeaderAttackerBonus`
+  = 13_000 (the attacker wins 75.5% of the headers, measured), plus the crosser's Crossing above `CrossHeaderDeliveryBaseline` = 13 at
+  `CrossHeaderDeliveryAerialWeight` = 3. Both jumpers' live ratings record it, and the winner is recorded with a
+  `Header`, the other as having gone for it.
+- **A won header is the shot**, from the box, in the zone the possession was planned for, with the header
+  winner's Heading in the goal chance. The cross is the creating pass and the crosser has the assist. **A lost one
+  creates nothing**: the cross was the pass that was stopped, and the defence clears it. There is no corner from
+  it.
+- A cross is a chance more readily than a ground ball, so the creation chance of a crossed approach is multiplied
+  by 12_300 (`CrossCreationMultiplierBasisPoints`), which keeps the shots from crosses at what they were.
 
 ```text
 zoneMultiplier  = central 15_000 | inside 10_000 | wide 8_000
@@ -532,6 +560,54 @@ at 2.90, and `ShortHandedPenaltyBasisPoints` 6_400 → 6_700 keeps a sending-off
   read from the mean of his Marking and Positioning. Positioning is also a fourth term of the aerial duel
   (`AerialDuelPositioningWeight` = 2) for both jumpers. No draw is added, and a side whose players are alike in
   Positioning shoots and scores as before; the edge moves who takes the chance within a side.
+
+### 7.10 Positions and the receiver chain (`engine-v10`)
+
+*(ADR-0061.)* Before `engine-v10` the ball's path was drawn first and the players were picked for it afterwards,
+one weighted draw each, with nothing reading where anybody stood. Since it, each pass of the approach has a passer
+and a receiver, chosen from where the formation puts the players and from the holder's Vision and Decisions.
+
+- **Where players stand** (`OffBallModel`, integer-only, no draw). `TacticalFormationResolver` gives each player a
+  spot for the ball's position, attackers with the ball and defenders without, resolved for each pass because the
+  block shifts with the ball. The away side is resolved in the home frame and flipped back. A target's **openness**
+  is the distance to the nearest defender (each defender's Marking and Positioning pulling him nearer or pushing
+  him further, the receiver's own Positioning edge widening it), full at `OffBallOpennessFullDistance` = 1_200 and
+  0 with a man on him. **Reach** is `OffBallReachDistance` = 4_000 times the receiver's Positioning edge.
+  **Progress** is the forward gain, full at 2_000. A holder is **under pressure** with a defender within 600.
+- **The depth rule.** Anyone may be given a ball back or across by up to `BackPassFreeDepth` = 500; a midfielder or
+  attacker up to `BackPassMaxDepth` = 2_500 back when the holder is under pressure; nobody further. A defender is a
+  receiver only while the holder is at or short of `DefenderReceiveMaxHolderX` = 4_500 and where he takes it at or
+  short of `DefenderReceiveMaxPointX` = 5_000; the goalkeeper never is.
+- **Choosing the receiver** (`ReceiverChooser`). For each leg the holder (the carrier at the start, then the previous
+  receiver) is *shown* a teammate with a chance from `ReceiverSeeLowestBasisPoints` = 3_500 at Vision 1 to
+  `ReceiverSeeHighestBasisPoints` = 9_800 at Vision 20, less up to 3_500 for a teammate 6_000 or more away. Of those
+  he sees, the ones who can *reach* the point and pass the depth rule are *scored*: openness, progress, reach and
+  the fit with the side's pass-focus lane, weighted 4/3/2/2. One is drawn with weight
+  `100 + score² × gain / 100`, the gain running from `ReceiverChoiceGainLowest` = 2 (Decisions 1, nearly flat) to
+  `ReceiverChoiceGainHighest` = 24 (Decisions 20, the best placed is about 25 times likelier than the worst). A
+  receiver is also weighted by his Passing, and on a possession the play draws already ended with that pass lost,
+  by what is left of Passing. The planned touch moves `ReceiverPullBasisPoints` = 2_500 of the way to him, never out
+  of its lane, and the last touch of the approach never moves. When nobody is seen and eligible the holder keeps the
+  ball for the leg (rare; solo play is `engine-v10`'s last milestone).
+- **One leg further.** The chain runs one pass past the approach, to the final-third entry point, which only a
+  progressing attack plays. The player it goes to is the carrier of the ground duel (step 8 of §7.2) and, in open
+  play, the favoured shooter and the crosser (§7.3). If the holder found nobody, he carries it in, the duel's carrier
+  is drawn as it always was, and nobody is favoured.
+- **Its own stream.** The chain draws from `new Pcg32(seed * 1_000_037 + ordinal)`, with a fixed number of draws per
+  leg (one for every outfield player, then the choice), so it never moves a play draw. The opening carrier is drawn
+  from the geometry stream, with one draw as before, weighted by Dribbling times how near the formation puts him to
+  the ball.
+- **The chain's quality drives the outcome.** The chain is played before the progression roll, because how it was
+  played is part of what the roll weighs. Its **weakest** pass's openness, over the approach's legs, moves the
+  chance the attack progresses by up to ±`ChainProgressSwingBasisPoints` = 700 about
+  `ChainWeakestOpennessReference` = 5_200, the mean of the passes the engine plays; the openness of the **last**
+  receiver (up to ±600 about 6_900) and the mean **score** of the receivers the holders chose (up to ±500 about
+  6_200) move the chance it creates a shot. The references are the measured means, so the nudges move who creates
+  chances, not how many. A possession lost on a pass is played again as far as it got.
+- **Credit.** `PassTally` credits each pass of the approach to its passer, the pass that creates the chance to the
+  man who has the ball (or, if he takes the shot, to the man who played it in to him) and the failed final pass to
+  the passer of the lost leg. `AssistPlanner` credits an open-play goal the same way; a set piece keeps its
+  weighted draw. The pass into the final third is not counted, as before.
 
 ### 7.x Pass focus (`engine-v8`; shots and crosses `engine-v9`)
 
@@ -861,6 +937,14 @@ stays on the pitch).
 | `AggressiveTacklingDuelScoreBonus` / `StayOnFeetDuelScorePenalty` | 6 / 4 | The tackling nudge, in attribute points. |
 | `GroundDuel*Weight`, `AerialDuel*Weight`, `Scramble*Weight` | 4/3/3, 4/3/3, 5/3/2/2, 3/3/2 | The skills each duel reads (the aerial duel's fourth term, Positioning, from `engine-v10`). |
 | `PositioningFloorBasisPoints` / `PositioningCeilingBasisPoints` | 7_000 / 13_000 | The Positioning edge on a shot or header weight, at Positioning 1 and 20 (`engine-v10`). |
+| `OffBall*`, `BackPass*Depth`, `DefenderReceiveMax*X` | 1_200, 4_000, 2_000, 600; 500, 2_500; 4_500, 5_000 | Openness, reach, progress, pressure, the depth rule (§7.10, `engine-v10`). |
+| `Receiver*` | see §7.10 | Sight, pull, the four score weights and the choice gains (§7.10, `engine-v10`). |
+| `ChainProgressSwingBasisPoints`, `ChainCreationOpennessSwingBasisPoints`, `ChainCreationChoiceSwingBasisPoints` | 700, 600, 500 | How far the chain's quality nudges progression and creation (`engine-v10`). |
+| `ChainWeakestOpennessReference`, `ChainFinalOpennessReference`, `ChainChoiceReference` | 5_200, 6_900, 6_200 | The measured means the nudges centre on (`engine-v10`). |
+| `ShooterChainBonusBasisPoints` | 25_000 | The player the ball was played in to multiplies his weight for the shot by this (`engine-v10`). |
+| `CrossHeaderAttackerBonus` / `CrossHeaderDeliveryBaseline` / `CrossHeaderDeliveryAerialWeight` | 13_000 / 13 / 3 | The aerial duel of an open-play cross (§7.3, `engine-v10`). |
+| `ReachWeightFloorBasisPoints` | 500 | What a player out of reach keeps of his weight to go up for a cross or pick the ball up (`engine-v10`). |
+| `CrossCreationMultiplierBasisPoints` | 12_300 | A crossed approach creates a chance this much more readily, so the header leaves the shots as they were (`engine-v10`). |
 | `DuelTackler*Weight` / `DuelCarrier*Weight` | 4/3/1, 1/3/4 | Band weights (defence/midfield/attack) in drawing the two players. |
 | `DuelShortHandedPenaltyBasisPoints` | 9_800 | Per missing player, on a duel skill. |
 | `DuelFoulPenaltyBasisPoints` | 300 | A duel foul that is a penalty. |
@@ -1052,6 +1136,10 @@ a test that is switched off catches nothing.
 | `ReplayDirectorTests` | `replay-v4`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
 | `FilmScriptTests`, `FilmMotionTests` | Every possession scripted into contiguous beats that join except at a cut; a cross only from a wide position into the box; restarts taken by the owning side; the players the engine named at their beats; a goal followed by its celebration and a cut; no teleports; receivers at the ball when it arrives; a carrier at the ball; the keeper at a save; a goal ending in the goal mouth; the ball never left standing outside the holds; fixed hold lengths; quiet play condensed before the pace rises. |
 | `BallPlayStatisticsTests` | `engine-v7` (§8.2): a completed count is a nonnegative subset of its attempted one; nobody who did not take the pitch passed or dribbled; an assist is a completed pass; counting is repeatable; a side's volumes and completion rates read like football; a better passer has the ball more and completes a higher share. |
+| `OffBallModelTests` | `engine-v10` (§7.10): home and away mirror, openness falls with a nearby defender, the depth rule's truth table, determinism. |
+| `ReceiverChooserTests`, `NamedReceiverPassageTests` | `engine-v10` (§7.10): a better Vision sees more, a better Decisions chooses the better placed, the pull stays in its lane and the last touch never moves, every ball received is received by a man of the side that had it, nobody passes to himself, and no defender is given the ball beyond halfway. |
+| `ChainDrivesOutcomeTests` | `engine-v10` (§7.10, §7.3): the chain's quality nudges are zero at the reference and bounded, the ball played into the final third goes to the man who fights the duel, the man it ended with shoots more than his share, a cross ends in a header from the box that the defence can win, and a header that scores is the crosser's assist. |
+| `ReceiverChoiceRegressionTests` | A hash of every event of 40 matches, re-pinned at each `engine-v10` milestone that moves play. |
 | `PositioningEdgeTests` | `engine-v10` (§7.9): the edge runs from the floor to the ceiling and never leaves them, only rises with skill, is neutral in the middle of the scale, is lower for a tired player, reads a defender's Marking and Positioning, and the twin striker with the higher Positioning takes more of the shots. |
 | `PassFocusShotsAndCrossesTests` | `engine-v9` (§7.x): each focus's shot zones sum to 100 and left and right mirror; no preference keeps the 40/20/10 zones and a volume of 10,000; the measured shot lanes follow each focus; crosses come from the flanks, both wings cross more and a left focus crosses more from the left; the wings shoot more and the centre less while goals stay within 15% and a shot is worth more from the middle; one side's focus does not move the other's shots. |
 | `PassFocusTests` | `engine-v8` (§7.x): a `Balanced` draw is returned unchanged; a focused draw stays on the pitch and never moves backwards; a uniform draw lands in the rules' lane shares; the measured lane shares of the ball match each option's calibration, and both wings send more wide than a single flank; left and right mirror; the away side is steered to its own left; one side's focus does not steer the other's ball; a focus is part of the snapshot's identity. |

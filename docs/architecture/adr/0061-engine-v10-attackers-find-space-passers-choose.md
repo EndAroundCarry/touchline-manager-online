@@ -60,7 +60,8 @@ Engine 10 and rules set 9 span all of them; the golden hashes are re-pinned at e
    receiver. Passes, passers and assists are credited to the people who made them. Drawn from a separate
    stream, so no event moves.
 4. **The chain drives the outcome**, and an open-play cross now gives a headed chance, which supersedes the v9
-   statement that a cross does not change the chance that follows it. Recalibrated to about 2.90 goals.
+   statement that a cross does not change the chance that follows it (ADR-0059 now says so). Recalibrated to about
+   2.90 goals.
 5. **Solo play**: the holder may dribble on or shoot from distance, by Decisions.
 6. **Replay polish** and the final documentation.
 
@@ -197,6 +198,114 @@ soonest, so a few more beats are stretched and the pace settles about 0.1x highe
 93% of matches (the test asks for 90%). Quiet possessions the film condenses still merge their ground moves into one
 pass by design, so their intermediate receivers are not shown; every possession with a chance in it, and the two before
 it, keeps all of them.
+
+### M4: The chain drives the outcome, and a cross is headed (built)
+
+**The chain is played before the progression roll**, because how the ball was played up the pitch is now part of
+what the roll weighs. It draws from its own stream, so playing it early moves no play draw, and a possession the
+attack loses on the way is played again as far as it got, with the lost pass known (the legs before the lost one
+come out the same). Three readings of it nudge the two probabilities the ratings used to decide alone:
+
+- the openness of its **weakest** pass over the approach moves the chance the attack **progresses**
+  (`ChainProgressSwingBasisPoints` = 700 either way, about `ChainWeakestOpennessReference` = 5,200);
+- the openness of the **last receiver** (600 about 6,900) and the mean **score of the receivers the holders chose**
+  (500 about 6,200) move the chance it **creates a shot**.
+
+The references are the measured means of 49,000 possessions, so the nudges move who creates chances and not how
+many. They are bounded well under the ratings' own swings (700 against 2,400 for progression; 1,100 against 2,800
+for creation), and a test pins that.
+
+**One leg further: the pass into the final third.** The first build named the ground duel's carrier from the chain
+(the M3 finding said that was M4's). The holder then carried the ball from the pressure point to the entry point on
+foot, and the film, which moves a carrier at running pace where it moves a pass at the speed of the ball, got 10%
+more real-time motion: the pace went from 2.65x to 2.91x and only 48% of films stayed in the 1.8-2.9x band. The
+fix is the natural one: the chain runs one pass past the approach, to the entry point, which only a progressing
+attack plays. The holder chooses who gets it there like any other pass, and that player fights the duel, is the
+favoured shooter, and puts the cross in. The pass is not counted in the tally, as before. When nobody is eligible
+the holder carries it in, and the duel's carrier is drawn as it always was (a defender can be that carrier: 21.5%
+of the duel's carries past halfway at M3, and this fallback is rare). The approach's own legs are unchanged by it.
+
+**The shooter** is the same single weighted draw, with the weight of the player the ball was played in to
+multiplied by `ShooterChainBonusBasisPoints` = 25,000 on top of Finishing and his Positioning edge. The ball that
+created the shot is credited to the player who has it, or, if he takes the shot himself, to the man who played it
+in to him (`PossessionPassing.CreatorFor`); `PassTally` credits the creating leg the same way for shots that do
+not score. The bonus is not what makes Positioning matter so much (see below): trying it mid-milestone, the twin gap was 1.9x
+at 15,000 and 2.1x at 25,000.
+
+**A cross is a header.** When the approach ended in a cross and creation succeeded, the man the ball was played in
+to puts it into the box (a `Cross` waypoint at `HeaderPoint`, at `HeaderAltitude`) and the chance is an aerial duel
+between the best-placed attacker (Heading, his Positioning edge, and how near the formation puts him to the box;
+never the crosser) and the defender the formation puts there. The duel is the corner's, with the attacker
+`CrossHeaderAttackerBonus` = 13,000 ahead (the attacker wins 75.5% of them over 600 matches, 7.4 crossed chances a match) and the crosser's Crossing
+above 13 adding to it. A won header is the shot, from the box, in the zone the possession was planned for, so the
+shot-zone shares of ADR-0059 stand; a lost one creates nothing, the cross is cleared, and there is no corner from
+it (a corner after a lost cross would put two header contests in one passage). A cross is a chance more readily than
+a ground ball, so a crossed approach's creation chance is multiplied by `CrossCreationMultiplierBasisPoints` =
+12,300, which keeps the shots from crosses at what they were: 26.9% of open-play chances come from a crossed
+approach, 24.2% of all open-play chances are now headed.
+
+**Finding: Finishing is worth less.** A header is decided by Heading, so the quarter of open-play chances that are
+headers no longer read Finishing. Over 3,000 matches a side of 20-Finishing players scores 15.6% more than a side
+of 6s, where it scored 23.5% more at M3; `Finishing_counts_when_the_shot_is_taken` asked for 15% on 200 matches and
+now asks for 5% (the 200-match sample is worth about 9%).
+
+**Finding: position-aware picks, because the formation moves the whole block with the ball.** The formation resolver
+pushes defenders up with the ball, so by the formation alone a centre half is "near" a ball in the other box. Three
+places picked a player with no regard to where he stood and put a defender at the ball in the attacking half: the
+carrier who begins the possession (a rebound or block that stays with the same side starts it there), the two players
+who contest a loose ball, and the man who heads a cross. They now weight by Dribbling, pace or Heading times how near
+the formation puts him to the ball (`ReachWeightFloorBasisPoints` = 500 at the limit of his reach, all of it at the
+ball), and a defender is held to the floor for any ball beyond `DefenderReceiveMaxPointX`. The draw count is the
+same. The duel's carrier, drawn by the play stream before, is the receiver of the entry pass.
+
+| Reading | engine-v9 | M3 | M4 |
+|---|---|---|---|
+| Goals per match (20,000) | 2.898 | 2.899 | 2.898 |
+| Shots per match | 27.22 | 27.22 | 27.17 |
+| Home possession | 52.10% | 52.10% | 52.11% |
+| Fouls, yellows, reds per match | 21.37, 3.40, 0.28 | 21.37, 3.40, 0.28 | 21.38, 3.41, 0.29 |
+| Penalties per match | 0.241 | 0.241 | 0.244 |
+| Matches with 7+ goals | 2.79% | 2.80% | 2.97% |
+| Passes attempted per match | | 622 | 626 |
+| Passes completed, Defence / Midfield / Attack | | 90% / 77% / 77% | 92% / 77% / 77% |
+| Share of passes by Defence / Midfield / Attack | | 14.4 / 56.0 / 29.6% | 9.8 / 58.2 / 32.0% |
+| Open-play chances that are headed | 0% | 0% | 24.2% |
+| Defender carries the ball past halfway (the engine's touches) | | 21.5% | 3.4% |
+| Defender receives past halfway, as the film shows it | 31.7% | 9.0% | 3.5% |
+| ... of which the chain's receivers | | 0.0% | 0.0% |
+| Film length p05 / p50 / p95 (10,000) | 9.90 / 10.13 / 10.41 | 9.90 / 10.12 / 10.42 | 9.91 / 10.13 / 10.41, max 10.76 |
+| Teleports outside cuts | 0 | 0 | 0 |
+| Film pace p50, inside 1.8-2.9x | 2.54x, 97.9% | 2.64x, 92.8% | 2.65x, 90.1% |
+| Moves lengthened for constraints | 18.4% | 19.7% | 20.4% |
+| Golden match | 2-2 | 2-2 | 3-2 |
+
+The 7+ goals share is the one reading that moved against its limit (3.0%): it is 2.82-3.05% over 10,000-match runs
+and 2.97% over 20,000. The 3.5% of film receptions left to a defender past halfway are in the passages the film
+fills in itself (the header at a corner, a free kick's delivery, a clearance): the film picks the receiver of a
+ball the engine does not name, and that is the replay milestone's. The engine's own receivers are 0.0%.
+
+Positioning and the mind, over 4,000 matches:
+
+| Reading | engine-v9 | M1 | M3 | M4 |
+|---|---|---|---|---|
+| Twin strikers, Positioning 18 against 4: shots per match | 1.470 against 1.491 | 1.704 against 1.151 | 1.718 against 1.156 | 2.225 against 0.890 |
+| ... goals per match | 0.144 against 0.150 | 0.167 against 0.117 | 0.172 against 0.120 | 0.235 against 0.095 |
+| Whole home side Vision and Decisions 4 against an even side, goals | | | 1.348 - 1.467 | 1.329 - 1.446 |
+| ... 13 | | | 1.585 - 1.348 | 1.586 - 1.301 |
+| ... 18 | | | 1.759 - 1.293 | 1.765 - 1.222 |
+
+Shots and goals by position family, with role-shaped squads (Finishing 16 up front, 11 in midfield, 6 at the back,
+Heading 13, 11, 14), Defence / Midfield / Attack: 23.0 / 45.0 / 32.1% of shots at M3, 19.5 / 49.8 / 30.7% at M4. A
+striker takes 15% of the shots, a midfielder 12% and a defender 5%, the defenders' mostly from set pieces, which still
+draw from the whole side.
+
+**Finding: Positioning now counts three times, and the gap at the extremes is 2.5x.** It lifts the shooter's weight
+(M1), it makes a player likelier to be found (his openness and reach in the receiver's score, M2) and likelier to be
+the one at the ball (the header and the opening carrier). The twin strikers at 18 and 4 are the extreme of the
+scale; the gap in a realistic squad (say 14 against 8) would be about 1.5x, read off the same curve. The knob, if it is
+too much, is the floor and ceiling of the edge (`PositioningFloorBasisPoints`, `PositioningCeilingBasisPoints`):
+8,000 and 12,000 would make it about 1.8x at the extremes, by the same estimate. Vision and Decisions help the side by what they do to the receiver (the +0.54 goal
+difference at 18 against +0.47 at M3, and the 4-side is no worse), and the effect stays bounded by the nudges.
 
 ## Consequences
 

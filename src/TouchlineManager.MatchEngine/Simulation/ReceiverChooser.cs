@@ -12,7 +12,9 @@ namespace TouchlineManager.MatchEngine.Simulation;
 /// <param name="Passer">The player on the ball at the start of the leg.</param>
 /// <param name="Receiver">The player the ball was played to, or null when nobody was and the holder kept it.</param>
 /// <param name="To">Where the ball went: the planned point, moved partway towards the receiver unless it is the last.</param>
-internal readonly record struct ReceiverLeg(Guid Passer, Guid? Receiver, SpatialPoint To)
+/// <param name="Openness">How open the receiver was where he took it, 0…10,000; nothing for a leg the holder kept.</param>
+/// <param name="Score">The score the holder gave the receiver he chose, 0…10,000; nothing for a leg the holder kept.</param>
+internal readonly record struct ReceiverLeg(Guid Passer, Guid? Receiver, SpatialPoint To, int Openness = 0, int Score = 0)
 {
     /// <summary>Gets whether the leg is a pass, as opposed to the holder carrying the ball on.</summary>
     public bool IsPass => Receiver is not null;
@@ -28,6 +30,67 @@ internal sealed record ReceiverChain(IReadOnlyList<ReceiverLeg> Legs, Guid Carri
 {
     /// <summary>Gets the players who played each pass of the chain, in order.</summary>
     public IReadOnlyList<Guid> Passers { get; } = [.. Legs.Where(leg => leg.IsPass).Select(leg => leg.Passer)];
+
+    /// <summary>
+    /// Reads how good the chain was, for the chances it moves: how open its most marked receiver was, how open the
+    /// player it ends with was, and how well its holders chose (`engine-v10`).
+    /// </summary>
+    /// <remarks>
+    /// A chain nobody played a pass in says nothing, so it reads as the average the rules centre on. The weakest
+    /// receiver is read over the legs of the approach, which is what the attack has to get through to progress; the
+    /// last receiver and the choices are read over every leg, the one into the final third included.
+    /// </remarks>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="approachLegs">How many legs, from the start, are the approach.</param>
+    public ChainQuality Quality(EngineRulesV2 rules, int approachLegs = int.MaxValue)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+
+        var passes = Legs.Where(leg => leg.IsPass).ToList();
+        var approach = Legs.Take(approachLegs).Where(leg => leg.IsPass).ToList();
+
+        return new ChainQuality(
+            approach.Count == 0 ? rules.ChainWeakestOpennessReference : approach.Min(leg => leg.Openness),
+            passes.Count == 0 ? rules.ChainFinalOpennessReference : passes[^1].Openness,
+            passes.Count == 0 ? rules.ChainChoiceReference : passes.Sum(leg => leg.Score) / passes.Count);
+    }
+}
+
+/// <summary>
+/// How good a receiver chain was, on the 0…10,000 scale of the scores it was built from (`engine-v10`).
+/// </summary>
+/// <param name="Weakest">How open the most marked of its receivers was.</param>
+/// <param name="Final">How open the player it ends with was.</param>
+/// <param name="Choice">The mean score of the receivers its holders chose.</param>
+internal readonly record struct ChainQuality(int Weakest, int Final, int Choice)
+{
+    /// <summary>Gets what the quality moves the chance the attack progresses by, in basis points.</summary>
+    /// <param name="rules">The rules in force.</param>
+    public int ProgressNudge(EngineRulesV2 rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+
+        return Probability.Swing(
+            Weakest - rules.ChainWeakestOpennessReference,
+            rules.ChainProgressSwingBasisPoints,
+            EngineRulesV2.Certain);
+    }
+
+    /// <summary>Gets what the quality moves the chance the attack creates a shot by, in basis points.</summary>
+    /// <param name="rules">The rules in force.</param>
+    public int CreationNudge(EngineRulesV2 rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+
+        return Probability.Swing(
+                Final - rules.ChainFinalOpennessReference,
+                rules.ChainCreationOpennessSwingBasisPoints,
+                EngineRulesV2.Certain)
+            + Probability.Swing(
+                Choice - rules.ChainChoiceReference,
+                rules.ChainCreationChoiceSwingBasisPoints,
+                EngineRulesV2.Certain);
+    }
 }
 
 /// <summary>
@@ -78,13 +141,18 @@ internal static class ReceiverChooser
     /// <param name="points">The planned path: the start, the touches between, and where it ends.</param>
     /// <param name="firstHolder">The player on the ball at the start.</param>
     /// <param name="lost">Whether the ball was lost on the last leg, which makes its passer likelier a poor one.</param>
+    /// <param name="unpulledFrom">
+    /// The index of the first point that is never moved towards its receiver; the last point when it is not given.
+    /// A path that goes on past the point the ball can be lost at holds the rest of it still too.
+    /// </param>
     /// <returns>The chain, or null when the first holder is not an outfield player on the pitch.</returns>
     public static ReceiverChain? Choose(
         MatchState state,
         MatchSide side,
         IReadOnlyList<SpatialPoint> points,
         Guid firstHolder,
-        bool lost)
+        bool lost,
+        int? unpulledFrom = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(points);
@@ -109,7 +177,7 @@ internal static class ReceiverChooser
         for (var index = 1; index < points.Count; index++)
         {
             var target = points[index];
-            var last = index == points.Count - 1;
+            var last = index >= (unpulledFrom ?? points.Count - 1);
 
             var teammates = OffBallModel.Place(attacking.Active, isHome, hasPossession: true, target, attacking.Instructions, rules);
             var defenders = OffBallModel.Place(defending.Active, !isHome, hasPossession: false, target, defending.Instructions, rules);
@@ -123,11 +191,16 @@ internal static class ReceiverChooser
                 rules,
                 stream);
 
-            var arrival = chosen is { } receiver ? LandingPoint(target, receiver, last, isHome, rules) : target;
+            var arrival = chosen is { } receiver ? LandingPoint(target, receiver.Player, last, isHome, rules) : target;
 
-            legs.Add(new ReceiverLeg(holder.Participant.ParticipantId, chosen?.Player.Participant.ParticipantId, arrival));
+            legs.Add(new ReceiverLeg(
+                holder.Participant.ParticipantId,
+                chosen?.Player.Player.Participant.ParticipantId,
+                arrival,
+                chosen?.Openness ?? 0,
+                chosen?.Score ?? 0));
 
-            holder = chosen?.Player ?? holder;
+            holder = chosen?.Player.Player ?? holder;
             from = arrival;
             defendersAtBall = defenders;
         }
@@ -274,10 +347,10 @@ internal static class ReceiverChooser
         MatchPassFocus Focus,
         bool NextIsLost);
 
-    /// <summary>A teammate who is seen and eligible, with his selection weight.</summary>
-    private readonly record struct Option(OffBallPlayer Player, int Weight);
+    /// <summary>A teammate who is seen and eligible, with his selection weight, his openness and his score.</summary>
+    private readonly record struct Option(OffBallPlayer Player, int Weight, int Openness, int Score);
 
-    private static OffBallPlayer? ChooseOne(
+    private static Option? ChooseOne(
         Leg leg,
         IReadOnlyList<OffBallPlayer> teammates,
         IReadOnlyList<OffBallPlayer> defenders,
@@ -325,8 +398,10 @@ internal static class ReceiverChooser
                 continue;
             }
 
+            var openness = OffBallModel.Openness(arrival, teammate.Player, defenders, rules);
+
             var score = Score(
-                OffBallModel.Openness(arrival, teammate.Player, defenders, rules),
+                openness,
                 OffBallModel.ProgressScore(leg.From, arrival, leg.IsHome, rules),
                 OffBallModel.ReachScore(teammate, arrival, rules),
                 PassagePlanner.LaneFit(teammate.Spot, leg.IsHome, leg.Focus, rules),
@@ -334,7 +409,7 @@ internal static class ReceiverChooser
 
             var weight = HandsWeight(ChoiceWeight(score, gain), teammate.Player, leg.NextIsLost, rules);
 
-            options.Add(new Option(teammate, weight));
+            options.Add(new Option(teammate, weight, openness, score));
             total += weight;
         }
 
@@ -349,7 +424,7 @@ internal static class ReceiverChooser
 
             if (draw < running)
             {
-                return option.Player;
+                return option;
             }
         }
 

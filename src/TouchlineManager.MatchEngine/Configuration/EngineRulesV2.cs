@@ -595,6 +595,81 @@ public sealed record EngineRulesV2
     /// </summary>
     public int ReceiverChoiceGainHighest { get; init; } = 24;
 
+    /// <summary>
+    /// How far, in basis points, the weakest pass of an approach moves the chance the attack progresses, when its
+    /// receiver was as open as could be or as marked as could be (`engine-v10`).
+    /// </summary>
+    public int ChainProgressSwingBasisPoints { get; init; } = 700;
+
+    /// <summary>
+    /// The openness of the weakest pass of an approach, 0…10,000, at which the chain moves neither the chance the
+    /// attack progresses nor the chance it creates one: the mean of the passes the engine plays (`engine-v10`).
+    /// </summary>
+    public int ChainWeakestOpennessReference { get; init; } = 5_200;
+
+    /// <summary>
+    /// How far, in basis points, the openness of the player the approach ends with moves the chance it creates a
+    /// shot (`engine-v10`).
+    /// </summary>
+    public int ChainCreationOpennessSwingBasisPoints { get; init; } = 600;
+
+    /// <summary>
+    /// The openness of the player the approach ends with, 0…10,000, at which he moves nothing: the mean of the
+    /// approaches the engine plays (`engine-v10`).
+    /// </summary>
+    public int ChainFinalOpennessReference { get; init; } = 6_900;
+
+    /// <summary>
+    /// How far, in basis points, the quality of the holders' choices along the approach moves the chance it creates
+    /// a shot (`engine-v10`).
+    /// </summary>
+    public int ChainCreationChoiceSwingBasisPoints { get; init; } = 500;
+
+    /// <summary>
+    /// The mean score of the receivers the holders chose along an approach, 0…10,000, at which the choices move
+    /// nothing: the mean of the approaches the engine plays (`engine-v10`).
+    /// </summary>
+    public int ChainChoiceReference { get; init; } = 6_200;
+
+    /// <summary>
+    /// What the player the approach ends with multiplies his weight for the shot by, in basis points on top of his
+    /// skill and his Positioning edge: he has the ball, so he is the likeliest to shoot (`engine-v10`).
+    /// </summary>
+    public int ShooterChainBonusBasisPoints { get; init; } = 25_000;
+
+    /// <summary>
+    /// The attribute point a crosser's Crossing is measured from, to see how far his delivery is above or below
+    /// the common standard (`engine-v10`).
+    /// </summary>
+    public int CrossHeaderDeliveryBaseline { get; init; } = 13;
+
+    /// <summary>
+    /// How much a crosser's delivery, above or below <see cref="CrossHeaderDeliveryBaseline"/>, adds to or takes
+    /// from the aerial score of the attacker who goes for the ball (`engine-v10`).
+    /// </summary>
+    public int CrossHeaderDeliveryAerialWeight { get; init; } = 3;
+
+    /// <summary>
+    /// What an attacker going for an open-play cross is given in the aerial duel, in hundredths of an attribute
+    /// point times the duel's weights: a cross is played to where the attackers are, and a defender clearing it has
+    /// less time than one who has watched a corner be set up (`engine-v10`).
+    /// </summary>
+    public int CrossHeaderAttackerBonus { get; init; } = 13_000;
+
+    /// <summary>
+    /// The share of a player's weight for being the one at the ball that he keeps when the formation puts him out of
+    /// reach of it, in basis points; at the ball he keeps all of it. It picks the player who goes up for an open-play
+    /// cross and the one who has the ball when a possession begins (`engine-v10`).
+    /// </summary>
+    public int ReachWeightFloorBasisPoints { get; init; } = 500;
+
+    /// <summary>
+    /// What a move that ended in a cross multiplies its chance of creating a shot by, in basis points: a cross is
+    /// played into the box more readily than a ground ball is, and the header that follows decides how many of them
+    /// are chances, so the shots from crosses stay what they were before the header was contested (`engine-v10`).
+    /// </summary>
+    public int CrossCreationMultiplierBasisPoints { get; init; } = 12_300;
+
     /// <summary>Weight of Pace in both sides' scramble score.</summary>
     public int ScramblePaceWeight { get; init; } = 3;
 
@@ -1529,6 +1604,39 @@ public sealed record EngineRulesV2
                 $"The receiver choice gains are inverted: lowest {ReceiverChoiceGainLowest}, highest {ReceiverChoiceGainHighest}.");
         }
 
+        foreach (var (name, value) in new[]
+                 {
+                     (nameof(ChainWeakestOpennessReference), ChainWeakestOpennessReference),
+                     (nameof(ChainFinalOpennessReference), ChainFinalOpennessReference),
+                     (nameof(ChainChoiceReference), ChainChoiceReference),
+                 })
+        {
+            if (value is < 0 or > Certain)
+            {
+                problems.Add($"{name} must be a score in 0..{Certain}, was {value}.");
+            }
+        }
+
+        if (ReachWeightFloorBasisPoints is < 0 or > Certain)
+        {
+            problems.Add($"ReachWeightFloorBasisPoints must be in 0..{Certain}, was {ReachWeightFloorBasisPoints}.");
+        }
+
+        if (CrossCreationMultiplierBasisPoints < Certain)
+        {
+            problems.Add($"CrossCreationMultiplierBasisPoints must not make a cross less likely to create a chance, was {CrossCreationMultiplierBasisPoints}.");
+        }
+
+        if (ShooterChainBonusBasisPoints < Certain)
+        {
+            problems.Add($"ShooterChainBonusBasisPoints must not take weight away from the player on the ball, was {ShooterChainBonusBasisPoints}.");
+        }
+
+        if (CrossHeaderDeliveryBaseline is < 1 or > 20 || CrossHeaderDeliveryAerialWeight < 0 || CrossHeaderAttackerBonus < 0)
+        {
+            problems.Add("The cross header constants must be a baseline in 1..20 and non-negative weights.");
+        }
+
         if (ShotFinalThirdXMinBasisPoints <= Certain / 2)
         {
             problems.Add(
@@ -1610,6 +1718,9 @@ public sealed record EngineRulesV2
         yield return (nameof(ReceiverSeeHighestBasisPoints), ReceiverSeeHighestBasisPoints);
         yield return (nameof(ReceiverSeeDistancePenaltyBasisPoints), ReceiverSeeDistancePenaltyBasisPoints);
         yield return (nameof(ReceiverPullBasisPoints), ReceiverPullBasisPoints);
+        yield return (nameof(ChainProgressSwingBasisPoints), ChainProgressSwingBasisPoints);
+        yield return (nameof(ChainCreationOpennessSwingBasisPoints), ChainCreationOpennessSwingBasisPoints);
+        yield return (nameof(ChainCreationChoiceSwingBasisPoints), ChainCreationChoiceSwingBasisPoints);
         yield return (nameof(BasePossessionBasisPoints), BasePossessionBasisPoints);
         yield return (nameof(PossessionControlSwingBasisPoints), PossessionControlSwingBasisPoints);
         yield return (nameof(PossessionHomeBonusBasisPoints), PossessionHomeBonusBasisPoints);

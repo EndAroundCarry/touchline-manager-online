@@ -31,6 +31,9 @@ namespace TouchlineManager.MatchEngine.Simulation;
 /// </remarks>
 internal static class PossessionSimulator
 {
+
+
+
     /// <summary>What one possession is being played with, so the phases do not each take eight parameters.</summary>
     /// <param name="Side">The side in possession.</param>
     /// <param name="Defending">The side defending.</param>
@@ -179,7 +182,15 @@ internal static class PossessionSimulator
             && attackingX >= rules.FreeKickShootingRangeX
             && state.Random.RollBasisPoints(rules.FreeKickAwardBasisPoints);
 
-        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, lost: false, scramble: null);
+        RecordApproach(
+            state,
+            possession,
+            plan.Approach,
+            plan.ApproachEndsInCross,
+            passer: true,
+            lost: false,
+            scramble: null,
+            OpeningCarrier(state, possession, scramble: null));
 
         if (penalty)
         {
@@ -302,7 +313,7 @@ internal static class PossessionSimulator
 
         if (state.Random.RollBasisPoints(rules.ScrambleOpeningBasisPoints))
         {
-            scramble = ResolveScramble(state, side);
+            scramble = ResolveScramble(state, side, plan.Approach[0]);
         }
 
         if (scramble is { Lost: true } lostScramble)
@@ -316,7 +327,8 @@ internal static class PossessionSimulator
                 endsInCross: false,
                 passer: false,
                 lost: true,
-                scramble: null);
+                scramble: null,
+                OpeningCarrier(state, possession, scramble: null));
 
             state.RecordTouch(lostScramble.AttackerId, PassageAction.Run);
             state.RecordTouch(lostScramble.DefenderId, PassageAction.Interception);
@@ -327,6 +339,21 @@ internal static class PossessionSimulator
             return;
         }
 
+        // The approach is played through before the progression is rolled, because how it was played is part of what
+        // the roll weighs: a ball into a crowd is likelier to be lost than one to a free man (`engine-v10`). The
+        // chain draws from a stream of its own, so playing it early moves no play draw.
+        var carrier = OpeningCarrier(state, possession, scramble);
+
+        // It runs on one pass further than the approach does: the ball played into the final third, which only a
+        // progressing attack plays. The approach's legs come out the same with or without it.
+        var approachLegs = plan.Approach.Count - 1;
+
+        var chain = carrier is Guid first
+            ? ReceiverChooser.Choose(state, side, [.. plan.Approach, plan.EntryPoint], first, lost: false, unpulledFrom: approachLegs)
+            : null;
+
+        var quality = chain?.Quality(rules, approachLegs);
+
         var control = Probability.Differential(attacker.Ratings.BuildUp, defender.Ratings.DefensivePressure);
 
         var progressChance = Probability.Band(
@@ -334,13 +361,15 @@ internal static class PossessionSimulator
                 + Probability.Swing(
                     control,
                     rules.ProgressControlSwingBasisPoints,
-                    rules.RatingDifferentialReference),
+                    rules.RatingDifferentialReference)
+                + (quality?.ProgressNudge(rules) ?? 0),
             rules.MinProgressBasisPoints,
             rules.MaxProgressBasisPoints);
 
         if (!state.Random.RollBasisPoints(progressChance))
         {
-            // The attack breaks down part of the way up the pitch, not after it has arrived.
+            // The attack breaks down part of the way up the pitch, not after it has arrived. Its chain is played again
+            // as far as it got, with the pass that was lost known.
             RecordApproach(
                 state,
                 possession,
@@ -348,7 +377,8 @@ internal static class PossessionSimulator
                 endsInCross: false,
                 passer: true,
                 lost: true,
-                scramble);
+                scramble,
+                carrier);
 
             // The ball was lost on the last pass of the approach: the one an interception or an offside
             // flag ended (`engine-v7`).
@@ -359,18 +389,19 @@ internal static class PossessionSimulator
             return;
         }
 
-        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, lost: false, scramble);
+        RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, lost: false, scramble, carrier, chain);
 
-        // The carrier takes the ball into the final third, where the last defender engages.
-        state.MoveBallAndRecord(plan.EntryPoint, PassageWaypointKind.Pass);
+        // The ball is played into the final third, where the last defender engages. When the approach was played
+        // through, the holder chooses who gets it there, and that is the carrier the duel is fought with (`engine-v10`).
+        RecordEntry(state, plan, chain);
 
         var creation = Probability.Differential(
             attacker.Ratings.Creation + (attacker.Ratings.Finishing / 2),
             defender.Ratings.DefensiveShape + (defender.Ratings.Goalkeeping / 2));
 
         // The 1v1 the carrier fights to reach the creation phase: a beat man makes the chance more likely,
-        // a tackle shuts the passage down.
-        var duel = ResolveGroundDuel(state, side);
+        // a tackle shuts the passage down. The carrier is the player the ball was played in to (`engine-v10`).
+        var duel = ResolveGroundDuel(state, side, state.Passing.EntryReceiver);
 
         if (duel.FoulerId is Guid foulerId)
         {
@@ -386,7 +417,8 @@ internal static class PossessionSimulator
                 + Probability.Swing(
                     creation,
                     rules.CreationSwingBasisPoints,
-                    rules.RatingDifferentialReference),
+                    rules.RatingDifferentialReference)
+                + (quality?.CreationNudge(rules) ?? 0),
             rules.MinCreationBasisPoints,
             rules.MaxCreationBasisPoints);
 
@@ -397,6 +429,16 @@ internal static class PossessionSimulator
             creationChance,
             PassagePlanner.ChanceVolume(state.SideOf(side).Instructions.PassFocus, rules));
 
+        // A cross is a chance more readily than a ground ball, and the header that follows decides how many are
+        // (`engine-v10`).
+        if (plan.ApproachEndsInCross)
+        {
+            creationChance = Probability.Band(
+                Probability.Apply(creationChance, rules.CrossCreationMultiplierBasisPoints),
+                0,
+                EngineRulesV2.Certain);
+        }
+
         if (!state.Random.RollBasisPoints(creationChance))
         {
             Finish(state, ResolveFailedCreation(state, possession));
@@ -404,11 +446,78 @@ internal static class PossessionSimulator
             return;
         }
 
+        if (plan.ApproachEndsInCross && state.Passing.EntryReceiver is Guid crosser)
+        {
+            // A move that ended in a cross ends in a header, which the defence can win (`engine-v10`).
+            Finish(state, ResolveCrossedChance(state, possession, crosser));
+
+            return;
+        }
+
         // The attack breaks through: the ball is played on to the shot point and struck from there.
-        state.MoveBallAndRecord(plan.ShotPoint, PassageWaypointKind.Pass);
         state.Passing.CreatedShot();
-        ChanceSimulator.ResolveOpenPlay(state, side, plan.Zone, PassagePlanner.StrikeFrom(plan, plan.ShotPoint, rules));
+        ChanceSimulator.ResolveOpenPlay(state, side, plan.Zone, plan.ShotPoint, PassagePlanner.StrikeFrom(plan, plan.ShotPoint, rules));
         Finish(state, PassageOutcome.OpenPlayShot);
+    }
+
+    /// <summary>Plays the ball into the final third: to the receiver the holder chose, or carried there when he chose nobody.</summary>
+    private static void RecordEntry(MatchState state, PlannedPassage plan, ReceiverChain? chain)
+    {
+        if (chain is null)
+        {
+            state.MoveBallAndRecord(plan.EntryPoint, PassageWaypointKind.Pass);
+
+            return;
+        }
+
+        var leg = chain.Legs[plan.Approach.Count - 1];
+
+        if (leg.Receiver is not Guid receiver)
+        {
+            state.MoveBallAndRecord(plan.EntryPoint, PassageWaypointKind.Carry);
+            state.RecordTouch(leg.Passer, PassageAction.Carry);
+
+            return;
+        }
+
+        state.RecordTouch(leg.Passer, PassageAction.Pass);
+        state.MoveBallAndRecord(plan.EntryPoint, PassageWaypointKind.Pass);
+        state.RecordTouch(receiver, PassageAction.Receive);
+        state.Passing.Entered(leg.Passer, receiver);
+    }
+
+    /// <summary>
+    /// Plays the end of a move that was crossed: the ball is delivered into the box and contested in the air
+    /// (`engine-v10`).
+    /// </summary>
+    /// <remarks>
+    /// The player on the ball puts it into the box, the best-placed of the others goes up for it against the
+    /// defender marking, and when the attacker wins it the header is the shot. When the defence wins it the attack
+    /// created nothing: the cross is cleared.
+    /// </remarks>
+    private static PassageOutcome ResolveCrossedChance(MatchState state, Possession possession, Guid crosser)
+    {
+        var rules = state.Rules;
+        var plan = possession.Plan;
+
+        state.RecordTouch(crosser, PassageAction.Cross);
+        state.MoveBallAndRecord(plan.HeaderPoint, PassageWaypointKind.Cross, rules.HeaderAltitude);
+
+        if (ChanceSimulator.ResolveCross(
+                state,
+                possession.Side,
+                plan.Zone,
+                PassagePlanner.StrikeFrom(plan, plan.HeaderPoint, rules),
+                crosser))
+        {
+            return PassageOutcome.OpenPlayShot;
+        }
+
+        // The defence won the ball in the air: the cross was the pass that was stopped, and it is cleared.
+        state.Passing.LostCreation();
+        ClearBall(state, plan);
+
+        return PassageOutcome.CreationFailed;
     }
 
     /// <summary>
@@ -458,6 +567,8 @@ internal static class PossessionSimulator
     /// <param name="passer">Whether the path was played through by passes, and so has a chain of receivers.</param>
     /// <param name="lost">Whether the ball was lost at the end of the path.</param>
     /// <param name="scramble">The scramble the side in possession won at the start, if there was one.</param>
+    /// <param name="carrier">The player who has the ball at the start.</param>
+    /// <param name="chain">The chain already played for this whole path, or null to play it here.</param>
     private static void RecordApproach(
         MatchState state,
         Possession possession,
@@ -465,10 +576,11 @@ internal static class PossessionSimulator
         bool endsInCross,
         bool passer,
         bool lost,
-        Scramble? scramble)
+        Scramble? scramble,
+        Guid? carrier,
+        ReceiverChain? chain = null)
     {
         var side = possession.Side;
-        var derived = possession.Derived;
 
         // The first waypoint is the possession's start: a dead ball set down, or the loose ball picked up
         // where it lay — and the carrier who receives there.
@@ -476,22 +588,19 @@ internal static class PossessionSimulator
             points[0],
             possession.Restart == PassageRestartKind.None ? PassageWaypointKind.Carry : PassageWaypointKind.Restart);
 
-        var carrier = PickOutfield(state, side, derived, MatchAttributeName.Dribbling);
-
         if (scramble is { } won)
         {
             // The contested loose ball is where the possession begins, and the side that won it carries on
             // from there: both contestants are at the ball.
             state.RecordTouch(won.AttackerId, PassageAction.Carry);
             state.RecordTouch(won.DefenderId, PassageAction.Run);
-            carrier = won.AttackerId;
         }
         else if (carrier is Guid carrierId)
         {
             state.RecordTouch(carrierId, PassageAction.Carry);
         }
 
-        var chain = passer && carrier is Guid first
+        chain ??= passer && carrier is Guid first
             ? ReceiverChooser.Choose(state, side, points, first, lost)
             : null;
 
@@ -529,8 +638,44 @@ internal static class PossessionSimulator
         }
 
         // Every leg that was a pass was one, unless the ball was lost before anybody played it on.
-        state.Passing.Completed(chain.Passers.Count);
-        state.Passing.Chained(chain);
+        state.Passing.Chained(chain, points.Count - 1);
+        state.Passing.Completed(state.Passing.ChainPassers.Count);
+    }
+
+    /// <summary>
+    /// Gets the player who has the ball when the possession begins: the one who won the scramble, or else one drawn
+    /// from the geometry stream, weighted by Dribbling and by how near the formation puts him to the ball.
+    /// </summary>
+    /// <remarks>
+    /// The draw is taken whether or not a scramble was won, so the geometry stream is the same either way. A player
+    /// the formation keeps far from where the possession starts is a fraction as likely to be the one who picks the
+    /// ball up there, so a centre half is not the man who has it in the other team's half (`engine-v10`).
+    /// </remarks>
+    private static Guid? OpeningCarrier(MatchState state, Possession possession, Scramble? scramble)
+    {
+        var rules = state.Rules;
+        var attacking = state.SideOf(possession.Side);
+        var start = possession.Plan.Approach[0];
+
+        var placed = OffBallModel.Place(
+            attacking.Active,
+            possession.Side == MatchSide.Home,
+            hasPossession: true,
+            start,
+            attacking.Instructions,
+            rules);
+
+        var drawn = OffBallModel.Pick(
+            [.. placed.Where(candidate => candidate.Player.Slot.Family != MatchPositionFamily.Goalkeeper)],
+            candidate => OffBallModel.ReachWeight(
+                candidate,
+                EffectiveSkill.Hundredths(candidate.Player, MatchAttributeName.Dribbling, rules),
+                start,
+                possession.Side == MatchSide.Home,
+                rules),
+            possession.Derived)?.Player.Participant.ParticipantId;
+
+        return scramble?.AttackerId ?? drawn;
     }
 
     /// <summary>
@@ -592,27 +737,38 @@ internal static class PossessionSimulator
     /// Resolves the loose-ball scramble that opens a passage: whether the possession side keeps the ball.
     /// </summary>
     /// <remarks>
-    /// The nearest players from each side contest it, chosen by the legs a scramble asks for (engine-v3). When
-    /// either side has nobody to contest it there is no scramble, which is the same as the side in possession
-    /// keeping the ball.
+    /// The nearest players from each side contest it, chosen by the legs a scramble asks for (engine-v3) and, since
+    /// `engine-v10`, by how near the formation puts them to the ball. When either side has nobody to contest it there
+    /// is no scramble, which is the same as the side in possession keeping the ball.
     /// </remarks>
     /// <returns>The scramble and who contested it, or null when there was nobody to contest it.</returns>
-    private static Scramble? ResolveScramble(MatchState state, MatchSide possessionSide)
+    private static Scramble? ResolveScramble(MatchState state, MatchSide possessionSide, SpatialPoint ball)
     {
-        var attacker = WeightedPick.From(
-            state.SideOf(possessionSide).Outfield,
-            slot => ScrambleWeight(slot, state.Rules),
+        var rules = state.Rules;
+        var home = possessionSide == MatchSide.Home;
+        var attacking = state.SideOf(possessionSide);
+        var defending = state.OpponentOf(possessionSide);
+
+        var attackers = OffBallModel.Place(attacking.Active, home, hasPossession: true, ball, attacking.Instructions, rules);
+        var defenders = OffBallModel.Place(defending.Active, !home, hasPossession: false, ball, defending.Instructions, rules);
+
+        var attackerPick = OffBallModel.Pick(
+            [.. attackers.Where(placed => placed.Player.Slot.Family != MatchPositionFamily.Goalkeeper)],
+            placed => OffBallModel.ReachWeight(placed, ScrambleWeight(placed.Player, rules), ball, home, rules),
             state.Random);
 
-        var defender = WeightedPick.From(
-            state.OpponentOf(possessionSide).Outfield,
-            slot => ScrambleWeight(slot, state.Rules),
+        var defenderPick = OffBallModel.Pick(
+            [.. defenders.Where(placed => placed.Player.Slot.Family != MatchPositionFamily.Goalkeeper)],
+            placed => OffBallModel.ReachWeight(placed, ScrambleWeight(placed.Player, rules), ball, attackingFor: null, rules),
             state.Random);
 
-        if (attacker is null || defender is null)
+        if (attackerPick is not { } attackerPlaced || defenderPick is not { } defenderPlaced)
         {
             return null;
         }
+
+        var attacker = attackerPlaced.Player;
+        var defender = defenderPlaced.Player;
 
         var kept = DuelResolver.ResolveScramble(
             DuelContender.Of(state.SideOf(possessionSide), attacker),
@@ -813,17 +969,21 @@ internal static class PossessionSimulator
     /// carrier mostly from midfield and attack, the defender mostly from defence and midfield, so a striker is
     /// rarely the tackler (engine-v6).
     /// </remarks>
-    private static GroundDuelResult ResolveGroundDuel(MatchState state, MatchSide possessionSide)
+    private static GroundDuelResult ResolveGroundDuel(MatchState state, MatchSide possessionSide, Guid? holderId)
     {
         var rules = state.Rules;
         var attackers = state.SideOf(possessionSide);
         var defenders = state.OpponentOf(possessionSide);
 
-        var carrier = WeightedPick.From(
+        var drawn = WeightedPick.From(
             attackers.Outfield,
             slot => EffectiveSkill.Hundredths(slot, MatchAttributeName.Dribbling, rules)
                 * BandWeight(slot, rules.DuelCarrierDefenceWeight, rules.DuelCarrierMidfieldWeight, rules.DuelCarrierAttackWeight),
             state.Random);
+
+        // The player who has the ball fights the duel, when the approach was played through to him; the draw is
+        // taken either way, so the stream after it is the same (`engine-v10`).
+        var carrier = attackers.Outfield.FirstOrDefault(slot => slot.Participant.ParticipantId == holderId) ?? drawn;
 
         var tackler = WeightedPick.From(
             defenders.Outfield,

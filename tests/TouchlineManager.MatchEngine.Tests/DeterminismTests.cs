@@ -103,16 +103,16 @@ public sealed class DeterminismTests
     public void The_golden_hash_for_a_known_snapshot_is_pinned()
     {
         // The most important test in the project. If this fails, an engine change has altered what a historical
-        // match would replay as. Engine version 9 re-pinned it (the pass focus gained its shot zones, chance
-        // volumes and cross lanes in the rules; the scoreline is still 2-2), and the engine-v8 values were retired
-        // with their version. From a
+        // match would replay as. Engine version 10 re-pinned it at each of its milestones (the receiver chain drives the
+        // outcome and a cross is headed in the last of them; the golden match is now 3-2), and the values of the
+        // versions before it were retired with them. From a
         // version's release onward, any change requires a new engine version and a new labelled constant
         // rather than an updated hash.
         var result = MatchSimulator.Simulate(TestMatchFactory.Even());
 
         result.OutputHash.Should().Be(GoldenOutputHash);
         result.InputHash.Should().Be(GoldenInputHash);
-        result.HomeGoals.Should().Be(2);
+        result.HomeGoals.Should().Be(3);
         result.AwayGoals.Should().Be(2);
     }
 
@@ -122,7 +122,7 @@ public sealed class DeterminismTests
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
         EngineConfiguration.HashOf(EngineRulesV2.Default)
-            .Should().Be("48f8b5e5c1395cc13bfdab262ecbeedbaea402d26fdcb0d0671af55a23b58080");
+            .Should().Be("9c29906382ee5d8f2e4a9e67a327c92df0ecd1533fb7b5fbd1227f23c1dd263d");
     }
 
     [Fact]
@@ -164,8 +164,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "e24f869ab39a74c35ec30868d1791832be26eda1d84329eeee3f5336add11036";
+        "d9c96ce7897544713cc88781206a62861c3f702482a9143a77fe8fb377323b30";
 
     private const string GoldenOutputHash =
-        "386d86c84753bdb36cc940f83eba53bbe753a9f67e5370d879fe94e37ee593af";
+        "2628ce8321204e9ca2b801f785483f5e5ae9e9f50e7c95fe5c14842f981e8054";
 }

@@ -31,13 +31,33 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
   defender is never given the ball beyond halfway. The film shows the engine's receiver, and `ReplayDirector.Version`
   is `replay-v5`. Twelve rules constants (`Receiver*`, `DefenderReceiveMaxPointX`); `ReceiverChooserTests`,
   `NamedReceiverPassageTests`, `ReceiverChoiceRegressionTests`.
+- **The chain drives the outcome (M4).** How open the weakest pass of the approach was nudges the chance the attack
+  progresses, and how open the last receiver was and how well the holders chose nudge the chance it creates a shot;
+  both are small and centred on the measured mean, so goals stay at 2.90 (2.898 over 20,000 matches). The chain runs
+  one pass past the approach, into the final third, and the player it goes to fights the duel, is the favoured
+  shooter and crosses; a pass that sets a shot up is credited to the man who has the ball, or to the man who gave it
+  to him when he takes the shot.
+- **A cross is a header.** An approach that ends in a cross now ends in an aerial duel in the box between the
+  best-placed attacker (Heading, Positioning, how near the formation puts him) and the defender who can get to it, the
+  attacker favoured (he wins 75%) and the crosser's Crossing helping. A won header is the shot; a lost one is
+  cleared. About a quarter of open-play chances are headed. This supersedes ADR-0059's statement that a cross does not
+  change the chance that follows it. A header is decided by Heading, so Finishing is worth less (a side of
+  finishers scores 16% more than a side of strugglers, 24% at M3).
+- **The man at the ball is the man nearest it.** The carrier who starts a possession, the two who contest a loose
+  ball and the man who heads a cross are weighted by how near the formation puts them, and a defender is held to a
+  small share beyond halfway. A defender carrying the ball past halfway falls from 21.5% to 3.4% of the engine's
+  carries; the film's defender receptions past halfway from 9.0% to 3.5% (v9: 31.7%).
+- Twin strikers differing only in Positioning, 18 against 4, now take 2.2 against 0.9 shots a match: Positioning
+  counts in being found as well as in the shot. See ADR-0061 for the knob if it is too much.
+- `ChainDrivesOutcomeTests`; twelve more rules constants (`Chain*`, `ShooterChainBonusBasisPoints`,
+  `CrossHeader*`, `CrossCreationMultiplierBasisPoints`, `ReachWeightFloorBasisPoints`).
 - `PositioningEdgeTests`; three rules constants (`AerialDuelPositioningWeight`, `PositioningFloorBasisPoints`,
   `PositioningCeilingBasisPoints`); an `offball` mode in `tools/simulation-benchmarks`.
 
 ### Changed
 
 - **Versions.** `EngineVersions.Engine` = 10 (`engine-v10`), `RuleSet` = 9 (`engine-rules-v9`). The rules hash and
-  the golden hashes are re-pinned; the golden match is still 2-2. A database seeded under `engine-v9` must be
+  the golden hashes are re-pinned; the golden match is now 3-2. A database seeded under `engine-v9` must be
   archived and reseeded.
 
 ## Engine-v9 — the pass focus moves the shots and the crosses

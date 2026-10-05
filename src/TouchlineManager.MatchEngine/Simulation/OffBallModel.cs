@@ -263,6 +263,50 @@ internal static class OffBallModel
             && family != MatchPositionFamily.Defence;
     }
 
+    /// <summary>
+    /// Scales the weight a player is picked to be at the ball by how near the formation puts him to it: a player who
+    /// cannot get to it keeps a fraction of his weight, one who is there keeps all of it.
+    /// </summary>
+    /// <remarks>
+    /// An attacker who plays in defence is a fraction as likely to be the one at the ball once it is beyond
+    /// <see cref="EngineRulesV2.DefenderReceiveMaxPointX"/>, however near the formation has moved him: the block
+    /// moves up with the ball, but a centre half is not the man in the other team's box.
+    /// </remarks>
+    /// <param name="placed">The player and where he stands.</param>
+    /// <param name="weight">His weight before the ball is counted.</param>
+    /// <param name="target">Where the ball is, in pitch coordinates.</param>
+    /// <param name="attackingFor">The side that has the ball and attacks towards the high end of the pitch, or null for a defender.</param>
+    /// <param name="rules">The rules in force.</param>
+    public static int ReachWeight(OffBallPlayer placed, int weight, SpatialPoint target, bool? attackingFor, EngineRulesV2 rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+
+        if (attackingFor is bool isHome
+            && placed.Player.Slot.Family == MatchPositionFamily.Defence
+            && PassagePlanner.AttackingX(target.X, isHome) > rules.DefenderReceiveMaxPointX)
+        {
+            return Probability.Apply(weight, rules.ReachWeightFloorBasisPoints);
+        }
+
+        var reach = ReachScore(placed, target, rules);
+        var factor = rules.ReachWeightFloorBasisPoints
+            + (int)((long)(EngineRulesV2.Certain - rules.ReachWeightFloorBasisPoints) * reach / EngineRulesV2.Certain);
+
+        return Probability.Apply(weight, factor);
+    }
+
+    /// <summary>Picks one placed player, weighted; a draw is consumed whenever there is anybody to pick.</summary>
+    /// <param name="candidates">The candidates, in a caller-fixed order.</param>
+    /// <param name="weightOf">The selection weight of each candidate.</param>
+    /// <param name="random">The generator.</param>
+    public static OffBallPlayer? Pick(IReadOnlyList<OffBallPlayer> candidates, Func<OffBallPlayer, int> weightOf, Randomness.Pcg32 random)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(weightOf);
+
+        return candidates.Count == 0 ? null : WeightedPick.From(candidates, weightOf, random);
+    }
+
     /// <summary>Turns a point round the centre of the pitch, which is the same player seen from the other end.</summary>
     private static SpatialPoint Mirror(SpatialPoint point) =>
         new(SpatialPitch.PitchLength - point.X, SpatialPitch.PitchWidth - point.Y);

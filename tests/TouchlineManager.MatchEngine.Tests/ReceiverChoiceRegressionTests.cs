@@ -6,26 +6,28 @@ using TouchlineManager.MatchEngine.Model;
 namespace TouchlineManager.MatchEngine.Tests;
 
 /// <summary>
-/// The receiver chain names who passed to whom and moves the ball's waypoints, and nothing else (`engine-v10`).
+/// Pins what the events of a spread of matches are, so that a change to play shows up as a changed hash and not as a
+/// quiet difference (`engine-v10`).
 /// </summary>
 /// <remarks>
 /// <para>
-/// The chain draws from its own stream, so no play draw moves, and the final waypoint and the point a ball is
-/// lost at are never pulled, so every position an event is read off stays where it was. This test pins that: a
-/// hash of every event of a spread of matches, with the scoreline, as the engine played them before the chain
-/// existed. Passes, assists, passages and the film are allowed to move; this hash is not.
+/// When the receiver chain was only a record of who passed to whom (M3) this hash was the proof that it moved
+/// nothing: the chain drew from its own stream and never moved a point an event is read off, so the events of 40
+/// matches were what they were before it existed. Since M4 the chain drives the outcome and a cross is headed, so
+/// play moves on purpose and the value was re-pinned in the same commit, with the calibration it was re-pinned
+/// against.
 /// </para>
 /// <para>
-/// A change that moves it is a change to play, and belongs to a later milestone (the chain driving the outcome,
-/// solo play), where it is made on purpose and this value re-pinned in the same commit.
+/// A change that moves it is a change to play. Until engine-v10 is released it is re-pinned in the milestone that
+/// makes it (solo play is the next); after the release, a new engine version.
 /// </para>
 /// </remarks>
 public sealed class ReceiverChoiceRegressionTests
 {
-    private const string PinnedEventsHash = "a9d860ea3f596a172fec6881cc4d87fda465e9b4c8f3ee9d98d7bdffa62dc471";
+    private const string PinnedEventsHash = "fa77976d53b7f4cee20701218af53f555b4101753b3d11f44baeb7d50a387793";
 
     [Fact]
-    public void The_events_and_scorelines_of_forty_matches_are_what_they_were_before_the_receiver_chain()
+    public void The_events_and_scorelines_of_forty_matches_are_what_they_were_when_the_chain_began_to_drive_the_outcome()
     {
         var text = new StringBuilder();
 

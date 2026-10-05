@@ -1,6 +1,7 @@
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Ratings;
+using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Simulation;
 
@@ -27,13 +28,22 @@ internal static class ChanceSimulator
     /// <param name="state">The match state.</param>
     /// <param name="side">The side attacking.</param>
     /// <param name="zone">The shot zone the possession's passage was aimed at (`engine-v4`).</param>
+    /// <param name="shotPoint">Where the ball is played to, and the shot is taken from.</param>
     /// <param name="strike">Where the strike finishes, for each outcome it could have (`engine-v5`).</param>
-    public static void ResolveOpenPlay(MatchState state, MatchSide side, ShotZone zone, StrikePlan strike)
+    public static void ResolveOpenPlay(MatchState state, MatchSide side, ShotZone zone, SpatialPoint shotPoint, StrikePlan strike)
     {
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
 
-        var shooter = ChooseShooter(state, attacker, MatchAttributeName.Finishing);
+        // The player the move was played through to has the ball, so he is the likeliest to shoot (`engine-v10`).
+        var shooter = ChooseShooter(state, attacker, MatchAttributeName.Finishing, state.Passing.EntryReceiver);
+
+        // The ball is played on to the shot point, or carried there when the shooter is the one who has it.
+        state.MoveBallAndRecord(
+            shotPoint,
+            shooter is not null && shooter.Participant.ParticipantId == state.Passing.EntryReceiver
+                ? PassageWaypointKind.Carry
+                : PassageWaypointKind.Pass);
 
         if (shooter is null)
         {
@@ -43,6 +53,7 @@ internal static class ChanceSimulator
         // The shooter is the participant the simulation actually picked, and the ball is already at the
         // passage's shot point (engine-v4).
         state.RecordTouch(shooter.Participant.ParticipantId, PassageAction.Shot);
+        state.Passing.Shooter = shooter.Participant.ParticipantId;
 
         var goalChance = GoalChance(state, defender, shooter, zone, headed: false);
 
@@ -184,12 +195,7 @@ internal static class ChanceSimulator
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
         var headerer = ChooseShooter(state, attacker, MatchAttributeName.Heading);
-        var marker = WeightedPick.From(
-            defender.Outfield,
-            slot => PositioningEdge.Apply(
-                EffectiveSkill.Hundredths(slot, MatchAttributeName.Heading, state.Rules),
-                PositioningEdge.OfDefender(slot, state.Rules)),
-            state.Random);
+        var marker = ChooseMarker(state, defender);
 
         if (headerer is null || marker is null)
         {
@@ -198,11 +204,130 @@ internal static class ChanceSimulator
 
         // A good delivery puts the ball where the header can be won: the taker's edge is added to the
         // attacker's aerial score (engine-v6).
+        if (!ContestHeader(state, side, headerer, marker, deliveryEdge * state.Rules.CornerDeliveryAerialWeight))
+        {
+            return false;
+        }
+
+        var goalChance = GoalChance(state, defender, headerer, ShotZone.Central, headed: true);
+
+        Resolve(state, side, headerer, ShotZone.Central, goalChance, strike);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves the header at the end of an open-play cross, contested with the defender marking it (`engine-v10`).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The best-placed of the crosser's team-mates goes up for it, weighted by Heading, Positioning and how near the
+    /// formation puts him to the ball, against the defender who can get to it. The better the crosser's Crossing, the likelier it is won, and a
+    /// cross is played to where the attackers are, so the attacker starts ahead (<see cref="EngineRulesV2.CrossHeaderAttackerBonus"/>).
+    /// When he wins it the header is the shot, from the box and with the zone the possession's chance was planned
+    /// for, and the ball that set it up is the cross; when he loses, nothing is created and the caller gives the
+    /// stopped ball its ending.
+    /// </para>
+    /// </remarks>
+    /// <param name="state">The match state.</param>
+    /// <param name="side">The side crossing.</param>
+    /// <param name="zone">The shot zone the possession's chance was planned for.</param>
+    /// <param name="strike">Where the header finishes, for each outcome it could have.</param>
+    /// <param name="crosserId">The player who delivered the ball, who cannot be the one who heads it.</param>
+    /// <returns>Whether the attacker won the header and it became a chance on goal.</returns>
+    public static bool ResolveCross(MatchState state, MatchSide side, ShotZone zone, StrikePlan strike, Guid crosserId)
+    {
+        var rules = state.Rules;
+        var attacker = state.SideOf(side);
+        var defender = state.OpponentOf(side);
+        var crosser = attacker.Active.FirstOrDefault(slot => slot.Participant.ParticipantId == crosserId);
+
+        var delivery = crosser is null
+            ? 0
+            : EffectiveSkill.Hundredths(crosser, MatchAttributeName.Crossing, rules)
+                - (rules.CrossHeaderDeliveryBaseline * EffectiveSkill.Scale);
+
+        // Both go up from where they stand when the ball is in the box: the attacker the formation puts nearest it
+        // with the best Heading, against the defender who can get to it.
+        var isHome = side == MatchSide.Home;
+        var attackers = OffBallModel.Place(attacker.Active, isHome, hasPossession: true, strike.Origin, attacker.Instructions, rules);
+        var defenders = OffBallModel.Place(defender.Active, !isHome, hasPossession: false, strike.Origin, defender.Instructions, rules);
+
+        OffBallPlayer? headerer = OffBallModel.Pick(
+            [.. attackers.Where(placed => placed.Player.Slot.Family != MatchPositionFamily.Goalkeeper
+                && placed.Player.Participant.ParticipantId != crosserId)],
+            placed => OffBallModel.ReachWeight(
+                placed,
+                PositioningEdge.Apply(
+                    EffectiveSkill.Hundredths(placed.Player, MatchAttributeName.Heading, rules),
+                    PositioningEdge.Of(placed.Player, rules)),
+                strike.Origin,
+                isHome,
+                rules),
+            state.Random);
+
+        OffBallPlayer? marker = OffBallModel.Pick(
+            [.. defenders.Where(placed => placed.Player.Slot.Family != MatchPositionFamily.Goalkeeper)],
+            placed => OffBallModel.ReachWeight(
+                placed,
+                PositioningEdge.Apply(
+                    EffectiveSkill.Hundredths(placed.Player, MatchAttributeName.Heading, rules),
+                    PositioningEdge.OfDefender(placed.Player, rules)),
+                strike.Origin,
+                attackingFor: null,
+                rules),
+            state.Random);
+
+        if (headerer is not { } up || marker is not { } against)
+        {
+            return false;
+        }
+
+        var bonus = rules.CrossHeaderAttackerBonus + (delivery * rules.CrossHeaderDeliveryAerialWeight);
+
+        if (!ContestHeader(state, side, up.Player, against.Player, bonus))
+        {
+            return false;
+        }
+
+        // The cross is the ball that set the header up, and the header is the shot it created.
+        state.Passing.CreatedShot();
+        state.Passing.Shooter = up.Player.Participant.ParticipantId;
+
+        Resolve(state, side, up.Player, zone, GoalChance(state, defender, up.Player, zone, headed: true), strike);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Chooses the defender who goes up against a header: the one with the best Heading, as his Marking and
+    /// Positioning let him get to it (`engine-v10`).
+    /// </summary>
+    private static ActiveSlot? ChooseMarker(MatchState state, SideRuntime defender) =>
+        WeightedPick.From(
+            defender.Outfield,
+            slot => PositioningEdge.Apply(
+                EffectiveSkill.Hundredths(slot, MatchAttributeName.Heading, state.Rules),
+                PositioningEdge.OfDefender(slot, state.Rules)),
+            state.Random);
+
+    /// <summary>
+    /// Fights the aerial duel for a header, records its live ratings and who went up for it, and says who won.
+    /// </summary>
+    /// <remarks>
+    /// Both players' live ratings record the contest, and both are recorded at the ball: the one who won it with a
+    /// header, the other as having gone for it (`engine-v5`).
+    /// </remarks>
+    private static bool ContestHeader(MatchState state, MatchSide side, ActiveSlot headerer, ActiveSlot marker, int attackerBonus)
+    {
+        var attacker = state.SideOf(side);
+        var defender = state.OpponentOf(side);
+
         var aerial = DuelResolver.ResolveAerialDuel(
             DuelContender.Of(attacker, headerer),
             DuelContender.Of(defender, marker),
             side == MatchSide.Home,
-            deliveryEdge * state.Rules.CornerDeliveryAerialWeight,
+            attackerBonus,
             state.Rules,
             state.Random);
 
@@ -220,16 +345,7 @@ internal static class ChanceSimulator
         state.RecordTouch(winner.Participant.ParticipantId, PassageAction.Header);
         state.RecordTouch(loser.Participant.ParticipantId, PassageAction.Run);
 
-        if (!aerial.AttackerWon)
-        {
-            return false;
-        }
-
-        var goalChance = GoalChance(state, defender, headerer, ShotZone.Central, headed: true);
-
-        Resolve(state, side, headerer, ShotZone.Central, goalChance, strike);
-
-        return true;
+        return aerial.AttackerWon;
     }
 
     private static void Resolve(
@@ -422,17 +538,33 @@ internal static class ChanceSimulator
     /// goalkeeper is excluded — a goalkeeper taking a shot from open play is not a thing this engine models
     /// — and an attribute of 1 is floored at 1 by the picker so nobody is impossible. Since `engine-v10` the
     /// weight is the skill times the player's Positioning edge: the best finisher takes the shot, and the
-    /// one who finds the space takes it more often than one who stands where the defenders are.
+    /// one who finds the space takes it more often than one who stands where the defenders are. A player the
+    /// move was played through to (<paramref name="favoured"/>) has his weight multiplied again, because he has the
+    /// ball, and one who put it there (<paramref name="excluded"/>) is not a candidate.
     /// </remarks>
-    private static ActiveSlot? ChooseShooter(MatchState state, SideRuntime side, MatchAttributeName attribute)
+    private static ActiveSlot? ChooseShooter(
+        MatchState state,
+        SideRuntime side,
+        MatchAttributeName attribute,
+        Guid? favoured = null,
+        Guid? excluded = null)
     {
-        var outfield = side.Outfield;
+        var candidates = side.Outfield
+            .Where(slot => slot.Participant.ParticipantId != excluded)
+            .ToList();
 
         return WeightedPick.From(
-            outfield,
-            slot => PositioningEdge.Apply(
-                EffectiveSkill.Hundredths(slot, attribute, state.Rules),
-                PositioningEdge.Of(slot, state.Rules)),
+            candidates,
+            slot =>
+            {
+                var weight = PositioningEdge.Apply(
+                    EffectiveSkill.Hundredths(slot, attribute, state.Rules),
+                    PositioningEdge.Of(slot, state.Rules));
+
+                return slot.Participant.ParticipantId == favoured
+                    ? Probability.Apply(weight, state.Rules.ShooterChainBonusBasisPoints)
+                    : weight;
+            },
             state.Random);
     }
 

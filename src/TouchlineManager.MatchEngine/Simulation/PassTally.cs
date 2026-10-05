@@ -33,10 +33,28 @@ internal sealed class PossessionPassing(MatchSide Side)
     public Guid? AssistedBy { get; set; }
 
     /// <summary>
+    /// Gets the player who took the shot the possession created, when it created one (`engine-v10`): the ball that
+    /// set it up is not his own pass.
+    /// </summary>
+    public Guid? Shooter { get; set; }
+
+    /// <summary>
     /// Gets the players who played the approach's passes, in order, when the approach was played through chosen
     /// receivers (`engine-v10`); empty when it was not.
     /// </summary>
     public IReadOnlyList<Guid> ChainPassers { get; private set; } = [];
+
+    /// <summary>
+    /// Gets the player who played the ball to the one who has it (`engine-v10`): the last of the approach's passers,
+    /// or the one who played it into the final third.
+    /// </summary>
+    public Guid? ChainFeeder { get; private set; }
+
+    /// <summary>
+    /// Gets the player the ball was played to as it went into the final third (`engine-v10`), or null when it was
+    /// not played in: the possession was not played through, or the holder kept it and carried it there.
+    /// </summary>
+    public Guid? EntryReceiver { get; private set; }
 
     /// <summary>
     /// Gets the player who has the ball when the approach ends (`engine-v10`): the one who plays on whatever the
@@ -46,12 +64,32 @@ internal sealed class PossessionPassing(MatchSide Side)
 
     /// <summary>Records who played the approach's passes and who has the ball at the end of it.</summary>
     /// <param name="chain">The receivers the approach was played through.</param>
-    public void Chained(ReceiverChain chain)
+    /// <param name="approachLegs">How many of the chain's legs are the approach.</param>
+    public void Chained(ReceiverChain chain, int approachLegs = int.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(chain);
 
-        ChainPassers = chain.Passers;
-        ChainHolder = chain.Holder;
+        var legs = chain.Legs.Take(approachLegs).ToList();
+
+        ChainPassers = [.. legs.Where(leg => leg.IsPass).Select(leg => leg.Passer)];
+        ChainHolder = legs.Count == 0 ? chain.Carrier : legs[^1].Receiver ?? legs[^1].Passer;
+        ChainFeeder = ChainPassers.Count > 0 ? ChainPassers[^1] : null;
+    }
+
+    /// <summary>
+    /// Records that the ball was played into the final third to a player, who has it from there (`engine-v10`).
+    /// </summary>
+    /// <remarks>
+    /// The pass is not counted: it is the ball every possession that progresses plays, as it always was. The player
+    /// who has it from here plays the ball that creates the chance, or takes the shot himself.
+    /// </remarks>
+    /// <param name="passer">The player who played the ball in.</param>
+    /// <param name="receiver">The player who was given it.</param>
+    public void Entered(Guid passer, Guid receiver)
+    {
+        ChainFeeder = passer;
+        ChainHolder = receiver;
+        EntryReceiver = receiver;
     }
 
     /// <summary>
@@ -82,7 +120,7 @@ internal sealed class PossessionPassing(MatchSide Side)
             return holder;
         }
 
-        return ChainPassers.Count > 0 && ChainPassers[^1] != scorerId ? ChainPassers[^1] : null;
+        return ChainFeeder is Guid feeder && feeder != scorerId ? feeder : null;
     }
 
     /// <summary>Adds passes that found their man.</summary>
@@ -173,6 +211,12 @@ internal static class PassTally
             {
                 // The ball that set a goal up is the assist, so it is the assister's pass.
                 passer = assister;
+            }
+            else if (last && passing.FinalLegCreatedShot && passing.Shooter is Guid shooter && passing.CreatorFor(shooter) is Guid creator)
+            {
+                // The ball that set a shot up is the pass of the player who put it in the shooter's way, who is
+                // not the shooter (`engine-v10`).
+                passer = creator;
             }
             else if (passing.PasserOf(leg) is Guid played)
             {

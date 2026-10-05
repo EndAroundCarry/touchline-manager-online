@@ -36,9 +36,36 @@ internal static class OffBallProbe
     public static void Run(int matches, ulong seed, EngineRulesV2 rules)
     {
         Console.WriteLine("== Off-ball probe ==");
-        Receivers(Math.Min(matches, 1_000), seed, rules);
-        PassCredit(Math.Min(matches, 2_000), seed, rules);
-        PositioningTwins(matches, seed, rules);
+
+        // OFFBALL_ONLY=twins,finishing narrows a tuning run to the readings it needs.
+        var only = Environment.GetEnvironmentVariable("OFFBALL_ONLY");
+
+        bool Wanted(string section) => string.IsNullOrEmpty(only) || only.Contains(section, StringComparison.OrdinalIgnoreCase);
+
+        if (Wanted("receivers"))
+        {
+            Receivers(Math.Min(matches, 1_000), seed, rules);
+        }
+
+        if (Wanted("credit"))
+        {
+            PassCredit(Math.Min(matches, 2_000), seed, rules);
+        }
+
+        if (Wanted("twins"))
+        {
+            PositioningTwins(matches, seed, rules);
+        }
+
+        if (Wanted("finishing"))
+        {
+            Finishing(Math.Min(matches, 4_000), seed, rules);
+        }
+
+        if (Wanted("mind"))
+        {
+            MindTiers(Math.Min(matches, 4_000), seed, rules);
+        }
     }
 
     private static void Receivers(int matches, ulong seed, EngineRulesV2 rules)
@@ -57,6 +84,7 @@ internal static class OffBallProbe
         var carries = 0L;
         var defenceCarries = 0L;
         var families = new Dictionary<Guid, MatchPositionFamily>();
+        var defenceByOutcome = new Dictionary<string, long>();
 
         for (var index = 0; index < matches; index++)
         {
@@ -98,7 +126,9 @@ internal static class OffBallProbe
                     }
                 }
 
-                foreach (var waypoint in passage.Waypoints.Skip(1))
+                // Only a possession the attack lost on the way up is wholly approach; one that got through has the ball
+                // carried into the final third and on to the shot after it.
+                foreach (var waypoint in passage.Outcome == PassageOutcome.ProgressionFailed ? passage.Waypoints.Skip(1) : [])
                 {
                     switch (waypoint.Kind)
                     {
@@ -149,6 +179,7 @@ internal static class OffBallProbe
                         if (player.Family == MatchPositionFamily.Defence)
                         {
                             defencePastHalfway++;
+                            defenceByOutcome[passage.OutcomeCode] = defenceByOutcome.GetValueOrDefault(passage.OutcomeCode) + 1;
 
                             if (attackingX > 6_500)
                             {
@@ -171,9 +202,10 @@ internal static class OffBallProbe
         Console.WriteLine($"    received past halfway           {(double)pastHalfway / matches,9:F1} per match");
         Console.WriteLine($"    ... by a Defence player         {Pct(defencePastHalfway, pastHalfway),8}%   target near zero");
         Console.WriteLine($"    ... by one beyond x 6,500       {Pct(defenceDeepPastHalfway, pastHalfway),8}%   target zero");
+        Console.WriteLine($"    ... by the passage's outcome: {string.Join(", ", defenceByOutcome.OrderByDescending(pair => pair.Value).Take(6).Select(pair => $"{pair.Key} {Pct(pair.Value, defencePastHalfway)}%"))}");
         Console.WriteLine($"    by the engine's touches past halfway: chain receivers by a Defence player {Pct(chainDefenceReceives, chainReceives),6}% of {(double)chainReceives / matches:F1} per match;");
-        Console.WriteLine($"      ground-duel carriers (drawn by the play stream, not the chain) by a Defence player {Pct(defenceCarries, carries),6}% of {(double)carries / matches:F1} per match");
-        Console.WriteLine($"    legs the holder kept            {Pct(soloLegs, soloLegs + passLegs),8}%   of the carried and passed legs after each start, {(double)soloLegs / Math.Max(1, passages):F2} per possession");
+        Console.WriteLine($"      players carrying the ball (the duel's carrier is the chain's last receiver since M4) by a Defence player {Pct(defenceCarries, carries),6}% of {(double)carries / matches:F1} per match");
+        Console.WriteLine($"    legs the holder kept            {Pct(soloLegs, soloLegs + passLegs),8}%   of the legs of the possessions lost on the way up, {(double)soloLegs / Math.Max(1, passages):F2} per possession");
         Console.WriteLine();
     }
 
@@ -262,6 +294,164 @@ internal static class OffBallProbe
         Console.WriteLine($"    {"Positioning " + LowPositioning,-22} {low.Shots,8} {low.Goals,8}   {(double)low.Shots / matches:F3} shots, {(double)low.Goals / matches:F3} goals");
         Console.WriteLine($"    goals per match, both sides      {((double)homeGoals + awayGoals) / matches:F3}");
         Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Who takes the shots and scores the goals by position family, and how many open-play chances end in a header
+    /// (`engine-v10`, M4): the chain's last receiver should take more of them, and a cross should now be headed.
+    /// </summary>
+    private static void Finishing(int matches, ulong seed, EngineRulesV2 rules)
+    {
+        var shots = new Dictionary<MatchPositionFamily, long>();
+        var goals = new Dictionary<MatchPositionFamily, long>();
+        var totalShots = 0L;
+        var totalGoals = 0L;
+        var openPlayShots = 0L;
+        var headedOpenPlay = 0L;
+        var crossedOpenPlay = 0L;
+        var headedGoals = 0L;
+        var openPlayGoals = 0L;
+
+        for (var index = 0; index < matches; index++)
+        {
+            var input = RoleShaped(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index));
+            var recorder = new MatchPassageRecorder();
+            var result = MatchSimulator.Simulate(input, rules, null, recorder);
+            var families = FamiliesOf(input);
+
+            foreach (var matchEvent in result.Events)
+            {
+                if (matchEvent.ParticipantId is not Guid who || !families.TryGetValue(who, out var family))
+                {
+                    continue;
+                }
+
+                switch (matchEvent.Type)
+                {
+                    case EngineEventType.Goal:
+                        totalGoals++;
+                        goals[family] = goals.GetValueOrDefault(family) + 1;
+                        totalShots++;
+                        shots[family] = shots.GetValueOrDefault(family) + 1;
+                        break;
+
+                    case EngineEventType.ShotSaved or EngineEventType.ShotBlocked
+                        or EngineEventType.ShotOffTarget or EngineEventType.Woodwork:
+                        totalShots++;
+                        shots[family] = shots.GetValueOrDefault(family) + 1;
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+
+            foreach (var passage in recorder.Passages.Where(passage => passage.Outcome == PassageOutcome.OpenPlayShot))
+            {
+                var headed = passage.Touches.Any(touch => touch.Action == PassageAction.Header);
+                var goal = passage.EventSequences.Any(sequence => result.Events.Any(matchEvent => matchEvent.Sequence == sequence && matchEvent.Type == EngineEventType.Goal));
+
+                openPlayShots++;
+                headedOpenPlay += headed ? 1 : 0;
+                crossedOpenPlay += passage.Waypoints.Any(waypoint => waypoint.Kind == PassageWaypointKind.Cross) ? 1 : 0;
+                openPlayGoals += goal ? 1 : 0;
+                headedGoals += goal && headed ? 1 : 0;
+            }
+        }
+
+        Console.WriteLine($"  Shots and goals by position family, {matches:N0} matches (both sides; Finishing 16 up front, 11 in midfield, 6 at the back, Heading 13, 11, 14):");
+
+        foreach (var family in shots.Keys.OrderBy(family => family))
+        {
+            Console.WriteLine(
+                $"    {family,-18} {Pct(shots[family], totalShots),6}% of shots, {Pct(goals.GetValueOrDefault(family), totalGoals),6}% of goals, conversion {Pct(goals.GetValueOrDefault(family), shots[family]),5}%");
+        }
+
+        Console.WriteLine($"    shots per match {(double)totalShots / matches:F2}, goals per match {(double)totalGoals / matches:F3}");
+        Console.WriteLine($"    open-play chances per match      {(double)openPlayShots / matches,9:F2}");
+        Console.WriteLine($"    ... that were headed             {Pct(headedOpenPlay, openPlayShots),8}%   of them crossed {Pct(crossedOpenPlay, openPlayShots)}%");
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Plays a side whose outfield players all have a high Vision and Decisions against one whose do not, everything
+    /// else equal: the chain should make the thinking side better, not just the team ratings (`engine-v10`, M4).
+    /// </summary>
+    private static void MindTiers(int matches, ulong seed, EngineRulesV2 rules)
+    {
+        Console.WriteLine($"  Vision and Decisions of the whole home side against an even away side, {matches:N0} matches:");
+
+        foreach (var tier in new[] { 4, 13, 18 })
+        {
+            var homeGoals = 0L;
+            var awayGoals = 0L;
+            var homeShots = 0L;
+            var awayShots = 0L;
+
+            for (var index = 0; index < matches; index++)
+            {
+                var input = WithMind(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index), tier);
+                var result = MatchSimulator.Simulate(input, rules);
+
+                homeGoals += result.HomeGoals;
+                awayGoals += result.AwayGoals;
+                homeShots += result.Home.Shots;
+                awayShots += result.Away.Shots;
+            }
+
+            Console.WriteLine(
+                $"    Vision and Decisions {tier,2}: goals {(double)homeGoals / matches:F3} against {(double)awayGoals / matches:F3}, shots {(double)homeShots / matches:F2} against {(double)awayShots / matches:F2}");
+        }
+
+        Console.WriteLine();
+    }
+
+    /// <summary>Gives both sides players whose strengths follow their jobs, which the uniform laboratory squads do not.</summary>
+    private static MatchInputV1 RoleShaped(MatchInputV1 input)
+    {
+        var families = FamiliesOf(input);
+
+        MatchSideV1 Shape(MatchSideV1 side) => side with
+        {
+            Squad = [.. side.Squad.Select(participant =>
+            {
+                var family = families.GetValueOrDefault(participant.ParticipantId, MatchPositionFamily.Midfield);
+                var values = Enumerable.Repeat(TwinAbility, MatchAttributeNames.Count).ToArray();
+
+                values[(int)MatchAttributeName.Finishing] = family switch
+                {
+                    MatchPositionFamily.Attack => 16,
+                    MatchPositionFamily.Midfield => 11,
+                    _ => 6,
+                };
+
+                values[(int)MatchAttributeName.Heading] = family switch
+                {
+                    MatchPositionFamily.Attack => 13,
+                    MatchPositionFamily.Midfield => 11,
+                    _ => 14,
+                };
+
+                return participant with { Attributes = PlayerAttributesV1.From(values) };
+            })],
+        };
+
+        return input with { Home = Shape(input.Home), Away = Shape(input.Away) };
+    }
+
+    private static MatchInputV1 WithMind(MatchInputV1 input, int value)
+    {
+        var values = Enumerable.Repeat(TwinAbility, MatchAttributeNames.Count).ToArray();
+
+        values[(int)MatchAttributeName.Vision] = value;
+        values[(int)MatchAttributeName.Decisions] = value;
+
+        var attributes = PlayerAttributesV1.From(values);
+        var squad = input.Home.Squad
+            .Select(participant => participant with { Attributes = attributes })
+            .ToList();
+
+        return input with { Home = input.Home with { Squad = squad } };
     }
 
     private static int AttackingX(int x, MatchSide side) => side == MatchSide.Home ? x : 10_000 - x;

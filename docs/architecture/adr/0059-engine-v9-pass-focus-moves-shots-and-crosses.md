@@ -1,6 +1,6 @@
 # ADR-0059: Engine-v9 makes the pass focus move the shots and the crosses
 
-- **Status:** Accepted
+- **Status:** Accepted (the statement that a cross does not change the chance that follows it is superseded by ADR-0061 from `engine-v10`)
 - **Date:** 2026-10-05
 - **Stage:** Engine roadmap, tactical instructions
 - **Related:** [ADR-0058](0058-engine-v8-pass-focus.md), [ADR-0004](0004-deterministic-match-engine.md), game rules `INS-9`
@@ -82,7 +82,8 @@ one side's focus does not move the other side's shots.
 
 - **A cross is still a display fact.** A crossed approach is recorded and shown, but a cross does not make a
   header or change the chance that follows it; the shot that follows is the same strike from the same zone. A
-  cross that creates a headed chance is a separate change with its own calibration.
+  cross that creates a headed chance is a separate change with its own calibration. *(Superseded: from
+  `engine-v10` an open-play cross ends in a contested header, ADR-0061.)*
 - The chance volumes are calibrated to parity at the current zone multipliers and rating differentials; a change
   to either moves the goal rate of a focused side first, and `PassFocusShotsAndCrossesTests` (goals within 15%)
   is the guard.
