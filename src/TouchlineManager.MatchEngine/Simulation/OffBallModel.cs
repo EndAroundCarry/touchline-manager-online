@@ -39,10 +39,12 @@ internal static class OffBallModel
     /// side's active list, so a result is reproducible slot for slot.
     /// </para>
     /// <para>
-    /// The away side is resolved in the home frame and flipped back. <see cref="TacticalFormationResolver"/> adds
-    /// its forward and phase shifts to X without mirroring their sign for the away side, which attacks towards
-    /// the low end of the pitch, so on its own it pulls an attacking away block back. The film still reads it as
-    /// it is; the model must not, or the two sides would be placed by different rules.
+    /// The away side is resolved in the home frame and flipped back. Before the resolver was corrected,
+    /// <see cref="TacticalFormationResolver"/> added its forward and phase shifts to X without mirroring their sign
+    /// for the away side, which attacks towards the low end of the pitch, so it pulled an attacking away block
+    /// back; the model resolved the away side this way so it would not read that. The resolver now mirrors the
+    /// shifts itself and the two ways give the same spots; this one is kept so that play does not move by a
+    /// rounding unit.
     /// </para>
     /// </remarks>
     /// <param name="side">The players on the pitch.</param>

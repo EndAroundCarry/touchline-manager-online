@@ -77,6 +77,8 @@ public static class TacticalFormationResolver
             ? (ballPosition.Y - anchor.Y) / 5
             : 0;
 
+        // The shifts above are from the side's own point of view, where positive is up the pitch. The home side
+        // attacks towards high X; the away side attacks towards low X, so its shift is subtracted.
         var xOffset = phaseShift + lineShift + ballShift;
         var yOffset = pressSqueeze;
 
@@ -102,7 +104,7 @@ public static class TacticalFormationResolver
         yOffset += ((anchor.Y - SpatialPitch.GoalYCenter) * (widthFactor - 1_000)) / 1_000;
 
         var position = new SpatialPoint(
-            ClampAxis(anchor.X + xOffset),
+            ClampAxis(isHome ? anchor.X + xOffset : anchor.X - xOffset),
             int.Clamp(anchor.Y + yOffset, TouchlineMargin, SpatialPitch.PitchWidth - TouchlineMargin));
 
         return position;

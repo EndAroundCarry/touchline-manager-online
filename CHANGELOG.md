@@ -70,6 +70,9 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
   Over 2,000 matches the film is 9.91 / 10.13 / 10.41 minutes (p05 / p50 / p95), never above 11:00, with no teleports;
   the pace is 2.64x at the median and 91% of films are inside the 1.8-2.9x band (v9: 97.9%). Cached presentations are
   re-derived (they are never stored).
+- **Fixed: the away side's formation leaned the wrong way in the replay.** `TacticalFormationResolver` added the ball, mentality
+  and defensive-line shifts to X with the same sign for both sides, so an attacking away block was pulled back towards its
+  own goal. Both sides now move up the pitch with the ball. Only the film read it; no result or hash moves.
 - **Docs.** `match-engine.md` now reads `engine-v10` (§7.10, §10, §11, §12, §13), ADR-0061 is Accepted with the
   measured tables, and the stale "version 6" header is fixed.
 - **Versions.** `EngineVersions.Engine` = 10 (`engine-v10`), `RuleSet` = 9 (`engine-rules-v9`). The rules hash and

@@ -118,7 +118,7 @@ mentality, line and phase shifts to X with the same sign for both sides, but the
 end of the pitch, so an attacking away block is pulled back instead of pushed up. The film reads it as it is, so
 away shapes in the replay lean the wrong way. M2 does not depend on it (`OffBallModel.Place` resolves the away side
 in the home frame and flips it back, and a test pins that both sides move up the pitch with the ball); fixing the
-resolver itself changes the film and belongs with the replay changes of M3, which bump `ReplayDirector.Version`.
+resolver itself changes only the film; it was corrected after M6 (see M6).
 
 ### M3: A receiver for each pass, credited to the people who made it (built)
 
@@ -408,9 +408,13 @@ the carrier who starts a possession and the carrier of the final-third duel when
 are held to a small share (`ReachWeightFloorBasisPoints` = 500) and not excluded. Zeroing the floor is one constant
 and would move play draws, so it was left to the user's decision rather than made quietly here. The film does not
 show a forward's run into space: the engine records `Run` only for a player who loses a duel or chases a ball, never an
-off-ball run, so a forward's movement is the formation's (`FilmShape`), as it was before v10. The away side's formation shift (the M2 finding: the resolver adds ball, line and
-phase shifts to X with the same sign for both sides) is still not corrected in `TacticalFormationResolver`; correcting it
-changes the film and the golden hashes of the shapes it feeds, and belongs with the next replay revision.
+off-ball run, so a forward's movement is the formation's (`FilmShape`), as it was before v10. The away side's formation shift (the M2 finding) was corrected after M6: `TacticalFormationResolver` now subtracts
+the ball, line and phase shifts from X for the away side, which attacks towards low X, so both sides push up the pitch
+with the ball. Only the film reads the resolver (`OffBallModel.Place` resolves in the home frame, which gives the same
+spots), so no match result and no golden hash moved, and the replay's readings are the same to the second decimal
+(film 9.91 / 10.13 / 10.41 minutes, pace 2.64x, 91.0% in band, no teleports). `SpatialPlayTests` pins that the away side
+is the home side mirrored and that each side's block moves towards the goal it attacks. `ReplayDirector.Version` stays
+`replay-v5`: the version is unreleased, and a cached away film from an earlier build is the only thing that is stale.
 
 ## Consequences
 

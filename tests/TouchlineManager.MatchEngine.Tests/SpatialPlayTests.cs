@@ -89,6 +89,62 @@ public sealed class SpatialPlayTests
             "the side with the ball pushes up to it, the side without holds off");
     }
 
+    [Fact]
+    public void The_away_side_is_placed_as_the_home_side_mirrored()
+    {
+        var input = TestMatchFactory.Even();
+
+        foreach (var family in new[] { MatchPositionFamily.Defence, MatchPositionFamily.Midfield, MatchPositionFamily.Attack })
+        {
+            var slot = input.Home.Slots.First(slot => slot.Family == family);
+
+            foreach (var hasPossession in new[] { true, false })
+            {
+                foreach (var ball in new[]
+                         {
+                             new SpatialPoint(1_000, 1_500),
+                             new SpatialPoint(3_000, 5_000),
+                             SpatialPoint.Center,
+                             new SpatialPoint(8_500, 2_000),
+                         })
+                {
+                    var home = TacticalFormationResolver.ResolvePosition(
+                        slot, isHome: true, hasPossession, ball, input.Home.Instructions, EngineRulesV2.Default);
+                    var away = TacticalFormationResolver.ResolvePosition(
+                        slot,
+                        isHome: false,
+                        hasPossession,
+                        new SpatialPoint(SpatialPitch.PitchLength - ball.X, SpatialPitch.PitchWidth - ball.Y),
+                        input.Home.Instructions,
+                        EngineRulesV2.Default);
+
+                    away.X.Should().BeCloseTo(SpatialPitch.PitchLength - home.X, 2, "the same shape, seen from the other end");
+                    away.Y.Should().BeCloseTo(SpatialPitch.PitchWidth - home.Y, 2);
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void Both_sides_move_up_the_pitch_with_the_ball_they_attack_with()
+    {
+        var input = TestMatchFactory.Even();
+        var slot = input.Home.Slots.First(slot => slot.Family == MatchPositionFamily.Midfield);
+        var centre = SpatialPitch.PitchWidth / 2;
+
+        var homeDeep = TacticalFormationResolver.ResolvePosition(
+            slot, isHome: true, hasPossession: true, new SpatialPoint(2_000, centre), input.Home.Instructions, EngineRulesV2.Default);
+        var homeHigh = TacticalFormationResolver.ResolvePosition(
+            slot, isHome: true, hasPossession: true, new SpatialPoint(8_000, centre), input.Home.Instructions, EngineRulesV2.Default);
+        var awayDeep = TacticalFormationResolver.ResolvePosition(
+            slot, isHome: false, hasPossession: true, new SpatialPoint(8_000, centre), input.Away.Instructions, EngineRulesV2.Default);
+        var awayHigh = TacticalFormationResolver.ResolvePosition(
+            slot, isHome: false, hasPossession: true, new SpatialPoint(2_000, centre), input.Away.Instructions, EngineRulesV2.Default);
+
+        homeHigh.X.Should().BeGreaterThan(homeDeep.X, "the home side attacks towards high X");
+        awayHigh.X.Should().BeLessThan(awayDeep.X, "the away side attacks towards low X, so its block moves to low X as the ball does");
+    }
+
     // ---- Duels -----------------------------------------------------------------------------------
 
     [Fact]
