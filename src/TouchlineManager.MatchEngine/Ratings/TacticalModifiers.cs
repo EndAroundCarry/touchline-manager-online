@@ -4,7 +4,7 @@ using TouchlineManager.MatchEngine.Model;
 namespace TouchlineManager.MatchEngine.Ratings;
 
 /// <summary>
-/// Turns the eight team instructions into a bounded multiplier on each unit rating (`INS-1`…`INS-9`).
+/// Turns the team instructions into a bounded multiplier on each unit rating (`INS-1`…`INS-9`).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -25,7 +25,7 @@ namespace TouchlineManager.MatchEngine.Ratings;
 public static class TacticalModifiers
 {
     /// <summary>The version label of this modifier table, versioned with the engine.</summary>
-    public const string Version = "engine-tactical-v2";
+    public const string Version = "engine-tactical-v3";
 
     /// <summary>Computes one unit's modifier for a side's instructions.</summary>
     /// <param name="unit">The unit.</param>
@@ -52,7 +52,8 @@ public static class TacticalModifiers
             + Tempo(instructions.Tempo, low: 200, high: -250)
             + Line(instructions.DefensiveLine, deep: -120, high: 120)
             + Width(instructions.Width, narrow: -80, wide: 80)
-            + Mentality(instructions.Mentality, defensive: -150, attacking: 100, positive: 50),
+            + Mentality(instructions.Mentality, defensive: -150, attacking: 100, positive: 50)
+            + PassFocus(instructions.PassFocus, centre: 100, centreAndFlank: 40, wings: -100),
 
         MatchUnit.Creation =>
             Mentality(instructions.Mentality, defensive: -350, cautious: -180, positive: 250, attacking: 500)
@@ -60,11 +61,13 @@ public static class TacticalModifiers
             + Passing(instructions.Passing, shortPassing: 120, direct: 80)
             + Width(instructions.Width, narrow: -120, wide: 150)
             + Pressing(instructions.Pressing, lowBlock: -100, highPress: 100)
+            + PassFocus(instructions.PassFocus, centre: -250, centreAndFlank: 100, wings: 300)
             + TimeWasting(instructions.TimeWasting, situational: -120, on: -350),
 
         MatchUnit.Finishing =>
             Mentality(instructions.Mentality, defensive: -250, cautious: -120, positive: 180, attacking: 350)
             + Tempo(instructions.Tempo, low: -100, high: 100)
+            + PassFocus(instructions.PassFocus, centre: 150, centreAndFlank: 50, wings: -150)
             + TimeWasting(instructions.TimeWasting, situational: -80, on: -200),
 
         MatchUnit.DefensivePressure =>
@@ -80,6 +83,7 @@ public static class TacticalModifiers
             + Width(instructions.Width, narrow: 150, wide: -100)
             + Tackling(instructions.Tackling, stayOnFeet: 120, aggressive: -200)
             + Pressing(instructions.Pressing, lowBlock: 180, highPress: -200)
+            + PassFocus(instructions.PassFocus, centre: 100, centreAndFlank: -150, wings: -250)
             + TimeWasting(instructions.TimeWasting, situational: 80, on: 150),
 
         // Stopping shots is the goalkeeper's own business; no team instruction changes it.
@@ -125,6 +129,25 @@ public static class TacticalModifiers
         MatchWidth.Normal => 0,
         MatchWidth.Wide => wide,
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown width."),
+    };
+
+    /// <summary>
+    /// The cost and benefit of steering the ball into particular lanes.
+    /// </summary>
+    /// <remarks>
+    /// Through the middle is the short, safe way: it builds up cleanly and finds better shots, but it runs into
+    /// the most defenders, so it creates less, and a side that stays compact is hard to counter. Down the wings
+    /// stretches a defence and creates the most, but the passes are longer, the crosses are poorer shots, and
+    /// wide players pushed forward leave the middle open when the ball is lost. The centre with one flank sits
+    /// between the two, and the flank it leaves alone is thin when the ball is lost.
+    /// </remarks>
+    private static int PassFocus(MatchPassFocus value, int centre, int centreAndFlank, int wings) => value switch
+    {
+        MatchPassFocus.Balanced => 0,
+        MatchPassFocus.Centre => centre,
+        MatchPassFocus.CentreAndLeft or MatchPassFocus.CentreAndRight => centreAndFlank,
+        MatchPassFocus.Wings => wings,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown pass focus."),
     };
 
     private static int Pressing(MatchPressing value, int lowBlock, int highPress) => value switch

@@ -9,12 +9,13 @@
  * back in `If-Match`, so a formation changed on one device cannot be silently overwritten on another.
  */
 
-/** The eight team-level settings, as stable codes (`INS-1`…`INS-8`). */
+/** The team-level settings, as stable codes (`INS-1`…`INS-8`, and the pass focus). */
 export interface TeamInstructions {
   readonly mentality: string;
   readonly tempo: string;
   readonly passing: string;
   readonly width: string;
+  readonly passFocus: string;
   readonly pressing: string;
   readonly defensiveLine: string;
   readonly tackling: string;

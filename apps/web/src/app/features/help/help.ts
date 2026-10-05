@@ -82,6 +82,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       'Thirteen formations are in this version. A plan names exactly eleven places, and a saved side is either complete or empty, so you never take the pitch a player short by accident.',
       'Every place has a position family and a role. A player used out of position carries a familiarity penalty, so the right player in the right place is worth more than the best player in any place.',
       'Eight team instructions set your mentality, tempo, passing, width, pressing, defensive line, tackling and time wasting. Each has a bounded effect and a cost, so an aggressive setting buys you something and gives something up.',
+      'Pass focus asks the team to play through the centre, the centre and one flank, or both wings. Each choice has a line under it saying what it costs: the middle is safe but less creative, the wings are creative but leave you open on the counter.',
       'Where each place stands is set by the formation, so choose a different formation to change the shape. You can fill a place by dragging a player onto it, or by selecting it and choosing a player, so the board is usable from the keyboard.',
     ],
     links: [{ label: 'Open your tactics board', path: '/tactics' }],

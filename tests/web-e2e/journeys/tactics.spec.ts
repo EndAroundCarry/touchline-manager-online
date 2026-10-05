@@ -56,6 +56,7 @@ interface PlanWrite {
   readonly tempo: string;
   readonly passing: string;
   readonly width: string;
+  readonly passFocus: string;
   readonly pressing: string;
   readonly defensiveLine: string;
   readonly tackling: string;
@@ -100,6 +101,7 @@ function toWrite(plan: Plan, name: string): PlanWrite {
     tempo: plan.instructions['tempo'],
     passing: plan.instructions['passing'],
     width: plan.instructions['width'],
+    passFocus: plan.instructions['passFocus'],
     pressing: plan.instructions['pressing'],
     defensiveLine: plan.instructions['defensiveLine'],
     tackling: plan.instructions['tackling'],
@@ -161,6 +163,10 @@ test.describe('tactics', () => {
     await page.getByRole('combobox', { name: 'Formation' }).selectOption('4-3-3');
     await expect(page.getByRole('button', { name: /^Slot \d+/ })).toHaveCount(11);
 
+    // Choosing where the passes go says in one line what it will do, so the manager is not choosing blind.
+    await page.getByLabel('Pass focus').selectOption('wings');
+    await expect(page.getByTestId('effect-passFocus')).toContainText('Down both flanks');
+
     // The player table carries the position-weighted averages a manager picks by.
     await expect(page.getByRole('columnheader', { name: /Technical average/ })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: /Physical average/ })).toBeVisible();
@@ -191,6 +197,7 @@ test.describe('tactics', () => {
     const created = plans.find((plan) => plan.name === planName);
 
     expect(created).toBeDefined();
+    expect(created!.instructions['passFocus']).toBe('wings');
 
     const elsewhere = await request.put(`${apiBaseUrl}/api/v1/tactics/${created!.id}`, {
       headers: { ...bearer, 'If-Match': `"${created!.version}"` },

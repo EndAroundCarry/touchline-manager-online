@@ -9,6 +9,8 @@ import { attributeBand, positionLabel, stateBand } from '../../core/squad/squad-
 import { Squad } from '../../core/squad/squad.models';
 import {
   INSTRUCTION_FIELDS,
+  InstructionField,
+  instructionEffect as effectOf,
   SelectOption,
   familyLabel,
   issueMessage,
@@ -276,6 +278,11 @@ export class Tactics {
   /** Re-lays the plan from a new formation preset. */
   protected onFormationChange(event: Event): void {
     this.store.setFormation((event.target as HTMLSelectElement).value);
+  }
+
+  /** The line saying what an instruction's current choice does, if it has one. */
+  protected instructionEffect(field: InstructionField, value: string): string | null {
+    return effectOf(field, value);
   }
 
   /** Changes one team instruction (`INS-1`…`INS-8`). */

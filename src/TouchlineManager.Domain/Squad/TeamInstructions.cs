@@ -58,6 +58,25 @@ public enum Width
     Wide = 2,
 }
 
+/// <summary>Which lanes of the pitch the team asks its passes to go through.</summary>
+public enum PassFocus
+{
+    /// <summary>Neither instruct nor inhibit.</summary>
+    Balanced = 0,
+
+    /// <summary>Play through the middle.</summary>
+    Centre = 1,
+
+    /// <summary>Play through the middle and the left.</summary>
+    CentreAndLeft = 2,
+
+    /// <summary>Play through the middle and the right.</summary>
+    CentreAndRight = 3,
+
+    /// <summary>Play out wide, down both flanks.</summary>
+    Wings = 4,
+}
+
 /// <summary>From where the team begins to press (`INS-5`).</summary>
 public enum Pressing
 {
@@ -111,7 +130,7 @@ public enum TimeWasting
 }
 
 /// <summary>
-/// The eight team-level settings a tactical plan carries (`INS-1`…`INS-8`).
+/// The team-level settings a tactical plan carries (`INS-1`…`INS-8`, and the pass focus).
 /// </summary>
 /// <remarks>
 /// Grouped into one value so a plan's instructions travel together and so comparing two plans is one
@@ -135,6 +154,7 @@ public sealed record TeamInstructionSet
         Tempo = Tempo.Normal,
         Passing = PassingStyle.MixedPassing,
         Width = Width.Normal,
+        PassFocus = PassFocus.Balanced,
         Pressing = Pressing.MidBlock,
         DefensiveLine = DefensiveLine.Normal,
         Tackling = TacklingStyle.Normal,
@@ -152,6 +172,9 @@ public sealed record TeamInstructionSet
 
     /// <summary>Gets how far the team spreads across the pitch.</summary>
     public Width Width { get; init; }
+
+    /// <summary>Gets which lanes of the pitch the team asks its passes to go through.</summary>
+    public PassFocus PassFocus { get; init; }
 
     /// <summary>Gets where the team begins to press.</summary>
     public Pressing Pressing { get; init; }
@@ -260,6 +283,30 @@ public static class TeamInstructions
         "normal" => Width.Normal,
         "wide" => Width.Wide,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown width code."),
+    };
+
+    /// <summary>Converts a pass focus to its stable code.</summary>
+    /// <param name="value">The pass focus.</param>
+    public static string ToCode(this PassFocus value) => value switch
+    {
+        PassFocus.Balanced => "balanced",
+        PassFocus.Centre => "centre",
+        PassFocus.CentreAndLeft => "centre_left",
+        PassFocus.CentreAndRight => "centre_right",
+        PassFocus.Wings => "wings",
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown pass focus."),
+    };
+
+    /// <summary>Parses a stable code back to its pass focus.</summary>
+    /// <param name="code">The stable code.</param>
+    public static PassFocus PassFocusFromCode(string code) => code switch
+    {
+        "balanced" => PassFocus.Balanced,
+        "centre" => PassFocus.Centre,
+        "centre_left" => PassFocus.CentreAndLeft,
+        "centre_right" => PassFocus.CentreAndRight,
+        "wings" => PassFocus.Wings,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown pass focus code."),
     };
 
     /// <summary>Converts a pressing scheme to its stable code.</summary>

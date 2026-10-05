@@ -106,6 +106,15 @@ public static class EngineVocabulary
                 Width.Wide => MatchWidth.Wide,
                 _ => throw new ArgumentOutOfRangeException(nameof(instructions), instructions.Width, "Unknown width."),
             },
+            PassFocus = instructions.PassFocus switch
+            {
+                PassFocus.Balanced => MatchPassFocus.Balanced,
+                PassFocus.Centre => MatchPassFocus.Centre,
+                PassFocus.CentreAndLeft => MatchPassFocus.CentreAndLeft,
+                PassFocus.CentreAndRight => MatchPassFocus.CentreAndRight,
+                PassFocus.Wings => MatchPassFocus.Wings,
+                _ => throw new ArgumentOutOfRangeException(nameof(instructions), instructions.PassFocus, "Unknown pass focus."),
+            },
             Pressing = instructions.Pressing switch
             {
                 Pressing.LowBlock => MatchPressing.LowBlock,

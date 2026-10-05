@@ -232,7 +232,7 @@ and ceiling, and they compose multiplicatively. Condition is no longer one of th
 | Morale | 9_500 | 10_000 |
 | Sharpness | 9_600 | 10_000 |
 
-### 6.5 Tactical modifiers (`engine-tactical-v2`)
+### 6.5 Tactical modifiers (`engine-tactical-v3`)
 
 Every instruction has a cost as well as a benefit, and this is where that is enforced. Each unit's
 modifier is the sum of the applicable deltas, then clamped to `MinTacticalModifierBasisPoints` = 8_800 …
@@ -245,6 +245,7 @@ three attribute points.
 | Tempo | High: +creation, shorter possessions, faster fatigue. Low: the reverse. |
 | Passing | Short: +build-up. Direct: −build-up, slightly +creation. |
 | Width | Wide: +creation, −defensive shape, −build-up. Narrow: the reverse. |
+| Pass focus | Centre: +build-up, +finishing, +defensive shape, −creation. Wings: +creation, −build-up, −finishing, −defensive shape. Centre with a flank: a smaller +build-up, +creation and +finishing, and −defensive shape (the flank it leaves alone is thin). Left and right cost the same. |
 | Pressing | High press: +defensive pressure, +creation, −defensive shape, faster fatigue. Low block: the reverse. |
 | Defensive line | High: +build-up, +defensive pressure, −defensive shape. Deep: the reverse. |
 | Tackling | Aggressive: +defensive pressure, −defensive shape, **and more fouls, more cards, more suspensions** (see §7.3). Stay on feet: the reverse. |
@@ -533,7 +534,9 @@ pressure point and to each touch of the approach, so no draw is added and a `Bal
 is the low end of the attacking side's own scale. The shares are calibrated, not read off: every possession
 starts where the last one ended, mostly in the middle, so the ball measures about 23/53/23 with no preference and
 about 20/60/20 (centre), 39/22/39 (wings) and 37/44/20 (centre and left) with a focus. The focus steers the ball
-only: goals and shots are identical for every option, and `PassTally` and the film's receiver choice do not read it.
+only: the geometry changes no outcome by itself, and `PassTally` and the film's receiver choice do not read it. What
+the focus costs and buys is the tactical modifier above (§6.5), so a manager who picks one is trading creation for
+shape; measured over 2,000 matches each the effect is small, as it is for every instruction (`INS-9`).
 
 ## 8. Output
 

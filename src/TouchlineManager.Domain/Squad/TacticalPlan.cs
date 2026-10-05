@@ -182,6 +182,9 @@ public sealed class TacticalPlan
     /// <summary>Gets how far the team spreads across the pitch.</summary>
     public Width Width { get; private set; }
 
+    /// <summary>Gets which lanes of the pitch the team asks its passes to go through.</summary>
+    public PassFocus PassFocus { get; private set; }
+
     /// <summary>Gets where the team begins to press.</summary>
     public Pressing Pressing { get; private set; }
 
@@ -244,6 +247,7 @@ public sealed class TacticalPlan
             Tempo = instructions.Tempo,
             Passing = instructions.Passing,
             Width = instructions.Width,
+            PassFocus = instructions.PassFocus,
             Pressing = instructions.Pressing,
             DefensiveLine = instructions.DefensiveLine,
             Tackling = instructions.Tackling,
@@ -262,6 +266,7 @@ public sealed class TacticalPlan
         Tempo = Tempo,
         Passing = Passing,
         Width = Width,
+        PassFocus = PassFocus,
         Pressing = Pressing,
         DefensiveLine = DefensiveLine,
         Tackling = Tackling,
@@ -288,6 +293,7 @@ public sealed class TacticalPlan
         Tempo = instructions.Tempo;
         Passing = instructions.Passing;
         Width = instructions.Width;
+        PassFocus = instructions.PassFocus;
         Pressing = instructions.Pressing;
         DefensiveLine = instructions.DefensiveLine;
         Tackling = instructions.Tackling;

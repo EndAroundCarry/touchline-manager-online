@@ -334,6 +334,7 @@ public sealed class SaveTacticalPlan
         Tempo = TeamInstructions.TempoFromCode(request.Tempo),
         Passing = TeamInstructions.PassingFromCode(request.Passing),
         Width = TeamInstructions.WidthFromCode(request.Width),
+        PassFocus = TeamInstructions.PassFocusFromCode(request.PassFocus),
         Pressing = TeamInstructions.PressingFromCode(request.Pressing),
         DefensiveLine = TeamInstructions.LineFromCode(request.DefensiveLine),
         Tackling = TeamInstructions.TacklingFromCode(request.Tackling),

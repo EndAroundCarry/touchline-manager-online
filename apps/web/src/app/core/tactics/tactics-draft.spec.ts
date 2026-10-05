@@ -94,6 +94,12 @@ function savedPlan(overrides: Partial<TacticalPlan> = {}): TacticalPlan {
 }
 
 describe('tactics draft', () => {
+  it('sends the pass focus with the other instructions', () => {
+    const draft = withInstruction(draftFromFormation(formation('4-4-2')), 'passFocus', 'wings');
+
+    expect(toRequest(draft).passFocus).toBe('wings');
+  });
+
   it('starts a new plan from neutral instructions with nobody picked', () => {
     const draft = draftFromFormation(formation('4-4-2'));
 

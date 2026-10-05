@@ -1,6 +1,6 @@
 # ADR-0058: Engine-v8 lets a manager direct the ball through the centre and a flank (the pass focus)
 
-- **Status:** Accepted (engine layer; the manager-facing instruction is not yet exposed)
+- **Status:** Accepted (engine layer, then exposed to the manager: see Decision 6)
 - **Date:** 2026-10-04
 - **Stage:** Engine roadmap, tactical instructions
 - **Related:** [ADR-0004](0004-deterministic-match-engine.md), [ADR-0051](0051-engine-v4-continuous-passages.md), [ADR-0055](0055-engine-v6-skills-where-the-design-says.md), [ADR-0056](0056-engine-v7-passes-and-take-ons.md), game rules `INS-9`, `MAT-5`
@@ -42,6 +42,18 @@ serialization gains `passFocus` per side and the rules gain nine constants, so t
 hashes and the rules hash are re-pinned. The golden match is still 2-2. As with every earlier version, stored
 `engine-v7` matches cannot be re-simulated and the dev database is archived and reseeded.
 
+**6. Exposed to the manager, with a price (added after the engine layer).** The instruction is a team setting
+saved with the tactical plan (`squad.tactical_plans.pass_focus`, codes `balanced`, `centre`, `centre_left`,
+`centre_right`, `wings`), carried by the save request (optional, so a client that does not send it keeps
+`balanced`) and the plan response, mapped to the engine in `EngineVocabulary`, and picked on the tactics board
+with a one-line description of what each choice does. AI clubs keep `balanced`, so their draws are unchanged.
+`TacticalModifiers` (`engine-tactical-v3`) gives each option a cost as `INS-9` requires, in basis points on the
+unit ratings: centre +100 build-up, +150 finishing, +100 defensive shape, −250 creation; wings −100 build-up,
+−150 finishing, −250 defensive shape, +300 creation; the centre with a flank +40 build-up, +50 finishing, +100
+creation, −150 defensive shape (the flank it leaves alone is thin). Left and right are priced alike. A `Balanced`
+side takes no modifier, so every existing replay is unchanged and the engine version is not bumped. The values are
+about half those of the attacking mentality, and the unit ratings are clamped as before.
+
 ## Evidence
 
 - **The suite passes unchanged in shape.** The full engine suite (883 tests, including the calibration and
@@ -65,10 +77,12 @@ hashes and the rules hash are re-pinned. The golden match is still 2-2. As with 
 
 **Negative**
 
-- **The instruction is cosmetic until something reads the lane.** Because goals and shots are unchanged, a manager
-  gains nothing from choosing a focus today. Before exposing it, either let the lane matter (flank play changing
-  crosses, shot zones or turnovers, with a cost on each side as `INS-9` requires) or present it as a style
-  preference only.
+- **The lane geometry still decides nothing; the price is a rating modifier.** Nothing in the engine reads a
+  lateral position to decide an outcome, so the trade-off is carried by the unit ratings, like every other
+  instruction, and is small: over 2,000 matches each against a balanced side, goals for and against moved by at
+  most 0.02 and shots by about 0.2 (the attacking mentality moves shots by about 0.4). The effect is real in the
+  ratings and tests but within noise in a single season; letting flank play change crosses, shot zones or
+  turnovers would make the choice matter more and needs its own calibration.
 - The shares are calibrated to a measurement that depends on where possessions start, so a change to restarts,
   clearances or the approach geometry moves the measured shares and wants the sweep repeated (`PassFocusTests`
   fails when it does).

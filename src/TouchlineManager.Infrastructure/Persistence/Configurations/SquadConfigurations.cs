@@ -462,6 +462,9 @@ internal sealed class TacticalPlanConfiguration : IEntityTypeConfiguration<Tacti
             table.HasCheckConstraint("ck_tactical_plans_passing", "passing in ('short', 'mixed', 'direct')");
             table.HasCheckConstraint("ck_tactical_plans_width", "width in ('narrow', 'normal', 'wide')");
             table.HasCheckConstraint(
+                "ck_tactical_plans_pass_focus",
+                "pass_focus in ('balanced', 'centre', 'centre_left', 'centre_right', 'wings')");
+            table.HasCheckConstraint(
                 "ck_tactical_plans_pressing",
                 "pressing in ('low_block', 'mid_block', 'high_press')");
             table.HasCheckConstraint("ck_tactical_plans_defensive_line", "defensive_line in ('deep', 'normal', 'high')");
@@ -501,6 +504,12 @@ internal sealed class TacticalPlanConfiguration : IEntityTypeConfiguration<Tacti
             .HasColumnName("width")
             .HasMaxLength(TeamInstructions.MaxCodeLength)
             .HasConversion(value => value.ToCode(), code => TeamInstructions.WidthFromCode(code))
+            .IsRequired();
+        builder.Property(plan => plan.PassFocus)
+            .HasColumnName("pass_focus")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasDefaultValue(PassFocus.Balanced)
+            .HasConversion(value => value.ToCode(), code => TeamInstructions.PassFocusFromCode(code))
             .IsRequired();
         builder.Property(plan => plan.Pressing)
             .HasColumnName("pressing")

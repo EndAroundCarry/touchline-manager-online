@@ -46,6 +46,12 @@ public sealed class SquadTacticsTests
             TeamInstructions.WidthFromCode(value.ToCode()).Should().Be(value);
         }
 
+        foreach (var value in Enum.GetValues<PassFocus>())
+        {
+            TeamInstructions.PassFocusFromCode(value.ToCode()).Should().Be(value);
+            value.ToCode().Length.Should().BeLessThanOrEqualTo(TeamInstructions.MaxCodeLength);
+        }
+
         foreach (var value in Enum.GetValues<Pressing>())
         {
             TeamInstructions.PressingFromCode(value.ToCode()).Should().Be(value);

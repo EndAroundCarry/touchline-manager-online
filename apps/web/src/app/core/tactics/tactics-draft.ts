@@ -45,6 +45,7 @@ export function defaultInstructions(): TeamInstructions {
     tempo: 'normal',
     passing: 'mixed',
     width: 'normal',
+    passFocus: 'balanced',
     pressing: 'mid_block',
     defensiveLine: 'normal',
     tackling: 'normal',

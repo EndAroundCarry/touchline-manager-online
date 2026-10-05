@@ -140,6 +140,66 @@ public sealed class TacticsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_plan_keeps_its_pass_focus_and_a_client_that_names_none_gets_balanced()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var silent = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Silent"));
+
+        silent.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await silent.Content.ReadFromJsonAsync<TacticalPlanResponse>())!.Instructions.PassFocus
+            .Should().Be("balanced", "a plan that names no pass focus plays without a preference");
+
+        var wings = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Wide", passFocus: "wings"));
+
+        wings.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var plan = (await wings.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        plan.Instructions.PassFocus.Should().Be("wings");
+
+        var read = await client.GetFromJsonAsync<TacticsResponse>("/api/v1/tactics");
+
+        read!.Plans.Single(candidate => candidate.Id == plan.Id).Instructions.PassFocus
+            .Should().Be("wings", "the setting is stored, not just echoed");
+
+        var revised = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Wide", passFocus: "centre_left"),
+            wings.Headers.ETag!.Tag);
+
+        revised.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await revised.Content.ReadFromJsonAsync<TacticalPlanResponse>())!.Instructions.PassFocus
+            .Should().Be("centre_left");
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task An_unknown_pass_focus_is_refused()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var response = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Odd", passFocus: "sideways"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
     public async Task A_save_without_a_version_is_refused()
     {
         using var client = CreateClient();
@@ -397,20 +457,35 @@ public sealed class TacticsTests : IAsyncLifetime
         return client.SendAsync(request);
     }
 
-    private static object PlanBody(string name, string preset = "4-4-2", IEnumerable<object>? lineup = null) => new
+    private static Dictionary<string, object?> PlanBody(
+        string name,
+        string preset = "4-4-2",
+        IEnumerable<object>? lineup = null,
+        string? passFocus = null)
     {
-        name,
-        formationPreset = preset,
-        mentality = "balanced",
-        tempo = "normal",
-        passing = "mixed",
-        width = "normal",
-        pressing = "mid_block",
-        defensiveLine = "normal",
-        tackling = "normal",
-        timeWasting = "off",
-        lineup = lineup?.ToArray(),
-    };
+        var body = new Dictionary<string, object?>
+        {
+            ["name"] = name,
+            ["formationPreset"] = preset,
+            ["mentality"] = "balanced",
+            ["tempo"] = "normal",
+            ["passing"] = "mixed",
+            ["width"] = "normal",
+            ["pressing"] = "mid_block",
+            ["defensiveLine"] = "normal",
+            ["tackling"] = "normal",
+            ["timeWasting"] = "off",
+            ["lineup"] = lineup?.ToArray(),
+        };
+
+        // Left out entirely when not chosen, as a client that predates the setting would send it.
+        if (passFocus is not null)
+        {
+            body["passFocus"] = passFocus;
+        }
+
+        return body;
+    }
 
     private static object[] LineupBody(IEnumerable<Guid> playerIds) =>
         [.. playerIds.Select((playerId, index) => (object)new { slotNumber = index + 1, playerId })];

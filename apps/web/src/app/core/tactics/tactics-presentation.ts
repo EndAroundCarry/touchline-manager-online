@@ -15,9 +15,12 @@ export interface SelectOption {
 
   /** The label shown in the control. */
   readonly label: string;
+
+  /** One line saying what choosing it does, shown beside the control, when the choice has a price. */
+  readonly effect?: string;
 }
 
-/** The eight instructions, their headings, and their allowed values (`INS-1`…`INS-8`). */
+/** The instructions, their headings, and their allowed values (`INS-1`…`INS-8`). */
 export interface InstructionField {
   /** The request/response property the instruction maps to. */
   readonly key:
@@ -25,6 +28,7 @@ export interface InstructionField {
     | 'tempo'
     | 'passing'
     | 'width'
+    | 'passFocus'
     | 'pressing'
     | 'defensiveLine'
     | 'tackling'
@@ -37,7 +41,7 @@ export interface InstructionField {
   readonly options: readonly SelectOption[];
 }
 
-/** The eight instruction pickers, in the order a manager reads them. */
+/** The instruction pickers, in the order a manager reads them. */
 export const INSTRUCTION_FIELDS: readonly InstructionField[] = [
   {
     key: 'mentality',
@@ -78,6 +82,41 @@ export const INSTRUCTION_FIELDS: readonly InstructionField[] = [
     ],
   },
   {
+    key: 'passFocus',
+    label: 'Pass focus',
+    options: [
+      {
+        value: 'balanced',
+        label: 'Balanced',
+        effect: 'No lane preference: the ball goes wherever the move leads.',
+      },
+      {
+        value: 'centre',
+        label: 'Centre',
+        effect:
+          'Through the middle: cleaner build-up and better shots, but less creative against a crowded middle.',
+      },
+      {
+        value: 'centre_left',
+        label: 'Centre and left',
+        effect:
+          'Middle and left: more creative than the centre alone, but the right flank is thin when the ball is lost.',
+      },
+      {
+        value: 'centre_right',
+        label: 'Centre and right',
+        effect:
+          'Middle and right: more creative than the centre alone, but the left flank is thin when the ball is lost.',
+      },
+      {
+        value: 'wings',
+        label: 'Wings',
+        effect:
+          'Down both flanks: the most creative option, but weaker build-up, poorer shots, and the middle is open on the counter.',
+      },
+    ],
+  },
+  {
     key: 'pressing',
     label: 'Pressing',
     options: [
@@ -114,6 +153,11 @@ export const INSTRUCTION_FIELDS: readonly InstructionField[] = [
     ],
   },
 ];
+
+/** The line saying what the chosen option does, or null when the option carries none. */
+export function instructionEffect(field: InstructionField, value: string): string | null {
+  return field.options.find((option) => option.value === value)?.effect ?? null;
+}
 
 /** The four position families and their headings, mirroring `PositionFamilies` on the server. */
 const POSITION_FAMILY_LABELS: Record<string, string> = {

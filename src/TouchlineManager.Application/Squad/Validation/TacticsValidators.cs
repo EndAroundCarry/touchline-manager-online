@@ -34,6 +34,7 @@ public sealed class SaveTacticalPlanRequestValidator : AbstractValidator<SaveTac
         RuleFor(request => request.Tempo).Must(IsTempo).WithMessage("Unknown tempo.");
         RuleFor(request => request.Passing).Must(IsPassing).WithMessage("Unknown passing style.");
         RuleFor(request => request.Width).Must(IsWidth).WithMessage("Unknown width.");
+        RuleFor(request => request.PassFocus).Must(IsPassFocus).WithMessage("Unknown pass focus.");
         RuleFor(request => request.Pressing).Must(IsPressing).WithMessage("Unknown pressing scheme.");
         RuleFor(request => request.DefensiveLine).Must(IsDefensiveLine).WithMessage("Unknown defensive line.");
         RuleFor(request => request.Tackling).Must(IsTackling).WithMessage("Unknown tackling style.");
@@ -95,6 +96,8 @@ public sealed class SaveTacticalPlanRequestValidator : AbstractValidator<SaveTac
     private static bool IsPassing(string? code) => IsKnown(TeamInstructions.PassingFromCode, code);
 
     private static bool IsWidth(string? code) => IsKnown(TeamInstructions.WidthFromCode, code);
+
+    private static bool IsPassFocus(string? code) => IsKnown(TeamInstructions.PassFocusFromCode, code);
 
     private static bool IsPressing(string? code) => IsKnown(TeamInstructions.PressingFromCode, code);
 

@@ -1,6 +1,7 @@
 import {
   INSTRUCTION_FIELDS,
   familyLabel,
+  instructionEffect,
   issueMessage,
   pitchStyle,
   roleLabel,
@@ -55,12 +56,13 @@ describe('tactics presentation', () => {
   });
 
   describe('the instruction pickers', () => {
-    it('lists all eight instructions with their allowed values (INS-1..INS-8)', () => {
+    it('lists every instruction with its allowed values (INS-1..INS-8 and the pass focus)', () => {
       expect(INSTRUCTION_FIELDS.map((field) => field.key)).toEqual([
         'mentality',
         'tempo',
         'passing',
         'width',
+        'passFocus',
         'pressing',
         'defensiveLine',
         'tackling',
@@ -79,6 +81,49 @@ describe('tactics presentation', () => {
         'positive',
         'attacking',
       ]);
+    });
+  });
+
+  describe('the pass focus', () => {
+    const field = INSTRUCTION_FIELDS.find((candidate) => candidate.key === 'passFocus')!;
+
+    it('offers the centre, each flank with the centre, and the wings, beside balanced', () => {
+      expect(field.options.map((option) => option.value)).toEqual([
+        'balanced',
+        'centre',
+        'centre_left',
+        'centre_right',
+        'wings',
+      ]);
+    });
+
+    it('says in one line what each choice does, so the manager is not choosing blind', () => {
+      for (const option of field.options) {
+        const line = instructionEffect(field, option.value);
+
+        expect(line, option.value).not.toBeNull();
+        expect(line!.length, option.value).toBeLessThan(140);
+        expect(line, option.value).not.toMatch(/\n/);
+      }
+    });
+
+    it('names the price of every choice that has one', () => {
+      for (const value of ['centre', 'centre_left', 'centre_right', 'wings']) {
+        expect(instructionEffect(field, value), value).toContain('but');
+      }
+    });
+
+    it('names the flank that is left thin', () => {
+      expect(instructionEffect(field, 'centre_left')).toContain('right flank');
+      expect(instructionEffect(field, 'centre_right')).toContain('left flank');
+    });
+
+    it('has no line for a value it does not know, and none for an instruction without one', () => {
+      expect(instructionEffect(field, 'sideways')).toBeNull();
+
+      const tempo = INSTRUCTION_FIELDS.find((candidate) => candidate.key === 'tempo')!;
+
+      expect(instructionEffect(tempo, 'high')).toBeNull();
     });
   });
 

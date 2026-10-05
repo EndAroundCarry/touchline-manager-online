@@ -80,7 +80,7 @@ public sealed class EngineVocabularyTests
     }
 
     [Fact]
-    public void The_eight_instructions_map_by_value()
+    public void The_instructions_map_by_value()
     {
         var instructions = new TeamInstructionSet
         {
@@ -88,6 +88,7 @@ public sealed class EngineVocabularyTests
             Tempo = Tempo.High,
             Passing = PassingStyle.DirectPassing,
             Width = Width.Wide,
+            PassFocus = PassFocus.CentreAndLeft,
             Pressing = Pressing.HighPress,
             DefensiveLine = DefensiveLine.High,
             Tackling = TacklingStyle.Aggressive,
@@ -100,6 +101,7 @@ public sealed class EngineVocabularyTests
         ((int)mapped.Tempo).Should().Be((int)instructions.Tempo);
         ((int)mapped.Passing).Should().Be((int)instructions.Passing);
         ((int)mapped.Width).Should().Be((int)instructions.Width);
+        ((int)mapped.PassFocus).Should().Be((int)instructions.PassFocus);
         ((int)mapped.Pressing).Should().Be((int)instructions.Pressing);
         ((int)mapped.DefensiveLine).Should().Be((int)instructions.DefensiveLine);
         ((int)mapped.Tackling).Should().Be((int)instructions.Tackling);
@@ -107,10 +109,21 @@ public sealed class EngineVocabularyTests
     }
 
     [Fact]
+    public void Every_pass_focus_maps_to_its_namesake()
+    {
+        foreach (var focus in Enum.GetValues<PassFocus>())
+        {
+            var mapped = EngineVocabulary.Instructions(TeamInstructionSet.Neutral with { PassFocus = focus });
+
+            mapped.PassFocus.ToString().Should().Be(focus.ToString());
+        }
+    }
+
+    [Fact]
     public void The_neutral_instruction_set_is_the_engines_own_middle()
     {
         // A club that has saved no plan takes the field with the set that neither instructs nor inhibits, and
-        // the engine's default instructions are the same eight values.
+        // the engine's default instructions are the same values.
         var neutral = EngineVocabulary.Instructions(TeamInstructionSet.Neutral);
         var engine = new MatchInstructionsV1();
 

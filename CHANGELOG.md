@@ -4,6 +4,32 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Pass focus — a manager can direct the ball
+
+The pass focus added to the engine in [`ADR-0058`](docs/architecture/adr/0058-engine-v8-pass-focus.md) is now a team
+instruction a manager sets on the tactics board: balanced, the centre, the centre with the left or the right flank,
+or both wings. It has a price, as every instruction does (`INS-9`), and the board says what it is in one line under
+the choice. Existing plans and every existing match are unchanged: a plan without a pass focus plays `balanced`, and
+a balanced side takes no modifier.
+
+### Added
+
+- **A "Pass focus" picker on the tactics board**, with a line under it for the chosen option, for example "Down both
+  flanks: the most creative option, but weaker build-up, poorer shots, and the middle is open on the counter."
+- **`passFocus`** on the tactical plan request (optional, defaulting to `balanced`) and on the plan response; stored
+  in `squad.tactical_plans.pass_focus` by migration `PassFocusInstruction` (expand step, default `balanced`).
+- **The price of each option** in `TacticalModifiers` (`engine-tactical-v3`): the centre builds, finishes and holds
+  its shape better but creates less; the wings create more but build and finish worse and are looser at the back;
+  the centre with a flank sits between them and is thin on the flank it leaves alone. Left and right cost the same.
+- A line on the Help page, and tests for the codes, the mapping, the prices, persistence and the API.
+
+### Notes
+
+- **The effect is small.** Over 2,000 matches each, an option moves goals by at most 0.02 and shots by about 0.2,
+  less than the attacking mentality. The prices are real in the unit ratings and bounded by `INS-9`, but a manager
+  will not see a single match turn on them.
+- AI clubs keep `balanced`, so their deterministic plans are unchanged.
+
 ## Training — progress is held per skill (`training-v3`)
 
 Each skill now carries its own progress towards its next point, so a manager can see how close a player is to

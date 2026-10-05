@@ -50,6 +50,10 @@ public sealed record SaveTacticalPlanRequest
     /// <summary>Gets the time-wasting code (`INS-8`).</summary>
     public required string TimeWasting { get; init; }
 
+    /// <summary>Gets the pass-focus code, which lanes the passes are asked to go through.</summary>
+    /// <remarks>Optional, so a client that does not know the setting keeps the balanced default.</remarks>
+    public string PassFocus { get; init; } = "balanced";
+
     /// <summary>
     /// Gets the slot layout, or null to lay the plan out from its formation preset.
     /// </summary>

@@ -63,6 +63,42 @@ public sealed class TacticsPersistenceTests
         await act.Should().ThrowAsync<DbUpdateConcurrencyException>("the plan version is the concurrency token");
     }
 
+    [Theory]
+    [InlineData(PassFocus.Balanced)]
+    [InlineData(PassFocus.Centre)]
+    [InlineData(PassFocus.CentreAndLeft)]
+    [InlineData(PassFocus.CentreAndRight)]
+    [InlineData(PassFocus.Wings)]
+    public async Task A_plans_pass_focus_survives_a_save_and_a_read(PassFocus focus)
+    {
+        Guid clubId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (clubId, _) = await ArrangeAsync(seeding);
+
+            db.TacticalPlans.Add(TacticalPlan.Create(
+                Guid.CreateVersion7(),
+                clubId,
+                "Focused",
+                FormationPreset.FourFourTwo,
+                Instructions() with { PassFocus = focus },
+                isDefault: true,
+                DateTimeOffset.UnixEpoch));
+            await db.SaveChangesAsync();
+        }
+
+        await using var reading = _fixture.CreateScope();
+        var readDb = reading.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var plan = await readDb.TacticalPlans.AsNoTracking().SingleAsync(candidate => candidate.ClubId == clubId);
+
+        plan.PassFocus.Should().Be(focus);
+        plan.Instructions.PassFocus.Should().Be(focus);
+    }
+
     [Fact]
     public async Task The_tactics_read_returns_the_plans_their_slots_and_the_selectable_squad()
     {

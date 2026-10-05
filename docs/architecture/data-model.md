@@ -372,6 +372,7 @@ erDiagram
         text tempo
         text passing
         text width
+        text pass_focus "balanced, centre, centre_left, centre_right, wings"
         text pressing
         text defensive_line
         text tackling
