@@ -13,21 +13,21 @@ namespace TouchlineManager.MatchEngine.Tests;
 /// <para>
 /// When the receiver chain was only a record of who passed to whom (M3) this hash was the proof that it moved
 /// nothing: the chain drew from its own stream and never moved a point an event is read off, so the events of 40
-/// matches were what they were before it existed. Since M4 the chain drives the outcome and a cross is headed, so
-/// play moves on purpose and the value was re-pinned in the same commit, with the calibration it was re-pinned
-/// against.
+/// matches were what they were before it existed. Since M4 the chain drives the outcome and a cross is headed, and since
+/// M5 the holder may dribble on or shoot from distance, so play moves on purpose and the value was re-pinned in the
+/// same commit, with the calibration it was re-pinned against.
 /// </para>
 /// <para>
 /// A change that moves it is a change to play. Until engine-v10 is released it is re-pinned in the milestone that
-/// makes it (solo play is the next); after the release, a new engine version.
+/// makes it; after the release, a new engine version.
 /// </para>
 /// </remarks>
 public sealed class ReceiverChoiceRegressionTests
 {
-    private const string PinnedEventsHash = "9f6e2ad66089f8b4879c81e9453e72a9e4b482d02fb8ac77f7ef532bff57c8fc";
+    private const string PinnedEventsHash = "346eeaab341ea79c6a3492b0d158c013f59c2c64b35c07c36862a899b9f31919";
 
     [Fact]
-    public void The_events_and_scorelines_of_forty_matches_are_what_they_were_when_the_chain_began_to_drive_the_outcome()
+    public void The_events_and_scorelines_of_forty_matches_are_what_they_were_when_the_holder_began_to_choose_between_a_pass_a_dribble_and_a_shot()
     {
         var text = new StringBuilder();
 

@@ -590,6 +590,30 @@ internal static class PassagePlanner
         return share * EngineRulesV2.Certain / Math.Max(1, Math.Max(left, Math.Max(centre, right)));
     }
 
+    /// <summary>
+    /// Gets the shot zone a point is in, read off where it is across the pitch with the bands the planner places shots
+    /// in (`engine-v10`).
+    /// </summary>
+    /// <param name="point">The point, in pitch coordinates.</param>
+    /// <param name="isHome">Whether the side attacks towards the high end of the pitch.</param>
+    /// <param name="rules">The rules in force.</param>
+    internal static ShotZone ZoneAt(SpatialPoint point, bool isHome, EngineRulesV2 rules)
+    {
+        var y = AttackingY(point.Y, isHome);
+
+        if (y >= rules.ShotCentralBandYMinBasisPoints && y <= rules.ShotCentralBandYMaxBasisPoints)
+        {
+            return ShotZone.Central;
+        }
+
+        if (y < SpatialPitch.PitchWidth / 2)
+        {
+            return y >= rules.ShotInsideBandYMinBasisPoints ? ShotZone.InsideLeft : ShotZone.WideLeft;
+        }
+
+        return y <= rules.ShotInsideBandYMaxBasisPoints ? ShotZone.InsideRight : ShotZone.WideRight;
+    }
+
     /// <summary>Maps a point on the attacking side's own scale to a pitch coordinate.</summary>
     /// <param name="attackingX">The distance from the attacker's own goal, 0…10,000.</param>
     /// <param name="attackingY">The position across the pitch, 0…7,000.</param>

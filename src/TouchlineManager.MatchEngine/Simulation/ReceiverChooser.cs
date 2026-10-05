@@ -14,9 +14,10 @@ namespace TouchlineManager.MatchEngine.Simulation;
 /// <param name="To">Where the ball went: the planned point, moved partway towards the receiver unless it is the last.</param>
 /// <param name="Openness">How open the receiver was where he took it, 0…10,000; nothing for a leg the holder kept.</param>
 /// <param name="Score">The score the holder gave the receiver he chose, 0…10,000; nothing for a leg the holder kept.</param>
-internal readonly record struct ReceiverLeg(Guid Passer, Guid? Receiver, SpatialPoint To, int Openness = 0, int Score = 0)
+/// <param name="Shoots">Whether the holder shot instead of playing the leg: the ball does not move.</param>
+internal readonly record struct ReceiverLeg(Guid Passer, Guid? Receiver, SpatialPoint To, int Openness = 0, int Score = 0, bool Shoots = false)
 {
-    /// <summary>Gets whether the leg is a pass, as opposed to the holder carrying the ball on.</summary>
+    /// <summary>Gets whether the leg is a pass, as opposed to the holder carrying the ball on or shooting.</summary>
     public bool IsPass => Receiver is not null;
 }
 
@@ -30,6 +31,9 @@ internal sealed record ReceiverChain(IReadOnlyList<ReceiverLeg> Legs, Guid Carri
 {
     /// <summary>Gets the players who played each pass of the chain, in order.</summary>
     public IReadOnlyList<Guid> Passers { get; } = [.. Legs.Where(leg => leg.IsPass).Select(leg => leg.Passer)];
+
+    /// <summary>Gets whether the holder ended the chain by shooting from distance (`engine-v10`).</summary>
+    public bool EndsInShot => Legs.Count > 0 && Legs[^1].Shoots;
 
     /// <summary>
     /// Reads how good the chain was, for the chances it moves: how open its most marked receiver was, how open the
@@ -145,6 +149,10 @@ internal static class ReceiverChooser
     /// The index of the first point that is never moved towards its receiver; the last point when it is not given.
     /// A path that goes on past the point the ball can be lost at holds the rest of it still too.
     /// </param>
+    /// <param name="canShoot">
+    /// Whether the holder at the last leg may shoot from distance instead of playing it: the ball played into the final
+    /// third of an attack that progressed, which is where a shot takes the place of the chance being created.
+    /// </param>
     /// <returns>The chain, or null when the first holder is not an outfield player on the pitch.</returns>
     public static ReceiverChain? Choose(
         MatchState state,
@@ -152,7 +160,8 @@ internal static class ReceiverChooser
         IReadOnlyList<SpatialPoint> points,
         Guid firstHolder,
         bool lost,
-        int? unpulledFrom = null)
+        int? unpulledFrom = null,
+        bool canShoot = false)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(points);
@@ -184,13 +193,25 @@ internal static class ReceiverChooser
 
             var pressed = OffBallModel.IsUnderPressure(from, defendersAtBall, rules);
 
-            var chosen = ChooseOne(
-                new Leg(holder, from, target, last, pressed, isHome, attacking.Instructions.PassFocus, lost && index == points.Count - 2),
+            var shoots = canShoot && index == points.Count - 1;
+
+            var choice = ChooseOne(
+                new Leg(holder, from, target, last, pressed, isHome, attacking.Instructions.PassFocus, lost && index == points.Count - 2, shoots),
                 teammates,
                 defenders,
+                defendersAtBall,
                 rules,
                 stream);
 
+            if (choice.Action == LegAction.Shoot)
+            {
+                // The ball stays where he is, and the shot is the end of the chain.
+                legs.Add(new ReceiverLeg(holder.Participant.ParticipantId, null, from, Shoots: true));
+
+                break;
+            }
+
+            var chosen = choice.Receiver;
             var arrival = chosen is { } receiver ? LandingPoint(target, receiver.Player, last, isHome, rules) : target;
 
             legs.Add(new ReceiverLeg(
@@ -345,15 +366,20 @@ internal static class ReceiverChooser
         bool Pressed,
         bool IsHome,
         MatchPassFocus Focus,
-        bool NextIsLost);
+        bool NextIsLost,
+        bool CanShoot);
 
     /// <summary>A teammate who is seen and eligible, with his selection weight, his openness and his score.</summary>
     private readonly record struct Option(OffBallPlayer Player, int Weight, int Openness, int Score);
 
-    private static Option? ChooseOne(
+    /// <summary>What the holder does, and to whom when he passes.</summary>
+    private readonly record struct Choice(LegAction Action, Option? Receiver);
+
+    private static Choice ChooseOne(
         Leg leg,
         IReadOnlyList<OffBallPlayer> teammates,
         IReadOnlyList<OffBallPlayer> defenders,
+        IReadOnlyList<OffBallPlayer> defendersAtBall,
         EngineRulesV2 rules,
         Pcg32 stream)
     {
@@ -416,6 +442,12 @@ internal static class ReceiverChooser
         // The choice is drawn whether or not anybody is there to choose, for the same reason.
         var draw = stream.NextInt((int)Math.Clamp(total, 1, int.MaxValue));
 
+        // And so are the two that settle what he does with it: whether he takes the option worth most to him, and which
+        // of the others he takes if he does not (`engine-v10`).
+        var choiceDraw = stream.NextBasisPoints();
+        var alternativeDraw = stream.NextBasisPoints();
+
+        Option? receiver = null;
         long running = 0;
 
         foreach (var option in options)
@@ -424,11 +456,22 @@ internal static class ReceiverChooser
 
             if (draw < running)
             {
-                return option;
+                receiver = option;
+
+                break;
             }
         }
 
-        return null;
+        var utilities = new SoloUtilities(
+            receiver is null ? null : options.Max(option => option.Score),
+            SoloPlay.DribbleUtility(leg.Holder, leg.From, defendersAtBall, leg.IsHome, rules),
+            leg.CanShoot && SoloPlay.CanShoot(leg.From, leg.IsHome, rules)
+                ? SoloPlay.ShootUtility(leg.Holder, leg.From, leg.IsHome, rules)
+                : null);
+
+        var action = SoloPlay.Decide(utilities, SoloPlay.BestChoiceChance(leg.Holder, rules), choiceDraw, alternativeDraw);
+
+        return new Choice(action, action == LegAction.Pass ? receiver : null);
     }
 
     /// <summary>Places an effective skill, in hundredths, on a line from a low value at the lowest skill to a high one at the highest.</summary>

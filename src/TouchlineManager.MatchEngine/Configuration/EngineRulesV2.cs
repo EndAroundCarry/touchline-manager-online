@@ -498,7 +498,7 @@ public sealed record EngineRulesV2
     /// How far a receiver of neutral Positioning can get to a pass, in pitch units; a better-placed player
     /// covers more and a worse one less (`engine-v10`).
     /// </summary>
-    public int OffBallReachDistance { get; init; } = 4_000;
+    public int OffBallReachDistance { get; init; } = 4_600;
 
     /// <summary>
     /// How far up the pitch a pass must take the ball, in pitch units, to be worth the whole progress score
@@ -541,13 +541,13 @@ public sealed record EngineRulesV2
     /// The chance, in basis points, that a holder of the lowest effective Vision sees a teammate standing next to
     /// him as a way to play the ball (`engine-v10`).
     /// </summary>
-    public int ReceiverSeeLowestBasisPoints { get; init; } = 3_500;
+    public int ReceiverSeeLowestBasisPoints { get; init; } = 4_500;
 
     /// <summary>
     /// The chance, in basis points, that a holder of the highest effective Vision sees a teammate standing next to
     /// him; it rises linearly from the lowest (`engine-v10`).
     /// </summary>
-    public int ReceiverSeeHighestBasisPoints { get; init; } = 9_800;
+    public int ReceiverSeeHighestBasisPoints { get; init; } = 9_900;
 
     /// <summary>
     /// How far off a teammate is, in pitch units, when the chance of seeing him has fallen by the whole of
@@ -682,6 +682,68 @@ public sealed record EngineRulesV2
     /// are chances, so the shots from crosses stay what they were before the header was contested (`engine-v10`).
     /// </summary>
     public int CrossCreationMultiplierBasisPoints { get; init; } = 12_300;
+
+    /// <summary>
+    /// The chance, in basis points, that a holder of the lowest effective Decisions takes the option that is worth
+    /// most to him (pass, dribble or shoot); otherwise he takes another (`engine-v10`).
+    /// </summary>
+    public int SoloBestChoiceLowestBasisPoints { get; init; } = 9_700;
+
+    /// <summary>
+    /// The chance, in basis points, that a holder of the highest effective Decisions takes the option that is worth
+    /// most to him; it rises linearly from the lowest (`engine-v10`).
+    /// </summary>
+    public int SoloBestChoiceHighestBasisPoints { get; init; } = 9_980;
+
+    /// <summary>
+    /// What a dribble is worth against a pass, in basis points of the 0…10,000 score it is read on: below 10,000 the
+    /// holder passes unless his teammates are poorly placed (`engine-v10`).
+    /// </summary>
+    public int SoloDribbleUtilityBasisPoints { get; init; } = 4_200;
+
+    /// <summary>Weight of the holder's Dribbling in what a dribble is worth (`engine-v10`).</summary>
+    public int SoloDribbleSkillWeight { get; init; } = 2;
+
+    /// <summary>Weight of the space ahead of the holder in what a dribble is worth (`engine-v10`).</summary>
+    public int SoloDribbleSpaceWeight { get; init; } = 3;
+
+    /// <summary>
+    /// How far ahead of the holder, in pitch units, the space is read for a dribble: how open the point he would run
+    /// into is (`engine-v10`).
+    /// </summary>
+    public int SoloDribbleStep { get; init; } = 800;
+
+    /// <summary>
+    /// How far up the pitch, on the side's own scale, the player on the ball must be for a shot from distance to be an
+    /// option when the attack is played into the final third: nearer the goal than this he may shoot (`engine-v10`).
+    /// </summary>
+    public int LongShotMinX { get; init; } = 7_800;
+
+    /// <summary>
+    /// How far up the pitch, on the side's own scale, the player on the ball can be for a shot from distance to be an
+    /// option: from the edge of the box in, the shot is the chance the attack creates, not one the holder takes on
+    /// himself (`engine-v10`).
+    /// </summary>
+    public int LongShotMaxX { get; init; } = 8_700;
+
+    /// <summary>
+    /// What a shot from distance is worth against a pass, in basis points of the 0…10,000 score it is read on
+    /// (`engine-v10`).
+    /// </summary>
+    public int LongShotUtilityBasisPoints { get; init; } = 5_600;
+
+    /// <summary>Weight of the holder's Finishing and Composure in what a shot from distance is worth (`engine-v10`).</summary>
+    public int LongShotSkillWeight { get; init; } = 3;
+
+    /// <summary>Weight of how near the goal he is in what a shot from distance is worth (`engine-v10`).</summary>
+    public int LongShotRangeWeight { get; init; } = 2;
+
+    /// <summary>
+    /// What a shot from distance multiplies the chance that it scores by, in basis points, after the shooter, the zone
+    /// and the goalkeeper have set it: a shot from outside the box is a worse chance than one the attack worked for
+    /// (`engine-v10`).
+    /// </summary>
+    public int LongShotGoalMultiplierBasisPoints { get; init; } = 6_000;
 
     /// <summary>Weight of Pace in both sides' scramble score.</summary>
     public int ScramblePaceWeight { get; init; } = 3;
@@ -1655,6 +1717,40 @@ public sealed record EngineRulesV2
             problems.Add("The cross header constants must be a baseline in 1..20 and non-negative weights.");
         }
 
+        if (SoloBestChoiceLowestBasisPoints > SoloBestChoiceHighestBasisPoints)
+        {
+            problems.Add(
+                $"The solo choice accuracies are inverted: lowest {SoloBestChoiceLowestBasisPoints}, highest {SoloBestChoiceHighestBasisPoints}.");
+        }
+
+        if (SoloDribbleUtilityBasisPoints is < 0 or > Certain
+            || LongShotUtilityBasisPoints is < 0 or > Certain
+            || LongShotGoalMultiplierBasisPoints is < 0 or > Certain)
+        {
+            problems.Add($"The solo utilities and the long shot's goal multiplier must be in 0..{Certain}.");
+        }
+
+        if (SoloDribbleSkillWeight < 0
+            || SoloDribbleSpaceWeight < 0
+            || SoloDribbleSkillWeight + SoloDribbleSpaceWeight < 1
+            || LongShotSkillWeight < 0
+            || LongShotRangeWeight < 0
+            || LongShotSkillWeight + LongShotRangeWeight < 1)
+        {
+            problems.Add("The solo score weights must not be negative, and at least one of each pair must be positive.");
+        }
+
+        if (SoloDribbleStep < 1)
+        {
+            problems.Add($"SoloDribbleStep must be a positive pitch distance, was {SoloDribbleStep}.");
+        }
+
+        if (LongShotMinX < 0 || LongShotMaxX <= LongShotMinX || LongShotMaxX > Certain)
+        {
+            problems.Add(
+                $"The long shot band must be an ordered pair of pitch coordinates inside 0..{Certain}, was {LongShotMinX}..{LongShotMaxX}.");
+        }
+
         if (ShotFinalThirdXMinBasisPoints <= Certain / 2)
         {
             problems.Add(
@@ -1736,6 +1832,8 @@ public sealed record EngineRulesV2
         yield return (nameof(ReceiverSeeHighestBasisPoints), ReceiverSeeHighestBasisPoints);
         yield return (nameof(ReceiverSeeDistancePenaltyBasisPoints), ReceiverSeeDistancePenaltyBasisPoints);
         yield return (nameof(ReceiverPullBasisPoints), ReceiverPullBasisPoints);
+        yield return (nameof(SoloBestChoiceLowestBasisPoints), SoloBestChoiceLowestBasisPoints);
+        yield return (nameof(SoloBestChoiceHighestBasisPoints), SoloBestChoiceHighestBasisPoints);
         yield return (nameof(FinishingGoalSwingBasisPoints), FinishingGoalSwingBasisPoints);
         yield return (nameof(ChainProgressSwingBasisPoints), ChainProgressSwingBasisPoints);
         yield return (nameof(ChainCreationOpennessSwingBasisPoints), ChainCreationOpennessSwingBasisPoints);

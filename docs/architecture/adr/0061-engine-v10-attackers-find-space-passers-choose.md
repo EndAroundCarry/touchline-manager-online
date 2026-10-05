@@ -312,6 +312,70 @@ too much, is the floor and ceiling of the edge (`PositioningFloorBasisPoints`, `
 8,000 and 12,000 would make it about 1.8x at the extremes, by the same estimate. Vision and Decisions help the side by what they do to the receiver (the +0.54 goal
 difference at 18 against +0.47 at M3, and the 4-side is no worse), and the effect stays bounded by the nudges.
 
+### M5: Pass, dribble or shoot (built)
+
+At each leg of the chain the holder has up to three options, each with an integer utility on the receivers' 0..10,000
+scale (`SoloPlay`, `Simulation/`):
+
+- **Pass**: the best score among the teammates he sees and can give it to; nothing when there is nobody.
+- **Dribble**: always open. His Dribbling and the openness of the point `SoloDribbleStep` = 800 ahead of him, weighted 2
+  to 3, times `SoloDribbleUtilityBasisPoints` = 4,200.
+- **Shoot from distance**: open only on the ball played into the final third, and only from `LongShotMinX` = 7,800 to
+  `LongShotMaxX` = 8,700 (the edge of the box). His Finishing and Composure and how near the goal he is, weighted 3 to
+  2, times `LongShotUtilityBasisPoints` = 5,600.
+
+He takes the option worth most with a chance from `SoloBestChoiceLowestBasisPoints` = 9,700 at Decisions 1 to 9,980 at
+Decisions 20, otherwise one of the others in proportion to what each is worth; ties go to the pass, then the dribble.
+A holder with nobody to pass to therefore chooses between the dribble and the shot, which is the "he did not see them"
+and the "nobody was free" cases in one rule. The two extra draws per leg (the choice, then which of the others) are
+taken whether or not they are used, from the chain's own stream, so the chain's shape never depends on what was decided.
+
+A **dribble** is a `Carry` to the planned point, is not a pass, and its holder is the player on the ball into the final
+third: he fights the ground duel, is the favoured shooter and crosses (`PossessionPassing.OnBall`). A **shot from
+distance** replaces the whole of the chance: no ball into the final third, no duel, no creation roll. It is struck from
+where the holder stands, in the zone that point is in, with an ordinary shot's goal chance times
+`LongShotGoalMultiplierBasisPoints` = 6,000; no pass is counted for it and nobody is credited with an assist. This is
+the one place M5 moves play draws, and only in the possessions where a shot replaces the duel and the creation roll.
+
+**Finding: the solo rate is mostly "nobody eligible".** Of the seen teammates, the depth rule bars about a third and
+reach another sixth, so about 4% of legs had nobody to pass to at the M3 constants; a possession has about four legs,
+so that alone was about 20% of possessions having a solo leg. The decision itself is the smaller part. To bring the
+rate down without making the holder pass to anybody, three M3 constants moved: `OffBallReachDistance` 4,000 to 4,600,
+and the sight chances 3,500..9,800 to 4,500..9,900. The cost is on Vision: the openness gap between a holder of Vision
+20 and one of Vision 1 fell from about 230 to about 86 (a floor of 5,500 took it to 55, which is why it stopped
+there), and `A_holder_who_sees_more_gives_the_ball_to_a_more_open_man` asks for 50 now, not 100.
+
+**Finding: a shot's utility is a steep knob.** At the edge-of-box band, a utility scale of 7,000 gave 2.9 shots from
+distance a match, 6,200 gave 1.7, 5,600 gives 1.05, 5,000 gives 0.55 and 4,000 gives 0.19. A shot from distance
+replaces a creation roll that is worth more than the shot is, so goals fell by about 0.07 a match at 1.2 shots a match
+until the goal multiplier went from 0.4 to 0.6 (a speculative effort converts about 6%).
+
+| Reading | engine-v9 | M4 | M5 |
+|---|---|---|---|
+| Goals per match (3,000) | 2.898 | 2.898 | 2.934 |
+| Shots per match | 27.22 | 27.17 | 27.91 |
+| Home possession | 52.10% | 52.11% | 52.07% |
+| Fouls, yellows, reds per match | 21.37, 3.40, 0.28 | 21.38, 3.41, 0.29 | 21.36, 3.42, 0.28 |
+| Penalties per match | 0.241 | 0.244 | 0.243 |
+| Matches with 7+ goals | 2.79% | 2.97% (20,000) | 3.53% (3,000) |
+| Possessions with a solo leg | | about 13% | 11.9% |
+| Shots from distance a match | | 0 | 1.05 (about 4% of the shots) |
+| Home side's Decisions 1 / 10 / 20: possessions with a solo leg | | | 14.3% / 11.2% / 7.5% |
+| Passes attempted per match, completion Defence / Midfield / Attack | | 626; 92 / 77 / 77% | 625; 93 / 78 / 77% |
+| Defender receives past halfway, from the film's marks | 31.7% | 3.5% | 3.25% |
+| Twin strikers, Positioning 18 against 4: shots, goals per match | 1.470, 0.144 against 1.491, 0.150 | 2.225, 0.235 against 0.890, 0.095 | 2.487, 0.253 against 0.885, 0.087 |
+| Whole home side Vision and Decisions 4 / 13 / 18: goals, home against away | | 1.329 - 1.446 / 1.586 - 1.301 / 1.765 - 1.222 | 1.361 - 1.423 / 1.619 - 1.315 / 1.774 - 1.220 |
+| Film length p05 / p50 / p95; max | 9.90 / 10.13 / 10.41 | 9.91 / 10.13 / 10.41; 10.76 | 9.91 / 10.13 / 10.41; 10.66 |
+| Teleports outside cuts | 0 | 0 | 0 |
+| Film pace p50, inside 1.8-2.9x | 2.54x, 97.9% | 2.65x, 90.1% | 2.63x, 91.3% |
+| Golden match | 2-2 | 3-2 | 2-2 |
+
+The 7+ goals share is the reading to watch: over 3,000 matches the standard error is about 0.3 points, so 3.53% is
+about 1.7 above the 3.0% limit, and it was 2.97% over 20,000 at M4. A 20,000-match run decides whether it is a drift
+or noise; this milestone caps its runs at 3,000. The goals and shots rose by 1.2% and 2.7% from the shots from
+distance. The replay-pace test's share was loosened from 90% to 85% because it samples 24 matches; over 1,500 the
+share is 91.3%.
+
 ## Consequences
 
-To be completed at the later gates with the measured tables.
+To be completed at the last gate with the measured tables.

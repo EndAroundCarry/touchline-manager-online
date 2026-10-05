@@ -104,7 +104,8 @@ public sealed class DeterminismTests
     {
         // The most important test in the project. If this fails, an engine change has altered what a historical
         // match would replay as. Engine version 10 re-pinned it at each of its milestones (the receiver chain drives the
-        // outcome and a cross is headed in the last of them; the golden match is now 3-2), and the values of the
+        // outcome and a cross is headed in M4; the holder may dribble on or shoot from distance in M5, and the golden
+        // match is now 2-2), and the values of the
         // versions before it were retired with them. From a
         // version's release onward, any change requires a new engine version and a new labelled constant
         // rather than an updated hash.
@@ -112,7 +113,7 @@ public sealed class DeterminismTests
 
         result.OutputHash.Should().Be(GoldenOutputHash);
         result.InputHash.Should().Be(GoldenInputHash);
-        result.HomeGoals.Should().Be(3);
+        result.HomeGoals.Should().Be(2);
         result.AwayGoals.Should().Be(2);
     }
 
@@ -122,7 +123,7 @@ public sealed class DeterminismTests
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
         EngineConfiguration.HashOf(EngineRulesV2.Default)
-            .Should().Be("12b4767fdfb10f4cf4b410045741baa119b36efa3914f6b54bb19074ed84f453");
+            .Should().Be("cb1a8aedd934f25a5e74fdc9f3f24653a5090fba8548d880fedb5e5c672612cb");
     }
 
     [Fact]
@@ -164,8 +165,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "b8187a8a46f8c44b3e98216c8440cb903a23e9d4c144a0a9eda51fee2896fa68";
+        "a64de1f43168faf14d72f8ce14d744df130d5a41895c10319c5fc1a94855bcd6";
 
     private const string GoldenOutputHash =
-        "8f88d05ce2a7bb5e729f69c704c9580487657c28877f27bdacfc324df6fd50c3";
+        "4c4a7792e17ae917132fafc8982eee77e5c14be8c4b253540a828dc8d130a214";
 }

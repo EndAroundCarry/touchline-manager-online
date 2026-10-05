@@ -62,6 +62,18 @@ internal sealed class PossessionPassing(MatchSide Side)
     /// </summary>
     public Guid? ChainHolder { get; private set; }
 
+    /// <summary>
+    /// Gets the player who has the ball as the attack goes into the final third (`engine-v10`): the one it was played to,
+    /// or the holder who carried it in himself. Null when the possession was not played through.
+    /// </summary>
+    public Guid? OnBall => EntryReceiver ?? ChainHolder;
+
+    /// <summary>
+    /// Gets whether the possession ended in a shot the holder took from distance (`engine-v10`): nobody set it up, so
+    /// there is nobody to credit with an assist.
+    /// </summary>
+    public bool LongShot { get; set; }
+
     /// <summary>Records who played the approach's passes and who has the ball at the end of it.</summary>
     /// <param name="chain">The receivers the approach was played through.</param>
     /// <param name="approachLegs">How many of the chain's legs are the approach.</param>

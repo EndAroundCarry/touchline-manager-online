@@ -66,6 +66,107 @@ internal static class OffBallProbe
         {
             MindTiers(Math.Min(matches, 4_000), seed, rules);
         }
+
+        if (Wanted("solo"))
+        {
+            SoloPlay(Math.Min(matches, 3_000), seed, rules);
+        }
+    }
+
+    /// <summary>
+    /// Solo play (`engine-v10`, M5): how often the holder keeps the ball or shoots from distance, how the long shots
+    /// do, and how it moves with the Decisions of the whole home side.
+    /// </summary>
+    /// <remarks>
+    /// A solo leg is a carry waypoint after the possession's first that is not the carry to the shot point; a shot from
+    /// distance is an open-play shot with no duel in front of it and no header.
+    /// </remarks>
+    private static void SoloPlay(int matches, ulong seed, EngineRulesV2 rules)
+    {
+        Console.WriteLine($"  Solo play, {matches:N0} matches (home side's Decisions at the tier, everything else {TwinAbility}; away side even):");
+        Console.WriteLine($"    {"tier",-14} {"possessions solo",17} {"solo legs/poss",15} {"long shots/match",17} {"long-shot goals",16} {"goals/match",12} {"shots/match",12}");
+
+        // SOLO_TIERS=0 plays only the even run, for a quick look while tuning.
+        var tiers = Environment.GetEnvironmentVariable("SOLO_TIERS") == "0"
+            ? new int?[] { null }
+            : new int?[] { null, 1, 5, 10, 15, 20 };
+
+        foreach (var tier in tiers)
+        {
+            var possessions = 0L;
+            var soloPossessions = 0L;
+            var soloLegs = 0L;
+            var longShots = 0L;
+            var longGoals = 0L;
+            var goals = 0L;
+            var shots = 0L;
+
+            for (var index = 0; index < matches; index++)
+            {
+                var even = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules);
+                var input = tier is int value ? WithDecisions(even, value) : even;
+                var recorder = new MatchPassageRecorder();
+                var result = MatchSimulator.Simulate(input, rules, null, recorder);
+
+                goals += result.HomeGoals + result.AwayGoals;
+                shots += result.Home.Shots + result.Away.Shots;
+
+                foreach (var passage in recorder.Passages)
+                {
+                    // The tiers move only the home side, so only its possessions are read; the even run reads both.
+                    if (tier is not null && passage.Side != MatchSide.Home)
+                    {
+                        continue;
+                    }
+
+                    possessions++;
+
+                    var legs = 0;
+
+                    for (var step = 1; step < passage.Waypoints.Count; step++)
+                    {
+                        var next = step + 1 < passage.Waypoints.Count ? passage.Waypoints[step + 1].Kind : (PassageWaypointKind?)null;
+
+                        if (passage.Waypoints[step].Kind == PassageWaypointKind.Carry && next != PassageWaypointKind.Shot)
+                        {
+                            legs++;
+                        }
+                    }
+
+                    soloLegs += legs;
+                    soloPossessions += legs > 0 ? 1 : 0;
+
+                    if (passage.Outcome == PassageOutcome.OpenPlayShot
+                        && !passage.Touches.Any(touch => touch.Action is PassageAction.Tackle or PassageAction.Header))
+                    {
+                        longShots++;
+                        longGoals += passage.EventSequences.Any(sequence => recorder.Passages.Count > 0
+                            && result.Events.Any(matchEvent => matchEvent.Sequence == sequence && matchEvent.Type == EngineEventType.Goal))
+                            ? 1
+                            : 0;
+                    }
+                }
+            }
+
+            Console.WriteLine(
+                $"    {(tier is null ? "even, both" : "Decisions " + tier),-14} {Pct(soloPossessions, possessions),16}% {(double)soloLegs / Math.Max(1, possessions),15:F3} {(double)longShots / matches,17:F3} {longGoals,16} {(double)goals / matches,12:F3} {(double)shots / matches,12:F2}");
+        }
+
+        Console.WriteLine();
+    }
+
+    private static MatchInputV1 WithDecisions(MatchInputV1 input, int value)
+    {
+        var values = Enumerable.Repeat(TwinAbility, MatchAttributeNames.Count).ToArray();
+
+        values[(int)MatchAttributeName.Decisions] = value;
+
+        var attributes = PlayerAttributesV1.From(values);
+        var squad = input.Home.Squad
+            .Select(participant => participant with { Attributes = attributes })
+            .ToList();
+
+        return input with { Home = input.Home with { Squad = squad } };
     }
 
     private static void Receivers(int matches, ulong seed, EngineRulesV2 rules)
@@ -88,7 +189,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index);
+            var input = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules);
             var recorder = new MatchPassageRecorder();
             var result = MatchSimulator.Simulate(input, rules, null, recorder);
             var presentation = ReplayDirector.Analyse(input, result, recorder.Passages, options, null).Presentation;
@@ -216,7 +317,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index);
+            var input = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules);
             var result = MatchSimulator.Simulate(input, rules);
             var families = FamiliesOf(input);
 
@@ -254,7 +355,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = Twins(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index), out var highId, out var lowId);
+            var input = Twins(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules), out var highId, out var lowId);
             var result = MatchSimulator.Simulate(input, rules);
 
             homeGoals += result.HomeGoals;
@@ -314,7 +415,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = RoleShaped(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index));
+            var input = RoleShaped(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules));
             var recorder = new MatchPassageRecorder();
             var result = MatchSimulator.Simulate(input, rules, null, recorder);
             var families = FamiliesOf(input);
@@ -390,7 +491,7 @@ internal static class OffBallProbe
 
             for (var index = 0; index < matches; index++)
             {
-                var input = WithMind(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index), tier);
+                var input = WithMind(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules), tier);
                 var result = MatchSimulator.Simulate(input, rules);
 
                 homeGoals += result.HomeGoals;

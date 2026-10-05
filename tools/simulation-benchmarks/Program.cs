@@ -42,6 +42,23 @@ var seed = positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.In
     : 20_260_925UL;
 
 var rules = EngineRulesV2.Default;
+
+// RULES="LongShotMinX=7500,SoloDribbleUtilityBasisPoints=5500" tries constants without rebuilding: a tuning aid, never
+// the rules a match is played with in the game.
+if (Environment.GetEnvironmentVariable("RULES") is { Length: > 0 } overrides)
+{
+    rules = rules with { };
+
+    foreach (var pair in overrides.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        var parts = pair.Split('=', 2);
+        var property = typeof(EngineRulesV2).GetProperty(parts[0])
+            ?? throw new ArgumentException($"No engine rule named {parts[0]}.");
+
+        property.SetValue(rules, int.Parse(parts[1], CultureInfo.InvariantCulture));
+    }
+}
+
 rules.Validate();
 
 Console.WriteLine($"Engine {EngineVersions.EngineLabel}, rules {EngineVersions.RuleSetLabel}");
@@ -89,7 +106,7 @@ return 0;
 
 void SingleMatch(ulong matchSeed)
 {
-    var input = LaboratoryFixtures.EvenlyMatched(matchSeed);
+    var input = LaboratoryFixtures.EvenlyMatched(matchSeed, rules);
     var liveMetrics = new PlayerLiveMetricsRecorder();
     var passages = new MatchPassageRecorder();
     var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
@@ -145,7 +162,7 @@ void Distributions(int matches, ulong baseSeed)
     for (var index = 0; index < matches; index++)
     {
         var result = MatchSimulator.Simulate(
-            LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index),
+            LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index, rules),
             rules);
 
         homeGoals += result.HomeGoals;
@@ -241,7 +258,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
 
     for (var index = 0; index < matches; index++)
     {
-        var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index);
+        var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index, rules);
         var liveMetrics = new PlayerLiveMetricsRecorder();
         var passages = new MatchPassageRecorder();
         var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
@@ -350,7 +367,7 @@ void Bench(int matches, ulong baseSeed)
 
     for (var index = 0; index < matches; index++)
     {
-        inputs[index] = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index);
+        inputs[index] = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index, rules);
     }
 
     // Warm up, so the first run's JIT cost is not reported as a percentile.
@@ -404,7 +421,7 @@ void Calibration(int fixtures, ulong baseSeed)
     {
         var matchSeed = baseSeed + (ulong)index;
 
-        var even = MatchSimulator.Simulate(LaboratoryFixtures.EvenlyMatched(matchSeed), rules);
+        var even = MatchSimulator.Simulate(LaboratoryFixtures.EvenlyMatched(matchSeed, rules), rules);
         var neutral = MatchSimulator.Simulate(
             LaboratoryFixtures.EvenlyMatched(matchSeed, neutralRules), neutralRules);
 
@@ -631,7 +648,7 @@ void Tactics(int fixtures, ulong baseSeed)
 
     for (var index = 0; index < fixtures; index++)
     {
-        var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index);
+        var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index, rules);
         var recorder = new PlayerLiveMetricsRecorder();
         var result = MatchSimulator.Simulate(input, rules, recorder);
 

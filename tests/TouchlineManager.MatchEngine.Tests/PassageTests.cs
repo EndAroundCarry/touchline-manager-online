@@ -111,9 +111,11 @@ public sealed class PassageTests
 
             if (!fromFreeKick)
             {
+                // A shot the holder took from distance is taken from where he stood, which is no nearer the goal than
+                // LongShotMinX; every other open-play shot is taken from the shot band the passage aimed at.
                 attackingX.Should().BeGreaterThanOrEqualTo(
-                    Rules.ShotFinalThirdXMinBasisPoints,
-                    "an open-play shot is taken from the final third the passage aimed at");
+                    Math.Min(Rules.ShotFinalThirdXMinBasisPoints, Rules.LongShotMinX),
+                    "an open-play shot is taken from the final third the passage aimed at, or from distance");
                 sawOpenPlayShot = true;
             }
         }

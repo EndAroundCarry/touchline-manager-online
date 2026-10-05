@@ -48,6 +48,15 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
   ball and the man who heads a cross are weighted by how near the formation puts them, and a defender is held to a
   small share beyond halfway. A defender carrying the ball past halfway falls from 21.5% to 3.4% of the engine's
   carries; the film's defender receptions past halfway from 9.0% to 3.5% (v9: 31.7%).
+- **Pass, dribble or shoot (M5).** The player on the ball weighs the best pass he sees, a dribble (his Dribbling and the
+  space ahead) and, at the edge of the box, a shot (Finishing, Composure, nearness to goal), and takes the one worth
+  most with a chance that rises with his Decisions (97% at 1, 99.8% at 20); otherwise he takes another. A holder with
+  nobody to pass to dribbles or shoots. A dribble is not a pass and its holder fights the duel and is favoured to shoot;
+  a shot from distance replaces the chance, converts at 60% of an ordinary shot and has no assist. 11.9% of
+  possessions have a solo leg (14.3% for a side of Decisions 1, 7.5% for 20) and there are 1.05 shots from distance a
+  match; goals 2.93, shots 27.9. To bring the solo rate down, the reach (4,000 to 4,600) and the sight floor (3,500 to
+  4,500) were widened, which makes Vision count a little less for who is found. `SoloPlayTests`; twelve rules
+  constants (`Solo*`, `LongShot*`).
 - Twin strikers differing only in Positioning, 18 against 4, now take 2.2 against 0.9 shots a match: Positioning
   counts in being found as well as in the shot. See ADR-0061 for the knob if it is too much.
 - `ChainDrivesOutcomeTests`; fourteen more rules constants (`Finishing*`, `Chain*`, `ShooterChainBonusBasisPoints`,
@@ -58,7 +67,7 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
 ### Changed
 
 - **Versions.** `EngineVersions.Engine` = 10 (`engine-v10`), `RuleSet` = 9 (`engine-rules-v9`). The rules hash and
-  the golden hashes are re-pinned; the golden match is now 3-2. A database seeded under `engine-v9` must be
+  the golden hashes are re-pinned; the golden match is now 2-2. A database seeded under `engine-v9` must be
   archived and reseeded.
 
 ## Engine-v9 — the pass focus moves the shots and the crosses

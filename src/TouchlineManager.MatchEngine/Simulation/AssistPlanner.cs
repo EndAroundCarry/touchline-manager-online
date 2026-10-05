@@ -42,6 +42,12 @@ internal static class AssistPlanner
 
         var runtime = state.SideOf(side);
 
+        // A shot from distance is the holder's own: nobody set it up (`engine-v10`).
+        if (state.Passing.LongShot)
+        {
+            return;
+        }
+
         // An open-play goal was set up by the player the ball was played to, who passed it on to the shooter or
         // took the shot on himself, and then it is the man who passed it to him (`engine-v10`). Everything else keeps
         // the draw: a set piece has no approach to credit.

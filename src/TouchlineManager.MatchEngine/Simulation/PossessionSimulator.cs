@@ -349,7 +349,7 @@ internal static class PossessionSimulator
         var approachLegs = plan.Approach.Count - 1;
 
         var chain = carrier is Guid first
-            ? ReceiverChooser.Choose(state, side, [.. plan.Approach, plan.EntryPoint], first, lost: false, unpulledFrom: approachLegs)
+            ? ReceiverChooser.Choose(state, side, [.. plan.Approach, plan.EntryPoint], first, lost: false, unpulledFrom: approachLegs, canShoot: true)
             : null;
 
         var quality = chain?.Quality(rules, approachLegs);
@@ -391,6 +391,20 @@ internal static class PossessionSimulator
 
         RecordApproach(state, possession, plan.Approach, plan.ApproachEndsInCross, passer: true, lost: false, scramble, carrier, chain);
 
+        if (chain is { EndsInShot: true })
+        {
+            // The holder took it on himself from where he stood, and the shot is the whole of the chance: there is no
+            // ball into the final third, no duel and no creation roll (`engine-v10`).
+            ChanceSimulator.ResolveLongShot(
+                state,
+                side,
+                chain.Holder,
+                PassagePlanner.StrikeFrom(plan, state.Ball.GroundPoint, rules));
+            Finish(state, PassageOutcome.OpenPlayShot);
+
+            return;
+        }
+
         // The ball is played into the final third, where the last defender engages. When the approach was played
         // through, the holder chooses who gets it there, and that is the carrier the duel is fought with (`engine-v10`).
         RecordEntry(state, plan, chain);
@@ -401,7 +415,7 @@ internal static class PossessionSimulator
 
         // The 1v1 the carrier fights to reach the creation phase: a beat man makes the chance more likely,
         // a tackle shuts the passage down. The carrier is the player the ball was played in to (`engine-v10`).
-        var duel = ResolveGroundDuel(state, side, state.Passing.EntryReceiver);
+        var duel = ResolveGroundDuel(state, side, state.Passing.OnBall);
 
         if (duel.FoulerId is Guid foulerId)
         {
@@ -446,7 +460,7 @@ internal static class PossessionSimulator
             return;
         }
 
-        if (plan.ApproachEndsInCross && state.Passing.EntryReceiver is Guid crosser)
+        if (plan.ApproachEndsInCross && state.Passing.OnBall is Guid crosser)
         {
             // A move that ended in a cross ends in a header, which the defence can win (`engine-v10`).
             Finish(state, ResolveCrossedChance(state, possession, crosser));

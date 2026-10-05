@@ -186,7 +186,7 @@ public sealed class ReceiverChooserTests
         var blind = MeanOpenness(vision: 1, decisions: 20);
         var sighted = MeanOpenness(vision: 20, decisions: 20);
 
-        sighted.Should().BeGreaterThan(blind + 100, "the more he sees, the better the best of what he sees");
+        sighted.Should().BeGreaterThan(blind + 50, "the more he sees, the better the best of what he sees");
     }
 
     [Fact]

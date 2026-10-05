@@ -328,8 +328,10 @@ three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` onc
    failure cuts the approach 40–80% of the way along. It is an offside
    (`OffsideShareOfTurnoverBasisPoints` = 800) — a through ball to the offside line, ahead of the ball, and a
    free kick for the defending side — or a plain turnover, cleared towards the middle third.
+   When the progression succeeds, the holder at the end of the approach may take a **shot from distance** instead
+   (§7.10, `engine-v10`): then there is no step 8 or 9, and the shot is struck from where he stands (§7.3).
 8. **The carrier's 1v1 ground duel** (engine-v3), at the final-third entry point: the carrier is the player
-   the ball was played in to (§7.10; drawn by dribbling and his band when nobody was) and the tackler is drawn by
+   the ball was played in to, or the holder who carried it in himself (§7.10), and the tackler is drawn by
    tackling, weighted by his band (§7.9), and the winner buys (or loses)
    `DribbleCreationBonusBasisPoints` = 1_200 of creation. A lost duel does not end the passage unless the
    defender fouled (`engine-v6`): a foul brings a free kick, a penalty (`DuelFoulPenaltyBasisPoints` = 300), or
@@ -580,15 +582,15 @@ and a receiver, chosen from where the formation puts the players and from the ho
   block shifts with the ball. The away side is resolved in the home frame and flipped back. A target's **openness**
   is the distance to the nearest defender (each defender's Marking and Positioning pulling him nearer or pushing
   him further, the receiver's own Positioning edge widening it), full at `OffBallOpennessFullDistance` = 1_200 and
-  0 with a man on him. **Reach** is `OffBallReachDistance` = 4_000 times the receiver's Positioning edge.
+  0 with a man on him. **Reach** is `OffBallReachDistance` = 4_600 times the receiver's Positioning edge.
   **Progress** is the forward gain, full at 2_000. A holder is **under pressure** with a defender within 600.
 - **The depth rule.** Anyone may be given a ball back or across by up to `BackPassFreeDepth` = 500; a midfielder or
   attacker up to `BackPassMaxDepth` = 2_500 back when the holder is under pressure; nobody further. A defender is a
   receiver only while the holder is at or short of `DefenderReceiveMaxHolderX` = 4_500 and where he takes it at or
   short of `DefenderReceiveMaxPointX` = 5_000; the goalkeeper never is.
 - **Choosing the receiver** (`ReceiverChooser`). For each leg the holder (the carrier at the start, then the previous
-  receiver) is *shown* a teammate with a chance from `ReceiverSeeLowestBasisPoints` = 3_500 at Vision 1 to
-  `ReceiverSeeHighestBasisPoints` = 9_800 at Vision 20, less up to 3_500 for a teammate 6_000 or more away. Of those
+  receiver) is *shown* a teammate with a chance from `ReceiverSeeLowestBasisPoints` = 4_500 at Vision 1 to
+  `ReceiverSeeHighestBasisPoints` = 9_900 at Vision 20, less up to 3_500 for a teammate 6_000 or more away. Of those
   he sees, the ones who can *reach* the point and pass the depth rule are *scored*: openness, progress, reach and
   the fit with the side's pass-focus lane, weighted 4/3/2/2. One is drawn with weight
   `100 + score² × gain / 100`, the gain running from `ReceiverChoiceGainLowest` = 2 (Decisions 1, nearly flat) to
@@ -596,13 +598,14 @@ and a receiver, chosen from where the formation puts the players and from the ho
   receiver is also weighted by his Passing, and on a possession the play draws already ended with that pass lost,
   by what is left of Passing. The planned touch moves `ReceiverPullBasisPoints` = 2_500 of the way to him, never out
   of its lane, and the last touch of the approach never moves. When nobody is seen and eligible the holder keeps the
-  ball for the leg (rare; solo play is `engine-v10`'s last milestone).
+  ball for the leg, which is the dribble below.
 - **One leg further.** The chain runs one pass past the approach, to the final-third entry point, which only a
   progressing attack plays. The player it goes to is the carrier of the ground duel (step 8 of §7.2) and, in open
-  play, the favoured shooter and the crosser (§7.3). If the holder found nobody, he carries it in, the duel's carrier
-  is drawn as it always was, and nobody is favoured.
+  play, the favoured shooter and the crosser (§7.3). If the holder keeps it, he carries it in and is all of those
+  himself.
 - **Its own stream.** The chain draws from `new Pcg32(seed * 1_000_037 + ordinal)`, with a fixed number of draws per
-  leg (one for every outfield player, then the choice), so it never moves a play draw. The opening carrier is drawn
+  leg (one for every outfield player, then the choice, then the two that settle pass, dribble or shot), so it never
+  moves a play draw. The opening carrier is drawn
   from the geometry stream, with one draw as before, weighted by Dribbling times how near the formation puts him to
   the ball.
 - **The chain's quality drives the outcome.** The chain is played before the progression roll, because how it was
@@ -616,6 +619,23 @@ and a receiver, chosen from where the formation puts the players and from the ho
   man who has the ball (or, if he takes the shot, to the man who played it in to him) and the failed final pass to
   the passer of the lost leg. `AssistPlanner` credits an open-play goal the same way; a set piece keeps its
   weighted draw. The pass into the final third is not counted, as before.
+- **Pass, dribble or shoot** (`SoloPlay`, `engine-v10`, M5). At each leg the holder has up to three options, each
+  with a small integer utility on the receivers' 0..10_000 scale. The **pass** is worth the best score among the
+  teammates he sees and can give it to, and nothing when there is nobody. The **dribble** is always open: his
+  Dribbling and the space ahead of him (the openness of the point `SoloDribbleStep` = 800 on, weighted
+  `SoloDribbleSkillWeight` 2 to `SoloDribbleSpaceWeight` 3), times `SoloDribbleUtilityBasisPoints` = 4_200. The
+  **shot from distance** is open only on the ball played into the final third, and only from `LongShotMinX` = 7_800 to
+  `LongShotMaxX` = 8_700 on the side's own scale (the edge of the box): his Finishing and Composure and how near the
+  goal he is (3 to 2), times `LongShotUtilityBasisPoints` = 5_600. He takes the option worth most with a chance from
+  `SoloBestChoiceLowestBasisPoints` = 9_700 at Decisions 1 to `SoloBestChoiceHighestBasisPoints` = 9_980 at Decisions
+  20, and otherwise one of the others, in proportion to what each is worth. Ties go to the pass, then the dribble. A
+  holder who finds nobody has only the dribble and the shot to choose between, which is "nobody in a good position" and
+  "he did not see them" in one rule. A dribble is a `Carry` waypoint to the planned point, is not a pass, and the man
+  who dribbled is the one who fights the ground duel, is favoured to shoot and crosses.
+- **A shot from distance** replaces the whole of the chance: there is no ball into the final third, no duel and no
+  creation roll. He shoots from where he stands with the zone read off where that is, the goal chance of an ordinary
+  shot (§7.3) times `LongShotGoalMultiplierBasisPoints` = 6_000 after the shooter, the zone and the keeper have set it.
+  It is no one's assist and no pass is counted for it; the ball he was given before is counted as it was.
 
 ### 7.x Pass focus (`engine-v8`; shots and crosses `engine-v9`)
 
@@ -945,7 +965,7 @@ stays on the pitch).
 | `AggressiveTacklingDuelScoreBonus` / `StayOnFeetDuelScorePenalty` | 6 / 4 | The tackling nudge, in attribute points. |
 | `GroundDuel*Weight`, `AerialDuel*Weight`, `Scramble*Weight` | 4/3/3, 4/3/3, 5/3/2/2, 3/3/2 | The skills each duel reads (the aerial duel's fourth term, Positioning, from `engine-v10`). |
 | `PositioningFloorBasisPoints` / `PositioningCeilingBasisPoints` | 7_000 / 13_000 | The Positioning edge on a shot or header weight, at Positioning 1 and 20 (`engine-v10`). |
-| `OffBall*`, `BackPass*Depth`, `DefenderReceiveMax*X` | 1_200, 4_000, 2_000, 600; 500, 2_500; 4_500, 5_000 | Openness, reach, progress, pressure, the depth rule (§7.10, `engine-v10`). |
+| `OffBall*`, `BackPass*Depth`, `DefenderReceiveMax*X` | 1_200, 4_600, 2_000, 600; 500, 2_500; 4_500, 5_000 | Openness, reach, progress, pressure, the depth rule (§7.10, `engine-v10`). |
 | `Receiver*` | see §7.10 | Sight, pull, the four score weights and the choice gains (§7.10, `engine-v10`). |
 | `ChainProgressSwingBasisPoints`, `ChainCreationOpennessSwingBasisPoints`, `ChainCreationChoiceSwingBasisPoints` | 700, 600, 500 | How far the chain's quality nudges progression and creation (`engine-v10`). |
 | `ChainWeakestOpennessReference`, `ChainFinalOpennessReference`, `ChainChoiceReference` | 5_200, 6_900, 6_200 | The measured means the nudges centre on (`engine-v10`). |
@@ -954,6 +974,10 @@ stays on the pitch).
 | `CrossHeaderAttackerBonus` / `CrossHeaderDeliveryBaseline` / `CrossHeaderDeliveryAerialWeight` | 13_000 / 13 / 3 | The aerial duel of an open-play cross (§7.3, `engine-v10`). |
 | `ReachWeightFloorBasisPoints` | 500 | What a player out of reach keeps of his weight to go up for a cross or pick the ball up (`engine-v10`). |
 | `CrossCreationMultiplierBasisPoints` | 12_300 | A crossed approach creates a chance this much more readily, so the header leaves the shots as they were (`engine-v10`). |
+| `SoloBestChoice{Lowest,Highest}BasisPoints` | 9_700 / 9_980 | The chance the holder takes the option worth most, at Decisions 1 and 20 (§7.10, `engine-v10`). |
+| `SoloDribbleUtilityBasisPoints`, `SoloDribble{Skill,Space}Weight`, `SoloDribbleStep` | 4_200; 2, 3; 800 | What a dribble is worth against a pass (§7.10, `engine-v10`). |
+| `LongShotMin/MaxX`, `LongShotUtilityBasisPoints`, `LongShot{Skill,Range}Weight` | 7_800 / 8_700; 5_600; 3, 2 | Where a shot from distance is open and what it is worth against a pass (§7.10, `engine-v10`). |
+| `LongShotGoalMultiplierBasisPoints` | 6_000 | A shot from distance scores this much as often as an ordinary one (§7.10, `engine-v10`). |
 | `DuelTackler*Weight` / `DuelCarrier*Weight` | 4/3/1, 1/3/4 | Band weights (defence/midfield/attack) in drawing the two players. |
 | `DuelShortHandedPenaltyBasisPoints` | 9_800 | Per missing player, on a duel skill. |
 | `DuelFoulPenaltyBasisPoints` | 300 | A duel foul that is a penalty. |
@@ -1149,6 +1173,7 @@ a test that is switched off catches nothing.
 | `ReceiverChooserTests`, `NamedReceiverPassageTests` | `engine-v10` (§7.10): a better Vision sees more, a better Decisions chooses the better placed, the pull stays in its lane and the last touch never moves, every ball received is received by a man of the side that had it, nobody passes to himself, and no defender is given the ball beyond halfway. |
 | `ChainDrivesOutcomeTests` | `engine-v10` (§7.10, §7.3): the chain's quality nudges are zero at the reference and bounded, the ball played into the final third goes to the man who fights the duel, the man it ended with shoots more than his share, a cross ends in a header from the box that the defence can win, and a header that scores is the crosser's assist. |
 | `ReceiverChoiceRegressionTests` | A hash of every event of 40 matches, re-pinned at each `engine-v10` milestone that moves play. |
+| `SoloPlayTests` | `engine-v10` (§7.10): a better Decisions takes the option worth most more often (exactly as the chance says over every draw), ties go to the pass then the dribble, an option that is not open is never taken, the others are taken in proportion to what they are worth, a better dribbler and more room make a dribble worth more, a shot is open only between the line and the box for either side and worth more to a better finisher nearer goal, only the last leg can end in a shot, a goal from distance is nobody's assist, and the man who shoots from distance is the man who had the ball.
 | `PositioningEdgeTests` | `engine-v10` (§7.9): the edge runs from the floor to the ceiling and never leaves them, only rises with skill, is neutral in the middle of the scale, is lower for a tired player, reads a defender's Marking and Positioning, and the twin striker with the higher Positioning takes more of the shots. |
 | `PassFocusShotsAndCrossesTests` | `engine-v9` (§7.x): each focus's shot zones sum to 100 and left and right mirror; no preference keeps the 40/20/10 zones and a volume of 10,000; the measured shot lanes follow each focus; crosses come from the flanks, both wings cross more and a left focus crosses more from the left; the wings shoot more and the centre less while goals stay within 15% and a shot is worth more from the middle; one side's focus does not move the other's shots. |
 | `PassFocusTests` | `engine-v8` (§7.x): a `Balanced` draw is returned unchanged; a focused draw stays on the pitch and never moves backwards; a uniform draw lands in the rules' lane shares; the measured lane shares of the ball match each option's calibration, and both wings send more wide than a single flank; left and right mirror; the away side is steered to its own left; one side's focus does not steer the other's ball; a focus is part of the snapshot's identity. |

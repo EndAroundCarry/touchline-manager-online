@@ -35,13 +35,13 @@ internal static class ChanceSimulator
         var attacker = state.SideOf(side);
         var defender = state.OpponentOf(side);
 
-        // The player the move was played through to has the ball, so he is the likeliest to shoot (`engine-v10`).
-        var shooter = ChooseShooter(state, attacker, MatchAttributeName.Finishing, state.Passing.EntryReceiver);
+        // The player who has the ball as the attack goes in is the likeliest to shoot (`engine-v10`).
+        var shooter = ChooseShooter(state, attacker, MatchAttributeName.Finishing, state.Passing.OnBall);
 
         // The ball is played on to the shot point, or carried there when the shooter is the one who has it.
         state.MoveBallAndRecord(
             shotPoint,
-            shooter is not null && shooter.Participant.ParticipantId == state.Passing.EntryReceiver
+            shooter is not null && shooter.Participant.ParticipantId == state.Passing.OnBall
                 ? PassageWaypointKind.Carry
                 : PassageWaypointKind.Pass);
 
@@ -56,6 +56,41 @@ internal static class ChanceSimulator
         state.Passing.Shooter = shooter.Participant.ParticipantId;
 
         var goalChance = GoalChance(state, defender, shooter, zone, headed: false);
+
+        Resolve(state, side, shooter, zone, goalChance, strike);
+    }
+
+    /// <summary>
+    /// Resolves a shot the holder takes from distance, in place of the attack creating a chance (`engine-v10`).
+    /// </summary>
+    /// <remarks>
+    /// He shoots from where the ball is, and it is not an assisted chance: no pass is counted for it and no assist is
+    /// credited. The shot is an ordinary one in every way but how likely it is to score, which the rules scale down
+    /// from the zone he is in and the keeper he faces.
+    /// </remarks>
+    /// <param name="state">The match state.</param>
+    /// <param name="side">The side attacking.</param>
+    /// <param name="shooterId">The player on the ball.</param>
+    /// <param name="strike">Where the strike finishes, for each outcome it could have, from where he stands.</param>
+    public static void ResolveLongShot(MatchState state, MatchSide side, Guid shooterId, StrikePlan strike)
+    {
+        var rules = state.Rules;
+        var shooter = state.SideOf(side).Outfield.FirstOrDefault(slot => slot.Participant.ParticipantId == shooterId);
+
+        if (shooter is null)
+        {
+            return;
+        }
+
+        var zone = PassagePlanner.ZoneAt(strike.Origin, side == MatchSide.Home, rules);
+
+        state.RecordTouch(shooterId, PassageAction.Shot);
+        state.Passing.Shooter = shooterId;
+        state.Passing.LongShot = true;
+
+        var goalChance = Probability.Apply(
+            GoalChance(state, state.OpponentOf(side), shooter, zone, headed: false),
+            rules.LongShotGoalMultiplierBasisPoints);
 
         Resolve(state, side, shooter, zone, goalChance, strike);
     }
