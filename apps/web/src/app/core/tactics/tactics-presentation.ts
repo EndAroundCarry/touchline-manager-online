@@ -94,25 +94,25 @@ export const INSTRUCTION_FIELDS: readonly InstructionField[] = [
         value: 'centre',
         label: 'Centre',
         effect:
-          'Through the middle: cleaner build-up and better shots, but less creative against a crowded middle.',
+          'Through the middle: fewer but better shots and fewer crosses, with a compact shape, but less creative.',
       },
       {
         value: 'centre_left',
         label: 'Centre and left',
         effect:
-          'Middle and left: more creative than the centre alone, but the right flank is thin when the ball is lost.',
+          'Middle and left: more shots and crosses from the left, but the right flank is thin when the ball is lost.',
       },
       {
         value: 'centre_right',
         label: 'Centre and right',
         effect:
-          'Middle and right: more creative than the centre alone, but the left flank is thin when the ball is lost.',
+          'Middle and right: more shots and crosses from the right, but the left flank is thin when the ball is lost.',
       },
       {
         value: 'wings',
         label: 'Wings',
         effect:
-          'Down both flanks: the most creative option, but weaker build-up, poorer shots, and the middle is open on the counter.',
+          'Down both flanks: many more shots and crosses from wide, but poorer shots, weaker build-up, and open in the middle on the counter.',
       },
     ],
   },

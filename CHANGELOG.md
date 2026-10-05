@@ -4,6 +4,41 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine-v9 — the pass focus moves the shots and the crosses
+
+The pass focus now changes where a side shoots from and where it crosses, not just where the ball goes. Recorded in
+[`ADR-0059`](docs/architecture/adr/0059-engine-v9-pass-focus-moves-shots-and-crosses.md). Both wings take their
+shots from the flanks and cross about a quarter more often; the centre and left favours the left; the centre takes
+fewer, better shots. A side with no preference scores and shoots as before.
+
+### Added
+
+- **Shot zones follow the focus.** The centre alone shoots about 20/60/19 (left/centre/right), the centre and left
+  38/41/20, both wings 39/21/39, against 26/47/26 with no preference (measured on events, corners and free kicks
+  included).
+- **A shot is worth what its zone is worth, and the focus pays for it.** A side that shoots from the centre takes
+  about 7% fewer shots at about 11.4% conversion; both wings take about 13% more at about 9.4%. Goals for stay
+  within about 2% of a side with no preference, so the focus is a choice of style rather than an upgrade.
+- **Crosses come from the flank.** The share of an approach that is crossed depends on the lane the ball arrives
+  in, 38.5% from a flank and 7% down the middle, so both wings cross 17.6 a match against 14.0, and the centre
+  and left sends about 53% of its crosses down the left.
+- `PassFocusShotsAndCrossesTests`; sixteen rules constants (`ShotFocus…Percent`, `ChanceVolume…BasisPoints`,
+  `CrossShareFlankLaneBasisPoints`, `CrossShareCentreLaneBasisPoints`).
+
+### Changed
+
+- **Versions.** `EngineVersions.Engine` = 9 (`engine-v9`), `RuleSet` = 8 (`engine-rules-v8`). The rules hash and the
+  golden hashes are re-pinned; the golden match is still 2-2. `CrossShareOfPassageBasisPoints` is replaced by the two
+  lane shares. A database seeded under `engine-v8` must be archived and reseeded.
+- A side with no preference now crosses almost only from the flanks, where it crossed from anywhere; its goals and
+  shots are unchanged.
+- The tactics board's description of each pass focus now says shots and crosses.
+
+### Notes
+
+- A cross is shown on the film and in the commentary, but it does not yet make a header or change the chance that
+  follows it.
+
 ## Pass focus — a manager can direct the ball
 
 The pass focus added to the engine in [`ADR-0058`](docs/architecture/adr/0058-engine-v8-pass-focus.md) is now a team

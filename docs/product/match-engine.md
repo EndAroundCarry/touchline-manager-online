@@ -525,7 +525,7 @@ every rating differential smaller; `RatingDifferentialReference` 1_000 → 950 r
 `HomeAdvantageBasisPoints` 10_380 → 10_420 the home edge. `BaseShotGoalBasisPoints` 845 → 865 puts goals back
 at 2.90, and `ShortHandedPenaltyBasisPoints` 6_400 → 6_700 keeps a sending-off at about 1.4 goals.
 
-### 7.x Pass focus (`engine-v8`)
+### 7.x Pass focus (`engine-v8`; shots and crosses `engine-v9`)
 
 `MatchInstructionsV1.PassFocus` asks for the centre alone, the centre and a flank, or both wings (`ADR-0058`).
 `PassagePlanner.FocusLateral` remaps a uniform lateral position into three lanes in the rules' shares (centre
@@ -533,10 +533,30 @@ alone 30/40/30; centre and a flank 42 favoured, 27 centre, 31 other; wings 46/8/
 pressure point and to each touch of the approach, so no draw is added and a `Balanced` side is unchanged. Left
 is the low end of the attacking side's own scale. The shares are calibrated, not read off: every possession
 starts where the last one ended, mostly in the middle, so the ball measures about 23/53/23 with no preference and
-about 20/60/20 (centre), 39/22/39 (wings) and 37/44/20 (centre and left) with a focus. The focus steers the ball
-only: the geometry changes no outcome by itself, and `PassTally` and the film's receiver choice do not read it. What
-the focus costs and buys is the tactical modifier above (§6.5), so a manager who picks one is trading creation for
-shape; measured over 2,000 matches each the effect is small, as it is for every instruction (`INS-9`).
+about 20/60/20 (centre), 39/22/39 (wings) and 37/44/20 (centre and left) with a focus. `PassTally` and the film's
+receiver choice do not read it.
+
+From `engine-v9` the focus also moves the shots and the crosses (`ADR-0059`), with no draw added:
+
+- **Shot zones.** The roll that picks an open-play shot's zone is read against the focus's shares of the five zones
+  (central, and an inside channel and a wide zone each side). No preference keeps 40 / 20 / 10 / 20 / 10; the centre
+  is 54 central, 15 inside and 8 wide each side; the centre and left is 34 central with 28 inside and 15 wide on the
+  left and 15 and 8 on the right; both wings is 12 central, 29 inside and 15 wide each side. Measured on events,
+  which include the corners, free kicks and penalties taken from the middle, the shot lanes (left/centre/right) are
+  about 26/47/26 with no preference, 20/60/19 (centre), 38/41/20 (centre and left) and 39/21/39 (wings).
+- **Crosses.** The share of a possession's final approach that is crossed depends on the lane the ball arrives in,
+  38.5% in a flank lane and 7% in the centre lane, for every side: about 28% overall, almost all from the flanks.
+  The focus decides the lane, so both wings cross about a quarter more often (17.6 a match against 14.0), and the
+  centre and left sends about 53% of its crosses down the left. A cross is shown on the film and in the
+  commentary; it does not change the chance that follows it.
+- **Shot volume.** A zone is worth different amounts (central 1.5, inside 1.0, wide 0.8 times the base), so the
+  focus also scales how often a progressed possession becomes a shot: the centre by 0.935, the centre and a flank
+  by 1.03 and both wings by 1.16. Goals for stay within about 2% of a side with no preference; the centre takes
+  about 7% fewer shots at a higher conversion, the wings about 13% more at a lower one.
+
+What the focus costs beyond that is the tactical modifier above (§6.5): the centre builds, finishes and holds its
+shape better and creates less, the wings the reverse. The modifiers are small, as they are for every instruction
+(`INS-9`).
 
 ## 8. Output
 
@@ -773,6 +793,8 @@ stays on the pitch).
 | `CornerDeliveryBaseline` / `CornerDeliveryAerialWeight` / `CornerDeliveryChanceStepBasisPoints` | 13 / 4 / 60 | A corner taker's delivery edge. |
 | `CornerChanceMinBasisPoints` / `Max` | 1_500 / 6_000 | Bounds on a corner becoming a headed chance. |
 | `ShotZoneCentralPercent` / `InsidePercent` / `WidePercent` | 40 / 20 / 10 | The open-play shot zones: one central, two inside, two wide. |
+| `ShotFocus…Percent` (eleven) | see §7.x | The shot zones of a side with a pass focus (`engine-v9`); each set sums to 100. |
+| `ChanceVolumeCentre` / `Pair` / `WingsBasisPoints` | 9_350 / 10_300 / 11_600 | How often a progressed possession becomes a shot, for a side with a pass focus (`engine-v9`). |
 | `MinPassageTouches` / `Max` | 3 / 8 | Touches a possession's passage is built from. |
 | `MinTouchAdvanceBasisPoints` / `Max` | 350 / 1_700 | How far one touch advances the ball. |
 | `MaxTouchLateralDriftBasisPoints` | 1_600 | How far a touch may drift across the pitch. |
@@ -784,7 +806,7 @@ stays on the pitch).
 | `OffsideLineXBasisPoints` | 7_400 | Where an offside is given. |
 | `TurnoverMiddleThirdXBasisPoints` | 4_800 | Where a plain turnover leaves the ball. |
 | `GoalAreaXBasisPoints` | 1_200 | The goal area a keeper's ball or goal kick is taken from. |
-| `CrossShareOfPassageBasisPoints` | 2_800 | Share of the final approach that is crossed. |
+| `CrossShareFlankLaneBasisPoints` / `CrossShareCentreLaneBasisPoints` | 3_850 / 700 | Share of the final approach that is crossed, by the lane the ball arrives in (`engine-v9`); about 28% overall. |
 | `CrossAltitude` / `HeaderAltitude` | 70 / 80 | Ball altitude at a cross and a header. |
 | `ShotAltitude` / `ClearanceAltitude` | 30 / 55 | Ball altitude at a shot (and the height of the crossbar) and at a clearance. |
 | `FreeKickShootingRangeX` | 6_500 | Distance beyond which a free kick is worth striking. |
@@ -1018,6 +1040,7 @@ a test that is switched off catches nothing.
 | `ReplayDirectorTests` | `replay-v4`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
 | `FilmScriptTests`, `FilmMotionTests` | Every possession scripted into contiguous beats that join except at a cut; a cross only from a wide position into the box; restarts taken by the owning side; the players the engine named at their beats; a goal followed by its celebration and a cut; no teleports; receivers at the ball when it arrives; a carrier at the ball; the keeper at a save; a goal ending in the goal mouth; the ball never left standing outside the holds; fixed hold lengths; quiet play condensed before the pace rises. |
 | `BallPlayStatisticsTests` | `engine-v7` (§8.2): a completed count is a nonnegative subset of its attempted one; nobody who did not take the pitch passed or dribbled; an assist is a completed pass; counting is repeatable; a side's volumes and completion rates read like football; a better passer has the ball more and completes a higher share. |
+| `PassFocusShotsAndCrossesTests` | `engine-v9` (§7.x): each focus's shot zones sum to 100 and left and right mirror; no preference keeps the 40/20/10 zones and a volume of 10,000; the measured shot lanes follow each focus; crosses come from the flanks, both wings cross more and a left focus crosses more from the left; the wings shoot more and the centre less while goals stay within 15% and a shot is worth more from the middle; one side's focus does not move the other's shots. |
 | `PassFocusTests` | `engine-v8` (§7.x): a `Balanced` draw is returned unchanged; a focused draw stays on the pitch and never moves backwards; a uniform draw lands in the rules' lane shares; the measured lane shares of the ball match each option's calibration, and both wings send more wide than a single flank; left and right mirror; the away side is steered to its own left; one side's focus does not steer the other's ball; a focus is part of the snapshot's identity. |
 | `HighlightTests` | Reel selection: goals always shown, the quality floor, the count cap and its goal exception. |
 | `EnginePurityTests` | No clock, no `System.Random`, no IO; exactly one source of randomness. |

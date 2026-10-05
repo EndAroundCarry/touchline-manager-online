@@ -324,6 +324,55 @@ public sealed record EngineRulesV2
     /// <summary>The share in the centre lane when the focus is both wings, in percent.</summary>
     public int PassFocusWingsCentrePercent { get; init; } = 8;
 
+    // ---- Pass focus: where the shots are taken, and how many (engine-v9) --------------------------
+    // A side's focus also moves its shots. The zone shares are the percent of open-play shots taken from each zone
+    // (one central, an inside channel and a wide zone on each side); a side with no preference keeps the
+    // ShotZone* shares above. The chance volume scales how often a progressed possession becomes a shot, because
+    // the zones differ in how often they score: the centre scores best, so a side that shoots from it takes fewer
+    // shots, and a side that shoots from wide takes more.
+
+    /// <summary>The share of shots from the central zone when the focus is the centre alone, in percent.</summary>
+    public int ShotFocusCentreCentralPercent { get; init; } = 54;
+
+    /// <summary>The share of shots from each inside channel when the focus is the centre alone, in percent.</summary>
+    public int ShotFocusCentreInsidePercent { get; init; } = 15;
+
+    /// <summary>The share of shots from each wide zone when the focus is the centre alone, in percent.</summary>
+    public int ShotFocusCentreWidePercent { get; init; } = 8;
+
+    /// <summary>The share of shots from the central zone when the focus is the centre and a flank, in percent.</summary>
+    public int ShotFocusPairCentralPercent { get; init; } = 34;
+
+    /// <summary>The share of shots from the favoured flank's inside channel when the focus is the centre and a flank, in percent.</summary>
+    public int ShotFocusPairInsidePercent { get; init; } = 28;
+
+    /// <summary>The share of shots from the favoured flank's wide zone when the focus is the centre and a flank, in percent.</summary>
+    public int ShotFocusPairWidePercent { get; init; } = 15;
+
+    /// <summary>The share of shots from the other flank's inside channel when the focus is the centre and a flank, in percent.</summary>
+    public int ShotFocusPairOtherInsidePercent { get; init; } = 15;
+
+    /// <summary>The share of shots from the other flank's wide zone when the focus is the centre and a flank, in percent.</summary>
+    public int ShotFocusPairOtherWidePercent { get; init; } = 8;
+
+    /// <summary>The share of shots from the central zone when the focus is both wings, in percent.</summary>
+    public int ShotFocusWingsCentralPercent { get; init; } = 12;
+
+    /// <summary>The share of shots from each inside channel when the focus is both wings, in percent.</summary>
+    public int ShotFocusWingsInsidePercent { get; init; } = 29;
+
+    /// <summary>The share of shots from each wide zone when the focus is both wings, in percent.</summary>
+    public int ShotFocusWingsWidePercent { get; init; } = 15;
+
+    /// <summary>The multiplier on the chance a progressed possession becomes a shot, for the centre alone.</summary>
+    public int ChanceVolumeCentreBasisPoints { get; init; } = 9_350;
+
+    /// <summary>The multiplier on the chance a progressed possession becomes a shot, for the centre and a flank.</summary>
+    public int ChanceVolumePairBasisPoints { get; init; } = 10_300;
+
+    /// <summary>The multiplier on the chance a progressed possession becomes a shot, for both wings.</summary>
+    public int ChanceVolumeWingsBasisPoints { get; init; } = 11_600;
+
     // ---- Spatial play (engine-v3) ----------------------------------------------------------------
 
     /// <summary>
@@ -531,8 +580,17 @@ public sealed record EngineRulesV2
     /// <summary>How far up the pitch a side restarts from after a goal kick or a keeper claim.</summary>
     public int GoalAreaXBasisPoints { get; init; } = 1_200;
 
-    /// <summary>The share of a possession's final approach that is crossed rather than passed.</summary>
-    public int CrossShareOfPassageBasisPoints { get; init; } = 2_800;
+    /// <summary>
+    /// The share of a possession's final approach that is crossed rather than passed, when the ball arrives in a
+    /// flank lane (`engine-v9`).
+    /// </summary>
+    public int CrossShareFlankLaneBasisPoints { get; init; } = 3_850;
+
+    /// <summary>
+    /// The share of a possession's final approach that is crossed rather than passed, when the ball arrives in
+    /// the centre lane (`engine-v9`).
+    /// </summary>
+    public int CrossShareCentreLaneBasisPoints { get; init; } = 700;
 
     /// <summary>The ball's altitude at a cross, 0…100.</summary>
     public int CrossAltitude { get; init; } = 70;
@@ -1199,6 +1257,21 @@ public sealed record EngineRulesV2
             problems.Add("Each pass focus must share its destinations across the three lanes in percentages summing to 100.");
         }
 
+        if (ShotFocusCentreCentralPercent + (2 * (ShotFocusCentreInsidePercent + ShotFocusCentreWidePercent)) != 100
+            || ShotFocusPairCentralPercent + ShotFocusPairInsidePercent + ShotFocusPairWidePercent
+                + ShotFocusPairOtherInsidePercent + ShotFocusPairOtherWidePercent != 100
+            || ShotFocusWingsCentralPercent + (2 * (ShotFocusWingsInsidePercent + ShotFocusWingsWidePercent)) != 100)
+        {
+            problems.Add("Each pass focus must share its shots across the five shot zones in percentages summing to 100.");
+        }
+
+        if (ChanceVolumeCentreBasisPoints is < 5_000 or > 15_000
+            || ChanceVolumePairBasisPoints is < 5_000 or > 15_000
+            || ChanceVolumeWingsBasisPoints is < 5_000 or > 15_000)
+        {
+            problems.Add("The pass focus chance volumes must lie between 5000 and 15000 basis points.");
+        }
+
         if (MinLeadershipMoraleMultiplierBasisPoints > MaxLeadershipMoraleMultiplierBasisPoints
             || MinStaminaConditionLossMultiplierBasisPoints > MaxStaminaConditionLossMultiplierBasisPoints)
         {
@@ -1393,7 +1466,8 @@ public sealed record EngineRulesV2
         yield return (nameof(MaxInjuryProbabilityBasisPoints), MaxInjuryProbabilityBasisPoints);
         yield return (nameof(ConditionSubstitutionThresholdBasisPoints), ConditionSubstitutionThresholdBasisPoints);
         yield return (nameof(MinimumConditionAdvantageBasisPoints), MinimumConditionAdvantageBasisPoints);
-        yield return (nameof(CrossShareOfPassageBasisPoints), CrossShareOfPassageBasisPoints);
+        yield return (nameof(CrossShareFlankLaneBasisPoints), CrossShareFlankLaneBasisPoints);
+        yield return (nameof(CrossShareCentreLaneBasisPoints), CrossShareCentreLaneBasisPoints);
         yield return (nameof(MissOverShareBasisPoints), MissOverShareBasisPoints);
         yield return (nameof(PostShareOfWoodworkBasisPoints), PostShareOfWoodworkBasisPoints);
         yield return (nameof(PenaltySavedShareBasisPoints), PenaltySavedShareBasisPoints);

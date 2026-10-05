@@ -220,7 +220,7 @@ internal static class PassagePlanner
             isHome,
             state.SideOf(side).Instructions.PassFocus);
 
-        var zone = ChooseZone(derived, rules);
+        var zone = ChooseZone(derived, rules, state.SideOf(side).Instructions.PassFocus);
         var shotAttackX = derived.NextRange(rules.ShotFinalThirdXMinBasisPoints, rules.ShotFinalThirdXMaxBasisPoints);
         var shotAttackY = ZoneY(zone, derived, rules);
         var shotPoint = FromAttack(shotAttackX, shotAttackY, isHome);
@@ -483,7 +483,12 @@ internal static class PassagePlanner
             ? 0
             : Math.Clamp((distance + advance - 1) / advance, minIntermediates, maxIntermediates);
 
-        var endsInCross = derived.RollBasisPoints(rules.CrossShareOfPassageBasisPoints);
+        // A cross is delivered from the flank: the ball that arrives in a flank lane is crossed far more often than
+        // one that arrives down the middle (`engine-v9`). The roll is the one the engine always took.
+        var arrivesWide = pressureAttackY < rules.PassLeftLaneMaxYBasisPoints
+            || pressureAttackY >= rules.PassRightLaneMinYBasisPoints;
+        var endsInCross = derived.RollBasisPoints(
+            arrivesWide ? rules.CrossShareFlankLaneBasisPoints : rules.CrossShareCentreLaneBasisPoints);
 
         for (var index = 1; index <= intermediates; index++)
         {
@@ -591,34 +596,91 @@ internal static class PassagePlanner
         return (int)(((long)draw * SpatialPitch.PitchWidth) / EngineRulesV2.Certain);
     }
 
-    /// <summary>Chooses the shot zone, weighted towards the middle of the pitch as before.</summary>
-    private static ShotZone ChooseZone(Pcg32 derived, EngineRulesV2 rules)
+    /// <summary>Chooses the shot zone, weighted towards the middle of the pitch unless the side asks for a lane.</summary>
+    private static ShotZone ChooseZone(Pcg32 derived, EngineRulesV2 rules, MatchPassFocus focus)
     {
         // One central zone, two inside channels, two wide zones, in the shares the rules give them (engine-v6
-        // moved the 40/20/20/10/10 mix here from the code).
+        // moved the 40/20/20/10/10 mix here from the code; engine-v9 lets the pass focus move it). The roll is
+        // the one the engine always took, so only where it lands changes.
         var roll = derived.NextInt(100);
-        var central = rules.ShotZoneCentralPercent;
-        var insideLeft = central + rules.ShotZoneInsidePercent;
-        var insideRight = insideLeft + rules.ShotZoneInsidePercent;
-        var wideLeft = insideRight + rules.ShotZoneWidePercent;
+        var (central, insideLeft, wideLeft, insideRight, wideRight) = ShotZoneShares(focus, rules);
+        var insideLeftEnd = central + insideLeft;
+        var insideRightEnd = insideLeftEnd + insideRight;
+        var wideLeftEnd = insideRightEnd + wideLeft;
 
         if (roll < central)
         {
             return ShotZone.Central;
         }
 
-        if (roll < insideLeft)
+        if (roll < insideLeftEnd)
         {
             return ShotZone.InsideLeft;
         }
 
-        if (roll < insideRight)
+        if (roll < insideRightEnd)
         {
             return ShotZone.InsideRight;
         }
 
-        return roll < wideLeft ? ShotZone.WideLeft : ShotZone.WideRight;
+        return roll < wideLeftEnd ? ShotZone.WideLeft : ShotZone.WideRight;
     }
+
+    /// <summary>Gets the percent of open-play shots taken from each zone, for a side's pass focus (`engine-v9`).</summary>
+    /// <param name="focus">The side's pass focus.</param>
+    /// <param name="rules">The rules in force.</param>
+    internal static (int Central, int InsideLeft, int WideLeft, int InsideRight, int WideRight) ShotZoneShares(
+        MatchPassFocus focus,
+        EngineRulesV2 rules) => focus switch
+        {
+            MatchPassFocus.Balanced => (
+                rules.ShotZoneCentralPercent,
+                rules.ShotZoneInsidePercent,
+                rules.ShotZoneWidePercent,
+                rules.ShotZoneInsidePercent,
+                rules.ShotZoneWidePercent),
+            MatchPassFocus.Centre => (
+                rules.ShotFocusCentreCentralPercent,
+                rules.ShotFocusCentreInsidePercent,
+                rules.ShotFocusCentreWidePercent,
+                rules.ShotFocusCentreInsidePercent,
+                rules.ShotFocusCentreWidePercent),
+            MatchPassFocus.CentreAndLeft => (
+                rules.ShotFocusPairCentralPercent,
+                rules.ShotFocusPairInsidePercent,
+                rules.ShotFocusPairWidePercent,
+                rules.ShotFocusPairOtherInsidePercent,
+                rules.ShotFocusPairOtherWidePercent),
+            MatchPassFocus.CentreAndRight => (
+                rules.ShotFocusPairCentralPercent,
+                rules.ShotFocusPairOtherInsidePercent,
+                rules.ShotFocusPairOtherWidePercent,
+                rules.ShotFocusPairInsidePercent,
+                rules.ShotFocusPairWidePercent),
+            MatchPassFocus.Wings => (
+                rules.ShotFocusWingsCentralPercent,
+                rules.ShotFocusWingsInsidePercent,
+                rules.ShotFocusWingsWidePercent,
+                rules.ShotFocusWingsInsidePercent,
+                rules.ShotFocusWingsWidePercent),
+            _ => throw new ArgumentOutOfRangeException(nameof(focus), focus, "Unknown pass focus."),
+        };
+
+    /// <summary>
+    /// Gets how much more or less often a side's progressed possession becomes a shot, for its pass focus
+    /// (`engine-v9`).
+    /// </summary>
+    /// <param name="focus">The side's pass focus.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <returns>The multiplier in basis points, 10,000 for a side with no preference.</returns>
+    internal static int ChanceVolume(MatchPassFocus focus, EngineRulesV2 rules) => focus switch
+    {
+        MatchPassFocus.Balanced => EngineRulesV2.Certain,
+        MatchPassFocus.Centre => rules.ChanceVolumeCentreBasisPoints,
+        MatchPassFocus.CentreAndLeft or MatchPassFocus.CentreAndRight => rules.ChanceVolumePairBasisPoints,
+        MatchPassFocus.Wings => rules.ChanceVolumeWingsBasisPoints,
+        _ => throw new ArgumentOutOfRangeException(nameof(focus), focus, "Unknown pass focus."),
+    };
 
     /// <summary>Places a shot across the pitch inside its zone's band.</summary>
     private static int ZoneY(ShotZone zone, Pcg32 derived, EngineRulesV2 rules)

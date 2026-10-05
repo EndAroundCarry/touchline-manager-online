@@ -103,9 +103,9 @@ public sealed class DeterminismTests
     public void The_golden_hash_for_a_known_snapshot_is_pinned()
     {
         // The most important test in the project. If this fails, an engine change has altered what a historical
-        // match would replay as. Engine version 8 re-pinned it (the instructions gained the pass focus and the
-        // rules its lane shares; the scoreline is still 2-2), and the engine-v7 values were retired with their
-        // version. From a
+        // match would replay as. Engine version 9 re-pinned it (the pass focus gained its shot zones, chance
+        // volumes and cross lanes in the rules; the scoreline is still 2-2), and the engine-v8 values were retired
+        // with their version. From a
         // version's release onward, any change requires a new engine version and a new labelled constant
         // rather than an updated hash.
         var result = MatchSimulator.Simulate(TestMatchFactory.Even());
@@ -122,7 +122,7 @@ public sealed class DeterminismTests
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
         EngineConfiguration.HashOf(EngineRulesV2.Default)
-            .Should().Be("03f844623bafeb22495d17a77086c700c6811630a94434b15432e7c3b00adf9e");
+            .Should().Be("bfc572327cb743b28eadec349646014150ebaaa423c31404efc7350fbe5ea578");
     }
 
     [Fact]
@@ -164,8 +164,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "ff1498da1b43b2af1474b65e5540e2e66e29bef2c1e481b67c633439f7fc442d";
+        "b6ddc40315bdafff213e84464919eb8b0f08f5748bc15de7a0edd4be895f6a99";
 
     private const string GoldenOutputHash =
-        "ce28f9ceb17df11a961b6fff4a74138cabdbf007d168ed8181985e829a5b963d";
+        "fe8f1dd110a2219cc193f1809eb419582ebd4c1d6b6eac260ed6cd1d353ae2a0";
 }

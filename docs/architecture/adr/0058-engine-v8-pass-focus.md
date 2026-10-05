@@ -1,6 +1,6 @@
 # ADR-0058: Engine-v8 lets a manager direct the ball through the centre and a flank (the pass focus)
 
-- **Status:** Accepted (engine layer, then exposed to the manager: see Decision 6)
+- **Status:** Accepted (engine layer, then exposed to the manager: see Decision 6; the focus moves the shots and the crosses from `engine-v9`, ADR-0059)
 - **Date:** 2026-10-04
 - **Stage:** Engine roadmap, tactical instructions
 - **Related:** [ADR-0004](0004-deterministic-match-engine.md), [ADR-0051](0051-engine-v4-continuous-passages.md), [ADR-0055](0055-engine-v6-skills-where-the-design-says.md), [ADR-0056](0056-engine-v7-passes-and-take-ons.md), game rules `INS-9`, `MAT-5`
@@ -77,9 +77,9 @@ about half those of the attacking mentality, and the unit ratings are clamped as
 
 **Negative**
 
-- **The lane geometry still decides nothing; the price is a rating modifier.** Nothing in the engine reads a
-  lateral position to decide an outcome, so the trade-off is carried by the unit ratings, like every other
-  instruction, and is small: over 2,000 matches each against a balanced side, goals for and against moved by at
+- **Under `engine-v8` the lane geometry decided nothing; the price was a rating modifier.** Nothing in the engine
+  read a lateral position to decide an outcome, so the trade-off was carried by the unit ratings, like every other
+  instruction, and was small (ADR-0059 then made the focus move the shots and the crosses): over 2,000 matches each against a balanced side, goals for and against moved by at
   most 0.02 and shots by about 0.2 (the attacking mentality moves shots by about 0.4). The effect is real in the
   ratings and tests but within noise in a single season; letting flank play change crosses, shot zones or
   turnovers would make the choice matter more and needs its own calibration.

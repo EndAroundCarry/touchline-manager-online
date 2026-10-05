@@ -387,6 +387,11 @@ internal static class PossessionSimulator
 
         creationChance = Probability.Apply(creationChance, GameStateModifier(state, side));
 
+        // A side that asked for a lane takes more or fewer shots, to pay for where it shoots from (`engine-v9`).
+        creationChance = Probability.Apply(
+            creationChance,
+            PassagePlanner.ChanceVolume(state.SideOf(side).Instructions.PassFocus, rules));
+
         if (!state.Random.RollBasisPoints(creationChance))
         {
             Finish(state, ResolveFailedCreation(state, possession));

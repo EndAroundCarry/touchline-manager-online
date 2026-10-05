@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 8;
+    public const int Engine = 9;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,10 +30,21 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 7;
+    public const int RuleSet = 8;
 
-    /// <summary>The stable label for engine version 8, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 9, used in hashes and diagnostics.</summary>
     /// <remarks>
+    /// <para>
+    /// Version 9 makes the pass focus change where the shots are taken and how many are, and where the crosses
+    /// come from. A side that asks for the centre, a flank, or both wings takes its open-play shots from the
+    /// zones on that side, in shares the rules give, and its progressed possessions become a shot more or less
+    /// often to pay for it: the centre shoots from where goals come most easily, so it takes fewer, and the
+    /// wings take more. A cross is delivered from the flank for every side: a ball that arrives in a flank lane
+    /// is crossed far more often than one that arrives down the middle, so the crosses follow the lanes the
+    /// focus favours. Every roll is the one the engine always took and only where it lands changes, so a side
+    /// with no preference scores and shoots as it did under `engine-v8`; its crosses are the
+    /// ones that move, from anywhere to the flanks.
+    /// </para>
     /// <para>
     /// Version 8 lets a manager direct the ball. A team instruction, the pass focus, asks for the centre alone,
     /// or the centre and one flank, and the lateral position of each possession's pressure point follows it, so
@@ -76,10 +87,10 @@ public static class EngineVersions
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v8";
+    public const string EngineLabel = "engine-v9";
 
-    /// <summary>The stable label for engine rules version 7.</summary>
-    public const string RuleSetLabel = "engine-rules-v7";
+    /// <summary>The stable label for engine rules version 8.</summary>
+    public const string RuleSetLabel = "engine-rules-v8";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v2";
