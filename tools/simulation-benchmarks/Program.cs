@@ -15,7 +15,9 @@ using TouchlineManager.SimulationBenchmarks;
 // rather than a test: the numbers that tune the engine want a hundred thousand matches and a printed table,
 // and a test suite that took twenty minutes would stop being run.
 //
-// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|all] [count] [seed] [--dump file]
+// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|offball|all] [count] [seed] [--dump file]
+//
+// `offball` is not part of `all`: it reads who receives the ball and what Positioning does at the finish (engine-v10).
 //
 // `--dump file` writes the first replayed match's presentation, as the API returns it, to a file: the fluidity
 // harness in apps/web/.preview plays it back in a browser (replay-v4).
@@ -76,6 +78,11 @@ if (mode is "replay" or "all")
 if (mode is "bench" or "all")
 {
     Bench(Math.Min(count, 5_000), seed);
+}
+
+if (mode is "offball")
+{
+    OffBallProbe.Run(count, seed, rules);
 }
 
 return 0;
