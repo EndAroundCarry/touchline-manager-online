@@ -473,6 +473,21 @@ public sealed record EngineRulesV2
     /// <summary>Weight of Strength in both sides' aerial duel score.</summary>
     public int AerialDuelStrengthWeight { get; init; } = 2;
 
+    /// <summary>Weight of Positioning in both sides' aerial duel score: getting to where the ball will drop (`engine-v10`).</summary>
+    public int AerialDuelPositioningWeight { get; init; } = 2;
+
+    /// <summary>
+    /// What the lowest effective Positioning multiplies a player's weight for a shot or a header by, in basis
+    /// points (`engine-v10`).
+    /// </summary>
+    public int PositioningFloorBasisPoints { get; init; } = 7_000;
+
+    /// <summary>
+    /// What the highest effective Positioning multiplies a player's weight for a shot or a header by, in basis
+    /// points; the edge rises linearly from the floor to this (`engine-v10`).
+    /// </summary>
+    public int PositioningCeilingBasisPoints { get; init; } = 13_000;
+
     /// <summary>Weight of Pace in both sides' scramble score.</summary>
     public int ScramblePaceWeight { get; init; } = 3;
 
@@ -1601,5 +1616,6 @@ public sealed record EngineRulesV2
         yield return (nameof(FatigueFactorFloorBasisPoints), FatigueFactorFloorBasisPoints, FatigueFactorCeilingBasisPoints);
         yield return (nameof(MoraleFactorFloorBasisPoints), MoraleFactorFloorBasisPoints, MoraleFactorCeilingBasisPoints);
         yield return (nameof(SharpnessFactorFloorBasisPoints), SharpnessFactorFloorBasisPoints, SharpnessFactorCeilingBasisPoints);
+        yield return (nameof(PositioningFloorBasisPoints), PositioningFloorBasisPoints, PositioningCeilingBasisPoints);
     }
 }

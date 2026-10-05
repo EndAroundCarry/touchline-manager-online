@@ -158,7 +158,8 @@ public static class DuelResolver
             rules,
             (MatchAttributeName.JumpingReach, rules.AerialDuelJumpingReachWeight),
             (MatchAttributeName.Heading, rules.AerialDuelHeadingWeight),
-            (MatchAttributeName.Strength, rules.AerialDuelStrengthWeight)) + attackerBonus;
+            (MatchAttributeName.Strength, rules.AerialDuelStrengthWeight),
+            (MatchAttributeName.Positioning, rules.AerialDuelPositioningWeight)) + attackerBonus;
 
         var defence = Score(
             defender,
@@ -166,7 +167,8 @@ public static class DuelResolver
             rules,
             (MatchAttributeName.JumpingReach, rules.AerialDuelJumpingReachWeight),
             (MatchAttributeName.Heading, rules.AerialDuelHeadingWeight),
-            (MatchAttributeName.Strength, rules.AerialDuelStrengthWeight));
+            (MatchAttributeName.Strength, rules.AerialDuelStrengthWeight),
+            (MatchAttributeName.Positioning, rules.AerialDuelPositioningWeight));
 
         var winChance = ContestChance(attack - defence, rules.BaseAerialDuelBasisPoints, rules.AerialDuelSwingBasisPoints, rules, random);
 

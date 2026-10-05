@@ -122,7 +122,7 @@ public sealed class DeterminismTests
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
         EngineConfiguration.HashOf(EngineRulesV2.Default)
-            .Should().Be("1baad8072944a85b80f47ab03b1cee9b9d5a323a145ae8f3f0bf0f417cf0f591");
+            .Should().Be("69b2328e5f17cfd23158bb72c7c566f9bf82c97c592f9776cff183fc24ac3a45");
     }
 
     [Fact]
@@ -164,8 +164,8 @@ public sealed class DeterminismTests
     }
 
     private const string GoldenInputHash =
-        "4c0704007ed4473c86636caaf5426b4e9e5c0b8fefd4706db5610391e541c1cd";
+        "0d38d806a71ebc399e7ae4ac61ac03770a6bc5607a801600ca94258fd2a56014";
 
     private const string GoldenOutputHash =
-        "9dd76cafd1837d56790a127b9a828cb0bea3cf1a94b18bd7be87d4d4950ea6cf";
+        "d592f7f4ebfac747dbfb37bf943cf2969ce6f131249f3c7fd4fb817f7b719e00";
 }

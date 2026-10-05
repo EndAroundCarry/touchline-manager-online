@@ -347,8 +347,8 @@ three draws, now taken by `RollFoul` and put on the event log by `ApplyFoul` onc
 ### 7.3 Shot resolution
 
 The shooter is drawn weighted by the effective skill the chance asks for — `Finishing` in open play,
-`Heading` from a corner — over the outfield players in slot order. The penalty taker is not drawn: it is the
-best finisher on the pitch, ties broken by identity.
+`Heading` from a corner — times his **Positioning edge** (`engine-v10`, §7.9), over the outfield players in slot
+order. The penalty taker is not drawn: it is the best finisher on the pitch, ties broken by identity.
 
 ```text
 zoneMultiplier  = central 15_000 | inside 10_000 | wide 8_000
@@ -524,6 +524,14 @@ tiredness drop for its family × fatigue, morale, and sharpness.
 every rating differential smaller; `RatingDifferentialReference` 1_000 → 950 restores the ability curve and
 `HomeAdvantageBasisPoints` 10_380 → 10_420 the home edge. `BaseShotGoalBasisPoints` 845 → 865 puts goals back
 at 2.90, and `ShortHandedPenaltyBasisPoints` 6_400 → 6_700 keeps a sending-off at about 1.4 goals.
+
+- **Positioning helps at the finish** (`engine-v10`, ADR-0061). The **Positioning edge** is a multiplier in basis
+  points that rises linearly with effective Positioning from `PositioningFloorBasisPoints` = 7_000 (Positioning 1)
+  to `PositioningCeilingBasisPoints` = 13_000 (20), neutral at 10.5. It multiplies the weight with which a player
+  is drawn as the shooter or the corner header. The defender who marks a corner is drawn by Heading times an edge
+  read from the mean of his Marking and Positioning. Positioning is also a fourth term of the aerial duel
+  (`AerialDuelPositioningWeight` = 2) for both jumpers. No draw is added, and a side whose players are alike in
+  Positioning shoots and scores as before; the edge moves who takes the chance within a side.
 
 ### 7.x Pass focus (`engine-v8`; shots and crosses `engine-v9`)
 
@@ -851,7 +859,8 @@ stays on the pitch).
 | `StayOnFeetDuelFoulMultiplierBasisPoints` | 6_000 | |
 | `DuelMinWinBasisPoints` / `Max` | 1_500 / 8_500 | The clamp on every duel. |
 | `AggressiveTacklingDuelScoreBonus` / `StayOnFeetDuelScorePenalty` | 6 / 4 | The tackling nudge, in attribute points. |
-| `GroundDuel*Weight`, `AerialDuel*Weight`, `Scramble*Weight` | 4/3/3, 4/3/3, 5/3/2, 3/3/2 | The skills each duel reads. |
+| `GroundDuel*Weight`, `AerialDuel*Weight`, `Scramble*Weight` | 4/3/3, 4/3/3, 5/3/2/2, 3/3/2 | The skills each duel reads (the aerial duel's fourth term, Positioning, from `engine-v10`). |
+| `PositioningFloorBasisPoints` / `PositioningCeilingBasisPoints` | 7_000 / 13_000 | The Positioning edge on a shot or header weight, at Positioning 1 and 20 (`engine-v10`). |
 | `DuelTackler*Weight` / `DuelCarrier*Weight` | 4/3/1, 1/3/4 | Band weights (defence/midfield/attack) in drawing the two players. |
 | `DuelShortHandedPenaltyBasisPoints` | 9_800 | Per missing player, on a duel skill. |
 | `DuelFoulPenaltyBasisPoints` | 300 | A duel foul that is a penalty. |
@@ -1043,6 +1052,7 @@ a test that is switched off catches nothing.
 | `ReplayDirectorTests` | `replay-v4`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
 | `FilmScriptTests`, `FilmMotionTests` | Every possession scripted into contiguous beats that join except at a cut; a cross only from a wide position into the box; restarts taken by the owning side; the players the engine named at their beats; a goal followed by its celebration and a cut; no teleports; receivers at the ball when it arrives; a carrier at the ball; the keeper at a save; a goal ending in the goal mouth; the ball never left standing outside the holds; fixed hold lengths; quiet play condensed before the pace rises. |
 | `BallPlayStatisticsTests` | `engine-v7` (§8.2): a completed count is a nonnegative subset of its attempted one; nobody who did not take the pitch passed or dribbled; an assist is a completed pass; counting is repeatable; a side's volumes and completion rates read like football; a better passer has the ball more and completes a higher share. |
+| `PositioningEdgeTests` | `engine-v10` (§7.9): the edge runs from the floor to the ceiling and never leaves them, only rises with skill, is neutral in the middle of the scale, is lower for a tired player, reads a defender's Marking and Positioning, and the twin striker with the higher Positioning takes more of the shots. |
 | `PassFocusShotsAndCrossesTests` | `engine-v9` (§7.x): each focus's shot zones sum to 100 and left and right mirror; no preference keeps the 40/20/10 zones and a volume of 10,000; the measured shot lanes follow each focus; crosses come from the flanks, both wings cross more and a left focus crosses more from the left; the wings shoot more and the centre less while goals stay within 15% and a shot is worth more from the middle; one side's focus does not move the other's shots. |
 | `PassFocusTests` | `engine-v8` (§7.x): a `Balanced` draw is returned unchanged; a focused draw stays on the pitch and never moves backwards; a uniform draw lands in the rules' lane shares; the measured lane shares of the ball match each option's calibration, and both wings send more wide than a single flank; left and right mirror; the away side is steered to its own left; one side's focus does not steer the other's ball; a focus is part of the snapshot's identity. |
 | `HighlightTests` | Reel selection: goals always shown, the quality floor, the count cap and its goal exception. |

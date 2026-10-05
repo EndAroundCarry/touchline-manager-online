@@ -186,7 +186,9 @@ internal static class ChanceSimulator
         var headerer = ChooseShooter(state, attacker, MatchAttributeName.Heading);
         var marker = WeightedPick.From(
             defender.Outfield,
-            slot => EffectiveSkill.Hundredths(slot, MatchAttributeName.Heading, state.Rules),
+            slot => PositioningEdge.Apply(
+                EffectiveSkill.Hundredths(slot, MatchAttributeName.Heading, state.Rules),
+                PositioningEdge.OfDefender(slot, state.Rules)),
             state.Random);
 
         if (headerer is null || marker is null)
@@ -418,7 +420,9 @@ internal static class ChanceSimulator
     /// The weight is deliberately the attribute itself rather than a flat draw over the eleven: a side's
     /// best finisher takes more of its shots, which is what makes the Finishing rating mean something. A
     /// goalkeeper is excluded — a goalkeeper taking a shot from open play is not a thing this engine models
-    /// — and an attribute of 1 is floored at 1 by the picker so nobody is impossible.
+    /// — and an attribute of 1 is floored at 1 by the picker so nobody is impossible. Since `engine-v10` the
+    /// weight is the skill times the player's Positioning edge: the best finisher takes the shot, and the
+    /// one who finds the space takes it more often than one who stands where the defenders are.
     /// </remarks>
     private static ActiveSlot? ChooseShooter(MatchState state, SideRuntime side, MatchAttributeName attribute)
     {
@@ -426,7 +430,9 @@ internal static class ChanceSimulator
 
         return WeightedPick.From(
             outfield,
-            slot => EffectiveSkill.Hundredths(slot, attribute, state.Rules),
+            slot => PositioningEdge.Apply(
+                EffectiveSkill.Hundredths(slot, attribute, state.Rules),
+                PositioningEdge.Of(slot, state.Rules)),
             state.Random);
     }
 

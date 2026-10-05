@@ -67,6 +67,31 @@ Engine 10 and rules set 9 span all of them; the golden hashes are re-pinned at e
 Rules the design holds to: no `double` in the simulation (ADR-0013); a fixed number of draws per decision; every
 new constant lives in `EngineRulesV2`, validated and hashed; a shipped engine version is never edited in place.
 
+## Milestone results
+
+### M1: Positioning at the finish (built)
+
+`PositioningEdge` (`Ratings/`) is linear in effective Positioning from `PositioningFloorBasisPoints` = 7,000
+to `PositioningCeilingBasisPoints` = 13,000, neutral at 10.5. It multiplies the weight of the open-play shooter
+(Finishing) and of the corner header (Heading), and of the defender marking the corner (Heading times an edge from
+the mean of Marking and Positioning). Positioning is a fourth term of the aerial duel
+(`AerialDuelPositioningWeight` = 2). No draw is added.
+
+| Reading | engine-v9 | M1 |
+|---|---|---|
+| Goals per match (20,000) | 2.898 | 2.899 |
+| Shots per match | 27.22 | 27.22 |
+| Home possession | 52.10% | 52.10% |
+| Fouls, yellows, reds per match | 21.37, 3.40, 0.28 | 21.37, 3.40, 0.28 |
+| Penalties per match | 0.241 | 0.241 |
+| Matches with 7+ goals | 2.79% | 2.80% |
+| Twin strikers (Positioning 18 vs 4), shots per match | 1.470 vs 1.491 | 1.704 vs 1.151 |
+| Twin strikers, goals per match | 0.144 vs 0.150 | 0.167 vs 0.117 |
+| Goals per match in the twin fixture, both sides | 2.928 | 2.932 |
+
+The golden match is still 2-2. The film is untouched, so the defender-receives reading (31.7%) is unchanged.
+Not measured separately: corner headers by tier (they are inside the twins' shot counts).
+
 ## Consequences
 
-To be completed at the each gate with the measured tables.
+To be completed at the later gates with the measured tables.

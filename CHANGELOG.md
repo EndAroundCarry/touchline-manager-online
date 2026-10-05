@@ -4,6 +4,27 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine-v10 (in progress) — attackers find space, passers choose who gets the ball
+
+Recorded in [`ADR-0061`](docs/architecture/adr/0061-engine-v10-attackers-find-space-passers-choose.md), built in
+milestones. Version 10 is unreleased, so its hashes are re-pinned at each milestone.
+
+### Added
+
+- **Positioning helps at the finish (M1).** A striker who finds the space is picked to shoot and to head a corner
+  more often: the weight of the pick is multiplied by an edge from 0.7 (Positioning 1) to 1.3 (Positioning 20).
+  Twin strikers differing only in Positioning, 18 against 4, take 1.70 against 1.15 shots a match and score 0.167
+  against 0.117. The defender who marks a corner is weighted by Heading and by his Marking and Positioning, and
+  Positioning is a fourth term of the aerial duel. Goals per match stay at 2.90.
+- `PositioningEdgeTests`; three rules constants (`AerialDuelPositioningWeight`, `PositioningFloorBasisPoints`,
+  `PositioningCeilingBasisPoints`); an `offball` mode in `tools/simulation-benchmarks`.
+
+### Changed
+
+- **Versions.** `EngineVersions.Engine` = 10 (`engine-v10`), `RuleSet` = 9 (`engine-rules-v9`). The rules hash and
+  the golden hashes are re-pinned; the golden match is still 2-2. A database seeded under `engine-v9` must be
+  archived and reseeded.
+
 ## Engine-v9 — the pass focus moves the shots and the crosses
 
 The pass focus now changes where a side shoots from and where it crosses, not just where the ball goes. Recorded in

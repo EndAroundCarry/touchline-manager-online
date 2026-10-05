@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 9;
+    public const int Engine = 10;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,10 +30,19 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 8;
+    public const int RuleSet = 9;
 
-    /// <summary>The stable label for engine version 9, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 10, used in hashes and diagnostics.</summary>
     /// <remarks>
+    /// <para>
+    /// Version 10 makes the individual player count where the ball is played and where it is struck. A player's
+    /// Positioning now helps him at the finish: the player picked to shoot, and the one picked to head a corner,
+    /// is weighted by his skill times an edge that rises with how well he finds the space, the defender marking a
+    /// corner is weighted by his Heading times the same edge read from Marking and Positioning, and Positioning
+    /// is a fourth term of the aerial duel. The edge reads the effective skill, so a tired or out-of-position
+    /// player finds less space. No draw is added: a pick consumes the one draw it always did, so a side whose
+    /// players are alike in Positioning plays as it did under `engine-v9` and only the hashes change for it.
+    /// </para>
     /// <para>
     /// Version 9 makes the pass focus change where the shots are taken and how many are, and where the crosses
     /// come from. A side that asks for the centre, a flank, or both wings takes its open-play shots from the
@@ -87,10 +96,10 @@ public static class EngineVersions
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v9";
+    public const string EngineLabel = "engine-v10";
 
-    /// <summary>The stable label for engine rules version 8.</summary>
-    public const string RuleSetLabel = "engine-rules-v8";
+    /// <summary>The stable label for engine rules version 9.</summary>
+    public const string RuleSetLabel = "engine-rules-v9";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v2";
