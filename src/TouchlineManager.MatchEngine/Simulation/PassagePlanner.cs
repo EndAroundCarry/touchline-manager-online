@@ -564,7 +564,7 @@ internal static class PassagePlanner
     /// <param name="attackingX">The distance from the attacker's own goal, 0…10,000.</param>
     /// <param name="attackingY">The position across the pitch, 0…7,000.</param>
     /// <param name="isHome">Whether the attacker plays towards the right of the shared pitch.</param>
-    private static SpatialPoint FromAttack(int attackingX, int attackingY, bool isHome)
+    internal static SpatialPoint FromAttack(int attackingX, int attackingY, bool isHome)
     {
         var x = isHome ? attackingX : SpatialPitch.PitchLength - attackingX;
         var y = isHome ? attackingY : SpatialPitch.PitchWidth - attackingY;
@@ -575,11 +575,11 @@ internal static class PassagePlanner
     }
 
     /// <summary>Gets how far up the pitch a pitch point is on a given side's own scale.</summary>
-    private static int AttackingX(int x, bool isHome) =>
+    internal static int AttackingX(int x, bool isHome) =>
         isHome ? x : SpatialPitch.PitchLength - x;
 
     /// <summary>Gets where across the pitch a pitch point is on a given side's own scale.</summary>
-    private static int AttackingY(int y, bool isHome) =>
+    internal static int AttackingY(int y, bool isHome) =>
         isHome ? y : SpatialPitch.PitchWidth - y;
 
     private static int Lerp(int from, int to, int fractionBasisPoints) =>

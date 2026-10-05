@@ -92,6 +92,33 @@ the mean of Marking and Positioning). Positioning is a fourth term of the aerial
 The golden match is still 2-2. The film is untouched, so the defender-receives reading (31.7%) is unchanged.
 Not measured separately: corner headers by tier (they are inside the twins' shot counts).
 
+### M2: The off-ball model (built, nothing calls it)
+
+`OffBallModel` (`Simulation/`) is pure and integer-only, with `SpatialMath` (`Spatial/`) for the integer square
+root and distances (ADR-0013). It places a side for a given ball position, and reads off a point:
+
+- **Spots:** from `TacticalFormationResolver`, attackers with the ball and defenders without, per pass because
+  the block shifts with the ball.
+- **Openness** (0..10,000): the nearest defender's distance, each defender's Marking and Positioning (the M1
+  defender edge) pulling him nearer or pushing him further, times the receiver's own Positioning edge; full at
+  `OffBallOpennessFullDistance` = 1,200 (about 12 m). The goalkeeper marks nobody.
+- **Reach**: `OffBallReachDistance` = 3,000 times the receiver's Positioning edge; and a reach score.
+- **Progress**: forward gain on the side's own scale, full score at `OffBallProgressFullGain` = 2,000.
+- **Pressure**: a defender within `OffBallPressureDistance` = 600.
+- **Depth rule**: behind the holder by up to `BackPassFreeDepth` = 500, anyone; up to `BackPassMaxDepth` = 2,500,
+  only a midfielder or attacker and only under pressure; beyond that nobody. A defender is a receiver only while
+  the holder is at or short of `DefenderReceiveMaxHolderX` = 4,500. The goalkeeper is never a receiver here.
+
+No behaviour moves: the golden match is 2-2 and the whole suite passes. The seven new constants change the rules
+hash, and with it the input and output hashes, which are re-pinned.
+
+**Finding: the formation resolver does not mirror its shifts for the away side.** `ResolvePosition` adds the ball,
+mentality, line and phase shifts to X with the same sign for both sides, but the away side attacks towards the low
+end of the pitch, so an attacking away block is pulled back instead of pushed up. The film reads it as it is, so
+away shapes in the replay lean the wrong way. M2 does not depend on it (`OffBallModel.Place` resolves the away side
+in the home frame and flips it back, and a test pins that both sides move up the pitch with the ball); fixing the
+resolver itself changes the film and belongs with the replay changes of M3, which bump `ReplayDirector.Version`.
+
 ## Consequences
 
 To be completed at the later gates with the measured tables.

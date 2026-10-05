@@ -16,6 +16,12 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
   Twin strikers differing only in Positioning, 18 against 4, take 1.70 against 1.15 shots a match and score 0.167
   against 0.117. The defender who marks a corner is weighted by Heading and by his Marking and Positioning, and
   Positioning is a fourth term of the aerial duel. Goals per match stay at 2.90.
+- **An off-ball model (M2), not yet used by the engine.** `OffBallModel` places a side for a ball position and
+  scores a receiver at a point: openness (the defenders' Marking and Positioning against his own), reach, progress,
+  and a depth rule (a ball back to a midfielder under pressure is allowed; a ball back to a defender while the attack
+  is in the other half is not). Integer-only, no draw; seven rules constants (`OffBall*`, `BackPass*`,
+  `DefenderReceiveMaxHolderX`); `OffBallModelTests`. The new constants change the rules hash, so the golden hashes
+  are re-pinned again; the golden match is still 2-2.
 - `PositioningEdgeTests`; three rules constants (`AerialDuelPositioningWeight`, `PositioningFloorBasisPoints`,
   `PositioningCeilingBasisPoints`); an `offball` mode in `tools/simulation-benchmarks`.
 

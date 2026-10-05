@@ -488,6 +488,48 @@ public sealed record EngineRulesV2
     /// </summary>
     public int PositioningCeilingBasisPoints { get; init; } = 13_000;
 
+    /// <summary>
+    /// How far from the nearest defender, in pitch units, a receiver is wholly free: at this distance and more
+    /// his openness is certain, and it falls in a straight line to nothing at no distance (`engine-v10`).
+    /// </summary>
+    public int OffBallOpennessFullDistance { get; init; } = 1_200;
+
+    /// <summary>
+    /// How far a receiver of neutral Positioning can get to a pass, in pitch units; a better-placed player
+    /// covers more and a worse one less (`engine-v10`).
+    /// </summary>
+    public int OffBallReachDistance { get; init; } = 3_000;
+
+    /// <summary>
+    /// How far up the pitch a pass must take the ball, in pitch units, to be worth the whole progress score
+    /// (`engine-v10`).
+    /// </summary>
+    public int OffBallProgressFullGain { get; init; } = 2_000;
+
+    /// <summary>
+    /// How close the nearest defender is, in pitch units, once his Marking and Positioning are counted, for the
+    /// player on the ball to be under pressure (`engine-v10`).
+    /// </summary>
+    public int OffBallPressureDistance { get; init; } = 600;
+
+    /// <summary>
+    /// How far behind the player on the ball a teammate may receive it, in pitch units, whoever he is: a short
+    /// ball back or across (`engine-v10`).
+    /// </summary>
+    public int BackPassFreeDepth { get; init; } = 500;
+
+    /// <summary>
+    /// How far behind the player on the ball a midfielder or attacker may receive it, in pitch units, when the
+    /// holder is under pressure; nobody is given the ball further back than this (`engine-v10`).
+    /// </summary>
+    public int BackPassMaxDepth { get; init; } = 2_500;
+
+    /// <summary>
+    /// How far up the pitch, on the side's own scale, the player on the ball can be for a defender to be given
+    /// it: past this the attack is in the other half, and a defender is no longer a receiver (`engine-v10`).
+    /// </summary>
+    public int DefenderReceiveMaxHolderX { get; init; } = 4_500;
+
     /// <summary>Weight of Pace in both sides' scramble score.</summary>
     public int ScramblePaceWeight { get; init; } = 3;
 
@@ -1362,6 +1404,32 @@ public sealed record EngineRulesV2
         {
             problems.Add(
                 $"MaxTouchLateralDriftBasisPoints must be in 0..{Certain}, was {MaxTouchLateralDriftBasisPoints}.");
+        }
+
+        foreach (var (name, value) in new[]
+                 {
+                     (nameof(OffBallOpennessFullDistance), OffBallOpennessFullDistance),
+                     (nameof(OffBallReachDistance), OffBallReachDistance),
+                     (nameof(OffBallProgressFullGain), OffBallProgressFullGain),
+                     (nameof(OffBallPressureDistance), OffBallPressureDistance),
+                 })
+        {
+            if (value < 1)
+            {
+                problems.Add($"{name} must be a positive pitch distance, was {value}.");
+            }
+        }
+
+        if (BackPassFreeDepth < 0 || BackPassMaxDepth < BackPassFreeDepth)
+        {
+            problems.Add(
+                $"The back-pass depths are inverted: free {BackPassFreeDepth}, at most {BackPassMaxDepth}.");
+        }
+
+        if (DefenderReceiveMaxHolderX is < 0 or > Certain)
+        {
+            problems.Add(
+                $"DefenderReceiveMaxHolderX must be a pitch coordinate in 0..{Certain}, was {DefenderReceiveMaxHolderX}.");
         }
 
         if (ShotFinalThirdXMinBasisPoints <= Certain / 2)
