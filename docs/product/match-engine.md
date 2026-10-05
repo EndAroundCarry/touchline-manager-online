@@ -1,9 +1,12 @@
-# Match engine version 6
+# Match engine version 10
 
-> **Status:** Executable specification for `engine-v5` / `engine-rules-v5`, implemented in
+> **Status:** Executable specification for `engine-v10` / `engine-rules-v9`, implemented in
 > `src/TouchlineManager.MatchEngine`.
-> **Applies to:** engine version `5`, engine rules version `5`, rating weights `engine-ratings-v1`,
-> tactical modifiers `engine-tactical-v1`, commentary `commentary-v3`, replay `replay-v4`.
+> **Applies to:** engine version `10`, engine rules version `9`, commentary `commentary-v3`, replay `replay-v5`.
+> The rating weights and tactical modifiers carry their own versions (§6.1, §6.5).
+> **Engine versions 6 to 10** are described in the sections that name them: the skill model (§7.9, `engine-v6`),
+> ball-play statistics (§8.2, `engine-v7`), the pass focus (§7.x, `engine-v8` and `engine-v9`), and positions and the
+> receiver chain (§7.10, `engine-v10`).
 > **Version 2** added the assists and the per-player match rating to a result's player lines (§8.1).
 > **Version 3** made the play spatial: a possession resolves a loose-ball scramble, a 1v1 ground duel,
 > and set pieces against player attributes on a normalised pitch, and samples a live condition and rating
@@ -764,7 +767,7 @@ the tests hold an allowlist of parameter names.
 
 ---
 
-## 10. Replay: the film and the reel (`replay-v4`)
+## 10. Replay: the film and the reel (`replay-v5`)
 
 `ReplayDirector.Build(input, result, passages, options, liveMetrics)` re-derives the whole presentation
 from the frozen snapshot, the result, the recorded passages (ADR-0051, ADR-0053), and the optional live metric
@@ -775,9 +778,10 @@ time warp and the anchor tracks of `replay-v3` (ADR-0054). Every constant below 
 
 **One film at one pace.** `FilmScript` turns each possession into *beats* — carry, pass, lofted pass, cross,
 header, shot, clearance, duel, save, placement, and dead-ball holds (restart, goal, card, substitution,
-half-time card) — from the recorder's `Outcome`, `Restart`, waypoints, touches and events. An intermediate pass
-goes to the teammate who can reach the reception point soonest in the current shape; the participants the engine
-named take precedence at their beats; a ground move of 12 m or more becomes *receive → carry 3–10 m → pass*
+half-time card) — from the recorder's `Outcome`, `Restart`, waypoints, touches and events. The participants the
+engine named take precedence at their beats: since `engine-v10` (`replay-v5`) a `Receive` touch names the receiver
+of each pass of the approach, and the station resolves to him. An intermediate pass the engine did not name goes to
+the teammate who can reach the reception point soonest in the current shape; a ground move of 12 m or more becomes *receive → carry 3–10 m → pass*
 (the carry's length weighted by Dribbling through a stable hash); a cross is drawn only from a wide final-third
 position into the box, and anything else is a lofted pass. A possession that starts away from where the last one
 ended without a restart gets a transition beat at physical speed.
@@ -1053,33 +1057,48 @@ The simulation laboratory (`tools/simulation-benchmarks`) is the tuning tool and
 dotnet run --project tools/simulation-benchmarks -c Release -- all 20000
 ```
 
-Run over **20,000 matches** between evenly matched 13/20 sides, on a 16-logical-core Windows machine
-(`engine-v6`, rules hash `e090db39…`):
+Run over **3,000 matches** between evenly matched 13/20 sides, on a 16-logical-core Windows machine
+(`engine-v10`, rules hash `cb1a8aed…`; the 10,000-fixture calibration below is the larger sample, and
+`engine-v9` measured 2.898 goals over 20,000):
 
 | Measure | Measured | Target |
 |---|---|---|
-| Goals per match | 2.90 | 2.5 – 3.0 |
-| Home / away goals | 1.58 / 1.32 | 1.3 – 1.9 / 1.0 – 1.5 |
-| Home win / draw / away win | 43.6% / 24.7% / 31.8% | 40 – 50 / 20 – 30 / 25 – 35 |
-| Shots per match | 27.2 | 20 – 32 |
+| Goals per match | 2.93 | 2.5 – 3.0 |
+| Home / away goals | 1.62 / 1.32 | 1.3 – 1.9 / 1.0 – 1.5 |
+| Home win / draw / away win | 44.8% / 23.9% / 31.3% | 40 – 50 / 20 – 30 / 25 – 35 |
+| Shots per match | 27.9 | 20 – 32 |
 | Home possession | 52.1% | 50 – 54 |
 | Fouls per match | 21.4 | 18 – 26 |
-| Yellows per match | 3.40 | 3.0 – 5.0 |
+| Yellows per match | 3.42 | 3.0 – 5.0 |
 | Reds per match | 0.28 | 0.10 – 0.35 |
-| Injuries per match | 0.43 | 0.20 – 0.60 |
+| Injuries per match | 0.44 | 0.20 – 0.60 |
 | Penalties per match | 0.24 | 0.15 – 0.40 |
 | Substitutions per match | 7.7 | 4.0 – 10.0 |
-| p99 total goals | 7 | 6 – 8 |
-| Matches with 7+ goals | 2.79% | < 3.0% |
+| p99 total goals | 8 | 6 – 8 |
+| Matches with 7+ goals | 3.53% (2.97% over 20,000 at the end of M4) | < 3.0% |
 
-Calibration invariants (10,000 fixtures): home advantage worth **+4.0 points** (target ~+4); a three-ability-
-point favourite upset **17.2%** of the time (target ~15; `engine-v5` measured 16.4% on the same sample size,
-a standard error of about 0.8 points); a side sent off early finishes **1.45 goals** worse (target ~1.2,
-band 0.9 – 1.5, measured over 2,000 fixtures); a high-pressing side is measurably more tired by the 80th
-minute (gap ~1,730 bp) and a fresh substitute measurably fresher than the tired defenders (~1,783 bp). Free
-kicks in shooting range occur about **1.5 per match** and fouls in the final third now come from the duel.
+The 7+ goals share is the one reading outside its band. Over 3,000 matches the standard error is about 0.3
+points; it has run 2.8 – 3.5% across the `engine-v10` builds (ADR-0061), and the shots from distance of
+`engine-v10` M5 (§7.10) added a little to it.
 
-The `engine-v6` run holds every `engine-v5` band, and the shape changed where the audit said it should: a
+Calibration invariants (10,000 fixtures, `engine-v10`): goals per match **2.89**; home advantage worth
+**+4.5 points** (target ~+4); a three-ability-point favourite upset **14.8%** of the time (target ~15); a side
+sent off early finishes **1.40 goals** worse (target ~1.2, band 0.9 – 1.5, measured over 2,000 fixtures); a
+high-pressing side is measurably more tired by the 80th minute (gap ~1,730 bp) and a fresh substitute
+measurably fresher than the tired defenders (~1,782 bp). Free kicks in shooting range occur about **1.5 per
+match** and fouls in the final third come from the duel.
+
+What the individual play of `engine-v10` adds (ADR-0061, `simulation-benchmarks -- offball`): about **625 passes**
+a match, completed 93% / 78% / 77% by Defence / Midfield / Attack players, who make 9.8% / 58.3% / 32.0% of them; a
+defender is given the ball past halfway by the chain **0.00%** of the time, and appears to receive it in the film
+**3.25%** of the time (`engine-v9`: 31.7%); none of it is the chain's receivers, and the probe finds 2.64% of the
+engine's own carries past halfway a defender's (the carrier who starts a possession and the duel's fallback carrier,
+held to a small share by `ReachWeightFloorBasisPoints` and not excluded); a holder keeps the ball on a leg that has nobody to pass to 3.9% of the time.
+Twin strikers differing only in Positioning (18 against 4) take 2.49 against 0.89 shots a match and score 0.253
+against 0.087 (`engine-v9`: 1.47 against 1.49). A side of 20-Finishing players scores about 46% more than a side of
+6s.
+
+The `engine-v6` run held every `engine-v5` band, and the shape changed where the audit said it should: a
 better finisher or goalkeeper counts at the shot, a tired player is worse, and a poor tackler fouls more.
 `engine-v6` retuning is in §7.9.
 
@@ -1100,28 +1119,31 @@ kick-offs (4.9). By outcome: open-play shots 24.0 a match, corners 9.0 (1.5 head
 crossed 3.5, penalties 0.3, offsides 4.8, quick free kicks 16.0, and turnovers (scramble, progression, creation)
 134 a match.
 
-The replay over **2,000 matches** (ADR-0054; `replay-v4` on `engine-v5`, `simulation-benchmarks -- replay 2000`):
+The replay over **2,000 matches** (ADR-0054; `replay-v5` on `engine-v10`, `simulation-benchmarks -- replay 2000`;
+`replay-v4` on `engine-v5` measured a median 10.12 minutes and a pace of 2.53×, 98.2% inside the band):
 
 | Measure | p05 | p50 | p95 | min / max |
 |---|---|---|---|---|
-| Passages per match | 60 | 63 | 66 | — / 69 |
-| **Film minutes** | 9.90 | **10.12** | 10.41 | 9.74 / **10.74** |
-| Reel minutes | 5.61 | 6.95 | 8.13 | — / 9.11 |
-| **Pace** (× real time) | 2.28 | **2.53** | 2.83 | — / 3.00 |
-| Real-time motion (min) | 20.6 | 22.5 | 24.8 | — |
-| Holds (min of film) | — | 1.23 | 1.58 | — |
-| Payload estimate (KB) | — | 722.0 | 746.8 | — / 750.0 |
-| Payload JSON (KB, `System.Text.Json`) | — | 2,095 | 2,172 | — / 2,190 |
+| Passages per match | 61 | 63 | 66 | — / 71 |
+| **Film minutes** | 9.91 | **10.13** | 10.41 | 9.71 / **10.71** |
+| Reel minutes | 5.51 | 6.87 | 8.06 | — / 9.02 |
+| **Pace** (× real time) | 2.34 | **2.64** | 2.97 | — / 3.08 |
+| Real-time motion (min) | 21.1 | 23.5 | 25.9 | — |
+| Holds (min of film) | — | 1.24 | 1.57 | — |
+| Payload estimate (KB) | — | 723.1 | 747.3 | — / 750.0 |
+| Payload JSON (KB, `System.Text.Json`) | — | 2,082 | 2,158 | — / 2,176 |
 
-**100%** of films land inside 9:00–11:00 and **0.00%** exceed eleven minutes; **98.2%** are played inside the
-1.8–2.9× band; the reel is always inside its 12:00 cap. Outside the cuts (3.8 a match) there are **0 teleports**
-in 2,000 matches, the ball stands still for a median 2.5% of the film outside the holds (p95 3.3%), and no
-player moves faster than the sprint cap times the pace (keepers at most 0.80 of the dive cap). Quiet play is
-condensed in every match — 41.5% of possessions at the median (p95 49.2%) — and a move is lengthened to meet a
-constraint by a median 18.4% (p95 21.4%). The ball moves at a median of 23 m/s of film in a pass (p95 39), 37 in a
-lofted pass, 45 in a cross, 44 in a shot. The payload sits on the third rung of the ladder in 78% of matches and
-the fourth in 19%; the estimate reaches the budget at the maximum and leaves little headroom. A match takes 96 ms
-end to end (simulate, film, serialise) on the benchmark machine.
+**100%** of films land inside 9:00–11:00 and **0.00%** exceed eleven minutes (the longest of 3,000 is 10.86);
+**91.0%** are played inside the 1.8–2.9× band (97.9% before the named receivers of `engine-v10`: the player the
+engine names is no longer always the one who can get there soonest, so more beats are lengthened and the pace
+settles about 0.1× higher); the reel is always inside its 12:00 cap. Outside the cuts (3.9 a match) there are
+**0 teleports** in 2,000 matches, the ball stands still for a median 2.6% of the film outside the holds (p95 3.4%),
+and no player moves faster than the sprint cap times the pace (keepers at most 0.82 of the dive cap). Quiet play is
+condensed in every match — 41.9% of possessions at the median (p95 49.5%) — and a move is lengthened to meet a
+constraint by a median 19.9% (p95 23.0%). The ball moves at a median of 24 m/s of film in a pass (p95 41), 38 in a
+lofted pass, 46 in a cross, 40 in a shot. The payload sits on the third rung of the ladder in 62% of matches and
+the fourth in 36%; the estimate reaches the budget at the maximum and leaves little headroom. A match takes about
+100–143 ms end to end (simulate, film, serialise) on the benchmark machine, which was loaded by other work.
 
 *Why the pace is 2.5× and not 2.2×.* A match's moves add up to about 26 minutes of real time before any is condensed
 (22.5 after), and a ten-minute film has about 8.8 minutes left once its holds are paid for. Holding 2.2× would
@@ -1139,7 +1161,11 @@ Performance, 5,000 matches after a warm-up (`engine-v5`):
 | Allocated | ~3.0 MB per match |
 | Throughput | ~759 matches/sec, single-threaded |
 
-A nine-fixture division matchday is therefore about 12 ms of simulation at the mean and about 37 ms at the
+`engine-v10` costs more per match, since every possession now plays a chain of named passes: over 3,000 matches
+(`bench`, with other work running on the machine) p50 6.5 ms, **p95 12.5 ms**, p99 25.7 ms, mean 7.6 ms, about
+6.5 MB allocated and ~132 matches/sec single-threaded; the budget is still 100 ms.
+
+A nine-fixture division matchday was therefore (`engine-v5`) about 12 ms of simulation at the mean and about 37 ms at the
 p95, well inside the per-match budget. Throughput comes from running *independent* fixtures concurrently;
 one match is always simulated single-threaded (ADR-0004).
 
@@ -1166,7 +1192,7 @@ a test that is switched off catches nothing.
 | `PassageTests` | One passage per possession; waypoints and touches on the pitch and in fraction order; every shot in the attacking third and free-kick shots in range; touches naming match participants; recorder determinism; the with/without-recorder hash equality. Since `engine-v5`: the possessions tile each half; events ordered and positioned; an outcome that tells the truth; a goal inside the goal mouth, a save at the keeper, a miss out of play, the woodwork and its rebound, a block two to six metres out, a penalty placement, a corner's path, a free kick's placement, the fouler and the fouled player, the scramble contestants, and the header pair. |
 | `HalfTimeClockTests` | `MAT-3`: the second half kicks off at 46'; each half plays its own regulation and stoppage; event minutes are 1'…45'+N and 46'…90'+N; `TotalMinutesPlayed` counts only the stoppage the clock used; substitutions at the planner's windows; the live metrics cover every minute. |
 | `RestartOwnershipTests` | `MAT-12`: the right side kicks each half off; every dead ball is taken by the side that owns it and by nobody else; a goal is followed by the conceding side's kick-off; a save is the keeper's ball and a miss a goal kick; a foul or offside gives the free kick to the right side; a loose ball is not a restart; a goal-area start only ever follows a keeper's ball or a goal kick; possessions join except at a placement. |
-| `ReplayDirectorTests` | `replay-v4`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
+| `ReplayDirectorTests` | `replay-v5`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
 | `FilmScriptTests`, `FilmMotionTests` | Every possession scripted into contiguous beats that join except at a cut; a cross only from a wide position into the box; restarts taken by the owning side; the players the engine named at their beats; a goal followed by its celebration and a cut; no teleports; receivers at the ball when it arrives; a carrier at the ball; the keeper at a save; a goal ending in the goal mouth; the ball never left standing outside the holds; fixed hold lengths; quiet play condensed before the pace rises. |
 | `BallPlayStatisticsTests` | `engine-v7` (§8.2): a completed count is a nonnegative subset of its attempted one; nobody who did not take the pitch passed or dribbled; an assist is a completed pass; counting is repeatable; a side's volumes and completion rates read like football; a better passer has the ball more and completes a higher share. |
 | `OffBallModelTests` | `engine-v10` (§7.10): home and away mirror, openness falls with a nearby defender, the depth rule's truth table, determinism. |

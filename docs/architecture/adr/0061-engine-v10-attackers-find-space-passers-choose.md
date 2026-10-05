@@ -1,6 +1,6 @@
 # ADR-0061: Engine-v10 lets attackers find space and passers choose who gets the ball
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-05
 - **Stage:** Engine roadmap, individual play
 - **Related:** [ADR-0004](0004-deterministic-match-engine.md), [ADR-0013](0013-engine-arithmetic-and-scoreline-effect.md), [ADR-0058](0058-engine-v8-pass-focus.md), [ADR-0059](0059-engine-v9-pass-focus-moves-shots-and-crosses.md)
@@ -45,7 +45,7 @@ The twin strikers are the user's complaint in numbers: with Positioning 18 again
 the two take the same shots and score the same goals. And nearly a third of what the film shows being received
 in the attacking half goes to a defender.
 
-## Decision (proposed, in milestones)
+## Decision (in milestones)
 
 Each milestone ends in a gate at which the measured results are shown and the user decides whether to continue.
 Engine 10 and rules set 9 span all of them; the golden hashes are re-pinned at each commit while v10 is unreleased.
@@ -376,6 +376,68 @@ or noise; this milestone caps its runs at 3,000. The goals and shots rose by 1.2
 distance. The replay-pace test's share was loosened from 90% to 85% because it samples 24 matches; over 1,500 the
 share is 91.3%.
 
+### M6: Replay, documentation, final verification (built)
+
+No engine behaviour moves in M6, so the final readings are M5's, measured again over 3,000 matches (the run cap) and
+10,000 calibration fixtures: goals 2.934, shots 27.91, home possession 52.07%, penalties 0.243, 7+ goals 3.53%
+(3,000 matches); in the 10,000 fixtures goals 2.892, home advantage +4.47 points, a three-point favourite's upset
+14.8%, a red card worth 1.40 goals. The golden match is 2-2.
+
+The replay, over 2,000 matches (3,000 for the maximum): film 9.91 / 10.13 / 10.41 minutes (p05 / p50 / p95), 100%
+inside 9:00-11:00, never above 11:00 (the longest 10.86), **0 teleports** outside the cuts, the ball still for 2.6% of
+the film, pace p50 2.64x with 90.8-91.0% inside the 1.8-2.9x band (the engine-v9 figure was 97.9%; the cost is named
+receivers, which are not always the ones who could get there soonest), moves lengthened for constraints 19.9% (v9
+18.4%), payload estimate at most 750 KB, JSON 2,082 KB at the median. Performance over 3,000 matches on a loaded
+machine: p95 12.5 ms against the 100 ms budget, about 132 matches a second on one thread.
+
+The probe, over 1,000 matches for the film and 2,000 for the credit:
+
+| Reading | engine-v9 | engine-v10 |
+|---|---|---|
+| Receptions per match in the film | 503.9 | 489.6 |
+| Share by Defence / Midfield / Attack | | 6.8 / 60.5 / 32.6% |
+| Receptions past halfway taken by a Defence player | 31.7% | 3.25% |
+| ... of which the chain's own receivers | | 0.00% |
+| ... of the engine's carries past halfway, a defender's | | 2.64% |
+| Legs the holder kept (possessions lost on the way up) | | 3.9% of legs, 0.03 a possession |
+| Passes attempted a match | | 625 |
+| Pass credit, Defence / Midfield / Attack | | 9.8 / 58.3 / 32.0%, completion 92.6 / 77.8 / 76.7% |
+
+**What M6 leaves.** The 3.25% of film receptions past halfway by a defender are the engine's carries, not its passes:
+the carrier who starts a possession and the carrier of the final-third duel when nobody could be given the ball. They
+are held to a small share (`ReachWeightFloorBasisPoints` = 500) and not excluded. Zeroing the floor is one constant
+and would move play draws, so it was left to the user's decision rather than made quietly here. The film does not
+show a forward's run into space: the engine records `Run` only for a player who loses a duel or chases a ball, never an
+off-ball run, so a forward's movement is the formation's (`FilmShape`), as it was before v10. The away side's formation shift (the M2 finding: the resolver adds ball, line and
+phase shifts to X with the same sign for both sides) is still not corrected in `TacticalFormationResolver`; correcting it
+changes the film and the golden hashes of the shapes it feeds, and belongs with the next replay revision.
+
 ## Consequences
 
-To be completed at the last gate with the measured tables.
+- **Positioning, Vision and Decisions count for the individual.** A striker who finds the space is picked to shoot and
+  head more often, found by his team-mates more often, and nearer the ball; a holder who sees more has more options and
+  a holder who decides better takes the better one, or dribbles or shoots when nobody is open. Passes and assists are
+  credited to the people who made them. Twin strikers at Positioning 18 and 4 take 2.5 against 0.9 shots (v9: no
+  difference), and a side of Finishing 20 scores 46% more than a side of 6.
+- **A cross is a header.** About a quarter of open-play chances are headed; the v9 statement that a cross does not
+  change the chance that follows it (ADR-0059) is superseded.
+- **The calibration holds with one reading to watch.** Goals per match are 2.89 to 2.93 (v9 2.898), every band holds,
+  and the share of matches with seven or more goals ran 2.8% to 3.5% across the builds (3.53% over 3,000 matches at the
+  end, 2.97% over 20,000 at M4). A 20,000-match run is what decides whether the last is drift or noise; the milestones
+  cap their runs at 3,000 matches, so it was not run. The knobs, if it needs to come down:
+  `LongShotUtilityBasisPoints` (1.05 shots a match from distance; 5,000 gives 0.55) and
+  `LongShotGoalMultiplierBasisPoints`.
+- **Knobs for the strength of each effect.** `PositioningFloorBasisPoints` / `PositioningCeilingBasisPoints` (the 2.5x
+  twin gap), `FinishingGoalSwingBasisPoints` (the 46%), `ShooterChainBonusBasisPoints`, the `Receiver*` gains
+  (how far Decisions sharpens the choice) and the `Solo*` constants (how often a holder goes alone).
+- **Vision counts a little less for who is found than it did at M3** (the openness gap between Vision 20 and Vision 1 fell
+  from about 230 to about 86) because the reach and the sight floor were widened to bring the solo rate down. It still
+  decides how often a holder has nobody to pass to (14.3% of possessions with a solo leg at Decisions 1, 7.5% at 20).
+- **Costs.** Every possession plays a chain of named passes: p95 12.5 ms and 6.5 MB a match against 4.1 ms and 3.0 MB
+  at engine-v5 (§12; the v10 run shared the machine with other work, so it overstates), well inside the 100 ms
+  budget, and a film 7 points less often inside its pace band. `replay-v5` invalidates every cached presentation ETag; the
+  presentation is never stored, so nothing is migrated. A database seeded under `engine-v9` is archived and reseeded
+  (the dev database is reseeded per version).
+- **Tests and tools.** `PositioningEdgeTests`, `OffBallModelTests`, `ReceiverChooserTests`, `NamedReceiverPassageTests`,
+  `ReceiverChoiceRegressionTests`, `ChainDrivesOutcomeTests`, `SoloPlayTests`; the `offball` mode of
+  `tools/simulation-benchmarks`, which measures the complaint this ADR began with.

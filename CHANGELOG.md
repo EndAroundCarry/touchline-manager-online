@@ -4,7 +4,7 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
-## Engine-v10 (in progress) — attackers find space, passers choose who gets the ball
+## Engine-v10 — attackers find space, passers choose who gets the ball
 
 Recorded in [`ADR-0061`](docs/architecture/adr/0061-engine-v10-attackers-find-space-passers-choose.md), built in
 milestones. Version 10 is unreleased, so its hashes are re-pinned at each milestone.
@@ -66,6 +66,12 @@ milestones. Version 10 is unreleased, so its hashes are re-pinned at each milest
 
 ### Changed
 
+- **Replay.** `ReplayDirector.Version` is `replay-v5`: the film shows the receiver the engine named for each pass.
+  Over 2,000 matches the film is 9.91 / 10.13 / 10.41 minutes (p05 / p50 / p95), never above 11:00, with no teleports;
+  the pace is 2.64x at the median and 91% of films are inside the 1.8-2.9x band (v9: 97.9%). Cached presentations are
+  re-derived (they are never stored).
+- **Docs.** `match-engine.md` now reads `engine-v10` (§7.10, §10, §11, §12, §13), ADR-0061 is Accepted with the
+  measured tables, and the stale "version 6" header is fixed.
 - **Versions.** `EngineVersions.Engine` = 10 (`engine-v10`), `RuleSet` = 9 (`engine-rules-v9`). The rules hash and
   the golden hashes are re-pinned; the golden match is now 2-2. A database seeded under `engine-v9` must be
   archived and reseeded.

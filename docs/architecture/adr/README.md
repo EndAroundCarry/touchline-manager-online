@@ -78,7 +78,7 @@ the system is shaped the way it is.
 | [0059](0059-engine-v9-pass-focus-moves-shots-and-crosses.md) | Engine-v9 makes the pass focus move the shots and the crosses | Accepted (a cross is headed from `engine-v10`, ADR-0061) |
 | [0059](0059-dark-management-workspace-ui.md) | The web client is a dark management workspace built on role tokens | Accepted |
 | [0060](0060-per-attribute-training-progress.md) | Training progress is held per attribute, and the day's budget is split by weight (`training-v3`) | Accepted |
-| [0061](0061-engine-v10-attackers-find-space-passers-choose.md) | Engine-v10 lets attackers find space and passers choose who gets the ball | Proposed |
+| [0061](0061-engine-v10-attackers-find-space-passers-choose.md) | Engine-v10 lets attackers find space and passers choose who gets the ball | Accepted |
 
 ## Rules for changing an ADR
 

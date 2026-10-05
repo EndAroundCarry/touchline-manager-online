@@ -669,7 +669,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `retirement_forced_announcement_age` | 36 outfield / 38 goalkeeper | CON-10 (balancing) |
 | `retirement_forced_age` | 37 outfield / 39 goalkeeper | CON-10 (balancing) |
 | `refresh_token_lifetime_minutes` | 15 (access) | ADR-0002 |
-| `replay_version` | `replay-v4` (the presentation is re-derived from the frozen snapshot, never stored) | MAT-8 (FIC-8) |
+| `replay_version` | `replay-v5` (the presentation is re-derived from the frozen snapshot, never stored) | MAT-8 (FIC-8) |
 | `commentary_version` | `commentary-v3` | MAT-8 (FIC-8) |
 | `match_film_seconds` | `clamp(played seconds ÷ 10, 570, 660)` (9:30 target floor, 11:00 hard ceiling that includes the half-time card); median 10:07 | ADR-0006, ADR-0054 |
 | `match_film_pace` | 1.8–2.9× real time, one value for the whole film (median 2.53×); quiet play is condensed above 2.3×, the pace may rise to 3.0× before holds are shortened | ADR-0054 |
