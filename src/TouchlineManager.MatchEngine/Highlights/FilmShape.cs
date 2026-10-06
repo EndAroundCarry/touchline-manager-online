@@ -260,6 +260,16 @@ internal sealed class FilmShape
         }
     }
 
+    /// <summary>Gets the line an outfield player stands in: 0 is the back line, the last is the front line (`replay-v6`).</summary>
+    /// <param name="entity">The entity.</param>
+    /// <param name="inPossession">Whether the player's side has the ball, which is the anchors the lines are cut from.</param>
+    public int LineOf(int entity, bool inPossession) => _lineOf[entity, inPossession ? 1 : 0];
+
+    /// <summary>Gets how many lines a side stands in (`replay-v6`).</summary>
+    /// <param name="side">The side.</param>
+    /// <param name="inPossession">Whether the side has the ball.</param>
+    public int LineCountOf(MatchSide side, bool inPossession) => _lineCount[(int)side, inPossession ? 1 : 0];
+
     /// <summary>Gets the phase a side is in, from who has the ball and how far it is from the side's own goal.</summary>
     /// <param name="side">The side.</param>
     /// <param name="possession">The side with the ball.</param>

@@ -159,8 +159,45 @@ internal sealed class FilmMotion
     /// <summary>How near his place in the shape a player has to get before he stops, in metres.</summary>
     private const double SettleDistance = 1.0;
 
-    /// <summary>The roles that are kept from one beat to the next: two pressers and one supporter.</summary>
-    private const int RoleSlots = 3;
+    /// <summary>
+    /// The roles that are kept from one beat to the next (`replay-v6`): a challenger, a second and a cover for the
+    /// side without the ball; and five places for its opponents' options, which a flank attack and a counter fill
+    /// differently.
+    /// </summary>
+    private const int RoleSlots = 8;
+
+    /// <summary>How near its goal the ball is, in metres, before the defenders send a second player to it.</summary>
+    private const double FinalThird = 35.0;
+
+    /// <summary>How near a team-mate a player walks before he turns aside, in metres.</summary>
+    private const double PersonalSpace = 2.5;
+
+    /// <summary>The furthest a player is turned aside from where he is going, in metres.</summary>
+    private const double MaxElbow = 2.0;
+
+    /// <summary>How near a role's place a team-mate's place in the shape may be, in metres.</summary>
+    private const double RoleClearance = 3.5;
+
+    /// <summary>How far behind the ball the player covering the challenger stands, in metres.</summary>
+    private const double CoverDistance = 7.0;
+
+    /// <summary>How far from the middle of the pitch the ball is, in metres, before it is a flank attack.</summary>
+    private const double FlankLane = 16.0;
+
+    /// <summary>How far up the pitch a flank attack is before the support runs and the box is set, in metres from the goal line.</summary>
+    private const double WingAttackDepth = 50.0;
+
+    /// <summary>How far from the goal line the edge of the box is, in metres.</summary>
+    private const double EdgeOfBox = 20.0;
+
+    /// <summary>How far forward a pass goes before it is a long ball, in metres.</summary>
+    private const double LongBall = 35.0;
+
+    /// <summary>How far a move after a turnover has to carry the ball before it is a break, in metres.</summary>
+    private const double BreakMetres = 30.0;
+
+    /// <summary>How many beats a move after a turnover can have had and still be a break.</summary>
+    private const int BreakBeats = 5;
 
     /// <summary>How far the play can move from a presser or supporter before somebody else takes the role, in metres.</summary>
     private const double RoleRadius = 16.0;
@@ -194,6 +231,7 @@ internal sealed class FilmMotion
     // Who is pressing and who is supporting, kept from one beat to the next while the play stays near them.
     private readonly int[] _roles = new int[RoleSlots];
     private readonly int[] _savedRoles = new int[RoleSlots];
+    private readonly Spec[] _specs = new Spec[RoleSlots];
     private readonly Vec[] _targets = new Vec[FilmRoster.Size];
     private readonly Task[] _tasks = new Task[FilmRoster.Size];
     private readonly List<Pin> _pins = [];
@@ -550,6 +588,66 @@ internal sealed class FilmMotion
         _focus = _savedFocus;
     }
 
+    /// <summary>
+    /// Moves the place a player holds in the shape off the places his team-mates are making for, so that a player sent
+    /// to the ball is not run into by the one who was standing where he is going.
+    /// </summary>
+    /// <summary>Gets how far a player is turned aside from his target by a team-mate who is in the way (`replay-v6`).</summary>
+    private Vec Elbow(int entity, Vec position)
+    {
+        var side = FilmRoster.SideOf(entity);
+        var push = Vec.Zero;
+
+        for (var slot = 1; slot <= 11; slot++)
+        {
+            var mate = FilmRoster.Index(side, slot);
+
+            if (mate == entity || !_roster.IsOccupied(mate) || _context.Slots[mate].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var away = position - new Vec(_px[mate], _py[mate]);
+            var distance = away.Length;
+
+            if (distance >= PersonalSpace)
+            {
+                continue;
+            }
+
+            push += (distance < 1e-6 ? new Vec(0, mate > entity ? -1 : 1) : away * (1.0 / distance)) * (PersonalSpace - distance);
+        }
+
+        return push.Length > MaxElbow ? push.Unit() * MaxElbow : push;
+    }
+
+    private Vec ClearOfRoles(int entity, Vec wanted)
+    {
+        var side = FilmRoster.SideOf(entity);
+
+        for (var slot = 0; slot < RoleSlots; slot++)
+        {
+            if (_roles[slot] < 0 || _specs[slot].Side != side)
+            {
+                continue;
+            }
+
+            var away = wanted - _specs[slot].Point;
+            var distance = away.Length;
+
+            if (distance >= RoleClearance)
+            {
+                continue;
+            }
+
+            var direction = distance < 1e-6 ? new Vec(0, entity % 2 == 0 ? 1 : -1) : away * (1.0 / distance);
+
+            wanted = FilmSpace.Clamp(_specs[slot].Point + (direction * RoleClearance), 1.5);
+        }
+
+        return wanted;
+    }
+
     /// <summary>How much longer the beat has to be for everyone who has to be somewhere to be there, or zero.</summary>
     private double Shortfall(FilmBeat beat)
     {
@@ -614,7 +712,7 @@ internal sealed class FilmMotion
             }
         }
 
-        AssignRoles(beat);
+        AssignRoles(beats, index);
         AssignDive(beat);
     }
 
@@ -679,9 +777,21 @@ internal sealed class FilmMotion
         return beat.To;
     }
 
-    /// <summary>Picks who presses the ball and who supports the player on it, for a beat in open play.</summary>
-    private void AssignRoles(FilmBeat beat)
+    // ---- Roles around the ball (`replay-v6`) ----------------------------------------------------------------------
+
+    /// <summary>
+    /// Picks who closes the ball down, who covers him, and where the team-mates of the player on the ball offer
+    /// themselves, for a beat in open play.
+    /// </summary>
+    /// <remarks>
+    /// One defender goes to the ball and a second only where the play is dangerous; the rest hold the shape. The
+    /// side with the ball offers options ten metres and more away, which is what leaves the player on it alone, and
+    /// changes them for a flank attack and for a counter.
+    /// </remarks>
+    private void AssignRoles(IReadOnlyList<FilmBeat> beats, int index)
     {
+        var beat = beats[index];
+
         if (beat.IsHold || beat.Kind is BeatKind.Shot or BeatKind.Cross or BeatKind.Clearance or BeatKind.Header or BeatKind.Save)
         {
             return;
@@ -691,76 +801,214 @@ internal sealed class FilmMotion
         var defending = MatchInputV1.OpponentOf(attacking);
         var focus = beat.To;
 
-        var pressers = beat.Kind == BeatKind.Placement ? 0 : PressersFor(defending, focus);
+        BuildSpecs(beat, IsTransition(beats, index), attacking, defending, focus);
 
-        // Each takes a place for the whole beat — a press closes down the point the ball is going to, and support
+        // Each takes a place for the whole beat — a press closes down the point the ball is going to, and an option
         // stands off it — so that a player runs straight there instead of chasing a ball that moves faster than he
         // does; and keeps the role while the play stays near him, so that two players do not swap every pass.
         for (var slot = 0; slot < RoleSlots; slot++)
         {
-            var kind = slot < 2 ? TaskKind.Press : TaskKind.Support;
-            var side = slot < 2 ? defending : attacking;
-            var wanted = slot < 2 ? slot < pressers : true;
-            var index = slot < 2 ? slot : 0;
-
-            if (!wanted)
-            {
-                _roles[slot] = -1;
-
-                continue;
-            }
-
+            var spec = _specs[slot];
             var holder = _roles[slot];
 
-            var keep = holder >= 0
+            var keep = spec.Wants != RoleWants.None
+                && holder >= 0
                 && _roster.IsOccupied(holder)
-                && FilmRoster.SideOf(holder) == side
+                && FilmRoster.SideOf(holder) == spec.Side
                 && _tasks[holder].Kind == TaskKind.None
-                && new Vec(_px[holder], _py[holder]).DistanceTo(focus) <= RoleRadius;
+                && Eligible(holder, spec, focus, relaxed: true)
+                && new Vec(_px[holder], _py[holder]).DistanceTo(spec.Point) <= RoleRadius;
 
             if (!keep)
             {
-                holder = NearestFree(side, focus);
+                _roles[slot] = -1;
+            }
+        }
+
+        for (var slot = 0; slot < RoleSlots; slot++)
+        {
+            var spec = _specs[slot];
+
+            if (spec.Wants == RoleWants.None || _roles[slot] >= 0)
+            {
+                continue;
             }
 
-            _roles[slot] = holder;
+            var found = Choose(spec, focus, relaxed: false);
 
-            if (holder >= 0)
+            _roles[slot] = found >= 0 || !spec.Relax ? found : Choose(spec, focus, relaxed: true);
+        }
+
+        for (var slot = 0; slot < RoleSlots; slot++)
+        {
+            if (_roles[slot] >= 0)
             {
-                _tasks[holder] = new Task(kind, RolePoint(side, kind, focus, index), index);
+                _tasks[_roles[slot]] = new Task(slot < 2 ? TaskKind.Press : TaskKind.Support, _specs[slot].Point, slot);
             }
         }
     }
 
-    private int PressersFor(MatchSide defending, Vec ball)
+    /// <summary>Writes the roles the beat wants and where each stands.</summary>
+    private void BuildSpecs(FilmBeat beat, bool transition, MatchSide attacking, MatchSide defending, Vec focus)
     {
-        var highPress = _context.InstructionsOf(defending).Pressing == MatchPressing.HighPress;
-        var ownHalf = FilmSpace.Attacking(ball, MatchInputV1.OpponentOf(defending)) >= FilmSpace.Length / 2;
+        Array.Fill(_specs, default);
 
-        // One player closes the ball down; a second joins when the ball is in the defenders' own half, or the
-        // instruction is to press high.
-        return ownHalf || highPress ? 2 : 1;
+        var d = FilmSpace.Direction(attacking);
+        var ballDepth = FilmSpace.Attacking(focus, attacking);
+        var ownDepth = FilmSpace.Attacking(focus, defending);
+        var finalThird = ownDepth < FinalThird;
+        var toGoal = (FilmSpace.OwnGoal(defending) - focus).Unit();
+
+        // The defenders: nobody chases a counter from the halfway line; they drop, and the shape closes them up.
+        var challenge = beat.Kind != BeatKind.Placement && (!transition || finalThird || beat.Kind == BeatKind.Duel);
+        var second = challenge
+            && (finalThird || beat.Kind == BeatKind.Duel || _context.InstructionsOf(defending).Pressing == MatchPressing.HighPress);
+
+        if (challenge)
+        {
+            _specs[0] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 1.5), 1.5), true, true);
+            _specs[2] = new Spec(defending, RoleWants.SameLine, FilmSpace.Clamp(focus + (toGoal * CoverDistance), 1.5), true, true);
+        }
+
+        if (second)
+        {
+            // The second cuts the ball's way in from the side the pitch is wider on.
+            var inside = focus.Y > FilmSpace.Width / 2 ? -1.0 : 1.0;
+
+            _specs[1] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 5.2) + new Vec(0, inside * 2.5), 1.5), true, true);
+        }
+
+        // The side with the ball.
+        var lateral = focus.Y - (FilmSpace.Width / 2);
+        var flank = Math.Abs(lateral) >= FlankLane;
+        var outward = lateral >= 0 ? 1.0 : -1.0;
+        var open = -outward;
+
+        if (transition)
+        {
+            // Two forwards hold high as outlets; the midfield runs the lanes behind them; the other side recovers.
+            _specs[4] = new Spec(attacking, RoleWants.FrontLine, Place(attacking, Math.Min(FilmSpace.Length - 18.0, ballDepth + 32.0), (FilmSpace.Width / 2) + (open * 14.0)), false, false);
+            _specs[7] = new Spec(attacking, RoleWants.FrontLine, Place(attacking, Math.Min(FilmSpace.Length - 18.0, ballDepth + 32.0), (FilmSpace.Width / 2) - (open * 14.0)), false, false);
+            _specs[3] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 14.0, open * 12.0), 1.5), false, false);
+            _specs[5] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 10.0, -open * 14.0), 1.5), false, false);
+
+            return;
+        }
+
+        var wingAttack = flank && ballDepth >= WingAttackDepth && beat.Kind is BeatKind.Carry or BeatKind.Pass or BeatKind.LoftedPass or BeatKind.Duel;
+
+        if (wingAttack)
+        {
+            // The ball-side partner overlaps, the striker pins the back line, a midfielder trails at the edge of the
+            // box for the cutback, and the far-side wide player stays high.
+            _specs[3] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 10.0, outward * 4.0), 1.5), false, false);
+            _specs[4] = new Spec(attacking, RoleWants.FrontLine, Place(attacking, PinDepth(defending), (FilmSpace.Width / 2) + (open * 4.0)), false, false);
+            _specs[5] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(-d * 9.0, open * 8.0), 1.5), false, false);
+            _specs[6] = new Spec(attacking, RoleWants.Any, Place(attacking, Math.Min(FilmSpace.Length - EdgeOfBox, ballDepth - 6.0), (FilmSpace.Width / 2) + (outward * 4.0)), false, false);
+            _specs[7] = new Spec(attacking, RoleWants.Any, Place(attacking, Math.Min(FilmSpace.Length - 14.0, Math.Max(ballDepth + 4.0, 60.0)), (FilmSpace.Width / 2) + (open * 22.0)), false, false);
+
+            return;
+        }
+
+        // The options: a wide one, a forward one and a way back, each a long pass from the ball.
+        _specs[3] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 3.0, open * 13.0), 1.5), false, false);
+        _specs[4] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 14.0, -open * 4.0), 1.5), false, false);
+        _specs[5] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(-d * 9.0, -open * 8.0), 1.5), false, false);
     }
 
-    /// <summary>Gets the outfield player of a side with nothing to do who is nearest a point, or -1.</summary>
-    private int NearestFree(MatchSide side, Vec point)
+    /// <summary>How deep from his own goal the back line of a side stands now, which is where an attacker can stand and be onside.</summary>
+    private double PinDepth(MatchSide defending)
+    {
+        var attacking = MatchInputV1.OpponentOf(defending);
+        var deepest = FilmSpace.Length / 2;
+
+        for (var slot = 1; slot <= 11; slot++)
+        {
+            var entity = FilmRoster.Index(defending, slot);
+
+            if (!_roster.IsOccupied(entity) || _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            deepest = Math.Min(deepest, FilmSpace.Attacking(new Vec(_px[entity], _py[entity]), defending));
+        }
+
+        // Metres from the attackers' own goal: the whole pitch less the line, and a step off it.
+        return Math.Min(FilmSpace.Length - deepest - 0.8, FilmSpace.Length - 6.0);
+    }
+
+    /// <summary>Gets the point a side's player stands at: so far from its own goal line, and so far from the touchline.</summary>
+    private static Vec Place(MatchSide side, double depth, double across) =>
+        FilmSpace.Clamp(new Vec(side == MatchSide.Home ? depth : FilmSpace.Length - depth, across), 1.5);
+
+    /// <summary>
+    /// Whether a ball is going a long way forward in a move that began with the other side having it: a long ball,
+    /// or a break that has covered most of the pitch in a few touches.
+    /// </summary>
+    internal static bool IsTransition(IReadOnlyList<FilmBeat> beats, int index)
+    {
+        var beat = beats[index];
+
+        if (beat.Kind is not (BeatKind.Pass or BeatKind.LoftedPass or BeatKind.Carry or BeatKind.Duel))
+        {
+            return false;
+        }
+
+        var side = beat.Side;
+        var forward = FilmSpace.Attacking(beat.To, side) - FilmSpace.Attacking(beat.From, side);
+
+        if (beat.Kind is BeatKind.Pass or BeatKind.LoftedPass && forward >= LongBall)
+        {
+            return true;
+        }
+
+        var first = index;
+
+        while (first > 0 && !beats[first].Cut && beats[first - 1].Possession == beat.Possession)
+        {
+            first--;
+        }
+
+        if (first == 0 || beats[first].Cut || index - first > BreakBeats)
+        {
+            return false;
+        }
+
+        for (var k = first; k <= index; k++)
+        {
+            if (beats[k].Hold is HoldKind.KickOff or HoldKind.GoalKick or HoldKind.Corner or HoldKind.FreeKick or HoldKind.Penalty or HoldKind.Goal)
+            {
+                return false;
+            }
+        }
+
+        var turnover = beats[first - 1];
+        var gained = FilmSpace.Attacking(beat.To, side) - FilmSpace.Attacking(beats[first].From, side);
+
+        return turnover.Side != side && gained >= BreakMetres && FilmSpace.Attacking(beat.To, side) <= FilmSpace.Length - 20.0;
+    }
+
+    /// <summary>Gets the free outfield player of a side who best fills a role, or -1.</summary>
+    private int Choose(Spec spec, Vec focus, bool relaxed)
     {
         var best = -1;
         var bestDistance = double.MaxValue;
 
         for (var slot = 1; slot <= 11; slot++)
         {
-            var entity = FilmRoster.Index(side, slot);
+            var entity = FilmRoster.Index(spec.Side, slot);
 
             if (!_roster.IsOccupied(entity)
                 || _tasks[entity].Kind != TaskKind.None
                 || _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper
-                || Array.IndexOf(_roles, entity) >= 0)
+                || Array.IndexOf(_roles, entity) >= 0
+                || !Eligible(entity, spec, focus, relaxed))
             {
                 continue;
             }
 
-            var distance = new Vec(_px[entity], _py[entity]).DistanceTo(point);
+            var distance = new Vec(_px[entity], _py[entity]).DistanceTo(spec.Point);
 
             if (distance < bestDistance - 1e-9)
             {
@@ -772,17 +1020,39 @@ internal sealed class FilmMotion
         return best;
     }
 
-    /// <summary>Gets where a presser or a supporter stands for a beat, relative to where the ball is going.</summary>
-    private static Vec RolePoint(MatchSide side, TaskKind kind, Vec ball, int index)
+    /// <summary>
+    /// Whether a player can take a role: a back-line player stays in his line unless the ball is in his own third (or,
+    /// for the side defending, half), the forwards' roles go to the front line, and the cover comes from the
+    /// challenger's line.
+    /// </summary>
+    private bool Eligible(int entity, Spec spec, Vec focus, bool relaxed)
     {
-        if (kind == TaskKind.Press)
+        var inPossession = !spec.Defending;
+        var count = _shape.LineCountOf(spec.Side, inPossession);
+        var line = _shape.LineOf(entity, inPossession);
+
+        if (count >= 2)
         {
-            return FilmSpace.Clamp(ball + ((FilmSpace.OwnGoal(side) - ball).Unit() * (1.5 + (index * 2.5))), 1.5);
+            var ownDepth = FilmSpace.Attacking(focus, spec.Side);
+            var leaves = spec.Defending ? ownDepth < FilmSpace.Length / 2 : ownDepth < FinalThird;
+
+            if (line == 0 && !leaves && (!relaxed || !spec.Defending))
+            {
+                return false;
+            }
+
+            if (spec.Wants == RoleWants.FrontLine && line != count - 1)
+            {
+                return false;
+            }
         }
 
-        var lateral = index == 0 ? 8.0 : -8.0;
+        if (spec.Wants == RoleWants.SameLine && !relaxed && _roles[0] >= 0)
+        {
+            return line == _shape.LineOf(_roles[0], inPossession);
+        }
 
-        return FilmSpace.Clamp(ball + new Vec(FilmSpace.Direction(side) * 4.0, lateral), 1.5);
+        return true;
     }
 
     /// <summary>A goalkeeper facing a strike dives at it: to the save if he makes one, towards it if he does not.</summary>
@@ -983,7 +1253,7 @@ internal sealed class FilmMotion
                     // A player holds his place until the shape has moved far enough from him to be worth the walk.
                     // He then walks to where it is, in a straight line, and stops: runs and rests, not a drift after
                     // every small shift of the block. It is also what a viewer expects of a player off the ball.
-                    var wanted = _targets[entity];
+                    var wanted = ClearOfRoles(entity, _targets[entity]);
                     var here = new Vec(_px[entity], _py[entity]);
 
                     if (_walking[entity])
@@ -1012,6 +1282,11 @@ internal sealed class FilmMotion
         {
             cap = _options.DiveMetresPerSecond;
             accel = DiveAcceleration;
+        }
+
+        if (task.Kind is TaskKind.None or TaskKind.Press or TaskKind.Support)
+        {
+            target += Elbow(entity, position);
         }
 
         var toTarget = target - position;
@@ -1088,6 +1363,30 @@ internal sealed class FilmMotion
     }
 
     private static double Smooth(double t) => t * t * (3.0 - (2.0 * t));
+
+    /// <summary>Who a role takes, among the players who are free.</summary>
+    private enum RoleWants
+    {
+        /// <summary>The role is not wanted for the beat.</summary>
+        None = 0,
+
+        /// <summary>Whoever is nearest the place.</summary>
+        Any = 1,
+
+        /// <summary>Whoever is nearest, from the line the challenger stands in.</summary>
+        SameLine = 2,
+
+        /// <summary>Whoever is nearest, from the front line.</summary>
+        FrontLine = 3,
+    }
+
+    /// <summary>One role for a beat.</summary>
+    /// <param name="Side">The side whose player takes the role.</param>
+    /// <param name="Wants">Who takes it.</param>
+    /// <param name="Point">Where he stands.</param>
+    /// <param name="Relax">Whether the role goes to somebody from the wrong line rather than to nobody.</param>
+    /// <param name="Defending">Whether the side is the one without the ball.</param>
+    private readonly record struct Spec(MatchSide Side, RoleWants Wants, Vec Point, bool Relax, bool Defending);
 
     private enum TaskKind
     {
