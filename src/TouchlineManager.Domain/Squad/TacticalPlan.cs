@@ -197,6 +197,9 @@ public sealed class TacticalPlan
     /// <summary>Gets whether the team runs down the clock.</summary>
     public TimeWasting TimeWasting { get; private set; }
 
+    /// <summary>Gets whether the team plays on the counter-attack.</summary>
+    public bool CounterAttack { get; private set; }
+
     /// <summary>Gets whether this is the club's default plan (`INS-11`).</summary>
     public bool IsDefault { get; private set; }
 
@@ -252,6 +255,7 @@ public sealed class TacticalPlan
             DefensiveLine = instructions.DefensiveLine,
             Tackling = instructions.Tackling,
             TimeWasting = instructions.TimeWasting,
+            CounterAttack = instructions.CounterAttack,
             IsDefault = isDefault,
             CreatedAt = now,
             UpdatedAt = now,
@@ -271,6 +275,7 @@ public sealed class TacticalPlan
         DefensiveLine = DefensiveLine,
         Tackling = Tackling,
         TimeWasting = TimeWasting,
+        CounterAttack = CounterAttack,
     };
 
     /// <summary>Replaces the formation, instructions, and name.</summary>
@@ -298,6 +303,7 @@ public sealed class TacticalPlan
         DefensiveLine = instructions.DefensiveLine;
         Tackling = instructions.Tackling;
         TimeWasting = instructions.TimeWasting;
+        CounterAttack = instructions.CounterAttack;
 
         Touch(now);
     }

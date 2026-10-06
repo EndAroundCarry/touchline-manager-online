@@ -50,6 +50,7 @@ export function defaultInstructions(): TeamInstructions {
     defensiveLine: 'normal',
     tackling: 'normal',
     timeWasting: 'off',
+    counterAttack: false,
   };
 }
 
@@ -140,13 +141,21 @@ export function withRole(draft: PlanDraft, slotNumber: number, role: string): Pl
   };
 }
 
+/** The instructions that are a choice of codes, which are every one but the counter-attack switch. */
+export type CodedInstructionKey = Exclude<keyof TeamInstructions, 'counterAttack'>;
+
 /** Changes one team instruction (`INS-1`…`INS-8`). */
 export function withInstruction(
   draft: PlanDraft,
-  key: keyof TeamInstructions,
+  key: CodedInstructionKey,
   value: string,
 ): PlanDraft {
   return { ...draft, instructions: { ...draft.instructions, [key]: value } };
+}
+
+/** Switches the counter-attack on or off. */
+export function withCounterAttack(draft: PlanDraft, on: boolean): PlanDraft {
+  return { ...draft, instructions: { ...draft.instructions, counterAttack: on } };
 }
 
 /** Renames the plan. */

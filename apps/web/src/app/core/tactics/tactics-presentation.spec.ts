@@ -1,4 +1,5 @@
 import {
+  COUNTER_ATTACK,
   INSTRUCTION_FIELDS,
   familyLabel,
   instructionEffect,
@@ -81,6 +82,14 @@ describe('tactics presentation', () => {
         'positive',
         'attacking',
       ]);
+    });
+  });
+
+  describe('the counter-attack switch', () => {
+    it('says what it does and what it costs', () => {
+      expect(COUNTER_ATTACK.label).toBe('Counter-attack');
+      expect(COUNTER_ATTACK.effect).toContain('one in two');
+      expect(COUNTER_ATTACK.effect).toContain('backfires');
     });
   });
 

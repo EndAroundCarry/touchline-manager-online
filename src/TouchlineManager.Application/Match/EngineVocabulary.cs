@@ -143,6 +143,7 @@ public static class EngineVocabulary
                 TimeWasting.On => MatchTimeWasting.On,
                 _ => throw new ArgumentOutOfRangeException(nameof(instructions), instructions.TimeWasting, "Unknown time-wasting setting."),
             },
+            CounterAttack = instructions.CounterAttack,
         };
     }
 

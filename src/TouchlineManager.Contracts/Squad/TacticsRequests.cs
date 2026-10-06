@@ -54,6 +54,10 @@ public sealed record SaveTacticalPlanRequest
     /// <remarks>Optional, so a client that does not know the setting keeps the balanced default.</remarks>
     public string PassFocus { get; init; } = "balanced";
 
+    /// <summary>Gets whether the team plays on the counter-attack.</summary>
+    /// <remarks>Optional, so a client that does not know the setting keeps it off.</remarks>
+    public bool CounterAttack { get; init; }
+
     /// <summary>
     /// Gets the slot layout, or null to lay the plan out from its formation preset.
     /// </summary>

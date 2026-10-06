@@ -387,6 +387,7 @@ erDiagram
         text defensive_line
         text tackling
         text time_wasting
+        boolean counter_attack "default false"
         boolean is_default
         bigint version
     }

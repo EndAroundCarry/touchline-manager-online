@@ -43,6 +43,15 @@ public sealed class AiClubPolicyTests
     ];
 
     [Fact]
+    public void About_one_club_in_four_plays_on_the_counter()
+    {
+        var counters = Enumerable.Range(1, 400)
+            .Count(index => AiClubPolicy.Decide(ClubId(index), Squad()).Instructions.CounterAttack);
+
+        counters.Should().BeInRange(70, 130, "the choice is a draw of one in four");
+    }
+
+    [Fact]
     public void The_same_club_and_squad_decide_the_same_way()
     {
         var first = AiClubPolicy.Decide(ClubId(1), Squad());

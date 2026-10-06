@@ -9,7 +9,7 @@
  * back in `If-Match`, so a formation changed on one device cannot be silently overwritten on another.
  */
 
-/** The team-level settings, as stable codes (`INS-1`…`INS-8`, and the pass focus). */
+/** The team-level settings, as stable codes (`INS-1`…`INS-8`, the pass focus, and the counter-attack switch). */
 export interface TeamInstructions {
   readonly mentality: string;
   readonly tempo: string;
@@ -20,6 +20,9 @@ export interface TeamInstructions {
   readonly defensiveLine: string;
   readonly tackling: string;
   readonly timeWasting: string;
+
+  /** Whether the team plays on the counter-attack: a switch, not a choice of codes. */
+  readonly counterAttack: boolean;
 }
 
 /** The player occupying a slot. */

@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { ApiError } from '../api/api-error';
 import { TacticsApi } from './tactics-api';
 import {
+  CodedInstructionKey,
   PlanDraft,
   assignedCount,
   draftFromFormation,
@@ -10,6 +11,7 @@ import {
   isDirty,
   toRequest,
   withAssignment,
+  withCounterAttack,
   withFormation,
   withInstruction,
   withName,
@@ -20,7 +22,6 @@ import {
   TacticalPlan,
   TacticalPlanIssue,
   TacticalPlanValidation,
-  TeamInstructions,
   Tactics,
 } from './tactics.models';
 
@@ -184,8 +185,13 @@ export class TacticsStore {
   }
 
   /** Changes one team instruction (`INS-1`…`INS-8`). */
-  setInstruction(key: keyof TeamInstructions, value: string): void {
+  setInstruction(key: CodedInstructionKey, value: string): void {
     this.edit((draft) => withInstruction(draft, key, value));
+  }
+
+  /** Switches the counter-attack on or off. */
+  setCounterAttack(on: boolean): void {
+    this.edit((draft) => withCounterAttack(draft, on));
   }
 
   /** Re-lays the plan from a new formation, keeping whoever is picked. */

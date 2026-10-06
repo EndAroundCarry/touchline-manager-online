@@ -531,6 +531,10 @@ internal sealed class TacticalPlanConfiguration : IEntityTypeConfiguration<Tacti
             .HasMaxLength(TeamInstructions.MaxCodeLength)
             .HasConversion(value => value.ToCode(), code => TeamInstructions.TimeWastingFromCode(code))
             .IsRequired();
+        builder.Property(plan => plan.CounterAttack)
+            .HasColumnName("counter_attack")
+            .HasDefaultValue(false)
+            .IsRequired();
         builder.Property(plan => plan.IsDefault).HasColumnName("is_default").IsRequired();
         builder.Property(plan => plan.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(plan => plan.UpdatedAt).HasColumnName("updated_at").IsRequired();

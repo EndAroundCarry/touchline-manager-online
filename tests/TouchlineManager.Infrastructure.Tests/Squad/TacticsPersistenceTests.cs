@@ -99,6 +99,39 @@ public sealed class TacticsPersistenceTests
         plan.Instructions.PassFocus.Should().Be(focus);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_plans_counter_attack_survives_a_save_and_a_read(bool counterAttack)
+    {
+        Guid clubId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+            (clubId, _) = await ArrangeAsync(seeding);
+
+            db.TacticalPlans.Add(TacticalPlan.Create(
+                Guid.CreateVersion7(),
+                clubId,
+                "Counter",
+                FormationPreset.FourFourTwo,
+                Instructions() with { CounterAttack = counterAttack },
+                isDefault: true,
+                DateTimeOffset.UnixEpoch));
+            await db.SaveChangesAsync();
+        }
+
+        await using var reading = _fixture.CreateScope();
+        var readDb = reading.ServiceProvider.GetRequiredService<TouchlineManagerDbContext>();
+
+        var plan = await readDb.TacticalPlans.AsNoTracking().SingleAsync(candidate => candidate.ClubId == clubId);
+
+        plan.CounterAttack.Should().Be(counterAttack);
+        plan.Instructions.CounterAttack.Should().Be(counterAttack);
+    }
+
     [Fact]
     public async Task The_tactics_read_returns_the_plans_their_slots_and_the_selectable_squad()
     {

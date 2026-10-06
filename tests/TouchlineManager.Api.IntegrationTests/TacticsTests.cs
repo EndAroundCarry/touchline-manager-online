@@ -183,6 +183,48 @@ public sealed class TacticsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_plan_keeps_its_counter_attack_and_a_client_that_names_none_plays_without_it()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var silent = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Silent"));
+
+        silent.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await silent.Content.ReadFromJsonAsync<TacticalPlanResponse>())!.Instructions.CounterAttack
+            .Should().BeFalse("a plan that names no counter-attack does not play on the counter");
+
+        var counter = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Counter", counterAttack: true));
+
+        counter.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var plan = (await counter.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        plan.Instructions.CounterAttack.Should().BeTrue();
+
+        var read = await client.GetFromJsonAsync<TacticsResponse>("/api/v1/tactics");
+
+        read!.Plans.Single(candidate => candidate.Id == plan.Id).Instructions.CounterAttack
+            .Should().BeTrue("the setting is stored, not just echoed");
+
+        var revised = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Counter", counterAttack: false),
+            counter.Headers.ETag!.Tag);
+
+        revised.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await revised.Content.ReadFromJsonAsync<TacticalPlanResponse>())!.Instructions.CounterAttack.Should().BeFalse();
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
     public async Task An_unknown_pass_focus_is_refused()
     {
         using var client = CreateClient();
@@ -461,7 +503,8 @@ public sealed class TacticsTests : IAsyncLifetime
         string name,
         string preset = "4-4-2",
         IEnumerable<object>? lineup = null,
-        string? passFocus = null)
+        string? passFocus = null,
+        bool? counterAttack = null)
     {
         var body = new Dictionary<string, object?>
         {
@@ -482,6 +525,11 @@ public sealed class TacticsTests : IAsyncLifetime
         if (passFocus is not null)
         {
             body["passFocus"] = passFocus;
+        }
+
+        if (counterAttack is not null)
+        {
+            body["counterAttack"] = counterAttack;
         }
 
         return body;

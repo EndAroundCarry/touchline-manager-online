@@ -120,6 +120,9 @@ public static class AiClubPolicy
             DefensiveLine = Pick(draws, Enum.GetValues<DefensiveLine>()),
             Tackling = Pick(draws, Enum.GetValues<TacklingStyle>()),
             TimeWasting = Pick(draws, Enum.GetValues<TimeWasting>()),
+
+            // About one club in four plays on the counter. It is the last draw, so nothing drawn before it moves.
+            CounterAttack = draws.NextInt(4) == 0,
         };
 
         var layout = FormationLayouts.DefaultSlots(formation);

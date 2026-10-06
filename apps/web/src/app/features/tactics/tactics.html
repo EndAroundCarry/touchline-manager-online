@@ -376,6 +376,27 @@
                 }
               </div>
             }
+
+            <div>
+              <label class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  class="size-4 accent-accent"
+                  data-testid="counter-attack"
+                  aria-describedby="effect-counterAttack"
+                  [checked]="plan.instructions.counterAttack"
+                  (change)="onCounterAttackChange($event)"
+                />
+                <span class="text-sm font-medium text-ink-2">{{ counterAttack.label }}</span>
+              </label>
+              <p
+                class="mt-1 text-xs text-ink-2"
+                id="effect-counterAttack"
+                data-testid="effect-counterAttack"
+              >
+                {{ counterAttack.effect }}
+              </p>
+            </div>
           </div>
         </div>
       </div>

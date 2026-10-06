@@ -1,12 +1,12 @@
-# Match engine version 10
+# Match engine version 11
 
-> **Status:** Executable specification for `engine-v10` / `engine-rules-v9`, implemented in
+> **Status:** Executable specification for `engine-v11` / `engine-rules-v10`, implemented in
 > `src/TouchlineManager.MatchEngine`.
-> **Applies to:** engine version `10`, engine rules version `9`, commentary `commentary-v3`, replay `replay-v5`.
+> **Applies to:** engine version `11`, engine rules version `10`, commentary `commentary-v3`, replay `replay-v5`.
 > The rating weights and tactical modifiers carry their own versions (§6.1, §6.5).
 > **Engine versions 6 to 10** are described in the sections that name them: the skill model (§7.9, `engine-v6`),
 > ball-play statistics (§8.2, `engine-v7`), the pass focus (§7.x, `engine-v8` and `engine-v9`), and positions and the
-> receiver chain (§7.10, `engine-v10`).
+> receiver chain (§7.10, `engine-v10`), and the counter-attack (§7.11, `engine-v11`).
 > **Version 2** added the assists and the per-player match rating to a result's player lines (§8.1).
 > **Version 3** made the play spatial: a possession resolves a loose-ball scramble, a 1v1 ground duel,
 > and set pieces against player attributes on a normalised pitch, and samples a live condition and rating
@@ -235,7 +235,7 @@ and ceiling, and they compose multiplicatively. Condition is no longer one of th
 | Morale | 9_500 | 10_000 |
 | Sharpness | 9_600 | 10_000 |
 
-### 6.5 Tactical modifiers (`engine-tactical-v3`)
+### 6.5 Tactical modifiers (`engine-tactical-v4`)
 
 Every instruction has a cost as well as a benefit, and this is where that is enforced. Each unit's
 modifier is the sum of the applicable deltas, then clamped to `MinTacticalModifierBasisPoints` = 8_800 …
@@ -248,6 +248,7 @@ three attribute points.
 | Tempo | High: +creation, shorter possessions, faster fatigue. Low: the reverse. |
 | Passing | Short: +build-up. Direct: −build-up, slightly +creation. |
 | Width | Wide: +creation, −defensive shape, −build-up. Narrow: the reverse. |
+| Counter-attack | On: −120 build-up and −60 defensive shape (`engine-v11`); the benefit is in the counters themselves (§7.11). |
 | Pass focus | Centre: +build-up, +finishing, +defensive shape, −creation. Wings: +creation, −build-up, −finishing, −defensive shape. Centre with a flank: a smaller +build-up, +creation and +finishing, and −defensive shape (the flank it leaves alone is thin). Left and right cost the same. |
 | Pressing | High press: +defensive pressure, +creation, −defensive shape, faster fatigue. Low block: the reverse. |
 | Defensive line | High: +build-up, +defensive pressure, −defensive shape. Deep: the reverse. |
@@ -676,6 +677,19 @@ What the focus costs beyond that is the tactical modifier above (§6.5): the cen
 shape better and creates less, the wings the reverse. The modifiers are small, as they are for every instruction
 (`INS-9`).
 
+### 7.11 The counter-attack (`engine-v11`)
+
+`MatchInstructionsV1.CounterAttack` (`ADR-0063`) is a switch, off by default. A possession is a counter-attack when it
+begins from play, the one before it was the opponent's, and a roll from a stream of its own comes up
+(`CounterStartBasisPoints` 2_000 off, `CounterStartWithInstructionBasisPoints` 5_000 on; the stream is the seed times
+a stride plus the possession ordinal, so no play draw moves). The passage record's `Counter` says which.
+
+A counter's progression chance gains `CounterProgressBasisPoints` (200) plus `CounterProgressPerPostureBasisPoints`
+(350) a step, and its creation chance `CounterCreationBasisPoints` (150) plus `CounterCreationPerPostureBasisPoints`
+(300) a step, where the opponent's posture is its mentality (−2 defensive … +2 attacking) plus its defensive line (−1
+deep … +1 high). A side that plays on the counter loses `CounterAttackBuildUpCostBasisPoints` (120) of build-up and
+`CounterAttackShapeCostBasisPoints` (60) of defensive shape (§6.5).
+
 ## 8. Output
 
 `MatchResultV1` carries the score, per-side statistics, the ordered event stream, per-player lines, the
@@ -913,6 +927,10 @@ stays on the pitch).
 | `CornerChanceMinBasisPoints` / `Max` | 1_500 / 6_000 | Bounds on a corner becoming a headed chance. |
 | `ShotZoneCentralPercent` / `InsidePercent` / `WidePercent` | 40 / 20 / 10 | The open-play shot zones: one central, two inside, two wide. |
 | `ShotFocus…Percent` (eleven) | see §7.x | The shot zones of a side with a pass focus (`engine-v9`); each set sums to 100. |
+| `CounterStartBasisPoints` / `WithInstruction` | 2_000 / 5_000 | How often a regained ball becomes a counter-attack, without and with the instruction (`engine-v11`). |
+| `CounterProgressBasisPoints` / `PerPosture` | 200 / 350 | A counter's progression edge: the base, and a step per point of the opponent's posture. |
+| `CounterCreationBasisPoints` / `PerPosture` | 150 / 300 | A counter's creation edge, likewise. |
+| `CounterAttackBuildUpCost` / `ShapeCostBasisPoints` | 120 / 60 | What playing on the counter costs in build-up and defensive shape. |
 | `ChanceVolumeCentre` / `Pair` / `WingsBasisPoints` | 9_350 / 10_300 / 11_600 | How often a progressed possession becomes a shot, for a side with a pass focus (`engine-v9`). |
 | `MinPassageTouches` / `Max` | 3 / 8 | Touches a possession's passage is built from. |
 | `MinTouchAdvanceBasisPoints` / `Max` | 350 / 1_700 | How far one touch advances the ball. |

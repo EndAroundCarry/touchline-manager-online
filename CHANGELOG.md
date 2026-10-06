@@ -4,6 +4,30 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine v11 — the counter-attack
+
+Recorded in [`ADR-0063`](docs/architecture/adr/0063-engine-v11-counter-attack.md). Engine `engine-v11`, rules
+`engine-rules-v10`, tactical modifiers `engine-tactical-v4`.
+
+### Added
+
+- **A Counter-attack switch on the tactics board.** Off, a side breaks on about one in five of the balls it wins back
+  from play; on, about one in two. It is saved with the plan (`squad.tactical_plans.counter_attack`, optional on the
+  request) and has a line under it saying what it does and costs.
+- **It depends on the opponent.** A counter progresses and creates more often against a side that has pushed forward
+  (attacking mentality, high line) and less often against one that sits deep, which cuts the long ball out. Over 800
+  matches it adds about 0.07 goals a match against an attacking side and costs about 0.09 against a defensive one,
+  and changes nothing against a balanced one.
+- **A price.** A side that plays on the counter gives up some build-up (120 basis points) and defensive shape (60).
+- **The replay draws the counter.** One outlet and one runner by default, two of each with the defenders dropping
+  when the switch is on (`FilmCounter`).
+- **AI clubs** play on the counter about one time in four.
+
+### Changed
+
+- Engine 10 to 11 and rules 9 to 10; the golden hashes are re-pinned (the golden match is still 2-2). Goals per match
+  are unchanged at 2.90.
+
 ## Stadium — a ground a manager builds, and a Facilities menu
 
 Recorded in [`ADR-0062`](docs/architecture/adr/0062-club-stadium-places-levels-and-gate.md). Rule set

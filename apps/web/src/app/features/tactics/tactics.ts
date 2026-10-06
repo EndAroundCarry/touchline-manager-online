@@ -8,6 +8,7 @@ import { SquadStore } from '../../core/squad/squad-store';
 import { attributeBand, positionLabel, stateBand } from '../../core/squad/squad-presentation';
 import { Squad } from '../../core/squad/squad.models';
 import {
+  COUNTER_ATTACK,
   INSTRUCTION_FIELDS,
   InstructionField,
   instructionEffect as effectOf,
@@ -21,7 +22,8 @@ import {
 } from '../../core/tactics/tactics-presentation';
 import { RosterRow, buildRoster } from '../../core/tactics/tactics-roster';
 import { TacticsStore } from '../../core/tactics/tactics-store';
-import { SelectablePlayer, TeamInstructions } from '../../core/tactics/tactics.models';
+import { CodedInstructionKey } from '../../core/tactics/tactics-draft';
+import { SelectablePlayer } from '../../core/tactics/tactics.models';
 import {
   FORM_ERROR,
   LINK_ACTION,
@@ -132,6 +134,7 @@ export class Tactics {
   protected readonly canMutate = this.maintenance.canMutate;
 
   protected readonly instructionFields = INSTRUCTION_FIELDS;
+  protected readonly counterAttack = COUNTER_ATTACK;
   protected readonly maxNameLength = 64;
 
   protected readonly pageHeadingClass = PAGE_HEADING;
@@ -286,8 +289,13 @@ export class Tactics {
   }
 
   /** Changes one team instruction (`INS-1`…`INS-8`). */
-  protected onInstructionChange(key: keyof TeamInstructions, event: Event): void {
+  protected onInstructionChange(key: CodedInstructionKey, event: Event): void {
     this.store.setInstruction(key, (event.target as HTMLSelectElement).value);
+  }
+
+  /** Switches the counter-attack on or off. */
+  protected onCounterAttackChange(event: Event): void {
+    this.store.setCounterAttack((event.target as HTMLInputElement).checked);
   }
 
   /** Changes a slot's role (`TAC-8`). */

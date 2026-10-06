@@ -74,6 +74,27 @@ public sealed class SquadTacticsTests
     }
 
     [Fact]
+    public void A_plan_carries_its_counter_attack_through_creation_and_revision()
+    {
+        var plan = TacticalPlan.Create(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            "Counter",
+            FormationPreset.FourFourTwo,
+            Instructions() with { CounterAttack = true },
+            isDefault: false,
+            DateTimeOffset.UnixEpoch);
+
+        plan.CounterAttack.Should().BeTrue();
+        plan.Instructions.CounterAttack.Should().BeTrue();
+
+        plan.Revise("Counter", FormationPreset.FourFourTwo, Instructions(), DateTimeOffset.UnixEpoch);
+
+        plan.CounterAttack.Should().BeFalse();
+        TeamInstructionSet.Neutral.CounterAttack.Should().BeFalse("a club that never opened the tactics screen does not play on the counter");
+    }
+
+    [Fact]
     public void A_role_reports_the_family_it_belongs_to()
     {
         PlayerRoles.FamilyOf(PlayerRole.Goalkeeper).Should().Be(PositionFamily.Goalkeeper);

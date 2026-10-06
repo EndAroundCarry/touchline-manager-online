@@ -159,6 +159,7 @@ public sealed record TeamInstructionSet
         DefensiveLine = DefensiveLine.Normal,
         Tackling = TacklingStyle.Normal,
         TimeWasting = TimeWasting.Off,
+        CounterAttack = false,
     };
 
     /// <summary>Gets the overall approach.</summary>
@@ -187,6 +188,12 @@ public sealed record TeamInstructionSet
 
     /// <summary>Gets whether the team runs down the clock.</summary>
     public TimeWasting TimeWasting { get; init; }
+
+    /// <summary>
+    /// Gets whether the team plays on the counter-attack: it turns a regained ball into a counter far more often,
+    /// which works against a side that has committed forward and backfires against one that sits deep.
+    /// </summary>
+    public bool CounterAttack { get; init; }
 }
 
 /// <summary>

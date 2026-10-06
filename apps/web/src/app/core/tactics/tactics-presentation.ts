@@ -154,6 +154,13 @@ export const INSTRUCTION_FIELDS: readonly InstructionField[] = [
   },
 ];
 
+/** The counter-attack switch's heading and the line saying what it does and what it costs. */
+export const COUNTER_ATTACK = {
+  label: 'Counter-attack',
+  effect:
+    'Breaks quickly on a ball won back: about one in two regained balls becomes a counter, against one in five without it. It works against a side that has pushed forward and backfires against one that sits deep, and you give up some patience in possession and some defensive shape.',
+} as const;
+
 /** The line saying what the chosen option does, or null when the option carries none. */
 export function instructionEffect(field: InstructionField, value: string): string | null {
   return field.options.find((option) => option.value === value)?.effect ?? null;

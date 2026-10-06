@@ -93,6 +93,7 @@ public sealed class EngineVocabularyTests
             DefensiveLine = DefensiveLine.High,
             Tackling = TacklingStyle.Aggressive,
             TimeWasting = TimeWasting.Situational,
+            CounterAttack = true,
         };
 
         var mapped = EngineVocabulary.Instructions(instructions);
@@ -106,6 +107,13 @@ public sealed class EngineVocabularyTests
         ((int)mapped.DefensiveLine).Should().Be((int)instructions.DefensiveLine);
         ((int)mapped.Tackling).Should().Be((int)instructions.Tackling);
         ((int)mapped.TimeWasting).Should().Be((int)instructions.TimeWasting);
+        mapped.CounterAttack.Should().BeTrue();
+    }
+
+    [Fact]
+    public void The_counter_attack_is_off_unless_the_plan_asks_for_it()
+    {
+        EngineVocabulary.Instructions(TeamInstructionSet.Neutral).CounterAttack.Should().BeFalse();
     }
 
     [Fact]

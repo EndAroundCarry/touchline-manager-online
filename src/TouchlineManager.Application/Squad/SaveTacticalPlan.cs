@@ -339,6 +339,7 @@ public sealed class SaveTacticalPlan
         DefensiveLine = TeamInstructions.LineFromCode(request.DefensiveLine),
         Tackling = TeamInstructions.TacklingFromCode(request.Tackling),
         TimeWasting = TeamInstructions.TimeWastingFromCode(request.TimeWasting),
+        CounterAttack = request.CounterAttack,
     };
 
     private static SaveTacticalPlanOutcome FromAccess(ClubAccessOutcome outcome) => outcome switch

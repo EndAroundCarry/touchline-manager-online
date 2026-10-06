@@ -9,6 +9,7 @@ import {
   toRequest,
   withAssignment,
   withFormation,
+  withCounterAttack,
   withInstruction,
   withName,
   withRole,
@@ -94,6 +95,18 @@ function savedPlan(overrides: Partial<TacticalPlan> = {}): TacticalPlan {
 }
 
 describe('tactics draft', () => {
+  it('starts with the counter-attack off, and sends it once it is switched on', () => {
+    const draft = draftFromFormation(formation('4-4-2'));
+
+    expect(draft.instructions.counterAttack).toBe(false);
+    expect(toRequest(draft).counterAttack).toBe(false);
+
+    const counter = withCounterAttack(draft, true);
+
+    expect(toRequest(counter).counterAttack).toBe(true);
+    expect(withCounterAttack(counter, false).instructions.counterAttack).toBe(false);
+  });
+
   it('sends the pass focus with the other instructions', () => {
     const draft = withInstruction(draftFromFormation(formation('4-4-2')), 'passFocus', 'wings');
 

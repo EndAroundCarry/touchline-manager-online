@@ -64,6 +64,7 @@ public sealed record TacticalPlanResponse(
 /// <param name="Tackling">The tackling code.</param>
 /// <param name="TimeWasting">The time-wasting code.</param>
 /// <param name="PassFocus">The pass-focus code, <c>balanced</c> when the plan names none.</param>
+/// <param name="CounterAttack">Whether the team plays on the counter-attack.</param>
 public sealed record TeamInstructionsResponse(
     string Mentality,
     string Tempo,
@@ -73,7 +74,8 @@ public sealed record TeamInstructionsResponse(
     string DefensiveLine,
     string Tackling,
     string TimeWasting,
-    string PassFocus = "balanced");
+    string PassFocus = "balanced",
+    bool CounterAttack = false);
 
 /// <summary>One slot in a saved plan, with whoever occupies it (`TAC-7`…`TAC-9`).</summary>
 /// <param name="SlotNumber">The slot number, 1–11.</param>
