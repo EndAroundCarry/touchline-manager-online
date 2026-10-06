@@ -1089,19 +1089,49 @@ public sealed record EngineRulesV2
     /// opponent who has committed forward leaves space to run into, and one who sits deep is well placed to cut out
     /// a long ball, so the counter breaks down more often against it.
     /// </summary>
-    public int CounterProgressPerPostureBasisPoints { get; init; } = 350;
+    public int CounterProgressPerPostureBasisPoints { get; init; } = 1_150;
 
     /// <summary>What a counter-attack adds to its creation chance against a balanced opponent.</summary>
     public int CounterCreationBasisPoints { get; init; } = 150;
 
     /// <summary>How far each step of the opponent's attacking posture moves the creation chance of a counter-attack.</summary>
-    public int CounterCreationPerPostureBasisPoints { get; init; } = 300;
+    public int CounterCreationPerPostureBasisPoints { get; init; } = 1_050;
 
     /// <summary>How much a side that plays on the counter loses in build-up, which is its patience in possession.</summary>
     public int CounterAttackBuildUpCostBasisPoints { get; init; } = 120;
 
     /// <summary>How much a side that plays on the counter loses in defensive shape, with players left forward.</summary>
     public int CounterAttackShapeCostBasisPoints { get; init; } = 60;
+
+    /// <summary>
+    /// The pace and acceleration, as an attribute point, that a side's defenders and midfielders are measured against when
+    /// they race back to meet a counter-attack: above it they cut the counter down, below it they are caught out.
+    /// </summary>
+    public int CounterRecoveryReference { get; init; } = 11;
+
+    /// <summary>How far each point of the defenders' and midfielders' pace and acceleration above the reference lowers a counter's progression chance.</summary>
+    public int CounterRecoveryProgressStepBasisPoints { get; init; } = 150;
+
+    /// <summary>How far each point of pace and acceleration above the reference lowers a counter's creation chance.</summary>
+    public int CounterRecoveryCreationStepBasisPoints { get; init; } = 120;
+
+    /// <summary>The most the defenders' recovery can move a counter's progression chance, either way.</summary>
+    public int CounterRecoveryMaxProgressBasisPoints { get; init; } = 900;
+
+    /// <summary>The most the defenders' recovery can move a counter's creation chance, either way.</summary>
+    public int CounterRecoveryMaxCreationBasisPoints { get; init; } = 700;
+
+    /// <summary>
+    /// How much likelier a side that sits deep is to counter in its turn, per step of its own caution, when it wins the
+    /// ball back from a counter-attack that failed.
+    /// </summary>
+    public int CounterBackfireStartBasisPoints { get; init; } = 2_000;
+
+    /// <summary>
+    /// What the chance that follows a failed counter-attack gains, per step of caution of the side that won the ball
+    /// back: it has the other side stretched.
+    /// </summary>
+    public int CounterBackfireCreationBasisPoints { get; init; } = 1_500;
 
     // ---- Fitness ---------------------------------------------------------------------------------
 
@@ -1887,6 +1917,12 @@ public sealed record EngineRulesV2
         yield return (nameof(CounterCreationPerPostureBasisPoints), CounterCreationPerPostureBasisPoints);
         yield return (nameof(CounterAttackBuildUpCostBasisPoints), CounterAttackBuildUpCostBasisPoints);
         yield return (nameof(CounterAttackShapeCostBasisPoints), CounterAttackShapeCostBasisPoints);
+        yield return (nameof(CounterRecoveryProgressStepBasisPoints), CounterRecoveryProgressStepBasisPoints);
+        yield return (nameof(CounterRecoveryCreationStepBasisPoints), CounterRecoveryCreationStepBasisPoints);
+        yield return (nameof(CounterRecoveryMaxProgressBasisPoints), CounterRecoveryMaxProgressBasisPoints);
+        yield return (nameof(CounterRecoveryMaxCreationBasisPoints), CounterRecoveryMaxCreationBasisPoints);
+        yield return (nameof(CounterBackfireStartBasisPoints), CounterBackfireStartBasisPoints);
+        yield return (nameof(CounterBackfireCreationBasisPoints), CounterBackfireCreationBasisPoints);
         yield return (nameof(BaseCreationBasisPoints), BaseCreationBasisPoints);
         yield return (nameof(CreationSwingBasisPoints), CreationSwingBasisPoints);
         yield return (nameof(LeadingCreationStepBasisPoints), LeadingCreationStepBasisPoints);

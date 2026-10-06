@@ -202,6 +202,9 @@ internal sealed class MatchState
         Passing = new PossessionPassing(side);
     }
 
+    /// <summary>Gets the side whose counter-attack was just lost, when the possession before the one being played was one (`engine-v11`).</summary>
+    public MatchSide? FailedCounterBy { get; private set; }
+
     /// <summary>Gets the side that had the possession before the one being played, once there has been one (`engine-v11`).</summary>
     public MatchSide? LastPossessionSide { get; private set; }
 
@@ -226,6 +229,12 @@ internal sealed class MatchState
         {
             return;
         }
+
+        // A counter that was lost leaves the other side with the ball and the first side stretched (`engine-v11`).
+        FailedCounterBy = _passage.Counter
+            && outcome is PassageOutcome.ScrambleLost or PassageOutcome.ProgressionFailed or PassageOutcome.CreationFailed or PassageOutcome.CornerCleared
+            ? _passage.Side
+            : null;
 
         Passages?.Add(_passage.Build(ClockSeconds, outcome));
         _passage = null;
@@ -528,6 +537,10 @@ internal sealed class MatchState
             _startClockSeconds = startClockSeconds;
             _restart = restart;
         }
+
+        public bool Counter => _counter;
+
+        public MatchSide Side => _side;
 
         public void AddWaypoint(int x, int y, int z, PassageWaypointKind kind) =>
             _waypoints.Add((_nextTick++, new PassageWaypointV1(0, x, y, z, kind)));

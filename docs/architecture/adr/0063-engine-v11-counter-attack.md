@@ -32,10 +32,25 @@ the output hash.
 **3. How a counter fares.** The opponent's posture is its mentality and its defensive line, each a step either side
 of the middle (mentality −2…+2, line −1…+1), so −3 for a defensive side with a deep line and +3 for an attacking
 one with a high line. A counter adds to the chance it progresses out of build-up
-`CounterProgressBasisPoints` (200) plus `CounterProgressPerPostureBasisPoints` (350) a step, and to its creation
-chance `CounterCreationBasisPoints` (150) plus `CounterCreationPerPostureBasisPoints` (300) a step. Against a
+`CounterProgressBasisPoints` (200) plus `CounterProgressPerPostureBasisPoints` (1,150) a step, and to its creation
+chance `CounterCreationBasisPoints` (150) plus `CounterCreationPerPostureBasisPoints` (1,050) a step. Against a
 balanced opponent it is worth the base only; against a deep and defensive one it is worth less than an ordinary
 attack, and the instruction backfires. Every roll is the one the engine always took and only the thresholds move.
+
+**3a. The defenders' legs.** How fast the side being countered gets back decides how much of that is left. The mean
+effective pace and acceleration of its defenders and midfielders, measured against `CounterRecoveryReference` (11,
+which is what an ordinary back line and midfield of ability 13 has), moves a counter's progression chance by
+`CounterRecoveryProgressStepBasisPoints` (150) and its creation chance by `CounterRecoveryCreationStepBasisPoints`
+(120) per attribute point, either way, capped at 900 and 700. A quick side is in position before the ball arrives or
+catches the runner from behind and tackles; a slow one is caught out. Tiredness is in the effective skill, so a
+side that has run itself out defends a counter worse late on.
+
+**3b. A failed counter leaves the other side stretched.** When a counter ends in a lost ball (`ScrambleLost`,
+`ProgressionFailed`, `CreationFailed` or `CornerCleared`), the side that wins the ball back, if it is cautious, has
+caught the first side out of shape. For each step of its own caution (mentality plus line, below the middle) its next
+possession is likelier to be a counter, by `CounterBackfireStartBasisPoints` (2,000), and its creation chance
+gains `CounterBackfireCreationBasisPoints` (1,500), counter or not: it either breaks in its turn or makes a
+dangerous chance of an ordinary attack.
 
 **4. A price, as `INS-9` requires.** A side that plays on the counter loses `CounterAttackBuildUpCostBasisPoints`
 (120) of build-up, which is its patience in possession, and `CounterAttackShapeCostBasisPoints` (60) of defensive
@@ -47,27 +62,28 @@ midfielder runs 10 m ahead, for the first three beats, and the defenders press a
 40 m ahead, two midfielders run 18 m ahead, for six beats, and the defenders drop and close up instead of chasing.
 
 **6. Versions.** `EngineVersions.Engine = 11` (`engine-v11`), `RuleSet = 10` (`engine-rules-v10`). The canonical
-serialization gains `counterAttack` per side and the rules gain eight constants, so the golden input and output
+serialization gains `counterAttack` per side and the rules gain fourteen constants, so the golden input and output
 hashes, the rules hash and the events pin are re-pinned. The golden match is still 2-2.
 
 ## Evidence
 
 - **The shares are the ones asked for.** Over 300 evenly matched matches, 20.3% of 11,613 regained balls were
   counters for a side that had not asked, and 50.2% of 11,638 for a side that had.
-- **A balanced opponent sees no change.** Goals per match are 1.61 with and without the instruction against a
-  balanced side, and calibration is unchanged: 2.902 goals a match over 2,000 fixtures (target 2.50 to 3.00), home
-  advantage 3.65 points.
-- **It works against an attacking side and backfires against a defensive one.** Over 800 matches against an
-  attacking mentality with a high line the instruction adds about 0.07 goals a match (1.68 to 1.75), and against a
-  defensive mentality with a deep line it costs about 0.09 (1.49 to 1.40). Over 1,500 matches the figures were
-  +0.09 and −0.07.
+- **A balanced opponent sees no change.** Over 3,000 matches goals per match are the same with and without the
+  instruction against a balanced side (+0.000), and calibration is unchanged: 2.894 goals a match over 1,500 fixtures
+  (target 2.50 to 3.00), home advantage 3.47 points.
+- **It works against an attacking side and backfires against a defensive one.** Over 3,000 matches a side that
+  plays on the counter scores about 0.24 more a match against an attacking mentality with a high line (goal difference
+  +0.20), and against a defensive mentality with a deep line it scores about 0.11 fewer and concedes about 0.06 more,
+  a goal difference of −0.165. The first version of the rule was worth +0.07 and −0.09.
 - **The suite.** The engine suite passes with the hashes re-pinned, and the new tests pin the shares, that only a
   regained ball is ever a counter, that the edge rises with the opponent's commitment, and the price.
 
 ## Consequences
 
-- The effect is modest, as every instruction is (`INS-9`): about 5% of a side's goals either way. The eight
-  constants are the knobs; the posture steps are the ones to turn for a stronger effect.
+- The effect is a clear one, as a tactic should be, and bounded (`INS-9`): about 0.24 goals a match for a side that
+  breaks on an attacking opponent and a goal difference of about 0.17 against it when it breaks on a deep one. The
+  posture steps, the recovery steps and the two backfire constants are the knobs.
 - Stored `engine-v10` matches cannot be re-simulated, as with every earlier version.
 - A counter is not yet different in where the ball goes or how long the possession lasts; it moves the thresholds
   and the replay shows it. Making it a faster, more direct passage is open.

@@ -41,13 +41,15 @@ internal static class PossessionSimulator
     /// <param name="Plan">The possession's planned geometry.</param>
     /// <param name="Derived">The possession's geometry stream.</param>
     /// <param name="Counter">Whether the possession is a counter-attack on a ball regained from play (`engine-v11`).</param>
+    /// <param name="Backfire">How many steps of caution the side has when it wins the ball back from a counter that failed, or zero (`engine-v11`).</param>
     private sealed record Possession(
         MatchSide Side,
         MatchSide Defending,
         PassageRestartKind Restart,
         PlannedPassage Plan,
         Pcg32 Derived,
-        bool Counter);
+        bool Counter,
+        int Backfire);
 
     /// <summary>The contested loose ball that opens some possessions, and who contested it (`engine-v5`).</summary>
     /// <param name="Lost">Whether the side in possession lost it.</param>
@@ -139,9 +141,15 @@ internal static class PossessionSimulator
 
         // A ball won back from play may become a counter-attack. The roll is drawn from a stream of its own, so it can
         // never move a play draw: what it changes is the thresholds of the possession it starts (`engine-v11`).
-        var counter = restart is null
-            && state.LastPossessionSide == MatchInputV1.OpponentOf(possessionSide)
-            && RollCounter(state, attacker);
+        var fromPlay = restart is null && state.LastPossessionSide == MatchInputV1.OpponentOf(possessionSide);
+
+        // A side that sits deep and wins the ball back from a counter that failed has the other side stretched: it is
+        // likelier to break in its turn, and what it creates is worth more.
+        var backfire = fromPlay && state.FailedCounterBy == MatchInputV1.OpponentOf(possessionSide)
+            ? Math.Max(0, -Posture(attacker.Instructions))
+            : 0;
+
+        var counter = fromPlay && RollCounter(state, attacker, backfire);
 
         var possession = new Possession(
             possessionSide,
@@ -149,7 +157,8 @@ internal static class PossessionSimulator
             restart?.Kind ?? PassageRestartKind.None,
             plan,
             derived,
-            counter);
+            counter,
+            backfire);
 
         state.BeginPassage(possessionSide, startSeconds, possession.Restart, counter);
 
@@ -442,6 +451,7 @@ internal static class PossessionSimulator
             rules.BaseCreationBasisPoints
                 + duel.CreationBonus
                 + counterCreation
+                + (possession.Backfire * rules.CounterBackfireCreationBasisPoints)
                 + Probability.Swing(
                     creation,
                     rules.CreationSwingBasisPoints,
@@ -492,13 +502,14 @@ internal static class PossessionSimulator
     private const ulong CounterStreamStride = 1_000_033UL;
 
     /// <summary>Rolls whether a ball regained from play becomes a counter-attack, on a stream that moves no play draw (`engine-v11`).</summary>
-    private static bool RollCounter(MatchState state, SideRuntime attacker)
+    private static bool RollCounter(MatchState state, SideRuntime attacker, int backfire)
     {
         var rules = state.Rules;
 
-        var chance = attacker.Instructions.CounterAttack
+        var chance = (attacker.Instructions.CounterAttack
             ? rules.CounterStartWithInstructionBasisPoints
-            : rules.CounterStartBasisPoints;
+            : rules.CounterStartBasisPoints)
+            + (backfire * rules.CounterBackfireStartBasisPoints);
 
         var stream = new Pcg32(unchecked((state.Input.Seed * CounterStreamStride) + (ulong)state.PossessionOrdinal));
 
@@ -521,7 +532,11 @@ internal static class PossessionSimulator
             return (0, 0);
         }
 
-        return CounterEdge(state.Rules, state.SideOf(possession.Defending).Instructions);
+        var defender = state.SideOf(possession.Defending);
+        var (progress, creation) = CounterEdge(state.Rules, defender.Instructions);
+        var (recoveryProgress, recoveryCreation) = CounterRecovery(state.Rules, defender.Outfield);
+
+        return (progress + recoveryProgress, creation + recoveryCreation);
     }
 
     /// <summary>Gets what a counter-attack gains or loses against an opponent set up as given (`engine-v11`).</summary>
@@ -529,11 +544,53 @@ internal static class PossessionSimulator
     /// <param name="opponent">The instructions of the side being countered.</param>
     internal static (int Progress, int Creation) CounterEdge(EngineRulesV2 rules, MatchInstructionsV1 opponent)
     {
-        var posture = ((int)opponent.Mentality - (int)MatchMentality.Balanced) + ((int)opponent.DefensiveLine - (int)MatchDefensiveLine.Normal);
+        var posture = Posture(opponent);
 
         return (
             rules.CounterProgressBasisPoints + (posture * rules.CounterProgressPerPostureBasisPoints),
             rules.CounterCreationBasisPoints + (posture * rules.CounterCreationPerPostureBasisPoints));
+    }
+
+    /// <summary>How far a side has committed forward: its mentality and its defensive line, each a step either side of the middle.</summary>
+    private static int Posture(MatchInstructionsV1 instructions) =>
+        ((int)instructions.Mentality - (int)MatchMentality.Balanced)
+        + ((int)instructions.DefensiveLine - (int)MatchDefensiveLine.Normal);
+
+    /// <summary>
+    /// Gets how much the pace and acceleration of the defenders and midfielders of the side being countered cut a counter
+    /// down, in basis points (negative) or leave it room (positive) (`engine-v11`). A quick back line is in position
+    /// before the ball arrives or catches the runner from behind and tackles; a slow one is not.
+    /// </summary>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="outfield">The side's outfield players on the pitch.</param>
+    internal static (int Progress, int Creation) CounterRecovery(EngineRulesV2 rules, IReadOnlyList<ActiveSlot> outfield)
+    {
+        long sum = 0;
+        var count = 0;
+
+        foreach (var slot in outfield)
+        {
+            if (slot.Slot.Family is not (MatchPositionFamily.Defence or MatchPositionFamily.Midfield))
+            {
+                continue;
+            }
+
+            sum += (EffectiveSkill.Hundredths(slot, MatchAttributeName.Pace, rules)
+                + EffectiveSkill.Hundredths(slot, MatchAttributeName.Acceleration, rules)) / 2;
+            count++;
+        }
+
+        if (count == 0)
+        {
+            return (0, 0);
+        }
+
+        // Hundredths of an attribute point above or below the reference.
+        var surplus = (sum / count) - ((long)rules.CounterRecoveryReference * EffectiveSkill.Scale);
+
+        return (
+            (int)Math.Clamp(-surplus * rules.CounterRecoveryProgressStepBasisPoints / EffectiveSkill.Scale, -rules.CounterRecoveryMaxProgressBasisPoints, rules.CounterRecoveryMaxProgressBasisPoints),
+            (int)Math.Clamp(-surplus * rules.CounterRecoveryCreationStepBasisPoints / EffectiveSkill.Scale, -rules.CounterRecoveryMaxCreationBasisPoints, rules.CounterRecoveryMaxCreationBasisPoints));
     }
 
     /// <summary>Plays the ball into the final third: to the receiver the holder chose, or carried there when he chose nobody.</summary>

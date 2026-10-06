@@ -1,6 +1,7 @@
 using FluentAssertions;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Ratings;
+using TouchlineManager.MatchEngine.Simulation;
 using Xunit.Abstractions;
 
 namespace TouchlineManager.MatchEngine.Tests;
@@ -150,4 +151,81 @@ public sealed class CounterAttackTests(ITestOutputHelper output)
 
     private static (int Progress, int Creation) PossessionSimulatorEdge(MatchInstructionsV1 opponent) =>
         Simulation.PossessionSimulator.CounterEdge(TestMatchFactory.Rules, opponent);
+
+    [Fact]
+    public void A_quick_back_line_and_midfield_cut_a_counter_down_and_a_slow_one_is_caught_out()
+    {
+        var rules = TestMatchFactory.Rules;
+
+        var quick = Recovery(20);
+        var average = Recovery(13);
+        var slow = Recovery(6);
+
+        quick.Progress.Should().BeLessThan(0, "defenders who get back into position or run the attacker down cut the counter");
+        quick.Creation.Should().BeLessThan(0);
+        slow.Progress.Should().BeGreaterThan(0, "a slow side is caught out");
+        slow.Creation.Should().BeGreaterThan(0);
+        Math.Abs(average.Progress).Should().BeLessThan(200, "the reference is an average pair of legs");
+        quick.Progress.Should().BeGreaterThanOrEqualTo(-rules.CounterRecoveryMaxProgressBasisPoints);
+        slow.Progress.Should().BeLessThanOrEqualTo(rules.CounterRecoveryMaxProgressBasisPoints);
+        slow.Creation.Should().BeLessThanOrEqualTo(rules.CounterRecoveryMaxCreationBasisPoints);
+    }
+
+    [Fact]
+    public void A_side_that_sits_deep_breaks_in_its_turn_when_it_wins_the_ball_back_from_a_failed_counter()
+    {
+        int afterFailed = 0, countersAfterFailed = 0, other = 0, countersOther = 0;
+
+        for (var seed = 1UL; seed <= 600; seed++)
+        {
+            var input = TestMatchFactory.WithInstructions(new MatchInstructionsV1 { CounterAttack = true }, Defensive, seed);
+            var recorder = new MatchPassageRecorder();
+
+            MatchSimulator.Simulate(input, TestMatchFactory.Rules, null, recorder);
+
+            MatchPassageV1? previous = null;
+
+            foreach (var passage in recorder.Passages)
+            {
+                var regained = passage.Restart == PassageRestartKind.None && previous is not null && previous.Side != passage.Side;
+
+                if (passage.Side == MatchSide.Away && regained)
+                {
+                    var failed = previous!.Counter
+                        && previous.Outcome is PassageOutcome.ScrambleLost or PassageOutcome.ProgressionFailed or PassageOutcome.CreationFailed or PassageOutcome.CornerCleared;
+
+                    if (failed)
+                    {
+                        afterFailed++;
+                        countersAfterFailed += passage.Counter ? 1 : 0;
+                    }
+                    else
+                    {
+                        other++;
+                        countersOther += passage.Counter ? 1 : 0;
+                    }
+                }
+
+                previous = passage;
+            }
+        }
+
+        afterFailed.Should().BeGreaterThan(100);
+
+        ((double)countersAfterFailed / afterFailed).Should().BeGreaterThan(((double)countersOther / other) + 0.3, "the side that sat deep has the other side stretched");
+    }
+
+    private static (int Progress, int Creation) Recovery(int ability)
+    {
+        var rules = TestMatchFactory.Rules;
+
+        var outfield = LineupResolver
+            .Resolve(TestMatchFactory.Side(11, "Quick Town", ability, new MatchInstructionsV1()), MatchSide.Away, rules)
+            .Slots
+            .Where(slot => slot.Slot.Family != MatchPositionFamily.Goalkeeper)
+            .Select(Ratings.ActiveSlot.From)
+            .ToList();
+
+        return Simulation.PossessionSimulator.CounterRecovery(rules, outfield);
+    }
 }

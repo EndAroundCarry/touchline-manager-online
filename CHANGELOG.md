@@ -15,9 +15,13 @@ Recorded in [`ADR-0063`](docs/architecture/adr/0063-engine-v11-counter-attack.md
   from play; on, about one in two. It is saved with the plan (`squad.tactical_plans.counter_attack`, optional on the
   request) and has a line under it saying what it does and costs.
 - **It depends on the opponent.** A counter progresses and creates more often against a side that has pushed forward
-  (attacking mentality, high line) and less often against one that sits deep, which cuts the long ball out. Over 800
-  matches it adds about 0.07 goals a match against an attacking side and costs about 0.09 against a defensive one,
-  and changes nothing against a balanced one.
+  (attacking mentality, high line) and less often against one that sits deep, which cuts the long ball out. Over 3,000
+  matches it adds about 0.24 goals a match against an attacking side, costs a goal difference of 0.165 against a
+  defensive one, and changes nothing against a balanced one.
+- **The defenders' legs matter.** The pace and acceleration of the side's defenders and midfielders cut a counter down
+  or leave it room: quick players get back into position or run the attacker down and tackle.
+- **A failed counter backfires.** A cautious side that wins the ball back from one is likelier to break in its turn, and
+  what it creates is worth more.
 - **A price.** A side that plays on the counter gives up some build-up (120 basis points) and defensive shape (60).
 - **The replay draws the counter.** One outlet and one runner by default, two of each with the defenders dropping
   when the switch is on (`FilmCounter`).

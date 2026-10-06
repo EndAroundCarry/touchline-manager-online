@@ -685,10 +685,17 @@ begins from play, the one before it was the opponent's, and a roll from a stream
 a stride plus the possession ordinal, so no play draw moves). The passage record's `Counter` says which.
 
 A counter's progression chance gains `CounterProgressBasisPoints` (200) plus `CounterProgressPerPostureBasisPoints`
-(350) a step, and its creation chance `CounterCreationBasisPoints` (150) plus `CounterCreationPerPostureBasisPoints`
-(300) a step, where the opponent's posture is its mentality (−2 defensive … +2 attacking) plus its defensive line (−1
-deep … +1 high). A side that plays on the counter loses `CounterAttackBuildUpCostBasisPoints` (120) of build-up and
-`CounterAttackShapeCostBasisPoints` (60) of defensive shape (§6.5).
+(1_150) a step, and its creation chance `CounterCreationBasisPoints` (150) plus `CounterCreationPerPostureBasisPoints`
+(1_050) a step, where the opponent's posture is its mentality (−2 defensive … +2 attacking) plus its defensive line
+(−1 deep … +1 high). The defenders' and midfielders' mean effective pace and acceleration against
+`CounterRecoveryReference` (11) then moves each by `CounterRecoveryProgressStepBasisPoints` (150) and
+`CounterRecoveryCreationStepBasisPoints` (120) per point, capped at 900 and 700: quick legs cut the counter down, slow
+ones are caught out. When a counter ends in a lost ball, the cautious side that wins it back (posture below the
+middle) is likelier to counter in its turn by `CounterBackfireStartBasisPoints` (2_000) a step, and its creation
+chance gains `CounterBackfireCreationBasisPoints` (1_500) a step. A side that plays on the counter loses
+`CounterAttackBuildUpCostBasisPoints` (120) of build-up and `CounterAttackShapeCostBasisPoints` (60) of defensive shape
+(§6.5). Measured over 3,000 matches the instruction is worth about +0.24 goals a match against an attacking side with
+a high line, nothing against a balanced one, and a goal difference of −0.165 against a defensive side with a deep line.
 
 ## 8. Output
 
@@ -928,9 +935,13 @@ stays on the pitch).
 | `ShotZoneCentralPercent` / `InsidePercent` / `WidePercent` | 40 / 20 / 10 | The open-play shot zones: one central, two inside, two wide. |
 | `ShotFocus…Percent` (eleven) | see §7.x | The shot zones of a side with a pass focus (`engine-v9`); each set sums to 100. |
 | `CounterStartBasisPoints` / `WithInstruction` | 2_000 / 5_000 | How often a regained ball becomes a counter-attack, without and with the instruction (`engine-v11`). |
-| `CounterProgressBasisPoints` / `PerPosture` | 200 / 350 | A counter's progression edge: the base, and a step per point of the opponent's posture. |
-| `CounterCreationBasisPoints` / `PerPosture` | 150 / 300 | A counter's creation edge, likewise. |
+| `CounterProgressBasisPoints` / `PerPosture` | 200 / 1_150 | A counter's progression edge: the base, and a step per point of the opponent's posture. |
+| `CounterCreationBasisPoints` / `PerPosture` | 150 / 1_050 | A counter's creation edge, likewise. |
 | `CounterAttackBuildUpCost` / `ShapeCostBasisPoints` | 120 / 60 | What playing on the counter costs in build-up and defensive shape. |
+| `CounterRecoveryReference` | 11 | The pace and acceleration, in attribute points, a back line and midfield are measured against. |
+| `CounterRecoveryProgress` / `CreationStepBasisPoints` | 150 / 120 | What each point above or below it moves a counter's progression and creation chance. |
+| `CounterRecoveryMaxProgress` / `MaxCreationBasisPoints` | 900 / 700 | The most it can move them. |
+| `CounterBackfireStartBasisPoints` / `CreationBasisPoints` | 2_000 / 1_500 | What a cautious side gains, a step, when it wins the ball back from a failed counter. |
 | `ChanceVolumeCentre` / `Pair` / `WingsBasisPoints` | 9_350 / 10_300 / 11_600 | How often a progressed possession becomes a shot, for a side with a pass focus (`engine-v9`). |
 | `MinPassageTouches` / `Max` | 3 / 8 | Touches a possession's passage is built from. |
 | `MinTouchAdvanceBasisPoints` / `Max` | 350 / 1_700 | How far one touch advances the ball. |
