@@ -222,17 +222,23 @@ internal enum FormationMode
     /// <summary>Attackers and defenders crowd the box.</summary>
     Corner = 2,
 
-    /// <summary>A wall and a line of attackers.</summary>
+    /// <summary>A free kick struck at goal: a wall sized by the distance, the keeper on the far side, a few attackers waiting for the rebound.</summary>
     FreeKickShot = 3,
 
-    /// <summary>Everyone waits outside the box.</summary>
+    /// <summary>Everyone waits outside the box and the arc.</summary>
     Penalty = 4,
 
     /// <summary>The scoring side celebrates.</summary>
     Celebration = 5,
 
-    /// <summary>The goalkeeper's side spreads out for a goal kick or a keeper's ball.</summary>
+    /// <summary>The goalkeeper's side spreads out for a goal kick or a keeper's ball, the other side steps up to the halfway line (`replay-v6`).</summary>
     GoalKick = 6,
+
+    /// <summary>A free kick delivered into the box (`replay-v6`): no wall, the defence in a line at the edge of the box with markers on the runners.</summary>
+    FreeKickCross = 7,
+
+    /// <summary>A free kick taken quickly, from open play, with the nearest defenders ten yards off (`replay-v6`). Only the shape uses it; a beat stays <see cref="Open"/>.</summary>
+    FreeKickQuick = 8,
 }
 
 /// <summary>Where the player who plays a beat comes from (`replay-v4`).</summary>

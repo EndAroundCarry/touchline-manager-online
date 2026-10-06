@@ -65,7 +65,9 @@ internal readonly record struct BoxSet(
 /// The shape starts from the tactics board: each slot's anchor is <see cref="TacticalFormationResolver.Orient"/>
 /// as the resolver gives it, moved by the side's real instructions — mentality, defensive line, width, and the
 /// press — through the same resolver the simulation uses, with the ball held at the centre so the ball's own pull
-/// can be applied here instead.
+/// can be applied here instead. A set piece is then arranged over the top of it: a corner and a free kick delivered into
+/// the box by role with runners and markers, a free kick struck at goal with a wall sized by the distance, a penalty
+/// with everybody out of the box and the arc, and a goal kick with one side spread and the other stepped up.
 /// </para>
 /// <para>
 /// A side then stands as three lines — defence, midfield, attack — each at the depth its anchors give, moved a
@@ -147,6 +149,50 @@ internal sealed class FilmShape
 
     /// <summary>How many defenders a side needs before it leaves one up the pitch as an outlet at a corner (`replay-v6`).</summary>
     private const int CornerOutletFrom = 5;
+
+    /// <summary>How far from the ball the defence stands at a free kick, in metres: a little over the 9.15 the rules ask for (`replay-v6`).</summary>
+    private const double FreeKickGap = 9.5;
+
+    /// <summary>How far apart the players of a wall stand, shoulder to shoulder, in metres (`replay-v6`).</summary>
+    private const double WallSpacing = 0.75;
+
+    /// <summary>How far outside the middle of the goal the wall's line, and the keeper's cover, reach towards a post, in metres (`replay-v6`).</summary>
+    private const double FreeKickPostReach = 1.8;
+
+    /// <summary>How far from the goal line the attackers wait for a rebound, in metres: the edge of the penalty area (`replay-v6`).</summary>
+    private const double FreeKickRebound = 20.5;
+
+    /// <summary>How deep the penalty area is, in metres.</summary>
+    private const double PenaltyBoxDepth = 16.5;
+
+    /// <summary>How far to each side of the middle of the goal the penalty area reaches, in metres.</summary>
+    private const double PenaltyBoxHalfWidth = 20.16;
+
+    /// <summary>How many players stand in one row at a penalty at the most (`replay-v6`).</summary>
+    private const int PenaltyRowSize = 9;
+
+    /// <summary>How far apart the players of a penalty's rows stand, along the row, in metres (`replay-v6`).</summary>
+    private const double PenaltySpacing = 4.0;
+
+    /// <summary>How far one row of a penalty is from the next, in metres (`replay-v6`).</summary>
+    private const double PenaltyRowGap = 3.0;
+
+    // A goal kick, as metres from the side's own goal line and metres either side of the middle of the pitch: the side taking
+    // it spreads out, its back line at the edge of its box; the side receiving it steps up to the halfway line (`replay-v6`).
+    private const double GoalKickBack = 18.0;
+    private const double GoalKickFront = 56.0;
+    private const double GoalKickBackHalfWidth = 26.0;
+    private const double GoalKickFrontHalfWidth = 18.0;
+    private const double StepUpBack = 47.5;
+    private const double StepUpFront = 64.0;
+    private const double StepUpBackHalfWidth = 20.0;
+    private const double StepUpFrontHalfWidth = 14.0;
+
+    // A free kick delivered into the box, as the corner's are: the places the runners run to, the line the rest of the
+    // defence makes at the edge of the box, and the one attacker who waits there for the second ball.
+    private static readonly (double Along, double Across)[] FreeKickRunners = [(11.0, -0.5), (7.5, -5.0), (8.5, 4.0), (14.0, 7.5), (14.5, -9.0), (10.0, 10.0)];
+    private static readonly (double Along, double Across)[] FreeKickLine = [(18.5, -10.5), (19.0, 0.5), (18.5, 10.5)];
+    private static readonly (double Along, double Across) FreeKickEdge = (22.0, 7.0);
 
     // The places a corner is set at, as metres from the goal line and metres across from the middle of the pitch, where
     // positive is towards the flag the corner is taken from. The runners are in order of who gets which: the best header
@@ -292,12 +338,28 @@ internal sealed class FilmShape
 
             case FormationMode.FreeKickShot:
                 FillOpen(roster, state.Side, state.Anchor, targets, separate: false);
-                ArrangeFreeKick(roster, state, targets);
+                ArrangeFreeKickShot(roster, state, targets);
+                break;
+
+            case FormationMode.FreeKickCross:
+                FillOpen(roster, state.Side, state.Anchor, targets, separate: false);
+                ArrangeFreeKickCross(roster, state, targets);
+                break;
+
+            case FormationMode.FreeKickQuick:
+                FillOpen(roster, state.Side, state.Anchor, targets);
+                PlaceTaker(roster, state, targets);
+                KeepOff(roster, MatchInputV1.OpponentOf(state.Side), state.Anchor, targets);
                 break;
 
             case FormationMode.Penalty:
                 FillOpen(roster, state.Side, FilmSpace.Centre, targets, separate: false);
                 ArrangePenalty(roster, state, targets);
+                break;
+
+            case FormationMode.GoalKick:
+                FillOpen(roster, state.Side, state.Anchor, targets, separate: false);
+                ArrangeGoalKick(roster, state, targets);
                 break;
 
             case FormationMode.Celebration:
@@ -783,55 +845,334 @@ internal sealed class FilmShape
         return entity;
     }
 
-    private void ArrangeFreeKick(FilmRoster roster, ShapeState state, Vec[] targets)
+    /// <summary>Gets how many defenders stand in the wall for a free kick struck from a distance from goal, in metres (`replay-v6`).</summary>
+    /// <param name="distance">How far the ball is from the middle of the goal.</param>
+    internal static int WallSize(double distance) => distance switch
     {
-        var defending = MatchInputV1.OpponentOf(state.Side);
-        var goal = FilmSpace.AttackedGoal(state.Side);
-        var toGoal = (goal - state.Anchor).Unit();
-        var across = new Vec(-toGoal.Y, toGoal.X);
+        < 20.0 => 5,
+        < 25.0 => 4,
+        < 30.0 => 3,
+        _ => 2,
+    };
 
-        // The wall: the four defenders nearest the ball stand ten yards from it, on the line to goal.
-        var ranked = Order(roster, defending, MatchPositionFamily.Defence)
-            .OrderBy(entity => targets[entity].DistanceTo(state.Anchor))
+    /// <summary>
+    /// Sets a free kick struck at goal (`replay-v6`): a wall of two to five by the distance, on the line to the near
+    /// post; the keeper covering the far side; three attackers at the edge of the box for the rebound, and the rest of
+    /// the attack held outside it.
+    /// </summary>
+    private void ArrangeFreeKickShot(FilmRoster roster, ShapeState state, Vec[] targets)
+    {
+        var attacking = state.Side;
+        var defending = MatchInputV1.OpponentOf(attacking);
+        var spot = state.Anchor;
+        var goal = FilmSpace.AttackedGoal(attacking);
+        var taker = PlaceTaker(roster, state, targets);
+
+        var offset = spot.Y - goal.Y;
+        var nearPost = Math.Abs(offset) < 1.0 ? 0.0 : Math.Sign(offset);
+        var toPost = (new Vec(goal.X, goal.Y + (nearPost * FreeKickPostReach)) - spot).Unit();
+        var across = new Vec(-toPost.Y, toPost.X);
+
+        var wall = Order(roster, defending, MatchPositionFamily.Defence)
+            .Where(entity => _context.Slots[entity].Family != MatchPositionFamily.Attack)
+            .OrderBy(entity => targets[entity].DistanceTo(spot))
+            .ThenBy(entity => entity)
+            .Take(WallSize(spot.DistanceTo(goal)))
+            .OrderBy(entity => (targets[entity].X * across.X) + (targets[entity].Y * across.Y))
             .ToArray();
 
-        var wall = Math.Min(4, ranked.Length);
+        // The rest of the defence stands where its own shape puts it, the wall's ten yards from the ball apart.
+        KeepOff(roster, defending, spot, targets);
 
-        for (var index = 0; index < wall; index++)
+        for (var index = 0; index < wall.Length; index++)
         {
-            var offset = (index - ((wall - 1) / 2.0)) * 0.9;
+            var step = (index - ((wall.Length - 1) / 2.0)) * WallSpacing;
 
-            targets[ranked[index]] = FilmSpace.Clamp(state.Anchor + (toGoal * 9.15) + (across * offset), LineMargin);
+            targets[wall[index]] = FilmSpace.Clamp(spot + (toPost * FreeKickGap) + (across * step), LineMargin);
         }
 
-        // Two attackers wait at the edge of the box for a rebound.
-        var waiting = Order(roster, state.Side, MatchPositionFamily.Attack);
+        var pool = Order(roster, attacking, MatchPositionFamily.Attack).Where(entity => entity != taker).ToList();
+        var waiting = Math.Min(pool.Count >= 8 ? 3 : 2, pool.Count);
 
-        for (var index = 0; index < waiting.Length && index < 3; index++)
+        for (var index = 0; index < pool.Count; index++)
         {
-            targets[waiting[index]] = Frame(state.Side, 19, (index - 1) * 8);
+            targets[pool[index]] = index < waiting
+                ? AwayFrom(Frame(attacking, FreeKickRebound, (index - ((waiting - 1) / 2.0)) * 8.0), spot, 2.5)
+                : OutsideBox(attacking, targets[pool[index]]);
         }
 
-        KeepKeeper(roster, defending, targets, 1.5);
+        // The keeper covers the side the wall does not.
+        KeepKeeper(roster, defending, targets, 1.0, -nearPost * FreeKickPostReach);
     }
 
+    /// <summary>
+    /// Sets a free kick delivered into the box (`replay-v6`): no wall. The runners are the best headers, waiting a few
+    /// metres short of their places until the ball is struck, each with a marker goal-side of him; the rest of the
+    /// defence is a line at the edge of the box with one player left up the pitch; one attacker is at the edge for
+    /// the second ball and a pair hold back against a break.
+    /// </summary>
+    private void ArrangeFreeKickCross(FilmRoster roster, ShapeState state, Vec[] targets)
+    {
+        var attacking = state.Side;
+        var defending = MatchInputV1.OpponentOf(attacking);
+        var spot = state.Anchor;
+        var flank = spot.Y >= FilmSpace.Width / 2 ? 1.0 : -1.0;
+        var run = state.Arrived ? 0.0 : CornerRunUp;
+
+        Vec At((double Along, double Across) place, double back = 0.0) => Frame(attacking, place.Along + back, place.Across * flank);
+
+        var taker = PlaceTaker(roster, state, targets);
+        var pool = Order(roster, attacking, MatchPositionFamily.Attack).Where(entity => entity != taker).ToList();
+        var guards = Math.Min(pool.Count >= 8 ? 2 : 1, pool.Count);
+        var guarding = ChooseGuards(pool, guards, attacking);
+
+        pool.RemoveAll(guarding.Contains);
+
+        for (var place = 0; place < guards; place++)
+        {
+            var point = At(CornerGuards[place]);
+
+            targets[TakeNearest(guarding, point, targets)] = point;
+        }
+
+        var edge = pool.Count > 4 ? 1 : 0;
+
+        var runners = pool
+            .OrderByDescending(entity => _context.AttributeOf(roster.Occupants[entity], MatchAttributeName.Heading)
+                + (CornerForwardWeight * FilmSpace.Attacking(_anchors[entity, 1], attacking)))
+            .ThenBy(entity => entity)
+            .Take(Math.Min(FreeKickRunners.Length, pool.Count - edge))
+            .ToList();
+
+        pool.RemoveAll(runners.Contains);
+
+        for (var index = 0; index < runners.Count; index++)
+        {
+            targets[runners[index]] = At(FreeKickRunners[index], run);
+        }
+
+        foreach (var entity in pool)
+        {
+            targets[entity] = edge > 0 ? At(FreeKickEdge) : OutsideBox(attacking, targets[entity]);
+            edge = 0;
+        }
+
+        // Each runner is picked up goal-side of where he runs to, so that who marks whom does not change as they run in;
+        // the others make the line at the edge of the box.
+        var defenders = Order(roster, defending, MatchPositionFamily.Defence).ToList();
+
+        if (defenders.Count >= CornerOutletFrom)
+        {
+            var outlet = defenders
+                .OrderByDescending(entity => FilmSpace.Attacking(_anchors[entity, 0], defending))
+                .ThenBy(entity => entity)
+                .First();
+
+            defenders.Remove(outlet);
+            targets[outlet] = At(CornerOutlet);
+        }
+
+        var jobs = new List<(Vec Place, Vec Stands)>(FreeKickRunners.Length + FreeKickLine.Length);
+
+        for (var runner = 0; runner < runners.Count; runner++)
+        {
+            var place = FreeKickRunners[runner];
+
+            jobs.Add((At((place.Along - CornerMarkGap, place.Across)), At((place.Along - CornerMarkGap, place.Across), run)));
+        }
+
+        foreach (var place in FreeKickLine)
+        {
+            jobs.Add((At(place), At(place)));
+        }
+
+        foreach (var (place, stands) in jobs)
+        {
+            if (defenders.Count == 0)
+            {
+                break;
+            }
+
+            targets[TakeNearest(defenders, place, targets)] = stands;
+        }
+
+        KeepKeeper(roster, defending, targets, 1.2);
+        KeepOff(roster, defending, spot, targets);
+    }
+
+    /// <summary>
+    /// Sets a penalty (`replay-v6`): everybody but the taker and the keeper stands outside the box and the arc, in rows
+    /// of seven at the most, the two sides alternating along each row so that neither is stacked behind the other.
+    /// </summary>
     private void ArrangePenalty(FilmRoster roster, ShapeState state, Vec[] targets)
     {
-        var defending = MatchInputV1.OpponentOf(state.Side);
-        var players = Order(roster, state.Side, MatchPositionFamily.Attack)
-            .Concat(Order(roster, defending, MatchPositionFamily.Defence))
-            .ToArray();
+        var attacking = state.Side;
+        var defending = MatchInputV1.OpponentOf(attacking);
+        var taker = PlaceTaker(roster, state, targets);
+        var spotAlong = attacking == MatchSide.Home ? FilmSpace.Length - state.Anchor.X : state.Anchor.X;
+        var first = Math.Max(spotAlong + FreeKickGap + 0.5, PenaltyBoxDepth + 1.5);
 
-        // Everyone but the taker and the keeper waits outside the box and the arc, spread along it.
-        for (var index = 0; index < players.Length; index++)
+        var shooters = Order(roster, attacking, MatchPositionFamily.Attack).Where(entity => entity != taker).ToArray();
+        var markers = Order(roster, defending, MatchPositionFamily.Defence);
+        var queue = new List<int>(shooters.Length + markers.Length);
+
+        // The side with more players leads, so that the two alternate to the very end instead of one ending in a pair.
+        var (lead, follow) = markers.Length > shooters.Length ? (markers, shooters) : (shooters, markers);
+
+        for (var index = 0; index < lead.Length; index++)
         {
-            var across = ((index % 9) - 4) * 3.2;
-            var along = 19.5 + (index >= 9 ? 2.0 : 0.0);
+            queue.Add(lead[index]);
 
-            targets[players[index]] = Frame(state.Side, along, across);
+            if (index < follow.Length)
+            {
+                queue.Add(follow[index]);
+            }
+        }
+
+        var rows = Math.Max(1, (int)Math.Ceiling(queue.Count / (double)PenaltyRowSize));
+        var perRow = (int)Math.Ceiling(queue.Count / (double)rows);
+
+        for (var index = 0; index < queue.Count; index++)
+        {
+            var row = index / perRow;
+            var inRow = Math.Min(perRow, queue.Count - (row * perRow));
+            var across = (((index % perRow) - ((inRow - 1) / 2.0)) * PenaltySpacing) + (row % 2 == 1 ? PenaltySpacing / 2 : 0.0);
+
+            targets[queue[index]] = FilmSpace.Clamp(Frame(attacking, first + (row * PenaltyRowGap), across), LineMargin);
         }
 
         KeepKeeper(roster, defending, targets, 0.5);
+    }
+
+    /// <summary>
+    /// Sets a goal kick or a keeper's ball (`replay-v6`): the side with the ball spreads out, its back line at the edge
+    /// of its box and wide, and the other side steps up to the halfway line in three compact lines.
+    /// </summary>
+    private void ArrangeGoalKick(FilmRoster roster, ShapeState state, Vec[] targets)
+    {
+        PlaceTaker(roster, state, targets);
+
+        StandInLines(roster, state.Side, 1, GoalKickBack, GoalKickFront, GoalKickBackHalfWidth, GoalKickFrontHalfWidth, targets);
+        StandInLines(roster, MatchInputV1.OpponentOf(state.Side), 0, StepUpBack, StepUpFront, StepUpBackHalfWidth, StepUpFrontHalfWidth, targets);
+    }
+
+    /// <summary>
+    /// Stands a side's outfield players in their lines, the back line at one depth from their own goal and the front line
+    /// at another, each line spread across the pitch in the order its anchors give.
+    /// </summary>
+    private void StandInLines(FilmRoster roster, MatchSide side, int phaseIndex, double backDepth, double frontDepth, double backHalfWidth, double frontHalfWidth, Vec[] targets)
+    {
+        var count = _lineCount[(int)side, phaseIndex];
+        var lines = new List<int>[count];
+
+        for (var slot = 1; slot <= 11; slot++)
+        {
+            var entity = FilmRoster.Index(side, slot);
+
+            if (!roster.IsOccupied(entity) || _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            (lines[_lineOf[entity, phaseIndex]] ??= []).Add(entity);
+        }
+
+        for (var line = 0; line < count; line++)
+        {
+            if (lines[line] is not { Count: > 0 } members)
+            {
+                continue;
+            }
+
+            var t = count <= 1 ? 0.0 : line / (count - 1.0);
+            var depth = backDepth + ((frontDepth - backDepth) * t);
+            var half = backHalfWidth + ((frontHalfWidth - backHalfWidth) * t);
+
+            // A pair of centre-backs stand close together; a back four reach the full width.
+            var span = half * Math.Min(1.0, (members.Count - 1) / 3.0);
+            var ordered = members.OrderBy(entity => _anchors[entity, phaseIndex].Y).ThenBy(entity => entity).ToArray();
+
+            for (var index = 0; index < ordered.Length; index++)
+            {
+                var across = ordered.Length == 1 ? 0.0 : -span + (2.0 * span * index / (ordered.Length - 1));
+
+                // Depth is from the side's own goal, so it is the frame of the side attacking the other way.
+                targets[ordered[index]] = FilmSpace.Clamp(Frame(MatchInputV1.OpponentOf(side), depth, across), LineMargin);
+            }
+        }
+    }
+
+    /// <summary>Puts the player taking a set piece on the ball, and gets who he is, or -1.</summary>
+    private static int PlaceTaker(FilmRoster roster, ShapeState state, Vec[] targets)
+    {
+        if (state.Taker < 0 || !roster.IsOccupied(state.Taker) || FilmRoster.SideOf(state.Taker) != state.Side)
+        {
+            return -1;
+        }
+
+        targets[state.Taker] = state.Anchor;
+
+        return state.Taker;
+    }
+
+    /// <summary>Moves any outfield player of a side who is within ten yards of the ball out to it, as the rules ask of a free kick.</summary>
+    private void KeepOff(FilmRoster roster, MatchSide side, Vec spot, Vec[] targets)
+    {
+        for (var slot = 1; slot <= 11; slot++)
+        {
+            var entity = FilmRoster.Index(side, slot);
+
+            if (!roster.IsOccupied(entity) || _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var between = targets[entity] - spot;
+
+            if (between.Length >= FreeKickGap - 0.1)
+            {
+                continue;
+            }
+
+            var away = between.Length < 1e-6 ? (FilmSpace.OwnGoal(side) - spot).Unit() : between.Unit();
+            var moved = FilmSpace.Clamp(spot + (away * FreeKickGap), LineMargin);
+
+            // Against a touchline there is no room that way: go the other, in towards the pitch.
+            if (moved.DistanceTo(spot) < FreeKickGap - 0.1)
+            {
+                moved = FilmSpace.Clamp(spot + ((FilmSpace.Centre - spot).Unit() * FreeKickGap), LineMargin);
+            }
+
+            targets[entity] = moved;
+        }
+    }
+
+    /// <summary>Moves a point a little away from the ball if it is closer to it than a given distance.</summary>
+    private static Vec AwayFrom(Vec point, Vec spot, double distance)
+    {
+        var between = point - spot;
+
+        if (between.Length >= distance)
+        {
+            return point;
+        }
+
+        var away = between.Length < 1e-6 ? new Vec(0, 1) : between.Unit();
+
+        return FilmSpace.Clamp(spot + (away * distance), LineMargin);
+    }
+
+    /// <summary>Moves a point that is in the penalty area out to just beyond its edge.</summary>
+    private static Vec OutsideBox(MatchSide attacking, Vec point)
+    {
+        var along = attacking == MatchSide.Home ? FilmSpace.Length - point.X : point.X;
+
+        if (along >= PenaltyBoxDepth + 1.0 || Math.Abs(point.Y - (FilmSpace.Width / 2)) > PenaltyBoxHalfWidth + 1.0)
+        {
+            return point;
+        }
+
+        return Frame(attacking, PenaltyBoxDepth + 5.0, point.Y - (FilmSpace.Width / 2));
     }
 
     private void ArrangeCelebration(FilmRoster roster, ShapeState state, Vec[] targets)
@@ -875,7 +1216,7 @@ internal sealed class FilmShape
         }
     }
 
-    private void KeepKeeper(FilmRoster roster, MatchSide side, Vec[] targets, double offLine)
+    private void KeepKeeper(FilmRoster roster, MatchSide side, Vec[] targets, double offLine, double acrossShift = 0.0)
     {
         for (var slot = 1; slot <= 11; slot++)
         {
@@ -885,7 +1226,7 @@ internal sealed class FilmShape
             {
                 var goal = FilmSpace.OwnGoal(side);
 
-                targets[entity] = new Vec(goal.X + (FilmSpace.Direction(side) * offLine), goal.Y);
+                targets[entity] = new Vec(goal.X + (FilmSpace.Direction(side) * offLine), goal.Y + acrossShift);
             }
         }
     }

@@ -313,7 +313,7 @@ internal static class FilmScript
                         AddRestart(
                             state,
                             source.Restart == PassageRestartKind.GoalKick ? HoldKind.GoalKick : HoldKind.KeeperBall,
-                            FormationMode.Open,
+                            FormationMode.GoalKick,
                             ball,
                             start,
                             keeper);
@@ -334,7 +334,15 @@ internal static class FilmScript
             // A kick-off is reached by a cut, or is where the film began; everything else is put back.
             if (kind != HoldKind.KickOff && from.DistanceTo(spot) > MinMove && state.Index > 0)
             {
-                state.Add(Move(state, BeatKind.Placement, from, spot, taker, ActorSource.Named, taker, false, side));
+                var placement = Move(state, BeatKind.Placement, from, spot, taker, ActorSource.Named, taker, false, side);
+
+                // The sides begin to take up a goal kick as the ball is put down, not when it is set.
+                if (formation == FormationMode.GoalKick)
+                {
+                    placement.Formation = formation;
+                }
+
+                state.Add(placement);
             }
 
             state.Add(Hold(kind, side, spot, state.Index, state.Source.Period, taker, formation));
@@ -627,11 +635,12 @@ internal static class FilmScript
                 _ => HoldKind.FreeKick,
             };
 
+            // A free kick is set for what it turns out to be: struck at goal, or delivered into the box.
             var formation = kind switch
             {
                 HoldKind.Penalty => FormationMode.Penalty,
                 HoldKind.Corner => FormationMode.Corner,
-                _ => FormationMode.FreeKickShot,
+                _ => source.Outcome == PassageOutcome.FreeKickCrossed ? FormationMode.FreeKickCross : FormationMode.FreeKickShot,
             };
 
             state.SetPiece = formation;

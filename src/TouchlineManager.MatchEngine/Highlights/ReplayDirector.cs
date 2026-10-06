@@ -707,4 +707,19 @@ public sealed record ShapeMetrics
 
     /// <summary>Gets, as a corner is delivered, the median number of the taking side's outfield players held back beyond forty metres from the goal line.</summary>
     public required double CornerGuardsP50 { get; init; }
+
+    /// <summary>Gets how many free kicks, struck or delivered, were measured as they were about to be taken.</summary>
+    public required int FreeKicks { get; init; }
+
+    /// <summary>Gets, as a free kick is about to be taken, the ninety-fifth percentile of the number of defenders inside the ten yards the rules keep clear.</summary>
+    public required double FreeKickIntrudersP95 { get; init; }
+
+    /// <summary>Gets, as a free kick struck at goal is about to be taken, the median number of defenders within eleven metres of the ball: the wall.</summary>
+    public required double FreeKickWallP50 { get; init; }
+
+    /// <summary>Gets how many penalties were measured as they were about to be taken.</summary>
+    public required int Penalties { get; init; }
+
+    /// <summary>Gets, as a penalty is about to be taken, the ninety-fifth percentile of the number of players other than the taker and the keepers inside the arc or the box.</summary>
+    public required double PenaltyIntrudersP95 { get; init; }
 }

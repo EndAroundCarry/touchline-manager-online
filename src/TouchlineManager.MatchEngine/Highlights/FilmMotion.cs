@@ -159,7 +159,7 @@ internal sealed class FilmMotion
     /// <summary>How near his place in the shape a player has to get before he stops, in metres.</summary>
     private const double SettleDistance = 1.0;
 
-    /// <summary>How far from his place at a corner a player has to be before he sets off for it, in metres (`replay-v6`).</summary>
+    /// <summary>How far from his place at a set piece a player has to be before he sets off for it, in metres (`replay-v6`).</summary>
     private const double CornerSetOff = 1.5;
 
     /// <summary>How long before a corner is taken its runners set off for the places they run to, in seconds of real time (`replay-v6`).</summary>
@@ -315,7 +315,7 @@ internal sealed class FilmMotion
             ResolveChoices(beats, index);
 
             // A set piece is arranged from the moment it is known to be coming: where it is taken, and by whom.
-            if (beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.Penalty
+            if (beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty or FormationMode.GoalKick
                 && SetPieceHold(beats, index) is { } hold)
             {
                 _setPieceAnchor = hold.To;
@@ -1261,7 +1261,7 @@ internal sealed class FilmMotion
             var tau = step * dt;
 
             // A corner's runners set off for the box as the hold nears its end, so that they arrive as the ball is struck.
-            var current = state.Mode == FormationMode.Corner && !state.Arrived && beat.IsHold && tau >= duration - RunInSeconds
+            var current = state.Mode is FormationMode.Corner or FormationMode.FreeKickCross && !state.Arrived && beat.IsHold && tau >= duration - RunInSeconds
                 ? state with { Arrived = true }
                 : state;
 
@@ -1336,17 +1336,38 @@ internal sealed class FilmMotion
                     Taker: _setPieceTaker,
                     Arrived: beat.Kind is BeatKind.Cross or BeatKind.Header);
 
+            case FormationMode.FreeKickCross:
+                // Like a corner: the runners wait for the hold, and are in the box for the delivery.
+                return new ShapeState(
+                    FormationMode.FreeKickCross,
+                    _setPieceSide,
+                    _setPieceAnchor,
+                    Taker: _setPieceTaker,
+                    Arrived: beat.Kind is BeatKind.Cross or BeatKind.Header);
+
             case FormationMode.FreeKickShot:
             case FormationMode.Penalty:
-                return new ShapeState(beat.Formation, _setPieceSide, _setPieceAnchor);
+            case FormationMode.GoalKick:
+                return new ShapeState(beat.Formation, _setPieceSide, _setPieceAnchor, Taker: _setPieceTaker);
 
             case FormationMode.KickOff:
                 return new ShapeState(FormationMode.KickOff, beat.Side, beat.To);
 
             default:
-                return new ShapeState(FormationMode.Open, beat.Side, beat.To);
+                // A free kick taken quickly leaves the shape as it is, with the nearest defenders stepping off the ball.
+                return IsQuickFreeKick(beat)
+                    ? new ShapeState(FormationMode.FreeKickQuick, beat.Side, beat.To, Taker: beat.Actor is Guid quick ? _roster.EntityOf(quick) : -1)
+                    : new ShapeState(FormationMode.Open, beat.Side, beat.To);
         }
     }
+
+    private static bool IsQuickFreeKick(FilmBeat beat) =>
+        beat.IsHold && beat.Hold == HoldKind.FreeKick && beat.Formation == FormationMode.Open;
+
+    /// <summary>Whether a beat is played with the players taking up a set piece: they have a place to be, and run to it.</summary>
+    private static bool IsSetPiece(FilmBeat beat) =>
+        beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty or FormationMode.GoalKick
+        || IsQuickFreeKick(beat);
 
     /// <summary>Gets where the scorer runs to: a few metres off the goal line, towards the nearer touchline.</summary>
     private static Vec CelebrationSpot(FilmBeat beat)
@@ -1419,12 +1440,12 @@ internal sealed class FilmMotion
                     var wanted = ClearOfRoles(entity, _targets[entity]);
                     var here = new Vec(_px[entity], _py[entity]);
 
-                    // At a corner everybody has a place to be, and goes to it; the runners run.
-                    var corner = beat.Formation == FormationMode.Corner;
-                    var setOff = corner ? CornerSetOff : SetOffDistance;
-                    var relatch = corner ? CornerSetOff : RelatchDistance;
+                    // At a set piece everybody has a place to be, and goes to it; the runners run.
+                    var setPiece = IsSetPiece(beat);
+                    var setOff = setPiece ? CornerSetOff : SetOffDistance;
+                    var relatch = setPiece ? CornerSetOff : RelatchDistance;
 
-                    if (corner)
+                    if (setPiece)
                     {
                         // The hold is short, and the players may have a long way to go.
                         cap = _options.SprintMetresPerSecond;

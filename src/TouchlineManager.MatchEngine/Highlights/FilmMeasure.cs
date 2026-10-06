@@ -36,6 +36,12 @@ internal static class FilmMeasure
     /// <summary>How far from the goal line a taking side's player is to count as held back against a break at a corner, in metres (`replay-v6`).</summary>
     private const double GuardFrom = 40.0;
 
+    /// <summary>How far from the ball the rules keep the defence at a free kick, and everybody at a penalty, in metres (`replay-v6`).</summary>
+    private const double FreeKickClear = 9.15;
+
+    /// <summary>How far from the ball a defender is to count as part of the wall, in metres (`replay-v6`).</summary>
+    private const double FreeKickWallReach = 11.0;
+
     /// <summary>Half the width of the six-yard box, in metres.</summary>
     private const double SixYardHalfWidth = 9.16;
 
@@ -210,6 +216,9 @@ internal static class FilmMeasure
         var cornerDefenders = new Histogram(1.0, FilmRoster.Size + 1);
         var cornerSix = new Histogram(1.0, FilmRoster.Size + 1);
         var cornerGuards = new Histogram(1.0, FilmRoster.Size + 1);
+        var freeKickIntruders = new Histogram(1.0, FilmRoster.Size + 1);
+        var freeKickWall = new Histogram(1.0, FilmRoster.Size + 1);
+        var penaltyIntruders = new Histogram(1.0, FilmRoster.Size + 1);
         var depthWith = new Average();
         var widthWith = new Average();
         var depthWithout = new Average();
@@ -241,6 +250,19 @@ internal static class FilmMeasure
                     cornerDefenders,
                     cornerSix,
                     cornerGuards);
+            }
+
+            if (beat.IsHold && beat.Possession >= 0 && beat.Formation is FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty)
+            {
+                MeasureDeadBall(
+                    context,
+                    rosters[beat.Possession],
+                    motion,
+                    motion.Spans[index].LastRecord,
+                    beat,
+                    freeKickIntruders,
+                    freeKickWall,
+                    penaltyIntruders);
             }
 
             if (beat.IsHold || beat.Formation != FormationMode.Open || beat.Possession < 0)
@@ -421,6 +443,11 @@ internal static class FilmMeasure
             CornerDefendersP50 = cornerDefenders.Percentile(0.5),
             CornerSixYardP95 = cornerSix.Percentile(0.95),
             CornerGuardsP50 = cornerGuards.Percentile(0.5),
+            FreeKicks = freeKickIntruders.Total,
+            FreeKickIntrudersP95 = freeKickIntruders.Percentile(0.95),
+            FreeKickWallP50 = freeKickWall.Percentile(0.5),
+            Penalties = penaltyIntruders.Total,
+            PenaltyIntrudersP95 = penaltyIntruders.Percentile(0.95),
         };
     }
 
@@ -457,6 +484,65 @@ internal static class FilmMeasure
         }
 
         guards.Add(held);
+    }
+
+    /// <summary>
+    /// Counts who is where as a free kick or a penalty is about to be taken (`replay-v6`): for a free kick how many
+    /// defenders are inside the ten yards the rules keep clear, and for one struck at goal how many make up the wall;
+    /// for a penalty how many players other than the taker and the keepers are inside the arc or the box.
+    /// </summary>
+    private static void MeasureDeadBall(
+        FilmContext context,
+        FilmRoster roster,
+        FilmMotionResult motion,
+        int record,
+        FilmBeat hold,
+        Histogram freeKickIntruders,
+        Histogram freeKickWall,
+        Histogram penaltyIntruders)
+    {
+        var attacking = hold.Side;
+        var goal = FilmSpace.AttackedGoal(attacking);
+        var spot = hold.To;
+        var taker = hold.Actor is Guid actor ? roster.EntityOf(actor) : -1;
+        int inside = 0, wall = 0;
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!roster.IsOccupied(entity) || entity == taker || context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
+            var distance = point.DistanceTo(spot);
+
+            if (hold.Formation == FormationMode.Penalty)
+            {
+                var inBox = Math.Abs(point.X - goal.X) <= BoxDepth && Math.Abs(point.Y - goal.Y) <= BoxHalfWidth;
+
+                inside += distance < FreeKickClear || inBox ? 1 : 0;
+            }
+            else if (FilmRoster.SideOf(entity) != attacking)
+            {
+                inside += distance < FreeKickClear ? 1 : 0;
+                wall += distance < FreeKickWallReach ? 1 : 0;
+            }
+        }
+
+        if (hold.Formation == FormationMode.Penalty)
+        {
+            penaltyIntruders.Add(inside);
+        }
+        else
+        {
+            freeKickIntruders.Add(inside);
+
+            if (hold.Formation == FormationMode.FreeKickShot)
+            {
+                freeKickWall.Add(wall);
+            }
+        }
     }
 
     /// <summary>
