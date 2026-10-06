@@ -40,12 +40,14 @@ internal static class PossessionSimulator
     /// <param name="Restart">The restart the possession began with.</param>
     /// <param name="Plan">The possession's planned geometry.</param>
     /// <param name="Derived">The possession's geometry stream.</param>
+    /// <param name="Counter">Whether the possession is a counter-attack on a ball regained from play (`engine-v11`).</param>
     private sealed record Possession(
         MatchSide Side,
         MatchSide Defending,
         PassageRestartKind Restart,
         PlannedPassage Plan,
-        Pcg32 Derived);
+        Pcg32 Derived,
+        bool Counter);
 
     /// <summary>The contested loose ball that opens some possessions, and who contested it (`engine-v5`).</summary>
     /// <param name="Lost">Whether the side in possession lost it.</param>
@@ -135,14 +137,21 @@ internal static class PossessionSimulator
         var derived = PassagePlanner.CreateStream(state);
         var plan = PassagePlanner.Plan(state, possessionSide, derived, restart);
 
+        // A ball won back from play may become a counter-attack. The roll is drawn from a stream of its own, so it can
+        // never move a play draw: what it changes is the thresholds of the possession it starts (`engine-v11`).
+        var counter = restart is null
+            && state.LastPossessionSide == MatchInputV1.OpponentOf(possessionSide)
+            && RollCounter(state, attacker);
+
         var possession = new Possession(
             possessionSide,
             MatchInputV1.OpponentOf(possessionSide),
             restart?.Kind ?? PassageRestartKind.None,
             plan,
-            derived);
+            derived,
+            counter);
 
-        state.BeginPassage(possessionSide, startSeconds, possession.Restart);
+        state.BeginPassage(possessionSide, startSeconds, possession.Restart, counter);
 
         // The defending side's foul comes first: a foul ends the passage of play before it develops, which is
         // what makes it the defending side's event rather than a consequence of the attack. It is only rolled
@@ -356,13 +365,17 @@ internal static class PossessionSimulator
 
         var control = Probability.Differential(attacker.Ratings.BuildUp, defender.Ratings.DefensivePressure);
 
+        // A counter-attack finds the opponent out of shape or well placed, by how it has set up (`engine-v11`).
+        var (counterProgress, counterCreation) = CounterEdge(state, possession);
+
         var progressChance = Probability.Band(
             rules.BaseProgressBasisPoints
                 + Probability.Swing(
                     control,
                     rules.ProgressControlSwingBasisPoints,
                     rules.RatingDifferentialReference)
-                + (quality?.ProgressNudge(rules) ?? 0),
+                + (quality?.ProgressNudge(rules) ?? 0)
+                + counterProgress,
             rules.MinProgressBasisPoints,
             rules.MaxProgressBasisPoints);
 
@@ -428,6 +441,7 @@ internal static class PossessionSimulator
         var creationChance = Probability.Band(
             rules.BaseCreationBasisPoints
                 + duel.CreationBonus
+                + counterCreation
                 + Probability.Swing(
                     creation,
                     rules.CreationSwingBasisPoints,
@@ -472,6 +486,54 @@ internal static class PossessionSimulator
         state.Passing.CreatedShot();
         ChanceSimulator.ResolveOpenPlay(state, side, plan.Zone, plan.ShotPoint, PassagePlanner.StrikeFrom(plan, plan.ShotPoint, rules));
         Finish(state, PassageOutcome.OpenPlayShot);
+    }
+
+    /// <summary>The stride that separates the counter-attack streams from the geometry streams.</summary>
+    private const ulong CounterStreamStride = 1_000_033UL;
+
+    /// <summary>Rolls whether a ball regained from play becomes a counter-attack, on a stream that moves no play draw (`engine-v11`).</summary>
+    private static bool RollCounter(MatchState state, SideRuntime attacker)
+    {
+        var rules = state.Rules;
+
+        var chance = attacker.Instructions.CounterAttack
+            ? rules.CounterStartWithInstructionBasisPoints
+            : rules.CounterStartBasisPoints;
+
+        var stream = new Pcg32(unchecked((state.Input.Seed * CounterStreamStride) + (ulong)state.PossessionOrdinal));
+
+        return stream.RollBasisPoints(chance);
+    }
+
+    /// <summary>
+    /// Gets how a counter-attack's chance of progressing and of creating moves, in basis points: up against an
+    /// opponent that has committed forward and down against one that sits deep (`engine-v11`).
+    /// </summary>
+    /// <remarks>
+    /// The opponent's posture is its mentality and its defensive line, each a step either side of the middle; the
+    /// edge is the rules' base plus a step per point of posture. A deep side is well placed to cut a long ball out, so
+    /// against it the counter is worth less than an ordinary attack and the instruction backfires a little.
+    /// </remarks>
+    private static (int Progress, int Creation) CounterEdge(MatchState state, Possession possession)
+    {
+        if (!possession.Counter)
+        {
+            return (0, 0);
+        }
+
+        return CounterEdge(state.Rules, state.SideOf(possession.Defending).Instructions);
+    }
+
+    /// <summary>Gets what a counter-attack gains or loses against an opponent set up as given (`engine-v11`).</summary>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="opponent">The instructions of the side being countered.</param>
+    internal static (int Progress, int Creation) CounterEdge(EngineRulesV2 rules, MatchInstructionsV1 opponent)
+    {
+        var posture = ((int)opponent.Mentality - (int)MatchMentality.Balanced) + ((int)opponent.DefensiveLine - (int)MatchDefensiveLine.Normal);
+
+        return (
+            rules.CounterProgressBasisPoints + (posture * rules.CounterProgressPerPostureBasisPoints),
+            rules.CounterCreationBasisPoints + (posture * rules.CounterCreationPerPostureBasisPoints));
     }
 
     /// <summary>Plays the ball into the final third: to the receiver the holder chose, or carried there when he chose nobody.</summary>

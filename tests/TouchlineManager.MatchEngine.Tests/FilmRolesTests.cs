@@ -5,12 +5,12 @@ using TouchlineManager.MatchEngine.Model;
 namespace TouchlineManager.MatchEngine.Tests;
 
 /// <summary>
-/// Who goes to the ball and where the others stand around it (`replay-v6`): the move that is a break or a long ball,
+/// Who goes to the ball and where the others stand around it (`replay-v6`): the counter-attack the engine plays,
 /// and what the roles leave of the player on the ball's space.
 /// </summary>
 public sealed class FilmRolesTests
 {
-    private static FilmBeat Beat(BeatKind kind, int possession, MatchSide side, Vec from, Vec to, HoldKind hold = HoldKind.None) =>
+    private static FilmBeat Beat(BeatKind kind, int possession, MatchSide side, Vec from, Vec to, HoldKind hold = HoldKind.None, bool counter = false) =>
         new()
         {
             Kind = kind,
@@ -20,93 +20,66 @@ public sealed class FilmRolesTests
             Side = side,
             From = from,
             To = to,
+            Counter = counter,
         };
 
     [Fact]
-    public void A_long_pass_forward_is_a_transition()
-    {
-        FilmBeat[] beats = [Beat(BeatKind.LoftedPass, 0, MatchSide.Home, new Vec(30, 34), new Vec(72, 20))];
-
-        FilmMotion.IsTransition(beats, 0).Should().BeTrue();
-    }
-
-    [Fact]
-    public void A_short_pass_is_not()
-    {
-        FilmBeat[] beats = [Beat(BeatKind.Pass, 0, MatchSide.Home, new Vec(30, 34), new Vec(42, 30))];
-
-        FilmMotion.IsTransition(beats, 0).Should().BeFalse();
-    }
-
-    [Fact]
-    public void A_long_pass_backwards_or_across_is_not()
+    public void The_first_moves_of_a_counter_the_engine_played_are_a_transition()
     {
         FilmBeat[] beats =
         [
-            Beat(BeatKind.Pass, 0, MatchSide.Home, new Vec(60, 5), new Vec(60, 55)),
-            Beat(BeatKind.LoftedPass, 0, MatchSide.Home, new Vec(70, 34), new Vec(30, 34)),
+            Beat(BeatKind.Pass, 1, MatchSide.Home, new Vec(35, 34), new Vec(45, 30), counter: true),
+            Beat(BeatKind.Carry, 1, MatchSide.Home, new Vec(45, 30), new Vec(66, 30), counter: true),
         ];
 
-        FilmMotion.IsTransition(beats, 0).Should().BeFalse("fifty metres across the pitch is a switch of play, not a ball in behind");
-        FilmMotion.IsTransition(beats, 1).Should().BeFalse();
+        FilmMotion.IsTransition(beats, 0, CounterTuning.Base).Should().BeTrue();
+        FilmMotion.IsTransition(beats, 1, CounterTuning.Base).Should().BeTrue();
     }
 
     [Fact]
-    public void A_move_that_covers_the_pitch_after_a_turnover_is_a_transition()
+    public void The_same_moves_in_a_possession_that_was_not_a_counter_are_not()
     {
         FilmBeat[] beats =
         [
-            Beat(BeatKind.Pass, 0, MatchSide.Away, new Vec(60, 30), new Vec(35, 34)),
             Beat(BeatKind.Pass, 1, MatchSide.Home, new Vec(35, 34), new Vec(45, 30)),
             Beat(BeatKind.Carry, 1, MatchSide.Home, new Vec(45, 30), new Vec(66, 30)),
         ];
 
-        FilmMotion.IsTransition(beats, 1).Should().BeFalse("the break has not gone anywhere yet");
-        FilmMotion.IsTransition(beats, 2).Should().BeTrue();
+        FilmMotion.IsTransition(beats, 1, CounterTuning.On).Should().BeFalse("only the possessions the engine played as counters are drawn as one");
     }
 
     [Fact]
-    public void The_same_move_with_the_ball_kept_is_not()
+    public void A_counter_that_has_reached_the_box_or_gone_on_too_long_has_settled()
     {
-        FilmBeat[] beats =
-        [
-            Beat(BeatKind.Pass, 0, MatchSide.Home, new Vec(20, 30), new Vec(35, 34)),
-            Beat(BeatKind.Pass, 1, MatchSide.Home, new Vec(35, 34), new Vec(45, 30)),
-            Beat(BeatKind.Carry, 1, MatchSide.Home, new Vec(45, 30), new Vec(66, 30)),
-        ];
-
-        FilmMotion.IsTransition(beats, 2).Should().BeFalse("the side had the ball already: it is build-up, not a break");
-    }
-
-    [Theory]
-    [InlineData(2)] // HoldKind.GoalKick
-    [InlineData(5)] // HoldKind.Corner
-    [InlineData(4)] // HoldKind.FreeKick
-    [InlineData(1)] // HoldKind.KickOff
-    public void A_restart_is_not_a_break(int restart)
-    {
-        FilmBeat[] beats =
-        [
-            Beat(BeatKind.Pass, 0, MatchSide.Away, new Vec(60, 30), new Vec(35, 34)),
-            Beat(BeatKind.Hold, 1, MatchSide.Home, new Vec(35, 34), new Vec(35, 34), (HoldKind)restart),
-            Beat(BeatKind.Pass, 1, MatchSide.Home, new Vec(35, 34), new Vec(45, 30)),
-            Beat(BeatKind.Carry, 1, MatchSide.Home, new Vec(45, 30), new Vec(66, 30)),
-        ];
-
-        FilmMotion.IsTransition(beats, 3).Should().BeFalse();
-    }
-
-    [Fact]
-    public void A_move_that_has_taken_too_long_is_not_a_break()
-    {
-        var beats = new List<FilmBeat> { Beat(BeatKind.Pass, 0, MatchSide.Away, new Vec(60, 30), new Vec(35, 34)) };
+        var beats = new List<FilmBeat>();
 
         for (var step = 0; step < 8; step++)
         {
-            beats.Add(Beat(BeatKind.Pass, 1, MatchSide.Home, new Vec(35 + (step * 3.5), 34), new Vec(38.5 + (step * 3.5), 34)));
+            beats.Add(Beat(BeatKind.Pass, 1, MatchSide.Home, new Vec(35 + (step * 3.5), 34), new Vec(38.5 + (step * 3.5), 34), counter: true));
         }
 
-        FilmMotion.IsTransition(beats, beats.Count - 1).Should().BeFalse("a possession that has been worked for eight touches has settled");
+        beats.Add(Beat(BeatKind.Carry, 1, MatchSide.Home, new Vec(60, 34), new Vec(90, 34), counter: true));
+
+        FilmMotion.IsTransition(beats, 7, CounterTuning.Base).Should().BeFalse("the small counter holds for three beats");
+        FilmMotion.IsTransition(beats, 7, CounterTuning.On).Should().BeFalse("the big one holds for six");
+        FilmMotion.IsTransition(beats, 8, CounterTuning.On).Should().BeFalse("a ball in the box is the attack, not the break");
+    }
+
+    [Fact]
+    public void A_side_that_plays_on_the_counter_draws_a_bigger_one()
+    {
+        var off = CounterTuning.For(new MatchInstructionsV1());
+        var on = CounterTuning.For(new MatchInstructionsV1 { CounterAttack = true });
+
+        off.Should().BeSameAs(CounterTuning.Base);
+        on.Should().BeSameAs(CounterTuning.On);
+
+        on.BreakBeats.Should().BeGreaterThan(off.BreakBeats);
+        on.OutletAhead.Should().BeGreaterThan(off.OutletAhead);
+        on.RunnerAhead.Should().BeGreaterThan(off.RunnerAhead);
+        on.Outlets.Should().BeGreaterThan(off.Outlets);
+        on.DefendersDrop.Should().BeTrue();
+        off.DefendersDrop.Should().BeFalse();
     }
 
     [Fact]

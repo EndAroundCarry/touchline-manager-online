@@ -190,15 +190,6 @@ internal sealed class FilmMotion
     /// <summary>How far from the goal line the edge of the box is, in metres.</summary>
     private const double EdgeOfBox = 20.0;
 
-    /// <summary>How far forward a pass goes before it is a long ball, in metres.</summary>
-    private const double LongBall = 35.0;
-
-    /// <summary>How far a move after a turnover has to carry the ball before it is a break, in metres.</summary>
-    private const double BreakMetres = 30.0;
-
-    /// <summary>How many beats a move after a turnover can have had and still be a break.</summary>
-    private const int BreakBeats = 5;
-
     /// <summary>How far the play can move from a presser or supporter before somebody else takes the role, in metres.</summary>
     private const double RoleRadius = 16.0;
 
@@ -217,6 +208,7 @@ internal sealed class FilmMotion
     private readonly FilmContext _context;
     private readonly FilmShape _shape;
     private readonly IReadOnlyList<FilmRoster> _rosters;
+    private readonly IReadOnlyList<MatchPassageV1> _passages;
     private readonly HighlightOptionsV1 _options;
 
     private readonly double[] _px = new double[FilmRoster.Size];
@@ -256,11 +248,13 @@ internal sealed class FilmMotion
     /// <param name="context">The film's context.</param>
     /// <param name="shape">Where the players want to be.</param>
     /// <param name="rosters">Who is on the pitch for each possession.</param>
-    public FilmMotion(FilmContext context, FilmShape shape, IReadOnlyList<FilmRoster> rosters)
+    /// <param name="passages">The recorded possessions, which say which of them were counter-attacks.</param>
+    public FilmMotion(FilmContext context, FilmShape shape, IReadOnlyList<FilmRoster> rosters, IReadOnlyList<MatchPassageV1> passages)
     {
         _context = context;
         _shape = shape;
         _rosters = rosters;
+        _passages = passages;
         _options = context.Options;
         _roster = context.Starters;
     }
@@ -283,6 +277,7 @@ internal sealed class FilmMotion
         }
 
         ForgetChoices(beats);
+        MarkCounters(beats);
 
         _roster = RosterOf(beats[0]);
         Reset(beats, 0);
@@ -394,6 +389,15 @@ internal sealed class FilmMotion
     }
 
     // ---- Who plays and who receives -------------------------------------------------------------------------
+
+    /// <summary>Marks the beats of the possessions the engine played as counter-attacks (`replay-v6`).</summary>
+    private void MarkCounters(IReadOnlyList<FilmBeat> beats)
+    {
+        foreach (var beat in beats)
+        {
+            beat.Counter = beat.Possession >= 0 && beat.Possession < _passages.Count && _passages[beat.Possession].Counter;
+        }
+    }
 
     /// <summary>Forgets who the motion chose last time, so that every run starts from the script.</summary>
     private static void ForgetChoices(IReadOnlyList<FilmBeat> beats)
@@ -801,7 +805,9 @@ internal sealed class FilmMotion
         var defending = MatchInputV1.OpponentOf(attacking);
         var focus = beat.To;
 
-        BuildSpecs(beat, IsTransition(beats, index), attacking, defending, focus);
+        var counter = CounterTuning.For(_context.InstructionsOf(attacking));
+
+        BuildSpecs(beat, IsTransition(beats, index, counter) ? counter : null, attacking, defending, focus);
 
         // Each takes a place for the whole beat — a press closes down the point the ball is going to, and an option
         // stands off it — so that a player runs straight there instead of chasing a ball that moves faster than he
@@ -849,7 +855,7 @@ internal sealed class FilmMotion
     }
 
     /// <summary>Writes the roles the beat wants and where each stands.</summary>
-    private void BuildSpecs(FilmBeat beat, bool transition, MatchSide attacking, MatchSide defending, Vec focus)
+    private void BuildSpecs(FilmBeat beat, CounterTuning? counter, MatchSide attacking, MatchSide defending, Vec focus)
     {
         Array.Fill(_specs, default);
 
@@ -860,7 +866,7 @@ internal sealed class FilmMotion
         var toGoal = (FilmSpace.OwnGoal(defending) - focus).Unit();
 
         // The defenders: nobody chases a counter from the halfway line; they drop, and the shape closes them up.
-        var challenge = beat.Kind != BeatKind.Placement && (!transition || finalThird || beat.Kind == BeatKind.Duel);
+        var challenge = beat.Kind != BeatKind.Placement && (counter is not { DefendersDrop: true } || finalThird || beat.Kind == BeatKind.Duel);
         var second = challenge
             && (finalThird || beat.Kind == BeatKind.Duel || _context.InstructionsOf(defending).Pressing == MatchPressing.HighPress);
 
@@ -884,13 +890,29 @@ internal sealed class FilmMotion
         var outward = lateral >= 0 ? 1.0 : -1.0;
         var open = -outward;
 
-        if (transition)
+        // The options: a wide one, a forward one and a way back, each a long pass from the ball.
+        _specs[3] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 3.0, open * 13.0), 1.5), false, false);
+        _specs[4] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 14.0, -open * 4.0), 1.5), false, false);
+        _specs[5] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(-d * 9.0, -open * 8.0), 1.5), false, false);
+
+        if (counter is not null)
         {
-            // Two forwards hold high as outlets; the midfield runs the lanes behind them; the other side recovers.
-            _specs[4] = new Spec(attacking, RoleWants.FrontLine, Place(attacking, Math.Min(FilmSpace.Length - 18.0, ballDepth + 32.0), (FilmSpace.Width / 2) + (open * 14.0)), false, false);
-            _specs[7] = new Spec(attacking, RoleWants.FrontLine, Place(attacking, Math.Min(FilmSpace.Length - 18.0, ballDepth + 32.0), (FilmSpace.Width / 2) - (open * 14.0)), false, false);
-            _specs[3] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 14.0, open * 12.0), 1.5), false, false);
-            _specs[5] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 10.0, -open * 14.0), 1.5), false, false);
+            // Forwards hold high as outlets; the midfield runs the lanes behind them; the other side recovers. A small
+            // counter keeps one of each and the usual options for the rest.
+            var outletDepth = Math.Min(FilmSpace.Length - 18.0, ballDepth + counter.OutletAhead);
+
+            _specs[4] = new Spec(attacking, RoleWants.FrontLine, Place(attacking, outletDepth, (FilmSpace.Width / 2) + (open * 14.0)), false, false);
+            _specs[3] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * counter.RunnerAhead, open * 12.0), 1.5), false, false);
+
+            if (counter.Outlets >= 2)
+            {
+                _specs[7] = new Spec(attacking, RoleWants.FrontLine, Place(attacking, outletDepth, (FilmSpace.Width / 2) - (open * 14.0)), false, false);
+            }
+
+            if (counter.Runners >= 2)
+            {
+                _specs[5] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * (counter.RunnerAhead * 0.7), -open * 14.0), 1.5), false, false);
+            }
 
             return;
         }
@@ -909,11 +931,6 @@ internal sealed class FilmMotion
 
             return;
         }
-
-        // The options: a wide one, a forward one and a way back, each a long pass from the ball.
-        _specs[3] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 3.0, open * 13.0), 1.5), false, false);
-        _specs[4] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(d * 14.0, -open * 4.0), 1.5), false, false);
-        _specs[5] = new Spec(attacking, RoleWants.Any, FilmSpace.Clamp(focus + new Vec(-d * 9.0, -open * 8.0), 1.5), false, false);
     }
 
     /// <summary>How deep from his own goal the back line of a side stands now, which is where an attacker can stand and be onside.</summary>
@@ -943,24 +960,16 @@ internal sealed class FilmMotion
         FilmSpace.Clamp(new Vec(side == MatchSide.Home ? depth : FilmSpace.Length - depth, across), 1.5);
 
     /// <summary>
-    /// Whether a ball is going a long way forward in a move that began with the other side having it: a long ball,
-    /// or a break that has covered most of the pitch in a few touches.
+    /// Whether the beat is part of the first moves of a counter-attack the engine played, while the ball is still on its
+    /// way up the pitch.
     /// </summary>
-    internal static bool IsTransition(IReadOnlyList<FilmBeat> beats, int index)
+    internal static bool IsTransition(IReadOnlyList<FilmBeat> beats, int index, CounterTuning counter)
     {
         var beat = beats[index];
 
-        if (beat.Kind is not (BeatKind.Pass or BeatKind.LoftedPass or BeatKind.Carry or BeatKind.Duel))
+        if (!beat.Counter || beat.Kind is not (BeatKind.Pass or BeatKind.LoftedPass or BeatKind.Carry or BeatKind.Duel))
         {
             return false;
-        }
-
-        var side = beat.Side;
-        var forward = FilmSpace.Attacking(beat.To, side) - FilmSpace.Attacking(beat.From, side);
-
-        if (beat.Kind is BeatKind.Pass or BeatKind.LoftedPass && forward >= LongBall)
-        {
-            return true;
         }
 
         var first = index;
@@ -970,23 +979,7 @@ internal sealed class FilmMotion
             first--;
         }
 
-        if (first == 0 || beats[first].Cut || index - first > BreakBeats)
-        {
-            return false;
-        }
-
-        for (var k = first; k <= index; k++)
-        {
-            if (beats[k].Hold is HoldKind.KickOff or HoldKind.GoalKick or HoldKind.Corner or HoldKind.FreeKick or HoldKind.Penalty or HoldKind.Goal)
-            {
-                return false;
-            }
-        }
-
-        var turnover = beats[first - 1];
-        var gained = FilmSpace.Attacking(beat.To, side) - FilmSpace.Attacking(beats[first].From, side);
-
-        return turnover.Side != side && gained >= BreakMetres && FilmSpace.Attacking(beat.To, side) <= FilmSpace.Length - 20.0;
+        return index - first <= counter.BreakBeats && FilmSpace.Attacking(beat.To, beat.Side) <= FilmSpace.Length - 20.0;
     }
 
     /// <summary>Gets the free outfield player of a side who best fills a role, or -1.</summary>

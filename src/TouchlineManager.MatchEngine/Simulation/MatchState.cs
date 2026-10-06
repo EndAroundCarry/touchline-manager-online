@@ -185,18 +185,25 @@ internal sealed class MatchState
     /// the possessions tile each half (`engine-v5`).
     /// </param>
     /// <param name="restart">The dead-ball restart the possession began with, or none.</param>
-    public void BeginPassage(MatchSide side, int startClockSeconds, PassageRestartKind restart)
+    /// <param name="counter">Whether the possession is a counter-attack (`engine-v11`).</param>
+    public void BeginPassage(MatchSide side, int startClockSeconds, PassageRestartKind restart, bool counter = false)
     {
         _passage = new PassageAccumulator(
             PossessionOrdinal,
             side,
             InFirstHalf ? 1 : 2,
             startClockSeconds,
-            restart);
+            restart,
+            counter);
+
+        LastPossessionSide = side;
 
         // The possession's pass ledger starts empty whether or not a recorder is attached (`engine-v7`).
         Passing = new PossessionPassing(side);
     }
+
+    /// <summary>Gets the side that had the possession before the one being played, once there has been one (`engine-v11`).</summary>
+    public MatchSide? LastPossessionSide { get; private set; }
 
     /// <summary>Gets the passes the possession being played has made so far (`engine-v7`).</summary>
     /// <remarks>
@@ -503,6 +510,7 @@ internal sealed class MatchState
         private readonly int _period;
         private readonly int _startClockSeconds;
         private readonly PassageRestartKind _restart;
+        private readonly bool _counter;
         private int _nextTick;
 
         public PassageAccumulator(
@@ -510,8 +518,10 @@ internal sealed class MatchState
             MatchSide side,
             int period,
             int startClockSeconds,
-            PassageRestartKind restart)
+            PassageRestartKind restart,
+            bool counter)
         {
+            _counter = counter;
             _ordinal = ordinal;
             _side = side;
             _period = period;
@@ -540,6 +550,7 @@ internal sealed class MatchState
                 EndClockSeconds = endClockSeconds,
                 Outcome = outcome,
                 Restart = _restart,
+                Counter = _counter,
                 Events =
                 [
                     .. _events.Select(pair => new PassageEventV1(

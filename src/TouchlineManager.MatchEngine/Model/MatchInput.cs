@@ -188,6 +188,12 @@ public sealed record MatchInstructionsV1
 
     /// <summary>Gets whether the team runs down the clock.</summary>
     public MatchTimeWasting TimeWasting { get; init; } = MatchTimeWasting.Off;
+
+    /// <summary>
+    /// Gets whether the team plays on the counter-attack (`engine-v11`): it turns a regained ball into a counter
+    /// far more often, and pays for it in patience in possession.
+    /// </summary>
+    public bool CounterAttack { get; init; }
 }
 
 /// <summary>One side's frozen squad, lineup, and instructions.</summary>

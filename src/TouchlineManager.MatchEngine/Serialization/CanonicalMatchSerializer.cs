@@ -125,6 +125,7 @@ public static class CanonicalMatchSerializer
         lines.Add(Field($"{label}.defensiveLine", (int)side.Instructions.DefensiveLine));
         lines.Add(Field($"{label}.tackling", (int)side.Instructions.Tackling));
         lines.Add(Field($"{label}.timeWasting", (int)side.Instructions.TimeWasting));
+        lines.Add(Field($"{label}.counterAttack", side.Instructions.CounterAttack ? 1 : 0));
 
         foreach (var participant in side.Squad.OrderBy(participant => participant.ParticipantId))
         {

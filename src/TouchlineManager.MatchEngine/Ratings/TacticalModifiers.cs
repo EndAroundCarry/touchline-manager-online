@@ -25,7 +25,7 @@ namespace TouchlineManager.MatchEngine.Ratings;
 public static class TacticalModifiers
 {
     /// <summary>The version label of this modifier table, versioned with the engine.</summary>
-    public const string Version = "engine-tactical-v3";
+    public const string Version = "engine-tactical-v4";
 
     /// <summary>Computes one unit's modifier for a side's instructions.</summary>
     /// <param name="unit">The unit.</param>
@@ -37,13 +37,27 @@ public static class TacticalModifiers
         ArgumentNullException.ThrowIfNull(instructions);
         ArgumentNullException.ThrowIfNull(rules);
 
-        var modifier = EngineRulesV2.Certain + Deltas(unit, instructions);
+        var modifier = EngineRulesV2.Certain + Deltas(unit, instructions) + CounterAttackCost(unit, instructions, rules);
 
         return int.Clamp(
             modifier,
             rules.MinTacticalModifierBasisPoints,
             rules.MaxTacticalModifierBasisPoints);
     }
+
+    /// <summary>
+    /// What playing on the counter costs (`engine-v11`): a side that waits to break gives up some patience in
+    /// possession, and its players left forward are a little less well placed to defend.
+    /// </summary>
+    private static int CounterAttackCost(MatchUnit unit, MatchInstructionsV1 instructions, EngineRulesV2 rules) =>
+        !instructions.CounterAttack
+            ? 0
+            : unit switch
+            {
+                MatchUnit.BuildUp => -rules.CounterAttackBuildUpCostBasisPoints,
+                MatchUnit.DefensiveShape => -rules.CounterAttackShapeCostBasisPoints,
+                _ => 0,
+            };
 
     private static int Deltas(MatchUnit unit, MatchInstructionsV1 instructions) => unit switch
     {

@@ -212,7 +212,7 @@ public sealed class MatchInputValidationTests
 
         var act = () => MatchSimulator.Simulate(input);
 
-        act.Should().Throw<InvalidMatchInputException>().WithMessage("*engine-v10*");
+        act.Should().Throw<InvalidMatchInputException>().WithMessage("*engine-v11*");
     }
 
     [Fact]
@@ -222,7 +222,7 @@ public sealed class MatchInputValidationTests
 
         var act = () => MatchSimulator.Simulate(input);
 
-        act.Should().Throw<InvalidMatchInputException>().WithMessage("*engine-rules-v9*");
+        act.Should().Throw<InvalidMatchInputException>().WithMessage("*engine-rules-v10*");
     }
 
     [Fact]

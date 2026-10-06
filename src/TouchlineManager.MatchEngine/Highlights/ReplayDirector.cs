@@ -145,7 +145,7 @@ public static class ReplayDirector
         for (var run = 0; ; run++)
         {
             used = pace;
-            motion = new FilmMotion(context, shape, rosters).Run(script.Beats, used.Pace, used.HoldScale);
+            motion = new FilmMotion(context, shape, rosters, passages).Run(script.Beats, used.Pace, used.HoldScale);
 
             var solved = FilmTiming.SolveFor(settings, motion.MotionSeconds, holds, target, condensed);
             var measured = natural <= 0 ? 0.0 : Math.Max(0.0, (motion.MotionSeconds / natural) - 1.0);
@@ -194,7 +194,7 @@ public static class ReplayDirector
             var raised = used.Pace * (length / ceilingSeconds) * 1.002;
 
             used = used with { Pace = raised };
-            motion = new FilmMotion(context, shape, rosters).Run(script.Beats, used.Pace, used.HoldScale);
+            motion = new FilmMotion(context, shape, rosters, passages).Run(script.Beats, used.Pace, used.HoldScale);
         }
 
         var assembler = new FilmAssembler(context, script, motion, rosters, used.Pace);

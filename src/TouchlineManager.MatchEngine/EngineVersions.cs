@@ -20,7 +20,7 @@ public static class EngineVersions
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 10;
+    public const int Engine = 11;
 
     /// <summary>
     /// The engine rules version implemented by this assembly.
@@ -30,10 +30,20 @@ public static class EngineVersions
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 9;
+    public const int RuleSet = 10;
 
-    /// <summary>The stable label for engine version 10, used in hashes and diagnostics.</summary>
+    /// <summary>The stable label for engine version 11, used in hashes and diagnostics.</summary>
     /// <remarks>
+    /// <para>
+    /// Version 11 adds the counter-attack. A ball a side wins back from play becomes a counter-attack on a roll the
+    /// possession's own stream takes: one time in five for a side that has not asked for it and one in two for a side
+    /// that has, a team instruction of its own. How the counter fares depends on how the opponent stands: one that
+    /// has committed forward, by its mentality and its line, leaves space to run into, so the counter progresses and
+    /// creates more often, and one that sits deep is well placed to cut out the long ball, so it breaks down more
+    /// often. The roll is drawn from a stream of its own and every play roll is the one the engine always took, so
+    /// only the thresholds of a counter-attack move; a side that plays on the counter pays in patience, a little
+    /// build-up and a little defensive shape. The passage record says which possessions were counters.
+    /// </para>
     /// <para>
     /// Version 10 makes the individual player count where the ball is played and where it is struck. A player's
     /// Positioning now helps him at the finish: the player picked to shoot, and the one picked to head a corner,
@@ -96,10 +106,10 @@ public static class EngineVersions
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v10";
+    public const string EngineLabel = "engine-v11";
 
-    /// <summary>The stable label for engine rules version 9.</summary>
-    public const string RuleSetLabel = "engine-rules-v9";
+    /// <summary>The stable label for engine rules version 10.</summary>
+    public const string RuleSetLabel = "engine-rules-v10";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v2";

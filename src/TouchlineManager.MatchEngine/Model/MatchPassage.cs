@@ -296,6 +296,12 @@ public sealed record MatchPassageV1
     public required PassageRestartKind Restart { get; init; }
 
     /// <summary>
+    /// Gets whether the possession was a counter-attack: the ball was won back from play and the side broke on it
+    /// (`engine-v11`).
+    /// </summary>
+    public bool Counter { get; init; }
+
+    /// <summary>
     /// Gets the events the possession produced, in order, each positioned among the waypoints and touches;
     /// empty when it produced none (`engine-v5`).
     /// </summary>

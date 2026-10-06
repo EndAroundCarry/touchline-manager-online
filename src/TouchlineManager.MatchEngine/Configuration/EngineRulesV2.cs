@@ -1067,6 +1067,42 @@ public sealed record EngineRulesV2
     /// <summary>What a side that is wasting time multiplies the length of its possessions by.</summary>
     public int TimeWastingPossessionSecondsMultiplierBasisPoints { get; init; } = 12_500;
 
+    // ---- The counter-attack (engine-v11) --------------------------------------------------------
+
+    /// <summary>
+    /// How often a ball a side wins back from play becomes a counter-attack when the side has not asked to play on
+    /// the counter.
+    /// </summary>
+    public int CounterStartBasisPoints { get; init; } = 2_000;
+
+    /// <summary>How often a regained ball becomes a counter-attack for a side that plays on the counter.</summary>
+    public int CounterStartWithInstructionBasisPoints { get; init; } = 5_000;
+
+    /// <summary>
+    /// What a counter-attack adds to the chance it progresses out of build-up against a balanced opponent: a side that
+    /// has just won the ball finds the other side out of shape.
+    /// </summary>
+    public int CounterProgressBasisPoints { get; init; } = 200;
+
+    /// <summary>
+    /// How far each step of the opponent's attacking posture moves the progression chance of a counter-attack: an
+    /// opponent who has committed forward leaves space to run into, and one who sits deep is well placed to cut out
+    /// a long ball, so the counter breaks down more often against it.
+    /// </summary>
+    public int CounterProgressPerPostureBasisPoints { get; init; } = 350;
+
+    /// <summary>What a counter-attack adds to its creation chance against a balanced opponent.</summary>
+    public int CounterCreationBasisPoints { get; init; } = 150;
+
+    /// <summary>How far each step of the opponent's attacking posture moves the creation chance of a counter-attack.</summary>
+    public int CounterCreationPerPostureBasisPoints { get; init; } = 300;
+
+    /// <summary>How much a side that plays on the counter loses in build-up, which is its patience in possession.</summary>
+    public int CounterAttackBuildUpCostBasisPoints { get; init; } = 120;
+
+    /// <summary>How much a side that plays on the counter loses in defensive shape, with players left forward.</summary>
+    public int CounterAttackShapeCostBasisPoints { get; init; } = 60;
+
     // ---- Fitness ---------------------------------------------------------------------------------
 
     /// <summary>
@@ -1843,6 +1879,14 @@ public sealed record EngineRulesV2
         yield return (nameof(PossessionHomeBonusBasisPoints), PossessionHomeBonusBasisPoints);
         yield return (nameof(BaseProgressBasisPoints), BaseProgressBasisPoints);
         yield return (nameof(ProgressControlSwingBasisPoints), ProgressControlSwingBasisPoints);
+        yield return (nameof(CounterStartBasisPoints), CounterStartBasisPoints);
+        yield return (nameof(CounterStartWithInstructionBasisPoints), CounterStartWithInstructionBasisPoints);
+        yield return (nameof(CounterProgressBasisPoints), CounterProgressBasisPoints);
+        yield return (nameof(CounterProgressPerPostureBasisPoints), CounterProgressPerPostureBasisPoints);
+        yield return (nameof(CounterCreationBasisPoints), CounterCreationBasisPoints);
+        yield return (nameof(CounterCreationPerPostureBasisPoints), CounterCreationPerPostureBasisPoints);
+        yield return (nameof(CounterAttackBuildUpCostBasisPoints), CounterAttackBuildUpCostBasisPoints);
+        yield return (nameof(CounterAttackShapeCostBasisPoints), CounterAttackShapeCostBasisPoints);
         yield return (nameof(BaseCreationBasisPoints), BaseCreationBasisPoints);
         yield return (nameof(CreationSwingBasisPoints), CreationSwingBasisPoints);
         yield return (nameof(LeadingCreationStepBasisPoints), LeadingCreationStepBasisPoints);

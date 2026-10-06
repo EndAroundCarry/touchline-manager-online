@@ -335,6 +335,9 @@ internal sealed class FilmBeat
     /// <summary>Gets the kind of cut, when there is one: <c>kick_off</c> or <c>half_time</c>.</summary>
     public string? CutKind { get; set; }
 
+    /// <summary>Gets or sets whether the beat belongs to a possession the engine played as a counter-attack (`replay-v6`).</summary>
+    public bool Counter { get; set; }
+
     /// <summary>Gets or sets whether the beat is the foul that stops a possession.</summary>
     public bool Foul { get; init; }
 
