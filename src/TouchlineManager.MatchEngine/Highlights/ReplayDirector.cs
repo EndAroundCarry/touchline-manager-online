@@ -692,4 +692,19 @@ public sealed record ShapeMetrics
 
     /// <summary>Gets, as a cross arrives, the ninety-fifth percentile of the number of outfield players inside the six-yard box.</summary>
     public required double DeliverySixYardP95 { get; init; }
+
+    /// <summary>Gets how many corners were measured as the ball was delivered.</summary>
+    public required int Corners { get; init; }
+
+    /// <summary>Gets, as a corner is delivered, the median number of the taking side's outfield players inside the box.</summary>
+    public required double CornerAttackersP50 { get; init; }
+
+    /// <summary>Gets, as a corner is delivered, the median number of the defending side's outfield players inside the box.</summary>
+    public required double CornerDefendersP50 { get; init; }
+
+    /// <summary>Gets, as a corner is delivered, the ninety-fifth percentile of the number of outfield players inside the six-yard box.</summary>
+    public required double CornerSixYardP95 { get; init; }
+
+    /// <summary>Gets, as a corner is delivered, the median number of the taking side's outfield players held back beyond forty metres from the goal line.</summary>
+    public required double CornerGuardsP50 { get; init; }
 }

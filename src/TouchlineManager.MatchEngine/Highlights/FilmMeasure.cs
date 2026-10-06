@@ -33,6 +33,9 @@ internal static class FilmMeasure
     /// <summary>How deep the six-yard box is, in metres.</summary>
     private const double SixYardDepth = 5.5;
 
+    /// <summary>How far from the goal line a taking side's player is to count as held back against a break at a corner, in metres (`replay-v6`).</summary>
+    private const double GuardFrom = 40.0;
+
     /// <summary>Half the width of the six-yard box, in metres.</summary>
     private const double SixYardHalfWidth = 9.16;
 
@@ -203,6 +206,10 @@ internal static class FilmMeasure
         var deliveryAttackers = new Histogram(1.0, FilmRoster.Size + 1);
         var deliveryDefenders = new Histogram(1.0, FilmRoster.Size + 1);
         var deliverySix = new Histogram(1.0, FilmRoster.Size + 1);
+        var cornerAttackers = new Histogram(1.0, FilmRoster.Size + 1);
+        var cornerDefenders = new Histogram(1.0, FilmRoster.Size + 1);
+        var cornerSix = new Histogram(1.0, FilmRoster.Size + 1);
+        var cornerGuards = new Histogram(1.0, FilmRoster.Size + 1);
         var depthWith = new Average();
         var widthWith = new Average();
         var depthWithout = new Average();
@@ -221,6 +228,20 @@ internal static class FilmMeasure
         for (var index = 0; index < script.Beats.Count; index++)
         {
             var beat = script.Beats[index];
+
+            if (beat.Kind == BeatKind.Cross && beat.Formation == FormationMode.Corner && beat.Possession >= 0)
+            {
+                MeasureCorner(
+                    context,
+                    rosters[beat.Possession],
+                    motion,
+                    motion.Spans[index].LastRecord,
+                    beat.Side,
+                    cornerAttackers,
+                    cornerDefenders,
+                    cornerSix,
+                    cornerGuards);
+            }
 
             if (beat.IsHold || beat.Formation != FormationMode.Open || beat.Possession < 0)
             {
@@ -395,7 +416,47 @@ internal static class FilmMeasure
             DeliveryAttackersP50 = deliveryAttackers.Percentile(0.5),
             DeliveryDefendersP50 = deliveryDefenders.Percentile(0.5),
             DeliverySixYardP95 = deliverySix.Percentile(0.95),
+            Corners = cornerAttackers.Total,
+            CornerAttackersP50 = cornerAttackers.Percentile(0.5),
+            CornerDefendersP50 = cornerDefenders.Percentile(0.5),
+            CornerSixYardP95 = cornerSix.Percentile(0.95),
+            CornerGuardsP50 = cornerGuards.Percentile(0.5),
         };
+    }
+
+    /// <summary>
+    /// Counts who stands where as a corner is delivered (`replay-v6`): the box as for a cross, and how many of the taking
+    /// side's players are held back beyond forty metres from the goal line, against a break.
+    /// </summary>
+    private static void MeasureCorner(
+        FilmContext context,
+        FilmRoster roster,
+        FilmMotionResult motion,
+        int record,
+        MatchSide attacking,
+        Histogram attackers,
+        Histogram defenders,
+        Histogram sixYard,
+        Histogram guards)
+    {
+        var goal = FilmSpace.AttackedGoal(attacking);
+        var held = 0;
+
+        MeasureDelivery(context, roster, motion, record, attacking, attackers, defenders, sixYard);
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!roster.IsOccupied(entity)
+                || FilmRoster.SideOf(entity) != attacking
+                || context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            held += Math.Abs(motion.PlayerX(record, entity) - goal.X) >= GuardFrom ? 1 : 0;
+        }
+
+        guards.Add(held);
     }
 
     /// <summary>

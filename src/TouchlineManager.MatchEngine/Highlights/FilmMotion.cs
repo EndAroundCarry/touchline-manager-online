@@ -159,6 +159,12 @@ internal sealed class FilmMotion
     /// <summary>How near his place in the shape a player has to get before he stops, in metres.</summary>
     private const double SettleDistance = 1.0;
 
+    /// <summary>How far from his place at a corner a player has to be before he sets off for it, in metres (`replay-v6`).</summary>
+    private const double CornerSetOff = 1.5;
+
+    /// <summary>How long before a corner is taken its runners set off for the places they run to, in seconds of real time (`replay-v6`).</summary>
+    private const double RunInSeconds = 2.0;
+
     /// <summary>
     /// The roles that are kept from one beat to the next (`replay-v6`): a challenger, a second and a cover for the
     /// side without the ball; five places for its opponents' options, which a flank attack, a counter and a delivery
@@ -250,6 +256,8 @@ internal sealed class FilmMotion
     private double _savedBallZ;
     private Vec _savedFocus;
     private Vec _setPieceAnchor = FilmSpace.Centre;
+    private MatchSide _setPieceSide = MatchSide.Home;
+    private int _setPieceTaker = -1;
     private Vec _celebration = FilmSpace.Centre;
     private FilmRoster _roster;
 
@@ -306,9 +314,13 @@ internal sealed class FilmMotion
 
             ResolveChoices(beats, index);
 
-            if (beat.IsHold && beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.Penalty)
+            // A set piece is arranged from the moment it is known to be coming: where it is taken, and by whom.
+            if (beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.Penalty
+                && SetPieceHold(beats, index) is { } hold)
             {
-                _setPieceAnchor = beat.To;
+                _setPieceAnchor = hold.To;
+                _setPieceSide = hold.Side;
+                _setPieceTaker = hold.Actor is Guid taker ? _roster.EntityOf(taker) : -1;
             }
 
             // The ball is where it is, whatever the plan said: the move is as long as the ground it has to cover.
@@ -341,6 +353,29 @@ internal sealed class FilmMotion
     }
 
     private FilmRoster RosterOf(FilmBeat beat) => beat.Possession >= 0 ? _rosters[beat.Possession] : _roster;
+
+    /// <summary>Gets the hold a set-piece beat is the lead-up to, or is: the beats that wait for the ball to be put down belong to it.</summary>
+    private static FilmBeat? SetPieceHold(IReadOnlyList<FilmBeat> beats, int index)
+    {
+        var beat = beats[index];
+
+        for (var next = index; next < beats.Count && next <= index + 4; next++)
+        {
+            var other = beats[next];
+
+            if (other.Possession != beat.Possession || (next > index && other.Cut))
+            {
+                break;
+            }
+
+            if (other.IsHold && other.Formation == beat.Formation)
+            {
+                return other;
+            }
+        }
+
+        return null;
+    }
 
     // ---- Cuts and set-ups ------------------------------------------------------------------------------------
 
@@ -806,7 +841,10 @@ internal sealed class FilmMotion
         var beat = beats[index];
         var cross = CrossOf(beats, index);
 
-        if (beat.IsHold || (cross < 0 && beat.Kind is BeatKind.Shot or BeatKind.Cross or BeatKind.Clearance or BeatKind.Header or BeatKind.Save))
+        // A set piece arranges everybody itself: nobody presses the flag or offers himself to the taker.
+        if (beat.IsHold
+            || beat.Formation != FormationMode.Open
+            || (cross < 0 && beat.Kind is BeatKind.Shot or BeatKind.Cross or BeatKind.Clearance or BeatKind.Header or BeatKind.Save))
         {
             return;
         }
@@ -1222,7 +1260,12 @@ internal sealed class FilmMotion
         {
             var tau = step * dt;
 
-            _shape.Fill(_roster, state, _focus, _targets);
+            // A corner's runners set off for the box as the hold nears its end, so that they arrive as the ball is struck.
+            var current = state.Mode == FormationMode.Corner && !state.Arrived && beat.IsHold && tau >= duration - RunInSeconds
+                ? state with { Arrived = true }
+                : state;
+
+            _shape.Fill(_roster, current, _focus, _targets);
 
             for (var entity = 0; entity < FilmRoster.Size; entity++)
             {
@@ -1284,9 +1327,18 @@ internal sealed class FilmMotion
                     beat.Actor is Guid scorer ? _roster.EntityOf(scorer) : -1);
 
             case FormationMode.Corner:
+                // The side is the one taking it, whoever plays the beat: the defence puts the ball behind, and may win the header.
+                // The runners wait for the hold, and are in the box for the delivery and what comes of it.
+                return new ShapeState(
+                    FormationMode.Corner,
+                    _setPieceSide,
+                    _setPieceAnchor,
+                    Taker: _setPieceTaker,
+                    Arrived: beat.Kind is BeatKind.Cross or BeatKind.Header);
+
             case FormationMode.FreeKickShot:
             case FormationMode.Penalty:
-                return new ShapeState(beat.Formation, beat.Side, _setPieceAnchor);
+                return new ShapeState(beat.Formation, _setPieceSide, _setPieceAnchor);
 
             case FormationMode.KickOff:
                 return new ShapeState(FormationMode.KickOff, beat.Side, beat.To);
@@ -1367,17 +1419,28 @@ internal sealed class FilmMotion
                     var wanted = ClearOfRoles(entity, _targets[entity]);
                     var here = new Vec(_px[entity], _py[entity]);
 
+                    // At a corner everybody has a place to be, and goes to it; the runners run.
+                    var corner = beat.Formation == FormationMode.Corner;
+                    var setOff = corner ? CornerSetOff : SetOffDistance;
+                    var relatch = corner ? CornerSetOff : RelatchDistance;
+
+                    if (corner)
+                    {
+                        // The hold is short, and the players may have a long way to go.
+                        cap = _options.SprintMetresPerSecond;
+                    }
+
                     if (_walking[entity])
                     {
                         // The destination is kept unless the shape has run off somewhere else altogether.
-                        if (_destinations[entity].DistanceTo(wanted) > RelatchDistance)
+                        if (_destinations[entity].DistanceTo(wanted) > relatch)
                         {
                             _destinations[entity] = wanted;
                         }
 
                         _walking[entity] = here.DistanceTo(_destinations[entity]) > SettleDistance;
                     }
-                    else if (here.DistanceTo(wanted) > SetOffDistance)
+                    else if (here.DistanceTo(wanted) > setOff)
                     {
                         _walking[entity] = true;
                         _destinations[entity] = wanted;

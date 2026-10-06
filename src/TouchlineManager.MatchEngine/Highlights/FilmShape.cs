@@ -8,7 +8,9 @@ namespace TouchlineManager.MatchEngine.Highlights;
 /// <param name="Side">The side with the ball, or taking the set piece, or celebrating.</param>
 /// <param name="Anchor">The corner flag, the free-kick or penalty spot, or the goal a celebration begins at.</param>
 /// <param name="Scorer">The entity celebrating, or -1.</param>
-internal readonly record struct ShapeState(FormationMode Mode, MatchSide Side, Vec Anchor, int Scorer = -1);
+/// <param name="Taker">The entity taking the set piece, or -1 (`replay-v6`).</param>
+/// <param name="Arrived">Whether the runners of a set piece have run in to the places they take it from, or still wait short of them (`replay-v6`).</param>
+internal readonly record struct ShapeState(FormationMode Mode, MatchSide Side, Vec Anchor, int Scorer = -1, int Taker = -1, bool Arrived = false);
 
 /// <summary>How a side stands as a block, chosen from where the ball is and who has it (`replay-v6`).</summary>
 internal enum BlockPhase
@@ -133,6 +135,29 @@ internal sealed class FilmShape
 
     /// <summary>How much more the players on the far side from the ball close in.</summary>
     private const double FarSideTuck = 0.90;
+
+    /// <summary>How far short of the place he is running to a corner's runner waits, in metres (`replay-v6`).</summary>
+    private const double CornerRunUp = 5.0;
+
+    /// <summary>How far goal-side of the runner his marker stands, in metres (`replay-v6`).</summary>
+    private const double CornerMarkGap = 1.4;
+
+    /// <summary>How much a point of heading is worth against a metre of how far forward a player plays, when choosing a corner's runners (`replay-v6`).</summary>
+    private const double CornerForwardWeight = 0.15;
+
+    /// <summary>How many defenders a side needs before it leaves one up the pitch as an outlet at a corner (`replay-v6`).</summary>
+    private const int CornerOutletFrom = 5;
+
+    // The places a corner is set at, as metres from the goal line and metres across from the middle of the pitch, where
+    // positive is towards the flag the corner is taken from. The runners are in order of who gets which: the best header
+    // takes the penalty spot.
+    private static readonly (double Along, double Across)[] CornerRunners = [(10.5, -0.5), (6.0, -4.5), (6.0, 3.0), (9.0, 6.5)];
+    private static readonly (double Along, double Across)[] CornerEdge = [(18.5, 8.0), (19.0, -7.0)];
+    private static readonly (double Along, double Across)[] CornerGuards = [(51.0, -9.0), (51.0, 9.0), (57.0, 0.0)];
+    private static readonly (double Along, double Across)[] CornerPosts = [(1.4, 3.0), (1.4, -3.0)];
+    private static readonly (double Along, double Across)[] CornerZones = [(5.0, 6.5), (5.0, -0.8), (5.5, -8.0)];
+    private static readonly (double Along, double Across) CornerDefendersEdge = (17.0, 1.0);
+    private static readonly (double Along, double Across) CornerOutlet = (46.0, -12.0);
 
     private readonly FilmContext _context;
 
@@ -583,39 +608,179 @@ internal sealed class FilmShape
         }
     }
 
+    /// <summary>
+    /// Sets a corner by role (`replay-v6`), mirrored for the flag it is taken from. The attackers are the taker, the best
+    /// headers in the box, a pair at the edge for the second ball and two or three held back near the halfway line
+    /// against a break; the defenders are two on the posts, three holding the six-yard line, markers for the runners,
+    /// one at the edge and one left high as an outlet. The runners wait a few metres short of the places they are
+    /// running to, and the markers stay goal-side of them; the places themselves do not move with the ball.
+    /// </summary>
     private void ArrangeCorner(FilmRoster roster, ShapeState state, Vec[] targets)
     {
-        var attackers = Order(roster, state.Side, MatchPositionFamily.Attack);
-        var defenders = Order(roster, MatchInputV1.OpponentOf(state.Side), MatchPositionFamily.Defence);
+        var attacking = state.Side;
+        var defending = MatchInputV1.OpponentOf(attacking);
+        var flag = state.Anchor.Y >= FilmSpace.Width / 2 ? 1.0 : -1.0;
 
-        // Attacking-frame coordinates: metres from the goal line, metres off the centre line.
-        (double Along, double Across)[] attackerPoints =
-        [
-            (6, 4), (8, -3), (10, 0), (12, 6), (11, -7), (15, 2), (19, 9), (19, -9),
-        ];
+        Vec At((double Along, double Across) place, double back = 0.0) => Frame(attacking, place.Along + back, place.Across * flag);
 
-        (double Along, double Across)[] defenderPoints =
-        [
-            (3, -4), (4, 3), (5, 0), (7, -6), (8, 6), (10, -2), (12, 3), (17, 0),
-        ];
+        var taker = state.Taker >= 0 && roster.IsOccupied(state.Taker) && FilmRoster.SideOf(state.Taker) == attacking ? state.Taker : -1;
+        var pool = Order(roster, attacking, MatchPositionFamily.Attack).Where(entity => entity != taker).ToList();
 
-        // The taker is the one standing on the flag; the beats pin them there, so they are left out of the box.
-        for (var index = 0; index < attackers.Length && index < attackerPoints.Length; index++)
+        if (taker >= 0)
         {
-            var point = attackerPoints[index];
-
-            targets[attackers[index]] = Frame(state.Side, point.Along, point.Across);
+            targets[taker] = state.Anchor;
         }
 
-        for (var index = 0; index < defenders.Length && index < defenderPoints.Length; index++)
-        {
-            var point = defenderPoints[index];
+        // Who does what: two or three guard against the break, the best headers go into the box, the rest wait at its edge.
+        var guards = Math.Min(pool.Count >= 8 ? 3 : 2, pool.Count);
+        var rest = pool.Count - guards;
+        var edge = rest >= 5 ? 2 : (rest >= 3 ? 1 : 0);
+        var box = Math.Min(CornerRunners.Length, rest - edge);
 
-            // The frame is measured from the goal the corner is taken at, which is the defenders' own.
-            targets[defenders[index]] = Frame(state.Side, point.Along, point.Across);
+        var guarding = ChooseGuards(pool, guards, attacking);
+
+        pool.RemoveAll(guarding.Contains);
+
+        for (var place = 0; place < CornerGuards.Length && guarding.Count > 0; place++)
+        {
+            var point = At(CornerGuards[place]);
+            var who = TakeNearest(guarding, point, targets);
+
+            targets[who] = point;
         }
 
-        KeepKeeper(roster, MatchInputV1.OpponentOf(state.Side), targets, 1.2);
+        // The best headers go in, but one who plays far back cannot get there in time: how far forward he plays counts too.
+        var runners = pool
+            .OrderByDescending(entity => _context.AttributeOf(roster.Occupants[entity], MatchAttributeName.Heading)
+                + (CornerForwardWeight * FilmSpace.Attacking(_anchors[entity, 1], attacking)))
+            .ThenBy(entity => entity)
+            .Take(box)
+            .ToList();
+
+        pool.RemoveAll(runners.Contains);
+
+        var run = state.Arrived ? 0.0 : CornerRunUp;
+
+        for (var index = 0; index < runners.Count; index++)
+        {
+            targets[runners[index]] = At(CornerRunners[index], run);
+        }
+
+        for (var place = 0; place < CornerEdge.Length && pool.Count > 0; place++)
+        {
+            var point = At(CornerEdge[place]);
+            var who = TakeNearest(pool, point, targets);
+
+            targets[who] = point;
+        }
+
+        // The defenders are chosen for the places the runners come to, so that who marks whom does not change as they run
+        // in; where each stands is where his runner is now.
+        var defenders = Order(roster, defending, MatchPositionFamily.Defence).ToList();
+
+        if (defenders.Count >= CornerOutletFrom)
+        {
+            var outlet = defenders
+                .OrderByDescending(entity => FilmSpace.Attacking(_anchors[entity, 0], defending))
+                .ThenBy(entity => entity)
+                .First();
+
+            defenders.Remove(outlet);
+            targets[outlet] = At(CornerOutlet);
+        }
+
+        var jobs = new List<(Vec Place, Vec Stands)>(CornerPosts.Length + CornerZones.Length + CornerRunners.Length + 1);
+
+        (Vec, Vec) Marking(int runner)
+        {
+            var place = CornerRunners[runner];
+
+            return (At((place.Along - CornerMarkGap, place.Across)), At((place.Along - CornerMarkGap, place.Across), run));
+        }
+
+        foreach (var post in CornerPosts)
+        {
+            jobs.Add((At(post), At(post)));
+        }
+
+        foreach (var zone in CornerZones)
+        {
+            jobs.Add((At(zone), At(zone)));
+        }
+
+        // Fewer markers than runners: the best header is picked up first.
+        for (var runner = 0; runner < Math.Min(2, runners.Count); runner++)
+        {
+            jobs.Add(Marking(runner));
+        }
+
+        jobs.Add((At(CornerDefendersEdge), At(CornerDefendersEdge)));
+
+        for (var runner = 2; runner < runners.Count; runner++)
+        {
+            jobs.Add(Marking(runner));
+        }
+
+        foreach (var (place, stands) in jobs)
+        {
+            if (defenders.Count == 0)
+            {
+                break;
+            }
+
+            targets[TakeNearest(defenders, place, targets)] = stands;
+        }
+
+        KeepKeeper(roster, defending, targets, 1.2);
+    }
+
+    /// <summary>Chooses who stays back against a break: the most central defenders, then the deepest midfielder, then the deepest left.</summary>
+    private List<int> ChooseGuards(List<int> pool, int count, MatchSide side)
+    {
+        var chosen = new List<int>(count);
+        var middle = FilmSpace.Width / 2;
+
+        chosen.AddRange(
+            pool.Where(entity => _context.Slots[entity].Family == MatchPositionFamily.Defence)
+                .OrderBy(entity => Math.Abs(_anchors[entity, 1].Y - middle))
+                .ThenBy(entity => entity)
+                .Take(Math.Min(2, count)));
+
+        foreach (var family in new[] { MatchPositionFamily.Midfield, MatchPositionFamily.Attack, MatchPositionFamily.Defence })
+        {
+            if (chosen.Count >= count)
+            {
+                break;
+            }
+
+            chosen.AddRange(
+                pool.Where(entity => !chosen.Contains(entity) && _context.Slots[entity].Family == family)
+                    .OrderBy(entity => FilmSpace.Attacking(_anchors[entity, 1], side))
+                    .ThenBy(entity => entity)
+                    .Take(count - chosen.Count));
+        }
+
+        return chosen;
+    }
+
+    /// <summary>Takes out of a pool the player whose place in the shape is nearest a point.</summary>
+    private static int TakeNearest(List<int> pool, Vec point, Vec[] targets)
+    {
+        var best = 0;
+
+        for (var index = 1; index < pool.Count; index++)
+        {
+            if (targets[pool[index]].DistanceTo(point) < targets[pool[best]].DistanceTo(point) - 1e-9)
+            {
+                best = index;
+            }
+        }
+
+        var entity = pool[best];
+
+        pool.RemoveAt(best);
+
+        return entity;
     }
 
     private void ArrangeFreeKick(FilmRoster roster, ShapeState state, Vec[] targets)

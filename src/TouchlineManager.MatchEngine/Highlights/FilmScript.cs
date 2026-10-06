@@ -50,6 +50,18 @@ internal static class FilmScript
     /// <summary>The altitude at which a ball is headed.</summary>
     private const double HeaderContactZ = 30.0;
 
+    /// <summary>How near the goal the ball is, in metres, for a ball that wins a corner to be a shot the keeper turns behind (`replay-v6`).</summary>
+    private const double TipRange = 26.0;
+
+    /// <summary>The share of such balls that are the keeper's, and not a defender's (`replay-v6`).</summary>
+    private const double TipShare = 0.5;
+
+    /// <summary>The altitude of the ball in the keeper's hands, where the crossbar is thirty: about a metre (`replay-v6`).</summary>
+    private const double TipZ = 12.0;
+
+    /// <summary>How far to the side of where he stands the keeper reaches, in metres (`replay-v6`).</summary>
+    private const double TipReach = 1.2;
+
     /// <summary>Builds the script for a whole match.</summary>
     /// <param name="context">The film's context.</param>
     /// <param name="shape">The team shape, which receivers are chosen from.</param>
@@ -379,9 +391,8 @@ internal static class FilmScript
 
             if (IsCornerOut(state, j))
             {
-                // The ball goes out of play: nobody receives it.
-                state.Add(Move(state, BeatKind.LoftedPass, start, to.Point, actor, actorSource, null, false, side));
-                SetHolder(state, null, pending: false);
+                // The ball goes out of play, and somebody put it there.
+                ScriptDeflection(state, j, start, to.Point);
 
                 return;
             }
@@ -417,6 +428,86 @@ internal static class FilmScript
 
             state.Add(Move(state, kind, start, to.Point, actor, actorSource, receiver, receiver is null, side));
             SetHolder(state, receiver, pending: receiver is null);
+        }
+
+        /// <summary>
+        /// The ball that wins a corner (`replay-v6`): what put it behind, shown. The engine decides that a corner is
+        /// given, not how; a cross is headed behind by a defender, a ball played into the box along the ground is blocked
+        /// or turned behind by one, and one that comes close to goal is sometimes a shot the keeper turns round the post.
+        /// Nothing here changes whether there is a corner.
+        /// </summary>
+        private void ScriptDeflection(State state, int j, Vec start, Vec outOfPlay)
+        {
+            var attacking = state.Source.Side;
+            var defending = MatchInputV1.OpponentOf(attacking);
+            var keeper = KeeperOf(state.Roster, defending);
+            var crossed = state.LastPlay is { Kind: BeatKind.Cross or BeatKind.LoftedPass };
+
+            var tipped = !crossed
+                && keeper is not null
+                && start.DistanceTo(FilmSpace.AttackedGoal(attacking)) <= TipRange
+                && FilmHash.Unit(state.Index, j, 11) < TipShare;
+
+            if (tipped && keeper is Guid saver)
+            {
+                ScriptTip(state, start, outOfPlay, saver);
+
+                return;
+            }
+
+            // The nearest defender gets there first: he heads a cross behind, or gets a block in.
+            var beat = Move(state, BeatKind.Clearance, start, outOfPlay, null, ActorSource.NearestToBall, null, false, defending);
+
+            beat.ZFrom = crossed ? HeaderContactZ : 0;
+            beat.ZTo = 0;
+            beat.ZArc = crossed ? 30 : 4;
+            beat.Formation = FormationMode.Corner;
+            state.Add(beat);
+            SetHolder(state, null, pending: false);
+        }
+
+        /// <summary>A strike the goalkeeper gets a hand to and turns behind: the shot, his save, and the ball going out.</summary>
+        private static void ScriptTip(State state, Vec start, Vec outOfPlay, Guid keeper)
+        {
+            var attacking = state.Source.Side;
+            var defending = MatchInputV1.OpponentOf(attacking);
+            var (actor, actorSource) = ActorOf(state);
+
+            // He is at the ball a step towards the post the ball is going behind.
+            var stands = FilmShape.KeeperOn(defending, start);
+            var hands = FilmSpace.Clamp(stands + new Vec(0, outOfPlay.Y >= stands.Y ? TipReach : -TipReach), 0.5);
+
+            var shot = Move(state, BeatKind.Shot, start, hands, actor, actorSource, keeper, false, attacking);
+
+            shot.ZTo = TipZ;
+            shot.Opponent = keeper;
+            shot.Strike = StrikeResult.Saved;
+            state.Add(shot);
+
+            // From the save on, everybody can see the corner coming.
+            state.Add(new FilmBeat
+            {
+                Kind = BeatKind.Save,
+                Possession = state.Index,
+                Period = state.Source.Period,
+                Side = defending,
+                From = hands,
+                To = hands,
+                ZFrom = TipZ,
+                ZTo = TipZ,
+                Actor = keeper,
+                Receiver = keeper,
+                Formation = FormationMode.Corner,
+            });
+
+            var tip = Move(state, BeatKind.Clearance, hands, outOfPlay, keeper, ActorSource.Named, null, false, defending);
+
+            tip.ZFrom = TipZ;
+            tip.ZTo = 0;
+            tip.ZArc = 14;
+            tip.Formation = FormationMode.Corner;
+            state.Add(tip);
+            SetHolder(state, null, pending: false);
         }
 
         /// <summary>A delivery that is a cross when it is wide and ends in the box, and a lofted ball otherwise.</summary>
@@ -906,6 +997,23 @@ internal static class FilmScript
 
         /// <summary>Gets the last beat added to this possession.</summary>
         public FilmBeat? Last => _beats.Count == 0 ? null : _beats[^1];
+
+        /// <summary>Gets the last beat added to this possession that is not a challenge: how the ball was played.</summary>
+        public FilmBeat? LastPlay
+        {
+            get
+            {
+                for (var index = _beats.Count - 1; index >= 0; index--)
+                {
+                    if (_beats[index].Kind != BeatKind.Duel)
+                    {
+                        return _beats[index];
+                    }
+                }
+
+                return null;
+            }
+        }
 
         /// <summary>Takes the named player waiting to receive the first ball, once.</summary>
         public Guid? TakePreferred()
