@@ -287,6 +287,10 @@ public static class DependencyInjection
         services.AddScoped<GetClubDashboard>();
         services.AddScoped<GetOnboardingState>();
 
+        // The club's stadium: a read and the one command that grows it (`STAD-1`…`STAD-6`).
+        services.AddScoped<GetStadium>();
+        services.AddScoped<BuildStadiumSeats>();
+
         // Reachable only from the non-production diagnostics triggers (§17.12).
         services.AddScoped<TriggerProvisioning>();
         services.AddScoped<TriggerInactivity>();
@@ -294,6 +298,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<CreateManagerProfileRequest>, CreateManagerProfileRequestValidator>();
         services.AddScoped<IValidator<UpdateManagerProfileRequest>, UpdateManagerProfileRequestValidator>();
         services.AddScoped<IValidator<ClaimClubRequest>, ClaimClubRequestValidator>();
+        services.AddScoped<IValidator<BuildSeatsRequest>, BuildSeatsRequestValidator>();
     }
 
     /// <summary>

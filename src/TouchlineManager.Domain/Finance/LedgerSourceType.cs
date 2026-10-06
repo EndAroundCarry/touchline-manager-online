@@ -31,6 +31,9 @@ public enum LedgerSourceType
 
     /// <summary>An audited operator repair posted a compensating entry (`FIN-12`).</summary>
     AdminRepair = 6,
+
+    /// <summary>A manager's stadium works paid for the new places (`STAD-4`).</summary>
+    Stadium = 7,
 }
 
 /// <summary>Stable codes and parsing for <see cref="LedgerSourceType"/>.</summary>
@@ -53,6 +56,7 @@ public static class LedgerSourceTypes
         LedgerSourceType.Transfer => "transfer",
         LedgerSourceType.SafetyJob => "safety_job",
         LedgerSourceType.AdminRepair => "admin_repair",
+        LedgerSourceType.Stadium => "stadium",
         _ => throw new ArgumentOutOfRangeException(nameof(sourceType), sourceType, "Unknown ledger source."),
     };
 
@@ -67,6 +71,7 @@ public static class LedgerSourceTypes
         "transfer" => LedgerSourceType.Transfer,
         "safety_job" => LedgerSourceType.SafetyJob,
         "admin_repair" => LedgerSourceType.AdminRepair,
+        "stadium" => LedgerSourceType.Stadium,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown ledger source code."),
     };
 }

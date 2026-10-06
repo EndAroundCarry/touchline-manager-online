@@ -59,8 +59,7 @@ public static class WorldMapping
             club.BadgeSeed,
             club.FoundingGameYear,
             club.Status.ToCode(),
-            club.Reputation,
-            club.StadiumBaseline);
+            club.Reputation);
     }
 
     /// <summary>Projects a division.</summary>

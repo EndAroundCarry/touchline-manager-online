@@ -41,6 +41,7 @@ flowchart LR
         game_worlds
         countries
         clubs
+        club_stadiums
         managers
         club_tenures
         division_provisioning_requests
@@ -158,6 +159,7 @@ erDiagram
     countries ||--o{ divisions : "has"
     countries ||--o{ division_provisioning_requests : "requests"
     clubs ||--o{ club_tenures : "controlled by"
+    clubs ||--|| club_stadiums : "plays in"
 
     users {
         uuid id PK
@@ -195,8 +197,16 @@ erDiagram
         text badge_seed
         int founding_game_year
         text status
-        bigint stadium_baseline
         int reputation
+        bigint version
+    }
+    club_stadiums {
+        uuid id PK
+        uuid club_id FK
+        int standing_seats
+        int seating_seats
+        int covered_seats
+        int vip_seats
         bigint version
     }
     countries {
@@ -672,6 +682,7 @@ erDiagram
 | Index `(listing_id, status, amount_minor, bid_sequence)` | `transfer_bids` | `TRF-8` ordering |
 | `unique (listing_id)` | `transfer_outcomes` | Resolution happens once |
 | `check` the action is a known code and names exactly one of the listing or the bid; `check (length(inputs_hash) = 64)`; index `(club_id, evaluated_at)` | `ai_market_decisions` | `TRF-12`: a decision always states what it produced and what it read |
+| `unique (club_id)`, `check (every stand >= 0)`, `check (standing + seating + covered + vip between 1 and 50000)` | `club_stadiums` | One ground per club, never empty and never past the top level (`STAD-1`) |
 | `check (cash_minor >= 0 and reserved_minor >= 0)` | `club_accounts` | `FIN-13` |
 | `unique (club_id, sequence)`, `unique (correlation_id, category)`, `check (resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor)` | `ledger_entries` | `FIN-11`, `FIN-13`, `FIN-17` |
 | `unique (club_id, season_id)` | `club_season_finances` | One finance summary per club per season (`FIN-19`) |
@@ -693,6 +704,12 @@ erDiagram
 > replacements (`SQ-8`); the finalize phase posts the position award (`FIN-5`) and writes a season finance
 > summary (`FIN-19`). The retirement and contract-continuity policies are pure and versioned
 > (`retirement-v1`, `ai-contract-v1`), and the rule set advanced to `world-rules-v9`.
+>
+> **Stadium milestone.** `world.club_stadiums` holds one ground per club: its places by kind (`standing`, `seating`,
+> `covered`, `vip`), with the `version` a build order is made against. Its level and capacity are derived, never
+> stored. It replaces `world.clubs.stadium_baseline`, which the migration drops after giving every existing club the
+> opening 5,000-place ground; gate revenue now reads the ground, not a baseline (ADR-0062, `STAD-5`). The ledger gains
+> the `stadium_construction` category and the `stadium` source, and the rule set advances to `world-rules-v10`.
 >
 > **Stage 12 status (season history).** No schema change: the closed entries are read back as a club's
 > season history and next-season placement (`PR-4`, `PR-6`), and the retained `player_season_stats` rows are

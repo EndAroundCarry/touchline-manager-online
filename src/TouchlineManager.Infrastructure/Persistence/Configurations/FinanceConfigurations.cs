@@ -78,11 +78,11 @@ internal sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<Ledger
                 "ck_ledger_entries_category",
                 "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', "
                 + "'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', "
-                + "'reservation_release', 'emergency_grant', 'compensation')");
+                + "'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction')");
             table.HasCheckConstraint(
                 "ck_ledger_entries_source_type",
                 "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', "
-                + "'safety_job', 'admin_repair')");
+                + "'safety_job', 'admin_repair', 'stadium')");
             table.HasCheckConstraint(
                 "ck_ledger_entries_balances",
                 "resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 "

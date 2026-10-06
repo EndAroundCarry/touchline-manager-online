@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Application.Abstractions.Finance;
 using TouchlineManager.Domain.Finance;
 using TouchlineManager.Domain.Squad;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 
@@ -35,14 +36,30 @@ internal sealed class FinanceQueries : IFinanceQueries
             return [];
         }
 
-        return await (
+        var rows = await (
             from entry in _dbContext.ClubSeasonEntries
-            join club in _dbContext.Clubs on entry.ClubId equals club.Id
+            join stadium in _dbContext.ClubStadiums on entry.ClubId equals stadium.ClubId
             join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
             join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
             where entry.DivisionSeasonId == divisionSeasonId.Value
-            select new ClubRevenueBasis(club.Id, club.StadiumBaseline, division.TierNumber))
+            select new
+            {
+                entry.ClubId,
+                stadium.StandingSeats,
+                stadium.SeatingSeats,
+                stadium.CoveredSeats,
+                stadium.VipSeats,
+                division.TierNumber,
+            })
             .ToListAsync(cancellationToken);
+
+        return
+        [
+            .. rows.Select(row => new ClubRevenueBasis(
+                row.ClubId,
+                new StadiumSeats(row.StandingSeats, row.SeatingSeats, row.CoveredSeats, row.VipSeats),
+                row.TierNumber)),
+        ];
     }
 
     /// <inheritdoc />

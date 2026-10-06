@@ -93,7 +93,6 @@ internal sealed class OnboardingQueries : IOnboardingQueries
                 club.Region,
                 club.BadgeSeed,
                 club.Reputation,
-                club.StadiumBaseline,
                 !_dbContext.ClubTenures.Any(tenure => tenure.ClubId == club.Id
                     && tenure.ControlStatus != ClubTenureControlStatus.Closed)))
             .ToListAsync(cancellationToken);

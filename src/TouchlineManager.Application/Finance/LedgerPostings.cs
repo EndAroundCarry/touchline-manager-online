@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.Finance;
 
@@ -59,6 +60,9 @@ public static class LedgerPostings
 
     /// <summary>The template that describes a seller receiving transfer income (`FIN-6`, `TRF-10`).</summary>
     public const string TransferProceedsTemplate = "finance.transfer_proceeds";
+
+    /// <summary>The template that describes a club paying for new places in its stadium (`STAD-4`).</summary>
+    public const string StadiumConstructionTemplate = "finance.stadium_construction";
 
     /// <summary>
     /// Builds the posting that funds a newly generated club's account.
@@ -385,6 +389,44 @@ public static class LedgerPostings
             TransferCorrelationId(listingId),
             TransferProceedsTemplate,
             Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>Builds the posting a club's stadium works make (`STAD-4`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club paying.</param>
+    /// <param name="stadiumId">The ground that grew, which is what the entry's source names.</param>
+    /// <param name="stadiumVersion">The ground's version once the places were added.</param>
+    /// <param name="stand">The kind of place built.</param>
+    /// <param name="count">How many places were built.</param>
+    /// <param name="amountMinor">The price, in minor units, as a positive amount to be debited.</param>
+    /// <remarks>
+    /// The correlation key is the ground at the version the works produced, because each build moves the
+    /// ground's version on by one: a retried order that was already paid for collides with its first entry
+    /// instead of charging the club twice, while a genuine second order is a different version and a different
+    /// key (`FIN-17`).
+    /// </remarks>
+    public static LedgerPosting StadiumConstruction(
+        Guid entryId,
+        Guid clubId,
+        Guid stadiumId,
+        long stadiumVersion,
+        StadiumStand stand,
+        int count,
+        long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.StadiumConstruction,
+            CashDeltaMinor: -amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Stadium,
+            SourceId: stadiumId,
+            $"stadium:{stadiumId:D}:v{stadiumVersion}",
+            StadiumConstructionTemplate,
+            Parameters(("amountMinor", amountMinor), ("stand", (long)stand), ("count", count)));
     }
 
     /// <summary>The correlation key of a bid's reservation (`FIN-17`, `TRF-7`).</summary>

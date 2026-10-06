@@ -74,6 +74,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the world module's clubs.</summary>
     public DbSet<Club> Clubs => Set<Club>();
 
+    /// <summary>Gets the club stadiums (`STAD-1`).</summary>
+    public DbSet<ClubStadium> ClubStadiums => Set<ClubStadium>();
+
     /// <summary>Gets the world module's club tenures, the whole of the ownership model.</summary>
     public DbSet<ClubTenure> ClubTenures => Set<ClubTenure>();
 

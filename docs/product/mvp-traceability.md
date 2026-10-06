@@ -126,7 +126,7 @@ enforced rather than remembered.
 | In-match tactical changes, WebSockets, synchronous PvP | No socket transport; team sheets lock before kickoff (`CAL-3`, `MAT-6`) |
 | Private negotiations, agents, loans, swaps, clauses, installments, windows | `TRF-13`; only the auction path exists |
 | Fog-of-war attributes, scouted network | `SCT-1`, `SCT-2`; attributes are exact and public |
-| Stadium/facilities/sponsorship negotiation, merchandising, taxes, currencies, debt | `FIN-14`; one currency, fixed baselines only |
+| Facilities beyond the stadium, sponsorship negotiation, merchandising, taxes, currencies, debt | `FIN-14`; one currency. The stadium itself is in scope: `STAD-1`…`STAD-6` |
 | Social chat, forums, PMs, associations, UGC | No such endpoints; `FIC-9` |
 | Native Android/iOS packages | ADR-0007: Capacitor follows the PWA (Stage 20) |
 | Offline mutations | ADR-0007: mutations disabled offline, no queue |

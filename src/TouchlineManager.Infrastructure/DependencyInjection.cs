@@ -420,6 +420,8 @@ public static class DependencyInjection
 
         services.AddScoped<IWorldRepository, WorldRepository>();
         services.AddScoped<IClubRepository, ClubRepository>();
+        services.AddScoped<IStadiumRepository, StadiumRepository>();
+        services.AddScoped<IStadiumQueries, StadiumQueries>();
         services.AddScoped<IManagerRepository, ManagerRepository>();
         services.AddScoped<IClubTenureRepository, ClubTenureRepository>();
         services.AddScoped<IDivisionProvisioningRequestRepository, DivisionProvisioningRequestRepository>();

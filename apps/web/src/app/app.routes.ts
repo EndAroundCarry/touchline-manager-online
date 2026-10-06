@@ -148,6 +148,12 @@ export const routes: Routes = [
         title: 'Finances — Touchline Manager',
       },
       {
+        path: 'stadium',
+        loadComponent: () => import('./features/stadium/stadium').then((m) => m.StadiumScreen),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Stadium — Touchline Manager',
+      },
+      {
         path: 'scouting',
         loadComponent: () => import('./features/scouting/scouting').then((m) => m.Scouting),
         canActivate: [requireAuthentication, requireVerifiedEmail],

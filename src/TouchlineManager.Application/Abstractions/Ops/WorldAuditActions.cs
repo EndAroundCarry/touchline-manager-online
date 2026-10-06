@@ -13,6 +13,9 @@ public static class WorldAuditActions
     /// <summary>A world was seeded from a generation seed.</summary>
     public const string WorldSeeded = "world.seeded";
 
+    /// <summary>A manager paid for new places in the club's stadium (`STAD-4`).</summary>
+    public const string StadiumSeatsBuilt = "world.club_stadium.seats_built";
+
     /// <summary>A manager profile was created.</summary>
     public const string ManagerProfileCreated = "world.manager_profile.created";
 

@@ -126,7 +126,6 @@ public sealed record AvailableClubsResponse(
 /// <param name="Region">The generated region.</param>
 /// <param name="BadgeSeed">The seed a procedurally drawn badge is derived from. No real mark is involved.</param>
 /// <param name="Reputation">The club's reputation, on the 1–100 scale.</param>
-/// <param name="StadiumBaseline">The fixed stadium baseline used by gate revenue (`FIN-3`).</param>
 /// <param name="IsAvailable">Whether the club is currently AI-controlled and claimable.</param>
 public sealed record AvailableClubResponse(
     Guid Id,
@@ -136,7 +135,6 @@ public sealed record AvailableClubResponse(
     string Region,
     string BadgeSeed,
     int Reputation,
-    long StadiumBaseline,
     bool IsAvailable);
 
 /// <summary>A manager profile (master plan §10.2).</summary>
@@ -233,7 +231,6 @@ public sealed record ClubDashboardResponse(
 /// <param name="FoundingGameYear">The game year the club was founded in.</param>
 /// <param name="Status">The lifecycle state, as a stable lowercase code.</param>
 /// <param name="Reputation">The club's reputation, on the 1–100 scale.</param>
-/// <param name="StadiumBaseline">The fixed stadium baseline (`FIN-3`).</param>
 public sealed record ClubSummaryResponse(
     Guid Id,
     string Name,
@@ -244,8 +241,7 @@ public sealed record ClubSummaryResponse(
     string BadgeSeed,
     int FoundingGameYear,
     string Status,
-    int Reputation,
-    long StadiumBaseline);
+    int Reputation);
 
 /// <summary>A tier of a country's pyramid.</summary>
 /// <param name="Id">The division identity.</param>

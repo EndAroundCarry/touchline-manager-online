@@ -89,7 +89,7 @@ Do not put these on the public MVP critical path:
 - Live in-match tactical changes, WebSockets, synchronous PvP, or a client-side match simulation.
 - Private transfer negotiations, player agents, loans, swaps, clauses, installment payments, or transfer windows.
 - Fog-of-war attribute estimates or a staffed scouting network; MVP scouting is database search plus shortlists.
-- Advanced stadium, facilities, sponsorship negotiation, merchandising, taxes, currencies, or debt.
+- Facilities beyond the stadium, sponsorship negotiation, merchandising, taxes, currencies, or debt.
 - Social chat, forums, private messages, manager associations, or user-generated public content.
 - Native Android/iOS packages; Capacitor follows the PWA release.
 - Offline mutations. Deadline-sensitive writes must never be silently queued.
@@ -263,7 +263,7 @@ Use integer minor units (`bigint`) and a single canonical in-game display curren
 
 Income:
 
-- Home-match gate revenue based on tier, attendance factor, form, and a fixed stadium baseline.
+- Home-match gate revenue from the club's own stadium (its places and their ticket prices), the tier, and form (`STAD-*`, ADR-0062).
 - Weekly sponsorship credit.
 - Promotion and final-position awards.
 - Transfer income.
@@ -278,7 +278,7 @@ Rules:
 
 - Clubs cannot place bids that exceed available cash after existing reservations.
 - Cash and reserved funds update transactionally with an append-only ledger.
-- No loans, debt, overdrafts, owner injections, stadium spending, or user purchases in the MVP.
+- No loans, debt, overdrafts, owner injections, or real-money purchases in the MVP. The one cash purchase besides players is new places in the club's stadium (`STAD-4`).
 - AI clubs obey the same affordability constraints.
 - A safety job detects clubs unable to field a legal squad or pay the next wage run and applies a logged emergency grant only when required to preserve competition integrity. This must emit an operations alert and be tuned out through balancing.
 
@@ -600,7 +600,7 @@ Use restrictive foreign keys for history. Do not cascade-delete completed season
 
 #### `world.clubs`
 
-- Country, stable fictional name/short name/slug, generated city/region, badge seed, founding game year, status, stadium baseline, reputation.
+- Country, stable fictional name/short name/slug, generated city/region, badge seed, founding game year, status, reputation. The club's stadium is its own row, `world.club_stadiums`.
 - Unique normalized club name and slug within world.
 - Club does not contain a mutable `human_manager_id`; derive control from active tenure.
 
@@ -1946,7 +1946,7 @@ Add in separate feature flags and migrations:
 
 - Staff roles, recruitment, contracts, and effects.
 - Youth academy, annual intake, development squads, and homegrown rules.
-- Facilities/stadium improvements.
+- Facilities beyond the stadium (training ground, academy buildings, upkeep costs, naming rights).
 - Richer morale, promises, player personalities, captaincy, and team cohesion.
 - More formations, roles, set-piece plans, and conditional substitution instructions.
 - Scout assignments and uncertain attribute reports.

@@ -409,18 +409,24 @@ public sealed class MatchdayWorkflowTests
 
         gates.Select(gate => gate.ClubId).Should().BeEquivalentTo(homeClubIds);
 
-        var clubs = await readDb.Clubs
-            .Where(club => homeClubIds.Contains(club.Id))
-            .ToDictionaryAsync(club => club.Id);
+        var grounds = await readDb.ClubStadiums
+            .Where(stadium => homeClubIds.Contains(stadium.ClubId))
+            .ToDictionaryAsync(stadium => stadium.ClubId);
+        var tier = await (
+            from divisionSeason in readDb.DivisionSeasons
+            join division in readDb.Divisions on divisionSeason.DivisionId equals division.Id
+            where divisionSeason.Id == divisionSeasonId
+            select division.TierNumber)
+            .SingleAsync();
         var ranks = await readDb.Standings
             .Where(standing => standing.DivisionSeasonId == divisionSeasonId)
             .ToDictionaryAsync(standing => standing.ClubId, standing => standing.Rank);
 
-        // The gate is the stadium baseline shaped by the position the round produced (FIN-3).
+        // The gate is the club's own ground filled by the crowd the position the round produced draws (FIN-3).
         foreach (var gate in gates)
         {
             gate.CashDeltaMinor.Should().Be(
-                WorldRuleSet.GateRevenueMinorFor(clubs[gate.ClubId].StadiumBaseline, ranks[gate.ClubId]));
+                StadiumRuleSet.GateRevenueMinorFor(grounds[gate.ClubId].Seats, tier, ranks[gate.ClubId]));
         }
 
         // The account is the running total of the ledger, so the gate sits inside the balance it produced

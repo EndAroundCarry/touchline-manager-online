@@ -284,7 +284,6 @@ public sealed class GetAvailableClubs
                     club.Region,
                     club.BadgeSeed,
                     club.Reputation,
-                    club.StadiumBaseline,
                     club.IsAvailable))],
                 _clock.UtcNow));
     }

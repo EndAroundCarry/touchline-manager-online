@@ -149,6 +149,22 @@ internal sealed class ClubRepository : IClubRepository
     public void Add(Club club) => _dbContext.Clubs.Add(club);
 }
 
+/// <summary>Club-stadium persistence (`STAD-1`).</summary>
+internal sealed class StadiumRepository : IStadiumRepository
+{
+    private readonly TouchlineManagerDbContext _dbContext;
+
+    /// <summary>Initializes the repository.</summary>
+    public StadiumRepository(TouchlineManagerDbContext dbContext) => _dbContext = dbContext;
+
+    /// <inheritdoc />
+    public void Add(ClubStadium stadium) => _dbContext.ClubStadiums.Add(stadium);
+
+    /// <inheritdoc />
+    public Task<ClubStadium?> FindByClubAsync(Guid clubId, CancellationToken cancellationToken) =>
+        _dbContext.ClubStadiums.SingleOrDefaultAsync(stadium => stadium.ClubId == clubId, cancellationToken);
+}
+
 /// <summary>Manager-profile persistence.</summary>
 internal sealed class ManagerRepository : IManagerRepository
 {

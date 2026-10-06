@@ -44,7 +44,6 @@ test.describe('onboarding', () => {
     // The claim lands on the dashboard of the club that was inherited.
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByText('Club funds')).toBeVisible();
-    await expect(page.getByText('Stadium baseline')).toBeVisible();
     await expect(page.getByText('Yours')).toBeVisible();
 
     // The club is inherited as it stands, so a second read shows the same control.

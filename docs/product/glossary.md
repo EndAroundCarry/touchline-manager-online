@@ -28,7 +28,7 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 |---|---|
 | **Account** | An authenticated identity (`auth.users`): email, credentials, status, and roles. One account owns at most one active manager profile. |
 | **Manager** | The game persona attached to an account: display name, reputation, timezone, locale, and takeover cooldown. |
-| **Club** | A persistent fictional organization with a squad, contracts, finances, stadium baseline, reputation, and history. A club is never owned by a manager and never resets on takeover (`WORLD-6`, `WORLD-9`). |
+| **Club** | A persistent fictional organization with a squad, contracts, finances, stadium, reputation, and history. A club is never owned by a manager and never resets on takeover (`WORLD-6`, `WORLD-9`). |
 | **Tenure** (`ClubTenure`) | A time-bounded period during which a manager controls a club, with a control status of `active`, `inactive`, or `closed`. Control is derived from the tenure; a club has no mutable `human_manager_id` (`WORLD-7`). |
 | **Human managed** | A club with an active tenure whose account is not suspended and whose release date is null. Only human-managed clubs count toward pyramid capacity. |
 | **AI controlled** | A club with no active tenure, or one whose tenure is inactive/closed. AI decisions are made by the same validators as humans and receive no privileged information (`INS-12`, `FIN-15`). |
@@ -92,7 +92,8 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 | **Reservation** | Funds held against a club's balance to back a leading bid. Released when the club is outbid, transferred on resolution (`TRF-7`). |
 | **Resolution** | The serializable transaction that validates and completes a listing: winner pays, seller is credited, registration moves, the old contract closes, and the new contract opens (`TRF-9`, `TRF-10`). |
 | **Ledger** | The append-only record of every money movement, from which cash and reserved balances are exactly reconstructible. Corrections are compensating entries (`FIN-12`, `FIN-18`). |
-| **Gate revenue** | Home-match income derived from tier, attendance factor, form, and stadium baseline (`FIN-3`). |
+| **Gate revenue** | Home-match income: what the club's stadium sells at a home match, from its places, their ticket prices, the crowd the tier and form draw (`FIN-3`, `STAD-5`). |
+| **Stadium** | A club's ground: a count of standing, seating, covered and VIP places, from which its level (1–10, one per 5,000 places) and its picture are read (`STAD-1`). |
 | **Emergency grant** | A logged, alerted integrity payment made only when a club cannot field a legal squad or pay the next wage run (`FIN-16`). |
 
 ## Platform and operations

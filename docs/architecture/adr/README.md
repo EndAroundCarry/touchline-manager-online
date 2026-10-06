@@ -79,6 +79,7 @@ the system is shaped the way it is.
 | [0059](0059-dark-management-workspace-ui.md) | The web client is a dark management workspace built on role tokens | Accepted |
 | [0060](0060-per-attribute-training-progress.md) | Training progress is held per attribute, and the day's budget is split by weight (`training-v3`) | Accepted |
 | [0061](0061-engine-v10-attackers-find-space-passers-choose.md) | Engine-v10 lets attackers find space and passers choose who gets the ball | Accepted |
+| [0062](0062-club-stadium-places-levels-and-gate.md) | A club's stadium is a count of places, its level is read from them, and gate revenue is what they sell | Accepted |
 
 ## Rules for changing an ADR
 

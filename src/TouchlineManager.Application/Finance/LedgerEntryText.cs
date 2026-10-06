@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.Finance;
 
@@ -52,9 +53,29 @@ public static class LedgerEntryText
             LedgerPostings.ReservationReleaseTemplate => "Bid funds released",
             LedgerPostings.TransferPaymentTemplate => "Transfer fee paid",
             LedgerPostings.TransferProceedsTemplate => "Transfer fee received",
+            LedgerPostings.StadiumConstructionTemplate => StadiumWorks(parameters),
             _ => throw new InvalidOperationException(
                 $"'{templateKey}' is not a ledger template this build renders."),
         };
+    }
+
+    private static string StadiumWorks(Dictionary<string, long> parameters)
+    {
+        var count = Number(parameters, "count");
+        var stand = (StadiumStand)Number(parameters, "stand");
+
+        var place = stand switch
+        {
+            StadiumStand.Standing => "standing place",
+            StadiumStand.Seating => "seat",
+            StadiumStand.CoveredSeating => "covered seat",
+            StadiumStand.Vip => "VIP seat",
+            _ => "place",
+        };
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Stadium works: {count:N0} {place}{(count == 1 ? string.Empty : "s")}");
     }
 
     private static long Number(Dictionary<string, long> parameters, string key) =>

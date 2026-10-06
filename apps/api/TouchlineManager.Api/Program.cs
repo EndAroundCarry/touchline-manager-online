@@ -267,6 +267,7 @@ app.MapTeamSheetEndpoints();
 app.MapMatchEndpoints();
 app.MapCommsEndpoints();
 app.MapFinanceEndpoints();
+app.MapStadiumEndpoints();
 app.MapMarketEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;

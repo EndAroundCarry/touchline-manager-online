@@ -279,15 +279,12 @@
               <dd>{{ inherited.club.reputation }} / 100</dd>
             </div>
             <div class="flex justify-between px-3.5 py-1.5">
-              <dt class="text-ink-2">Stadium baseline</dt>
-              <dd>{{ funds(inherited.club.stadiumBaseline) }}</dd>
-            </div>
-            <div class="flex justify-between px-3.5 py-1.5">
               <dt class="text-ink-2">Control</dt>
               <dd>{{ inherited.control.status === 'active' ? 'Yours' : 'AI-assisted' }}</dd>
             </div>
           </dl>
-          <div class="border-t border-line-soft px-3.5 py-2 text-right text-xs">
+          <div class="flex justify-end gap-4 border-t border-line-soft px-3.5 py-2 text-xs">
+            <a routerLink="/stadium" [class]="linkClass">Stadium</a>
             <a routerLink="/finances" [class]="linkClass">Finances</a>
           </div>
         </section>

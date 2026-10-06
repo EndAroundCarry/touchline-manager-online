@@ -1443,8 +1443,8 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Category")
                         .IsRequired()
-                        .HasMaxLength(19)
-                        .HasColumnType("character varying(19)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("category");
 
                     b.Property<Guid>("ClubSeasonFinanceId")
@@ -1487,8 +1487,8 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Category")
                         .IsRequired()
-                        .HasMaxLength(19)
-                        .HasColumnType("character varying(19)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("category");
 
                     b.Property<Guid>("ClubId")
@@ -1566,7 +1566,7 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_ledger_entries_balances", "resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor");
 
-                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation')");
+                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction')");
 
                             t.HasCheckConstraint("ck_ledger_entries_correlation_id", "length(correlation_id) > 0");
 
@@ -1578,7 +1578,7 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_ledger_entries_sequence", "sequence >= 1");
 
-                            t.HasCheckConstraint("ck_ledger_entries_source_type", "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', 'safety_job', 'admin_repair')");
+                            t.HasCheckConstraint("ck_ledger_entries_source_type", "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', 'safety_job', 'admin_repair', 'stadium')");
                         });
                 });
 
@@ -3464,10 +3464,6 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("slug");
 
-                    b.Property<long>("StadiumBaseline")
-                        .HasColumnType("bigint")
-                        .HasColumnName("stadium_baseline");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -3503,9 +3499,60 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_clubs_reputation", "reputation between 1 and 100");
 
-                            t.HasCheckConstraint("ck_clubs_stadium_baseline", "stadium_baseline >= 0");
-
                             t.HasCheckConstraint("ck_clubs_status", "status in ('active', 'retired')");
+                        });
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.World.ClubStadium", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<int>("CoveredSeats")
+                        .HasColumnType("integer")
+                        .HasColumnName("covered_seats");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("SeatingSeats")
+                        .HasColumnType("integer")
+                        .HasColumnName("seating_seats");
+
+                    b.Property<int>("StandingSeats")
+                        .HasColumnType("integer")
+                        .HasColumnName("standing_seats");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.Property<int>("VipSeats")
+                        .HasColumnType("integer")
+                        .HasColumnName("vip_seats");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClubId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_club_stadiums_club_id");
+
+                    b.ToTable("club_stadiums", "world", t =>
+                        {
+                            t.HasCheckConstraint("ck_club_stadiums_capacity", "standing_seats + seating_seats + covered_seats + vip_seats between 1 and 50000");
+
+                            t.HasCheckConstraint("ck_club_stadiums_places", "standing_seats >= 0 and seating_seats >= 0 and covered_seats >= 0 and vip_seats >= 0");
                         });
                 });
 
@@ -4810,6 +4857,15 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                     b.HasOne("TouchlineManager.Domain.World.GameWorld", null)
                         .WithMany()
                         .HasForeignKey("WorldId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TouchlineManager.Domain.World.ClubStadium", b =>
+                {
+                    b.HasOne("TouchlineManager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -58,7 +58,6 @@ const DASHBOARD: ClubDashboard = {
     foundingGameYear: 1901,
     status: 'active',
     reputation: 70,
-    stadiumBaseline: 25_000_000,
   },
   country: { id: 'country-1', code: 'ENG', displayName: 'England', locale: 'en-GB', sortOrder: 1 },
   division: {

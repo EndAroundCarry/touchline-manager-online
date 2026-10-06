@@ -47,13 +47,16 @@ public enum LedgerCategory
 
     /// <summary>A compensating entry that corrects an earlier one; balances are never edited (`FIN-12`).</summary>
     Compensation = 11,
+
+    /// <summary>Places a club paid to add to its stadium (`STAD-4`).</summary>
+    StadiumConstruction = 12,
 }
 
 /// <summary>Stable codes and parsing for <see cref="LedgerCategory"/>.</summary>
 public static class LedgerCategories
 {
     /// <summary>The longest code, so a column can be sized to hold every value.</summary>
-    public const int MaxCodeLength = 19;
+    public const int MaxCodeLength = 20;
 
     /// <summary>Every category, in declaration order.</summary>
     public static readonly IReadOnlyList<LedgerCategory> All = [.. Enum.GetValues<LedgerCategory>()];
@@ -74,6 +77,7 @@ public static class LedgerCategories
         LedgerCategory.ReservationRelease => "reservation_release",
         LedgerCategory.EmergencyGrant => "emergency_grant",
         LedgerCategory.Compensation => "compensation",
+        LedgerCategory.StadiumConstruction => "stadium_construction",
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown ledger category."),
     };
 
@@ -93,6 +97,7 @@ public static class LedgerCategories
         "reservation_release" => LedgerCategory.ReservationRelease,
         "emergency_grant" => LedgerCategory.EmergencyGrant,
         "compensation" => LedgerCategory.Compensation,
+        "stadium_construction" => LedgerCategory.StadiumConstruction,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown ledger category code."),
     };
 }

@@ -4,6 +4,41 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Stadium — a ground a manager builds, and a Facilities menu
+
+Recorded in [`ADR-0062`](docs/architecture/adr/0062-club-stadium-places-levels-and-gate.md). Rule set
+`world-rules-v10`.
+
+### Added
+
+- **A Facilities heading in the menu, with Stadium under it** (`/stadium`).
+- **A stadium for every club.** 5,000 places to start — 3,000 standing, 1,000 seating, 900 covered, 100 VIP — in ten
+  levels up to 50,000. The level is read from the places (one per 5,000), so passing 5,000, 10,000 and so on moves the
+  ground up a level.
+- **Building places.** A manager adds as many places of any kind as the club can pay for. A place costs, at tier 1,
+  300.00 standing, 600.00 seating, 1,000.00 covered and 4,000.00 VIP, halved per tier. The order is paid through the
+  ledger (`stadium_construction`, shown as "Stadium works: 40 seats"), needs the ground's version in `If-Match`, and
+  is refused rather than charged twice when it is repeated.
+- **Ticket prices.** At tier 1, 8.00 standing, 15.00 seating, 25.00 covered and 90.00 VIP, halved per tier.
+- **Ten pictures, in the club's colours.** A top-down drawing of the ground at each level, from a village terrace to
+  a closed two-tier bowl with floodlights and a banner. The seats are drawn in the club's own colour, and the picture
+  changes each time the ground passes another 5,000 places. The page also shows every level ahead.
+- **`GET /stadium` and `POST /stadium/seats`.**
+
+### Changed
+
+- **Gate revenue is what the club's ground sells.** For each kind of place a home match sells the lesser of the
+  places and the crowd that wants them, at that place's price. A tier-1 crowd is 9,000 at mid-table, falling by a
+  quarter per tier and moving with league position. Places nobody turns up for earn nothing. This replaces the flat
+  stadium baseline: against it, the opening ground takes about 41% more at tiers 1 and 2, 29% more at tier 3, 13%
+  more at tier 4, and 5% and 24% less at tiers 5 and 6. The values are provisional until the multi-season study.
+- **`FIN-14` is relaxed** to allow the one cash purchase besides players, new places in the stadium.
+
+### Removed
+
+- **`world.clubs.stadium_baseline`**, its constant and its check, and the `stadiumBaseline` field of the club
+  responses and the dashboard. The migration gives every existing club the opening ground, then drops the column.
+
 ## Engine-v10 — attackers find space, passers choose who gets the ball
 
 Recorded in [`ADR-0061`](docs/architecture/adr/0061-engine-v10-attackers-find-space-passers-choose.md), built in

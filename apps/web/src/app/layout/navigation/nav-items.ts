@@ -61,6 +61,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: 'Market',
   },
   { path: '/finances', label: 'Finances', icon: 'pi pi-wallet', available: true, group: 'Market' },
+  {
+    path: '/stadium',
+    label: 'Stadium',
+    icon: 'pi pi-building',
+    available: true,
+    group: 'Facilities',
+  },
   { path: '/inbox', label: 'Inbox', icon: 'pi pi-inbox', available: true, group: 'Messages' },
   { path: '/news', label: 'News', icon: 'pi pi-megaphone', available: true, group: 'Messages' },
   { path: '/settings', label: 'Settings', icon: 'pi pi-cog', available: true, group: 'Game' },

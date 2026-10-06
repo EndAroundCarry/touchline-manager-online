@@ -21,6 +21,8 @@ namespace TouchlineManager.Domain.Rules;
 /// settle; Stage 10 the auction windows, blackout, and minimum bid increment the transfer market runs on,
 /// and — its AI-market milestone — the player valuation and bidding bands the AI's own market decisions
 /// use (`TRF-12`).
+/// The stadium milestone moved gate revenue off a fixed baseline and onto the club's own ground — places,
+/// prices, and the crowd that fills them — which lives in <see cref="StadiumRuleSet"/> (`STAD-*`).
 /// Stage 12 added the rollover-continuity values: the contract-continuity AI's target squad size, and the
 /// retirement rule's start age, growth, forced caps, and ability and fitness gate (`CON-6`, `CON-8`).
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
@@ -30,7 +32,7 @@ namespace TouchlineManager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v9";
+    public const string Version = "world-rules-v10";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -103,9 +105,6 @@ public static class WorldRuleSet
     /// </remarks>
     public const long OpeningCashMinorTier1 = 50_000_000;
 
-    /// <summary>Opening stadium baseline for a tier-1 club, in minor units. A balancing value.</summary>
-    public const long OpeningStadiumBaselineTier1 = 25_000_000;
-
     /// <summary>Opening reputation for a tier-1 club, on the same 1–100 scale as player ability.</summary>
     public const int OpeningReputationTier1 = 70;
 
@@ -132,10 +131,6 @@ public static class WorldRuleSet
     public static long OpeningCashMinorForTier(int tier) =>
         OpeningCashMinorTier1 / TierScalingFactor(tier);
 
-    /// <summary>Opening stadium baseline for a club in the given tier, in minor units.</summary>
-    public static long OpeningStadiumBaselineForTier(int tier) =>
-        OpeningStadiumBaselineTier1 / TierScalingFactor(tier);
-
     /// <summary>Opening reputation for a club in the given tier.</summary>
     public static int OpeningReputationForTier(int tier) =>
         Math.Max(1, OpeningReputationTier1 / (int)TierScalingFactor(tier));
@@ -153,22 +148,13 @@ public static class WorldRuleSet
     /// </remarks>
     public static readonly TimeOnly WeeklyFinanceUtc = new(23, 0);
 
-    /// <summary>
-    /// The fraction of the stadium baseline a full house yields, in basis points (`FIN-3`).
-    /// </summary>
-    /// <remarks>
-    /// Gate revenue is a share of the club's own fixed stadium baseline rather than an invented attendance
-    /// figure, so it scales with tier the same way the baseline does. The value is provisional and is
-    /// calibrated by the multi-season simulations this stage requires, like the other baselines.
-    /// </remarks>
-    public const int GateRevenueBaseFractionBp = 2_000;
-
     /// <summary>How much one place in the table moves the gate factor, in basis points (`FIN-3`).</summary>
     /// <remarks>Above and below the middle place the factor rises and falls, and both ends clamp.</remarks>
     private const int GateRevenueFormFactorStepPerRankBp = 300;
 
     /// <summary>
-    /// The attendance factor a league position applies to gate revenue, in basis points (`FIN-3`).
+    /// The attendance factor a league position applies to a matchday's demand, in basis points (`FIN-3`,
+    /// <see cref="StadiumRuleSet.MatchdayDemandFor"/>).
     /// </summary>
     /// <param name="formRank">The club's league position, 1 (top) to 18 (bottom).</param>
     /// <returns>A factor bounded between 8,000 and 12,000 basis points, pivoting on ninth place.</returns>
@@ -178,20 +164,6 @@ public static class WorldRuleSet
         ArgumentOutOfRangeException.ThrowIfGreaterThan(formRank, ClubsPerDivision);
 
         return Math.Clamp(10_000 + ((9 - formRank) * GateRevenueFormFactorStepPerRankBp), 8_000, 12_000);
-    }
-
-    /// <summary>The gate revenue a home fixture yields, in minor units (`FIN-3`).</summary>
-    /// <param name="stadiumBaseline">The club's fixed stadium baseline, already scaled to its tier.</param>
-    /// <param name="formRank">The club's league position, 1–18.</param>
-    public static long GateRevenueMinorFor(long stadiumBaseline, int formRank)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(stadiumBaseline);
-
-        // Divided in two steps so the intermediate product stays well inside long, and so the factor and the
-        // fraction each truncate on their own rather than blending into one rounding.
-        return stadiumBaseline
-            * GateRevenueBaseFractionBp / 10_000
-            * GateRevenueFormFactorBpFor(formRank) / 10_000;
     }
 
     /// <summary>The weekly sponsorship credit for a tier-1 club, in minor units. A balancing value (`FIN-4`).</summary>

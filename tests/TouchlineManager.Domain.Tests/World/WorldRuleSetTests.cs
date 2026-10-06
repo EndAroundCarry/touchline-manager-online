@@ -134,8 +134,6 @@ public sealed class WorldRuleSetTests
 
         WorldRuleSet.OpeningCashMinorForTier(1).Should().BeGreaterThan(WorldRuleSet.OpeningCashMinorForTier(2));
         WorldRuleSet.OpeningCashMinorForTier(2).Should().BeGreaterThan(WorldRuleSet.OpeningCashMinorForTier(3));
-        WorldRuleSet.OpeningStadiumBaselineForTier(4).Should().BeLessThan(
-            WorldRuleSet.OpeningStadiumBaselineForTier(1));
         WorldRuleSet.OpeningReputationForTier(6).Should().BeGreaterThanOrEqualTo(1);
     }
 
@@ -155,13 +153,6 @@ public sealed class WorldRuleSetTests
         WorldRuleSet.GateRevenueFormFactorBpFor(9).Should().Be(10_000, "ninth place is the neutral gate");
         WorldRuleSet.GateRevenueFormFactorBpFor(18).Should().Be(8_000, "the bottom of the table clamps at the floor");
 
-        var top = WorldRuleSet.GateRevenueMinorFor(WorldRuleSet.OpeningStadiumBaselineTier1, formRank: 1);
-        var bottom = WorldRuleSet.GateRevenueMinorFor(WorldRuleSet.OpeningStadiumBaselineTier1, formRank: 18);
-
-        top.Should().BeGreaterThan(bottom, "a club near the top draws the fuller ground");
-        bottom.Should().BeGreaterThan(0, "even the bottom club draws a gate");
-        WorldRuleSet.GateRevenueMinorFor(WorldRuleSet.OpeningStadiumBaselineTier1, formRank: 9).Should()
-            .Be(WorldRuleSet.OpeningStadiumBaselineTier1 * WorldRuleSet.GateRevenueBaseFractionBp / 10_000);
     }
 
     [Fact]

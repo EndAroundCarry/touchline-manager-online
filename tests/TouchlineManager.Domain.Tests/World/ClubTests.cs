@@ -43,18 +43,16 @@ public sealed class ClubTests
         var club = Generate(tier: 1);
 
         club.Status.Should().Be(ClubStatus.Active);
-        club.StadiumBaseline.Should().Be(WorldRuleSet.OpeningStadiumBaselineForTier(1));
         club.Reputation.Should().Be(WorldRuleSet.OpeningReputationForTier(1));
         club.Version.Should().Be(1);
     }
 
     [Fact]
-    public void A_deeper_tier_club_is_less_wealthy_and_less_reputed_than_a_top_tier_one()
+    public void A_deeper_tier_club_is_less_reputed_than_a_top_tier_one()
     {
         var top = Generate(tier: 1);
         var deep = Generate(tier: 4);
 
-        deep.StadiumBaseline.Should().BeLessThan(top.StadiumBaseline);
         deep.Reputation.Should().BeLessThan(top.Reputation);
     }
 

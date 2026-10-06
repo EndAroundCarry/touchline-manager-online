@@ -75,7 +75,6 @@ export interface AvailableClub {
   readonly region: string;
   readonly badgeSeed: string;
   readonly reputation: number;
-  readonly stadiumBaseline: number;
   readonly isAvailable: boolean;
 }
 
@@ -133,7 +132,6 @@ export interface ClubSummary {
   readonly foundingGameYear: number;
   readonly status: string;
   readonly reputation: number;
-  readonly stadiumBaseline: number;
 }
 
 /** A tier of a country's pyramid. */

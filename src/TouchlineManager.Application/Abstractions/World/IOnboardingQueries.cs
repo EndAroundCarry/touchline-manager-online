@@ -113,7 +113,6 @@ public sealed record CountryCapacitySnapshot(
 /// <param name="Region">The generated region.</param>
 /// <param name="BadgeSeed">The badge seed.</param>
 /// <param name="Reputation">The club's reputation.</param>
-/// <param name="StadiumBaseline">The fixed stadium baseline.</param>
 /// <param name="IsAvailable">Whether the club is AI-controlled and therefore claimable.</param>
 public sealed record AvailableClubRow(
     Guid Id,
@@ -123,7 +122,6 @@ public sealed record AvailableClubRow(
     string Region,
     string BadgeSeed,
     int Reputation,
-    long StadiumBaseline,
     bool IsAvailable);
 
 /// <summary>Everything the inherited-club dashboard reads (`WORLD-9`).</summary>

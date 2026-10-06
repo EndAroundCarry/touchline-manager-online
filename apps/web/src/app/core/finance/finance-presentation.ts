@@ -20,6 +20,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   reservation_release: 'Reservations released',
   emergency_grant: 'Emergency grants',
   compensation: 'Compensating entries',
+  stadium_construction: 'Stadium construction',
 };
 
 /** One labelled total for display. */

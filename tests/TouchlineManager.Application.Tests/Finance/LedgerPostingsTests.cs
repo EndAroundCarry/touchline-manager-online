@@ -2,6 +2,7 @@ using System.Text.Json;
 using FluentAssertions;
 using TouchlineManager.Application.Finance;
 using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.Tests.Finance;
 
@@ -184,5 +185,63 @@ public sealed class LedgerPostingsTests
             amountMinor: 0);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Stadium_works_debit_the_cash_and_key_on_the_ground_at_the_version_they_produced()
+    {
+        var clubId = Guid.CreateVersion7();
+        var stadiumId = Guid.CreateVersion7();
+
+        var posting = LedgerPostings.StadiumConstruction(
+            Guid.CreateVersion7(), clubId, stadiumId, stadiumVersion: 4, StadiumStand.CoveredSeating, 250, 25_000_000);
+
+        posting.Category.Should().Be(LedgerCategory.StadiumConstruction);
+        posting.SourceType.Should().Be(LedgerSourceType.Stadium);
+        posting.SourceId.Should().Be(stadiumId);
+        posting.CashDeltaMinor.Should().Be(-25_000_000, "building is a spend");
+        posting.ReservedDeltaMinor.Should().Be(0);
+        posting.CorrelationId.Should().Be(
+            $"stadium:{stadiumId:D}:v4",
+            "a retried order collides with its first entry, a genuine second order does not (FIN-17)");
+    }
+
+    [Theory]
+    [InlineData(StadiumStand.Standing, 1, "Stadium works: 1 standing place")]
+    [InlineData(StadiumStand.Standing, 1_500, "Stadium works: 1,500 standing places")]
+    [InlineData(StadiumStand.Seating, 40, "Stadium works: 40 seats")]
+    [InlineData(StadiumStand.CoveredSeating, 1, "Stadium works: 1 covered seat")]
+    [InlineData(StadiumStand.Vip, 12, "Stadium works: 12 VIP seats")]
+    public void A_stadium_works_entry_reads_as_the_places_it_bought(StadiumStand stand, int count, string expected)
+    {
+        var posting = LedgerPostings.StadiumConstruction(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 2, stand, count, 1_000);
+
+        LedgerEntryText.Render(posting.DescriptionTemplate, posting.DescriptionParametersJson)
+            .Should().Be(expected);
+    }
+
+    [Fact]
+    public void An_order_that_costs_nothing_or_adds_nothing_is_refused()
+    {
+        var free = () => LedgerPostings.StadiumConstruction(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 2, StadiumStand.Standing, 5, 0);
+        var empty = () => LedgerPostings.StadiumConstruction(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 2, StadiumStand.Standing, 0, 100);
+
+        free.Should().Throw<ArgumentOutOfRangeException>();
+        empty.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void The_new_category_and_source_round_trip_through_their_stable_codes()
+    {
+        LedgerCategory.StadiumConstruction.ToCode().Should().Be("stadium_construction");
+        LedgerCategories.FromCode("stadium_construction").Should().Be(LedgerCategory.StadiumConstruction);
+        LedgerSourceType.Stadium.ToCode().Should().Be("stadium");
+        LedgerSourceTypes.FromCode("stadium").Should().Be(LedgerSourceType.Stadium);
+
+        LedgerCategories.All.Select(category => category.ToCode().Length).Max()
+            .Should().BeLessThanOrEqualTo(LedgerCategories.MaxCodeLength, "the column holds every code");
     }
 }

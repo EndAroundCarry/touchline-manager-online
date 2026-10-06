@@ -326,7 +326,7 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 
 | Ref | Source | Basis |
 |---|---|---|
-| FIN-3 | Home-match gate revenue | tier, attendance factor, form, fixed stadium baseline |
+| FIN-3 | Home-match gate revenue | the club's stadium (places and ticket prices), tier, and form |
 | FIN-4 | Weekly sponsorship credit | fixed baseline per tier |
 | FIN-5 | Promotion award and final-position award | tier and final rank |
 | FIN-6 | Transfer income | completed auction proceeds |
@@ -347,7 +347,7 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 | FIN-11 | Cash and reserved funds update transactionally together with an append-only ledger entry. |
 | FIN-12 | The ledger is append-only. Corrections use compensating entries; balances are never edited directly. |
 | FIN-13 | Cash and reserved balances are never negative. Enforced by database check constraints. |
-| FIN-14 | No loans, debt, overdrafts, owner injections, stadium spending, or user purchases exist in the MVP. |
+| FIN-14 | No loans, debt, overdrafts, owner injections, or real-money purchases exist in the MVP. The one thing a club buys with its cash besides players is new places in its stadium (`STAD-4`). |
 | FIN-15 | AI clubs obey identical affordability constraints. They never receive hidden discounts or unlimited money. |
 | FIN-16 | A safety job detects clubs that cannot field a legal squad or pay the next wage run and applies a **logged emergency grant** only when required to preserve competition integrity. It emits an operations alert and is tuned out through balancing. |
 | FIN-17 | Every financial operation is idempotent under retry and carries a correlation key. |
@@ -371,10 +371,11 @@ Each of the sources above is a named value in the rule set (`RULE-1`), so a bala
 rather than a hunt for a constant. The study of the six leagues staying viable over several seasons is what
 calibrates the baselines; the shapes below are fixed from this version on.
 
-- **Gate revenue (`FIN-3`)** is the club's fixed stadium baseline (already scaled to its tier) times a base
-  fraction of 20%, times an attendance factor of 8000–12000 basis points that rises with league position and
-  clamps at both ends. It is posted for the host club of every published fixture, inside the publication
-  transaction, priced against the table that round produced.
+- **Gate revenue (`FIN-3`)** is what the club's own stadium takes in at a home match (§13.5): for each kind of
+  place, the lesser of the places the club has and the crowd that wants them, times that place's ticket price,
+  summed. The crowd is the tier's demand times an attendance factor of 8000–12000 basis points that rises with
+  league position and clamps at both ends. It is posted for the host club of every published fixture, inside the
+  publication transaction, priced against the table that round produced.
 - **Weekly sponsorship (`FIN-4`)** is a fixed tier-1 credit halved per tier below the first.
 - **Weekly player wages (`FIN-7`)** are the sum of the club's active contracts' weekly wages, charged after the
   Sunday matchday.
@@ -387,6 +388,25 @@ calibrates the baselines; the shapes below are fixed from this version on.
   season's own window, with opening cash read from before the season and closing cash as opening plus the
   category totals. It is written once, at rollover, for reporting; the settlement award (`FIN-5`) is the next
   season's first money and lies outside the window.
+
+### 13.5 The stadium
+
+Every club owns one stadium (`world.club_stadiums`). It is a count of places of four kinds, and everything else —
+its size, its level, the picture a manager sees — is read from those counts.
+
+| Ref | Rule |
+|---|---|
+| STAD-1 | A stadium's **level** is the number of 5,000-place blocks it spans: 1 up to 5,000 places, 2 from 5,001, and so on to **level 10 at 50,000 places**, which is the largest ground there is. Nothing but the places sets the level, so the level and its picture can never disagree with what a manager bought. |
+| STAD-2 | Every club opens with **5,000 places**: 3,000 standing, 1,000 seating, 900 covered seating and 100 VIP, whatever its tier. |
+| STAD-3 | A ticket costs, at a tier-1 club, **8.00** standing, **15.00** seating, **25.00** covered seating and **90.00** VIP. Prices halve per tier below the first, like every other baseline (`WORLD-4`). |
+| STAD-4 | A manager may add as many places as they like, of any kind, up to the top level. A place costs, at a tier-1 club, **300.00** standing, **600.00** seating, **1,000.00** covered seating and **4,000.00** VIP, halved per tier. The club pays from its available cash (`FIN-10`) through one ledger entry (`stadium_construction`), and the order is refused if the club cannot pay or the ground has no room. The ground's version is the entity tag the order carries, so a retried or doubled order is refused rather than paid for twice (`CONC-1`, `FIN-17`). |
+| STAD-5 | A home match sells, for each kind of place, the lesser of the places the club has and the crowd that wants them. A tier-1 club draws 9,000 at mid-table, **a quarter fewer per tier below**, scaled by the league-position factor of `FIN-3`; the crowd splits across the kinds 45% standing, 20% seating, 28% covered and 7% VIP. Places nobody turns up for earn nothing. |
+| STAD-6 | Places are only ever added. A club's ground cannot shrink, and a place is paid for once. |
+
+A mid-table tier-1 club's opening ground sells out and takes 70,500.00 a home match. A place that sells out pays for
+itself in roughly two and a half seasons (17 home matches); one that does not sell pays nothing, so a manager builds
+toward the crowd and not toward the cap. The values are balancing values in `StadiumRuleSet`, to be calibrated with
+the rest of the economy.
 
 ---
 
@@ -635,11 +655,15 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `weekly_wage_minor_per_ability_squared` | 300 minor units | CON-2 (balancing) |
 | `tier_scaling_factor` | 2^(tier − 1) | WORLD-4 (balancing) |
 | `opening_cash_minor_tier1` | 50,000,000 minor units | FIN-1 (balancing) |
-| `opening_stadium_baseline_tier1` | 25,000,000 minor units | FIN-3 (balancing) |
 | `opening_reputation_tier1` | 70 / 100 | WORLD-3 (balancing) |
-| `gate_revenue_base_fraction_bp` | 2,000 (20% of stadium baseline) | FIN-3 (balancing) |
 | `gate_revenue_form_factor_bp` | 8,000–12,000, pivoting on ninth place | FIN-3 (balancing) |
 | `gate_revenue_form_factor_step_bp` | 300 per place | FIN-3 (balancing) |
+| `stadium_seats_per_level` / `stadium_max_level` | 5,000 / 10 (50,000 places) | STAD-1 |
+| `stadium_opening_places` | 3,000 / 1,000 / 900 / 100 | STAD-2 |
+| `stadium_ticket_price_minor_tier1` | 800 / 1,500 / 2,500 / 9,000 minor units | STAD-3 (balancing) |
+| `stadium_build_cost_minor_tier1` | 30,000 / 60,000 / 100,000 / 400,000 minor units per place | STAD-4 (balancing) |
+| `stadium_matchday_demand_tier1` | 9,000, retaining 7,500 bp per tier below | STAD-5 (balancing) |
+| `stadium_demand_share_bp` | 4,500 / 2,000 / 2,800 / 700 | STAD-5 (balancing) |
 | `weekly_sponsorship_minor_tier1` | 3,000,000 minor units | FIN-4 (balancing) |
 | `weekly_operating_cost_minor_tier1` | 1,000,000 minor units | FIN-9 (balancing) |
 | `position_award_minor_tier1_winner` | 40,000,000 minor units | FIN-5 (balancing) |

@@ -95,7 +95,7 @@ public sealed class MatchdayFinances
                     $"Club {clubId:D} has no position in the rebuilt table, so its gate has no form (FIN-3).");
             }
 
-            var amount = WorldRuleSet.GateRevenueMinorFor(revenue.StadiumBaseline, formRank);
+            var amount = StadiumRuleSet.GateRevenueMinorFor(revenue.Seats, revenue.TierNumber, formRank);
 
             if (amount <= 0)
             {

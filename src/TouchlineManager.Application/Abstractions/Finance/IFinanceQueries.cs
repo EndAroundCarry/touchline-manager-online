@@ -1,19 +1,20 @@
 using TouchlineManager.Domain.Finance;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.Abstractions.Finance;
 
 /// <summary>
-/// One club's basis for gate revenue: its fixed stadium baseline and the tier it plays in (`FIN-3`).
+/// One club's basis for gate revenue: the places in its ground and the tier it plays in (`FIN-3`, `STAD-5`).
 /// </summary>
 /// <remarks>
-/// The baseline is the whole of "how big is the ground", and it is already scaled to the tier, so the tier
-/// is carried beside it rather than derived from it: the safety and warning reads want the tier too, and a
-/// second read that must agree with the first is a second read that can disagree.
+/// The ground says how many people the club can seat and the tier says how many want to come and what they
+/// pay, so the two are read together: a second read that must agree with the first is a second read that can
+/// disagree.
 /// </remarks>
 /// <param name="ClubId">The club.</param>
-/// <param name="StadiumBaseline">The club's fixed stadium baseline, in minor units.</param>
+/// <param name="Seats">The places in the club's ground.</param>
 /// <param name="TierNumber">The tier the club plays in, 1 and up.</param>
-public sealed record ClubRevenueBasis(Guid ClubId, long StadiumBaseline, int TierNumber);
+public sealed record ClubRevenueBasis(Guid ClubId, StadiumSeats Seats, int TierNumber);
 
 /// <summary>
 /// One club's obligations for a week's finance run: the tier it plays in and what its squad costs (`FIN-7`).

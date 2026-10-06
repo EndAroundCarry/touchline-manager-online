@@ -141,7 +141,6 @@ internal sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
         {
             table.HasCheckConstraint("ck_clubs_status", "status in ('active', 'retired')");
             table.HasCheckConstraint("ck_clubs_reputation", "reputation between 1 and 100");
-            table.HasCheckConstraint("ck_clubs_stadium_baseline", "stadium_baseline >= 0");
         });
 
         builder.HasKey(club => club.Id);
@@ -164,7 +163,6 @@ internal sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
             .HasMaxLength(16)
             .HasConversion(status => status.ToCode(), code => ClubStatuses.FromCode(code))
             .IsRequired();
-        builder.Property(club => club.StadiumBaseline).HasColumnName("stadium_baseline").IsRequired();
         builder.Property(club => club.Reputation).HasColumnName("reputation").IsRequired();
         builder.Property(club => club.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(club => club.UpdatedAt).HasColumnName("updated_at").IsRequired();
@@ -382,5 +380,64 @@ internal sealed class GenerationRunConfiguration : IEntityTypeConfiguration<Gene
         builder.Property(run => run.CompletedAt).HasColumnName("completed_at");
 
         builder.HasIndex(run => new { run.Kind, run.StartedAt }).HasDatabaseName("ix_generation_runs_kind_started_at");
+    }
+}
+
+/// <summary>
+/// Maps <c>world.club_stadiums</c>: one ground per club, with its places by kind (`STAD-1`, `STAD-2`).
+/// </summary>
+/// <remarks>
+/// <para>
+/// A ground is never empty and never larger than the top level, so both are check constraints: no write —
+/// including a repair — can leave a club with a ground the picture and the level cannot describe. The unique
+/// index on <c>club_id</c> is what makes "a club has exactly one ground" a database fact.
+/// </para>
+/// <para>
+/// The version is the strong entity tag a build order is made against, so it is also the concurrency token: an
+/// order that raced another is refused with 0 rows affected rather than paying twice for one decision
+/// (`CONC-1`, ADR-0009).
+/// </para>
+/// </remarks>
+internal sealed class ClubStadiumConfiguration : IEntityTypeConfiguration<ClubStadium>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<ClubStadium> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("club_stadiums", "world", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_club_stadiums_places",
+                "standing_seats >= 0 and seating_seats >= 0 and covered_seats >= 0 and vip_seats >= 0");
+            table.HasCheckConstraint(
+                "ck_club_stadiums_capacity",
+                "standing_seats + seating_seats + covered_seats + vip_seats between 1 and 50000");
+        });
+
+        builder.HasKey(stadium => stadium.Id);
+        builder.Property(stadium => stadium.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(stadium => stadium.ClubId).HasColumnName("club_id").IsRequired();
+        builder.Property(stadium => stadium.StandingSeats).HasColumnName("standing_seats").IsRequired();
+        builder.Property(stadium => stadium.SeatingSeats).HasColumnName("seating_seats").IsRequired();
+        builder.Property(stadium => stadium.CoveredSeats).HasColumnName("covered_seats").IsRequired();
+        builder.Property(stadium => stadium.VipSeats).HasColumnName("vip_seats").IsRequired();
+        builder.Property(stadium => stadium.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(stadium => stadium.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(stadium => stadium.Version).HasColumnName("version").IsRequired().IsConcurrencyToken();
+
+        // The derived readings are never columns: a level or a capacity stored beside the places could
+        // disagree with them.
+        builder.Ignore(stadium => stadium.Seats);
+        builder.Ignore(stadium => stadium.Capacity);
+        builder.Ignore(stadium => stadium.Level);
+        builder.Ignore(stadium => stadium.RemainingRoom);
+
+        builder.HasIndex(stadium => stadium.ClubId).IsUnique().HasDatabaseName("ux_club_stadiums_club_id");
+
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(stadium => stadium.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

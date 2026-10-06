@@ -62,9 +62,6 @@ public sealed class Club
     /// <summary>Gets the lifecycle state.</summary>
     public ClubStatus Status { get; private set; }
 
-    /// <summary>Gets the fixed stadium baseline used by gate-revenue calculations (`FIN-3`).</summary>
-    public long StadiumBaseline { get; private set; }
-
     /// <summary>Gets the club's reputation, on the same 1–100 scale as manager reputation.</summary>
     public int Reputation { get; private set; }
 
@@ -111,7 +108,6 @@ public sealed class Club
             BadgeSeed = identity.BadgeSeed,
             FoundingGameYear = foundingGameYear,
             Status = ClubStatus.Active,
-            StadiumBaseline = WorldRuleSet.OpeningStadiumBaselineForTier(tier),
             Reputation = WorldRuleSet.OpeningReputationForTier(tier),
             CreatedAt = now,
             UpdatedAt = now,

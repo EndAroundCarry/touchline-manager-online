@@ -16,7 +16,7 @@ namespace TouchlineManager.MatchEngine.Highlights;
 /// center draws beside it.
 /// </para>
 /// </remarks>
-internal static class ClubPalette
+public static class ClubPalette
 {
     /// <summary>Gets the primary colour a club's kit is drawn in.</summary>
     /// <param name="clubId">The club identity.</param>
