@@ -1,3 +1,5 @@
+using TouchlineManager.Application.Match;
+using TouchlineManager.Domain.Squad;
 using TouchlineManager.MatchEngine;
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
@@ -37,6 +39,41 @@ internal static class LaboratoryFixtures
     /// <param name="rules">The rules in force.</param>
     public static MatchInputV1 EvenlyMatched(ulong seed, EngineRulesV2 rules) =>
         Build(seed, 13, 13, new MatchInstructionsV1(), new MatchInstructionsV1(), rules);
+
+    /// <summary>
+    /// Stands both sides where the tactics board does: the domain's four-four-two, depth in X and width in Y (`replay-v6`).
+    /// </summary>
+    /// <remarks>
+    /// The laboratory's own shape has X across and Y down the pitch, which the calibration was fitted to and which the
+    /// goldens pin. The film reads the board's way round, so a film measured on the laboratory's shape would show a
+    /// formation laid on its side. Only the replay run uses this; nothing that simulates for calibration does.
+    /// </remarks>
+    /// <param name="input">The snapshot.</param>
+    public static MatchInputV1 OnTheBoard(MatchInputV1 input)
+    {
+        var layout = FormationLayouts.DefaultSlots(FormationPreset.FourFourTwo);
+
+        MatchSideV1 Restand(MatchSideV1 side) => side with
+        {
+            Slots =
+            [
+                .. side.Slots.Select(slot =>
+                {
+                    var preset = layout.Single(entry => entry.SlotNumber == slot.SlotNumber);
+
+                    return slot with
+                    {
+                        Family = EngineVocabulary.Family(preset.PositionFamily),
+                        Role = EngineVocabulary.Role(preset.Role),
+                        X = preset.NormalizedX,
+                        Y = preset.NormalizedY,
+                    };
+                }),
+            ],
+        };
+
+        return input with { Home = Restand(input.Home), Away = Restand(input.Away) };
+    }
 
     /// <summary>Builds a snapshot with the given ability, shape, and instructions.</summary>
     /// <param name="seed">The match seed.</param>

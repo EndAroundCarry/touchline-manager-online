@@ -294,6 +294,50 @@ internal static class TestMatchFactory
         return clock[^1].MatchSecond;
     }
 
+    /// <summary>
+    /// Stands both sides where the tactics board does: the domain's four-four-two, with depth in X and width in Y
+    /// (`replay-v6`).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Shape"/> has X across and Y down the pitch, which the engine tests and the goldens are built on.
+    /// The film reads the board's way round, so a test of how the film arranges the players wants this, and a test of
+    /// the simulation does not.
+    /// </remarks>
+    /// <param name="input">The snapshot.</param>
+    public static MatchInputV1 OnTheBoard(MatchInputV1 input)
+    {
+        // The domain's first preset: slot number, family, role, depth from the own goal line, and width.
+        (MatchPositionFamily Family, MatchRole Role, int X, int Y)[] board =
+        [
+            (MatchPositionFamily.Goalkeeper, MatchRole.Goalkeeper, 500, 5_000),
+            (MatchPositionFamily.Defence, MatchRole.FullBack, 2_000, 8_000),
+            (MatchPositionFamily.Defence, MatchRole.CentreBack, 1_800, 6_000),
+            (MatchPositionFamily.Defence, MatchRole.CentreBack, 1_800, 4_000),
+            (MatchPositionFamily.Defence, MatchRole.FullBack, 2_000, 2_000),
+            (MatchPositionFamily.Attack, MatchRole.Winger, 5_800, 8_300),
+            (MatchPositionFamily.Midfield, MatchRole.CentralMidfielder, 5_200, 6_200),
+            (MatchPositionFamily.Midfield, MatchRole.CentralMidfielder, 5_200, 3_800),
+            (MatchPositionFamily.Attack, MatchRole.Winger, 5_800, 1_700),
+            (MatchPositionFamily.Attack, MatchRole.Striker, 8_200, 6_200),
+            (MatchPositionFamily.Attack, MatchRole.Striker, 8_200, 3_800),
+        ];
+
+        MatchSideV1 Restand(MatchSideV1 side) => side with
+        {
+            Slots =
+            [
+                .. side.Slots.Select(slot =>
+                {
+                    var place = board[slot.SlotNumber - 1];
+
+                    return slot with { Family = place.Family, Role = place.Role, X = place.X, Y = place.Y };
+                }),
+            ],
+        };
+
+        return input with { Home = Restand(input.Home), Away = Restand(input.Away) };
+    }
+
     /// <summary>A four-four-two, which is the shape the domain's first preset describes.</summary>
     internal static SlotShape Shape(int slotNumber) => slotNumber switch
     {

@@ -245,6 +245,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
     var extensionShare = new double[matches];
     var playerSpeedRatio = new double[matches];
     var keeperSpeedRatio = new double[matches];
+    var shapes = new List<ShapeMetrics>(matches);
     var ballByKind = new Dictionary<string, (List<double> Median, List<double> P95)>(StringComparer.Ordinal);
     var inWindow = 0;
     var overCeiling = 0;
@@ -258,7 +259,8 @@ void Replay(int matches, ulong baseSeed, string? dump)
 
     for (var index = 0; index < matches; index++)
     {
-        var input = LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index, rules);
+        // The film is judged on the board's own formation, not the laboratory's calibration shape.
+        var input = LaboratoryFixtures.OnTheBoard(LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index, rules));
         var liveMetrics = new PlayerLiveMetricsRecorder();
         var passages = new MatchPassageRecorder();
         var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
@@ -290,6 +292,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
         keeperSpeedRatio[index] = film.MaxKeeperFilmSpeed / (options.DiveMetresPerSecond * film.Pace);
         teleports += film.Teleports;
         cuts += film.Cuts;
+        shapes.Add(film.Shape);
         rungs[Math.Min(film.PayloadRung, rungs.Length - 1)]++;
 
         if (film.CondensedPossessions > 0)
@@ -345,6 +348,17 @@ void Replay(int matches, ulong baseSeed, string? dump)
     Console.WriteLine($"  {"payload JSON KB p50/p95",-30} {Percentile(bytes, 0.50) / 1024.0,7:F1}       {Percentile(bytes, 0.95) / 1024.0,7:F1}       max {bytes[^1] / 1024.0:F1}   (System.Text.Json, the API's own shape)");
     Console.WriteLine($"  {"payload ladder rungs",-30} {string.Join("  ", rungs.Select((rung, position) => $"{position}: {rung}"))}");
 
+    // Median over matches of each match's own measure; the film's shape, in open play, with the dead balls left out.
+    double Of(Func<ShapeMetrics, double> pick) => Percentile(shapes.Select(pick).Order().ToArray(), 0.50);
+
+    Console.WriteLine("  shape in open play (median over matches):");
+    Console.WriteLine($"    {"players within 5 m of ball",-34} p50 {Of(s => s.NearBallP50),5:F1}   p95 {Of(s => s.NearBallP95),5:F1}   target <= 3 at p95");
+    Console.WriteLine($"    {"nearest team-mate, p5",-34} {Of(s => s.NeighbourSpacingP5),5:F1} m   target >= 2");
+    Console.WriteLine($"    {"block depth / width, with ball",-34} {Of(s => s.InPossessionDepth),5:F1} / {Of(s => s.InPossessionWidth),5:F1} m");
+    Console.WriteLine($"    {"block depth / width, without ball",-34} {Of(s => s.OutOfPossessionDepth),5:F1} / {Of(s => s.OutOfPossessionWidth),5:F1} m   target depth 20-30, width 45-55");
+    Console.WriteLine($"    {"back line / front line from goal",-34} {Of(s => s.BackLineDepth),5:F1} / {Of(s => s.FrontLineDepth),5:F1} m   (side without the ball)");
+    Console.WriteLine($"    {"ball in own third: deep / back line",-34} {Of(s => s.DeepBlockOutfield),5:F1} players within 30 m, back line {Of(s => s.DeepBlockBackLine),5:F1} m   target 8-9, ~18");
+    Console.WriteLine($"    {"ball in a box: players in box",-34} p50 {Of(s => s.InBoxP50),5:F1}   p95 {Of(s => s.InBoxP95),5:F1}   six-yard p95 {Of(s => s.SixYardP95),5:F1}   target six-yard <= 7");
     Console.WriteLine("  ball speed by beat, metres per second of film (median over matches of p50 / p95):");
 
     foreach (var (kind, lists) in ballByKind.OrderBy(pair => pair.Key, StringComparer.Ordinal))

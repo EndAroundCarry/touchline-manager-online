@@ -12,6 +12,8 @@ public sealed class FilmMotionTests
 {
     private const int Seeds = 16;
 
+    private const int FilmRosterSize = 22;
+
     private static readonly HighlightOptionsV1 Defaults = new();
 
     [Fact]
@@ -154,6 +156,26 @@ public sealed class FilmMotionTests
         }
 
         condensed.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void The_shape_is_measured_in_open_play_on_the_boards_own_formation()
+    {
+        for (var seed = 1UL; seed <= 4; seed++)
+        {
+            var shape = TestMatchFactory.Analyse(TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed))).Build.Diagnostics!.Shape;
+
+            shape.Samples.Should().BeGreaterThan(10_000, "most of the film is open play, sampled at every step");
+            shape.NearBallP50.Should().BeInRange(1, FilmRosterSize);
+            shape.NearBallP95.Should().BeGreaterThanOrEqualTo(shape.NearBallP50);
+            shape.NeighbourSpacingP5.Should().BeGreaterThan(0);
+            shape.BackLineDepth.Should().BeLessThan(shape.FrontLineDepth, "the back line stands behind the front line on the board");
+            shape.OutOfPossessionDepth.Should().BeGreaterThan(0);
+            shape.InPossessionWidth.Should().BeGreaterThan(0);
+            shape.BoxSamples.Should().BeGreaterThan(0, "the ball is in a box at some point of a match");
+            shape.InBoxP95.Should().BeGreaterThanOrEqualTo(shape.InBoxP50);
+            shape.SixYardP95.Should().BeLessThanOrEqualTo(shape.InBoxP95 + 0.5, "the six-yard box is inside the eighteen-yard box");
+        }
     }
 
     [Fact]

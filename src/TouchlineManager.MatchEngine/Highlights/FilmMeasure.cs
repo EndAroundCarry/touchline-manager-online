@@ -21,6 +21,30 @@ internal static class FilmMeasure
     /// <summary>Half the width of the goal mouth the engine aims inside, in metres.</summary>
     private const double GoalHalfWidth = 4.9;
 
+    /// <summary>How near the ball a player is to be crowding it, in metres (`replay-v6`).</summary>
+    private const double Crowding = 5.0;
+
+    /// <summary>How deep the eighteen-yard box is, in metres.</summary>
+    private const double BoxDepth = 16.5;
+
+    /// <summary>Half the width of the eighteen-yard box, in metres.</summary>
+    private const double BoxHalfWidth = 20.16;
+
+    /// <summary>How deep the six-yard box is, in metres.</summary>
+    private const double SixYardDepth = 5.5;
+
+    /// <summary>Half the width of the six-yard box, in metres.</summary>
+    private const double SixYardHalfWidth = 9.16;
+
+    /// <summary>How many of a side's furthest-forward outfield players are left out of the block's depth: its outlets.</summary>
+    private const int OutletCount = 2;
+
+    /// <summary>How far from its own goal line a side's block counts as deep, in metres.</summary>
+    private const double DeepLimit = 30.0;
+
+    /// <summary>How far from the goal line the ball is when it is in the defending side's own third, in metres.</summary>
+    private const double OwnThird = 35.0;
+
     /// <summary>Measures the film.</summary>
     public static FilmDiagnostics Measure(
         FilmContext context,
@@ -158,7 +182,304 @@ internal static class FilmMeasure
             WorstKeeperGap = gaps.WorstKeeperGap,
             GoalStrikes = gaps.GoalStrikes,
             GoalsInNet = gaps.GoalsInNet,
+            Shape = MeasureShape(context, script, motion, rosters),
         };
+    }
+
+    /// <summary>
+    /// How the twenty-two stand around the ball in open play (`replay-v6`): how many crowd it, how close team-mates
+    /// stand, how deep and wide each block is, and how the box fills when the ball is in it. Dead balls are left out.
+    /// </summary>
+    private static ShapeMetrics MeasureShape(
+        FilmContext context,
+        FilmScriptResult script,
+        FilmMotionResult motion,
+        IReadOnlyList<FilmRoster> rosters)
+    {
+        var near = new Histogram(1.0, FilmRoster.Size + 1);
+        var spacing = new Histogram(0.1, 600);
+        var inBox = new Histogram(1.0, FilmRoster.Size + 1);
+        var sixYard = new Histogram(1.0, FilmRoster.Size + 1);
+        var depthWith = new Average();
+        var widthWith = new Average();
+        var depthWithout = new Average();
+        var widthWithout = new Average();
+        var back = new Average();
+        var front = new Average();
+        var deepCount = new Average();
+        var deepBack = new Average();
+        var samples = 0;
+
+        // The occupied outfield entities of each side, home then away, gathered afresh for every record.
+        int[][] outfield = [new int[11], new int[11]];
+        var counts = new int[2];
+        Span<double> reach = stackalloc double[11];
+
+        for (var index = 0; index < script.Beats.Count; index++)
+        {
+            var beat = script.Beats[index];
+
+            if (beat.IsHold || beat.Formation != FormationMode.Open || beat.Possession < 0)
+            {
+                continue;
+            }
+
+            var roster = rosters[beat.Possession];
+            var span = motion.Spans[index];
+            var attacking = beat.Side;
+            var defending = MatchInputV1.OpponentOf(attacking);
+
+            for (var record = span.FirstRecord; record <= span.LastRecord; record++)
+            {
+                var ball = new Vec(motion.BallX(record), motion.BallY(record));
+                var crowd = 0;
+
+                counts[0] = 0;
+                counts[1] = 0;
+
+                for (var entity = 0; entity < FilmRoster.Size; entity++)
+                {
+                    if (!roster.IsOccupied(entity))
+                    {
+                        continue;
+                    }
+
+                    var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
+
+                    crowd += point.DistanceTo(ball) <= Crowding ? 1 : 0;
+
+                    if (context.Slots[entity].Family != MatchPositionFamily.Goalkeeper)
+                    {
+                        var half = (int)FilmRoster.SideOf(entity);
+
+                        outfield[half][counts[half]++] = entity;
+                    }
+                }
+
+                near.Add(crowd);
+                samples++;
+
+                foreach (var side in new[] { attacking, defending })
+                {
+                    var members = outfield[(int)side];
+                    var count = counts[(int)side];
+
+                    if (count == 0)
+                    {
+                        continue;
+                    }
+
+                    double minY = double.MaxValue, maxY = double.MinValue;
+                    double backSum = 0, frontSum = 0;
+                    int backCount = 0, frontCount = 0, deepPlayers = 0;
+
+                    for (var member = 0; member < count; member++)
+                    {
+                        var entity = members[member];
+                        var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
+                        var fromGoal = FilmSpace.Attacking(point, side);
+                        var nearest = double.MaxValue;
+
+                        reach[member] = fromGoal;
+                        minY = Math.Min(minY, point.Y);
+                        maxY = Math.Max(maxY, point.Y);
+                        deepPlayers += fromGoal <= DeepLimit ? 1 : 0;
+
+                        switch (context.Slots[entity].Family)
+                        {
+                            case MatchPositionFamily.Defence:
+                                backSum += fromGoal;
+                                backCount++;
+                                break;
+
+                            case MatchPositionFamily.Attack:
+                                frontSum += fromGoal;
+                                frontCount++;
+                                break;
+
+                            default:
+                                break;
+                        }
+
+                        for (var other = 0; other < count; other++)
+                        {
+                            if (other != member)
+                            {
+                                var mate = members[other];
+
+                                nearest = Math.Min(
+                                    nearest,
+                                    point.DistanceTo(new Vec(motion.PlayerX(record, mate), motion.PlayerY(record, mate))));
+                            }
+                        }
+
+                        if (count > 1)
+                        {
+                            spacing.Add(nearest);
+                        }
+                    }
+
+                    // The block is the deepest eight: the two furthest forward are outlets, left high on purpose.
+                    var block = reach[..count];
+
+                    block.Sort();
+
+                    var depth = block[Math.Max(1, count - OutletCount) - 1] - block[0];
+                    var width = maxY - minY;
+
+                    if (side == attacking)
+                    {
+                        depthWith.Add(depth);
+                        widthWith.Add(width);
+
+                        continue;
+                    }
+
+                    depthWithout.Add(depth);
+                    widthWithout.Add(width);
+
+                    if (backCount > 0)
+                    {
+                        back.Add(backSum / backCount);
+                    }
+
+                    if (frontCount > 0)
+                    {
+                        front.Add(frontSum / frontCount);
+                    }
+
+                    // The ball is in the defending side's own third: how many of them are back, and how deep their line is.
+                    if (FilmSpace.Attacking(ball, defending) <= OwnThird)
+                    {
+                        deepCount.Add(deepPlayers);
+
+                        if (backCount > 0)
+                        {
+                            deepBack.Add(backSum / backCount);
+                        }
+                    }
+                }
+
+                MeasureBox(motion, record, ball, outfield, counts, inBox, sixYard);
+            }
+        }
+
+        return new ShapeMetrics
+        {
+            Samples = samples,
+            NearBallP50 = near.Percentile(0.5),
+            NearBallP95 = near.Percentile(0.95),
+            NeighbourSpacingP5 = spacing.Percentile(0.05),
+            InPossessionDepth = depthWith.Value,
+            InPossessionWidth = widthWith.Value,
+            OutOfPossessionDepth = depthWithout.Value,
+            OutOfPossessionWidth = widthWithout.Value,
+            BackLineDepth = back.Value,
+            FrontLineDepth = front.Value,
+            DeepSamples = deepCount.Count,
+            DeepBlockOutfield = deepCount.Value,
+            DeepBlockBackLine = deepBack.Value,
+            BoxSamples = inBox.Total,
+            InBoxP50 = inBox.Percentile(0.5),
+            InBoxP95 = inBox.Percentile(0.95),
+            SixYardP95 = sixYard.Percentile(0.95),
+        };
+    }
+
+    /// <summary>Counts the outfield players in the box the ball is in, and in its six-yard box, when it is in one.</summary>
+    private static void MeasureBox(
+        FilmMotionResult motion,
+        int record,
+        Vec ball,
+        int[][] outfield,
+        int[] counts,
+        Histogram inBox,
+        Histogram sixYard)
+    {
+        var low = ball.X <= BoxDepth;
+        var high = ball.X >= FilmSpace.Length - BoxDepth;
+        var middle = FilmSpace.Width / 2;
+
+        if ((!low && !high) || Math.Abs(ball.Y - middle) > BoxHalfWidth)
+        {
+            return;
+        }
+
+        var goalLine = low ? 0.0 : FilmSpace.Length;
+        int boxCount = 0, sixCount = 0;
+
+        for (var side = 0; side < 2; side++)
+        {
+            for (var member = 0; member < counts[side]; member++)
+            {
+                var entity = outfield[side][member];
+                var x = motion.PlayerX(record, entity);
+                var y = motion.PlayerY(record, entity);
+                var along = Math.Abs(x - goalLine);
+                var across = Math.Abs(y - middle);
+
+                boxCount += along <= BoxDepth && across <= BoxHalfWidth ? 1 : 0;
+                sixCount += along <= SixYardDepth && across <= SixYardHalfWidth ? 1 : 0;
+            }
+        }
+
+        inBox.Add(boxCount);
+        sixYard.Add(sixCount);
+    }
+
+    /// <summary>A fixed-width histogram, for percentiles of many samples without keeping them.</summary>
+    private sealed class Histogram(double width, int bins)
+    {
+        private readonly int[] _bins = new int[bins];
+
+        public int Total { get; private set; }
+
+        public void Add(double value)
+        {
+            var bin = int.Clamp((int)Math.Floor(value / width), 0, _bins.Length - 1);
+
+            _bins[bin]++;
+            Total++;
+        }
+
+        public double Percentile(double fraction)
+        {
+            if (Total == 0)
+            {
+                return 0.0;
+            }
+
+            var wanted = Math.Min(Total - 1, (int)Math.Floor(fraction * Total));
+            var seen = 0;
+
+            for (var bin = 0; bin < _bins.Length; bin++)
+            {
+                seen += _bins[bin];
+
+                if (seen > wanted)
+                {
+                    return bin * width;
+                }
+            }
+
+            return (_bins.Length - 1) * width;
+        }
+    }
+
+    /// <summary>A running mean.</summary>
+    private sealed class Average
+    {
+        private double _sum;
+
+        public int Count { get; private set; }
+
+        public double Value => Count == 0 ? 0.0 : _sum / Count;
+
+        public void Add(double value)
+        {
+            _sum += value;
+            Count++;
+        }
     }
 
     /// <summary>How near the ball the players who should be at it are, at the moments they should be.</summary>

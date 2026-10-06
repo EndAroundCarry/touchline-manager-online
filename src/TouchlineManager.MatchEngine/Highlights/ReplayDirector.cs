@@ -619,4 +619,65 @@ public sealed record FilmDiagnostics
 
     /// <summary>Gets how many of those ended inside the goal mouth, on the line.</summary>
     public required int GoalsInNet { get; init; }
+
+    /// <summary>Gets how the players stand around the ball in open play (`replay-v6`).</summary>
+    public required ShapeMetrics Shape { get; init; }
+}
+
+/// <summary>
+/// How the twenty-two stand around the ball in open play, sampled at every step of the simulated record with the dead
+/// balls left out (`replay-v6`). Distances are metres. Used by the tests and the replay benchmark; never sent to a client.
+/// </summary>
+public sealed record ShapeMetrics
+{
+    /// <summary>Gets how many steps were sampled.</summary>
+    public required int Samples { get; init; }
+
+    /// <summary>Gets the median number of players within five metres of the ball.</summary>
+    public required double NearBallP50 { get; init; }
+
+    /// <summary>Gets the ninety-fifth percentile of the number of players within five metres of the ball.</summary>
+    public required double NearBallP95 { get; init; }
+
+    /// <summary>Gets the fifth percentile of an outfield player's distance to his nearest team-mate.</summary>
+    public required double NeighbourSpacingP5 { get; init; }
+
+    /// <summary>Gets the mean depth, front to back, of the outfield players of the side with the ball.</summary>
+    public required double InPossessionDepth { get; init; }
+
+    /// <summary>Gets the mean width of the outfield players of the side with the ball.</summary>
+    public required double InPossessionWidth { get; init; }
+
+    /// <summary>Gets the mean depth of the outfield players of the side without the ball.</summary>
+    public required double OutOfPossessionDepth { get; init; }
+
+    /// <summary>Gets the mean width of the outfield players of the side without the ball.</summary>
+    public required double OutOfPossessionWidth { get; init; }
+
+    /// <summary>Gets the mean distance from its own goal line of the back line of the side without the ball.</summary>
+    public required double BackLineDepth { get; init; }
+
+    /// <summary>Gets the mean distance from its own goal line of the front line of the side without the ball.</summary>
+    public required double FrontLineDepth { get; init; }
+
+    /// <summary>Gets how many steps had the ball in the own third of the side without it.</summary>
+    public required int DeepSamples { get; init; }
+
+    /// <summary>Gets, in those steps, the mean number of its outfield players within thirty metres of its own goal line.</summary>
+    public required double DeepBlockOutfield { get; init; }
+
+    /// <summary>Gets, in those steps, the mean distance of its back line from its own goal line.</summary>
+    public required double DeepBlockBackLine { get; init; }
+
+    /// <summary>Gets how many steps had the ball inside an eighteen-yard box.</summary>
+    public required int BoxSamples { get; init; }
+
+    /// <summary>Gets, in those steps, the median number of outfield players inside that box.</summary>
+    public required double InBoxP50 { get; init; }
+
+    /// <summary>Gets, in those steps, the ninety-fifth percentile of the number of outfield players inside that box.</summary>
+    public required double InBoxP95 { get; init; }
+
+    /// <summary>Gets, in those steps, the ninety-fifth percentile of the number of outfield players inside its six-yard box.</summary>
+    public required double SixYardP95 { get; init; }
 }
