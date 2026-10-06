@@ -53,6 +53,7 @@ function plan(overrides: Partial<TacticalPlan> = {}): TacticalPlan {
       assignedPlayer: null,
       isOutOfPosition: false,
     })),
+    bench: [],
     ...overrides,
   };
 }
@@ -153,6 +154,66 @@ describe('TacticsStore', () => {
     expect(store.draft()?.version).toBe(2);
     expect(store.savedMessage()).toContain('saved');
     expect(store.isDirty()).toBe(false);
+  });
+
+  it('routes a pick for place 12 or later to the bench, and sends it with the plan', () => {
+    api.get.mockReturnValue(of(tactics([plan({ version: 1 })])));
+    api.update.mockReturnValue(of(plan({ version: 2 })));
+
+    store.load();
+    store.assignPlayer(12, 'p1');
+
+    expect(store.benchCount()).toBe(1);
+    expect(store.assignedCount()).toBe(0);
+    expect(store.isDirty()).toBe(true);
+
+    store.save();
+
+    expect(api.update).toHaveBeenCalledWith(
+      'plan-1',
+      expect.objectContaining({ bench: [{ slotNumber: 12, playerId: 'p1' }] }),
+      '"1"',
+    );
+
+    store.clearSlot(12);
+
+    expect(store.benchCount()).toBe(0);
+  });
+
+  it('keeps the bench issues the server refused a save with, by place', () => {
+    const preview: TacticalPlanValidation = {
+      isValid: false,
+      assignedCount: 0,
+      isComplete: false,
+      issues: [
+        { code: 'PLAYER_UNAVAILABLE', slotNumber: 14, playerId: 'p1' },
+        { code: 'BENCH_NEEDS_GOALKEEPER', slotNumber: null, playerId: null },
+      ],
+    };
+
+    api.get.mockReturnValue(of(tactics([plan()])));
+    api.update.mockReturnValue(
+      throwError(
+        () =>
+          new ApiError(
+            400,
+            'PLAN_VALIDATION_FAILED',
+            'That plan is not valid.',
+            null,
+            new Map(),
+            new Map([['validation', preview]]),
+          ),
+      ),
+    );
+
+    store.load();
+    store.assignPlayer(14, 'p1');
+    store.save();
+
+    expect(store.issuesBySlot().get(14)).toHaveLength(1);
+    expect(store.validation()?.issues.map((issue) => issue.code)).toContain(
+      'BENCH_NEEDS_GOALKEEPER',
+    );
   });
 
   it('creates the first plan the club saves', () => {

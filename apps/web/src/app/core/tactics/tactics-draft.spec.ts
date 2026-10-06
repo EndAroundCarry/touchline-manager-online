@@ -1,6 +1,10 @@
 import {
+  BENCH_FIRST_SLOT,
+  BENCH_SIZE,
+  KEEPER_BENCH_SLOT,
   NEW_PLAN_NAME,
   assignedCount,
+  benchCount,
   defaultInstructions,
   draftFromFormation,
   draftFromPlan,
@@ -8,6 +12,7 @@ import {
   isDirty,
   toRequest,
   withAssignment,
+  withBenchAssignment,
   withFormation,
   withCounterAttack,
   withInstruction,
@@ -90,6 +95,7 @@ function savedPlan(overrides: Partial<TacticalPlan> = {}): TacticalPlan {
       assignedPlayer: null,
       isOutOfPosition: false,
     })),
+    bench: [],
     ...overrides,
   };
 }
@@ -236,5 +242,95 @@ describe('tactics draft', () => {
     expect(isDirty(clean, plan)).toBe(false);
     expect(isDirty(withName(clean, 'Renamed'), plan)).toBe(true);
     expect(isDirty(clean, null)).toBe(true);
+  });
+
+  describe('the bench', () => {
+    it('starts as seven empty places numbered after the eleven starters, and sends nothing', () => {
+      const draft = draftFromFormation(formation('4-4-2'));
+
+      expect(draft.bench).toHaveLength(BENCH_SIZE);
+      expect(draft.bench.map((place) => place.slotNumber)).toEqual([12, 13, 14, 15, 16, 17, 18]);
+      expect(draft.bench.every((place) => place.playerId === null)).toBe(true);
+      expect(benchCount(draft)).toBe(0);
+      expect(toRequest(draft).bench).toBeNull();
+    });
+
+    it('keeps the goalkeeper place as the first one', () => {
+      expect(KEEPER_BENCH_SLOT).toBe(BENCH_FIRST_SLOT);
+    });
+
+    it('sends every named substitute in slot order, including a half-filled bench', () => {
+      const draft = withBenchAssignment(
+        withBenchAssignment(draftFromFormation(formation('4-4-2')), 15, 'p15'),
+        12,
+        'p12',
+      );
+
+      expect(benchCount(draft)).toBe(2);
+      expect(toRequest(draft).bench).toEqual([
+        { slotNumber: 12, playerId: 'p12' },
+        { slotNumber: 15, playerId: 'p15' },
+      ]);
+    });
+
+    it('empties a place when no player is given', () => {
+      const named = withBenchAssignment(draftFromFormation(formation('4-4-2')), 13, 'p13');
+      const emptied = withBenchAssignment(named, 13, null);
+
+      expect(benchCount(emptied)).toBe(0);
+      expect(toRequest(emptied).bench).toBeNull();
+    });
+
+    it('moves a starter to the bench rather than naming them twice', () => {
+      const started = withAssignment(draftFromFormation(formation('4-4-2')), 5, 'p5');
+      const benched = withBenchAssignment(started, 14, 'p5');
+
+      expect(benched.slots.find((slot) => slot.slotNumber === 5)?.playerId).toBeNull();
+      expect(benched.bench.find((place) => place.slotNumber === 14)?.playerId).toBe('p5');
+    });
+
+    it('moves a substitute who is picked to start off the bench', () => {
+      const benched = withBenchAssignment(draftFromFormation(formation('4-4-2')), 14, 'p5');
+      const started = withAssignment(benched, 5, 'p5');
+
+      expect(started.slots.find((slot) => slot.slotNumber === 5)?.playerId).toBe('p5');
+      expect(benchCount(started)).toBe(0);
+    });
+
+    it('moves a substitute between bench places rather than naming them twice', () => {
+      const benched = withBenchAssignment(draftFromFormation(formation('4-4-2')), 13, 'p9');
+      const moved = withBenchAssignment(benched, 16, 'p9');
+
+      expect(moved.bench.find((place) => place.slotNumber === 13)?.playerId).toBeNull();
+      expect(moved.bench.find((place) => place.slotNumber === 16)?.playerId).toBe('p9');
+    });
+
+    it('keeps the bench when the formation changes', () => {
+      const benched = withBenchAssignment(draftFromFormation(formation('4-4-2')), 12, 'gk2');
+
+      expect(withFormation(benched, formation('4-4-2')).bench).toEqual(benched.bench);
+    });
+
+    it('reads the saved bench back into the draft and treats it as clean until it changes', () => {
+      const plan = savedPlan({
+        bench: [
+          {
+            slotNumber: 12,
+            assignedPlayer: {
+              id: 'gk2',
+              fullName: 'Second Keeper',
+              shortName: 'KEE',
+              primaryPosition: 'gk',
+              isUnavailable: false,
+            },
+          },
+        ],
+      });
+      const draft = draftFromPlan(plan);
+
+      expect(draft.bench[0]).toEqual({ slotNumber: 12, playerId: 'gk2' });
+      expect(isDirty(draft, plan)).toBe(false);
+      expect(isDirty(withBenchAssignment(draft, 12, null), plan)).toBe(true);
+    });
   });
 });

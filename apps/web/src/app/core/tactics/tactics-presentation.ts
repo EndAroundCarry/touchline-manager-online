@@ -6,6 +6,7 @@
  * component. The codes are the server's (master plan §10.4); this file only names them.
  */
 
+import { KEEPER_BENCH_SLOT } from './tactics-draft';
 import type { TacticalPlanIssue } from './tactics.models';
 
 /** An option in a select: the stable code, and the words a manager reads. */
@@ -296,7 +297,34 @@ export function issueMessage(
       return `${player} is injured or suspended and cannot be picked (TRN-12).`;
     case 'SELECTION_INCOMPLETE':
       return 'Pick all eleven players, or leave the lineup empty — a half-filled side would field short (SQ-4).';
+    case 'BENCH_SLOT_NUMBER':
+      return `Substitute place ${slot ?? ''} is not on the bench.`;
+    case 'BENCH_INCOMPLETE':
+      return 'Name all seven substitutes, or leave the bench empty (SQ-4).';
+    case 'BENCH_NEEDS_GOALKEEPER':
+      return 'The bench needs a goalkeeper, so an injury to your keeper has an answer (SQ-2).';
     default:
       return 'That plan is not valid.';
   }
+}
+
+/** The primary-position code of a goalkeeper. */
+const GOALKEEPER_POSITION = 'gk';
+
+/** Whether a bench place is the one kept for a goalkeeper. */
+export function isKeeperPlace(slotNumber: number): boolean {
+  return slotNumber === KEEPER_BENCH_SLOT;
+}
+
+/**
+ * Why a player cannot take a bench place, or null when they can.
+ *
+ * The first place is the reserve goalkeeper's, so it takes a goalkeeper and nobody else. The other six take
+ * anyone, a second goalkeeper included. Starting places are not judged here: a makeshift lineup is a
+ * penalty the engine applies, not a refusal (`INS-10`).
+ */
+export function benchPlacementRefusal(slotNumber: number, primaryPosition: string): string | null {
+  return slotNumber === KEEPER_BENCH_SLOT && primaryPosition !== GOALKEEPER_POSITION
+    ? 'The first substitute is the reserve goalkeeper, so only a goalkeeper can take that place.'
+    : null;
 }

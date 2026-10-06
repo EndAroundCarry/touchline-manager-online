@@ -2,10 +2,14 @@ using TouchlineManager.Domain.Squad;
 
 namespace TouchlineManager.Application.Abstractions.Squad;
 
-/// <summary>A plan and its slots, loaded together because neither is meaningful alone.</summary>
+/// <summary>A plan, its slots, and its bench, loaded together because none is meaningful alone.</summary>
 /// <param name="Plan">The plan.</param>
 /// <param name="Slots">The plan's eleven slots.</param>
-public sealed record TacticalPlanRecord(TacticalPlan Plan, IReadOnlyList<TacticalSlot> Slots);
+/// <param name="Bench">The substitutes the plan names, in slot order. Empty when it names none.</param>
+public sealed record TacticalPlanRecord(
+    TacticalPlan Plan,
+    IReadOnlyList<TacticalSlot> Slots,
+    IReadOnlyList<TacticalBenchSlot> Bench);
 
 /// <summary>
 /// Persistence for the squad module's tactical plans.
@@ -30,6 +34,14 @@ public interface ITacticsRepository
     /// <summary>Stages a new slot.</summary>
     /// <param name="slot">The slot.</param>
     void AddSlot(TacticalSlot slot);
+
+    /// <summary>Stages a new bench place.</summary>
+    /// <param name="benchSlot">The bench place.</param>
+    void AddBenchSlot(TacticalBenchSlot benchSlot);
+
+    /// <summary>Stages the removal of a bench place the manager has emptied.</summary>
+    /// <param name="benchSlot">The bench place.</param>
+    void RemoveBenchSlot(TacticalBenchSlot benchSlot);
 
     /// <summary>Loads a plan and its slots, or returns null if no such plan exists.</summary>
     /// <param name="planId">The plan to load.</param>

@@ -3,14 +3,17 @@ import { Observable } from 'rxjs';
 import { ApiError } from '../api/api-error';
 import { TacticsApi } from './tactics-api';
 import {
+  BENCH_FIRST_SLOT,
   CodedInstructionKey,
   PlanDraft,
   assignedCount,
+  benchCount,
   draftFromFormation,
   draftFromPlan,
   isDirty,
   toRequest,
   withAssignment,
+  withBenchAssignment,
   withCounterAttack,
   withFormation,
   withInstruction,
@@ -114,6 +117,13 @@ export class TacticsStore {
     return draft === null ? 0 : assignedCount(draft);
   });
 
+  /** How many of the seven bench places name a player. */
+  readonly benchCount = computed(() => {
+    const draft = this.draftSignal();
+
+    return draft === null ? 0 : benchCount(draft);
+  });
+
   /** The validation issues keyed by slot, so the board can mark the slots they concern. */
   readonly issuesBySlot = computed(() => {
     const bySlot = new Map<number, TacticalPlanIssue[]>();
@@ -205,14 +215,22 @@ export class TacticsStore {
     this.edit((draft) => withFormation(draft, formation));
   }
 
-  /** Assigns a player to a slot. */
+  /** Assigns a player to a slot: one of the eleven starting places, or a bench place from 12. */
   assignPlayer(slotNumber: number, playerId: string): void {
-    this.edit((draft) => withAssignment(draft, slotNumber, playerId));
+    this.edit((draft) =>
+      slotNumber >= BENCH_FIRST_SLOT
+        ? withBenchAssignment(draft, slotNumber, playerId)
+        : withAssignment(draft, slotNumber, playerId),
+    );
   }
 
-  /** Empties a slot. */
+  /** Empties a slot, starting or on the bench. */
   clearSlot(slotNumber: number): void {
-    this.edit((draft) => withAssignment(draft, slotNumber, null));
+    this.edit((draft) =>
+      slotNumber >= BENCH_FIRST_SLOT
+        ? withBenchAssignment(draft, slotNumber, null)
+        : withAssignment(draft, slotNumber, null),
+    );
   }
 
   /** Changes the role one slot asks for (`TAC-8`). */

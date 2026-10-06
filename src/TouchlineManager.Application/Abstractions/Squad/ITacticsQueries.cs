@@ -32,6 +32,11 @@ public sealed record TacticsSlotRow(
     int NormalizedY,
     TacticsAssignedPlayerRow? AssignedPlayer);
 
+/// <summary>One substitute on a saved plan's bench.</summary>
+/// <param name="SlotNumber">The bench slot number, 12–18.</param>
+/// <param name="Player">The substitute.</param>
+public sealed record TacticsBenchRow(int SlotNumber, TacticsAssignedPlayerRow Player);
+
 /// <summary>A saved tactical plan.</summary>
 /// <param name="Id">The plan identity.</param>
 /// <param name="Name">The manager-facing name.</param>
@@ -40,6 +45,7 @@ public sealed record TacticsSlotRow(
 /// <param name="IsDefault">Whether this is the club's default plan.</param>
 /// <param name="Version">The plan version.</param>
 /// <param name="Slots">The plan's slots, in slot order.</param>
+/// <param name="Bench">The substitutes the plan names, in slot order. Empty when it names none.</param>
 public sealed record TacticsPlanRow(
     Guid Id,
     string Name,
@@ -47,7 +53,8 @@ public sealed record TacticsPlanRow(
     TeamInstructionSet Instructions,
     bool IsDefault,
     long Version,
-    IReadOnlyList<TacticsSlotRow> Slots);
+    IReadOnlyList<TacticsSlotRow> Slots,
+    IReadOnlyList<TacticsBenchRow> Bench);
 
 /// <summary>A player who may be assigned to a slot.</summary>
 /// <param name="Id">The player identity.</param>

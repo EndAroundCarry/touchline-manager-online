@@ -79,6 +79,22 @@ public sealed class SaveTacticalPlanRequestValidator : AbstractValidator<SaveTac
                 entry.RuleFor(candidate => candidate.PlayerId).NotEmpty();
             });
         });
+
+        When(request => request.Bench is not null, () =>
+        {
+            // As with the lineup, whether seven places are filled and whether one is a goalkeeper are rules
+            // about the squad, so the domain validator answers them with issues the screen can point at.
+            RuleFor(request => request.Bench!)
+                .Must(bench => bench.Select(entry => entry.SlotNumber).Distinct().Count() == bench.Count)
+                .WithMessage("Two bench entries name the same slot.");
+
+            RuleForEach(request => request.Bench!).ChildRules(entry =>
+            {
+                entry.RuleFor(candidate => candidate.SlotNumber)
+                    .InclusiveBetween(TacticalBenchSlot.FirstSlotNumber, TacticalBenchSlot.LastSlotNumber);
+                entry.RuleFor(candidate => candidate.PlayerId).NotEmpty();
+            });
+        });
     }
 
     private static bool IsFormationPreset(string? code) =>

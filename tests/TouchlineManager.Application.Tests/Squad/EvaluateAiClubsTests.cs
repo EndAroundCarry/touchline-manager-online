@@ -241,6 +241,14 @@ public sealed class EvaluateAiClubsTests
 
         public void AddSlot(TacticalSlot slot) => Slots.Add(slot);
 
+        public void AddBenchSlot(TacticalBenchSlot benchSlot)
+        {
+        }
+
+        public void RemoveBenchSlot(TacticalBenchSlot benchSlot)
+        {
+        }
+
         public Task<TacticalPlanRecord?> FindAsync(Guid planId, CancellationToken cancellationToken) =>
             Task.FromResult<TacticalPlanRecord?>(null);
 

@@ -41,6 +41,15 @@ public enum TacticalPlanIssueCode
 
     /// <summary>Some, but not all, of the eleven slots are assigned (`SQ-4`).</summary>
     SelectionIncomplete = 9,
+
+    /// <summary>A bench slot number falls outside 12–18, or two bench entries share one (`SQ-4`).</summary>
+    BenchSlotNumber = 10,
+
+    /// <summary>The bench names some, but not all, of its seven substitutes (`SQ-4`).</summary>
+    BenchIncomplete = 11,
+
+    /// <summary>The bench names no goalkeeper, so an injury to the keeper has no answer (`SQ-2`).</summary>
+    BenchNeedsGoalkeeper = 12,
 }
 
 /// <summary>Stable wire codes for <see cref="TacticalPlanIssueCode"/>.</summary>
@@ -60,6 +69,9 @@ public static class TacticalPlanIssueCodes
         TacticalPlanIssueCode.PlayerNotEligible => "PLAYER_NOT_ELIGIBLE",
         TacticalPlanIssueCode.PlayerUnavailable => "PLAYER_UNAVAILABLE",
         TacticalPlanIssueCode.SelectionIncomplete => "SELECTION_INCOMPLETE",
+        TacticalPlanIssueCode.BenchSlotNumber => "BENCH_SLOT_NUMBER",
+        TacticalPlanIssueCode.BenchIncomplete => "BENCH_INCOMPLETE",
+        TacticalPlanIssueCode.BenchNeedsGoalkeeper => "BENCH_NEEDS_GOALKEEPER",
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown tactical plan issue code."),
     };
 }
@@ -85,6 +97,13 @@ public sealed record TacticalSlotDefinition(
     int NormalizedX,
     int NormalizedY,
     Guid? AssignedPlayerId);
+
+/// <summary>
+/// One substitute as submitted for validation, before it becomes a <see cref="TacticalBenchSlot"/>.
+/// </summary>
+/// <param name="SlotNumber">The bench slot number, 12–18.</param>
+/// <param name="PlayerId">The substitute.</param>
+public sealed record TacticalBenchDefinition(int SlotNumber, Guid PlayerId);
 
 /// <summary>One reason a plan is not valid.</summary>
 /// <param name="Code">What is wrong.</param>
@@ -139,10 +158,20 @@ public static class TacticalPlanValidator
     /// <param name="unavailablePlayerIds">
     /// The subset of those with an open injury or suspension (`TRN-12`).
     /// </param>
+    /// <param name="bench">
+    /// The default bench, or null for none. A bench is nobody or seven players, and when it names anybody it
+    /// must include a goalkeeper (`SQ-4`).
+    /// </param>
+    /// <param name="goalkeeperPlayerIds">
+    /// The selectable players whose primary position is goalkeeper. Left null, nobody counts as one, so a
+    /// caller that names a bench without saying who the keepers are is refused rather than waved through.
+    /// </param>
     public static TacticalPlanValidation Validate(
         IEnumerable<TacticalSlotDefinition> slots,
         IReadOnlyCollection<Guid> selectablePlayerIds,
-        IReadOnlyCollection<Guid> unavailablePlayerIds)
+        IReadOnlyCollection<Guid> unavailablePlayerIds,
+        IEnumerable<TacticalBenchDefinition>? bench = null,
+        IReadOnlyCollection<Guid>? goalkeeperPlayerIds = null)
     {
         ArgumentNullException.ThrowIfNull(slots);
         ArgumentNullException.ThrowIfNull(selectablePlayerIds);
@@ -232,6 +261,14 @@ public static class TacticalPlanValidator
             issues.Add(new TacticalPlanIssue(TacticalPlanIssueCode.SelectionIncomplete, null, null));
         }
 
+        ValidateBench(
+            bench,
+            goalkeeperPlayerIds,
+            selectable,
+            unavailable,
+            assignedPlayers,
+            issues);
+
         issues.Sort(static (left, right) =>
         {
             var bySlot = Comparer<int?>.Default.Compare(left.SlotNumber, right.SlotNumber);
@@ -240,5 +277,71 @@ public static class TacticalPlanValidator
         });
 
         return new TacticalPlanValidation(issues, assignedCount);
+    }
+
+    /// <summary>
+    /// Checks the default bench: legal numbers, players who can be fielded and are not already starting, all
+    /// seven places or none, and a goalkeeper among them.
+    /// </summary>
+    /// <remarks>
+    /// The goalkeeper rule is about the bench as a whole rather than one place on it, so the issue carries no
+    /// slot. A bench that is merely short is not also told it lacks a keeper: the manager is still filling it.
+    /// </remarks>
+    private static void ValidateBench(
+        IEnumerable<TacticalBenchDefinition>? bench,
+        IReadOnlyCollection<Guid>? goalkeeperPlayerIds,
+        ISet<Guid> selectable,
+        ISet<Guid> unavailable,
+        HashSet<Guid> assignedPlayers,
+        List<TacticalPlanIssue> issues)
+    {
+        var entries = bench?.OrderBy(entry => entry.SlotNumber).ToList() ?? [];
+
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        var goalkeepers = goalkeeperPlayerIds as ISet<Guid> ?? new HashSet<Guid>(goalkeeperPlayerIds ?? []);
+        var usedNumbers = new HashSet<int>();
+        var named = 0;
+        var hasGoalkeeper = false;
+
+        foreach (var entry in entries)
+        {
+            if (entry.SlotNumber is < TacticalBenchSlot.FirstSlotNumber or > TacticalBenchSlot.LastSlotNumber
+                || !usedNumbers.Add(entry.SlotNumber))
+            {
+                issues.Add(new TacticalPlanIssue(TacticalPlanIssueCode.BenchSlotNumber, entry.SlotNumber, entry.PlayerId));
+
+                continue;
+            }
+
+            named++;
+
+            if (!assignedPlayers.Add(entry.PlayerId))
+            {
+                issues.Add(new TacticalPlanIssue(TacticalPlanIssueCode.DuplicatePlayer, entry.SlotNumber, entry.PlayerId));
+            }
+            else if (!selectable.Contains(entry.PlayerId))
+            {
+                issues.Add(new TacticalPlanIssue(TacticalPlanIssueCode.PlayerNotEligible, entry.SlotNumber, entry.PlayerId));
+            }
+            else if (unavailable.Contains(entry.PlayerId))
+            {
+                issues.Add(new TacticalPlanIssue(TacticalPlanIssueCode.PlayerUnavailable, entry.SlotNumber, entry.PlayerId));
+            }
+
+            hasGoalkeeper |= goalkeepers.Contains(entry.PlayerId);
+        }
+
+        if (named < WorldRuleSet.TeamSheetSubstitutes)
+        {
+            issues.Add(new TacticalPlanIssue(TacticalPlanIssueCode.BenchIncomplete, null, null));
+        }
+        else if (!hasGoalkeeper)
+        {
+            issues.Add(new TacticalPlanIssue(TacticalPlanIssueCode.BenchNeedsGoalkeeper, null, null));
+        }
     }
 }

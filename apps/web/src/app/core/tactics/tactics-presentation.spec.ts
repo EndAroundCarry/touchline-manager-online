@@ -1,8 +1,10 @@
 import {
   COUNTER_ATTACK,
   INSTRUCTION_FIELDS,
+  benchPlacementRefusal,
   familyLabel,
   instructionEffect,
+  isKeeperPlace,
   issueMessage,
   pitchStyle,
   roleLabel,
@@ -171,6 +173,14 @@ describe('tactics presentation', () => {
       expect(issueMessage(issue('SLOT_COUNT'), names)).toContain('eleven slots');
     });
 
+    it('explains the bench rules in their own words, not the generic refusal', () => {
+      const generic = issueMessage(issue('NOT_A_CODE'), names);
+
+      expect(issueMessage(issue('BENCH_INCOMPLETE'), names)).toContain('all seven substitutes');
+      expect(issueMessage(issue('BENCH_NEEDS_GOALKEEPER'), names)).toContain('goalkeeper');
+      expect(issueMessage(issue('BENCH_SLOT_NUMBER', 20), names)).not.toBe(generic);
+    });
+
     it('has words for every code the validator can raise', () => {
       const codes = [
         'SLOT_COUNT',
@@ -183,11 +193,35 @@ describe('tactics presentation', () => {
         'PLAYER_NOT_ELIGIBLE',
         'PLAYER_UNAVAILABLE',
         'SELECTION_INCOMPLETE',
+        'BENCH_SLOT_NUMBER',
+        'BENCH_INCOMPLETE',
+        'BENCH_NEEDS_GOALKEEPER',
       ];
 
       for (const code of codes) {
         expect(issueMessage(issue(code, 1, 'p1'), names).length).toBeGreaterThan(0);
       }
+    });
+  });
+
+  describe('the bench', () => {
+    it('keeps the first substitute place for a goalkeeper', () => {
+      expect(isKeeperPlace(12)).toBe(true);
+      expect(isKeeperPlace(13)).toBe(false);
+      expect(benchPlacementRefusal(12, 'gk')).toBeNull();
+      expect(benchPlacementRefusal(12, 'cb')).toContain('goalkeeper');
+    });
+
+    it('lets the other six places take anyone, a goalkeeper included', () => {
+      for (const slot of [13, 14, 15, 16, 17, 18]) {
+        expect(benchPlacementRefusal(slot, 'st')).toBeNull();
+        expect(benchPlacementRefusal(slot, 'gk')).toBeNull();
+      }
+    });
+
+    it('does not judge the starting places', () => {
+      expect(benchPlacementRefusal(1, 'st')).toBeNull();
+      expect(benchPlacementRefusal(9, 'gk')).toBeNull();
     });
   });
 });

@@ -296,6 +296,135 @@ public sealed class TacticsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_bench_of_seven_with_a_goalkeeper_saves_revises_and_reads_back()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var clubId = await OnboardAsync(client);
+        var (starters, bench) = await StartersAndBenchAsync(client, clubId);
+
+        var created = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/v1/tactics",
+            PlanBody("With a bench", lineup: LineupBody(starters), bench: BenchBody(bench)));
+
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var plan = (await created.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        plan.Bench.Select(place => place.SlotNumber)
+            .Should().Equal(Enumerable.Range(TacticalBenchSlot.FirstSlotNumber, WorldRuleSet.TeamSheetSubstitutes));
+        plan.Bench.Select(place => place.AssignedPlayer.Id).Should().Equal(bench);
+
+        // Swapping two places and saving again keeps all seven and moves the version on.
+        var swapped = new List<Guid>(bench);
+
+        (swapped[1], swapped[2]) = (swapped[2], swapped[1]);
+
+        var revised = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("With a bench", lineup: LineupBody(starters), bench: BenchBody(swapped)),
+            ifMatch: created.Headers.ETag!.Tag);
+
+        revised.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var revisedPlan = (await revised.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        revisedPlan.Bench.Select(place => place.AssignedPlayer.Id).Should().Equal(swapped);
+
+        // The read side agrees with what the save answered.
+        var screen = (await client.GetFromJsonAsync<TacticsResponse>("/api/v1/tactics"))!;
+
+        screen.Plans.Single(saved => saved.Id == plan.Id).Bench
+            .Select(place => place.AssignedPlayer.Id).Should().Equal(swapped);
+
+        // Leaving the bench out empties it.
+        var cleared = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("With a bench", lineup: LineupBody(starters)),
+            ifMatch: revised.Headers.ETag!.Tag);
+
+        cleared.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await cleared.Content.ReadFromJsonAsync<TacticalPlanResponse>())!.Bench.Should().BeEmpty();
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task A_bench_without_a_goalkeeper_is_refused()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var clubId = await OnboardAsync(client);
+        var (starters, bench) = await StartersAndBenchAsync(client, clubId);
+        var outfield = await OutfieldIdsAsync(client, clubId);
+
+        // Seven outfield players on the bench, none of them in the lineup.
+        var noKeeper = outfield.Where(id => !starters.Contains(id)).Take(WorldRuleSet.TeamSheetSubstitutes).ToList();
+
+        noKeeper.Should().HaveCount(WorldRuleSet.TeamSheetSubstitutes);
+
+        var response = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/v1/tactics",
+            PlanBody("No keeper", lineup: LineupBody(starters), bench: BenchBody(noKeeper)));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeAsync(response)).Should().Be(SquadErrorCodes.PlanValidationFailed);
+        (await IssueCodesAsync(response)).Should().Contain("BENCH_NEEDS_GOALKEEPER");
+
+        bench.Should().HaveCount(WorldRuleSet.TeamSheetSubstitutes);
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task A_half_filled_bench_and_a_starter_on_the_bench_are_refused()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var clubId = await OnboardAsync(client);
+        var (starters, bench) = await StartersAndBenchAsync(client, clubId);
+
+        var half = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/v1/tactics",
+            PlanBody("Half a bench", lineup: LineupBody(starters), bench: BenchBody(bench.Take(3))));
+
+        half.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IssueCodesAsync(half)).Should().Contain("BENCH_INCOMPLETE");
+
+        var doubled = new List<Guid>(bench) { [0] = starters[3] };
+
+        var both = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/v1/tactics",
+            PlanBody("Starts and sits", lineup: LineupBody(starters), bench: BenchBody(doubled)));
+
+        both.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IssueCodesAsync(both)).Should().Contain("DUPLICATE_PLAYER");
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
     public async Task A_repeated_player_is_refused_with_issues()
     {
         using var client = CreateClient();
@@ -477,6 +606,35 @@ public sealed class TacticsTests : IAsyncLifetime
         return [.. squad!.Players.Take(take).Select(player => player.Id)];
     }
 
+    /// <summary>
+    /// Picks eleven starters led by a goalkeeper and seven substitutes that include another, from the squad.
+    /// </summary>
+    private static async Task<(List<Guid> Starters, List<Guid> Bench)> StartersAndBenchAsync(
+        HttpClient client,
+        Guid clubId)
+    {
+        var squad = (await client.GetFromJsonAsync<SquadResponse>($"/api/v1/clubs/{clubId}/squad"))!;
+
+        var keepers = squad.Players.Where(player => player.PrimaryPosition == PlayerPositions.GoalkeeperCode)
+            .Select(player => player.Id).ToList();
+        var outfield = squad.Players.Where(player => player.PrimaryPosition != PlayerPositions.GoalkeeperCode)
+            .Select(player => player.Id).ToList();
+
+        keepers.Should().HaveCountGreaterThanOrEqualTo(2, "SQ-2 gives every club two goalkeepers");
+
+        List<Guid> starters = [keepers[0], .. outfield.Take(WorldRuleSet.TeamSheetStarters - 1)];
+        List<Guid> bench = [keepers[1], .. outfield.Skip(WorldRuleSet.TeamSheetStarters - 1).Take(WorldRuleSet.TeamSheetSubstitutes - 1)];
+
+        return (starters, bench);
+    }
+
+    private static async Task<List<Guid>> OutfieldIdsAsync(HttpClient client, Guid clubId)
+    {
+        var squad = (await client.GetFromJsonAsync<SquadResponse>($"/api/v1/clubs/{clubId}/squad"))!;
+
+        return [.. squad.Players.Where(player => player.PrimaryPosition != PlayerPositions.GoalkeeperCode).Select(player => player.Id)];
+    }
+
     private static Task<HttpResponseMessage> SendAsync(
         HttpClient client,
         HttpMethod method,
@@ -504,7 +662,8 @@ public sealed class TacticsTests : IAsyncLifetime
         string preset = "4-4-2",
         IEnumerable<object>? lineup = null,
         string? passFocus = null,
-        bool? counterAttack = null)
+        bool? counterAttack = null,
+        IEnumerable<object>? bench = null)
     {
         var body = new Dictionary<string, object?>
         {
@@ -519,6 +678,7 @@ public sealed class TacticsTests : IAsyncLifetime
             ["tackling"] = "normal",
             ["timeWasting"] = "off",
             ["lineup"] = lineup?.ToArray(),
+            ["bench"] = bench?.ToArray(),
         };
 
         // Left out entirely when not chosen, as a client that predates the setting would send it.
@@ -537,6 +697,11 @@ public sealed class TacticsTests : IAsyncLifetime
 
     private static object[] LineupBody(IEnumerable<Guid> playerIds) =>
         [.. playerIds.Select((playerId, index) => (object)new { slotNumber = index + 1, playerId })];
+
+    /// <summary>The bench's places are numbered after the eleven starters.</summary>
+    private static object[] BenchBody(IEnumerable<Guid> playerIds) =>
+        [.. playerIds.Select((playerId, index) =>
+            (object)new { slotNumber = TacticalBenchSlot.FirstSlotNumber + index, playerId })];
 
     /// <summary>Reads the stable <c>code</c> out of a Problem Details response.</summary>
     private static async Task<string?> CodeAsync(HttpResponseMessage response)

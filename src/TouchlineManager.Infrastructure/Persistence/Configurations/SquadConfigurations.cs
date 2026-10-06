@@ -624,6 +624,47 @@ internal sealed class TacticalSlotConfiguration : IEntityTypeConfiguration<Tacti
     }
 }
 
+/// <summary>
+/// Maps <c>squad.tactical_bench_slots</c>: the substitutes a plan names by default. Only filled places are
+/// stored, so the unique indexes make a place hold one player and a player take one place.
+/// </summary>
+internal sealed class TacticalBenchSlotConfiguration : IEntityTypeConfiguration<TacticalBenchSlot>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<TacticalBenchSlot> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("tactical_bench_slots", "squad", table =>
+        {
+            table.HasCheckConstraint("ck_tactical_bench_slots_number", "slot_number between 12 and 18");
+        });
+
+        builder.HasKey(place => place.Id);
+        builder.Property(place => place.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(place => place.PlanId).HasColumnName("plan_id").IsRequired();
+        builder.Property(place => place.SlotNumber).HasColumnName("slot_number").HasColumnType("smallint").IsRequired();
+        builder.Property(place => place.PlayerId).HasColumnName("player_id").IsRequired();
+        builder.Property(place => place.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(place => place.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(place => place.Version).HasColumnName("version").IsRequired();
+
+        builder.HasIndex(place => new { place.PlanId, place.SlotNumber })
+            .IsUnique()
+            .HasDatabaseName("ux_tactical_bench_slots_plan_slot");
+        builder.HasIndex(place => place.PlayerId).HasDatabaseName("ix_tactical_bench_slots_player_id");
+
+        builder.HasOne<TacticalPlan>()
+            .WithMany()
+            .HasForeignKey(place => place.PlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Player>()
+            .WithMany()
+            .HasForeignKey(place => place.PlayerId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 /// <summary>Maps <c>squad.training_plans</c>: one current training plan per club, holding its intensity.</summary>
 internal sealed class TrainingPlanConfiguration : IEntityTypeConfiguration<TrainingPlan>
 {

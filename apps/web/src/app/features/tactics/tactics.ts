@@ -13,7 +13,9 @@ import {
   InstructionField,
   instructionEffect as effectOf,
   SelectOption,
+  benchPlacementRefusal,
   familyLabel,
+  isKeeperPlace,
   issueMessage,
   pitchStyle,
   positionForRole,
@@ -22,7 +24,7 @@ import {
 } from '../../core/tactics/tactics-presentation';
 import { RosterRow, buildRoster } from '../../core/tactics/tactics-roster';
 import { TacticsStore } from '../../core/tactics/tactics-store';
-import { CodedInstructionKey } from '../../core/tactics/tactics-draft';
+import { BENCH_SIZE, CodedInstructionKey } from '../../core/tactics/tactics-draft';
 import { SelectablePlayer } from '../../core/tactics/tactics.models';
 import {
   FORM_ERROR,
@@ -55,6 +57,19 @@ interface SlotView {
   readonly issueCount: number;
 }
 
+/** One bench place as the board draws it: a dot under the pitch for a substitute. */
+interface BenchView {
+  readonly slotNumber: number;
+  readonly isKeeperPlace: boolean;
+
+  /** The word on an empty dot: `GK` for the keeper's place, otherwise `S` and its number. */
+  readonly tag: string;
+  readonly player: SelectablePlayer | null;
+  readonly isUnavailable: boolean;
+  readonly isSelected: boolean;
+  readonly issueCount: number;
+}
+
 /** What the skills popup is showing, and where. */
 interface SkillsPopup {
   readonly row: RosterRow;
@@ -75,7 +90,8 @@ interface RatingBasis {
  * The tactics screen (master plan §11.1, F-19).
  *
  * A formation board with the eleven slots at the positions the chosen formation dictates (`TAC-9`), the
- * eight team instructions, and the default lineup. The slots are fixed: choosing a different formation is
+ * eight team instructions, and the default lineup. Under the pitch sit the seven substitutes as dots; the
+ * first is the reserve goalkeeper's, and the other six take anyone (`SQ-4`). The slots are fixed: choosing a different formation is
  * the only way to change where they stand. A player is assigned by dragging their row in the player table
  * onto a slot, or — the accessible alternative §11.3 requires — by selecting a slot and pressing the
  * player's name, so a keyboard or a screen reader reaches every slot without dragging anything. The pitch
@@ -113,6 +129,8 @@ export class Tactics {
   protected readonly hasConflict = this.store.hasConflict;
   protected readonly isDirty = this.store.isDirty;
   protected readonly assignedCount = this.store.assignedCount;
+  protected readonly benchCount = this.store.benchCount;
+  protected readonly benchSize = BENCH_SIZE;
   protected readonly tactics = this.store.tactics;
 
   /** The slot the manager has focused, or 0 when none is. Assigning a player needs a target slot. */
@@ -126,6 +144,9 @@ export class Tactics {
 
   /** Whether the squad details could not be read, so the table can say what it is missing. */
   protected readonly detailsError = signal(false);
+
+  /** Why the last pick for a bench place was refused, or null. Cleared by the next pick or selection. */
+  protected readonly placementNotice = signal<string | null>(null);
 
   /** The row whose skills are open in the popup, or null. */
   protected readonly popup = signal<SkillsPopup | null>(null);
@@ -175,6 +196,42 @@ export class Tactics {
     });
   });
 
+  /** The bench: seven dots under the pitch, the reserve goalkeeper's first. */
+  protected readonly benchViews = computed<readonly BenchView[]>(() => {
+    const draft = this.draft();
+
+    if (draft === null) {
+      return [];
+    }
+
+    const byId = new Map(this.store.selectablePlayers().map((player) => [player.id, player]));
+    const issues = this.store.issuesBySlot();
+    const selected = this.selectedSlot();
+    const needsKeeper = this.validation()?.issues.some(
+      (issue) => issue.code === 'BENCH_NEEDS_GOALKEEPER',
+    );
+
+    return draft.bench.map((place, index) => {
+      const player = place.playerId === null ? null : (byId.get(place.playerId) ?? null);
+      const keeper = isKeeperPlace(place.slotNumber);
+
+      return {
+        slotNumber: place.slotNumber,
+        isKeeperPlace: keeper,
+        tag: keeper ? 'GK' : `S${index + 1}`,
+        player,
+        isUnavailable: player?.isUnavailable ?? false,
+        isSelected: selected === place.slotNumber,
+        issueCount: (issues.get(place.slotNumber) ?? []).length + (keeper && needsKeeper ? 1 : 0),
+      };
+    });
+  });
+
+  /** The bench place being edited, for the line under the dots. */
+  protected readonly selectedBenchView = computed(
+    () => this.benchViews().find((place) => place.isSelected) ?? null,
+  );
+
   /** The slot being edited, for the role picker under the board. */
   protected readonly selectedSlotView = computed(
     () => this.slotViews().find((slot) => slot.isSelected) ?? null,
@@ -195,7 +252,7 @@ export class Tactics {
     ...buildRoster(
       this.store.selectablePlayers(),
       this.squad()?.players ?? [],
-      this.draft()?.slots ?? [],
+      [...(this.draft()?.slots ?? []), ...(this.draft()?.bench ?? [])],
       this.ratingBasis()?.position ?? null,
     ),
   ]);
@@ -236,6 +293,7 @@ export class Tactics {
 
   /** Selects a slot, or clears the selection when it is already the focused one. */
   protected selectSlot(slotNumber: number): void {
+    this.placementNotice.set(null);
     this.selectedSlot.update((current) => (current === slotNumber ? 0 : slotNumber));
   }
 
@@ -244,12 +302,28 @@ export class Tactics {
     const slot = this.selectedSlot();
 
     if (slot !== 0 && !row.isUnavailable) {
-      this.store.assignPlayer(slot, row.id);
+      this.place(slot, row.id, row.position);
     }
+  }
+
+  /** Puts a player in a slot, unless the bench place they were offered is the keeper's and they are not one. */
+  private place(slotNumber: number, playerId: string, position: string): boolean {
+    const refusal = benchPlacementRefusal(slotNumber, position);
+
+    this.placementNotice.set(refusal);
+
+    if (refusal !== null) {
+      return false;
+    }
+
+    this.store.assignPlayer(slotNumber, playerId);
+
+    return true;
   }
 
   /** Empties a slot from the board. */
   protected clearSlot(slotNumber: number): void {
+    this.placementNotice.set(null);
     this.store.clearSlot(slotNumber);
   }
 
@@ -376,6 +450,41 @@ export class Tactics {
     return `${base} border-white/80 bg-panel text-ink`;
   }
 
+  /** The classes for a bench dot, which follow the same states as a slot marker but sit in a row. */
+  protected benchClasses(place: BenchView): string {
+    const base =
+      'flex aspect-square w-full flex-col items-center justify-center rounded-full border-2 text-center ' +
+      'text-[10px] font-semibold leading-tight shadow ' +
+      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
+    if (place.issueCount > 0 || place.isUnavailable) {
+      return `${base} border-red-400 bg-[#2a1416] text-red-200`;
+    }
+
+    if (place.isSelected) {
+      return `${base} border-accent bg-panel text-ink ring-2 ring-accent`;
+    }
+
+    if (place.player === null) {
+      return place.isKeeperPlace
+        ? `${base} border-amber-400 border-dashed bg-raised text-amber-200`
+        : `${base} border-line-strong border-dashed bg-raised text-ink-2`;
+    }
+
+    return `${base} border-line-strong bg-panel text-ink`;
+  }
+
+  /** The accessible name of a bench dot: its place, who is on it, and its state. */
+  protected benchLabel(place: BenchView): string {
+    const name = `Substitute ${place.slotNumber - 11}${place.isKeeperPlace ? ', reserve goalkeeper' : ''}`;
+
+    if (place.player === null) {
+      return `${name}: empty`;
+    }
+
+    return `${name}: ${place.player.fullName}${place.isUnavailable ? ', unavailable' : ''}`;
+  }
+
   /** The accessible name of a slot marker, describing where it is, who is in it, and its state. */
   protected slotLabel(slot: SlotView): string {
     const position = `${familyLabel(slot.positionFamily)}, ${roleLabel(slot.role)}`;
@@ -428,8 +537,14 @@ export class Tactics {
 
     event.preventDefault();
     event.stopPropagation();
-    this.store.assignPlayer(slotNumber, playerId);
-    this.selectedSlot.set(slotNumber);
+
+    const position = this.store
+      .selectablePlayers()
+      .find((player) => player.id === playerId)?.primaryPosition;
+
+    if (position !== undefined && this.place(slotNumber, playerId, position)) {
+      this.selectedSlot.set(slotNumber);
+    }
   }
 
   /** Opens the skills popup for a row, beside the pointer (or the row, for the keyboard). */

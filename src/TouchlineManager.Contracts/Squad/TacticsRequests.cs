@@ -75,6 +75,16 @@ public sealed record SaveTacticalPlanRequest
     /// eleven must be (`SQ-4`) — the validator refuses a half-filled side rather than fielding one short.
     /// </remarks>
     public IReadOnlyList<TacticalLineupEntryRequest>? Lineup { get; init; }
+
+    /// <summary>
+    /// Gets the default bench, slots 12–18, or null to leave the plan without one.
+    /// </summary>
+    /// <remarks>
+    /// Omitted entirely, the plan names no substitutes. When any is named, all seven must be, and at least
+    /// one must be a goalkeeper (`SQ-4`) — the validator answers with <c>BENCH_INCOMPLETE</c> or
+    /// <c>BENCH_NEEDS_GOALKEEPER</c> rather than saving a bench that cannot cover an injured keeper.
+    /// </remarks>
+    public IReadOnlyList<TacticalLineupEntryRequest>? Bench { get; init; }
 }
 
 /// <summary>One slot's layout in a submitted plan (`TAC-7`…`TAC-9`).</summary>
@@ -102,7 +112,7 @@ public sealed record TacticalSlotRequest
 }
 
 /// <summary>One player's place in the default lineup (`SQ-4`).</summary>
-/// <param name="SlotNumber">The slot the player occupies, 1–11.</param>
+/// <param name="SlotNumber">The slot the player occupies: 1–11 in the lineup, 12–18 on the bench.</param>
 /// <param name="PlayerId">The selected player.</param>
 public sealed record TacticalLineupEntryRequest
 {

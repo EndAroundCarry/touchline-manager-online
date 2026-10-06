@@ -65,6 +65,12 @@ internal sealed class TacticsQueries : ITacticsQueries
             .ThenBy(slot => slot.SlotNumber)
             .ToListAsync(cancellationToken);
 
+        var benchSlots = await _dbContext.TacticalBenchSlots
+            .Where(place => planIds.Contains(place.PlanId))
+            .OrderBy(place => place.PlanId)
+            .ThenBy(place => place.SlotNumber)
+            .ToListAsync(cancellationToken);
+
         // A player is selectable when an active contract and an active registration agree on the club
         // (SQ-6, SQ-7). Both joins are required, so an inconsistent pair drops out rather than half-listing.
         var selectable = await (
@@ -90,6 +96,7 @@ internal sealed class TacticsQueries : ITacticsQueries
         var assignedIds = slots
             .Where(slot => slot.AssignedPlayerId is not null)
             .Select(slot => slot.AssignedPlayerId!.Value)
+            .Concat(benchSlots.Select(place => place.PlayerId))
             .Distinct()
             .ToList();
 
@@ -125,7 +132,14 @@ internal sealed class TacticsQueries : ITacticsQueries
                         slot.Role,
                         slot.NormalizedX,
                         slot.NormalizedY,
-                        Describe(slot.AssignedPlayerId, playersById, unavailable)))]))
+                        Describe(slot.AssignedPlayerId, playersById, unavailable)))],
+                [.. benchSlots
+                    .Where(place => place.PlanId == plan.Id)
+                    .OrderBy(place => place.SlotNumber)
+                    .Select(place => Describe(place.PlayerId, playersById, unavailable) is { } player
+                        ? new TacticsBenchRow(place.SlotNumber, player)
+                        : null)
+                    .OfType<TacticsBenchRow>()]))
             .ToList();
 
         var selectableRows = selectable

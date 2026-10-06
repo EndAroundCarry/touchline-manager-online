@@ -189,6 +189,9 @@ public sealed class TouchlineManagerDbContext : DbContext
     /// <summary>Gets the squad module's tactical slots.</summary>
     public DbSet<TacticalSlot> TacticalSlots => Set<TacticalSlot>();
 
+    /// <summary>Gets the squad module's default bench places, one per substitute a plan names.</summary>
+    public DbSet<TacticalBenchSlot> TacticalBenchSlots => Set<TacticalBenchSlot>();
+
     /// <summary>Gets the squad module's club training plans.</summary>
     public DbSet<TrainingPlan> TrainingPlans => Set<TrainingPlan>();
 

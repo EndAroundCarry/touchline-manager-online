@@ -47,6 +47,13 @@ export interface TacticalSlot {
   readonly isOutOfPosition: boolean;
 }
 
+/** One substitute on a saved plan's bench (`SQ-4`). */
+export interface TacticalBenchSlot {
+  /** The bench slot number, 12–18: the places that follow the eleven starters. */
+  readonly slotNumber: number;
+  readonly assignedPlayer: AssignedPlayer;
+}
+
 /** One saved tactical plan (`INS-11`). */
 export interface TacticalPlan {
   readonly id: string;
@@ -58,6 +65,9 @@ export interface TacticalPlan {
   readonly assignedCount: number;
   readonly isComplete: boolean;
   readonly slots: readonly TacticalSlot[];
+
+  /** The substitutes the plan names, in slot order. Empty when it names none. */
+  readonly bench: readonly TacticalBenchSlot[];
 }
 
 /** A player who may be assigned to a slot. */
@@ -140,4 +150,10 @@ export interface SaveTacticalPlanRequest extends TeamInstructions {
   readonly formationPreset: string;
   readonly slots: readonly TacticalSlotRequest[];
   readonly lineup: readonly TacticalLineupEntryRequest[] | null;
+
+  /**
+   * The default bench, slots 12–18, or null for none. When any substitute is named all seven must be, and
+   * one of them a goalkeeper (`SQ-4`): the server answers `BENCH_INCOMPLETE` or `BENCH_NEEDS_GOALKEEPER`.
+   */
+  readonly bench: readonly TacticalLineupEntryRequest[] | null;
 }

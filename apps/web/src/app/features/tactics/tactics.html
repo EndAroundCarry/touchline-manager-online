@@ -12,7 +12,7 @@
       <p class="mt-1 text-sm text-ink-2">
         {{ club.countryCode }} · season {{ club.seasonNumber }} · {{ plans().length }} saved
         {{ plans().length === 1 ? 'plan' : 'plans' }} · {{ assignedCount() }} of
-        {{ plan.slots.length }} slots filled
+        {{ plan.slots.length }} slots filled · {{ benchCount() }} of {{ benchSize }} substitutes
       </p>
 
       <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -121,7 +121,8 @@
           <h2 class="text-lg font-semibold text-ink">Formation</h2>
           <p class="mt-1 text-sm text-ink-2">
             Positions are set by the formation. Drag a player from the table onto a slot, or select
-            a slot and then press the player's name.
+            a slot and then press the player's name. The seven dots under the pitch are your
+            substitutes: the first is the reserve goalkeeper, the other six can be anyone.
           </p>
 
           <div
@@ -161,6 +162,60 @@
                   <span class="text-[9px] font-normal" aria-hidden="true">empty</span>
                 }
               </button>
+            }
+          </div>
+
+          <div class="mt-3 max-w-sm" data-testid="bench">
+            <h3 class="text-sm font-medium text-ink-2">
+              Substitutes
+              <span class="font-normal text-muted">({{ benchCount() }} of {{ benchSize }})</span>
+            </h3>
+
+            <ul class="mt-1.5 grid grid-cols-7 gap-1.5" role="list">
+              @for (place of benchViews(); track place.slotNumber) {
+                <li class="min-w-0">
+                  <button
+                    type="button"
+                    [class]="benchClasses(place)"
+                    [attr.data-testid]="'bench-' + place.slotNumber"
+                    [attr.aria-pressed]="place.isSelected"
+                    [attr.aria-label]="benchLabel(place)"
+                    (click)="selectSlot(place.slotNumber)"
+                    (dragover)="onSlotDragOver($event)"
+                    (drop)="onSlotDrop($event, place.slotNumber)"
+                  >
+                    @if (place.player; as player) {
+                      <span class="max-w-full truncate px-0.5" aria-hidden="true">{{
+                        player.shortName
+                      }}</span>
+                      @if (place.isUnavailable) {
+                        <span class="text-[9px] font-normal" aria-hidden="true">unavailable</span>
+                      }
+                    } @else {
+                      <span aria-hidden="true">{{ place.tag }}</span>
+                      <span class="text-[9px] font-normal" aria-hidden="true">empty</span>
+                    }
+                  </button>
+                </li>
+              }
+            </ul>
+
+            @if (placementNotice(); as notice) {
+              <p class="mt-2 text-sm text-amber-200" role="alert" data-testid="bench-notice">
+                {{ notice }}
+              </p>
+            }
+
+            @if (selectedBenchView(); as place) {
+              <p class="mt-2 text-sm text-ink-2" role="status">
+                Substitute {{ place.slotNumber - 11 }} is selected{{
+                  place.isKeeperPlace ? ' (reserve goalkeeper)' : ''
+                }}. Press {{ place.isKeeperPlace ? "a goalkeeper's" : "a player's" }} name in the
+                table to pick them, or
+                <button type="button" [class]="linkClass" (click)="clearSlot(place.slotNumber)">
+                  empty it</button
+                >.
+              </p>
             }
           </div>
 

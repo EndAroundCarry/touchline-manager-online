@@ -66,7 +66,27 @@ public static class TacticsMapping
                     && IsOutOfPosition(assigned.PrimaryPosition, assigned.SecondaryPositions, slot.PositionFamily)))
             .ToList();
 
-        return Build(plan.Id, plan.Name, plan.FormationPreset, plan.Instructions, plan.IsDefault, plan.Version, slots);
+        var bench = plan.Bench
+            .OrderBy(place => place.SlotNumber)
+            .Select(place => new TacticalBenchSlotResponse(
+                place.SlotNumber,
+                new AssignedPlayerResponse(
+                    place.Player.Id,
+                    place.Player.FullName,
+                    place.Player.ShortName,
+                    place.Player.PrimaryPosition.ToCode(),
+                    place.Player.IsUnavailable)))
+            .ToList();
+
+        return Build(
+            plan.Id,
+            plan.Name,
+            plan.FormationPreset,
+            plan.Instructions,
+            plan.IsDefault,
+            plan.Version,
+            slots,
+            bench);
     }
 
     /// <summary>
@@ -97,6 +117,13 @@ public static class TacticsMapping
                     && IsOutOfPosition(player.PrimaryPosition, player.SecondaryPositions, slot.PositionFamily)))
             .ToList();
 
+        var bench = record.Bench
+            .OrderBy(place => place.SlotNumber)
+            .Select(place => new TacticalBenchSlotResponse(
+                place.SlotNumber,
+                DescribeAssigned(place.PlayerId, selectablePlayers)!))
+            .ToList();
+
         return Build(
             record.Plan.Id,
             record.Plan.Name,
@@ -104,7 +131,8 @@ public static class TacticsMapping
             record.Plan.Instructions,
             record.Plan.IsDefault,
             record.Plan.Version,
-            slots);
+            slots,
+            bench);
     }
 
     /// <summary>Projects the validator's verdict.</summary>
@@ -207,7 +235,8 @@ public static class TacticsMapping
         TeamInstructionSet instructions,
         bool isDefault,
         long version,
-        List<TacticalSlotResponse> slots)
+        List<TacticalSlotResponse> slots,
+        List<TacticalBenchSlotResponse> bench)
     {
         var assignedCount = slots.Count(slot => slot.AssignedPlayer is not null);
 
@@ -230,6 +259,7 @@ public static class TacticsMapping
             version,
             assignedCount,
             assignedCount == slots.Count,
-            slots);
+            slots,
+            bench);
     }
 }

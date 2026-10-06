@@ -43,6 +43,7 @@ public sealed record TacticsResponse(
 /// <param name="AssignedCount">How many of the eleven slots name a player.</param>
 /// <param name="IsComplete">Whether all eleven slots name a player.</param>
 /// <param name="Slots">The eleven slots, in slot order.</param>
+/// <param name="Bench">The substitutes the plan names, in slot order (12–18). Empty when it names none.</param>
 public sealed record TacticalPlanResponse(
     Guid Id,
     string Name,
@@ -52,7 +53,13 @@ public sealed record TacticalPlanResponse(
     long Version,
     int AssignedCount,
     bool IsComplete,
-    IReadOnlyList<TacticalSlotResponse> Slots);
+    IReadOnlyList<TacticalSlotResponse> Slots,
+    IReadOnlyList<TacticalBenchSlotResponse> Bench);
+
+/// <summary>One substitute on a saved plan's bench (`SQ-4`).</summary>
+/// <param name="SlotNumber">The bench slot number, 12–18.</param>
+/// <param name="AssignedPlayer">The substitute.</param>
+public sealed record TacticalBenchSlotResponse(int SlotNumber, AssignedPlayerResponse AssignedPlayer);
 
 /// <summary>The eight team-level settings, as stable codes (`INS-1`…`INS-8`).</summary>
 /// <param name="Mentality">The mentality code.</param>

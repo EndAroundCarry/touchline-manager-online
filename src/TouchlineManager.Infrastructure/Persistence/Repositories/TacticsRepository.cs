@@ -8,7 +8,7 @@ namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 /// The squad module's write-side persistence for tactical plans.
 /// </summary>
 /// <remarks>
-/// Plans and slots load together because neither is meaningful alone, and both are tracked: an update
+/// Plans, slots and bench places load together because neither is meaningful alone, and both are tracked: an update
 /// reshapes the loaded slots in place rather than replacing them, so a save that changes a formation is
 /// one <c>SaveChanges</c> with no delete-and-reinsert churn against the plan's unique indexes.
 /// </remarks>
@@ -24,6 +24,12 @@ internal sealed class TacticsRepository : ITacticsRepository
 
     /// <inheritdoc />
     public void AddSlot(TacticalSlot slot) => _dbContext.TacticalSlots.Add(slot);
+
+    /// <inheritdoc />
+    public void AddBenchSlot(TacticalBenchSlot benchSlot) => _dbContext.TacticalBenchSlots.Add(benchSlot);
+
+    /// <inheritdoc />
+    public void RemoveBenchSlot(TacticalBenchSlot benchSlot) => _dbContext.TacticalBenchSlots.Remove(benchSlot);
 
     /// <inheritdoc />
     public Task<TacticalPlanRecord?> FindAsync(Guid planId, CancellationToken cancellationToken) =>
@@ -51,6 +57,11 @@ internal sealed class TacticsRepository : ITacticsRepository
             .OrderBy(slot => slot.SlotNumber)
             .ToListAsync(cancellationToken);
 
-        return new TacticalPlanRecord(plan, slots);
+        var bench = await _dbContext.TacticalBenchSlots
+            .Where(place => place.PlanId == plan.Id)
+            .OrderBy(place => place.SlotNumber)
+            .ToListAsync(cancellationToken);
+
+        return new TacticalPlanRecord(plan, slots, bench);
     }
 }

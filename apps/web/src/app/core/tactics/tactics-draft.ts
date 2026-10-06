@@ -18,6 +18,18 @@ import type {
 /** The name a new plan starts with, until the manager renames it. */
 export const NEW_PLAN_NAME = 'New plan';
 
+/** The first bench slot number, which follows the eleven starters (`SQ-4`). */
+export const BENCH_FIRST_SLOT = 12;
+
+/** How many substitutes a bench holds (`SQ-4`). */
+export const BENCH_SIZE = 7;
+
+/**
+ * The bench place kept for a goalkeeper. The server asks only that the bench holds one somewhere; the
+ * screen reserves the first place for it so the rule is something a manager can see rather than discover.
+ */
+export const KEEPER_BENCH_SLOT = BENCH_FIRST_SLOT;
+
 /** One slot as the screen edits it: the layout, plus whoever is picked. */
 export interface SlotDraft {
   readonly slotNumber: number;
@@ -25,6 +37,12 @@ export interface SlotDraft {
   readonly role: string;
   readonly normalizedX: number;
   readonly normalizedY: number;
+  readonly playerId: string | null;
+}
+
+/** One bench place as the screen edits it. */
+export interface BenchDraft {
+  readonly slotNumber: number;
   readonly playerId: string | null;
 }
 
@@ -36,6 +54,9 @@ export interface PlanDraft {
   readonly formationPreset: string;
   readonly instructions: TeamInstructions;
   readonly slots: readonly SlotDraft[];
+
+  /** Always seven places, slots 12–18, filled or not. */
+  readonly bench: readonly BenchDraft[];
 }
 
 /** The neutral instructions a new plan starts from (`INS-1`…`INS-8`). */
@@ -58,6 +79,15 @@ function bySlot(left: { slotNumber: number }, right: { slotNumber: number }): nu
   return left.slotNumber - right.slotNumber;
 }
 
+/** The seven bench places, with whoever is named in each. */
+function benchOf(picked: ReadonlyMap<number, string>): readonly BenchDraft[] {
+  return Array.from({ length: BENCH_SIZE }, (_, index) => {
+    const slotNumber = BENCH_FIRST_SLOT + index;
+
+    return { slotNumber, playerId: picked.get(slotNumber) ?? null };
+  });
+}
+
 /** Builds a draft from a saved plan, so the screen edits what the server holds. */
 export function draftFromPlan(plan: TacticalPlan): PlanDraft {
   return {
@@ -74,6 +104,7 @@ export function draftFromPlan(plan: TacticalPlan): PlanDraft {
       normalizedY: slot.normalizedY,
       playerId: slot.assignedPlayer?.id ?? null,
     })),
+    bench: benchOf(new Map(plan.bench.map((place) => [place.slotNumber, place.assignedPlayer.id]))),
   };
 }
 
@@ -93,6 +124,7 @@ export function draftFromFormation(formation: FormationPreset, name = NEW_PLAN_N
       normalizedY: slot.normalizedY,
       playerId: null,
     })),
+    bench: benchOf(new Map()),
   };
 }
 
@@ -119,7 +151,12 @@ export function withFormation(draft: PlanDraft, formation: FormationPreset): Pla
   };
 }
 
-/** Assigns a player to a slot, or clears it when `playerId` is null. */
+/**
+ * Assigns a player to a slot, or clears it when `playerId` is null.
+ *
+ * A player picked to start leaves the bench: one player cannot be in both, and moving them is what the
+ * manager means by picking them.
+ */
 export function withAssignment(
   draft: PlanDraft,
   slotNumber: number,
@@ -130,6 +167,43 @@ export function withAssignment(
     slots: draft.slots.map((slot) =>
       slot.slotNumber === slotNumber ? { ...slot, playerId } : slot,
     ),
+    bench:
+      playerId === null
+        ? draft.bench
+        : draft.bench.map((place) =>
+            place.playerId === playerId ? { ...place, playerId: null } : place,
+          ),
+  };
+}
+
+/**
+ * Names a substitute for a bench place, or empties the place when `playerId` is null.
+ *
+ * A player already starting, or already on the bench, is moved rather than copied: the place they held is
+ * left empty, so the manager sees the gap rather than a refusal about a double booking.
+ */
+export function withBenchAssignment(
+  draft: PlanDraft,
+  slotNumber: number,
+  playerId: string | null,
+): PlanDraft {
+  return {
+    ...draft,
+    slots:
+      playerId === null
+        ? draft.slots
+        : draft.slots.map((slot) =>
+            slot.playerId === playerId ? { ...slot, playerId: null } : slot,
+          ),
+    bench: draft.bench.map((place) => {
+      if (place.slotNumber === slotNumber) {
+        return { ...place, playerId };
+      }
+
+      return playerId !== null && place.playerId === playerId
+        ? { ...place, playerId: null }
+        : place;
+    }),
   };
 }
 
@@ -168,6 +242,11 @@ export function assignedCount(draft: PlanDraft): number {
   return draft.slots.filter((slot) => slot.playerId !== null).length;
 }
 
+/** How many of the seven bench places name a player. */
+export function benchCount(draft: PlanDraft): number {
+  return draft.bench.filter((place) => place.playerId !== null).length;
+}
+
 /** Whether all eleven slots name a player. */
 export function isComplete(draft: PlanDraft): boolean {
   return assignedCount(draft) === draft.slots.length;
@@ -175,6 +254,9 @@ export function isComplete(draft: PlanDraft): boolean {
 
 /**
  * Turns a draft into the request the server accepts.
+ *
+ * `bench` follows the same rule as `lineup`: any substitute at all is sent, so a half-filled bench is
+ * refused with `BENCH_INCOMPLETE` rather than quietly dropped, and an empty bench is omitted.
  *
  * `lineup` is emitted whenever anybody is picked, including a partial selection: the server refuses a
  * half-filled side with `SELECTION_INCOMPLETE` (`SQ-4`), and omitting it would silently save a template
@@ -186,6 +268,10 @@ export function toRequest(draft: PlanDraft): SaveTacticalPlanRequest {
   const lineup: TacticalLineupEntryRequest[] = slots
     .filter((slot): slot is SlotDraft & { playerId: string } => slot.playerId !== null)
     .map((slot) => ({ slotNumber: slot.slotNumber, playerId: slot.playerId }));
+  const bench: TacticalLineupEntryRequest[] = [...draft.bench]
+    .sort(bySlot)
+    .filter((place): place is BenchDraft & { playerId: string } => place.playerId !== null)
+    .map((place) => ({ slotNumber: place.slotNumber, playerId: place.playerId }));
 
   return {
     name: draft.name,
@@ -199,6 +285,7 @@ export function toRequest(draft: PlanDraft): SaveTacticalPlanRequest {
       normalizedY: slot.normalizedY,
     })),
     lineup: lineup.length === 0 ? null : lineup,
+    bench: bench.length === 0 ? null : bench,
   };
 }
 

@@ -174,7 +174,7 @@ public sealed class EvaluateAiClubs
                 now))
             .ToList();
 
-        record = new TacticalPlanRecord(plan, slots);
+        record = new TacticalPlanRecord(plan, slots, []);
 
         return true;
     }

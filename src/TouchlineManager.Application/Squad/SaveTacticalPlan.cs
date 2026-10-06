@@ -158,10 +158,15 @@ public sealed class SaveTacticalPlan
         }
 
         var definitions = BuildDefinitions(request);
+        var benchDefinitions = BuildBench(request);
         var validation = TacticalPlanValidator.Validate(
             definitions,
             [.. snapshot.SelectablePlayers.Select(player => player.Id)],
-            [.. snapshot.SelectablePlayers.Where(player => player.IsUnavailable).Select(player => player.Id)]);
+            [.. snapshot.SelectablePlayers.Where(player => player.IsUnavailable).Select(player => player.Id)],
+            benchDefinitions,
+            [.. snapshot.SelectablePlayers
+                .Where(player => player.PrimaryPosition == PlayerPosition.Goalkeeper)
+                .Select(player => player.Id)]);
 
         if (!validation.IsValid)
         {
@@ -173,8 +178,8 @@ public sealed class SaveTacticalPlan
 
         var now = _clock.UtcNow;
         var record = existing is null
-            ? Create(request, snapshot, access.ClubId, definitions, now)
-            : Revise(existing, request, definitions, now);
+            ? Create(request, snapshot, access.ClubId, definitions, benchDefinitions, now)
+            : Revise(existing, request, definitions, benchDefinitions, _repository, now);
 
         var action = existing is null
             ? SquadAuditActions.TacticalPlanCreated
@@ -249,6 +254,10 @@ public sealed class SaveTacticalPlan
         return [.. layout.Select(slot => slot with { AssignedPlayerId = lineup.GetValueOrDefault(slot.SlotNumber) })];
     }
 
+    /// <summary>Reads the bench the request names, or none when it names no substitutes.</summary>
+    private static List<TacticalBenchDefinition> BuildBench(SaveTacticalPlanRequest request) =>
+        [.. (request.Bench ?? []).Select(entry => new TacticalBenchDefinition(entry.SlotNumber, entry.PlayerId))];
+
     /// <summary>Lays out a new plan and its slots.</summary>
     /// <remarks>
     /// The default is decided from the read snapshot rather than a second query: the plans that exist are
@@ -259,6 +268,7 @@ public sealed class SaveTacticalPlan
         TacticsSnapshot snapshot,
         Guid clubId,
         IReadOnlyList<TacticalSlotDefinition> definitions,
+        IReadOnlyList<TacticalBenchDefinition> benchDefinitions,
         DateTimeOffset now)
     {
         var hasDefault = snapshot.Plans.Any(plan => plan.IsDefault);
@@ -292,14 +302,31 @@ public sealed class SaveTacticalPlan
             _repository.AddSlot(slot);
         }
 
-        return new TacticalPlanRecord(plan, slots);
+        var bench = benchDefinitions
+            .OrderBy(definition => definition.SlotNumber)
+            .Select(definition => TacticalBenchSlot.Place(
+                Guid.CreateVersion7(),
+                plan.Id,
+                definition.SlotNumber,
+                definition.PlayerId,
+                now))
+            .ToList();
+
+        foreach (var place in bench)
+        {
+            _repository.AddBenchSlot(place);
+        }
+
+        return new TacticalPlanRecord(plan, slots, bench);
     }
 
-    /// <summary>Revises an existing plan in place and re-lays its slots.</summary>
+    /// <summary>Revises an existing plan in place and re-lays its slots and bench.</summary>
     private static TacticalPlanRecord Revise(
         TacticalPlanRecord existing,
         SaveTacticalPlanRequest request,
         IReadOnlyList<TacticalSlotDefinition> definitions,
+        IReadOnlyList<TacticalBenchDefinition> benchDefinitions,
+        ITacticsRepository repository,
         DateTimeOffset now)
     {
         existing.Plan.Revise(
@@ -325,7 +352,54 @@ public sealed class SaveTacticalPlan
             slot.Assign(definition.AssignedPlayerId, now);
         }
 
-        return existing;
+        return existing with { Bench = ReviseBench(existing, benchDefinitions, repository, now) };
+    }
+
+    /// <summary>
+    /// Brings the stored bench to the submitted one: places keep their identity while they stay filled, new
+    /// ones are added, and any the manager emptied are removed.
+    /// </summary>
+    /// <remarks>
+    /// Revising in place rather than deleting and re-adding keeps a save from writing a place's number twice
+    /// in one commit, which the plan-and-slot unique index would refuse.
+    /// </remarks>
+    private static List<TacticalBenchSlot> ReviseBench(
+        TacticalPlanRecord existing,
+        IReadOnlyList<TacticalBenchDefinition> benchDefinitions,
+        ITacticsRepository repository,
+        DateTimeOffset now)
+    {
+        var stored = existing.Bench.ToDictionary(place => place.SlotNumber);
+        var wanted = benchDefinitions.ToDictionary(definition => definition.SlotNumber);
+        var result = new List<TacticalBenchSlot>();
+
+        foreach (var place in existing.Bench.Where(place => !wanted.ContainsKey(place.SlotNumber)))
+        {
+            repository.RemoveBenchSlot(place);
+        }
+
+        foreach (var definition in benchDefinitions.OrderBy(definition => definition.SlotNumber))
+        {
+            if (stored.TryGetValue(definition.SlotNumber, out var place))
+            {
+                place.Assign(definition.PlayerId, now);
+                result.Add(place);
+
+                continue;
+            }
+
+            var added = TacticalBenchSlot.Place(
+                Guid.CreateVersion7(),
+                existing.Plan.Id,
+                definition.SlotNumber,
+                definition.PlayerId,
+                now);
+
+            repository.AddBenchSlot(added);
+            result.Add(added);
+        }
+
+        return result;
     }
 
     private static TeamInstructionSet ReadInstructions(SaveTacticalPlanRequest request) => new()
