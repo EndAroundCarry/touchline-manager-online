@@ -161,10 +161,19 @@ internal sealed class FilmMotion
 
     /// <summary>
     /// The roles that are kept from one beat to the next (`replay-v6`): a challenger, a second and a cover for the
-    /// side without the ball; and five places for its opponents' options, which a flank attack and a counter fill
-    /// differently.
+    /// side without the ball; five places for its opponents' options, which a flank attack, a counter and a delivery
+    /// fill differently; and six for the defenders who mark and hold zones when a cross comes in.
     /// </summary>
-    private const int RoleSlots = 8;
+    private const int RoleSlots = 14;
+
+    /// <summary>The first of the slots the defenders take to mark and hold zones in the box.</summary>
+    private const int BoxDefenderSlot = 8;
+
+    /// <summary>How many beats before a cross the box begins to fill, so that the runners are there when it arrives.</summary>
+    private const int DeliveryLead = 3;
+
+    /// <summary>How many beats after a cross, at the most, the box stays set while it is headed, cleared or shot at.</summary>
+    private const int DeliveryAftermath = 3;
 
     /// <summary>How near its goal the ball is, in metres, before the defenders send a second player to it.</summary>
     private const double FinalThird = 35.0;
@@ -795,8 +804,9 @@ internal sealed class FilmMotion
     private void AssignRoles(IReadOnlyList<FilmBeat> beats, int index)
     {
         var beat = beats[index];
+        var cross = CrossOf(beats, index);
 
-        if (beat.IsHold || beat.Kind is BeatKind.Shot or BeatKind.Cross or BeatKind.Clearance or BeatKind.Header or BeatKind.Save)
+        if (beat.IsHold || (cross < 0 && beat.Kind is BeatKind.Shot or BeatKind.Cross or BeatKind.Clearance or BeatKind.Header or BeatKind.Save))
         {
             return;
         }
@@ -805,9 +815,16 @@ internal sealed class FilmMotion
         var defending = MatchInputV1.OpponentOf(attacking);
         var focus = beat.To;
 
-        var counter = CounterTuning.For(_context.InstructionsOf(attacking));
+        if (cross >= 0)
+        {
+            BuildDeliverySpecs(beat, beats[cross]);
+        }
+        else
+        {
+            var counter = CounterTuning.For(_context.InstructionsOf(attacking));
 
-        BuildSpecs(beat, IsTransition(beats, index, counter) ? counter : null, attacking, defending, focus);
+            BuildSpecs(beat, IsTransition(beats, index, counter) ? counter : null, attacking, defending, focus);
+        }
 
         // Each takes a place for the whole beat — a press closes down the point the ball is going to, and an option
         // stands off it — so that a player runs straight there instead of chasing a ball that moves faster than he
@@ -849,8 +866,109 @@ internal sealed class FilmMotion
         {
             if (_roles[slot] >= 0)
             {
-                _tasks[_roles[slot]] = new Task(slot < 2 ? TaskKind.Press : TaskKind.Support, _specs[slot].Point, slot);
+                _tasks[_roles[slot]] = new Task(_specs[slot].Run ? TaskKind.Press : TaskKind.Support, _specs[slot].Point, slot);
             }
+        }
+    }
+
+    /// <summary>
+    /// Gets the index of the cross, in open play, that a beat is the run-up to, the flight of, or the finish after, or -1
+    /// (`replay-v6`). Crosses from a corner or a free kick are set pieces, which arrange their own box.
+    /// </summary>
+    internal static int CrossOf(IReadOnlyList<FilmBeat> beats, int index)
+    {
+        var beat = beats[index];
+
+        if (beat.IsHold || beat.Formation != FormationMode.Open)
+        {
+            return -1;
+        }
+
+        if (beat.Kind == BeatKind.Cross)
+        {
+            return index;
+        }
+
+        if (beat.Kind is BeatKind.Carry or BeatKind.Pass or BeatKind.LoftedPass or BeatKind.Duel)
+        {
+            for (var next = index + 1; next < beats.Count && next <= index + DeliveryLead; next++)
+            {
+                var other = beats[next];
+
+                if (other.Cut || other.IsHold || other.Possession != beat.Possession || other.Formation != FormationMode.Open)
+                {
+                    break;
+                }
+
+                if (other.Kind == BeatKind.Cross)
+                {
+                    return next;
+                }
+
+                if (other.Kind is BeatKind.Shot or BeatKind.Clearance or BeatKind.Header or BeatKind.Save)
+                {
+                    break;
+                }
+            }
+
+            return -1;
+        }
+
+        for (var back = index - 1; back >= 0 && back >= index - DeliveryAftermath; back--)
+        {
+            var other = beats[back];
+
+            if (beats[back + 1].Cut || other.IsHold || other.Possession != beat.Possession)
+            {
+                break;
+            }
+
+            if (other.Kind == BeatKind.Cross)
+            {
+                return other.Formation == FormationMode.Open ? back : -1;
+            }
+
+            if (other.Kind is not (BeatKind.Header or BeatKind.Shot or BeatKind.Clearance or BeatKind.Save))
+            {
+                break;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Writes the roles for a cross coming in: runners at the near post, the far post and the penalty spot and a
+    /// cutback player at the edge of the box, each with a defender goal-side of him, two defenders holding zones, the
+    /// far-side wide player left high, and — while the ball is still being worked down the flank — one challenger.
+    /// </summary>
+    private void BuildDeliverySpecs(FilmBeat beat, FilmBeat cross)
+    {
+        Array.Fill(_specs, default);
+
+        var attacking = cross.Side;
+        var defending = MatchInputV1.OpponentOf(attacking);
+        var ballSide = cross.From.Y >= FilmSpace.Width / 2 ? 1.0 : -1.0;
+        var box = FilmShape.SetBox(attacking, ballSide);
+
+        if (beat.Kind is BeatKind.Carry or BeatKind.Pass or BeatKind.LoftedPass or BeatKind.Duel)
+        {
+            var toGoal = (FilmSpace.OwnGoal(defending) - beat.To).Unit();
+
+            _specs[0] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(beat.To + (toGoal * 1.5), 1.5), true, true, true);
+        }
+
+        _specs[3] = new Spec(attacking, RoleWants.FrontLine, box.NearPost, false, false, true);
+        _specs[4] = new Spec(attacking, RoleWants.Any, box.FarPost, false, false, true);
+        _specs[5] = new Spec(attacking, RoleWants.Any, box.PenaltySpot, false, false, true);
+        _specs[6] = new Spec(attacking, RoleWants.Any, box.Cutback, false, false, true);
+        _specs[7] = new Spec(attacking, RoleWants.Any, Place(attacking, FilmSpace.Length - 24.0, (FilmSpace.Width / 2) - (ballSide * 22.0)), false, false, true);
+
+        Vec[] defenders = [box.NearMark, box.SpotMark, box.FarMark, box.SixYardZone, box.BoxZone, box.CutbackMark];
+
+        for (var index = 0; index < defenders.Length; index++)
+        {
+            _specs[BoxDefenderSlot + index] = new Spec(defending, RoleWants.Any, defenders[index], true, true, true);
         }
     }
 
@@ -872,7 +990,7 @@ internal sealed class FilmMotion
 
         if (challenge)
         {
-            _specs[0] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 1.5), 1.5), true, true);
+            _specs[0] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 1.5), 1.5), true, true, true);
             _specs[2] = new Spec(defending, RoleWants.SameLine, FilmSpace.Clamp(focus + (toGoal * CoverDistance), 1.5), true, true);
         }
 
@@ -881,7 +999,7 @@ internal sealed class FilmMotion
             // The second cuts the ball's way in from the side the pitch is wider on.
             var inside = focus.Y > FilmSpace.Width / 2 ? -1.0 : 1.0;
 
-            _specs[1] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 5.2) + new Vec(0, inside * 2.5), 1.5), true, true);
+            _specs[1] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 5.2) + new Vec(0, inside * 2.5), 1.5), true, true, true);
         }
 
         // The side with the ball.
@@ -1379,7 +1497,8 @@ internal sealed class FilmMotion
     /// <param name="Point">Where he stands.</param>
     /// <param name="Relax">Whether the role goes to somebody from the wrong line rather than to nobody.</param>
     /// <param name="Defending">Whether the side is the one without the ball.</param>
-    private readonly record struct Spec(MatchSide Side, RoleWants Wants, Vec Point, bool Relax, bool Defending);
+    /// <param name="Run">Whether he sprints there rather than jogs.</param>
+    private readonly record struct Spec(MatchSide Side, RoleWants Wants, Vec Point, bool Relax, bool Defending, bool Run = false);
 
     private enum TaskKind
     {

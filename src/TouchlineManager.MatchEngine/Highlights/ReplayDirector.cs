@@ -680,4 +680,16 @@ public sealed record ShapeMetrics
 
     /// <summary>Gets, in those steps, the ninety-fifth percentile of the number of outfield players inside its six-yard box.</summary>
     public required double SixYardP95 { get; init; }
+
+    /// <summary>Gets how many crosses in open play were measured as the ball arrived in the box.</summary>
+    public required int Deliveries { get; init; }
+
+    /// <summary>Gets, as a cross arrives, the median number of the attacking side's outfield players inside the box.</summary>
+    public required double DeliveryAttackersP50 { get; init; }
+
+    /// <summary>Gets, as a cross arrives, the median number of the defending side's outfield players inside the box.</summary>
+    public required double DeliveryDefendersP50 { get; init; }
+
+    /// <summary>Gets, as a cross arrives, the ninety-fifth percentile of the number of outfield players inside the six-yard box.</summary>
+    public required double DeliverySixYardP95 { get; init; }
 }

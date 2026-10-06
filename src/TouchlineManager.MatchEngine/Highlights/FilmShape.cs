@@ -30,6 +30,32 @@ internal enum BlockPhase
 }
 
 /// <summary>
+/// The places a cross sets the box at (`replay-v6`): where the attackers run to, and where the defenders stand to mark
+/// them or to hold a zone.
+/// </summary>
+/// <param name="NearPost">The attacker who runs at the near post.</param>
+/// <param name="FarPost">The attacker who runs at the far post.</param>
+/// <param name="PenaltySpot">The attacker who arrives at the penalty spot.</param>
+/// <param name="Cutback">The attacker who waits at the edge of the box for a ball pulled back.</param>
+/// <param name="NearMark">The defender who marks the near-post runner, goal-side of him.</param>
+/// <param name="FarMark">The defender who marks the far-post runner.</param>
+/// <param name="SpotMark">The defender who marks the runner at the penalty spot.</param>
+/// <param name="CutbackMark">The defender at the edge of the box who picks up the cutback.</param>
+/// <param name="SixYardZone">The defender who holds the middle of the six-yard box.</param>
+/// <param name="BoxZone">The defender who holds the ball side of the penalty area.</param>
+internal readonly record struct BoxSet(
+    Vec NearPost,
+    Vec FarPost,
+    Vec PenaltySpot,
+    Vec Cutback,
+    Vec NearMark,
+    Vec FarMark,
+    Vec SpotMark,
+    Vec CutbackMark,
+    Vec SixYardZone,
+    Vec BoxZone);
+
+/// <summary>
 /// Where the twenty-two players want to be (`replay-v4`, lines and phases `replay-v6`).
 /// </summary>
 /// <remarks>
@@ -486,6 +512,32 @@ internal sealed class FilmShape
         new(
             side == MatchSide.Home ? FilmSpace.Length - alongFromGoalLine : alongFromGoalLine,
             (FilmSpace.Width / 2) + acrossFromCentre);
+
+    /// <summary>
+    /// Gets where the box is set for a cross from one flank (`replay-v6`): a staggered row of runners, each with a
+    /// defender goal-side of him, and two more defenders who hold zones. The runners and their markers are paired by
+    /// whoever is nearest, not by slot, so only the places are fixed here.
+    /// </summary>
+    /// <param name="attacking">The side crossing the ball.</param>
+    /// <param name="ballSide">Which way the ball comes from across the pitch: positive towards the high-Y touchline, negative towards the other.</param>
+    public static BoxSet SetBox(MatchSide attacking, double ballSide)
+    {
+        var sign = ballSide >= 0 ? 1.0 : -1.0;
+
+        Vec At(double along, double across) => Frame(attacking, along, across * sign);
+
+        return new BoxSet(
+            NearPost: At(5.0, 4.5),
+            FarPost: At(6.0, -5.0),
+            PenaltySpot: At(11.0, -0.5),
+            Cutback: At(18.0, 7.0),
+            NearMark: At(3.7, 3.6),
+            FarMark: At(4.7, -4.0),
+            SpotMark: At(9.7, -0.4),
+            CutbackMark: At(15.5, 6.0),
+            SixYardZone: At(3.0, 0.4),
+            BoxZone: At(8.5, 7.5));
+    }
 
     private static void ArrangeKickOff(FilmRoster roster, ShapeState state, Vec[] targets)
     {

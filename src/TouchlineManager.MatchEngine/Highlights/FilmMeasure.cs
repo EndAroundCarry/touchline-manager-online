@@ -200,6 +200,9 @@ internal static class FilmMeasure
         var spacing = new Histogram(0.1, 600);
         var inBox = new Histogram(1.0, FilmRoster.Size + 1);
         var sixYard = new Histogram(1.0, FilmRoster.Size + 1);
+        var deliveryAttackers = new Histogram(1.0, FilmRoster.Size + 1);
+        var deliveryDefenders = new Histogram(1.0, FilmRoster.Size + 1);
+        var deliverySix = new Histogram(1.0, FilmRoster.Size + 1);
         var depthWith = new Average();
         var widthWith = new Average();
         var depthWithout = new Average();
@@ -362,6 +365,11 @@ internal static class FilmMeasure
 
                 MeasureBox(motion, record, ball, outfield, counts, inBox, sixYard);
             }
+
+            if (beat.Kind == BeatKind.Cross)
+            {
+                MeasureDelivery(context, roster, motion, span.LastRecord, attacking, deliveryAttackers, deliveryDefenders, deliverySix);
+            }
         }
 
         return new ShapeMetrics
@@ -383,7 +391,62 @@ internal static class FilmMeasure
             InBoxP50 = inBox.Percentile(0.5),
             InBoxP95 = inBox.Percentile(0.95),
             SixYardP95 = sixYard.Percentile(0.95),
+            Deliveries = deliveryAttackers.Total,
+            DeliveryAttackersP50 = deliveryAttackers.Percentile(0.5),
+            DeliveryDefendersP50 = deliveryDefenders.Percentile(0.5),
+            DeliverySixYardP95 = deliverySix.Percentile(0.95),
         };
+    }
+
+    /// <summary>
+    /// Counts who stands in the box a cross is played into, at the moment it arrives (`replay-v6`): the attackers, the
+    /// defenders, and how many are in the six-yard box.
+    /// </summary>
+    private static void MeasureDelivery(
+        FilmContext context,
+        FilmRoster roster,
+        FilmMotionResult motion,
+        int record,
+        MatchSide attacking,
+        Histogram attackers,
+        Histogram defenders,
+        Histogram sixYard)
+    {
+        var goal = FilmSpace.AttackedGoal(attacking);
+        int attackerCount = 0, defenderCount = 0, sixCount = 0;
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!roster.IsOccupied(entity) || context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
+            var along = Math.Abs(point.X - goal.X);
+            var across = Math.Abs(point.Y - goal.Y);
+            var side = FilmRoster.SideOf(entity);
+
+            if (along > BoxDepth || across > BoxHalfWidth)
+            {
+                continue;
+            }
+
+            sixCount += along <= SixYardDepth && across <= SixYardHalfWidth ? 1 : 0;
+
+            if (side == attacking)
+            {
+                attackerCount++;
+            }
+            else
+            {
+                defenderCount++;
+            }
+        }
+
+        attackers.Add(attackerCount);
+        defenders.Add(defenderCount);
+        sixYard.Add(sixCount);
     }
 
     /// <summary>Counts the outfield players in the box the ball is in, and in its six-yard box, when it is in one.</summary>

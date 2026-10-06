@@ -359,6 +359,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
     Console.WriteLine($"    {"back line / front line from goal",-34} {Of(s => s.BackLineDepth),5:F1} / {Of(s => s.FrontLineDepth),5:F1} m   (side without the ball)");
     Console.WriteLine($"    {"ball in own third: deep / back line",-34} {Of(s => s.DeepBlockOutfield),5:F1} players within 30 m, back line {Of(s => s.DeepBlockBackLine),5:F1} m   target 8-9, ~18");
     Console.WriteLine($"    {"ball in a box: players in box",-34} p50 {Of(s => s.InBoxP50),5:F1}   p95 {Of(s => s.InBoxP95),5:F1}   six-yard p95 {Of(s => s.SixYardP95),5:F1}   target six-yard <= 7");
+    Console.WriteLine($"    {"cross arrives: in box att / def",-34} {Of(s => s.DeliveryAttackersP50),5:F1} / {Of(s => s.DeliveryDefendersP50),5:F1}   six-yard p95 {Of(s => s.DeliverySixYardP95),5:F1}   ({Of(s => s.Deliveries),4:F0} crosses per match)   target 3-5 / 4-6, six-yard <= 7");
     Console.WriteLine("  ball speed by beat, metres per second of film (median over matches of p50 / p95):");
 
     foreach (var (kind, lists) in ballByKind.OrderBy(pair => pair.Key, StringComparer.Ordinal))
