@@ -166,13 +166,23 @@ public sealed class FilmRolesTests
     [Fact]
     public void The_player_on_the_ball_is_not_swarmed_in_open_play()
     {
+        double crowded = 0, clustered = 0, p95 = 0;
+
         for (var seed = 1UL; seed <= 4; seed++)
         {
             var shape = TestMatchFactory.Analyse(TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed))).Build.Diagnostics!.Shape;
 
             shape.NearBallP50.Should().BeLessThanOrEqualTo(3, "one challenger and a team-mate or two, not a ring of players");
-            shape.NearBallP95.Should().BeLessThanOrEqualTo(6);
+            shape.NearBallP95.Should().BeLessThanOrEqualTo(5, "a match is never a ring of players");
             shape.NeighbourSpacingP5.Should().BeGreaterThanOrEqualTo(1.5, "the roles do not put two team-mates on one spot");
+
+            p95 += shape.NearBallP95;
+            crowded += shape.CrowdedShare;
+            clustered += shape.ClusteredShare;
         }
+
+        (p95 / 4).Should().BeLessThan(4.5, "the players the beat is about, one challenger and nobody else; it was 5 before the zone");
+        (crowded / 4).Should().BeLessThan(0.055, "five players within five metres of the ball was 6.4% of open play before the zone around it");
+        (clustered / 4).Should().BeLessThan(0.038, "four players within three metres of the ball was 4.4% of open play before the zone around it");
     }
 }

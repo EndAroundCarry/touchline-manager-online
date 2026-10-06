@@ -639,6 +639,12 @@ public sealed record ShapeMetrics
     /// <summary>Gets the ninety-fifth percentile of the number of players within five metres of the ball.</summary>
     public required double NearBallP95 { get; init; }
 
+    /// <summary>Gets the share of steps in open play with five or more players within five metres of the ball.</summary>
+    public required double CrowdedShare { get; init; }
+
+    /// <summary>Gets the share of steps in open play with four or more players within three metres of the ball, a pile the eye sees at once.</summary>
+    public required double ClusteredShare { get; init; }
+
     /// <summary>Gets the fifth percentile of an outfield player's distance to his nearest team-mate.</summary>
     public required double NeighbourSpacingP5 { get; init; }
 

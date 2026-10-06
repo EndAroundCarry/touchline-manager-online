@@ -834,9 +834,9 @@ side is grouped into back, midfield and front lines by the depth of its slot anc
 low block, mid block, high press) from the ball and possession, is moved 0.15 along and 0.30 across by the ball's
 offset, holds a low block's back line at about the 18-yard line with the forwards left high, and has its outfield
 targets kept 3 m apart. The side without the ball sends **one challenger** to the carrier (a second only in its
-final third, in a duel, or when told to press high) with a cover behind him; the side with the ball offers a wide,
+final third or when told to press high; the defender a duel names is its challenger) with a cover behind him; the side with the ball offers a wide,
 a forward and a way-back option 10 m and more from the ball, sets an overlap on a flank, and, on a counter the
-engine marked (§7.11), sends outlets forward. The keeper stands on the line between the ball and the goal. A cross
+engine marked (§7.11), sends outlets forward. Everybody the beat is not about keeps 6.5 m clear of the ball and of the places it goes over the next 6 s, and comes in only 2.5 s before he is due on it, so the ball is not ringed. The keeper stands on the line between the ball and the goal. A cross
 comes into a box with near-post, far-post, spot and cutback runners and goal-side markers. **Set pieces are laid
 out for what they are**: every corner is preceded by a defender's block or header or a keeper's tip, then set by
 role and mirrored by the flag (taker, four runners, two at the edge, two or three held back; two posts, three
@@ -869,8 +869,9 @@ are shortened to their floor first, then the lowest-quality non-goal clips are d
 **Payload.** `EstimatedPayloadBytes` counts entities (×48), keyframes (×24), narration, commentary, schedule
 segments (×48), both lineups, and the live metrics (×64). Each entity is compressed with one tolerance (the ball
 20, the players on a ladder) and action keyframes are always kept. If the estimate exceeds `PayloadBudgetBytes` =
-750 KB (ADR-0006) the director recompresses the players at widening tolerances (50 → 70 → 90 → 120 → 160) and
-sampling intervals (200 → 300 → 400 → 500 → 600 ms) until it fits — deterministic, so the same match always lands
+750 KB (ADR-0006) the director recompresses the players at widening tolerances (50 → 70 → 90 → 120 → 160 → 220; the last
+rung was added in `replay-v6`, when the players' extra movement left the fifth no room) and sampling intervals
+(200 → 300 → 400 → 500 → 600 → 700 ms) until it fits — deterministic, so the same match always lands
 on the same rung.
 
 Entities and tracks are ordered by identifier. The narration names the player and the clock, so the Canvas

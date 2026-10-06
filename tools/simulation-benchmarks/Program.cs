@@ -352,7 +352,9 @@ void Replay(int matches, ulong baseSeed, string? dump)
     double Of(Func<ShapeMetrics, double> pick) => Percentile(shapes.Select(pick).Order().ToArray(), 0.50);
 
     Console.WriteLine("  shape in open play (median over matches):");
-    Console.WriteLine($"    {"players within 5 m of ball",-34} p50 {Of(s => s.NearBallP50),5:F1}   p95 {Of(s => s.NearBallP95),5:F1}   target <= 3 at p95");
+    Console.WriteLine($"    {"players within 5 m of ball",-34} p50 {Of(s => s.NearBallP50),5:F1}   p95 {Of(s => s.NearBallP95),5:F1}   target <= 4 at p95");
+    Console.WriteLine($"    {"steps with 5+ within 5 m of ball",-34} {Of(s => s.CrowdedShare) * 100,5:F1}%   target < 2%");
+    Console.WriteLine($"    {"steps with 4+ within 3 m of ball",-34} {Of(s => s.ClusteredShare) * 100,5:F1}%   target < 1%");
     Console.WriteLine($"    {"nearest team-mate, p5",-34} {Of(s => s.NeighbourSpacingP5),5:F1} m   target >= 2");
     Console.WriteLine($"    {"block depth / width, with ball",-34} {Of(s => s.InPossessionDepth),5:F1} / {Of(s => s.InPossessionWidth),5:F1} m");
     Console.WriteLine($"    {"block depth / width, without ball",-34} {Of(s => s.OutOfPossessionDepth),5:F1} / {Of(s => s.OutOfPossessionWidth),5:F1} m   target depth 20-30, width 45-55");

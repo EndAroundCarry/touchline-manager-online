@@ -535,10 +535,10 @@ public sealed record HighlightOptionsV1
     /// The film is close to the payload budget, so the director retries compression at widening tolerances
     /// until it fits. Deterministic: the same match always lands on the same rung of the ladder.
     /// </remarks>
-    public IReadOnlyList<int> PlayerTolerances { get; init; } = [50, 70, 90, 120, 160];
+    public IReadOnlyList<int> PlayerTolerances { get; init; } = [50, 70, 90, 120, 160, 220];
 
     /// <summary>Gets the sampling intervals the adaptive ladder tries, in milliseconds of film, paired by index.</summary>
-    public IReadOnlyList<int> PlayerSampleIntervals { get; init; } = [200, 300, 400, 500, 600];
+    public IReadOnlyList<int> PlayerSampleIntervals { get; init; } = [200, 300, 400, 500, 600, 700];
 
     // ---- Commentary ---------------------------------------------------------------------------------------------
 

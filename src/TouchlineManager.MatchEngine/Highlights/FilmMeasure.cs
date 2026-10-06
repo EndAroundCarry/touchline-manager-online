@@ -24,6 +24,15 @@ internal static class FilmMeasure
     /// <summary>How near the ball a player is to be crowding it, in metres (`replay-v6`).</summary>
     private const double Crowding = 5.0;
 
+    /// <summary>How many players within the crowding distance of the ball make it a crowd.</summary>
+    private const int CrowdedCount = 5;
+
+    /// <summary>How near the ball players are a pile, in metres.</summary>
+    private const double Clustering = 3.0;
+
+    /// <summary>How many players within the clustering distance of the ball make a pile.</summary>
+    private const int ClusteredCount = 4;
+
     /// <summary>How deep the eighteen-yard box is, in metres.</summary>
     private const double BoxDepth = 16.5;
 
@@ -228,6 +237,8 @@ internal static class FilmMeasure
         var deepCount = new Average();
         var deepBack = new Average();
         var samples = 0;
+        var crowded = 0;
+        var clustered = 0;
 
         // The occupied outfield entities of each side, home then away, gathered afresh for every record.
         int[][] outfield = [new int[11], new int[11]];
@@ -279,6 +290,7 @@ internal static class FilmMeasure
             {
                 var ball = new Vec(motion.BallX(record), motion.BallY(record));
                 var crowd = 0;
+                var tight = 0;
 
                 counts[0] = 0;
                 counts[1] = 0;
@@ -292,7 +304,10 @@ internal static class FilmMeasure
 
                     var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
 
-                    crowd += point.DistanceTo(ball) <= Crowding ? 1 : 0;
+                    var gap = point.DistanceTo(ball);
+
+                    crowd += gap <= Crowding ? 1 : 0;
+                    tight += gap <= Clustering ? 1 : 0;
 
                     if (context.Slots[entity].Family != MatchPositionFamily.Goalkeeper)
                     {
@@ -304,6 +319,8 @@ internal static class FilmMeasure
 
                 near.Add(crowd);
                 samples++;
+                crowded += crowd >= CrowdedCount ? 1 : 0;
+                clustered += tight >= ClusteredCount ? 1 : 0;
 
                 foreach (var side in new[] { attacking, defending })
                 {
@@ -420,6 +437,8 @@ internal static class FilmMeasure
             Samples = samples,
             NearBallP50 = near.Percentile(0.5),
             NearBallP95 = near.Percentile(0.95),
+            CrowdedShare = samples == 0 ? 0.0 : (double)crowded / samples,
+            ClusteredShare = samples == 0 ? 0.0 : (double)clustered / samples,
             NeighbourSpacingP5 = spacing.Percentile(0.05),
             InPossessionDepth = depthWith.Value,
             InPossessionWidth = widthWith.Value,

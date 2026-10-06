@@ -193,6 +193,18 @@ internal sealed class FilmMotion
     /// <summary>How near a role's place a team-mate's place in the shape may be, in metres.</summary>
     private const double RoleClearance = 3.5;
 
+    /// <summary>
+    /// How far from the ball, in metres, a player who is not on it keeps (`replay-v6`): only the players the beat is
+    /// about, the challenger and whoever is due on the ball may be nearer.
+    /// </summary>
+    private const double ClearZone = 6.5;
+
+    /// <summary>How long before he is due on the ball, in seconds, a player kept clear of it may come in.</summary>
+    private const double ComeInSeconds = 2.5;
+
+    /// <summary>How many seconds of play ahead the places the ball is going to are kept clear, so that players have time to leave them.</summary>
+    private const double ClearHorizon = 6.0;
+
     /// <summary>How far behind the ball the player covering the challenger stands, in metres.</summary>
     private const double CoverDistance = 7.0;
 
@@ -241,6 +253,8 @@ internal sealed class FilmMotion
     private readonly Spec[] _specs = new Spec[RoleSlots];
     private readonly Vec[] _targets = new Vec[FilmRoster.Size];
     private readonly Task[] _tasks = new Task[FilmRoster.Size];
+    private readonly bool[] _clear = new bool[FilmRoster.Size];
+    private readonly List<Vec> _path = [];
     private readonly List<Pin> _pins = [];
     private readonly List<Pin> _endPins = [];
 
@@ -762,6 +776,107 @@ internal sealed class FilmMotion
 
         AssignRoles(beats, index);
         AssignDive(beat);
+        MarkKeptClear(beats, index);
+
+    }
+
+    /// <summary>
+    /// Marks who keeps clear of the ball for a beat in open play (`replay-v6`): everybody but the keepers, the players
+    /// the beat is about (the one who plays it, who receives it, who is beaten or tackled), whoever has to be on the ball
+    /// by the end of it, and the one challenger. A delivery into the box and a set piece fill the area around the ball
+    /// on purpose, so they are left alone.
+    /// </summary>
+    private void MarkKeptClear(IReadOnlyList<FilmBeat> beats, int index)
+    {
+        Array.Clear(_clear);
+        _path.Clear();
+
+        var beat = beats[index];
+
+        if (beat.IsHold
+            || beat.Formation != FormationMode.Open
+            || beat.Kind is not (BeatKind.Carry or BeatKind.Pass or BeatKind.LoftedPass or BeatKind.Duel)
+            || CrossOf(beats, index) >= 0)
+        {
+            return;
+        }
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            var challenger = _tasks[entity].Kind == TaskKind.Press && (int)_tasks[entity].Value == 0;
+
+            _clear[entity] = _roster.IsOccupied(entity)
+                && _context.Slots[entity].Family != MatchPositionFamily.Goalkeeper
+                && !challenger;
+        }
+
+        foreach (var involved in new Guid?[] { beat.Actor, beat.Receiver, beat.Opponent })
+        {
+            if (involved is Guid id && _roster.EntityOf(id) is var found and >= 0)
+            {
+                _clear[found] = false;
+            }
+        }
+
+        foreach (var pin in _endPins)
+        {
+            var due = _roster.EntityOf(pin.Participant);
+
+            if (due >= 0)
+            {
+                _clear[due] = false;
+            }
+        }
+
+        // Where the ball is going over the next few seconds of open play, and so where nobody should be standing.
+        var elapsed = 0.0;
+
+        for (var k = index; k < beats.Count && elapsed < ClearHorizon; k++)
+        {
+            var ahead = beats[k];
+
+            if (k > index && (ahead.Cut || ahead.IsHold || ahead.Formation != FormationMode.Open || ahead.Possession < 0))
+            {
+                break;
+            }
+
+            _path.Add(ahead.To);
+            elapsed += ahead.NaturalSeconds;
+        }
+    }
+
+    /// <summary>Moves a place off the ball, and off the place it is going to, to the edge of the zone a player keeps clear of it.</summary>
+    private Vec KeepClear(FilmBeat beat, Vec target, Vec position)
+    {
+        // Pushed off one place it can land in another's zone, so it is settled in a few passes.
+        for (var pass = 0; pass < 3; pass++)
+        {
+            var moved = false;
+
+            for (var point = -1; point < _path.Count; point++)
+            {
+                var around = point < 0 ? _ball : _path[point];
+                var away = target - around;
+
+                if (away.Length >= ClearZone)
+                {
+                    continue;
+                }
+
+                var outward = away.Length > 1e-6 ? away : position - around;
+                var direction = outward.Length > 1e-6 ? outward.Unit() : new Vec(0, position.Y >= FilmSpace.Width / 2 ? 1 : -1);
+
+                target = FilmSpace.Clamp(around + (direction * ClearZone), 1.5);
+                moved = true;
+            }
+
+            if (!moved)
+            {
+                break;
+            }
+        }
+
+        return target;
     }
 
     private void Assign(Pin pin, double deadline)
@@ -1024,11 +1139,18 @@ internal sealed class FilmMotion
         // The defenders: nobody chases a counter from the halfway line; they drop, and the shape closes them up.
         var challenge = beat.Kind != BeatKind.Placement && (counter is not { DefendersDrop: true } || finalThird || beat.Kind == BeatKind.Duel);
         var second = challenge
-            && (finalThird || beat.Kind == BeatKind.Duel || _context.InstructionsOf(defending).Pressing == MatchPressing.HighPress);
+            && (finalThird || _context.InstructionsOf(defending).Pressing == MatchPressing.HighPress);
+
+        // In a duel the defender the beat names is the one on the ball: he is the challenger, and nobody else is sent to it.
+        var named = beat.Kind == BeatKind.Duel && beat.Opponent is Guid opponent && _context.SideOf(opponent) == defending;
 
         if (challenge)
         {
-            _specs[0] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 1.5), 1.5), true, true, true);
+            if (!named)
+            {
+                _specs[0] = new Spec(defending, RoleWants.Any, FilmSpace.Clamp(focus + (toGoal * 1.5), 1.5), true, true, true);
+            }
+
             _specs[2] = new Spec(defending, RoleWants.SameLine, FilmSpace.Clamp(focus + (toGoal * CoverDistance), 1.5), true, true);
         }
 
@@ -1470,6 +1592,12 @@ internal sealed class FilmMotion
                     target = _walking[entity] ? _destinations[entity] : here;
                     break;
                 }
+        }
+
+        // Whoever the beat is not about stays off the ball: he comes in only when he is due on it.
+        if (_clear[entity] && task.Kind != TaskKind.Dive && !(task.Kind == TaskKind.Pin && deadline <= ComeInSeconds))
+        {
+            target = KeepClear(beat, target, position);
         }
 
         // A keeper going for a save dives, too.

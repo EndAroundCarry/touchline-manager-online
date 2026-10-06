@@ -22,10 +22,27 @@ Recorded in [`ADR-0064`](docs/architecture/adr/0064-replay-v6-shape-and-set-piec
   no longer puts players inside the arc. A **goal kick** has its own shape.
 - Every cached `replay-v5` presentation is refetched once. Throw-ins are not changed.
 
+### Follow-up: fewer players crowd the ball
+
+Players were still piling around the ball in a duel or a run of short passes. Found by measuring who stood there:
+the pinned defender of a duel *and* a separate challenger and second presser were all sent to the ball; and a
+player who had just played a short pass was still beside it for the next one. Now the defender a duel names is its
+challenger and nobody else is sent, a duel has no automatic second, and everybody the beat is not about keeps 6.5 m
+from the ball and from where it goes over the next 6 s, coming in only 2.5 s before he is due on it.
+
+- Steps in open play with five or more players within 5 m of the ball: 6.4% to 4.5%. Four or more within 3 m of it
+  (a pile the eye sees at once): 4.4% to 3.2%. The p95 of players within 5 m: 5 to 4 (median over matches).
+- The players' extra movement used up what room the payload ladder had left, so it has a sixth, coarser rung (tolerance
+  220, sampling 700 ms), used only by a film that did not fit on the fifth.
+- Film length, pace (2.65x, 91.3% inside the band) and the share of moves lengthened for constraints (19.4%) are
+  unchanged. A wider zone (7.5 m) cut the crowd to 3.3% but lengthened 32% of moves and left the pace band, so it was
+  not kept.
+
 ### Known gaps
 
-Players within 5 m of the ball is still 5 at p95 (a challenger is by design), and a low block holds 4.6 players
-within 30 m of its goal, not 8 to 9. Both are in the ADR.
+Crowding is reduced, not gone: a run of 3 to 10 m passes keeps the passer, the receiver and the next receiver within a
+few metres of each other, and a challenger is always on the ball. Players within 5 m of the ball is 4 at p95, and a
+low block holds 4.6 players within 30 m of its goal, not 8 to 9. See the ADR for the second.
 
 ## Engine v11 — the counter-attack
 
