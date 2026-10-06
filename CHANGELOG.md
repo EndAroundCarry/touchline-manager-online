@@ -4,6 +4,29 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Replay v6 — players hold a shape, and set pieces look like set pieces
+
+Recorded in [`ADR-0064`](docs/architecture/adr/0064-replay-v6-shape-and-set-pieces.md). `ReplayDirector.Version` is
+`replay-v6`. The film layer only: the simulation, the golden hashes and the calibration are unchanged.
+
+### Changed
+
+- **Shape.** Each side stands as back, midfield and front lines by phase (build-up, attack, low block, mid block, high
+  press), moved less by the ball and kept 3 m apart. The block without the ball is 7.5 m shallower than in `replay-v5`.
+- **Roles around the ball.** One challenger and a cover instead of two pressers; the side with the ball offers
+  options 10 m and more away, an overlap on a flank, and outlets on a counter.
+- **A cross comes into a populated box** (3 attackers and 5 defenders at arrival, from 2 and 1).
+- **Corners** are won by a defender's block or header or a keeper's tip, set by role and mirrored by the flag, with
+  runners arriving as the ball is struck and two or three players held back.
+- **Free kicks** differ for a shot (wall of 2 to 5 by distance), a delivery (no wall) and a quick one. The **penalty**
+  no longer puts players inside the arc. A **goal kick** has its own shape.
+- Every cached `replay-v5` presentation is refetched once. Throw-ins are not changed.
+
+### Known gaps
+
+Players within 5 m of the ball is still 5 at p95 (a challenger is by design), and a low block holds 4.6 players
+within 30 m of its goal, not 8 to 9. Both are in the ADR.
+
 ## Engine v11 — the counter-attack
 
 Recorded in [`ADR-0063`](docs/architecture/adr/0063-engine-v11-counter-attack.md). Engine `engine-v11`, rules

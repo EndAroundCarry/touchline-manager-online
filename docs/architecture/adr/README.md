@@ -81,6 +81,7 @@ the system is shaped the way it is.
 | [0061](0061-engine-v10-attackers-find-space-passers-choose.md) | Engine-v10 lets attackers find space and passers choose who gets the ball | Accepted |
 | [0062](0062-club-stadium-places-levels-and-gate.md) | A club's stadium is a count of places, its level is read from them, and gate revenue is what they sell | Accepted |
 | [0063](0063-engine-v11-counter-attack.md) | Engine-v11 adds the counter-attack, a tactic that works against a side that has pushed forward | Accepted |
+| [0064](0064-replay-v6-shape-and-set-pieces.md) | Replay-v6 makes the players hold a shape, leaves the ball carrier room, and sets pieces for what they are | Accepted |
 
 ## Rules for changing an ADR
 
