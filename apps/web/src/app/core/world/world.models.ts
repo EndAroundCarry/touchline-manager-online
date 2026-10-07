@@ -111,6 +111,25 @@ export interface ClubTenureSummary {
   readonly startedAt: string;
   readonly lastActiveAt: string;
   readonly version: number;
+  /** The club's main kit colour as `#rrggbb`: the one the manager chose, or the generated one. */
+  readonly primaryColour: string;
+  /** The club's second kit colour as `#rrggbb`. */
+  readonly secondaryColour: string;
+  /** Whether the manager has chosen the colours, rather than wearing the generated ones. */
+  readonly hasChosenColours: boolean;
+}
+
+/** The colours a club plays in. */
+export interface ClubColours {
+  readonly clubId: string;
+  readonly primaryColour: string;
+  readonly secondaryColour: string;
+}
+
+/** The body of a request to choose the club's colours. */
+export interface ChangeClubColoursPayload {
+  readonly primaryColour: string;
+  readonly secondaryColour: string;
 }
 
 /** Where an account stands in onboarding. */

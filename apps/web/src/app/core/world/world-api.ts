@@ -3,7 +3,9 @@ import { Observable, map } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
   AvailableClubs,
+  ChangeClubColoursPayload,
   ClaimClubPayload,
+  ClubColours,
   ClubDashboard,
   CountryCapacity,
   CountrySummary,
@@ -86,6 +88,11 @@ export class WorldApi {
           return response.body;
         }),
       );
+  }
+
+  /** Chooses the two colours the manager's club plays in. */
+  changeClubColours(payload: ChangeClubColoursPayload): Observable<ClubColours> {
+    return this.api.put<ClubColours, ChangeClubColoursPayload>('/club-tenure/colours', payload);
   }
 
   /** Resigns from the manager's club. */

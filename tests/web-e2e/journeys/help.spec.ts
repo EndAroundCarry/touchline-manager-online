@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
 import { navigateTo } from '../support/navigation';
+import { confirmKitColours } from '../support/kit-colours';
 
 /**
  * Guided help (`F-53`, master plan §16 Stage 13).
@@ -26,6 +27,7 @@ test.describe('help', () => {
     await expect(page).toHaveURL(/\/onboarding\/club(\?|$)/);
 
     await page.getByRole('button', { name: /^Take over/ }).first().click();
+    await confirmKitColours(page);
     await expect(page).toHaveURL(/\/dashboard$/);
 
     // The guidance is offered on the dashboard, and the manager can decline it.

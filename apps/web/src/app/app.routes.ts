@@ -118,6 +118,13 @@ export const routes: Routes = [
         title: 'Choose your club — Touchline Manager',
       },
       {
+        path: 'onboarding/colours',
+        loadComponent: () =>
+          import('./features/onboarding/colours/colours').then((m) => m.ClubColoursChoice),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Choose your colours — Touchline Manager',
+      },
+      {
         path: 'dashboard',
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
         canActivate: [requireAuthentication, requireVerifiedEmail],

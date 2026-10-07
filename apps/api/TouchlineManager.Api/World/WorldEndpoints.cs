@@ -104,6 +104,14 @@ internal static class WorldEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPut("/club-tenure/colours", ChangeClubColoursAsync)
+            .WithName("ChangeClubColours")
+            .WithSummary("Chooses the two colours the manager's club plays in.")
+            .Produces<ClubColoursResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapPost("/club-tenure/resign", ResignClubAsync)
             .WithName("ResignClub")
             .WithSummary("Resigns from the manager's club and starts the takeover cooldown.")
@@ -373,6 +381,57 @@ internal static class WorldEndpoints
                 "The world is frozen and is not accepting new managers right now."),
 
             _ => ProblemResults.Forbidden("This account cannot claim a club."),
+        };
+    }
+
+    private static async Task<IResult> ChangeClubColoursAsync(
+        HttpContext httpContext,
+        ChangeClubColoursRequest request,
+        IValidator<ChangeClubColoursRequest> validator,
+        ChangeClubColours useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var invalid = await RequestValidation.ValidateAsync(validator, request, cancellationToken);
+
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        var result = await useCase.ExecuteAsync(userId, request, cancellationToken);
+
+        return result.Outcome switch
+        {
+            ChangeClubColoursOutcome.Changed => Results.Ok(result.Colours),
+
+            ChangeClubColoursOutcome.NoClub => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                WorldErrorCodes.NoActiveTenure,
+                "You do not manage a club.",
+                "Take over a club before choosing its colours."),
+
+            ChangeClubColoursOutcome.NoManagerProfile => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                WorldErrorCodes.ManagerProfileRequired,
+                "No manager profile.",
+                "Create your manager profile before managing a club."),
+
+            ChangeClubColoursOutcome.WorldNotSeeded => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                WorldErrorCodes.WorldNotSeeded,
+                "No world yet.",
+                "The world has not been created."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                WorldErrorCodes.ClubNotFound,
+                "No such club.",
+                "That club does not exist in this world."),
         };
     }
 

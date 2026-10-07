@@ -42,6 +42,9 @@ const STATE: OnboardingState = {
     startedAt: '2026-09-01T10:00:00Z',
     lastActiveAt: '2026-09-02T10:00:00Z',
     version: 1,
+    primaryColour: '#1f4e79',
+    secondaryColour: '#d6e4f0',
+    hasChosenColours: false,
   },
   serverTime: '2026-09-30T12:00:00Z',
 };

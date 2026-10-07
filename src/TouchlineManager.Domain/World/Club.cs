@@ -56,6 +56,18 @@ public sealed class Club
     /// <summary>Gets the deterministic seed a procedurally drawn badge is derived from.</summary>
     public string BadgeSeed { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Gets the primary kit colour the club's manager chose as <c>#rrggbb</c>, or null while the club
+    /// wears the colours generated from its identity.
+    /// </summary>
+    public string? PrimaryColour { get; private set; }
+
+    /// <summary>
+    /// Gets the secondary kit colour the club's manager chose as <c>#rrggbb</c>, or null while the club
+    /// wears the colours generated from its identity.
+    /// </summary>
+    public string? SecondaryColour { get; private set; }
+
     /// <summary>Gets the game year the club was founded, which is a game year and not a real one.</summary>
     public int FoundingGameYear { get; private set; }
 
@@ -162,6 +174,55 @@ public sealed class Club
         }
 
         return builder.ToString().TrimEnd('-');
+    }
+
+    /// <summary>Checks that a value is a six-digit hexadecimal colour such as <c>#1f4e79</c>.</summary>
+    /// <param name="value">The value to check.</param>
+    public static bool IsHexColour(string? value)
+    {
+        if (value is not { Length: 7 } || value[0] != '#')
+        {
+            return false;
+        }
+
+        foreach (var digit in value.AsSpan(1))
+        {
+            if (!char.IsAsciiHexDigit(digit))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Sets the two colours the club plays in, stored in a single canonical lower-case form.</summary>
+    /// <remarks>
+    /// The pair must be two different colours: a kit whose trim is its own base colour cannot be told apart
+    /// from a plain one, which is the one thing a second colour is for.
+    /// </remarks>
+    /// <param name="primary">The primary colour as <c>#rrggbb</c>.</param>
+    /// <param name="secondary">The secondary colour as <c>#rrggbb</c>.</param>
+    /// <param name="now">The current instant.</param>
+    public void ChangeColours(string primary, string secondary, DateTimeOffset now)
+    {
+        if (!IsHexColour(primary) || !IsHexColour(secondary))
+        {
+            throw new ArgumentException("Colours must be written as #rrggbb.");
+        }
+
+        var normalizedPrimary = primary.ToLowerInvariant();
+        var normalizedSecondary = secondary.ToLowerInvariant();
+
+        if (normalizedPrimary == normalizedSecondary)
+        {
+            throw new ArgumentException("The two colours must differ.");
+        }
+
+        PrimaryColour = normalizedPrimary;
+        SecondaryColour = normalizedSecondary;
+
+        Touch(now);
     }
 
     /// <summary>Retires the club through an audited administrative repair (`WORLD-6`).</summary>

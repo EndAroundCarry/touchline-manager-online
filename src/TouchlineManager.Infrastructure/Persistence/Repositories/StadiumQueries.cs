@@ -46,6 +46,16 @@ internal sealed class StadiumQueries : IStadiumQueries
                 select (int?)division.TierNumber)
                 .FirstOrDefaultAsync(cancellationToken);
 
-        return new ClubStadiumContext(tier ?? 1, account.CashMinor, account.ReservedMinor);
+        var colours = await _dbContext.Clubs
+            .Where(candidate => candidate.Id == clubId)
+            .Select(candidate => new { candidate.PrimaryColour, candidate.SecondaryColour })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new ClubStadiumContext(
+            tier ?? 1,
+            account.CashMinor,
+            account.ReservedMinor,
+            colours?.PrimaryColour,
+            colours?.SecondaryColour);
     }
 }

@@ -1,0 +1,115 @@
+<div class="flex flex-col gap-6 sm:flex-row sm:items-start">
+  <figure class="mx-auto shrink-0 sm:mx-0" data-testid="kit-preview">
+    <svg
+      viewBox="0 0 120 120"
+      class="h-36 w-36"
+      role="img"
+      [attr.aria-label]="'Shirt in ' + primary() + ' with ' + secondary() + ' sleeves and collar'"
+    >
+      <path
+        d="M38 16 Q60 30 82 16 L88 44 L84 108 L36 108 L32 44 Z"
+        [attr.fill]="primary()"
+        stroke="rgba(0,0,0,0.45)"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M38 16 L12 34 L22 58 L32 44 Z"
+        [attr.fill]="secondary()"
+        stroke="rgba(0,0,0,0.45)"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M82 16 L108 34 L98 58 L88 44 Z"
+        [attr.fill]="secondary()"
+        stroke="rgba(0,0,0,0.45)"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M47 15 Q60 31 73 15"
+        fill="none"
+        [attr.stroke]="secondary()"
+        stroke-width="5"
+        stroke-linecap="round"
+      />
+    </svg>
+    <figcaption class="mt-1 text-center text-xs text-muted">Your kit</figcaption>
+  </figure>
+
+  <div class="flex flex-1 flex-col gap-6">
+    @for (item of slots; track item.slot) {
+      <fieldset [disabled]="disabled()" class="min-w-0">
+        <legend class="text-sm font-medium text-ink">{{ item.label }}</legend>
+        <p class="text-xs text-muted">{{ item.hint }}</p>
+
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+          <input
+            type="color"
+            class="h-11 w-16 cursor-pointer rounded border border-line-strong bg-panel p-1 disabled:cursor-not-allowed"
+            [id]="'kit-' + item.slot + '-spectrum'"
+            [value]="item.slot === 'primary' ? primary() : secondary()"
+            [attr.aria-label]="item.label + ': pick from the full spectrum'"
+            (input)="choose(item.slot, $any($event.target).value)"
+          />
+
+          <div>
+            <label class="sr-only" [for]="'kit-' + item.slot + '-hex'"
+              >{{ item.label }} as a hex code</label
+            >
+            <input
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              spellcheck="false"
+              maxlength="7"
+              class="w-28 font-mono uppercase"
+              [class]="textInputClass"
+              [id]="'kit-' + item.slot + '-hex'"
+              [value]="hexText(item.slot)"
+              [attr.aria-invalid]="hexInvalid(item.slot)"
+              (input)="type(item.slot, $any($event.target).value)"
+              (blur)="settle(item.slot)"
+            />
+          </div>
+        </div>
+
+        @if (hexInvalid(item.slot)) {
+          <p class="mt-1 text-sm text-red-300">Use six digits, like #1F4E79.</p>
+        }
+
+        <div
+          class="mt-3 flex flex-wrap gap-2"
+          role="group"
+          [attr.aria-label]="item.label + ' shortcuts'"
+        >
+          @for (preset of presets; track preset.value) {
+            <button
+              type="button"
+              class="h-8 w-8 rounded-full border border-line-strong ring-offset-2 ring-offset-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+              [style.background]="preset.value"
+              [style.color]="readable(preset.value)"
+              [attr.aria-label]="preset.name"
+              [attr.aria-pressed]="
+                (item.slot === 'primary' ? primary() : secondary()) === preset.value
+              "
+              [title]="preset.name"
+              (click)="choose(item.slot, preset.value)"
+            >
+              @if ((item.slot === 'primary' ? primary() : secondary()) === preset.value) {
+                <span aria-hidden="true">✓</span>
+              }
+            </button>
+          }
+        </div>
+      </fieldset>
+    }
+
+    @if (sameColour()) {
+      <p class="text-sm text-red-300" role="alert" data-testid="same-colour">
+        Choose two different colours, so the sleeves and collar can be told from the shirt.
+      </p>
+    }
+  </div>
+</div>

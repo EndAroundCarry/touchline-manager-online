@@ -3,7 +3,13 @@ import { firstValueFrom, of, throwError } from 'rxjs';
 import { OnboardingStore } from './onboarding-store';
 import { preferredTimeZone, resetPresentation } from './presentation';
 import { WorldApi } from './world-api';
-import { ClubDashboard, CountryCapacity, CountrySummary, ManagerProfile } from './world.models';
+import {
+  ClubDashboard,
+  ClubTenureSummary,
+  CountryCapacity,
+  CountrySummary,
+  ManagerProfile,
+} from './world.models';
 
 /**
  * The onboarding store's guarantees.
@@ -59,6 +65,7 @@ function createWorldApiStub() {
     createManagerProfile: vi.fn(),
     updateManagerProfile: vi.fn(),
     claimClub: vi.fn(),
+    changeClubColours: vi.fn(),
     resign: vi.fn(),
     state: vi.fn(),
     dashboard: vi.fn(),
@@ -203,6 +210,51 @@ describe('OnboardingStore', () => {
     await expect(firstValueFrom(store.updateManagerProfile('en-GB', 'UTC'))).rejects.toThrow();
 
     expect(api.updateManagerProfile).not.toHaveBeenCalled();
+  });
+
+  it("adopts the club's chosen colours in the cached tenure, without another read", async () => {
+    const tenure = {
+      id: 'tenure-1',
+      clubId: 'club-1',
+      clubName: 'Ashvale United',
+      primaryColour: '#1f4e79',
+      secondaryColour: '#d6e4f0',
+      hasChosenColours: false,
+    } as unknown as ClubTenureSummary;
+
+    api.state.mockReturnValue(
+      of({ manager: managerProfile, tenure, serverTime: '2026-09-01T00:00:00Z' }),
+    );
+    await firstValueFrom(store.loadState());
+    api.changeClubColours.mockReturnValue(
+      of({ clubId: 'club-1', primaryColour: '#c0392b', secondaryColour: '#fcd116' }),
+    );
+
+    await firstValueFrom(store.changeClubColours('#c0392b', '#fcd116'));
+
+    expect(api.changeClubColours).toHaveBeenCalledWith({
+      primaryColour: '#c0392b',
+      secondaryColour: '#fcd116',
+    });
+    expect(api.state).toHaveBeenCalledTimes(1);
+    expect(store.state()?.tenure).toMatchObject({
+      clubName: 'Ashvale United',
+      primaryColour: '#c0392b',
+      secondaryColour: '#fcd116',
+      hasChosenColours: true,
+    });
+  });
+
+  it('leaves the cached tenure alone when the colours are refused', async () => {
+    api.state.mockReturnValue(
+      of({ manager: managerProfile, tenure: null, serverTime: '2026-09-01T00:00:00Z' }),
+    );
+    await firstValueFrom(store.loadState());
+    api.changeClubColours.mockReturnValue(throwError(() => new Error('refused')));
+
+    await expect(firstValueFrom(store.changeClubColours('#c0392b', '#c0392b'))).rejects.toThrow();
+
+    expect(store.state()?.tenure).toBeNull();
   });
 
   it('forgets the formatting preference when the session ends', async () => {

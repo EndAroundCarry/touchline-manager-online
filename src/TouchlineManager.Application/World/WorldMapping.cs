@@ -1,6 +1,7 @@
 using TouchlineManager.Contracts.World;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.World;
+using TouchlineManager.MatchEngine.Highlights;
 
 namespace TouchlineManager.Application.World;
 
@@ -101,6 +102,8 @@ public static class WorldMapping
         ArgumentNullException.ThrowIfNull(country);
         ArgumentNullException.ThrowIfNull(division);
 
+        var colours = ClubPalette.Resolve(club.Id, club.PrimaryColour, club.SecondaryColour);
+
         return new ClubTenureSummaryResponse(
             tenure.Id,
             tenure.ClubId,
@@ -112,7 +115,10 @@ public static class WorldMapping
             tenure.ControlStatus.ToCode(),
             tenure.StartedAt,
             tenure.LastActiveAt,
-            tenure.Version);
+            tenure.Version,
+            colours.Primary,
+            colours.Secondary,
+            club.PrimaryColour is not null && club.SecondaryColour is not null);
     }
 
     /// <summary>

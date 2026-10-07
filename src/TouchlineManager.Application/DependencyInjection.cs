@@ -276,6 +276,7 @@ public static class DependencyInjection
         services.AddScoped<CreateManagerProfile>();
         services.AddScoped<UpdateManagerProfile>();
         services.AddScoped<ClaimClub>();
+        services.AddScoped<ChangeClubColours>();
         services.AddScoped<ResignClub>();
 
         // Operator ownership repair (master plan §10.8, OCC-6, F-46, ADR-0045).
@@ -298,6 +299,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<CreateManagerProfileRequest>, CreateManagerProfileRequestValidator>();
         services.AddScoped<IValidator<UpdateManagerProfileRequest>, UpdateManagerProfileRequestValidator>();
         services.AddScoped<IValidator<ClaimClubRequest>, ClaimClubRequestValidator>();
+        services.AddScoped<IValidator<ChangeClubColoursRequest>, ChangeClubColoursRequestValidator>();
         services.AddScoped<IValidator<BuildSeatsRequest>, BuildSeatsRequestValidator>();
     }
 

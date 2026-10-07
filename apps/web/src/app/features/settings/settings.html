@@ -144,6 +144,47 @@
       }
     </div>
 
+    <div class="mt-6 rounded border border-line bg-panel p-6" data-testid="team-colours">
+      <h2 class="text-lg font-semibold">Team colours</h2>
+      <p class="mt-2 text-sm text-ink-2">
+        The two colours your club plays in. They are drawn on your stadium and on the pitch. Matches
+        already locked keep the colours they were locked with.
+      </p>
+
+      @if (tenure() !== null) {
+        @if (kitSaved()) {
+          <p [class]="statusMessageClass" role="status">Your team colours have been saved.</p>
+        }
+
+        @if (kitError(); as message) {
+          <p [class]="formErrorClass" role="alert">{{ message }}</p>
+        }
+
+        <div class="mt-4">
+          <app-kit-colour-picker
+            #kitPicker
+            [(primary)]="kitPrimary"
+            [(secondary)]="kitSecondary"
+            [disabled]="kitSaving()"
+          />
+        </div>
+
+        <button
+          type="button"
+          class="mt-4"
+          [class]="primaryButtonClass"
+          [disabled]="kitSaving() || !kitChanged() || !kitPicker.valid() || !canMutate()"
+          (click)="saveColours(kitPicker)"
+        >
+          {{ kitSaving() ? 'Saving…' : 'Save team colours' }}
+        </button>
+      } @else {
+        <p class="mt-4 text-sm text-ink-2" role="status">
+          Take over a club to choose the colours it plays in.
+        </p>
+      }
+    </div>
+
     <div class="mt-6 rounded border border-line bg-panel p-6">
       <h2 class="text-lg font-semibold">Notifications</h2>
       <p class="mt-2 text-sm text-ink-2">

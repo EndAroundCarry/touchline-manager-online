@@ -2,6 +2,7 @@ import { APIRequestContext, expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
 import { navigateTo } from '../support/navigation';
+import { confirmKitColours } from '../support/kit-colours';
 
 /**
  * The Stage 6 criteria for the fixture list and the prepare-match screen (F-18, F-19).
@@ -56,6 +57,7 @@ test.describe('fixtures', () => {
       .getByRole('button', { name: /^Take over/ })
       .first()
       .click();
+    await confirmKitColours(page);
 
     await expect(page).toHaveURL(/\/dashboard$/);
 

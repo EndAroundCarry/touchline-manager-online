@@ -28,6 +28,9 @@ public static class WorldAuditActions
     /// <summary>A manager resigned from a club.</summary>
     public const string ClubResigned = "world.club_tenure.resigned";
 
+    /// <summary>A manager chose the colours their club plays in.</summary>
+    public const string ClubColoursChanged = "world.club.colours_changed";
+
     /// <summary>A takeover was refused because the country was out of capacity.</summary>
     public const string ClaimRefusedAtCapacity = "world.club_claim.refused_capacity";
 

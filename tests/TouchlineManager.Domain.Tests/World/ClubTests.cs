@@ -98,6 +98,69 @@ public sealed class ClubTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    [Fact]
+    public void A_new_club_wears_the_generated_colours_until_its_manager_chooses_some()
+    {
+        var club = Generate(tier: 1);
+
+        club.PrimaryColour.Should().BeNull();
+        club.SecondaryColour.Should().BeNull();
+    }
+
+    [Fact]
+    public void Chosen_colours_are_stored_in_one_lowercase_form_and_count_as_a_change()
+    {
+        var club = Generate(tier: 1);
+
+        club.ChangeColours("#C0392B", "#FCD116", Now.AddMinutes(1));
+
+        club.PrimaryColour.Should().Be("#c0392b");
+        club.SecondaryColour.Should().Be("#fcd116");
+        club.Version.Should().Be(2);
+        club.UpdatedAt.Should().Be(Now.AddMinutes(1));
+    }
+
+    [Theory]
+    [InlineData("#1f4e79", "#1F4E79")]
+    [InlineData("#abcdef", "#ABCDEF")]
+    public void The_two_colours_must_differ_whatever_their_case(string primary, string secondary)
+    {
+        var club = Generate(tier: 1);
+
+        var act = () => club.ChangeColours(primary, secondary, Now);
+
+        act.Should().Throw<ArgumentException>();
+        club.PrimaryColour.Should().BeNull();
+        club.Version.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("#fff")]
+    [InlineData("1f4e79")]
+    [InlineData("#1f4e7g")]
+    [InlineData("#1f4e799")]
+    [InlineData("rgb(1,2,3)")]
+    public void Anything_but_a_six_digit_hex_colour_is_refused(string colour)
+    {
+        var club = Generate(tier: 1);
+
+        Club.IsHexColour(colour).Should().BeFalse();
+
+        var act = () => club.ChangeColours(colour, "#d6e4f0", Now);
+
+        act.Should().Throw<ArgumentException>();
+        club.PrimaryColour.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_six_digit_hex_colour_is_recognised_in_either_case()
+    {
+        Club.IsHexColour("#1f4e79").Should().BeTrue();
+        Club.IsHexColour("#1F4E79").Should().BeTrue();
+        Club.IsHexColour(null).Should().BeFalse();
+    }
+
     private static Club Generate(int tier) =>
         Club.Generate(
             Guid.CreateVersion7(),

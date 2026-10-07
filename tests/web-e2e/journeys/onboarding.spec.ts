@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
+import { confirmKitColours } from '../support/kit-colours';
 
 /**
  * The Stage 3 exit criterion at the interface level: a manager onboards into a club and inherits it.
@@ -40,6 +41,7 @@ test.describe('onboarding', () => {
       .getByRole('button', { name: /^Take over/ })
       .first()
       .click();
+    await confirmKitColours(page);
 
     // The claim lands on the dashboard of the club that was inherited.
     await expect(page).toHaveURL(/\/dashboard$/);

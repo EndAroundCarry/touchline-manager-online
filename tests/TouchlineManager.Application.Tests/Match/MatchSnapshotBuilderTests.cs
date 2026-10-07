@@ -47,6 +47,33 @@ public sealed class MatchSnapshotBuilderTests
     }
 
     [Fact]
+    public void A_snapshot_freezes_the_colours_a_manager_chose_and_leaves_the_rest_to_the_palette()
+    {
+        var built = Build(
+            Home() with { PrimaryColour = "#c0392b", SecondaryColour = "#fcd116" },
+            Away());
+
+        built.Input.Home.PrimaryColour.Should().Be("#c0392b");
+        built.Input.Home.SecondaryColour.Should().Be("#fcd116");
+        built.Input.Away.PrimaryColour.Should().BeNull("a club whose manager chose nothing wears its generated colours");
+        built.Input.Away.SecondaryColour.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_kit_colour_never_changes_the_snapshots_hashes_so_it_never_changes_a_result()
+    {
+        var plain = Build(Home(), Away());
+        var dressed = Build(
+            Home() with { PrimaryColour = "#c0392b", SecondaryColour = "#fcd116" },
+            Away() with { PrimaryColour = "#12284c", SecondaryColour = "#ffffff" });
+
+        CanonicalMatchSerializer.ContentHash(dressed.Input)
+            .Should().Be(CanonicalMatchSerializer.ContentHash(plain.Input), "the seed is derived from it");
+        CanonicalMatchSerializer.InputHash(dressed.Input)
+            .Should().Be(CanonicalMatchSerializer.InputHash(plain.Input));
+    }
+
+    [Fact]
     public void A_club_with_no_plan_has_every_slot_recorded_as_the_builders_choice()
     {
         var built = Build(Home(), Away());

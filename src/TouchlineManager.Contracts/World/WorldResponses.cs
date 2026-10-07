@@ -164,6 +164,9 @@ public sealed record ManagerProfileResponse(
 /// <param name="StartedAt">When control began.</param>
 /// <param name="LastActiveAt">When the manager was last seen.</param>
 /// <param name="Version">The concurrency version.</param>
+/// <param name="PrimaryColour">The club's primary kit colour as <c>#rrggbb</c>: the one chosen, or the generated one.</param>
+/// <param name="SecondaryColour">The club's secondary kit colour as <c>#rrggbb</c>: the one chosen, or the generated one.</param>
+/// <param name="HasChosenColours">Whether the manager has chosen the colours, rather than wearing the generated ones.</param>
 public sealed record ClubTenureSummaryResponse(
     Guid Id,
     Guid ClubId,
@@ -175,7 +178,16 @@ public sealed record ClubTenureSummaryResponse(
     string ControlStatus,
     DateTimeOffset StartedAt,
     DateTimeOffset LastActiveAt,
-    long Version);
+    long Version,
+    string PrimaryColour,
+    string SecondaryColour,
+    bool HasChosenColours);
+
+/// <summary>The colours a club plays in, as the manager's change left them.</summary>
+/// <param name="ClubId">The club.</param>
+/// <param name="PrimaryColour">The primary kit colour as <c>#rrggbb</c>.</param>
+/// <param name="SecondaryColour">The secondary kit colour as <c>#rrggbb</c>.</param>
+public sealed record ClubColoursResponse(Guid ClubId, string PrimaryColour, string SecondaryColour);
 
 /// <summary>
 /// Where an account stands in onboarding: no profile, a profile but no club, or a club.

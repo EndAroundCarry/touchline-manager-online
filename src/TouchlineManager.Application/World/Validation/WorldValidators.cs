@@ -1,5 +1,6 @@
 using FluentValidation;
 using TouchlineManager.Contracts.World;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Application.World.Validation;
 
@@ -53,6 +54,28 @@ public sealed class UpdateManagerProfileRequestValidator : AbstractValidator<Upd
     {
         RuleFor(request => request.Locale).LocaleRules();
         RuleFor(request => request.TimeZone).TimeZoneRules();
+    }
+}
+
+/// <summary>Validates <see cref="ChangeClubColoursRequest"/>.</summary>
+public sealed class ChangeClubColoursRequestValidator : AbstractValidator<ChangeClubColoursRequest>
+{
+    /// <summary>Initializes the validator.</summary>
+    public ChangeClubColoursRequestValidator()
+    {
+        RuleFor(request => request.PrimaryColour)
+            .Must(Club.IsHexColour)
+            .WithMessage("Choose the main colour with the colour picker.");
+
+        RuleFor(request => request.SecondaryColour)
+            .Must(Club.IsHexColour)
+            .WithMessage("Choose the second colour with the colour picker.");
+
+        RuleFor(request => request)
+            .Must(request => !string.Equals(request.PrimaryColour, request.SecondaryColour, StringComparison.OrdinalIgnoreCase))
+            .When(request => Club.IsHexColour(request.PrimaryColour) && Club.IsHexColour(request.SecondaryColour))
+            .WithName(nameof(ChangeClubColoursRequest.SecondaryColour))
+            .WithMessage("Choose two different colours.");
     }
 }
 

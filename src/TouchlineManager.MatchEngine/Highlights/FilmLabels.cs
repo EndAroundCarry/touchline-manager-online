@@ -29,7 +29,9 @@ internal static class FilmLabels
     /// <summary>Gets the two sides' primary colours.</summary>
     /// <param name="input">The frozen snapshot.</param>
     public static (string Home, string Away) Colours(MatchInputV1 input) =>
-        (ClubPalette.PrimaryOf(input.Home.ClubId), ClubPalette.PrimaryOf(input.Away.ClubId));
+        (
+            ClubPalette.Resolve(input.Home.ClubId, input.Home.PrimaryColour, input.Home.SecondaryColour).Primary,
+            ClubPalette.Resolve(input.Away.ClubId, input.Away.PrimaryColour, input.Away.SecondaryColour).Primary);
 
     /// <summary>Gets the abbreviated position a slot is labelled with.</summary>
     /// <param name="slot">The slot.</param>

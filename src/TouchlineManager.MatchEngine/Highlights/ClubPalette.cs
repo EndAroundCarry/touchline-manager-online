@@ -26,6 +26,24 @@ public static class ClubPalette
     /// <param name="clubId">The club identity.</param>
     public static string SecondaryOf(Guid clubId) => Palette[Index(clubId)].Secondary;
 
+    /// <summary>
+    /// Gets the colour a club's kit is drawn in: the one its manager chose, or the generated one.
+    /// </summary>
+    /// <remarks>
+    /// The two colours are chosen as a pair, so a club with only one of them set is treated as having chosen
+    /// neither. Mixing a chosen primary with a generated secondary would pair colours nobody picked together.
+    /// </remarks>
+    /// <param name="clubId">The club identity.</param>
+    /// <param name="chosenPrimary">The manager's primary colour, if one was chosen.</param>
+    /// <param name="chosenSecondary">The manager's secondary colour, if one was chosen.</param>
+    public static (string Primary, string Secondary) Resolve(
+        Guid clubId,
+        string? chosenPrimary,
+        string? chosenSecondary) =>
+        !string.IsNullOrEmpty(chosenPrimary) && !string.IsNullOrEmpty(chosenSecondary)
+            ? (chosenPrimary, chosenSecondary)
+            : Palette[Index(clubId)];
+
     /// <summary>The pair of colours each palette entry carries, in a fixed order.</summary>
     private static readonly (string Primary, string Secondary)[] Palette =
     [

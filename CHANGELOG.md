@@ -4,6 +4,21 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Team colours — the manager chooses the two colours the club plays in
+
+A club still arrives in colours generated from its identity. After taking a club over, the manager is sent to a
+**Choose your colours** step (`/onboarding/colours`) and can change the pair later under **Settings → Team colours**.
+
+### Added
+
+- **Two colours per club**, picked with the browser's colour picker (the whole spectrum), a hex field, or a shortcut
+  swatch, with a shirt preview. The two must differ. `PUT /api/v1/club-tenure/colours`; `world.clubs` gains the
+  nullable `primary_colour` and `secondary_colour` (migration `ClubColours`).
+- The chosen colours are used by the **stadium**, the **match lineups** and the **film**. A match snapshot freezes
+  the colours it was locked with, so a replay keeps the kit the match was played in. The colours are not part of the
+  canonical hashes, so choosing them never changes a seed or a result.
+- A club with no choice (or half of one) keeps its generated colours.
+
 ## Replay v6 — players hold a shape, and set pieces look like set pieces
 
 Recorded in [`ADR-0064`](docs/architecture/adr/0064-replay-v6-shape-and-set-pieces.md). `ReplayDirector.Version` is

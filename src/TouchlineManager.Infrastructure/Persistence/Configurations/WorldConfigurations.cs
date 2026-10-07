@@ -157,6 +157,8 @@ internal sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
         builder.Property(club => club.City).HasColumnName("city").HasMaxLength(60).IsRequired();
         builder.Property(club => club.Region).HasColumnName("region").HasMaxLength(60).IsRequired();
         builder.Property(club => club.BadgeSeed).HasColumnName("badge_seed").HasMaxLength(64).IsRequired();
+        builder.Property(club => club.PrimaryColour).HasColumnName("primary_colour").HasMaxLength(7);
+        builder.Property(club => club.SecondaryColour).HasColumnName("secondary_colour").HasMaxLength(7);
         builder.Property(club => club.FoundingGameYear).HasColumnName("founding_game_year").IsRequired();
         builder.Property(club => club.Status)
             .HasColumnName("status")

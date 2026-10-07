@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
 import { navigateTo } from '../support/navigation';
+import { confirmKitColours } from '../support/kit-colours';
 
 /**
  * The Stage 8 inbox (F-41, master plan §10.7, §11.1).
@@ -30,6 +31,7 @@ test.describe('inbox', () => {
       .getByRole('button', { name: /^Take over/ })
       .first()
       .click();
+    await confirmKitColours(page);
 
     await expect(page).toHaveURL(/\/dashboard$/);
 

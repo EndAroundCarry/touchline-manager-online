@@ -3,6 +3,7 @@ import { createAccount } from '../support/account';
 import { collectA11yViolations, expectFocusRing, renderA11yViolations } from '../support/accessibility';
 import { createVerifiedManager } from '../support/auth-flows';
 import { navigateTo } from '../support/navigation';
+import { confirmKitColours } from '../support/kit-colours';
 
 /**
  * The accessibility gate (`§11.3`, `§15.6`).
@@ -89,6 +90,7 @@ test.describe('@a11y the manager screens meet WCAG 2.2 AA', () => {
     await audit.scan('onboarding: club');
 
     await page.getByRole('button', { name: /^Take over/ }).first().click();
+    await confirmKitColours(page);
     await expect(page).toHaveURL(/\/dashboard$/);
 
     // A player profile is a detail route, so its id is read off the squad's own link rather than guessed.
@@ -182,6 +184,7 @@ test.describe('@a11y the light theme meets WCAG 2.2 AA', () => {
     await page.getByRole('button', { name: 'Create my profile' }).click();
     await page.getByRole('button', { name: 'See the clubs' }).first().click();
     await page.getByRole('button', { name: /^Take over/ }).first().click();
+    await confirmKitColours(page);
     await expect(page).toHaveURL(/\/dashboard$/);
 
     await navigateTo(page, 'Squad');

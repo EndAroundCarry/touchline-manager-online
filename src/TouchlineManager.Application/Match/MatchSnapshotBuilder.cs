@@ -262,6 +262,8 @@ public static class MatchSnapshotBuilder
         {
             ClubId = source.ClubId,
             ClubName = source.ClubName,
+            PrimaryColour = source.PrimaryColour,
+            SecondaryColour = source.SecondaryColour,
             Instructions = EngineVocabulary.Instructions(source.Instructions ?? TeamInstructionSet.Neutral),
             Squad = [.. Squad(source, players, slots, placed, bench)],
             Slots = [.. Slots(selection, slots, placed)],

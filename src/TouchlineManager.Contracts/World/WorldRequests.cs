@@ -31,6 +31,20 @@ public sealed record UpdateManagerProfileRequest
     public required string TimeZone { get; init; }
 }
 
+/// <summary>Request to choose the two colours the manager's club plays in.</summary>
+/// <remarks>
+/// The club is never named in the body: it is the club the authenticated manager holds. Colours are written
+/// as <c>#rrggbb</c>, which is what a colour picker produces and what the renderer draws.
+/// </remarks>
+public sealed record ChangeClubColoursRequest
+{
+    /// <summary>Gets the primary kit colour, e.g. <c>#1f4e79</c>.</summary>
+    public required string PrimaryColour { get; init; }
+
+    /// <summary>Gets the secondary kit colour, e.g. <c>#d6e4f0</c>. It must differ from the primary.</summary>
+    public required string SecondaryColour { get; init; }
+}
+
 /// <summary>Request to take over an AI-controlled club (master plan §7.6).</summary>
 /// <remarks>
 /// The command identifies the club only. Ownership is never taken from the body: the manager is derived

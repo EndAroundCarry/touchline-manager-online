@@ -4,7 +4,14 @@ namespace TouchlineManager.Application.Abstractions.World;
 /// <param name="TierNumber">The tier the club plays in this season, which scales prices and build costs.</param>
 /// <param name="CashMinor">The club's cash, in minor units.</param>
 /// <param name="ReservedMinor">The part of it already committed to open bids, in minor units.</param>
-public sealed record ClubStadiumContext(int TierNumber, long CashMinor, long ReservedMinor);
+/// <param name="PrimaryColour">The primary kit colour the club's manager chose, or null for the generated one.</param>
+/// <param name="SecondaryColour">The secondary kit colour the club's manager chose, or null for the generated one.</param>
+public sealed record ClubStadiumContext(
+    int TierNumber,
+    long CashMinor,
+    long ReservedMinor,
+    string? PrimaryColour = null,
+    string? SecondaryColour = null);
 
 /// <summary>
 /// The stadium module's read projection (`STAD-1`).

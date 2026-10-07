@@ -205,6 +205,19 @@ public sealed record MatchSideV1
     /// <summary>Gets the club's name, for commentary.</summary>
     public required string ClubName { get; init; }
 
+    /// <summary>
+    /// Gets the primary kit colour the club's manager chose, as <c>#rrggbb</c>, or null for the generated one.
+    /// </summary>
+    /// <remarks>
+    /// Presentation only. The colours are frozen with the snapshot so a replay is drawn in the colours the
+    /// match was locked with, but they are deliberately left out of the canonical hashes: a kit colour must
+    /// never change a seed, and so never change a result.
+    /// </remarks>
+    public string? PrimaryColour { get; init; }
+
+    /// <summary>Gets the secondary kit colour the club's manager chose, or null for the generated one.</summary>
+    public string? SecondaryColour { get; init; }
+
     /// <summary>Gets every available player: the eleven starters and up to seven substitutes.</summary>
     public required IReadOnlyList<MatchParticipantV1> Squad { get; init; }
 

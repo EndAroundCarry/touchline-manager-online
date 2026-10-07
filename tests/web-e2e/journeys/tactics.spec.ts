@@ -2,6 +2,7 @@ import { APIRequestContext, Page, expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
 import { navigateTo } from '../support/navigation';
+import { confirmKitColours } from '../support/kit-colours';
 
 /**
  * The Stage 4 exit criteria for the tactics screen (F-19).
@@ -141,6 +142,7 @@ test.describe('tactics', () => {
     await page.getByRole('button', { name: 'Create my profile' }).click();
     await page.getByRole('button', { name: 'See the clubs' }).first().click();
     await page.getByRole('button', { name: /^Take over/ }).first().click();
+    await confirmKitColours(page);
 
     await expect(page).toHaveURL(/\/dashboard$/);
 

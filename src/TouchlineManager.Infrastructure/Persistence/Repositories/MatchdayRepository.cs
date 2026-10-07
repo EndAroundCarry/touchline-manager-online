@@ -398,9 +398,9 @@ internal sealed class MatchdayRepository : IMatchdayRepository
         IReadOnlyList<FixtureTeamSheet> sheets,
         CancellationToken cancellationToken)
     {
-        var clubName = await _dbContext.Clubs
+        var identity = await _dbContext.Clubs
             .Where(club => club.Id == clubId)
-            .Select(club => club.Name)
+            .Select(club => new { club.Name, club.PrimaryColour, club.SecondaryColour })
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 $"Club {clubId:D} is named by fixture {fixtureId:D} but does not exist.");
@@ -465,7 +465,7 @@ internal sealed class MatchdayRepository : IMatchdayRepository
 
         return new ClubSideSource(
             clubId,
-            clubName,
+            identity.Name,
             plan?.Instructions,
             slots,
             selection,
@@ -480,6 +480,8 @@ internal sealed class MatchdayRepository : IMatchdayRepository
                 row.state.FatigueBp,
                 row.state.MoraleBp,
                 row.state.MatchSharpnessBp,
-                !unavailableIds.Contains(row.player.Id)))]);
+                !unavailableIds.Contains(row.player.Id)))],
+            identity.PrimaryColour,
+            identity.SecondaryColour);
     }
 }

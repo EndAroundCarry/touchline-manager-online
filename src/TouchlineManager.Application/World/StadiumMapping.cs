@@ -46,6 +46,7 @@ public static class StadiumMapping
             .ToList();
 
         var level = stadium.Level;
+        var colours = ClubPalette.Resolve(stadium.ClubId, context.PrimaryColour, context.SecondaryColour);
 
         return new StadiumResponse(
             stadium.ClubId,
@@ -55,8 +56,8 @@ public static class StadiumMapping
             StadiumRuleSet.MaxCapacity,
             StadiumRuleSet.SeatsPerLevel,
             level == StadiumRuleSet.MaxLevel ? 0 : (level * StadiumRuleSet.SeatsPerLevel) - capacity + 1,
-            ClubPalette.PrimaryOf(stadium.ClubId),
-            ClubPalette.SecondaryOf(stadium.ClubId),
+            colours.Primary,
+            colours.Secondary,
             stands,
             demand,
             StadiumRuleSet.FullHouseMinorFor(stadium.Seats, tier),

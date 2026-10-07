@@ -1,6 +1,7 @@
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
 import { createAccount, TestAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
+import { confirmKitColours } from '../support/kit-colours';
 import {
   apiAccessToken,
   playAuction,
@@ -39,6 +40,7 @@ async function onboard(
     .getByRole('button', { name: /^Take over/ })
     .first()
     .click();
+  await confirmKitColours(page);
 
   await expect(page).toHaveURL(/\/dashboard$/);
 

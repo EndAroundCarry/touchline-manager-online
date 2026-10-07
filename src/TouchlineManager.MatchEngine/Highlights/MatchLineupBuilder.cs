@@ -15,7 +15,8 @@ namespace TouchlineManager.MatchEngine.Highlights;
 /// </para>
 /// <para>
 /// The three things that are neither are derived instead: the formation label from the side's own roles,
-/// the short name from the club's frozen name, and the colours from the generated palette. All three are
+/// the short name from the club's frozen name, and the colours from the colours the snapshot froze, or the
+/// generated palette when the club's manager chose none. All three are
 /// functions of the frozen input, deliberately — a presentation is immutable and cached under the result's
 /// own hash, so a field read from live club state would let the same entity tag describe two different
 /// bodies (`MAT-8`, §9.5).
@@ -61,12 +62,14 @@ public static class MatchLineupBuilder
             }
         }
 
+        var colours = ClubPalette.Resolve(frozen.ClubId, frozen.PrimaryColour, frozen.SecondaryColour);
+
         return new MatchLineupV1
         {
             ClubName = frozen.ClubName,
             ShortName = ShortName(frozen.ClubName),
-            PrimaryColour = ClubPalette.PrimaryOf(frozen.ClubId),
-            SecondaryColour = ClubPalette.SecondaryOf(frozen.ClubId),
+            PrimaryColour = colours.Primary,
+            SecondaryColour = colours.Secondary,
             Formation = FormationOf(slots),
 
             // The eleven in slot order, then the bench in the order the snapshot named it: the sheet a

@@ -5,6 +5,7 @@ import { configurePresentation, resetPresentation } from './presentation';
 import { WorldApi } from './world-api';
 import {
   AvailableClubs,
+  ClubColours,
   ClubDashboard,
   CountryCapacity,
   CountrySummary,
@@ -257,6 +258,30 @@ export class OnboardingStore {
     this.claimKeys.set(clubId, key);
 
     return this.api.claimClub(clubId, key).pipe(tap({ next: () => this.claimKeys.delete(clubId) }));
+  }
+
+  /**
+   * Chooses the colours the manager's club plays in, and adopts them in the cached tenure so every screen
+   * that draws the club reads the new pair without another round trip.
+   */
+  changeClubColours(primaryColour: string, secondaryColour: string): Observable<ClubColours> {
+    return this.api.changeClubColours({ primaryColour, secondaryColour }).pipe(
+      tap((colours) =>
+        this.stateSignal.update((state) =>
+          state === null || state.tenure === null
+            ? state
+            : {
+                ...state,
+                tenure: {
+                  ...state.tenure,
+                  primaryColour: colours.primaryColour,
+                  secondaryColour: colours.secondaryColour,
+                  hasChosenColours: true,
+                },
+              },
+        ),
+      ),
+    );
   }
 
   /** Resigns from the manager's club. */

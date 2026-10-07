@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { expectNoA11yViolations } from '../support/accessibility';
 import { createVerifiedManager } from '../support/auth-flows';
+import { confirmKitColours } from '../support/kit-colours';
 import {
   apiAccessToken,
   playMatchday,
@@ -56,6 +57,7 @@ test.describe('the matchday', () => {
       .getByRole('button', { name: /^Take over/ })
       .first()
       .click();
+    await confirmKitColours(page);
 
     await expect(page).toHaveURL(/\/dashboard$/);
 

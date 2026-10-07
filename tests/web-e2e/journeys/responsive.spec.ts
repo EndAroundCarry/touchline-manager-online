@@ -2,6 +2,7 @@ import { Locator, Page, expect, test } from '@playwright/test';
 import { createAccount } from '../support/account';
 import { createVerifiedManager } from '../support/auth-flows';
 import { isCompact, navigateTo } from '../support/navigation';
+import { confirmKitColours } from '../support/kit-colours';
 
 /**
  * The breakpoint suite (`F-44`).
@@ -54,6 +55,7 @@ test.describe('@responsive the app adapts to the breakpoint', () => {
     await expectNoHorizontalOverflow(page);
 
     await page.getByRole('button', { name: /^Take over/ }).first().click();
+    await confirmKitColours(page);
     await expect(page).toHaveURL(/\/dashboard$/);
 
     // Navigation: from `md` up the sidebar is present and there is no menu button; below it the

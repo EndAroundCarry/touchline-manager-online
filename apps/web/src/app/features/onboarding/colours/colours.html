@@ -1,0 +1,44 @@
+<section class="max-w-3xl">
+  <h1 [class]="pageHeadingClass">Choose your colours</h1>
+
+  @if (loading()) {
+    <p class="mt-6 text-sm text-ink-2" role="status">Loading your club…</p>
+  } @else if (loadError(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  } @else if (clubName(); as name) {
+    <p class="mt-2 text-sm text-ink-2">
+      Pick the two colours {{ name }} plays in. They are drawn on your stadium and on the pitch in
+      every match from now on.
+    </p>
+
+    <div class="mt-6 rounded border border-line bg-panel p-6">
+      <app-kit-colour-picker
+        #picker
+        [(primary)]="primary"
+        [(secondary)]="secondary"
+        [disabled]="saving()"
+      />
+    </div>
+
+    @if (saveError(); as message) {
+      <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    }
+
+    <div class="mt-6 flex flex-wrap items-center gap-4">
+      <button
+        type="button"
+        [class]="primaryButtonClass"
+        [disabled]="saving() || !picker.valid() || !canMutate()"
+        (click)="confirm(picker)"
+      >
+        {{ saving() ? 'Saving…' : 'Confirm colours' }}
+      </button>
+      <a routerLink="/dashboard" [class]="linkClass">Decide later in Settings</a>
+    </div>
+  } @else {
+    <p class="mt-6 text-sm text-ink-2" role="status">
+      You do not manage a club yet.
+      <a routerLink="/onboarding/country" [class]="linkClass">Choose one</a>
+    </p>
+  }
+</section>

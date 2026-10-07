@@ -1,6 +1,7 @@
 using FluentAssertions;
 using TouchlineManager.MatchEngine.Highlights;
 using TouchlineManager.MatchEngine.Model;
+using TouchlineManager.MatchEngine.Serialization;
 
 namespace TouchlineManager.MatchEngine.Tests;
 
@@ -54,6 +55,65 @@ public sealed class MatchLineupTests
                     .Should().BeEquivalentTo(frozen.Squad.Select(participant => participant.ParticipantId));
             }
         }
+    }
+
+    [Fact]
+    public void A_lineup_is_drawn_in_the_colours_the_snapshot_froze()
+    {
+        var plain = TestMatchFactory.Even(7);
+        var dressed = plain with
+        {
+            Home = plain.Home with { PrimaryColour = "#c0392b", SecondaryColour = "#fcd116" },
+        };
+
+        var presentation = TestMatchFactory.Play(dressed).Presentation;
+
+        presentation.HomeLineup!.PrimaryColour.Should().Be("#c0392b");
+        presentation.HomeLineup.SecondaryColour.Should().Be("#fcd116");
+    }
+
+    [Fact]
+    public void A_club_that_chose_nothing_keeps_its_generated_colours_beside_one_that_did()
+    {
+        var plain = TestMatchFactory.Even(7);
+        var generated = TestMatchFactory.Play(plain).Presentation;
+        var dressed = TestMatchFactory.Play(plain with
+        {
+            Home = plain.Home with { PrimaryColour = "#c0392b", SecondaryColour = "#fcd116" },
+        }).Presentation;
+
+        dressed.AwayLineup!.PrimaryColour.Should().Be(generated.AwayLineup!.PrimaryColour);
+        dressed.AwayLineup.SecondaryColour.Should().Be(generated.AwayLineup.SecondaryColour);
+        dressed.AwayLineup.PrimaryColour.Should().Be(ClubPalette.PrimaryOf(plain.Away.ClubId));
+    }
+
+    [Fact]
+    public void Half_a_chosen_pair_is_ignored_rather_than_paired_with_a_generated_colour()
+    {
+        var plain = TestMatchFactory.Even(7);
+        var presentation = TestMatchFactory.Play(plain with
+        {
+            Home = plain.Home with { PrimaryColour = "#c0392b" },
+        }).Presentation;
+
+        presentation.HomeLineup!.PrimaryColour.Should().Be(ClubPalette.PrimaryOf(plain.Home.ClubId));
+        presentation.HomeLineup.SecondaryColour.Should().Be(ClubPalette.SecondaryOf(plain.Home.ClubId));
+    }
+
+    [Fact]
+    public void Choosing_colours_changes_how_a_match_is_drawn_and_nothing_about_how_it_is_played()
+    {
+        var plain = TestMatchFactory.Even(7);
+        var dressed = plain with
+        {
+            Home = plain.Home with { PrimaryColour = "#c0392b", SecondaryColour = "#fcd116" },
+            Away = plain.Away with { PrimaryColour = "#12284c", SecondaryColour = "#ffffff" },
+        };
+
+        var before = TestMatchFactory.Play(plain).Result;
+        var after = TestMatchFactory.Play(dressed).Result;
+
+        CanonicalMatchSerializer.OutputHash(after).Should().Be(CanonicalMatchSerializer.OutputHash(before));
     }
 
     [Fact]

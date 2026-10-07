@@ -88,7 +88,7 @@ export class ClubChoice implements OnDestroy {
     this.store.stopProvisioningPoll();
   }
 
-  /** Claims a club, then opens the dashboard it arrived with. */
+  /** Claims a club, then asks for the colours it will play in before opening the dashboard. */
   protected claim(club: AvailableClub): void {
     if (this.claimingClubId() !== null) {
       return;
@@ -101,7 +101,7 @@ export class ClubChoice implements OnDestroy {
 
     this.store.claimClub(club.id).subscribe({
       next: () => {
-        void this.router.navigate(['/dashboard']);
+        void this.router.navigate(['/onboarding/colours']);
       },
       error: (error: unknown) => {
         this.claimingClubId.set(null);

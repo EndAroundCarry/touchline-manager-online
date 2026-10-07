@@ -36,6 +36,7 @@ import {
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
 import { controlError, errorId } from '../../shared/forms/form-support';
+import { KitColourPicker } from '../../shared/ui/kit-colour-picker/kit-colour-picker';
 
 /** Requires the deletion confirmation to be ticked. */
 function mustBeAccepted(control: AbstractControl): ValidationErrors | null {
@@ -99,7 +100,7 @@ function withCurrent(options: readonly string[], current: string | null): readon
  */
 @Component({
   selector: 'app-settings',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [KitColourPicker, ReactiveFormsModule, RouterLink],
   templateUrl: './settings.html',
 })
 export class Settings {
@@ -162,6 +163,30 @@ export class Settings {
   protected readonly localeOptions = computed(() =>
     withCurrent(LOCALE_OPTIONS, this.manager()?.locale ?? null),
   );
+
+  /** The club the manager holds, which carries the colours it plays in. */
+  protected readonly tenure = computed(() => this.onboarding.state()?.tenure ?? null);
+
+  /** The colours being edited, seeded from the club's own and applied only on save. */
+  protected readonly kitPrimary = signal('#1f4e79');
+  protected readonly kitSecondary = signal('#d6e4f0');
+  protected readonly kitSaving = signal(false);
+  protected readonly kitSaved = signal(false);
+  protected readonly kitError = signal<string | null>(null);
+
+  /** Whether the edited pair differs from the one the club plays in. */
+  protected readonly kitChanged = computed(() => {
+    const current = this.tenure();
+
+    return (
+      current !== null &&
+      (current.primaryColour !== this.kitPrimary() ||
+        current.secondaryColour !== this.kitSecondary())
+    );
+  });
+
+  /** Which club and colours the editor was last seeded from, so a background reload leaves an edit alone. */
+  private kitSeededFor: string | null = null;
 
   protected readonly deleteForm = inject(FormBuilder).nonNullable.group({
     password: ['', [Validators.required, Validators.maxLength(128)]],
@@ -249,6 +274,48 @@ export class Settings {
       if (manager !== null && this.prefsForm.pristine) {
         this.prefsForm.setValue({ locale: manager.locale, timeZone: manager.timeZone });
       }
+    });
+
+    // Seed the colour editor from the club once it arrives, and again whenever the club's colours change
+    // underneath it. A reload that brings nothing new does not reseed, so it cannot undo an edit.
+    effect(() => {
+      const club = this.tenure();
+
+      if (club === null) {
+        return;
+      }
+
+      const key = `${club.clubId}|${club.primaryColour}|${club.secondaryColour}`;
+
+      if (key !== this.kitSeededFor) {
+        this.kitSeededFor = key;
+        this.kitPrimary.set(club.primaryColour);
+        this.kitSecondary.set(club.secondaryColour);
+      }
+    });
+  }
+
+  /** Saves the club's colours. */
+  protected saveColours(picker: KitColourPicker): void {
+    if (this.kitSaving() || !picker.valid() || this.tenure() === null) {
+      return;
+    }
+
+    this.kitSaved.set(false);
+    this.kitError.set(null);
+    this.kitSaving.set(true);
+
+    this.onboarding.changeClubColours(this.kitPrimary(), this.kitSecondary()).subscribe({
+      next: () => {
+        this.kitSaving.set(false);
+        this.kitSaved.set(true);
+      },
+      error: (error: unknown) => {
+        this.kitSaving.set(false);
+        this.kitError.set(
+          error instanceof ApiError ? error.detail : 'Your colours could not be saved.',
+        );
+      },
     });
   }
 

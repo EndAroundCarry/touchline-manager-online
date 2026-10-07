@@ -78,13 +78,17 @@ public sealed record SnapshotPlayerRow(
 /// unavailable ones are carried rather than filtered out, because a repair has to be able to say that the
 /// player it dropped was injured rather than merely not selected.
 /// </param>
+/// <param name="PrimaryColour">The primary kit colour the club's manager chose, or null for the generated one.</param>
+/// <param name="SecondaryColour">The secondary kit colour the club's manager chose, or null for the generated one.</param>
 public sealed record ClubSideSource(
     Guid ClubId,
     string ClubName,
     TeamInstructionSet? Instructions,
     IReadOnlyList<SnapshotSlotRow> Slots,
     IReadOnlyList<SnapshotSelectionRow> Selection,
-    IReadOnlyList<SnapshotPlayerRow> Players);
+    IReadOnlyList<SnapshotPlayerRow> Players,
+    string? PrimaryColour = null,
+    string? SecondaryColour = null);
 
 /// <summary>Both clubs of one fixture, with everything a snapshot is built from.</summary>
 /// <param name="FixtureId">The fixture.</param>
