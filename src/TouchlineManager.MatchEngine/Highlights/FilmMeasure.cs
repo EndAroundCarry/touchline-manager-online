@@ -66,6 +66,42 @@ internal static class FilmMeasure
     /// <summary>How far from the goal line the ball is when it is in the defending side's own third, in metres.</summary>
     private const double OwnThird = 35.0;
 
+    /// <summary>How near the ball a player is to be part of the local pack, in metres (`replay-v12` baseline).</summary>
+    private const double PackNear = 10.0;
+
+    /// <summary>How near the ball a player is to be part of the compressed game, in metres.</summary>
+    private const double PackFar = 25.0;
+
+    /// <summary>How far from the ball a player is to be far from the play, in metres.</summary>
+    private const double FarFrom = 25.0;
+
+    /// <summary>How near an attacker a defender stands to mark him, in metres: the two dots touch.</summary>
+    private const double MarkGap = 1.5;
+
+    /// <summary>How near the goal a player is to be in the pack at a set piece, in metres.</summary>
+    private const double FreeKickPack = 25.0;
+
+    /// <summary>How far from the middle of the pitch a carrier is to be running a wing, in metres: the film's own flank lane.</summary>
+    private const double WingLane = 16.0;
+
+    /// <summary>How far up the pitch the ball is, on its side's scale, for a wing carry to be an attack, in metres.</summary>
+    private const double WingDepth = 50.0;
+
+    /// <summary>How far from the carrier a defender is to be chasing him, in metres.</summary>
+    private const double ChaseReach = 10.0;
+
+    /// <summary>How far behind the carrier, away from the goal he attacks, a defender is to be chasing him, in metres.</summary>
+    private const double ChaseBehind = 1.0;
+
+    /// <summary>How many chasers make a chain.</summary>
+    private const int ChaseCount = 3;
+
+    /// <summary>How near the place he ends up a waiting player is to have settled, in metres: the two dots would touch.</summary>
+    private const double SettledWithin = 1.0;
+
+    /// <summary>How long a player has to have waited in his place to count as settled, in seconds of film.</summary>
+    private const double SettledFor = 0.3;
+
     /// <summary>Measures the film.</summary>
     public static FilmDiagnostics Measure(
         FilmContext context,
@@ -204,7 +240,7 @@ internal static class FilmMeasure
             SelfPasses = gaps.SelfPasses,
             GoalStrikes = gaps.GoalStrikes,
             GoalsInNet = gaps.GoalsInNet,
-            Shape = MeasureShape(context, script, motion, rosters),
+            Shape = MeasureShape(context, script, motion, rosters, used.Pace),
         };
     }
 
@@ -216,7 +252,8 @@ internal static class FilmMeasure
         FilmContext context,
         FilmScriptResult script,
         FilmMotionResult motion,
-        IReadOnlyList<FilmRoster> rosters)
+        IReadOnlyList<FilmRoster> rosters,
+        double pace)
     {
         var near = new Histogram(1.0, FilmRoster.Size + 1);
         var spacing = new Histogram(0.1, 600);
@@ -236,6 +273,25 @@ internal static class FilmMeasure
         var freeKickIntruders = new Histogram(1.0, FilmRoster.Size + 1);
         var freeKickWall = new Histogram(1.0, FilmRoster.Size + 1);
         var penaltyIntruders = new Histogram(1.0, FilmRoster.Size + 1);
+        var pack10 = new Histogram(1.0, FilmRoster.Size + 1);
+        var pack25 = new Histogram(1.0, FilmRoster.Size + 1);
+        var marks = new MarkCount();
+        var cornerMarks = new MarkCount();
+        var freeKickMarks = new MarkCount();
+        var farMetres = new Average();
+        var farSeconds = new Average();
+        var farCount = new Average();
+        var attackKeeper = new[] { new Average(), new Average(), new Average() };
+        var defendKeeper = new[] { new Average(), new Average(), new Average() };
+        var settledMotion = new Average();
+        var cornerGoalPack = new Histogram(1.0, FilmRoster.Size + 1);
+        var freeKickGoalPack = new Histogram(1.0, FilmRoster.Size + 1);
+        var settledShare = new Average();
+        var holdSeconds = new Average();
+        var chasers = new Histogram(1.0, FilmRoster.Size + 1);
+        var wingSamples = 0;
+        var chained = 0;
+        var keepers = new int[2];
         var depthWith = new Average();
         var widthWith = new Average();
         var depthWithout = new Average();
@@ -278,6 +334,11 @@ internal static class FilmMeasure
                 MeasureKeeperAtShot(rosters[beat.Possession], motion, index, beat, keeperOffGoal, keeperAtWideBall);
             }
 
+            if (beat.IsHold && beat.Possession >= 0 && beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross)
+            {
+                MeasureWaiting(context, rosters[beat.Possession], motion, motion.Spans[index], beat, pace, cornerMarks, freeKickMarks, settledMotion, settledShare, holdSeconds, cornerGoalPack, freeKickGoalPack);
+            }
+
             if (beat.IsHold && beat.Possession >= 0 && beat.Formation is FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty)
             {
                 MeasureDeadBall(
@@ -309,6 +370,8 @@ internal static class FilmMeasure
 
                 counts[0] = 0;
                 counts[1] = 0;
+                keepers[0] = -1;
+                keepers[1] = -1;
 
                 for (var entity = 0; entity < FilmRoster.Size; entity++)
                 {
@@ -330,6 +393,19 @@ internal static class FilmMeasure
 
                         outfield[half][counts[half]++] = entity;
                     }
+                    else
+                    {
+                        keepers[(int)FilmRoster.SideOf(entity)] = entity;
+                    }
+                }
+
+                MeasurePack(motion, record, ball, outfield, counts, span, pace, pack10, pack25, farMetres, farSeconds, farCount);
+                MeasureOpenMarks(context, roster, motion, record, ball, attacking, marks);
+                MeasureKeepers(motion, record, ball, keepers, attacking, attackKeeper, defendKeeper);
+
+                if (beat.Kind == BeatKind.Carry)
+                {
+                    MeasureChasers(motion, record, ball, outfield, counts, attacking, chasers, ref wingSamples, ref chained);
                 }
 
                 near.Add(crowd);
@@ -486,7 +562,278 @@ internal static class FilmMeasure
             FreeKickWallP50 = freeKickWall.Percentile(0.5),
             Penalties = penaltyIntruders.Total,
             PenaltyIntrudersP95 = penaltyIntruders.Percentile(0.95),
+            PackWithin10mP50 = pack10.Percentile(0.5),
+            PackWithin25mP50 = pack25.Percentile(0.5),
+            MarkedShare = marks.Share,
+            CornerMarkedShare = cornerMarks.Share,
+            FreeKickMarkedShare = freeKickMarks.Share,
+            FarPlayerMotion = farSeconds.Count == 0 ? 0.0 : farMetres.Sum / farSeconds.Sum,
+            FarPlayerCount = farCount.Value,
+            AttackKeeperOffLine = new DepthBands(attackKeeper[0].Value, attackKeeper[1].Value, attackKeeper[2].Value),
+            DefendKeeperOffLine = new DepthBands(defendKeeper[0].Value, defendKeeper[1].Value, defendKeeper[2].Value),
+            SetPieceHolds = holdSeconds.Count,
+            SetPieceHoldSeconds = holdSeconds.Value,
+            SetPieceSettledShare = settledShare.Value,
+            SetPieceSettledMotion = settledMotion.Value,
+            CornerGoalPackP50 = cornerGoalPack.Percentile(0.5),
+            FreeKickGoalPackP50 = freeKickGoalPack.Percentile(0.5),
+            WingCarrySamples = wingSamples,
+            ChasersP50 = chasers.Percentile(0.5),
+            ChasersShare = wingSamples == 0 ? 0.0 : (double)chained / wingSamples,
         };
+    }
+
+    /// <summary>
+    /// Counts the outfield players near the ball and how fast those far from it move (`replay-v12` baseline): how many are
+    /// within ten and twenty-five metres, and the speed of the ones beyond twenty-five, in metres per second of film.
+    /// </summary>
+    private static void MeasurePack(
+        FilmMotionResult motion,
+        int record,
+        Vec ball,
+        int[][] outfield,
+        int[] counts,
+        BeatSpan span,
+        double pace,
+        Histogram pack10,
+        Histogram pack25,
+        Average farMetres,
+        Average farSeconds,
+        Average farCount)
+    {
+        int within10 = 0, within25 = 0, far = 0;
+        var dt = record > span.FirstRecord ? motion.TimeOf(record) - motion.TimeOf(record - 1) : 0.0;
+
+        for (var side = 0; side < 2; side++)
+        {
+            for (var member = 0; member < counts[side]; member++)
+            {
+                var entity = outfield[side][member];
+                var gap = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity)).DistanceTo(ball);
+
+                within10 += gap <= PackNear ? 1 : 0;
+                within25 += gap <= PackFar ? 1 : 0;
+
+                if (gap <= FarFrom)
+                {
+                    continue;
+                }
+
+                far++;
+
+                if (dt > 1e-9)
+                {
+                    var step = new Vec(
+                        motion.PlayerX(record, entity) - motion.PlayerX(record - 1, entity),
+                        motion.PlayerY(record, entity) - motion.PlayerY(record - 1, entity)).Length;
+
+                    farMetres.Add(step);
+                    farSeconds.Add(dt / pace);
+                }
+            }
+        }
+
+        pack10.Add(within10);
+        pack25.Add(within25);
+        farCount.Add(far);
+    }
+
+    /// <summary>Whether a defender stands within a metre and a half of an attacker: the two dots touch, as the reference marks a man.</summary>
+    private static bool HasMarker(FilmContext context, FilmRoster roster, FilmMotionResult motion, int record, int entity, MatchSide attacking)
+    {
+        var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
+
+        for (var other = 0; other < FilmRoster.Size; other++)
+        {
+            if (!roster.IsOccupied(other)
+                || FilmRoster.SideOf(other) == attacking
+                || context.Slots[other].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var mark = new Vec(motion.PlayerX(record, other), motion.PlayerY(record, other));
+
+            if (mark.DistanceTo(point) <= MarkGap)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Counts, in open play, the attackers within ten metres of the ball who have a marker (`replay-v12` baseline).</summary>
+    private static void MeasureOpenMarks(
+        FilmContext context,
+        FilmRoster roster,
+        FilmMotionResult motion,
+        int record,
+        Vec ball,
+        MatchSide attacking,
+        MarkCount marks)
+    {
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!roster.IsOccupied(entity)
+                || FilmRoster.SideOf(entity) != attacking
+                || context.Slots[entity].Family == MatchPositionFamily.Goalkeeper
+                || new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity)).DistanceTo(ball) > PackNear)
+            {
+                continue;
+            }
+
+            marks.Add(HasMarker(context, roster, motion, record, entity, attacking));
+        }
+    }
+
+    /// <summary>Records how far each keeper stands from his goal line, by how far up the pitch the ball is (`replay-v12` baseline).</summary>
+    private static void MeasureKeepers(
+        FilmMotionResult motion,
+        int record,
+        Vec ball,
+        int[] keepers,
+        MatchSide attacking,
+        Average[] attackKeeper,
+        Average[] defendKeeper)
+    {
+        var third = FilmSpace.Length / 3.0;
+        var band = int.Clamp((int)Math.Floor(FilmSpace.Attacking(ball, attacking) / third), 0, 2);
+        var defending = MatchInputV1.OpponentOf(attacking);
+
+        foreach (var (side, sink) in new[] { (attacking, attackKeeper), (defending, defendKeeper) })
+        {
+            var entity = keepers[(int)side];
+
+            if (entity >= 0)
+            {
+                sink[band].Add(Math.Abs(motion.PlayerX(record, entity) - FilmSpace.OwnGoal(side).X));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Counts the defenders chasing a carrier who runs a wing in the attacking half (`replay-v12` baseline): the reference
+    /// strings three or four of them out behind him, within ten metres, between him and the goal he is running away from.
+    /// </summary>
+    private static void MeasureChasers(
+        FilmMotionResult motion,
+        int record,
+        Vec ball,
+        int[][] outfield,
+        int[] counts,
+        MatchSide attacking,
+        Histogram chasers,
+        ref int samples,
+        ref int chained)
+    {
+        if (Math.Abs(ball.Y - (FilmSpace.Width / 2)) < WingLane || FilmSpace.Attacking(ball, attacking) < WingDepth)
+        {
+            return;
+        }
+
+        var defending = (int)MatchInputV1.OpponentOf(attacking);
+        var behind = 0;
+
+        for (var member = 0; member < counts[defending]; member++)
+        {
+            var entity = outfield[defending][member];
+            var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
+
+            // Behind him is further from the goal he attacks than he is.
+            behind += point.DistanceTo(ball) <= ChaseReach && FilmSpace.Attacking(point, attacking) <= FilmSpace.Attacking(ball, attacking) - ChaseBehind ? 1 : 0;
+        }
+
+        chasers.Add(behind);
+        samples++;
+        chained += behind >= ChaseCount ? 1 : 0;
+    }
+
+    /// <summary>
+    /// Measures a set piece that is waiting to be taken (`replay-v12` baseline): how long the hold is, how many of the players
+    /// have settled in their places before the kick, how fast those that have settled move about afterwards, and how many of the
+    /// taking side's players in the pack have a marker.
+    /// </summary>
+    private static void MeasureWaiting(
+        FilmContext context,
+        FilmRoster roster,
+        FilmMotionResult motion,
+        BeatSpan span,
+        FilmBeat hold,
+        double pace,
+        MarkCount cornerMarks,
+        MarkCount freeKickMarks,
+        Average settledMotion,
+        Average settledShare,
+        Average holdSeconds,
+        Histogram cornerGoalPack,
+        Histogram freeKickGoalPack)
+    {
+        var attacking = hold.Side;
+        var goal = FilmSpace.AttackedGoal(attacking);
+        var taker = hold.Actor is Guid actor ? roster.EntityOf(actor) : -1;
+        var last = span.LastRecord;
+
+        holdSeconds.Add(span.Seconds / pace);
+
+        int players = 0, settled = 0, nearGoal = 0;
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!roster.IsOccupied(entity) || entity == taker || context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var point = new Vec(motion.PlayerX(last, entity), motion.PlayerY(last, entity));
+            var arrived = span.FirstRecord;
+
+            // A player has settled once he is within a metre of where he ends up, and has a moment left to wait there.
+            while (arrived <= last && new Vec(motion.PlayerX(arrived, entity), motion.PlayerY(arrived, entity)).DistanceTo(point) > SettledWithin)
+            {
+                arrived++;
+            }
+
+            players++;
+            nearGoal += point.DistanceTo(goal) <= FreeKickPack ? 1 : 0;
+
+            if (arrived <= last && motion.TimeOf(last) - motion.TimeOf(arrived) >= SettledFor * pace)
+            {
+                var path = 0.0;
+
+                for (var record = arrived + 1; record <= last; record++)
+                {
+                    path += new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity))
+                        .DistanceTo(new Vec(motion.PlayerX(record - 1, entity), motion.PlayerY(record - 1, entity)));
+                }
+
+                settledMotion.Add(path / ((motion.TimeOf(last) - motion.TimeOf(arrived)) / pace));
+                settled++;
+            }
+
+            if (FilmRoster.SideOf(entity) != attacking)
+            {
+                continue;
+            }
+
+            if (hold.Formation == FormationMode.Corner)
+            {
+                if (Math.Abs(point.X - goal.X) <= BoxDepth && Math.Abs(point.Y - goal.Y) <= BoxHalfWidth)
+                {
+                    cornerMarks.Add(HasMarker(context, roster, motion, last, entity, attacking));
+                }
+            }
+            else if (point.DistanceTo(goal) <= FreeKickPack)
+            {
+                freeKickMarks.Add(HasMarker(context, roster, motion, last, entity, attacking));
+            }
+        }
+
+        if (players > 0)
+        {
+            settledShare.Add((double)settled / players);
+            (hold.Formation == FormationMode.Corner ? cornerGoalPack : freeKickGoalPack).Add(nearGoal);
+        }
     }
 
     /// <summary>
@@ -780,12 +1127,29 @@ internal static class FilmMeasure
         }
     }
 
+    /// <summary>How many players were looked at for a marker, and how many had one.</summary>
+    private sealed class MarkCount
+    {
+        private int _marked;
+        private int _total;
+
+        public double Share => _total == 0 ? 0.0 : (double)_marked / _total;
+
+        public void Add(bool marked)
+        {
+            _marked += marked ? 1 : 0;
+            _total++;
+        }
+    }
+
     /// <summary>A running mean.</summary>
     private sealed class Average
     {
         private double _sum;
 
         public int Count { get; private set; }
+
+        public double Sum => _sum;
 
         public double Value => Count == 0 ? 0.0 : _sum / Count;
 

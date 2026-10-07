@@ -150,6 +150,18 @@ internal sealed class FilmShape
     /// <summary>How many defenders a side needs before it leaves one up the pitch as an outlet at a corner (`replay-v6`).</summary>
     private const int CornerOutletFrom = 5;
 
+    /// <summary>The nearest to his line the keeper of the side without the ball stands, in metres (`replay-v12`).</summary>
+    private const double DefendingKeeperLine = 1.5;
+
+    /// <summary>How much further out the keeper of the side without the ball stands for each metre the ball is from him (`replay-v12`).</summary>
+    private const double DefendingKeeperSlope = 0.01;
+
+    /// <summary>The furthest from his line the keeper of the side without the ball stands, in metres (`replay-v12`).</summary>
+    private const double DefendingKeeperFar = 2.5;
+
+    /// <summary>How far from his line the corner-taking side's keeper stands, in metres: the reference has him near halfway (`replay-v12`).</summary>
+    private const double CornerKeeperOff = 28.0;
+
     /// <summary>How far from the ball the defence stands at a free kick, in metres: a little over the 9.15 the rules ask for (`replay-v6`).</summary>
     private const double FreeKickGap = 9.5;
 
@@ -204,6 +216,10 @@ internal sealed class FilmShape
     private static readonly (double Along, double Across)[] CornerZones = [(5.0, 6.5), (5.0, -0.8), (5.5, -8.0)];
     private static readonly (double Along, double Across) CornerDefendersEdge = (17.0, 1.0);
     private static readonly (double Along, double Across) CornerOutlet = (46.0, -12.0);
+
+    // How far from his line the keeper of the side with the ball stands, as metres from the goal line the ball is and metres
+    // off the line he stands, joined by straight lines (`replay-v12`). The first rung is where the build-up ends.
+    private static readonly (double Depth, double Off)[] KeeperLadder = [(BuildUpDepth, 3.1), (52.5, 13.0), (80.0, 20.0), (105.0, 28.0)];
 
     private readonly FilmContext _context;
 
@@ -327,12 +343,12 @@ internal sealed class FilmShape
         switch (state.Mode)
         {
             case FormationMode.KickOff:
-                FillOpen(roster, state.Side, FilmSpace.Centre, targets, separate: false);
+                FillOpen(roster, state.Side, FilmSpace.Centre, targets, separate: false, keeperUp: false);
                 ArrangeKickOff(roster, state, targets);
                 break;
 
             case FormationMode.Corner:
-                FillOpen(roster, state.Side, FilmSpace.Centre, targets, separate: false);
+                FillOpen(roster, state.Side, FilmSpace.Centre, targets, separate: false, keeperUp: false);
                 ArrangeCorner(roster, state, targets);
                 break;
 
@@ -353,17 +369,17 @@ internal sealed class FilmShape
                 break;
 
             case FormationMode.Penalty:
-                FillOpen(roster, state.Side, FilmSpace.Centre, targets, separate: false);
+                FillOpen(roster, state.Side, FilmSpace.Centre, targets, separate: false, keeperUp: false);
                 ArrangePenalty(roster, state, targets);
                 break;
 
             case FormationMode.GoalKick:
-                FillOpen(roster, state.Side, state.Anchor, targets, separate: false);
+                FillOpen(roster, state.Side, state.Anchor, targets, separate: false, keeperUp: false);
                 ArrangeGoalKick(roster, state, targets);
                 break;
 
             case FormationMode.Celebration:
-                FillOpen(roster, state.Side, state.Anchor, targets, separate: false);
+                FillOpen(roster, state.Side, state.Anchor, targets, separate: false, keeperUp: false);
                 ArrangeCelebration(roster, state, targets);
                 break;
 
@@ -412,11 +428,12 @@ internal sealed class FilmShape
     /// <param name="focus">The point the block follows.</param>
     /// <param name="targets">The targets, written in place.</param>
     /// <param name="separate">Whether to keep any two outfield players apart; set pieces place their own.</param>
-    public void FillOpen(FilmRoster roster, MatchSide possession, Vec focus, Vec[] targets, bool separate = true)
+    /// <param name="keeperUp">Whether the keeper of the side with the ball comes up the pitch with it (`replay-v12`); a restart whose focus is not the ball keeps him home.</param>
+    public void FillOpen(FilmRoster roster, MatchSide possession, Vec focus, Vec[] targets, bool separate = true, bool keeperUp = true)
     {
         foreach (var side in new[] { MatchSide.Home, MatchSide.Away })
         {
-            FillSide(roster, side, possession, focus, targets);
+            FillSide(roster, side, possession, focus, targets, keeperUp && side == possession);
         }
 
         if (separate)
@@ -425,7 +442,7 @@ internal sealed class FilmShape
         }
     }
 
-    private void FillSide(FilmRoster roster, MatchSide side, MatchSide possession, Vec focus, Vec[] targets)
+    private void FillSide(FilmRoster roster, MatchSide side, MatchSide possession, Vec focus, Vec[] targets, bool keeperUp)
     {
         var phaseIndex = side == possession ? 1 : 0;
         var ballDepth = FilmSpace.Attacking(focus, side);
@@ -493,7 +510,7 @@ internal sealed class FilmShape
 
             if (_context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
             {
-                targets[entity] = KeeperOn(side, focus);
+                targets[entity] = KeeperOn(side, focus, keeperUp);
 
                 continue;
             }
@@ -578,17 +595,56 @@ internal sealed class FilmShape
         }
     }
 
-    /// <summary>Gets where a goalkeeper stands: on the line between the ball and the goal, further out the further the ball is.</summary>
+    /// <summary>
+    /// Gets where a goalkeeper stands: on the line between the ball and the goal. A keeper whose side defends stays
+    /// close to his line (`replay-v12`); one whose side has the ball in the other half comes up the pitch with it, which
+    /// <see cref="KeeperUp"/> says how far.
+    /// </summary>
     /// <param name="side">The goalkeeper's side.</param>
     /// <param name="ball">The ball.</param>
-    public static Vec KeeperOn(MatchSide side, Vec ball)
+    /// <param name="inPossession">Whether the keeper's side has the ball.</param>
+    public static Vec KeeperOn(MatchSide side, Vec ball, bool inPossession = false)
     {
         var goal = FilmSpace.OwnGoal(side);
         var toBall = ball - goal;
         var distance = toBall.Length;
-        var off = double.Clamp(1.0 + (0.06 * distance), 1.5, 8.0);
+        var depth = FilmSpace.Attacking(ball, side);
+
+        var off = inPossession
+            ? KeeperUp(depth)
+            : double.Clamp(DefendingKeeperLine + (DefendingKeeperSlope * distance), DefendingKeeperLine, DefendingKeeperFar);
 
         return FilmSpace.Clamp(goal + (toBall.Unit() * off), 0.5);
+    }
+
+    /// <summary>
+    /// Gets how far from his line the keeper of the side with the ball stands, by how far up the pitch the ball is
+    /// (`replay-v12`): near the line while the side builds from the back, about thirteen metres at halfway, and twenty
+    /// or more with the ball in the other side's third, as the reference shows him.
+    /// </summary>
+    /// <param name="ballDepth">Metres from the keeper's own goal line to the ball.</param>
+    private static double KeeperUp(double ballDepth)
+    {
+        if (ballDepth < BuildUpDepth)
+        {
+            return double.Clamp(1.0 + (0.06 * ballDepth), 1.5, 8.0);
+        }
+
+        var from = KeeperLadder[0];
+
+        for (var rung = 1; rung < KeeperLadder.Length; rung++)
+        {
+            var to = KeeperLadder[rung];
+
+            if (ballDepth <= to.Depth)
+            {
+                return from.Off + ((to.Off - from.Off) * ((ballDepth - from.Depth) / (to.Depth - from.Depth)));
+            }
+
+            from = to;
+        }
+
+        return from.Off;
     }
 
     /// <summary>Gets the point a player with the given attacking-frame coordinates stands at.</summary>
@@ -794,6 +850,7 @@ internal sealed class FilmShape
         }
 
         KeepKeeper(roster, defending, targets, 1.2);
+        KeepKeeper(roster, attacking, targets, CornerKeeperOff);
     }
 
     /// <summary>Chooses who stays back against a break: the most central defenders, then the deepest midfielder, then the deepest left.</summary>
@@ -1204,7 +1261,7 @@ internal sealed class FilmShape
         var restart = new ShapeState(FormationMode.KickOff, opponents, FilmSpace.Centre);
         var kickOff = new Vec[FilmRoster.Size];
 
-        FillOpen(roster, opponents, FilmSpace.Centre, kickOff, separate: false);
+        FillOpen(roster, opponents, FilmSpace.Centre, kickOff, separate: false, keeperUp: false);
         ArrangeKickOff(roster, restart, kickOff);
 
         for (var entity = 0; entity < FilmRoster.Size; entity++)

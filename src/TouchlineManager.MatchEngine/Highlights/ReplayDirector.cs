@@ -28,7 +28,7 @@ namespace TouchlineManager.MatchEngine.Highlights;
 public static class ReplayDirector
 {
     /// <summary>The version label of this presentation.</summary>
-    public const string Version = "replay-v11";
+    public const string Version = "replay-v12";
 
     /// <summary>The most times the film is played again to let its pace settle.</summary>
     private const int MaxSettlingRuns = 4;
@@ -743,4 +743,64 @@ public sealed record ShapeMetrics
 
     /// <summary>Gets, as a penalty is about to be taken, the ninety-fifth percentile of the number of players other than the taker and the keepers inside the arc or the box.</summary>
     public required double PenaltyIntrudersP95 { get; init; }
+
+    /// <summary>Gets the median number of outfield players, both sides, within ten metres of the ball in open play (`replay-v12` baseline).</summary>
+    public required double PackWithin10mP50 { get; init; }
+
+    /// <summary>Gets the median number of outfield players, both sides, within twenty-five metres of the ball in open play: the reference has sixteen to eighteen of twenty.</summary>
+    public required double PackWithin25mP50 { get; init; }
+
+    /// <summary>Gets, in open play, the share of the attacking side's outfield players within ten metres of the ball who have a defender within a metre and a half: the two dots touch.</summary>
+    public required double MarkedShare { get; init; }
+
+    /// <summary>Gets, as a corner is delivered, the share of the taking side's players in the box who have such a marker.</summary>
+    public required double CornerMarkedShare { get; init; }
+
+    /// <summary>Gets, as a free kick is about to be taken, the share of the taking side's players within twenty-five metres of the goal who have such a marker.</summary>
+    public required double FreeKickMarkedShare { get; init; }
+
+    /// <summary>Gets how fast the outfield players more than twenty-five metres from the ball move in open play, in metres per second of film.</summary>
+    public required double FarPlayerMotion { get; init; }
+
+    /// <summary>Gets, in open play, the mean number of outfield players more than twenty-five metres from the ball.</summary>
+    public required double FarPlayerCount { get; init; }
+
+    /// <summary>Gets how far from his goal line the keeper of the side with the ball stands, by how far up the pitch the ball is, in metres.</summary>
+    public required DepthBands AttackKeeperOffLine { get; init; }
+
+    /// <summary>Gets how far from his goal line the keeper of the side without the ball stands, by how far up the pitch the ball is, in metres.</summary>
+    public required DepthBands DefendKeeperOffLine { get; init; }
+
+    /// <summary>Gets how many waiting set pieces, corners and free kicks, were measured.</summary>
+    public required int SetPieceHolds { get; init; }
+
+    /// <summary>Gets how long a set piece waits before it is taken, on average, in seconds of film.</summary>
+    public required double SetPieceHoldSeconds { get; init; }
+
+    /// <summary>Gets the mean share of the waiting outfield players who have settled in their places, within a metre of where they end up for at least a third of a second, before the kick.</summary>
+    public required double SetPieceSettledShare { get; init; }
+
+    /// <summary>Gets how fast the players who have settled in their places move about while the set piece waits, in metres per second of film: nought is frozen, the reference drifts a metre or two every few seconds.</summary>
+    public required double SetPieceSettledMotion { get; init; }
+
+    /// <summary>Gets, as a corner is about to be taken, the median number of outfield players, both sides, within twenty-five metres of the goal: the reference has most of them there.</summary>
+    public required double CornerGoalPackP50 { get; init; }
+
+    /// <summary>Gets, as a free kick is about to be taken, the median number of outfield players, both sides, within twenty-five metres of the goal.</summary>
+    public required double FreeKickGoalPackP50 { get; init; }
+
+    /// <summary>Gets how many steps had a carrier running a wing with the defence to be measured against.</summary>
+    public required int WingCarrySamples { get; init; }
+
+    /// <summary>Gets, in those steps, the median number of defenders within ten metres of the carrier and behind him: chasing.</summary>
+    public required double ChasersP50 { get; init; }
+
+    /// <summary>Gets, in those steps, the share with three or more chasers.</summary>
+    public required double ChasersShare { get; init; }
 }
+
+/// <summary>A distance measured three times, by how far up the pitch the ball is (`replay-v12` baseline).</summary>
+/// <param name="Own">While the ball is in the first third of the side's own scale, in metres.</param>
+/// <param name="Middle">While it is in the middle third, in metres.</param>
+/// <param name="Final">While it is in the last third, in metres.</param>
+public sealed record DepthBands(double Own, double Middle, double Final);

@@ -175,6 +175,29 @@ were. Measured over 300 matches: pace 2.65x (2.63x), inside the band 93.0% (94.3
 The one that moves is the ball standing still outside holds: 3.4% at p50 and 4.4% at p95 (2.8% and 3.5%), against a
 target of 5%.
 
+### Follow-up: the keeper comes up with the ball (`replay-v12`)
+
+`ReplayDirector.Version` is `replay-v12`, so a film cached under `replay-v11` is fetched again. Film only; the engine,
+the golden hashes and the calibration do not move.
+
+Counted against the Football Manager reference clips, the keepers were the clearest gap: the attacking keeper stood 4 m
+off his line wherever the ball was (reference 12 to 14 m with the ball at halfway, 15 to 30 m inside 25 m of goal), and
+the defending keeper 4 to 5 m off it (reference about 2 m). Now:
+
+- **The keeper of the side with the ball comes up with it.** About 3 m while his side builds from the back (ball inside
+  35 m of his goal line), 13 m with the ball at halfway, 20 m with it 25 m from the other goal and 28 m at the far goal
+  line, joined by straight lines so he never jumps. At a corner his side takes he stands 28 m out.
+- **The keeper of the side without it stays home**: 1.5 m off his line, up to 2.5 m with the ball far away. A turnover
+  sends him back at the shape speed like anybody else.
+- A restart whose focus is not the ball (kick-off, penalty, goal kick, celebration) keeps him home as before.
+
+Measured over 300 matches, keeper off his line by third of the pitch the ball is in (own / middle / final): attacking
+4.4 / 3.8 / 4.5 m before, 4.0 / 7.9 / 15.9 m now; defending 5.2 / 4.3 / 3.6 m before, 11.3 / 5.3 / 2.3 m now (the first
+figure is the keeper still walking back after his side lost the ball far up the pitch). Pace 2.65x, film length, moves
+lengthened (16.9%), ball still outside holds (3.4% / 4.3%), crowding and every other shape metric as before. A keeper is
+nearer to the goal line, so a shot that goes wide ends 2.5 m from him at p05, not 3.0 m: the benchmark's target now reads
+2.5 m, as the test always did. The keeper as a strike arrives is 4.0 m from the goal mouth at p95 as before.
+
 ### Known gaps
 
 Crowding is reduced, not gone: a run of 3 to 10 m passes keeps the passer, the receiver and the next receiver within a

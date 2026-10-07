@@ -171,3 +171,9 @@ Teleports outside cuts stay at 0, no speed cap is exceeded, and the payload ladd
 | Remove the challenger so no more than three players are ever near the ball | Nobody would then press the carrier. The lone carrier in screenshots 3 and 7 is where no opponent is near, which the roles allow. |
 | Fix the fixtures' transposed axes | Calibration and the goldens are fitted to them. The film measures restand the slots (`OnTheBoard`) instead. |
 | Keep `replay-v5` because it is unreleased | A harmless version bump removes any doubt about a stale cached film. |
+
+*Amended in `replay-v12`.* Counted against the reference clips, the keeper of the side with the ball stood about 4 m off his
+line wherever the ball was, where the reference has him 12 to 14 m out at halfway and 15 to 30 m inside 25 m of goal, and the
+keeper of the side without it stood 4 to 5 m off where the reference has about 2 m. The film now stands the first on a ladder
+of the ball's depth (3 m while his side builds from the back, 13 m at halfway, 28 m at the far goal line, 28 m at a corner
+his side takes) and the second 1.5 to 2.5 m off his line. Restarts whose focus is not the ball keep him home.
