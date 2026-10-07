@@ -188,3 +188,15 @@ sides begin to take up a free kick at the foul; and a corner or a penalty is hel
 a pace of 2.68x (2.65x) and 89.7% of matches inside the band (92.3%). A pack of a free kick from 30 m or more out still has about a
 quarter of its players arriving at the strike, because a player covers about 28 m in the 4.5 s the foul and the hold last at 8 m/s; settling
 them would cost more pace, and was left for the viewer to judge.
+
+*Amended in `replay-v14`.* Counted against the reference clips, a carrier running a wing in the attacking half was chased by nobody
+(three or more defenders within 10 m behind him in 0.4% of the steps), where one reference carry has three strung out behind him; a
+second has none. The film now sends up to three free defenders (within 25 m, no more than 8 m ahead of the ball) to trail him in a
+diagonal line, using the role slots a flank attack never filled. It reaches 2.8% of the steps and leaves the median at none: the
+defenders about the ball are mostly the challenger, the cover or a pin already, and turning the ones ahead of him round was not tried
+on two reference carries.
+
+*Amended in `replay-v15`.* The reference corner is a low ball driven in at about 35 m/s on screen; ours was a lofted cross
+(`ZArc` 55) at about 47 m/s of film. The delivery of a corner is now driven in at head height (`ZArc` 18) at its own speed, 33.7
+m/s of film. The balls in open play keep their speeds: the film is a fixed length, so a slower ball only raises the pace it is
+played at (the lofted ball 44 to 40 m/s of film for a pace of 2.68x to 2.89x and 55% of the films inside the band).

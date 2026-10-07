@@ -432,6 +432,9 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets the speed of a cross.</summary>
     public double CrossMetresPerSecond { get; init; } = 21.0;
 
+    /// <summary>Gets the speed of a corner: a low, fast ball from the flag, about 37 m/s of film at the usual pace, where the reference is about 35 (`replay-v15`).</summary>
+    public double CornerMetresPerSecond { get; init; } = 14.0;
+
     /// <summary>Gets the speed of a clearance.</summary>
     public double ClearanceMetresPerSecond { get; init; } = 24.0;
 

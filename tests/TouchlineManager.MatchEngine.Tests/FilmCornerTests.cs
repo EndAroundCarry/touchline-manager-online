@@ -405,6 +405,43 @@ public sealed class FilmCornerTests
         sixYard.Should().BeLessThanOrEqualTo(8, "a crowded six-yard box is a handful of players, not a queue");
     }
 
+    [Fact]
+    public void A_corner_is_driven_in_low_and_fast_and_nothing_else_is_given_a_corner_ball()
+    {
+        int corners = 0, others = 0;
+        var options = new HighlightOptionsV1();
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var input = TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed));
+            var (result, _, script) = TestMatchFactory.Script(input);
+            var context = new FilmContext(input, result, TestMatchFactory.Rules, options);
+
+            foreach (var beat in script.Beats.Where(candidate => !candidate.IsHold))
+            {
+                if (!beat.CornerKick)
+                {
+                    others++;
+
+                    continue;
+                }
+
+                corners++;
+                beat.Kind.Should().Be(BeatKind.Cross, "it is the delivery into the box");
+                beat.Formation.Should().Be(FormationMode.Corner);
+                beat.ZArc.Should().BeLessThan(30.0, "a lofted cross arcs 55; the corner is a low ball");
+
+                var travel = FilmTiming.NaturalSeconds(context, beat) - options.ControlSeconds;
+                var speed = beat.Distance / travel;
+
+                speed.Should().BeApproximately(options.CornerMetresPerSecond, 0.01 + (options.CornerMetresPerSecond * 0.02), "it is played at the corner's own speed, not a cross's");
+            }
+        }
+
+        corners.Should().BeGreaterThan(10, "a corner is delivered into the box in most matches");
+        others.Should().BeGreaterThan(corners);
+    }
+
     private static bool InTheBox(Vec point) =>
         Math.Abs(point.X - FilmSpace.Length) <= 16.5 && Math.Abs(point.Y - (FilmSpace.Width / 2)) <= 20.2;
 

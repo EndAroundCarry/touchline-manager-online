@@ -118,7 +118,7 @@ internal static class FilmMeasure
     {
         var options = context.Options;
         var ballLimit = Math.Max(options.ShotMetresPerSecond, options.ClearanceMetresPerSecond) * 1.05;
-        var speeds = new Dictionary<BeatKind, List<double>>();
+        var speeds = new Dictionary<string, List<double>>(StringComparer.Ordinal);
         var teleports = 0;
         double still = 0;
         double moving = 0;
@@ -145,10 +145,13 @@ internal static class FilmMeasure
 
             natural += beat.NaturalSeconds;
 
-            if (!speeds.TryGetValue(beat.Kind, out var list))
+            // A corner is counted on its own (`replay-v15`): it is a cross by kind, but it is not played like one.
+            var key = beat.CornerKick ? "Corner" : beat.Kind.ToString();
+
+            if (!speeds.TryGetValue(key, out var list))
             {
                 list = [];
-                speeds[beat.Kind] = list;
+                speeds[key] = list;
             }
 
             for (var record = span.FirstRecord + 1; record <= span.LastRecord; record++)
@@ -229,7 +232,7 @@ internal static class FilmMeasure
             BallSpeeds = speeds
                 .Where(pair => pair.Value.Count > 0)
                 .ToDictionary(
-                    pair => pair.Key.ToString(),
+                    pair => pair.Key,
                     pair => Summarize(pair.Value),
                     StringComparer.Ordinal),
             PayloadRung = rung,

@@ -71,7 +71,7 @@ internal static class FilmTiming
             BeatKind.Carry => length / CarrySpeed(context, beat),
             BeatKind.Pass => (length / options.PassMetresPerSecond) + control,
             BeatKind.LoftedPass => (length / options.LoftedPassMetresPerSecond) + control,
-            BeatKind.Cross => (length / options.CrossMetresPerSecond) + control,
+            BeatKind.Cross => (length / (beat.CornerKick ? options.CornerMetresPerSecond : options.CrossMetresPerSecond)) + control,
             BeatKind.Clearance => (length / options.ClearanceMetresPerSecond) + control,
             BeatKind.Shot => (length / (beat.Headed ? options.HeaderMetresPerSecond : options.ShotMetresPerSecond)) + control,
             BeatKind.Header => HeaderSeconds,

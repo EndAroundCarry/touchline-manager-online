@@ -229,6 +229,29 @@ internal sealed class FilmMotion
     /// <summary>How far from the goal line the edge of the box is, in metres.</summary>
     private const double EdgeOfBox = 20.0;
 
+    /// <summary>The first of the slots the defenders take to trail a carrier running a wing (`replay-v14`); the box defenders' slots, which a wing attack does not use.</summary>
+    private const int ChaserSlot = 8;
+
+    /// <summary>How many defenders trail a carrier running a wing, at the most (`replay-v14`).</summary>
+    private const int Chasers = 3;
+
+    /// <summary>How far behind the carrier the nearest of the defenders trailing him stands, in metres (`replay-v14`). The place is pushed out to the zone the ball keeps clear, so the nearest is about 6.5 m off.</summary>
+    private const double ChaseBehind = 5.0;
+
+    /// <summary>How much further back each next of the defenders trailing him stands, in metres.</summary>
+    private const double ChaseSpacing = 2.2;
+
+    /// <summary>How far the nearest of the defenders trailing him stands toward the middle of the pitch, in metres, and how much further each next does, so that they string out in a diagonal.</summary>
+    private const double ChaseInside = 1.0;
+
+    private const double ChaseInsideStep = 1.0;
+
+    /// <summary>How far from the carrier a defender may be to be sent after him, in metres: only those who are already about him run with him.</summary>
+    private const double ChaseRecruit = 25.0;
+
+    /// <summary>How far ahead of the carrier, in metres, a defender may be and still be sent after him: he is level with him or about to be beaten.</summary>
+    private const double ChaseAhead = 8.0;
+
     /// <summary>How far the play can move from a presser or supporter before somebody else takes the role, in metres.</summary>
     private const double RoleRadius = 16.0;
 
@@ -1277,6 +1300,15 @@ internal sealed class FilmMotion
             _specs[6] = new Spec(attacking, RoleWants.Any, Place(attacking, Math.Min(FilmSpace.Length - EdgeOfBox, ballDepth - 6.0), (FilmSpace.Width / 2) + (outward * 4.0)), false, false);
             _specs[7] = new Spec(attacking, RoleWants.Any, Place(attacking, Math.Min(FilmSpace.Length - 14.0, Math.Max(ballDepth + 4.0, 60.0)), (FilmSpace.Width / 2) + (open * 22.0)), false, false);
 
+            // The free defenders about the carrier, and level with him or behind, trail him in a diagonal line, each a little
+            // further back and further in: the ones that are already on a role or a pin keep it (`replay-v14`).
+            for (var chaser = 0; chaser < Chasers; chaser++)
+            {
+                var point = focus + new Vec(-d * (ChaseBehind + (chaser * ChaseSpacing)), open * (ChaseInside + (chaser * ChaseInsideStep)));
+
+                _specs[ChaserSlot + chaser] = new Spec(defending, RoleWants.Trailing, FilmSpace.Clamp(point, 1.5), false, true, true);
+            }
+
             return;
         }
     }
@@ -1391,6 +1423,14 @@ internal sealed class FilmMotion
         if (spec.Wants == RoleWants.SameLine && !relaxed && _roles[0] >= 0)
         {
             return line == _shape.LineOf(_roles[0], inPossession);
+        }
+
+        if (spec.Wants == RoleWants.Trailing)
+        {
+            var carrierSide = MatchInputV1.OpponentOf(spec.Side);
+            var here = new Vec(_px[entity], _py[entity]);
+
+            return here.DistanceTo(focus) <= ChaseRecruit && FilmSpace.Attacking(here, carrierSide) <= FilmSpace.Attacking(focus, carrierSide) + ChaseAhead;
         }
 
         return true;
@@ -1784,6 +1824,9 @@ internal sealed class FilmMotion
 
         /// <summary>Whoever is nearest, from the front line.</summary>
         FrontLine = 3,
+
+        /// <summary>Whoever is nearest, from those who are about the ball and level with it or behind it (`replay-v14`).</summary>
+        Trailing = 4,
     }
 
     /// <summary>One role for a beat.</summary>

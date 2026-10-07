@@ -47,6 +47,9 @@ internal static class FilmScript
     /// <summary>How far a challenge the carrier comes through pushes the ball on, in metres.</summary>
     private const double DuelPush = 2.5;
 
+    /// <summary>How high above the chord a corner arcs, where the crossbar is thirty: a ball driven in at head height (`replay-v15`, a cross is 55).</summary>
+    private const double CornerArc = 18.0;
+
     /// <summary>The altitude at which a ball is headed.</summary>
     private const double HeaderContactZ = 30.0;
 
@@ -651,6 +654,14 @@ internal static class FilmScript
 
             beat.ZTo = to.HasHeader ? HeaderContactZ : 0;
             beat.ZArc = cross ? 55 : Math.Min(50, 12 + (0.9 * start.DistanceTo(to.Point)));
+
+            // The corner itself is a low, fast ball into the box, not a lofted cross (`replay-v15`).
+            if (cross && from.Kind == PassageWaypointKind.Restart && state.Source.Outcome is PassageOutcome.CornerCleared or PassageOutcome.CornerHeaded)
+            {
+                beat.CornerKick = true;
+                beat.ZArc = CornerArc;
+            }
+
             state.Add(beat);
 
             SetHolder(state, to.HasHeader ? to.Holder : receiver, pending: pending);

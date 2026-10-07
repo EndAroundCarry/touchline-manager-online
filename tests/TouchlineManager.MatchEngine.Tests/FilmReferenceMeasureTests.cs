@@ -172,6 +172,25 @@ public sealed class FilmReferenceMeasureTests
     }
 
     [Fact]
+    public void Defenders_trail_a_carrier_running_a_wing_more_than_they_did_but_no_closer_than_the_ball_keeps_clear()
+    {
+        double share = 0, crowded = 0;
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var shape = ShapeOf(seed);
+
+            share += shape.ChasersShare;
+            crowded += shape.CrowdedShare;
+        }
+
+        // replay-v13 had three or more of them behind him in 0.4 % of the steps; the reference has three in the one carry counted
+        // and none in the other, and the free defenders about him are few (the rest are on roles and pins), so the aim is a few per cent.
+        (share / Seeds).Should().BeGreaterThan(0.015, "the nearest free defenders string out behind a carrier running a wing");
+        (crowded / Seeds).Should().BeLessThan(0.06, "and they stand outside the zone the ball keeps clear, so the crowding does not grow (replay-v13: 4.2 %)");
+    }
+
+    [Fact]
     public void The_measures_are_the_same_every_time_the_film_is_built()
     {
         var first = ShapeOf(3);

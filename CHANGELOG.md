@@ -238,6 +238,54 @@ The players who cannot get there are the ones who have to run the furthest, and 
 a spot 30 m or more out is still arriving for about a quarter of its players: a player covers about 28 m in 4.5 s at 8 m/s,
 and the foul and the hold together last about that long. Longer holds would settle the rest at the cost of pace.
 
+### Follow-up: defenders trail a wing carrier (`replay-v14`)
+
+`ReplayDirector.Version` is `replay-v14`, so a film cached under `replay-v13` is fetched again. Film only; the engine,
+the golden hashes and the calibration do not move.
+
+Counted against the Football Manager reference clips, a carrier running a wing in the attacking half was chased by nobody in
+ours (three or more defenders within 10 m behind him in 0.4% of the steps; median none), where one reference carry has three
+strung out behind him in a diagonal line. A second reference carry (`corner_defender_deflection`, the winger before the corner)
+has none within 15 m, so the reference is one carry with three and one with none, not a rule. Now, on a flank attack past
+50 m from the attackers' goal line, up to three **free** defenders (within 25 m of the ball and no more than 8 m ahead of it)
+are sent to trail him, each 2.2 m further back and 1 m further in than the last, the first at the edge of the zone the ball
+keeps clear (about 6.5 m). They take the three spare role slots a flank attack never used (the box defenders'), so nothing
+else in the shape changes: `ClearZone`, `Elbow` and `MinSpacing` are as they were.
+
+Measured over 300 matches (before): three or more behind a wing carrier within 10 m in 2.8% of the steps (0.4%); the median
+is still none, because the defenders about the ball are mostly already the challenger, the cover or a pin, and a defender
+ahead of the carrier is not turned round to chase him. Pace 2.68x, inside its band for 89.7%, the film 10.1 min, ball still
+outside holds 3.4% / 4.3%, moves lengthened 16.8% (16.9), crowding (5 or more within 5 m 4.3%, 4 or more within 3 m 2.8%) and
+every other shape metric as before, within a tenth. Getting to the reference's three at the median would mean taking defenders
+off those roles, which is a change to how the film defends and was not done on two reference carries.
+
+### Follow-up: the corner is a low, fast ball (`replay-v15`)
+
+`ReplayDirector.Version` is `replay-v15`, so a film cached under `replay-v14` is fetched again. Film only; the engine,
+the golden hashes and the calibration do not move.
+
+The reference corner is a low ball driven in from the flag at about 35 m/s on screen. Ours was a `Cross` with `ZArc` 55 at
+21 m/s of real time, about 47 m/s of film and lofted. The delivery of a corner (`FilmBeat.CornerKick`, set in
+`FilmScript.ScriptDelivery` for a ball into the box from a corner) is now driven in at head height (`ZArc` 18, a lofted
+cross is 55) at its own `CornerMetresPerSecond` = 14, which is about 34 m/s of film at the usual pace. Free-kick crosses
+and open-play crosses are as they were. The ball-speed table of the benchmark now lists `Corner` on its own.
+
+**Why the other balls were not slowed.** The plan asked for lofted balls, crosses and clearances nearer the reference's
+35 m/s of film (ours 44 to 50) and for the ground pass nearer 18 (ours 25). The film is a fixed length, so a ball that is
+slower in real time only raises the pace the whole film is played at: taking the ground pass from 15 to 12 m/s, the lofted
+ball from 20 to 16, the cross from 21 to 16.5 and the clearance from 24 to 19 moved the lofted ball from 44 to 40 m/s of
+film and the ground pass from 24.7 to 24.1, while the pace went from 2.68x to 2.89x (p95 3.00x, max 3.18x, over the ceiling),
+the share of films inside the 1.8x to 2.9x band from 89.7% to 55%, crowding up (5 or more within 5 m 4.3% to 4.8%) and the
+keeper at a wide ball down to 2.0 m (target 2.5). A milder cut (lofted 18, cross 18.5, clearance 21.5) moved the lofted ball
+to 41.5 and the band to 81%. The speeds of a ball are therefore left as they were: to bring them to the reference the film
+would have to be longer (the 9:30 to 11:00 window is the user's), or the pace band wider.
+
+Measured over 300 matches (before): corner ball 33.7 m/s of film at p50 (reference about 35; the cross row, which had the
+corners in it, 46.6 to 42.6). Pace 2.69x (2.68x), inside its band 87.7% (89.7%: a few films on the edge of the band tip over
+because a corner now takes less time), the film 10.1 min, ball still outside holds 3.4% / 4.3%, moves lengthened 16.6% (16.8%),
+crowding, the keeper, the corner, the wall and the set pieces as before. `ReplayDirectorTests` allows 70% of 24 matches in
+band (it allowed 75%).
+
 ### Known gaps
 
 Crowding is reduced, not gone: a run of 3 to 10 m passes keeps the passer, the receiver and the next receiver within a

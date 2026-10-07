@@ -306,6 +306,9 @@ internal sealed class FilmBeat
     /// <summary>Gets how far above the chord from the start altitude to the end altitude the ball arcs.</summary>
     public double ZArc { get; set; }
 
+    /// <summary>Gets or sets whether the beat is the corner itself: a low, fast ball from the flag (`replay-v15`).</summary>
+    public bool CornerKick { get; set; }
+
     /// <summary>Gets the player who plays the ball, or has it at the start of the beat.</summary>
     /// <remarks>Null until the motion has chosen them, when <see cref="ActorSource"/> says they are not named.</remarks>
     public Guid? Actor { get; set; }
