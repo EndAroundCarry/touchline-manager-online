@@ -231,6 +231,22 @@ internal sealed class FilmShape
     // A goal kick, as metres from the side's own goal line and metres either side of the middle of the pitch: the side taking
     // it spreads out, its back line at the edge of its box; the side receiving it steps up to the halfway line (`replay-v6`).
     private const double GoalKickBack = 18.0;
+
+    /// <summary>
+    /// Where the side taking a throw-in stands in front of the thrower, as metres along the pitch towards the goal it attacks
+    /// and metres in from the touchline (`replay-v16`): a pocket of four within fifteen metres of him, as the reference
+    /// shows five of a side around the thrower.
+    /// </summary>
+    private static readonly (double Along, double In)[] ThrowInPocket = [(4.0, 6.0), (-4.0, 9.0), (10.0, 10.0), (0.0, 15.0)];
+
+    /// <summary>How far goal-side of the man he marks a defender stands at a throw-in, in metres (`replay-v16`).</summary>
+    private const double ThrowInMarkAlong = 1.2;
+
+    /// <summary>How far towards the touchline of the man he marks a defender stands at a throw-in, in metres (`replay-v16`).</summary>
+    private const double ThrowInMarkIn = 0.8;
+
+    /// <summary>How near the thrower anybody else stands at a throw-in, in metres (`replay-v16`).</summary>
+    private const double ThrowInClear = 4.0;
     private const double GoalKickFront = 56.0;
     private const double GoalKickBackHalfWidth = 26.0;
     private const double GoalKickFrontHalfWidth = 18.0;
@@ -418,6 +434,11 @@ internal sealed class FilmShape
             case FormationMode.GoalKick:
                 FillOpen(roster, state.Side, state.Anchor, targets, separate: false, keeperUp: false);
                 ArrangeGoalKick(roster, state, targets);
+                break;
+
+            case FormationMode.ThrowIn:
+                FillOpen(roster, state.Side, state.Anchor, targets, separate: false);
+                ArrangeThrowIn(roster, state, targets);
                 break;
 
             case FormationMode.Celebration:
@@ -1261,6 +1282,85 @@ internal sealed class FilmShape
                 targets[ordered[index]] = FilmSpace.Clamp(Frame(MatchInputV1.OpponentOf(side), depth, across), LineMargin);
             }
         }
+    }
+
+    /// <summary>
+    /// Sets a throw-in (`replay-v16`): the thrower on the line, four of his side in the pocket in front of him, and a defender
+    /// goal-side of each, as the reference has them; everybody else stays in the block, a few metres from the thrower.
+    /// The players are the ones nearest their places, so the block is not rearranged to fill it.
+    /// </summary>
+    private void ArrangeThrowIn(FilmRoster roster, ShapeState state, Vec[] targets)
+    {
+        var attacking = state.Side;
+        var defending = MatchInputV1.OpponentOf(attacking);
+        var direction = FilmSpace.Direction(attacking);
+        var inward = state.Anchor.Y < FilmSpace.Width / 2 ? 1.0 : -1.0;
+        var taker = PlaceTaker(roster, state, targets);
+        var placed = new bool[FilmRoster.Size];
+
+        if (taker >= 0)
+        {
+            placed[taker] = true;
+        }
+
+        foreach (var (along, pocket) in ThrowInPocket)
+        {
+            var place = FilmSpace.Clamp(new Vec(state.Anchor.X + (along * direction), state.Anchor.Y + (pocket * inward)), LineMargin);
+            var attacker = NearestUnplaced(roster, attacking, place, targets, placed);
+
+            if (attacker < 0)
+            {
+                continue;
+            }
+
+            placed[attacker] = true;
+            targets[attacker] = place;
+
+            var marker = NearestUnplaced(roster, defending, place, targets, placed);
+
+            if (marker < 0)
+            {
+                continue;
+            }
+
+            placed[marker] = true;
+            targets[marker] = FilmSpace.Clamp(place + new Vec(direction * ThrowInMarkAlong, -inward * ThrowInMarkIn), LineMargin);
+        }
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!placed[entity] && roster.IsOccupied(entity) && _context.Slots[entity].Family != MatchPositionFamily.Goalkeeper)
+            {
+                targets[entity] = AwayFrom(targets[entity], state.Anchor, ThrowInClear);
+            }
+        }
+    }
+
+    /// <summary>Gets the outfield player of a side, not yet placed, whose target is nearest a point, or -1.</summary>
+    private int NearestUnplaced(FilmRoster roster, MatchSide side, Vec point, Vec[] targets, bool[] placed)
+    {
+        var best = -1;
+        var bestDistance = double.MaxValue;
+
+        for (var slot = 1; slot <= 11; slot++)
+        {
+            var entity = FilmRoster.Index(side, slot);
+
+            if (!roster.IsOccupied(entity) || placed[entity] || _context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var distance = targets[entity].DistanceTo(point);
+
+            if (distance < bestDistance - 1e-9)
+            {
+                bestDistance = distance;
+                best = entity;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>Puts the player taking a set piece on the ball, and gets who he is, or -1.</summary>

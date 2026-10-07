@@ -476,6 +476,9 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets how long a free kick that will be struck or crossed is held: longer than a corner, which has the ball being put down to give the players time to take up their places (`replay-v13`).</summary>
     public double FreeKickHoldSeconds { get; init; } = 1.5;
 
+    /// <summary>Gets how long a throw-in is held (`replay-v16`).</summary>
+    public double ThrowInHoldSeconds { get; init; } = 0.5;
+
     /// <summary>Gets how long a goal and its celebration are held.</summary>
     public double GoalHoldSeconds { get; init; } = 4.0;
 

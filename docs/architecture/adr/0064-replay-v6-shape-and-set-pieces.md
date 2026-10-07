@@ -159,7 +159,7 @@ Teleports outside cuts stay at 0, no speed cap is exceeded, and the payload ladd
 - **More players in the box when the ball is in it** (p95 11, it was 9). The cause was not
   investigated; the six-yard area is still at most 3.
 - **Penalties are about 0 a match in the film**, so the fix is measured on a handful and checked by test.
-- A throw-in is out of scope and still takes the open-play shape.
+- A throw-in is recorder-only: the engine records none, and from `replay-v16` the film derives them (see the amendment below).
 - Every cached `replay-v5` presentation is refetched once.
 
 ## Alternatives considered
@@ -200,3 +200,10 @@ on two reference carries.
 (`ZArc` 55) at about 47 m/s of film. The delivery of a corner is now driven in at head height (`ZArc` 18) at its own speed, 33.7
 m/s of film. The balls in open play keep their speeds: the film is a fixed length, so a slower ball only raises the pace it is
 played at (the lofted ball 44 to 40 m/s of film for a pace of 2.68x to 2.89x and 55% of the films inside the band).
+
+*Amended in `replay-v16`.* Throw-ins are shown, film only. The engine records none, so the film reads a possession that begins
+from play, for the other side, where the ball was lost within 9 m of a touchline (and not within 12 m of a goal line), as one:
+the ball runs out to the line, play is held for 0.5 s of film (`HoldKind.ThrowIn`, `FormationMode.ThrowIn`), and the nearest
+player of the winning side throws it a few metres to the player the engine named. The thrower stands on the line with four of
+his side in a pocket in front of him, each with a defender close by. About 7 a match (a real match has about 40). The cost is
+in the pace band: 81% of the films are inside it (88%), because the film is a fixed length.

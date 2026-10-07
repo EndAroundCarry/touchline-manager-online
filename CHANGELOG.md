@@ -286,6 +286,33 @@ because a corner now takes less time), the film 10.1 min, ball still outside hol
 crowding, the keeper, the corner, the wall and the set pieces as before. `ReplayDirectorTests` allows 70% of 24 matches in
 band (it allowed 75%).
 
+### Follow-up: throw-ins, shown by the film (`replay-v16`)
+
+`ReplayDirector.Version` is `replay-v16`, so a film cached under `replay-v15` is fetched again. Film only; the engine,
+the golden hashes and the calibration do not move, and nothing is drawn from the play stream.
+
+The engine records no throw-in: a possession that begins from play (`Restart == None`) just starts where the last one ended.
+`FilmScript.AddThrowIn` now reads such a start as a throw-in when the side changed, the ball was lost within `ThrowInBand` =
+9 m of a touchline, and not within `ThrowInEnds` = 12 m of a goal line (the film has corners there). The ball runs out to the
+touchline (a `Placement` beat, so the sides set as it runs), play is held at `HoldKind.ThrowIn` for `ThrowInHoldSeconds` = 0.5 s
+of film, and the nearest player of the side that won it (not the player the engine named) throws it, a short arc (`ThrowZ`
+22, `ThrowArc` 8) to the player the engine named, at least 3 m away. About 7 a match; a real match has about 40, so a few
+are shown, and only in the possessions the film keeps.
+
+`FormationMode.ThrowIn` (`FilmShape.ArrangeThrowIn`): the thrower on the line, four of his side in a pocket in front of him
+(`ThrowInPocket`, 6 to 15 m from him), a defender goal-side and touchline-side of each (1.4 m), the others kept `ThrowInClear`
+= 4 m off the thrower. It is a set piece in `FilmMotion` like a goal kick: they take their places as the ball runs out, and the
+ball put down is not fetched by a pin on the thrower.
+
+Measured over 300 matches: 7.0 throw-ins a match; as one is taken 2 outfield players (the thrower with them) are within 10 m of
+the ball and 7 within 25 m (reference, from three throw-ins: 2 to 4 and 6 to 9); the thrower stands on the line (p95 0.0 m);
+8% of the side's players within 20 m of him have a marker (the reference count cannot see a white dot under a red one).
+Cost: pace p50 2.72x (2.69x), p95 3.00x (2.97x), inside its band **81.0%** (87.7%): the film is a fixed length and the throw-ins
+add about two seconds of motion and half a second of hold each, which tips the films on the edge of the band over; the film
+10.1 min, moves lengthened 16.5% (16.6%), crowding, the keeper, the corner, the wall and the set pieces as before.
+A hold of 0.8 s cost the same (80.3%). `ReplayDirectorTests` allows 70% of 24 matches in band, as before. The throw is not
+narrated: the commentary vocabulary has no throw-in beat and the engine's tokens do not change.
+
 ### Known gaps
 
 Crowding is reduced, not gone: a run of 3 to 10 m passes keeps the passer, the receiver and the next receiver within a

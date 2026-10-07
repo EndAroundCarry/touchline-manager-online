@@ -26,7 +26,7 @@ public sealed class ReplayDirectorTests
         {
             var (_, presentation) = TestMatchFactory.Play(TestMatchFactory.Even(seed));
 
-            presentation.PresentationVersion.Should().Be("replay-v15");
+            presentation.PresentationVersion.Should().Be("replay-v16");
             presentation.Passages.Should().NotBeEmpty();
             presentation.Playback.Should().HaveCount(presentation.Passages.Count);
             presentation.Playback[0].StartMilliseconds.Should().Be(0);
@@ -121,8 +121,9 @@ public sealed class ReplayDirectorTests
             }
         }
 
-        // Over 300 matches the share is 88% (the replay benchmark; 90% before `replay-v15`, whose quicker corner pushes a few matches
-        // that sat on the edge of the band over it); a sample this small moves by two or three matches.
+        // Over 300 matches the share is 81% (the replay benchmark; 88% before `replay-v16`, whose throw-ins add about a second of
+        // film a match, and 90% before `replay-v15`, whose quicker corner pushed a few matches that sat on the edge of the band
+        // over it); a sample this small moves by two or three matches.
         inBand.Should().BeGreaterThanOrEqualTo((int)(Seeds * 0.7), "the pace sits in its band for nearly every match");
     }
 

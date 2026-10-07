@@ -99,6 +99,12 @@ internal static class FilmMeasure
     /// <summary>How near the place he ends up a waiting player is to have settled, in metres: the two dots would touch.</summary>
     private const double SettledWithin = 1.0;
 
+    /// <summary>How near a touchline the thrower of a throw-in has to be as he throws, in metres (`replay-v16`).</summary>
+    private const double ThrowInOnLine = 1.0;
+
+    /// <summary>How far from the ball a throw-in's marked players are counted, in metres (`replay-v16`).</summary>
+    private const double ThrowInPack = 20.0;
+
     /// <summary>How long a player has to have waited in his place to count as settled, in seconds of film.</summary>
     private const double SettledFor = 0.3;
 
@@ -281,6 +287,10 @@ internal static class FilmMeasure
         var penaltyIntruders = new Histogram(1.0, FilmRoster.Size + 1);
         var pack10 = new Histogram(1.0, FilmRoster.Size + 1);
         var pack25 = new Histogram(1.0, FilmRoster.Size + 1);
+        var throwPack10 = new Histogram(1.0, FilmRoster.Size + 1);
+        var throwPack25 = new Histogram(1.0, FilmRoster.Size + 1);
+        var throwOffLine = new Histogram(0.1, 200);
+        var throwMarks = new MarkCount();
         var marks = new MarkCount();
         var cornerMarks = new MarkCount();
         var freeKickMarks = new MarkCount();
@@ -334,6 +344,11 @@ internal static class FilmMeasure
             if (beat.Kind == BeatKind.Shot && beat.Possession >= 0)
             {
                 MeasureKeeperAtShot(rosters[beat.Possession], motion, index, beat, keeperOffGoal, keeperAtWideBall);
+            }
+
+            if (beat.IsHold && beat.Hold == HoldKind.ThrowIn && beat.Possession >= 0)
+            {
+                MeasureThrowIn(context, rosters[beat.Possession], motion, motion.Spans[index].LastRecord, beat, throwPack10, throwPack25, throwOffLine, throwMarks);
             }
 
             if (beat.IsHold && beat.Possession >= 0 && beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross)
@@ -564,6 +579,11 @@ internal static class FilmMeasure
             FreeKickWallP50 = freeKickWall.Percentile(0.5),
             Penalties = penaltyIntruders.Total,
             PenaltyIntrudersP95 = penaltyIntruders.Percentile(0.95),
+            ThrowIns = throwPack10.Total,
+            ThrowInPack10mP50 = throwPack10.Percentile(0.5),
+            ThrowInPack25mP50 = throwPack25.Percentile(0.5),
+            ThrowInMarkedShare = throwMarks.Share,
+            ThrowInOffLineP95 = throwOffLine.Percentile(0.95),
             PackWithin10mP50 = pack10.Percentile(0.5),
             PackWithin25mP50 = pack25.Percentile(0.5),
             MarkedShare = marks.Share,
@@ -753,6 +773,52 @@ internal static class FilmMeasure
         chasers.Add(behind);
         samples++;
         chained += behind >= ChaseCount ? 1 : 0;
+    }
+
+    /// <summary>
+    /// Measures a throw-in as it is taken (`replay-v16`): how many outfield players, both sides and the thrower with them, are
+    /// within ten and twenty-five metres of the ball, as the reference clips are counted; how many of the throwing side's
+    /// players near him have a marker; and how far from the touchline the thrower stands.
+    /// </summary>
+    private static void MeasureThrowIn(
+        FilmContext context,
+        FilmRoster roster,
+        FilmMotionResult motion,
+        int record,
+        FilmBeat hold,
+        Histogram pack10,
+        Histogram pack25,
+        Histogram offLine,
+        MarkCount marked)
+    {
+        var taker = hold.Actor is Guid actor ? roster.EntityOf(actor) : -1;
+        int within10 = 0, within25 = 0;
+
+        for (var entity = 0; entity < FilmRoster.Size; entity++)
+        {
+            if (!roster.IsOccupied(entity) || context.Slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            var point = new Vec(motion.PlayerX(record, entity), motion.PlayerY(record, entity));
+            var distance = point.DistanceTo(hold.To);
+
+            within10 += distance <= 10.0 ? 1 : 0;
+            within25 += distance <= 25.0 ? 1 : 0;
+
+            if (entity == taker)
+            {
+                offLine.Add(Math.Min(point.Y, FilmSpace.Width - point.Y));
+            }
+            else if (FilmRoster.SideOf(entity) == hold.Side && distance <= ThrowInPack)
+            {
+                marked.Add(HasMarker(context, roster, motion, record, entity, hold.Side));
+            }
+        }
+
+        pack10.Add(within10);
+        pack25.Add(within25);
     }
 
     /// <summary>

@@ -92,6 +92,21 @@ internal static class FilmScript
     /// <summary>The furthest a defender heads a ball that has just landed behind his line, in metres (`replay-v8`).</summary>
     private const double HeadReach = 14.0;
 
+    /// <summary>How far from a touchline the ball can be where a possession was lost for the film to have it run out there, in metres (`replay-v16`).</summary>
+    private const double ThrowInBand = 9.0;
+
+    /// <summary>How near a goal line a throw-in is not shown, in metres: the film has corners there (`replay-v16`).</summary>
+    private const double ThrowInEnds = 12.0;
+
+    /// <summary>The shortest throw that is shown, in metres (`replay-v16`).</summary>
+    private const double ThrowInMin = 3.0;
+
+    /// <summary>The altitude the ball leaves the thrower's hands at, where the crossbar is thirty (`replay-v16`).</summary>
+    private const double ThrowZ = 22.0;
+
+    /// <summary>How high above the chord a throw arcs (`replay-v16`).</summary>
+    private const double ThrowArc = 8.0;
+
     /// <summary>Builds the script for a whole match.</summary>
     /// <param name="context">The film's context.</param>
     /// <param name="shape">The team shape, which receivers are chosen from.</param>
@@ -146,7 +161,7 @@ internal static class FilmScript
                 beats.Add(hold);
             }
 
-            beats.AddRange(builder.Possession(index, source, roster, ball));
+            beats.AddRange(builder.Possession(index, source, roster, ball, index > 0 ? possessions[index - 1] : null));
 
             if (beats.Count == afterCard)
             {
@@ -215,6 +230,7 @@ internal static class FilmScript
                 HoldKind.GoalKick or HoldKind.KeeperBall => options.GoalKickHoldSeconds,
                 HoldKind.FreeKick => formation == FormationMode.Open ? options.QuickFreeKickHoldSeconds : options.FreeKickHoldSeconds,
                 HoldKind.Corner or HoldKind.Penalty => options.SetPieceHoldSeconds,
+                HoldKind.ThrowIn => options.ThrowInHoldSeconds,
                 HoldKind.Goal => options.GoalHoldSeconds,
                 HoldKind.Card => options.CardHoldSeconds,
                 HoldKind.Substitution => options.SubstitutionHoldSeconds,
@@ -224,7 +240,7 @@ internal static class FilmScript
         }
 
         /// <summary>Scripts one possession: the restart it began with, then its stations in order.</summary>
-        public List<FilmBeat> Possession(int index, MatchPassageV1 source, FilmRoster roster, Vec ball)
+        public List<FilmBeat> Possession(int index, MatchPassageV1 source, FilmRoster roster, Vec ball, MatchPassageV1? previous)
         {
             var stations = Stations(source);
             var beats = new List<FilmBeat>(stations.Count * 3);
@@ -236,7 +252,7 @@ internal static class FilmScript
 
             var state = new State(index, source, roster, stations, beats);
 
-            StartOfPossession(state, ball);
+            StartOfPossession(state, ball, previous);
             StationActions(state, 0);
             AttachEvents(state, 0);
 
@@ -303,7 +319,7 @@ internal static class FilmScript
 
         // ---- The start of a possession ---------------------------------------------------------------------
 
-        private void StartOfPossession(State state, Vec ball)
+        private void StartOfPossession(State state, Vec ball, MatchPassageV1? previous)
         {
             var source = state.Source;
             var side = source.Side;
@@ -319,7 +335,7 @@ internal static class FilmScript
             switch (source.Restart)
             {
                 case PassageRestartKind.None:
-                    if (state.Index > 0 && ball.DistanceTo(start) > MinMove)
+                    if (state.Index > 0 && !AddThrowIn(state, previous, ball, start, named) && ball.DistanceTo(start) > MinMove)
                     {
                         // The ball is where the last possession left it, and the engine says it started somewhere
                         // else: it travels there at a pace it could.
@@ -354,6 +370,55 @@ internal static class FilmScript
                     AddRestart(state, HoldKind.FreeKick, FormationMode.Open, ball, start, named);
                     break;
             }
+        }
+
+        /// <summary>
+        /// A throw-in the engine does not record (`replay-v16`): the side that won the ball took it where the other side lost
+        /// it, and that was out wide, so the film has the ball run out, play held, and the ball thrown in to where the engine
+        /// says the possession began. Nothing here is drawn from the play stream, and nothing is changed but how the ball
+        /// gets from where it was lost to where the next possession begins.
+        /// </summary>
+        /// <returns>Whether the possession begins with a throw-in; when it does not, no beat has been added.</returns>
+        private bool AddThrowIn(State state, MatchPassageV1? previous, Vec ball, Vec start, Guid? receiver)
+        {
+            var side = state.Source.Side;
+
+            if (previous is null || previous.Side == side || previous.Period != state.Source.Period)
+            {
+                return false;
+            }
+
+            var towardsLow = ball.Y < FilmSpace.Width / 2;
+            var spot = new Vec(ball.X, towardsLow ? 0.0 : FilmSpace.Width);
+
+            if (ball.DistanceTo(spot) > ThrowInBand
+                || Math.Abs(ball.X - (FilmSpace.Length / 2)) > (FilmSpace.Length / 2) - ThrowInEnds
+                || spot.DistanceTo(start) < ThrowInMin)
+            {
+                return false;
+            }
+
+            var thrower = Nearest(state.Roster, side, spot, spot, [receiver], includeKeeper: false);
+
+            if (thrower is null)
+            {
+                return false;
+            }
+
+            // The side is the one that takes it, from the moment the ball is out, so that it sets as the ball runs.
+            var placement = Move(state, BeatKind.Placement, ball, spot, thrower, ActorSource.Named, null, false, side);
+
+            placement.Formation = FormationMode.ThrowIn;
+            state.Add(placement);
+            state.Add(Hold(HoldKind.ThrowIn, side, spot, state.Index, state.Source.Period, thrower, FormationMode.ThrowIn));
+
+            var thrown = Move(state, BeatKind.Pass, spot, start, thrower, ActorSource.Named, receiver, false, side);
+
+            thrown.ZFrom = ThrowZ;
+            thrown.ZArc = ThrowArc;
+            state.Add(thrown);
+
+            return true;
         }
 
         /// <summary>A dead-ball restart: the ball is put where it is taken from, and play is held.</summary>

@@ -186,6 +186,9 @@ internal enum HoldKind
 
     /// <summary>The half-time card.</summary>
     HalfTime = 10,
+
+    /// <summary>A throw-in, which the film puts where the ball runs out wide (`replay-v16`).</summary>
+    ThrowIn = 11,
 }
 
 /// <summary>Where a strike finished (`replay-v4`).</summary>
@@ -239,6 +242,9 @@ internal enum FormationMode
 
     /// <summary>A free kick taken quickly, from open play, with the nearest defenders ten yards off (`replay-v6`). Only the shape uses it; a beat stays <see cref="Open"/>.</summary>
     FreeKickQuick = 8,
+
+    /// <summary>A throw-in (`replay-v16`): the taker on the touchline, a few of his side in the pocket in front of him, each with a defender close by.</summary>
+    ThrowIn = 9,
 }
 
 /// <summary>Where the player who plays a beat comes from (`replay-v4`).</summary>

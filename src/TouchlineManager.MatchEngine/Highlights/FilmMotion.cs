@@ -364,7 +364,7 @@ internal sealed class FilmMotion
             ResolveChoices(beats, index);
 
             // A set piece is arranged from the moment it is known to be coming: where it is taken, and by whom.
-            if (beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty or FormationMode.GoalKick
+            if (beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty or FormationMode.GoalKick or FormationMode.ThrowIn
                 && SetPieceHold(beats, index) is { } hold)
             {
                 _setPieceAnchor = hold.To;
@@ -1020,7 +1020,7 @@ internal sealed class FilmMotion
 
     /// <summary>Whether a beat puts the ball down at a spot well away from where it stopped, for a restart (`replay-v9`).</summary>
     private static bool IsPutDownElsewhere(FilmBeat beat) =>
-        beat.Kind == BeatKind.Placement && (beat.Formation is FormationMode.Corner or FormationMode.GoalKick || beat.Distance > PutDownDistance);
+        beat.Kind == BeatKind.Placement && (beat.Formation is FormationMode.Corner or FormationMode.GoalKick or FormationMode.ThrowIn || beat.Distance > PutDownDistance);
 
     /// <summary>Where a pinned player stands: at the point, or just behind the ball if he is the one driving it.</summary>
     private static Vec CarryPoint(FilmBeat beat, bool carrier)
@@ -1580,6 +1580,7 @@ internal sealed class FilmMotion
             case FormationMode.FreeKickShot:
             case FormationMode.Penalty:
             case FormationMode.GoalKick:
+            case FormationMode.ThrowIn:
                 return new ShapeState(beat.Formation, _setPieceSide, _setPieceAnchor, Taker: _setPieceTaker, Seed: beat.Possession);
 
             case FormationMode.KickOff:
@@ -1602,7 +1603,7 @@ internal sealed class FilmMotion
 
     /// <summary>Whether a beat is played with the players taking up a set piece: they have a place to be, and run to it.</summary>
     private static bool IsSetPiece(FilmBeat beat) =>
-        beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty or FormationMode.GoalKick
+        beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty or FormationMode.GoalKick or FormationMode.ThrowIn
         || IsQuickFreeKick(beat);
 
     /// <summary>Gets where the scorer runs to: a few metres off the goal line, towards the nearer touchline.</summary>

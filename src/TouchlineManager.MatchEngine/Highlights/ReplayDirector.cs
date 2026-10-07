@@ -28,7 +28,7 @@ namespace TouchlineManager.MatchEngine.Highlights;
 public static class ReplayDirector
 {
     /// <summary>The version label of this presentation.</summary>
-    public const string Version = "replay-v15";
+    public const string Version = "replay-v16";
 
     /// <summary>The most times the film is played again to let its pace settle.</summary>
     private const int MaxSettlingRuns = 4;
@@ -809,6 +809,21 @@ public sealed record ShapeMetrics
 
     /// <summary>Gets, in those steps, the share with three or more chasers.</summary>
     public required double ChasersShare { get; init; }
+
+    /// <summary>Gets how many throw-ins were measured (`replay-v16`).</summary>
+    public required int ThrowIns { get; init; }
+
+    /// <summary>Gets, as a throw-in is taken, the median number of outfield players, both sides and the thrower, within ten metres of the ball: the reference has two to four.</summary>
+    public required double ThrowInPack10mP50 { get; init; }
+
+    /// <summary>Gets the same within twenty-five metres: the reference has six to nine.</summary>
+    public required double ThrowInPack25mP50 { get; init; }
+
+    /// <summary>Gets the share of the throwing side's players within twenty metres of the thrower who have a marker.</summary>
+    public required double ThrowInMarkedShare { get; init; }
+
+    /// <summary>Gets how far from the touchline the thrower stands as he throws, at the 95th percentile, in metres.</summary>
+    public required double ThrowInOffLineP95 { get; init; }
 }
 
 /// <summary>A distance measured three times, by how far up the pitch the ball is (`replay-v12` baseline).</summary>

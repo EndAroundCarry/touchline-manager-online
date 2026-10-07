@@ -61,7 +61,7 @@ public sealed class MatchTests : IAsyncLifetime
         summary.RoundNumber.Should().BeGreaterThan(0);
         summary.SeasonLabel.Should().NotBeEmpty();
         summary.EngineVersion.Should().NotBeEmpty();
-        summary.PresentationVersion.Should().Be("replay-v15");
+        summary.PresentationVersion.Should().Be("replay-v16");
         summary.ServerTime.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2), "TIME-5");
 
         // Possession is a share, so the two sides' shares are complementary.
@@ -83,7 +83,7 @@ public sealed class MatchTests : IAsyncLifetime
             $"/api/v1/matches/{matchId}/presentation"))!;
 
         presentation.MatchId.Should().Be(matchId);
-        presentation.PresentationVersion.Should().Be("replay-v15");
+        presentation.PresentationVersion.Should().Be("replay-v16");
         presentation.Commentary.Should().NotBeEmpty();
         presentation.Commentary.Select(line => line.TemplateKey).Should()
             .Contain(["match.kickoff", "match.full_time"], "a match is narrated from kick-off to full time");
