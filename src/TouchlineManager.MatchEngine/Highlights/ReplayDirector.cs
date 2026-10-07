@@ -28,7 +28,7 @@ namespace TouchlineManager.MatchEngine.Highlights;
 public static class ReplayDirector
 {
     /// <summary>The version label of this presentation.</summary>
-    public const string Version = "replay-v6";
+    public const string Version = "replay-v7";
 
     /// <summary>The most times the film is played again to let its pace settle.</summary>
     private const int MaxSettlingRuns = 4;

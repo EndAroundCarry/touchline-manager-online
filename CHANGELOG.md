@@ -22,7 +22,10 @@ Recorded in [`ADR-0064`](docs/architecture/adr/0064-replay-v6-shape-and-set-piec
   no longer puts players inside the arc. A **goal kick** has its own shape.
 - Every cached `replay-v5` presentation is refetched once. Throw-ins are not changed.
 
-### Follow-up: fewer players crowd the ball
+### Follow-up: fewer players crowd the ball (`replay-v7`)
+
+`ReplayDirector.Version` is `replay-v7` from this change, so a presentation a client cached under `replay-v6`
+(`Cache-Control: immutable`, ETag `{OutputHash}:replay-v6`) is fetched again and shows the new film.
 
 Players were still piling around the ball in a duel or a run of short passes. Found by measuring who stood there:
 the pinned defender of a duel *and* a separate challenger and second presser were all sent to the ball; and a
