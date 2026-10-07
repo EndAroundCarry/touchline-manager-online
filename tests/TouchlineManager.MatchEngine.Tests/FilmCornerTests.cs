@@ -34,7 +34,9 @@ public sealed class FilmCornerTests
                 behind.Kind.Should().Be(BeatKind.Clearance, "somebody played it behind, it did not leave on its own");
                 behind.Side.Should().Be(defending, "it is the defence who put it behind");
                 FilmSpace.Attacking(behind.To, possession.Source.Side).Should().BeApproximately(FilmSpace.Length, 0.01, "it goes out over the goal line");
-                (behind.Actor is null).Should().Be(behind.ActorSource == ActorSource.NearestToBall, "a named player is the keeper, and the rest is whoever gets there");
+                (behind.Actor is null).Should().Be(
+                    behind.ActorSource is ActorSource.NearestToBall or ActorSource.PreviousReceiver,
+                    "a named player is the keeper, and the rest is whoever gets there, or whoever won the held ball");
 
                 if (placement >= 3 && beats[placement - 3].Kind == BeatKind.Shot && beats[placement - 2].Kind == BeatKind.Save)
                 {
@@ -94,7 +96,18 @@ public sealed class FilmCornerTests
                     continue;
                 }
 
-                if (before.Kind is BeatKind.Pass or BeatKind.LoftedPass && before.Side == attacking)
+                if (before.Contested)
+                {
+                    // The ball played in along the ground is received and held first (`replay-v11`), and then won.
+                    played++;
+                    before.From.Should().Be(behind.From, "the defender wins it where it was held");
+                    FilmSpace.Attacking(before.To, attacking).Should().BeLessThan(FilmSpace.Length, "it is held short of the line, and goes over it");
+                    behind.Distance.Should().BeLessThanOrEqualTo(5.5 + 1e-6, "his touch is within a few metres of where the ball leaves play");
+
+                    continue;
+                }
+
+                if (before.Kind == BeatKind.LoftedPass && before.Side == attacking)
                 {
                     played++;
                     before.To.Should().Be(behind.From, "the defender touches it where it arrives");
@@ -108,6 +121,99 @@ public sealed class FilmCornerTests
         corners.Should().BeGreaterThan(20);
         played.Should().BeGreaterThan(corners / 2, "most corners follow a ball played in towards the line");
         tipped.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void A_ball_played_in_along_the_ground_is_held_by_the_man_who_gets_it_and_won_by_a_defender_and_a_ball_in_the_air_is_not()
+    {
+        int held = 0, aerial = 0;
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var (_, _, script) = TestMatchFactory.Script(TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed)));
+
+            foreach (var possession in script.Possessions.Where(candidate => candidate.Source.Outcome is PassageOutcome.CornerCleared or PassageOutcome.CornerHeaded))
+            {
+                var beats = script.Beats.Skip(possession.FirstBeat).Take(possession.LastBeat - possession.FirstBeat + 1).ToList();
+                var placement = beats.FindIndex(beat => beat.Kind == BeatKind.Placement && beat.Formation == FormationMode.Corner);
+                var behind = beats[placement - 1];
+                var before = beats[placement - 2];
+
+                if (before.Contested)
+                {
+                    held++;
+
+                    var played = beats[placement - 3];
+
+                    before.Kind.Should().Be(BeatKind.Duel);
+                    before.Side.Should().Be(possession.Source.Side, "the side with the ball is the one held up");
+                    before.ActorSource.Should().Be(ActorSource.PreviousReceiver, "the man who has it is the one the ball was played to");
+                    before.Distance.Should().Be(0, "the ball stays at his feet while he is closed down");
+                    played.Kind.Should().Be(BeatKind.Pass, "it is played in along the ground");
+                    played.ReceiverPending.Should().BeTrue("an attacker, found as it is played, is there to receive it");
+                    played.To.Should().Be(before.From, "he is held where he received it");
+                    behind.Side.Should().Be(MatchInputV1.OpponentOf(possession.Source.Side), "the defence put it behind");
+                    behind.ActorSource.Should().Be(ActorSource.PreviousReceiver, "the defender who closed him down is the one who wins it");
+                }
+                else
+                {
+                    beats.Skip(Math.Max(0, placement - 4)).Take(4).Should().NotContain(beat => beat.Contested, "a ball in the air, a header and a keeper's save are left as they were");
+
+                    if (before.Kind == BeatKind.LoftedPass)
+                    {
+                        aerial++;
+                    }
+                }
+            }
+        }
+
+        held.Should().BeGreaterThan(0, "a ball along the ground is held before it goes behind");
+        aerial.Should().BeGreaterThan(0, "a ball played in the air is still a defender's touch");
+    }
+
+    [Fact]
+    public void The_film_holds_the_ball_still_for_about_a_second_while_a_defender_closes_the_man_down()
+    {
+        int held = 0;
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var (_, presentation) = TestMatchFactory.Play(TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed)));
+
+            foreach (var passage in presentation.Passages)
+            {
+                var ball = passage.Tracks.Single(track => track.EntityId == "ball").Keyframes;
+
+                // The ball goes out over the goal line, and is then put at the flag: the touch that did it is the keyframe before.
+                for (var index = 3; index + 1 < ball.Count; index++)
+                {
+                    var restart = ball[index];
+
+                    if (restart.Action != "restart" || (restart.X > 5 && restart.X < 9_995) || (ball[index + 1].Y > 5 && ball[index + 1].Y < 9_995))
+                    {
+                        continue;
+                    }
+
+                    // A held ball is a ball that does not move from the end of the pass until the touch: two keyframes in one
+                    // place, the first tagged as the man carrying it (a keeper's hand on a shot is tagged as a save).
+                    var touch = ball[index - 2];
+                    var arrived = ball[index - 3];
+
+                    if (touch.Action != "clearance" || arrived.Action != "carry" || arrived.X != touch.X || arrived.Y != touch.Y)
+                    {
+                        continue;
+                    }
+
+                    held++;
+
+                    var seconds = (touch.TimeMilliseconds - arrived.TimeMilliseconds) / 1000.0;
+
+                    seconds.Should().BeInRange(0.7, 2.2, "about a second of film: long enough to see him closed down, not a pause");
+                }
+            }
+        }
+
+        held.Should().BeGreaterThan(0, "some corners are won off a held ball");
     }
 
     [Fact]

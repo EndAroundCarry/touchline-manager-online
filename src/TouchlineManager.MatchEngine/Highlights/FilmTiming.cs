@@ -50,6 +50,12 @@ internal static class FilmTiming
     /// <summary>How long the goalkeeper takes to hold a save, in seconds.</summary>
     private const double SaveSeconds = 0.5;
 
+    /// <summary>
+    /// How long a ball held at the goal line is held for, in seconds of real time (`replay-v11`): about a second of film
+    /// at the pace the film is played at, which is as long as the defenders take to close the man down.
+    /// </summary>
+    private const double ContestSeconds = 3.0;
+
     /// <summary>Gets the real-time length of a move.</summary>
     /// <param name="context">The film's context.</param>
     /// <param name="beat">The move.</param>
@@ -69,6 +75,7 @@ internal static class FilmTiming
             BeatKind.Clearance => (length / options.ClearanceMetresPerSecond) + control,
             BeatKind.Shot => (length / (beat.Headed ? options.HeaderMetresPerSecond : options.ShotMetresPerSecond)) + control,
             BeatKind.Header => HeaderSeconds,
+            BeatKind.Duel when beat.Contested => ContestSeconds,
             BeatKind.Duel => Math.Max(0.8, (length / options.DuelMetresPerSecond) + 0.5),
             BeatKind.Save => SaveSeconds,
             BeatKind.Placement => (length / options.PlacementMetresPerSecond) + 0.2,

@@ -78,6 +78,14 @@ at somebody's feet, so it is played in. The taker is no longer pinned to the poi
 the hold waits for him: he runs the length of the hold, and the ball is put down once he is within 14 m of the flag.
 The engine's facts are unchanged: whether there is a corner, who takes it, and where the flag is.
 
+*Amended in `replay-v11`.* Against a reference clip the defender's touch came almost as the ball arrived, 0.2 s after
+it, where the reference has the man who is played the ball controlling it and being closed down for about a second
+before he loses it. A ball played in along the ground is now received (by the attacker who can reach it soonest) and
+held for 3.0 s of real time, about 1.1 s of film, in a `Contested` duel beat; the defender who can reach him soonest is
+pinned there by the end of it and is the one who puts the ball behind. The two are found as the film is played, since
+where people stand is not known when the script is written. A ball in the air, a header and a keeper's tip are as they
+were.
+
 **7. Free kicks, penalties and goal kicks (`FilmShape`).** A free kick **struck** at goal has a wall of 5 / 4 / 3 / 2
 by distance (under 20 / 25 / 30 m, else 2) on the line to the near post at 9.5 m, the keeper on the far side, and two
 or three attackers waiting for the rebound. A free kick **crossed** (`FormationMode.FreeKickCross`, from

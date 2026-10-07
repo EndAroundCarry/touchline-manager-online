@@ -347,6 +347,13 @@ internal sealed class FilmBeat
     /// <summary>Gets or sets whether the beat is the foul that stops a possession.</summary>
     public bool Foul { get; init; }
 
+    /// <summary>
+    /// Gets whether the beat is a held ball (`replay-v11`): a player has been played the ball at the goal line, and a
+    /// defender, chosen as the beat is played, closes him down and wins it. It has no named challenger; the motion picks
+    /// the defender who can reach the ball soonest, and he receives it.
+    /// </summary>
+    public bool Contested { get; init; }
+
     /// <summary>Gets the events that happened at the beat.</summary>
     public List<BeatEvent> Events { get; } = [];
 

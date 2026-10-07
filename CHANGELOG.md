@@ -153,6 +153,28 @@ Measured over 300 matches: passes of 4 m and more received by the player who pla
 match, and the keeper's included). Film length, pace (2.63x) and the share of moves lengthened (17.0%) are as before. A new
 metric, `SelfPasses`, is in the benchmark's `replay` mode, and a test holds it at zero.
 
+### Follow-up: a corner is won off a held ball (`replay-v11`)
+
+`ReplayDirector.Version` is `replay-v11`, so a film cached under `replay-v10` is fetched again. Film only; the engine,
+the golden hashes and the calibration do not move.
+
+Set beside a reference clip of a corner being won, the film had the ball played in along the ground and a defender's
+touch that put it behind almost at once: the ball arrived and was out 0.2 s later. In the reference the man the ball is
+played to controls it, is held up for about a second while two defenders close him down, and loses it. A ball played in
+along the ground now does the same:
+
+- **The ball is received.** The attacker who can reach the touch point soonest is its receiver (it had none).
+- **It is held.** A `Duel` beat, `Contested`, keeps the ball at his feet for 3.0 s of real time, about 1.1 s of film at
+  2.65x. The defender who can reach it soonest is pinned there by the end of it, and the challenger and cover of an open
+  duel close in beside him.
+- **He wins it, and puts it behind.** The defender who closed him down is the one who plays the ball out.
+
+A ball in the air, a header from a cross that has just landed, a keeper's tip and a ball already at the line are as they
+were. Measured over 300 matches: pace 2.65x (2.63x), inside the band 93.0% (94.3%), moves lengthened for constraints
+16.8% (17.0%), no teleports, the touch that puts a corner behind 5.5 m at p95 as before, every shape metric as before.
+The one that moves is the ball standing still outside holds: 3.4% at p50 and 4.4% at p95 (2.8% and 3.5%), against a
+target of 5%.
+
 ### Known gaps
 
 Crowding is reduced, not gone: a run of 3 to 10 m passes keeps the passer, the receiver and the next receiver within a

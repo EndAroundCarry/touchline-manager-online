@@ -483,6 +483,12 @@ internal sealed class FilmMotion
             {
                 beat.Receiver = null;
             }
+
+            if (beat.Contested)
+            {
+                beat.Receiver = null;
+                beat.Opponent = null;
+            }
         }
     }
 
@@ -528,6 +534,18 @@ internal sealed class FilmMotion
     private void ResolveReceiver(IReadOnlyList<FilmBeat> beats, int k)
     {
         var beat = beats[k];
+
+        // A held ball is won by the defender who can reach it soonest, off the man who has it (`replay-v11`).
+        if (beat.Contested)
+        {
+            if (beat.Receiver is null)
+            {
+                beat.Receiver = Nearest(MatchInputV1.OpponentOf(beat.Side), beat.To, beat, k, beats);
+                beat.Opponent = beat.Actor;
+            }
+
+            return;
+        }
 
         if (!beat.ReceiverPending || beat.Receiver is not null)
         {

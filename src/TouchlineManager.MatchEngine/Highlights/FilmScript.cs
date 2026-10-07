@@ -496,11 +496,20 @@ internal static class FilmScript
             }
 
             // A cross that has already come in is headed from where it landed; any other ball is played in first.
-            var (touch, lofted) = crossed ? (start, false) : PlayIn(state, j, start, outOfPlay);
+            var (touch, lofted, playedIn) = crossed ? (start, false, false) : PlayIn(state, j, start, outOfPlay);
             var headed = crossed || lofted;
 
-            // The nearest defender gets there first: he heads it behind, or gets a block in.
-            var beat = Move(state, BeatKind.Clearance, touch, outOfPlay, null, ActorSource.NearestToBall, null, false, defending);
+            // A ball played in along the ground is received, held while a defender closes the man down, and won off
+            // him (`replay-v11`); a ball in the air, or one that was already at the line, is not.
+            if (playedIn && !lofted)
+            {
+                state.Add(ContestBeat(state, touch, attacking));
+            }
+
+            // The nearest defender gets there first: he heads it behind, or gets a block in. After a held ball it is the
+            // one who won it.
+            var contested = state.Last is { Contested: true };
+            var beat = Move(state, BeatKind.Clearance, touch, outOfPlay, null, contested ? ActorSource.PreviousReceiver : ActorSource.NearestToBall, null, false, defending);
 
             beat.ZFrom = headed ? HeaderContactZ : 0;
             beat.ZTo = 0;
@@ -514,8 +523,8 @@ internal static class FilmScript
         /// Plays the ball that is stopped at the goal line (`replay-v8`): from where it was last played, to where the
         /// defender gets a foot to it a few metres short of the line, along the way it was going.
         /// </summary>
-        /// <returns>Where the defender touches it, and whether the ball is in the air; the start itself when the ball was already too near the line to be played in.</returns>
-        private (Vec Touch, bool Lofted) PlayIn(State state, int j, Vec start, Vec outOfPlay)
+        /// <returns>Where the defender touches it, whether the ball is in the air, and whether a ball was played at all; the start itself when the ball was already too near the line to be played in.</returns>
+        private (Vec Touch, bool Lofted, bool PlayedIn) PlayIn(State state, int j, Vec start, Vec outOfPlay)
         {
             var attacking = state.Source.Side;
             var gap = FilmSpace.Length - FilmSpace.Attacking(start, attacking);
@@ -531,7 +540,7 @@ internal static class FilmScript
 
             if (distance < PlayedInMin)
             {
-                return (start, false);
+                return (start, false, false);
             }
 
             // Whoever has the ball plays it; if the engine left the ball with a defender, the nearest attacker does.
@@ -543,13 +552,34 @@ internal static class FilmScript
             }
 
             var lofted = distance >= LoftedThreshold;
-            var ball = Move(state, lofted ? BeatKind.LoftedPass : BeatKind.Pass, start, touch, actor, actorSource, null, false, attacking);
+
+            // Along the ground the ball is received by the attacker who can reach it soonest, who is then held up
+            // (`replay-v11`); in the air nobody is named, as before.
+            var ball = Move(state, lofted ? BeatKind.LoftedPass : BeatKind.Pass, start, touch, actor, actorSource, null, !lofted, attacking);
 
             ball.ZTo = lofted ? HeaderContactZ : 0;
             state.Add(ball);
 
-            return (touch, lofted);
+            return (touch, lofted, true);
         }
+
+        /// <summary>
+        /// The ball held at the goal line (`replay-v11`): the attacker who was played it has it at his feet and a defender,
+        /// who is the one the motion finds nearest, is on him by the time it is won. Nobody is named here, since where
+        /// people stand is not known until the film is played; the attacker is whoever received the ball, the defender
+        /// whoever can reach it soonest, and it is he who puts the ball behind.
+        /// </summary>
+        private static FilmBeat ContestBeat(State state, Vec at, MatchSide attacking) => new()
+        {
+            Kind = BeatKind.Duel,
+            Possession = state.Index,
+            Period = state.Source.Period,
+            Side = attacking,
+            From = at,
+            To = at,
+            ActorSource = ActorSource.PreviousReceiver,
+            Contested = true,
+        };
 
         /// <summary>
         /// A strike the goalkeeper gets a hand to and turns behind: the shot, his save, and the ball going out round the
