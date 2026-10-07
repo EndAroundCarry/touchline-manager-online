@@ -9,22 +9,61 @@
   <section class="max-w-5xl">
     <h1 [class]="pageHeadingClass">Stadium</h1>
     <p class="mt-1 text-sm text-ink-2">
-      Your ground, in your club's colours. Add as many places as the club can pay for. The stadium
-      moves up a level, and its picture changes, each time it passes another
-      {{ number(ground.seatsPerLevel) }} places.
+      Your ground, seen from a corner, with its seats in your club's two colours. Every row and
+      sector is drawn. Add as many places as the club can pay for. The stadium moves up a level, and
+      its picture changes, each time it passes another {{ number(ground.seatsPerLevel) }} places.
     </p>
 
-    <div class="mt-6 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div class="mt-6 grid gap-4">
       <figure class="rounded border border-line bg-panel p-3" data-testid="stadium-figure">
         <app-stadium-picture
           [level]="ground.level"
           [primaryColour]="ground.primaryColour"
           [secondaryColour]="ground.secondaryColour"
+          [highlight]="highlight()"
+          [labels]="true"
         />
         <figcaption class="mt-2 text-sm text-ink-2">
           Level {{ ground.level }} of {{ ground.maxLevel }} &middot;
           {{ number(ground.capacity) }} places
         </figcaption>
+
+        <ul
+          class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+          aria-label="Kinds of place in the picture"
+          data-testid="stadium-regions"
+        >
+          @for (stand of ground.stands; track stand.stand) {
+            <li>
+              <button
+                type="button"
+                class="flex min-h-11 w-full items-center gap-3 rounded border border-line-strong px-3 py-2 text-left hover:bg-raised"
+                [class.bg-raised]="highlight() === stand.stand"
+                [class.border-accent]="highlight() === stand.stand"
+                [attr.aria-pressed]="highlight() === stand.stand"
+                [attr.data-region]="stand.stand"
+                (click)="toggleRegion(stand.stand)"
+                (pointerenter)="pointAt(stand.stand)"
+                (pointerleave)="pointAt(null)"
+                (focus)="pointAt(stand.stand)"
+                (blur)="pointAt(null)"
+              >
+                <span
+                  class="h-7 w-9 shrink-0 rounded-sm border border-line-strong"
+                  aria-hidden="true"
+                  [style.background]="swatch(ground, stand.stand)"
+                ></span>
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-ink">{{ label(stand).name }}</span>
+                  <span class="block text-sm text-ink-2">{{ number(stand.seats) }} places</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+        <p class="mt-2 text-sm text-muted">
+          Point at a kind of place to light its sectors in the picture.
+        </p>
       </figure>
 
       <section class="rounded border border-line bg-panel p-4" aria-labelledby="level-heading">
@@ -232,6 +271,7 @@
               [primaryColour]="ground.primaryColour"
               [secondaryColour]="ground.secondaryColour"
               [decorative]="true"
+              detail="low"
             />
             <p class="mt-1 text-sm font-semibold">Level {{ item.level }}</p>
             <p class="text-sm text-ink-2">{{ number(item.from) }}&ndash;{{ number(item.to) }}</p>

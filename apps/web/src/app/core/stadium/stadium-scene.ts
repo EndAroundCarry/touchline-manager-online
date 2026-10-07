@@ -1,47 +1,68 @@
 /**
- * The geometry of the stadium pictures, one per level (`STAD-1`).
+ * The drawing of the stadium at one level (`STAD-1`).
  *
- * Pure and framework-free so the ten levels can be unit tested without a DOM: the picture is a top-down
- * drawing of the pitch with its stands around it, and a level decides how many sides are built, how deep each
- * stand is, which are roofed, and how many floodlight masts stand. A bigger level is always the previous
- * level plus something — never a different ground — so a manager watches the same stadium grow.
+ * {@link buildScene} turns a level's plan into an ordered list of shapes, far to near, which a component paints as it
+ * is. The list is the whole picture: the grass, the pitch, every stand with its rows, sectors and seats, the roofs,
+ * the hospitality boxes, the floodlights and the trees. Nothing is a bitmap, so the seats can take the club's own two
+ * colours, and nothing here knows about the DOM, so each of the ten levels can be tested as plain data.
  *
- * Coordinates live in a 520 x 340 box with the pitch in the middle. The deepest stand (level 10) is 77 units
- * deep, which leaves a margin on every side.
+ * The parts live beside this file: `stadium-camera` projects the world, `stadium-plan` is the table of levels,
+ * `stadium-stand` draws a stand, `stadium-grounds` draws everything round the stands and `stadium-canvas` is what a
+ * drawing is made of.
  */
+import { VIEW_HEIGHT, VIEW_WIDTH, WORLD_FRAME, nearness, project } from './stadium-camera';
+import { Canvas, PALETTE, SceneDetail, ScenePart } from './stadium-canvas';
+import {
+  Extent,
+  FENCE_GAP,
+  MAST_HEIGHT,
+  RING_GAP,
+  ROAD,
+  drawBoards,
+  drawCornerFlags,
+  drawEnclosure,
+  drawFlag,
+  drawGoal,
+  drawMast,
+  drawPitch,
+  drawRoads,
+  drawTrees,
+  extentOf,
+  ground,
+  grow,
+  mastSites,
+  treeSites,
+} from './stadium-grounds';
+import {
+  BAND_HEIGHT,
+  LEVELS,
+  PITCH,
+  StandSide,
+  clampLevel,
+  depthOf,
+  heightOf,
+  kindsOf,
+  planOf,
+  spansOf,
+} from './stadium-plan';
+import { ROOF_CLEARANCE, drawStand, frameOf } from './stadium-stand';
+import { StadiumStandCode } from './stadium.models';
 
-/** The drawing's width. */
-export const SCENE_WIDTH = 520;
+export { FALLBACK_COLOUR, safeColour } from './stadium-canvas';
+export type { PartRole, SceneDetail, ScenePart } from './stadium-canvas';
+export { clampLevel } from './stadium-plan';
 
-/** The drawing's height. */
-export const SCENE_HEIGHT = 340;
-
-/** The pitch, inside its markings. */
-export const PITCH = { x: 180, y: 122, width: 160, height: 96 } as const;
-
-/** The clear apron between the pitch and the front row of every stand. */
-const APRON = 10;
-
-/** How tall one row of seats is. */
-const ROW = 6;
-
-/** The walkway between a stand's lower and upper tier, which is also where the hospitality boxes sit. */
-const GAP = 5;
-
-/** What a rectangle of the drawing is. */
-export type SceneKind = 'terrace' | 'seats' | 'vip' | 'roof';
-
-/** One rectangle of the drawing. */
-export interface SceneRect {
-  readonly kind: SceneKind;
+/** The part of the drawing that is shown, in the drawing's own units. */
+export interface SceneView {
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
 }
 
-/** A floodlight mast. */
-export interface SceneMast {
+/** A name written beside a stand. */
+export interface SceneLabel {
+  readonly text: string;
   readonly x: number;
   readonly y: number;
 }
@@ -49,368 +70,210 @@ export interface SceneMast {
 /** The drawing of one level. */
 export interface Scene {
   readonly level: number;
-  readonly rects: readonly SceneRect[];
-  readonly masts: readonly SceneMast[];
-  /** Whether the ground is ringed by an outer concourse wall (the big grounds). */
-  readonly ring: boolean;
-  /** Whether the club's banner flies over the main stand (the biggest ground). */
-  readonly banner: boolean;
-  /** The extent of everything built, for the outer wall and the banner. */
-  readonly bounds: {
-    readonly x: number;
-    readonly y: number;
-    readonly width: number;
-    readonly height: number;
+  readonly detail: SceneDetail;
+  /** The shapes, far to near. */
+  readonly parts: readonly ScenePart[];
+  /** The part of the drawing that holds this level's ground, so a small ground is not lost in a big frame. */
+  readonly view: SceneView;
+  /** The names of the stands that are built. */
+  readonly labels: readonly SceneLabel[];
+  /** Which kinds of place the ground has, in the order the screen lists them. */
+  readonly regions: readonly StadiumStandCode[];
+}
+
+/** How many levels there are to draw. */
+export const SCENE_LEVELS = LEVELS;
+
+/** What each stand is called, written beside it. */
+const STAND_NAMES: Readonly<Record<StandSide, string>> = {
+  main: 'Main stand',
+  opposite: 'Opposite stand',
+  east: 'East end',
+  west: 'West end',
+};
+
+/** The room kept round a ground in its frame, in the drawing's units. */
+const VIEW_PADDING = 30;
+
+const TREES = treeSites();
+const CACHE = new Map<string, Scene>();
+
+/**
+ * Frames a level: the smallest part of the drawing, in the drawing's own proportions, that holds its fenced ground
+ * and everything that stands over it. The biggest ground fills the whole drawing; a smaller one fills more of its
+ * frame, which is what keeps the first level from being a small ground lost in a big field.
+ */
+function viewOf(level: number, extent: Extent): SceneView {
+  const plan = planOf(level);
+  const compound = grow(extent, FENCE_GAP + (plan.ring ? RING_GAP : 0));
+
+  const stands = [plan.main, plan.opposite, plan.east, plan.west];
+  const tallest = Math.max(...stands.map((stand) => heightOf(stand) + BAND_HEIGHT));
+  const high = Math.max(
+    tallest + ROOF_CLEARANCE + (plan.flag ? 28 : 6),
+    plan.masts > 0 ? MAST_HEIGHT + 6 : 0,
+  );
+
+  const points = [compound.minX, compound.maxX].flatMap((x) =>
+    [compound.minY, compound.maxY].flatMap((y) => [project(x, y, 0), project(x, y, high)]),
+  );
+
+  const xs = points.map(([x]) => x);
+  const ys = points.map(([, y]) => y);
+  const minX = Math.min(...xs) - VIEW_PADDING;
+  const maxX = Math.max(...xs) + VIEW_PADDING;
+  const minY = Math.min(...ys) - VIEW_PADDING;
+  const maxY = Math.max(...ys) + VIEW_PADDING;
+
+  const ratio = VIEW_WIDTH / VIEW_HEIGHT;
+  const width = Math.min(Math.max(maxX - minX, (maxY - minY) * ratio), VIEW_WIDTH);
+  const height = width / ratio;
+
+  return {
+    x:
+      Math.round(Math.min(Math.max((minX + maxX) / 2 - width / 2, 0), VIEW_WIDTH - width) * 10) /
+      10,
+    y:
+      Math.round(Math.min(Math.max((minY + maxY) / 2 - height / 2, 0), VIEW_HEIGHT - height) * 10) /
+      10,
+    width: Math.round(width * 10) / 10,
+    height: Math.round(height * 10) / 10,
   };
 }
 
-type Side = 'south' | 'north' | 'east' | 'west';
+/** Where the names of the built stands go: on the outside of each, clear of its roof. */
+function labelsOf(level: number): SceneLabel[] {
+  return spansOf(planOf(level)).map((span) => {
+    const at = frameOf(span.side);
+    const deep = depthOf(span.plan);
+    // A floodlight stands in the middle of each long side, so its name goes a little along from it.
+    const middle =
+      span.side === 'main' || span.side === 'opposite'
+        ? span.from + (span.to - span.from) * 0.3
+        : (span.from + span.to) / 2;
 
-interface Stand {
-  /** Rows in the lower tier. Zero means the side is not built yet. */
-  readonly lower: number;
-  /** Rows in the upper tier. */
-  readonly upper: number;
-  /** Whether a roof covers the stand. */
-  readonly roof: boolean;
-  /** Whether the lower tier is a standing terrace rather than seats. */
-  readonly terrace: boolean;
-}
+    // The two stands the camera sees from the front are named above their roofs, the two it sees from behind in
+    // front of their walls.
+    const [x, y] =
+      span.side === 'main' || span.side === 'east'
+        ? project(...at(middle, deep + 6, heightOf(span.plan) + ROOF_CLEARANCE + 6))
+        : project(...at(middle, deep + 12, 0));
 
-interface LevelPlan {
-  readonly south: Stand;
-  readonly north: Stand;
-  readonly east: Stand;
-  readonly west: Stand;
-  readonly masts: number;
-  readonly ring: boolean;
-  readonly banner: boolean;
-}
-
-const NONE: Stand = { lower: 0, upper: 0, roof: false, terrace: false };
-
-function stand(lower: number, upper: number, roof: boolean, terrace: boolean): Stand {
-  return { lower, upper, roof, terrace };
-}
-
-/**
- * The ten levels. Each row of the table builds on the one above it: stands deepen, terraces become seats, roofs
- * appear, an upper tier rises, and the last levels close the bowl.
- */
-const PLANS: readonly LevelPlan[] = [
-  // 1 — a village ground: a terrace along each touchline.
-  {
-    south: stand(3, 0, false, true),
-    north: stand(2, 0, false, true),
-    east: NONE,
-    west: NONE,
-    masts: 0,
-    ring: false,
-    banner: false,
-  },
-  // 2 — the main stand gets seats, a terrace goes up behind one goal.
-  {
-    south: stand(4, 0, false, false),
-    north: stand(3, 0, false, true),
-    east: stand(2, 0, false, true),
-    west: NONE,
-    masts: 0,
-    ring: false,
-    banner: false,
-  },
-  // 3 — the main stand is roofed, both ends are terraced, and the floodlights go up.
-  {
-    south: stand(4, 0, true, false),
-    north: stand(3, 0, false, true),
-    east: stand(2, 0, false, true),
-    west: stand(2, 0, false, true),
-    masts: 2,
-    ring: false,
-    banner: false,
-  },
-  // 4 — the far side is seated and roofed.
-  {
-    south: stand(5, 0, true, false),
-    north: stand(4, 0, true, false),
-    east: stand(3, 0, false, true),
-    west: stand(3, 0, false, true),
-    masts: 4,
-    ring: false,
-    banner: false,
-  },
-  // 5 — every stand deepens.
-  {
-    south: stand(6, 0, true, false),
-    north: stand(5, 0, true, false),
-    east: stand(4, 0, false, true),
-    west: stand(4, 0, false, true),
-    masts: 4,
-    ring: false,
-    banner: false,
-  },
-  // 6 — the main stand rises a second tier, one end is roofed.
-  {
-    south: stand(6, 3, true, false),
-    north: stand(5, 0, true, false),
-    east: stand(4, 0, true, true),
-    west: stand(4, 0, false, true),
-    masts: 4,
-    ring: false,
-    banner: false,
-  },
-  // 7 — both long stands have two tiers, the ends are seated and roofed.
-  {
-    south: stand(6, 4, true, false),
-    north: stand(6, 3, true, false),
-    east: stand(5, 0, true, false),
-    west: stand(5, 0, true, false),
-    masts: 4,
-    ring: false,
-    banner: false,
-  },
-  // 8 — the ends rise a second tier, a wall rings the ground.
-  {
-    south: stand(7, 4, true, false),
-    north: stand(6, 4, true, false),
-    east: stand(5, 3, true, false),
-    west: stand(5, 3, true, false),
-    masts: 6,
-    ring: true,
-    banner: false,
-  },
-  // 9 — nearly a full bowl.
-  {
-    south: stand(7, 5, true, false),
-    north: stand(7, 4, true, false),
-    east: stand(6, 4, true, false),
-    west: stand(6, 4, true, false),
-    masts: 6,
-    ring: true,
-    banner: false,
-  },
-  // 10 — the complete two-tier bowl, and the club's banner.
-  {
-    south: stand(7, 5, true, false),
-    north: stand(7, 5, true, false),
-    east: stand(7, 5, true, false),
-    west: stand(7, 5, true, false),
-    masts: 6,
-    ring: true,
-    banner: true,
-  },
-];
-
-/** How many levels there are to draw. */
-export const SCENE_LEVELS = PLANS.length;
-
-/** The depth of a stand, front row to back wall. */
-function depthOf(side: Stand): number {
-  if (side.lower === 0) {
-    return 0;
-  }
-
-  return side.lower * ROW + (side.upper > 0 ? GAP + side.upper * ROW : 0);
-}
-
-/** Clamps a level into the range the drawing has a plan for. */
-export function clampLevel(level: number): number {
-  if (!Number.isFinite(level)) {
-    return 1;
-  }
-
-  return Math.min(Math.max(Math.round(level), 1), PLANS.length);
+    return { text: STAND_NAMES[span.side], x, y };
+  });
 }
 
 /**
  * Builds the drawing of one level.
  *
- * @param level The stadium level, 1 to 10. Anything else is clamped, so a response the screen does not yet
- *   know about still draws something rather than nothing.
+ * @param level The stadium level, 1 to 10. Anything else is clamped, so a response the screen does not yet know about
+ *   still draws something rather than nothing.
+ * @param detail `full` draws every row; `low` groups rows in threes, for a thumbnail.
  */
-export function buildScene(level: number): Scene {
+export function buildScene(level: number, detail: SceneDetail = 'full'): Scene {
   const clamped = clampLevel(level);
-  const plan = PLANS[clamped - 1];
+  const key = `${clamped}:${detail}`;
+  const cached = CACHE.get(key);
 
-  const left = PITCH.x - APRON;
-  const right = PITCH.x + PITCH.width + APRON;
-  const top = PITCH.y - APRON;
-  const bottom = PITCH.y + PITCH.height + APRON;
+  if (cached !== undefined) {
+    return cached;
+  }
 
-  const depth: Record<Side, number> = {
-    south: depthOf(plan.south),
-    north: depthOf(plan.north),
-    east: depthOf(plan.east),
-    west: depthOf(plan.west),
+  const plan = planOf(clamped);
+  const extent = extentOf(clamped);
+  const compound = grow(extent, plan.ring ? FENCE_GAP + RING_GAP : FENCE_GAP);
+  const canvas = new Canvas();
+  const spans = spansOf(plan);
+
+  canvas.add({ role: 'ground', d: `M0 0H${VIEW_WIDTH}V${VIEW_HEIGHT}H0Z`, fill: PALETTE.grass });
+  canvas.add({
+    role: 'ground',
+    d: ground([
+      [WORLD_FRAME.minX, ROAD.y + 18],
+      [WORLD_FRAME.maxX, ROAD.y + 18],
+      [WORLD_FRAME.maxX, WORLD_FRAME.maxY],
+      [WORLD_FRAME.minX, WORLD_FRAME.maxY],
+    ]),
+    fill: PALETTE.grassDark,
+    opacity: 0.55,
+  });
+
+  drawRoads(canvas, extent);
+  drawTrees(canvas, TREES.far);
+
+  if (plan.ring) {
+    const paved = grow(extent, RING_GAP);
+
+    canvas.add({
+      role: 'plaza',
+      d: ground([
+        [paved.minX, paved.minY],
+        [paved.maxX, paved.minY],
+        [paved.maxX, paved.maxY],
+        [paved.minX, paved.maxY],
+      ]),
+      fill: PALETTE.plaza,
+    });
+  }
+
+  drawEnclosure(canvas, compound, false, false);
+
+  // A mast is drawn with the far stands or the near ones, by where it stands.
+  const masts = mastSites(extent, plan.masts);
+  const middle = nearness(PITCH.width / 2, PITCH.height / 2);
+
+  for (const [x, y] of masts.filter(([mx, my]) => nearness(mx, my) < middle - 40)) {
+    drawMast(canvas, x, y);
+  }
+
+  drawPitch(canvas);
+
+  const stand = (side: StandSide): void => {
+    const span = spans.find((candidate) => candidate.side === side);
+
+    if (span !== undefined) {
+      drawStand(canvas, span, detail);
+    }
   };
 
-  // The long stands run on past the pitch to close the corners wherever an end stand stands beside them.
-  const spanLeft = left - depth.west;
-  const spanRight = right + depth.east;
+  // Far to near: what the camera sees past is drawn before what it sees over.
+  stand('main');
+  stand('east');
+  drawBoards(canvas, 'main');
+  drawBoards(canvas, 'east');
+  drawGoal(canvas, 'east');
+  drawGoal(canvas, 'west');
+  drawCornerFlags(canvas);
+  drawBoards(canvas, 'west');
+  drawBoards(canvas, 'opposite');
+  stand('west');
+  stand('opposite');
 
-  const rects: SceneRect[] = [];
+  for (const [x, y] of masts.filter(([mx, my]) => nearness(mx, my) >= middle - 40)) {
+    drawMast(canvas, x, y);
+  }
 
-  addLongStand(rects, plan.south, 'south', spanLeft, spanRight, bottom);
-  addLongStand(rects, plan.north, 'north', spanLeft, spanRight, top);
-  addEndStand(rects, plan.east, 'east', top, bottom, right);
-  addEndStand(rects, plan.west, 'west', top, bottom, left);
+  if (plan.flag) {
+    drawFlag(canvas, extent);
+  }
 
-  const bounds = {
-    x: left - depth.west,
-    y: top - depth.north,
-    width: right - left + depth.west + depth.east,
-    height: bottom - top + depth.north + depth.south,
-  };
+  if (plan.ring) {
+    drawEnclosure(canvas, grow(extent, RING_GAP), true, true);
+  }
 
-  return {
+  drawEnclosure(canvas, compound, true, false);
+  drawTrees(canvas, TREES.near);
+
+  const scene: Scene = {
     level: clamped,
-    rects,
-    masts: mastsFor(plan.masts, bounds),
-    ring: plan.ring,
-    banner: plan.banner,
-    bounds,
+    detail,
+    parts: canvas.parts,
+    view: viewOf(clamped, extent),
+    labels: labelsOf(clamped),
+    regions: kindsOf(clamped),
   };
-}
 
-function addLongStand(
-  rects: SceneRect[],
-  stand: Stand,
-  side: 'south' | 'north',
-  spanLeft: number,
-  spanRight: number,
-  edge: number,
-): void {
-  if (stand.lower === 0) {
-    return;
-  }
+  CACHE.set(key, scene);
 
-  const width = spanRight - spanLeft;
-  const lowerDepth = stand.lower * ROW;
-  const upperDepth = stand.upper * ROW;
-  const total = depthOf(stand);
-
-  // South stands grow downwards from the front edge, north stands upwards.
-  const at = (offset: number, height: number): number =>
-    side === 'south' ? edge + offset : edge - offset - height;
-
-  rects.push({
-    kind: stand.terrace ? 'terrace' : 'seats',
-    x: spanLeft,
-    y: at(0, lowerDepth),
-    width,
-    height: lowerDepth,
-  });
-
-  if (stand.upper > 0) {
-    // The walkway between the tiers is where the hospitality boxes are.
-    rects.push({ kind: 'vip', x: spanLeft, y: at(lowerDepth, GAP), width, height: GAP });
-    rects.push({
-      kind: 'seats',
-      x: spanLeft,
-      y: at(lowerDepth + GAP, upperDepth),
-      width,
-      height: upperDepth,
-    });
-  } else if (side === 'south') {
-    // A small block of boxes behind the main stand, so even a young ground has somewhere to host.
-    const centre = spanLeft + width / 2;
-
-    rects.push({ kind: 'vip', x: centre - 34, y: at(lowerDepth, GAP), width: 68, height: GAP });
-  }
-
-  if (stand.roof) {
-    rects.push({
-      kind: 'roof',
-      x: spanLeft - 2,
-      y: at(-2, total + 6),
-      width: width + 4,
-      height: total + 6,
-    });
-  }
-}
-
-function addEndStand(
-  rects: SceneRect[],
-  stand: Stand,
-  side: 'east' | 'west',
-  top: number,
-  bottom: number,
-  edge: number,
-): void {
-  if (stand.lower === 0) {
-    return;
-  }
-
-  const height = bottom - top;
-  const lowerDepth = stand.lower * ROW;
-  const upperDepth = stand.upper * ROW;
-  const total = depthOf(stand);
-
-  // East stands grow to the right of the front edge, west stands to the left.
-  const at = (offset: number, width: number): number =>
-    side === 'east' ? edge + offset : edge - offset - width;
-
-  rects.push({
-    kind: stand.terrace ? 'terrace' : 'seats',
-    x: at(0, lowerDepth),
-    y: top,
-    width: lowerDepth,
-    height,
-  });
-
-  if (stand.upper > 0) {
-    rects.push({ kind: 'vip', x: at(lowerDepth, GAP), y: top, width: GAP, height });
-    rects.push({
-      kind: 'seats',
-      x: at(lowerDepth + GAP, upperDepth),
-      y: top,
-      width: upperDepth,
-      height,
-    });
-  }
-
-  if (stand.roof) {
-    rects.push({
-      kind: 'roof',
-      x: at(-2, total + 6),
-      y: top - 2,
-      width: total + 6,
-      height: height + 4,
-    });
-  }
-}
-
-/** Places the floodlight masts at the corners, then along the touchlines for the biggest grounds. */
-function mastsFor(count: number, bounds: Scene['bounds']): SceneMast[] {
-  if (count === 0) {
-    return [];
-  }
-
-  const inset = 6;
-  const left = bounds.x - inset;
-  const right = bounds.x + bounds.width + inset;
-  const top = bounds.y - inset;
-  const bottom = bounds.y + bounds.height + inset;
-  const middle = bounds.x + bounds.width / 2;
-
-  const corners: SceneMast[] = [
-    { x: left, y: top },
-    { x: right, y: bottom },
-    { x: right, y: top },
-    { x: left, y: bottom },
-  ];
-
-  const all = [...corners, { x: middle, y: top }, { x: middle, y: bottom }];
-
-  // Two masts light a village ground from opposite corners; four light it evenly; six ring the biggest.
-  return all.slice(0, count);
-}
-
-/** The colour used when the server sends none, or one that is not a plain hex colour. */
-export const FALLBACK_COLOUR = '#1f4e79';
-
-/** Accepts only a plain `#rrggbb` colour, so nothing else can reach a drawing attribute. */
-export function safeColour(value: string | null | undefined, fallback = FALLBACK_COLOUR): string {
-  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
-    ? value.toLowerCase()
-    : fallback;
+  return scene;
 }

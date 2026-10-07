@@ -19,7 +19,7 @@ lands, and its route is added to `app.routes.ts` at the same time, so no unreach
 | `scouting/` | `/scouting` | 10 |
 | `transfers/` | `/transfers` | 10 |
 | `finances/` | `/finances` | 9 |
-| `stadium/` | `/stadium` — the club's ground, its pictures by level, and building places | Stadium milestone (ADR-0062) |
+| `stadium/` | `/stadium` — the club's ground drawn in three dimensions with a key of its kinds of place, its pictures by level, and building places | Stadium milestone (ADR-0062, ADR-0065) |
 | `inbox/` | `/inbox` | 11 |
 | `news/` | `/news` | 11 |
 | `settings/` | `/settings` | 13 |

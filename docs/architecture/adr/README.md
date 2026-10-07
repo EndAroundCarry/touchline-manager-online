@@ -79,9 +79,10 @@ the system is shaped the way it is.
 | [0059](0059-dark-management-workspace-ui.md) | The web client is a dark management workspace built on role tokens | Accepted |
 | [0060](0060-per-attribute-training-progress.md) | Training progress is held per attribute, and the day's budget is split by weight (`training-v3`) | Accepted |
 | [0061](0061-engine-v10-attackers-find-space-passers-choose.md) | Engine-v10 lets attackers find space and passers choose who gets the ball | Accepted |
-| [0062](0062-club-stadium-places-levels-and-gate.md) | A club's stadium is a count of places, its level is read from them, and gate revenue is what they sell | Accepted |
+| [0062](0062-club-stadium-places-levels-and-gate.md) | A club's stadium is a count of places, its level is read from them, and gate revenue is what they sell | Accepted (decision 6 superseded by ADR-0065) |
 | [0063](0063-engine-v11-counter-attack.md) | Engine-v11 adds the counter-attack, a tactic that works against a side that has pushed forward | Accepted |
 | [0064](0064-replay-v6-shape-and-set-pieces.md) | Replay-v6 makes the players hold a shape, leaves the ball carrier room, and sets pieces for what they are | Accepted |
+| [0065](0065-stadium-picture-in-three-dimensions.md) | The stadium picture is a three-dimensional drawing with sectors, rows and seats in the club's two colours | Accepted |
 
 ## Rules for changing an ADR
 

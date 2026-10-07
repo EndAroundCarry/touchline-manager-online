@@ -19,6 +19,32 @@ A club still arrives in colours generated from its identity. After taking a club
   canonical hashes, so choosing them never changes a seed or a result.
 - A club with no choice (or half of one) keeps its generated colours.
 
+## Stadium picture in three dimensions — rows, sectors and seats in the club's two colours
+
+Recorded in [`ADR-0065`](docs/architecture/adr/0065-stadium-picture-in-three-dimensions.md), which supersedes decision 6
+of ADR-0062. The web client only: the stadium response, the rules and the money are unchanged.
+
+### Changed
+
+- **The ground is drawn in three dimensions**, seen from a corner, instead of from above. Every stand shows its rows,
+  its sectors split by aisles, its roof, its hospitality boxes behind glass, and the floodlights, fence, road and trees
+  round it. Still a drawing, not a bitmap: the biggest ground is 342 shapes.
+- **Seats take both club colours.** The first colour is every seat; the second runs across each sector as a diagonal band.
+  The second colour is also the roof trim, the frames of the boxes, half the advertising boards and the club flag.
+- **Every level shows every kind of place** — standing terraces, open seats, covered seats and boxes — because a club
+  opens with all four and places are never removed. Level 1 now has seats; before, it showed terraces only. A terrace
+  stays a terrace, and a seated tier rises over it where a level wants seats.
+- **A small ground fills its picture.** Each level is framed to its own fenced ground, so level 1 is no longer a small
+  ground in a field sized for level 10.
+- The picture is full width, with the name of each stand beside it. The gallery of every level draws the same grounds
+  with fewer rows.
+
+### Added
+
+- **A key of the four kinds of place under the picture**, each with the club's own seats as its swatch and its real places
+  from the server. Pointing at a kind, focusing it or choosing it lights its sectors in the picture; choosing it again
+  lets it go.
+
 ## Replay v6 — players hold a shape, and set pieces look like set pieces
 
 Recorded in [`ADR-0064`](docs/architecture/adr/0064-replay-v6-shape-and-set-pieces.md). `ReplayDirector.Version` is

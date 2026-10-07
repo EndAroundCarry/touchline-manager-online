@@ -9,6 +9,7 @@ import {
   placesPhrase,
   standLabel,
 } from '../../core/stadium/stadium-presentation';
+import { safeColour } from '../../core/stadium/stadium-scene';
 import { StadiumStore } from '../../core/stadium/stadium-store';
 import { Stadium, StadiumStand, StadiumStandCode } from '../../core/stadium/stadium.models';
 import { formatFunds, preferredLocale } from '../../core/world/presentation';
@@ -28,11 +29,12 @@ const QUICK_ORDERS: readonly number[] = [100, 500, 1_000];
 /**
  * The stadium screen (`STAD-1`…`STAD-6`).
  *
- * A manager sees the ground as a picture in the club's colours, how big it is and how far it is from the next
- * level, and the four kinds of place with what each sells for, costs to add, and how full it gets. They can add
- * as many places of any kind as the club can pay for. Every price, cost and crowd comes from the server; the
- * screen only multiplies a quoted cost by the number being considered, so the figure shown beside the button is
- * the figure the server charges.
+ * A manager sees the ground as a three-dimensional picture with its seats in the club's two colours, how big it is
+ * and how far it is from the next level, and the four kinds of place with what each sells for, costs to add, and
+ * how full it gets. Pointing at a kind of place lights its sectors in the picture. They can add as many places of
+ * any kind as the club can pay for. Every price, cost and crowd comes from the server; the screen only multiplies a
+ * quoted cost by the number being considered, so the figure shown beside the button is the figure the server
+ * charges.
  */
 @Component({
   selector: 'app-stadium',
@@ -61,6 +63,13 @@ export class StadiumScreen {
 
   /** The places the manager is considering, by stand. Absent means nothing typed yet. */
   private readonly counts = signal<Readonly<Partial<Record<StadiumStandCode, number>>>>({});
+
+  /** The kind of place chosen in the legend, which stays lit, and the one pointed at, which lights while pointed. */
+  private readonly pinned = signal<StadiumStandCode | null>(null);
+  private readonly pointed = signal<StadiumStandCode | null>(null);
+
+  /** The kind of place to light in the picture. */
+  protected readonly highlight = computed(() => this.pointed() ?? this.pinned());
 
   /** Every level the stadium can reach, for the gallery. */
   protected readonly levels = computed(() => {
@@ -110,6 +119,36 @@ export class StadiumScreen {
   /** How full a stand gets at a mid-table home match. */
   protected fill(stand: StadiumStand): number {
     return fillPercent(stand);
+  }
+
+  /** Keeps a kind of place lit in the picture, or lets it go when it already is. */
+  protected toggleRegion(code: StadiumStandCode): void {
+    this.pinned.update((current) => (current === code ? null : code));
+  }
+
+  /** Lights a kind of place while the pointer or the focus is on it. */
+  protected pointAt(code: StadiumStandCode | null): void {
+    this.pointed.set(code);
+  }
+
+  /**
+   * What a kind of place looks like in the picture, as a swatch for the legend. Drawn from the club's own colours, so
+   * the legend shows the seats a manager will find in the picture and not a stock key.
+   */
+  protected swatch(ground: Stadium, code: StadiumStandCode): string {
+    const primary = safeColour(ground.primaryColour);
+    const secondary = safeColour(ground.secondaryColour, '#d6e4f0');
+
+    switch (code) {
+      case 'standing':
+        return 'repeating-linear-gradient(90deg, #aeb7c1 0 3px, #8e98a3 3px 5px)';
+      case 'seating':
+        return `repeating-linear-gradient(135deg, ${primary} 0 5px, ${secondary} 5px 8px)`;
+      case 'covered_seating':
+        return `linear-gradient(#d5dbe2 0 30%, transparent 30%), repeating-linear-gradient(135deg, ${primary} 0 5px, ${secondary} 5px 8px)`;
+      case 'vip':
+        return 'linear-gradient(#2d3842 0 35%, #6fa5c9 35% 70%, #2d3842 70%)';
+    }
   }
 
   /** The places the manager has typed for a stand, or zero. */

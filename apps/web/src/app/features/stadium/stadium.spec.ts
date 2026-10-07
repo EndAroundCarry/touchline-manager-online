@@ -128,19 +128,143 @@ describe('Stadium screen', () => {
     );
   });
 
-  it('draws the stadium at its level with the seats in the club colour', async () => {
-    await render(stadium({ level: 3, primaryColour: '#6a4c93' }));
+  it("draws the stadium at its level with the seats in the club's two colours", async () => {
+    await render(stadium({ level: 3, primaryColour: '#6a4c93', secondaryColour: '#f2c94c' }));
 
     const picture = root.querySelector('[data-testid="stadium-figure"] svg')!;
+    const strokes = (role: string) =>
+      Array.from(
+        new Set(
+          Array.from(picture.querySelectorAll(`path[data-role="${role}"]`)).map((path) =>
+            path.getAttribute('stroke'),
+          ),
+        ),
+      );
 
     expect(picture.getAttribute('data-level')).toBe('3');
     expect(picture.getAttribute('aria-label')).toContain('level 3');
 
-    const seatFills = Array.from(picture.querySelectorAll('pattern rect')).map((rect) =>
-      rect.getAttribute('fill'),
+    expect(strokes('seat')).toEqual(['#6a4c93']);
+    expect(strokes('seat-alt')).toEqual(['#f2c94c']);
+  });
+
+  it('names the stands in the picture', async () => {
+    await render(stadium({ level: 3 }));
+
+    const names = Array.from(
+      root.querySelectorAll('[data-testid="stadium-figure"] [data-testid="stadium-labels"] text'),
+    ).map((label) => label.textContent);
+
+    expect(names).toEqual(['Main stand', 'East end', 'West end', 'Opposite stand']);
+  });
+
+  it('lists the four kinds of place beside the picture, with the places of each', async () => {
+    await render();
+
+    const kinds = Array.from(
+      root.querySelectorAll<HTMLElement>('[data-testid="stadium-regions"] button'),
     );
 
-    expect(seatFills).toContain('#6a4c93');
+    expect(kinds.map((kind) => kind.getAttribute('data-region'))).toEqual([
+      'standing',
+      'seating',
+      'covered_seating',
+      'vip',
+    ]);
+    expect(kinds[0].textContent).toContain('Standing');
+    expect(kinds[0].textContent).toContain('3,000 places');
+    expect(kinds[3].textContent).toContain('100 places');
+    expect(kinds.every((kind) => kind.getAttribute('aria-pressed') === 'false')).toBe(true);
+  });
+
+  /** The planes of the picture that are lit, by the kind of place they belong to. */
+  const lit = () =>
+    Array.from(root.querySelectorAll('[data-testid="stadium-figure"] path[data-role="region"]'))
+      .filter((plane) => plane.getAttribute('opacity') !== '0')
+      .map((plane) => plane.getAttribute('data-region'));
+
+  it('lights a kind of place in the picture when it is chosen, and lets go when it is chosen again', async () => {
+    await render(stadium({ level: 5 }));
+
+    const standing = root.querySelector<HTMLButtonElement>('button[data-region="standing"]')!;
+
+    expect(lit()).toEqual([]);
+
+    standing.click();
+    await fixture.whenStable();
+
+    expect(standing.getAttribute('aria-pressed')).toBe('true');
+    expect(
+      root.querySelector('[data-testid="stadium-figure"] svg')!.getAttribute('data-highlight'),
+    ).toBe('standing');
+    expect(lit().length).toBeGreaterThan(0);
+    expect(new Set(lit())).toEqual(new Set(['standing']));
+
+    standing.click();
+    await fixture.whenStable();
+
+    expect(standing.getAttribute('aria-pressed')).toBe('false');
+    expect(lit()).toEqual([]);
+  });
+
+  it('lights a kind of place while it is pointed at or has focus', async () => {
+    await render(stadium({ level: 5 }));
+
+    const vip = root.querySelector<HTMLButtonElement>('button[data-region="vip"]')!;
+
+    vip.dispatchEvent(new Event('pointerenter'));
+    await fixture.whenStable();
+
+    expect(new Set(lit())).toEqual(new Set(['vip']));
+
+    vip.dispatchEvent(new Event('pointerleave'));
+    await fixture.whenStable();
+
+    expect(lit()).toEqual([]);
+
+    vip.dispatchEvent(new Event('focus'));
+    await fixture.whenStable();
+
+    expect(new Set(lit())).toEqual(new Set(['vip']));
+
+    vip.dispatchEvent(new Event('blur'));
+    await fixture.whenStable();
+
+    expect(lit()).toEqual([]);
+  });
+
+  it('lights the chosen kind even when another is pointed at, then goes back to it', async () => {
+    await render(stadium({ level: 5 }));
+
+    root.querySelector<HTMLButtonElement>('button[data-region="seating"]')!.click();
+    await fixture.whenStable();
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-region="vip"]')!
+      .dispatchEvent(new Event('pointerenter'));
+    await fixture.whenStable();
+
+    expect(new Set(lit())).toEqual(new Set(['vip']));
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-region="vip"]')!
+      .dispatchEvent(new Event('pointerleave'));
+    await fixture.whenStable();
+
+    expect(new Set(lit())).toEqual(new Set(['seating']));
+  });
+
+  it('draws the level gallery lighter than the picture, and without names', async () => {
+    await render(stadium({ level: 8, capacity: 37_000 }));
+
+    const figure = root.querySelector('[data-testid="stadium-figure"] svg')!;
+    const thumbnail = root.querySelector('[data-testid="stadium-levels"] [data-level="8"] svg')!;
+
+    expect(thumbnail.querySelectorAll('path').length).toBeLessThan(
+      figure.querySelectorAll('path').length,
+    );
+    expect(thumbnail.querySelector('[data-testid="stadium-labels"]')).toBeNull();
+    expect(thumbnail.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('changes the picture when the level changes', async () => {

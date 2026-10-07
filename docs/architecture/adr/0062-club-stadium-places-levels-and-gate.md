@@ -1,6 +1,6 @@
 # ADR-0062: A club's stadium is a count of places, its level is read from them, and gate revenue is what they sell
 
-- **Status:** Accepted
+- **Status:** Accepted (decision 6 superseded by [ADR-0065](0065-stadium-picture-in-three-dimensions.md))
 - **Date:** 2026-10-06
 - **Stage:** Facilities milestone, after Stage 12
 - **Related:** game rules `FIN-3`, `FIN-10`, `FIN-14`, `FIN-17`, `STAD-1`…`STAD-6`, [ADR-0009](0009-time-identity-and-concurrency.md)
