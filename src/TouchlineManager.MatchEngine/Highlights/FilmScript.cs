@@ -210,7 +210,7 @@ internal static class FilmScript
             {
                 HoldKind.KickOff => options.KickOffHoldSeconds,
                 HoldKind.GoalKick or HoldKind.KeeperBall => options.GoalKickHoldSeconds,
-                HoldKind.FreeKick => formation == FormationMode.Open ? options.QuickFreeKickHoldSeconds : options.SetPieceHoldSeconds,
+                HoldKind.FreeKick => formation == FormationMode.Open ? options.QuickFreeKickHoldSeconds : options.FreeKickHoldSeconds,
                 HoldKind.Corner or HoldKind.Penalty => options.SetPieceHoldSeconds,
                 HoldKind.Goal => options.GoalHoldSeconds,
                 HoldKind.Card => options.CardHoldSeconds,
@@ -760,6 +760,13 @@ internal static class FilmScript
             };
 
             state.SetPiece = formation;
+
+            // The sides begin to take up a free kick when the foul is given, not when the ball is set down: it is the one
+            // thing that gives the players time to get there (`replay-v13`).
+            if (kind == HoldKind.FreeKick && state.Last is { Kind: BeatKind.Duel, Foul: true } fouled && fouled.Formation == FormationMode.Open)
+            {
+                fouled.Formation = formation;
+            }
 
             if (start.DistanceTo(to.Point) > MinMove)
             {

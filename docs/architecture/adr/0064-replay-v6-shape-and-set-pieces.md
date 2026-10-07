@@ -177,3 +177,14 @@ line wherever the ball was, where the reference has him 12 to 14 m out at halfwa
 keeper of the side without it stood 4 to 5 m off where the reference has about 2 m. The film now stands the first on a ladder
 of the ball's depth (3 m while his side builds from the back, 13 m at halfway, 28 m at the far goal line, 28 m at a corner
 his side takes) and the second 1.5 to 2.5 m off his line. Restarts whose focus is not the ball keep him home.
+
+*Amended in `replay-v13`.* The set pieces were not set when taken: the runners of a corner and a free kick waited 5 m short of
+their places and ran in over the last 2 s, a free kick struck at goal had a wall and nothing else at the box (7 of the 20 within 25 m of
+the goal, the reference 11 to 15), and about 41% of the players of a free kick were still running flat out at the strike. The film
+now sets the pack in its places for the whole hold and has it drift 1.6 to 3.0 m in pairs, by a hash of the set piece and the pair,
+and in its places at the strike; a free kick has the pack the reference shows (pairs of an attacker and a marker 13.5 to 17.5 m
+from the goal line, a line of four, a pair at the top of the D), struck or crossed; a corner keeps two back, one on the outlet; the
+sides begin to take up a free kick at the foul; and a corner or a penalty is held 1.4 s of film and a free kick 1.5 s (1.2). The cost is
+a pace of 2.68x (2.65x) and 89.7% of matches inside the band (92.3%). A pack of a free kick from 30 m or more out still has about a
+quarter of its players arriving at the strike, because a player covers about 28 m in the 4.5 s the foul and the hold last at 8 m/s; settling
+them would cost more pace, and was left for the viewer to judge.

@@ -467,8 +467,11 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets how long a quick free kick is held.</summary>
     public double QuickFreeKickHoldSeconds { get; init; } = 0.6;
 
-    /// <summary>Gets how long a corner, a penalty, or a free kick that will be struck or crossed is held.</summary>
-    public double SetPieceHoldSeconds { get; init; } = 1.2;
+    /// <summary>Gets how long a corner or a penalty is held: long enough for most of the players to reach their places at a player's speed (`replay-v13`, up from 1.2).</summary>
+    public double SetPieceHoldSeconds { get; init; } = 1.4;
+
+    /// <summary>Gets how long a free kick that will be struck or crossed is held: longer than a corner, which has the ball being put down to give the players time to take up their places (`replay-v13`).</summary>
+    public double FreeKickHoldSeconds { get; init; } = 1.5;
 
     /// <summary>Gets how long a goal and its celebration are held.</summary>
     public double GoalHoldSeconds { get; init; } = 4.0;

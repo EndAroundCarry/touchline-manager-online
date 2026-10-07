@@ -198,6 +198,46 @@ lengthened (16.9%), ball still outside holds (3.4% / 4.3%), crowding and every o
 nearer to the goal line, so a shot that goes wide ends 2.5 m from him at p05, not 3.0 m: the benchmark's target now reads
 2.5 m, as the test always did. The keeper as a strike arrives is 4.0 m from the goal mouth at p95 as before.
 
+### Follow-up: set pieces are set (`replay-v13`)
+
+`ReplayDirector.Version` is `replay-v13`, so a film cached under `replay-v12` is fetched again. Film only; the engine,
+the golden hashes and the calibration do not move.
+
+Counted against the Football Manager reference clips, a set piece was not set when it was taken: the runners of a corner
+and a free kick waited 5 m short of their places and ran in during the last 2 s, a free kick struck at goal had a wall and
+nothing else at the box (7 of the 20 players within 25 m of the goal; the reference has 11 to 15), and about 41% of the
+players of a free kick were still running flat out as the ball was struck. Now:
+
+- **No run-in at the strike.** Everybody takes up his place and the pack *drifts* a metre or two while the set piece
+  waits (1.6 to 3.0 m, back from the ball and to one side, a pair together so that who marks whom does not come apart; the
+  wall does not drift). Which way each pair goes is a function of the set piece and the pair, so a film is the same
+  every time. At the strike everybody is in his place.
+- **A free kick has the pack the reference shows.** Attackers each with a marker goal-side of them, a loose line 12 to 18 m
+  from the goal line, two defenders at the near corner of the box, one attacker with a marker at the top of the D for the
+  second ball, two or three left at the circle. A kick struck at goal keeps its wall and gets three of these pairs; one
+  delivered into the box has five. A kick from close in sets the whole pack back towards the goal line by one share, so it
+  keeps its shape and does not stack.
+- **A corner has two players held back, one of them on the defender left up the pitch**, and three attackers waiting
+  outside the box for the second ball, one of them at the top of the D (it was three held back and two at the edge).
+- **The sides begin to take up a free kick when the foul is given**, not when the ball is set down, which is the only way
+  to give the players time to reach their places at a player's speed. Corners already had the ball being put down.
+- **Holds**: a corner or a penalty 1.4 s of film (1.2), a free kick struck or crossed 1.5 s (1.2), so that most of the
+  pack gets there. This is the one cost: the pace is 2.68x (2.65x) and sits inside its band for 89.7% of matches (92.3%).
+- Players close in on their places faster at a corner or a free kick (they run until they have to brake).
+
+Measured over 300 matches, against the reference: players within 25 m of the goal at a corner 13 (12; reference 13 to 14),
+at a free kick 11 (10; struck at goal 10 and delivered 11 on this sample, 7 and 11 before on a 100-match sample;
+reference 11 to 15); the share running flat out as the ball is struck, a corner 11% (17%) and a free kick 29% (41%, on
+the same 100-match sample); the share settled in their places 41% (32%). The film is still 10.1 min at the median, the
+ball standing still outside holds 3.4% and 4.3% as before, moves lengthened for constraints 16.9% as before, no
+teleports; crowding (5 or more within 5 m 4.2%, 4 or more within 3 m 2.8%), the keepers, a cross arriving into the box and a
+corner delivered are as they were. The wall is now counted as the defenders standing on the ten yards (9.05 to 11 m); those
+nearer are intruders and counted as such, which is what the "inside 9.15 m" figure already says (2.0 at p95, as before).
+
+The players who cannot get there are the ones who have to run the furthest, and a pack the size of a free kick's from
+a spot 30 m or more out is still arriving for about a quarter of its players: a player covers about 28 m in 4.5 s at 8 m/s,
+and the foul and the hold together last about that long. Longer holds would settle the rest at the cost of pace.
+
 ### Known gaps
 
 Crowding is reduced, not gone: a run of 3 to 10 m passes keeps the passer, the receiver and the next receiver within a

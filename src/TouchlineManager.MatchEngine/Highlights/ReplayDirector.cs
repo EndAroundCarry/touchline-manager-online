@@ -28,7 +28,7 @@ namespace TouchlineManager.MatchEngine.Highlights;
 public static class ReplayDirector
 {
     /// <summary>The version label of this presentation.</summary>
-    public const string Version = "replay-v12";
+    public const string Version = "replay-v13";
 
     /// <summary>The most times the film is played again to let its pace settle.</summary>
     private const int MaxSettlingRuns = 4;
@@ -783,11 +783,23 @@ public sealed record ShapeMetrics
     /// <summary>Gets how fast the players who have settled in their places move about while the set piece waits, in metres per second of film: nought is frozen, the reference drifts a metre or two every few seconds.</summary>
     public required double SetPieceSettledMotion { get; init; }
 
+    /// <summary>Gets the mean share of the waiting outfield players of a corner who are running flat out as it is taken: nought is a pack that is in its places (`replay-v13`).</summary>
+    public required double CornerRunningShare { get; init; }
+
+    /// <summary>Gets the same for a free kick (`replay-v13`).</summary>
+    public required double FreeKickRunningShare { get; init; }
+
     /// <summary>Gets, as a corner is about to be taken, the median number of outfield players, both sides, within twenty-five metres of the goal: the reference has most of them there.</summary>
     public required double CornerGoalPackP50 { get; init; }
 
     /// <summary>Gets, as a free kick is about to be taken, the median number of outfield players, both sides, within twenty-five metres of the goal.</summary>
     public required double FreeKickGoalPackP50 { get; init; }
+
+    /// <summary>Gets the same for a free kick struck at goal (`replay-v13`).</summary>
+    public required double FreeKickShotGoalPackP50 { get; init; }
+
+    /// <summary>Gets the same for a free kick delivered into the box (`replay-v13`).</summary>
+    public required double FreeKickCrossGoalPackP50 { get; init; }
 
     /// <summary>Gets how many steps had a carrier running a wing with the defence to be measured against.</summary>
     public required int WingCarrySamples { get; init; }

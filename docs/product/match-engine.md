@@ -2,7 +2,7 @@
 
 > **Status:** Executable specification for `engine-v11` / `engine-rules-v10`, implemented in
 > `src/TouchlineManager.MatchEngine`.
-> **Applies to:** engine version `11`, engine rules version `10`, commentary `commentary-v3`, replay `replay-v12`.
+> **Applies to:** engine version `11`, engine rules version `10`, commentary `commentary-v3`, replay `replay-v13`.
 > The rating weights and tactical modifiers carry their own versions (§6.1, §6.5).
 > **Engine versions 6 to 10** are described in the sections that name them: the skill model (§7.9, `engine-v6`),
 > ball-play statistics (§8.2, `engine-v7`), the pass focus (§7.x, `engine-v8` and `engine-v9`), and positions and the
@@ -788,7 +788,7 @@ the tests hold an allowlist of parameter names.
 
 ---
 
-## 10. Replay: the film and the reel (`replay-v12`)
+## 10. Replay: the film and the reel (`replay-v13`)
 
 `ReplayDirector.Build(input, result, passages, options, liveMetrics)` re-derives the whole presentation
 from the frozen snapshot, the result, the recorded passages (ADR-0051, ADR-0053), and the optional live metric
@@ -796,7 +796,7 @@ curve. It is a pure function of those inputs and consumes no draw; the presentat
 why a replay revision is a clean contract change rather than a migration (ADR-0052). `replay-v4` replaced the
 time warp and the anchor tracks of `replay-v3` (ADR-0054); `replay-v6` changed where the players stand and how a
 set piece is laid out (ADR-0064), `replay-v7` stops the ball being ringed (the clearance zone and the duel's
-one challenger, below), `replay-v8` shows a corner as a ball played in and a touch short of the line, `replay-v9` keeps the keeper on his line (below), `replay-v10` lets nobody play a ball to himself, `replay-v11` holds a ball played in along the ground at the goal line while a defender closes the man down before it is won, and `replay-v12` brings the keeper of the side with the ball up the pitch with it. Every constant below is a field of
+one challenger, below), `replay-v8` shows a corner as a ball played in and a touch short of the line, `replay-v9` keeps the keeper on his line (below), `replay-v10` lets nobody play a ball to himself, `replay-v11` holds a ball played in along the ground at the goal line while a defender closes the man down before it is won, `replay-v12` brings the keeper of the side with the ball up the pitch with it, and `replay-v13` sets the set pieces (below). Every constant below is a field of
 `HighlightOptionsV1`: the film's pace is a presentation decision, so none of it can move a result.
 
 **One film at one pace.** `FilmScript` turns each possession into *beats* — carry, pass, lofted pass, cross,
@@ -812,7 +812,7 @@ ended without a restart gets a transition beat at physical speed.
 `FilmTiming` gives each move its natural real-time length — its distance at the speed of its kind plus
 `ControlSeconds` = 0.3 (pass 15 m/s, lofted 20, cross 21, clearance 24, shot 27, header 14, carry 5–7 by
 Dribbling, placement 8) — and each hold a fixed film length (kick-off 1.2 s, goal kick 0.8, quick free kick
-0.6, set piece 1.2, goal and celebration 4.0, card 1.0, substitution 1.0, half-time card 3.0), and solves **one
+0.6, corner and penalty 1.4, free kick struck or crossed 1.5, goal and celebration 4.0, card 1.0, substitution 1.0, half-time card 3.0), and solves **one
 pace** for the whole film: `p = motionSeconds / (targetSeconds − holdSeconds)`.
 
 - `targetSeconds = clamp(playedSeconds / 10, 9:30, 11:00)` (`FilmMatchSecondsPerFilmSecond` = 10). **11:00 is a
@@ -841,9 +841,10 @@ engine marked (§7.11), sends outlets forward. Everybody the beat is not about k
 comes into a box with near-post, far-post, spot and cutback runners and goal-side markers. **Set pieces are laid
 out for what they are**: every corner is preceded by the ball being played towards the goal line by the attacking side and a defender's
 touch a few metres short of it (a block or a header), or by a keeper's tip round the post, and the sides set for the
-corner only once the ball is out, then by role and mirrored by the flag (taker, four runners, two at the edge, two or three held back; two posts, three
-zonal, markers, an outlet); a free kick struck at goal has a wall of 2 to 5 by distance and the keeper on the far
-side, one crossed into the box has no wall, a quick one keeps open-play shape with the defence 9.5 m off; a
+corner only once the ball is out, then by role and mirrored by the flag (taker, four runners, three outside the box, two held back, one of them on the outlet; two posts, three
+zonal, markers, an outlet); a free kick struck at goal has a wall of 2 to 5 by distance, the keeper on the far
+side and the rest of the defence a pack at the box with a marker on each of three attackers, one crossed into the box has no wall and the pack with five,
+a quick one keeps open-play shape with the defence 9.5 m off; a
 penalty has everybody outside the box and the arc; a goal kick spreads the kicking side and steps the other up.
 **Hard constraints override the shape**: the carrier is at the ball, the receiver at the reception point when the
 ball arrives, the shooter, the header pair and the fouler and fouled player at their touches, the keeper at the
@@ -864,6 +865,26 @@ side without the ball stands `1.5 + 0.01 d` m off his line, at most 2.5 m. Kick-
 keep him home. The reference has the attacking keeper 12 to 14 m out with the ball at halfway and 15 to 30 m inside 25 m
 of goal, the defending one about 2 m. Measured (own / middle / final third of the ball): attacking 4.0 / 7.9 / 15.9 m
 (4.4 / 3.8 / 4.5 before), defending 11.3 / 5.3 / 2.3 m (5.2 / 4.3 / 3.6, the first being the walk back after a turnover).
+**Set pieces are set** (`replay-v13`): nobody runs in at the strike. A corner, a free kick struck at goal and one
+delivered into the box are arranged from the moment they are known to be coming (a free kick from the foul, which is the
+`Duel` beat before it), and while the hold lasts each pair of the pack drifts 1.6 to 3.0 m (`DriftLeast`, `DriftMost`) back from
+the ball and up to 1 rad to either side (`DriftTurn`), setting off up to 0.3 of the hold in and taking 0.6 of it (`DriftStart`,
+`DriftSpan`), a smooth step; the two of a pair share a key, the key and the possession pick the numbers (`Chance`, a
+hash: no randomness), the wall, the taker and the keepers do not drift, and at the strike everybody is in his place
+(`ShapeState.Waited` is the share of the hold gone, nought outside it). A free kick's pack (`FreeKickRunners`,
+`FreeKickLine`, `FreeKickEdge`) is five pairs of an attacker and a marker 1.4 m goal-side of him at 13.5 to 17.5 m from the
+goal line, a line of four, one pair at the top of the D at 25.5 m and two or three attackers at the circle, the best headers of
+the attackers going in (three for a kick struck at goal, five for one delivered); from a spot closer than about 31 m the whole
+pack is scaled towards the goal line by `(spot depth - 12) / 19.5`, at least 0.45, so that it stays clear of the wall and keeps
+its shape. A corner has two held back (`CornerGuards`, the first goal-side of the outlet), four runners, three outside the
+box (`CornerEdge`) and the posts, zones and markers as before. A pack running to its places keeps 0.9 of the speed it could
+still stop from (`PackBraking`), rather than the smooth close-in of open play. A corner and a penalty are held 1.4 s of film
+(`SetPieceHoldSeconds`) and a free kick that is struck or crossed 1.5 s (`FreeKickHoldSeconds`), up from 1.2. Measured over 300
+matches (before): players within 25 m of the goal at a corner 13 (12) and at a free kick 11 (10; reference 13 to 14 and 11 to
+15); running flat out as the ball is struck, a corner 11% (17%) and a free kick 29% (41%); settled in their places 41% (32%);
+pace 2.68x (2.65x), inside the band 89.7% (92.3%), the film 10.1 min, the ball standing still outside holds 3.4% / 4.3%, moves
+lengthened 16.9%, and crowding, the keepers and the delivery as before.
+
 **A held ball wins a corner** (`replay-v11`): a ball played in along the ground towards the goal line is received by the
 attacker who can reach it soonest (a pending receiver, found as it is played), who is then *held*: a `Duel` beat with
 `Contested` set, whose ball stays at his feet for `ContestSeconds` = 3.0 s of real time (about 1.1 s of film at 2.65x),
@@ -1262,8 +1283,8 @@ a test that is switched off catches nothing.
 | `PassageTests` | One passage per possession; waypoints and touches on the pitch and in fraction order; every shot in the attacking third and free-kick shots in range; touches naming match participants; recorder determinism; the with/without-recorder hash equality. Since `engine-v5`: the possessions tile each half; events ordered and positioned; an outcome that tells the truth; a goal inside the goal mouth, a save at the keeper, a miss out of play, the woodwork and its rebound, a block two to six metres out, a penalty placement, a corner's path, a free kick's placement, the fouler and the fouled player, the scramble contestants, and the header pair. |
 | `HalfTimeClockTests` | `MAT-3`: the second half kicks off at 46'; each half plays its own regulation and stoppage; event minutes are 1'…45'+N and 46'…90'+N; `TotalMinutesPlayed` counts only the stoppage the clock used; substitutions at the planner's windows; the live metrics cover every minute. |
 | `RestartOwnershipTests` | `MAT-12`: the right side kicks each half off; every dead ball is taken by the side that owns it and by nobody else; a goal is followed by the conceding side's kick-off; a save is the keeper's ball and a miss a goal kick; a foul or offside gives the free kick to the right side; a loose ball is not a restart; a goal-area start only ever follows a keeper's ball or a goal kick; possessions join except at a placement. |
-| `ReplayDirectorTests` | `replay-v12`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
-| `FilmRolesTests`, `FilmCornerTests`, `FilmSetPieceTests`, `FilmMotionTests` | `replay-v6`: one challenger and a cover, options at 10 m and more, back-line eligibility; a cross arrives into a populated box; a corner is preceded by a ball played in and a defender or keeper touch a few metres from where it leaves play, the taker is at the ball when it is delivered, mirrored by the flag, with two or three held back; a free kick differs for a shot, a delivery and a quick one; no penalty position inside 9.15 m of the spot or inside the box; the shape metrics (`FilmDiagnostics.ShapeMetrics`). |
+| `ReplayDirectorTests` | `replay-v13`: one contiguous schedule; the film between 9:00 and 11:00 and never longer, with a median near ten minutes; a short film is a faster one, not a longer one; one pace inside its band; the ball and the players never faster than their caps times the pace outside a cut; each half on its own clock, the second starting at 45:00; the displayed minute at each event is its stamped minute; boundary frames joined except at a cut; cuts only at a kick-off and the interval; on-pitch, in-passage keyframes; the eleven and the ball with a track each; `MAT-11`-safe commentary read when the beat happens; the reel carrying every goal; determinism; the payload budget. |
+| `FilmRolesTests`, `FilmCornerTests`, `FilmSetPieceTests`, `FilmMotionTests` | `replay-v6`: one challenger and a cover, options at 10 m and more, back-line eligibility; a cross arrives into a populated box; a corner is preceded by a ball played in and a defender or keeper touch a few metres from where it leaves play, the taker is at the ball when it is delivered, mirrored by the flag, with two held back and one of them on the outlet, the pack drifting a metre or two while it waits and in its places at the strike; a free kick differs for a shot, a delivery and a quick one, with the pack at the box and a wall that stands still; no penalty position inside 9.15 m of the spot or inside the box; the shape metrics (`FilmDiagnostics.ShapeMetrics`). |
 | `FilmScriptTests`, `FilmMotionTests` | Every possession scripted into contiguous beats that join except at a cut; a cross only from a wide position into the box; restarts taken by the owning side; the players the engine named at their beats; a goal followed by its celebration and a cut; no teleports; receivers at the ball when it arrives; a carrier at the ball; the keeper at a save; a goal ending in the goal mouth; the ball never left standing outside the holds; fixed hold lengths; quiet play condensed before the pace rises. |
 | `BallPlayStatisticsTests` | `engine-v7` (§8.2): a completed count is a nonnegative subset of its attempted one; nobody who did not take the pitch passed or dribbled; an assist is a completed pass; counting is repeatable; a side's volumes and completion rates read like football; a better passer has the ball more and completes a higher share. |
 | `OffBallModelTests` | `engine-v10` (§7.10): home and away mirror, openness falls with a nearby defender, the depth rule's truth table, determinism. |

@@ -63,6 +63,8 @@ public sealed class FilmReferenceMeasureTests
                 shape.SetPieceHoldSeconds.Should().BeInRange(0.3, 6.0, "a set piece waits for about a second of film");
                 shape.SetPieceSettledShare.Should().BeInRange(0, 1);
                 shape.SetPieceSettledMotion.Should().BeInRange(0, 12);
+                shape.CornerRunningShare.Should().BeInRange(0, 1);
+                shape.FreeKickRunningShare.Should().BeInRange(0, 1);
             }
         }
 
@@ -125,6 +127,48 @@ public sealed class FilmReferenceMeasureTests
         (final / Seeds).Should().BeGreaterThanOrEqualTo(13.0);
         (defendMiddle / Seeds).Should().BeLessThan(6.0, "the keeper of the side without the ball is near his line (reference about 2 m)");
         (defendFinal / Seeds).Should().BeLessThan(4.0);
+    }
+
+    [Fact]
+    public void A_set_piece_is_set_by_the_strike_and_its_pack_is_where_the_reference_has_it()
+    {
+        double corner = 0, freeKick = 0, freeKickShot = 0, freeKickCross = 0, cornerRunning = 0, freeKickRunning = 0, settled = 0, hold = 0;
+        var matches = 0;
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var shape = ShapeOf(seed);
+
+            if (shape.SetPieceHolds == 0)
+            {
+                continue;
+            }
+
+            matches++;
+            corner += shape.CornerGoalPackP50;
+            freeKick += shape.FreeKickGoalPackP50;
+            freeKickShot += shape.FreeKickShotGoalPackP50;
+            freeKickCross += shape.FreeKickCrossGoalPackP50;
+            cornerRunning += shape.CornerRunningShare;
+            freeKickRunning += shape.FreeKickRunningShare;
+            settled += shape.SetPieceSettledShare;
+            hold += shape.SetPieceHoldSeconds;
+        }
+
+        matches.Should().Be(Seeds);
+
+        // The reference has 13 to 15 of the 20 within twenty-five metres of the goal at a corner and 11 to 15 at a free kick;
+        // replay-v12 had 12 and 9 (7 for a free kick struck at goal).
+        (corner / matches).Should().BeInRange(12.0, 16.0, "the corner pack is where the reference has it");
+        (freeKick / matches).Should().BeInRange(10.0, 16.0, "and so is the free kick's");
+        (freeKickShot / matches).Should().BeGreaterThanOrEqualTo(8.5, "a free kick struck at goal has the pack at the box, not only the wall (replay-v12: 7)");
+        (freeKickCross / matches).Should().BeGreaterThanOrEqualTo(10.0);
+
+        // replay-v12 had 17 % of the players of a corner and 41 % at a free kick running flat out as the ball was struck.
+        (cornerRunning / matches).Should().BeLessThanOrEqualTo(0.15, "at a corner hardly anyone is still running in");
+        (freeKickRunning / matches).Should().BeLessThanOrEqualTo(0.35, "and at a free kick the pack is in its places for the most part");
+        (settled / matches).Should().BeGreaterThanOrEqualTo(0.36, "replay-v12 had a third settled");
+        (hold / matches).Should().BeInRange(1.3, 1.7, "a set piece waits for about a second and a half of film");
     }
 
     [Fact]

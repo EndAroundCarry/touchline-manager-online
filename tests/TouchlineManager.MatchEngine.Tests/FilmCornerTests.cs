@@ -272,8 +272,8 @@ public sealed class FilmCornerTests
         var taker = Outfield(context, taking).First(entity => context.Slots[entity].Family == MatchPositionFamily.Midfield);
         var goal = FilmSpace.AttackedGoal(taking);
 
-        var high = Targets(shape, roster, taking, new Vec(goal.X, FilmSpace.Width), taker, arrived: true);
-        var low = Targets(shape, roster, taking, new Vec(goal.X, 0), taker, arrived: true);
+        var high = Targets(shape, roster, taking, new Vec(goal.X, FilmSpace.Width), taker);
+        var low = Targets(shape, roster, taking, new Vec(goal.X, 0), taker);
 
         high[taker].Should().Be(new Vec(goal.X, FilmSpace.Width), "the taker is on the flag");
         low[taker].Should().Be(new Vec(goal.X, 0));
@@ -296,37 +296,55 @@ public sealed class FilmCornerTests
         double Along(Vec point) => Math.Abs(point.X - goal.X);
         bool InBox(Vec point) => Along(point) <= 16.5 && Math.Abs(point.Y - goal.Y) <= 20.2;
 
-        attackers.Count(point => Along(point) >= 40).Should().BeInRange(2, 3, "two or three stay back against a break");
+        attackers.Count(point => Along(point) >= 40).Should().Be(2, "two stay back against a break");
         attackers.Count(InBox).Should().Be(4, "four go into the box");
-        attackers.Count(point => !InBox(point) && Along(point) < 40).Should().Be(2, "two wait at its edge for the second ball");
+        attackers.Count(point => !InBox(point) && Along(point) < 40).Should().Be(3, "three wait outside it for the second ball, one of them at the top of the D");
 
         defenders.Count(point => Along(point) >= 40).Should().Be(1, "one is left up the pitch as an outlet");
+
+        var outlet = defenders.First(point => Along(point) >= 40);
+
+        attackers.Count(point => Along(point) >= 40 && point.DistanceTo(outlet) <= 2.0).Should().Be(1, "and one of the players held back is on him");
         defenders.Count(point => Along(point) <= 6 && Math.Abs(point.Y - goal.Y) <= 9.2).Should().BeGreaterThanOrEqualTo(5, "two on the posts and three holding the six-yard line");
         defenders.Count(InBox).Should().BeGreaterThanOrEqualTo(8);
     }
 
     [Fact]
-    public void The_runners_wait_five_metres_short_of_their_places_and_no_two_team_mates_share_one()
+    public void The_pack_drifts_a_metre_or_two_while_a_corner_waits_in_pairs_and_is_in_its_places_at_the_strike()
     {
         var (context, shape) = ShapeOf(5);
         var roster = context.Starters;
         var taker = Outfield(context, MatchSide.Home).First();
         var flag = new Vec(FilmSpace.Length, FilmSpace.Width);
 
-        var waiting = Targets(shape, roster, MatchSide.Home, flag, taker, arrived: false);
-        var arrived = Targets(shape, roster, MatchSide.Home, flag, taker, arrived: true);
+        var strike = Targets(shape, roster, MatchSide.Home, flag, taker);
+        var early = Targets(shape, roster, MatchSide.Home, flag, taker, waited: 0.1);
+        var late = Targets(shape, roster, MatchSide.Home, flag, taker, waited: 1.0);
 
-        var runners = Outfield(context, MatchSide.Home).Where(entity => entity != taker && InTheBox(arrived[entity])).ToList();
+        var inBox = Outfield(context, MatchSide.Home).Concat(Outfield(context, MatchSide.Away))
+            .Where(entity => entity != taker && InTheBox(strike[entity]))
+            .ToList();
 
-        runners.Should().HaveCount(4);
+        inBox.Count.Should().BeGreaterThanOrEqualTo(12, "the runners, their markers and the rest of the defence");
 
-        foreach (var runner in runners)
+        foreach (var entity in inBox)
         {
-            (FilmSpace.Length - waiting[runner].X).Should().BeApproximately(FilmSpace.Length - arrived[runner].X + 5.0, 1e-6, "a runner waits five metres short of the place he runs to");
-            waiting[runner].Y.Should().BeApproximately(arrived[runner].Y, 1e-6);
+            early[entity].DistanceTo(strike[entity]).Should().BeLessThan(1.0, "the drift has hardly begun");
+            late[entity].DistanceTo(strike[entity]).Should().BeInRange(1.5, 3.05, "a player has drifted a metre or two by the end of the wait, and no more");
         }
 
-        foreach (var shown in new[] { waiting, arrived })
+        // The two of a pair drift together, so that who marks whom does not come apart.
+        foreach (var runner in Outfield(context, MatchSide.Home).Where(entity => entity != taker && InTheBox(strike[entity])))
+        {
+            var marker = Outfield(context, MatchSide.Away).OrderBy(entity => strike[entity].DistanceTo(strike[runner])).First();
+
+            if (strike[marker].DistanceTo(strike[runner]) < 2.0)
+            {
+                late[marker].DistanceTo(late[runner]).Should().BeApproximately(strike[marker].DistanceTo(strike[runner]), 0.3, "a pair drifts together");
+            }
+        }
+
+        foreach (var shown in new[] { strike, early, late })
         {
             foreach (var side in new[] { MatchSide.Home, MatchSide.Away })
             {
@@ -340,6 +358,22 @@ public sealed class FilmCornerTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void The_drift_is_the_same_every_time_for_the_same_set_piece_and_not_for_another()
+    {
+        var (context, shape) = ShapeOf(5);
+        var roster = context.Starters;
+        var taker = Outfield(context, MatchSide.Home).First();
+        var flag = new Vec(FilmSpace.Length, FilmSpace.Width);
+
+        var first = Targets(shape, roster, MatchSide.Home, flag, taker, waited: 1.0, seed: 41);
+        var again = Targets(shape, roster, MatchSide.Home, flag, taker, waited: 1.0, seed: 41);
+        var other = Targets(shape, roster, MatchSide.Home, flag, taker, waited: 1.0, seed: 42);
+
+        first.Should().Equal(again, "the drift is a function of the set piece, not of chance");
+        Outfield(context, MatchSide.Home).Count(entity => first[entity].DistanceTo(other[entity]) > 0.5).Should().BeGreaterThan(3, "another set piece drifts another way");
     }
 
     [Fact]
@@ -367,7 +401,7 @@ public sealed class FilmCornerTests
         matches.Should().BeGreaterThan(8, "most matches have a corner");
         (attackers / matches).Should().BeGreaterThanOrEqualTo(3, "four runners, give or take one who is still arriving");
         (defenders / matches).Should().BeGreaterThanOrEqualTo(6, "the posts, the six-yard line and the markers");
-        (held / matches).Should().BeInRange(1.5, 3.5, "two or three are held back");
+        (held / matches).Should().BeInRange(1.5, 3.5, "two are held back, give or take one who is still on his way");
         sixYard.Should().BeLessThanOrEqualTo(8, "a crowded six-yard box is a handful of players, not a queue");
     }
 
@@ -383,11 +417,11 @@ public sealed class FilmCornerTests
         return (context, new FilmShape(context));
     }
 
-    private static Vec[] Targets(FilmShape shape, FilmRoster roster, MatchSide taking, Vec flag, int taker, bool arrived)
+    private static Vec[] Targets(FilmShape shape, FilmRoster roster, MatchSide taking, Vec flag, int taker, double waited = 0.0, int seed = 0)
     {
         var targets = new Vec[FilmRoster.Size];
 
-        shape.Fill(roster, new ShapeState(FormationMode.Corner, taking, flag, Taker: taker, Arrived: arrived), FilmSpace.Centre, targets);
+        shape.Fill(roster, new ShapeState(FormationMode.Corner, taking, flag, Taker: taker, Waited: waited, Seed: seed), FilmSpace.Centre, targets);
 
         return targets;
     }

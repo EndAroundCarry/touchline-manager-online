@@ -51,7 +51,7 @@ internal static class FilmMeasure
     /// <summary>How far from the ball the rules keep the defence at a free kick, and everybody at a penalty, in metres (`replay-v6`).</summary>
     private const double FreeKickClear = 9.15;
 
-    /// <summary>How far from the ball a defender is to count as part of the wall, in metres (`replay-v6`).</summary>
+    /// <summary>How far from the ball a defender is, at the most, to count as part of the wall, in metres: it stands on the ten yards, and those nearer than that are intruders, counted as such (`replay-v6`, `replay-v13`).</summary>
     private const double FreeKickWallReach = 11.0;
 
     /// <summary>Half the width of the six-yard box, in metres.</summary>
@@ -101,6 +101,9 @@ internal static class FilmMeasure
 
     /// <summary>How long a player has to have waited in his place to count as settled, in seconds of film.</summary>
     private const double SettledFor = 0.3;
+
+    /// <summary>How fast a player is going, in metres per second of real time, to count as running at the strike rather than standing or walking about (`replay-v13`).</summary>
+    private const double RunningAt = 5.0;
 
     /// <summary>Measures the film.</summary>
     public static FilmDiagnostics Measure(
@@ -283,11 +286,7 @@ internal static class FilmMeasure
         var farCount = new Average();
         var attackKeeper = new[] { new Average(), new Average(), new Average() };
         var defendKeeper = new[] { new Average(), new Average(), new Average() };
-        var settledMotion = new Average();
-        var cornerGoalPack = new Histogram(1.0, FilmRoster.Size + 1);
-        var freeKickGoalPack = new Histogram(1.0, FilmRoster.Size + 1);
-        var settledShare = new Average();
-        var holdSeconds = new Average();
+        var waiting = new WaitingTally();
         var chasers = new Histogram(1.0, FilmRoster.Size + 1);
         var wingSamples = 0;
         var chained = 0;
@@ -336,7 +335,7 @@ internal static class FilmMeasure
 
             if (beat.IsHold && beat.Possession >= 0 && beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross)
             {
-                MeasureWaiting(context, rosters[beat.Possession], motion, motion.Spans[index], beat, pace, cornerMarks, freeKickMarks, settledMotion, settledShare, holdSeconds, cornerGoalPack, freeKickGoalPack);
+                MeasureWaiting(context, rosters[beat.Possession], motion, motion.Spans[index], beat, pace, cornerMarks, freeKickMarks, waiting);
             }
 
             if (beat.IsHold && beat.Possession >= 0 && beat.Formation is FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty)
@@ -571,12 +570,16 @@ internal static class FilmMeasure
             FarPlayerCount = farCount.Value,
             AttackKeeperOffLine = new DepthBands(attackKeeper[0].Value, attackKeeper[1].Value, attackKeeper[2].Value),
             DefendKeeperOffLine = new DepthBands(defendKeeper[0].Value, defendKeeper[1].Value, defendKeeper[2].Value),
-            SetPieceHolds = holdSeconds.Count,
-            SetPieceHoldSeconds = holdSeconds.Value,
-            SetPieceSettledShare = settledShare.Value,
-            SetPieceSettledMotion = settledMotion.Value,
-            CornerGoalPackP50 = cornerGoalPack.Percentile(0.5),
-            FreeKickGoalPackP50 = freeKickGoalPack.Percentile(0.5),
+            SetPieceHolds = waiting.HoldSeconds.Count,
+            SetPieceHoldSeconds = waiting.HoldSeconds.Value,
+            SetPieceSettledShare = waiting.SettledShare.Value,
+            SetPieceSettledMotion = waiting.SettledMotion.Value,
+            CornerRunningShare = waiting.CornerRunning.Value,
+            FreeKickRunningShare = waiting.FreeKickRunning.Value,
+            CornerGoalPackP50 = waiting.CornerGoalPack.Percentile(0.5),
+            FreeKickGoalPackP50 = waiting.FreeKickGoalPack.Percentile(0.5),
+            FreeKickShotGoalPackP50 = waiting.FreeKickShotGoalPack.Percentile(0.5),
+            FreeKickCrossGoalPackP50 = waiting.FreeKickCrossGoalPack.Percentile(0.5),
             WingCarrySamples = wingSamples,
             ChasersP50 = chasers.Percentile(0.5),
             ChasersShare = wingSamples == 0 ? 0.0 : (double)chained / wingSamples,
@@ -763,20 +766,16 @@ internal static class FilmMeasure
         double pace,
         MarkCount cornerMarks,
         MarkCount freeKickMarks,
-        Average settledMotion,
-        Average settledShare,
-        Average holdSeconds,
-        Histogram cornerGoalPack,
-        Histogram freeKickGoalPack)
+        WaitingTally tally)
     {
         var attacking = hold.Side;
         var goal = FilmSpace.AttackedGoal(attacking);
         var taker = hold.Actor is Guid actor ? roster.EntityOf(actor) : -1;
         var last = span.LastRecord;
 
-        holdSeconds.Add(span.Seconds / pace);
+        tally.HoldSeconds.Add(span.Seconds / pace);
 
-        int players = 0, settled = 0, nearGoal = 0;
+        int players = 0, settled = 0, running = 0, nearGoal = 0;
 
         for (var entity = 0; entity < FilmRoster.Size; entity++)
         {
@@ -797,6 +796,15 @@ internal static class FilmMeasure
             players++;
             nearGoal += point.DistanceTo(goal) <= FreeKickPack ? 1 : 0;
 
+            // Running flat out as the ball is struck, which is not how a pack stands: the last step of the hold.
+            if (last > span.FirstRecord)
+            {
+                var seconds = motion.TimeOf(last) - motion.TimeOf(last - 1);
+                var before = new Vec(motion.PlayerX(last - 1, entity), motion.PlayerY(last - 1, entity));
+
+                running += seconds > 0 && point.DistanceTo(before) / seconds >= RunningAt ? 1 : 0;
+            }
+
             if (arrived <= last && motion.TimeOf(last) - motion.TimeOf(arrived) >= SettledFor * pace)
             {
                 var path = 0.0;
@@ -807,7 +815,7 @@ internal static class FilmMeasure
                         .DistanceTo(new Vec(motion.PlayerX(record - 1, entity), motion.PlayerY(record - 1, entity)));
                 }
 
-                settledMotion.Add(path / ((motion.TimeOf(last) - motion.TimeOf(arrived)) / pace));
+                tally.SettledMotion.Add(path / ((motion.TimeOf(last) - motion.TimeOf(arrived)) / pace));
                 settled++;
             }
 
@@ -831,8 +839,19 @@ internal static class FilmMeasure
 
         if (players > 0)
         {
-            settledShare.Add((double)settled / players);
-            (hold.Formation == FormationMode.Corner ? cornerGoalPack : freeKickGoalPack).Add(nearGoal);
+            tally.SettledShare.Add((double)settled / players);
+
+            if (hold.Formation == FormationMode.Corner)
+            {
+                tally.CornerGoalPack.Add(nearGoal);
+                tally.CornerRunning.Add((double)running / players);
+            }
+            else
+            {
+                tally.FreeKickGoalPack.Add(nearGoal);
+                (hold.Formation == FormationMode.FreeKickShot ? tally.FreeKickShotGoalPack : tally.FreeKickCrossGoalPack).Add(nearGoal);
+                tally.FreeKickRunning.Add((double)running / players);
+            }
         }
     }
 
@@ -977,7 +996,7 @@ internal static class FilmMeasure
             else if (FilmRoster.SideOf(entity) != attacking)
             {
                 inside += distance < FreeKickClear ? 1 : 0;
-                wall += distance < FreeKickWallReach ? 1 : 0;
+                wall += distance < FreeKickWallReach && distance >= FreeKickClear - 0.1 ? 1 : 0;
             }
         }
 
@@ -1089,6 +1108,28 @@ internal static class FilmMeasure
     }
 
     /// <summary>A fixed-width histogram, for percentiles of many samples without keeping them.</summary>
+    /// <summary>What is counted at every set piece that waits to be taken (`replay-v13`).</summary>
+    private sealed class WaitingTally
+    {
+        public Average HoldSeconds { get; } = new();
+
+        public Average SettledShare { get; } = new();
+
+        public Average SettledMotion { get; } = new();
+
+        public Average CornerRunning { get; } = new();
+
+        public Average FreeKickRunning { get; } = new();
+
+        public Histogram CornerGoalPack { get; } = new(1.0, FilmRoster.Size + 1);
+
+        public Histogram FreeKickGoalPack { get; } = new(1.0, FilmRoster.Size + 1);
+
+        public Histogram FreeKickShotGoalPack { get; } = new(1.0, FilmRoster.Size + 1);
+
+        public Histogram FreeKickCrossGoalPack { get; } = new(1.0, FilmRoster.Size + 1);
+    }
+
     private sealed class Histogram(double width, int bins)
     {
         private readonly int[] _bins = new int[bins];

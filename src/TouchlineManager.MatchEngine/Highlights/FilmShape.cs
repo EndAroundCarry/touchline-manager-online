@@ -9,8 +9,9 @@ namespace TouchlineManager.MatchEngine.Highlights;
 /// <param name="Anchor">The corner flag, the free-kick or penalty spot, or the goal a celebration begins at.</param>
 /// <param name="Scorer">The entity celebrating, or -1.</param>
 /// <param name="Taker">The entity taking the set piece, or -1 (`replay-v6`).</param>
-/// <param name="Arrived">Whether the runners of a set piece have run in to the places they take it from, or still wait short of them (`replay-v6`).</param>
-internal readonly record struct ShapeState(FormationMode Mode, MatchSide Side, Vec Anchor, int Scorer = -1, int Taker = -1, bool Arrived = false);
+/// <param name="Waited">How much of a set piece's hold has gone by, from nought to one; nought is everybody at the places the set piece is taken from, as at the strike (`replay-v13`).</param>
+/// <param name="Seed">What the pack's drift is told apart by: one set piece's drift is not another's (`replay-v13`).</param>
+internal readonly record struct ShapeState(FormationMode Mode, MatchSide Side, Vec Anchor, int Scorer = -1, int Taker = -1, double Waited = 0.0, int Seed = 0);
 
 /// <summary>How a side stands as a block, chosen from where the ball is and who has it (`replay-v6`).</summary>
 internal enum BlockPhase
@@ -138,8 +139,49 @@ internal sealed class FilmShape
     /// <summary>How much more the players on the far side from the ball close in.</summary>
     private const double FarSideTuck = 0.90;
 
-    /// <summary>How far short of the place he is running to a corner's runner waits, in metres (`replay-v6`).</summary>
-    private const double CornerRunUp = 5.0;
+    // The keys that tell the drifts of a corner's places apart from the runners', which are keyed by their number (`replay-v13`).
+    private const int CornerKeyEdge = 10;
+    private const int CornerKeyPost = 20;
+    private const int CornerKeyZone = 30;
+    private const int CornerKeyDefendersEdge = 40;
+    private const int FreeKickKeyEdge = 10;
+    private const int FreeKickKeyLine = 20;
+
+    /// <summary>The least a pair drifts from its place while a set piece waits, in metres: the reference has the pack move one to three (`replay-v13`).</summary>
+    private const double DriftLeast = 1.6;
+
+    /// <summary>The most a pair drifts from its place while a set piece waits, in metres (`replay-v13`).</summary>
+    private const double DriftMost = 3.0;
+
+    /// <summary>How far to either side of straight back from the ball a pair drifts, in radians (`replay-v13`).</summary>
+    private const double DriftTurn = 1.0;
+
+    /// <summary>The latest, as a share of the hold, a pair sets off drifting (`replay-v13`).</summary>
+    private const double DriftStart = 0.3;
+
+    /// <summary>How much of the hold a pair's drift takes (`replay-v13`).</summary>
+    private const double DriftSpan = 0.6;
+
+    /// <summary>The least of its depth the pack of a free kick keeps when the ball is close, as a share (`replay-v13`).</summary>
+    private const double FreeKickPackLeast = 0.45;
+
+    /// <summary>How far from the goal line the deepest place of a free kick's pack is, in metres: what a close ball's distance to the wall is measured against (`replay-v13`).</summary>
+    private const double FreeKickPackDepth = 19.5;
+
+    /// <summary>How far in front of the ball's depth, in metres, the pack of a free kick stands at the nearest: the wall is between (`replay-v13`).</summary>
+    private const double FreeKickPackBack = 2.5;
+
+    /// <summary>How many of the attackers go into the box for a free kick struck at goal (`replay-v13`).</summary>
+    private const int FreeKickShotRunners = 3;
+
+    /// <summary>How many of the attackers go into the box for a free kick delivered into it (`replay-v13`).</summary>
+    private const int FreeKickCrossRunners = 5;
+
+    /// <summary>How many of the attackers are left back near the halfway line at a free kick struck at goal (`replay-v13`).</summary>
+    private const int FreeKickShotGuards = 2;
+
+    /// <summary>How many of the attackers are left back near the halfway line at a free kick delivered into the box: the rest of the attack, so that every player has a place (`replay-v13`).</summary>
+    private const int FreeKickCrossGuards = 3;
 
     /// <summary>How far goal-side of the runner his marker stands, in metres (`replay-v6`).</summary>
     private const double CornerMarkGap = 1.4;
@@ -171,9 +213,6 @@ internal sealed class FilmShape
     /// <summary>How far outside the middle of the goal the wall's line, and the keeper's cover, reach towards a post, in metres (`replay-v6`).</summary>
     private const double FreeKickPostReach = 1.8;
 
-    /// <summary>How far from the goal line the attackers wait for a rebound, in metres: the edge of the penalty area (`replay-v6`).</summary>
-    private const double FreeKickRebound = 20.5;
-
     /// <summary>How deep the penalty area is, in metres.</summary>
     private const double PenaltyBoxDepth = 16.5;
 
@@ -200,18 +239,21 @@ internal sealed class FilmShape
     private const double StepUpBackHalfWidth = 20.0;
     private const double StepUpFrontHalfWidth = 14.0;
 
-    // A free kick delivered into the box, as the corner's are: the places the runners run to, the line the rest of the
-    // defence makes at the edge of the box, and the one attacker who waits there for the second ball.
-    private static readonly (double Along, double Across)[] FreeKickRunners = [(11.0, -0.5), (7.5, -5.0), (8.5, 4.0), (14.0, 7.5), (14.5, -9.0), (10.0, 10.0)];
-    private static readonly (double Along, double Across)[] FreeKickLine = [(18.5, -10.5), (19.0, 0.5), (18.5, 10.5)];
-    private static readonly (double Along, double Across) FreeKickEdge = (22.0, 7.0);
+    // The pack at a free kick, from the reference's free kick from wide (`replay-v13`): attackers each with a marker goal-side
+    // of him, a loose line twelve to eighteen metres from the goal line leaning to the far side from the ball; two defenders at
+    // the near corner of the box; and one attacker with a marker at the top of the D for the second ball. The first places are
+    // on the far side, so that a wall on the near post is never among them.
+    private static readonly (double Along, double Across)[] FreeKickRunners = [(14.0, -1.0), (13.5, -5.0), (13.5, -8.5), (17.5, -4.0), (14.0, 3.5)];
+    private static readonly (double Along, double Across)[] FreeKickLine = [(16.5, 18.0), (18.0, 21.5), (16.0, -14.0), (19.5, -8.0)];
+    private static readonly (double Along, double Across) FreeKickEdge = (25.5, 3.0);
 
     // The places a corner is set at, as metres from the goal line and metres across from the middle of the pitch, where
     // positive is towards the flag the corner is taken from. The runners are in order of who gets which: the best header
     // takes the penalty spot.
     private static readonly (double Along, double Across)[] CornerRunners = [(10.5, -0.5), (6.0, -4.5), (6.0, 3.0), (9.0, 6.5)];
-    private static readonly (double Along, double Across)[] CornerEdge = [(18.5, 8.0), (19.0, -7.0)];
-    private static readonly (double Along, double Across)[] CornerGuards = [(51.0, -9.0), (51.0, 9.0), (57.0, 0.0)];
+    private static readonly (double Along, double Across)[] CornerEdge = [(18.5, 8.0), (19.0, -7.0), (24.5, 2.0)];
+    // The first guard stands goal-side of the defender left up the pitch, a marker's gap from him (`replay-v13`).
+    private static readonly (double Along, double Across)[] CornerGuards = [(47.4, -12.0), (51.0, 9.0), (57.0, 0.0)];
     private static readonly (double Along, double Across)[] CornerPosts = [(1.4, 3.0), (1.4, -3.0)];
     private static readonly (double Along, double Across)[] CornerZones = [(5.0, 6.5), (5.0, -0.8), (5.5, -8.0)];
     private static readonly (double Along, double Across) CornerDefendersEdge = (17.0, 1.0);
@@ -730,8 +772,9 @@ internal sealed class FilmShape
     /// Sets a corner by role (`replay-v6`), mirrored for the flag it is taken from. The attackers are the taker, the best
     /// headers in the box, a pair at the edge for the second ball and two or three held back near the halfway line
     /// against a break; the defenders are two on the posts, three holding the six-yard line, markers for the runners,
-    /// one at the edge and one left high as an outlet. The runners wait a few metres short of the places they are
-    /// running to, and the markers stay goal-side of them; the places themselves do not move with the ball.
+    /// one at the edge and one left high as an outlet, with one of the players held back on him. Everybody waits in his
+    /// place, and the pack drifts a metre or two while the corner is pending (`replay-v13`); the markers stay goal-side
+    /// of their runners, and the places themselves do not move with the ball.
     /// </summary>
     private void ArrangeCorner(FilmRoster roster, ShapeState state, Vec[] targets)
     {
@@ -739,7 +782,10 @@ internal sealed class FilmShape
         var defending = MatchInputV1.OpponentOf(attacking);
         var flag = state.Anchor.Y >= FilmSpace.Width / 2 ? 1.0 : -1.0;
 
-        Vec At((double Along, double Across) place, double back = 0.0) => Frame(attacking, place.Along + back, place.Across * flag);
+        Vec At((double Along, double Across) place) => Frame(attacking, place.Along, place.Across * flag);
+
+        // Where a pair stands while the corner waits: its place, and how far it has drifted from it.
+        Vec Stand(int key, Vec point, Vec basis) => FilmSpace.Clamp(point + Drift(state, key, basis), LineMargin);
 
         var taker = state.Taker >= 0 && roster.IsOccupied(state.Taker) && FilmRoster.SideOf(state.Taker) == attacking ? state.Taker : -1;
         var pool = Order(roster, attacking, MatchPositionFamily.Attack).Where(entity => entity != taker).ToList();
@@ -749,10 +795,10 @@ internal sealed class FilmShape
             targets[taker] = state.Anchor;
         }
 
-        // Who does what: two or three guard against the break, the best headers go into the box, the rest wait at its edge.
-        var guards = Math.Min(pool.Count >= 8 ? 3 : 2, pool.Count);
+        // Who does what: two guard against the break, the best headers go into the box, the rest wait at its edge (`replay-v13`).
+        var guards = Math.Min(2, pool.Count);
         var rest = pool.Count - guards;
-        var edge = rest >= 5 ? 2 : (rest >= 3 ? 1 : 0);
+        var edge = rest >= 6 ? 3 : (rest >= 5 ? 2 : (rest >= 3 ? 1 : 0));
         var box = Math.Min(CornerRunners.Length, rest - edge);
 
         var guarding = ChooseGuards(pool, guards, attacking);
@@ -777,11 +823,9 @@ internal sealed class FilmShape
 
         pool.RemoveAll(runners.Contains);
 
-        var run = state.Arrived ? 0.0 : CornerRunUp;
-
         for (var index = 0; index < runners.Count; index++)
         {
-            targets[runners[index]] = At(CornerRunners[index], run);
+            targets[runners[index]] = Stand(index, At(CornerRunners[index]), At(CornerRunners[index]));
         }
 
         for (var place = 0; place < CornerEdge.Length && pool.Count > 0; place++)
@@ -789,7 +833,7 @@ internal sealed class FilmShape
             var point = At(CornerEdge[place]);
             var who = TakeNearest(pool, point, targets);
 
-            targets[who] = point;
+            targets[who] = Stand(CornerKeyEdge + place, point, point);
         }
 
         // The defenders are chosen for the places the runners come to, so that who marks whom does not change as they run
@@ -812,18 +856,19 @@ internal sealed class FilmShape
         (Vec, Vec) Marking(int runner)
         {
             var place = CornerRunners[runner];
+            var behind = At((place.Along - CornerMarkGap, place.Across));
 
-            return (At((place.Along - CornerMarkGap, place.Across)), At((place.Along - CornerMarkGap, place.Across), run));
+            return (behind, Stand(runner, behind, At(place)));
         }
 
-        foreach (var post in CornerPosts)
+        for (var post = 0; post < CornerPosts.Length; post++)
         {
-            jobs.Add((At(post), At(post)));
+            jobs.Add((At(CornerPosts[post]), Stand(CornerKeyPost + post, At(CornerPosts[post]), At(CornerPosts[post]))));
         }
 
-        foreach (var zone in CornerZones)
+        for (var zone = 0; zone < CornerZones.Length; zone++)
         {
-            jobs.Add((At(zone), At(zone)));
+            jobs.Add((At(CornerZones[zone]), Stand(CornerKeyZone + zone, At(CornerZones[zone]), At(CornerZones[zone]))));
         }
 
         // Fewer markers than runners: the best header is picked up first.
@@ -832,7 +877,7 @@ internal sealed class FilmShape
             jobs.Add(Marking(runner));
         }
 
-        jobs.Add((At(CornerDefendersEdge), At(CornerDefendersEdge)));
+        jobs.Add((At(CornerDefendersEdge), Stand(CornerKeyDefendersEdge, At(CornerDefendersEdge), At(CornerDefendersEdge))));
 
         for (var runner = 2; runner < runners.Count; runner++)
         {
@@ -851,6 +896,50 @@ internal sealed class FilmShape
 
         KeepKeeper(roster, defending, targets, 1.2);
         KeepKeeper(roster, attacking, targets, CornerKeeperOff);
+    }
+
+    /// <summary>Gets how far a pair, or a lone player, of a set piece that is waiting has drifted from his place (`replay-v13`): back from the ball and to one side or the other, a metre or two, and gone by the strike.</summary>
+    /// <param name="state">The set piece and how much of its wait has gone by.</param>
+    /// <param name="key">Which pair it is: the two of a pair are given the same key, so they drift together.</param>
+    /// <param name="place">The place the pair is taking, which says which way is back from the ball.</param>
+    private static Vec Drift(ShapeState state, int key, Vec place)
+    {
+        if (state.Waited <= 0.0)
+        {
+            return Vec.Zero;
+        }
+
+        var back = (place - state.Anchor).Unit();
+
+        if (back == Vec.Zero)
+        {
+            back = new Vec(1.0, 0.0);
+        }
+
+        var amount = DriftLeast + ((DriftMost - DriftLeast) * Chance(state.Seed, key, 0));
+        var turn = ((2.0 * Chance(state.Seed, key, 1)) - 1.0) * DriftTurn;
+        var start = DriftStart * Chance(state.Seed, key, 2);
+        var progress = Math.Clamp((state.Waited - start) / DriftSpan, 0.0, 1.0);
+        var direction = new Vec((back.X * Math.Cos(turn)) - (back.Y * Math.Sin(turn)), (back.X * Math.Sin(turn)) + (back.Y * Math.Cos(turn)));
+
+        return direction * (amount * progress * progress * (3.0 - (2.0 * progress)));
+    }
+
+    /// <summary>Gets a number between nought and one that is the same every time for the same set piece, pair and purpose, and unrelated for any other (`replay-v13`).</summary>
+    private static double Chance(int seed, int key, int purpose)
+    {
+        unchecked
+        {
+            var mixed = (uint)((seed * 73856093) ^ (key * 19349663) ^ (purpose * 83492791));
+
+            mixed ^= mixed >> 16;
+            mixed *= 0x7feb352dU;
+            mixed ^= mixed >> 15;
+            mixed *= 0x846ca68bU;
+            mixed ^= mixed >> 16;
+
+            return mixed / (double)uint.MaxValue;
+        }
     }
 
     /// <summary>Chooses who stays back against a break: the most central defenders, then the deepest midfielder, then the deepest left.</summary>
@@ -914,8 +1003,9 @@ internal sealed class FilmShape
 
     /// <summary>
     /// Sets a free kick struck at goal (`replay-v6`): a wall of two to five by the distance, on the line to the near
-    /// post; the keeper covering the far side; three attackers at the edge of the box for the rebound, and the rest of
-    /// the attack held outside it.
+    /// post; the keeper covering the far side; and, as the reference shows a free kick from wide, the rest of the defence
+    /// a pack at the box with a marker on each of three attackers waiting for the rebound (`replay-v13`), the rest of
+    /// the attack held outside.
     /// </summary>
     private void ArrangeFreeKickShot(FilmRoster roster, ShapeState state, Vec[] targets)
     {
@@ -938,7 +1028,9 @@ internal sealed class FilmShape
             .OrderBy(entity => (targets[entity].X * across.X) + (targets[entity].Y * across.Y))
             .ToArray();
 
-        // The rest of the defence stands where its own shape puts it, the wall's ten yards from the ball apart.
+        ArrangeFreeKickPack(roster, state, targets, taker, wall, FreeKickShotRunners, FreeKickShotGuards);
+
+        // Nobody of the defence is within ten yards of the ball, the pack or what is left of its own shape.
         KeepOff(roster, defending, spot, targets);
 
         for (var index = 0; index < wall.Length; index++)
@@ -948,99 +1040,114 @@ internal sealed class FilmShape
             targets[wall[index]] = FilmSpace.Clamp(spot + (toPost * FreeKickGap) + (across * step), LineMargin);
         }
 
-        var pool = Order(roster, attacking, MatchPositionFamily.Attack).Where(entity => entity != taker).ToList();
-        var waiting = Math.Min(pool.Count >= 8 ? 3 : 2, pool.Count);
-
-        for (var index = 0; index < pool.Count; index++)
-        {
-            targets[pool[index]] = index < waiting
-                ? AwayFrom(Frame(attacking, FreeKickRebound, (index - ((waiting - 1) / 2.0)) * 8.0), spot, 2.5)
-                : OutsideBox(attacking, targets[pool[index]]);
-        }
-
         // The keeper covers the side the wall does not.
         KeepKeeper(roster, defending, targets, 1.0, -nearPost * FreeKickPostReach);
     }
 
     /// <summary>
-    /// Sets a free kick delivered into the box (`replay-v6`): no wall. The runners are the best headers, waiting a few
-    /// metres short of their places until the ball is struck, each with a marker goal-side of him; the rest of the
-    /// defence is a line at the edge of the box with one player left up the pitch; one attacker is at the edge for
-    /// the second ball and a pair hold back against a break.
+    /// Sets a free kick delivered into the box (`replay-v6`): no wall, the pack at the box with a marker on each of
+    /// five runners (`replay-v13`).
     /// </summary>
     private void ArrangeFreeKickCross(FilmRoster roster, ShapeState state, Vec[] targets)
+    {
+        var taker = PlaceTaker(roster, state, targets);
+
+        ArrangeFreeKickPack(roster, state, targets, taker, [], FreeKickCrossRunners, FreeKickCrossGuards);
+        KeepKeeper(roster, MatchInputV1.OpponentOf(state.Side), targets, 1.2);
+        KeepOff(roster, MatchInputV1.OpponentOf(state.Side), state.Anchor, targets);
+    }
+
+    /// <summary>
+    /// Sets the pack of a free kick into the box, as the reference has it (`replay-v13`): the attackers who are best in
+    /// the air each stand where they will go for the ball with a marker goal-side of him, one more attacker waits at the
+    /// top of the D for the second ball with a marker, two stay back near the halfway line, and the rest of the defence is
+    /// a loose line at the near corner of the box and the far side of it. Each pair drifts a metre or two while the free
+    /// kick waits and is in its place at the strike. A free kick from close in sets the whole pack back towards the goal line.
+    /// </summary>
+    private void ArrangeFreeKickPack(FilmRoster roster, ShapeState state, Vec[] targets, int taker, IReadOnlyCollection<int> wall, int runnerCount, int guardCount)
     {
         var attacking = state.Side;
         var defending = MatchInputV1.OpponentOf(attacking);
         var spot = state.Anchor;
         var flank = spot.Y >= FilmSpace.Width / 2 ? 1.0 : -1.0;
-        var run = state.Arrived ? 0.0 : CornerRunUp;
+        var spotAlong = attacking == MatchSide.Home ? FilmSpace.Length - spot.X : spot.X;
 
-        Vec At((double Along, double Across) place, double back = 0.0) => Frame(attacking, place.Along + back, place.Across * flank);
+        // A free kick from close in sets the whole pack back towards the goal line by the same share, so that it keeps its
+        // shape and stays clear of the wall, rather than every place being pushed to one depth.
+        var scale = Math.Clamp((spotAlong - FreeKickGap - FreeKickPackBack) / FreeKickPackDepth, FreeKickPackLeast, 1.0);
 
-        var taker = PlaceTaker(roster, state, targets);
+        Vec At((double Along, double Across) place, double back = 0.0) => Frame(attacking, (place.Along * scale) - back, place.Across * flank);
+
+        Vec Stand(int key, Vec point, Vec basis) => FilmSpace.Clamp(point + Drift(state, key, basis), LineMargin);
+
         var pool = Order(roster, attacking, MatchPositionFamily.Attack).Where(entity => entity != taker).ToList();
-        var guards = Math.Min(pool.Count >= 8 ? 2 : 1, pool.Count);
+        var guards = Math.Min(guardCount, pool.Count);
         var guarding = ChooseGuards(pool, guards, attacking);
 
         pool.RemoveAll(guarding.Contains);
 
         for (var place = 0; place < guards; place++)
         {
-            var point = At(CornerGuards[place]);
+            var point = Frame(attacking, CornerGuards[place].Along, CornerGuards[place].Across * flank);
 
             targets[TakeNearest(guarding, point, targets)] = point;
         }
 
-        var edge = pool.Count > 4 ? 1 : 0;
+        var edge = pool.Count > runnerCount ? 1 : 0;
 
         var runners = pool
             .OrderByDescending(entity => _context.AttributeOf(roster.Occupants[entity], MatchAttributeName.Heading)
                 + (CornerForwardWeight * FilmSpace.Attacking(_anchors[entity, 1], attacking)))
             .ThenBy(entity => entity)
-            .Take(Math.Min(FreeKickRunners.Length, pool.Count - edge))
+            .Take(Math.Min(runnerCount, pool.Count - edge))
             .ToList();
 
         pool.RemoveAll(runners.Contains);
 
         for (var index = 0; index < runners.Count; index++)
         {
-            targets[runners[index]] = At(FreeKickRunners[index], run);
+            var place = At(FreeKickRunners[index]);
+
+            targets[runners[index]] = Stand(index, place, place);
+        }
+
+        if (edge > 0)
+        {
+            var place = At(FreeKickEdge);
+
+            targets[pool[0]] = Stand(FreeKickKeyEdge, place, place);
+            pool.RemoveAt(0);
         }
 
         foreach (var entity in pool)
         {
-            targets[entity] = edge > 0 ? At(FreeKickEdge) : OutsideBox(attacking, targets[entity]);
-            edge = 0;
+            targets[entity] = OutsideBox(attacking, targets[entity]);
         }
 
-        // Each runner is picked up goal-side of where he runs to, so that who marks whom does not change as they run in;
-        // the others make the line at the edge of the box.
-        var defenders = Order(roster, defending, MatchPositionFamily.Defence).ToList();
-
-        if (defenders.Count >= CornerOutletFrom)
-        {
-            var outlet = defenders
-                .OrderByDescending(entity => FilmSpace.Attacking(_anchors[entity, 0], defending))
-                .ThenBy(entity => entity)
-                .First();
-
-            defenders.Remove(outlet);
-            targets[outlet] = At(CornerOutlet);
-        }
-
-        var jobs = new List<(Vec Place, Vec Stands)>(FreeKickRunners.Length + FreeKickLine.Length);
+        // Each runner is picked up goal-side of where he runs to, so that who marks whom does not change as they drift;
+        // the others make the line at the near corner of the box and across to the far side.
+        var defenders = Order(roster, defending, MatchPositionFamily.Defence).Where(entity => !wall.Contains(entity)).ToList();
+        var jobs = new List<(Vec Place, Vec Stands)>(FreeKickRunners.Length + FreeKickLine.Length + 1);
 
         for (var runner = 0; runner < runners.Count; runner++)
         {
-            var place = FreeKickRunners[runner];
+            var behind = At(FreeKickRunners[runner], CornerMarkGap);
 
-            jobs.Add((At((place.Along - CornerMarkGap, place.Across)), At((place.Along - CornerMarkGap, place.Across), run)));
+            jobs.Add((behind, Stand(runner, behind, At(FreeKickRunners[runner]))));
         }
 
-        foreach (var place in FreeKickLine)
+        if (edge > 0)
         {
-            jobs.Add((At(place), At(place)));
+            var behind = At(FreeKickEdge, CornerMarkGap);
+
+            jobs.Add((behind, Stand(FreeKickKeyEdge, behind, At(FreeKickEdge))));
+        }
+
+        for (var line = 0; line < FreeKickLine.Length; line++)
+        {
+            var place = At(FreeKickLine[line]);
+
+            jobs.Add((place, Stand(FreeKickKeyLine + line, place, place)));
         }
 
         foreach (var (place, stands) in jobs)
@@ -1052,9 +1159,6 @@ internal sealed class FilmShape
 
             targets[TakeNearest(defenders, place, targets)] = stands;
         }
-
-        KeepKeeper(roster, defending, targets, 1.2);
-        KeepOff(roster, defending, spot, targets);
     }
 
     /// <summary>

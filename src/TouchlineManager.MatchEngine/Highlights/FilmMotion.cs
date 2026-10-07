@@ -171,11 +171,11 @@ internal sealed class FilmMotion
     /// <summary>How near his place in the shape a player has to get before he stops, in metres.</summary>
     private const double SettleDistance = 1.0;
 
+    /// <summary>How much of the speed it could still stop from a pack running to its places keeps, as a share (`replay-v13`).</summary>
+    private const double PackBraking = 0.9;
+
     /// <summary>How far from his place at a set piece a player has to be before he sets off for it, in metres (`replay-v6`).</summary>
     private const double CornerSetOff = 1.5;
-
-    /// <summary>How long before a corner is taken its runners set off for the places they run to, in seconds of real time (`replay-v6`).</summary>
-    private const double RunInSeconds = 2.0;
 
     /// <summary>
     /// The roles that are kept from one beat to the next (`replay-v6`): a challenger, a second and a cover for the
@@ -1452,9 +1452,9 @@ internal sealed class FilmMotion
         {
             var tau = step * dt;
 
-            // A corner's runners set off for the box as the hold nears its end, so that they arrive as the ball is struck.
-            var current = state.Mode is FormationMode.Corner or FormationMode.FreeKickCross && !state.Arrived && beat.IsHold && tau >= duration - RunInSeconds
-                ? state with { Arrived = true }
+            // A set piece's pack stands in its places and drifts while the hold lasts, and is in them at the strike (`replay-v13`).
+            var current = beat.IsHold && state.Mode is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross
+                ? state with { Waited = tau / duration }
                 : state;
 
             _shape.Fill(_roster, current, _focus, _targets);
@@ -1520,27 +1520,27 @@ internal sealed class FilmMotion
 
             case FormationMode.Corner:
                 // The side is the one taking it, whoever plays the beat: the defence puts the ball behind, and may win the header.
-                // The runners wait for the hold, and are in the box for the delivery and what comes of it.
+                // The runners wait in their places for the hold, and are in them for the delivery and what comes of it.
                 return new ShapeState(
                     FormationMode.Corner,
                     _setPieceSide,
                     _setPieceAnchor,
                     Taker: _setPieceTaker,
-                    Arrived: beat.Kind is BeatKind.Cross or BeatKind.Header);
+                    Seed: beat.Possession);
 
             case FormationMode.FreeKickCross:
-                // Like a corner: the runners wait for the hold, and are in the box for the delivery.
+                // Like a corner: the pack waits in its places for the hold, and is in them for the delivery.
                 return new ShapeState(
                     FormationMode.FreeKickCross,
                     _setPieceSide,
                     _setPieceAnchor,
                     Taker: _setPieceTaker,
-                    Arrived: beat.Kind is BeatKind.Cross or BeatKind.Header);
+                    Seed: beat.Possession);
 
             case FormationMode.FreeKickShot:
             case FormationMode.Penalty:
             case FormationMode.GoalKick:
-                return new ShapeState(beat.Formation, _setPieceSide, _setPieceAnchor, Taker: _setPieceTaker);
+                return new ShapeState(beat.Formation, _setPieceSide, _setPieceAnchor, Taker: _setPieceTaker, Seed: beat.Possession);
 
             case FormationMode.KickOff:
                 return new ShapeState(FormationMode.KickOff, beat.Side, beat.To);
@@ -1555,6 +1555,10 @@ internal sealed class FilmMotion
 
     private static bool IsQuickFreeKick(FilmBeat beat) =>
         beat.IsHold && beat.Hold == HoldKind.FreeKick && beat.Formation == FormationMode.Open;
+
+    /// <summary>Whether a beat is played with a set piece's pack taking up its places (`replay-v13`).</summary>
+    private static bool IsPack(FilmBeat beat) =>
+        beat.Formation is FormationMode.Corner or FormationMode.FreeKickShot or FormationMode.FreeKickCross;
 
     /// <summary>Whether a beat is played with the players taking up a set piece: they have a place to be, and run to it.</summary>
     private static bool IsSetPiece(FilmBeat beat) =>
@@ -1709,8 +1713,9 @@ internal sealed class FilmMotion
         }
         else
         {
-            // Close in smoothly on a target with no deadline, rather than overshooting it.
-            speed = Math.Min(cap, distance * 1.5);
+            // Close in smoothly on a target with no deadline, rather than overshooting it. A pack taking up a set piece is in a
+            // hurry and runs until it has to brake, which is later than the smooth close-in would have it (`replay-v13`).
+            speed = Math.Min(cap, IsPack(beat) && task.Kind == TaskKind.None ? Math.Sqrt(2.0 * accel * distance) * PackBraking : distance * 1.5);
         }
 
         var desired = toTarget.Unit() * speed;

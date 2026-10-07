@@ -64,16 +64,20 @@ public sealed class FilmSetPieceTests
                 Math.Sign(targets[keeper].Y - goal.Y).Should().Be(-Math.Sign(across), "the keeper covers the far side");
             }
 
-            var rebound = Outfield(context, taking)
-                .Where(entity => entity != taker && Math.Abs(FilmSpace.Attacking(targets[entity], MatchInputV1.OpponentOf(taking)) - 20.5) < 0.5 && Math.Abs(targets[entity].Y - goal.Y) < 14)
-                .ToList();
+            // As in the reference free kick from wide: the rest of the defence is a pack at the box, a marker on each attacker.
+            var defenders = Outfield(context, defending);
+            var attackers = Outfield(context, taking).Where(entity => entity != taker).ToList();
+            var inTheBox = attackers.Where(entity => InTheBox(targets[entity], goal)).ToList();
 
-            rebound.Count.Should().BeInRange(2, 3, "two or three wait at the edge of the box for the rebound");
+            inTheBox.Count.Should().BeInRange(3, 4, "three go into the box for the rebound, a fourth waits at the top of the D, or in it when the kick is close");
+            defenders.Count(entity => targets[entity].DistanceTo(goal) <= 25.0).Should().BeGreaterThanOrEqualTo(7, "the wall and the pack are all within twenty-five metres of the goal");
 
-            foreach (var entity in Outfield(context, taking).Where(entity => entity != taker && !rebound.Contains(entity)))
+            foreach (var entity in inTheBox)
             {
-                InTheBox(targets[entity], goal).Should().BeFalse("the rest of the attack is held outside the box");
+                defenders.Min(other => targets[other].DistanceTo(targets[entity])).Should().BeLessThan(2.5, "every attacker in the box has a marker");
             }
+
+            attackers.Count(entity => FilmSpace.Attacking(targets[entity], MatchInputV1.OpponentOf(taking)) >= 40.0).Should().BeGreaterThanOrEqualTo(2, "two stay back near the halfway line, and the rest of the attack stays where its own shape has it");
         }
     }
 
@@ -87,8 +91,8 @@ public sealed class FilmSetPieceTests
         var spot = new Vec(goal.X - 34.0, goal.Y + 24.0);
         var taker = Outfield(context, taking).First();
 
-        var waiting = Targets(shape, context.Starters, FormationMode.FreeKickCross, taking, spot, taker, arrived: false);
-        var arrived = Targets(shape, context.Starters, FormationMode.FreeKickCross, taking, spot, taker, arrived: true);
+        var waiting = Targets(shape, context.Starters, FormationMode.FreeKickCross, taking, spot, taker, waited: 1.0);
+        var arrived = Targets(shape, context.Starters, FormationMode.FreeKickCross, taking, spot, taker);
 
         foreach (var shown in new[] { waiting, arrived })
         {
@@ -107,11 +111,15 @@ public sealed class FilmSetPieceTests
         defenders.Count(entity => InTheBox(arrived[entity], goal)).Should().BeGreaterThanOrEqualTo(5, "the markers are in it with them");
         defenders.Count(entity => FilmSpace.Attacking(arrived[entity], MatchInputV1.OpponentOf(taking)) is >= 17.0 and <= 20.5 && !InTheBox(arrived[entity], goal)).Should().BeGreaterThanOrEqualTo(1, "the line is at the edge of the box");
 
+        // The line the reference has: twelve to eighteen metres from the goal line, with a marker on each runner.
+        defenders.Count(entity => FilmSpace.Attacking(arrived[entity], MatchInputV1.OpponentOf(taking)) is >= 11.5 and <= 18.5 && InTheBox(arrived[entity], goal)).Should().BeGreaterThanOrEqualTo(5, "the line is twelve to eighteen metres from the goal line");
+        attackers.Count(entity => FilmSpace.Attacking(arrived[entity], MatchInputV1.OpponentOf(taking)) >= 40.0).Should().BeInRange(2, 3, "two or three attackers are left at the circle");
+
         var runners = attackers.Where(entity => InTheBox(arrived[entity], goal)).ToList();
 
         foreach (var runner in runners)
         {
-            (FilmSpace.Attacking(waiting[runner], MatchInputV1.OpponentOf(taking)) - FilmSpace.Attacking(arrived[runner], MatchInputV1.OpponentOf(taking))).Should().BeApproximately(5.0, 1e-6, "a runner waits five metres short");
+            waiting[runner].DistanceTo(arrived[runner]).Should().BeInRange(1.5, 3.05, "a runner drifts a metre or two while the free kick waits, and is in his place at the strike");
         }
 
         // Each runner has a defender within two metres of him, goal-side.
@@ -127,8 +135,8 @@ public sealed class FilmSetPieceTests
         var (context, shape) = ShapeOf(7);
         var goal = FilmSpace.AttackedGoal(MatchSide.Home);
         var taker = Outfield(context, MatchSide.Home).First();
-        var high = Targets(shape, context.Starters, FormationMode.FreeKickCross, MatchSide.Home, new Vec(goal.X - 30, goal.Y + 22), taker, arrived: true);
-        var low = Targets(shape, context.Starters, FormationMode.FreeKickCross, MatchSide.Home, new Vec(goal.X - 30, goal.Y - 22), taker, arrived: true);
+        var high = Targets(shape, context.Starters, FormationMode.FreeKickCross, MatchSide.Home, new Vec(goal.X - 30, goal.Y + 22), taker);
+        var low = Targets(shape, context.Starters, FormationMode.FreeKickCross, MatchSide.Home, new Vec(goal.X - 30, goal.Y - 22), taker);
 
         var mirrored = Places(high, context).Select(point => new Vec(point.X, FilmSpace.Width - point.Y)).OrderBy(point => point.X).ThenBy(point => point.Y).ToList();
         var other = Places(low, context);
@@ -165,6 +173,58 @@ public sealed class FilmSetPieceTests
 
         defenders.Count(entity => shot[entity].DistanceTo(cross[entity]) > 1.0).Should().BeGreaterThan(4);
         defenders.Count(entity => shot[entity].DistanceTo(quick[entity]) > 1.0).Should().BeGreaterThan(1);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_free_kick_pack_drifts_a_metre_or_two_while_it_waits_and_the_wall_stands_still(bool struck)
+    {
+        var mode = struck ? FormationMode.FreeKickShot : FormationMode.FreeKickCross;
+        var (context, shape) = ShapeOf(15);
+        var taking = MatchSide.Home;
+        var defending = MatchSide.Away;
+        var goal = FilmSpace.AttackedGoal(taking);
+        var taker = Outfield(context, taking).First(entity => context.Slots[entity].Family == MatchPositionFamily.Midfield);
+
+        foreach (var (along, across) in new[] { (18.0, 6.0), (22.0, 9.0), (28.0, -4.0), (34.0, 24.0) })
+        {
+            var spot = new Vec(goal.X - along, goal.Y + across);
+            var strike = Targets(shape, context.Starters, mode, taking, spot, taker);
+            var waiting = Targets(shape, context.Starters, mode, taking, spot, taker, waited: 1.0, seed: 3);
+            var moved = Outfield(context, taking).Concat(Outfield(context, defending)).Where(entity => entity != taker && strike[entity].DistanceTo(waiting[entity]) > 0.01).ToList();
+
+            moved.Count.Should().BeGreaterThanOrEqualTo(8, "the pack is not frozen while it waits");
+
+            foreach (var entity in moved)
+            {
+                strike[entity].DistanceTo(waiting[entity]).Should().BeLessThanOrEqualTo(3.05, "it drifts a metre or two");
+            }
+
+            var wall = struck
+                ? Outfield(context, defending).Where(entity => strike[entity].DistanceTo(spot) is >= 9.45 and <= 9.9 && strike[entity].DistanceTo(waiting[entity]) < 0.01).ToList()
+                : [];
+
+            if (struck)
+            {
+                wall.Count.Should().BeGreaterThanOrEqualTo(FilmShape.WallSize(spot.DistanceTo(goal)), "the wall stands still");
+            }
+
+            // However close the kick, the pack does not stack: no two team-mates are on top of each other, the wall apart, which
+            // stands shoulder to shoulder.
+            foreach (var shown in new[] { strike, waiting })
+            {
+                foreach (var side in new[] { taking, defending })
+                {
+                    var players = Outfield(context, side).Where(entity => entity != taker && !wall.Contains(entity)).ToList();
+
+                    foreach (var entity in players)
+                    {
+                        players.Where(other => other != entity).Min(other => shown[entity].DistanceTo(shown[other])).Should().BeGreaterThan(1.2, "two team-mates are not set on one spot");
+                    }
+                }
+            }
+        }
     }
 
     [Theory]
@@ -243,7 +303,7 @@ public sealed class FilmSetPieceTests
     [Fact]
     public void Every_set_piece_in_a_match_is_set_for_what_it_turns_out_to_be()
     {
-        int struck = 0, crossed = 0, goalKicks = 0, penalties = 0;
+        int struck = 0, crossed = 0, goalKicks = 0, penalties = 0, fouls = 0;
 
         for (var seed = 1UL; seed <= Seeds; seed++)
         {
@@ -255,6 +315,15 @@ public sealed class FilmSetPieceTests
 
                 foreach (var hold in beats.Where(beat => beat.IsHold))
                 {
+                    // The sides begin to take up a free kick when the foul is given (`replay-v13`).
+                    var before = beats.IndexOf(hold) - 1;
+
+                    if (hold.Hold == HoldKind.FreeKick && hold.Formation != FormationMode.Open && before >= 0 && beats[before] is { Kind: BeatKind.Duel, Foul: true } foul)
+                    {
+                        foul.Formation.Should().Be(hold.Formation, "the foul is the start of the free kick");
+                        fouls++;
+                    }
+
                     switch (hold.Hold)
                     {
                         case HoldKind.FreeKick when possession.Source.Outcome == PassageOutcome.FreeKickCrossed && hold.Formation != FormationMode.Open:
@@ -283,6 +352,7 @@ public sealed class FilmSetPieceTests
 
         goalKicks.Should().BeGreaterThan(10);
         (struck + crossed).Should().BeGreaterThan(0, "the matches have free kicks");
+        fouls.Should().BeGreaterThan(0, "a free kick follows a foul");
         _ = penalties;
     }
 
@@ -332,11 +402,11 @@ public sealed class FilmSetPieceTests
         return (context, new FilmShape(context));
     }
 
-    private static Vec[] Targets(FilmShape shape, FilmRoster roster, FormationMode mode, MatchSide taking, Vec spot, int taker, bool arrived = true)
+    private static Vec[] Targets(FilmShape shape, FilmRoster roster, FormationMode mode, MatchSide taking, Vec spot, int taker, double waited = 0.0, int seed = 0)
     {
         var targets = new Vec[FilmRoster.Size];
 
-        shape.Fill(roster, new ShapeState(mode, taking, spot, Taker: taker, Arrived: arrived), spot, targets);
+        shape.Fill(roster, new ShapeState(mode, taking, spot, Taker: taker, Waited: waited, Seed: seed), spot, targets);
 
         return targets;
     }
