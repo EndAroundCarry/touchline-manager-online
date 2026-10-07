@@ -62,6 +62,33 @@ internal static class FilmScript
     /// <summary>How far to the side of where he stands the keeper reaches, in metres (`replay-v6`).</summary>
     private const double TipReach = 1.2;
 
+    /// <summary>Half the width of the goal, in metres: where a post stands from the middle of the goal line (`replay-v8`).</summary>
+    private const double PostHalfWidth = 3.66;
+
+    /// <summary>The least, in metres, that a ball the keeper tips behind goes out past the post (`replay-v8`).</summary>
+    private const double TipPast = 1.0;
+
+    /// <summary>How much further than <see cref="TipPast"/> a tipped ball may go out past the post, in metres (`replay-v8`).</summary>
+    private const double TipPastSpread = 1.5;
+
+    /// <summary>The nearest to the goal line, in metres, that a defender gets a foot to a ball played in behind his line (`replay-v8`).</summary>
+    private const double TouchMin = 2.5;
+
+    /// <summary>The furthest from the goal line, in metres, that a defender gets a foot to such a ball (`replay-v8`).</summary>
+    private const double TouchMax = 4.5;
+
+    /// <summary>The furthest from where the ball goes out that a defender gets a foot to it, in metres (`replay-v8`).</summary>
+    private const double TouchReach = 5.5;
+
+    /// <summary>
+    /// The shortest ball played in towards the goal line that is shown as a ball, in metres (`replay-v8`). Nearer than
+    /// this the defender is already on it, and he alone puts it behind.
+    /// </summary>
+    private const double PlayedInMin = 4.0;
+
+    /// <summary>The furthest a defender heads a ball that has just landed behind his line, in metres (`replay-v8`).</summary>
+    private const double HeadReach = 14.0;
+
     /// <summary>Builds the script for a whole match.</summary>
     /// <param name="context">The film's context.</param>
     /// <param name="shape">The team shape, which receivers are chosen from.</param>
@@ -439,17 +466,22 @@ internal static class FilmScript
         }
 
         /// <summary>
-        /// The ball that wins a corner (`replay-v6`): what put it behind, shown. The engine decides that a corner is
-        /// given, not how; a cross is headed behind by a defender, a ball played into the box along the ground is blocked
-        /// or turned behind by one, and one that comes close to goal is sometimes a shot the keeper turns round the post.
-        /// Nothing here changes whether there is a corner.
+        /// The ball that wins a corner (`replay-v6`, `replay-v8`): what put it behind, shown. The engine decides that a
+        /// corner is given, not how; a cross is headed behind by a defender, a ball played into the box along the ground
+        /// is blocked or turned behind by one, and one that comes close to goal is sometimes a shot the keeper turns round
+        /// the post. The ball is always played first, by the side that is attacking, towards the goal line, and a defender
+        /// gets a touch to it a few metres short of the line: nobody sends it the length of the pitch to the flag, and
+        /// the sides do not set for the corner until it is out. Nothing here changes whether there is a corner.
         /// </summary>
         private void ScriptDeflection(State state, int j, Vec start, Vec outOfPlay)
         {
             var attacking = state.Source.Side;
             var defending = MatchInputV1.OpponentOf(attacking);
             var keeper = KeeperOf(state.Roster, defending);
-            var crossed = state.LastPlay is { Kind: BeatKind.Cross or BeatKind.LoftedPass };
+
+            // A ball that has just landed is in the air for a defender to head; after a duel, or once it has come down
+            // a long way from the line, it is at somebody's feet.
+            var crossed = state.Last is { Kind: BeatKind.Cross or BeatKind.LoftedPass } && start.DistanceTo(outOfPlay) <= HeadReach;
 
             var tipped = !crossed
                 && keeper is not null
@@ -463,18 +495,67 @@ internal static class FilmScript
                 return;
             }
 
-            // The nearest defender gets there first: he heads a cross behind, or gets a block in.
-            var beat = Move(state, BeatKind.Clearance, start, outOfPlay, null, ActorSource.NearestToBall, null, false, defending);
+            // A cross that has already come in is headed from where it landed; any other ball is played in first.
+            var (touch, lofted) = crossed ? (start, false) : PlayIn(state, j, start, outOfPlay);
+            var headed = crossed || lofted;
 
-            beat.ZFrom = crossed ? HeaderContactZ : 0;
+            // The nearest defender gets there first: he heads it behind, or gets a block in.
+            var beat = Move(state, BeatKind.Clearance, touch, outOfPlay, null, ActorSource.NearestToBall, null, false, defending);
+
+            beat.ZFrom = headed ? HeaderContactZ : 0;
             beat.ZTo = 0;
-            beat.ZArc = crossed ? 30 : 4;
+            beat.ZArc = crossed ? 30 : (headed ? 6 : 2);
             beat.Formation = FormationMode.Corner;
             state.Add(beat);
             SetHolder(state, null, pending: false);
         }
 
-        /// <summary>A strike the goalkeeper gets a hand to and turns behind: the shot, his save, and the ball going out.</summary>
+        /// <summary>
+        /// Plays the ball that is stopped at the goal line (`replay-v8`): from where it was last played, to where the
+        /// defender gets a foot to it a few metres short of the line, along the way it was going.
+        /// </summary>
+        /// <returns>Where the defender touches it, and whether the ball is in the air; the start itself when the ball was already too near the line to be played in.</returns>
+        private (Vec Touch, bool Lofted) PlayIn(State state, int j, Vec start, Vec outOfPlay)
+        {
+            var attacking = state.Source.Side;
+            var gap = FilmSpace.Length - FilmSpace.Attacking(start, attacking);
+            var shortOfLine = TouchMin + ((TouchMax - TouchMin) * FilmHash.Unit(state.Index, j, 13));
+            var toOut = start.DistanceTo(outOfPlay);
+
+            // Along the way to where it goes out the touch is a few metres short of the line; and when the ball is
+            // coming along the line, or from a long way to the side, it is a few metres from where it leaves play.
+            var shortOfIt = gap > shortOfLine ? (gap - shortOfLine) / gap : 0.0;
+            var nearIt = toOut > TouchReach ? 1.0 - (TouchReach / toOut) : 0.0;
+            var touch = start.Lerp(outOfPlay, Math.Max(shortOfIt, nearIt));
+            var distance = start.DistanceTo(touch);
+
+            if (distance < PlayedInMin)
+            {
+                return (start, false);
+            }
+
+            // Whoever has the ball plays it; if the engine left the ball with a defender, the nearest attacker does.
+            var (actor, actorSource) = ActorOf(state);
+
+            if (!state.HolderPending && state.Holder is Guid holder && _context.SideOf(holder) != attacking)
+            {
+                (actor, actorSource) = (null, ActorSource.NearestToBall);
+            }
+
+            var lofted = distance >= LoftedThreshold;
+            var ball = Move(state, lofted ? BeatKind.LoftedPass : BeatKind.Pass, start, touch, actor, actorSource, null, false, attacking);
+
+            ball.ZTo = lofted ? HeaderContactZ : 0;
+            state.Add(ball);
+
+            return (touch, lofted);
+        }
+
+        /// <summary>
+        /// A strike the goalkeeper gets a hand to and turns behind: the shot, his save, and the ball going out round the
+        /// post on the side of the flag (`replay-v8`). A hand turns a ball a few metres, not the length of the goal line,
+        /// so it is put down at the flag afterwards like any other.
+        /// </summary>
         private static void ScriptTip(State state, Vec start, Vec outOfPlay, Guid keeper)
         {
             var attacking = state.Source.Side;
@@ -485,6 +566,10 @@ internal static class FilmScript
             var stands = FilmShape.KeeperOn(defending, start);
             var hands = FilmSpace.Clamp(stands + new Vec(0, outOfPlay.Y >= stands.Y ? TipReach : -TipReach), 0.5);
 
+            // Round the post on the flag's side, a little outside it.
+            var flagSide = outOfPlay.Y >= FilmSpace.Width / 2 ? 1.0 : -1.0;
+            var round = new Vec(outOfPlay.X, (FilmSpace.Width / 2) + (flagSide * (PostHalfWidth + TipPast + (TipPastSpread * FilmHash.Unit(state.Index, 0, 17)))));
+
             var shot = Move(state, BeatKind.Shot, start, hands, actor, actorSource, keeper, false, attacking);
 
             shot.ZTo = TipZ;
@@ -492,7 +577,6 @@ internal static class FilmScript
             shot.Strike = StrikeResult.Saved;
             state.Add(shot);
 
-            // From the save on, everybody can see the corner coming.
             state.Add(new FilmBeat
             {
                 Kind = BeatKind.Save,
@@ -505,14 +589,14 @@ internal static class FilmScript
                 ZTo = TipZ,
                 Actor = keeper,
                 Receiver = keeper,
-                Formation = FormationMode.Corner,
             });
 
-            var tip = Move(state, BeatKind.Clearance, hands, outOfPlay, keeper, ActorSource.Named, null, false, defending);
+            // The sides set for the corner once the ball is on its way behind, not while the keeper has a hand to it.
+            var tip = Move(state, BeatKind.Clearance, hands, round, keeper, ActorSource.Named, null, false, defending);
 
             tip.ZFrom = TipZ;
             tip.ZTo = 0;
-            tip.ZArc = 14;
+            tip.ZArc = 6;
             tip.Formation = FormationMode.Corner;
             state.Add(tip);
             SetHolder(state, null, pending: false);
@@ -626,7 +710,9 @@ internal static class FilmScript
             var side = source.Side;
             var corner = source.Outcome is PassageOutcome.CornerCleared or PassageOutcome.CornerHeaded;
             var taker = to.Holder ?? (corner ? CornerTaker(state, side) : (state.HolderPending ? Nearest(state.Roster, side, to.Point, to.Point, [], includeKeeper: false) : state.Holder));
-            var start = BallStart(state, from);
+
+            // A corner is put down from where the ball went out, which is not always the engine's mark for it (`replay-v8`).
+            var start = corner && state.Last is { } wentOut ? wentOut.To : BallStart(state, from);
 
             var kind = source.Outcome switch
             {

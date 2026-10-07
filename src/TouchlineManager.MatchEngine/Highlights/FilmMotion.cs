@@ -153,6 +153,18 @@ internal sealed class FilmMotion
     /// <summary>How near a driven ball's end a player has to be: he is moving, so it is looser.</summary>
     private const double SoftTolerance = 1.8;
 
+    /// <summary>How far a restart's spot has to be from where the ball stopped for it to be put down rather than fetched, in metres (`replay-v9`).</summary>
+    private const double PutDownDistance = 6.0;
+
+    /// <summary>How far from his place on the line the keeper has to be before he moves to it, in metres (`replay-v9`).</summary>
+    private const double KeeperSetOff = 1.5;
+
+    /// <summary>How near the ball the keeper has to be when a strike he saves ends, in metres: he is not sent there ahead of time, so he has to arrive (`replay-v9`).</summary>
+    private const double SaveTolerance = 0.7;
+
+    /// <summary>How far from the flag the taker of a corner may still be when the ball is put down, in metres: what he runs while it is held (`replay-v8`).</summary>
+    private const double CornerArrival = 14.0;
+
     /// <summary>How far from his place in the shape a player has to be before he sets off for it, in metres.</summary>
     private const double SetOffDistance = 8.0;
 
@@ -770,6 +782,13 @@ internal sealed class FilmMotion
 
             foreach (var pin in _pins)
             {
+                // The keeper stays on his line until the ball is dead: he does not set off for the goal kick, or for
+                // where the shot will arrive, while the ball is still on its way (`replay-v9`).
+                if (IsKeeperKeptOnLine(pin, beats, index, k))
+                {
+                    continue;
+                }
+
                 Assign(pin, elapsed);
             }
         }
@@ -901,7 +920,11 @@ internal sealed class FilmMotion
         {
             var carrier = beat.Kind is BeatKind.Carry or BeatKind.Duel && beat.Receiver == beat.Actor;
 
-            pins.Add(new Pin(receiver, CarryPoint(beat, carrier), carrier ? SoftTolerance : HardTolerance, carrier));
+            // The taker of a corner is on his way to the flag, and has the hold to arrive in: the ball is put down once
+            // he is within the distance he can still cover (`replay-v8`).
+            var tolerance = IsCornerPlacement(beat) ? CornerArrival : carrier ? SoftTolerance : beat.Kind is BeatKind.Shot or BeatKind.Save ? SaveTolerance : HardTolerance;
+
+            pins.Add(new Pin(receiver, CarryPoint(beat, carrier), tolerance, carrier));
         }
 
         if (k + 1 >= beats.Count || beats[k + 1].Cut)
@@ -916,7 +939,9 @@ internal sealed class FilmMotion
             return;
         }
 
-        if (next.Actor is Guid actor && actor != beat.Receiver)
+        // A ball that is put down somewhere else is not fetched from where it stopped: a goal kick is taken from the
+        // six-yard box and a corner from the flag, so the keeper does not run to meet a shot that goes wide (`replay-v9`).
+        if (next.Actor is Guid actor && actor != beat.Receiver && !IsPutDownElsewhere(next))
         {
             pins.Add(new Pin(actor, beat.To, HardTolerance));
         }
@@ -928,6 +953,33 @@ internal sealed class FilmMotion
             pins.Add(new Pin(opponent, beat.To + ((FilmSpace.OwnGoal(side) - beat.To).Unit() * 0.9), 1.5));
         }
     }
+
+    /// <summary>
+    /// Whether a pin for a beat still to come is a goalkeeper's for a strike, a save, a dead-ball restart, or a later
+    /// possession (`replay-v9`): his place for those is not taken up ahead of time, only when the beat itself is reached.
+    /// </summary>
+    private bool IsKeeperKeptOnLine(Pin pin, IReadOnlyList<FilmBeat> beats, int index, int k)
+    {
+        var entity = _roster.EntityOf(pin.Participant);
+
+        if (entity < 0 || _context.Slots[entity].Family != MatchPositionFamily.Goalkeeper)
+        {
+            return false;
+        }
+
+        static bool Stands(FilmBeat beat) => beat.IsHold || beat.Kind is BeatKind.Shot or BeatKind.Save or BeatKind.Placement;
+
+        // Nor for anything that is the next possession's: the ball is not dead yet.
+        return beats[k].Possession != beats[index].Possession || Stands(beats[k]) || (k + 1 < beats.Count && Stands(beats[k + 1]));
+    }
+
+    /// <summary>Whether a beat puts the ball down at a corner flag (`replay-v8`).</summary>
+    private static bool IsCornerPlacement(FilmBeat beat) =>
+        beat.Kind == BeatKind.Placement && beat.Formation == FormationMode.Corner;
+
+    /// <summary>Whether a beat puts the ball down at a spot well away from where it stopped, for a restart (`replay-v9`).</summary>
+    private static bool IsPutDownElsewhere(FilmBeat beat) =>
+        beat.Kind == BeatKind.Placement && (beat.Formation is FormationMode.Corner or FormationMode.GoalKick || beat.Distance > PutDownDistance);
 
     /// <summary>Where a pinned player stands: at the point, or just behind the ball if he is the one driving it.</summary>
     private static Vec CarryPoint(FilmBeat beat, bool carrier)
@@ -1566,6 +1618,14 @@ internal sealed class FilmMotion
                     var setPiece = IsSetPiece(beat);
                     var setOff = setPiece ? CornerSetOff : SetOffDistance;
                     var relatch = setPiece ? CornerSetOff : RelatchDistance;
+
+                    // The keeper follows the ball across his goal in small steps, and is back on his line when it comes:
+                    // he does not wait for the shape to be eight metres from him (`replay-v9`).
+                    if (_context.Slots[entity].Family == MatchPositionFamily.Goalkeeper && !setPiece)
+                    {
+                        setOff = KeeperSetOff;
+                        relatch = KeeperSetOff;
+                    }
 
                     if (setPiece)
                     {

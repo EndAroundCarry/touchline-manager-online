@@ -294,6 +294,14 @@ internal static class FilmTiming
         {
             var beat = beats[index];
 
+            // A run does not come back to the player who began it: that would be a pass to himself (`replay-v10`).
+            var returns = run.Count > 0 && !beat.ReceiverIsActor && beat.Receiver is not null && beat.Receiver == run[0].Actor;
+
+            if (returns)
+            {
+                Flush();
+            }
+
             if (beat.IsGroundMove && !beat.Cut && (run.Count == 0 || run[^1].Side == beat.Side))
             {
                 run.Add(beat);
@@ -325,9 +333,15 @@ internal static class FilmTiming
         var last = run[^1];
         var distance = first.From.DistanceTo(last.To);
 
+        // The ball ends with whoever the last move ended with. When that was a player driving it who is not the one
+        // who starts the run (a keeper's kick, then a team-mate's carry), he receives the ball; the run is not a pass to
+        // the player who played it (`replay-v10`).
+        var solo = last.ReceiverIsActor && first.Actor is not null && first.Actor == last.Actor;
+        var driven = last.ReceiverIsActor && !solo;
+
         var beat = new FilmBeat
         {
-            Kind = distance >= 30.0 ? BeatKind.LoftedPass : BeatKind.Pass,
+            Kind = solo ? BeatKind.Carry : distance >= 30.0 ? BeatKind.LoftedPass : BeatKind.Pass,
             Possession = first.Possession,
             Period = first.Period,
             Side = first.Side,
@@ -335,11 +349,11 @@ internal static class FilmTiming
             To = last.To,
             Actor = first.Actor,
             ActorSource = first.ActorSource,
-            Receiver = last.Receiver,
-            ReceiverPending = last.ReceiverPending,
-            ReceiverIsActor = last.ReceiverIsActor,
+            Receiver = driven ? last.Actor : last.Receiver,
+            ReceiverPending = driven ? last.Actor is null : last.ReceiverPending,
+            ReceiverIsActor = solo,
             Formation = first.Formation,
-            ZArc = distance >= 30.0 ? Math.Min(50, 12 + (0.9 * distance)) : 0,
+            ZArc = !solo && distance >= 30.0 ? Math.Min(50, 12 + (0.9 * distance)) : 0,
         };
 
         beat.NaturalSeconds = NaturalSeconds(context, beat);

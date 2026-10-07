@@ -4,21 +4,6 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
-## Team colours — the manager chooses the two colours the club plays in
-
-A club still arrives in colours generated from its identity. After taking a club over, the manager is sent to a
-**Choose your colours** step (`/onboarding/colours`) and can change the pair later under **Settings → Team colours**.
-
-### Added
-
-- **Two colours per club**, picked with the browser's colour picker (the whole spectrum), a hex field, or a shortcut
-  swatch, with a shirt preview. The two must differ. `PUT /api/v1/club-tenure/colours`; `world.clubs` gains the
-  nullable `primary_colour` and `secondary_colour` (migration `ClubColours`).
-- The chosen colours are used by the **stadium**, the **match lineups** and the **film**. A match snapshot freezes
-  the colours it was locked with, so a replay keeps the kit the match was played in. The colours are not part of the
-  canonical hashes, so choosing them never changes a seed or a result.
-- A club with no choice (or half of one) keeps its generated colours.
-
 ## Stadium picture in three dimensions — rows, sectors and seats in the club's two colours
 
 Recorded in [`ADR-0065`](docs/architecture/adr/0065-stadium-picture-in-three-dimensions.md), which supersedes decision 6
@@ -44,6 +29,21 @@ of ADR-0062. The web client only: the stadium response, the rules and the money 
 - **A key of the four kinds of place under the picture**, each with the club's own seats as its swatch and its real places
   from the server. Pointing at a kind, focusing it or choosing it lights its sectors in the picture; choosing it again
   lets it go.
+
+## Team colours — the manager chooses the two colours the club plays in
+
+A club still arrives in colours generated from its identity. After taking a club over, the manager is sent to a
+**Choose your colours** step (`/onboarding/colours`) and can change the pair later under **Settings → Team colours**.
+
+### Added
+
+- **Two colours per club**, picked with the browser's colour picker (the whole spectrum), a hex field, or a shortcut
+  swatch, with a shirt preview. The two must differ. `PUT /api/v1/club-tenure/colours`; `world.clubs` gains the
+  nullable `primary_colour` and `secondary_colour` (migration `ClubColours`).
+- The chosen colours are used by the **stadium**, the **match lineups** and the **film**. A match snapshot freezes
+  the colours it was locked with, so a replay keeps the kit the match was played in. The colours are not part of the
+  canonical hashes, so choosing them never changes a seed or a result.
+- A club with no choice (or half of one) keeps its generated colours.
 
 ## Replay v6 — players hold a shape, and set pieces look like set pieces
 
@@ -81,6 +81,77 @@ from the ball and from where it goes over the next 6 s, coming in only 2.5 s bef
 - Film length, pace (2.65x, 91.3% inside the band) and the share of moves lengthened for constraints (19.4%) are
   unchanged. A wider zone (7.5 m) cut the crowd to 3.3% but lengthened 32% of moves and left the pace band, so it was
   not kept.
+
+### Follow-up: a corner is won by a touch, not by a ball sent to the flag (`replay-v8`)
+
+`ReplayDirector.Version` is `replay-v8` from this change, so a film a client cached under `replay-v7` is fetched again.
+Film only: whether there is a corner, who takes it and where the flag is are the engine's and are unchanged; the
+simulation, the golden hashes and the calibration do not move.
+
+A corner looked like a pass to the player waiting at the flag. The beat that put the ball behind was one move from
+wherever the last duel was to where the engine had the ball leave play (31 m at the median, 65 m at the most, over 102
+corners), by a defender who was not there; the sides were already set for the corner while it flew; and the taker was
+held at the point it arrived. Now:
+
+- **The ball is played in, then touched.** The player on the ball plays it towards the goal line (a pass, or a lofted
+  ball from 30 m); a defender gets a foot or a head to it 2.5 to 4.5 m short of the line and puts it behind. His touch is
+  within 5.5 m of where the ball leaves play. Only a ball that has just landed within 14 m of the line is headed from
+  where it landed; after a duel it is at somebody's feet, so it is played in.
+- **A keeper's tip goes round the post** on the flag's side, a few metres, not 24 m along the goal line.
+- **The sides set for the corner once the ball is out**, not from the save or the flight. The ball is put down at the
+  flag from where it went out.
+- **The taker is no longer pinned to the point the ball left play**, so a short touch is not stretched until he arrives.
+  He has the hold to run up in; the ball is put down once he is within 14 m of the flag.
+
+Measured over 300 matches (9 corners a match): the touch that puts the ball behind is 5.5 m at p95 (it was 50 m at p90);
+the taker is at the ball when it is delivered (p95 0.0 m, as before). The film is otherwise unchanged: pace 2.65x, 91.0%
+inside the band (91.3%), moves lengthened for constraints 18.4% (19.4%), no teleports, and the shape metrics as they
+were. Two new metrics, `CornerOutLegP95` and `CornerTakerGapP95`, are in the benchmark's `replay` mode.
+
+Throw-ins are still not modelled by the engine and are not changed.
+
+### Follow-up: the keeper stays on his line (`replay-v9`)
+
+`ReplayDirector.Version` is `replay-v9`, so a film cached under `replay-v8` is fetched again. Film only; the engine,
+the golden hashes and the calibration do not move.
+
+After the corner fix the goalkeeper was seen outside his goal, and a shot that went wide seemed to be sent to where he
+stood. Three causes, all in the film's motion:
+
+- **He was sent to where a wide shot ends.** The player who plays the next beat is pinned at the place the ball
+  arrives, and after a shot that goes wide that player is the keeper taking the goal kick. A goal kick (and any
+  restart put down more than 6 m from where the ball stopped) is no longer fetched from there.
+- **He set off for the goal kick while the shot was in the air.** Whoever has to be somewhere in the beats to come
+  starts making his way as soon as he should; for the keeper that was the goal-kick spot, 12 m out, or the place his own
+  goal kick lands, so he drifted out through the whole build-up. His pins for a strike, a save, a restart or a later
+  possession are no longer taken ahead of time.
+- **He did not come back.** A player holds his place until the shape has moved 8 m from him; a keeper that far out
+  stayed there. The keeper now moves once his place is 1.5 m from him.
+
+A keeper who saves a shot is no longer sent to the save point ahead of time, so he has to arrive: his tolerance there is
+0.7 m (it was 1.2 m) and the beat is lengthened if he cannot. Measured over 300 matches: as a strike arrives the keeper
+is 4.0 m from the goal mouth at p95 (it was 11.5 m); his distance to a shot that goes wide is 3.0 m at p05 (0.0 m).
+Pace is unchanged (2.64x). Two new metrics, `KeeperOffGoalP95` and `KeeperAtWideBallP05`, are in the benchmark's
+`replay` mode.
+
+### Follow-up: nobody passes the ball to himself (`replay-v10`)
+
+`ReplayDirector.Version` is `replay-v10`, so a film cached under `replay-v9` is fetched again. Film only.
+
+A goalkeeper was seen kicking the ball and then running after it as if he had passed it to himself, about once a match.
+The cause is the condensing of quiet possessions (`FilmTiming.Combine`), which merges a run of ground moves into one
+pass from the first player to wherever the last one ended. A goal kick played to a team-mate who then carried the ball
+became "the keeper passes, and receives": the merged beat kept the last move's "receiver is the player on it" and
+applied it to the keeper, so he was pinned at the far end of his own kick. Two fixes:
+
+- The merged beat's receiver is the last move's player, not the first move's. A run of one player's drives is a drive
+  (a carry), not a pass.
+- A run is cut before a move that would hand the ball back to the player who began it (A to B to A), which merged
+  into a pass from A to A.
+
+Measured over 300 matches: passes of 4 m and more received by the player who played them 4,209 before, none now (14 a
+match, and the keeper's included). Film length, pace (2.63x) and the share of moves lengthened (17.0%) are as before. A new
+metric, `SelfPasses`, is in the benchmark's `replay` mode, and a test holds it at zero.
 
 ### Known gaps
 

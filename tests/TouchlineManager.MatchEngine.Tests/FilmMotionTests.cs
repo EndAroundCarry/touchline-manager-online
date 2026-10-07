@@ -61,6 +61,24 @@ public sealed class FilmMotionTests
     }
 
     [Fact]
+    public void Nobody_plays_a_ball_to_himself()
+    {
+        var passes = 0;
+        var self = 0;
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var film = TestMatchFactory.Analyse(TestMatchFactory.Even(seed)).Build.Diagnostics!;
+
+            passes += film.Receptions;
+            self += film.SelfPasses;
+        }
+
+        passes.Should().BeGreaterThan(1_000);
+        self.Should().Be(0, "a run of moves merged for the film's length is never a pass from a player to himself, keeper or not");
+    }
+
+    [Fact]
     public void A_player_driving_the_ball_has_it_at_his_feet()
     {
         int carries = 0, withBall = 0;

@@ -28,7 +28,7 @@ namespace TouchlineManager.MatchEngine.Highlights;
 public static class ReplayDirector
 {
     /// <summary>The version label of this presentation.</summary>
-    public const string Version = "replay-v7";
+    public const string Version = "replay-v10";
 
     /// <summary>The most times the film is played again to let its pace settle.</summary>
     private const int MaxSettlingRuns = 4;
@@ -614,6 +614,9 @@ public sealed record FilmDiagnostics
     /// <summary>Gets the furthest the goalkeeper was from the ball as he saved it, in metres.</summary>
     public required double WorstKeeperGap { get; init; }
 
+    /// <summary>Gets how many passes of four metres and more are received by the player who played them (`replay-v10`); there should be none.</summary>
+    public required int SelfPasses { get; init; }
+
     /// <summary>Gets how many strikes ended in a goal.</summary>
     public required int GoalStrikes { get; init; }
 
@@ -713,6 +716,18 @@ public sealed record ShapeMetrics
 
     /// <summary>Gets, as a corner is delivered, the median number of the taking side's outfield players held back beyond forty metres from the goal line.</summary>
     public required double CornerGuardsP50 { get; init; }
+
+    /// <summary>Gets the ninety-fifth percentile of how far the ball travels in the touch that puts it behind for a corner, in metres (`replay-v8`).</summary>
+    public required double CornerOutLegP95 { get; init; }
+
+    /// <summary>Gets the ninety-fifth percentile of how far the taker is from the ball as a corner is delivered, in metres (`replay-v8`).</summary>
+    public required double CornerTakerGapP95 { get; init; }
+
+    /// <summary>Gets the ninety-fifth percentile of how far the keeper is from the goal mouth as a strike at it arrives, in metres (`replay-v9`).</summary>
+    public required double KeeperOffGoalP95 { get; init; }
+
+    /// <summary>Gets the fifth percentile of how far the keeper is from the ball as a shot that goes wide ends, in metres: low means he stands where it comes (`replay-v9`).</summary>
+    public required double KeeperAtWideBallP05 { get; init; }
 
     /// <summary>Gets how many free kicks, struck or delivered, were measured as they were about to be taken.</summary>
     public required int FreeKicks { get; init; }

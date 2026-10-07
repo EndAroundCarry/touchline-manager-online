@@ -21,6 +21,9 @@ internal static class FilmMeasure
     /// <summary>Half the width of the goal mouth the engine aims inside, in metres.</summary>
     private const double GoalHalfWidth = 4.9;
 
+    /// <summary>How long a pass has to be, in metres, for a player who plays it and receives it himself to be an error (`replay-v10`).</summary>
+    private const double SelfPassDistance = 4.0;
+
     /// <summary>How near the ball a player is to be crowding it, in metres (`replay-v6`).</summary>
     private const double Crowding = 5.0;
 
@@ -198,6 +201,7 @@ internal static class FilmMeasure
             WorstReceiverGap = gaps.WorstReceiverGap,
             Saves = gaps.Saves,
             WorstKeeperGap = gaps.WorstKeeperGap,
+            SelfPasses = gaps.SelfPasses,
             GoalStrikes = gaps.GoalStrikes,
             GoalsInNet = gaps.GoalsInNet,
             Shape = MeasureShape(context, script, motion, rosters),
@@ -225,6 +229,10 @@ internal static class FilmMeasure
         var cornerDefenders = new Histogram(1.0, FilmRoster.Size + 1);
         var cornerSix = new Histogram(1.0, FilmRoster.Size + 1);
         var cornerGuards = new Histogram(1.0, FilmRoster.Size + 1);
+        var cornerOutLeg = new Histogram(0.5, 200);
+        var cornerTakerGap = new Histogram(0.5, 200);
+        var keeperOffGoal = new Histogram(0.5, 200);
+        var keeperAtWideBall = new Histogram(0.5, 200);
         var freeKickIntruders = new Histogram(1.0, FilmRoster.Size + 1);
         var freeKickWall = new Histogram(1.0, FilmRoster.Size + 1);
         var penaltyIntruders = new Histogram(1.0, FilmRoster.Size + 1);
@@ -261,6 +269,13 @@ internal static class FilmMeasure
                     cornerDefenders,
                     cornerSix,
                     cornerGuards);
+
+                MeasureCornerLead(script, rosters[beat.Possession], motion, index, cornerOutLeg, cornerTakerGap);
+            }
+
+            if (beat.Kind == BeatKind.Shot && beat.Possession >= 0)
+            {
+                MeasureKeeperAtShot(rosters[beat.Possession], motion, index, beat, keeperOffGoal, keeperAtWideBall);
             }
 
             if (beat.IsHold && beat.Possession >= 0 && beat.Formation is FormationMode.FreeKickShot or FormationMode.FreeKickCross or FormationMode.Penalty)
@@ -462,6 +477,10 @@ internal static class FilmMeasure
             CornerDefendersP50 = cornerDefenders.Percentile(0.5),
             CornerSixYardP95 = cornerSix.Percentile(0.95),
             CornerGuardsP50 = cornerGuards.Percentile(0.5),
+            CornerOutLegP95 = cornerOutLeg.Percentile(0.95),
+            CornerTakerGapP95 = cornerTakerGap.Percentile(0.95),
+            KeeperOffGoalP95 = keeperOffGoal.Percentile(0.95),
+            KeeperAtWideBallP05 = keeperAtWideBall.Percentile(0.05),
             FreeKicks = freeKickIntruders.Total,
             FreeKickIntrudersP95 = freeKickIntruders.Percentile(0.95),
             FreeKickWallP50 = freeKickWall.Percentile(0.5),
@@ -503,6 +522,72 @@ internal static class FilmMeasure
         }
 
         guards.Add(held);
+    }
+
+    /// <summary>
+    /// Measures where the keeper is as a strike at his goal arrives (`replay-v9`): how far he is from the goal mouth,
+    /// and, for a shot that goes wide, how far from the ball. A keeper who stands where the ball is coming, off his
+    /// goal, is the second.
+    /// </summary>
+    private static void MeasureKeeperAtShot(
+        FilmRoster roster,
+        FilmMotionResult motion,
+        int index,
+        FilmBeat shot,
+        Histogram offGoal,
+        Histogram atWideBall)
+    {
+        if (shot.Strike is StrikeResult.None or StrikeResult.Goal || shot.Opponent is not Guid keeperId || roster.EntityOf(keeperId) is not (var entity and >= 0))
+        {
+            return;
+        }
+
+        var last = motion.Spans[index].LastRecord;
+        var keeper = new Vec(motion.PlayerX(last, entity), motion.PlayerY(last, entity));
+        var goal = FilmSpace.OwnGoal(MatchInputV1.OpponentOf(shot.Side));
+        var across = Math.Max(0.0, Math.Abs(keeper.Y - goal.Y) - GoalHalfWidth);
+
+        offGoal.Add(new Vec(keeper.X - goal.X, across).Length);
+
+        if (shot.Strike == StrikeResult.OffTarget)
+        {
+            atWideBall.Add(keeper.DistanceTo(new Vec(motion.BallX(last), motion.BallY(last))));
+        }
+    }
+
+    /// <summary>
+    /// Measures how a corner came about and how it is taken (`replay-v8`): how far the ball travels in the touch that
+    /// puts it behind, and how far the taker is from it as he delivers it. A ball sent the length of the pitch to where
+    /// the taker waits is the first; a taker still running up as the ball leaves the flag is the second.
+    /// </summary>
+    private static void MeasureCornerLead(
+        FilmScriptResult script,
+        FilmRoster roster,
+        FilmMotionResult motion,
+        int cross,
+        Histogram outLeg,
+        Histogram takerGap)
+    {
+        var beats = script.Beats;
+
+        // The beats before the delivery are the hold at the flag, the ball being put down, and what put it behind.
+        if (cross < 3 || !beats[cross - 1].IsHold || beats[cross - 2].Kind != BeatKind.Placement)
+        {
+            return;
+        }
+
+        if (beats[cross - 3].Kind == BeatKind.Clearance)
+        {
+            outLeg.Add(beats[cross - 3].Distance);
+        }
+
+        if (beats[cross - 1].Actor is Guid takerId && roster.EntityOf(takerId) is var taker and >= 0)
+        {
+            var record = motion.Spans[cross].FirstRecord;
+            var ball = new Vec(motion.BallX(record), motion.BallY(record));
+
+            takerGap.Add(new Vec(motion.PlayerX(record, taker), motion.PlayerY(record, taker)).DistanceTo(ball));
+        }
     }
 
     /// <summary>
@@ -761,6 +846,11 @@ internal static class FilmMeasure
                     {
                         var gap = GapOf(beat.Receiver);
 
+                        if (beat.Actor is not null && beat.Actor == beat.Receiver && beat.Distance >= SelfPassDistance)
+                        {
+                            gaps.SelfPasses++;
+                        }
+
                         if (!double.IsNaN(gap))
                         {
                             gaps.Receptions++;
@@ -820,6 +910,8 @@ internal static class FilmMeasure
         public int Saves { get; set; }
 
         public double WorstKeeperGap { get; set; }
+
+        public int SelfPasses { get; set; }
 
         public int GoalStrikes { get; set; }
 

@@ -63,6 +63,99 @@ public sealed class FilmCornerTests
         tipped.Should().BeGreaterThan(0, "a strike the keeper gets a hand to goes round the post");
     }
 
+    [Fact]
+    public void A_ball_is_played_towards_the_line_and_a_defender_touches_it_just_short_of_it_before_it_goes_behind()
+    {
+        int corners = 0, played = 0, tipped = 0;
+
+        for (var seed = 1UL; seed <= Seeds; seed++)
+        {
+            var (_, _, script) = TestMatchFactory.Script(TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed)));
+
+            foreach (var possession in script.Possessions.Where(candidate => candidate.Source.Outcome is PassageOutcome.CornerCleared or PassageOutcome.CornerHeaded))
+            {
+                var beats = script.Beats.Skip(possession.FirstBeat).Take(possession.LastBeat - possession.FirstBeat + 1).ToList();
+                var placement = beats.FindIndex(beat => beat.Kind == BeatKind.Placement && beat.Formation == FormationMode.Corner);
+                var behind = beats[placement - 1];
+                var before = beats[placement - 2];
+                var attacking = possession.Source.Side;
+
+                corners++;
+
+                behind.Distance.Should().BeLessThanOrEqualTo(14.0 + 1e-6, "it is turned behind a few metres, not sent the length of the pitch to the flag");
+                beats[placement].From.Should().Be(behind.To, "the ball is put down from where it went out");
+                before.Formation.Should().NotBe(FormationMode.Corner, "the sides do not set for the corner until the ball is out");
+
+                if (before.Kind == BeatKind.Save)
+                {
+                    tipped++;
+                    Math.Abs(behind.To.Y - (FilmSpace.Width / 2)).Should().BeInRange(3.66 + 1.0 - 1e-6, 3.66 + 1.0 + 1.5 + 1e-6, "a hand turns it round the post, not along the goal line");
+
+                    continue;
+                }
+
+                if (before.Kind is BeatKind.Pass or BeatKind.LoftedPass && before.Side == attacking)
+                {
+                    played++;
+                    before.To.Should().Be(behind.From, "the defender touches it where it arrives");
+                    before.Receiver.Should().BeNull("nobody on the attacking side gets to it first");
+                    FilmSpace.Attacking(before.To, attacking).Should().BeLessThan(FilmSpace.Length, "he touches it short of the line, and it goes over it");
+                    behind.Distance.Should().BeLessThanOrEqualTo(5.5 + 1e-6, "his touch is within a few metres of where the ball leaves play");
+                }
+            }
+        }
+
+        corners.Should().BeGreaterThan(20);
+        played.Should().BeGreaterThan(corners / 2, "most corners follow a ball played in towards the line");
+        tipped.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void The_taker_is_at_the_ball_when_the_corner_is_delivered_and_no_ball_is_sent_the_length_of_the_line()
+    {
+        int matches = 0;
+        double outLeg = 0, takerGap = 0;
+
+        for (var seed = 1UL; seed <= 16; seed++)
+        {
+            var shape = TestMatchFactory.Analyse(TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed))).Build.Diagnostics!.Shape;
+
+            if (shape.Corners == 0)
+            {
+                continue;
+            }
+
+            matches++;
+            outLeg = Math.Max(outLeg, shape.CornerOutLegP95);
+            takerGap = Math.Max(takerGap, shape.CornerTakerGapP95);
+        }
+
+        matches.Should().BeGreaterThan(8, "most matches have a corner");
+        outLeg.Should().BeLessThanOrEqualTo(14.5, "the touch that puts the ball behind is short");
+        takerGap.Should().BeLessThanOrEqualTo(2.0, "the taker is at the ball when it is struck, he is not still running up to it");
+    }
+
+    [Fact]
+    public void The_keeper_stays_on_his_line_for_a_strike_and_does_not_meet_a_shot_that_goes_wide()
+    {
+        int matches = 0;
+        double offGoal = 0, atWideBall = 0;
+
+        for (var seed = 1UL; seed <= 16; seed++)
+        {
+            var shape = TestMatchFactory.Analyse(TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed))).Build.Diagnostics!.Shape;
+
+            matches++;
+            offGoal = Math.Max(offGoal, shape.KeeperOffGoalP95);
+            atWideBall += shape.KeeperAtWideBallP05;
+        }
+
+        matches.Should().Be(16);
+        atWideBall /= matches;
+        offGoal.Should().BeLessThanOrEqualTo(7.0, "he is on his line as the ball arrives, not out of the goal on his way to take the kick");
+        atWideBall.Should().BeGreaterThanOrEqualTo(2.5, "on average the low end of it is a few metres: he does not run to where a wide shot ends, as if the ball were sent to him");
+    }
+
     [Theory]
     [InlineData(MatchSide.Home)]
     [InlineData(MatchSide.Away)]

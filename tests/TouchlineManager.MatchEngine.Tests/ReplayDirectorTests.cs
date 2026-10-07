@@ -14,6 +14,9 @@ public sealed class ReplayDirectorTests
 {
     private const int Seeds = 24;
 
+    /// <summary>The shortest gap between two keyframes across which a speed is measured, in seconds.</summary>
+    private const double MeasurableSeconds = 0.005;
+
     private static readonly HighlightOptionsV1 Defaults = new();
 
     [Fact]
@@ -23,7 +26,7 @@ public sealed class ReplayDirectorTests
         {
             var (_, presentation) = TestMatchFactory.Play(TestMatchFactory.Even(seed));
 
-            presentation.PresentationVersion.Should().Be("replay-v7");
+            presentation.PresentationVersion.Should().Be("replay-v10");
             presentation.Passages.Should().NotBeEmpty();
             presentation.Playback.Should().HaveCount(presentation.Passages.Count);
             presentation.Playback[0].StartMilliseconds.Should().Be(0);
@@ -138,7 +141,10 @@ public sealed class ReplayDirectorTests
                 {
                     var seconds = (ball[index].TimeMilliseconds - ball[index - 1].TimeMilliseconds) / 1000.0;
 
-                    if (seconds <= 0)
+                    // A position is a whole number of ten-thousandths of the pitch, about a centimetre, so one unit of
+                    // rounding across a millisecond reads as ten metres a second: two keyframes that close (a tagged
+                    // moment just after a grid sample) say nothing about how fast the ball is going.
+                    if (seconds < MeasurableSeconds)
                     {
                         continue;
                     }

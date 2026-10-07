@@ -67,6 +67,17 @@ edge, one outlet left high. Runners wait about 5 m short of their places and run
 Set-piece beats are arranged from the moment the set piece is known, take their side from the hold (a defender
 winning the header no longer flips the layout), skip the open-play roles, and use a 1.5 m set-off.
 
+*Amended in `replay-v8`.* As first built, the beat that put the ball behind was one move from wherever the last duel
+was to where the engine had the ball leave play, a median of 31 m and up to 65 m, with the corner already set and the
+taker waiting where it arrived; to a viewer it was a pass to the corner taker. Now the attacking side plays the ball
+towards the goal line, and a defender touches it 2.5 to 4.5 m short of the line and puts it behind (a header when
+the ball came in the air, a block when it did not); the sides do not set for the corner until it is out. A keeper's
+tip goes round the post on the flag's side, a few metres, and the ball is put down at the flag from wherever it went
+out. Only a ball that has just landed within 14 m of the line is headed from where it landed; after a duel the ball is
+at somebody's feet, so it is played in. The taker is no longer pinned to the point the ball went out, so nothing before
+the hold waits for him: he runs the length of the hold, and the ball is put down once he is within 14 m of the flag.
+The engine's facts are unchanged: whether there is a corner, who takes it, and where the flag is.
+
 **7. Free kicks, penalties and goal kicks (`FilmShape`).** A free kick **struck** at goal has a wall of 5 / 4 / 3 / 2
 by distance (under 20 / 25 / 30 m, else 2) on the line to the near post at 9.5 m, the keeper on the far side, and two
 or three attackers waiting for the rebound. A free kick **crossed** (`FormationMode.FreeKickCross`, from

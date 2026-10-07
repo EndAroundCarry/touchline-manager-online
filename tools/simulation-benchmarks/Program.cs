@@ -20,7 +20,7 @@ using TouchlineManager.SimulationBenchmarks;
 // `offball` is not part of `all`: it reads who receives the ball and what Positioning does at the finish (engine-v10).
 //
 // `--dump file` writes the first replayed match's presentation, as the API returns it, to a file: the fluidity
-// harness in apps/web/.preview plays it back in a browser (replay-v7).
+// harness in apps/web/.preview plays it back in a browser (replay-v8).
 
 var dumpAt = Array.IndexOf(args, "--dump");
 var dumpPath = dumpAt >= 0 && dumpAt + 1 < args.Length ? args[dumpAt + 1] : null;
@@ -253,6 +253,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
     var condensedMatches = 0;
     var teleports = 0L;
     var cuts = 0L;
+    var selfPasses = 0L;
     var rungs = new int[4];
     var options = new HighlightOptionsV1();
     var elapsed = Stopwatch.StartNew();
@@ -292,6 +293,7 @@ void Replay(int matches, ulong baseSeed, string? dump)
         keeperSpeedRatio[index] = film.MaxKeeperFilmSpeed / (options.DiveMetresPerSecond * film.Pace);
         teleports += film.Teleports;
         cuts += film.Cuts;
+        selfPasses += film.SelfPasses;
         shapes.Add(film.Shape);
         rungs[Math.Min(film.PayloadRung, rungs.Length - 1)]++;
 
@@ -363,6 +365,9 @@ void Replay(int matches, ulong baseSeed, string? dump)
     Console.WriteLine($"    {"ball in a box: players in box",-34} p50 {Of(s => s.InBoxP50),5:F1}   p95 {Of(s => s.InBoxP95),5:F1}   six-yard p95 {Of(s => s.SixYardP95),5:F1}   target six-yard <= 7");
     Console.WriteLine($"    {"cross arrives: in box att / def",-34} {Of(s => s.DeliveryAttackersP50),5:F1} / {Of(s => s.DeliveryDefendersP50),5:F1}   six-yard p95 {Of(s => s.DeliverySixYardP95),5:F1}   ({Of(s => s.Deliveries),4:F0} crosses per match)   target 3-5 / 4-6, six-yard <= 7");
     Console.WriteLine($"    {"corner delivered: in box att / def",-34} {Of(s => s.CornerAttackersP50),5:F1} / {Of(s => s.CornerDefendersP50),5:F1}   six-yard p95 {Of(s => s.CornerSixYardP95),5:F1}   held back {Of(s => s.CornerGuardsP50),4:F1}   ({Of(s => s.Corners),4:F0} corners per match)   target 4 / 6-7, six-yard <= 7, held back 2-3");
+    Console.WriteLine($"    {"corner: ball out / taker at ball",-34} touch that puts it behind p95 {Of(s => s.CornerOutLegP95),4:F1} m   taker from ball p95 {Of(s => s.CornerTakerGapP95),4:F1} m   target out <= 14, taker <= 2");
+    Console.WriteLine($"    {"keeper at a strike",-34} off his goal mouth p95 {Of(s => s.KeeperOffGoalP95),4:F1} m   from a wide ball p05 {Of(s => s.KeeperAtWideBallP05),4:F1} m   target off <= 7, wide >= 3");
+    Console.WriteLine($"    {"passes received by their passer",-34} {selfPasses,4}   target 0");
     Console.WriteLine($"    {"free kick about to be taken",-34} inside 9.15 m p95 {Of(s => s.FreeKickIntrudersP95),4:F1}   wall p50 {Of(s => s.FreeKickWallP50),4:F1}   ({Of(s => s.FreeKicks),4:F1} per match)   target 0, wall 2-5");
     Console.WriteLine($"    {"penalty about to be taken",-34} inside arc or box p95 {Of(s => s.PenaltyIntrudersP95),4:F1}   ({Of(s => s.Penalties),4:F1} per match)   target 0");
     Console.WriteLine("  ball speed by beat, metres per second of film (median over matches of p50 / p95):");
