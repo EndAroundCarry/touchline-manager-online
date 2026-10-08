@@ -165,6 +165,26 @@ public sealed class TickBallPhysics
     /// <summary>Gets a value indicating whether the ball is off the grass.</summary>
     public bool IsAirborne => Mode is TickBallMode.Flight or TickBallMode.Bounced;
 
+    /// <summary>
+    /// Copies another ball's whole state into this one, so a flight can be played forward on a scratch ball without
+    /// disturbing the real one and without allocating.
+    /// </summary>
+    /// <param name="other">The ball to copy.</param>
+    public void CopyFrom(TickBallPhysics other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        X = other.X;
+        Y = other.Y;
+        Z = other.Z;
+        VelocityX = other.VelocityX;
+        VelocityY = other.VelocityY;
+        VelocityZ = other.VelocityZ;
+        Mode = other.Mode;
+        ControllerIndex = other.ControllerIndex;
+        BounceCount = other.BounceCount;
+    }
+
     /// <summary>Puts the ball at rest on the grass at a point.</summary>
     /// <param name="xUnits">The X position, in pitch units.</param>
     /// <param name="yUnits">The Y position, in pitch units.</param>

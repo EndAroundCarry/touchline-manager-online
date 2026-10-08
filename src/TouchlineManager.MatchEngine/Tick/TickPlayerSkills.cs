@@ -8,7 +8,8 @@ namespace TouchlineManager.MatchEngine.Tick;
 /// <remarks>
 /// Every value is on the canonical 1..20 scale. Milestone 3 needs the defensive and duelling attributes, Milestone 4
 /// the off-the-ball ones (Pace, Acceleration, WorkRate) and Milestone 5 the ones the ball carrier decides with
-/// (Finishing, Passing, Crossing, Technique, Vision); the goalkeeping milestone adds its own. Kept apart from <see cref="TickPlayerProfile"/>, which
+/// (Finishing, Passing, Crossing, Technique, Vision) and Milestone 6 the goalkeeper's (Reflexes, Handling, OneOnOnes,
+/// AerialAbility, JumpingReach). Kept apart from <see cref="TickPlayerProfile"/>, which
 /// holds the athletic limits, because the physics and the decisions are separate jobs.
 /// </remarks>
 internal readonly record struct TickPlayerSkills
@@ -67,6 +68,21 @@ internal readonly record struct TickPlayerSkills
     /// <summary>Gets the Vision attribute: how much of the pitch he sees, and whether he sees the through ball.</summary>
     public required int Vision { get; init; }
 
+    /// <summary>Gets the Reflexes attribute: how soon a goalkeeper reacts to a shot.</summary>
+    public required int Reflexes { get; init; }
+
+    /// <summary>Gets the Handling attribute: whether a goalkeeper holds the ball or spills it.</summary>
+    public required int Handling { get; init; }
+
+    /// <summary>Gets the OneOnOnes attribute: how well a goalkeeper comes out to a lone attacker.</summary>
+    public required int OneOnOnes { get; init; }
+
+    /// <summary>Gets the AerialAbility attribute: a goalkeeper's command of the high ball.</summary>
+    public required int AerialAbility { get; init; }
+
+    /// <summary>Gets the JumpingReach attribute: how high a goalkeeper stretches.</summary>
+    public required int JumpingReach { get; init; }
+
     /// <summary>Builds a player's skills from his frozen attributes.</summary>
     /// <param name="attributes">The player's attributes.</param>
     public static TickPlayerSkills From(PlayerAttributesV1 attributes)
@@ -93,6 +109,11 @@ internal readonly record struct TickPlayerSkills
             Crossing = attributes.ValueOf(MatchAttributeName.Crossing),
             Technique = attributes.ValueOf(MatchAttributeName.Technique),
             Vision = attributes.ValueOf(MatchAttributeName.Vision),
+            Reflexes = attributes.ValueOf(MatchAttributeName.Reflexes),
+            Handling = attributes.ValueOf(MatchAttributeName.Handling),
+            OneOnOnes = attributes.ValueOf(MatchAttributeName.OneOnOnes),
+            AerialAbility = attributes.ValueOf(MatchAttributeName.AerialAbility),
+            JumpingReach = attributes.ValueOf(MatchAttributeName.JumpingReach),
         };
     }
 }
