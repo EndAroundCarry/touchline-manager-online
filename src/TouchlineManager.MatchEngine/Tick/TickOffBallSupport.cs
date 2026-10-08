@@ -879,7 +879,8 @@ internal static class TickOffBallSupport
         return (dx * dx) + (dy * dy);
     }
 
-    private static long SegmentDistanceSquared(long px, long py, long ax, long ay, long bx, long by)
+    /// <summary>Gets the squared distance from a point to a segment; the ball carrier's brain reads its lanes with it.</summary>
+    internal static long SegmentDistanceSquared(long px, long py, long ax, long ay, long bx, long by)
     {
         var sx = bx - ax;
         var sy = by - ay;

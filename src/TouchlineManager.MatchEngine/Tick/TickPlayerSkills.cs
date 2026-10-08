@@ -6,9 +6,9 @@ namespace TouchlineManager.MatchEngine.Tick;
 /// The attributes the tick engine's decision code reads, taken once per player per match (`tick-engine-v1`).
 /// </summary>
 /// <remarks>
-/// Every value is on the canonical 1..20 scale. Milestone 3 needs the defensive and duelling attributes and Milestone 4
-/// the off-the-ball ones (Pace, Acceleration, WorkRate); later milestones add what the ball-carrier and goalkeeping
-/// brains read. Kept apart from <see cref="TickPlayerProfile"/>, which
+/// Every value is on the canonical 1..20 scale. Milestone 3 needs the defensive and duelling attributes, Milestone 4
+/// the off-the-ball ones (Pace, Acceleration, WorkRate) and Milestone 5 the ones the ball carrier decides with
+/// (Finishing, Passing, Crossing, Technique, Vision); the goalkeeping milestone adds its own. Kept apart from <see cref="TickPlayerProfile"/>, which
 /// holds the athletic limits, because the physics and the decisions are separate jobs.
 /// </remarks>
 internal readonly record struct TickPlayerSkills
@@ -52,6 +52,21 @@ internal readonly record struct TickPlayerSkills
     /// <summary>Gets the WorkRate attribute: how hard he works to get into a supporting position.</summary>
     public required int WorkRate { get; init; }
 
+    /// <summary>Gets the Finishing attribute: putting a shot where the keeper is not.</summary>
+    public required int Finishing { get; init; }
+
+    /// <summary>Gets the Passing attribute: playing the ball where he means to.</summary>
+    public required int Passing { get; init; }
+
+    /// <summary>Gets the Crossing attribute: delivering the ball from the flank.</summary>
+    public required int Crossing { get; init; }
+
+    /// <summary>Gets the Technique attribute: striking the ball cleanly.</summary>
+    public required int Technique { get; init; }
+
+    /// <summary>Gets the Vision attribute: how much of the pitch he sees, and whether he sees the through ball.</summary>
+    public required int Vision { get; init; }
+
     /// <summary>Builds a player's skills from his frozen attributes.</summary>
     /// <param name="attributes">The player's attributes.</param>
     public static TickPlayerSkills From(PlayerAttributesV1 attributes)
@@ -73,6 +88,11 @@ internal readonly record struct TickPlayerSkills
             Pace = attributes.ValueOf(MatchAttributeName.Pace),
             Acceleration = attributes.ValueOf(MatchAttributeName.Acceleration),
             WorkRate = attributes.ValueOf(MatchAttributeName.WorkRate),
+            Finishing = attributes.ValueOf(MatchAttributeName.Finishing),
+            Passing = attributes.ValueOf(MatchAttributeName.Passing),
+            Crossing = attributes.ValueOf(MatchAttributeName.Crossing),
+            Technique = attributes.ValueOf(MatchAttributeName.Technique),
+            Vision = attributes.ValueOf(MatchAttributeName.Vision),
         };
     }
 }
