@@ -33,7 +33,7 @@ public sealed class CalibrationTests
         {
             HomeAdvantageBasisPoints = EngineRulesV2.Certain,
         };
-        var neutralHash = EngineConfiguration.HashOf(neutralRules);
+        var neutralHash = EngineConfiguration.HashOf(neutralRules, EngineVersions.LegacyRuleSetLabel);
 
         var withCrowd = 0;
         var neutral = 0;

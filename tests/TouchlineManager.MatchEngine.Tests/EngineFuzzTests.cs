@@ -81,7 +81,7 @@ public sealed class EngineFuzzTests
             0 => input with { FixtureId = Guid.Empty },
             1 => input with { WorldId = Guid.Empty },
             2 => input with { SeasonId = Guid.Empty },
-            3 => input with { EngineVersion = "engine-v12" },
+            3 => input with { EngineVersion = "engine-v99" },
             4 => input with { RuleSetVersion = "engine-rules-v12" },
             5 => input with { FormulaConfigurationHash = "not-a-hash" },
             6 => input with { Home = input.Home with { Slots = [.. input.Home.Slots.Take(9)] } },
