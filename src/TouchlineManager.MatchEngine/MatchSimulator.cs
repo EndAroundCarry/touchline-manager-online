@@ -75,7 +75,8 @@ public static class MatchSimulator
             Passages = passages,
         };
 
-        PossessionSimulator.Run(state);
+        var engine = MatchEngineRegistry.Resolve(input.EngineVersion);
+        engine.Run(state);
 
         state.Home.CaptureEndOfMatchStates();
         state.Away.CaptureEndOfMatchStates();
@@ -94,21 +95,27 @@ public static class MatchSimulator
     /// </remarks>
     private static void VerifyVersionAgreement(MatchInputV1 input, EngineRulesV2 rules)
     {
-        if (!string.Equals(input.EngineVersion, EngineVersions.EngineLabel, StringComparison.Ordinal))
+        var isCurrentEngine = string.Equals(input.EngineVersion, EngineVersions.EngineLabel, StringComparison.Ordinal);
+        var isLegacyEngine = string.Equals(input.EngineVersion, EngineVersions.LegacyEngineLabel, StringComparison.Ordinal);
+
+        if (!isCurrentEngine && !isLegacyEngine)
         {
             throw new InvalidMatchInputException(
                 $"The snapshot was frozen for engine '{input.EngineVersion}' but this is "
-                + $"'{EngineVersions.EngineLabel}' (ADR-0004: a released engine version is never altered in place).");
+                + $"'{EngineVersions.EngineLabel}' (ADR-0004: a released engine version is never altered in place; legacy fallback: '{EngineVersions.LegacyEngineLabel}').");
         }
 
-        if (!string.Equals(input.RuleSetVersion, EngineVersions.RuleSetLabel, StringComparison.Ordinal))
+        var isCurrentRuleSet = string.Equals(input.RuleSetVersion, EngineVersions.RuleSetLabel, StringComparison.Ordinal);
+        var isLegacyRuleSet = string.Equals(input.RuleSetVersion, EngineVersions.LegacyRuleSetLabel, StringComparison.Ordinal);
+
+        if (!isCurrentRuleSet && !isLegacyRuleSet)
         {
             throw new InvalidMatchInputException(
                 $"The snapshot was frozen for rules '{input.RuleSetVersion}' but this is "
-                + $"'{EngineVersions.RuleSetLabel}'.");
+                + $"'{EngineVersions.RuleSetLabel}' (legacy fallback: '{EngineVersions.LegacyRuleSetLabel}').");
         }
 
-        var expected = EngineConfiguration.HashOf(rules);
+        var expected = EngineConfiguration.HashOf(rules, input.RuleSetVersion);
 
         if (!string.Equals(input.FormulaConfigurationHash, expected, StringComparison.Ordinal))
         {

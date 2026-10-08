@@ -20,7 +20,7 @@ internal static class TestMatchFactory
     public static EngineRulesV2 Rules { get; } = EngineRulesV2.Default;
 
     /// <summary>The configuration hash a valid snapshot must carry.</summary>
-    public static string ConfigurationHash { get; } = EngineConfiguration.HashOf(Rules);
+    public static string ConfigurationHash { get; } = EngineConfiguration.HashOf(Rules, EngineVersions.LegacyRuleSetLabel);
 
     /// <summary>Builds a snapshot with two evenly matched sides.</summary>
     /// <param name="seed">The match seed.</param>
@@ -75,8 +75,8 @@ internal static class TestMatchFactory
             FixtureId = fixtureId,
             WorldId = worldId,
             SeasonId = seasonId,
-            EngineVersion = EngineVersions.EngineLabel,
-            RuleSetVersion = EngineVersions.RuleSetLabel,
+            EngineVersion = EngineVersions.LegacyEngineLabel,
+            RuleSetVersion = EngineVersions.LegacyRuleSetLabel,
             HomeAdvantageBasisPoints = Rules.HomeAdvantageBasisPoints,
             FormulaConfigurationHash = ConfigurationHash,
             Seed = seed,

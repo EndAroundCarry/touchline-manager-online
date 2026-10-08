@@ -122,8 +122,11 @@ public sealed class DeterminismTests
     {
         // The rules hash is what a snapshot is frozen against, so it is pinned for the same reason the output
         // hash is: a balance change must be a visible, deliberate act.
-        EngineConfiguration.HashOf(EngineRulesV2.Default)
+        EngineConfiguration.HashOf(EngineRulesV2.Default, EngineVersions.LegacyRuleSetLabel)
             .Should().Be("6eccb0c65a8eb4ac5e6a59ea7145ffa99b2273be5737558d473a5e8400ba1aee");
+
+        EngineConfiguration.HashOf(EngineRulesV2.Default, EngineVersions.RuleSetLabel)
+            .Should().Be("dbaf9f57a45d8c5f20ea7dc61a6c02ea9ff27fb053b9347895bc6c3bc59ba8fe");
     }
 
     [Fact]

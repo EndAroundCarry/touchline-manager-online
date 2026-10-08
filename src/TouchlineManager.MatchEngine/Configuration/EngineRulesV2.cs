@@ -1432,10 +1432,11 @@ public sealed record EngineRulesV2
     /// under genuinely different rules would claim the same provenance. Sorting is ordinal and the
     /// formatting is invariant, so the description is stable across platforms and cultures.
     /// </remarks>
+    /// <param name="versionOverride">An optional rule version override (e.g. for legacy rule verification).</param>
     /// <returns>The canonical, name-ordered description of every constant.</returns>
-    public IReadOnlyList<string> ToCanonicalParts()
+    public IReadOnlyList<string> ToCanonicalParts(string? versionOverride = null)
     {
-        var parts = new List<string> { Version };
+        var parts = new List<string> { versionOverride ?? Version };
 
         var properties = GetType()
             .GetProperties()

@@ -13,26 +13,32 @@ namespace TouchlineManager.MatchEngine;
 public static class EngineVersions
 {
     /// <summary>
-    /// The engine version implemented by this assembly.
+    /// The engine version implemented by this assembly (engine-v12 discrete tick-based engine).
     /// </summary>
     /// <remarks>
     /// Bump on any change to formulas, draw order, canonical serialization, or event semantics. The
     /// golden output hashes are pinned per version, so the bump is what makes the change honest rather
     /// than a silent rewrite of history.
     /// </remarks>
-    public const int Engine = 11;
+    public const int Engine = 12;
 
     /// <summary>
-    /// The engine rules version implemented by this assembly.
+    /// The engine rules version implemented by this assembly (engine-rules-v11).
     /// </summary>
     /// <remarks>
     /// Distinct from <see cref="Engine"/> because a tuning change and a behavioural change are different
     /// kinds of change: a constant may move within a rules version only if it produces a new rules
     /// version, and either kind requires the engine version to be re-pinned.
     /// </remarks>
-    public const int RuleSet = 10;
+    public const int RuleSet = 11;
 
-    /// <summary>The stable label for engine version 11, used in hashes and diagnostics.</summary>
+    /// <summary>The legacy engine version 11 (macro possession engine).</summary>
+    public const int LegacyEngine = 11;
+
+    /// <summary>The legacy engine rules version 10.</summary>
+    public const int LegacyRuleSet = 10;
+
+    /// <summary>The stable label for engine version 12 (discrete tick-based engine), used in hashes and diagnostics.</summary>
     /// <remarks>
     /// <para>
     /// Version 11 adds the counter-attack. A ball a side wins back from play becomes a counter-attack on a roll the
@@ -106,10 +112,16 @@ public static class EngineVersions
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
     /// </remarks>
-    public const string EngineLabel = "engine-v11";
+    public const string EngineLabel = "engine-v12";
 
-    /// <summary>The stable label for engine rules version 10.</summary>
-    public const string RuleSetLabel = "engine-rules-v10";
+    /// <summary>The stable label for engine rules version 11.</summary>
+    public const string RuleSetLabel = "engine-rules-v11";
+
+    /// <summary>The stable label for legacy engine version 11.</summary>
+    public const string LegacyEngineLabel = "engine-v11";
+
+    /// <summary>The stable label for legacy engine rules version 10.</summary>
+    public const string LegacyRuleSetLabel = "engine-rules-v10";
 
     /// <summary>The stable label for the unit-rating weight table, versioned with the engine.</summary>
     public const string RatingWeightsLabel = "engine-ratings-v2";

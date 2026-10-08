@@ -18,12 +18,13 @@ public static class EngineConfiguration
 {
     /// <summary>Computes the canonical hash of a rules instance.</summary>
     /// <param name="rules">The rules.</param>
+    /// <param name="versionOverride">An optional rule version override.</param>
     /// <returns>The lowercase hexadecimal hash.</returns>
-    public static string HashOf(EngineRulesV2 rules)
+    public static string HashOf(EngineRulesV2 rules, string? versionOverride = null)
     {
         ArgumentNullException.ThrowIfNull(rules);
 
-        var canonical = string.Join('\n', rules.ToCanonicalParts());
+        var canonical = string.Join('\n', rules.ToCanonicalParts(versionOverride));
         var digest = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
 
         return Convert.ToHexStringLower(digest);
@@ -31,12 +32,13 @@ public static class EngineConfiguration
 
     /// <summary>Describes a rules instance as text, for diagnosing a hash mismatch.</summary>
     /// <param name="rules">The rules.</param>
-    public static string Describe(EngineRulesV2 rules)
+    /// <param name="versionOverride">An optional rule version override.</param>
+    public static string Describe(EngineRulesV2 rules, string? versionOverride = null)
     {
         ArgumentNullException.ThrowIfNull(rules);
 
         return string.Join(
             '\n',
-            rules.ToCanonicalParts().Select(part => part.ToString(CultureInfo.InvariantCulture)));
+            rules.ToCanonicalParts(versionOverride).Select(part => part.ToString(CultureInfo.InvariantCulture)));
     }
 }
