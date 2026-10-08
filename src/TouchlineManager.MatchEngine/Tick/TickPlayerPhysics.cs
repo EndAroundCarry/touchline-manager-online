@@ -29,6 +29,13 @@ internal struct TickPlayerState
     /// <summary>His energy: <see cref="TickPlayerPhysics.EnergyFull"/> is fully fresh, 0 is spent.</summary>
     public int Energy;
 
+    /// <summary>
+    /// The ticks left in which he is off balance after being beaten or dispossessed: he runs at
+    /// <see cref="TickPlayerPhysics.StumbleSpeedBasisPoints"/> of his pace and may not press or challenge. Counted down by
+    /// <see cref="TickPlayerPhysics.Step"/>.
+    /// </summary>
+    public int Lockout;
+
     /// <summary>Gets the X velocity, in fixed units per tick.</summary>
     public readonly int VelocityX => (int)((long)TickTrigonometry.Cos(Heading) * Speed / TickTrigonometry.Scale);
 
@@ -192,6 +199,9 @@ internal static class TickPlayerPhysics
     /// <summary>Above this share of top speed (basis points) a player is sprinting.</summary>
     public const int SprintFloorBasisPoints = 7_000;
 
+    /// <summary>The share of his pace a player keeps while off balance (<see cref="TickPlayerState.Lockout"/>), in basis points.</summary>
+    public const int StumbleSpeedBasisPoints = 5_000;
+
     private const int BasisPoints = 10_000;
 
     /// <summary>The slowest a tired player runs, as a share of his fresh top speed, in basis points.</summary>
@@ -230,6 +240,12 @@ internal static class TickPlayerPhysics
 
         var topSpeed = EffectiveTopSpeed(player, profile);
         var speedCap = (int)((long)topSpeed * Math.Clamp(intent.SpeedLimitBasisPoints, 0, BasisPoints) / BasisPoints);
+
+        if (player.Lockout > 0)
+        {
+            speedCap = (int)((long)speedCap * StumbleSpeedBasisPoints / BasisPoints);
+            player.Lockout--;
+        }
 
         if (intent.Arrive)
         {

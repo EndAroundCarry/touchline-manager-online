@@ -88,7 +88,16 @@ internal static class TickSteering
     /// <param name="team">His side's players, as they stand at the start of the tick.</param>
     /// <param name="profile">His athletic limits.</param>
     /// <param name="anchor">The anchor to hold, in pitch units.</param>
-    public static TickMoveIntent Steer(int selfIndex, ReadOnlySpan<TickPlayerState> team, in TickPlayerProfile profile, SpatialPoint anchor)
+    /// <param name="paceBasisPoints">
+    /// The share of top speed to travel at, in basis points, or 0 for the holding pace of <see cref="HoldSpeedBasisPoints"/>
+    /// (the defensive AI asks for more when it sends a player to close the ball down).
+    /// </param>
+    public static TickMoveIntent Steer(
+        int selfIndex,
+        ReadOnlySpan<TickPlayerState> team,
+        in TickPlayerProfile profile,
+        SpatialPoint anchor,
+        int paceBasisPoints = 0)
     {
         var self = team[selfIndex];
         var topSpeed = TickPlayerPhysics.EffectiveTopSpeed(self, profile);
@@ -104,7 +113,7 @@ internal static class TickSteering
         if (distance > ContentRadius)
         {
             // He is content anywhere within the radius, so the run is only as long as what lies beyond it.
-            var cap = (long)topSpeed * HoldSpeedBasisPoints(distance) / BasisPoints;
+            var cap = (long)topSpeed * (paceBasisPoints > 0 ? paceBasisPoints : HoldSpeedBasisPoints(distance)) / BasisPoints;
             var wanted = Math.Min(cap, SpatialMath.Sqrt(2L * profile.Deceleration * (distance - ContentRadius)));
 
             desiredX = dx * wanted / distance;
@@ -179,7 +188,15 @@ internal static class TickSteering
     /// <param name="team">The side's players, updated in place (at most <see cref="TickTacticalGeometry.TeamSize"/>).</param>
     /// <param name="profiles">Their athletic limits, in the same order.</param>
     /// <param name="anchors">The anchors to hold, in the same order, in pitch units.</param>
-    public static void StepTeam(Span<TickPlayerState> team, ReadOnlySpan<TickPlayerProfile> profiles, ReadOnlySpan<SpatialPoint> anchors)
+    /// <param name="paces">
+    /// Optional: the share of top speed each player travels at, in basis points, in the same order (0 or an empty span is
+    /// the holding pace).
+    /// </param>
+    public static void StepTeam(
+        Span<TickPlayerState> team,
+        ReadOnlySpan<TickPlayerProfile> profiles,
+        ReadOnlySpan<SpatialPoint> anchors,
+        ReadOnlySpan<int> paces = default)
     {
         ArgumentOutOfRangeException.ThrowIfGreaterThan(team.Length, TickTacticalGeometry.TeamSize);
 
@@ -187,7 +204,7 @@ internal static class TickSteering
 
         for (var index = 0; index < team.Length; index++)
         {
-            intents[index] = Steer(index, team, profiles[index], anchors[index]);
+            intents[index] = Steer(index, team, profiles[index], anchors[index], paces.IsEmpty ? 0 : paces[index]);
         }
 
         for (var index = 0; index < team.Length; index++)
