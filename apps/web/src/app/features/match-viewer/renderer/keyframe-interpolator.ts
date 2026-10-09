@@ -1,4 +1,5 @@
 import { FilmTrack } from '../../../core/match/film-timeline';
+import { PITCH_COORDINATE_SCALE, PITCH_LENGTH_METRES, PITCH_WIDTH_METRES } from './pitch-layout';
 
 /**
  * Turns a film track into a position at an arbitrary moment (`§9.1`, `§9.4`, `replay-v4`).
@@ -7,12 +8,16 @@ import { FilmTrack } from '../../../core/match/film-timeline';
  * hundreds and the replay is identical on a 60 Hz and a 144 Hz display. Everything here is pure and takes the
  * animation time it is given, so a test can ask for any moment without a canvas or a clock.
  *
- * **Players** move on a monotone cubic Hermite spline (Fritsch–Carlson) that is aware of *time*: the server
+ * **Players** move on a cubic Hermite spline whose tangents are *planar* and aware of *time*: the server
  * keeps only the samples where a run changed, so they are not evenly spaced, and a spline that assumed they
- * were — the Catmull-Rom this replaces — overshot a corner and wobbled after a slow stretch. A monotone spline
- * never leaves the range of the two keyframes it joins, so a player cannot swing past where they were going,
- * and it has one velocity at every keyframe, so a run is smooth where two segments meet. It is still an
- * *interpolating* spline: it passes through every keyframe, so a strike or a dive lands when it was authored.
+ * were — the Catmull-Rom this replaces — overshot a corner and wobbled after a slow stretch. The tangent at a
+ * keyframe is the time-weighted mean of the two segment velocity vectors, so a player who turns keeps most of
+ * his speed through the bend (a per-axis monotone spline zeroed an axis at every turn and slowed him on it),
+ * and it is zero only at a real stop, a cut or a track end. It is limited to 1.5 times the slower segment and
+ * the curve is kept within 0.3 m of the line between its keyframes, so a player cannot swing past where they
+ * were going. It is still an *interpolating* spline: it passes through every keyframe, so a strike or a dive
+ * lands when it was authored. Altitude keeps the monotone spline, because a header must not dip below the
+ * ground.
  *
  * **The ball** is linear. The server samples a flight every hundred milliseconds already, and a curve through
  * those samples would invent a bend in a pass that is a straight line.
@@ -112,6 +117,76 @@ export function monotoneTangents(
   return tangents;
 }
 
+/** Metres per film unit along each axis: the pitch is 105 m by 68 m on a 10 000 by 10 000 grid, so a unit is not square. */
+const METRES_PER_UNIT_X = PITCH_LENGTH_METRES / PITCH_COORDINATE_SCALE;
+const METRES_PER_UNIT_Y = PITCH_WIDTH_METRES / PITCH_COORDINATE_SCALE;
+
+/** Below this, in metres per millisecond (0.3 m/s), both neighbouring segments mean the player is standing. */
+const STOP_SPEED = 0.0003;
+
+/** A tangent is never faster than this multiple of the slower neighbouring segment, so a corner cannot overshoot. */
+const TANGENT_SPEED_LIMIT = 1.5;
+
+/** How far, in metres, a drawn position may stray from the straight line between its two keyframes. */
+const CHORD_GUARD_METRES = 0.3;
+
+/**
+ * The tangents of a planar path through `(times[i], xs[i], ys[i])`, in film units per millisecond, so a player who
+ * changes direction at a keyframe carries his speed round the corner instead of stopping on it.
+ *
+ * Each axis used to be made monotone on its own, which sets that axis's velocity to zero wherever it changes sign:
+ * every bend slowed the token down. Here the tangent is the time-aware three-point slope of the two segment
+ * *velocity vectors*, worked out in metres (the grid is not square), limited to 1.5 times the slower of the two
+ * segments, and zero only at a real stop, at a cut, or at either end of the track.
+ */
+export function planarTangents(
+  times: ArrayLike<number>,
+  xs: ArrayLike<number>,
+  ys: ArrayLike<number>,
+): { readonly x: Float64Array; readonly y: Float64Array } {
+  const count = times.length;
+  const tangentX = new Float64Array(count);
+  const tangentY = new Float64Array(count);
+
+  for (let index = 1; index < count - 1; index += 1) {
+    const before = times[index] - times[index - 1];
+    const after = times[index + 1] - times[index];
+
+    // Next to a cut, or at an end, there is no run to carry on: the entity starts or stops there.
+    if (before <= 0 || after <= 0) {
+      continue;
+    }
+
+    const leftX = ((xs[index] - xs[index - 1]) * METRES_PER_UNIT_X) / before;
+    const leftY = ((ys[index] - ys[index - 1]) * METRES_PER_UNIT_Y) / before;
+    const rightX = ((xs[index + 1] - xs[index]) * METRES_PER_UNIT_X) / after;
+    const rightY = ((ys[index + 1] - ys[index]) * METRES_PER_UNIT_Y) / after;
+    const leftSpeed = Math.hypot(leftX, leftY);
+    const rightSpeed = Math.hypot(rightX, rightY);
+
+    if (leftSpeed < STOP_SPEED && rightSpeed < STOP_SPEED) {
+      continue;
+    }
+
+    let slopeX = (after * leftX + before * rightX) / (before + after);
+    let slopeY = (after * leftY + before * rightY) / (before + after);
+    const limit = TANGENT_SPEED_LIMIT * Math.min(leftSpeed, rightSpeed);
+    const slope = Math.hypot(slopeX, slopeY);
+
+    if (slope > limit) {
+      const scale = limit / slope;
+
+      slopeX *= scale;
+      slopeY *= scale;
+    }
+
+    tangentX[index] = slopeX / METRES_PER_UNIT_X;
+    tangentY[index] = slopeY / METRES_PER_UNIT_Y;
+  }
+
+  return { x: tangentX, y: tangentY };
+}
+
 /** The cubic Hermite basis at `fraction` (0…1) between two values with their tangents and the span between them. */
 export function hermite(
   from: number,
@@ -151,8 +226,10 @@ export class TrackInterpolator {
   ) {
     const empty = new Float64Array(0);
 
-    this.xTangents = smooth ? monotoneTangents(track.times, track.xs) : empty;
-    this.yTangents = smooth ? monotoneTangents(track.times, track.ys) : empty;
+    const planar = smooth ? planarTangents(track.times, track.xs, track.ys) : null;
+
+    this.xTangents = planar?.x ?? empty;
+    this.yTangents = planar?.y ?? empty;
     this.zTangents = smooth ? monotoneTangents(track.times, track.zs) : empty;
   }
 
@@ -264,30 +341,37 @@ export class TrackInterpolator {
       return;
     }
 
-    out.x = within(
-      hermite(
-        xs[index],
-        xs[index + 1],
-        this.xTangents[index],
-        this.xTangents[index + 1],
-        span,
-        fraction,
-      ),
-      xs[index],
-      xs[index + 1],
-    );
-    out.y = within(
-      hermite(
-        ys[index],
-        ys[index + 1],
-        this.yTangents[index],
-        this.yTangents[index + 1],
-        span,
-        fraction,
-      ),
-      ys[index],
-      ys[index + 1],
-    );
+    const fromX = xs[index];
+    const fromY = ys[index];
+    const toX = xs[index + 1];
+    const toY = ys[index + 1];
+    let x = hermite(fromX, toX, this.xTangents[index], this.xTangents[index + 1], span, fraction);
+    let y = hermite(fromY, toY, this.yTangents[index], this.yTangents[index + 1], span, fraction);
+
+    // The curve may bow a little off the straight line between its keyframes, but not past a small guard: the
+    // nearest point of the chord is found in metres, and a point further than the guard is pulled back to it.
+    const chordX = (toX - fromX) * METRES_PER_UNIT_X;
+    const chordY = (toY - fromY) * METRES_PER_UNIT_Y;
+    const chordLength = chordX * chordX + chordY * chordY;
+    const offsetX = (x - fromX) * METRES_PER_UNIT_X;
+    const offsetY = (y - fromY) * METRES_PER_UNIT_Y;
+    const along =
+      chordLength > 0
+        ? Math.min(1, Math.max(0, (offsetX * chordX + offsetY * chordY) / chordLength))
+        : 0;
+    const strayX = offsetX - along * chordX;
+    const strayY = offsetY - along * chordY;
+    const stray = Math.hypot(strayX, strayY);
+
+    if (stray > CHORD_GUARD_METRES) {
+      const scale = CHORD_GUARD_METRES / stray;
+
+      x = fromX + (along * chordX + strayX * scale) / METRES_PER_UNIT_X;
+      y = fromY + (along * chordY + strayY * scale) / METRES_PER_UNIT_Y;
+    }
+
+    out.x = x;
+    out.y = y;
     out.z = within(
       hermite(
         zs[index],

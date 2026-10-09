@@ -104,7 +104,8 @@ function distribution(values: readonly number[]): Distribution {
   }
 
   const sorted = [...values].sort((one, other) => one - other);
-  const at = (share: number) => sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))];
+  const at = (share: number) =>
+    sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))];
 
   return { p50: at(0.5), p95: at(0.95), p99: at(0.99), max: sorted[sorted.length - 1] };
 }
@@ -321,13 +322,19 @@ function still(): {
  */
 function clockChecks(): {
   readonly checked: number;
-  readonly mismatches: readonly { readonly what: string; readonly stamped: string; readonly shown: string }[];
+  readonly mismatches: readonly {
+    readonly what: string;
+    readonly stamped: string;
+    readonly shown: string;
+  }[];
 } {
   const mismatches: { what: string; stamped: string; shown: string }[] = [];
   const stamped = (line: { minute: number; stoppageMinute: number }) =>
     matchClockLabel(line.minute, line.stoppageMinute);
   const goalLines = presentation.commentary.filter((line) => isGoalCommentary(line.templateKey));
-  const cardLines = presentation.commentary.filter((line) => cardKindFor(line.templateKey) !== null);
+  const cardLines = presentation.commentary.filter(
+    (line) => cardKindFor(line.templateKey) !== null,
+  );
   let checked = 0;
 
   timeline.goals.forEach((goal, index) => {
@@ -399,6 +406,7 @@ function fluidity(): {
   readonly coveredShareOfSteps: number;
   readonly coveredPairsPerFilmMinute: number;
   readonly tokenRadiusMetres: number;
+  readonly examples: readonly { id: string; timeMs: number; speeds: number[] }[];
 } {
   const steps = Math.floor(timeline.durationMilliseconds / FLUIDITY_STEP);
   const ids: string[] = [];
@@ -466,6 +474,7 @@ function fluidity(): {
 
   // Speeds in metres per film second, with a gap wherever the token was put somewhere new or is not drawn.
   let stutters = 0;
+  const examples: { id: string; timeMs: number; speeds: number[] }[] = [];
   const window = Math.round(300 / FLUIDITY_STEP);
   const recovery = Math.round(400 / FLUIDITY_STEP);
 
@@ -473,7 +482,10 @@ function fluidity(): {
     const speed = new Float32Array(steps + 1).fill(Number.NaN);
 
     for (let step = 1; step <= steps; step += 1) {
-      const moved = Math.hypot(xs[slot][step] - xs[slot][step - 1], ys[slot][step] - ys[slot][step - 1]);
+      const moved = Math.hypot(
+        xs[slot][step] - xs[slot][step - 1],
+        ys[slot][step] - ys[slot][step - 1],
+      );
 
       if (!Number.isNaN(moved) && moved < STEP_JUMP_METRES && broken[step] === 0) {
         speed[step] = moved / (FLUIDITY_STEP / 1_000);
@@ -498,13 +510,28 @@ function fluidity(): {
       // The average counts only if the whole ±300 ms is one unbroken run.
       const average = total / Math.max(1, count);
 
-      if (count < 2 * window + 1 || average < STUTTER_MINIMUM_AVERAGE || speed[step] >= STUTTER_DIP * average) {
+      if (
+        count < 2 * window + 1 ||
+        average < STUTTER_MINIMUM_AVERAGE ||
+        speed[step] >= STUTTER_DIP * average
+      ) {
         continue;
       }
 
       for (let later = step + 1; later <= step + recovery; later += 1) {
         if (!Number.isNaN(speed[later]) && speed[later] >= STUTTER_RECOVERY * average) {
           stutters += 1;
+
+          if (examples.length < 12) {
+            examples.push({
+              id: ids[slot],
+              timeMs: step * FLUIDITY_STEP,
+              speeds: Array.from(
+                speed.slice(step - 6, step + 11),
+                (value) => Math.round(value * 10) / 10,
+              ),
+            });
+          }
           step = later;
 
           break;
@@ -523,6 +550,7 @@ function fluidity(): {
     coveredShareOfSteps: coveredSteps / Math.max(1, steps + 1),
     coveredPairsPerFilmMinute: coveredPairSteps / Math.max(0.001, filmMinutes),
     tokenRadiusMetres: radius,
+    examples,
   };
 }
 

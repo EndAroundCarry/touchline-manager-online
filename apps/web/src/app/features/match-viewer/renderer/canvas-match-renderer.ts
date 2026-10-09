@@ -1,6 +1,8 @@
 import { FilmTimeline } from '../../../core/match/film-timeline';
 import { KeyframeSample, TrackInterpolator, emptySample } from './keyframe-interpolator';
 import {
+  PITCH_COORDINATE_SCALE,
+  PITCH_LENGTH_METRES,
   PitchGeometry,
   SHADOW_MIN_ALTITUDE,
   altitudeLift,
@@ -27,9 +29,20 @@ import {
   TeamKit,
   TeamKits,
 } from './renderer.models';
+import { TOKEN_MIN_GAP, separateTokens } from './token-separation';
 
 /** The width of the pitch the film is drawn on, in metres: the harness measures distances in the same metres. */
 const PITCH_WIDTH_METRES = 68;
+
+/**
+ * The nearest two player tokens may be drawn to each other, as a multiple of a token's radius. The film keeps the
+ * true positions; the renderer pushes tokens apart for display only, so a duel is readable and no token covers
+ * another. 1.45 lets them still overlap by about a quarter.
+ */
+export const TOKEN_MIN_GAP_RADII = TOKEN_MIN_GAP;
+
+/** The ball follows the player this close to it (in metres) when that player is pushed aside, so it stays at his feet. */
+const BALL_CARRIER_METRES = 1.5;
 
 /**
  * Draws one whole film on a canvas, interpolating the timeline's tracks (`§9.1`, `§9.4`, `replay-v4`).
@@ -79,6 +92,13 @@ export class CanvasMatchRenderer {
   private readonly trailFrom: KeyframeSample = emptySample();
   private readonly trailTo: KeyframeSample = emptySample();
   private ball: LiveEntity | null = null;
+
+  // Scratch for pushing tokens apart, grown once and reused.
+  private separationX = new Float64Array(32);
+  private separationY = new Float64Array(32);
+  private separationOffsetX = new Float64Array(32);
+  private separationOffsetY = new Float64Array(32);
+  private readonly separationIds: string[] = [];
 
   private observer: ResizeObserver | null = null;
   private layer: HTMLCanvasElement | null = null;
@@ -194,6 +214,8 @@ export class CanvasMatchRenderer {
     const cards = this.timeline.cardsAt(timeMs);
     const radius = playerRadius(rect);
     let effects = 0;
+
+    this.separatePlayers(rect, radius);
 
     this.numberFont = this.fontFor(radius);
 
@@ -382,6 +404,89 @@ export class CanvasMatchRenderer {
       fillEntity(this.liveBall, this.scratch);
       this.frame.push(this.liveBall);
       this.ball = this.liveBall;
+    }
+  }
+
+  /**
+   * Pushes overlapping player tokens apart, for display only, and takes the ball with the player who has it.
+   *
+   * It runs on the frame just sampled, so the film's own positions are never changed and the push is the same for
+   * the same moment however the film was reached. Hover and name tags read the pushed positions, because those
+   * are the ones on screen.
+   */
+  private separatePlayers(rect: PitchRect, radius: number): void {
+    const players = this.players;
+    const count = players.length;
+
+    if (count < 2) {
+      return;
+    }
+
+    if (this.separationX.length < count) {
+      this.separationX = new Float64Array(count * 2);
+      this.separationY = new Float64Array(count * 2);
+      this.separationOffsetX = new Float64Array(count * 2);
+      this.separationOffsetY = new Float64Array(count * 2);
+    }
+
+    const unitsX = rect.width / PITCH_COORDINATE_SCALE;
+    const unitsY = rect.height / PITCH_COORDINATE_SCALE;
+    const ids = this.separationIds;
+
+    ids.length = count;
+
+    for (let index = 0; index < count; index += 1) {
+      const player = players[index];
+
+      this.separationX[index] = player.position.x * unitsX;
+      this.separationY[index] = player.position.y * unitsY;
+      ids[index] = player.entity.id;
+    }
+
+    separateTokens(
+      this.separationX,
+      this.separationY,
+      ids,
+      count,
+      TOKEN_MIN_GAP_RADII * radius,
+      radius,
+      this.separationOffsetX,
+      this.separationOffsetY,
+    );
+
+    // A ball on the ground belongs to the nearest player within reach, judged on the true positions.
+    const ball = this.ball;
+    let carrier = -1;
+
+    if (ball !== null && ball.z < SHADOW_MIN_ALTITUDE) {
+      const metresX = PITCH_LENGTH_METRES / PITCH_COORDINATE_SCALE;
+      const metresY = PITCH_WIDTH_METRES / PITCH_COORDINATE_SCALE;
+      let nearest = BALL_CARRIER_METRES;
+
+      for (let index = 0; index < count; index += 1) {
+        const distance = Math.hypot(
+          (players[index].position.x - ball.position.x) * metresX,
+          (players[index].position.y - ball.position.y) * metresY,
+        );
+
+        if (distance <= nearest) {
+          nearest = distance;
+          carrier = index;
+        }
+      }
+    }
+
+    for (let index = 0; index < count; index += 1) {
+      const dx = this.separationOffsetX[index] / unitsX;
+      const dy = this.separationOffsetY[index] / unitsY;
+
+      players[index].position.x += dx;
+      players[index].position.y += dy;
+
+      if (index === carrier && ball !== null) {
+        ball.position.x += dx;
+        ball.position.y += dy;
+      }
     }
   }
 

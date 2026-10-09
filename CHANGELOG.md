@@ -4,6 +4,15 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tick film, Milestone 1 — smoother runs and no stacked tokens in the viewer
+
+### Changed
+
+- A player's drawn path bends without slowing down: the spline now has planar tangents, so a token keeps most of its speed through a turn and stops only
+  where the player really stopped.
+- Player tokens are pushed apart for display (never closer than 1.45 token radii), so a duel or a marking pair is readable and no token covers another.
+  The film's own positions are unchanged.
+
 ## Engine v12 — matches are played tick by tick, by twenty-two players and a ball
 
 Recorded in [`ADR-0066`](docs/architecture/adr/0066-engine-v12-discrete-tick-match-engine.md); specified in

@@ -33,10 +33,14 @@ const option = (name, fallback) => {
 
   return at >= 0 && args[at + 1] !== undefined ? args[at + 1] : fallback;
 };
-const presentation = args.find((value, index) => !value.startsWith('--') && !args[index - 1]?.startsWith('--'));
+const presentation = args.find(
+  (value, index) => !value.startsWith('--') && !args[index - 1]?.startsWith('--'),
+);
 
 if (!presentation) {
-  console.error('usage: node capture.mjs <presentation.json> [--out <dir>] [--seconds <n>] [--min-fps <n>]');
+  console.error(
+    'usage: node capture.mjs <presentation.json> [--out <dir>] [--seconds <n>] [--min-fps <n>]',
+  );
   process.exit(2);
 }
 
@@ -50,7 +54,8 @@ const { url, close } = await startServer({ presentation });
 
 // The browsers this container carries are pre-installed rather than fetched for a pinned version, so a
 // version mismatch falls back to the installed binary instead of failing.
-const executable = process.env.PW_CHROMIUM ?? ['/opt/pw-browsers/chromium'].find((path) => existsSync(path));
+const executable =
+  process.env.PW_CHROMIUM ?? ['/opt/pw-browsers/chromium'].find((path) => existsSync(path));
 let browser;
 
 try {
@@ -74,7 +79,8 @@ await page.waitForFunction(() => window.film !== undefined, undefined, { timeout
 
 const info = await page.evaluate(() => window.film.info());
 const clock = (milliseconds) => page.evaluate((value) => window.film.clockAt(value), milliseconds);
-const minutes = (milliseconds) => `${Math.floor(milliseconds / 60_000)}:${String(Math.floor((milliseconds % 60_000) / 1_000)).padStart(2, '0')}`;
+const minutes = (milliseconds) =>
+  `${Math.floor(milliseconds / 60_000)}:${String(Math.floor((milliseconds % 60_000) / 1_000)).padStart(2, '0')}`;
 
 console.log(`\n== ${presentation} ==`);
 console.log(
@@ -111,7 +117,9 @@ for (const moment of moments) {
   await page.evaluate((at) => window.film.show(at), moment.at);
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done())));
   await canvas.screenshot({ path: join(outputDirectory, `${moment.name}.png`) });
-  console.log(`  photographed ${moment.name.padEnd(10)} at ${minutes(moment.at)}  clock ${await clock(moment.at)}`);
+  console.log(
+    `  photographed ${moment.name.padEnd(10)} at ${minutes(moment.at)}  clock ${await clock(moment.at)}`,
+  );
 }
 
 // ---- The clock at the seams ------------------------------------------------------------------------------------
@@ -154,6 +162,12 @@ async function reportFluidity() {
       `covered tokens: ${(fluidity.coveredShareOfSteps * 100).toFixed(1)}% of steps, ${fluidity.coveredPairsPerFilmMinute.toFixed(0)} pair-steps per film minute  ` +
       `(token radius ${fluidity.tokenRadiusMetres.toFixed(2)} m)`,
   );
+
+  if (args.includes('--stutter-examples')) {
+    for (const example of fluidity.examples) {
+      console.log(`  ${example.id} @${example.timeMs} ms: ${example.speeds.join(' ')}`);
+    }
+  }
 }
 
 await reportFluidity();
@@ -163,15 +177,40 @@ await reportFluidity();
 const runs = [
   { label: 'kick-off, 1x', fromMilliseconds: 0, seconds, speed: 1 },
   ...(info.goals[0]
-    ? [{ label: 'a goal and its celebration, 1x', fromMilliseconds: Math.max(0, info.goals[0].filmMilliseconds - 5_000), seconds, speed: 1 }]
+    ? [
+        {
+          label: 'a goal and its celebration, 1x',
+          fromMilliseconds: Math.max(0, info.goals[0].filmMilliseconds - 5_000),
+          seconds,
+          speed: 1,
+        },
+      ]
     : []),
   ...(halfTime
-    ? [{ label: 'across the half-time cut, 1x', fromMilliseconds: Math.max(0, halfTime.startMilliseconds - 3_000), seconds: Math.max(seconds, 9), speed: 1 }]
+    ? [
+        {
+          label: 'across the half-time cut, 1x',
+          fromMilliseconds: Math.max(0, halfTime.startMilliseconds - 3_000),
+          seconds: Math.max(seconds, 9),
+          speed: 1,
+        },
+      ]
     : []),
-  { label: 'eight times speed through the match', fromMilliseconds: 30_000, seconds: Math.max(seconds, 30), speed: 8 },
+  {
+    label: 'eight times speed through the match',
+    fromMilliseconds: 30_000,
+    seconds: Math.max(seconds, 30),
+    speed: 8,
+  },
   { label: 'the highlights reel, 1x', fromMilliseconds: 0, seconds, speed: 1, mode: 'reel' },
   // At 8x the reel plays on through its clip boundaries, which is where the screen dips and the playhead jumps.
-  { label: 'the highlights reel across its clips, 8x', fromMilliseconds: 0, seconds: Math.max(seconds, 25), speed: 8, mode: 'reel' },
+  {
+    label: 'the highlights reel across its clips, 8x',
+    fromMilliseconds: 0,
+    seconds: Math.max(seconds, 25),
+    speed: 8,
+    mode: 'reel',
+  },
 ];
 
 let totalJumps = 0;
@@ -186,14 +225,18 @@ for (const run of runs) {
   totalJumps += report.jumps;
   worstFps = Math.min(worstFps, report.fps);
 
-  console.log(`-- ${run.label} (from ${minutes(report.fromMilliseconds)}, ${format(report.realSeconds, 1)} s real = ${format(report.filmSeconds, 1)} s of film)`);
+  console.log(
+    `-- ${run.label} (from ${minutes(report.fromMilliseconds)}, ${format(report.realSeconds, 1)} s real = ${format(report.filmSeconds, 1)} s of film)`,
+  );
   console.log(
     `   ${format(report.fps, 1)} fps  frame ms p50 ${format(report.frameMilliseconds.p50, 1)} p95 ${format(report.frameMilliseconds.p95, 1)} max ${format(report.frameMilliseconds.max, 1)}  dropped ${report.droppedFrames}  draw ms p50 ${format(report.drawMilliseconds.p50)} p95 ${format(report.drawMilliseconds.p95)} max ${format(report.drawMilliseconds.max)}`,
   );
   console.log(
     `   per drawn frame (m): ball p99 ${format(report.ballMetresPerFrame.p99)} max ${format(report.ballMetresPerFrame.max)} | players p99 ${format(report.playerMetresPerFrame.p99)} max ${format(report.playerMetresPerFrame.max)} | keepers max ${format(report.keeperMetresPerFrame.max)}  (${report.comparedFrames} comparisons, ${report.cutsCrossed} cuts crossed, ${report.jumpsSkipped} reel jumps)`,
   );
-  console.log(`   jumps above the speed caps: ${report.jumps}${report.jumps > 0 ? `  worst: ${report.worstJump}` : ''}`);
+  console.log(
+    `   jumps above the speed caps: ${report.jumps}${report.jumps > 0 ? `  worst: ${report.worstJump}` : ''}`,
+  );
 }
 
 await canvas.screenshot({ path: join(outputDirectory, 'last-frame.png') });
@@ -201,7 +244,9 @@ await canvas.screenshot({ path: join(outputDirectory, 'last-frame.png') });
 console.log(`\nshots in ${outputDirectory}`);
 
 if (problems.length > 0) {
-  console.log(`\n${problems.length} problem(s) in the page:\n  ${[...new Set(problems)].join('\n  ')}`);
+  console.log(
+    `\n${problems.length} problem(s) in the page:\n  ${[...new Set(problems)].join('\n  ')}`,
+  );
 }
 
 await browser.close();
@@ -214,16 +259,24 @@ if (totalJumps > 0) {
 }
 
 if (worstFps < minimumFps) {
-  failures.push(`the slowest run was ${format(worstFps, 1)} fps, under the ${minimumFps} fps floor`);
+  failures.push(
+    `the slowest run was ${format(worstFps, 1)} fps, under the ${minimumFps} fps floor`,
+  );
 }
 
 if (clockChecks.mismatches.length > 0) {
-  failures.push(`${clockChecks.mismatches.length} event(s) read a different minute from the one the engine stamped`);
+  failures.push(
+    `${clockChecks.mismatches.length} event(s) read a different minute from the one the engine stamped`,
+  );
 }
 
 if (problems.length > 0) {
   failures.push('the page reported errors');
 }
 
-console.log(failures.length === 0 ? '\nFLUID: no jumps outside cuts, and the frame rate holds.' : `\nNOT FLUID: ${failures.join('; ')}.`);
+console.log(
+  failures.length === 0
+    ? '\nFLUID: no jumps outside cuts, and the frame rate holds.'
+    : `\nNOT FLUID: ${failures.join('; ')}.`,
+);
 process.exit(failures.length === 0 ? 0 : 1);

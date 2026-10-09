@@ -1480,3 +1480,19 @@ What the numbers say about the five complaints: the ball does crawl (55% of rece
 and not only in duels; and the film already shows the regain in 94% of goals, because most goals follow a short spell of possession, so the longer film
 is for context rather than for a missing start. How much of the stutter is the viewer's spline and how much is the engine's stop-and-go is what Milestone 1
 (the spline alone) separates.
+
+### 14.9 The viewer's spline and de-overlap (the tick-film plan, Milestone 1)
+
+Web only; no engine or calibration change. Players are drawn on a cubic Hermite spline with **planar** tangents: the time-weighted mean of the two
+segment velocity vectors (worked out in metres, since the grid is not square), limited to 1.5 times the slower segment, zero only at a real stop (both
+segments under 0.3 m/s), a cut or a track end, and the curve is held within 0.3 m of the line between its keyframes. A per-axis monotone spline zeroed an
+axis at every bend; this one keeps at least 60% of its speed through a right-angled turn. Altitude and the ball are as before.
+
+The renderer then pushes tokens apart for display only (`token-separation.ts`): three passes, any two centres closer than `TOKEN_MIN_GAP` = 1.45 token
+radii are moved apart along their line, half each, no token by more than a radius; the ball follows the nearest player within 1.5 m when it is on the
+ground. The film's positions are untouched, and hover and name tags use the drawn positions.
+
+Measured on seed 11 with the harness: covered pairs 25% of steps to 0%. Stutters per film minute: 190 with the old spline, 164 with the new spline alone,
+194 with the new spline and the de-overlap. The plan's aim of 70% fewer stutters is **not** met from the viewer: the slow-downs left are real in the
+data (a token runs at 3–6 m/s, falls to under 1 m/s and sets off again over a second), which is the engine's stop-and-go, and the de-overlap adds a few
+because a token pushed by one coming the other way is slowed. That is Milestone 5's work.

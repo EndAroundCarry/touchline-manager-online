@@ -5,16 +5,22 @@ import {
   emptySample,
   hermite,
   monotoneTangents,
+  planarTangents,
 } from './keyframe-interpolator';
 
 /**
  * The interpolator's geometry guarantees (`§9.1`, `§9.4`, `replay-v4`).
  *
- * Players move on a monotone cubic Hermite spline that knows how far apart in time its keyframes are, and the
- * ball moves in straight lines. What a manager would call "fluid" is asserted here as numbers: the curve never
- * leaves the range of the two keyframes it joins (no overshoot), has one velocity where two segments meet
- * (no kink), and does not blend across a cut.
+ * Players move on a cubic Hermite spline with planar tangents that knows how far apart in time its keyframes
+ * are, and the ball moves in straight lines. What a manager would call "fluid" is asserted here as numbers: the
+ * curve stays within 0.3 m of the line between the two keyframes it joins (no overshoot), has one velocity
+ * where two segments meet (no kink), keeps its speed through a bend, reaches zero at a real stop, and does not
+ * blend across a cut.
  */
+
+/** The overshoot a planar spline may have, in film units along x (0.3 m of a 105 m pitch on a 10 000 grid). */
+const GUARD_X = 0.3 / (105 / 10_000);
+const GUARD_Y = 0.3 / (68 / 10_000);
 
 interface Point {
   readonly t: number;
@@ -88,6 +94,51 @@ describe('monotoneTangents', () => {
 
   it('has no tangents to give a track of one keyframe', () => {
     expect([...monotoneTangents([5], [7])]).toEqual([0]);
+  });
+});
+
+describe('planarTangents', () => {
+  /** Metres per second of a tangent in film units per millisecond, along x. */
+  const speedX = (tangent: number): number => tangent * (105 / 10_000) * 1_000;
+
+  it('keeps most of the speed round a right-angled turn, which a per-axis spline stopped dead on', () => {
+    // 5 m/s east for two seconds, then 5 m/s south: 10 m is 952 units east, 10 m is 1 470 units south.
+    const { x, y } = planarTangents([0, 2_000, 4_000], [0, 1_905, 1_905], [0, 0, 2_941]);
+    const speed = Math.hypot(speedX(x[1]), y[1] * (68 / 10_000) * 1_000);
+
+    expect(speed).toBeGreaterThanOrEqual(0.6 * 5);
+  });
+
+  it('is zero at both ends of a track, and at a real stop', () => {
+    const { x, y } = planarTangents(
+      [0, 1_000, 2_000, 3_000],
+      [0, 1_000, 1_000, 2_000],
+      [0, 0, 0, 0],
+    );
+
+    expect(x[0]).toBe(0);
+    expect(x[3]).toBe(0);
+    expect(x[1]).toBeLessThan(1e-9);
+    expect(y[1]).toBe(0);
+  });
+
+  it('is zero either side of a cut', () => {
+    const { x } = planarTangents(
+      [0, 1_000, 1_000, 2_000, 3_000],
+      [0, 500, 4_000, 4_500, 5_000],
+      [0, 0, 0, 0, 0],
+    );
+
+    expect(x[1]).toBe(0);
+    expect(x[2]).toBe(0);
+    expect(x[3]).toBeGreaterThan(0);
+  });
+
+  it('is the velocity itself for a straight run, however unevenly it is sampled', () => {
+    const { x } = planarTangents([0, 100, 1_000, 5_000], [0, 10, 100, 500], [0, 0, 0, 0]);
+
+    expect(x[1]).toBeCloseTo(0.1, 9);
+    expect(x[2]).toBeCloseTo(0.1, 9);
   });
 });
 
@@ -200,7 +251,7 @@ describe('TrackInterpolator: fluid movement', () => {
     { t: 9_000, x: 8_000 },
   ];
 
-  it('never leaves the range of the two keyframes it is between, so there is no overshoot', () => {
+  it('never strays more than 0.3 m outside the two keyframes it is between, so there is no real overshoot', () => {
     const interpolator = new TrackInterpolator(trackOf(ragged), true);
 
     for (let time = 0; time <= 9_000; time += 7) {
@@ -218,8 +269,8 @@ describe('TrackInterpolator: fluid movement', () => {
       const low = Math.min(ragged[index].x, ragged[index + 1].x);
       const high = Math.max(ragged[index].x, ragged[index + 1].x);
 
-      expect(x, `x at ${time} ms`).toBeGreaterThanOrEqual(low - 1e-6);
-      expect(x, `x at ${time} ms`).toBeLessThanOrEqual(high + 1e-6);
+      expect(x, `x at ${time} ms`).toBeGreaterThanOrEqual(low - GUARD_X);
+      expect(x, `x at ${time} ms`).toBeLessThanOrEqual(high + GUARD_X);
     }
   });
 
@@ -237,10 +288,10 @@ describe('TrackInterpolator: fluid movement', () => {
     for (let time = 0; time <= 2_000; time += 10) {
       const sample = sampled(interpolator, time);
 
-      expect(sample.x).toBeLessThanOrEqual(10_000);
-      expect(sample.x).toBeGreaterThanOrEqual(0);
-      expect(sample.y).toBeGreaterThanOrEqual(0);
-      expect(sample.y).toBeLessThanOrEqual(10_000);
+      expect(sample.x).toBeLessThanOrEqual(10_000 + GUARD_X + 1e-6);
+      expect(sample.x).toBeGreaterThanOrEqual(-GUARD_X - 1e-6);
+      expect(sample.y).toBeGreaterThanOrEqual(-GUARD_Y - 1e-6);
+      expect(sample.y).toBeLessThanOrEqual(10_000 + GUARD_Y + 1e-6);
     }
   });
 
@@ -302,6 +353,65 @@ describe('TrackInterpolator: fluid movement', () => {
   });
 });
 
+describe('TrackInterpolator: bends and stops', () => {
+  it('keeps at least 60% of its speed through a right-angled turn at a keyframe', () => {
+    const interpolator = new TrackInterpolator(
+      trackOf([
+        { t: 0, x: 0, y: 0 },
+        { t: 2_000, x: 1_905, y: 0 },
+        { t: 4_000, x: 1_905, y: 2_941 },
+      ]),
+      true,
+    );
+    const step = 20;
+    const before = sampled(interpolator, 2_000 - step);
+    const after = sampled(interpolator, 2_000 + step);
+    const metresPerSecond =
+      Math.hypot(((after.x - before.x) * 105) / 10_000, ((after.y - before.y) * 68) / 10_000) /
+      ((2 * step) / 1_000);
+
+    expect(metresPerSecond).toBeGreaterThanOrEqual(0.6 * 5);
+  });
+
+  it('comes to rest where the player really stops', () => {
+    const interpolator = new TrackInterpolator(
+      trackOf([
+        { t: 0, x: 0 },
+        { t: 1_000, x: 500 },
+        { t: 2_000, x: 500 },
+        { t: 3_000, x: 1_000 },
+      ]),
+      true,
+    );
+    const step = 5;
+    const speed =
+      Math.abs(sampled(interpolator, 1_500 + step).x - sampled(interpolator, 1_500 - step).x) /
+      (2 * step);
+
+    expect(speed).toBeLessThan(0.0005);
+  });
+
+  it('stays within 0.3 m of the line between its keyframes on a sharp reversal', () => {
+    const interpolator = new TrackInterpolator(
+      trackOf([
+        { t: 0, x: 0, y: 0 },
+        { t: 300, x: 3_000, y: 0 },
+        { t: 600, x: 0, y: 40 },
+        { t: 900, x: 3_000, y: 0 },
+      ]),
+      true,
+    );
+
+    for (let time = 0; time <= 900; time += 5) {
+      const sample = sampled(interpolator, time);
+
+      expect(sample.x).toBeGreaterThanOrEqual(-GUARD_X - 1e-6);
+      expect(sample.x).toBeLessThanOrEqual(3_000 + GUARD_X + 1e-6);
+      expect(Math.abs(sample.y)).toBeLessThanOrEqual(GUARD_Y + 40 + 1e-6);
+    }
+  });
+});
+
 describe('TrackInterpolator: cuts', () => {
   const stepped = trackOf([
     { t: 0, x: 1_000, y: 1_000 },
@@ -325,8 +435,8 @@ describe('TrackInterpolator: cuts', () => {
 
     for (let time = 3_900; time <= 4_100; time += 0.5) {
       const { x, y } = sampled(interpolator, time);
-      const before = x <= 2_000.001 && y === 1_000;
-      const after = x >= 4_999 && y === 5_000;
+      const before = x <= 2_000.001 && Math.abs(y - 1_000) < 1e-6;
+      const after = x >= 4_999 && Math.abs(y - 5_000) < 1e-6;
 
       expect(before || after, `a position between the two places at ${time} ms`).toBe(true);
     }
