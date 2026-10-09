@@ -6,8 +6,9 @@ namespace TouchlineManager.MatchEngine.Tick;
 /// The discrete tick-based match engine (10 Hz).
 /// </summary>
 /// <remarks>
-/// Operates at 10 ticks per match second (100 ms per tick).
-/// Autonomous player agents, ball physics, tactical steering, and physical duels are simulated in discrete time.
+/// Operates at 10 ticks per match second (100 ms per tick): 22 autonomous players and one ball are stepped through
+/// <see cref="TickMatchLoop"/> for the whole match, and the possession engine is kept only as the fallback a snapshot frozen
+/// against <c>engine-v11</c> resolves to (`tick-engine-v1`, Milestone 9).
 /// </remarks>
 internal sealed class TickMatchEngine : IMatchSimulationEngine
 {
@@ -25,8 +26,6 @@ internal sealed class TickMatchEngine : IMatchSimulationEngine
     {
         ArgumentNullException.ThrowIfNull(state);
 
-        // Milestone 0 scaffolding: The tick-based components (kinematics, agents, AI, state machine)
-        // are phased in across Milestones 1-8. During initial wrap, delegates to legacy execution.
-        LegacyPossessionEngine.Instance.Run(state);
+        TickMatchLoop.Play(state);
     }
 }

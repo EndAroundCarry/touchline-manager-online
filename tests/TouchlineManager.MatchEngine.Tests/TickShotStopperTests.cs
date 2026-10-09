@@ -52,7 +52,7 @@ public sealed class TickShotStopperTests
     public void A_shot_wide_of_the_post_is_not_on_target_and_one_that_hits_the_post_is_not_a_save_to_make()
     {
         var wide = Forecast(Shot(1_100, 5_000), true);
-        var post = Forecast(Shot(1_100, 2_818), true);
+        var post = Forecast(Shot(1_100, 2_986), true);
 
         wide.OnTarget.Should().BeFalse();
         wide.Boundary.Should().Be(TickBallBoundary.OutGoalLine);
@@ -368,7 +368,7 @@ public sealed class TickShotStopperTests
             return hash;
         }
 
-        TickBallPhysics[] Balls() => [Shot(1_100, 3_850), Shot(3_000, 3_200), Shot(2_000, 5_000), Shot(1_500, 2_818)];
+        TickBallPhysics[] Balls() => [Shot(1_100, 3_850), Shot(3_000, 3_200), Shot(2_000, 5_000), Shot(1_500, 3_022)];
 
         var first = Run(Balls(), new TickBallPhysics());
         var balls = Balls();

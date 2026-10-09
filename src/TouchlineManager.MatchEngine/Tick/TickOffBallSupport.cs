@@ -180,7 +180,7 @@ internal static class TickOffBallSupport
     public const int RunDepth = 1_000;
 
     /// <summary>The nearest to the goal line a run goes, in pitch units.</summary>
-    public const int RunGoalGap = 500;
+    public const int RunGoalGap = 800;
 
     /// <summary>The least room behind the line a run needs, in pitch units (15 m).</summary>
     public const int MinimumRunSpace = 1_500;

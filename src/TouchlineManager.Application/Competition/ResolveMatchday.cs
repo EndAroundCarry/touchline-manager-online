@@ -106,16 +106,14 @@ public sealed class ResolveMatchday
             return new ResolveMatchdayResult(ResolveMatchdayOutcome.AlreadyResolved, 0, workload.Fixtures.Count);
         }
 
-        var simulated = 0;
+        var pending = new List<(Fixture Fixture, InputSnapshot Snapshot)>();
 
         foreach (var fixture in workload.Fixtures.Where(NeedsSimulation))
         {
-            var snapshot = await EnsureSnapshotAsync(matchdayId, fixture, cancellationToken);
-
-            await SimulateAsync(fixture, snapshot, jobId, cancellationToken);
-
-            simulated++;
+            pending.Add((fixture, await EnsureSnapshotAsync(matchdayId, fixture, cancellationToken)));
         }
+
+        var simulated = await SimulateRoundAsync(pending, jobId, cancellationToken);
 
         if (workload.AllFixturesStaged)
         {
@@ -201,48 +199,103 @@ public sealed class ResolveMatchday
         return snapshot.Snapshot;
     }
 
-    /// <summary>Simulates one fixture and stages its result.</summary>
-    private async Task SimulateAsync(
-        Fixture fixture,
-        InputSnapshot snapshot,
+    /// <summary>
+    /// Simulates the fixtures that are still to be played and stages their results, in the order the round lists them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The fixtures are marked as simulating one after the other, then simulated all at once, then staged one after the other. A simulation is a pure
+    /// function of its frozen snapshot and shares nothing with the others, so running them side by side changes no result; the tick engine takes a
+    /// third of a second a match, and a round of nine has to fit inside the matchday worker's two-second window (§7.4). Staging stays in order and
+    /// in a transaction of its own per fixture, so a round is resumable exactly as it was: a worker that dies between two fixtures leaves the
+    /// first ones staged and the rest marked as simulating, which the next attempt simulates again.
+    /// </para>
+    /// <para>
+    /// A snapshot the engine refuses fails the round at that fixture: those before it in the list are staged, the refusal is recorded against it, and
+    /// the fixtures after it are left for the next attempt.
+    /// </para>
+    /// </remarks>
+    private async Task<int> SimulateRoundAsync(
+        List<(Fixture Fixture, InputSnapshot Snapshot)> pending,
         Guid? jobId,
         CancellationToken cancellationToken)
     {
         var rules = EngineRulesV2.Default;
-        var input = MatchSnapshotFactory.ReadVerified(snapshot);
-        var startedAt = _clock.UtcNow;
+        var inputs = new MatchInputV1[pending.Count];
+        var startedAt = new DateTimeOffset[pending.Count];
 
-        // The fixture is marked as simulating before the engine is called, in its own committed step, so a
-        // run that dies mid-simulation is visible as one that started rather than one that never happened.
-        if (fixture.Status == FixtureStatus.Locked)
+        for (var index = 0; index < pending.Count; index++)
         {
-            await using var marking = await _unitOfWork.BeginTransactionAsync(
-                TransactionIsolation.ReadCommitted,
-                cancellationToken);
+            var (fixture, snapshot) = pending[index];
 
-            fixture.BeginSimulation(startedAt);
+            inputs[index] = MatchSnapshotFactory.ReadVerified(snapshot);
+            startedAt[index] = _clock.UtcNow;
 
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            // The fixture is marked as simulating before the engine is called, in its own committed step, so a
+            // run that dies mid-simulation is visible as one that started rather than one that never happened.
+            if (fixture.Status == FixtureStatus.Locked)
+            {
+                await using var marking = await _unitOfWork.BeginTransactionAsync(
+                    TransactionIsolation.ReadCommitted,
+                    cancellationToken);
 
-            await marking.CommitAsync(cancellationToken);
+                fixture.BeginSimulation(startedAt[index]);
+
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+                await marking.CommitAsync(cancellationToken);
+            }
         }
 
-        MatchResultV1 result;
+        var played = await Task.WhenAll(inputs.Select(input => Task.Run(() => Play(input, rules), cancellationToken)));
 
+        for (var index = 0; index < pending.Count; index++)
+        {
+            var (fixture, snapshot) = pending[index];
+
+            if (played[index].Refusal is { } refusal)
+            {
+                await RecordFailureAsync(fixture, snapshot, jobId, startedAt[index], refusal, cancellationToken);
+
+                throw new PermanentJobFailureException(
+                    $"Fixture {fixture.Id:D} cannot be simulated from its frozen snapshot: {refusal.Message}",
+                    refusal);
+            }
+
+            await StageAsync(fixture, snapshot, jobId, startedAt[index], played[index].Result!, played[index].CompletedAt, cancellationToken);
+        }
+
+        return pending.Count;
+    }
+
+    /// <summary>Plays one snapshot, keeping the engine's refusal of it rather than throwing, so that the round can stage what came before it.</summary>
+    private PlayedFixture Play(MatchInputV1 input, EngineRulesV2 rules)
+    {
         try
         {
-            result = MatchSimulator.Simulate(input, rules);
+            var result = MatchSimulator.Simulate(input, rules);
+
+            return new PlayedFixture(result, null, _clock.UtcNow);
         }
         catch (InvalidMatchInputException exception)
         {
-            await RecordFailureAsync(fixture, snapshot, jobId, startedAt, exception, cancellationToken);
-
-            throw new PermanentJobFailureException(
-                $"Fixture {fixture.Id:D} cannot be simulated from its frozen snapshot: {exception.Message}",
-                exception);
+            return new PlayedFixture(null, exception, _clock.UtcNow);
         }
+    }
 
-        var completedAt = _clock.UtcNow;
+    /// <summary>What playing one fixture came to: its result, or the engine's refusal of its snapshot.</summary>
+    private sealed record PlayedFixture(MatchResultV1? Result, InvalidMatchInputException? Refusal, DateTimeOffset CompletedAt);
+
+    /// <summary>Stages one fixture's result.</summary>
+    private async Task StageAsync(
+        Fixture fixture,
+        InputSnapshot snapshot,
+        Guid? jobId,
+        DateTimeOffset startedAt,
+        MatchResultV1 result,
+        DateTimeOffset completedAt,
+        CancellationToken cancellationToken)
+    {
         var matchId = Guid.CreateVersion7();
         var attemptId = Guid.CreateVersion7();
         var attemptNumber = await _matches.CountAttemptsAsync(fixture.Id, cancellationToken) + 1;

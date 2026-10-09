@@ -360,8 +360,8 @@ internal static class TickGoalkeeperAI
         var arcX = Math.Max(LineClearance, (int)(dx * depth / length));
         var arcY = Math.Clamp(
             SpatialPitch.GoalYCenter + (int)(dy * depth / length),
-            SpatialPitch.GoalYMin + PostClearance,
-            SpatialPitch.GoalYMax - PostClearance);
+            TickSpatialUnits.GoalMouthMinUnits + PostClearance,
+            TickSpatialUnits.GoalMouthMaxUnits - PostClearance);
 
         var targetX = anchorX + ((arcX - anchorX) * threat / BasisPoints);
         var targetY = anchorY + ((arcY - anchorY) * threat / BasisPoints);

@@ -189,7 +189,7 @@ internal static class TickSetPieces
     public const int PenaltyPressure = 4_500;
 
     /// <summary>How far inside the post a penalty is aimed, in pitch units.</summary>
-    public const int PenaltyAimOffset = 250;
+    public const int PenaltyAimOffset = 120;
 
     /// <summary>How far behind the spot the penalty taker stands, in pitch units.</summary>
     public const int PenaltyStandBack = 150;
@@ -441,13 +441,13 @@ internal static class TickSetPieces
     {
         if (kind != TickRestartKind.FreeKick || decision.Action != TickCarrierAction.Shoot)
         {
-            return TickBallCarrierBrain.Execute(decision, skills, ball, random);
+            return TickBallCarrierBrain.Execute(decision, skills, ball, random, TickBallCarrierBrain.SetPieceShotBaseError);
         }
 
         ArgumentNullException.ThrowIfNull(ball);
         ArgumentNullException.ThrowIfNull(random);
 
-        var error = TickBallCarrierBrain.ErrorAngle(skills.SetPieces, skills.Technique, TickBallCarrierBrain.ShotBaseError, decision.EffectivePressure);
+        var error = TickBallCarrierBrain.ErrorAngle(skills.SetPieces, skills.Technique, TickBallCarrierBrain.SetPieceShotBaseError, decision.EffectivePressure);
         var turn = random.NextRange(-error, error);
         var fromX = ball.UnitX;
         var fromY = ball.UnitY;
@@ -1181,7 +1181,7 @@ internal static class TickSetPieces
         {
             // At the far post, away from the wall's side.
             var nearSign = spot.Y <= Middle ? -1 : 1;
-            var aim = new SpatialPoint(PitchLength + TickBallCarrierBrain.ShotOvershoot, Middle - (nearSign * (SpatialPitch.GoalYMax - Middle - TickBallCarrierBrain.ShotAimOffset)));
+            var aim = new SpatialPoint(PitchLength + TickBallCarrierBrain.ShotOvershoot, Middle - (nearSign * (TickSpatialUnits.GoalMouthMaxUnits - Middle - TickBallCarrierBrain.ShotAimOffset)));
 
             return new TickCarrierDecision(TickCarrierAction.Shoot, -1, aim, 0, 0, TickBallCarrierBrain.EffectivePressure(FreeKickPressure, composure));
         }
@@ -1196,7 +1196,7 @@ internal static class TickSetPieces
         // Into the corner on the side the keeper is not standing.
         var keeperY = view.Opp.Length > 0 ? view.Opp[0].Y : Middle;
         var toHigh = keeperY <= Middle;
-        var aimY = toHigh ? SpatialPitch.GoalYMax - PenaltyAimOffset : SpatialPitch.GoalYMin + PenaltyAimOffset;
+        var aimY = toHigh ? TickSpatialUnits.GoalMouthMaxUnits - PenaltyAimOffset : TickSpatialUnits.GoalMouthMinUnits + PenaltyAimOffset;
         var aim = new SpatialPoint(PitchLength + TickBallCarrierBrain.ShotOvershoot, aimY);
 
         return new TickCarrierDecision(TickCarrierAction.Shoot, -1, aim, 0, 0, TickBallCarrierBrain.EffectivePressure(PenaltyPressure, composure));

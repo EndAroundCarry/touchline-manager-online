@@ -84,8 +84,8 @@ internal readonly record struct TickSaveAssessment(
 /// </description></item>
 /// </list>
 /// <para>
-/// <b>Reach.</b> At the moment of the save he can get a hand to a ball that passes within <c>70 + 40 + 6 × Agility</c> pitch units of
-/// him sideways (arms plus a dive: 1.7 m at Agility 10 to 2.4 m at 20). He can <em>hold</em> a ball within <c>45% + 2.5% × Handling</c> of
+/// <b>Reach.</b> At the moment of the save he can get a hand to a ball that passes within <c>70 + 40 + 6 × (Agility + Reflexes) / 2</c> pitch units of
+/// him sideways (arms plus a dive: 1.7 m at an agility of 10 to 2.4 m at 20; a goalkeeper dives on his reflexes as well as his agility). He can <em>hold</em> a ball within <c>45% + 2.5% × Handling</c> of
 /// that. Upward he reaches <c>20 + 0.4 × (JumpingReach + AerialAbility)</c> Z units (1.5 to 2.5 m), and holds nothing above 85% of that.
 /// A ball outside the reach is <see cref="TickSaveOutcome.Beaten"/> with no draw to soften it: a corner shot from close range beats an
 /// ordinary keeper, and a weak shot from long range never beats a good one.
@@ -249,7 +249,7 @@ internal static class TickShotStopper
     public static TickSaveAssessment Assess(in TickPlayerState keeper, in TickPlayerSkills skills, in TickShotForecast forecast)
     {
         var needed = Math.Abs(forecast.PlaneY - TickSpatialUnits.ToUnits(keeper.Y));
-        var parry = BodyReach + DiveBase + (DivePerAgility * skills.Agility);
+        var parry = BodyReach + DiveBase + (DivePerAgility * (skills.Agility + skills.Reflexes) / 2);
         var share = CatchShareBase + (CatchSharePerHandlingTenths * skills.Handling / 10);
         var height = HeightBase + ((skills.JumpingReach + skills.AerialAbility) * 2 / 5);
 
@@ -373,7 +373,7 @@ internal static class TickShotStopper
         }
 
         var side = ball.UnitY >= SpatialPitch.GoalYCenter ? 1 : -1;
-        var wide = SpatialPitch.GoalYCenter + (side * (((SpatialPitch.GoalYMax - SpatialPitch.GoalYMin) / 2) + TipWideOfPost));
+        var wide = SpatialPitch.GoalYCenter + (side * (((TickSpatialUnits.GoalMouthMaxUnits - TickSpatialUnits.GoalMouthMinUnits) / 2) + TipWideOfPost));
 
         ball.LaunchRolling(lineX, wide, TickSpatialUnits.SpeedToFixedPerTick(TipSpeedCentimetresPerSecond));
     }

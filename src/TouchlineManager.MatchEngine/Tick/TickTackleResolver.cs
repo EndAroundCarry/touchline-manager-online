@@ -1,7 +1,7 @@
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
-using TouchlineManager.MatchEngine.Ratings;
 using TouchlineManager.MatchEngine.Randomness;
+using TouchlineManager.MatchEngine.Ratings;
 using TouchlineManager.MatchEngine.Simulation;
 using TouchlineManager.MatchEngine.Spatial;
 

@@ -520,8 +520,8 @@ public sealed class TickBallPhysics
     private TickBallBoundary ResolveGoalLine(int lineX, int crossY, int crossZ)
     {
         var postContact = TickSpatialUnits.ToFixed(PostContactUnits);
-        var goalMin = TickSpatialUnits.ToFixed(SpatialPitch.GoalYMin);
-        var goalMax = TickSpatialUnits.ToFixed(SpatialPitch.GoalYMax);
+        var goalMin = TickSpatialUnits.ToFixed(TickSpatialUnits.GoalMouthMinUnits);
+        var goalMax = TickSpatialUnits.ToFixed(TickSpatialUnits.GoalMouthMaxUnits);
         var bar = TickSpatialUnits.ToFixed(TickSpatialUnits.CrossbarZUnits);
         var barContact = TickSpatialUnits.ToFixed(BarContactZUnits);
         var homeEnd = lineX == 0;

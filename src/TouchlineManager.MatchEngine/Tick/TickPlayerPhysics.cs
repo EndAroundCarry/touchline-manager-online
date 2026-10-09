@@ -95,13 +95,27 @@ internal readonly record struct TickPlayerProfile
 
     /// <summary>Builds the profile for a player's attributes.</summary>
     /// <param name="attributes">The player's frozen attributes.</param>
-    public static TickPlayerProfile From(PlayerAttributesV1 attributes)
+    /// <param name="goalkeeper">
+    /// Whether he plays in goal. A goalkeeper moves on his goalkeeping, not on a sprinter's Pace: his speed and agility are
+    /// each the mean of the athletic attribute and Reflexes, so a keeper who is slow over thirty metres still gets across his goal.
+    /// </param>
+    public static TickPlayerProfile From(PlayerAttributesV1 attributes, bool goalkeeper = false)
     {
         ArgumentNullException.ThrowIfNull(attributes);
 
         var pace = attributes.ValueOf(MatchAttributeName.Pace);
         var acceleration = attributes.ValueOf(MatchAttributeName.Acceleration);
         var agility = attributes.ValueOf(MatchAttributeName.Agility);
+
+        if (goalkeeper)
+        {
+            var reflexes = attributes.ValueOf(MatchAttributeName.Reflexes);
+
+            pace = (pace + reflexes) / 2;
+            acceleration = (acceleration + reflexes) / 2;
+            agility = (agility + reflexes) / 2;
+        }
+
         var stamina = attributes.ValueOf(MatchAttributeName.Stamina);
         var workRate = attributes.ValueOf(MatchAttributeName.WorkRate);
 

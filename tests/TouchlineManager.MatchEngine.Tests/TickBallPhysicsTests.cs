@@ -286,10 +286,10 @@ public sealed class TickBallPhysicsTests
     [Fact]
     public void A_shot_that_clips_the_post_rebounds_into_play()
     {
-        // Sweep the sideways speed of a low drive from 8,500 so that one of them meets the near post (Y 3,000).
+        // Sweep the sideways speed of a low drive from 8,500 so that one of them meets the near post (Y 3,123).
         var found = false;
 
-        for (var sideways = -40_000; sideways >= -60_000 && !found; sideways -= 250)
+        for (var sideways = -22_000; sideways >= -42_000 && !found; sideways -= 250)
         {
             var ball = new TickBallPhysics();
             ball.PlaceAt(8_500, 3_300);

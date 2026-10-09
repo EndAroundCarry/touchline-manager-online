@@ -61,7 +61,7 @@ internal static class TickPlay
     {
         var recorder = new MatchPassageRecorder();
         var metrics = new PlayerLiveMetricsRecorder();
-        var result = MatchSimulator.Simulate(input, rules ?? TestMatchFactory.Rules, metrics, record ? recorder : null, TickLoopEngine.Instance);
+        var result = MatchSimulator.Simulate(input, rules ?? TestMatchFactory.Rules, metrics, record ? recorder : null, TickMatchEngine.Instance);
 
         return new TickSample(input, result, recorder, metrics);
     }

@@ -85,6 +85,12 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:Database", _container.GetConnectionString());
             builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:4200");
+
+            // The default start date is a fixed calendar day, so once the real clock passes it the first matchday
+            // is locked and "the next fixture" cannot take a team sheet. A start a fortnight out keeps it open.
+            builder.UseSetting(
+                "World:FirstSeasonStartDate",
+                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
             builder.UseSetting("Diagnostics:EnableJobProbe", enableJobProbe ? "true" : "false");
             builder.UseSetting(
                 "Diagnostics:EnableRolloverTrigger",

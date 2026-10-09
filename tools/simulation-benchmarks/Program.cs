@@ -15,12 +15,15 @@ using TouchlineManager.SimulationBenchmarks;
 // rather than a test: the numbers that tune the engine want a hundred thousand matches and a printed table,
 // and a test suite that took twenty minutes would stop being run.
 //
-// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|offball|tick|all] [count] [seed] [--dump file]
+// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|offball|tick|tickmatrix|ticksnap|all] [count] [seed] [--dump file]
 //
 // `offball` is not part of `all`: it reads who receives the ball and what Positioning does at the finish (engine-v10).
 //
 // `tick` plays matches on the tick engine's loop (engine-v12, Milestone 8), whether or not it is the default engine yet, and
 // prints what they came to; with `--dump file` it writes the first match's film as the API would return it.
+//
+// `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
+// snapshots (see TickCalibration). Neither is part of `all`.
 //
 // `--dump file` writes the first replayed match's presentation, as the API returns it, to a file: the fluidity
 // harness in apps/web/.preview plays it back in a browser (replay-v8).
@@ -108,6 +111,16 @@ if (mode is "offball")
 if (mode is "tick")
 {
     TickProbe.Run(Math.Min(count, 3_000), seed, rules, dumpPath);
+}
+
+if (mode is "tickmatrix")
+{
+    TickCalibration.Matrix(Math.Min(count, 100), seed, rules);
+}
+
+if (mode is "ticksnap")
+{
+    TickCalibration.Snapshots(positional[2], Math.Min(count, 3_000), rules);
 }
 
 return 0;

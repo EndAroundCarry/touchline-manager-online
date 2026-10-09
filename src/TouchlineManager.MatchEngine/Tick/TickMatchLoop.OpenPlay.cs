@@ -19,6 +19,9 @@ internal sealed partial class TickMatchLoop
     private int _kickTick;
 
     private bool _passPending;
+
+    /// <summary>The opponents who have already had their chance to cut out the pass in flight: one bit per side and seat.</summary>
+    private ulong _passTried;
     private TickRef _passer = TickRef.None;
     private TickRef _intended = TickRef.None;
     private bool _offsidePending;
@@ -433,6 +436,7 @@ internal sealed partial class TickMatchLoop
                     var id = team.Id[seat];
 
                     _passPending = true;
+                    _passTried = 0;
                     _passer = me;
                     _intended = decision.Receiver >= 0 && decision.Receiver < team.Count
                         ? new TickRef(side, team.SlotNumber[decision.Receiver])
@@ -554,18 +558,36 @@ internal sealed partial class TickMatchLoop
             return;
         }
 
+        // A man in touch of the carrier goes in for the ball on some ticks and not others: the draw is always taken.
+        var commit = Math.Clamp(ChallengeCommitBase + (ChallengeCommitPerAggression * opponents.Skills[challenger].Aggression), 0, BasisPointsCertain);
+
+        if (_random.NextBasisPoints() >= commit)
+        {
+            return;
+        }
+
+        // The home crowd and the referee lean on the duel: the roll shifts by the home edge towards the home side's man.
+        var edge = HomeEdgeBasisPoints(opponents.IsHome);
         var outcome = TickTackleResolver.Resolve(
             opponents.Skills[challenger],
             team.Skills[seat],
             opponents.Runtime.Instructions.Tackling,
             _rules,
-            _random);
+            Math.Clamp(_random.NextBasisPoints() - edge, 0, BasisPointsCertain - 1));
 
         var carrierRef = new TickRef(side, team.SlotNumber[seat]);
         var challengerRef = new TickRef(1 - side, opponents.SlotNumber[challenger]);
         var carrierId = team.Id[seat];
         var challengerId = opponents.Id[challenger];
         var spot = new SpatialPoint(TickSpatialUnits.ToUnits(carrier.X), TickSpatialUnits.ToUnits(carrier.Y));
+
+        if (outcome == TickTackleOutcome.Foul
+            && (team.IsHome ? SpatialPitch.IsInAwayPenaltyBox(spot) : SpatialPitch.IsInHomePenaltyBox(spot))
+            && _random.NextBasisPoints() >= PenaltyGivenBasisPoints)
+        {
+            // A referee gives the penalty on only some of the fouls in the area; the rest is play on.
+            outcome = TickTackleOutcome.Beaten;
+        }
 
         TickTackleResolver.Apply(outcome, ref opponents.Body[challenger], ref team.Body[seat], challenger, _ball);
 
@@ -616,6 +638,11 @@ internal sealed partial class TickMatchLoop
         var spot = new SpatialPoint(_ball.UnitX, _ball.UnitY);
         var outcome = TickGoalkeeperAI.Smother(keeperTeam.Skills[0], team.Skills[seat], _random.NextBasisPoints());
 
+        if (outcome == TickSmotherOutcome.Foul && _random.NextBasisPoints() >= PenaltyGivenBasisPoints)
+        {
+            outcome = TickSmotherOutcome.Beaten;
+        }
+
         TickGoalkeeperAI.ApplySmother(outcome, ref keeperTeam.Body[0], ref team.Body[seat], 0, keeperTeam.IsHome, _ball);
 
         var keeperRef = new TickRef(1 - side, keeperTeam.SlotNumber[0]);
@@ -650,6 +677,17 @@ internal sealed partial class TickMatchLoop
                 break;
         }
     }
+
+    /// <summary>The chance, in basis points, that a foul on a carrier inside the penalty area is given as a penalty.</summary>
+    private const int PenaltyGivenBasisPoints = 1_000;
+
+    /// <summary>The chance, in basis points, that a defender in touch of the carrier challenges on a tick, at Aggression 0.</summary>
+    private const int ChallengeCommitBase = 1_000;
+
+    /// <summary>The chance each point of Aggression adds, in basis points.</summary>
+    private const int ChallengeCommitPerAggression = 100;
+
+    private const int BasisPointsCertain = 10_000;
 
     private static void Dribbled(TickTeam team, Guid id, bool completed)
     {
@@ -814,6 +852,11 @@ internal sealed partial class TickMatchLoop
                     continue;
                 }
 
+                if (_passPending && index != _passer.Side && (_tick - _kickTick < PassGraceTicks || (_passTried & PassTriedBit(index, seat)) != 0))
+                {
+                    continue;
+                }
+
                 long distance;
 
                 if (fast)
@@ -830,6 +873,13 @@ internal sealed partial class TickMatchLoop
 
                 if (distance <= radius * radius && distance < best)
                 {
+                    if (_passPending && index != _passer.Side && !CutsOutPass(team.Skills[seat]))
+                    {
+                        _passTried |= PassTriedBit(index, seat);
+
+                        continue;
+                    }
+
                     best = distance;
                     bestSide = index;
                     bestSeat = seat;
@@ -851,6 +901,42 @@ internal sealed partial class TickMatchLoop
 
         Take(bestSide, bestSeat);
     }
+
+    /// <summary>The ticks after a pass leaves the passer's foot in which an opponent cannot reach it: it has not yet got out of his reach.</summary>
+    private const int PassGraceTicks = 3;
+
+    /// <summary>
+    /// Gets how far a duel tilts towards one side for playing at home, in basis points: the snapshot's home advantage (a ratio of 1.0420 is
+    /// 420 basis points above even), added to the chance of the home side's man in every tackle and every interception and taken off the
+    /// visiting side's man's. The tick engine has no team rating to multiply, so the crowd and the referee lean on the duels.
+    /// </summary>
+    /// <param name="homeMan">Whether the man whose chance it is plays for the home side.</param>
+    private int HomeEdgeBasisPoints(bool homeMan) =>
+        (homeMan ? 1 : -1) * (_state.Input.HomeAdvantageBasisPoints - BasisPointsCertain);
+
+    private static ulong PassTriedBit(int side, int seat) => 1UL << ((side * 16) + seat);
+
+    /// <summary>
+    /// Rolls whether a defender who has reached a pass in flight gets a foot to it: <see cref="InterceptMaximum"/> scaled by his
+    /// Anticipation and Positioning, one draw. A defender who fails has had his chance and lets the ball past.
+    /// </summary>
+    private bool CutsOutPass(in TickPlayerSkills skills)
+    {
+        var passerTeam = _teams[_passer.Side];
+        var passerSeat = passerTeam.SeatOfSlot(_passer.Slot);
+        var passer = passerSeat >= 0 ? passerTeam.Skills[passerSeat] : skills;
+        var difference = ((skills.Anticipation + skills.Positioning) - (passer.Passing + passer.Vision)) / 2;
+        var factor = Math.Clamp(100 + (InterceptSkillPerPoint * difference), 50, 160);
+        var chance = Math.Clamp((InterceptMaximum * factor / 100) + HomeEdgeBasisPoints(_teams[1 - _passer.Side].IsHome), 500, 9_000);
+
+        return _random.NextBasisPoints() < chance;
+    }
+
+    /// <summary>The chance, in basis points, that a defender of average skill who reaches a pass in flight cuts it out.</summary>
+    private const int InterceptMaximum = 3_500;
+
+    /// <summary>The percentage points of <see cref="InterceptMaximum"/> each point the defender's Anticipation and Positioning are above the passer's Passing and Vision adds.</summary>
+    private const int InterceptSkillPerPoint = 4;
 
     /// <summary>A player has reached the ball: it is his, unless he is the man a pass was meant for and he was offside.</summary>
     private void Take(int side, int seat)
@@ -927,6 +1013,23 @@ internal sealed partial class TickMatchLoop
         EmitShotResult(EngineEventType.ShotBlocked);
         _shotLive = false;
 
+        if (_random.NextBasisPoints() < BlockToCornerBasisPoints)
+        {
+            // Turned behind for a corner: he gets a foot to it and it runs on, wide of the post on the side it was heading for.
+            var lineX = _teams[_shooter.Side].IsHome ? SpatialPitch.PitchLength : 0;
+            var wideY = _ball.UnitY >= SpatialPitch.GoalYCenter ? SpatialPitch.GoalYMax + BlockWideOfPost : SpatialPitch.GoalYMin - BlockWideOfPost;
+
+            _ball.LaunchRolling(lineX, wideY, TickSpatialUnits.SpeedToFixedPerTick(BlockCornerSpeed));
+            Tag(new TickRef(side, team.SlotNumber[seat]), PassageAction.Interception);
+            _controllerSide = -1;
+            _passPending = false;
+            Touch(new TickRef(side, team.SlotNumber[seat]));
+            TurnOver();
+            PredictRest();
+
+            return;
+        }
+
         _ball.Kick(
             (int)(TickTrigonometry.Cos(heading) * speed / TickTrigonometry.Scale),
             (int)(TickTrigonometry.Sin(heading) * speed / TickTrigonometry.Scale),
@@ -939,6 +1042,15 @@ internal sealed partial class TickMatchLoop
         TurnOver();
         PredictRest();
     }
+
+    /// <summary>The chance, in basis points, that a blocked shot is turned behind for a corner.</summary>
+    private const int BlockToCornerBasisPoints = 4_500;
+
+    /// <summary>How far outside the post a block turns the ball behind, in pitch units.</summary>
+    private const int BlockWideOfPost = 400;
+
+    /// <summary>The speed a block sends the ball behind at, in cm/s.</summary>
+    private const int BlockCornerSpeed = 600;
 
     /// <summary>The chance, in basis points, that a defender in the line of a shot blocks it at Positioning 0.</summary>
     private const int BlockBaseBasisPoints = 3_800;

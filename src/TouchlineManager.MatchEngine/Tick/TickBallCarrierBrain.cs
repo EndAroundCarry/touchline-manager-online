@@ -150,8 +150,9 @@ internal readonly ref struct TickCarrierSituation
 /// </description></item>
 /// </list>
 /// <para>
-/// <see cref="Execute"/> hits the kick. The error is <c>BaseError × max(15%, 100 − (4 × Passing + Technique)) × (1 +
-/// pressure)</c> in binary angle units (the plan's formula, floored so that a perfect player is not a machine), the kick leaves
+/// <see cref="Execute"/> hits the kick. The error is <c>BaseError × max(25%, 100 − (5 × Passing + Technique) / 2) × (1 +
+/// pressure)</c> in binary angle units (the plan's formula, flattened and floored so that a perfect player is not a machine and a poor
+/// one is not hopeless: Milestone 9 calibration), the kick leaves
 /// rotated by a draw within that angle either way, and one draw is taken for every kick whatever the outcome. A pass or shot is
 /// rolled along the ground below 35 m and lofted above it. Everything works on spans and a stack buffer, so a decision allocates
 /// nothing.
@@ -166,6 +167,9 @@ internal static class TickBallCarrierBrain
     public const int MaximumGoalChance = 6_500;
 
     /// <summary>How many times a shot's chance is valued when it is weighed against a pass.</summary>
+    /// <summary>The goal chance, in basis points, below which a carrier will not shoot: he keeps the ball.</summary>
+    public const int ShotMinimumChance = 1_850;
+
     public const int ShotValueMultiplier = 3;
 
     /// <summary>How near a defender may stand to the line to goal before he blocks the shot, in pitch units (2.5 m).</summary>
@@ -177,8 +181,8 @@ internal static class TickBallCarrierBrain
     /// <summary>The blockers beyond which no shot is attempted.</summary>
     public const int ShotMaximumBlockers = 3;
 
-    /// <summary>How far inside the far post a shot is aimed, in pitch units.</summary>
-    public const int ShotAimOffset = 350;
+    /// <summary>How far from the middle of the goal a shot is aimed, to the side away from the shooter, in pitch units (the posts are 377 either side).</summary>
+    public const int ShotAimOffset = 250;
 
     /// <summary>How far past the goal line a shot is aimed, in pitch units.</summary>
     public const int ShotOvershoot = 400;
@@ -186,8 +190,8 @@ internal static class TickBallCarrierBrain
     /// <summary>The speed a shot arrives at the line with, in cm/s.</summary>
     public const int ShotArrivalCentimetresPerSecond = 1_800;
 
-    /// <summary>The speed a pass is meant to arrive at its receiver with, in cm/s.</summary>
-    public const int PassArrivalCentimetresPerSecond = 400;
+    /// <summary>The speed a pass is meant to arrive at its receiver with, in cm/s: a firm ground pass, so that it is there before a defender can read it.</summary>
+    public const int PassArrivalCentimetresPerSecond = 1000;
 
     /// <summary>Within this distance of a defender the carrier is under pressure (9 m), in pitch units.</summary>
     public const int PressureRange = 900;
@@ -222,8 +226,11 @@ internal static class TickBallCarrierBrain
     /// <summary>The base error angle of a pass, in binary angle units (about 10°).</summary>
     public const int PassBaseError = 30;
 
-    /// <summary>The base error angle of a shot, in binary angle units (about 13°).</summary>
-    public const int ShotBaseError = 36;
+    /// <summary>The base error angle of a shot, in binary angle units: a snap shot under a defender's eye goes wide or high as often as it goes in.</summary>
+    public const int ShotBaseError = 210;
+
+    /// <summary>The base error angle of a shot from a still ball, a penalty or a direct free kick, in binary angle units: struck unhurried, with the man's feet set.</summary>
+    public const int SetPieceShotBaseError = 50;
 
     /// <summary>The base error angle of a cross, in binary angle units (about 14°).</summary>
     public const int CrossBaseError = 40;
@@ -232,10 +239,13 @@ internal static class TickBallCarrierBrain
     public const int ClearBaseError = 50;
 
     /// <summary>The share of the base error a perfect player still makes, in percent.</summary>
-    public const int MinimumErrorPercent = 15;
+    public const int MinimumErrorPercent = 25;
 
-    /// <summary>The attribute points that an error of nothing would need: <c>4 × Passing + Technique</c> against this.</summary>
+    /// <summary>The percentage an error of nothing would need: <c>(5 × Passing + Technique) / 2</c> is taken from this.</summary>
     public const int ErrorSkillCeiling = 100;
+
+    /// <summary>How many times the kicking skill counts against Technique in a kick's accuracy.</summary>
+    public const int ErrorSkillWeight = 5;
 
     /// <summary>The farthest a teammate is seen at Vision 0, in pitch units (22 m).</summary>
     public const int VisionBase = 2_100;
@@ -255,8 +265,17 @@ internal static class TickBallCarrierBrain
     /// <summary>The distance of ball travel that adds one tick of lead, in pitch units.</summary>
     public const int LeadDistance = 500;
 
-    /// <summary>The Decisions plus Anticipation from which a player reads the offside line.</summary>
-    public const int OffsideAwareness = 12;
+    /// <summary>The Decisions plus Anticipation of an average player (13 and 13): the chance of misjudging the offside line is <see cref="OffsideCarelessBase"/> here.</summary>
+    public const int OffsideReadingSum = 26;
+
+    /// <summary>The percentage of passes to a receiver who is offside that an average player does not notice.</summary>
+    public const int OffsideCarelessBase = 12;
+
+    /// <summary>The percentage points more of such passes a player misses for every point his Decisions plus Anticipation fall below <see cref="OffsideReadingSum"/>.</summary>
+    public const int OffsideCarelessPerPoint = 4;
+
+    /// <summary>The most of such passes a player misses, in percent.</summary>
+    public const int OffsideCarelessMaximum = 60;
 
     /// <summary>The Decisions plus Anticipation from which a player decides every tick.</summary>
     public const int QuickDecisionSum = 24;
@@ -440,7 +459,7 @@ internal static class TickBallCarrierBrain
         pressure * (14_000 - (400 * composure)) / BasisPoints;
 
     /// <summary>
-    /// Gets the error angle of a kick, in binary angle units: <c>BaseError × max(15%, 100 − (4 × skill + Technique)) × (1 +
+    /// Gets the error angle of a kick, in binary angle units: <c>BaseError × max(25%, 100 − (5 × skill + Technique) / 2) × (1 +
     /// pressure)</c>. The kick leaves anywhere within this angle either side of its aim.
     /// </summary>
     /// <param name="skill">The attribute the kick is made with: Passing, Finishing or Crossing.</param>
@@ -449,7 +468,7 @@ internal static class TickBallCarrierBrain
     /// <param name="effectivePressure">The pressure on him after his composure, in basis points.</param>
     public static int ErrorAngle(int skill, int technique, int baseError, int effectivePressure)
     {
-        var percent = Math.Max(MinimumErrorPercent, ErrorSkillCeiling - ((4 * skill) + technique));
+        var percent = Math.Max(MinimumErrorPercent, ErrorSkillCeiling - (((ErrorSkillWeight * skill) + technique) / 2));
         var error = baseError * percent * (BasisPoints + Math.Max(0, effectivePressure)) / (100 * BasisPoints);
 
         return Math.Max(1, error);
@@ -494,6 +513,29 @@ internal static class TickBallCarrierBrain
             situation.Defenders,
             !situation.IsHome);
 
+    /// <summary>
+    /// Gets the share, in percent, of offside receivers a carrier fails to notice: <c>12 + 4 × (26 − Decisions − Anticipation)</c>, between 0
+    /// and 60. Which of them he fails to notice is a fixed function of where the two men stand (no draw), so a careless player now and then plays
+    /// the ball to a man who is offside.
+    /// </summary>
+    /// <param name="skills">The carrier's skills.</param>
+    public static int OffsideCarelessPercent(in TickPlayerSkills skills) =>
+        Math.Clamp(OffsideCarelessBase + (OffsideCarelessPerPoint * (OffsideReadingSum - skills.Decisions - skills.Anticipation)), 0, OffsideCarelessMaximum);
+
+    /// <summary>Tells whether the carrier sees a receiver as offside: he was, and the carrier is not one of the times he misses it.</summary>
+    private static bool SeesOffside(in TickCarrierSituation situation, int careless, int receiver)
+    {
+        if (!IsReceiverOffside(situation, receiver))
+        {
+            return false;
+        }
+
+        // A function of the positions only: the same moment of play always gives the same answer.
+        var spot = (uint)(situation.Attackers[receiver].X >> 6) * 2_654_435_761u ^ (uint)(situation.Attackers[situation.CarrierIndex].Y >> 6) * 40_503u;
+
+        return spot % 100 >= careless;
+    }
+
     /// <summary>Chooses what the carrier does with the ball this decision.</summary>
     /// <param name="situation">The moment of play.</param>
     /// <returns>The best-scoring action; ties go to the earlier candidate, so the choice is deterministic.</returns>
@@ -530,8 +572,9 @@ internal static class TickBallCarrierBrain
     /// <param name="skills">The carrier's skills.</param>
     /// <param name="ball">The ball, which the carrier has at his feet; it is released and launched.</param>
     /// <param name="random">The play stream.</param>
+    /// <param name="shotBaseError">The base error of a shot, which a set piece makes smaller.</param>
     /// <returns>True when the ball was kicked.</returns>
-    public static bool Execute(in TickCarrierDecision decision, in TickPlayerSkills skills, TickBallPhysics ball, Pcg32 random)
+    public static bool Execute(in TickCarrierDecision decision, in TickPlayerSkills skills, TickBallPhysics ball, Pcg32 random, int shotBaseError = ShotBaseError)
     {
         ArgumentNullException.ThrowIfNull(ball);
         ArgumentNullException.ThrowIfNull(random);
@@ -543,7 +586,7 @@ internal static class TickBallCarrierBrain
 
         var error = decision.Action switch
         {
-            TickCarrierAction.Shoot => ErrorAngle(skills.Finishing, skills.Technique, ShotBaseError, decision.EffectivePressure),
+            TickCarrierAction.Shoot => ErrorAngle(skills.Finishing, skills.Technique, shotBaseError, decision.EffectivePressure),
             TickCarrierAction.Cross => ErrorAngle(skills.Crossing, skills.Technique, CrossBaseError, decision.EffectivePressure),
             TickCarrierAction.Clear => ErrorAngle(skills.Passing, skills.Technique, ClearBaseError, decision.EffectivePressure),
             _ => ErrorAngle(skills.Passing, skills.Technique, PassBaseError, decision.EffectivePressure),
@@ -594,7 +637,7 @@ internal static class TickBallCarrierBrain
     {
         var carrierSkills = situation.Skills[situation.CarrierIndex];
         var vision = VisionBase + (VisionStep * carrierSkills.Vision);
-        var aware = carrierSkills.Decisions + carrierSkills.Anticipation >= OffsideAwareness;
+        var careless = OffsideCarelessPercent(carrierSkills);
         var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo);
         var loss = LossOfBall(view);
 
@@ -618,7 +661,7 @@ internal static class TickBallCarrierBrain
             var run = situation.Orders.Length > index ? situation.Orders[index].Role : TickAttackingRole.Holding;
             var through = run == TickAttackingRole.Runner && carrierSkills.Vision >= ThroughBallMinimumVision;
 
-            if (aware && IsReceiverOffside(situation, index))
+            if (SeesOffside(situation, careless, index))
             {
                 continue;
             }
@@ -679,7 +722,7 @@ internal static class TickBallCarrierBrain
         }
 
         var carrierSkills = situation.Skills[situation.CarrierIndex];
-        var aware = carrierSkills.Decisions + carrierSkills.Anticipation >= OffsideAwareness;
+        var careless = OffsideCarelessPercent(carrierSkills);
         var areaX = SpatialPitch.PitchLength - SpatialPitch.PenaltyBoxWidth;
         var receiver = -1;
         var targetX = CrossFallbackX;
@@ -697,7 +740,7 @@ internal static class TickBallCarrierBrain
             var x = MirrorX(TickSpatialUnits.ToUnits(situation.Attackers[index].X), situation.IsHome);
             var y = MirrorY(TickSpatialUnits.ToUnits(situation.Attackers[index].Y), situation.IsHome);
 
-            if (x < areaX || Math.Abs(y - SpatialPitch.GoalYCenter) > AreaHalfWidth || (aware && IsReceiverOffside(situation, index)))
+            if (x < areaX || Math.Abs(y - SpatialPitch.GoalYCenter) > AreaHalfWidth || SeesOffside(situation, careless, index))
             {
                 continue;
             }
@@ -757,7 +800,7 @@ internal static class TickBallCarrierBrain
 
         var chance = ExpectedGoals(view.X, view.Y, blockers, skills);
 
-        if (chance <= 0)
+        if (chance <= ShotMinimumChance)
         {
             return;
         }

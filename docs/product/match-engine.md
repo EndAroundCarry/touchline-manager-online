@@ -1,4 +1,10 @@
-# Match engine version 11
+# Match engine version 12 (the tick engine) and version 11 (the possession engine)
+
+> **Version 12** is a different kind of engine: it plays the match tick by tick with twenty-two players and a ball, and it is the engine every new match
+> is played on. It is specified in [§14](#14-engine-version-12-the-tick-engine) and decided in
+> [ADR-0066](../architecture/adr/0066-engine-v12-discrete-tick-match-engine.md). Sections 1 to 13 describe the possession engine, `engine-v11` /
+> `engine-rules-v10`, which stays compiled and is what a snapshot frozen against `engine-v11` is played by; the rules constants in §11 are shared
+> (discipline, injuries, substitutions, ratings), the possession model in §7 is not used by version 12.
 
 > **Status:** Executable specification for `engine-v11` / `engine-rules-v10`, implemented in
 > `src/TouchlineManager.MatchEngine`.
@@ -1324,3 +1330,122 @@ a test that is switched off catches nothing.
 | `HighlightTests` | Reel selection: goals always shown, the quality floor, the count cap and its goal exception. |
 | `EnginePurityTests` | No clock, no `System.Random`, no IO; exactly one source of randomness. |
 | `DistributionTests` | The statistical bands, over two thousand matches. |
+
+---
+
+## 14. Engine version 12: the tick engine
+
+> **Status:** Executable specification for `engine-v12` / `engine-rules-v11`, `tick-engine-v1`, implemented in
+> `src/TouchlineManager.MatchEngine/Tick` and `Spatial`. **Decision:** [ADR-0066](../architecture/adr/0066-engine-v12-discrete-tick-match-engine.md).
+
+### 14.1 What it is
+
+A match is played at ten ticks a second, 100 ms a tick, 54,000 ticks and the stoppages. Twenty-two players and the ball have a position and a velocity
+at every tick, and everything that happens in the match is something the players did: a pass is a ball in flight that somebody reaches or does not, a
+save is a goalkeeper's body against the line of the shot, a corner is a ball that crossed the goal line off a defender. Nothing is drawn afterwards to
+fit a result.
+
+The engine is `TickMatchEngine` (the registry entry for `engine-v12`) running `TickMatchLoop.Play`. It takes the same `MatchInputV1` and returns the
+same `MatchResultV1` as version 11; the events, the player lines, the ratings and the commentary are made the same way.
+
+### 14.2 Numbers
+
+Everything the simulation computes is an integer. A pitch unit (100 units are about 1.05 m) is 1,000 fixed units, a speed is fixed units a tick, a
+heading is a binary angle (1,024 to the turn, 0 facing the away goal, 256 facing +Y), the sine is a literal quarter table (`TickTrigonometry`) and the
+square root is the integer root (`SpatialMath.Sqrt`). The pitch is 10,000 by 7,000 units and the ball's height is a Z of 0 to 100 (the crossbar is 35).
+The goal is 3,123 to 3,877 across the line: 7.32 m, as the viewer draws it (the possession engine's own mouth is 3,000 to 4,000 and is not touched).
+
+The one random stream is the snapshot's `Pcg32`. A tick takes the draws the things that happened in it need, in a fixed order, so a match is a function
+of its snapshot. The recording of the match for a film takes no draw and changes no state.
+
+### 14.3 One tick, in order
+
+1. **Play state.** Open play, or a dead ball (a restart waiting to be taken, a goal being celebrated, half-time). `TickMatchStateMachine` holds a restart
+   for 0.8 to 1.5 s while `TickSetPieces` places the twenty-two players, then the taker plays it.
+2. **Shape.** `TickTacticalGeometry` turns each slot of the team sheet into a point to hold: the block follows the ball up and down the pitch, pushes up
+   with the ball and drops without it, is squeezed or opened by the width, the defensive line and the pass focus, and a defender is never nearer than
+   8 m to his own goal line nor a player nearer than 7 m to the other.
+3. **Orders.** The side without the ball (`TickDefensiveAI`): one presser, a second only on a touchline under a high press, markers in the own third,
+   screens in the passing lanes, and a defensive line that steps up on a pressed carrier and drops off a free one; and the side with it
+   (`TickOffBallSupport`): the carrier's support at 12 to 25 m, a runner behind the line, a pocket, an overlap. A goalkeeper takes his arc, rushes out
+   to a lone attacker or dives (`TickGoalkeeperAI`, `TickShotStopper`).
+4. **The man with the ball** decides every one to three ticks (`TickBallCarrierBrain`): shoot, pass, through ball, cross, dribble, shield, recycle or
+   clear, whichever is worth most as the chance it comes off times its worth less the chance it fails times what a lost ball costs here, with no draw. A
+   kick leaves rotated off its aim by one draw within the error angle.
+5. **Bodies.** `TickSteering` and `TickPlayerPhysics` move every player: arrive, keep 2 m from a teammate, blend with the old velocity, turn at the rate
+   Agility allows, accelerate and brake as Pace and Acceleration allow, and spend energy.
+6. **Contest.** A defender in touch of the carrier may challenge (`TickTackleResolver`), a goalkeeper in reach may smother, a defender who reaches a
+   pass or a shot rolls to cut it out or to block it, and the nearest man to a loose ball takes it.
+7. **Boundary.** The ball steps (`TickBallPhysics`: roll, flight, bounce, post, bar) and a goal, a goal line, a touchline or a post is settled.
+
+### 14.4 The calibration constants
+
+All of these are `const` in the type that uses them, with the reason beside them. They were set by the calibration of §14.5 and are the engine's rules
+for version 12; changing one moves the golden hash in `TickEngineTests`.
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `TickPlayerSkills.CurvePercent` | 60 | A player's attribute counts 60% of its distance from 13. |
+| `TickBallCarrierBrain.ShotMinimumChance` | 1,850 bp | Below this heuristic chance a carrier does not shoot. |
+| `TickBallCarrierBrain.ShotBaseError` | 210 | Base error angle of an open-play shot (a set piece: `SetPieceShotBaseError` 50). |
+| `TickBallCarrierBrain.ErrorSkillWeight`, `MinimumErrorPercent` | 5, 25% | A kick's error is `Base × max(25%, 100 − (5 × skill + Technique) / 2)`. |
+| `TickBallCarrierBrain.PassArrivalCentimetresPerSecond` | 1,000 | A ground pass arrives at 10 m/s. |
+| `TickBallCarrierBrain.OffsideCarelessBase`, `…PerPoint` | 12%, 4 | Share of offside receivers a carrier misses, by Decisions plus Anticipation below 26. |
+| `TickMatchLoop.InterceptMaximum`, `InterceptSkillPerPoint` | 3,500 bp, 4% | Chance a defender cuts out a pass he reaches, and the % it moves per point he is above the passer. |
+| `TickMatchLoop.PassGraceTicks` | 3 | Ticks after a pass in which no opponent can reach it. |
+| `TickMatchLoop.ChallengeCommitBase`, `…PerAggression` | 1,000, 100 bp | Chance a defender in touch of the carrier challenges on a tick. |
+| `TickMatchLoop.PenaltyGivenBasisPoints` | 1,000 bp | Share of fouls in the area given as penalties. |
+| `TickMatchLoop.BlockToCornerBasisPoints` | 4,500 bp | Share of blocked shots turned behind for a corner. |
+| `TickTacticalGeometry.DefenceMinimumX`, `AttackMarginX` | 800, 700 | The nearest to a goal line a shape position goes. |
+| `TickShotStopper` reach | `70 + 40 + 6 × (Agility + Reflexes) / 2` | A goalkeeper dives on his reflexes as well as his agility. |
+
+Home advantage is the snapshot's `HomeAdvantageBasisPoints` less 10,000, added to the home side's man in every tackle and interception roll.
+
+### 14.5 Measured behaviour
+
+`tools/simulation-benchmarks` (`dotnet run -c Release --project tools/simulation-benchmarks -- <mode> …`):
+
+| Mode | What it plays |
+|---|---|
+| `tick N` | N matches with the board's formations in turn, uniform players: the figures of the plan, the film's size and the time. |
+| `tickmatrix N` | Every formation against every other, N matches each; `TICK_FORMS=0,1,5` picks formations, `TICK_ABILITY`, `TICK_INSTR=Pressing=2,Tempo=0`, `TICK_HOME_ATTR=16,Pace=9` change the sides. |
+| `ticksnap N file` | The stored snapshots of a database export (id, goals, goals, document, tab separated): real formations, instructions and attributes. `TICK_UNIFORM`, `TICK_FORM`, `TICK_FLAT` take the real thing apart. |
+
+The stored matches (205 snapshots of the development database, each played once):
+
+| | Measured | Plan band |
+|---|---|---|
+| Goals a match | 2.83 | 2.60–2.90 |
+| Shots a match | 28.3 | 22–28 |
+| Shots on target | 38% | 32–38% |
+| Pass completion | 76% | 75–85% |
+| Yellow cards | 4.0 | 3.0–4.5 |
+| Home / draw / away | 42 / 24 / 34 % | 42–48 / 22–26 / 28–34 % |
+| Fouls, penalties, corners, offsides | 22, 0.4, 5.1, 3.9 | |
+
+Every formation against every other with uniform players of 13 gives about 2.3 goals and 26 shots a match, 78% pass completion, 3.4 yellow cards; at an
+ability of 8 and of 19 it gives 2.9 and 2.4 goals. A home side whose players are all 3 points better than the visitors wins 59% of the matches and loses
+18%. Each instruction at its extreme (a high press, a high tempo, a high or deep line, an aggressive tackle, the most defensive and the most attacking
+mentality) moves the goals between 1.9 and 3.1 and nothing runs away.
+
+What is not matched: a throw-in is taken about 14 times a match (a real match has about 35) and a corner 5 (about 10), because balls leave the pitch
+less often than they do in football; and the formations are not alike — a lone striker or three forwards shoots about twice as often as two strikers.
+
+### 14.6 The film
+
+With a `MatchPassageRecorder` attached the loop records each tick (`TickMatchRecording`: the 22 players and the ball as shorts, plus the actions, events,
+rosters and stoppages), and `ReplayDirector.Build(input, result, recorder)` cuts a film from it (`TickFilmSelector`, `TickReplaySynthesizer`,
+`tick-replay-v1`). The film is a selection at twice the pace — about ten minutes of kick-offs, every goal with 18 s of build-up, cards, the best chances and
+the corners — in passages that share a boundary frame and are joined by `jump`, `kick_off` and `half_time` cuts; the viewer reads it unchanged.
+
+### 14.7 Tests
+
+| Suite | What it pins |
+|---|---|
+| `TickEngineTests` | A v12 snapshot is played by the tick loop and a v11 one by the possession engine; the same snapshot plays the same match (hash, canonical text, across threads); recording changes nothing; **the golden hash**; no floating point in the simulation; the plan's bands, widened for 72 matches. |
+| `TickBallPhysicsTests`, `TickPlayerPhysicsTests` | Trajectories, friction, bounce, posts and bar; speed, turning and energy. |
+| `TickTacticalGeometryTests`, `TickDefensiveAITests`, `TickTackleResolverTests` | Anchors, steering, the press, the line and the offside judge, the duel. |
+| `TickOffBallSupportTests`, `TickBallCarrierBrainTests` | Support, runs and the carrier's choice and error. |
+| `TickGoalkeeperAITests`, `TickShotStopperTests` | The arc, the rush, the dive and the save. |
+| `TickMatchStateMachineTests`, `TickSetPiecesTests` | Every restart. |
+| `TickMatchLoopTests`, `TickTeamTests`, `TickMatchRecordingTests`, `TickFilmSelectorTests`, `TickReplaySynthesizerTests` | The loop, the sides, the recording and the film. |

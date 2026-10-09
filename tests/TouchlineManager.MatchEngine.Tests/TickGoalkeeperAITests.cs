@@ -105,8 +105,8 @@ public sealed class TickGoalkeeperAITests
 
         order.Intent.TargetXUnits.Should().BeGreaterThanOrEqualTo(TickGoalkeeperAI.LineClearance);
         order.Intent.TargetYUnits.Should().BeInRange(
-            SpatialPitch.GoalYMin + TickGoalkeeperAI.PostClearance,
-            SpatialPitch.GoalYMax - TickGoalkeeperAI.PostClearance);
+            TickSpatialUnits.GoalMouthMinUnits + TickGoalkeeperAI.PostClearance,
+            TickSpatialUnits.GoalMouthMaxUnits - TickGoalkeeperAI.PostClearance);
     }
 
     [Fact]

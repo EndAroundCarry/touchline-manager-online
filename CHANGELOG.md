@@ -4,6 +4,33 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine v12 — matches are played tick by tick, by twenty-two players and a ball
+
+Recorded in [`ADR-0066`](docs/architecture/adr/0066-engine-v12-discrete-tick-match-engine.md); specified in
+[`docs/product/match-engine.md`](docs/product/match-engine.md) §14. Milestone 9 of `tick-based-match-engine-plan.md`: the tick loop built in
+Milestones 1 to 8 is wired in as the engine every new match is played on, and calibrated.
+
+### Changed
+
+- **`engine-v12` plays on the tick engine.** Every new match is simulated at ten ticks a second with real positions for the players and the ball, and its
+  film is cut from that recording (`tick-replay-v1`), so what the viewer shows is what the engine did. A snapshot frozen against `engine-v11` is still
+  played by the possession engine, which is kept as it was.
+- **Calibrated on what the game really plays, not on one geometry.** The stored matches of the development database scored 28 goals and 245 shots a
+  match; they now score 2.8 goals and 28 shots, 38% of the shots on target, 76% pass completion and 4.0 yellow cards, with home / draw / away at
+  42 / 24 / 34 %. Every formation against every other, abilities from 8 to 19 and each instruction at its extreme stay between 1.9 and 3.1 goals.
+- Passes are contested (a defender rolls to cut one out, and cannot reach it in its first 0.3 s), a tackle is not offered on every tick of contact,
+  a foul in the area is a penalty one time in ten, a shot is taken from a decent chance, a ball over the line off a pass is a goal kick, players keep out
+  of the six-yard box, careless passers play to men who are offside, and the goal is 7.32 m wide as the viewer draws it.
+- Attributes count 60% of their distance from 13, so a team of stars is better than a team of journeymen without being a different sport, and a goalkeeper
+  dives on his reflexes as much as his agility.
+- A match plays in about 0.3 s: the integer square root now starts at the power of two above the root (four steps, not thirty; no answer changes).
+
+### Added
+
+- `TickEngineTests`: routing by version, repeatability (hash, canonical text, across threads), recording changes nothing, the golden hash, no floating
+  point in the simulation, and the plan's bands.
+- Benchmark modes `tickmatrix` (every formation against every other) and `ticksnap` (stored snapshots, with switches to take the real thing apart).
+
 ## Stadium picture in three dimensions — rows, sectors and seats in the club's two colours
 
 Recorded in [`ADR-0065`](docs/architecture/adr/0065-stadium-picture-in-three-dimensions.md), which supersedes decision 6

@@ -182,6 +182,15 @@ internal sealed partial class TickMatchLoop
         var attackers = _teams[attackIndex];
         var defenders = _teams[1 - attackIndex];
 
+        // A ball nobody shot that runs over the line off the attackers' last touch is a pass or a cross that went too far, not a goal:
+        // the goalkeeper picks it up.
+        if (!_shotLive && !_lastTouch.IsNone && _lastTouch.Side == attackIndex)
+        {
+            OutOnGoalLine();
+
+            return;
+        }
+
         var scorerRef = _shotLive && _shooter.Side == attackIndex ? _shooter : _lastTouchBySide[attackIndex];
         var scorerSeat = scorerRef.IsNone ? -1 : attackers.SeatOfSlot(scorerRef.Slot);
 
@@ -238,6 +247,12 @@ internal sealed partial class TickMatchLoop
         _state.AddGoalStoppage();
         runtime.ShiftMorale(_rules.MoraleGainPerGoalBasisPoints, _rules.MaxMoraleDriftBasisPoints, _rules);
         defenders.Runtime.ShiftMorale(-_rules.MoraleLossPerConcededGoalBasisPoints, _rules.MaxMoraleDriftBasisPoints, _rules);
+
+        if (!live)
+        {
+            // A goal off a deflection or a goalkeeper's mistake has no shot of its own: the film still shows the man it is given to striking it.
+            Tag(scorerRef, PassageAction.Shot);
+        }
 
         Tag(scorerRef, PassageAction.Celebrate);
         ResetPlay();

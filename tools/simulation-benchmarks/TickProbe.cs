@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using TouchlineManager.Application.Match;
+using TouchlineManager.Domain.Squad;
 using TouchlineManager.MatchEngine;
 using TouchlineManager.MatchEngine.Commentary;
 using TouchlineManager.MatchEngine.Configuration;
@@ -21,6 +22,14 @@ namespace TouchlineManager.SimulationBenchmarks;
 /// </remarks>
 internal static class TickProbe
 {
+    private static readonly FormationPreset[] Shapes =
+    [
+        FormationPreset.FourFourTwo,
+        FormationPreset.FourThreeThree,
+        FormationPreset.FourTwoThreeOne,
+        FormationPreset.FiveThreeTwo,
+    ];
+
     /// <summary>Runs the probe.</summary>
     /// <param name="matches">How many matches to play.</param>
     /// <param name="seed">The base seed.</param>
@@ -51,12 +60,16 @@ internal static class TickProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = LaboratoryFixtures.OnTheBoard(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules));
+            // The sides take the board's formations in turn, so the figures are not those of the one shape that scores least.
+            var input = TickCalibration.Stand(
+                LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules),
+                Shapes[index % Shapes.Length],
+                Shapes[(index / Shapes.Length) % Shapes.Length]);
             var liveMetrics = new PlayerLiveMetricsRecorder();
             var recorder = new MatchPassageRecorder();
 
             play.Start();
-            var result = MatchSimulator.Simulate(input, rules, liveMetrics, recorder, TickLoopEngine.Instance);
+            var result = MatchSimulator.Simulate(input, rules, liveMetrics, recorder, TickMatchEngine.Instance);
             play.Stop();
 
             film.Start();

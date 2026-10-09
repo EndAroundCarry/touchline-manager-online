@@ -172,6 +172,12 @@ internal static class TickTacticalGeometry
     /// <summary>The margin any anchor keeps from a touchline or goal line, in pitch units.</summary>
     public const int Margin = 150;
 
+    /// <summary>The nearest to his own goal line a defender's shape position drops, in pitch units.</summary>
+    public const int DefenceMinimumX = 800;
+
+    /// <summary>The nearest to the opponents' goal line a player's shape position rises, in pitch units.</summary>
+    public const int AttackMarginX = 700;
+
     /// <summary>The deepest into the pitch a goalkeeper's anchor may go, in pitch units.</summary>
     public const int GoalkeeperLimit = 1_100;
 
@@ -240,7 +246,7 @@ internal static class TickTacticalGeometry
             ownY = middleY + ((spec.OwnY - middleY) * widthBasisPoints / BasisPoints) + lean + slide;
         }
 
-        ownX = Math.Clamp(ownX, Margin, SpatialPitch.PitchLength - Margin);
+        ownX = Math.Clamp(ownX, spec.Family == MatchPositionFamily.Defence ? DefenceMinimumX : Margin, SpatialPitch.PitchLength - AttackMarginX);
         ownY = Math.Clamp(ownY, Margin, SpatialPitch.PitchWidth - Margin);
 
         return isHome

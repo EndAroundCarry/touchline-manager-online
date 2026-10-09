@@ -305,8 +305,8 @@ internal sealed class TickTeam
         Id[seat] = slot.Participant.ParticipantId;
         SlotNumber[seat] = slot.Slot.SlotNumber;
         Spec[seat] = TickAnchorSpec.From(slot.Slot);
-        Skills[seat] = TickPlayerSkills.From(attributes);
-        Profile[seat] = TickPlayerProfile.From(attributes);
+        Skills[seat] = TickPlayerSkills.Rated(attributes);
+        Profile[seat] = TickPlayerProfile.From(attributes, slot.Slot.Family == MatchPositionFamily.Goalkeeper);
         _startCondition[seat] = condition;
         _startEnergy[seat] = Math.Clamp(condition, 0, 10_000) * (TickPlayerPhysics.EnergyFull / 10_000);
         Body[seat] = new TickPlayerState { Energy = _startEnergy[seat] };

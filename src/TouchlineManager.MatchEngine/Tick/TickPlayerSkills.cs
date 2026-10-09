@@ -89,6 +89,32 @@ internal readonly record struct TickPlayerSkills
     /// <summary>Gets the SetPieces attribute: striking a dead ball, which picks the corner, free-kick and penalty takers.</summary>
     public required int SetPieces { get; init; }
 
+    /// <summary>The pitch's average attribute, which the engine's skill curve is centred on.</summary>
+    public const int CurveCentre = 13;
+
+    /// <summary>
+    /// How much of an attribute's distance from <see cref="CurveCentre"/> counts, in percent. The curve flattens the ends so that a side of stars
+    /// is better than a side of journeymen without being a different sport: the possession engine's team ratings did the same by averaging, and
+    /// the tick engine, which plays every player, has to do it player by player (Milestone 9 calibration).
+    /// </summary>
+    public const int CurvePercent = 60;
+
+    /// <summary>Builds the skills a player brings to a match: his attributes pulled towards the average by the skill curve.</summary>
+    /// <param name="attributes">The player's attributes.</param>
+    public static TickPlayerSkills Rated(PlayerAttributesV1 attributes)
+    {
+        ArgumentNullException.ThrowIfNull(attributes);
+
+        var values = new int[MatchAttributeNames.Count];
+
+        for (var index = 0; index < values.Length; index++)
+        {
+            values[index] = CurveCentre + (((attributes.Values[index]) - CurveCentre) * CurvePercent / 100);
+        }
+
+        return From(PlayerAttributesV1.From(values));
+    }
+
     /// <summary>Builds a player's skills from his frozen attributes.</summary>
     /// <param name="attributes">The player's attributes.</param>
     public static TickPlayerSkills From(PlayerAttributesV1 attributes)

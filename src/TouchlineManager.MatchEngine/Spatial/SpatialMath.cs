@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace TouchlineManager.MatchEngine.Spatial;
 
 /// <summary>
@@ -39,9 +41,10 @@ public static class SpatialMath
             return value;
         }
 
-        // Newton's method from above converges on the floor of the root in a handful of steps.
-        var root = value;
-        var next = (root + 1) / 2;
+        // Newton's method from above converges on the floor of the root. Starting at the power of two just above the root rather than at the
+        // value itself it takes four or five steps, not thirty; the answer is the same whatever the start, so no result moves.
+        var root = 1L << ((BitOperations.Log2((ulong)value) / 2) + 1);
+        var next = (root + (value / root)) / 2;
 
         while (next < root)
         {

@@ -541,7 +541,10 @@ internal sealed class TickReplaySynthesizer
     private PassageV1 ToPassage(Item item, List<HighlightTrackV1> tracks, string homeColour, string awayColour)
     {
         var clock = ClockOf(item);
-        var period = _recording.Period(item.First);
+
+        // The half-time card stands on the first half's last clock second, so it belongs to the first half; its frame
+        // is the second half's first, which would put a second-half passage's clock behind it.
+        var period = item.IsHalfTime ? 1 : _recording.Period(item.First);
         var principal = item.Principal;
         var (minute, stoppage) = principal is null
             ? FilmLabels.ClockOf(clock[0].MatchSecond, period, _rules)

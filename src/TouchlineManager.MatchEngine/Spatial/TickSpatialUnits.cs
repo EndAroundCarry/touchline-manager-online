@@ -43,6 +43,12 @@ public static class TickSpatialUnits
     /// <summary>The highest ball height, in fixed units.</summary>
     public const int MaxZFixed = MaxZUnits * FixedScale;
 
+    /// <summary>The goal's near post along the goal line, in pitch units: a goal is 7.32 m wide, as the viewer draws it, centred on the line (the possession engine's wider 10 m mouth is its own).</summary>
+    public const int GoalMouthMinUnits = 3_123;
+
+    /// <summary>The goal's far post along the goal line, in pitch units.</summary>
+    public const int GoalMouthMaxUnits = 3_877;
+
     /// <summary>The crossbar's height, in Z units (2.44 m).</summary>
     public const int CrossbarZUnits = 35;
 

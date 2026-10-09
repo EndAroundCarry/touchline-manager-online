@@ -134,12 +134,15 @@ internal static class TickSteering
 
             var awayX = (long)self.X - team[other].X;
             var awayY = (long)self.Y - team[other].Y;
-            var gap = SpatialMath.Sqrt((awayX * awayX) + (awayY * awayY));
+            var apart = (awayX * awayX) + (awayY * awayY);
 
-            if (gap >= SeparationRadius)
+            // Most of his side is far off: only a root for the ones inside the circle.
+            if (apart >= (long)SeparationRadius * SeparationRadius)
             {
                 continue;
             }
+
+            var gap = SpatialMath.Sqrt(apart);
 
             if (gap == 0)
             {

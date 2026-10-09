@@ -83,7 +83,7 @@ public sealed class MatchTests : IAsyncLifetime
             $"/api/v1/matches/{matchId}/presentation"))!;
 
         presentation.MatchId.Should().Be(matchId);
-        presentation.PresentationVersion.Should().Be("replay-v16");
+        presentation.PresentationVersion.Should().Be("tick-replay-v1");
         presentation.Commentary.Should().NotBeEmpty();
         presentation.Commentary.Select(line => line.TemplateKey).Should()
             .Contain(["match.kickoff", "match.full_time"], "a match is narrated from kick-off to full time");
@@ -203,6 +203,14 @@ public sealed class MatchTests : IAsyncLifetime
             passage.Entities.Where(entity => !entity.IsBall).Should()
                 .OnlyContain(entity =>
                     (entity.Side == "home" || entity.Side == "away") && entity.ParticipantId.HasValue);
+
+            // The half-time card is a held frame: its entities stand where they are and it carries no tracks.
+            if (passage.OutcomeCode == "half_time")
+            {
+                passage.Tracks.Should().BeEmpty();
+
+                continue;
+            }
 
             passage.Tracks.Should().HaveCount(passage.Entities.Count);
             passage.Tracks.Select(track => track.EntityId).Should()
