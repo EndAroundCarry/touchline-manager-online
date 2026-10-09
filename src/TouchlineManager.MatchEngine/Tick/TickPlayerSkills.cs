@@ -9,7 +9,7 @@ namespace TouchlineManager.MatchEngine.Tick;
 /// Every value is on the canonical 1..20 scale. Milestone 3 needs the defensive and duelling attributes, Milestone 4
 /// the off-the-ball ones (Pace, Acceleration, WorkRate) and Milestone 5 the ones the ball carrier decides with
 /// (Finishing, Passing, Crossing, Technique, Vision) and Milestone 6 the goalkeeper's (Reflexes, Handling, OneOnOnes,
-/// AerialAbility, JumpingReach). Kept apart from <see cref="TickPlayerProfile"/>, which
+/// AerialAbility, JumpingReach) and Milestone 7 the set-piece ones (Heading, SetPieces). Kept apart from <see cref="TickPlayerProfile"/>, which
 /// holds the athletic limits, because the physics and the decisions are separate jobs.
 /// </remarks>
 internal readonly record struct TickPlayerSkills
@@ -83,6 +83,12 @@ internal readonly record struct TickPlayerSkills
     /// <summary>Gets the JumpingReach attribute: how high a goalkeeper stretches.</summary>
     public required int JumpingReach { get; init; }
 
+    /// <summary>Gets the Heading attribute: winning a high ball with the head, which ranks a corner's targets and markers.</summary>
+    public required int Heading { get; init; }
+
+    /// <summary>Gets the SetPieces attribute: striking a dead ball, which picks the corner, free-kick and penalty takers.</summary>
+    public required int SetPieces { get; init; }
+
     /// <summary>Builds a player's skills from his frozen attributes.</summary>
     /// <param name="attributes">The player's attributes.</param>
     public static TickPlayerSkills From(PlayerAttributesV1 attributes)
@@ -114,6 +120,8 @@ internal readonly record struct TickPlayerSkills
             OneOnOnes = attributes.ValueOf(MatchAttributeName.OneOnOnes),
             AerialAbility = attributes.ValueOf(MatchAttributeName.AerialAbility),
             JumpingReach = attributes.ValueOf(MatchAttributeName.JumpingReach),
+            Heading = attributes.ValueOf(MatchAttributeName.Heading),
+            SetPieces = attributes.ValueOf(MatchAttributeName.SetPieces),
         };
     }
 }
