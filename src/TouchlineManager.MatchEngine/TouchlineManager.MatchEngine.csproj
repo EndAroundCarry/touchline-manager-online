@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="TouchlineManager.MatchEngine.Tests" />
+    <InternalsVisibleTo Include="TouchlineManager.SimulationBenchmarks" />
   </ItemGroup>
 
 </Project>

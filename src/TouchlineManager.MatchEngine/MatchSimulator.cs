@@ -55,7 +55,22 @@ public static class MatchSimulator
         MatchInputV1 input,
         EngineRulesV2 rules,
         PlayerLiveMetricsRecorder? liveMetrics = null,
-        MatchPassageRecorder? passages = null)
+        MatchPassageRecorder? passages = null) =>
+        Simulate(input, rules, liveMetrics, passages, engine: null);
+
+    /// <summary>Simulates a match on an explicitly chosen engine rather than the one the snapshot's version names.</summary>
+    /// <param name="input">The frozen snapshot.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="liveMetrics">The recorder for the replay's condition and rating curve, or null.</param>
+    /// <param name="passages">The recorder for the replay's ball paths (or a tick match's trace), or null.</param>
+    /// <param name="engine">The engine to play the match on, or null to resolve it from the snapshot.</param>
+    /// <returns>The result, including both hashes.</returns>
+    internal static MatchResultV1 Simulate(
+        MatchInputV1 input,
+        EngineRulesV2 rules,
+        PlayerLiveMetricsRecorder? liveMetrics,
+        MatchPassageRecorder? passages,
+        IMatchSimulationEngine? engine)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(rules);
@@ -75,7 +90,7 @@ public static class MatchSimulator
             Passages = passages,
         };
 
-        var engine = MatchEngineRegistry.Resolve(input.EngineVersion);
+        engine ??= MatchEngineRegistry.Resolve(input.EngineVersion);
         engine.Run(state);
 
         state.Home.CaptureEndOfMatchStates();

@@ -1,4 +1,5 @@
 using TouchlineManager.MatchEngine.Spatial;
+using TouchlineManager.MatchEngine.Tick;
 
 namespace TouchlineManager.MatchEngine.Model;
 
@@ -354,6 +355,19 @@ public sealed class MatchPassageRecorder
 
     /// <summary>Gets how many possessions have been captured.</summary>
     internal int Count => _passages.Count;
+
+    /// <summary>
+    /// Gets the continuous 10 Hz trace of a tick match, when the match was played by the tick engine (`tick-engine-v1`).
+    /// </summary>
+    /// <remarks>
+    /// The tick engine has no possessions: it plays the match tick by tick, so what it hands the replay is the trace itself and the
+    /// film is cut from that. A recorder that was given to a possession match leaves it null, and one given to a tick match leaves
+    /// <see cref="Passages"/> empty.
+    /// </remarks>
+    internal TickMatchRecording? Tick { get; private set; }
+
+    /// <summary>Starts the tick trace; the tick engine calls it once, at kick-off.</summary>
+    internal TickMatchRecording StartTickRecording() => Tick = new TickMatchRecording();
 
     /// <summary>Appends one completed possession.</summary>
     /// <param name="passage">The passage.</param>

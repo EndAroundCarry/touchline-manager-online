@@ -51,6 +51,29 @@ public static class ReplayDirector
         BuildFilm(input, result, passages, options, liveMetrics, diagnose: false).Presentation;
 
     /// <summary>
+    /// Builds the match's presentation from whatever the recorder captured: the film of a tick match is cut from its continuous
+    /// trace, and the film of a possession match is scripted from its recorded possessions.
+    /// </summary>
+    /// <param name="input">The frozen snapshot.</param>
+    /// <param name="result">The simulated result.</param>
+    /// <param name="recorder">The recorder the match was simulated with.</param>
+    /// <param name="options">How much is worth showing, and the film's pacing.</param>
+    /// <param name="liveMetrics">The minute-by-minute condition and rating curve, or null.</param>
+    public static MatchPresentationV1 Build(
+        MatchInputV1 input,
+        MatchResultV1 result,
+        MatchPassageRecorder recorder,
+        HighlightOptionsV1? options = null,
+        IReadOnlyList<PlayerLiveMetricV1>? liveMetrics = null)
+    {
+        ArgumentNullException.ThrowIfNull(recorder);
+
+        return recorder.Tick is { } trace
+            ? Tick.TickReplaySynthesizer.Build(input, result, trace, options, liveMetrics)
+            : Build(input, result, recorder.Passages, options, liveMetrics);
+    }
+
+    /// <summary>
     /// Builds the presentation and measures the film it describes: its pace, how much was condensed, how fast the
     /// ball moves, and whether anything jumps. For tests and the replay benchmark.
     /// </summary>

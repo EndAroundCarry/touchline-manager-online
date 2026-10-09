@@ -421,6 +421,18 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets the fastest pace allowed before the holds are shortened (3.0×).</summary>
     public int CeilingPaceMilli { get; init; } = 3_000;
 
+    /// <summary>
+    /// Gets the one pace a tick match's film is played at, in thousandths of real time (2.0×): 50 ms of film for every 100 ms tick
+    /// (`tick-engine-v1`).
+    /// </summary>
+    /// <remarks>
+    /// A tick match is recorded as it was played, so the film cannot be stretched or condensed to a length: it can only be played
+    /// at a speed and cut to a selection. Ten match seconds to one film second, the divisor the plan first named, would have a
+    /// sprint cross the screen at seventy metres a second, so the film plays at a speed the eye can follow and shows the stretches of
+    /// the match worth watching (<see cref="MinFilmMilliseconds"/> to <see cref="MaxFilmMilliseconds"/> of them).
+    /// </remarks>
+    public int TickFilmPaceMilli { get; init; } = 2_000;
+
     // ---- How fast the ball moves, in metres per second of real time -----------------------------------------
 
     /// <summary>Gets the speed of a ground pass.</summary>

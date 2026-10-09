@@ -74,7 +74,7 @@ public sealed class GetMatchPresentation
         }
 
         var commentary = CommentaryTokenBuilder.Build(input, result);
-        var presentation = ReplayDirector.Build(input, result, passages.Passages, liveMetrics: liveMetrics.Metrics);
+        var presentation = ReplayDirector.Build(input, result, passages, liveMetrics: liveMetrics.Metrics);
 
         return new GetMatchPresentationResult(
             MatchReadOutcome.Found,
