@@ -28,15 +28,18 @@ internal enum TickTackleOutcome
 /// </summary>
 /// <remarks>
 /// <para>
-/// A presser within <see cref="ContactRadiusUnits"/> (90 units, 0.9 m) of the carrier may challenge. The contest reuses the
-/// possession engine's ground-duel rules, so a tackle here is worth what a duel there was worth:
+/// A presser within <see cref="ContactRadiusUnits"/> of the carrier may challenge — a lunge at a man at arm's length, not
+/// only a shoulder-to-shoulder contact — and the further from <see cref="FullContactUnits"/> the lunge starts, the less
+/// of it lands. The contest otherwise reuses the possession engine's ground-duel rules, so a tackle here is worth what a
+/// duel there was worth:
 /// </para>
 /// <list type="bullet">
 /// <item><description>
 /// The defender's score is <c>5 × Tackling + 3 × Strength + 2 × Aggression</c> and the carrier's is
 /// <c>5 × Dribbling + 3 × Agility + 2 × Composure</c>, in hundredths of an attribute point. An aggressive tackling style
 /// adds <c>AggressiveTacklingDuelScoreBonus</c> to the defender's score; staying on his feet takes
-/// <c>StayOnFeetDuelScorePenalty</c> off it.
+/// <c>StayOnFeetDuelScorePenalty</c> off it, and every pitch unit of reach past <see cref="FullContactUnits"/> takes
+/// <see cref="RangePenaltyPerUnitBasisPoints"/> off the chance.
 /// </description></item>
 /// <item><description>
 /// The defender wins the ball with <c>BaseGroundDuelBasisPoints + swing</c>, where the swing scales the score gap against
@@ -44,9 +47,10 @@ internal enum TickTackleOutcome
 /// tackle two times in three and a poke that leaves the ball loose the rest.
 /// </description></item>
 /// <item><description>
-/// A challenge that does not win the ball is a foul with <c>DuelFoulBasisPoints</c>, scaled by the tackling style and by
-/// the same Aggression/Tackling multiplier the possession engine uses, and otherwise the carrier is past him
-/// (<see cref="TickTackleOutcome.Beaten"/>).
+/// A challenge that does not win the ball is a foul with <c>DuelFoulBasisPoints × FoulShareMultiplierBasisPoints</c>
+/// (the rules' per-duel share, raised for the tick engine's own fights: a challenge here is already a lunge at the man),
+/// scaled by the tackling style and by the same Aggression/Tackling multiplier the possession engine uses, and otherwise
+/// the carrier is past him (<see cref="TickTackleOutcome.Beaten"/>).
 /// </description></item>
 /// </list>
 /// <para>
@@ -57,8 +61,17 @@ internal enum TickTackleOutcome
 /// </remarks>
 internal static class TickTackleResolver
 {
-    /// <summary>The distance within which a defender may challenge, in pitch units (0.9 m).</summary>
-    public const int ContactRadiusUnits = 90;
+    /// <summary>The distance within which a defender may challenge, in pitch units (1.6 m).</summary>
+    public const int ContactRadiusUnits = 150;
+
+    /// <summary>The distance at which a challenge is at its full strength, in pitch units (0.9 m).</summary>
+    public const int FullContactUnits = 90;
+
+    /// <summary>How much of the win chance each pitch unit of reach past <see cref="FullContactUnits"/> costs, in basis points.</summary>
+    public const int RangePenaltyPerUnitBasisPoints = 15;
+
+    /// <summary>The share of the rules' per-duel foul chance a failed challenge carries, in basis points (three and one tenth).</summary>
+    public const int FoulShareMultiplierBasisPoints = 31_000;
 
     /// <summary>The share of winning challenges that leave the ball loose rather than at the defender's feet, in percent.</summary>
     public const int PokedLoosePercent = 33;
@@ -101,7 +114,26 @@ internal static class TickTackleResolver
     /// <param name="carrier">The carrier's skills.</param>
     /// <param name="style">The defending side's tackling style.</param>
     /// <param name="rules">The rules in force.</param>
-    public static int WinChanceBasisPoints(in TickPlayerSkills defender, in TickPlayerSkills carrier, MatchTacklingStyle style, EngineRulesV2 rules)
+    public static int WinChanceBasisPoints(in TickPlayerSkills defender, in TickPlayerSkills carrier, MatchTacklingStyle style, EngineRulesV2 rules) =>
+        WinChanceBasisPoints(defender, carrier, style, rules, FullContactUnits, EngineRulesV2.Certain);
+
+    /// <summary>Gets the chance, in basis points, that a challenge started a given distance away wins the ball.</summary>
+    /// <param name="defender">The tackler's skills.</param>
+    /// <param name="carrier">The carrier's skills.</param>
+    /// <param name="style">The defending side's tackling style.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="distanceUnits">How far the challenge started from the carrier, in pitch units.</param>
+    public static int WinChanceBasisPoints(in TickPlayerSkills defender, in TickPlayerSkills carrier, MatchTacklingStyle style, EngineRulesV2 rules, int distanceUnits) =>
+        WinChanceBasisPoints(defender, carrier, style, rules, distanceUnits, EngineRulesV2.Certain);
+
+    /// <summary>Gets the chance, in basis points, that a challenge started a given distance away wins the ball.</summary>
+    /// <param name="defender">The tackler's skills.</param>
+    /// <param name="carrier">The carrier's skills.</param>
+    /// <param name="style">The defending side's tackling style.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="distanceUnits">How far the challenge started from the carrier, in pitch units.</param>
+    /// <param name="advantageBasisPoints">The tackler's side's home advantage, in basis points (10,000 is none): the crowd lifts a home side's tackling.</param>
+    public static int WinChanceBasisPoints(in TickPlayerSkills defender, in TickPlayerSkills carrier, MatchTacklingStyle style, EngineRulesV2 rules, int distanceUnits, int advantageBasisPoints)
     {
         ArgumentNullException.ThrowIfNull(rules);
 
@@ -125,7 +157,10 @@ internal static class TickTackleResolver
             rules.GroundDuelSwingBasisPoints,
             rules.DuelDifferentialReference * EffectiveSkill.Scale);
 
-        return Probability.Band(rules.BaseGroundDuelBasisPoints + swing, rules.DuelMinWinBasisPoints, rules.DuelMaxWinBasisPoints);
+        var reach = Math.Max(0, distanceUnits - FullContactUnits) * RangePenaltyPerUnitBasisPoints;
+        var chance = (rules.BaseGroundDuelBasisPoints + swing - reach) * Math.Clamp(advantageBasisPoints, 1, 2 * EngineRulesV2.Certain) / EngineRulesV2.Certain;
+
+        return Probability.Band(chance, rules.DuelMinWinBasisPoints, rules.DuelMaxWinBasisPoints);
     }
 
     /// <summary>Gets the chance, in basis points, that a challenge which does not win the ball is a foul.</summary>
@@ -149,7 +184,11 @@ internal static class TickTackleResolver
             rules);
 
         return Probability.Band(
-            Probability.Apply(Probability.Apply(rules.DuelFoulBasisPoints, styleMultiplier), skillMultiplier),
+            Probability.Apply(
+                Probability.Apply(
+                    Probability.Apply(rules.DuelFoulBasisPoints, FoulShareMultiplierBasisPoints),
+                    styleMultiplier),
+                skillMultiplier),
             0,
             EngineRulesV2.Certain);
     }
@@ -165,9 +204,43 @@ internal static class TickTackleResolver
         in TickPlayerSkills carrier,
         MatchTacklingStyle style,
         EngineRulesV2 rules,
+        int roll) =>
+        Resolve(defender, carrier, style, rules, FullContactUnits, EngineRulesV2.Certain, roll);
+
+    /// <summary>Settles a challenge started a given distance away from one draw.</summary>
+    /// <param name="defender">The tackler's skills.</param>
+    /// <param name="carrier">The carrier's skills.</param>
+    /// <param name="style">The defending side's tackling style.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="distanceUnits">How far the challenge started from the carrier, in pitch units.</param>
+    /// <param name="roll">A draw in basis points, 0..9,999.</param>
+    public static TickTackleOutcome Resolve(
+        in TickPlayerSkills defender,
+        in TickPlayerSkills carrier,
+        MatchTacklingStyle style,
+        EngineRulesV2 rules,
+        int distanceUnits,
+        int roll) =>
+        Resolve(defender, carrier, style, rules, distanceUnits, EngineRulesV2.Certain, roll);
+
+    /// <summary>Settles a challenge started a given distance away from one draw, under a home advantage.</summary>
+    /// <param name="defender">The tackler's skills.</param>
+    /// <param name="carrier">The carrier's skills.</param>
+    /// <param name="style">The defending side's tackling style.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="distanceUnits">How far the challenge started from the carrier, in pitch units.</param>
+    /// <param name="advantageBasisPoints">The tackler's side's home advantage, in basis points (10,000 is none).</param>
+    /// <param name="roll">A draw in basis points, 0..9,999.</param>
+    public static TickTackleOutcome Resolve(
+        in TickPlayerSkills defender,
+        in TickPlayerSkills carrier,
+        MatchTacklingStyle style,
+        EngineRulesV2 rules,
+        int distanceUnits,
+        int advantageBasisPoints,
         int roll)
     {
-        var win = WinChanceBasisPoints(defender, carrier, style, rules);
+        var win = WinChanceBasisPoints(defender, carrier, style, rules, distanceUnits, advantageBasisPoints);
 
         if (roll < win)
         {
@@ -192,11 +265,45 @@ internal static class TickTackleResolver
         in TickPlayerSkills carrier,
         MatchTacklingStyle style,
         EngineRulesV2 rules,
+        Pcg32 random) =>
+        Resolve(defender, carrier, style, rules, FullContactUnits, EngineRulesV2.Certain, random);
+
+    /// <summary>Settles a challenge started a given distance away, taking one draw from the stream.</summary>
+    /// <param name="defender">The tackler's skills.</param>
+    /// <param name="carrier">The carrier's skills.</param>
+    /// <param name="style">The defending side's tackling style.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="distanceUnits">How far the challenge started from the carrier, in pitch units.</param>
+    /// <param name="random">The play stream.</param>
+    public static TickTackleOutcome Resolve(
+        in TickPlayerSkills defender,
+        in TickPlayerSkills carrier,
+        MatchTacklingStyle style,
+        EngineRulesV2 rules,
+        int distanceUnits,
+        Pcg32 random) =>
+        Resolve(defender, carrier, style, rules, distanceUnits, EngineRulesV2.Certain, random);
+
+    /// <summary>Settles a challenge started a given distance away, taking one draw from the stream.</summary>
+    /// <param name="defender">The tackler's skills.</param>
+    /// <param name="carrier">The carrier's skills.</param>
+    /// <param name="style">The defending side's tackling style.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="distanceUnits">How far the challenge started from the carrier, in pitch units.</param>
+    /// <param name="advantageBasisPoints">The tackler's side's home advantage, in basis points (10,000 is none).</param>
+    /// <param name="random">The play stream.</param>
+    public static TickTackleOutcome Resolve(
+        in TickPlayerSkills defender,
+        in TickPlayerSkills carrier,
+        MatchTacklingStyle style,
+        EngineRulesV2 rules,
+        int distanceUnits,
+        int advantageBasisPoints,
         Pcg32 random)
     {
         ArgumentNullException.ThrowIfNull(random);
 
-        return Resolve(defender, carrier, style, rules, random.NextBasisPoints());
+        return Resolve(defender, carrier, style, rules, distanceUnits, advantageBasisPoints, random.NextBasisPoints());
     }
 
     /// <summary>Carries a challenge's result onto the two bodies and the ball.</summary>

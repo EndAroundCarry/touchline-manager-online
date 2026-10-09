@@ -111,7 +111,9 @@ public static class TickTrigonometry
             ay >>= 1;
         }
 
-        // Smallest first-quadrant angle whose tangent reaches ay/ax: sin(a) * ax >= cos(a) * ay.
+        // Smallest first-quadrant angle whose tangent reaches ay/ax: sin(a) * ax >= cos(a) * ay. The quarter
+        // table is read directly — cos(mid) is the table's mirror image — because this search runs once per
+        // player per tick in the physics (`tick-engine-v1`, Milestone 9).
         var low = 0;
         var high = QuarterTurn;
 
@@ -119,7 +121,7 @@ public static class TickTrigonometry
         {
             var mid = (low + high) / 2;
 
-            if (Sin(mid) * ax >= Cos(mid) * ay)
+            if (((long)QuarterSine[mid] * ax) >= ((long)QuarterSine[QuarterTurn - mid] * ay))
             {
                 high = mid;
             }
@@ -132,8 +134,8 @@ public static class TickTrigonometry
         // The search lands on the first angle at or above the vector; the one below may be nearer.
         if (low > 0)
         {
-            var above = Math.Abs((Sin(low) * ax) - (Cos(low) * ay));
-            var below = Math.Abs((Sin(low - 1) * ax) - (Cos(low - 1) * ay));
+            var above = Math.Abs(((long)QuarterSine[low] * ax) - ((long)QuarterSine[QuarterTurn - low] * ay));
+            var below = Math.Abs(((long)QuarterSine[low - 1] * ax) - ((long)QuarterSine[QuarterTurn - low + 1] * ay));
 
             if (below < above)
             {

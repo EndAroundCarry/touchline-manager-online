@@ -242,8 +242,10 @@ public sealed class TickBallCarrierBrainTests
     [Fact]
     public void A_shot_through_a_crowd_is_worth_less_than_the_same_shot_with_a_clear_line()
     {
-        var clear = new Scene(true, 9, Move(OwnHalf, (9, 8_300, 3_500)), DeepBlock).Decide();
-        var crowded = new Scene(true, 9, Move(OwnHalf, (9, 8_300, 3_500)), Move(DeepBlock, (6, 8_900, 3_500), (7, 9_200, 3_480))).Decide();
+        // Eleven metres out, where a shot is worth taking: the crowd stands on the line to goal, so each man of it
+        // halves the chance the shot gets through (the keeper already counts as one of them, Milestone 9).
+        var clear = new Scene(true, 9, Move(OwnHalf, (9, 8_900, 3_500)), DeepBlock).Decide();
+        var crowded = new Scene(true, 9, Move(OwnHalf, (9, 8_900, 3_500)), Move(DeepBlock, (6, 9_000, 3_400), (7, 9_050, 3_600))).Decide();
 
         clear.Action.Should().Be(TickCarrierAction.Shoot);
         crowded.Utility.Should().BeLessThan(clear.Utility);
@@ -619,8 +621,10 @@ public sealed class TickBallCarrierBrainTests
         var master = Goals(20);
         var poor = Goals(1);
 
-        master.Should().Be(100, "the line is open and his error is under 2 degrees");
-        poor.Should().BeLessThan(master);
+        // The scene shoots under a defender's pressure, so even a master's placement is only about 64% (Milestone 9):
+        // the spread is drawn from the pressure-scaled chance, not a guaranteed on-target shot.
+        master.Should().BeGreaterThan(50, "a master places most shots from eight metres on target");
+        poor.Should().BeLessThan(master - 20, "a poor striker scatters them");
     }
 
     [Fact]
@@ -663,6 +667,11 @@ public sealed class TickBallCarrierBrainTests
 
         var first = Run(Scenes());
         var scenes = Scenes();
+
+        // A second, unmeasured run: tier-1 compilation of the decision code happens in the background, and its
+        // allocations are charged to this thread, where they would be read as the brain's.
+        Run(scenes);
+
         var before = GC.GetAllocatedBytesForCurrentThread();
         var second = Run(scenes);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;

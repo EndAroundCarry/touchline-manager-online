@@ -549,6 +549,20 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets the sampling intervals the adaptive ladder tries, in milliseconds of film, paired by index.</summary>
     public IReadOnlyList<int> PlayerSampleIntervals { get; init; } = [200, 300, 400, 500, 600, 700];
 
+    /// <summary>
+    /// Gets the tick film's player keyframe tolerances, in normalized position units.
+    /// </summary>
+    /// <remarks>
+    /// The tick engine's tracks describe real continuous movement rather than authored beats, so they carry
+    /// far more keyframes at the possession film's tolerances and need a ladder of their own: the same
+    /// widening retry, over the physics' own detail, until the film fits the payload budget
+    /// (`tick-engine-v1`, Milestone 8).
+    /// </remarks>
+    public IReadOnlyList<int> TickPlayerTolerances { get; init; } = [100, 250, 400, 600, 800, 1_000];
+
+    /// <summary>Gets the tick film's sampling intervals, in milliseconds of film, paired by index with its tolerances.</summary>
+    public IReadOnlyList<int> TickPlayerSampleIntervals { get; init; } = [400, 600, 800, 1_000, 1_400, 2_000];
+
     // ---- Commentary ---------------------------------------------------------------------------------------------
 
     /// <summary>Gets the least film time between two build-up lines, in milliseconds; events are never thinned.</summary>

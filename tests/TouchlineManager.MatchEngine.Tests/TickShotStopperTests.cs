@@ -160,7 +160,7 @@ public sealed class TickShotStopperTests
         var tall = TickShotStopper.Assess(keeper, Skills(10) with { JumpingReach = 20, AerialAbility = 20 }, forecast);
 
         average.Needed.Should().Be(200);
-        average.ParryReach.Should().Be(170);
+        average.ParryReach.Should().Be(185);
         average.CatchReach.Should().BeLessThan(average.ParryReach);
         agile.ParryReach.Should().BeGreaterThan(average.ParryReach);
         safe.CatchReach.Should().BeGreaterThan(average.CatchReach);

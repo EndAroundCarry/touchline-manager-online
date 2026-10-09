@@ -40,6 +40,17 @@ internal static class LaboratoryFixtures
     public static MatchInputV1 EvenlyMatched(ulong seed, EngineRulesV2 rules) =>
         Build(seed, 13, 13, new MatchInstructionsV1(), new MatchInstructionsV1(), rules);
 
+    /// <summary>Builds two evenly matched sides for the legacy possession engine.</summary>
+    /// <remarks>
+    /// The off-ball probe and the possession film diagnostics read the possession model's own mechanisms, so
+    /// they must be simulated by the engine they measure rather than by whichever engine is current
+    /// (`engine-v12` is the tick engine; `engine-v11` is the preserved possession engine).
+    /// </remarks>
+    /// <param name="seed">The match seed.</param>
+    /// <param name="rules">The rules in force.</param>
+    public static MatchInputV1 LegacyEvenlyMatched(ulong seed, EngineRulesV2 rules) =>
+        Build(seed, 13, 13, new MatchInstructionsV1(), new MatchInstructionsV1(), rules, legacy: true);
+
     /// <summary>
     /// Stands both sides where the tactics board does: the domain's four-four-two, depth in X and width in Y (`replay-v6`).
     /// </summary>
@@ -82,22 +93,26 @@ internal static class LaboratoryFixtures
     /// <param name="home">The home side's instructions.</param>
     /// <param name="away">The away side's instructions.</param>
     /// <param name="rules">The rules in force, or null for the shipped set.</param>
+    /// <param name="legacy">Whether the snapshot is frozen for the legacy possession engine rather than the current tick engine.</param>
     public static MatchInputV1 Build(
         ulong seed,
         int homeAbility,
         int awayAbility,
         MatchInstructionsV1 home,
         MatchInstructionsV1 away,
-        EngineRulesV2? rules = null) =>
+        EngineRulesV2? rules = null,
+        bool legacy = false) =>
         new()
         {
             FixtureId = Guid.Parse("018f0000-0000-7000-8000-0000000000f1"),
             WorldId = Guid.Parse("018f0000-0000-7000-8000-0000000000f2"),
             SeasonId = Guid.Parse("018f0000-0000-7000-8000-0000000000f3"),
-            EngineVersion = EngineVersions.EngineLabel,
-            RuleSetVersion = EngineVersions.RuleSetLabel,
+            EngineVersion = legacy ? EngineVersions.LegacyEngineLabel : EngineVersions.EngineLabel,
+            RuleSetVersion = legacy ? EngineVersions.LegacyRuleSetLabel : EngineVersions.RuleSetLabel,
             HomeAdvantageBasisPoints = (rules ?? EngineRulesV2.Default).HomeAdvantageBasisPoints,
-            FormulaConfigurationHash = EngineConfiguration.HashOf(rules ?? EngineRulesV2.Default),
+            FormulaConfigurationHash = EngineConfiguration.HashOf(
+                rules ?? EngineRulesV2.Default,
+                legacy ? EngineVersions.LegacyRuleSetLabel : EngineVersions.RuleSetLabel),
             Seed = seed,
             Home = Side(1, "Home", homeAbility, home),
             Away = Side(2, "Away", awayAbility, away),

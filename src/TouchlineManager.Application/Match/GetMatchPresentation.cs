@@ -63,22 +63,20 @@ public sealed class GetMatchPresentation
 
         var input = MatchSnapshotFactory.ReadVerified(snapshot.Snapshot);
         var liveMetrics = new PlayerLiveMetricsRecorder();
-        var passages = new MatchPassageRecorder();
-        var result = MatchSimulator.Simulate(input, EngineRulesV2.Default, liveMetrics, passages);
+        var film = MatchSimulator.SimulateFilm(input, EngineRulesV2.Default, liveMetrics);
 
-        if (!string.Equals(result.OutputHash, snapshot.OutputHash, StringComparison.Ordinal))
+        if (!string.Equals(film.Result.OutputHash, snapshot.OutputHash, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Re-simulating match {snapshot.MatchId:D} did not reproduce its stored output hash. "
                 + "The engine or its rules changed without a version bump (MAT-9).");
         }
 
-        var commentary = CommentaryTokenBuilder.Build(input, result);
-        var presentation = ReplayDirector.Build(input, result, passages.Passages, liveMetrics: liveMetrics.Metrics);
+        var commentary = CommentaryTokenBuilder.Build(input, film.Result);
 
         return new GetMatchPresentationResult(
             MatchReadOutcome.Found,
-            snapshot.ToResponse(presentation, commentary),
-            $"{snapshot.OutputHash}:{presentation.PresentationVersion}");
+            snapshot.ToResponse(film.Presentation, commentary),
+            $"{snapshot.OutputHash}:{film.Presentation.PresentationVersion}");
     }
 }

@@ -30,7 +30,7 @@ public sealed class TickReplaySynthesizerTests
     [Fact]
     public void The_film_slices_the_whole_match_into_passages_of_the_presentation_length()
     {
-        var (_, _, film) = Run();
+        var (_, recording, film) = Run();
         var options = new HighlightOptionsV1();
 
         film.Passages.Should().NotBeEmpty("a whole match was recorded");
@@ -50,12 +50,14 @@ public sealed class TickReplaySynthesizerTests
             }
 
             // A passage is only shorter than the minimum where the film was cut, a stretch of play ended at a jump,
-            // or the final passage ran to the whistle.
+            // the interval holds (a passage either side of the seam), or the final passage ran to the whistle.
             var last = index == film.Passages.Count - 1;
             var startsAfterJump = index > 0 && slice.FirstTick > film.Passages[index - 1].LastTick + 1;
             var endsAtJump = index + 1 < film.Passages.Count && film.Passages[index + 1].FirstTick > slice.LastTick + 1;
+            var endsAtInterval = slice.LastTick + 1 < recording.TickCount
+                && recording.PeriodAt(slice.LastTick) != recording.PeriodAt(slice.LastTick + 1);
 
-            (last || startsAfterJump || endsAtJump || slice.Passage.Cuts.Count > 0 || slice.Passage.OutcomeCode == "half_time")
+            (last || startsAfterJump || endsAtJump || endsAtInterval || slice.Passage.Cuts.Count > 0 || slice.Passage.OutcomeCode == "half_time")
                 .Should().BeTrue($"passage {index} is short only where the film jumps or the interval holds");
         }
     }

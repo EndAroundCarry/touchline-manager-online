@@ -1423,34 +1423,83 @@ public sealed record EngineRulesV2
     public int HomeAdvantageBasisPoints { get; init; } = 10_420;
 
     /// <summary>
+    /// Every rule constant, as its name and a reader, resolved from the type once and kept.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The list is derived from the type by reflection over its own properties and ordered by name rather than
+    /// written out by hand. A hand-written list is a list somebody forgets to extend, and the failure mode is
+    /// silent: a new constant would simply not be covered by the hash, so two results produced under genuinely
+    /// different rules would claim the same provenance (<see cref="EngineRulesTests"/> pins the coverage).
+    /// </para>
+    /// <para>
+    /// The readers are typed delegates rather than <c>PropertyInfo.GetValue</c>: a match is hashed on every
+    /// simulation, and the reflection invoke path compiles a dynamic method per call, which churned the
+    /// finalizer thread for a quarter of the process's time in the tick-engine benchmark (`tick-engine-v1`,
+    /// Milestone 9). A delegate reads the same property with the same value.
+    /// </para>
+    /// </remarks>
+    private static readonly (string Name, Func<EngineRulesV2, object?> Read)[] CanonicalReaders = BuildReaders();
+
+    /// <summary>
     /// Describes every constant canonically, for the configuration hash a result records.
     /// </summary>
     /// <remarks>
-    /// Derived from the type by reflection over its own properties and ordered by name rather than
-    /// written out by hand. A hand-written list is a list somebody forgets to extend, and the failure
-    /// mode is silent: a new constant would simply not be covered by the hash, so two results produced
-    /// under genuinely different rules would claim the same provenance. Sorting is ordinal and the
-    /// formatting is invariant, so the description is stable across platforms and cultures.
+    /// Sorting is ordinal and the formatting is invariant, so the description is stable across platforms and
+    /// cultures.
     /// </remarks>
     /// <param name="versionOverride">An optional rule version override (e.g. for legacy rule verification).</param>
     /// <returns>The canonical, name-ordered description of every constant.</returns>
     public IReadOnlyList<string> ToCanonicalParts(string? versionOverride = null)
     {
-        var parts = new List<string> { versionOverride ?? Version };
+        var parts = new List<string>(CanonicalReaders.Length + 1) { versionOverride ?? Version };
 
-        var properties = GetType()
-            .GetProperties()
-            .OrderBy(property => property.Name, StringComparer.Ordinal);
-
-        foreach (var property in properties)
+        foreach (var (name, read) in CanonicalReaders)
         {
-            // Every property on this type is an int or an int list; nothing else is a rule constant.
-            var value = property.GetValue(this);
-
-            parts.Add($"{property.Name}={Describe(value)}");
+            parts.Add($"{name}={Describe(read(this))}");
         }
 
         return parts;
+    }
+
+    /// <summary>Resolves every public instance property into a name and a reader, ordered by name.</summary>
+    private static (string Name, Func<EngineRulesV2, object?> Read)[] BuildReaders()
+    {
+        var readers = new List<(string, Func<EngineRulesV2, object?>)>();
+
+        foreach (var property in typeof(EngineRulesV2)
+            .GetProperties()
+            .OrderBy(property => property.Name, StringComparer.Ordinal))
+        {
+            var getter = property.GetGetMethod()
+                ?? throw new InvalidOperationException($"Rule constant '{property.Name}' has no public getter.");
+
+            readers.Add((property.Name, CreateReader(property.PropertyType, getter)));
+        }
+
+        return [.. readers];
+    }
+
+    /// <summary>Creates the reader for one property: a typed delegate where the type is a rule constant's.</summary>
+    private static Func<EngineRulesV2, object?> CreateReader(Type type, System.Reflection.MethodInfo getter)
+    {
+        // Every property on this type is an int or an int list; nothing else is a rule constant, and anything
+        // else keeps the old reflection read rather than silently changing the description.
+        if (type == typeof(int))
+        {
+            var read = getter.CreateDelegate<Func<EngineRulesV2, int>>();
+
+            return rules => read(rules);
+        }
+
+        if (type == typeof(IReadOnlyList<int>))
+        {
+            var read = getter.CreateDelegate<Func<EngineRulesV2, IReadOnlyList<int>>>();
+
+            return rules => read(rules);
+        }
+
+        return rules => getter.Invoke(rules, null);
     }
 
     private static string Describe(object? value) => value switch

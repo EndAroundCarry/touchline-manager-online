@@ -67,7 +67,15 @@ internal struct TickPlayerState
 /// <param name="Arrive">
 /// True to stop on the point (the player brakes in time and settles on it); false to run through it at the limit.
 /// </param>
-internal readonly record struct TickMoveIntent(int TargetXUnits, int TargetYUnits, int SpeedLimitBasisPoints, bool Arrive);
+internal readonly record struct TickMoveIntent(int TargetXUnits, int TargetYUnits, int SpeedLimitBasisPoints, bool Arrive)
+{
+    /// <summary>
+    /// Gets a value indicating whether the move is a goalkeeper's dive at a shot: he pushes off in any direction without
+    /// paying for the turn, and his first steps are several times a run's acceleration. Only
+    /// <see cref="TickShotStopper.DiveIntent"/> sets it.
+    /// </summary>
+    public bool Dive { get; init; }
+}
 
 /// <summary>
 /// One player's athletic limits, worked out once from his attributes.
@@ -202,6 +210,9 @@ internal static class TickPlayerPhysics
     /// <summary>The share of his pace a player keeps while off balance (<see cref="TickPlayerState.Lockout"/>), in basis points.</summary>
     public const int StumbleSpeedBasisPoints = 5_000;
 
+    /// <summary>How much quicker than a run a goalkeeper's dive accelerates, in percent: the explosive first step that makes a dive cover ground a run cannot.</summary>
+    public const int DiveAccelerationPercent = 200;
+
     private const int BasisPoints = 10_000;
 
     /// <summary>The slowest a tired player runs, as a share of his fresh top speed, in basis points.</summary>
@@ -228,7 +239,11 @@ internal static class TickPlayerPhysics
         return (int)((long)profile.TopSpeed * factor / BasisPoints);
     }
 
-    /// <summary>Advances a player one tick (100 ms) towards an intent.</summary>
+    /// <summary>
+    /// Advances a player one tick (100 ms) towards an intent. A dive (<see cref="TickMoveIntent.Dive"/>) is pushed off
+    /// without a turn — the keeper throws himself the way the ball is going — and accelerates at
+    /// <see cref="DiveAccelerationPercent"/> of a run's rate.
+    /// </summary>
     /// <param name="player">The player, updated in place.</param>
     /// <param name="profile">His athletic limits.</param>
     /// <param name="intent">Where he wants to go.</param>
@@ -236,7 +251,15 @@ internal static class TickPlayerPhysics
     {
         var dx = (long)TickSpatialUnits.ToFixed(intent.TargetXUnits) - player.X;
         var dy = (long)TickSpatialUnits.ToFixed(intent.TargetYUnits) - player.Y;
-        var distance = SpatialMath.Sqrt((dx * dx) + (dy * dy));
+
+        // The distance is only read by a player told to stop on his target (the arrival brake and the clamp in
+        // Advance); an ordinary run never reads it, so it is not worked out for one.
+        long distance = 0;
+
+        if (intent.Arrive)
+        {
+            distance = SpatialMath.Sqrt((dx * dx) + (dy * dy));
+        }
 
         var topSpeed = EffectiveTopSpeed(player, profile);
         var speedCap = (int)((long)topSpeed * Math.Clamp(intent.SpeedLimitBasisPoints, 0, BasisPoints) / BasisPoints);
@@ -249,17 +272,30 @@ internal static class TickPlayerPhysics
 
         if (intent.Arrive)
         {
+            // Sqrt(2 · braking · distance) is only smaller than the cap when the square is, so the root is
+            // taken only when it can win.
+            var braking = 2L * profile.Deceleration * distance;
+
             speedCap = distance <= ArriveToleranceFixed
                 ? 0
-                : (int)Math.Min(speedCap, SpatialMath.Sqrt(2L * profile.Deceleration * distance));
+                : (braking >= (long)speedCap * speedCap ? speedCap : (int)SpatialMath.Sqrt(braking));
         }
 
-        var misalignment = Turn(ref player, profile, topSpeed, dx, dy);
-        var alignment = Math.Max(MinAlignmentBasisPoints, TickTrigonometry.Cos(misalignment));
+        var acceleration = profile.Acceleration;
+
+        if (intent.Dive)
+        {
+            acceleration = (int)((long)profile.Acceleration * DiveAccelerationPercent / 100);
+        }
+
+        var misalignment = Turn(ref player, profile, topSpeed, dx, dy, snap: intent.Dive);
+        var alignment = intent.Dive
+            ? BasisPoints
+            : Math.Max(MinAlignmentBasisPoints, TickTrigonometry.Cos(misalignment));
         var desiredSpeed = (int)((long)speedCap * alignment / BasisPoints);
 
         player.Speed = desiredSpeed > player.Speed
-            ? Math.Min(desiredSpeed, player.Speed + profile.Acceleration)
+            ? Math.Min(desiredSpeed, player.Speed + acceleration)
             : Math.Max(desiredSpeed, player.Speed - profile.Deceleration);
 
         Advance(ref player, intent.Arrive, distance);
@@ -267,7 +303,7 @@ internal static class TickPlayerPhysics
     }
 
     /// <summary>Turns the player towards a vector as far as his agility allows and returns the angle still to go.</summary>
-    private static int Turn(ref TickPlayerState player, in TickPlayerProfile profile, int topSpeed, long dx, long dy)
+    private static int Turn(ref TickPlayerState player, in TickPlayerProfile profile, int topSpeed, long dx, long dy, bool snap = false)
     {
         if (dx == 0 && dy == 0)
         {
@@ -276,7 +312,7 @@ internal static class TickPlayerPhysics
 
         var wanted = TickTrigonometry.AngleOf(dx, dy);
 
-        if (player.Speed < SnapSpeed)
+        if (snap || player.Speed < SnapSpeed)
         {
             player.Heading = wanted;
 

@@ -1,3 +1,4 @@
+using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Randomness;
 using TouchlineManager.MatchEngine.Spatial;
@@ -47,7 +48,15 @@ internal readonly record struct TickCarrierDecision(
     SpatialPoint Target,
     int Utility,
     int PaceBasisPoints,
-    int EffectivePressure);
+    int EffectivePressure)
+{
+    /// <summary>
+    /// Gets the carrier's side's home advantage, in basis points (10,000 is none; 0, the default for a caller that builds
+    /// a decision by hand, is read as none too). It lifts the side's finishing: the crowd's edge, as the snapshot's own
+    /// number, applied where a home side is better rather than where it runs faster.
+    /// </summary>
+    public int AdvantageBasisPoints { get; init; }
+}
 
 /// <summary>
 /// Everything the ball carrier's brain reads about one moment of play. Index 0 of both sides is the goalkeeper.
@@ -92,6 +101,9 @@ internal readonly ref struct TickCarrierSituation
 
     /// <summary>Gets how many ticks the carrier has already spent shielding the ball, which wears the option out.</summary>
     public int ShieldTicks { get; init; }
+
+    /// <summary>Gets the carrier's side's home advantage, in basis points (10,000 is none; 0 is read as none too): it lifts his finishing.</summary>
+    public int AdvantageBasisPoints { get; init; }
 }
 
 /// <summary>
@@ -165,8 +177,12 @@ internal static class TickBallCarrierBrain
     /// <summary>The share of an xG heuristic that becomes the chance of scoring, in basis points.</summary>
     public const int MaximumGoalChance = 6_500;
 
-    /// <summary>How many times a shot's chance is valued when it is weighed against a pass.</summary>
-    public const int ShotValueMultiplier = 3;
+    /// <summary>What share of a shot's chance its utility is, in percent: the chance times this against a pass's value.</summary>
+    /// <remarks>
+    /// Calibrated in Milestone 9 from three hundred (= three times the chance) down: at three times the carrier shot
+    /// whenever a shooting chance existed at all. The brain now has to prefer a shot to a pass on the chance itself.
+    /// </remarks>
+    public const int ShotValuePercent = 205;
 
     /// <summary>How near a defender may stand to the line to goal before he blocks the shot, in pitch units (2.5 m).</summary>
     public const int ShotBlockReach = 250;
@@ -185,6 +201,37 @@ internal static class TickBallCarrierBrain
 
     /// <summary>The speed a shot arrives at the line with, in cm/s.</summary>
     public const int ShotArrivalCentimetresPerSecond = 1_800;
+
+    /// <summary>The share of open-play shots that hit the target at the reference distance and skill, in basis points.</summary>
+    public const int OnTargetBase = 4_300;
+
+    /// <summary>The distance the base on-target share is measured at, in pitch units (about 16 m).</summary>
+    public const int OnTargetReferenceDistance = 1_500;
+
+    /// <summary>The on-target share added for every pitch unit nearer the goal than the reference, in basis points.</summary>
+    /// <remarks>Two basis points a unit is a fifth of a percent a metre: a shot from the six-yard box is far likelier to test the keeper than one from the edge of the area.</remarks>
+    public const int OnTargetPerUnit = 2;
+
+    /// <summary>The <c>2 × Finishing + Technique</c> the base on-target share is measured at.</summary>
+    public const int OnTargetSkillReference = 39;
+
+    /// <summary>The on-target share added per point of <c>2 × Finishing + Technique</c> over the reference, in basis points.</summary>
+    public const int OnTargetPerSkill = 150;
+
+    /// <summary>The share of the on-target chance the pressure takes off at full pressure, in basis points (half).</summary>
+    public const int OnTargetPressureWeight = 5_000;
+
+    /// <summary>The least an on-target chance is clamped to, in basis points.</summary>
+    public const int MinimumOnTargetShare = 1_000;
+
+    /// <summary>The most an on-target chance is clamped to, in basis points.</summary>
+    public const int MaximumOnTargetShare = 8_000;
+
+    /// <summary>How far beyond a post the first off-target shot crosses, in pitch units (the post's own thickness).</summary>
+    public const int MissInset = 30;
+
+    /// <summary>How far beyond <see cref="MissInset"/> the wildest miss crosses, in pitch units (9 m).</summary>
+    public const int MissSpread = 900;
 
     /// <summary>The speed a pass is meant to arrive at its receiver with, in cm/s.</summary>
     public const int PassArrivalCentimetresPerSecond = 400;
@@ -519,12 +566,16 @@ internal static class TickBallCarrierBrain
 
         var target = Mirror(best.X, best.Y, situation.IsHome);
 
-        return new TickCarrierDecision(best.Action, best.Receiver, target, Math.Max(best.Utility, int.MinValue + 1), best.Pace, view.Effective);
+        return new TickCarrierDecision(best.Action, best.Receiver, target, Math.Max(best.Utility, int.MinValue + 1), best.Pace, view.Effective)
+        {
+            AdvantageBasisPoints = situation.AdvantageBasisPoints,
+        };
     }
 
     /// <summary>
-    /// Hits the ball as decided. A shot, pass, cross or clearance leaves the ball rotated from its aim by a draw within the
-    /// kick's error angle (one draw, always); a dribble or a shield is the caller's to steer and takes no draw.
+    /// Hits the ball as decided. A shot crosses the goal line at a drawn placement — on target or wide of the post it was
+    /// aimed at (two draws, always) — and a pass, cross or clearance leaves the ball rotated from its aim by a draw within
+    /// the kick's error angle (one draw, always); a dribble or a shield is the caller's to steer and takes no draw.
     /// </summary>
     /// <param name="decision">What the carrier decided.</param>
     /// <param name="skills">The carrier's skills.</param>
@@ -541,9 +592,13 @@ internal static class TickBallCarrierBrain
             return false;
         }
 
+        if (decision.Action is TickCarrierAction.Shoot)
+        {
+            return Shoot(decision, skills, ball, random);
+        }
+
         var error = decision.Action switch
         {
-            TickCarrierAction.Shoot => ErrorAngle(skills.Finishing, skills.Technique, ShotBaseError, decision.EffectivePressure),
             TickCarrierAction.Cross => ErrorAngle(skills.Crossing, skills.Technique, CrossBaseError, decision.EffectivePressure),
             TickCarrierAction.Clear => ErrorAngle(skills.Passing, skills.Technique, ClearBaseError, decision.EffectivePressure),
             _ => ErrorAngle(skills.Passing, skills.Technique, PassBaseError, decision.EffectivePressure),
@@ -562,10 +617,6 @@ internal static class TickBallCarrierBrain
 
         switch (decision.Action)
         {
-            case TickCarrierAction.Shoot:
-                ball.LaunchRolling(targetX, targetY, TickSpatialUnits.SpeedToFixedPerTick(ShotArrivalCentimetresPerSecond));
-                break;
-
             case TickCarrierAction.Cross:
                 ball.LaunchLofted(ClampX(targetX), ClampY(targetY), CrossApex);
                 break;
@@ -586,6 +637,80 @@ internal static class TickBallCarrierBrain
 
                 break;
         }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the share of open-play shots, in basis points, that the shooter puts on target: the placement the plan asks of
+    /// a Finishing 13 striker at 16 m (<see cref="OnTargetBase"/>), better from nearer, worse from farther, better from a
+    /// better striker, and half of it under the full pressure of a man in his face.
+    /// </summary>
+    /// <param name="distance">The distance from the shooter to the goal line, in pitch units.</param>
+    /// <param name="skills">The shooter's skills.</param>
+    /// <param name="effectivePressure">The pressure on him after his composure, in basis points.</param>
+    /// <param name="advantageBasisPoints">The shooter's side's home advantage, in basis points (10,000 is none).</param>
+    public static int OnTargetChance(int distance, in TickPlayerSkills skills, int effectivePressure, int advantageBasisPoints = EngineRulesV2.Certain)
+    {
+        var chance = OnTargetBase
+            + ((OnTargetReferenceDistance - distance) * OnTargetPerUnit)
+            + ((((2 * skills.Finishing) + skills.Technique) - OnTargetSkillReference) * OnTargetPerSkill);
+
+        chance = Math.Clamp(chance, MinimumOnTargetShare, MaximumOnTargetShare);
+        chance = chance * (BasisPoints - (Math.Max(0, effectivePressure) * OnTargetPressureWeight / BasisPoints)) / BasisPoints;
+
+        return Math.Clamp(
+            chance * Math.Clamp(advantageBasisPoints, 1, 2 * EngineRulesV2.Certain) / EngineRulesV2.Certain,
+            MinimumOnTargetShare,
+            BasisPoints);
+    }
+
+    /// <summary>
+    /// Hits a shot at the drawn placement: a placed strike crosses the goal line inside the frame (and can clip the
+    /// woodwork), a mishit crosses wide of the post it was aimed at. The ball is launched at the crossing point, so the
+    /// flight the goalkeeper reads is the shot the shooter hit.
+    /// </summary>
+    private static bool Shoot(in TickCarrierDecision decision, in TickPlayerSkills skills, TickBallPhysics ball, Pcg32 random)
+    {
+        var fromX = ball.UnitX;
+        var fromY = ball.UnitY;
+        var targetX = decision.Target.X;
+        var lineX = targetX > fromX ? SpatialPitch.PitchLength : 0;
+        var span = Math.Max(1, Math.Abs(lineX - fromX));
+        var onTargetRoll = random.NextBasisPoints();
+        var placementRoll = random.NextBasisPoints();
+        int crossingY;
+
+        if (onTargetRoll < OnTargetChance(
+            span,
+            skills,
+            decision.EffectivePressure,
+            decision.AdvantageBasisPoints <= 0 ? EngineRulesV2.Certain : decision.AdvantageBasisPoints))
+        {
+            // A placed shot: drawn towards the middle of the goal (the placed shots are the ones that test the keeper)
+            // but not so tightly that the corners go unvisited. The extreme draw can clip a post.
+            var deviation = (placementRoll * 2) - BasisPoints;
+            var shaped = (deviation + ((int)((long)deviation * Math.Abs(deviation) / BasisPoints))) / 2;
+            var half = (SpatialPitch.GoalYMax - SpatialPitch.GoalYMin) / 2;
+
+            crossingY = SpatialPitch.GoalYCenter + (int)((long)half * shaped / BasisPoints);
+        }
+        else
+        {
+            // The mishit crosses wide of the post he aimed at, by up to nine metres: drawn squarely so a shot just past
+            // the post is the common one.
+            var wide = MissInset + (int)((long)MissSpread * placementRoll * placementRoll / (BasisPoints * BasisPoints));
+
+            crossingY = decision.Target.Y > SpatialPitch.GoalYCenter
+                ? SpatialPitch.GoalYMax + wide
+                : SpatialPitch.GoalYMin - wide;
+        }
+
+        var overshoot = targetX > fromX ? ShotOvershoot : -ShotOvershoot;
+        var stretch = span + ShotOvershoot;
+        var aimY = fromY + (int)(((long)(crossingY - fromY) * stretch) / span);
+
+        ball.LaunchRolling(lineX + overshoot, ClampY(aimY), TickSpatialUnits.SpeedToFixedPerTick(ShotArrivalCentimetresPerSecond));
 
         return true;
     }
@@ -739,7 +864,9 @@ internal static class TickBallCarrierBrain
         var blockers = 0;
         var limit = (long)ShotBlockReach * ShotBlockReach;
 
-        for (var index = 1; index < situation.Defenders.Length; index++)
+        // The goalkeeper counts like any other defender on the line: he stands where the shots go, and a keeper in the way
+        // is what makes a shooting chance a poor one.
+        for (var index = 0; index < situation.Defenders.Length; index++)
         {
             var x = MirrorX(TickSpatialUnits.ToUnits(situation.Defenders[index].X), situation.IsHome);
             var y = MirrorY(TickSpatialUnits.ToUnits(situation.Defenders[index].Y), situation.IsHome);
@@ -762,7 +889,7 @@ internal static class TickBallCarrierBrain
             return;
         }
 
-        var utility = chance * ShotValueMultiplier * ShotEagerness(situation.Mentality) / 100;
+        var utility = chance * ShotValuePercent * ShotEagerness(situation.Mentality) / 10_000;
         var aimY = view.Y <= SpatialPitch.GoalYCenter
             ? SpatialPitch.GoalYCenter + ShotAimOffset
             : SpatialPitch.GoalYCenter - ShotAimOffset;

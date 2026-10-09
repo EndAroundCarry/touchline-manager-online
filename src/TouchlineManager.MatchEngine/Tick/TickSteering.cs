@@ -114,16 +114,19 @@ internal static class TickSteering
         {
             // He is content anywhere within the radius, so the run is only as long as what lies beyond it.
             var cap = (long)topSpeed * (paceBasisPoints > 0 ? paceBasisPoints : HoldSpeedBasisPoints(distance)) / BasisPoints;
-            var wanted = Math.Min(cap, SpatialMath.Sqrt(2L * profile.Deceleration * (distance - ContentRadius)));
+            var braking = 2L * profile.Deceleration * (distance - ContentRadius);
+            var wanted = braking >= cap * cap ? cap : SpatialMath.Sqrt(braking);
 
             desiredX = dx * wanted / distance;
             desiredY = dy * wanted / distance;
         }
 
-        // Separation: lean away from every teammate inside the circle.
+        // Separation: lean away from every teammate inside the circle. The squared distance is tested first,
+        // because a teammate outside the circle costs no square root and most teammates are outside it.
         long pushX = 0;
         long pushY = 0;
         var maxPush = (long)topSpeed * SeparationBasisPoints / BasisPoints;
+        var separationSquared = (long)SeparationRadius * SeparationRadius;
 
         for (var other = 0; other < team.Length; other++)
         {
@@ -134,12 +137,14 @@ internal static class TickSteering
 
             var awayX = (long)self.X - team[other].X;
             var awayY = (long)self.Y - team[other].Y;
-            var gap = SpatialMath.Sqrt((awayX * awayX) + (awayY * awayY));
+            var gapSquared = (awayX * awayX) + (awayY * awayY);
 
-            if (gap >= SeparationRadius)
+            if (gapSquared >= separationSquared)
             {
                 continue;
             }
+
+            var gap = SpatialMath.Sqrt(gapSquared);
 
             if (gap == 0)
             {
@@ -216,7 +221,15 @@ internal static class TickSteering
     /// <summary>Shortens a vector to a maximum length, keeping its direction.</summary>
     private static void LimitLength(ref long x, ref long y, long maximum)
     {
-        var length = SpatialMath.Sqrt((x * x) + (y * y));
+        var squared = (x * x) + (y * y);
+
+        // Most vectors are inside the limit, and the squared comparison decides that without a square root.
+        if (squared <= maximum * maximum)
+        {
+            return;
+        }
+
+        var length = SpatialMath.Sqrt(squared);
 
         if (length > maximum && length > 0)
         {

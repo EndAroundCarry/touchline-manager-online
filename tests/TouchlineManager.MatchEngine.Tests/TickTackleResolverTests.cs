@@ -16,13 +16,13 @@ public sealed class TickTackleResolverTests
     private static readonly EngineRulesV2 Rules = EngineRulesV2.Default;
 
     [Fact]
-    public void A_defender_may_challenge_only_inside_ninety_units_of_the_carrier_and_not_while_off_balance()
+    public void A_defender_may_challenge_only_inside_the_contact_reach_and_not_while_off_balance()
     {
         var carrier = TickPlayerState.Standing(5_000, 3_500, 0, 10_000);
 
-        TickTackleResolver.InContact(TickPlayerState.Standing(5_089, 3_500, 0, 10_000), carrier).Should().BeTrue();
-        TickTackleResolver.InContact(TickPlayerState.Standing(5_090, 3_500, 0, 10_000), carrier).Should().BeFalse("the plan says less than 90");
-        TickTackleResolver.InContact(TickPlayerState.Standing(5_065, 3_565, 0, 10_000), carrier).Should().BeFalse("diagonally that is 92 units");
+        TickTackleResolver.InContact(TickPlayerState.Standing(5_149, 3_500, 0, 10_000), carrier).Should().BeTrue();
+        TickTackleResolver.InContact(TickPlayerState.Standing(5_150, 3_500, 0, 10_000), carrier).Should().BeFalse("the reach is less than 150 units");
+        TickTackleResolver.InContact(TickPlayerState.Standing(5_110, 3_610, 0, 10_000), carrier).Should().BeFalse("diagonally that is 156 units");
 
         var stumbling = TickPlayerState.Standing(5_050, 3_500, 0, 10_000);
 

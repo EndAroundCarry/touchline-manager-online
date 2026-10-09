@@ -1,12 +1,19 @@
 using TouchlineManager.MatchEngine.Configuration;
+using TouchlineManager.MatchEngine.Highlights;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Randomness;
 using TouchlineManager.MatchEngine.Ratings;
 using TouchlineManager.MatchEngine.Serialization;
 using TouchlineManager.MatchEngine.Simulation;
 using TouchlineManager.MatchEngine.Spatial;
+using TouchlineManager.MatchEngine.Tick;
 
 namespace TouchlineManager.MatchEngine;
+
+/// <summary>A played match and the film its replay plays (`tick-engine-v1`, Milestone 9).</summary>
+/// <param name="Result">The result, including both hashes, exactly as <see cref="MatchSimulator.Simulate(MatchInputV1)"/> returns it.</param>
+/// <param name="Presentation">The film the presentation carries, as the engine that played the match describes it.</param>
+public sealed record MatchFilm(MatchResultV1 Result, MatchPresentationV1 Presentation);
 
 /// <summary>
 /// The match engine: a pure, deterministic simulation of one fixture from a frozen snapshot.
@@ -75,9 +82,138 @@ public static class MatchSimulator
             Passages = passages,
         };
 
-        var engine = MatchEngineRegistry.Resolve(input.EngineVersion);
-        engine.Run(state);
+        MatchEngineRegistry.Resolve(input.EngineVersion).Run(state);
 
+        return Complete(state, input);
+    }
+
+    /// <summary>Simulates a match and derives its film under the current rules set.</summary>
+    /// <param name="input">The frozen snapshot.</param>
+    /// <returns>The result and the film, from one run of the engine the snapshot names.</returns>
+    /// <exception cref="InvalidMatchInputException">When the snapshot cannot be simulated.</exception>
+    public static MatchFilm SimulateFilm(MatchInputV1 input) =>
+        SimulateFilm(input, EngineRulesV2.Default, liveMetrics: null);
+
+    /// <summary>
+    /// Simulates a match and derives the film its replay plays, in one pass (`tick-engine-v1`, Milestone 9).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The result the replay is verified against and the film it plays are produced by the same run, so the
+    /// curve, the score and the movements belong to one match rather than two derivations that could drift.
+    /// Which film is derived is the engine's business: a possession match records its passages and hands them
+    /// to <see cref="ReplayDirector"/>, a tick match records its continuous trace and hands it to
+    /// <see cref="TickReplaySynthesizer"/>.
+    /// </para>
+    /// <para>
+    /// The tick film is retried at widening tolerances until it fits the presentation's payload budget, and a
+    /// possession film does the same inside the director, so the same match always lands on the same rung
+    /// (ADR-0006: deterministic compression).
+    /// </para>
+    /// </remarks>
+    /// <param name="input">The frozen snapshot.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="liveMetrics">
+    /// The recorder the replay's minute-by-minute condition and ratings are captured into, or null when no
+    /// curve is being derived.
+    /// </param>
+    /// <param name="options">How long a passage may run, how much is worth showing, and the film's pacing.</param>
+    /// <returns>The result and the film, from one run of the engine the snapshot names.</returns>
+    /// <exception cref="InvalidMatchInputException">
+    /// When the snapshot cannot be simulated, or was frozen against a different engine or rules version.
+    /// </exception>
+    public static MatchFilm SimulateFilm(
+        MatchInputV1 input,
+        EngineRulesV2 rules,
+        PlayerLiveMetricsRecorder? liveMetrics = null,
+        HighlightOptionsV1? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(rules);
+
+        input.Validate();
+        rules.Validate();
+        VerifyVersionAgreement(input, rules);
+
+        var random = new Pcg32(input.Seed);
+
+        var home = BuildSide(input.Home, MatchSide.Home, rules);
+        var away = BuildSide(input.Away, MatchSide.Away, rules);
+
+        var passages = new MatchPassageRecorder();
+        var state = new MatchState(input, rules, random, home, away)
+        {
+            LiveMetrics = liveMetrics,
+            Passages = passages,
+        };
+
+        var engine = MatchEngineRegistry.Resolve(input.EngineVersion);
+        var settings = options ?? new HighlightOptionsV1();
+
+        if (engine is not TickMatchEngine)
+        {
+            engine.Run(state);
+
+            var possessionResult = Complete(state, input);
+
+            return new MatchFilm(
+                possessionResult,
+                ReplayDirector.Build(input, possessionResult, passages.Passages, settings, liveMetrics?.Metrics));
+        }
+
+        var recorder = new TickMatchRecorder();
+
+        TickMatchLoop.Run(state, recorder);
+
+        var result = Complete(state, input);
+
+        return new MatchFilm(result, TickFilm(input, result, state, recorder.Build(), settings, liveMetrics));
+    }
+
+    /// <summary>Derives the tick match's film, retried at widening rungs until the presentation fits its budget.</summary>
+    /// <param name="input">The frozen snapshot.</param>
+    /// <param name="result">The finished result.</param>
+    /// <param name="state">The match state, for the synthesizer's events, rules and colours.</param>
+    /// <param name="recording">The continuous trace the run produced.</param>
+    /// <param name="options">How long a passage may run, how much is worth showing, and the film's pacing.</param>
+    /// <param name="liveMetrics">The recorder the curve was captured into, or null.</param>
+    private static MatchPresentationV1 TickFilm(
+        MatchInputV1 input,
+        MatchResultV1 result,
+        MatchState state,
+        TickMatchRecording recording,
+        HighlightOptionsV1 options,
+        PlayerLiveMetricsRecorder? liveMetrics)
+    {
+        var presentation = TickReplayDirector.Build(
+            input,
+            result,
+            TickReplaySynthesizer.Synthesize(state, recording, options),
+            recording,
+            state,
+            options,
+            liveMetrics?.Metrics);
+
+        for (var rung = 1; rung < options.TickPlayerTolerances.Count && presentation.EstimatedPayloadBytes > options.PayloadBudgetBytes; rung++)
+        {
+            presentation = TickReplayDirector.Build(
+                input,
+                result,
+                TickReplaySynthesizer.Synthesize(state, recording, options, rung),
+                recording,
+                state,
+                options,
+                liveMetrics?.Metrics);
+        }
+
+        return presentation;
+    }
+
+    /// <summary>Captures the final states and assembles the output contract from a finished run.</summary>
+    /// <param name="state">The finished match state.</param>
+    /// <param name="input">The frozen snapshot the result is bound to.</param>
+    private static MatchResultV1 Complete(MatchState state, MatchInputV1 input)
+    {
         state.Home.CaptureEndOfMatchStates();
         state.Away.CaptureEndOfMatchStates();
 

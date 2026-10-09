@@ -83,6 +83,7 @@ the system is shaped the way it is.
 | [0063](0063-engine-v11-counter-attack.md) | Engine-v11 adds the counter-attack, a tactic that works against a side that has pushed forward | Accepted |
 | [0064](0064-replay-v6-shape-and-set-pieces.md) | Replay-v6 makes the players hold a shape, leaves the ball carrier room, and sets pieces for what they are | Accepted |
 | [0065](0065-stadium-picture-in-three-dimensions.md) | The stadium picture is a three-dimensional drawing with sectors, rows and seats in the club's two colours | Accepted |
+| [0066](0066-engine-v12-tick-simulation.md) | Engine-v12 plays the match as a discrete tick simulation, and the possession engine is kept for the matches it played | Accepted |
 
 ## Rules for changing an ADR
 

@@ -1,3 +1,4 @@
+using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
 using TouchlineManager.MatchEngine.Ratings;
 using TouchlineManager.MatchEngine.Simulation;
@@ -90,6 +91,12 @@ internal sealed class TickMatchLoop
     private int _lastPasserSide = -1;
     private int _lastPasserLocal = -1;
 
+    // The passer of the last completed pass into whoever owns the ball: the candidate the result's assist is
+    // credited to if the receiver scores. Cleared when an opponent takes the ball or play stops, so a goal can
+    // only be assisted by a pass of the possession it was scored in (Milestone 9).
+    private int _pendingAssistSide = -1;
+    private int _pendingAssistLocal = -1;
+
     private int _guardSide = -1;
     private int _guardLocal = -1;
     private int _guardEntity = -1;
@@ -105,6 +112,7 @@ internal sealed class TickMatchLoop
     private int _shotTicks;
     private int _shotShooterLocal = -1;
     private MatchSide? _shotSide;
+    private bool _shotInFlight;
     private bool _penaltyInFlight;
     private bool _offsideFreeKick;
 
@@ -444,13 +452,23 @@ internal sealed class TickMatchLoop
 
         var taker = _setupPlan.Taker;
         var penalty = restart.Kind == TickMatchPhase.PenaltyPending;
+        var isPass = action is TickRestartAction.Pass or TickRestartAction.Throw or TickRestartAction.LongBall;
 
-        BookKick(
-            taking,
-            taker,
-            isPass: action is TickRestartAction.Pass or TickRestartAction.Throw or TickRestartAction.LongBall);
+        BookKick(taking, taker, isPass);
         _decisionIn = 1;
         _shieldTicks = 0;
+
+        if (isPass)
+        {
+            // A restart's pass is an attempted pass like an open-play one, so a completed pass can never
+            // outrun the attempts counter (MAT-5).
+            var runtime = _state.SideOf(restart.Side);
+            var passerId = Participant(taking, taker);
+
+            runtime.PassesAttempted[passerId] = runtime.PassesAttempted.TryGetValue(passerId, out var attempted)
+                ? attempted + 1
+                : 1;
+        }
 
         var touch = action switch
         {
@@ -594,8 +612,14 @@ internal sealed class TickMatchLoop
             defendingPaces[_presser[defendingIndex]] = 10_000;
         }
 
+        // The challenge comes before the carrier's own act: a defender within reach gets his foot in as the pass is
+        // played, not after it. Whoever ends the duel with the ball — the carrier who rode it, or the defender with a
+        // fresh tackle — plays on next tick.
+        var contested = _controllerSide is MatchSide challenged
+            && !TryTackle(attackingIndex, defendingIndex, challenged, _ball.ControllerIndex);
+
         // The man on the ball decides, on his own interval, and acts.
-        if (carrier >= 0)
+        if (carrier >= 0 && !contested)
         {
             CarrierTurn(attackingIndex, defendingIndex, carrier, attackingOrders, attackingTargets, attackingPaces);
 
@@ -631,11 +655,9 @@ internal sealed class TickMatchLoop
             CarryControlled(controlling);
         }
 
-        TrySmother(defendingIndex, attackingIndex, carrier);
-
-        if (_controllerSide is MatchSide holder)
+        if (!contested)
         {
-            TryTackle(attackingIndex, defendingIndex, holder, _ball.ControllerIndex);
+            TrySmother(defendingIndex, attackingIndex, carrier);
         }
 
         // The ball: a save is settled at the plane, otherwise it steps and its boundary is answered.
@@ -765,6 +787,7 @@ internal sealed class TickMatchLoop
                 CarrierIndex = carrier,
                 Orders = orders,
                 ShieldTicks = _shieldTicks,
+                AdvantageBasisPoints = Advantage(attackingIndex),
             };
 
             _decision = TickBallCarrierBrain.Decide(situation);
@@ -965,7 +988,8 @@ internal sealed class TickMatchLoop
     }
 
     /// <summary>A challenge on the carrier by the nearest defender within contact range.</summary>
-    private void TryTackle(int attackingIndex, int defendingIndex, MatchSide holder, int carrier)
+    /// <returns>True when the carrier keeps the ball (nobody was in reach, or he rode the challenge); false when the duel took it off him or stopped play.</returns>
+    private bool TryTackle(int attackingIndex, int defendingIndex, MatchSide holder, int carrier)
     {
         var defenders = _players[defendingIndex];
         var attacker = _players[attackingIndex][carrier];
@@ -992,15 +1016,18 @@ internal sealed class TickMatchLoop
 
         if (best < 0)
         {
-            return;
+            return true;
         }
 
         var rules = _state.Rules;
+        var reach = (int)(SpatialMath.Sqrt(bestDistance) / TickSpatialUnits.FixedScale);
         var outcome = TickTackleResolver.Resolve(
             _skills[defendingIndex][best],
             _skills[attackingIndex][carrier],
             Instructions(defendingIndex).Tackling,
             rules,
+            reach,
+            Advantage(defendingIndex),
             _state.Random);
 
         TickTackleResolver.Apply(outcome, ref defenders[best], ref _players[attackingIndex][carrier], best, _ball);
@@ -1017,7 +1044,8 @@ internal sealed class TickMatchLoop
                 AdjustRating(defendingIndex, best, rules.LiveRatingTackleBonusBasisPoints);
                 AdjustRating(attackingIndex, carrier, -rules.LiveRatingTackleLostPenaltyBasisPoints);
                 _recorder?.AddTouch(_tick, Entity(defendingIndex, best), PassageAction.Tackle);
-                break;
+
+                return false;
 
             case TickTackleOutcome.PokedLoose:
                 _controllerSide = null;
@@ -1027,7 +1055,8 @@ internal sealed class TickMatchLoop
                 AdjustRating(defendingIndex, best, rules.LiveRatingTackleBonusBasisPoints);
                 AdjustRating(attackingIndex, carrier, -rules.LiveRatingTackleLostPenaltyBasisPoints);
                 _recorder?.AddTouch(_tick, Entity(defendingIndex, best), PassageAction.Tackle);
-                break;
+
+                return false;
 
             case TickTackleOutcome.Foul:
                 {
@@ -1044,11 +1073,12 @@ internal sealed class TickMatchLoop
                     ClearReceiver();
                     _machine.Foul(_ball.GroundPoint, holder);
                     StampEvents();
-                    break;
+
+                    return false;
                 }
 
             default:
-                break;
+                return true;
         }
     }
 
@@ -1119,11 +1149,36 @@ internal sealed class TickMatchLoop
         var keeperId = Participant(keeperIndex, 0);
         var rules = _state.Rules;
 
-        var assessment = TickShotStopper.Assess(_players[keeperIndex][0], _skills[keeperIndex][0], _shotForecast);
+        var assessment = TickShotStopper.Assess(
+            _players[keeperIndex][0], _skills[keeperIndex][0], _shotForecast, Advantage(keeperIndex));
         var outcome = TickShotStopper.Resolve(assessment, _shotForecast.PlaneZ, _state.Random, out var deflectRoll);
 
         TickShotStopper.Apply(outcome, ref _players[keeperIndex][0], 0, keeperIndex == Home, _ball, deflectRoll);
         SyncBall();
+
+        switch (outcome)
+        {
+            case TickSaveOutcome.Beaten:
+
+                // The shot is still travelling: the shooter's identity stays on it so that a man in the way is recorded
+                // as the blocked shot it was, with the right name against it.
+                _shotForecast = TickShotForecast.None;
+                break;
+
+            case TickSaveOutcome.Caught:
+                ClearShot();
+                break;
+
+            case TickSaveOutcome.Parried:
+                GuardKeeper(keeperIndex);
+                ClearShot();
+                break;
+
+            default:
+                GuardKeeper(keeperIndex);
+                ClearShot();
+                break;
+        }
 
         if (outcome != TickSaveOutcome.Beaten)
         {
@@ -1154,10 +1209,6 @@ internal sealed class TickMatchLoop
         {
             _controllerSide = null;
         }
-
-        _shotForecast = TickShotForecast.None;
-        _shotSide = null;
-        _shotShooterLocal = -1;
     }
 
     /// <summary>Starts tracking a shot in flight, so the goalkeeper can dive at it and the events can name the shooter.</summary>
@@ -1169,6 +1220,7 @@ internal sealed class TickMatchLoop
         _shotTicks = 0;
         _shotSide = side;
         _shotShooterLocal = shooterLocal;
+        _shotInFlight = true;
         _penaltyInFlight = penalty;
     }
 
@@ -1251,11 +1303,32 @@ internal sealed class TickMatchLoop
             scorerId);
         _state.AddGoalStoppage();
 
-        if (scorerLocal >= 0)
+        if (scorerId is Guid scorer)
         {
+            // The result's player line counts the goals the scorer put away, so the count is kept here, where
+            // the goal is settled rather than read back from the event log.
+            var runtime = _state.SideOf(scoringSide);
+
+            runtime.Goals[scorer] = runtime.Goals.TryGetValue(scorer, out var scored) ? scored + 1 : 1;
+
+            // A goal is credited the pass that set it up, when the scorer received one in this possession: a
+            // penalty is the taker's own, and a man cannot assist his own goal.
+            if (!penalty
+                && _pendingAssistSide == scoringIndex
+                && _pendingAssistLocal >= 0
+                && _pendingAssistLocal != scorerLocal)
+            {
+                var assistId = Participant(scoringIndex, _pendingAssistLocal);
+
+                runtime.Assists[assistId] = runtime.Assists.TryGetValue(assistId, out var assists) ? assists + 1 : 1;
+                runtime.AdjustLiveRating(assistId, _state.Rules.LiveRatingAssistBonusBasisPoints);
+            }
+
             AdjustRating(scoringIndex, scorerLocal, _state.Rules.LiveRatingGoalBonusBasisPoints);
         }
 
+        _pendingAssistSide = -1;
+        _pendingAssistLocal = -1;
         AdjustRating(1 - scoringIndex, 0, -_state.Rules.LiveRatingGoalConcededPenaltyBasisPoints);
 
         _machine.Goal(scoringSide);
@@ -1310,7 +1383,7 @@ internal sealed class TickMatchLoop
         }
 
         var previousTouch = _lastTouchSide;
-        var wasShot = _shotForecast != TickShotForecast.None;
+        var wasShot = _shotInFlight;
         var shotSide = _shotSide;
         var shotShooter = _shotShooterLocal;
 
@@ -1341,7 +1414,9 @@ internal sealed class TickMatchLoop
             _recorder?.AddTouch(_tick, Entity(bestSide, bestLocal), PassageAction.Receive);
         }
 
-        if (_lastPasserSide == bestSide && _lastPasserLocal >= 0 && _lastKickWasPass)
+        var completedPass = _lastPasserSide == bestSide && _lastPasserLocal >= 0 && _lastKickWasPass;
+
+        if (completedPass)
         {
             var passerId = Participant(_lastPasserSide, _lastPasserLocal);
 
@@ -1349,15 +1424,25 @@ internal sealed class TickMatchLoop
                 _state.SideOf(SideOfIndex(_lastPasserSide)).PassesCompleted.TryGetValue(passerId, out var completed)
                     ? completed + 1
                     : 1;
-
-            _lastPasserSide = -1;
-            _lastPasserLocal = -1;
         }
 
-        _shotForecast = TickShotForecast.None;
-        _shotSide = null;
-        _shotShooterLocal = -1;
-        _penaltyInFlight = false;
+        // Whoever the ball reached, the last completed pass into him is the assist candidate. A ball won off
+        // an opponent clears it: an assist belongs to the possession the goal was scored in.
+        _pendingAssistSide = completedPass ? bestSide : -1;
+        _pendingAssistLocal = completedPass ? _lastPasserLocal : -1;
+        _lastPasserSide = -1;
+        _lastPasserLocal = -1;
+
+        ClearShot();
+    }
+
+    /// <summary>Keeps the goalkeeper who has just pushed the ball away from gathering it straight back.</summary>
+    /// <param name="keeperIndex">The keeper's side index.</param>
+    private void GuardKeeper(int keeperIndex)
+    {
+        _guardSide = keeperIndex;
+        _guardLocal = 0;
+        _guardEntity = Entity(keeperIndex, 0);
     }
 
     /// <summary>Clears the self-pass guard once the ball has left the kicker or come to rest.</summary>
@@ -1477,6 +1562,19 @@ internal sealed class TickMatchLoop
             }
         }
 
+        if (_pendingAssistSide == side && _pendingAssistLocal >= 0)
+        {
+            if (_pendingAssistLocal == index)
+            {
+                _pendingAssistSide = -1;
+                _pendingAssistLocal = -1;
+            }
+            else if (_pendingAssistLocal > index)
+            {
+                _pendingAssistLocal--;
+            }
+        }
+
         if (_sideLastKickerLocal[side] == index)
         {
             _sideLastKickerLocal[side] = -1;
@@ -1513,6 +1611,7 @@ internal sealed class TickMatchLoop
         _shotForecast = TickShotForecast.None;
         _shotSide = null;
         _shotShooterLocal = -1;
+        _shotInFlight = false;
         _penaltyInFlight = false;
     }
 
@@ -1522,6 +1621,8 @@ internal sealed class TickMatchLoop
         _controllerSide = null;
         _decision = default;
         _shieldTicks = 0;
+        _pendingAssistSide = -1;
+        _pendingAssistLocal = -1;
         ClearShot();
         ClearGuard();
         ClearReceiver();
@@ -1605,6 +1706,14 @@ internal sealed class TickMatchLoop
 
     /// <summary>Gets a side's instructions.</summary>
     private MatchInstructionsV1 Instructions(int side) => _state.SideOf(SideOfIndex(side)).Instructions;
+
+    /// <summary>
+    /// Gets a side's home advantage from the snapshot, in basis points (10,000 for the away side and for a crowd that
+    /// gives nothing). The crowd's lift goes into the contests a home side is said to win more of — its finishing, its
+    /// tackling and its goalkeeping — and not into its legs: a faster side is not a better one (Milestone 9).
+    /// </summary>
+    /// <param name="side">The side's index.</param>
+    private int Advantage(int side) => side == Home ? _state.Input.HomeAdvantageBasisPoints : EngineRulesV2.Certain;
 
     /// <summary>Adjusts one player's live match rating.</summary>
     private void AdjustRating(int side, int local, int delta)

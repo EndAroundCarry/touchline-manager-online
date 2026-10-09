@@ -15,7 +15,10 @@ using TouchlineManager.SimulationBenchmarks;
 // rather than a test: the numbers that tune the engine want a hundred thousand matches and a printed table,
 // and a test suite that took twenty minutes would stop being run.
 //
-// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tactics|bench|offball|all] [count] [seed] [--dump file]
+// Usage: dotnet run --project tools/simulation-benchmarks -- [single|distributions|replay|calibration|tick|tactics|bench|offball|all] [count] [seed] [--dump file]
+//
+// `tick` is the tick engine's own calibration suite (`tick-engine-v1`, Milestone 9): the plan's bands over
+// each fixture's result, and the film's shape over a small sample.
 //
 // `offball` is not part of `all`: it reads who receives the ball and what Positioning does at the finish (engine-v10).
 //
@@ -61,6 +64,12 @@ if (Environment.GetEnvironmentVariable("RULES") is { Length: > 0 } overrides)
 
 rules.Validate();
 
+// The tick engine's calibration fixture: the board's own four-four-two (`LaboratoryFixtures.OnTheBoard`). Both engines read
+// a slot's X as depth towards the goal the side attacks, and the laboratory's own shape is written the legacy way round
+// (X across), so a tick fixture built from it would stand the sides sideways — which is what the first calibration did.
+MatchInputV1 TickFixture(ulong matchSeed) =>
+    LaboratoryFixtures.OnTheBoard(LaboratoryFixtures.EvenlyMatched(matchSeed, rules));
+
 Console.WriteLine($"Engine {EngineVersions.EngineLabel}, rules {EngineVersions.RuleSetLabel}");
 Console.WriteLine($"Rules hash  {EngineConfiguration.HashOf(rules)}");
 Console.WriteLine();
@@ -97,6 +106,11 @@ if (mode is "bench" or "all")
     Bench(Math.Min(count, 5_000), seed);
 }
 
+if (mode is "tick")
+{
+    Tick(count, seed);
+}
+
 if (mode is "offball")
 {
     OffBallProbe.Run(count, seed, rules);
@@ -106,10 +120,10 @@ return 0;
 
 void SingleMatch(ulong matchSeed)
 {
-    var input = LaboratoryFixtures.EvenlyMatched(matchSeed, rules);
+    var input = TickFixture(matchSeed);
     var liveMetrics = new PlayerLiveMetricsRecorder();
-    var passages = new MatchPassageRecorder();
-    var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
+    var film = MatchSimulator.SimulateFilm(input, rules, liveMetrics);
+    var result = film.Result;
 
     Console.WriteLine("== One match ==");
     Console.WriteLine($"  {input.Home.ClubName} {result.HomeGoals} - {result.AwayGoals} {input.Away.ClubName}");
@@ -125,7 +139,7 @@ void SingleMatch(ulong matchSeed)
     Console.WriteLine($"  output hash      {result.OutputHash}");
 
     var commentary = CommentaryTokenBuilder.Build(input, result);
-    var presentation = ReplayDirector.Build(input, result, passages.Passages, liveMetrics: liveMetrics.Metrics);
+    var presentation = film.Presentation;
 
     Console.WriteLine($"  commentary lines {commentary.Count}");
     Console.WriteLine($"  live metrics     {liveMetrics.Metrics.Count}");
@@ -133,6 +147,7 @@ void SingleMatch(ulong matchSeed)
         + $", pace {presentation.PaceMilli / 1_000.0:F2}x"
         + $", film {presentation.TotalPlaybackMilliseconds / 60_000.0:F1} min"
         + $", reel {presentation.Reel.Sum(clip => clip.DurationMilliseconds) / 60_000.0:F1} min"
+        + $", keyframes {presentation.Passages.Sum(passage => passage.Tracks.Sum(track => track.Keyframes.Count)):N0}"
         + $", ~{presentation.EstimatedPayloadBytes / 1024.0:F1} KB");
     Console.WriteLine();
 }
@@ -260,8 +275,9 @@ void Replay(int matches, ulong baseSeed, string? dump)
 
     for (var index = 0; index < matches; index++)
     {
-        // The film is judged on the board's own formation, not the laboratory's calibration shape.
-        var input = LaboratoryFixtures.OnTheBoard(LaboratoryFixtures.EvenlyMatched(baseSeed + (ulong)index, rules));
+        // The film is judged on the board's own formation, not the laboratory's calibration shape, and on the
+        // possession engine whose film the diagnostics measure (`engine-v11`; the tick film has the `tick` mode).
+        var input = LaboratoryFixtures.OnTheBoard(LaboratoryFixtures.LegacyEvenlyMatched(baseSeed + (ulong)index, rules));
         var liveMetrics = new PlayerLiveMetricsRecorder();
         var passages = new MatchPassageRecorder();
         var result = MatchSimulator.Simulate(input, rules, liveMetrics, passages);
@@ -528,6 +544,102 @@ void Calibration(int fixtures, ulong baseSeed)
     // Three attribute points is a clear tier of difference — a good side against a poor one — and it is
     // where the plan's "about 15%" underdog sits on this engine's curve.
     Verdict("underdog win % (gap +3)", underdogAtThree ?? 0, 10.0, 20.0, "about 15 (Stage 7)");
+    Console.WriteLine();
+}
+
+void Tick(int matches, ulong baseSeed)
+{
+    Console.WriteLine($"== tick engine calibration, {matches:N0} fixtures (`tick-engine-v1`, Milestone 9) ==");
+
+    long homeGoals = 0;
+    long awayGoals = 0;
+    long homeWins = 0;
+    long draws = 0;
+    long awayWins = 0;
+    long shots = 0;
+    long onTarget = 0;
+    long yellows = 0;
+    long passesAttempted = 0;
+    long passesCompleted = 0;
+    var elapsed = Stopwatch.StartNew();
+
+    for (var index = 0; index < matches; index++)
+    {
+        var result = MatchSimulator.Simulate(TickFixture(baseSeed + (ulong)index), rules);
+
+        homeGoals += result.HomeGoals;
+        awayGoals += result.AwayGoals;
+        shots += result.Home.Shots + result.Away.Shots;
+        onTarget += result.Home.ShotsOnTarget + result.Away.ShotsOnTarget;
+        yellows += result.Home.YellowCards + result.Away.YellowCards;
+
+        homeWins += result.HomeGoals > result.AwayGoals ? 1 : 0;
+        draws += result.HomeGoals == result.AwayGoals ? 1 : 0;
+        awayWins += result.HomeGoals < result.AwayGoals ? 1 : 0;
+
+        foreach (var line in result.PlayerLines)
+        {
+            passesAttempted += line.PassesAttempted;
+            passesCompleted += line.PassesCompleted;
+        }
+    }
+
+    Print("goals per match", (double)(homeGoals + awayGoals) / matches, "2.60 – 2.90");
+    Print("shots per match", (double)shots / matches, "22 – 28");
+    Print("shots on target %", 100.0 * onTarget / Math.Max(1, shots), "32 – 38");
+    Print("pass completion %", 100.0 * passesCompleted / Math.Max(1, passesAttempted), "75 – 85");
+    Print("yellow cards per match", (double)yellows / matches, "3.0 – 4.5");
+    Print("home win %", 100.0 * homeWins / matches, "42 – 48");
+    Print("draw %", 100.0 * draws / matches, "22 – 26");
+    Print("away win %", 100.0 * awayWins / matches, "28 – 34");
+    Console.WriteLine($"  {"simulate ms per match",-28} {elapsed.Elapsed.TotalMilliseconds / matches,10:F1}   budget 100 ms (`bench` measures the same path)");
+    Console.WriteLine();
+
+    TickFilm(Math.Min(matches, 10), baseSeed);
+}
+
+void TickFilm(int matches, ulong baseSeed)
+{
+    Console.WriteLine($"== tick film, {matches:N0} matches (passages, pace, tracks, payload) ==");
+
+    var options = new HighlightOptionsV1();
+    var passages = new double[matches];
+    var minutes = new double[matches];
+    var keyframes = new double[matches];
+    var payload = new double[matches];
+    var milliseconds = new double[matches];
+    var overBudget = 0;
+
+    for (var index = 0; index < matches; index++)
+    {
+        var input = TickFixture(baseSeed + (ulong)index);
+        var started = Stopwatch.GetTimestamp();
+        var film = MatchSimulator.SimulateFilm(input, rules);
+        var presentation = film.Presentation;
+
+        milliseconds[index] = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        passages[index] = presentation.Passages.Count;
+        minutes[index] = presentation.TotalPlaybackMilliseconds / 60_000.0;
+        keyframes[index] = presentation.Passages.Sum(passage => passage.Tracks.Sum(track => track.Keyframes.Count));
+        payload[index] = presentation.EstimatedPayloadBytes / 1024.0;
+
+        if (presentation.EstimatedPayloadBytes > options.PayloadBudgetBytes)
+        {
+            overBudget++;
+        }
+    }
+
+    Array.Sort(passages);
+    Array.Sort(minutes);
+    Array.Sort(keyframes);
+    Array.Sort(payload);
+    Array.Sort(milliseconds);
+
+    Console.WriteLine($"  {"passages p50/max",-28} {Percentile(passages, 0.50),7}   {passages[^1],7}   cap {options.MaxPassages}");
+    Console.WriteLine($"  {"film minutes p05/p50/p95",-28} {Percentile(minutes, 0.05),7:F1}   {Percentile(minutes, 0.50),7:F1}   {Percentile(minutes, 0.95),7:F1}   window 9.5 – 11.0");
+    Console.WriteLine($"  {"keyframes p50/p95/max",-28} {Percentile(keyframes, 0.50),7:N0}   {Percentile(keyframes, 0.95),7:N0}   {keyframes[^1],7:N0}");
+    Console.WriteLine($"  {"payload KB p50/p95/max",-28} {Percentile(payload, 0.50),7:F0}   {Percentile(payload, 0.95),7:F0}   {payload[^1],7:F0}   budget {options.PayloadBudgetBytes / 1024}   over {overBudget}/{matches}");
+    Console.WriteLine($"  {"simulate + film ms p50",-28} {Percentile(milliseconds, 0.50),7:F1}");
     Console.WriteLine();
 }
 

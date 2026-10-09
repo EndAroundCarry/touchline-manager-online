@@ -72,20 +72,26 @@ internal sealed class TickReplaySynthesizer
     private readonly MatchState _state;
     private readonly TickMatchRecording _recording;
     private readonly HighlightOptionsV1 _options;
+    private readonly int _rung;
     private readonly int _filmMsPerTick;
     private readonly Dictionary<Guid, string> _names;
     private readonly Dictionary<int, int> _dismissals;
+    private readonly Dictionary<(int Tick, int Entity), PassageAction> _touches;
+    private readonly Dictionary<int, PassageAction> _ballTouches;
     private readonly string _homeColour;
     private readonly string _awayColour;
 
-    private TickReplaySynthesizer(MatchState state, TickMatchRecording recording, HighlightOptionsV1 options)
+    private TickReplaySynthesizer(MatchState state, TickMatchRecording recording, HighlightOptionsV1 options, int rung)
     {
         _state = state;
         _recording = recording;
         _options = options;
+        _rung = Math.Clamp(rung, 0, Math.Max(0, options.TickPlayerTolerances.Count - 1));
         _filmMsPerTick = Math.Max(1, TickSpatialUnits.TickDeltaMs / Math.Max(1, options.FilmMatchSecondsPerFilmSecond));
         _names = FilmLabels.Names(state.Input);
         _dismissals = Dismissed(state, recording);
+        _touches = Touches(recording);
+        _ballTouches = BallTouches(recording);
         (_homeColour, _awayColour) = FilmLabels.Colours(state.Input);
     }
 
@@ -93,12 +99,21 @@ internal sealed class TickReplaySynthesizer
     /// <param name="state">The match state the recording was made from, for its events, rules and kit colours.</param>
     /// <param name="recording">The continuous trace the loop recorded.</param>
     /// <param name="options">How long a passage may run and how the film is paced.</param>
-    public static TickReplayFilm Synthesize(MatchState state, TickMatchRecording recording, HighlightOptionsV1? options = null)
+    /// <param name="rung">
+    /// Which rung of the payload ladder the tracks are compressed at. The assembly retries at widening
+    /// tolerances until the film fits the presentation's payload budget, deterministically
+    /// (`tick-engine-v1`, Milestone 8).
+    /// </param>
+    public static TickReplayFilm Synthesize(
+        MatchState state,
+        TickMatchRecording recording,
+        HighlightOptionsV1? options = null,
+        int rung = 0)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(recording);
 
-        return new TickReplaySynthesizer(state, recording, options ?? new HighlightOptionsV1()).Slice();
+        return new TickReplaySynthesizer(state, recording, options ?? new HighlightOptionsV1(), rung).Slice();
     }
 
     private TickReplayFilm Slice()
@@ -107,6 +122,8 @@ internal sealed class TickReplaySynthesizer
         var (skips, cuts) = Jumps(halfTime);
         var slices = Chunk(skips);
         var events = OwnedEvents(slices);
+        var tolerance = _options.TickPlayerTolerances[_rung];
+        var interval = _options.TickPlayerSampleIntervals[Math.Min(_rung, _options.TickPlayerSampleIntervals.Count - 1)];
         var passages = new List<TickFilmPassage>(slices.Count);
 
         for (var index = 0; index < slices.Count; index++)
@@ -114,7 +131,7 @@ internal sealed class TickReplaySynthesizer
             passages.Add(new TickFilmPassage(
                 slices[index].FirstTick,
                 slices[index].LastTick,
-                Describe(slices[index], events[index], cuts, halfTime)));
+                Describe(slices[index], events[index], cuts, halfTime, interval, tolerance)));
         }
 
         return new TickReplayFilm(passages, _options.FilmMatchSecondsPerFilmSecond * 1_000);
@@ -358,7 +375,15 @@ internal sealed class TickReplaySynthesizer
     /// <param name="events">The events the window owns.</param>
     /// <param name="cuts">The jump each tick that resumes the film after one carries.</param>
     /// <param name="halfTime">The tick the interval began at, or -1.</param>
-    private PassageV1 Describe(TickFilmSlice slice, List<EngineEventV1> events, Dictionary<int, string> cuts, int halfTime)
+    /// <param name="intervalMs">How often the players are sampled, in milliseconds of film.</param>
+    /// <param name="tolerance">How far a dropped player keyframe may sit from the line that replaces it.</param>
+    private PassageV1 Describe(
+        TickFilmSlice slice,
+        List<EngineEventV1> events,
+        Dictionary<int, string> cuts,
+        int halfTime,
+        int intervalMs,
+        int tolerance)
     {
         var first = slice.FirstTick;
         var last = slice.LastTick;
@@ -399,7 +424,7 @@ internal sealed class TickReplaySynthesizer
             AwayColour = _awayColour,
             EventSequences = [.. events.Select(matchEvent => matchEvent.Sequence)],
             Entities = Entities(first),
-            Tracks = [],
+            Tracks = Tracks(first, last, intervalMs, tolerance),
         };
     }
 
@@ -464,6 +489,133 @@ internal sealed class TickReplaySynthesizer
         entities.Sort((left, right) => string.CompareOrdinal(left.EntityId, right.EntityId));
 
         return entities;
+    }
+
+    /// <summary>Builds the passage's tracks: one per drawn entity, sampled, action-tagged and compressed.</summary>
+    /// <remarks>
+    /// The recording is ten samples a second, which is finer than any display needs: the tracks are sampled at
+    /// the payload ladder's interval, kept wherever a player touched the ball, and compressed to the points
+    /// where the movement actually changes. That is the delta compression the plan asks for (`tick-engine-v1`,
+    /// Milestone 8, ADR-0006), and a semantic touch is never dropped because the compressor keeps every
+    /// keyframe that carries an action.
+    /// </remarks>
+    /// <param name="first">The passage's first tick.</param>
+    /// <param name="last">The passage's last tick.</param>
+    /// <param name="intervalMs">How often a player is sampled, in film milliseconds.</param>
+    /// <param name="tolerance">How far a dropped player keyframe may sit from the line that replaces it.</param>
+    private List<HighlightTrackV1> Tracks(int first, int last, int intervalMs, int tolerance)
+    {
+        var tracks = new List<HighlightTrackV1>(TickMatchRecording.EntityCount);
+
+        foreach (var entity in _recording.Entities)
+        {
+            if (entity.IsBall)
+            {
+                continue;
+            }
+
+            // The tracks describe the entities the passage draws, so a sent-off player the entities leave out
+            // is left out of the tracks too.
+            if (_dismissals.TryGetValue(entity.Index, out var dismissed) && first >= dismissed)
+            {
+                continue;
+            }
+
+            tracks.Add(new HighlightTrackV1(
+                FilmRoster.EntityId(entity.Index),
+                TrackOf(entity.Index, first, last, intervalMs, tolerance)));
+        }
+
+        tracks.Add(new HighlightTrackV1(
+            "ball",
+            TrackOf(TickMatchRecording.BallEntityIndex, first, last, intervalMs, _options.BallTolerance)));
+        tracks.Sort((left, right) => string.CompareOrdinal(left.EntityId, right.EntityId));
+
+        return tracks;
+    }
+
+    /// <summary>Builds one entity's compressed track through a passage.</summary>
+    /// <param name="entity">The entity's index in the recording.</param>
+    /// <param name="first">The passage's first tick.</param>
+    /// <param name="last">The passage's last tick.</param>
+    /// <param name="intervalMs">How often the entity is sampled on the ground, in film milliseconds.</param>
+    /// <param name="tolerance">How far a dropped keyframe may sit from the line that replaces it.</param>
+    private List<HighlightKeyframeV1> TrackOf(int entity, int first, int last, int intervalMs, int tolerance)
+    {
+        var ball = entity == TickMatchRecording.BallEntityIndex;
+        var step = Math.Max(1, intervalMs / _filmMsPerTick);
+        var airStep = Math.Max(1, _options.BallAirSampleMilliseconds / _filmMsPerTick);
+        var samples = new List<HighlightKeyframeV1>(((last - first) / step) + 2);
+
+        for (var tick = first; tick <= last; tick++)
+        {
+            var offset = tick - first;
+            var wanted = offset == 0
+                || tick == last
+                || offset % step == 0
+                || (ball && offset % airStep == 0 && _recording.ZAt(tick, entity) > 0)
+                || _touches.ContainsKey((tick, entity));
+
+            if (!wanted)
+            {
+                continue;
+            }
+
+            var point = FilmSpace.FromEngine(_recording.XAt(tick, entity), _recording.YAt(tick, entity));
+
+            samples.Add(new HighlightKeyframeV1(
+                offset * _filmMsPerTick,
+                FilmSpace.NormalizeX(point.X),
+                FilmSpace.NormalizeY(point.Y),
+                ball ? _recording.ZAt(tick, entity) : 0,
+                Action: ActionOf(tick, entity)));
+        }
+
+        return KeyframeCompressor.Compress(samples, tolerance);
+    }
+
+    /// <summary>
+    /// Gets the action a keyframe carries: the touch the entity made at that tick, or for the ball the touch
+    /// that struck it, so a strike is visible on the ball's own track as well as the striker's.
+    /// </summary>
+    /// <param name="tick">The tick.</param>
+    /// <param name="entity">The entity.</param>
+    private string? ActionOf(int tick, int entity)
+    {
+        if (entity != TickMatchRecording.BallEntityIndex && _touches.TryGetValue((tick, entity), out var own))
+        {
+            return own.Code();
+        }
+
+        return _ballTouches.TryGetValue(tick, out var striking) ? striking.Code() : null;
+    }
+
+    /// <summary>Indexes every touch by tick and entity, so a keyframe can carry the action it belongs to.</summary>
+    /// <param name="recording">The recording.</param>
+    private static Dictionary<(int Tick, int Entity), PassageAction> Touches(TickMatchRecording recording)
+    {
+        var touches = new Dictionary<(int Tick, int Entity), PassageAction>(recording.Touches.Count);
+
+        foreach (var touch in recording.Touches)
+        {
+            touches.TryAdd((touch.Tick, touch.EntityIndex), touch.Action);
+        }
+
+        return touches;
+    }
+
+    /// <summary>Indexes the first touch at each tick, which is the action the ball's own keyframe carries.</summary>
+    /// <param name="recording">The recording.</param>
+    private static Dictionary<int, PassageAction> BallTouches(TickMatchRecording recording)
+    {
+        var touches = new Dictionary<int, PassageAction>(recording.Touches.Count);
+
+        foreach (var touch in recording.Touches)
+        {
+            touches.TryAdd(touch.Tick, touch.Action);
+        }
+
+        return touches;
     }
 
     /// <summary>Gets the abbreviated position a family is labelled with, as the film's entities are.</summary>

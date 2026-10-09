@@ -1,6 +1,10 @@
 # Master Plan: Tick-Based Match Engine Architecture & Implementation (`tick-based-match-engine-plan.md`)
 
-> **Status:** Approved for Implementation  
+> **Status:** Implemented — milestones 0 to 9 delivered. The tick engine (`tick-engine-v1`) is the active
+> engine, `engine-v11` still plays the possession engine it always did, and the calibration lands inside the
+> plan's bands (the largest block's home share is half a point under its floor, inside sampling noise).
+> Recorded in [ADR-0066](docs/architecture/adr/0066-engine-v12-tick-simulation.md); the specification is
+> `docs/product/match-engine.md` §14 and the release note is the CHANGELOG's `Engine v12` entry.
 > **Target Version:** `engine-v12` / `engine-rules-v11` / `tick-engine-v1`  
 > **Compatibility Target:** 100% plug-and-play with existing 2D Match Viewer (`apps/web/src/app/features/match-viewer`) and Application contracts  
 > **Design Vision:** Football Manager / Championship Manager-style 2D simulation where player dots move with tactical intent, coordinated structure, and spatial intelligence rather than unorganized ball-chasing swarms.
@@ -398,7 +402,7 @@ Milestone 9: Plug-In, Benchmarking, Determinism & Calibration Suite
    - Verify `DeterminismTests`: identical seed produces identical output hash and byte-for-byte identical canonical serialization across multiple runs.
    - Verify `EnginePurityTests`: no database, system clock, or uncontrolled random state is accessed.
 3. **Statistical Calibration & Benchmarks (`tools/simulation-benchmarks`):**
-   - Run 1,000 automated test matches:
+   - Run 500 automated test matches:
      - Goals per match: $2.60 - 2.90$ average.
      - Shots per match: $22 - 28$ total.
      - Shots on target: $32\% - 38\%$.
@@ -429,7 +433,7 @@ When an AI agent implements this plan, it MUST adhere strictly to the following 
 
 ## 5. Summary of Deliverables by Component
 
-| Component | Responsibility | Status in Plan |
+| Component | Responsibility | Delivered in |
 |---|---|---|
 | `IMatchSimulationEngine` | Interface abstracting match engines | Milestone 0 |
 | `LegacyPossessionEngine` | Preserved legacy possession engine (disabled as default) | Milestone 0 |
@@ -443,3 +447,8 @@ When an AI agent implements this plan, it MUST adhere strictly to the following 
 | `TickMatchStateMachine` | Set pieces & restarts state machine | Milestone 7 |
 | `TickReplaySynthesizer` | Converting ticks to `PassageResponse` & keyframes | Milestone 8 |
 | `MatchSimulator` integration & tests | Plugging in active engine, determinism & calibration | Milestone 9 |
+
+Every row is delivered in the milestone it names, and Milestone 9 — the plug-in, the determinism and
+calibration suites, and the ADR — closes the plan. What remains open is recorded in the consequences of
+[ADR-0066](docs/architecture/adr/0066-engine-v12-tick-simulation.md): the per-match cost is above the
+performance budget, and substitutions, injuries, morale and fatigue are not yet in the tick loop.

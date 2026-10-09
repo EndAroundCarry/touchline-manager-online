@@ -481,7 +481,7 @@ public static class ReplayDirector
     /// kicks the spatial play model struck at goal. A penalty award or a free-kick award is not selected on its
     /// own: the goal or the miss that follows it a moment later is the thing worth watching.
     /// </remarks>
-    private static bool IsWorthShowing(EngineEventV1 matchEvent, HighlightOptionsV1 options) => matchEvent.Type switch
+    internal static bool IsWorthShowing(EngineEventV1 matchEvent, HighlightOptionsV1 options) => matchEvent.Type switch
     {
         EngineEventType.Goal or EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed => true,
         EngineEventType.FreeKickShot when options.IncludeFreeKicks => true,

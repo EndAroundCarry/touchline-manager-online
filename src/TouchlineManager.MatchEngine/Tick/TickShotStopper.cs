@@ -84,8 +84,8 @@ internal readonly record struct TickSaveAssessment(
 /// </description></item>
 /// </list>
 /// <para>
-/// <b>Reach.</b> At the moment of the save he can get a hand to a ball that passes within <c>70 + 40 + 6 × Agility</c> pitch units of
-/// him sideways (arms plus a dive: 1.7 m at Agility 10 to 2.4 m at 20). He can <em>hold</em> a ball within <c>45% + 2.5% × Handling</c> of
+/// <b>Reach.</b> At the moment of the save he can get a hand to a ball that passes within <c>125 + 6 × Agility</c> pitch units of
+/// him sideways (arms plus a dive: 1.9 m at Agility 10 to 2.6 m at 20). He can <em>hold</em> a ball within <c>45% + 2.5% × Handling</c> of
 /// that. Upward he reaches <c>20 + 0.4 × (JumpingReach + AerialAbility)</c> Z units (1.5 to 2.5 m), and holds nothing above 85% of that.
 /// A ball outside the reach is <see cref="TickSaveOutcome.Beaten"/> with no draw to soften it: a corner shot from close range beats an
 /// ordinary keeper, and a weak shot from long range never beats a good one.
@@ -113,7 +113,7 @@ internal static class TickShotStopper
     public const int BodyReach = 70;
 
     /// <summary>The sideways reach of a dive at Agility 0, in pitch units.</summary>
-    public const int DiveBase = 40;
+    public const int DiveBase = 55;
 
     /// <summary>The dive reach gained per point of Agility, in pitch units.</summary>
     public const int DivePerAgility = 6;
@@ -139,11 +139,11 @@ internal static class TickShotStopper
     /// <summary>The speed a parried ball leaves the goalkeeper at, in cm/s.</summary>
     public const int ParrySpeedCentimetresPerSecond = 800;
 
-    /// <summary>The speed a ball tipped round the post leaves at, in cm/s.</summary>
-    public const int TipSpeedCentimetresPerSecond = 500;
+    /// <summary>The speed a ball tipped round the post leaves at, in cm/s: firm enough to reach the line before anyone can react.</summary>
+    public const int TipSpeedCentimetresPerSecond = 800;
 
     /// <summary>The speed a ball tipped over the bar leaves at, in cm/s.</summary>
-    public const int TipOverSpeedCentimetresPerSecond = 700;
+    public const int TipOverSpeedCentimetresPerSecond = 900;
 
     /// <summary>How far outside the nearer post a ball tipped round it is sent, in pitch units.</summary>
     public const int TipWideOfPost = 600;
@@ -217,7 +217,8 @@ internal static class TickShotStopper
     }
 
     /// <summary>
-    /// Tells the goalkeeper where to go: nowhere until he has reacted, then flat out across the line of the ball at the depth he stands.
+    /// Tells the goalkeeper where to go: nowhere until he has reacted, then a dive flat out across the line of the ball at
+    /// the depth he stands.
     /// </summary>
     /// <param name="keeper">The goalkeeper's body.</param>
     /// <param name="skills">The goalkeeper's skills.</param>
@@ -233,7 +234,7 @@ internal static class TickShotStopper
             return new TickMoveIntent(here, TickSpatialUnits.ToUnits(keeper.Y), 0, true);
         }
 
-        return new TickMoveIntent(here, forecast.PlaneY, BasisPoints, false);
+        return new TickMoveIntent(here, forecast.PlaneY, BasisPoints, false) { Dive = true };
     }
 
     /// <summary>Tells the loop to settle the save instead of stepping the ball: the next step would carry it through the goalkeeper's plane.</summary>
@@ -246,12 +247,17 @@ internal static class TickShotStopper
     /// <param name="keeper">The goalkeeper's body, as it is when the ball reaches him.</param>
     /// <param name="skills">The goalkeeper's skills.</param>
     /// <param name="forecast">The shot's forecast.</param>
-    public static TickSaveAssessment Assess(in TickPlayerState keeper, in TickPlayerSkills skills, in TickShotForecast forecast)
+    /// <param name="advantageBasisPoints">
+    /// The goalkeeper's side's home advantage, in basis points (10,000 is none): a home keeper's crowd lifts his reach
+    /// with the rest of his game.
+    /// </param>
+    public static TickSaveAssessment Assess(in TickPlayerState keeper, in TickPlayerSkills skills, in TickShotForecast forecast, int advantageBasisPoints = BasisPoints)
     {
         var needed = Math.Abs(forecast.PlaneY - TickSpatialUnits.ToUnits(keeper.Y));
-        var parry = BodyReach + DiveBase + (DivePerAgility * skills.Agility);
+        var advantage = Math.Clamp(advantageBasisPoints, 1, 2 * BasisPoints);
+        var parry = (BodyReach + DiveBase + (DivePerAgility * skills.Agility)) * advantage / BasisPoints;
         var share = CatchShareBase + (CatchSharePerHandlingTenths * skills.Handling / 10);
-        var height = HeightBase + ((skills.JumpingReach + skills.AerialAbility) * 2 / 5);
+        var height = (HeightBase + ((skills.JumpingReach + skills.AerialAbility) * 2 / 5)) * advantage / BasisPoints;
 
         var speed = (int)((long)forecast.PlaneSpeed * 1_000 / FixedPerMetreDivisor);
         var hold = Math.Clamp(

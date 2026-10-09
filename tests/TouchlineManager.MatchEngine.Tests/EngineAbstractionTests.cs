@@ -63,16 +63,12 @@ public sealed class EngineAbstractionTests
     [Fact]
     public void Match_simulator_simulates_v12_snapshot_through_registered_tick_engine()
     {
-        var v12Input = TestMatchFactory.Even(seed: 42UL) with
-        {
-            EngineVersion = EngineVersions.EngineLabel,
-            RuleSetVersion = EngineVersions.RuleSetLabel,
-            FormulaConfigurationHash = EngineConfiguration.HashOf(EngineRulesV2.Default, EngineVersions.RuleSetLabel),
-        };
+        var v12Input = TestMatchFactory.ForTickEngine(TestMatchFactory.Even(seed: 42UL));
 
         var result = MatchSimulator.Simulate(v12Input);
 
         result.Should().NotBeNull();
+        result.EngineVersion.Should().Be(EngineVersions.EngineLabel);
         result.Events.Should().NotBeEmpty();
         result.TotalMinutesPlayed.Should().BeInRange(90, 105);
     }

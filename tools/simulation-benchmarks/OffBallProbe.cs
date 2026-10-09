@@ -103,7 +103,7 @@ internal static class OffBallProbe
 
             for (var index = 0; index < matches; index++)
             {
-                var even = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules);
+                var even = LaboratoryFixtures.LegacyEvenlyMatched(seed + (ulong)index, rules);
                 var input = tier is int value ? WithDecisions(even, value) : even;
                 var recorder = new MatchPassageRecorder();
                 var result = MatchSimulator.Simulate(input, rules, null, recorder);
@@ -189,7 +189,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules);
+            var input = LaboratoryFixtures.LegacyEvenlyMatched(seed + (ulong)index, rules);
             var recorder = new MatchPassageRecorder();
             var result = MatchSimulator.Simulate(input, rules, null, recorder);
             var presentation = ReplayDirector.Analyse(input, result, recorder.Passages, options, null).Presentation;
@@ -317,7 +317,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules);
+            var input = LaboratoryFixtures.LegacyEvenlyMatched(seed + (ulong)index, rules);
             var result = MatchSimulator.Simulate(input, rules);
             var families = FamiliesOf(input);
 
@@ -355,7 +355,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = Twins(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules), out var highId, out var lowId);
+            var input = Twins(LaboratoryFixtures.LegacyEvenlyMatched(seed + (ulong)index, rules), out var highId, out var lowId);
             var result = MatchSimulator.Simulate(input, rules);
 
             homeGoals += result.HomeGoals;
@@ -415,7 +415,7 @@ internal static class OffBallProbe
 
         for (var index = 0; index < matches; index++)
         {
-            var input = RoleShaped(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules));
+            var input = RoleShaped(LaboratoryFixtures.LegacyEvenlyMatched(seed + (ulong)index, rules));
             var recorder = new MatchPassageRecorder();
             var result = MatchSimulator.Simulate(input, rules, null, recorder);
             var families = FamiliesOf(input);
@@ -491,7 +491,7 @@ internal static class OffBallProbe
 
             for (var index = 0; index < matches; index++)
             {
-                var input = WithMind(LaboratoryFixtures.EvenlyMatched(seed + (ulong)index, rules), tier);
+                var input = WithMind(LaboratoryFixtures.LegacyEvenlyMatched(seed + (ulong)index, rules), tier);
                 var result = MatchSimulator.Simulate(input, rules);
 
                 homeGoals += result.HomeGoals;

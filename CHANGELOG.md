@@ -4,6 +4,53 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Engine v12 — the match is played tick by tick
+
+Recorded in [`ADR-0066`](docs/architecture/adr/0066-engine-v12-tick-simulation.md). `EngineVersions.Engine` is `12`,
+the rules are `engine-rules-v11`, and the new model is `tick-engine-v1`. The tick engine (`TickMatchEngine`) becomes
+the active engine; the possession engine is quarantined behind `engine-v11` and its golden hashes are unmoved.
+`MatchSimulator`'s public surface and the presentation contract are unchanged, so the 2D viewer needs no change.
+
+### Changed
+
+- **A match is a physical simulation.** Twenty-two autonomous players and one physical ball on the fixed-point
+  pitch, advanced at 10 Hz (100 ms a tick): dynamic formation anchors, off-the-ball support runs and triangles, a
+  zonal defence with one presser, markers, cover shadows and an offside line, a ball-carrier decision engine
+  (shoot, pass, through-ball, cross, dribble, shield, recycle), goalkeeper positioning, rushes, dives and
+  shot-stopping, and a restarts state machine for kick-offs, goal kicks, throw-ins, corners, free kicks and
+  penalties. Every dot's movement is where the simulation actually put it — nothing is reconstructed.
+- **The film is the recording, sliced.** The tick loop records the continuous trace; the synthesizer cuts it into
+  passages of 8–12 s of film (at most 75, ten match seconds to one film second) with delta-compressed keyframe
+  tracks at a widening tolerance ladder; the director assembles the same presentation shape (`replay-v16`) the
+  possession film produces — contiguous playback schedule, lineups, live curve, and the reel over the same film.
+  `MatchSimulator.SimulateFilm` plays and films in one pass, and `GetMatchPresentation` still refuses to serve a
+  film whose result does not reproduce the stored output hash.
+- **The shot is a placement draw, and the keeper counts as a blocker.** One draw decides whether a shot is on
+  target (43% at 16 m, moved by `2 × Finishing + Technique`, halved at full pressure, clamped 10–80%), a second
+  where it crosses (placed shots to the middle, mishits wide of the post). The goalkeeper's reach is
+  `70 + 55 + 6 × Agility` pitch units, his hold 45% + 2.5% × Handling of it, and a dive accelerates at 200% of a
+  run's rate — about 68% of shots on target are saved.
+- **The challenge comes before the carrier's act**, within 150 units (1.6 m), with the win chance falling off past
+  90; a beaten shot keeps the shooter's identity, so a block on the line is recorded as a `ShotBlocked` shot and
+  the result's shot count reconciles with the events (`MAT-5`).
+- **Home advantage goes through the contests** — the finishing draw, the keeper's reach, the tackler's win chance
+  — not through pace, which measured *worse* for the home side.
+
+### Fixed
+
+- **The rules hash no longer invokes reflection per simulation.** `EngineRulesV2.ToCanonicalParts` reads its
+  properties through cached typed readers instead of `PropertyInfo.GetValue`, whose dynamic-method emit had the
+  finalizer thread burning about a quarter of the process's sampled time in the benchmark (ADR-0066).
+- **The physics takes no square root it does not read**, and the integer root is seeded from a table; the tick
+  match's p50 fell from 233 ms to 206 ms (`bench`, budget 100 ms).
+
+### Known gaps
+
+- Substitutions, injuries, morale drift and fatigue accumulation are not yet in the tick loop; offsides are
+  unit-tested but never occur on the calibration fixture (its players never play the offside ball); and
+  `PassageV1.Commentary` is still empty on a tick film, while the match-level commentary works (§14.9 of the
+  engine specification).
+
 ## Stadium picture in three dimensions — rows, sectors and seats in the club's two colours
 
 Recorded in [`ADR-0065`](docs/architecture/adr/0065-stadium-picture-in-three-dimensions.md), which supersedes decision 6

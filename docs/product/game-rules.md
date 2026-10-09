@@ -486,7 +486,7 @@ version. The value and band constants are in §18.
 |---|---|
 | MAT-1 | Matches are simulated only by the worker, only from an immutable input snapshot, and only with a versioned engine. |
 | MAT-2 | There is no public command that simulates or influences a match. |
-| MAT-3 | Simulation covers 90 regulation minutes plus deterministic stoppage time, modelled as a sequence of possessions. Each half has its own clock and its own stoppage: the first half runs 1'…45' and the second 46'…90', and the second half is never started or ended by the first half's added time. |
+| MAT-3 | Simulation covers 90 regulation minutes plus deterministic stoppage time, under a versioned engine model (a sequence of possessions through `engine-v11`, a continuous tick simulation recorded as passages from `engine-v12`; ADR-0066). Each half has its own clock and its own stoppage: the first half runs 1'…45' and the second 46'…90', and the second half is never started or ended by the first half's added time. |
 | MAT-4 | Goals are produced by resolved chances, never by an independent per-minute roll. |
 | MAT-5 | The final score equals the goal events. Statistics reconcile exactly with events. |
 | MAT-6 | Human managers make no live in-match changes in the MVP; substitutions are chosen deterministically by the engine from the selected bench. |
@@ -499,11 +499,12 @@ version. The value and band constants are in §18.
 
 Detailed engine formulas (unit ratings, possession and chance resolution, the continuous passage, bounded
 tactical modifiers, and all versioned constants) live in `docs/product/match-engine.md`, which covers
-engine version 5. A possession is played as a real passage — a chain of touches from where the last one
-left the ball into the attacking third — so a shot, a foul, a free kick, a corner, and every other event
-carries the pitch coordinates it actually happened at (ADR-0051). The replay is one continuous film of the
-whole match, played at one constant pace in about ten minutes, with a companion highlights reel over the same
-data (ADR-0052, ADR-0054).
+engine version 11 (the possession engine, the active engine through that version) and engine version 12
+(the tick engine, the active engine since; §14). A possession is played as a real passage — a chain of touches
+from where the last one left the ball into the attacking third — so a shot, a foul, a free kick, a corner, and
+every other event carries the pitch coordinates it actually happened at (ADR-0051). The replay is one
+continuous film of the whole match, played at one constant pace in about ten minutes, with a companion
+highlights reel over the same data (ADR-0052, ADR-0054).
 
 ### 15.1 Player statistics
 

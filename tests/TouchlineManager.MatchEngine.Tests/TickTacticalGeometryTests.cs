@@ -390,6 +390,11 @@ public sealed class TickTacticalGeometryTests
         var first = Run(Kickoff(FourFourTwo, true), Kickoff(FourFourTwo, false));
         var homeTeam = Kickoff(FourFourTwo, true);
         var awayTeam = Kickoff(FourFourTwo, false);
+
+        // A second, unmeasured run: tier-1 compilation of the steering happens in the background, and its allocations
+        // are charged to this thread, where they would be read as the geometry's.
+        Run(Kickoff(FourFourTwo, true), Kickoff(FourFourTwo, false));
+
         var before = GC.GetAllocatedBytesForCurrentThread();
         var second = Run(homeTeam, awayTeam);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;

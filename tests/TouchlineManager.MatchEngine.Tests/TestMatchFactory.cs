@@ -22,6 +22,18 @@ internal static class TestMatchFactory
     /// <summary>The configuration hash a valid snapshot must carry.</summary>
     public static string ConfigurationHash { get; } = EngineConfiguration.HashOf(Rules, EngineVersions.LegacyRuleSetLabel);
 
+    /// <summary>The configuration hash a valid tick-engine snapshot must carry (`engine-rules-v11`).</summary>
+    public static string TickConfigurationHash { get; } = EngineConfiguration.HashOf(Rules, EngineVersions.RuleSetLabel);
+
+    /// <summary>Freezes a snapshot for the tick engine, which is the active engine for `engine-v12`.</summary>
+    /// <param name="input">A snapshot built for the legacy labels.</param>
+    public static MatchInputV1 ForTickEngine(MatchInputV1 input) => input with
+    {
+        EngineVersion = EngineVersions.EngineLabel,
+        RuleSetVersion = EngineVersions.RuleSetLabel,
+        FormulaConfigurationHash = TickConfigurationHash,
+    };
+
     /// <summary>Builds a snapshot with two evenly matched sides.</summary>
     /// <param name="seed">The match seed.</param>
     /// <param name="homeAbility">The home side's uniform attribute value.</param>

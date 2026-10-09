@@ -41,6 +41,16 @@ public static class EngineVersions
     /// <summary>The stable label for engine version 12 (discrete tick-based engine), used in hashes and diagnostics.</summary>
     /// <remarks>
     /// <para>
+    /// Version 12 replaces the possession model with the discrete tick engine: a match is a physical
+    /// simulation of twenty-two autonomous players and one ball at 10 Hz, steered by dynamic formation
+    /// anchors, off-the-ball runs, a zonal defence, a ball-carrier decision engine, goalkeeper positioning
+    /// and shot-stopping, and a restarts state machine, with contests resolved by geometry and
+    /// attribute-weighted duels rather than by macro possession rolls. The film is the continuous recording
+    /// sliced into passages, so no movement is reconstructed. Every stored version 11 snapshot still plays on
+    /// the possession engine it was frozen against, and the input, result and presentation contracts are
+    /// unchanged (ADR-0066).
+    /// </para>
+    /// <para>
     /// Version 11 adds the counter-attack. A ball a side wins back from play becomes a counter-attack on a roll the
     /// possession's own stream takes: one time in five for a side that has not asked for it and one in two for a side
     /// that has, a team instruction of its own. How the counter fares depends on how the opponent stands: one that
