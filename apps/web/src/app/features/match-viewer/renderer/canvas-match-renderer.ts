@@ -28,6 +28,9 @@ import {
   TeamKits,
 } from './renderer.models';
 
+/** The width of the pitch the film is drawn on, in metres: the harness measures distances in the same metres. */
+const PITCH_WIDTH_METRES = 68;
+
 /**
  * Draws one whole film on a canvas, interpolating the timeline's tracks (`§9.1`, `§9.4`, `replay-v4`).
  *
@@ -145,6 +148,11 @@ export class CanvasMatchRenderer {
   /** Gets how much the last frame drew, for the renderer's own instrumentation. */
   get metrics(): FrameMetrics {
     return this.metricsValue;
+  }
+
+  /** Gets how big a player token is on the pitch it is drawn on, as a radius in metres, for the fluidity harness. */
+  get tokenRadiusMetres(): number {
+    return playerRadius(this.rect) / (this.rect.height / PITCH_WIDTH_METRES);
   }
 
   /**

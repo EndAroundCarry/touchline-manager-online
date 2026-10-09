@@ -8,7 +8,7 @@ import { startServer } from './serve.mjs';
 /**
  * Drives the film fluidity harness in headless Chromium and says whether the film is fluid (`replay-v4`, M3).
  *
- *   node apps/web/.preview/capture.mjs <presentation.json> [--out <dir>] [--seconds <n>] [--min-fps <n>]
+ *   node apps/web/.preview/capture.mjs <presentation.json> [--out <dir>] [--seconds <n>] [--min-fps <n>] [--fluidity-only]
  *
  * The presentation is a dump from `dotnet run --project tools/simulation-benchmarks -- replay 1 <seed> --dump
  * <file>`. It is played through the real playback, render loop, fade and renderer; this script reports
@@ -85,6 +85,13 @@ console.log(
   `goals ${info.goals.length}  shots ${info.markers.filter((marker) => marker.kind === 'shot').length}  cards ${info.cards.length}  slots with a substitute ${info.substitutions}  half-time ${info.halfTimes.map((interval) => minutes(interval.startMilliseconds)).join(', ') || 'none'}`,
 );
 
+if (args.includes('--fluidity-only')) {
+  await reportFluidity();
+  await browser.close();
+  await close();
+  process.exit(0);
+}
+
 // ---- Photographs ------------------------------------------------------------------------------------------
 
 const firstShot = info.markers.find((marker) => marker.kind === 'shot' || marker.kind === 'goal');
@@ -134,6 +141,22 @@ const still = await page.evaluate(() => window.film.still());
 console.log(
   `ball still: ${(still.allShare * 100).toFixed(1)}% of the whole film, ${(still.outsideHoldsShare * 100).toFixed(1)}% outside half-time, celebrations and cuts; longest stretch ${still.longestStillSeconds.toFixed(1)} s`,
 );
+
+// ---- Stutters and covered tokens --------------------------------------------------------------------------------
+// Stepped through the film, not played, so it is the same on every machine. Reported, not failed on: it is the baseline the
+// interpolator and de-overlap work is measured against (tick-film-v1).
+
+async function reportFluidity() {
+  const fluidity = await page.evaluate(() => window.film.fluidity());
+
+  console.log(
+    `stutters: ${fluidity.stutters} (${fluidity.stuttersPerFilmMinute.toFixed(1)} per film minute)  ` +
+      `covered tokens: ${(fluidity.coveredShareOfSteps * 100).toFixed(1)}% of steps, ${fluidity.coveredPairsPerFilmMinute.toFixed(0)} pair-steps per film minute  ` +
+      `(token radius ${fluidity.tokenRadiusMetres.toFixed(2)} m)`,
+  );
+}
+
+await reportFluidity();
 
 // ---- Real-time runs ----------------------------------------------------------------------------------------------
 

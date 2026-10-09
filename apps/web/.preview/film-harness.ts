@@ -365,6 +365,167 @@ function clockChecks(): {
   return { checked, mismatches };
 }
 
+/** How finely the film is stepped when the drawn motion is measured, in milliseconds of film. */
+const FLUIDITY_STEP = 40;
+
+/** A token stutters when its drawn speed falls below this share of its average over the ±300 ms around it... */
+const STUTTER_DIP = 0.35;
+
+/** ...and is back above this share of that average within 400 ms. */
+const STUTTER_RECOVERY = 0.7;
+
+/** A token moving slower than this on average, in metres per film second, is not running, so slowing is not a stutter. */
+const STUTTER_MINIMUM_AVERAGE = 2;
+
+/** Two tokens are covered when their centres are closer than this share of a token's radius. */
+const COVERED_SHARE = 0.6;
+
+/** A token that moves further than this between two steps was put somewhere new, not moved. */
+const STEP_JUMP_METRES = 4;
+
+/**
+ * Steps through the film, outside the cuts, and counts what a manager would see as stiffness (`tick-film-v1`, M0).
+ *
+ * A **stutter** is a token whose drawn speed falls below 35% of its average over ±300 ms and recovers within 400 ms: the
+ * slow-down at a keyframe the interpolator can draw, which looks like a player pausing mid-run. A **covered pair** is two
+ * player tokens whose drawn centres are closer than 0.6 of a token radius, so one hides the other. Both are counted
+ * from what is *drawn*, so a change to the interpolator or to the renderer's own placement shows up here.
+ */
+function fluidity(): {
+  readonly filmMinutes: number;
+  readonly stutters: number;
+  readonly stuttersPerFilmMinute: number;
+  readonly coveredPairSteps: number;
+  readonly coveredShareOfSteps: number;
+  readonly coveredPairsPerFilmMinute: number;
+  readonly tokenRadiusMetres: number;
+} {
+  const steps = Math.floor(timeline.durationMilliseconds / FLUIDITY_STEP);
+  const ids: string[] = [];
+  const index = new Map<string, number>();
+  const xs: Float32Array[] = [];
+  const ys: Float32Array[] = [];
+  const broken = new Uint8Array(steps + 1);
+  let coveredPairSteps = 0;
+  let coveredSteps = 0;
+  let radius = 0;
+
+  for (let step = 0; step <= steps; step += 1) {
+    const time = step * FLUIDITY_STEP;
+
+    renderer.render(time, 0);
+    radius = renderer.tokenRadiusMetres;
+
+    const cutHere = timeline.cuts.some(
+      (cut) => cut.startMilliseconds > time - FLUIDITY_STEP && cut.startMilliseconds <= time,
+    );
+
+    broken[step] = cutHere || timeline.isHalfTimeAt(time) ? 1 : 0;
+
+    const players: { x: number; y: number }[] = [];
+
+    for (const item of renderer.drawn) {
+      if (item.entity.isBall) {
+        continue;
+      }
+
+      let slot = index.get(item.entity.id);
+
+      if (slot === undefined) {
+        slot = ids.length;
+        index.set(item.entity.id, slot);
+        ids.push(item.entity.id);
+        xs.push(new Float32Array(steps + 1).fill(Number.NaN));
+        ys.push(new Float32Array(steps + 1).fill(Number.NaN));
+      }
+
+      const x = (item.position.x * 105) / 10_000;
+      const y = (item.position.y * 68) / 10_000;
+
+      xs[slot][step] = x;
+      ys[slot][step] = y;
+      players.push({ x, y });
+    }
+
+    let covered = 0;
+
+    for (let one = 0; one < players.length; one += 1) {
+      for (let other = one + 1; other < players.length; other += 1) {
+        if (
+          Math.hypot(players[one].x - players[other].x, players[one].y - players[other].y) <
+          COVERED_SHARE * radius
+        ) {
+          covered += 1;
+        }
+      }
+    }
+
+    coveredPairSteps += covered;
+    coveredSteps += covered > 0 ? 1 : 0;
+  }
+
+  // Speeds in metres per film second, with a gap wherever the token was put somewhere new or is not drawn.
+  let stutters = 0;
+  const window = Math.round(300 / FLUIDITY_STEP);
+  const recovery = Math.round(400 / FLUIDITY_STEP);
+
+  for (let slot = 0; slot < ids.length; slot += 1) {
+    const speed = new Float32Array(steps + 1).fill(Number.NaN);
+
+    for (let step = 1; step <= steps; step += 1) {
+      const moved = Math.hypot(xs[slot][step] - xs[slot][step - 1], ys[slot][step] - ys[slot][step - 1]);
+
+      if (!Number.isNaN(moved) && moved < STEP_JUMP_METRES && broken[step] === 0) {
+        speed[step] = moved / (FLUIDITY_STEP / 1_000);
+      }
+    }
+
+    for (let step = window + 1; step < steps - window - recovery; step += 1) {
+      if (Number.isNaN(speed[step])) {
+        continue;
+      }
+
+      let total = 0;
+      let count = 0;
+
+      for (let near = step - window; near <= step + window; near += 1) {
+        if (!Number.isNaN(speed[near])) {
+          total += speed[near];
+          count += 1;
+        }
+      }
+
+      // The average counts only if the whole ±300 ms is one unbroken run.
+      const average = total / Math.max(1, count);
+
+      if (count < 2 * window + 1 || average < STUTTER_MINIMUM_AVERAGE || speed[step] >= STUTTER_DIP * average) {
+        continue;
+      }
+
+      for (let later = step + 1; later <= step + recovery; later += 1) {
+        if (!Number.isNaN(speed[later]) && speed[later] >= STUTTER_RECOVERY * average) {
+          stutters += 1;
+          step = later;
+
+          break;
+        }
+      }
+    }
+  }
+
+  const filmMinutes = timeline.durationMilliseconds / 60_000;
+
+  return {
+    filmMinutes,
+    stutters,
+    stuttersPerFilmMinute: stutters / Math.max(0.001, filmMinutes),
+    coveredPairSteps,
+    coveredShareOfSteps: coveredSteps / Math.max(1, steps + 1),
+    coveredPairsPerFilmMinute: coveredPairSteps / Math.max(0.001, filmMinutes),
+    tokenRadiusMetres: radius,
+  };
+}
+
 /** What the film holds, so the driver knows where to look. */
 function info(timelineToDescribe: FilmTimeline = timeline) {
   return {
@@ -397,6 +558,7 @@ declare global {
       readonly show: typeof show;
       readonly run: typeof run;
       readonly still: typeof still;
+      readonly fluidity: typeof fluidity;
       readonly clockChecks: typeof clockChecks;
     };
   }
@@ -408,6 +570,7 @@ window.film = {
   show,
   run,
   still,
+  fluidity,
   clockChecks,
 };
 

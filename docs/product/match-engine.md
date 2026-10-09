@@ -1449,3 +1449,34 @@ the corners — in passages that share a boundary frame and are joined by `jump`
 | `TickGoalkeeperAITests`, `TickShotStopperTests` | The arc, the rush, the dive and the save. |
 | `TickMatchStateMachineTests`, `TickSetPiecesTests` | Every restart. |
 | `TickMatchLoopTests`, `TickTeamTests`, `TickMatchRecordingTests`, `TickFilmSelectorTests`, `TickReplaySynthesizerTests` | The loop, the sides, the recording and the film. |
+
+### 14.8 Motion and film baseline (the tick-film plan, Milestone 0)
+
+`tickmotion N seed` (`TickMotionProbe`) reads how the players and the ball move, and how much of a move the film shows, from the recording alone, so it
+changes no play. Speeds are the distance between two frames (a pitch unit is about a centimetre, so one unit a frame is 0.1 m/s). The figures below are
+200 matches from seed 11 on the engine as committed at `5163b96`, and are what each later milestone is compared with.
+
+| | Baseline |
+|---|---|
+| Standing (under 0.3 m/s), outfield, open play | 12.2% of player-ticks |
+| Stop-and-go (under 0.5 m/s, then over 2 m/s within 1.5 s) | 7.5 per player-minute |
+| 12 or more outfielders under 0.5 m/s at once | 8.6% of open-play frames |
+| Distance per outfield player per 90 | 13.6 km (the plan's aim is 9.5–11.5) |
+| Ball speed when a pass is received (p10 / p50 / p90) | 1.9 / 2.4 / 10.4 m/s |
+| Ball under 4 m/s for over 1 s before it is received | 55% of receptions |
+| Receiver moving toward the ball at reception | 2% (median 0.0 m/s: he is already standing there) |
+| Kick to reception (p10 / p50 / p90) | 3 / 48 / 53 ticks |
+| Reception to next release (p10 / p50 / p90); one-touch (2 ticks or fewer) | 3 / 3 / 10 ticks; 1.6% |
+| Opposing pair closer than 1.0 m, neither near the ball (3 m) | 35% of open-play frames |
+| Goal moves (first control of the spell to the strike; p10 / p50 / p90) | 0.0 / 6.3 / 16.1 s |
+| Goals whose regain lies before the film window | 6.4% (shots 8.5%) |
+
+The viewer harness (`apps/web/.preview/capture.mjs <film.json> --fluidity-only`) steps the film at 40 ms and counts a **stutter** (a token whose drawn speed
+falls under 35% of its ±300 ms average and recovers within 400 ms) and a **covered pair** (drawn centres closer than 0.6 of a token radius). Over seeds 11,
+12 and 13: 161–215 stutters a film minute, and a covered pair in 27% of the steps. A token's radius is `clamp(pitch height / 58, 5, 10)` pixels, about
+1.04 m on the harness's 1400 × 900 page, so a token is 2 m across and two tokens touch at 2 m.
+
+What the numbers say about the five complaints: the ball does crawl (55% of receptions follow a slow tail) and the receiver does wait; tokens do stack,
+and not only in duels; and the film already shows the regain in 94% of goals, because most goals follow a short spell of possession, so the longer film
+is for context rather than for a missing start. How much of the stutter is the viewer's spline and how much is the engine's stop-and-go is what Milestone 1
+(the spline alone) separates.
