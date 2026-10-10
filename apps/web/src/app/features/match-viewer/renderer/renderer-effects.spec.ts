@@ -1,4 +1,6 @@
 import {
+  BLAME_MILLISECONDS,
+  blameStrength,
   isDiveAction,
   isStrikeAction,
   isTackleAction,
@@ -77,6 +79,24 @@ describe('action tags', () => {
     expect(isDiveAction('save')).toBe(true);
     expect(isDiveAction('dive')).toBe(true);
     expect(isDiveAction('run')).toBe(false);
+  });
+});
+
+describe('blameStrength', () => {
+  it('is full at the moment of the error and for a moment after, so it can be seen', () => {
+    expect(blameStrength(0)).toBe(1);
+    expect(blameStrength(BLAME_MILLISECONDS * 0.25)).toBe(1);
+  });
+
+  it('fades to nothing over the rest of the window', () => {
+    expect(blameStrength(BLAME_MILLISECONDS * 0.625)).toBeCloseTo(0.5, 5);
+    expect(blameStrength(BLAME_MILLISECONDS - 1)).toBeGreaterThan(0);
+    expect(blameStrength(BLAME_MILLISECONDS - 1)).toBeLessThan(0.01);
+    expect(blameStrength(BLAME_MILLISECONDS)).toBe(0);
+  });
+
+  it('is nothing before the error, so a seek never shows a mistake that has not happened', () => {
+    expect(blameStrength(-1)).toBe(0);
   });
 });
 

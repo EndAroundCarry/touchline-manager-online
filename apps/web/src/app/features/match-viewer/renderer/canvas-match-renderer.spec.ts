@@ -587,6 +587,110 @@ describe('CanvasMatchRenderer', () => {
     expect(context.calls.some((call) => call.op === 'ellipse')).toBe(false);
   });
 
+  describe('mistakes', () => {
+    /** A film in which `entityId` makes a mistake, tagged `action`, five seconds in. */
+    function mistake(entityId: string, action: string): FilmTimeline {
+      return filmOf([
+        highlight({
+          tracks: [
+            {
+              entityId,
+              keyframes: [
+                keyframe(0, 7_000, 4_000),
+                keyframe(5_000, 7_400, 4_100, { action }),
+                keyframe(20_000, 7_400, 4_100),
+              ],
+            },
+          ],
+        }),
+      ]);
+    }
+
+    function drawnAt(film: FilmTimeline, timeMs: number): RecordingContext {
+      const { canvas, context } = canvasWithContext();
+
+      new CanvasMatchRenderer(canvas, film, DIRECT).render(timeMs);
+
+      return context;
+    }
+
+    const alphaOf = (style: string | undefined): number =>
+      Number(/, ([\d.]+)\)$/.exec(style ?? '')?.[1]);
+
+    // The recording context keeps no state stack, so the ring's colour is still set when the ball is drawn after it:
+    // a ring is the red arc as big as a token and more, which the ball is not.
+    const rings = (context: RecordingContext): DrawCall[] =>
+      context.calls.filter(
+        (call) =>
+          call.op === 'arc' &&
+          (call.strokeStyle ?? '').startsWith('rgba(239, 68, 68') &&
+          call.args[2] > 6,
+      );
+
+    const chevrons = (context: RecordingContext): DrawCall[] =>
+      context.calls.filter(
+        (call) => call.op === 'stroke' && (call.strokeStyle ?? '').startsWith('rgba(245, 158, 11'),
+      );
+
+    it('rings the man who lost the ball, labels him, and lets the ring fade out', () => {
+      const film = mistake('H9', 'dispossessed');
+      const justAfter = drawnAt(film, 5_200);
+      const later = drawnAt(film, 6_200);
+
+      expect(rings(justAfter)).toHaveLength(1);
+      expect(chevrons(justAfter)).toHaveLength(0);
+      expect(numbers(justAfter)).toContain('Dispossessed');
+      expect(rings(later)).toHaveLength(1);
+      expect(alphaOf(rings(later)[0].strokeStyle)).toBeLessThan(
+        alphaOf(rings(justAfter)[0].strokeStyle),
+      );
+    });
+
+    it('puts the marker on the token it belongs to', () => {
+      const context = drawnAt(mistake('H9', 'misplaced'), 5_200);
+      const token = numberAt(context, '9');
+      const ring = rings(context)[0];
+
+      expect(numbers(context)).toContain('Misplaced pass');
+      expect(token).toBeDefined();
+      expect(ring.args[0]).toBeCloseTo(token![0], 1);
+    });
+
+    it('marks a man who was beaten with an amber chevron rather than a ring', () => {
+      const context = drawnAt(mistake('A5', 'beaten'), 5_200);
+
+      expect(chevrons(context).length).toBeGreaterThan(0);
+      expect(rings(context)).toHaveLength(0);
+      expect(numbers(context)).toContain('Beaten');
+      expect(numbers(drawnAt(mistake('A5', 'bypassed'), 5_200))).toContain('Outrun');
+    });
+
+    it('draws no marker before the mistake, nor once it has faded', () => {
+      const film = mistake('H9', 'dispossessed');
+
+      expect(rings(drawnAt(film, 4_900))).toHaveLength(0);
+      expect(rings(drawnAt(film, 6_600))).toHaveLength(0);
+      expect(numbers(drawnAt(film, 6_600))).not.toContain('Dispossessed');
+    });
+
+    it('shows the same marker on a seek as it does playing through', () => {
+      const film = mistake('H9', 'dispossessed');
+      const { canvas, context } = canvasWithContext();
+      const renderer = new CanvasMatchRenderer(canvas, film, DIRECT);
+
+      for (let time = 4_000; time <= 5_400; time += 200) {
+        renderer.render(time);
+      }
+
+      context.calls.length = 0;
+      renderer.render(5_400);
+
+      const played = rings(context).map((call) => call.strokeStyle);
+
+      expect(played).toEqual(rings(drawnAt(film, 5_400)).map((call) => call.strokeStyle));
+    });
+  });
+
   it('clears the canvas and releases the pointer when it is disposed', () => {
     const { canvas, context } = canvasWithContext();
     const removeSpy = vi.spyOn(canvas, 'removeEventListener');

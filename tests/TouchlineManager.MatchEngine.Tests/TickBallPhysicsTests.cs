@@ -253,6 +253,49 @@ public sealed class TickBallPhysicsTests
     }
 
     [Fact]
+    public void A_received_ball_runs_on_a_step_then_is_eased_to_a_touch_ahead_and_drawn_in_to_the_foot()
+    {
+        var ball = new TickBallPhysics();
+        var playerY = TickSpatialUnits.ToFixed(3_000);
+        var playerX = TickSpatialUnits.ToFixed(4_000);
+        var arrival = TickSpatialUnits.SpeedToFixedPerTick(1_000);
+
+        // A ground pass arriving along +X, 0.9 m short of the man, who stands facing +X.
+        ball.PlaceAt(3_910, 3_000);
+        ball.Kick(arrival, 0, 0);
+        ball.Attach(4, cushioned: true);
+
+        ball.Mode.Should().Be(TickBallMode.Controlled, "who has the ball is the same either way");
+
+        var xs = new List<int>();
+
+        for (var tick = 0; tick < 8; tick++)
+        {
+            ball.Carry(playerX, playerY, heading: 0, playerSpeed: 0);
+            xs.Add(ball.X - playerX);
+        }
+
+        // First tick: the ball carried on its last step (0.9 m short plus a metre travelled is 0.1 m past him), then eased to a touch 1 m ahead.
+        xs[0].Should().BeInRange(TickSpatialUnits.ToFixed(10), TickSpatialUnits.ToFixed(100));
+        xs[2].Should().BeCloseTo(TickSpatialUnits.ToFixed(TickBallPhysics.TouchLeadUnits), 100, "after the touch ticks it is a metre ahead");
+        xs[^1].Should().Be(TickSpatialUnits.ToFixed(TickBallPhysics.DribbleOffsetUnits), "then it settles to the dribbling offset");
+        xs.Zip(xs.Skip(1), (a, b) => Math.Abs(b - a)).Max().Should().BeLessThan(TickSpatialUnits.ToFixed(60), "it never jumps");
+    }
+
+    [Fact]
+    public void A_ball_attached_without_a_cushion_is_at_the_foot_at_once()
+    {
+        var ball = new TickBallPhysics();
+
+        ball.PlaceAt(3_910, 3_000);
+        ball.Kick(TickSpatialUnits.SpeedToFixedPerTick(1_000), 0, 0);
+        ball.Attach(4);
+        ball.Carry(TickSpatialUnits.ToFixed(4_000), TickSpatialUnits.ToFixed(3_000), heading: 0, playerSpeed: 0);
+
+        ball.UnitX.Should().Be(4_000 + TickBallPhysics.DribbleOffsetUnits);
+    }
+
+    [Fact]
     public void Reception_reaches_further_on_the_grass_than_in_the_air_and_not_at_all_overhead()
     {
         var ball = new TickBallPhysics();

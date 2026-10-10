@@ -139,6 +139,13 @@ internal static class TickDefensiveAI
     /// <summary>The farthest up the pitch a mid block presses, in the defender's own X (the opponent's final third starts here).</summary>
     public const int MidBlockLimit = 7_000;
 
+    /// <summary>
+    /// The farthest up the pitch a high press presses, in the defender's own X: from about the edge of the opponent's penalty area, not
+    /// at the goal kick. A ball that is played out cleanly and fast beats a press that chases it into the corner of the pitch and leaves
+    /// the side stretched behind it, so an unlimited press was worth a goal and a half a match to the side it was played against.
+    /// </summary>
+    public const int HighPressLimit = 7_800;
+
     /// <summary>The own-X below which an attacker is in the defensive third, in pitch units.</summary>
     public const int DefensiveThird = 3_500;
 
@@ -332,6 +339,7 @@ internal static class TickDefensiveAI
         {
             MatchPressing.LowBlock => ownBallX <= SpatialPitch.PitchLength / 2,
             MatchPressing.MidBlock => ownBallX <= MidBlockLimit,
+            MatchPressing.HighPress => ownBallX <= HighPressLimit,
             _ => true,
         };
 

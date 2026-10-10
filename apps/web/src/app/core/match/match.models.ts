@@ -83,6 +83,11 @@ export interface HighlightKeyframe {
   readonly y: number;
   readonly z?: number;
   readonly speed?: number;
+  /**
+   * What the entity did at this keyframe: a touch (`pass`, `receive`, `cross`, `header`, `tackle`, `interception`,
+   * `shot`, `penalty`, `free_kick`, `save`, `dive`, `carry`, `run`, `celebrate`), or, since `tick-film-v1`, a mistake
+   * stamped on the man at fault (`dispossessed`, `misplaced`, `beaten`, `bypassed`).
+   */
   readonly action?: string | null;
 }
 

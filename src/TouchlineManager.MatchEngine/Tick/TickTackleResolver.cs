@@ -60,6 +60,13 @@ internal static class TickTackleResolver
     /// <summary>The distance within which a defender may challenge, in pitch units (0.9 m).</summary>
     public const int ContactRadiusUnits = 90;
 
+    /// <summary>
+    /// How many times the possession engine's foul chance a challenge here has, in percent. The ball now reaches a receiver in the stride he
+    /// meets it in and is played on within a few tenths of a second, so a carrier is challenged about a third as often as when it crawled
+    /// in and sat at his feet; the fouls a match has (about twenty-two, a real match's) are taken from the challenges there are.
+    /// </summary>
+    public const int FoulScalePercent = 250;
+
     /// <summary>The share of winning challenges that leave the ball loose rather than at the defender's feet, in percent.</summary>
     public const int PokedLoosePercent = 33;
 
@@ -149,7 +156,7 @@ internal static class TickTackleResolver
             rules);
 
         return Probability.Band(
-            Probability.Apply(Probability.Apply(rules.DuelFoulBasisPoints, styleMultiplier), skillMultiplier),
+            Probability.Apply(Probability.Apply(rules.DuelFoulBasisPoints, styleMultiplier), skillMultiplier) * FoulScalePercent / 100,
             0,
             EngineRulesV2.Certain);
     }

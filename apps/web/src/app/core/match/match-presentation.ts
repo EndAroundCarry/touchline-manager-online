@@ -223,6 +223,48 @@ export function isStrikeTag(action: string | null | undefined): boolean {
   return action !== null && action !== undefined && STRIKE_ACTIONS.has(action);
 }
 
+/**
+ * What an action tag blames a player for (`tick-film-v1`): losing the ball, or being beaten.
+ *
+ * The engine stamps these on the man at fault at the moment of the error. They are not touches of the ball, so
+ * the renderer marks the token for a moment instead of animating a play.
+ */
+export type BlameKind = 'lost' | 'beaten';
+
+/** The action tags that mean the player lost the ball, and the label the marker carries. */
+const LOST_ACTIONS = new Map([
+  ['dispossessed', 'Dispossessed'],
+  ['misplaced', 'Misplaced pass'],
+]);
+
+/** The action tags that mean the player was beaten, and the label the marker carries. */
+const BEATEN_ACTIONS = new Map([
+  ['beaten', 'Beaten'],
+  ['bypassed', 'Outrun'],
+]);
+
+/** Which kind of blame an action tag is, or null when it blames nobody. */
+export function blameKindOf(action: string | null | undefined): BlameKind | null {
+  if (action === null || action === undefined) {
+    return null;
+  }
+
+  if (LOST_ACTIONS.has(action)) {
+    return 'lost';
+  }
+
+  return BEATEN_ACTIONS.has(action) ? 'beaten' : null;
+}
+
+/** The short label a blame marker carries, or an empty string for an action that blames nobody. */
+export function blameLabelOf(action: string | null | undefined): string {
+  if (action === null || action === undefined) {
+    return '';
+  }
+
+  return LOST_ACTIONS.get(action) ?? BEATEN_ACTIONS.get(action) ?? '';
+}
+
 /** Whether an outcome code means a shot at goal, which is what the shot map plots. */
 export function isShotOutcome(code: string): boolean {
   return SHOT_OUTCOMES.has(code);

@@ -99,16 +99,87 @@ internal static class TickMotionProbe
                 continue;
             }
 
+            Space(recording, tally);
             Motion(recording, tally);
             Receptions(recording, tally);
             Overlap(recording, tally);
             tally.EnginePasses += result.PlayerLines.Sum(line => line.PassesAttempted);
             tally.EngineCompleted += result.PlayerLines.Sum(line => line.PassesCompleted);
             Film(recording, result, tally);
+
+            foreach (var stamp in recording.Actions)
+            {
+                tally.Stamps[stamp.Action] = tally.Stamps.GetValueOrDefault(stamp.Action) + 1;
+
+                if (stamp.Action.IsBlame())
+                {
+                    tally.Blame[stamp.Action] = tally.Blame.GetValueOrDefault(stamp.Action) + 1;
+                }
+            }
+
             tally.Matches++;
         }
 
         Report(tally);
+    }
+
+    // ---- Space ------------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>How much room a man has when he takes the ball and when he shoots: the distance to the nearest opponent, in metres.</summary>
+    private static void Space(TickMatchRecording recording, Tally tally)
+    {
+        foreach (var stamp in recording.Actions)
+        {
+            if (stamp.Entity < 0 || stamp.Frame >= recording.FrameCount || recording.State(stamp.Frame) != TickPlayState.OpenPlay)
+            {
+                continue;
+            }
+
+            if (stamp.Action is not (PassageAction.Receive or PassageAction.Shot))
+            {
+                continue;
+            }
+
+            var side = stamp.Entity / Half;
+            var x = recording.PlayerX(stamp.Frame, stamp.Entity);
+            var y = recording.PlayerY(stamp.Frame, stamp.Entity);
+            var nearest = double.MaxValue;
+            var markers = 0;
+
+            for (var other = (1 - side) * Half; other < ((1 - side) * Half) + Half; other++)
+            {
+                if (recording.PlayerX(stamp.Frame, other) < 0 || other % Half == 0)
+                {
+                    continue;
+                }
+
+                var dx = recording.PlayerX(stamp.Frame, other) - x;
+                var dy = recording.PlayerY(stamp.Frame, other) - y;
+                var distance = Math.Sqrt((dx * (double)dx) + (dy * (double)dy)) / 100.0;
+
+                nearest = Math.Min(nearest, distance);
+                markers += distance < 5.0 ? 1 : 0;
+            }
+
+            // Into the opponent's half, in the side's own point of view: home attacks towards high X.
+            var attackingX = side == 0 ? x : 10_000 - x;
+            var advanced = attackingX > 7_000;
+
+            if (stamp.Action == PassageAction.Shot)
+            {
+                tally.ShotSpace.Add(nearest);
+                tally.ShotMarkers.Add(markers);
+            }
+            else
+            {
+                tally.ReceiveSpace.Add(nearest);
+
+                if (advanced)
+                {
+                    tally.FinalThirdReceiveSpace.Add(nearest);
+                }
+            }
+        }
     }
 
     // ---- Movement ---------------------------------------------------------------------------------------------------------------------
@@ -418,6 +489,16 @@ internal static class TickMotionProbe
 
         tally.FilmSeconds.Add(windows.Sum(window => window.Length) / 20.0);
         tally.ContentSeconds.Add(content.Sum(window => window.Length) / 20.0);
+        tally.FilmFrames += windows.Sum(window => window.Length);
+
+        foreach (var stamp in recording.Actions)
+        {
+            if (stamp.Action.IsBlame() && windows.Any(window => window.Start <= stamp.Frame && stamp.Frame <= window.End))
+            {
+                tally.BlameInFilm[stamp.Action] = tally.BlameInFilm.GetValueOrDefault(stamp.Action) + 1;
+            }
+        }
+
         var possession = PossessionOf(recording);
         var frameOf = recording.Events.ToDictionary(stamp => stamp.Sequence, stamp => Math.Min(stamp.Frame, recording.FrameCount - 1));
 
@@ -503,7 +584,7 @@ internal static class TickMotionProbe
             {
                 var stamp = recording.Actions[next];
 
-                if (stamp.Entity >= 0 && stamp.Action is not (PassageAction.Run or PassageAction.Celebrate))
+                if (stamp.Entity >= 0 && stamp.Action is not (PassageAction.Run or PassageAction.Celebrate) && !stamp.Action.IsBlame())
                 {
                     last = stamp.Entity / Half;
                 }
@@ -590,10 +671,28 @@ internal static class TickMotionProbe
         Console.WriteLine($"  {"one-touch plays",-34} {Share(tally.HoldFrames.Count(frames => frames <= 2), tally.HoldFrames.Count),8}   held 2 frames or fewer");
         Console.WriteLine($"  {"slow tail before reception",-34} {Share(tally.SlowTails, tally.Receptions),8}   ball under 4 m/s for over 1 s");
 
+        Console.WriteLine("  -- room (metres to the nearest opponent)");
+        Console.WriteLine($"  {"on receiving",-34} {Spread(tally.ReceiveSpace)}");
+        Console.WriteLine($"  {"on receiving, final third",-34} {Spread(tally.FinalThirdReceiveSpace)}   {tally.FinalThirdReceiveSpace.Count / Math.Max(1.0, tally.Matches):F0} a match");
+        Console.WriteLine($"  {"on shooting",-34} {Spread(tally.ShotSpace)}   markers within 5 m {tally.ShotMarkers.DefaultIfEmpty(0).Average():F2}");
+
         Console.WriteLine("  -- overlap (open play)");
         Console.WriteLine($"  {"opponents under 1.0 m, outside duels",-34} {Share(tally.OverlapFrames, tally.OpenFramesForOverlap),8}   of frames, {tally.OverlapPairs / Math.Max(1.0, tally.Matches):F0} pair-frames a match");
         Console.WriteLine($"  {"opponents under 1.0 m, anywhere",-34} {Share(tally.OverlapAnyFrames, tally.OpenFramesForOverlap),8}   of frames");
 
+        Console.WriteLine("  -- every stamp a match");
+        Console.WriteLine("  " + string.Join("   ", tally.Stamps.OrderByDescending(pair => pair.Value).Select(pair => $"{pair.Key.Code()} {pair.Value / Math.Max(1.0, tally.Matches):F0}")));
+
+        Console.WriteLine("  -- who erred (stamps a match)");
+
+        foreach (var action in new[] { PassageAction.Dispossessed, PassageAction.Misplaced, PassageAction.Beaten, PassageAction.Bypassed })
+        {
+            Console.WriteLine(
+                $"  {action.Code(),-34} {tally.Blame.GetValueOrDefault(action) / Math.Max(1.0, tally.Matches),8:F1}"
+                + $"   {tally.BlameInFilm.GetValueOrDefault(action) / Math.Max(1.0, tally.Matches),5:F1} in the film, {tally.BlameInFilm.GetValueOrDefault(action) / Math.Max(1.0, tally.FilmFrames / 1_200.0),5:F2} a film minute");
+        }
+
+        Console.WriteLine();
         Console.WriteLine("  -- film windows (match seconds; negative slack means the regain is cut off)");
         Console.WriteLine($"  {"film, in play (s of film)",-34} {Spread(tally.FilmSeconds)}");
         Console.WriteLine($"  {"without the filler (s of film)",-34} {Spread(tally.ContentSeconds)}");
@@ -610,6 +709,22 @@ internal static class TickMotionProbe
     private sealed class Tally
     {
         public int Matches { get; set; }
+
+        public List<double> ReceiveSpace { get; } = [];
+
+        public List<double> FinalThirdReceiveSpace { get; } = [];
+
+        public List<double> ShotSpace { get; } = [];
+
+        public List<int> ShotMarkers { get; } = [];
+
+        public Dictionary<PassageAction, long> Stamps { get; } = [];
+
+        public Dictionary<PassageAction, long> Blame { get; } = [];
+
+        public Dictionary<PassageAction, long> BlameInFilm { get; } = [];
+
+        public long FilmFrames { get; set; }
 
         public long PlayerFrames { get; set; }
 

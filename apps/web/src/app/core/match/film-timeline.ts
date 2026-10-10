@@ -1,6 +1,8 @@
 import { LineupIndex, lineupIndexOf } from './match-lineups';
 import { placePassages } from './match-playback';
 import {
+  BlameKind,
+  blameKindOf,
   cardKindFor,
   isGoalCommentary,
   isGoalOutcome,
@@ -141,6 +143,17 @@ export interface FilmCardMoment {
   readonly kind: FilmCardKind;
 }
 
+/** A mistake the film shows: a player lost the ball or was beaten at a film moment (`tick-film-v1`). */
+export interface FilmBlame {
+  /** The slot the man stands in, an entity id such as `H9`. */
+  readonly entityId: string;
+  /** The film moment of the error. */
+  readonly filmMilliseconds: number;
+  readonly kind: BlameKind;
+  /** The action tag the engine wrote: `dispossessed`, `misplaced`, `beaten` or `bypassed`. */
+  readonly action: string;
+}
+
 /** A cut: the instant the players and the ball are put somewhere new, because they could not walk there. */
 export interface FilmCut {
   readonly startMilliseconds: number;
@@ -200,6 +213,9 @@ export class FilmTimeline {
   /** The cuts, in film order. */
   readonly cuts: readonly FilmCut[];
 
+  /** The mistakes the film shows (a ball lost, a man beaten), in film order. */
+  readonly blames: readonly FilmBlame[];
+
   /** The stretches the half-time card holds. */
   readonly halfTimes: readonly FilmInterval[];
 
@@ -225,6 +241,7 @@ export class FilmTimeline {
     this.markers = parts.markers;
     this.goals = parts.goals;
     this.cuts = parts.cuts;
+    this.blames = parts.blames;
     this.halfTimes = parts.halfTimes;
     this.cardMoments = parts.cardMoments;
     this.clockTimes = parts.clockTimes;
@@ -372,6 +389,30 @@ export class FilmTimeline {
     return { home, away };
   }
 
+  /**
+   * Fills `out` with the mistakes made in the `windowMilliseconds` up to a film moment, newest last, and returns how
+   * many there are. The caller owns the array and reuses it, so a frame allocates nothing.
+   */
+  blamesAt(filmMilliseconds: number, windowMilliseconds: number, out: FilmBlame[]): number {
+    out.length = 0;
+
+    const upTo = countAtOrBefore(this.blames, filmMilliseconds);
+    let from = upTo;
+
+    while (
+      from > 0 &&
+      filmMilliseconds - this.blames[from - 1].filmMilliseconds < windowMilliseconds
+    ) {
+      from -= 1;
+    }
+
+    for (let index = from; index < upTo; index += 1) {
+      out.push(this.blames[index]);
+    }
+
+    return out.length;
+  }
+
   /** How far into a goal's celebration a film moment is, or -1 when none is being celebrated. */
   celebrationAt(filmMilliseconds: number): number {
     const goal = this.activeGoalAt(filmMilliseconds);
@@ -407,6 +448,7 @@ export interface FilmTimelineParts {
   readonly markers: readonly FilmMarker[];
   readonly goals: readonly FilmGoal[];
   readonly cuts: readonly FilmCut[];
+  readonly blames: readonly FilmBlame[];
   readonly halfTimes: readonly FilmInterval[];
   readonly cardMoments: readonly FilmCardMoment[];
   readonly clockTimes: readonly number[];
@@ -587,6 +629,7 @@ export function buildFilmTimeline(presentation: MatchPresentation | null): FilmT
     durationMilliseconds,
     passageStarts: placed.map((item) => item.startMilliseconds),
     slots,
+    blames: blamesOf(slots),
     ball: ballTrack.finish(),
     ballEntity,
     homeColour: passages[0]?.homeColour ?? DEFAULT_HOME_COLOUR,
@@ -886,6 +929,26 @@ function tokenSide(token: HighlightCommentary, index: LineupIndex): string {
   const participantId = parameter(token.parameters, 'participantId');
 
   return participantId === undefined ? '' : (index.sideByParticipant.get(participantId) ?? '');
+}
+
+/** The mistakes the slots' tracks are tagged with, in film order: read once, so a frame never scans a track for them. */
+function blamesOf(slots: readonly FilmSlot[]): readonly FilmBlame[] {
+  const blames: FilmBlame[] = [];
+
+  for (const slot of slots) {
+    const { actions, times, length } = slot.track;
+
+    for (let index = 0; index < length; index += 1) {
+      const action = actions[index];
+      const kind = blameKindOf(action);
+
+      if (action !== null && kind !== null) {
+        blames.push({ entityId: slot.id, filmMilliseconds: times[index], kind, action });
+      }
+    }
+  }
+
+  return blames.sort(byFilmTime);
 }
 
 /** The cards everybody carries after each card in turn, so a frame looks a state up rather than building one. */

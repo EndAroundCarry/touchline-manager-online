@@ -129,11 +129,12 @@ public sealed class TickDefensiveAITests
         Presses(MatchPressing.HighPress, 3_100).Should().BeTrue();
         Presses(MatchPressing.HighPress, 3_500).Should().BeFalse("a high press closes down from 32 m");
 
-        // How high up the pitch each one goes: a low block stays in its own half, a mid block out of the final third.
+        // How high up the pitch each one goes: a low block stays in its own half, a mid block out of the final third, a high press out of the opponent's box.
         Presses(MatchPressing.LowBlock, 800, ballX: 6_000).Should().BeFalse();
         Presses(MatchPressing.MidBlock, 800, ballX: 6_000).Should().BeTrue();
         Presses(MatchPressing.MidBlock, 800, ballX: 8_000).Should().BeFalse();
-        Presses(MatchPressing.HighPress, 800, ballX: 8_000).Should().BeTrue();
+        Presses(MatchPressing.HighPress, 800, ballX: 7_500).Should().BeTrue();
+        Presses(MatchPressing.HighPress, 800, ballX: 9_000).Should().BeFalse("a high press starts at the edge of the box, not at the goal kick");
     }
 
     [Fact]

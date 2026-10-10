@@ -1385,9 +1385,9 @@ for version 12; changing one moves the golden hash in `TickEngineTests`.
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `TickPlayerSkills.CurvePercent` | 60 | A player's attribute counts 60% of its distance from 13. |
+| `TickPlayerSkills.CurvePercent` | 38 | A player's attribute counts 38% of its distance from 13 (60 before the ball flowed, §14.12). |
 | `TickBallCarrierBrain.ShotMinimumChance` | 1,850 bp | Below this heuristic chance a carrier does not shoot. |
-| `TickBallCarrierBrain.ShotBaseError` | 210 | Base error angle of an open-play shot (a set piece: `SetPieceShotBaseError` 50). |
+| `TickBallCarrierBrain.ShotBaseError` | 200 | Base error angle of an open-play shot (a set piece: `SetPieceShotBaseError` 50). |
 | `TickBallCarrierBrain.ErrorSkillWeight`, `MinimumErrorPercent` | 5, 25% | A kick's error is `Base × max(25%, 100 − (5 × skill + Technique) / 2)`. |
 | `TickBallCarrierBrain.PassArrivalCentimetresPerSecond` | 1,000 | A ground pass arrives at 10 m/s. |
 | `TickBallCarrierBrain.OffsideCarelessBase`, `…PerPoint` | 12%, 4 | Share of offside receivers a carrier misses, by Decisions plus Anticipation below 26. |
@@ -1397,6 +1397,10 @@ for version 12; changing one moves the golden hash in `TickEngineTests`.
 | `TickMatchLoop.PenaltyGivenBasisPoints` | 1,000 bp | Share of fouls in the area given as penalties. |
 | `TickMatchLoop.BlockToCornerBasisPoints` | 4,500 bp | Share of blocked shots turned behind for a corner. |
 | `TickTacticalGeometry.DefenceMinimumX`, `AttackMarginX` | 800, 700 | The nearest to a goal line a shape position goes. |
+| `TickTackleResolver.FoulScalePercent` | 250 | A challenge's foul chance as a multiple of the possession engine's, in percent (§14.12). |
+| `TickDefensiveAI.HighPressLimit` | 7,800 | The farthest up the pitch a high press presses (§14.12). |
+| `TickMatchLoop` hold: `FirstTouchTicks`, `DwellTicks`, `DwellScale`, `MaximumDwellTicks`, `OneTouchPressure` | 3, 60, 8,000 bp, 40, 7,000 bp | How long a man keeps a ball he has received (§14.12). |
+| `TickMatchLoop.ReceiverAdjustUnits` | 300 | How far from where a pass was aimed its receiver goes to meet it. |
 | `TickShotStopper` reach | `70 + 40 + 6 × (Agility + Reflexes) / 2` | A goalkeeper dives on his reflexes as well as his agility. |
 
 Home advantage is the snapshot's `HomeAdvantageBasisPoints` less 10,000, added to the home side's man in every tackle and interception roll.
@@ -1543,3 +1547,92 @@ Cutting a film takes about 60 ms.
 
 The harness, seed 11: 60 fps with no dropped frame, 0 covered tokens; 205 stutters a film minute against 194 before (the denser sampling follows the engine's
 stops more faithfully); 100 frame jumps outside the cuts against 111 on the same seed before this milestone.
+
+### 14.11 Who erred and who was beaten (the tick-film plan, Milestone 3)
+
+Recording and viewer only: play is unchanged (the golden hash and the calibration stand; `tickmotion` reproduces the Milestone 0 baseline to the digit).
+Four new action tags (`PassageAction`, wire codes in `PassageVocabulary.Code`) say whom to blame. They are stamped on the man at fault, at the moment of
+the error, through `Tag(...)`/`TagBlame(...)` in the loop, which only writes the recording and draws nothing:
+
+| Tag | Stamped on | When |
+|---|---|---|
+| `dispossessed` | the carrier | a tackle is `Won` or `PokedLoose` (the tackler gets `tackle` on the same frame) |
+| `misplaced` | the passer | his pass is cut out (`Interception`), or the ball leaves the pitch with the pass still in flight |
+| `beaten` | the defender, or the goalkeeper | a tackle is `Beaten`, or a smother is `Beaten` (the carrier keeps the ball) |
+| `bypassed` | a defender | he was on the goal side of the carrier within 3 m and, 1 to 3 s later, is 1 m or more behind him, the same man still on the ball and no challenge made (`TrackBypassed`, from the bodies) |
+
+A man is not stamped `beaten` or `bypassed` twice within 3 s (a defender beaten tick after tick in one dribble is shown beaten once). Because a blame tag is
+not a touch of the ball, `PassageVocabulary.IsBlame` lets a reader following who played the ball last step over it (`TickMoveFinder.TouchSide` does).
+
+**In the film.** The synthesizer keeps the tags on keyframes (the compressor never drops an action keyframe) and ranks them in `ActionPriority` below a
+save and above a pass. Two beat kinds narrate them, `PassageBeatKind.LosesBall` ("X loses it to Y", Y being the other side's tackler or interceptor at
+the same frame, when there is one) and `Skipped` ("Y skips past X": Y is the man on the ball, X the man left behind), at priorities 45 and 35, so a
+dispossession reads in place of the tackle line and a beaten man in place of the carry line. A keeper beaten in a smother loses his dive streak for that
+segment: `beaten` outranks `dive` on the one keyframe.
+
+**On the pitch.** `FilmTimeline.blames` lists the tags of every slot's track in film order; `blamesAt(t, window, out)` fills a caller-owned array with
+the mistakes of the last 1.5 s of film, so a frame allocates nothing and a seek shows exactly what playing through would have. The renderer draws, over the
+token (after the tokens have been pushed apart), a **red ring** for a ball lost (`dispossessed`, `misplaced`) and an **amber double chevron** for a man
+beaten (`beaten`, `bypassed`), each with a small label under the token ("Dispossessed", "Misplaced pass", "Beaten", "Outrun"). The marker holds full for the
+first quarter of `BLAME_MILLISECONDS` (1.5 s) and fades to nothing over the rest.
+
+Measured over 200 matches, seed 11 (`tickmotion`):
+
+| Per match | Stamped | In the film | A film minute |
+|---|---|---|---|
+| dispossessed | 208.0 | 57.3 | 3.47 |
+| misplaced | 240.0 | 70.9 | 4.29 |
+| beaten | 193.9 | 63.7 | 3.86 |
+| bypassed | 3.7 | 1.6 | 0.09 |
+
+That is a marker about every five seconds of film. `bypassed` is rare because a defender who is 3 m goal-side and then 1 m behind without a challenge is
+rare in this engine: pressers close the carrier down. Both its window and the rule are constants (`BypassReach`, `BypassMinTicks`, `BypassMaxTicks`,
+`BypassBehindUnits`) if the plan's reading is too strict.
+
+### 14.12 The ball flows: meet the pass, decide early, first touch (the tick-film plan, Milestone 4)
+
+Engine play changes; this is the first milestone to move the golden hash (re-pinned to `2984c8c4…`). Matches stored under the old build of engine-v12 refuse to
+replay (MAT-9): play new ones.
+
+**What changed.**
+
+| Piece | What it does |
+|---|---|
+| `TickInterception` | Plays the ball forward 6 s on a scratch ball (`Trace`, the real `Step`) and finds, for a man, the first point he can be at as soon as the ball is (`EarliestReach`: speed now along the line, acceleration to top speed, tiredness, the turn). |
+| `PlanBall`, `AssignChasers` | A pass used to send its receiver to where the ball *stops* (up to 25 m past him). Now the man it was played to goes to meet it, within `ReceiverAdjustUnits` (3 m) of where it was aimed, so a pass that goes wide of him is wide of him; the best man of each other side goes to the earliest point he can reach. Chasers run only as hard as they need (`MeetingPace`, a jog at least). |
+| `PrepareReceiver` | Four ticks or fewer from the ball, the receiver runs the brain for himself from where he will be; that is his decision on the first tick he has it. |
+| Cushioned touch | `TickBallPhysics.Attach(…, cushioned: true)`: the ball runs on a step, is eased over 3 ticks to a touch 1 m ahead along his heading, then drawn in over 3 ticks to the 0.3 m dribbling offset. Who controls the ball is the same, so duels are unchanged. |
+| Hold (`HoldTicks`) | First touch 3 ticks; while nobody is on him a man adds a dwell of up to 40 ticks that falls to nothing as the pressure reaches 8,000 bp; with Technique 12 or more he plays first time (1 tick) from 7,000 bp or when he shoots. |
+| Lane reach | A defender within 2.5 m of a pass on the ground (swept along the tick's path) gets the cut-out roll, not only one within 1.2 m of where the ball ends the tick. |
+
+**What the faster ball did, and what was done about it.** A ball that arrives in a second and is met at pace roughly doubles the passes a match
+(1,100 to 1,750) and shifts the balance of the whole game. Calibration moved these, one at a time against the 205 stored snapshots:
+
+- *Fouls* collapsed (22 to 2 a match) because a carrier is challenged far less: `FoulScalePercent` 250 takes the fouls (and so the cards) from the challenges there are.
+- *Scoring on real squads* ran away (7 to 8 goals) while uniform sides barely moved. Flattening each attribute group showed Finishing, Dribbling and Composure carry it; the skill curve went from 60% to 38%.
+- *The high press* applied to the opponent's goal kick and, against a ball that now gets out cleanly, was worth +2.6 goals a match to the side pressed (4.4 against 1.7 at the default): `HighPressLimit` stops it at the edge of the opponent's box.
+- *Shot error* 210 to 200, the shot floor unchanged (1,850 bp).
+
+Measured over 200 to 300 matches, seed 11 (`tickmotion`, `tick`), and 205 stored snapshots (`ticksnap`):
+
+| | Before (5163b96 + M3) | After |
+|---|---|---|
+| Ball speed at reception p50 | 2.4 m/s | 11.1 m/s |
+| Kick to reception p50 | 48 ticks | 10 ticks |
+| Slow tail before reception | 55% | 0.2% |
+| Receiver moving toward the ball | 2% | 72% |
+| Hold p50 / p90, first-time plays | 3 / 10 ticks, 1.6% | 6 / 21 ticks, 28% |
+| Passes a match (engine count), completion | 1,104, 77% | 1,775, 82% |
+| Opponents under 1 m outside duels | 35% | 13.5% |
+| Stored snapshots: goals, shots, on target | 2.83, 28.3, 38% | 2.85, 29.7, 29% |
+| Stored: completion, yellow cards, fouls | 76%, 4.0, 22 | 84%, 3.5, 20 |
+| Stored: home / draw / away | 42 / 24 / 34 | 40 / 25 / 35 |
+| Uniform sides, board formations (`tick`) | 2.4 goals, 26.5 shots | 2.0 goals, 20.7 shots |
+| Play, ms a match (alone) | 296 | 533 |
+
+**Where it is outside the plan, and why.** Shots are 6% over the band and on target is 29% (band 32–38): the shot floor was kept so uniform sides still shoot (a higher
+floor starves them: 0.9 goals), and a lower shot error raises goals faster than it raises the on-target share. The hold median is 6 ticks, not 4: the passes a match
+fall back to a plausible level only if a free man keeps the ball, and a shorter hold takes the challenges (and the fouls) away. Distance per outfielder is 16.0 km a
+90 against 13.6 before and an aim of 9.5–11.5: the block follows a ball that travels twice as far, which M5 (a smoothed, anticipating ball reference) is for.
+Equal-level sides are no longer level-invariant (ability 10 / 13 / 16 give 15 / 19.5 / 24.7 shots, the baseline 20 / 22 / 25): the attacker's skills now count for
+more than the defender's. A play of 533 ms a match against 296 is the path trace and the extra decisions.

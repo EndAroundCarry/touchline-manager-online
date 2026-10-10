@@ -1,4 +1,6 @@
 import {
+  blameKindOf,
+  blameLabelOf,
   cardKindFor,
   commentarySideLabel,
   conditionColorClass,
@@ -241,5 +243,26 @@ describe('match presentation helpers', () => {
     expect(cardKindFor('match.card.second_yellow')).toBe('red');
     expect(cardKindFor('match.card.red')).toBe('red');
     expect(cardKindFor('match.foul')).toBeNull();
+  });
+});
+
+describe('blame tags', () => {
+  it('tells a lost ball from a man beaten, and neither from a touch', () => {
+    expect(blameKindOf('dispossessed')).toBe('lost');
+    expect(blameKindOf('misplaced')).toBe('lost');
+    expect(blameKindOf('beaten')).toBe('beaten');
+    expect(blameKindOf('bypassed')).toBe('beaten');
+    expect(blameKindOf('tackle')).toBeNull();
+    expect(blameKindOf(null)).toBeNull();
+    expect(blameKindOf(undefined)).toBeNull();
+  });
+
+  it('labels each mistake in words, and a touch in none', () => {
+    expect(blameLabelOf('dispossessed')).toBe('Dispossessed');
+    expect(blameLabelOf('misplaced')).toBe('Misplaced pass');
+    expect(blameLabelOf('beaten')).toBe('Beaten');
+    expect(blameLabelOf('bypassed')).toBe('Outrun');
+    expect(blameLabelOf('pass')).toBe('');
+    expect(blameLabelOf(null)).toBe('');
   });
 });

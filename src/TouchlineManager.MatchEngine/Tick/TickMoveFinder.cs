@@ -172,11 +172,11 @@ internal static class TickMoveFinder
 
     /// <summary>
     /// Finds the side of whoever played the ball last at a frame, walking <paramref name="index"/> back through the actions as the frame
-    /// goes back. Running and celebrating are not touches of the ball.
+    /// goes back. Running and celebrating are not touches of the ball, and neither is a stamp that blames a man for losing it.
     /// </summary>
     private static int TouchSide(List<TickActionStamp> actions, ref int index, int frame)
     {
-        while (index >= 0 && (actions[index].Frame > frame || actions[index].Entity < 0 || actions[index].Action is PassageAction.Run or PassageAction.Celebrate))
+        while (index >= 0 && (actions[index].Frame > frame || actions[index].Entity < 0 || actions[index].Action is PassageAction.Run or PassageAction.Celebrate || actions[index].Action.IsBlame()))
         {
             index--;
         }

@@ -228,6 +228,11 @@ internal sealed partial class TickMatchLoop
         else
         {
             StepOpenPlay();
+
+            if (_recording is not null && !_machine.IsDeadBall)
+            {
+                TrackBypassed();
+            }
         }
 
         Record();

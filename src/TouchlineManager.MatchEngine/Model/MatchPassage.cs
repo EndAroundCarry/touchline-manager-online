@@ -157,6 +157,23 @@ public enum PassageAction
 
     /// <summary>Celebrated a goal.</summary>
     Celebrate = 13,
+
+    /// <summary>
+    /// Was beaten (`tick-film-v1`): a defender the carrier dribbled past, or a goalkeeper he rounded. Not a touch of the ball.
+    /// </summary>
+    Beaten = 14,
+
+    /// <summary>Was dispossessed (`tick-film-v1`): the carrier who lost the ball to a tackle. Not a touch of the ball.</summary>
+    Dispossessed = 15,
+
+    /// <summary>
+    /// Misplaced a pass (`tick-film-v1`): the passer whose ball was cut out or ran out of play untouched. Not a touch of the ball at
+    /// the moment it is stamped.
+    /// </summary>
+    Misplaced = 16,
+
+    /// <summary>Was bypassed (`tick-film-v1`): a defender the carrier outran or turned without a challenge. Not a touch of the ball.</summary>
+    Bypassed = 17,
 }
 
 /// <summary>Stable codes for the passage vocabulary, so a replay and a renderer agree on a spelling.</summary>
@@ -193,8 +210,20 @@ public static class PassageVocabulary
         PassageAction.Save => "save",
         PassageAction.Dive => "dive",
         PassageAction.Celebrate => "celebrate",
+        PassageAction.Beaten => "beaten",
+        PassageAction.Dispossessed => "dispossessed",
+        PassageAction.Misplaced => "misplaced",
+        PassageAction.Bypassed => "bypassed",
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Unknown action."),
     };
+
+    /// <summary>
+    /// Gets whether an action only says who erred or was beaten (`tick-film-v1`): it is stamped on the man at fault, who has not
+    /// touched the ball, so a reader following who played the ball last must step over it.
+    /// </summary>
+    /// <param name="action">The action.</param>
+    public static bool IsBlame(this PassageAction action) =>
+        action is PassageAction.Beaten or PassageAction.Dispossessed or PassageAction.Misplaced or PassageAction.Bypassed;
 }
 
 /// <summary>

@@ -1,4 +1,5 @@
-import { FilmTimeline } from '../../../core/match/film-timeline';
+import { FilmBlame, FilmTimeline } from '../../../core/match/film-timeline';
+import { blameLabelOf } from '../../../core/match/match-presentation';
 import { KeyframeSample, TrackInterpolator, emptySample } from './keyframe-interpolator';
 import {
   PITCH_COORDINATE_SCALE,
@@ -13,6 +14,8 @@ import {
   pitchRect,
 } from './pitch-layout';
 import {
+  BLAME_MILLISECONDS,
+  blameStrength,
   isDiveAction,
   isStrikeAction,
   nearestPlayerToBall,
@@ -91,6 +94,7 @@ export class CanvasMatchRenderer {
   private readonly scratch: KeyframeSample = emptySample();
   private readonly trailFrom: KeyframeSample = emptySample();
   private readonly trailTo: KeyframeSample = emptySample();
+  private readonly blames: FilmBlame[] = [];
   private ball: LiveEntity | null = null;
 
   // Scratch for pushing tokens apart, grown once and reused.
@@ -222,6 +226,8 @@ export class CanvasMatchRenderer {
     for (const player of this.players) {
       this.drawPlayer(rect, player, radius, ball, cards);
     }
+
+    effects += this.drawBlames(rect, radius, timeMs);
 
     if (ball !== null) {
       if (wantsTrail(ball.action, ball.z, ball.speed)) {
@@ -717,6 +723,126 @@ export class CanvasMatchRenderer {
     if (card !== undefined) {
       this.drawCard(groundX, pointY, radius, card);
     }
+  }
+
+  /**
+   * Marks the men who have just made a mistake: a red ring on one who lost the ball, an amber chevron over one who was
+   * beaten, each with its label, fading over `BLAME_MILLISECONDS` of film (`tick-film-v1`).
+   *
+   * The marker is a function of the film moment alone, so a seek shows exactly what playing through would have. It
+   * follows the token to where it is drawn, after the tokens have been pushed apart.
+   *
+   * @returns How many markers were drawn.
+   */
+  private drawBlames(rect: PitchRect, radius: number, timeMs: number): number {
+    if (this.timeline.blamesAt(timeMs, BLAME_MILLISECONDS, this.blames) === 0) {
+      return 0;
+    }
+
+    let drawn = 0;
+
+    for (const blame of this.blames) {
+      const strength = blameStrength(timeMs - blame.filmMilliseconds);
+
+      if (strength <= 0) {
+        continue;
+      }
+
+      for (const player of this.players) {
+        if (player.entity.id !== blame.entityId) {
+          continue;
+        }
+
+        const x = canvasX(player.position.x, rect);
+        const y =
+          canvasY(player.position.y, rect) - (player.z > 0 ? altitudeLift(rect, player.z) : 0);
+
+        if (blame.kind === 'lost') {
+          this.drawLostRing(x, y, radius, strength);
+        } else {
+          this.drawBeatenChevron(x, y, radius, strength);
+        }
+
+        this.drawBlameLabel(x, y, radius, strength, blame);
+        drawn += 1;
+
+        break;
+      }
+    }
+
+    return drawn;
+  }
+
+  /** A red ring round the token of a man who lost the ball. */
+  private drawLostRing(x: number, y: number, radius: number, strength: number): void {
+    const context = this.context;
+
+    context.save();
+    context.strokeStyle = `rgba(239, 68, 68, ${(0.95 * strength).toFixed(3)})`;
+    context.lineWidth = Math.max(2, radius * 0.3);
+    context.beginPath();
+    context.arc(x, y, radius * (1.45 + 0.35 * (1 - strength)), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
+
+  /** An amber chevron over the token of a man who was beaten, pointing down at him. */
+  private drawBeatenChevron(x: number, y: number, radius: number, strength: number): void {
+    const context = this.context;
+    const half = radius * 0.75;
+    const depth = radius * 0.55;
+    const top = y - radius * 1.35 - depth * 2;
+
+    context.save();
+    context.strokeStyle = `rgba(245, 158, 11, ${(0.95 * strength).toFixed(3)})`;
+    context.lineWidth = Math.max(2, radius * 0.3);
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+
+    for (let chevron = 0; chevron < 2; chevron += 1) {
+      const offset = chevron * depth * 1.1;
+
+      context.beginPath();
+      context.moveTo(x - half, top + offset);
+      context.lineTo(x, top + offset + depth);
+      context.lineTo(x + half, top + offset);
+      context.stroke();
+    }
+
+    context.restore();
+  }
+
+  /** The words for a mistake, in a small pill under the token, so the name tag above it stays readable. */
+  private drawBlameLabel(
+    x: number,
+    y: number,
+    radius: number,
+    strength: number,
+    blame: FilmBlame,
+  ): void {
+    const label = blameLabelOf(blame.action);
+
+    if (label.length === 0) {
+      return;
+    }
+
+    const context = this.context;
+    const width = label.length * 5.2 + 10;
+    const height = 13;
+    const top = y + radius + 4;
+    const lost = blame.kind === 'lost';
+
+    context.save();
+    context.fillStyle = lost
+      ? `rgba(127, 29, 29, ${(0.9 * strength).toFixed(3)})`
+      : `rgba(120, 53, 15, ${(0.9 * strength).toFixed(3)})`;
+    context.fillRect(x - width / 2, top, width, height);
+    context.fillStyle = `rgba(254, 242, 242, ${strength.toFixed(3)})`;
+    context.font = '600 9px system-ui, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(label, x, top + height / 2 + 0.5);
+    context.restore();
   }
 
   /** A short shadow on the grass under a player who has jumped. */

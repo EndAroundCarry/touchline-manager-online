@@ -680,11 +680,15 @@ internal sealed class TickReplaySynthesizer
         PassageAction.FreeKick,
         PassageAction.Shot,
         PassageAction.Save,
+        PassageAction.Beaten,
         PassageAction.Dive,
         PassageAction.Cross,
         PassageAction.Header,
         PassageAction.Tackle,
         PassageAction.Interception,
+        PassageAction.Dispossessed,
+        PassageAction.Misplaced,
+        PassageAction.Bypassed,
         PassageAction.Pass,
         PassageAction.Receive,
         PassageAction.Carry,
@@ -854,13 +858,37 @@ internal sealed class TickReplaySynthesizer
                 continue;
             }
 
+            if (kind == PassageBeatKind.LosesBall)
+            {
+                // The loser is the actor; the man who won it is the other side's tackle or interception at the same frame, if there is one.
+                var winner = WinnerOf(item, stamp);
+
+                target = winner is { } won ? item.Occupants[won] : null;
+            }
+            else if (kind == PassageBeatKind.Skipped)
+            {
+                // The stamp is on the man left behind; the beat is about the man who was on the ball and went past him.
+                var carrier = _recording.Controller(Math.Min(stamp.Frame, _recording.FrameCount - 1));
+
+                if (carrier < 0 || item.Occupants[carrier] == Guid.Empty || FilmRoster.SideOf(carrier) == side)
+                {
+                    continue;
+                }
+
+                target = actor;
+                actor = item.Occupants[carrier];
+                side = FilmRoster.SideOf(carrier);
+            }
+
             var priority = kind switch
             {
                 PassageBeatKind.Chance => 80,
                 PassageBeatKind.Cross => 70,
                 PassageBeatKind.Header or PassageBeatKind.Save => 60,
                 PassageBeatKind.Interception => 50,
+                PassageBeatKind.LosesBall => 45,
                 PassageBeatKind.Tackle => 40,
+                PassageBeatKind.Skipped => 35,
                 PassageBeatKind.Carry => 30,
                 _ => 20,
             };
@@ -886,6 +914,24 @@ internal sealed class TickReplaySynthesizer
             .ToList();
 
         return [.. CommentaryTokenBuilder.BuildPassageCommentary(_input, ordered, Math.Max(1, item.DurationMs))];
+    }
+
+    /// <summary>Finds the slot entity that took the ball off a man who lost it: the other side's tackle or interception at the same frame.</summary>
+    private static int? WinnerOf(Item item, TickActionStamp loss)
+    {
+        foreach (var other in item.Marks)
+        {
+            if (other.Frame == loss.Frame
+                && other.Entity >= 0
+                && FilmRoster.SideOf(other.Entity) != FilmRoster.SideOf(loss.Entity)
+                && other.Action is PassageAction.Tackle or PassageAction.Interception
+                && item.Occupants[other.Entity] != Guid.Empty)
+            {
+                return other.Entity;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Finds who a pass was played to: the next teammate to receive it, within the next six seconds of play.</summary>

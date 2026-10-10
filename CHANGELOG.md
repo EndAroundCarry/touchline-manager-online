@@ -4,6 +4,44 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tick film, Milestone 4 — the ball flows
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.12. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its
+label): matches stored under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- **A pass is met on its way.** The man it was played to goes to where it will come to him (within 3 m of where it was aimed) instead of to where it would stop up to
+  25 m beyond him; the best chaser of each side goes to the earliest point he can reach, at the pace he needs. The ball reaches a receiver at about 11 m/s in a second,
+  not at 2 m/s after five.
+- **A first touch.** A received ball runs on a step, is eased to a touch a metre ahead and drawn in to the foot, instead of stopping dead; the receiver decides what to do
+  with it before it arrives; a pressed man with the Technique plays first time (28% of receptions), a free one takes up to four seconds.
+- **Re-calibrated for the faster game**: a challenge's foul chance ×2.5 (the fouls and cards come from far fewer challenges), the skill curve 60% to 38%, the high press
+  stops at the edge of the opponent's box, shot error 210 to 200.
+
+### Added
+
+- `TickInterception` (the path of the ball and the earliest point a man reaches it), `TickBallPhysics.Attach(…, cushioned)`, and the motion probe's room
+  at reception and at the shot and its stamp histogram.
+
+### Known
+
+- Play is 1.8× slower to simulate (533 ms a match); distance run is 16 km a 90 (M5); equal sides of different ability are no longer equally productive; shots run 6%
+  over the band and on-target is 29%.
+
+## Tick film, Milestone 3 — the film shows who erred and who was beaten
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.11. The engine's play is unchanged (the golden hash and the calibration
+stand); the loop stamps four new facts into the recording and the film carries them.
+
+### Added
+
+- **Four blame tags**: `dispossessed` (the carrier who lost the ball to a tackle), `misplaced` (the passer whose pass was cut out or went out untouched),
+  `beaten` (the defender or goalkeeper the carrier got past) and `bypassed` (a defender outrun without a challenge).
+- **Markers on the pitch**: a red ring for a ball lost, an amber chevron for a man beaten, with a label, fading over 1.5 s of film.
+- **Commentary** for them: "X loses it to Y" and "Y skips past X".
+- The motion probe reports the stamps a match, in the film and a film minute.
+
 ## Tick film, Milestone 2 — the film shows the whole move, and is longer
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.10. The engine's play is unchanged (the golden hash and the calibration

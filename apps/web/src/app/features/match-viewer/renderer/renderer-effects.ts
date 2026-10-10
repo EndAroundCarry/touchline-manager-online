@@ -29,6 +29,27 @@ const DIVE_ACTIONS = new Set(['save', 'dive']);
 /** How close a player must be to the ball to be shown as in possession, in normalized units (~9 m). */
 export const POSSESSION_DISTANCE = 900;
 
+/** How long a mistake's marker stays on a token, in film milliseconds, fading as it goes. */
+export const BLAME_MILLISECONDS = 1_500;
+
+/**
+ * How strong a mistake's marker is, 1 at the moment of the error to 0 when it has faded (`tick-film-v1`).
+ *
+ * The marker holds for a moment so it can be seen, then fades to nothing over the rest of `BLAME_MILLISECONDS`. A
+ * moment before the error is no marker at all: a seek must not show a ring for a mistake that has not happened.
+ */
+export function blameStrength(elapsedMilliseconds: number): number {
+  if (elapsedMilliseconds < 0 || elapsedMilliseconds >= BLAME_MILLISECONDS) {
+    return 0;
+  }
+
+  const held = BLAME_MILLISECONDS * 0.25;
+
+  return elapsedMilliseconds <= held
+    ? 1
+    : 1 - (elapsedMilliseconds - held) / (BLAME_MILLISECONDS - held);
+}
+
 /** The speed, in normalized units per second, at or above which an airborne ball earns a trail. */
 export const TRAIL_MIN_SPEED = 2_400;
 

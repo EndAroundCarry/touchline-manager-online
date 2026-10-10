@@ -314,6 +314,75 @@ public sealed class TickMatchLoopTests
         allocated.Should().BeLessThan(6 * 1024 * 1024);
     }
 
+    [Fact]
+    public void A_completed_pass_is_met_on_its_way_and_not_at_the_end_of_its_roll()
+    {
+        var recording = TickPlay.Even.Recording;
+        var half = TickMatchRecording.Entities / 2;
+        var flights = new List<int>();
+        var arrivals = new List<int>();
+        var actions = recording.Actions;
+
+        for (var index = 0; index < actions.Count; index++)
+        {
+            var kick = actions[index];
+
+            if (kick.Action != PassageAction.Pass || kick.Frame + 3 >= recording.FrameCount || recording.State(kick.Frame) != TickPlayState.OpenPlay)
+            {
+                continue;
+            }
+
+            // The next thing that ends the ball's flight: a reception by a team-mate completes the pass.
+            var next = actions.Skip(index + 1).FirstOrDefault(stamp => stamp.Action is PassageAction.Receive or PassageAction.Interception or PassageAction.Pass or PassageAction.Cross or PassageAction.Shot);
+
+            if (next is not { Action: PassageAction.Receive } reception
+                || reception.Entity / half != kick.Entity / half
+                || reception.Entity == kick.Entity
+                || reception.Frame - kick.Frame < 3
+                || reception.Frame >= recording.FrameCount)
+            {
+                continue;
+            }
+
+            var dx = recording.BallX(reception.Frame - 1) - recording.BallX(reception.Frame - 2);
+            var dy = recording.BallY(reception.Frame - 1) - recording.BallY(reception.Frame - 2);
+
+            flights.Add(reception.Frame - kick.Frame);
+            arrivals.Add(Distance(dx, dy, 0, 0));
+        }
+
+        flights.Count.Should().BeGreaterThan(100);
+        flights.Order().ElementAt(flights.Count / 2).Should().BeLessThan(25, "a pass is met in a second or two, where it used to crawl for five");
+        arrivals.Order().ElementAt(arrivals.Count / 2).Should().BeGreaterThan(60, "it arrives at pace (6 m/s or more), and is not waited for until it stops");
+    }
+
+    [Fact]
+    public void A_received_ball_is_eased_to_the_foot_and_has_settled_there_within_a_second()
+    {
+        var recording = TickPlay.Even.Recording;
+        var gaps = new List<int>();
+
+        foreach (var stamp in recording.Actions.Where(action => action.Action == PassageAction.Receive))
+        {
+            var frame = stamp.Frame + 8;
+
+            if (frame >= recording.FrameCount || recording.Controller(frame) != stamp.Entity || recording.State(frame) != TickPlayState.OpenPlay)
+            {
+                continue;
+            }
+
+            gaps.Add(Distance(
+                recording.BallX(frame),
+                recording.BallY(frame),
+                recording.PlayerX(frame, stamp.Entity),
+                recording.PlayerY(frame, stamp.Entity)));
+        }
+
+        gaps.Count.Should().BeGreaterThan(50);
+        gaps.Order().ElementAt(gaps.Count / 2).Should().BeLessThan(100, "after the touch and the settling the ball is at his foot again");
+        gaps.Max().Should().BeLessThan(400, "and is never left behind");
+    }
+
     private static int Distance(int ax, int ay, int bx, int by)
     {
         var dx = (double)(ax - bx);

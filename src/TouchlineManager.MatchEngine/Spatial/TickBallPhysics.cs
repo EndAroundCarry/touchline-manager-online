@@ -97,6 +97,17 @@ public sealed class TickBallPhysics
     /// <summary>The distance a dribbled ball sits ahead of its player, in pitch units (0.3 m).</summary>
     public const int DribbleOffsetUnits = 29;
 
+    /// <summary>How far ahead of a player the first touch of a received ball goes, in pitch units (1.0 m).</summary>
+    public const int TouchLeadUnits = 100;
+
+    /// <summary>The ticks over which a received ball is eased from where it arrived to the touch ahead.</summary>
+    public const int CushionTouchTicks = 3;
+
+    /// <summary>The ticks over which the touch is then drawn in to the dribbling offset.</summary>
+    public const int CushionSettleTicks = 3;
+
+    private const int CushionTotalTicks = CushionTouchTicks + CushionSettleTicks;
+
     /// <summary>The reach of a player on a ball at his feet, in pitch units (1.2 m).</summary>
     public const int GroundReceptionRadiusUnits = 120;
 
@@ -119,6 +130,14 @@ public sealed class TickBallPhysics
     private const int WoodworkRestitutionBasisPoints = 6_000;
 
     private const int BasisPoints = 10_000;
+
+    /// <summary>The ticks since a cushioned ball was attached; <see cref="CushionTotalTicks"/> or more when there is no cushion.</summary>
+    private int _cushionAge = CushionTotalTicks;
+
+    private int _arrivalSpeedX;
+    private int _arrivalSpeedY;
+    private int _arrivalOffsetX;
+    private int _arrivalOffsetY;
 
     /// <summary>Gets the X position, in fixed units.</summary>
     public int X { get; private set; }
@@ -183,6 +202,11 @@ public sealed class TickBallPhysics
         Mode = other.Mode;
         ControllerIndex = other.ControllerIndex;
         BounceCount = other.BounceCount;
+        _cushionAge = other._cushionAge;
+        _arrivalSpeedX = other._arrivalSpeedX;
+        _arrivalSpeedY = other._arrivalSpeedY;
+        _arrivalOffsetX = other._arrivalOffsetX;
+        _arrivalOffsetY = other._arrivalOffsetY;
     }
 
     /// <summary>Puts the ball at rest on the grass at a point.</summary>
@@ -205,9 +229,17 @@ public sealed class TickBallPhysics
     /// Locks the ball to a player's dribbling foot. <see cref="Carry"/> must then be called each tick.
     /// </summary>
     /// <param name="playerIndex">The player's index.</param>
-    public void Attach(int playerIndex)
+    /// <param name="cushioned">
+    /// True when the ball is arriving, as a pass does: it is not snapped to his foot but runs on a tick and is eased to it
+    /// (<see cref="Carry"/>), so a received ball is a first touch and not a stop. Who has the ball is the same either way.
+    /// </param>
+    public void Attach(int playerIndex, bool cushioned = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(playerIndex);
+
+        _arrivalSpeedX = cushioned ? VelocityX : 0;
+        _arrivalSpeedY = cushioned ? VelocityY : 0;
+        _cushionAge = cushioned ? 0 : CushionTotalTicks;
 
         Mode = TickBallMode.Controlled;
         ControllerIndex = playerIndex;
@@ -222,6 +254,12 @@ public sealed class TickBallPhysics
     /// Holds a controlled ball 0.3 m ahead of its player along his heading, and gives it the player's velocity so a
     /// <see cref="Release"/> carries on at the same pace.
     /// </summary>
+    /// <remarks>
+    /// A cushioned ball (<see cref="Attach"/>) is not 0.3 m ahead at once. On the first tick it carries on a step the way it was
+    /// travelling; over the next <see cref="CushionTouchTicks"/> its place relative to the player is eased from where it arrived to a
+    /// touch <see cref="TouchLeadUnits"/> ahead along his heading, and over <see cref="CushionSettleTicks"/> more it is drawn in to the
+    /// dribbling offset. Nothing about who controls the ball changes, only where the ball is drawn.
+    /// </remarks>
     /// <param name="playerX">The player's X, in fixed units.</param>
     /// <param name="playerY">The player's Y, in fixed units.</param>
     /// <param name="heading">The player's heading, in binary angle units.</param>
@@ -236,9 +274,40 @@ public sealed class TickBallPhysics
         var offset = TickSpatialUnits.ToFixed(DribbleOffsetUnits);
         var cos = TickTrigonometry.Cos(heading);
         var sin = TickTrigonometry.Sin(heading);
+        long offsetX = (long)cos * offset / TickTrigonometry.Scale;
+        long offsetY = (long)sin * offset / TickTrigonometry.Scale;
 
-        X = Math.Clamp(playerX + (int)((long)cos * offset / TickTrigonometry.Scale), 0, TickSpatialUnits.PitchLengthFixed);
-        Y = Math.Clamp(playerY + (int)((long)sin * offset / TickTrigonometry.Scale), 0, TickSpatialUnits.PitchWidthFixed);
+        if (_cushionAge < CushionTotalTicks)
+        {
+            if (_cushionAge == 0)
+            {
+                // The ball's last step: it was moving when it reached him and has not stopped yet.
+                _arrivalOffsetX = X + _arrivalSpeedX - playerX;
+                _arrivalOffsetY = Y + _arrivalSpeedY - playerY;
+            }
+
+            _cushionAge++;
+
+            var lead = TickSpatialUnits.ToFixed(TouchLeadUnits);
+            long leadX = (long)cos * lead / TickTrigonometry.Scale;
+            long leadY = (long)sin * lead / TickTrigonometry.Scale;
+
+            if (_cushionAge <= CushionTouchTicks)
+            {
+                offsetX = _arrivalOffsetX + ((leadX - _arrivalOffsetX) * _cushionAge / CushionTouchTicks);
+                offsetY = _arrivalOffsetY + ((leadY - _arrivalOffsetY) * _cushionAge / CushionTouchTicks);
+            }
+            else
+            {
+                var settled = _cushionAge - CushionTouchTicks;
+
+                offsetX = leadX + ((offsetX - leadX) * settled / CushionSettleTicks);
+                offsetY = leadY + ((offsetY - leadY) * settled / CushionSettleTicks);
+            }
+        }
+
+        X = Math.Clamp(playerX + (int)offsetX, 0, TickSpatialUnits.PitchLengthFixed);
+        Y = Math.Clamp(playerY + (int)offsetY, 0, TickSpatialUnits.PitchWidthFixed);
         VelocityX = (int)((long)cos * playerSpeed / TickTrigonometry.Scale);
         VelocityY = (int)((long)sin * playerSpeed / TickTrigonometry.Scale);
     }

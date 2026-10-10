@@ -294,6 +294,8 @@ internal sealed partial class TickMatchLoop
 
     private void OutOnTouchline()
     {
+        TagMisplacedPass();
+
         if (_shotLive)
         {
             EmitShotResult(EngineEventType.ShotOffTarget);
@@ -312,6 +314,8 @@ internal sealed partial class TickMatchLoop
         var attackIndex = 1 - defenceIndex;
         var lastSide = _lastTouch.IsNone ? attackIndex : _lastTouch.Side;
         var ballY = _ball.UnitY;
+
+        TagMisplacedPass();
 
         if (_shotLive)
         {

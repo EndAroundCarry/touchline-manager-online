@@ -97,7 +97,7 @@ internal readonly record struct TickPlayerSkills
     /// is better than a side of journeymen without being a different sport: the possession engine's team ratings did the same by averaging, and
     /// the tick engine, which plays every player, has to do it player by player (Milestone 9 calibration).
     /// </summary>
-    public const int CurvePercent = 60;
+    public const int CurvePercent = 38;
 
     /// <summary>Builds the skills a player brings to a match: his attributes pulled towards the average by the skill curve.</summary>
     /// <param name="attributes">The player's attributes.</param>

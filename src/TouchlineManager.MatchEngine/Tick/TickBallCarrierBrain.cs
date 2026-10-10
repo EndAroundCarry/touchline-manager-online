@@ -227,7 +227,7 @@ internal static class TickBallCarrierBrain
     public const int PassBaseError = 30;
 
     /// <summary>The base error angle of a shot, in binary angle units: a snap shot under a defender's eye goes wide or high as often as it goes in.</summary>
-    public const int ShotBaseError = 210;
+    public const int ShotBaseError = 200;
 
     /// <summary>The base error angle of a shot from a still ball, a penalty or a direct free kick, in binary angle units: struck unhurried, with the man's feet set.</summary>
     public const int SetPieceShotBaseError = 50;
@@ -345,6 +345,7 @@ internal static class TickBallCarrierBrain
 
     /// <summary>The extra worth of a clearance from the player's own third, in utility.</summary>
     public const int ClearOwnThirdBonus = 600;
+
 
     private const int BasisPoints = 10_000;
 

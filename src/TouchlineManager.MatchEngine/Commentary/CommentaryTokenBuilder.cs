@@ -133,6 +133,12 @@ public enum PassageBeatKind
 
     /// <summary>A ball played long through the air to a team-mate (`commentary-v5`).</summary>
     LongPass = 13,
+
+    /// <summary>A player lost the ball: tackled, or a pass cut out (`tick-film-v1`). The beat names the loser and, when known, who won it.</summary>
+    LosesBall = 14,
+
+    /// <summary>A player got past a defender, beating him or outrunning him (`tick-film-v1`). The beat names the carrier and the man left behind.</summary>
+    Skipped = 15,
 }
 
 /// <summary>
@@ -285,6 +291,8 @@ public static class CommentaryTokenBuilder
         PassageAction.Interception => PassageBeatKind.Interception,
         PassageAction.Save or PassageAction.Dive => PassageBeatKind.Save,
         PassageAction.Shot or PassageAction.Penalty or PassageAction.FreeKick => PassageBeatKind.Chance,
+        PassageAction.Dispossessed or PassageAction.Misplaced => PassageBeatKind.LosesBall,
+        PassageAction.Beaten or PassageAction.Bypassed => PassageBeatKind.Skipped,
         _ => null,
     };
 
@@ -358,6 +366,8 @@ public static class CommentaryTokenBuilder
         PassageBeatKind.Interception => BuildTemplates["interception"],
         PassageBeatKind.Save => BuildTemplates["save"],
         PassageBeatKind.Chance => BuildTemplates["chance"],
+        PassageBeatKind.LosesBall => BuildTemplates["loses_ball"],
+        PassageBeatKind.Skipped => BuildTemplates["skipped"],
         PassageBeatKind.GoalKick => BuildTemplates["goal_kick"],
         PassageBeatKind.KeeperBall => BuildTemplates["keeper_ball"],
         PassageBeatKind.FreeKick => BuildTemplates["free_kick"],
@@ -740,6 +750,26 @@ public static class CommentaryTokenBuilder
                 "{player} works some space and lets fly!",
                 "{player} pounces on the loose ball and shoots!",
                 "{player} strikes it with power...",
+            ]),
+
+        // Who erred and who was beaten (`tick-film-v1`). A variant that names the man who won the ball is only used when he is known.
+        ["loses_ball"] = new(
+            "match.build.loses_ball",
+            [
+                "{player} loses it to {second}.",
+                "{player} is robbed by {second}.",
+                "{player} gives it away to {second}.",
+                "{player} is dispossessed by {second}.",
+                "{player} loses the ball.",
+                "{player} gives it away.",
+            ]),
+        ["skipped"] = new(
+            "match.build.skipped",
+            [
+                "{player} skips past {second}.",
+                "{player} goes round {second}.",
+                "{player} leaves {second} behind.",
+                "{player} gets the better of {second}.",
             ]),
 
         // The restarts a continuous film shows (`commentary-v4`).

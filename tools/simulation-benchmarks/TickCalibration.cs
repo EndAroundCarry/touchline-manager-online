@@ -162,6 +162,15 @@ internal static class TickCalibration
                 };
             }
 
+            if (Environment.GetEnvironmentVariable("TICK_DEFAULTINSTR") is { Length: > 0 })
+            {
+                input = input with
+                {
+                    Home = input.Home with { Instructions = Instructions() },
+                    Away = input.Away with { Instructions = Instructions() },
+                };
+            }
+
             if (Environment.GetEnvironmentVariable("TICK_FORM") is { Length: > 0 } form)
             {
                 var preset = (FormationPreset)int.Parse(form, CultureInfo.InvariantCulture);

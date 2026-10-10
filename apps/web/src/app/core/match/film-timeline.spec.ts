@@ -1,4 +1,4 @@
-import { BALL_ENTITY_ID, SLOT_IDS, buildFilmTimeline } from './film-timeline';
+import { BALL_ENTITY_ID, FilmBlame, SLOT_IDS, buildFilmTimeline } from './film-timeline';
 import {
   HighlightCommentary,
   HighlightEntity,
@@ -257,6 +257,50 @@ describe('buildFilmTimeline: the continuous tracks', () => {
   it('is empty, and says so, for a presentation with no passages', () => {
     expect(buildFilmTimeline(null).isEmpty).toBe(true);
     expect(buildFilmTimeline(presentation([])).isEmpty).toBe(true);
+  });
+});
+
+describe('buildFilmTimeline: mistakes', () => {
+  const film = () =>
+    buildFilmTimeline(
+      presentation([
+        passage({
+          occupants: [player('H9', 'p9', 9), player('A5', 'q5', 5, { side: 'away' })],
+          tracks: {
+            H9: [keyframe(0, 100, 100), keyframe(1_000, 200, 100, { action: 'dispossessed' })],
+            A5: [keyframe(0, 300, 100), keyframe(2_500, 400, 100, { action: 'beaten' })],
+          },
+        }),
+        passage({
+          occupants: [player('H9', 'p9', 9), player('A5', 'q5', 5, { side: 'away' })],
+          tracks: { A5: [keyframe(0, 400, 100), keyframe(3_000, 500, 100, { action: 'tackle' })] },
+        }),
+      ]),
+    );
+
+  it('collects the tags that blame a man, in film order, and leaves the touches of the ball out', () => {
+    expect(film().blames).toEqual([
+      { entityId: 'H9', filmMilliseconds: 1_000, kind: 'lost', action: 'dispossessed' },
+      { entityId: 'A5', filmMilliseconds: 2_500, kind: 'beaten', action: 'beaten' },
+    ]);
+  });
+
+  it('lists the mistakes of the last window up to a film moment, and none from before it or after', () => {
+    const timeline = film();
+    const out: FilmBlame[] = [];
+
+    expect(timeline.blamesAt(900, 1_500, out)).toBe(0);
+    expect(timeline.blamesAt(1_000, 1_500, out)).toBe(1);
+    expect(timeline.blamesAt(2_600, 1_700, out)).toBe(2);
+    expect(out.map((blame) => blame.entityId)).toEqual(['H9', 'A5']);
+    expect(timeline.blamesAt(2_600, 1_000, out)).toBe(1);
+    expect(out[0].entityId).toBe('A5');
+    expect(timeline.blamesAt(2_600, 1_700, out)).toBe(2);
+  });
+
+  it('has none for a film where nobody erred', () => {
+    expect(buildFilmTimeline(presentation([passage()])).blames).toEqual([]);
+    expect(buildFilmTimeline(null).blames).toEqual([]);
   });
 });
 
