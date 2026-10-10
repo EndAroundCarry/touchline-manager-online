@@ -1362,9 +1362,10 @@ of its snapshot. The recording of the match for a film takes no draw and changes
 
 1. **Play state.** Open play, or a dead ball (a restart waiting to be taken, a goal being celebrated, half-time). `TickMatchStateMachine` holds a restart
    for 0.8 to 1.5 s while `TickSetPieces` places the twenty-two players, then the taker plays it.
-2. **Shape.** `TickTacticalGeometry` turns each slot of the team sheet into a point to hold: the block follows the ball up and down the pitch, pushes up
-   with the ball and drops without it, is squeezed or opened by the width, the defensive line and the pass focus, and a defender is never nearer than
-   8 m to his own goal line nor a player nearer than 7 m to the other.
+2. **Shape.** `TickTacticalGeometry` turns each slot of the team sheet into a point to hold: the block follows where the ball is going (a smoothed,
+   anticipating reference, §14.13) up and down the pitch, pushes up with the ball and drops without it (the two shapes blended over 1.5 s after a turnover),
+   is squeezed or opened by the width, the defensive line and the pass focus, and a defender is never nearer than 8 m to his own goal line nor a player
+   nearer than 7 m to the other.
 3. **Orders.** The side without the ball (`TickDefensiveAI`): one presser, a second only on a touchline under a high press, markers in the own third,
    screens in the passing lanes, and a defensive line that steps up on a pressed carrier and drops off a free one; and the side with it
    (`TickOffBallSupport`): the carrier's support at 12 to 25 m, a runner behind the line, a pocket, an overlap. A goalkeeper takes his arc, rushes out
@@ -1372,8 +1373,9 @@ of its snapshot. The recording of the match for a film takes no draw and changes
 4. **The man with the ball** decides every one to three ticks (`TickBallCarrierBrain`): shoot, pass, through ball, cross, dribble, shield, recycle or
    clear, whichever is worth most as the chance it comes off times its worth less the chance it fails times what a lost ball costs here, with no draw. A
    kick leaves rotated off its aim by one draw within the error angle.
-5. **Bodies.** `TickSteering` and `TickPlayerPhysics` move every player: arrive, keep 2 m from a teammate, blend with the old velocity, turn at the rate
-   Agility allows, accelerate and brake as Pace and Acceleration allow, and spend energy.
+5. **Bodies.** `TickSteering` and `TickPlayerPhysics` move every player: arrive (a man holding his place eases in), walk about his place instead of standing on it,
+   keep 2 m from a teammate and 2.5 m from an opponent he is not in a duel with, blend with the old velocity, turn at the rate Agility allows, accelerate and brake
+   as Pace and Acceleration allow, and spend energy.
 6. **Contest.** A defender in touch of the carrier may challenge (`TickTackleResolver`), a goalkeeper in reach may smother, a defender who reaches a
    pass or a shot rolls to cut it out or to block it, and the nearest man to a loose ball takes it.
 7. **Boundary.** The ball steps (`TickBallPhysics`: roll, flight, bounce, post, bar) and a goal, a goal line, a touchline or a post is settled.
@@ -1401,6 +1403,11 @@ for version 12; changing one moves the golden hash in `TickEngineTests`.
 | `TickDefensiveAI.HighPressLimit` | 7,800 | The farthest up the pitch a high press presses (§14.12). |
 | `TickMatchLoop` hold: `FirstTouchTicks`, `DwellTicks`, `DwellScale`, `MaximumDwellTicks`, `OneTouchPressure` | 3, 60, 8,000 bp, 40, 7,000 bp | How long a man keeps a ball he has received (§14.12). |
 | `TickMatchLoop.ReceiverAdjustUnits` | 300 | How far from where a pass was aimed its receiver goes to meet it. |
+| `TickMatchLoop.ReferencePercent`, `ReferenceStepUnits`, `PossessionBlendTicks` | 25%, 9 m/s, 15 | How fast the ball reference closes on its target, how fast it may move, and the ticks the shape takes to change between its two forms (§14.13). |
+| `TickSteering.InertiaBasisPoints`, `ArriveBrakingPercent`, `WalkBasisPoints` | 4,500, 60%, 1,800 | The weight of the old velocity, the braking of a man holding his place, and the walk about it (§14.13). |
+| `TickSteering.OpponentSpaceRadius`, `OpponentSpacePercent` | 2.5 m, 200% | How near an opponent pushes a man who is not engaged, and how hard, against a teammate's push (§14.13). |
+| `TickOffBallSupport` space: `SpaceInterval`, `SpaceInnerRing`, `SpaceOuterRing`, `SpaceSwitchPercent`, `SpacePaceFloor/Step/Ceiling` | 10 ticks, 4 m, 8 m, 15%, 3,000 + 50 per WorkRate to 4,000 bp | The look for room (§14.13). |
+| `TickDefensiveAI` adjust: `AdjustInterval`, `AdjustZone`, `AdjustLeash`, `AdjustStandOff`, `AdjustLineSlack`, `AdjustPaceBasisPoints` | 10 ticks, 12 m, 6 m, 2.5 m, 2.5 m, 3,000 bp | The defenders' steps (§14.13). |
 | `TickShotStopper` reach | `70 + 40 + 6 × (Agility + Reflexes) / 2` | A goalkeeper dives on his reflexes as well as his agility. |
 
 Home advantage is the snapshot's `HomeAdvantageBasisPoints` less 10,000, added to the home side's man in every tackle and interception roll.
@@ -1636,3 +1643,60 @@ fall back to a plausible level only if a free man keeps the ball, and a shorter 
 90 against 13.6 before and an aim of 9.5–11.5: the block follows a ball that travels twice as far, which M5 (a smoothed, anticipating ball reference) is for.
 Equal-level sides are no longer level-invariant (ability 10 / 13 / 16 give 15 / 19.5 / 24.7 shots, the baseline 20 / 22 / 25): the attacker's skills now count for
 more than the defender's. A play of 533 ms a match against 296 is the path trace and the extra decisions.
+
+### 14.13 Continuous off-ball movement (the tick-film plan, Milestone 5)
+
+Engine play changes (golden hash re-pinned to `c492e3ef…`; engine-v12 keeps its label). Matches stored under the earlier build refuse to replay (MAT-9): play new ones.
+
+**Why it was chess.** The block followed the ball itself: every anchor was still while a man held the ball, all moved together on each pass and the whole team stopped dead
+together inside a metre of the anchor. A possession flip switched the shape in one tick.
+
+**What changed.**
+
+| Piece | What it does |
+|---|---|
+| Ball reference (`TickTeam.RefX/RefY`, `TickMatchLoop.FollowBall`) | The shape follows not the ball but where it is going: the point the receiver will meet a pass at (M4), a second ahead of a man carrying it, otherwise where a loose ball stops. It closes 25% of the way a tick and never runs faster than 9 m/s. In a dead ball it sits on the ball. |
+| Possession blend (`TickTeam.PossessionBlend`, `TickTacticalGeometry.Resolve/ResolveTeam` with a blend) | The shape with the ball and the one without it are mixed by how long ago the ball changed hands: 15 ticks to go from one to the other, not one. |
+| Walking about (`TickSteering.Steer`, `TickSteerContext`) | A man in position with a micro-target within 10 m of his anchor does not stand: he walks to it at 18% of top speed (about 1.5 m/s, inside the walk band so he recovers energy) or at the pace his order gives. A man with no job and no square drifts to one of eight points 2 m from his place, a new one every 2 s and at a different tick for each seat (`TickMatchLoop.Drift`). |
+| Easing in, inertia | A man holding his place (no pace in his order) brakes at 60% of what he has, so he eases onto his anchor; one sent at a pace brakes in full. Inertia 30% to 45%. |
+| Looking for room (`TickOffBallSupport.FindSpace`) | A midfielder or forward with nothing to do scores eight squares (four at 4 m, four at 8 m) every 10 ticks, a seat at a time (`(tick + 3 × seat) % 10 = 0`): distance to the nearest defender (to 8 m), a clear lane from the carrier (+4 m), room from teammates (to 8 m, a quarter), less half the distance from his place. He keeps his square unless a new one beats it by 15%, stays onside (`ClampOnside`) and walks to it at 30–40% of top speed. A back-line man and the goalkeeper do not. |
+| Adjusting (`TickDefensiveAI.AssignAdjustments`) | A defender who is only holding his place (`Holding`, `Line`) steps every 10 ticks, a seat at a time, to 2.5 m from the nearest attacker within 12 m of his place, goal-side of him and into the lane from the ball, at 30%; a back-line man stays within 2.5 m of the line's height and none goes more than 6 m from his place. The presser and the markers are not touched. |
+| Personal space (`TickSteering`) | A man who is not engaged (not the carrier, the presser or second presser, the man sent to meet the ball, nor off balance) is pushed from an opponent within 2.5 m, at twice the strength of the teammate push (80% of top speed at contact). In a dead ball it is off. |
+
+**What the measurements said.**
+
+- A half-strength push at 1.5 m (the plan) left the overlap at 13.7%: the pairs were strikers held one metre short of the offside line beside the centre-backs they face, the pull to
+  the place beating the push. 2.5 m at twice the strength takes it to 5.4%; a push of 3.5 m at four times takes it only to 4.2%, so what is left is two men crossing
+  (a marker jogging alongside his man, runners passing), not two men sitting. The probe now also counts pairs where both move under 1.5 m/s: 0.7% before, 0.0% after.
+- Easing every man in at 60% of his braking raised the fouls by a third (20 to 26 a match, yellow cards 3.5 to 4.6, reds 0.4 to 0.8): a presser who slows early stays in
+  contact range and challenges again and again. Applying it only to a man with no pace in his order gave the fouls back (20.7, 3.7, 0.5).
+- The walk is slower than the plan's "30% of top speed" (18%, search squares 30–40% instead of 45–60%, adjusting 30%): at the plan's values nobody stood, but the
+  distance run was 15.8 km a 90, and the plan's aim is 9.5–11.5. Slowing every role's pace by a third, or the holding speeds, gained only a kilometre more and would have
+  moved the defence; they were left.
+- Stored squads are not moved by any of it (goals 2.85 to 2.89); uniform squads on the board formations score 11% fewer goals (1.97 to 1.75) and shoot 4% less. Switched off one at
+  a time on the uniform harness: the push −4%, the search for room −6%, the adjusting −4%, the walking and drifting together −18%; the smoothed reference adds shots (+7%).
+  None of it was bought back with another lever.
+
+Measured over 200 matches from seed 11 (`tickmotion`), 205 stored snapshots (`ticksnap`), 1,000 matches (`tick`) and 20 matches of each pair of the 13 formations (`tickmatrix`):
+
+| | Before (M4) | After |
+|---|---|---|
+| Standing (under 0.3 m/s), outfield, open play | 11.6% | 2.5% |
+| Stop-and-go per player-minute | 8.05 | 3.17 |
+| 12 or more outfielders under 0.5 m/s at once | 3.1% | 0.0% |
+| Speed dips per player-minute (engine, 10 Hz) | 0.29 | 0.19 |
+| Distance per outfield player per 90 | 16.0 km | 13.8 km |
+| Opposing pair closer than 1.0 m, outside duels | 13.5% | 5.4% |
+| … of which both under 1.5 m/s | 0.7% | 0.0% |
+| Receiver moving toward the ball at reception | 72% | 82% |
+| Viewer stutters a film minute (seed 11) | 275 | 203 |
+| Stored snapshots: goals, shots, on target | 2.85, 29.7, 29.3% | 2.89, 28.8, 30.8% |
+| Stored: pass completion, yellow cards, fouls | 83.7%, 3.50, 19.6 | 84.6%, 3.70, 20.7 |
+| Stored: home / draw / away | 40.0 / 24.9 / 35.1 | 48.3 / 22.9 / 28.8 |
+| Uniform sides, board formations (`tick`): goals, shots | 1.97, 20.5 | 1.75, 19.7 |
+| All 169 formation pairs (`tickmatrix`): goals, shots | 1.93, 20.3 | 1.76, 19.4 |
+
+**Where it is outside the plan, and why.** The standing, stop-and-go and synchronised-stop figures meet the plan (under 10%, down 50%, down 70%). The overlap does not reach 1%:
+5.4% of frames still have a pair under a metre outside the ball's 3 m, almost all of them men crossing at speed, and the viewer's de-overlap (§14.9) covers those. Distance is 13.8 km, not
+9.5–11.5. The viewer's stutters are down a quarter, not by 70%: the engine's own dips are rare (0.19 a player-minute is about 8 a film minute), so what the harness counts is the
+sampling and the spline, which is the viewer's. The home / draw / away split of 205 matches moves by more than the 205-match noise (±3.5 points) in its home share and should be read with that.

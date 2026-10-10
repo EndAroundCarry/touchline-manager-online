@@ -702,6 +702,134 @@ public sealed class TickOffBallSupportTests
                 10_000)),
         ];
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_man_holding_his_place_looks_for_a_free_square_once_a_second_and_a_seat_at_a_time(bool isHome)
+    {
+        var scene = new Scene(isHome, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Defensive, skill: 10);
+        var looked = new bool[11];
+
+        for (var tick = 0; tick < 10; tick++)
+        {
+            scene.Tick = tick;
+
+            var before = scene.HasOffset.ToArray();
+            var orders = scene.Assign();
+
+            for (var index = 0; index < 11; index++)
+            {
+                if (scene.HasOffset[index] && !before[index])
+                {
+                    looked[index] = true;
+                    ((tick + (3 * index)) % 10).Should().Be(0, $"seat {index} looks at the tick his turn comes");
+                    orders[index].Role.Should().Be(TickAttackingRole.Holding);
+                }
+            }
+        }
+
+        looked[0].Should().BeFalse("the goalkeeper stays in goal");
+        looked[1].Should().BeFalse("a back-line man holds his line");
+        looked[4].Should().BeFalse("a back-line man holds his line");
+        looked[8].Should().BeTrue("a wide midfielder with nothing to do looks for room");
+        (looked[9] || looked[10]).Should().BeTrue("the striker who is not dropping into the pocket looks for room");
+    }
+
+    [Fact]
+    public void The_square_he_picks_lies_within_eight_metres_of_his_place_is_onside_and_is_walked_to_at_a_jog()
+    {
+        var scene = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Defensive, skill: 10);
+
+        for (var tick = 0; tick < 10; tick++)
+        {
+            scene.Tick = tick;
+            scene.Assign();
+        }
+
+        var line = 8_200;
+
+        for (var index = 8; index <= 10; index++)
+        {
+            if (!scene.HasOffset[index])
+            {
+                continue;
+            }
+
+            var offset = scene.Offsets[index];
+            var square = new SpatialPoint(scene.Anchors[index].X + offset.X, scene.Anchors[index].Y + offset.Y);
+
+            SpatialMath.Sqrt((offset.X * (long)offset.X) + (offset.Y * (long)offset.Y)).Should().BeLessThanOrEqualTo(800, "within the outer ring");
+            square.X.Should().BeLessThanOrEqualTo(line - TickOffBallSupport.OnsideMargin);
+            scene.OffsetPaces[index].Should().BeInRange(3_000, 4_000);
+        }
+    }
+
+    [Fact]
+    public void He_keeps_the_square_he_has_when_nothing_has_changed_and_there_is_no_search_without_a_place_to_keep_it()
+    {
+        var scene = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Defensive, skill: 10);
+
+        for (var tick = 0; tick < 10; tick++)
+        {
+            scene.Tick = tick;
+            scene.Assign();
+        }
+
+        scene.HasOffset.Count(has => has).Should().BeGreaterThan(0);
+
+        var first = scene.Offsets.ToArray();
+
+        for (var tick = 10; tick < 30; tick++)
+        {
+            scene.Tick = tick;
+            scene.Assign();
+        }
+
+        scene.Offsets.Should().Equal(first, "with the picture the same, no square beats the one he has by 15%");
+
+        var blind = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Defensive, skill: 10);
+        var orders = new TickAttackingOrder[11];
+
+        TickOffBallSupport.Assign(
+            new TickAttackingSituation
+            {
+                IsHome = true,
+                Mentality = MatchMentality.Defensive,
+                Passing = MatchPassingStyle.MixedPassing,
+                Attackers = blind.Attackers,
+                Specs = blind.Specs,
+                Anchors = blind.Anchors,
+                Skills = blind.Skills,
+                Defenders = blind.Defenders,
+                CarrierIndex = 6,
+                Tick = 3,
+            },
+            orders);
+
+        orders[8].Role.Should().Be(TickAttackingRole.Holding, "a search with nowhere to write the square is simply off");
+    }
+
+    [Fact]
+    public void A_man_with_a_job_is_given_no_square()
+    {
+        var scene = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, skill: 10);
+
+        for (var tick = 0; tick < 10; tick++)
+        {
+            scene.Tick = tick;
+
+            var orders = scene.Assign();
+
+            for (var index = 0; index < 11; index++)
+            {
+                if (orders[index].Role != TickAttackingRole.Holding)
+                {
+                    scene.HasOffset[index].Should().BeFalse($"seat {index} is a {orders[index].Role}");
+                }
+            }
+        }
+    }
+
     private static TickPlayerProfile[] Profiles() =>
         [.. Enumerable.Repeat(TickPlayerProfile.From(PlayerAttributesV1.From(Enumerable.Repeat(10, MatchAttributeNames.Count).ToArray())), 11)];
 
@@ -758,6 +886,14 @@ public sealed class TickOffBallSupportTests
 
         public int PreviousRunners { get; set; }
 
+        public int Tick { get; set; }
+
+        public SpatialPoint[] Offsets { get; } = new SpatialPoint[11];
+
+        public bool[] HasOffset { get; } = new bool[11];
+
+        public int[] OffsetPaces { get; } = new int[11];
+
         /// <summary>Turns an absolute point into the side's own point of view (the conversion is its own inverse).</summary>
         public SpatialPoint Own(SpatialPoint point) => Mirror(point);
 
@@ -807,6 +943,10 @@ public sealed class TickOffBallSupportTests
                     CarrierIndex = Carrier,
                     PreviousSupporters = PreviousSupporters,
                     PreviousRunners = PreviousRunners,
+                    Tick = Tick,
+                    Offsets = Offsets,
+                    HasOffset = HasOffset,
+                    OffsetPaces = OffsetPaces,
                 },
                 orders);
 

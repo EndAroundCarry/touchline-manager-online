@@ -78,6 +78,21 @@ internal readonly ref struct TickDefensiveSituation
     /// defenders at the same distance do not trade the job every tick.
     /// </summary>
     public required int PreviousPresser { get; init; }
+
+    /// <summary>Gets the tick the match is on, which staggers the adjustments of the defenders; with no <see cref="Offsets"/> it is unused.</summary>
+    public int Tick { get; init; }
+
+    /// <summary>
+    /// Gets, per defender, where he walks about, as an offset from his order's target in pitch units (written when he steps to cover a
+    /// man). Empty for no adjusting.
+    /// </summary>
+    public Span<SpatialPoint> Offsets { get; init; }
+
+    /// <summary>Gets, per defender, whether <see cref="Offsets"/> holds a step for him.</summary>
+    public Span<bool> HasOffset { get; init; }
+
+    /// <summary>Gets, per defender, the share of top speed he makes the step at, in basis points.</summary>
+    public Span<int> OffsetPaces { get; init; }
 }
 
 /// <summary>
@@ -114,6 +129,9 @@ internal readonly ref struct TickDefensiveSituation
 /// stepped up by up to 2.5 m when the carrier is closed down within 6 m (the squeeze, scaled by their Decisions) and
 /// dropped by 3 m when the carrier has time (no defender within 12 m and the ball in the defender's own 65%). It never
 /// goes beyond the halfway line.
+/// </description></item>
+/// <item><description>
+/// <b>Adjust.</b> The men still holding their place keep adjusting (`tick-film-v1`, Milestone 5): see <see cref="AssignAdjustments"/>.
 /// </description></item>
 /// </list>
 /// <para>
@@ -217,6 +235,27 @@ internal static class TickDefensiveAI
 
     private const int HysteresisPercent = 85;
 
+    /// <summary>The ticks between one defender stepping to cover a man and the next (1 s).</summary>
+    private const int AdjustInterval = 10;
+
+    /// <summary>The ticks each seat's adjustment is put back by, so the side does not all step in the same tick.</summary>
+    private const int AdjustStagger = 3;
+
+    /// <summary>The farthest from his place an attacker is for a defender to step to him, in pitch units (12 m).</summary>
+    private const int AdjustZone = 1_143;
+
+    /// <summary>The farthest a step takes a defender from his place, in pitch units (6 m).</summary>
+    private const int AdjustLeash = 572;
+
+    /// <summary>How far from the attacker the defender stands, in pitch units (2.5 m).</summary>
+    private const int AdjustStandOff = 238;
+
+    /// <summary>How far in front of or behind his line's height a back-line man steps, in pitch units (2.5 m).</summary>
+    private const int AdjustLineSlack = 238;
+
+    /// <summary>The pace of an adjustment, in basis points of top speed (a jog).</summary>
+    private const int AdjustPaceBasisPoints = 3_000;
+
     /// <summary>Gets the radius a pressing instruction closes the ball down from, in pitch units.</summary>
     /// <param name="pressing">The instruction.</param>
     public static int PressRadius(MatchPressing pressing) => pressing switch
@@ -255,6 +294,7 @@ internal static class TickDefensiveAI
         AssignMarkers(situation, orders, busy, dealtWith);
         AssignScreens(situation, orders, busy, dealtWith);
         AssignLine(situation, orders);
+        AssignAdjustments(situation, orders);
     }
 
     /// <summary>Copies the orders into the anchors and paces the steering takes.</summary>
@@ -638,6 +678,122 @@ internal static class TickDefensiveAI
                     -1);
             }
         }
+    }
+
+    /// <summary>
+    /// Keeps the men who are only holding their place (the back line and the midfielders with no job) adjusting: every ten ticks, a man at a
+    /// time, he steps to the near side of the nearest attacker within 12 m of his place, goal-side of him and into the lane from the ball to
+    /// him (the cover shadow), 2.5 m from him, at a jog. A man of the back line stays within 2.5 m of the line's height, so the line is not
+    /// broken; no step takes a man more than 6 m from his place.
+    /// </summary>
+    private static void AssignAdjustments(in TickDefensiveSituation situation, Span<TickDefensiveOrder> orders)
+    {
+        if (situation.Offsets.IsEmpty || situation.CarrierIndex < 0)
+        {
+            return;
+        }
+
+        var carrier = situation.Attackers[situation.CarrierIndex];
+        var carrierX = TickSpatialUnits.ToUnits(carrier.X);
+        var carrierY = TickSpatialUnits.ToUnits(carrier.Y);
+        var goalX = situation.IsHome ? 0 : SpatialPitch.PitchLength;
+        var zone = (long)AdjustZone * AdjustZone;
+        var leash = (long)AdjustLeash * AdjustLeash;
+
+        for (var index = 0; index < situation.Defenders.Length; index++)
+        {
+            var role = orders[index].Role;
+
+            if ((role != TickDefensiveRole.Holding && role != TickDefensiveRole.Line)
+                || situation.Specs[index].Family == MatchPositionFamily.Goalkeeper
+                || (situation.Tick + (AdjustStagger * index)) % AdjustInterval != 0)
+            {
+                continue;
+            }
+
+            var place = orders[index].Target;
+
+            // The attacker nearest his place, the ball carrier aside: the presser has him.
+            var man = -1;
+            var manDistance = long.MaxValue;
+
+            for (var attacker = 1; attacker < situation.Attackers.Length; attacker++)
+            {
+                if (attacker == situation.CarrierIndex)
+                {
+                    continue;
+                }
+
+                long dx = TickSpatialUnits.ToUnits(situation.Attackers[attacker].X) - place.X;
+                long dy = TickSpatialUnits.ToUnits(situation.Attackers[attacker].Y) - place.Y;
+                var distance = (dx * dx) + (dy * dy);
+
+                if (distance <= zone && distance < manDistance)
+                {
+                    manDistance = distance;
+                    man = attacker;
+                }
+            }
+
+            if (man < 0)
+            {
+                situation.HasOffset[index] = false;
+
+                continue;
+            }
+
+            var manX = TickSpatialUnits.ToUnits(situation.Attackers[man].X);
+            var manY = TickSpatialUnits.ToUnits(situation.Attackers[man].Y);
+
+            // Half goal-side, half into the lane to the ball: the two directions summed.
+            var towardGoal = Unit(goalX - manX, SpatialPitch.GoalYCenter - manY);
+            var towardBall = Unit(carrierX - manX, carrierY - manY);
+            var directionX = towardGoal.X + towardBall.X;
+            var directionY = towardGoal.Y + towardBall.Y;
+            var length = SpatialMath.Sqrt(((long)directionX * directionX) + ((long)directionY * directionY));
+
+            if (length == 0)
+            {
+                directionX = towardGoal.X;
+                directionY = towardGoal.Y;
+                length = Math.Max(1, SpatialMath.Sqrt(((long)directionX * directionX) + ((long)directionY * directionY)));
+            }
+
+            var stepX = manX + (int)(directionX * (long)AdjustStandOff / length);
+            var stepY = manY + (int)(directionY * (long)AdjustStandOff / length);
+
+            if (role == TickDefensiveRole.Line)
+            {
+                stepX = Math.Clamp(stepX, place.X - AdjustLineSlack, place.X + AdjustLineSlack);
+            }
+
+            stepX = Math.Clamp(stepX, TickTacticalGeometry.Margin, SpatialPitch.PitchLength - TickTacticalGeometry.Margin);
+            stepY = Math.Clamp(stepY, TickTacticalGeometry.Margin, SpatialPitch.PitchWidth - TickTacticalGeometry.Margin);
+
+            long offsetX = stepX - place.X;
+            long offsetY = stepY - place.Y;
+            var offset = (offsetX * offsetX) + (offsetY * offsetY);
+
+            if (offset > leash)
+            {
+                var root = Math.Max(1, SpatialMath.Sqrt(offset));
+
+                offsetX = offsetX * AdjustLeash / root;
+                offsetY = offsetY * AdjustLeash / root;
+            }
+
+            situation.Offsets[index] = new SpatialPoint((int)offsetX, (int)offsetY);
+            situation.HasOffset[index] = true;
+            situation.OffsetPaces[index] = AdjustPaceBasisPoints;
+        }
+    }
+
+    /// <summary>Gets the direction of a vector as a vector of length 10,000, or zero for no length.</summary>
+    private static SpatialPoint Unit(int dx, int dy)
+    {
+        var length = SpatialMath.Sqrt(((long)dx * dx) + ((long)dy * dy));
+
+        return length == 0 ? default : new SpatialPoint((int)(dx * 10_000L / length), (int)(dy * 10_000L / length));
     }
 
     private static long NearestOutfieldDistanceSquared(in TickDefensiveSituation situation)

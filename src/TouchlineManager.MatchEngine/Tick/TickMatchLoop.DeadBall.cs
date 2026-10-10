@@ -476,6 +476,8 @@ internal sealed partial class TickMatchLoop
 
     private void StepDeadBall()
     {
+        SnapReferences();
+
         if (_machine.State == TickPlayState.GoalCelebration)
         {
             // Everybody walks to the places the kick-off will find them in.

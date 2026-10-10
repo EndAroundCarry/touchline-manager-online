@@ -2,28 +2,51 @@ using TouchlineManager.MatchEngine.Spatial;
 
 namespace TouchlineManager.MatchEngine.Tick;
 
+/// <summary>What open play adds to a man's steering (`tick-film-v1`, Milestone 5); the default adds nothing.</summary>
+internal readonly ref struct TickSteerContext
+{
+    /// <summary>Gets the other side's players, whom he keeps clear of unless he is <see cref="Engaged"/>; empty for no personal space.</summary>
+    public ReadOnlySpan<TickPlayerState> Opponents { get; init; }
+
+    /// <summary>Gets whether he is in a duel or on the ball (the carrier, the presser, the man sent to meet a pass): such a man goes at the opponent.</summary>
+    public bool Engaged { get; init; }
+
+    /// <summary>Gets whether he has a micro-target to walk to while he is in position.</summary>
+    public bool HasMicro { get; init; }
+
+    /// <summary>Gets the point he walks to while he is in position, in pitch units.</summary>
+    public SpatialPoint Micro { get; init; }
+
+    /// <summary>Gets the share of top speed he walks to it at, or 0 for a walk.</summary>
+    public int MicroPaceBasisPoints { get; init; }
+}
+
 /// <summary>
 /// Steering for the tick engine: turns "stand on that anchor" into the move a player asks the physics for
 /// (`tick-engine-v1`, Milestone 2).
 /// </summary>
 /// <remarks>
 /// <para>
-/// Three behaviours are added together into the velocity the player <em>wants</em>, all in fixed units per tick:
+/// Four behaviours are added together into the velocity the player <em>wants</em>, all in fixed units per tick:
 /// </para>
 /// <list type="number">
 /// <item><description>
 /// <b>Arrive.</b> Towards the anchor at a holding pace (55% of top speed within 5 m, rising to 90% from 30 m), but never
-/// faster than <c>√(2 · braking · distance)</c>, so he glides onto the anchor instead of overshooting and shaking. He is
-/// content anywhere within 1 m of it: a shape does not need to be exact, and the slack is what lets two players given
-/// the same anchor stand beside each other instead of fighting for the spot.
+/// faster than <c>√(2 · braking · distance)</c>, so he glides onto the anchor instead of overshooting and shaking; a man holding
+/// his place brakes at 60% of what he has (so he eases in), one sent at a pace brakes in full. He is content anywhere within 1 m of
+/// it: a shape does not need to be exact, and the slack is what lets two players given the same anchor stand beside each other
+/// instead of fighting for the spot. A man in position who has a micro-target (<see cref="TickSteerContext"/>) does not stand
+/// there: within 10 m of his anchor he walks, at 18% of his top speed or the pace his order gives, to the micro-target (`tick-film-v1`,
+/// Milestone 5).
 /// </description></item>
 /// <item><description>
 /// <b>Separation.</b> Each teammate within 2 m pushes him away, in proportion to how far inside that circle the
 /// teammate stands, up to 40% of his top speed. Two players never settle on top of each other, and a crowd drifts
-/// apart rather than stacking.
+/// apart rather than stacking. A man who is not engaged in a duel or on the ball is pushed the same way by an opponent within
+/// 2.5 m, at twice the strength, so a marker or a striker on the offside line does not stand on the man he faces.
 /// </description></item>
 /// <item><description>
-/// <b>Velocity blending.</b> The result is <c>desired × 70% + current × 30%</c>, so a sudden change of anchor (the
+/// <b>Velocity blending.</b> The result is <c>desired × 55% + current × 45%</c>, so a sudden change of anchor (the
 /// ball switching sides, the possession flipping) bends his path instead of snapping it.
 /// </description></item>
 /// </list>
@@ -45,7 +68,33 @@ internal static class TickSteering
     public const int SeparationBasisPoints = 4_000;
 
     /// <summary>The weight of the player's current velocity in the blend, in basis points.</summary>
-    public const int InertiaBasisPoints = 3_000;
+    public const int InertiaBasisPoints = 4_500;
+
+    /// <summary>
+    /// The share of his braking a man holding his place uses to ease onto it, in percent: he starts slowing early and does not stop dead. A man sent at
+    /// a pace brakes in full: easing in a presser kept him inside contact range, challenging again and again, and raised the fouls by a third.
+    /// </summary>
+    public const int ArriveBrakingPercent = 60;
+
+    /// <summary>The pace of a player walking about his place, in basis points of top speed (about 1.5 m/s): inside the walk band, so it recovers energy.</summary>
+    public const int WalkBasisPoints = 1_800;
+
+    /// <summary>The distance within which opponents who are not engaged push each other apart (2.5 m), in fixed units.</summary>
+    public static readonly int OpponentSpaceRadius = TickSpatialUnits.CentimetresToFixed(250);
+
+    /// <summary>
+    /// The strength of the push from an opponent, as a share of the push from a teammate, in percent. A half-strength push at 1.5 m (the plan's first
+    /// number) left a striker held a metre short of the offside line standing beside the centre-back he faces: the pull to his place won.
+    /// </summary>
+    public const int OpponentSpacePercent = 200;
+
+    /// <summary>
+    /// How far from his anchor (10 m) a player may be and still walk about his micro-target: beyond it he is out of position and goes back.
+    /// </summary>
+    public static readonly int MicroLeash = TickSpatialUnits.CentimetresToFixed(1_000);
+
+    /// <summary>The distance from the micro-target (0.4 m) within which a player is there, in fixed units.</summary>
+    private static readonly int MicroContentRadius = TickSpatialUnits.CentimetresToFixed(40);
 
     /// <summary>The share of top speed used to hold position within <see cref="NearDistance"/>, in basis points.</summary>
     public const int NearSpeedBasisPoints = 5_500;
@@ -92,15 +141,20 @@ internal static class TickSteering
     /// The share of top speed to travel at, in basis points, or 0 for the holding pace of <see cref="HoldSpeedBasisPoints"/>
     /// (the defensive AI asks for more when it sends a player to close the ball down).
     /// </param>
+    /// <param name="context">What the open play adds: the opponents to keep clear of, whether he is engaged, and his micro-target.</param>
     public static TickMoveIntent Steer(
         int selfIndex,
         ReadOnlySpan<TickPlayerState> team,
         in TickPlayerProfile profile,
         SpatialPoint anchor,
-        int paceBasisPoints = 0)
+        int paceBasisPoints = 0,
+        in TickSteerContext context = default)
     {
         var self = team[selfIndex];
         var topSpeed = TickPlayerPhysics.EffectiveTopSpeed(self, profile);
+
+        // A man holding his place eases onto it; one sent somewhere at a pace (the presser, the marker, the man meeting a pass) brakes in full.
+        var braking = paceBasisPoints > 0 ? profile.Deceleration : (long)profile.Deceleration * ArriveBrakingPercent / 100;
 
         // Arrive: aim at the anchor, slow enough to stop on it.
         var dx = (long)TickSpatialUnits.ToFixed(anchor.X) - self.X;
@@ -110,11 +164,27 @@ internal static class TickSteering
         long desiredX = 0;
         long desiredY = 0;
 
-        if (distance > ContentRadius)
+        if (context.HasMicro && distance <= MicroLeash)
+        {
+            // In position, he does not stand: he walks (or jogs, when the order says so) to a nearby point and keeps adjusting.
+            var mx = (long)TickSpatialUnits.ToFixed(context.Micro.X) - self.X;
+            var my = (long)TickSpatialUnits.ToFixed(context.Micro.Y) - self.Y;
+            var microDistance = SpatialMath.Sqrt((mx * mx) + (my * my));
+
+            if (microDistance > MicroContentRadius)
+            {
+                var cap = (long)topSpeed * (context.MicroPaceBasisPoints > 0 ? context.MicroPaceBasisPoints : WalkBasisPoints) / BasisPoints;
+                var wanted = Math.Min(cap, SpatialMath.Sqrt(2L * braking * (microDistance - MicroContentRadius)));
+
+                desiredX = mx * wanted / microDistance;
+                desiredY = my * wanted / microDistance;
+            }
+        }
+        else if (distance > ContentRadius)
         {
             // He is content anywhere within the radius, so the run is only as long as what lies beyond it.
             var cap = (long)topSpeed * (paceBasisPoints > 0 ? paceBasisPoints : HoldSpeedBasisPoints(distance)) / BasisPoints;
-            var wanted = Math.Min(cap, SpatialMath.Sqrt(2L * profile.Deceleration * (distance - ContentRadius)));
+            var wanted = Math.Min(cap, SpatialMath.Sqrt(2L * braking * (distance - ContentRadius)));
 
             desiredX = dx * wanted / distance;
             desiredY = dy * wanted / distance;
@@ -156,6 +226,39 @@ internal static class TickSteering
 
             pushX += awayX * strength / gap;
             pushY += awayY * strength / gap;
+        }
+
+        // Personal space: a man who is not in a duel does not stand on an opponent either, at half the strength.
+        if (!context.Engaged)
+        {
+            var opponentPush = maxPush * OpponentSpacePercent / 100;
+            var limit = (long)OpponentSpaceRadius * OpponentSpaceRadius;
+
+            for (var other = 0; other < context.Opponents.Length; other++)
+            {
+                var awayX = (long)self.X - context.Opponents[other].X;
+                var awayY = (long)self.Y - context.Opponents[other].Y;
+                var apart = (awayX * awayX) + (awayY * awayY);
+
+                if (apart >= limit)
+                {
+                    continue;
+                }
+
+                var gap = SpatialMath.Sqrt(apart);
+
+                if (gap == 0)
+                {
+                    awayX = 0;
+                    awayY = (selfIndex & 1) == 0 ? 1 : -1;
+                    gap = 1;
+                }
+
+                var strength = opponentPush * (OpponentSpaceRadius - gap) / OpponentSpaceRadius;
+
+                pushX += awayX * strength / gap;
+                pushY += awayY * strength / gap;
+            }
         }
 
         LimitLength(ref pushX, ref pushY, maxPush);

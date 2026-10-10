@@ -4,6 +4,31 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tick film, Milestone 5 — continuous off-ball movement
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.13. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its
+label): matches stored under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- **The block follows where the ball is going**, not the ball: the point a pass will be met at, a second ahead of a man carrying it, or where a loose ball stops, smoothed at
+  25% a tick and capped at 9 m/s. The shape with the ball and the one without it are blended over 1.5 s after a turnover.
+- **Nobody stands in position.** A man within 10 m of his place walks about it (a free square, a step goal-side of the nearest attacker, or a slow drift); standing falls from
+  11.6% to 2.5% of player-time, stop-and-go by 61%, and the whole side no longer stops at once (3.1% to 0.0% of frames).
+- **Opponents keep clear of each other** unless they are in a duel: a man pushed from an opponent within 2.5 m. Two opponents sitting on each other (both under 1.5 m/s): 0.7% to 0.0%
+  of frames; any pair under a metre outside the ball: 13.5% to 5.4%.
+- A man holding his place eases onto it (60% braking) and inertia is 45%; a man sent at a pace brakes in full.
+
+### Added
+
+- `TickSteerContext`, `TickTeam.RefX/RefY/PossessionBlend`, the blended `TickTacticalGeometry.Resolve`, `TickOffBallSupport.FindSpace` and `ClampOnside`,
+  `TickDefensiveAI.AssignAdjustments`, and the motion probe's speed dips and its sitting-on-each-other overlap.
+
+### Known
+
+- Distance run is 13.8 km a 90 (aim 9.5–11.5); uniform sides on the board formations score 11% fewer goals (stored squads are unchanged); the viewer's stutters fall by a quarter,
+  not 70%: the engine's own dips are rare and what is left is the sampling and the spline.
+
 ## Tick film, Milestone 4 — the ball flows
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.12. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its

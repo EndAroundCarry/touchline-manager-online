@@ -163,6 +163,11 @@ internal readonly record struct TickTeamStyle
 /// The goalkeeper takes an eighth of the ball shift and none of the phase, line or width shifts, and never leaves the
 /// box. The pure functions here touch nothing and allocate nothing.
 /// </para>
+/// <para>
+/// The blended overloads (`tick-film-v1`, Milestone 5) take the shape part-way between the one with the ball and the one without it, and
+/// the loop hands them not the ball but a smoothed reference to where it is going, so the block bends with the play and does not start
+/// and stop with each pass.
+/// </para>
 /// </remarks>
 internal static class TickTacticalGeometry
 {
@@ -252,6 +257,65 @@ internal static class TickTacticalGeometry
         return isHome
             ? new SpatialPoint(ownX, ownY)
             : new SpatialPoint(SpatialPitch.PitchLength - ownX, SpatialPitch.PitchWidth - ownY);
+    }
+
+    /// <summary>
+    /// Resolves one player's anchor part-way between the shape with the ball and the shape without it, so a turnover bends the block
+    /// into its new shape instead of switching it in one tick.
+    /// </summary>
+    /// <param name="spec">His board anchor.</param>
+    /// <param name="style">His side's style.</param>
+    /// <param name="isHome">Whether the side is at home (attacking towards high X).</param>
+    /// <param name="possessionBlendBasisPoints">How much of the side's shape is the one with the ball: 0 is without it, 10,000 is with it.</param>
+    /// <param name="ballXUnits">The ball reference's X, in absolute pitch units.</param>
+    /// <param name="ballYUnits">The ball reference's Y, in absolute pitch units.</param>
+    public static SpatialPoint Resolve(
+        in TickAnchorSpec spec,
+        in TickTeamStyle style,
+        bool isHome,
+        int possessionBlendBasisPoints,
+        int ballXUnits,
+        int ballYUnits)
+    {
+        if (possessionBlendBasisPoints >= BasisPoints)
+        {
+            return Resolve(spec, style, isHome, true, ballXUnits, ballYUnits);
+        }
+
+        if (possessionBlendBasisPoints <= 0)
+        {
+            return Resolve(spec, style, isHome, false, ballXUnits, ballYUnits);
+        }
+
+        var with = Resolve(spec, style, isHome, true, ballXUnits, ballYUnits);
+        var without = Resolve(spec, style, isHome, false, ballXUnits, ballYUnits);
+
+        return new SpatialPoint(
+            without.X + ((with.X - without.X) * possessionBlendBasisPoints / BasisPoints),
+            without.Y + ((with.Y - without.Y) * possessionBlendBasisPoints / BasisPoints));
+    }
+
+    /// <summary>Resolves the anchors of a whole side part-way between its two shapes (see the blended <c>Resolve</c>).</summary>
+    /// <param name="specs">The side's board anchors, one per player.</param>
+    /// <param name="style">The side's style.</param>
+    /// <param name="isHome">Whether the side is at home.</param>
+    /// <param name="possessionBlendBasisPoints">How much of the side's shape is the one with the ball, 0..10,000.</param>
+    /// <param name="ballXUnits">The ball reference's X, in absolute pitch units.</param>
+    /// <param name="ballYUnits">The ball reference's Y, in absolute pitch units.</param>
+    /// <param name="anchors">Receives one anchor per spec, in the same order.</param>
+    public static void ResolveTeam(
+        ReadOnlySpan<TickAnchorSpec> specs,
+        in TickTeamStyle style,
+        bool isHome,
+        int possessionBlendBasisPoints,
+        int ballXUnits,
+        int ballYUnits,
+        Span<SpatialPoint> anchors)
+    {
+        for (var index = 0; index < specs.Length; index++)
+        {
+            anchors[index] = Resolve(specs[index], style, isHome, possessionBlendBasisPoints, ballXUnits, ballYUnits);
+        }
     }
 
     /// <summary>Resolves the anchors of a whole side.</summary>

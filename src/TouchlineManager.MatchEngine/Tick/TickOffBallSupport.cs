@@ -82,6 +82,21 @@ internal readonly ref struct TickAttackingSituation
     /// (<see cref="TickOffBallSupport.RunnerMask"/>). A run once begun is carried through while the carrier still has room.
     /// </summary>
     public int PreviousRunners { get; init; }
+
+    /// <summary>Gets the tick the match is on, which staggers the men's looks for space; with no <see cref="Offsets"/> it is unused.</summary>
+    public int Tick { get; init; }
+
+    /// <summary>
+    /// Gets, per attacker, where he walks about, as an offset from his order's target in pitch units (read for the standing score, written
+    /// when a better square turns up). Empty for no search for space.
+    /// </summary>
+    public Span<SpatialPoint> Offsets { get; init; }
+
+    /// <summary>Gets, per attacker, whether <see cref="Offsets"/> holds a square for him.</summary>
+    public Span<bool> HasOffset { get; init; }
+
+    /// <summary>Gets, per attacker, the share of top speed he walks to his square at, in basis points.</summary>
+    public Span<int> OffsetPaces { get; init; }
 }
 
 /// <summary>
@@ -127,6 +142,11 @@ internal readonly ref struct TickAttackingSituation
 /// <b>Pocket.</b> The forward left over who is nearest the carrier (and at least 12 m from him) drops to 5 m in front of the
 /// back line, 40% of the way across towards the carrier's side, to take the ball to feet, provided the point is ahead of
 /// the carrier.
+/// </description></item>
+/// <item><description>
+/// <b>Space.</b> A midfielder or forward left with nothing to do looks for room (`tick-film-v1`, Milestone 5): every ten ticks, a seat at a
+/// time, he scores eight squares round his place (<see cref="FindSpace"/>) and walks to the best at a jog, so a side that holds the ball
+/// is never a row of men waiting for the next pass.
 /// </description></item>
 /// </list>
 /// <para>
@@ -250,6 +270,45 @@ internal static class TickOffBallSupport
 
     private const int HysteresisPercent = 85;
 
+    /// <summary>The ticks between one man's looks for space (1 s).</summary>
+    private const int SpaceInterval = 10;
+
+    /// <summary>The ticks each seat's look is put back by, so the side does not all look in the same tick.</summary>
+    private const int SpaceStagger = 3;
+
+    /// <summary>The squares scored round a man's place.</summary>
+    private const int SpaceCandidates = 8;
+
+    /// <summary>The radius of the inner ring of squares, in pitch units (4 m).</summary>
+    private const int SpaceInnerRing = 381;
+
+    /// <summary>The radius of the outer ring of squares, in pitch units (8 m).</summary>
+    private const int SpaceOuterRing = 762;
+
+    /// <summary>The distance from a defender or a teammate beyond which more room is worth no more, in pitch units (8 m).</summary>
+    private const int SpaceRoomCap = 762;
+
+    /// <summary>What a clear lane from the carrier to a square is worth, in pitch units of room (4 m).</summary>
+    private const int SpaceLaneBonus = 381;
+
+    /// <summary>A new square must beat the one he has by this share to be preferred, in percent.</summary>
+    private const int SpaceSwitchPercent = 15;
+
+    /// <summary>A constant added to every square's score so that the score is a positive number to take a share of.</summary>
+    private const int SpaceBase = 400;
+
+    /// <summary>The pace of a man walking to a square at WorkRate 0, in basis points of top speed (a jog).</summary>
+    private const int SpacePaceFloor = 3_000;
+
+    /// <summary>The pace gained per point of WorkRate, in basis points.</summary>
+    private const int SpacePaceStep = 50;
+
+    /// <summary>The fastest pace to a square, in basis points.</summary>
+    private const int SpacePaceCeiling = 4_000;
+
+    /// <summary>The angles of the squares, in binary angle units: four a quarter turn apart at 4 m, four between them at 8 m.</summary>
+    private static readonly int[] SpaceAngles = [0, 256, 512, 768, 128, 384, 640, 896];
+
     /// <summary>The score a runner already running is given over a rival, so the job does not change hands every tick.</summary>
     private const int RunnerStickiness = 8;
 
@@ -325,6 +384,115 @@ internal static class TickOffBallSupport
         AssignRuns(situation, frame, orders, busy);
         AssignPocket(situation, frame, orders, busy);
         KeepOnside(situation, frame, orders);
+        FindSpace(situation, frame, orders);
+    }
+
+    /// <summary>
+    /// Keeps the men who are only holding their place looking for room: every ten ticks, a man at a time, he scores eight squares round his
+    /// place (four at 4 m, four at 8 m) and walks to the best. A square scores the distance to the nearest defender (to 8 m), a clear lane from
+    /// the carrier, and the room from his teammates (to 8 m), less its distance from his place; he keeps the square he has unless a new
+    /// one beats it by 15%.
+    /// </summary>
+    private static void FindSpace(in TickAttackingSituation situation, in Frame frame, Span<TickAttackingOrder> orders)
+    {
+        if (situation.Offsets.IsEmpty)
+        {
+            return;
+        }
+
+        var limit = OnsideLimit(frame);
+
+        for (var index = 0; index < situation.Attackers.Length; index++)
+        {
+            var family = situation.Specs[index].Family;
+
+            if (orders[index].Role != TickAttackingRole.Holding
+                || family == MatchPositionFamily.Goalkeeper
+                || family == MatchPositionFamily.Defence
+                || (situation.Tick + (SpaceStagger * index)) % SpaceInterval != 0)
+            {
+                continue;
+            }
+
+            var anchor = orders[index].Target;
+            var own = Mirror(anchor.X, anchor.Y, situation.IsHome);
+
+            var bestScore = int.MinValue;
+            var bestX = own.X;
+            var bestY = own.Y;
+
+            for (var candidate = 0; candidate < SpaceCandidates; candidate++)
+            {
+                var radius = candidate < SpaceCandidates / 2 ? SpaceInnerRing : SpaceOuterRing;
+                var angle = SpaceAngles[candidate];
+                var x = Math.Clamp(
+                    Math.Min(own.X + (radius * TickTrigonometry.Cos(angle) / BasisPoints), limit),
+                    TickTacticalGeometry.Margin,
+                    SpatialPitch.PitchLength - TickTacticalGeometry.Margin);
+                var y = Math.Clamp(
+                    own.Y + (radius * TickTrigonometry.Sin(angle) / BasisPoints),
+                    TickTacticalGeometry.Margin,
+                    SpatialPitch.PitchWidth - TickTacticalGeometry.Margin);
+                var score = SpaceScore(situation, frame, index, own.X, own.Y, x, y);
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+
+            if (situation.HasOffset[index])
+            {
+                // The square he has, as it stands now: he moves only for a clearly better one.
+                var keep = Mirror(anchor.X + situation.Offsets[index].X, anchor.Y + situation.Offsets[index].Y, situation.IsHome);
+                var keepX = Math.Min(keep.X, limit);
+                var keepScore = SpaceScore(situation, frame, index, own.X, own.Y, keepX, keep.Y);
+
+                if (bestScore * 100L <= keepScore * (100L + SpaceSwitchPercent))
+                {
+                    continue;
+                }
+            }
+
+            var chosen = Mirror(bestX, bestY, situation.IsHome);
+
+            situation.Offsets[index] = new SpatialPoint(chosen.X - anchor.X, chosen.Y - anchor.Y);
+            situation.HasOffset[index] = true;
+
+            var workRate = situation.Skills[index].WorkRate;
+
+            situation.OffsetPaces[index] = Math.Min(SpacePaceCeiling, SpacePaceFloor + (SpacePaceStep * workRate));
+        }
+    }
+
+    /// <summary>Scores a square for a man to stand on (see <see cref="FindSpace"/>); everything is in the side's own point of view.</summary>
+    private static int SpaceScore(in TickAttackingSituation situation, in Frame frame, int self, int placeX, int placeY, int x, int y)
+    {
+        var nearestDefender = long.MaxValue;
+
+        for (var index = 0; index < situation.Defenders.Length; index++)
+        {
+            nearestDefender = Math.Min(nearestDefender, DistanceSquared(situation.Defenders[index], frame.IsHome, x, y));
+        }
+
+        var nearestMate = long.MaxValue;
+
+        for (var index = 0; index < situation.Attackers.Length; index++)
+        {
+            if (index != self)
+            {
+                nearestMate = Math.Min(nearestMate, DistanceSquared(situation.Attackers[index], frame.IsHome, x, y));
+            }
+        }
+
+        var room = (int)Math.Min(SpaceRoomCap, SpatialMath.Sqrt(nearestDefender));
+        var mates = (int)Math.Min(SpaceRoomCap, SpatialMath.Sqrt(nearestMate)) / 4;
+        var lane = LaneClear(situation.Defenders, frame.IsHome, frame.CarrierX, frame.CarrierY, x, y) ? SpaceLaneBonus : 0;
+        var drift = (int)SpatialMath.Sqrt(((long)(x - placeX) * (x - placeX)) + ((long)(y - placeY) * (y - placeY))) / 2;
+
+        return Math.Max(1, room + lane + mates - drift + SpaceBase);
     }
 
     /// <summary>Copies the orders into the anchors and paces the steering takes.</summary>
@@ -349,6 +517,22 @@ internal static class TickOffBallSupport
     /// <param name="orders">The orders.</param>
     public static int RunnerMask(ReadOnlySpan<TickAttackingOrder> orders) =>
         MaskOf(orders, TickAttackingRole.Runner, TickAttackingRole.Runner);
+
+    /// <summary>
+    /// Keeps a point a man walks to onside: no further up the pitch than the ball, the halfway line or the offside line, whichever is
+    /// deepest, the line held a metre short as the support orders hold it.
+    /// </summary>
+    /// <param name="point">The point, in absolute pitch units.</param>
+    /// <param name="isHome">Whether the attacking side is the home side.</param>
+    /// <param name="ballX">The ball's X, in absolute pitch units.</param>
+    /// <param name="defenders">The defending side's players.</param>
+    public static SpatialPoint ClampOnside(SpatialPoint point, bool isHome, int ballX, ReadOnlySpan<TickPlayerState> defenders)
+    {
+        var line = SpatialPitch.PitchLength - TickSpatialUnits.ToUnits(TickDefensiveAI.OffsideLine(defenders, !isHome));
+        var limit = Math.Max(MirrorX(ballX, isHome), Math.Max(SpatialPitch.PitchLength / 2, line - OnsideMargin));
+
+        return MirrorX(point.X, isHome) > limit ? new SpatialPoint(MirrorX(limit, isHome), point.Y) : point;
+    }
 
     /// <summary>Tells whether a pass lane is free of defenders: none stands within <see cref="InterceptReach"/> of it.</summary>
     /// <param name="defenders">The defending side's players.</param>

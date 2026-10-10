@@ -48,6 +48,9 @@ internal static class TickMotionProbe
     /// <summary>The distance below which two opponents stand on each other, in pitch units (1.0 m).</summary>
     private const int OverlapUnits = 100;
 
+    /// <summary>Both men of a pair are sitting together when each moves less than this a frame, in pitch units (1.5 m/s).</summary>
+    private const int SittingSpeedUnits = 15;
+
     /// <summary>How near the ball a pair is excused as a duel, in pitch units (3 m).</summary>
     private const int DuelUnits = 300;
 
@@ -101,6 +104,7 @@ internal static class TickMotionProbe
 
             Space(recording, tally);
             Motion(recording, tally);
+            Dips(recording, tally);
             Receptions(recording, tally);
             Overlap(recording, tally);
             tally.EnginePasses += result.PlayerLines.Sum(line => line.PassesAttempted);
@@ -272,6 +276,73 @@ internal static class TickMotionProbe
         }
     }
 
+    /// <summary>
+    /// Counts the dips in a man's speed: one frame under 35% of the speed he keeps over the three either side, which he then recovers
+    /// within four frames. It is what the viewer shows as a stutter, read from the engine's own motion.
+    /// </summary>
+    private static void Dips(TickMatchRecording recording, Tally tally)
+    {
+        var speeds = new int[recording.FrameCount];
+
+        for (var entity = 0; entity < Entities; entity++)
+        {
+            if (entity % Half == 0)
+            {
+                continue;
+            }
+
+            for (var frame = 0; frame < speeds.Length; frame++)
+            {
+                var valid = frame > 0
+                    && recording.State(frame) == TickPlayState.OpenPlay
+                    && recording.State(frame - 1) == TickPlayState.OpenPlay
+                    && recording.Flags(frame) == TickFrameFlags.None
+                    && recording.PlayerX(frame, entity) >= 0
+                    && recording.PlayerX(frame - 1, entity) >= 0;
+                var step = valid ? Step(recording, frame, entity) : -1;
+
+                speeds[frame] = step > TeleportUnits ? -1 : step;
+            }
+
+            for (var frame = 4; frame < speeds.Length - 5; frame++)
+            {
+                if (speeds[frame] < 0)
+                {
+                    continue;
+                }
+
+                var sum = 0;
+                var valid = true;
+
+                for (var near = -3; near <= 4 && valid; near++)
+                {
+                    if (speeds[frame + near] < 0)
+                    {
+                        valid = false;
+                    }
+                    else if (near is >= -3 and <= 3 && near != 0)
+                    {
+                        sum += speeds[frame + near];
+                    }
+                }
+
+                if (!valid)
+                {
+                    continue;
+                }
+
+                var keeps = sum / 6;
+                var recovers = Math.Max(Math.Max(speeds[frame + 1], speeds[frame + 2]), Math.Max(speeds[frame + 3], speeds[frame + 4]));
+
+                if (keeps >= 15 && speeds[frame] * 100 < keeps * 35 && recovers * 100 >= keeps * 70)
+                {
+                    tally.Dips++;
+                    frame += 4;
+                }
+            }
+        }
+    }
+
     private static int Step(TickMatchRecording recording, int frame, int entity)
     {
         var dx = recording.PlayerX(frame, entity) - recording.PlayerX(frame - 1, entity);
@@ -422,6 +493,7 @@ internal static class TickMotionProbe
             var ballY = recording.BallY(frame);
             var any = false;
             var outsideDuels = false;
+            var sitting = false;
 
             for (var home = 0; home < Half; home++)
             {
@@ -462,12 +534,18 @@ internal static class TickMotionProbe
                     {
                         outsideDuels = true;
                         tally.OverlapPairs++;
+
+                        if (frame > 0 && Step(recording, frame, home) < SittingSpeedUnits && Step(recording, frame, away) < SittingSpeedUnits)
+                        {
+                            sitting = true;
+                        }
                     }
                 }
             }
 
             tally.OverlapAnyFrames += any ? 1 : 0;
             tally.OverlapFrames += outsideDuels ? 1 : 0;
+            tally.SittingFrames += sitting ? 1 : 0;
             tally.OpenFramesForOverlap++;
         }
     }
@@ -657,6 +735,7 @@ internal static class TickMotionProbe
 
         Console.WriteLine("  -- movement (open play, outfield players)");
         Console.WriteLine($"  {"standing share",-34} {Share(tally.StandingFrames, tally.PlayerFrames),8}   speed under {StandingSpeed:F1} m/s");
+        Console.WriteLine($"  {"speed dips per player-minute",-34} {tally.Dips / Math.Max(1, playerMinutes),8:F2}   a frame under 35% of the speed either side, then back to 70%");
         Console.WriteLine($"  {"stop-go per player-minute",-34} {tally.StopGo / Math.Max(1, playerMinutes),8:F2}   under {StoppedSpeed:F1}, then over {GoingSpeed:F0} m/s within 1.5 s");
         Console.WriteLine($"  {"synchronised stops",-34} {Share(tally.SynchronisedFrames, tally.OpenFrames),8}   frames with {SynchronisedStop}+ outfielders under {StoppedSpeed:F1} m/s");
         Console.WriteLine($"  {"distance per player per 90 (km)",-34} {tally.KilometresPer90.DefaultIfEmpty(0).Average(),8:F2}   aim 9.5 - 11.5");
@@ -678,6 +757,7 @@ internal static class TickMotionProbe
 
         Console.WriteLine("  -- overlap (open play)");
         Console.WriteLine($"  {"opponents under 1.0 m, outside duels",-34} {Share(tally.OverlapFrames, tally.OpenFramesForOverlap),8}   of frames, {tally.OverlapPairs / Math.Max(1.0, tally.Matches):F0} pair-frames a match");
+        Console.WriteLine($"  {"  of which both slower than 1.5 m/s",-34} {Share(tally.SittingFrames, tally.OpenFramesForOverlap),8}   of frames (sitting on each other)");
         Console.WriteLine($"  {"opponents under 1.0 m, anywhere",-34} {Share(tally.OverlapAnyFrames, tally.OpenFramesForOverlap),8}   of frames");
 
         Console.WriteLine("  -- every stamp a match");
@@ -732,6 +812,8 @@ internal static class TickMotionProbe
 
         public long StopGo { get; set; }
 
+        public long Dips { get; set; }
+
         public long OpenFrames { get; set; }
 
         public long SynchronisedFrames { get; set; }
@@ -763,6 +845,8 @@ internal static class TickMotionProbe
         public long OverlapFrames { get; set; }
 
         public long OverlapAnyFrames { get; set; }
+
+        public long SittingFrames { get; set; }
 
         public long OverlapPairs { get; set; }
 

@@ -105,6 +105,33 @@ internal sealed class TickTeam
     /// <summary>Gets the defensive orders of the current tick, by seat.</summary>
     public TickDefensiveOrder[] DefenceOrders { get; } = new TickDefensiveOrder[Capacity];
 
+    /// <summary>Gets or sets the X of the point the block's shape follows, in pitch units: the ball, smoothed and looking ahead (`tick-film-v1`, Milestone 5).</summary>
+    public int RefX { get; set; } = SpatialPitch.PitchLength / 2;
+
+    /// <summary>Gets or sets the Y of the point the block's shape follows, in pitch units.</summary>
+    public int RefY { get; set; } = SpatialPitch.GoalYCenter;
+
+    /// <summary>Gets or sets how much of the block's shape is the one with the ball, in basis points: it ramps after a turnover instead of switching.</summary>
+    public int PossessionBlend { get; set; }
+
+    /// <summary>
+    /// Gets where each seat is to walk about, as an offset from the point he is sent to, in pitch units, when <see cref="HasOffset"/> is
+    /// set: a free square for an attacker, a step goal-side for a defender. It is worked out every ten ticks, a seat at a time.
+    /// </summary>
+    public SpatialPoint[] MicroOffset { get; } = new SpatialPoint[Capacity];
+
+    /// <summary>Gets whether a seat has a <see cref="MicroOffset"/> on hand. It outlasts the tick it was worked out on.</summary>
+    public bool[] HasOffset { get; } = new bool[Capacity];
+
+    /// <summary>Gets whether a seat walks about his <see cref="MicroOffset"/> this tick: only a man with no job beyond holding his place does.</summary>
+    public bool[] UseMicro { get; } = new bool[Capacity];
+
+    /// <summary>Gets the share of top speed each seat walks to his micro-target at, in basis points (0 is a walk).</summary>
+    public int[] MicroPace { get; } = new int[Capacity];
+
+    /// <summary>Gets whether a seat is in a duel or on the ball this tick, and so does not keep clear of opponents.</summary>
+    public bool[] Engaged { get; } = new bool[Capacity];
+
     /// <summary>Gets or sets the players who supported the carrier last tick, one bit a seat.</summary>
     public int SupporterMask { get; set; }
 
@@ -192,6 +219,11 @@ internal sealed class TickTeam
 
             Body[seat] = TickPlayerState.Standing(x, anchor.Y, heading, ConditionOf(seat)) with { Energy = Body[seat].Energy };
         }
+
+        RefX = SpatialPitch.PitchLength / 2;
+        RefY = SpatialPitch.GoalYCenter;
+        PossessionBlend = hasBall ? 10_000 : 0;
+        Array.Clear(HasOffset);
     }
 
     /// <summary>
@@ -230,6 +262,7 @@ internal sealed class TickTeam
                 var keepBody = Body[seat];
 
                 Fill(seat, replacement);
+                HasOffset[seat] = false;
 
                 // He takes his man's place on the pitch.
                 Body[seat] = keepBody with
@@ -326,6 +359,9 @@ internal sealed class TickTeam
             SlotNumber[index] = SlotNumber[index + 1];
             _startEnergy[index] = _startEnergy[index + 1];
             _startCondition[index] = _startCondition[index + 1];
+            MicroOffset[index] = MicroOffset[index + 1];
+            HasOffset[index] = HasOffset[index + 1];
+            MicroPace[index] = MicroPace[index + 1];
         }
 
         Count--;
@@ -333,6 +369,7 @@ internal sealed class TickTeam
         RunnerMask = 0;
         PreviousPresser = -1;
         KeeperRushing = false;
+        Array.Clear(HasOffset);
 
         if (wasKeeper && Count > 0)
         {

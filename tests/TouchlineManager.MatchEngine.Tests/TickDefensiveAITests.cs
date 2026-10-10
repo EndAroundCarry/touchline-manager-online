@@ -710,6 +710,76 @@ public sealed class TickDefensiveAITests
         return (int)SpatialMath.Sqrt((dx * dx) + (dy * dy));
     }
 
+    [Fact]
+    public void A_man_holding_his_place_steps_goal_side_of_the_nearest_attacker_and_stays_near_his_place_and_in_his_line()
+    {
+        var scene = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
+        var stepped = 0;
+
+        for (var tick = 0; tick < 10; tick++)
+        {
+            scene.Tick = tick;
+
+            var before = scene.HasOffset.ToArray();
+            var orders = scene.Assign();
+
+            for (var index = 0; index < 11; index++)
+            {
+                if (!scene.HasOffset[index] || before[index])
+                {
+                    continue;
+                }
+
+                stepped++;
+
+                var offset = scene.Offsets[index];
+
+                ((tick + (3 * index)) % 10).Should().Be(0, $"seat {index} steps when his turn comes");
+                orders[index].Role.Should().BeOneOf(TickDefensiveRole.Holding, TickDefensiveRole.Line);
+                SpatialMath.Sqrt((offset.X * (long)offset.X) + (offset.Y * (long)offset.Y)).Should().BeLessThanOrEqualTo(572, "no more than 6 m from his place");
+                scene.OffsetPaces[index].Should().Be(3_000);
+
+                if (orders[index].Role == TickDefensiveRole.Line)
+                {
+                    Math.Abs(offset.X).Should().BeLessThanOrEqualTo(238, "he stays within 2.5 m of the line's height");
+                }
+            }
+        }
+
+        stepped.Should().BeGreaterThan(0, "somebody in the picture has a man to cover");
+    }
+
+    [Fact]
+    public void Pressers_markers_and_the_goalkeeper_never_adjust_and_nobody_does_while_the_ball_is_loose()
+    {
+        var scene = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
+
+        for (var tick = 0; tick < 10; tick++)
+        {
+            scene.Tick = tick;
+
+            var orders = scene.Assign();
+
+            for (var index = 0; index < 11; index++)
+            {
+                if (orders[index].Role is TickDefensiveRole.Presser or TickDefensiveRole.Marker or TickDefensiveRole.Keeper)
+                {
+                    scene.HasOffset[index].Should().BeFalse($"seat {index} is a {orders[index].Role}");
+                }
+            }
+        }
+
+        var loose = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: -1);
+
+        for (var tick = 0; tick < 10; tick++)
+        {
+            loose.Tick = tick;
+            loose.Assign();
+        }
+
+        loose.HasOffset.Should().OnlyContain(has => !has, "with the ball loose there is nobody to cover");
+    }
+
     /// <summary>One defending side standing on its anchors, and the attackers it faces, with everything the AI reads.</summary>
     private sealed class Scene
     {
@@ -766,6 +836,14 @@ public sealed class TickDefensiveAITests
 
         public int Previous { get; set; } = -1;
 
+        public int Tick { get; set; }
+
+        public SpatialPoint[] Offsets { get; } = new SpatialPoint[11];
+
+        public bool[] HasOffset { get; } = new bool[11];
+
+        public int[] OffsetPaces { get; } = new int[11];
+
         /// <summary>Gets the same scene with the four back-line players listed in the opposite order.</summary>
         public Scene WithBackLineReversed()
         {
@@ -797,6 +875,10 @@ public sealed class TickDefensiveAITests
                 BallY = BallY,
                 CarrierIndex = Carrier,
                 PreviousPresser = Previous,
+                Tick = Tick,
+                Offsets = Offsets,
+                HasOffset = HasOffset,
+                OffsetPaces = OffsetPaces,
             };
 
             TickDefensiveAI.Assign(situation, orders);

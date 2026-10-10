@@ -83,18 +83,22 @@ internal sealed partial class TickMatchLoop
         var possession = controlled ? carrierSide : (_lastTouch.IsNone ? 0 : _lastTouch.Side);
 
         PlanBall(controlled);
+        FollowBall(controlled, possession);
 
         for (var index = 0; index < _teams.Length; index++)
         {
             var team = _teams[index];
 
+            Array.Clear(team.Engaged);
+            Array.Clear(team.UseMicro);
+
             TickTacticalGeometry.ResolveTeam(
                 team.Spec.AsSpan(0, team.Count),
                 team.Style,
                 team.IsHome,
-                index == possession,
-                _ball.UnitX,
-                _ball.UnitY,
+                team.PossessionBlend,
+                team.RefX,
+                team.RefY,
                 team.Anchor.AsSpan(0, team.Count));
         }
 
@@ -106,6 +110,7 @@ internal sealed partial class TickMatchLoop
 
         if (controlled)
         {
+            _teams[carrierSide].Engaged[carrierSeat] = true;
             StepCarrier(carrierSide, carrierSeat);
         }
 
@@ -130,9 +135,107 @@ internal sealed partial class TickMatchLoop
         }
     }
 
+    // ---- The block follows the ball -------------------------------------------------------------------------------------------------
+
+    /// <summary>The share of the way to its target the ball reference covers each tick, in percent.</summary>
+    private const int ReferencePercent = 25;
+
+    /// <summary>The fastest the ball reference moves, in pitch units per tick (9 m/s).</summary>
+    private static readonly int ReferenceStepUnits = TickSpatialUnits.ToUnits(TickSpatialUnits.SpeedToFixedPerTick(900));
+
+    /// <summary>The ticks the block takes to change from its shape with the ball to the one without it (1.5 s), and back.</summary>
+    private const int PossessionBlendTicks = 15;
+
+    /// <summary>The side that had the ball last tick: when it changes, the squares and steps worked out for the old shapes are dropped.</summary>
+    private int _microPossession = -1;
+
+    /// <summary>The side that has the ball (or touched it last) this tick.</summary>
+    private int _possessionSide;
+
+    /// <summary>
+    /// Moves what each block's shape follows. It is not the ball: it is where the ball is going. A pass in flight sends it to the point the
+    /// man it is for will meet it at, a man with the ball sends it a second ahead of him, and a loose ball sends it to where it will stop; it
+    /// closes a quarter of the way to its target a tick and never runs faster than 9 m/s. The shape with the ball and the shape without it are
+    /// blended by how long ago the ball changed hands, so a turnover bends the block instead of switching it.
+    /// </summary>
+    private void FollowBall(bool controlled, int possession)
+    {
+        _possessionSide = possession;
+
+        if (_microPossession != possession)
+        {
+            _microPossession = possession;
+
+            foreach (var team in _teams)
+            {
+                Array.Clear(team.HasOffset);
+            }
+        }
+
+        int targetX;
+        int targetY;
+
+        if (_passPending && _receiverReach >= 0)
+        {
+            targetX = _receiverPoint.X;
+            targetY = _receiverPoint.Y;
+        }
+        else if (controlled)
+        {
+            var body = _teams[_controllerSide].Body[_ball.ControllerIndex];
+
+            targetX = _ball.UnitX + (body.VelocityX * TickSpatialUnits.TicksPerSecond / TickSpatialUnits.FixedScale);
+            targetY = _ball.UnitY + (body.VelocityY * TickSpatialUnits.TicksPerSecond / TickSpatialUnits.FixedScale);
+        }
+        else
+        {
+            targetX = _restX;
+            targetY = _restY;
+        }
+
+        targetX = Math.Clamp(targetX, 0, SpatialPitch.PitchLength);
+        targetY = Math.Clamp(targetY, 0, SpatialPitch.PitchWidth);
+
+        for (var index = 0; index < _teams.Length; index++)
+        {
+            var team = _teams[index];
+            long moveX = (targetX - team.RefX) * ReferencePercent / 100;
+            long moveY = (targetY - team.RefY) * ReferencePercent / 100;
+            var length = SpatialMath.Sqrt((moveX * moveX) + (moveY * moveY));
+
+            if (length > ReferenceStepUnits)
+            {
+                moveX = moveX * ReferenceStepUnits / length;
+                moveY = moveY * ReferenceStepUnits / length;
+            }
+
+            team.RefX += (int)moveX;
+            team.RefY += (int)moveY;
+
+            var blendStep = 10_000 / PossessionBlendTicks;
+
+            team.PossessionBlend = index == possession
+                ? Math.Min(10_000, team.PossessionBlend + blendStep)
+                : Math.Max(0, team.PossessionBlend - blendStep);
+        }
+    }
+
+    /// <summary>While the ball is dead the references sit on it, so open play begins with the block where the restart is.</summary>
+    private void SnapReferences()
+    {
+        foreach (var team in _teams)
+        {
+            team.RefX = _ball.UnitX;
+            team.RefY = _ball.UnitY;
+            Array.Clear(team.HasOffset);
+        }
+
+        _microPossession = -1;
+    }
+
     // ---- Orders ----------------------------------------------------------------------------------------------------------------------
 
-    private static void AssignAttack(TickTeam attackers, TickTeam defenders, int carrier)
+    private void AssignAttack(TickTeam attackers, TickTeam defenders, int carrier)
     {
         var count = attackers.Count;
 
@@ -154,6 +257,10 @@ internal sealed partial class TickMatchLoop
             CarrierIndex = carrier,
             PreviousSupporters = attackers.SupporterMask,
             PreviousRunners = attackers.RunnerMask,
+            Tick = _tick,
+            Offsets = attackers.MicroOffset.AsSpan(0, count),
+            HasOffset = attackers.HasOffset.AsSpan(0, count),
+            OffsetPaces = attackers.MicroPace.AsSpan(0, count),
         };
 
         var orders = attackers.AttackOrders.AsSpan(0, count);
@@ -162,6 +269,15 @@ internal sealed partial class TickMatchLoop
         attackers.SupporterMask = TickOffBallSupport.SupporterMask(orders);
         attackers.RunnerMask = TickOffBallSupport.RunnerMask(orders);
         TickOffBallSupport.ToSteering(orders, attackers.Anchor.AsSpan(0, count), attackers.Pace.AsSpan(0, count));
+
+        for (var seat = 0; seat < count; seat++)
+        {
+            var family = attackers.Spec[seat].Family;
+
+            // A man with a job goes where it sends him; one with none walks about his place, a back-line man in his line.
+            attackers.UseMicro[seat] = orders[seat].Role == TickAttackingRole.Holding && family != MatchPositionFamily.Goalkeeper;
+            attackers.Engaged[seat] = attackers.Body[seat].Lockout > 0;
+        }
     }
 
     private void AssignDefence(TickTeam defenders, TickTeam attackers, int carrier)
@@ -186,6 +302,10 @@ internal sealed partial class TickMatchLoop
             BallY = _ball.UnitY,
             CarrierIndex = carrier,
             PreviousPresser = defenders.PreviousPresser,
+            Tick = _tick,
+            Offsets = defenders.MicroOffset.AsSpan(0, count),
+            HasOffset = defenders.HasOffset.AsSpan(0, count),
+            OffsetPaces = defenders.MicroPace.AsSpan(0, count),
         };
 
         var orders = defenders.DefenceOrders.AsSpan(0, count);
@@ -205,6 +325,17 @@ internal sealed partial class TickMatchLoop
         }
 
         TickDefensiveAI.ToSteering(orders, defenders.Anchor.AsSpan(0, count), defenders.Pace.AsSpan(0, count));
+
+        for (var seat = 0; seat < count; seat++)
+        {
+            var role = orders[seat].Role;
+
+            defenders.UseMicro[seat] = (role == TickDefensiveRole.Holding || role == TickDefensiveRole.Line)
+                && defenders.Spec[seat].Family != MatchPositionFamily.Goalkeeper;
+            defenders.Engaged[seat] = role == TickDefensiveRole.Presser
+                || role == TickDefensiveRole.SupportPresser
+                || defenders.Body[seat].Lockout > 0;
+        }
     }
 
     /// <summary>
@@ -356,6 +487,8 @@ internal sealed partial class TickMatchLoop
 
             team.Anchor[best] = bestPoint;
             team.Pace[best] = bestPace;
+            team.Engaged[best] = true;
+            team.UseMicro[best] = false;
 
             if (_passPending && bestTicks >= 0 && _intended.Side == index && _intended.Slot == team.SlotNumber[best])
             {
@@ -741,18 +874,66 @@ internal sealed partial class TickMatchLoop
 
     private void MoveTeams()
     {
-        foreach (var team in _teams)
+        // In a dead ball nobody walks about and the opponents are not kept clear of: a set piece is set where its plan puts the men.
+        var live = !_machine.IsDeadBall;
+
+        for (var side = 0; side < _teams.Length; side++)
         {
+            var team = _teams[side];
+            var other = _teams[1 - side];
             var count = team.Count;
             var bodies = team.Body.AsSpan(0, count);
+            var opponents = other.Body.AsSpan(0, other.Count);
 
             for (var seat = 0; seat < count; seat++)
             {
-                if (!team.HasIntent[seat])
+                if (team.HasIntent[seat])
                 {
-                    team.Intent[seat] = TickSteering.Steer(seat, bodies, team.Profile[seat], team.Anchor[seat], team.Pace[seat]);
+                    continue;
                 }
+
+                var walks = live && team.UseMicro[seat];
+                var micro = default(SpatialPoint);
+                var microPace = team.MicroPace[seat];
+
+                if (walks)
+                {
+                    var anchor = team.Anchor[seat];
+                    var offset = team.MicroOffset[seat];
+
+                    if (!team.HasOffset[seat])
+                    {
+                        // Nothing to look for or cover: he drifts about his place, a few steps one way and then another.
+                        offset = Drift(side, seat);
+                        microPace = 0;
+                    }
+
+                    micro = new SpatialPoint(
+                        Math.Clamp(anchor.X + offset.X, TickTacticalGeometry.Margin, SpatialPitch.PitchLength - TickTacticalGeometry.Margin),
+                        Math.Clamp(anchor.Y + offset.Y, TickTacticalGeometry.Margin, SpatialPitch.PitchWidth - TickTacticalGeometry.Margin));
+
+                    if (side == _possessionSide)
+                    {
+                        micro = TickOffBallSupport.ClampOnside(micro, team.IsHome, _ball.UnitX, opponents);
+                    }
+                }
+
+                var context = new TickSteerContext
+                {
+                    Opponents = live ? opponents : default,
+                    Engaged = !live || team.Engaged[seat],
+                    HasMicro = walks,
+                    Micro = micro,
+                    MicroPaceBasisPoints = microPace,
+                };
+
+                team.Intent[seat] = TickSteering.Steer(seat, bodies, team.Profile[seat], team.Anchor[seat], team.Pace[seat], context);
             }
+        }
+
+        foreach (var team in _teams)
+        {
+            var count = team.Count;
 
             for (var seat = 0; seat < count; seat++)
             {
@@ -760,6 +941,19 @@ internal sealed partial class TickMatchLoop
             }
         }
     }
+
+    /// <summary>The ticks a man drifts one way before he turns to another (2 s).</summary>
+    private const int DriftTicks = 20;
+
+    /// <summary>The steps of a drift, in pitch units: eight directions 2 m from his place.</summary>
+    private static readonly SpatialPoint[] DriftSteps =
+    [
+        new(190, 0), new(134, 134), new(0, 190), new(-134, 134), new(-190, 0), new(-134, -134), new(0, -190), new(134, -134),
+    ];
+
+    /// <summary>Gets where a man with nothing to do drifts to, as an offset from his place: it changes every two seconds, at a different tick for each seat.</summary>
+    private SpatialPoint Drift(int side, int seat) =>
+        DriftSteps[(((_tick + (7 * seat) + (3 * side)) / DriftTicks * 3) + seat + side) & 7];
 
     // ---- Challenges on the man with the ball ----------------------------------------------------------------------------------------------
 
