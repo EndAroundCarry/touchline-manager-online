@@ -24,9 +24,9 @@ public sealed class TickReplaySynthesizerTests
 
         presentation.PresentationVersion.Should().Be(TickReplaySynthesizer.Version);
         presentation.PaceMilli.Should().Be(2_000);
-        presentation.TotalPlaybackMilliseconds.Should().BeInRange(Options.MinFilmMilliseconds - 5_000, Options.MaxFilmMilliseconds);
+        presentation.TotalPlaybackMilliseconds.Should().BeInRange(Options.TickMinFilmMilliseconds - 5_000, Options.TickMaxFilmMilliseconds);
         presentation.Playback.Should().HaveCount(presentation.Passages.Count);
-        presentation.Passages.Count.Should().BeLessThanOrEqualTo(Options.MaxPassages);
+        presentation.Passages.Count.Should().BeLessThanOrEqualTo(Options.TickMaxPassages);
 
         var expected = 0;
 
@@ -42,7 +42,7 @@ public sealed class TickReplaySynthesizerTests
     [Fact]
     public void The_film_fits_the_payload_budget()
     {
-        Presentation.EstimatedPayloadBytes.Should().BeLessThanOrEqualTo(Options.PayloadBudgetBytes);
+        Presentation.EstimatedPayloadBytes.Should().BeLessThanOrEqualTo(Options.TickPayloadBudgetBytes);
     }
 
     [Fact]
@@ -188,6 +188,23 @@ public sealed class TickReplaySynthesizerTests
         }
 
         goals.Should().OnlyContain(goal => TestMatchFactory.ReelCovers(presentation, goal), "a reel always carries every goal");
+    }
+
+    [Fact]
+    public void A_booking_the_film_does_not_show_is_carried_to_the_next_passage_and_never_names_one()
+    {
+        var sample = TickPlay.Reduced;
+        var presentation = Film(sample);
+        var bookings = sample.Result.Events.Where(matchEvent => matchEvent.Type == EngineEventType.YellowCard).ToList();
+
+        bookings.Should().NotBeEmpty();
+        presentation.Passages.Should().NotContain(passage => passage.OutcomeCode == "yellow_card", "a foul and its booking are not filmed for themselves");
+
+        // Each is in exactly one passage, so the viewer can put the card on the man's token from there.
+        foreach (var booking in bookings)
+        {
+            presentation.Passages.Count(passage => passage.EventSequences.Contains(booking.Sequence)).Should().Be(1, $"booking {booking.Sequence}");
+        }
     }
 
     [Fact]

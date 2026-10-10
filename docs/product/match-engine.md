@@ -1435,8 +1435,9 @@ less often than they do in football; and the formations are not alike — a lone
 
 With a `MatchPassageRecorder` attached the loop records each tick (`TickMatchRecording`: the 22 players and the ball as shorts, plus the actions, events,
 rosters and stoppages), and `ReplayDirector.Build(input, result, recorder)` cuts a film from it (`TickFilmSelector`, `TickReplaySynthesizer`,
-`tick-replay-v1`). The film is a selection at twice the pace — about ten minutes of kick-offs, every goal with 18 s of build-up, cards, the best chances and
-the corners — in passages that share a boundary frame and are joined by `jump`, `kick_off` and `half_time` cuts; the viewer reads it unchanged.
+`tick-replay-v2`). The film is a selection at twice the pace — sixteen to twenty minutes of kick-offs, every goal and every good chance as the whole move
+that made it, cards, the other chances and the set pieces, topped up with spells of play at the ends of the pitch — in passages that share a boundary frame
+and are joined by `jump`, `kick_off` and `half_time` cuts; the viewer reads it unchanged (§14.10).
 
 ### 14.7 Tests
 
@@ -1449,6 +1450,7 @@ the corners — in passages that share a boundary frame and are joined by `jump`
 | `TickGoalkeeperAITests`, `TickShotStopperTests` | The arc, the rush, the dive and the save. |
 | `TickMatchStateMachineTests`, `TickSetPiecesTests` | Every restart. |
 | `TickMatchLoopTests`, `TickTeamTests`, `TickMatchRecordingTests`, `TickFilmSelectorTests`, `TickReplaySynthesizerTests` | The loop, the sides, the recording and the film. |
+| `TickMoveFinderTests` | Where a move began, on recordings built to have one shape: a tackle, a capped possession snapped to a pass, the interval, a restart, a deflection, a loose ball. |
 
 ### 14.8 Motion and film baseline (the tick-film plan, Milestone 0)
 
@@ -1496,3 +1498,48 @@ Measured on seed 11 with the harness: covered pairs 25% of steps to 0%. Stutters
 194 with the new spline and the de-overlap. The plan's aim of 70% fewer stutters is **not** met from the viewer: the slow-downs left are real in the
 data (a token runs at 3–6 m/s, falls to under 1 m/s and sets off again over a second), which is the engine's stop-and-go, and the de-overlap adds a few
 because a token pushed by one coming the other way is slowed. That is Milestone 5's work.
+
+### 14.10 Whole moves in the film (the tick-film plan, Milestone 2)
+
+The film used to show a fixed 18 s (goal) or 15 s (shot) before a chance, whatever the move was. It now opens on the move.
+
+**The move finder** (`TickMoveFinder.StartOf(recording, eventFrame, side, minLead)`). From the strike (the side's `Shot`, `FreeKick` or `Penalty` stamp in
+open play within 8 s before the event; failing that the last open-play frame) it walks back frame by frame for as long as the side keeps the ball. A side
+has the ball when its man controls it, and while it is loose when it played it last. A tackle, an interception and a keeper's claim all leave the other
+side's man in control, which is how the walk meets a regain. Two gaps are forgiven: a ball nobody holds for up to 1.5 s, and an opponent's control of up
+to 0.5 s. A restart (play not open) ends the walk, and the move is then the restart's kick. The film opens 3 s before the regain (1 s before a restart's
+kick). The lead is then held to a range: never more than 40 s, and when capped it opens on the side's last pass within 10 s before the cap, so the film
+begins on a kick and not halfway through a carry; never less than the minimum the caller asks for; never before the half began. A lead that reaches back
+over a restart shows it, and the film fades over the jump as it does anywhere the ball is put down.
+
+**The selector.** Goals, penalties awarded and chances of at least `MinQualityForShotBasisPoints` (7%) use the move; the least lead for a goal is 18 s and
+for a chance 15 s, the leads the film had, because a median move is only 6 s (§14.8) and a 3 s lead-in would have made most highlights shorter than before.
+Weaker chances and direct free kick strikes keep a 15 s lead; corners, free kicks won and red cards keep theirs. A yellow card is never a reason to show a stretch: the foul is not filmed for its own sake, and the booking is handed to the next passage the film shows, where the viewer puts the card on the player's token. Stretches within 10 s are joined. The target is
+`TickMinFilmMilliseconds` 16:00 to `TickMaxFilmMilliseconds` 20:00 (tick-only options; the possession engine's film is unchanged): everything above is
+selected in order of worth until the middle of that range, and what is still short is filled with spells at the ends of the pitch (40 s of play each, then
+shorter if they no longer fit). The selection aims 20 s over the floor, since the finished film loses a frame at every cut. Over the ceiling, the moves
+behind chances are cut back to 15 s first, and only then are whole stretches dropped; goals and red cards stay.
+
+**The sampling.** Players are sampled every tick first (`TickPlayerSampleIntervals` 50, 100, 200, 300 ms against `TickPlayerTolerances` 15, 25, 40, 60,
+a rung of the ladder at a time until the film fits `TickPayloadBudgetBytes`), so a path is not cornered by the sampling. At most `TickMaxPassages` = 150
+passages. The presentation version is `tick-replay-v2`, so a film cached under v1 is not served for the same match.
+
+**The wire.** The film is about 3.3 times the old one: 6.7 MB of JSON, 1.0 MB with Brotli. The API compresses (Brotli, Gzip) the presentation response only,
+over HTTPS as well: other responses are small, and some carry a token, which compression over HTTPS can leak when it shares a response with attacker-chosen
+text (BREACH). The budget is on the estimate (24 bytes a keyframe), which is a third of the real JSON: p95 2 283 KB over 200 matches, plus a fifth,
+2 750 KB.
+
+Measured over 200 matches, seed 11, engine unchanged (so play and its calibration are as at the end of Milestone 9):
+
+| | Milestone 0 | Milestone 2 |
+|---|---|---|
+| Film | 9:30, 74 passages | 16:02 to 16:39, 124 passages (cap 150), 81 cuts |
+| Regain cut off, goals / shots | 6.4% / 8.5% | 0.2% / 0.3% (moves longer than the 40 s cap) |
+| Film made of chances and set pieces, without filler | | about 5:50; the rest is filler |
+| Payload estimate p50 / p95 | | 2 227 / 2 283 KB |
+| Payload on the wire, JSON / Brotli | 2.0 MB (one match) | 6.8 MB / 1.1 MB |
+
+Cutting a film takes about 60 ms.
+
+The harness, seed 11: 60 fps with no dropped frame, 0 covered tokens; 205 stutters a film minute against 194 before (the denser sampling follows the engine's
+stops more faithfully); 100 frame jumps outside the cuts against 111 on the same seed before this milestone.

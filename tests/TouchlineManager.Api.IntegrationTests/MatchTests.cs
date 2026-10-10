@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -9,6 +10,7 @@ using TouchlineManager.Contracts.Match;
 using TouchlineManager.Domain.Competition;
 using TouchlineManager.Domain.Match;
 using TouchlineManager.Infrastructure.Persistence;
+using TouchlineManager.MatchEngine.Highlights;
 
 namespace TouchlineManager.Api.IntegrationTests;
 
@@ -83,7 +85,7 @@ public sealed class MatchTests : IAsyncLifetime
             $"/api/v1/matches/{matchId}/presentation"))!;
 
         presentation.MatchId.Should().Be(matchId);
-        presentation.PresentationVersion.Should().Be("tick-replay-v1");
+        presentation.PresentationVersion.Should().Be("tick-replay-v2");
         presentation.Commentary.Should().NotBeEmpty();
         presentation.Commentary.Select(line => line.TemplateKey).Should()
             .Contain(["match.kickoff", "match.full_time"], "a match is narrated from kick-off to full time");
@@ -151,7 +153,10 @@ public sealed class MatchTests : IAsyncLifetime
         }
 
         cursor.Should().Be(presentation.TotalPlaybackMilliseconds);
-        presentation.TotalPlaybackMilliseconds.Should().BeLessThanOrEqualTo(11 * 60 * 1000);
+        presentation.TotalPlaybackMilliseconds.Should().BeInRange(
+            new HighlightOptionsV1().TickMinFilmMilliseconds - 5_000,
+            new HighlightOptionsV1().TickMaxFilmMilliseconds,
+            "a tick match's film is sixteen to twenty minutes");
     }
 
     [Fact]
@@ -228,7 +233,7 @@ public sealed class MatchTests : IAsyncLifetime
             }
         }
 
-        presentation.EstimatedPayloadBytes.Should().BeLessThanOrEqualTo(750 * 1024, "§9.3: the payload budget");
+        presentation.EstimatedPayloadBytes.Should().BeLessThanOrEqualTo(new HighlightOptionsV1().TickPayloadBudgetBytes, "§9.3: the payload budget of a tick match's film");
     }
 
     [Fact]
@@ -350,6 +355,51 @@ public sealed class MatchTests : IAsyncLifetime
         stale.Headers.TryAddWithoutValidation("If-None-Match", "\"not-the-current-tag\"");
 
         (await client.SendAsync(stale)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task A_replay_is_compressed_for_a_client_that_accepts_it_and_is_the_same_film_either_way()
+    {
+        using var client = _fixture.CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture.Email, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var matchId = await PublishNextRoundAsync();
+        var url = $"/api/v1/matches/{matchId}/presentation";
+        var plain = await client.GetByteArrayAsync(url);
+
+        foreach (var encoding in new[] { "br", "gzip" })
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.TryAddWithoutValidation("Accept-Encoding", encoding);
+
+            var response = await client.SendAsync(request);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            response.Content.Headers.ContentEncoding.Should().ContainSingle().Which.Should().Be(encoding);
+            response.Headers.Vary.Should().Contain("Accept-Encoding", "a cache must keep the compressed and the plain body apart");
+
+            var compressed = await response.Content.ReadAsByteArrayAsync();
+
+            compressed.Length.Should().BeLessThan(plain.Length / 2, "a film is numbers, and numbers compress");
+
+            await using var input = new MemoryStream(compressed);
+            await using Stream decoder = encoding == "br"
+                ? new BrotliStream(input, CompressionMode.Decompress)
+                : new GZipStream(input, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+
+            await decoder.CopyToAsync(output);
+
+            output.ToArray().Should().Equal(plain, $"the {encoding} body is the same film");
+        }
+
+        // Only the film is compressed: the summary is small and carries nothing that gains from it.
+        var summary = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/matches/{matchId}");
+        summary.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip");
+
+        (await client.SendAsync(summary)).Content.Headers.ContentEncoding.Should().BeEmpty();
     }
 
     [Fact]

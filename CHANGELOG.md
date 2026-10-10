@@ -4,6 +4,27 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tick film, Milestone 2 — the film shows the whole move, and is longer
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.10. The engine's play is unchanged (the golden hash and the calibration
+stand); the film cut from it changes, so a match is re-filmed under `tick-replay-v2`.
+
+### Changed
+
+- **A goal or a good chance is shown as the move that made it.** The film opens 3 s before the side won the ball (a tackle, an interception, a keeper's
+  claim, a restart), never less than the 18 s (goal) or 15 s (chance) it showed before and never more than 40 s, instead of a fixed 18 or 15 s.
+- **The film runs 16 to 20 minutes** (it was 9:30 to 11:00), at the same twice-real pace, in up to 150 passages. Players are sampled every tick. The
+  possession engine's film is unchanged.
+- **The presentation is compressed** (Brotli, Gzip) on the wire: the longer, denser film is 6.7 MB of JSON and 1.0 MB compressed. Only the presentation
+  response is compressed.
+- **A yellow card is no longer a highlight.** The foul that earned it is not picked for the film; the player's token carries the card from the next passage shown.
+- `tick-replay-v2`: a film cached for a match under `tick-replay-v1` is not reused.
+
+### Added
+
+- `TickMoveFinder` and its tests; tick-only film options in `HighlightOptionsV1`; the tick probe reports the film's wire size, keyframes and length range,
+  and the motion probe the film's make-up.
+
 ## Tick film, Milestone 1 — smoother runs and no stacked tokens in the viewer
 
 ### Changed

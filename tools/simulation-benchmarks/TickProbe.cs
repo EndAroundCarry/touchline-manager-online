@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text.Json;
 using TouchlineManager.Application.Match;
 using TouchlineManager.Domain.Squad;
@@ -53,6 +54,9 @@ internal static class TickProbe
         var passageCounts = new double[matches];
         var cuts = new double[matches];
         var kilobytes = new double[matches];
+        var wireKilobytes = new double[matches];
+        var brotliKilobytes = new double[matches];
+        var keyframes = new double[matches];
         var homeWins = 0;
         var draws = 0;
         var play = new Stopwatch();
@@ -89,6 +93,12 @@ internal static class TickProbe
             passageCounts[index] = presentation.Passages.Count;
             cuts[index] = presentation.Passages.Sum(passage => passage.Cuts.Count);
             kilobytes[index] = presentation.EstimatedPayloadBytes / 1_024.0;
+            keyframes[index] = presentation.Passages.Sum(passage => passage.Tracks.Sum(track => track.Keyframes.Count));
+
+            var wire = JsonSerializer.SerializeToUtf8Bytes(presentation.ToResponse(Guid.Empty, CommentaryTokenBuilder.Build(input, result)), json);
+
+            wireKilobytes[index] = wire.Length / 1_024.0;
+            brotliKilobytes[index] = BrotliSize(wire) / 1_024.0;
 
             if (result.HomeGoals > result.AwayGoals)
             {
@@ -121,12 +131,37 @@ internal static class TickProbe
         Console.WriteLine(Row("yellow cards per match", yellows, "target 3.0 - 4.5"));
         Console.WriteLine($"  {"pass completion",-24} {100.0 * completed.Sum() / Math.Max(1, passes.Sum()),9:F1}%   target 75% - 85%");
         Console.WriteLine($"  {"home win / draw",-24} {100.0 * homeWins / matches,5:F1}% / {100.0 * draws / matches:F1}%   target 42 - 48 / 22 - 26");
-        Console.WriteLine(Row("film seconds", filmSeconds, "target 570 - 660"));
-        Console.WriteLine(Row("passages per film", passageCounts, "cap 75"));
+        Console.WriteLine(Row("film seconds", filmSeconds, "target 960 - 1200"));
+        Console.WriteLine($"  {"film seconds min / max",-24} {filmSeconds.Min(),10:F0} {filmSeconds.Max(),8:F0}");
+        Console.WriteLine(Row("passages per film", passageCounts, "cap 150"));
         Console.WriteLine(Row("cuts per film", cuts, string.Empty));
-        Console.WriteLine(Row("payload estimate (KB)", kilobytes, "budget 750"));
+        Console.WriteLine(Row("payload estimate (KB)", kilobytes, $"budget {new HighlightOptionsV1().TickPayloadBudgetBytes / 1_024}"));
+        Console.WriteLine(Row("keyframes per film", keyframes, string.Empty));
+        Console.WriteLine(Row("payload on the wire (KB)", wireKilobytes, "JSON, uncompressed"));
+        Console.WriteLine(Row("payload compressed (KB)", brotliKilobytes, "Brotli"));
+        Console.WriteLine($"  {"estimate p50 / p95 / max (KB)",-24} {Percentile(kilobytes, 0.50),10:F0} {Percentile(kilobytes, 0.95),8:F0} {kilobytes.Max(),8:F0}");
+        Console.WriteLine($"  {"wire p50 / p95 / max (KB)",-24} {Percentile(wireKilobytes, 0.50),10:F0} {Percentile(wireKilobytes, 0.95),8:F0} {wireKilobytes.Max(),8:F0}");
         Console.WriteLine($"  {"play (ms per match)",-24} {play.Elapsed.TotalMilliseconds / matches,10:F0}");
         Console.WriteLine($"  {"film (ms per match)",-24} {film.Elapsed.TotalMilliseconds / matches,10:F0}");
         Console.WriteLine();
+    }
+
+    private static double Percentile(double[] values, double share)
+    {
+        var sorted = values.OrderBy(value => value).ToArray();
+
+        return sorted[Math.Min(sorted.Length - 1, (int)(share * sorted.Length))];
+    }
+
+    private static int BrotliSize(byte[] bytes)
+    {
+        using var output = new MemoryStream();
+
+        using (var brotli = new BrotliStream(output, CompressionLevel.Fastest, leaveOpen: true))
+        {
+            brotli.Write(bytes);
+        }
+
+        return (int)output.Length;
     }
 }

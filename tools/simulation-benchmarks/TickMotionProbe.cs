@@ -414,6 +414,10 @@ internal static class TickMotionProbe
     private static void Film(TickMatchRecording recording, MatchResultV1 result, Tally tally)
     {
         var windows = TickFilmSelector.Select(recording, result.Events, new HighlightOptionsV1());
+        var content = TickFilmSelector.Select(recording, result.Events, new HighlightOptionsV1 { TickMinFilmMilliseconds = 0 });
+
+        tally.FilmSeconds.Add(windows.Sum(window => window.Length) / 20.0);
+        tally.ContentSeconds.Add(content.Sum(window => window.Length) / 20.0);
         var possession = PossessionOf(recording);
         var frameOf = recording.Events.ToDictionary(stamp => stamp.Sequence, stamp => Math.Min(stamp.Frame, recording.FrameCount - 1));
 
@@ -591,6 +595,8 @@ internal static class TickMotionProbe
         Console.WriteLine($"  {"opponents under 1.0 m, anywhere",-34} {Share(tally.OverlapAnyFrames, tally.OpenFramesForOverlap),8}   of frames");
 
         Console.WriteLine("  -- film windows (match seconds; negative slack means the regain is cut off)");
+        Console.WriteLine($"  {"film, in play (s of film)",-34} {Spread(tally.FilmSeconds)}");
+        Console.WriteLine($"  {"without the filler (s of film)",-34} {Spread(tally.ContentSeconds)}");
         FilmLine("goals", tally.GoalLeads, tally.GoalSlacks);
         FilmLine("shots", tally.ShotLeads, tally.ShotSlacks);
         Console.WriteLine();
@@ -644,6 +650,10 @@ internal static class TickMotionProbe
         public long OverlapAnyFrames { get; set; }
 
         public long OverlapPairs { get; set; }
+
+        public List<double> FilmSeconds { get; } = [];
+
+        public List<double> ContentSeconds { get; } = [];
 
         public List<double> GoalLeads { get; } = [];
 

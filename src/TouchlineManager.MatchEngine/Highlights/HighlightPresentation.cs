@@ -433,6 +433,34 @@ public sealed record HighlightOptionsV1
     /// </remarks>
     public int TickFilmPaceMilli { get; init; } = 2_000;
 
+    /// <summary>
+    /// Gets the shortest a tick match's film is aimed at, in milliseconds (16:00): long enough to show every goal and good chance as the
+    /// whole move that made it (`tick-film-v1`). The possession engine's film ignores it.
+    /// </summary>
+    public int TickMinFilmMilliseconds { get; init; } = 16 * 60 * 1_000;
+
+    /// <summary>Gets the longest a tick match's film may ever run for, in milliseconds (20:00, a hard ceiling). The possession engine's film ignores it.</summary>
+    public int TickMaxFilmMilliseconds { get; init; } = 20 * 60 * 1_000;
+
+    /// <summary>Gets the most passages a tick match's film may carry: about ten seconds each, so it covers the longer film.</summary>
+    public int TickMaxPassages { get; init; } = 150;
+
+    /// <summary>
+    /// Gets the sampling intervals the ladder tries for a tick match's players, in milliseconds of film, paired by index with
+    /// <see cref="TickPlayerTolerances"/>. The first is every tick at the usual pace, so a player's path is not cornered by the sampling.
+    /// </summary>
+    public IReadOnlyList<int> TickPlayerSampleIntervals { get; init; } = [50, 100, 200, 300];
+
+    /// <summary>Gets the keyframe tolerances the ladder tries for a tick match's players, in normalized position units (15 is about 16 cm).</summary>
+    public IReadOnlyList<int> TickPlayerTolerances { get; init; } = [15, 25, 40, 60];
+
+    /// <summary>
+    /// Gets the estimated payload budget for a tick match's film, in bytes. The film is longer than the possession engine's and denser
+    /// in keyframes, and the API compresses it, so the budget is larger than <see cref="PayloadBudgetBytes"/>: the estimate's p95 over
+    /// 200 matches (2 283 KB) plus a fifth. A match that exceeds it is sampled more coarsely, a rung of the ladder at a time.
+    /// </summary>
+    public int TickPayloadBudgetBytes { get; init; } = 2_750 * 1024;
+
     // ---- How fast the ball moves, in metres per second of real time -----------------------------------------
 
     /// <summary>Gets the speed of a ground pass.</summary>

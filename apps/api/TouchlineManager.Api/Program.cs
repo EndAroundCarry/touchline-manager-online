@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Options;
 using TouchlineManager.Api.Auth;
 using TouchlineManager.Api.Comms;
@@ -171,6 +172,16 @@ builder.Services
 
 builder.Services.AddOpenApi();
 
+// A tick match's film is a few megabytes of numbers that compress to a fifth of that. Compression is switched on for the film
+// alone (see the pipeline below), over HTTPS as well, so the one large response is the one that is sent small.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ["application/json"];
+});
+
 var allowedOrigins = builder.Configuration
     .GetSection(CorsOptions.SectionName)
     .Get<CorsOptions>()?.AllowedOrigins ?? [];
@@ -191,6 +202,13 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
+// Only a match's presentation is compressed. Compressing a response over HTTPS can leak a secret that shares it with attacker-chosen
+// text (BREACH); the film carries neither, and the endpoints that do carry a token are small enough not to need it.
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments("/api/v1/matches", StringComparison.OrdinalIgnoreCase)
+        && context.Request.Path.Value!.EndsWith("/presentation", StringComparison.OrdinalIgnoreCase),
+    branch => branch.UseResponseCompression());
 
 if (!app.Environment.IsDevelopment())
 {

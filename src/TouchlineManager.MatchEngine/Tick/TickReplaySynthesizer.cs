@@ -33,7 +33,7 @@ namespace TouchlineManager.MatchEngine.Tick;
 internal sealed class TickReplaySynthesizer
 {
     /// <summary>The version label of a film made from a tick recording.</summary>
-    public const string Version = "tick-replay-v1";
+    public const string Version = "tick-replay-v2";
 
     /// <summary>The cut that covers a jump to a stretch of the match that is not the one before it.</summary>
     public const string JumpCut = "jump";
@@ -175,14 +175,14 @@ internal sealed class TickReplaySynthesizer
         var homeColour = FilmLabels.Colours(_input).Home;
         var awayColour = FilmLabels.Colours(_input).Away;
 
-        for (var rung = 0; rung < _options.PlayerTolerances.Count; rung++)
+        for (var rung = 0; rung < _options.TickPlayerTolerances.Count; rung++)
         {
-            var tolerance = _options.PlayerTolerances[rung];
-            var interval = _options.PlayerSampleIntervals[Math.Min(rung, _options.PlayerSampleIntervals.Count - 1)];
+            var tolerance = _options.TickPlayerTolerances[rung];
+            var interval = _options.TickPlayerSampleIntervals[Math.Min(rung, _options.TickPlayerSampleIntervals.Count - 1)];
 
             built = [.. items.Select(item => ToPassage(item, Tracks(item, interval, tolerance), homeColour, awayColour))];
 
-            if (Estimate(built, reel, playback, homeLineup, awayLineup, liveMetrics) <= _options.PayloadBudgetBytes)
+            if (Estimate(built, reel, playback, homeLineup, awayLineup, liveMetrics) <= _options.TickPayloadBudgetBytes)
             {
                 break;
             }
@@ -233,7 +233,7 @@ internal sealed class TickReplaySynthesizer
             var scale = relax switch { 0 => 100, 1 => 125, 2 => 150, 3 => 200, _ => 300 };
             var items = PlanAt(windows, scale);
 
-            if (items.Count <= _options.MaxPassages || relax == RelaxationSteps - 1)
+            if (items.Count <= _options.TickMaxPassages || relax == RelaxationSteps - 1)
             {
                 return items;
             }
@@ -452,6 +452,13 @@ internal sealed class TickReplaySynthesizer
                 && item.First <= frame
                 && (frame < item.Last || (frame == item.Last && !item.SharedNext)));
 
+            if (owner < 0 && matchEvent.Type == EngineEventType.YellowCard)
+            {
+                // The foul that earned a booking is not worth filming, but the man carries the card from then on: it goes to the next
+                // passage the film shows, where the viewer puts it on his token.
+                owner = items.FindIndex(item => !item.IsHalfTime && item.First > frame);
+            }
+
             if (owner >= 0)
             {
                 items[owner].Events.Add(matchEvent);
@@ -467,7 +474,12 @@ internal sealed class TickReplaySynthesizer
 
             item.Marks = [.. _recording.Actions.Where(stamp => stamp.Frame >= item.First && stamp.Frame <= item.Last)];
 
-            var inPlay = item.Events.Where(matchEvent => !matchEvent.IsPeriodBoundary && matchEvent.Type != EngineEventType.Substitution).ToList();
+            // A booking carried over from a stretch the film skipped says nothing about this passage.
+            var inPlay = item.Events
+                .Where(matchEvent => !matchEvent.IsPeriodBoundary
+                    && matchEvent.Type != EngineEventType.Substitution
+                    && !(matchEvent.Type == EngineEventType.YellowCard && _eventFrame.GetValueOrDefault(matchEvent.Sequence) < item.First))
+                .ToList();
 
             item.Principal = inPlay.FirstOrDefault(matchEvent => matchEvent.IsGoal)
                 ?? inPlay.FirstOrDefault(matchEvent => FilmLabels.IsShot(matchEvent.Type))

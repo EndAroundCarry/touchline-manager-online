@@ -18,23 +18,27 @@ internal readonly record struct TickFilmWindow(int Start, int End)
 /// </summary>
 /// <remarks>
 /// <para>
-/// The recording is a ninety-minute match and the film is about ten minutes played at twice real speed, so about a fifth of the
-/// match is shown, and the question is which fifth. The answer follows what a viewer came for. Both kick-offs and the final whistle
-/// are always shown. Every goal is shown with the eighteen seconds of play that built it and the celebration after it; every red
-/// card and every penalty with the moments around them. What room is left goes to the best chances by their goal probability, then
-/// to corners and free kicks in range, then to yellow cards and offsides, and last, if the film is still short of its length, to the
-/// spells in which a side camped in the other's final third.
+/// The recording is a ninety-minute match and the film is about eighteen minutes played at twice real speed, so about a third of the
+/// match is shown, and the question is which third. The answer follows what a viewer came for. Both kick-offs and the final whistle
+/// are always shown. Every goal is shown as the whole move that made it, from the moment its side won the ball
+/// (<see cref="TickMoveFinder"/>), and the celebration after it; so is every penalty awarded and every good chance. What room is left
+/// goes to the best chances by their goal probability, then to corners and free kicks in range, then to offsides (a booking is never chosen for itself), and
+/// last, if the film is still short of its length, to the spells in which a side camped in the other's final third.
 /// </para>
 /// <para>
-/// Stretches that overlap or lie within six seconds of each other are one stretch, a stretch never crosses the interval, and the
-/// chosen total never exceeds <see cref="HighlightOptionsV1.MaxFilmMilliseconds"/>. The choice is a pure function of the recording
-/// and the event log, so a replay is the same on every machine.
+/// Stretches that overlap or lie within ten seconds of each other are one stretch, a stretch never crosses the interval, and the
+/// chosen total never exceeds <see cref="HighlightOptionsV1.TickMaxFilmMilliseconds"/>. When it would, the moves behind the chances are
+/// cut back to fifteen seconds first, and only then are whole stretches dropped; a goal and a red card are never dropped. The choice is
+/// a pure function of the recording and the event log, so a replay is the same on every machine.
 /// </para>
 /// </remarks>
 internal static class TickFilmSelector
 {
-    /// <summary>The play before a goal that is shown, in frames (18 s).</summary>
-    public const int GoalBuildUp = 180;
+    /// <summary>The play shown before a chance whose move is not looked for, and the least shown before one whose move is, in frames (15 s).</summary>
+    public const int ShotLead = 150;
+
+    /// <summary>The least play shown before a goal, in frames (18 s): a move shorter than that is shown with the play before it, never less than the film once showed.</summary>
+    public const int GoalLead = 180;
 
     /// <summary>The play after a goal that is shown, in frames: the celebration (7 s).</summary>
     public const int GoalAfter = 70;
@@ -45,14 +49,29 @@ internal static class TickFilmSelector
     /// <summary>The frames before the final whistle that are always shown (10 s).</summary>
     public const int FinalFrames = 100;
 
-    /// <summary>Stretches closer than this (6 s) are joined, so two chances a few seconds apart are one run of play and not two cuts.</summary>
-    public const int JoinGap = 60;
+    /// <summary>Stretches closer than this (10 s) are joined, so two moves a few seconds apart are one run of play and not two cuts.</summary>
+    public const int JoinGap = 100;
 
-    /// <summary>The shortest a filler stretch is, in frames (20 s).</summary>
-    public const int FillerFrames = 200;
+    /// <summary>The longest a filler stretch is, in frames (40 s of play, 20 s of film): fewer, longer stretches mean fewer cuts.</summary>
+    public const int FillerFrames = 400;
 
-    /// <summary>One thing worth showing: where it is, how much play around it, and how much it is worth.</summary>
-    private readonly record struct Moment(int Frame, int Before, int After, int Rank, int Weight);
+    /// <summary>
+    /// The frames the selection aims over the film's floor (20 s of film): the film loses a frame at every cut, and the stretches the
+    /// passages cannot make into one lose a few more, so a film aimed at exactly the floor ends a few seconds under it.
+    /// </summary>
+    public const int FloorMargin = 400;
+
+    /// <summary>
+    /// One thing worth showing: where it is, how much play around it, and how much it is worth. <c>ShortBefore</c> is the lead the
+    /// moment is cut back to when the film is over its ceiling; it is <c>Before</c> for a moment that is never cut back.
+    /// </summary>
+    private readonly record struct Moment(int Frame, int Before, int After, int Rank, int Weight, int ShortBefore)
+    {
+        public Moment(int frame, int before, int after, int rank, int weight)
+            : this(frame, before, after, rank, weight, before)
+        {
+        }
+    }
 
     /// <summary>Picks the stretches the film shows.</summary>
     /// <param name="recording">The continuous trace.</param>
@@ -74,8 +93,8 @@ internal static class TickFilmSelector
         }
 
         var msPerFrame = MillisecondsPerFrame(options);
-        var minFrames = options.MinFilmMilliseconds / msPerFrame;
-        var maxFrames = (options.MaxFilmMilliseconds / msPerFrame) - HalfTimeFilmFrames(options);
+        var minFrames = (options.TickMinFilmMilliseconds / msPerFrame) + FloorMargin;
+        var maxFrames = (options.TickMaxFilmMilliseconds / msPerFrame) - HalfTimeFilmFrames(options);
         var targetFrames = Math.Min(maxFrames, Math.Max(minFrames, (minFrames + maxFrames) / 2));
         var last = recording.FrameCount - 1;
         var secondHalf = recording.SecondHalfFrame;
@@ -99,11 +118,13 @@ internal static class TickFilmSelector
             frameOf[stamp.Sequence] = Math.Min(stamp.Frame, last);
         }
 
-        var moments = MomentsOf(events, frameOf);
+        var moments = MomentsOf(recording, events, frameOf, options);
+        var kept = new List<Moment>();
+        var fixedCount = chosen.Count;
 
         foreach (var moment in moments.OrderBy(moment => moment.Rank).ThenByDescending(moment => moment.Weight).ThenBy(moment => moment.Frame))
         {
-            var window = new TickFilmWindow(Math.Max(0, moment.Frame - moment.Before), Math.Min(last, moment.Frame + moment.After));
+            var window = WindowOf(moment, moment.Before, last);
 
             // A goal and a red card are always shown; the rest wait their turn for the room.
             if (moment.Rank > 1 && Total(chosen, recording) + Added(chosen, window, recording) > targetFrames)
@@ -112,17 +133,38 @@ internal static class TickFilmSelector
             }
 
             Add(chosen, window, recording);
+            kept.Add(moment);
         }
+
+        var fillFrom = chosen.Count;
 
         if (Total(chosen, recording) < minFrames)
         {
             Fill(chosen, recording, minFrames, last);
         }
 
+        if (Total(chosen, recording) > maxFrames)
+        {
+            // Over the ceiling: the moves behind the chances are cut back first, and every stretch stays.
+            var fillers = chosen.Skip(fillFrom).ToList();
+
+            chosen = [.. chosen.Take(fixedCount)];
+
+            foreach (var moment in kept)
+            {
+                Add(chosen, WindowOf(moment, moment.ShortBefore, last), recording);
+            }
+
+            chosen.AddRange(fillers);
+        }
+
         Trim(chosen, recording, maxFrames, moments);
 
         return Merge(chosen, recording);
     }
+
+    private static TickFilmWindow WindowOf(Moment moment, int before, int last) =>
+        new(Math.Max(0, moment.Frame - before), Math.Min(last, moment.Frame + moment.After));
 
     /// <summary>Gets the film time one frame lasts, in milliseconds.</summary>
     /// <param name="options">The film's pace.</param>
@@ -132,7 +174,11 @@ internal static class TickFilmSelector
     private static int HalfTimeFilmFrames(HighlightOptionsV1 options) =>
         (int)(options.HalfTimeHoldSeconds * 1_000 / MillisecondsPerFrame(options));
 
-    private static List<Moment> MomentsOf(IReadOnlyList<EngineEventV1> events, Dictionary<int, int> frameOf)
+    private static List<Moment> MomentsOf(
+        TickMatchRecording recording,
+        IReadOnlyList<EngineEventV1> events,
+        Dictionary<int, int> frameOf,
+        HighlightOptionsV1 options)
     {
         var moments = new List<Moment>();
 
@@ -149,7 +195,7 @@ internal static class TickFilmSelector
             {
                 case EngineEventType.Goal:
                 case EngineEventType.PenaltyGoal:
-                    moments.Add(new Moment(frame, GoalBuildUp, GoalAfter, 0, 10_000));
+                    moments.Add(new Moment(frame, MoveLead(recording, matchEvent, frame, GoalLead), GoalAfter, 0, 10_000));
                     break;
 
                 case EngineEventType.RedCard:
@@ -158,7 +204,7 @@ internal static class TickFilmSelector
                     break;
 
                 case EngineEventType.PenaltyAwarded:
-                    moments.Add(new Moment(frame, 60, 140, 1, 9_500));
+                    moments.Add(new Moment(frame, MoveLead(recording, matchEvent, frame, TickMoveFinder.MinLead), 140, 1, 9_500));
                     break;
 
                 case EngineEventType.PenaltyMissed:
@@ -170,7 +216,20 @@ internal static class TickFilmSelector
                 case EngineEventType.ShotBlocked:
                 case EngineEventType.ShotOffTarget:
                 case EngineEventType.FreeKickShot:
-                    moments.Add(new Moment(frame, 150, 40, 2, quality + (matchEvent.Type == EngineEventType.Woodwork ? 1_000 : 0)));
+                    {
+                        // A good chance is shown as the move that made it; a poor one, and a dead-ball strike, with the fifteen seconds before.
+                        var whole = matchEvent.Type != EngineEventType.FreeKickShot && quality >= options.MinQualityForShotBasisPoints;
+                        var before = whole ? MoveLead(recording, matchEvent, frame, ShotLead) : ShotLead;
+
+                        moments.Add(new Moment(
+                            frame,
+                            before,
+                            40,
+                            2,
+                            quality + (matchEvent.Type == EngineEventType.Woodwork ? 1_000 : 0),
+                            ShotLead));
+                    }
+
                     break;
 
                 case EngineEventType.Corner:
@@ -179,10 +238,6 @@ internal static class TickFilmSelector
 
                 case EngineEventType.FreeKickWon:
                     moments.Add(new Moment(frame, 20, 120, 3, 700));
-                    break;
-
-                case EngineEventType.YellowCard:
-                    moments.Add(new Moment(frame, 40, 30, 4, 300));
                     break;
 
                 case EngineEventType.Offside:
@@ -196,6 +251,10 @@ internal static class TickFilmSelector
 
         return moments;
     }
+
+    /// <summary>Gets how many frames before an event its move began, so the film opens on the side winning the ball.</summary>
+    private static int MoveLead(TickMatchRecording recording, EngineEventV1 matchEvent, int frame, int minLead) =>
+        frame - TickMoveFinder.StartOf(recording, frame, (int)matchEvent.Side, minLead);
 
     // ---- Windows ---------------------------------------------------------------------------------------------------------------------
 
@@ -269,16 +328,27 @@ internal static class TickFilmSelector
         return merged;
     }
 
-    /// <summary>Tops a short film up with the spells in which one end of the pitch saw the most of the ball.</summary>
+    /// <summary>
+    /// Tops a short film up with the spells in which one end of the pitch saw the most of the ball: long stretches first, so there are few
+    /// cuts, then shorter ones into the gaps the long ones left, if the film is still short.
+    /// </summary>
     private static void Fill(List<TickFilmWindow> chosen, TickMatchRecording recording, int minFrames, int last)
+    {
+        for (var size = FillerFrames; size >= FillerFrames / 4 && Total(chosen, recording) < minFrames; size /= 2)
+        {
+            FillWith(chosen, recording, minFrames, last, size);
+        }
+    }
+
+    private static void FillWith(List<TickFilmWindow> chosen, TickMatchRecording recording, int minFrames, int last, int size)
     {
         var scores = new List<(int Start, int Score)>();
 
-        for (var start = 0; start + FillerFrames <= last; start += FillerFrames / 2)
+        for (var start = 0; start + size <= last; start += size / 2)
         {
             var score = 0;
 
-            for (var frame = start; frame < start + FillerFrames; frame += 5)
+            for (var frame = start; frame < start + size; frame += 5)
             {
                 var x = recording.BallX(frame);
 
@@ -298,7 +368,7 @@ internal static class TickFilmSelector
                 return;
             }
 
-            var window = new TickFilmWindow(start, start + FillerFrames - 1);
+            var window = new TickFilmWindow(start, start + size - 1);
 
             if (Merge(chosen, recording).Any(existing => existing.Start <= window.End && window.Start <= existing.End))
             {
