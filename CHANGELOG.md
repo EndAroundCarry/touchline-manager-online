@@ -4,6 +4,29 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tick film, Milestone 6 — passes read the receiver's situation
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.14. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its
+label): matches stored under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- **A pass is judged on what waits for the ball.** The nearest defender's time to the receiver's spot is set against the ball's flight time and takes up to 15% from the pass's chance.
+- **A ball for a man with a marker beside him** goes 0.5 to 1 m to the side of him away from the marker; **a through ball** is aimed where the ball and the runner get there together
+  (a lead of 8 to 14 ticks, not always 8).
+- **A switch of play** to a free man on the far half earns a bonus when four or more defenders crowd the carrier's half; **a carry** into ground the nearest defender is giving up earns one.
+- Interceptions fall 10% (214 against 239 a match among passes a man touches), the man receiving has 0.4 m more room (median), stored snapshots: goals 2.89 to 2.70, shots 28.8 to 27.9,
+  yellow cards 3.70 to 3.45.
+
+### Added
+
+- `TickBallPhysics.RollingTicks` and `LoftedFlightTicks` (the flight time of a launch, in closed form), and the motion probe's pass-style counters (length, forward share, switches, interceptions).
+
+### Known
+
+- About 1 100 backward balls a match are not followed as passes by the loop (no pending pass, no receiver, no completion): a finding, not changed here (§14.14).
+- The switch bonus rarely fires (a lofted 35 m ball is a long shot for an average passer); switches a match were already inside the plan's aim.
+
 ## Tick film, Milestone 5 — continuous off-ball movement
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.13. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its

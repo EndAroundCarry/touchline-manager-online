@@ -63,6 +63,9 @@ internal static class TickMotionProbe
     /// <summary>A step longer than this in one frame is a teleport (15 m), not running.</summary>
     private const int TeleportUnits = 1_500;
 
+    /// <summary>A pass is a switch of play when it crosses at least this much of the width, in pitch units (30 m).</summary>
+    private const int SwitchUnits = 3_000;
+
     /// <summary>A player who has not stopped, as a frame far enough back that no set-off is near it.</summary>
     private const int Never = -1_000_000;
 
@@ -401,6 +404,8 @@ internal static class TickMotionProbe
                 }
             }
 
+            Style(recording, kick, next, tally);
+
             if (next is not { Action: PassageAction.Receive } reception
                 || reception.Entity / Half != kick.Entity / Half
                 || reception.Entity == kick.Entity
@@ -474,6 +479,43 @@ internal static class TickMotionProbe
 
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// How a pass is played, from where the ball is when it is kicked and where it is when a man touches it (a reception or an
+    /// interception): its length, whether it goes forward, whether it is a switch of play and whether the other side gets it. A ball
+    /// that goes to nobody in particular (a backward ball, which the loop does not follow to a receiver) is not counted.
+    /// </summary>
+    private static void Style(TickMatchRecording recording, TickActionStamp kick, TickActionStamp? next, Tally tally)
+    {
+        if (kick.Action != PassageAction.Pass
+            || next is not { Action: PassageAction.Receive or PassageAction.Interception } end
+            || end.Frame >= recording.FrameCount)
+        {
+            return;
+        }
+
+        var dx = recording.BallX(end.Frame) - recording.BallX(kick.Frame);
+        var dy = recording.BallY(end.Frame) - recording.BallY(kick.Frame);
+        var forward = kick.Entity < Half ? dx : -dx;
+
+        tally.StyleKicks++;
+        tally.PassLengths.Add(Math.Sqrt((dx * (double)dx) + (dy * (double)dy)) / 100.0);
+
+        if (forward > 0)
+        {
+            tally.ForwardPasses++;
+        }
+
+        if (Math.Abs(dy) >= SwitchUnits)
+        {
+            tally.Switches++;
+        }
+
+        if (end.Action == PassageAction.Interception && end.Entity / Half != kick.Entity / Half)
+        {
+            tally.Intercepted++;
         }
     }
 
@@ -750,6 +792,13 @@ internal static class TickMotionProbe
         Console.WriteLine($"  {"one-touch plays",-34} {Share(tally.HoldFrames.Count(frames => frames <= 2), tally.HoldFrames.Count),8}   held 2 frames or fewer");
         Console.WriteLine($"  {"slow tail before reception",-34} {Share(tally.SlowTails, tally.Receptions),8}   ball under 4 m/s for over 1 s");
 
+        Console.WriteLine("  -- how passes are played (balls a man touches, not crosses)");
+        Console.WriteLine($"  {"passes a match",-34} {tally.StyleKicks / Math.Max(1.0, tally.Matches),8:F0}");
+        Console.WriteLine($"  {"length (m)",-34} {Spread(tally.PassLengths)}");
+        Console.WriteLine($"  {"forward share",-34} {Share(tally.ForwardPasses, tally.StyleKicks),8}");
+        Console.WriteLine($"  {"switches of play a match",-34} {tally.Switches / Math.Max(1.0, tally.Matches),8:F1}   {SwitchUnits / 100} m or more across the pitch, aim 8 - 20");
+        Console.WriteLine($"  {"intercepted a match",-34} {tally.Intercepted / Math.Max(1.0, tally.Matches),8:F1}   {Share(tally.Intercepted, tally.StyleKicks)} of passes");
+
         Console.WriteLine("  -- room (metres to the nearest opponent)");
         Console.WriteLine($"  {"on receiving",-34} {Spread(tally.ReceiveSpace)}");
         Console.WriteLine($"  {"on receiving, final third",-34} {Spread(tally.FinalThirdReceiveSpace)}   {tally.FinalThirdReceiveSpace.Count / Math.Max(1.0, tally.Matches):F0} a match");
@@ -789,6 +838,16 @@ internal static class TickMotionProbe
     private sealed class Tally
     {
         public int Matches { get; set; }
+
+        public List<double> PassLengths { get; } = [];
+
+        public long StyleKicks { get; set; }
+
+        public long ForwardPasses { get; set; }
+
+        public long Switches { get; set; }
+
+        public long Intercepted { get; set; }
 
         public List<double> ReceiveSpace { get; } = [];
 

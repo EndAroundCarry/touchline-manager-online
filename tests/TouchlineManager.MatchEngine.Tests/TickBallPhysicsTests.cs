@@ -225,6 +225,45 @@ public sealed class TickBallPhysicsTests
         ball.GroundSpeed.Should().BeInRange((int)(arrival * 0.9), (int)(arrival * 1.15));
     }
 
+    [Theory]
+    [InlineData(500, 300)]
+    [InlineData(1_500, 300)]
+    [InlineData(2_500, 1_000)]
+    [InlineData(4_000, 1_000)]
+    public void The_planned_rolling_time_is_the_tick_the_ball_covers_the_distance(int distance, int arrivalCentimetresPerSecond)
+    {
+        var ball = new TickBallPhysics();
+        var arrival = TickSpatialUnits.SpeedToFixedPerTick(arrivalCentimetresPerSecond);
+
+        ball.PlaceAt(2_000, 3_500);
+        ball.LaunchRolling(2_000 + distance, 3_500, arrival);
+
+        var ticks = 0;
+
+        while (ball.UnitX < 2_000 + distance && ticks < 200)
+        {
+            ball.Step();
+            ticks++;
+        }
+
+        TickBallPhysics.RollingTicks(distance, arrival).Should().BeInRange(ticks - 1, ticks + 1);
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(20)]
+    [InlineData(45)]
+    public void The_planned_flight_time_is_the_tick_the_lofted_ball_lands(int apex)
+    {
+        var ball = new TickBallPhysics();
+
+        ball.PlaceAt(2_000, 3_500);
+
+        var flight = ball.LaunchLofted(4_000, 3_500, apex);
+
+        TickBallPhysics.LoftedFlightTicks(apex).Should().Be(flight);
+    }
+
     [Fact]
     public void A_dribbled_ball_sits_ahead_of_its_player_and_moves_on_when_released()
     {

@@ -416,7 +416,7 @@ public sealed class TickBallCarrierBrainTests
     [Fact]
     public void A_reader_of_the_game_does_not_play_to_a_man_in_an_offside_position_and_a_careless_one_does()
     {
-        var attackers = Move(OwnHalf, (6, 6_000, 3_500), (9, 8_600, 3_000), (5, 500, 6_900), (7, 500, 6_800), (8, 500, 6_700), (10, 500, 6_600));
+        var attackers = Move(OwnHalf, (6, 6_000, 3_500), (9, 8_600, 3_350), (5, 500, 6_900), (7, 500, 6_800), (8, 500, 6_700), (10, 500, 6_600));
         var defenders = HighLine;
 
         var scene = new Scene(true, 6, attackers, defenders).WithVision(6, 12);
@@ -480,6 +480,139 @@ public sealed class TickBallCarrierBrainTests
         open.Action.Should().Be(TickCarrierAction.Pass);
         open.Receiver.Should().Be(9);
         blocked.Utility.Should().BeLessThan(open.Utility);
+    }
+
+    [Fact]
+    public void A_defender_who_is_at_the_receivers_spot_before_the_ball_takes_from_the_chance_of_a_pass()
+    {
+        long Near(int metres) => (long)metres * 100 * metres * 100;
+
+        TickBallCarrierBrain.ArrivalPressure(2_000, false, long.MaxValue).Should().Be(0, "nobody is near the spot");
+        TickBallCarrierBrain.ArrivalPressure(2_000, false, Near(40)).Should().Be(0, "a defender 40 m away cannot get there first");
+        TickBallCarrierBrain.ArrivalPressure(2_000, false, Near(8)).Should().BeGreaterThan(TickBallCarrierBrain.ArrivalPressure(2_000, false, Near(12)));
+        TickBallCarrierBrain.ArrivalPressure(2_000, false, Near(1)).Should().Be(TickBallCarrierBrain.ArrivalPressureMaximum, "on top of the receiver he is there long before it");
+        TickBallCarrierBrain.ArrivalPressure(2_500, false, Near(10)).Should().BeGreaterThan(
+            TickBallCarrierBrain.ArrivalPressure(800, false, Near(10)),
+            "the longer the ball is on its way the more time the defender has");
+    }
+
+    [Fact]
+    public void A_pass_to_a_man_with_a_marker_on_him_is_worth_less_than_the_same_pass_to_a_man_in_space()
+    {
+        var attackers = Move(OwnHalf, (6, 5_000, 3_500), (9, 7_000, 3_500), (5, 500, 500), (7, 500, 600), (8, 500, 700), (10, 500, 800));
+        var free = new Scene(true, 6, attackers, DeepBlock).WithVision(6, 20).Decide();
+        var marked = new Scene(true, 6, attackers, Move(DeepBlock, (9, 7_450, 3_900))).WithVision(6, 20).Decide();
+
+        free.Receiver.Should().Be(9);
+        marked.Utility.Should().BeLessThan(free.Utility);
+    }
+
+    [Fact]
+    public void A_pass_to_a_man_with_a_marker_beside_him_is_played_half_a_metre_to_a_metre_to_the_side_away_from_the_marker()
+    {
+        var attackers = Move(OwnHalf, (6, 5_000, 3_500), (9, 7_000, 3_500), (5, 500, 500), (7, 500, 600), (8, 500, 700), (10, 500, 800));
+
+        foreach (var isHome in new[] { true, false })
+        {
+            var below = new Scene(isHome, 6, attackers, Move(DeepBlock, (9, 7_000, 3_150))).WithVision(6, 20).Decide();
+            var above = new Scene(isHome, 6, attackers, Move(DeepBlock, (9, 7_000, 3_850))).WithVision(6, 20).Decide();
+            var sign = isHome ? 1 : -1;
+
+            below.Receiver.Should().Be(9);
+            above.Receiver.Should().Be(9);
+
+            // The home side's Y counts from its left; the away side's is the same pitch seen from the other end.
+            ((below.Target.Y - 3_500) * sign).Should().BeInRange(
+                TickBallCarrierBrain.SafeSideMinimum,
+                TickBallCarrierBrain.SafeSideMaximum,
+                "the marker is on the low side, so the ball goes to the high side");
+            ((above.Target.Y - 3_500) * sign).Should().BeInRange(
+                -TickBallCarrierBrain.SafeSideMaximum,
+                -TickBallCarrierBrain.SafeSideMinimum,
+                "the marker is on the high side, so the ball goes to the low side");
+        }
+    }
+
+    [Fact]
+    public void A_pass_to_a_man_nobody_is_near_goes_to_his_feet()
+    {
+        var attackers = Move(OwnHalf, (6, 5_000, 3_500), (9, 7_000, 3_500), (5, 500, 500), (7, 500, 600), (8, 500, 700), (10, 500, 800));
+        var decision = new Scene(true, 6, attackers, DeepBlock).WithVision(6, 20).Decide();
+
+        decision.Receiver.Should().Be(9);
+        decision.Target.Should().Be(new SpatialPoint(7_000, 3_500));
+    }
+
+    [Fact]
+    public void A_through_ball_leads_a_fast_runner_by_the_flight_of_the_ball()
+    {
+        var orders = new TickAttackingOrder[11];
+
+        orders[9] = new TickAttackingOrder(TickAttackingRole.Runner, new SpatialPoint(9_000, 3_000), 10_000);
+
+        TickCarrierDecision Through(int carrierX, int runnerX) =>
+            new Scene(true, 6, Move(OwnHalf, (6, carrierX, 3_500), (9, runnerX, 3_000), (10, 500, 5_200)), CompactFourFourTwo) { Orders = orders }
+                .Moving(9, 0, 800)
+                .WithVision(6, 16)
+                .Decide();
+
+        var near = Through(6_000, 6_300);
+        var far = Through(4_300, 6_300);
+
+        near.Action.Should().Be(TickCarrierAction.ThroughBall);
+        far.Action.Should().Be(TickCarrierAction.ThroughBall);
+        near.Target.X.Should().BeGreaterThan(6_300 + (TickBallCarrierBrain.ThroughLeadTicks * 80), "the ball takes longer than the old fixed lead");
+        far.Target.X.Should().BeGreaterThan(near.Target.X, "a longer ball takes longer, so the runner has gone farther");
+        far.Target.X.Should().BeLessThanOrEqualTo(6_300 + (TickBallCarrierBrain.MeetingLeadMaximum * 80));
+    }
+
+    [Fact]
+    public void A_crowded_half_makes_a_switch_to_a_free_man_on_the_other_side_worth_more()
+    {
+        // The carrier is on the left with defenders about him; a teammate on the right, 41 m across, is alone.
+        var attackers = Move(OwnHalf, (6, 4_800, 1_200), (5, 500, 500), (7, 500, 600), (8, 5_200, 5_300), (9, 500, 700), (10, 500, 800));
+
+        TickCarrierDecision Switch(int fourthX, int markerY = 9_000) =>
+            new Scene(
+                    true,
+                    6,
+                    attackers,
+                    Move(DeepBlock, (6, 5_600, 900), (7, 5_600, 1_500), (8, 6_200, 1_200), (9, fourthX, 1_200), (10, 5_200, markerY)))
+                .WithVision(6, 20)
+                .WithSkill(6, skills => skills with { Passing = 20, Technique = 20 })
+                .Decide();
+
+        // The fourth defender stands just inside 20 m of the carrier, then just outside it.
+        var crowded = Switch(4_800 + TickBallCarrierBrain.SwitchCongestionReach - 10);
+        var open = Switch(4_800 + TickBallCarrierBrain.SwitchCongestionReach + 10);
+
+        crowded.Receiver.Should().Be(8);
+        open.Receiver.Should().Be(8);
+        crowded.Target.Y.Should().BeGreaterThan(SpatialPitch.GoalYCenter + (TickBallCarrierBrain.SwitchMinimumWidth / 2));
+        (crowded.Utility - open.Utility).Should().BeGreaterThan(TickBallCarrierBrain.SwitchBonus / 4, "four defenders about him make the switch worth it");
+
+        // The same crowd with a marker on the far man: no room there, no bonus.
+        var marked = Switch(4_800 + TickBallCarrierBrain.SwitchCongestionReach - 10, markerY: 5_000);
+        var markedOpen = Switch(4_800 + TickBallCarrierBrain.SwitchCongestionReach + 10, markerY: 5_000);
+
+        (marked.Utility - markedOpen.Utility).Should().BeLessThan(TickBallCarrierBrain.SwitchBonus / 8, "the man on the far side is not free");
+    }
+
+    [Fact]
+    public void A_carrier_drives_into_ground_the_nearest_defender_is_giving_up()
+    {
+        var attackers = Move(OwnHalf, (6, 3_000, 3_500), (5, 500, 500), (7, 500, 600), (8, 500, 700), (9, 500, 800), (10, 500, 900));
+        var defenders = Move(DeepBlock, (9, 4_300, 3_500));
+
+        var standing = new Scene(true, 6, attackers, defenders).WithVision(6, 1).Decide();
+        var backing = new Scene(true, 6, attackers, defenders).WithVision(6, 1).DefenderMoving(9, 0, 300).Decide();
+        var close = new Scene(true, 6, attackers, Move(DeepBlock, (9, 3_600, 3_500))).WithVision(6, 1).Decide();
+        var closeBacking = new Scene(true, 6, attackers, Move(DeepBlock, (9, 3_600, 3_500))).WithVision(6, 1).DefenderMoving(9, 0, 300).Decide();
+
+        standing.Action.Should().Be(TickCarrierAction.Dribble);
+        backing.Action.Should().Be(TickCarrierAction.Dribble);
+        backing.Utility.Should().BeGreaterThan(standing.Utility);
+        closeBacking.Utility.Should().Be(close.Utility, "a defender only six metres off is not giving the ground up");
     }
 
     [Fact]

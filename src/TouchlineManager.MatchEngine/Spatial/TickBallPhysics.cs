@@ -131,6 +131,9 @@ public sealed class TickBallPhysics
 
     private const int BasisPoints = 10_000;
 
+    /// <summary>The most ticks <see cref="RollingTicks"/> looks ahead (6 s).</summary>
+    private const int MaximumPlannedTicks = 60;
+
     /// <summary>The ticks since a cushioned ball was attached; <see cref="CushionTotalTicks"/> or more when there is no cushion.</summary>
     private int _cushionAge = CushionTotalTicks;
 
@@ -387,6 +390,38 @@ public sealed class TickBallPhysics
         Mode = TickBallMode.Loose;
     }
 
+    /// <summary>Gets how many ticks a ball rolled to a distance takes to get there: the closed form of <see cref="LaunchRolling"/>'s launch.</summary>
+    /// <param name="distanceUnits">The distance, in pitch units.</param>
+    /// <param name="arrivalSpeedFixed">The speed it is to arrive with, in fixed units per tick.</param>
+    /// <returns>The tick on which the ball has covered the distance, at least 1 and at most 60.</returns>
+    public static int RollingTicks(int distanceUnits, int arrivalSpeedFixed)
+    {
+        var distance = (long)TickSpatialUnits.ToFixed(distanceUnits);
+        var speed = arrivalSpeedFixed + (distance * (BasisPoints - GroundFrictionBasisPoints) / BasisPoints);
+        long travelled = 0;
+        var ticks = 0;
+
+        while (travelled < distance && ticks < MaximumPlannedTicks && speed > 0)
+        {
+            travelled += speed;
+            speed = speed * GroundFrictionBasisPoints / BasisPoints;
+            ticks++;
+        }
+
+        return Math.Max(1, ticks);
+    }
+
+    /// <summary>Gets how many ticks a lofted ball with a peak height is in the air: the tick on which <see cref="LaunchLofted"/> says it lands.</summary>
+    /// <param name="apexZUnits">The peak height, in Z units.</param>
+    public static int LoftedFlightTicks(int apexZUnits)
+    {
+        const int gravity = TickSpatialUnits.GravityFixed;
+
+        var climbSpeed = SpatialMath.Sqrt(2L * gravity * TickSpatialUnits.ToFixed(apexZUnits));
+
+        return Math.Max(2, 1 + (int)(((2 * climbSpeed) + (gravity / 2)) / gravity));
+    }
+
     /// <summary>
     /// Lofts the ball from where it lies onto a point, with a given peak height, so that it comes down on the point
     /// at the end of a whole number of ticks.
@@ -411,8 +446,7 @@ public sealed class TickBallPhysics
 
         const int gravity = TickSpatialUnits.GravityFixed;
 
-        var climbSpeed = SpatialMath.Sqrt(2L * gravity * TickSpatialUnits.ToFixed(apexZUnits));
-        var flightTicks = Math.Max(2, 1 + (int)(((2 * climbSpeed) + (gravity / 2)) / gravity));
+        var flightTicks = LoftedFlightTicks(apexZUnits);
         var launchSpeedZ = gravity * (flightTicks - 1) / 2;
 
         var dx = (long)TickSpatialUnits.ToFixed(targetXUnits) - X;

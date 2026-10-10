@@ -149,6 +149,13 @@ internal readonly ref struct TickCarrierSituation
 /// scores more.
 /// </description></item>
 /// </list>
+/// <para><b>Reading the receiver's situation</b> (`tick-film-v1`, Milestone 6). A pass is judged on what is waiting for the ball when it gets
+/// there, not only on the lane: the nearest defender's time to the receiver's spot is set against the ball's flight time
+/// (<see cref="ArrivalPressure"/>, up to 15% of the chance); a ball for a man who is standing or jogging is moved half to one metre to the side
+/// of him away from his marker (<see cref="SafeSide"/>); a ball for a runner is aimed where the ball and the runner get to together
+/// (<see cref="MeetingPoint"/>); when four or more defenders crowd the carrier's half of the width a ball across to a free man on the other half
+/// earns <see cref="SwitchBonus"/>; and a carry into ground the nearest defender is giving up (eight metres away and backing off) earns up to
+/// <see cref="DriveBonus"/>.</para>
 /// <para>
 /// <see cref="Execute"/> hits the kick. The error is <c>BaseError × max(25%, 100 − (5 × Passing + Technique) / 2) × (1 +
 /// pressure)</c> in binary angle units (the plan's formula, flattened and floored so that a perfect player is not a machine and a poor
@@ -264,6 +271,57 @@ internal static class TickBallCarrierBrain
 
     /// <summary>The distance of ball travel that adds one tick of lead, in pitch units.</summary>
     public const int LeadDistance = 500;
+
+    /// <summary>The farthest a runner is led by a through ball, in ticks: the meeting point of the ball and a man running on at his speed.</summary>
+    public const int MeetingLeadMaximum = 14;
+
+    /// <summary>How many times the meeting point is refined: the ball's flight time sets the lead, the lead sets the length.</summary>
+    public const int MeetingRounds = 3;
+
+    /// <summary>The speed a defender is taken to close on the man a pass is for, in pitch units per tick (6.5 m/s).</summary>
+    public const int DefenderClosingSpeed = 65;
+
+    /// <summary>The ticks after the ball arrives within which a defender who gets there still spoils the first touch.</summary>
+    public const int ArrivalGraceTicks = 2;
+
+    /// <summary>What a tick by which a defender is there sooner takes from a pass's chance, in basis points.</summary>
+    public const int ArrivalPressurePerTick = 150;
+
+    /// <summary>The most the defender's arrival can take from a pass's chance, in basis points.</summary>
+    public const int ArrivalPressureMaximum = 1_500;
+
+    /// <summary>The distance a defender stands from the receiver's spot for the ball to be played to the other side of him, in pitch units (4 m).</summary>
+    public const int SafeSideReach = 400;
+
+    /// <summary>The least a ball is moved to the side of the receiver away from his marker, in pitch units (0.5 m).</summary>
+    public const int SafeSideMinimum = 50;
+
+    /// <summary>The most a ball is moved to the side of the receiver away from his marker, in pitch units (1 m).</summary>
+    public const int SafeSideMaximum = 100;
+
+    /// <summary>The defenders within <see cref="SwitchCongestionReach"/> of the ball, on its half of the width, from which a switch of play is worth it.</summary>
+    public const int SwitchCongestion = 4;
+
+    /// <summary>How near the ball a defender must be to count in the congestion on its side, in pitch units (20 m).</summary>
+    public const int SwitchCongestionReach = 2_000;
+
+    /// <summary>The width a ball must cross to be a switch of play, in pitch units (30 m).</summary>
+    public const int SwitchMinimumWidth = 3_000;
+
+    /// <summary>The room, from the nearest defender, a man on the far side needs for the ball to be switched to him, in pitch units (10 m).</summary>
+    public const int SwitchSpace = 1_000;
+
+    /// <summary>What a switch of play to a free man on the far side of a crowded half is worth over any other pass, in utility.</summary>
+    public const int SwitchBonus = 1_500;
+
+    /// <summary>The distance to the nearest defender beyond which the defence is backing off, in pitch units (8 m).</summary>
+    public const int DriveGap = 800;
+
+    /// <summary>The speed at which the nearest defender must be moving away for the defence to be backing off, in pitch units per tick (1 m/s).</summary>
+    public const int DriveRetreatSpeed = 10;
+
+    /// <summary>What a full carry into ground the defence has given up is worth, in utility; a shorter carry is worth its share.</summary>
+    public const int DriveBonus = 1_200;
 
     /// <summary>The Decisions plus Anticipation of an average player (13 and 13): the chance of misjudging the offside line is <see cref="OffsideCarelessBase"/> here.</summary>
     public const int OffsideReadingSum = 26;
@@ -428,19 +486,7 @@ internal static class TickBallCarrierBrain
 
         if (pressure > 0 || distance < 2 * PressureRange)
         {
-            // How fast the gap is closing: the defender's velocity relative to the carrier, along the line between them.
-            var relativeX = (long)defenders[nearestIndex].VelocityX - carrier.VelocityX;
-            var relativeY = (long)defenders[nearestIndex].VelocityY - carrier.VelocityY;
-            var lineX = (long)carrier.X - defenders[nearestIndex].X;
-            var lineY = (long)carrier.Y - defenders[nearestIndex].Y;
-            var length = SpatialMath.Sqrt((lineX * lineX) + (lineY * lineY));
-
-            if (length > 0)
-            {
-                var closing = ((relativeX * lineX) + (relativeY * lineY)) / length / TickSpatialUnits.FixedScale;
-
-                pressure += (int)Math.Clamp(closing * ClosingPressure / FullClosingSpeed, 0, ClosingPressure);
-            }
+            pressure += (int)Math.Clamp(ClosingSpeed(carrier, defenders[nearestIndex]) * ClosingPressure / FullClosingSpeed, 0, ClosingPressure);
         }
 
         if (second != long.MaxValue)
@@ -451,6 +497,21 @@ internal static class TickBallCarrierBrain
         }
 
         return Math.Min(BasisPoints, pressure);
+    }
+
+    /// <summary>
+    /// Gets how fast a defender is closing on the carrier, in pitch units per tick: his velocity relative to the carrier, along the line
+    /// between them. Negative when he is backing off; 0 when they stand on the same spot.
+    /// </summary>
+    private static long ClosingSpeed(in TickPlayerState carrier, in TickPlayerState defender)
+    {
+        var relativeX = (long)defender.VelocityX - carrier.VelocityX;
+        var relativeY = (long)defender.VelocityY - carrier.VelocityY;
+        var lineX = (long)carrier.X - defender.X;
+        var lineY = (long)carrier.Y - defender.Y;
+        var length = SpatialMath.Sqrt((lineX * lineX) + (lineY * lineY));
+
+        return length > 0 ? ((relativeX * lineX) + (relativeY * lineY)) / length / TickSpatialUnits.FixedScale : 0;
     }
 
     /// <summary>Scales a raw pressure by the carrier's composure: 140% − 4% × Composure, so 60% at 20 and 136% at 1.</summary>
@@ -621,7 +682,7 @@ internal static class TickBallCarrierBrain
             default:
                 if (distance >= LoftedDistance)
                 {
-                    ball.LaunchLofted(ClampX(targetX), ClampY(targetY), Math.Clamp(LoftApexBase + (distance / LoftApexDistance), 8, 45));
+                    ball.LaunchLofted(ClampX(targetX), ClampY(targetY), LoftApex(distance));
                 }
                 else
                 {
@@ -641,6 +702,7 @@ internal static class TickBallCarrierBrain
         var careless = OffsideCarelessPercent(carrierSkills);
         var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo);
         var loss = LossOfBall(view);
+        var crowded = Congestion(situation, view) >= SwitchCongestion;
 
         for (var index = 0; index < situation.Attackers.Length; index++)
         {
@@ -667,23 +729,41 @@ internal static class TickBallCarrierBrain
                 continue;
             }
 
-            // Where the ball goes: to where he will be by the time it gets there.
-            var lead = through ? ThroughLeadTicks : Math.Min(MaximumLeadTicks, sight / LeadDistance);
+            // Where the ball goes: to where he will be by the time it gets there. A runner is met where the ball and he get to together;
+            // a man who is standing or jogging is played to the side of him away from his marker.
             var velocityX = situation.IsHome ? receiver.VelocityX : -receiver.VelocityX;
             var velocityY = situation.IsHome ? receiver.VelocityY : -receiver.VelocityY;
-            var aimX = Math.Clamp(x + (velocityX * lead / TickSpatialUnits.FixedScale), Margin, SpatialPitch.PitchLength - Margin);
-            var aimY = Math.Clamp(y + (velocityY * lead / TickSpatialUnits.FixedScale), Margin, SpatialPitch.PitchWidth - Margin);
+            int aimX;
+            int aimY;
+
+            if (through)
+            {
+                MeetingPoint(view, x, y, velocityX, velocityY, out aimX, out aimY);
+            }
+            else
+            {
+                var lead = Math.Min(MaximumLeadTicks, sight / LeadDistance);
+
+                aimX = Aim(x, velocityX, lead, SpatialPitch.PitchLength);
+                aimY = Aim(y, velocityY, lead, SpatialPitch.PitchWidth);
+                SafeSide(situation, view, ref aimX, ref aimY);
+            }
+
             var length = Distance(view.X, view.Y, aimX, aimY);
             var lofted = length >= LoftedDistance;
+            var marker = NearestDefenderTo(situation, aimX, aimY, out var markerSquared);
 
             var survive = LaneSurvival(situation, view.X, view.Y, aimX, aimY, lofted);
             var accuracy = Accuracy(carrierSkills.Passing, carrierSkills.Technique, PassBaseError, length, lofted, view.Effective);
             var success = survive * accuracy / BasisPoints;
 
+            success = success * (BasisPoints - ArrivalPressure(length, lofted, markerSquared)) / BasisPoints;
+
             var gain = aimX - view.X;
             var value = PassBaseValue
                 + (Math.Clamp(gain, -BackwardLimit, ForwardLimit) * progressPercent / 100)
-                + SpaceValue(situation, aimX, aimY)
+                + SpaceValue(marker < 0 ? long.MaxValue : markerSquared)
+                + (crowded && IsSwitch(view, aimY, marker < 0 ? long.MaxValue : markerSquared) ? SwitchBonus : 0)
                 + StyleValue(situation.Passing, gain, length)
                 + FocusValue(situation.Focus, aimY)
                 + (through ? ThroughBonus : 0)
@@ -849,6 +929,12 @@ internal static class TickBallCarrierBrain
             var turn = Math.Abs(TickTrigonometry.Difference(view.Heading, heading));
             var value = DribbleBaseValue + (progress * progressPercent / 100) - (turn * DribbleTurnCostPerUnit);
 
+            if (view.Retreating)
+            {
+                // The defence is giving the ground up: a carry into it is worth more the more of it he takes.
+                value += DriveBonus * progress / MaximumCarry;
+            }
+
             var targetX = view.X + (space * cos / TickTrigonometry.Scale);
             var targetY = view.Y + (space * TickTrigonometry.Sin(heading) / TickTrigonometry.Scale);
 
@@ -975,21 +1061,161 @@ internal static class TickBallCarrierBrain
     }
 
     /// <summary>Gets what the receiver's room is worth: up to 1,000 for being 17 m or more from the nearest marker.</summary>
-    private static int SpaceValue(in TickCarrierSituation situation, int x, int y)
+    /// <param name="nearestSquared">The squared distance to the nearest marker, or <see cref="long.MaxValue"/> when there is none.</param>
+    private static int SpaceValue(long nearestSquared)
     {
-        var nearest = long.MaxValue;
+        var distance = nearestSquared == long.MaxValue ? SpaceReach + 200 : (int)SpatialMath.Sqrt(nearestSquared);
+
+        return Math.Clamp(distance - 200, 0, SpaceReach) * SpaceValueMaximum / SpaceReach;
+    }
+
+    /// <summary>Finds the defender nearest a point, in the side's own point of view; the goalkeeper is not one.</summary>
+    /// <returns>His index, or -1 when there is none.</returns>
+    private static int NearestDefenderTo(in TickCarrierSituation situation, int x, int y, out long squared)
+    {
+        var nearest = -1;
+
+        squared = long.MaxValue;
 
         for (var index = 1; index < situation.Defenders.Length; index++)
         {
             var dx = (long)MirrorX(TickSpatialUnits.ToUnits(situation.Defenders[index].X), situation.IsHome) - x;
             var dy = (long)MirrorY(TickSpatialUnits.ToUnits(situation.Defenders[index].Y), situation.IsHome) - y;
+            var distance = (dx * dx) + (dy * dy);
 
-            nearest = Math.Min(nearest, (dx * dx) + (dy * dy));
+            if (distance < squared)
+            {
+                squared = distance;
+                nearest = index;
+            }
         }
 
-        var distance = nearest == long.MaxValue ? SpaceReach + 200 : (int)SpatialMath.Sqrt(nearest);
+        return nearest;
+    }
 
-        return Math.Clamp(distance - 200, 0, SpaceReach) * SpaceValueMaximum / SpaceReach;
+    /// <summary>Gets how many ticks a pass of a length is on its way, from the same launch the kick uses.</summary>
+    private static int ArrivalTicks(int length, bool lofted) =>
+        lofted
+            ? TickBallPhysics.LoftedFlightTicks(LoftApex(length))
+            : TickBallPhysics.RollingTicks(length, TickSpatialUnits.SpeedToFixedPerTick(PassArrivalCentimetresPerSecond));
+
+    /// <summary>Gets the peak of a lofted pass of a length, in Z units.</summary>
+    private static int LoftApex(int length) => Math.Clamp(LoftApexBase + (length / LoftApexDistance), 8, 45);
+
+    /// <summary>
+    /// Gets what the nearest defender takes from a pass's chance by being at the receiver's spot soon: he needs the distance to it at
+    /// <see cref="DefenderClosingSpeed"/>, and every tick by which that is less than the ball's flight (and a first touch) costs
+    /// <see cref="ArrivalPressurePerTick"/>, up to <see cref="ArrivalPressureMaximum"/>.
+    /// </summary>
+    /// <param name="length">The length of the pass.</param>
+    /// <param name="lofted">Whether it is lofted.</param>
+    /// <param name="markerSquared">The squared distance from the defender nearest the spot to it, or <see cref="long.MaxValue"/> when there is none.</param>
+    internal static int ArrivalPressure(int length, bool lofted, long markerSquared)
+    {
+        if (markerSquared == long.MaxValue)
+        {
+            return 0;
+        }
+
+        var gap = Math.Max(0, (int)SpatialMath.Sqrt(markerSquared) - TickBallPhysics.GroundReceptionRadiusUnits);
+        var defenderTicks = (gap + DefenderClosingSpeed - 1) / DefenderClosingSpeed;
+        var sooner = ArrivalTicks(length, lofted) + ArrivalGraceTicks - defenderTicks;
+
+        return Math.Clamp(sooner * ArrivalPressurePerTick, 0, ArrivalPressureMaximum);
+    }
+
+    /// <summary>
+    /// Moves a ball meant for a man who is standing or jogging to the side of him away from his nearest marker: half a metre when the
+    /// marker is at the edge of <see cref="SafeSideReach"/>, a metre when he is on top of him. The ball keeps its length.
+    /// </summary>
+    private static void SafeSide(in TickCarrierSituation situation, in View view, ref int aimX, ref int aimY)
+    {
+        var marker = NearestDefenderTo(situation, aimX, aimY, out var squared);
+
+        if (marker < 0 || squared >= (long)SafeSideReach * SafeSideReach)
+        {
+            return;
+        }
+
+        // Across the way the ball goes.
+        long acrossX = view.Y - aimY;
+        long acrossY = aimX - view.X;
+        var length = SpatialMath.Sqrt((acrossX * acrossX) + (acrossY * acrossY));
+
+        if (length == 0)
+        {
+            return;
+        }
+
+        long markerX = MirrorX(TickSpatialUnits.ToUnits(situation.Defenders[marker].X), situation.IsHome) - aimX;
+        long markerY = MirrorY(TickSpatialUnits.ToUnits(situation.Defenders[marker].Y), situation.IsHome) - aimY;
+        var away = ((markerX * acrossX) + (markerY * acrossY)) > 0 ? -1 : 1;
+        var gap = (int)SpatialMath.Sqrt(squared);
+        var offset = SafeSideMinimum + ((SafeSideMaximum - SafeSideMinimum) * (SafeSideReach - gap) / SafeSideReach);
+
+        aimX = Math.Clamp(aimX + (int)(acrossX * offset * away / length), Margin, SpatialPitch.PitchLength - Margin);
+        aimY = Math.Clamp(aimY + (int)(acrossY * offset * away / length), Margin, SpatialPitch.PitchWidth - Margin);
+    }
+
+    /// <summary>
+    /// Finds where a ball played to a runner and the runner get to together: the ball is aimed at where he will be when it arrives, and how
+    /// long it takes depends on where it is aimed, so the lead is refined a few times from the ball's flight time. It is never less than
+    /// <see cref="ThroughLeadTicks"/> or more than <see cref="MeetingLeadMaximum"/>.
+    /// </summary>
+    private static void MeetingPoint(in View view, int x, int y, int velocityX, int velocityY, out int aimX, out int aimY)
+    {
+        var lead = ThroughLeadTicks;
+
+        for (var round = 0; round < MeetingRounds; round++)
+        {
+            var length = Distance(view.X, view.Y, Aim(x, velocityX, lead, SpatialPitch.PitchLength), Aim(y, velocityY, lead, SpatialPitch.PitchWidth));
+
+            lead = Math.Clamp(ArrivalTicks(length, length >= LoftedDistance), ThroughLeadTicks, MeetingLeadMaximum);
+        }
+
+        aimX = Aim(x, velocityX, lead, SpatialPitch.PitchLength);
+        aimY = Aim(y, velocityY, lead, SpatialPitch.PitchWidth);
+    }
+
+    private static int Aim(int position, int velocity, int lead, int extent) =>
+        Math.Clamp(position + (velocity * lead / TickSpatialUnits.FixedScale), Margin, extent - Margin);
+
+    /// <summary>Counts the defenders within <see cref="SwitchCongestionReach"/> of the carrier who stand on his half of the width.</summary>
+    private static int Congestion(in TickCarrierSituation situation, in View view)
+    {
+        var crowd = 0;
+        var limit = (long)SwitchCongestionReach * SwitchCongestionReach;
+        var side = Math.Sign(view.Y - SpatialPitch.GoalYCenter);
+
+        for (var index = 1; index < situation.Defenders.Length; index++)
+        {
+            var x = MirrorX(TickSpatialUnits.ToUnits(situation.Defenders[index].X), situation.IsHome);
+            var y = MirrorY(TickSpatialUnits.ToUnits(situation.Defenders[index].Y), situation.IsHome);
+
+            if (Math.Sign(y - SpatialPitch.GoalYCenter) == side && SquaredDistance(view.X, view.Y, x, y) < limit)
+            {
+                crowd++;
+            }
+        }
+
+        return crowd;
+    }
+
+    /// <summary>
+    /// Tells whether a ball is a switch of play to a free man: it crosses to the other half of the width and is at least
+    /// <see cref="SwitchMinimumWidth"/> across, and its receiver has <see cref="SwitchSpace"/> to the nearest defender.
+    /// </summary>
+    private static bool IsSwitch(in View view, int aimY, long markerSquared) =>
+        Math.Sign(aimY - SpatialPitch.GoalYCenter) == -Math.Sign(view.Y - SpatialPitch.GoalYCenter)
+        && Math.Abs(aimY - view.Y) >= SwitchMinimumWidth
+        && markerSquared >= (long)SwitchSpace * SwitchSpace;
+
+    private static long SquaredDistance(int fromX, int fromY, int toX, int toY)
+    {
+        long dx = toX - fromX;
+        long dy = toY - fromY;
+
+        return (dx * dx) + (dy * dy);
     }
 
     /// <summary>Gets the chance, in basis points, that a ball along a lane gets through every defender near it.</summary>
@@ -1153,7 +1379,8 @@ internal static class TickBallCarrierBrain
         int Effective,
         int Nearest,
         int NearestX,
-        int NearestY)
+        int NearestY,
+        bool Retreating)
     {
         public static View Of(in TickCarrierSituation situation)
         {
@@ -1175,6 +1402,11 @@ internal static class TickBallCarrierBrain
                 }
             }
 
+            // The defence is backing off when the man nearest him is well away and moving away.
+            var retreating = nearest >= 0
+                && nearestSquared > (long)DriveGap * DriveGap * TickSpatialUnits.FixedScale * TickSpatialUnits.FixedScale
+                && ClosingSpeed(carrier, situation.Defenders[nearest]) <= -DriveRetreatSpeed;
+
             return new View(
                 MirrorX(TickSpatialUnits.ToUnits(carrier.X), situation.IsHome),
                 MirrorY(TickSpatialUnits.ToUnits(carrier.Y), situation.IsHome),
@@ -1183,7 +1415,8 @@ internal static class TickBallCarrierBrain
                 EffectivePressure(pressure, situation.Skills[situation.CarrierIndex].Composure),
                 nearest,
                 nearest < 0 ? 0 : MirrorX(TickSpatialUnits.ToUnits(situation.Defenders[nearest].X), situation.IsHome),
-                nearest < 0 ? 0 : MirrorY(TickSpatialUnits.ToUnits(situation.Defenders[nearest].Y), situation.IsHome));
+                nearest < 0 ? 0 : MirrorY(TickSpatialUnits.ToUnits(situation.Defenders[nearest].Y), situation.IsHome),
+                retreating);
         }
     }
 }

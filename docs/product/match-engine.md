@@ -1700,3 +1700,57 @@ Measured over 200 matches from seed 11 (`tickmotion`), 205 stored snapshots (`ti
 5.4% of frames still have a pair under a metre outside the ball's 3 m, almost all of them men crossing at speed, and the viewer's de-overlap (§14.9) covers those. Distance is 13.8 km, not
 9.5–11.5. The viewer's stutters are down a quarter, not by 70%: the engine's own dips are rare (0.19 a player-minute is about 8 a film minute), so what the harness counts is the
 sampling and the spline, which is the viewer's. The home / draw / away split of 205 matches moves by more than the 205-match noise (±3.5 points) in its home share and should be read with that.
+
+### 14.14 Reading the receiver's situation (the tick-film plan, Milestone 6)
+
+Engine play changes (golden hash re-pinned to `5286dc38…`; engine-v12 keeps its label). Matches stored under the earlier build refuse to replay (MAT-9): play new ones. All of it is in
+`TickBallCarrierBrain` and is a pure function of the positions, so no random draw moved.
+
+**What was missing.** A pass was judged by its lane (defenders within 3.5 m of the line) and the receiver's room *now*. It did not ask what would be waiting when the ball got there, played
+every ball at the receiver's body wherever his marker stood, led a runner by a fixed 8 ticks whatever the length of the ball, and had no idea of a switch of play or of a defence backing off.
+
+| Piece | What it does |
+|---|---|
+| Pressure on arrival (`ArrivalPressure`) | The ball's flight time (`TickBallPhysics.RollingTicks` for a rolled ball, `LoftedFlightTicks` for a lofted one, the same closed forms the launch uses) is set against the nearest defender's time to the receiver's spot at 6.5 m/s. Every tick by which he is there sooner (and two ticks for the first touch) takes 1.5% from the pass's chance, up to 15%. |
+| The safe side (`SafeSide`) | A ball for a man who is standing or jogging, with a marker within 4 m of the spot, is moved 0.5 m (marker at 4 m) to 1 m (on top of him) across the ball's line to the side away from the marker. The length does not change. |
+| Meeting a runner (`MeetingPoint`) | A through ball is aimed where the ball and the runner get there together: the lead is the ball's flight time, refined three times, between the old 8 ticks and 14. |
+| Switch of play (`Congestion`, `IsSwitch`) | With four or more defenders within 20 m of the carrier on his half of the width, a ball to a teammate on the other half, 30 m or more across, with 10 m to his nearest marker, is worth 15 m more (`SwitchBonus` 1 500). |
+| Driving into space | When the nearest defender is over 8 m away and moving away at 1 m/s or more, a carry is worth up to `DriveBonus` (1 200) more, in proportion to the ground taken. |
+
+**What the measurements said.** Each piece was switched on alone against the M5 build (205 stored snapshots, 200 matches of `tickmotion`):
+
+- *Arrival pressure at 2.5% a tick, up to 30%* (the first draft) was the whole of the effect and too strong: interceptions fell 24%, tackles 29%, fouls 27% and yellow cards to 2.6, while
+  crosses rose 76% and goals to 3.3 (a pass into a defended area lost to a cross, which is not weighed this way). At 1.0% a tick it was nearly right (goals 2.94, yellow 3.46); 1.5% a tick up to 15% was kept.
+- The safe side alone: the median room of the man receiving does not move (4.7 m against 4.8) and shots fall a little (27.3 against 28.8).
+- The meeting point, the drive and the switch moved the totals by less than the 205-match noise.
+- **The switch bonus barely fires.** It is worth more than a pass to a free man, but a ball of 35 m or more is lofted and the carrier's accuracy model gives an average passer a 30% chance of
+  landing it within a receiver's catch, so only a skilled passer ever takes it. Raising the bonus to 4 000 left the switches at 69.1 against 68.6 (by the stamp count below). Left as it is: it shifts the choice for the
+  skilled passer and costs nothing elsewhere.
+- **Switches a match is already in the plan's aim.** Counted as balls a man touches that cross 30 m or more of the width, the M5 build plays 8.4 a match (aim 8–20) and this build 8.5.
+  (Counted over every `pass` stamp it is 61 and 78, because the stamps include the backward balls below.)
+
+**A finding that is not changed here.** About 1 100 of the 2 900 `pass` stamps in a match (a backward ball over 2 m, `TickCarrierAction.Recycle`) are not followed as passes:
+`AfterKick` has no case for them, so they set no pending pass and no intended receiver, count in nobody's `PassesAttempted`, give the receiver no early decision, and show no `receive` stamp, `misplaced` blame
+or completion. They are also why the stamp count (2 900) is nearly twice the engine's own (1 700). Counting them as passes (tried, `Recycle` joined to the pass case) moves the play: 2 400 attempts,
+interceptions up from 214 to 294 a match, passes forward 63% instead of 91%. It needs its own decision and calibration.
+
+Measured over 200 matches from seed 11 (`tickmotion`), 205 stored snapshots (`ticksnap`), 1 000 matches (`tick`) and 17 matches of each pair of the 13 formations (`tickmatrix`):
+
+| | Before (M5) | After |
+|---|---|---|
+| Passes a man touches a match, share intercepted | 1 665, 14.4% | 1 627, 13.2% |
+| Interceptions a match | 249 | 225 |
+| Median room of the man receiving (to the nearest opponent) | 4.8 m | 5.2 m |
+| Final-third receptions a match | 403 | 375 |
+| Switches of play a match (30 m across) | 8.4 | 8.5 |
+| Forward share of passes a man touches | 92.7% | 91.3% |
+| Stored snapshots: goals, shots, on target | 2.89, 28.8, 30.8% | 2.70, 27.9, 30.4% |
+| Stored: pass completion, yellow cards, fouls | 84.6%, 3.70, 20.7 | 85.6%, 3.45, 18.4 |
+| Stored: home / draw / away | 48.3 / 22.9 / 28.8 | 40.0 / 24.4 / 35.6 |
+| Uniform sides, board formations (`tick`): goals, shots, corners | 1.75, 19.7, 6.8 | 1.80, 19.4, 8.4 |
+| All 169 formation pairs (`tickmatrix`): goals, shots | 1.76, 19.4 | 1.72, 18.9 |
+| Standing, stop-and-go, distance (unchanged) | 2.5%, 3.17, 13.8 km | 2.6%, 3.22, 13.8 km |
+
+**Where it is outside the plan, and why.** The plan's aim for switches was reached before the milestone began, so the bonus adds nothing to the count. The home share of 205 matches is below its band
+(40.0 against 42–48, the away share 35.6 against 28–34) but moves by 4 to 8 points between builds that differ in one tiny lever (43 to 48 with the switch alone, the drive alone, the meeting point alone), which is the noise of 205 chaotic
+matches, not a trend. The stored-snapshot pass completion is 0.6 points over the band's 85%, inside the 3% accepted. Corners rise by a quarter (more crosses, fewer interceptions).
