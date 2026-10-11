@@ -292,7 +292,7 @@ public sealed class TickMatchLoopTests
         var sample = TickPlay.Reduced;
 
         sample.Result.Events[^1].Type.Should().Be(EngineEventType.FullTime);
-        (sample.Result.Home.RedCards + sample.Result.Away.RedCards).Should().BeGreaterThan(4);
+        (sample.Result.Home.RedCards + sample.Result.Away.RedCards).Should().BeGreaterThan(3);
         sample.Recording.FrameCount.Should().BeGreaterThan(55_000);
     }
 

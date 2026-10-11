@@ -438,6 +438,11 @@ internal static class TickBallCarrierBrain
     /// <summary>The extra worth of a clearance from the player's own third, in utility.</summary>
     public const int ClearOwnThirdBonus = 600;
 
+    /// <summary>The furthest upfield a carrier may be and still hoof a clearance, in pitch units (his own half: 50 m).</summary>
+    public const int ClearZoneLimit = 5_000;
+
+    /// <summary>The deepest a clearance may be aimed, in pitch units (75 m), so it cannot drop into the byline zone.</summary>
+    public const int ClearMaximumX = 7_500;
 
     private const int BasisPoints = 10_000;
 
@@ -1049,6 +1054,12 @@ internal static class TickBallCarrierBrain
 
     private static void ScoreClearance(in TickCarrierSituation situation, in View view, ref Best best)
     {
+        // Past his own half a pressed carrier passes, recycles, shields or dribbles; a hoof from there only runs out.
+        if (view.X >= ClearZoneLimit)
+        {
+            return;
+        }
+
         var skills = situation.Skills[situation.CarrierIndex];
 
         if (view.Pressure < PanicBase + (PanicStep * skills.Composure))
@@ -1057,7 +1068,7 @@ internal static class TickBallCarrierBrain
         }
 
         // Hoofed upfield to the wing away from the man closing him down.
-        var targetX = Math.Min(SpatialPitch.PitchLength - Margin, view.X + 3_000);
+        var targetX = Math.Min(ClearMaximumX, view.X + 3_000);
         var targetY = view.Nearest >= 0 && view.NearestY > view.Y ? 900 : SpatialPitch.PitchWidth - 900;
         var utility = ClearUtility + (view.X < OwnThird ? ClearOwnThirdBonus : 0);
 

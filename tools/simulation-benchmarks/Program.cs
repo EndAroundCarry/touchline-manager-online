@@ -126,6 +126,11 @@ if (mode is "tickmatrix")
     TickCalibration.Matrix(Math.Min(count, 100), seed, rules);
 }
 
+if (mode is "goalorigin")
+{
+    GoalOriginProbe.Run(positional[2], Math.Min(count, 3_000), rules);
+}
+
 if (mode is "ticksnap")
 {
     TickCalibration.Snapshots(positional[2], Math.Min(count, 3_000), rules);

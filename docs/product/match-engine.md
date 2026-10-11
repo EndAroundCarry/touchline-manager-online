@@ -1864,3 +1864,25 @@ recording (alone, M4 measured 533 ms), 49 ms of it the film.
 
 **Not reached.** Distance per outfield player (13.9 km against the aim of 9.5 to 11.5, and 13.6 at the start) and viewer stutter (no lower). Matches stored under any earlier build of engine-v12 refuse to
 replay (MAT-9); new matches must be played, and a browser may need a hard reload to show a film re-made for an old match (a presentation is cached `immutable` for each URL).
+
+### 14.17 No hoofing out of the opponent's half (the keeper-gift plan, Milestone 1)
+
+The first step of the plan to cut goals that come straight off a goalkeeper's kick (26% of goals on the stored snapshots, 4 of the 5 in three films watched). The `goalorigin` probe
+(`tools/simulation-benchmarks/GoalOriginProbe.cs`) found 72 goal kicks a match, 41 of them an attacker's `Clear` from the opponent's half that rolled over the byline, and the keeper's short
+kick that followed went to a centre-back with an opponent on him.
+
+**The change** (`TickBallCarrierBrain.ScoreClearance`): a clearance is considered only while the carrier is in his own half (`ClearZoneLimit`, 50 m); beyond it a pressed carrier passes, recycles,
+shields or dribbles, as he already could. A clearance from the own half aims `X + 30 m` as before but never past `ClearMaximumX` (75 m), so it cannot land in the byline zone.
+
+| Stored snapshots (205) | Before | Now |
+|---|---|---|
+| Goals a match | 2.68 | 2.87 |
+| Goals straight off a keeper's kick | 144 of 549 (26.2%) | 57 of 588 (9.7%) |
+| Goal kicks a match | 72 | 30.1 |
+| Goal kicks put out by the keeper's own pass a match | 11.6 | 4.5 |
+| Shots a match; on target | 27.6; 31.0% | 32.5; 29.6% |
+| Yellow cards; fouls | 3.04; 17.4 | 3.80; 21.0 |
+
+The ball now stays in play, so there are more turnovers in the final third and more shots (32.5, over the band's 22 to 28; M5 of the plan re-balances shot volume). Goals are inside the plan's
+2.4 to 3.0. `tickmotion` is unchanged in kind (standing 2.6%, distance 13.9 km, one-touch 29.8%). Short goal kicks still turn over 21% of the time (Milestone 3) and the keeper's long balls still
+roll out (Milestone 2).

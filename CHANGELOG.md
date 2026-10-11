@@ -4,6 +4,24 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Keeper-gift plan, Milestone 1 — no hoofing out of the opponent's half
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.17. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
+under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- A pressed carrier may hoof a clearance only from his own half (`ClearZoneLimit`, 50 m), and a clearance is aimed no deeper than 75 m (`ClearMaximumX`). Beyond that he passes, recycles, shields or dribbles.
+- Stored snapshots: goals straight off a goalkeeper's kick 26.2% to 9.7%, goal kicks a match 72 to 30, goals 2.68 to 2.87, shots 27.6 to 32.5.
+
+### Added
+
+- The `goalorigin` mode of the simulation benchmarks (`GoalOriginProbe.cs`): where each goal's move began, the goalkeeper's kicks, what put the ball out for a goal kick, and shot quality.
+
+### Changed (tests)
+
+- The golden output hash is re-pinned. The carnage fixture now sends off 4 players, so its bound is "more than 3" red cards.
+
 ## Tick film, Milestone 8 — wrap-up of the tick-film plan
 
 Recorded in [`ADR-0067`](docs/architecture/adr/0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md); measured in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.16.
