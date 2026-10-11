@@ -1938,3 +1938,27 @@ its `pressed < 2` gate and also needs a safe man; Direct is unchanged.
 **Not reached.** The plan expected short goal kicks to be lost about 5% of the time. They are lost 15%: a receiver 8 to 10 m clear is reached by the press while the ball is still travelling 19 m,
 and a lost one still becomes a shot 41% of the time. A wider margin (15 m clearance, 12 m space) was tried: the loss was 13% on the same matches, within noise, and it cut the short kicks from
 9.2 to 7.1 a match, so the plan's margins stay. The goals that matter did fall: the goals from short goal kicks are 10 a 205 matches, from 124 for all goal kicks at the start of the plan. `tickmotion` is unchanged in kind (standing 2.6%, distance 13.89 km, one-touch 30.0%).
+
+### 14.20 A risk-averse keeper in open play (the keeper-gift plan, Milestone 4)
+
+A keeper with the ball in his hands scored his passes like any other carrier, so he rolled the ball to a defender with a forward standing a few metres from him, and 49% of the balls he lost
+became shots (25 goals in 205 matches).
+
+**The filter.** In `ScorePasses` a goalkeeper considers a receiver only when the nearest opponent to the aim is at least 9 m away (`KeeperReceiverClearance`) and the pass has a 90% chance of
+coming off (`KeeperSafePassChance`; lane survival, accuracy and arrival pressure as for anyone). Failing that, a lofted ball to a free midfielder or forward is a fallback that competes only when
+no safe pass exists (it still goes through the 88 m cap of 14.18). Failing that, the keeper clears (`ScoreClearance` now ignores the panic threshold for a keeper with nothing else on): the clearance
+is aimed at the wing away from the nearest opponent and no deeper than 75 m, as in 14.17. The plan's 85% and 6 m were tried first and left 12 open-play goals; the keeper-gift track was already
+under its 10% aim, so the stricter pair is the one kept.
+
+| Stored snapshots (205) | Before (M3) | Now |
+|---|---|---|
+| Goals straight off a keeper's kick | 35 of 544 (6.4%) | 20 of 544 (3.7%) |
+| Of which from the keeper's open-play pass | 25 | 5 |
+| Keeper short (under 25 m) open-play balls a match; turned over | 31.5; 5.1% | 20.0; 2.1% |
+| Keeper open-play balls of 25 m and over a match | 0.3 | 8.7 (medium 19.7% turned over, long 12.1%) |
+| Goal kicks a match | 25.3 | 26.1 |
+| Goals a match; shots | 2.65; 32.1 | 2.65; 32.2 |
+
+**Not as planned.** The plan expected the keeper's open-play turnovers to fall from 5% to 2%. Those on short balls did (2.1%), but the keeper now kicks 8.7 balls a match that are not short, and a
+fifth of the medium ones are lost, so the keeper's overall turnover rate is 6.5%. These are lost 30 m or more from his goal, where 6 to 7% of them become a shot (49% of the short ones did). 1.6 a match of his
+clearances end without a receiver (out of play or loose). `tickmotion` is unchanged in kind.

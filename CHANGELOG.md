@@ -4,6 +4,16 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Keeper-gift plan, Milestone 4 — a risk-averse keeper in open play
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.20. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
+under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- A goalkeeper with the ball in open play passes only to a man no opponent is within 9 m of (`KeeperReceiverClearance`) with at least a 90% chance of success (`KeeperSafePassChance`). Otherwise he lofts it to a free midfielder or forward, or clears, whatever the pressure on him.
+- Stored snapshots: goals straight off a keeper's kick 6.4% to 3.7% of goals, goals off his open-play pass 25 to 5, his short balls turned over 5.1% to 2.1%. Goals are in the band (2.65).
+
 ## Keeper-gift plan, Milestone 3 — cautious goal kicks
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.19. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored

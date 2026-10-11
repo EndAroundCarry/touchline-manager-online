@@ -922,6 +922,39 @@ public sealed class TickBallCarrierBrainTests
             .Should().BeFalse("the cut-back zone is only played to from within ten metres of the goal line");
     }
 
+    [Fact]
+    public void A_goalkeeper_plays_a_free_man_when_there_is_one()
+    {
+        var decision = new Scene(true, 0, OwnHalf, DeepBlock).WithVision(0, 20).Decide();
+
+        decision.Action.Should().BeOneOf(TickCarrierAction.Pass, TickCarrierAction.Recycle);
+        decision.Receiver.Should().BePositive();
+    }
+
+    [Fact]
+    public void A_goalkeeper_with_every_team_mate_marked_clears_the_ball_though_nobody_is_on_him()
+    {
+        // A man on every team-mate's shoulder, 3 m off him; the keeper himself is a long way from any of them.
+        var marked = OwnHalf.Select(point => new SpatialPoint(point.X + 300, point.Y)).ToArray();
+        var decision = new Scene(true, 0, OwnHalf, marked).WithVision(0, 20).Decide();
+
+        decision.Action.Should().Be(TickCarrierAction.Clear, "a pass into a marked man is a gamble the keeper does not take");
+        decision.Target.X.Should().BeInRange(1, TickBallCarrierBrain.ClearMaximumX);
+    }
+
+    [Fact]
+    public void A_goalkeeper_with_only_a_distant_midfielder_free_lofts_it_to_him_inside_the_long_ball_cap()
+    {
+        var marked = OwnHalf.Select(point => new SpatialPoint(point.X + 300, point.Y)).ToArray();
+        var attackers = Move(OwnHalf, (7, 3_800, 5_200));
+        var defenders = Move(marked, (7, 7_000, 6_900));
+        var decision = new Scene(true, 0, attackers, defenders).WithVision(0, 20).Decide();
+
+        decision.Action.Should().Be(TickCarrierAction.Pass);
+        decision.Receiver.Should().Be(7);
+        decision.Target.X.Should().BeLessThanOrEqualTo(TickBallCarrierBrain.LongBallDeepestX);
+    }
+
     private static TickPlayerState Standing(int x, int y) => TickPlayerState.Standing(x, y, 0, 10_000);
 
     private static SpatialPoint[] Move(SpatialPoint[] layout, params (int Index, int X, int Y)[] moves)

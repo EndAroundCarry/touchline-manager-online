@@ -447,6 +447,12 @@ internal static class TickBallCarrierBrain
     /// <summary>The deepest a lofted pass or long kick may land, in pitch units (88 m: 12 m from the goal line), so it cannot run on over it.</summary>
     public const int LongBallDeepestX = 8_800;
 
+    /// <summary>The chance, in basis points, a goalkeeper's pass must have of coming off for him to play it: he does not gamble with the ball in his own area.</summary>
+    public const int KeeperSafePassChance = 9_000;
+
+    /// <summary>How far from a receiver the nearest opponent must be for a goalkeeper to play to him, in pitch units (6 m).</summary>
+    public const int KeeperReceiverClearance = 900;
+
     private const int BasisPoints = 10_000;
 
     private const int PassBaseValue = 1_200;
@@ -746,6 +752,9 @@ internal static class TickBallCarrierBrain
         var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo);
         var loss = LossOfBall(view);
         var crowded = Congestion(situation, view) >= SwitchCongestion;
+        var keeper = situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper;
+        var safeFound = false;
+        var fallback = Best.StartingAt(view.X, view.Y);
 
         for (var index = 0; index < situation.Attackers.Length; index++)
         {
@@ -841,6 +850,30 @@ internal static class TickBallCarrierBrain
             var utility = Expected(success, value, loss);
             var action = through ? TickCarrierAction.ThroughBall : (backward ? TickCarrierAction.Recycle : TickCarrierAction.Pass);
 
+            if (keeper)
+            {
+                // A goalkeeper plays only a pass that is all but certain to a man nobody is near. Failing that, a lofted ball to a free
+                // midfielder or forward (it competes only when no safe pass exists); failing that, the clearance.
+                var markerFree = marker < 0 || markerSquared >= (long)KeeperReceiverClearance * KeeperReceiverClearance;
+
+                if (!markerFree)
+                {
+                    continue;
+                }
+
+                if (success < KeeperSafePassChance)
+                {
+                    if (lofted && situation.Specs[index].Family is MatchPositionFamily.Midfield or MatchPositionFamily.Attack)
+                    {
+                        fallback.Consider(action, index, aimX, aimY, utility, 0);
+                    }
+
+                    continue;
+                }
+
+                safeFound = true;
+            }
+
             if (gain >= 0)
             {
                 scan = scan with { BestForward = Math.Max(scan.BestForward, utility) };
@@ -851,6 +884,11 @@ internal static class TickBallCarrierBrain
             }
 
             best.Consider(action, index, aimX, aimY, utility, 0);
+        }
+
+        if (keeper && !safeFound && fallback.Utility > int.MinValue)
+        {
+            best.Consider(fallback.Action, fallback.Receiver, fallback.X, fallback.Y, fallback.Utility, 0);
         }
     }
 
@@ -1074,7 +1112,10 @@ internal static class TickBallCarrierBrain
 
         var skills = situation.Skills[situation.CarrierIndex];
 
-        if (view.Pressure < PanicBase + (PanicStep * skills.Composure))
+        // A goalkeeper with no pass he trusts clears whatever the pressure on him.
+        var stuck = best.Utility == int.MinValue && situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper;
+
+        if (!stuck && view.Pressure < PanicBase + (PanicStep * skills.Composure))
         {
             return;
         }
