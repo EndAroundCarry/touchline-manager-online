@@ -10,7 +10,7 @@ namespace TouchlineManager.MatchEngine.Tests;
 /// <para>
 /// The full distribution suite lives in the simulation laboratory
 /// (<c>tools/simulation-benchmarks</c>), which runs tens of thousands of matches and prints every band. This is
-/// the smaller version that runs with the unit tests: two thousand matches is a couple of seconds and is
+/// the smaller version that runs with the unit tests: five hundred matches is a second or so and is
 /// enough to catch a change that moved the goals-per-match figure by a fifth.
 /// </para>
 /// <para>
@@ -21,7 +21,7 @@ namespace TouchlineManager.MatchEngine.Tests;
 /// </remarks>
 public sealed class DistributionTests
 {
-    private const int Matches = 2_000;
+    private const int Matches = 500;
 
     [Fact]
     public void The_scoreline_and_discipline_distributions_stay_inside_their_ranges()

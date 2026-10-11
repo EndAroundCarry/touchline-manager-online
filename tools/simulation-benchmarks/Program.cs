@@ -113,12 +113,12 @@ if (mode is "offball")
 
 if (mode is "tick")
 {
-    TickProbe.Run(Math.Min(count, 3_000), seed, rules, dumpPath);
+    TickProbe.Run(Math.Min(count, 600), seed, rules, dumpPath);
 }
 
 if (mode is "tickmotion")
 {
-    TickMotionProbe.Run(Math.Min(count, 3_000), seed, rules);
+    TickMotionProbe.Run(Math.Min(count, 600), seed, rules);
 }
 
 if (mode is "tickmatrix")
@@ -128,12 +128,12 @@ if (mode is "tickmatrix")
 
 if (mode is "goalorigin")
 {
-    GoalOriginProbe.Run(positional[2], Math.Min(count, 3_000), rules);
+    GoalOriginProbe.Run(positional[2], Math.Min(count, 600), rules);
 }
 
 if (mode is "ticksnap")
 {
-    TickCalibration.Snapshots(positional[2], Math.Min(count, 3_000), rules);
+    TickCalibration.Snapshots(positional[2], Math.Min(count, 600), rules);
 }
 
 return 0;

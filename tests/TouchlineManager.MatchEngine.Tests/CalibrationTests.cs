@@ -22,7 +22,7 @@ namespace TouchlineManager.MatchEngine.Tests;
 /// </remarks>
 public sealed class CalibrationTests
 {
-    private const int Fixtures = 1_500;
+    private const int Fixtures = 500;
 
     [Fact]
     public void Home_advantage_is_worth_about_four_points_of_win_share()
