@@ -4,6 +4,27 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tick film, Milestone 8 — wrap-up of the tick-film plan
+
+Recorded in [`ADR-0067`](docs/architecture/adr/0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md); measured in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.16.
+No change to play (the golden hash is the Milestone 7 one).
+
+### Added
+
+- ADR-0067, which records the whole-move film, the viewer's spline and de-overlap, and the flow and movement model of Milestones 1 to 7.
+- Match-engine §14.16: the five complaints before (`5163b96`) and after, and the final balance over the stored snapshots, 3 000 matches and the whole formation matrix.
+
+### Measured
+
+- Film 9:30 to about 16:20 (139 passages, payload p95 2.6 MB of 2.75 MB, 1.2 MB compressed); goals whose regain is cut off 6.4% to 0%; ball at reception 2.4 to 11.1 m/s; receiver moving toward it 2% to 81%;
+  standing 12.2% to 2.6%; stop-and-go 7.5 to 3.15 a player-minute; opponents under 1 m outside duels 35% to 5.3%; drawn tokens covered 27% to 0%.
+- Stored snapshots: 2.68 goals, 27.6 shots, 84% completion, 3.04 yellow cards (in the bands); on target 31.0%.
+
+### Known
+
+- Uniform sides score 1.7 to 1.8 goals from 19 to 20 shots and get 1.7 yellow cards (below the bands written for them); the stored squads are in band.
+- Distance per outfield player is 13.9 km (aim 9.5 to 11.5) and the viewer's stutters are not lower (213 against 194 a film minute on the same film).
+
 ## Tick film, Milestone 7 — combination play: the wall pass, the third man, the cut-back
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.15. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its

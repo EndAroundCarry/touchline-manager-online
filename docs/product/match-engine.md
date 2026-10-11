@@ -1336,7 +1336,7 @@ a test that is switched off catches nothing.
 ## 14. Engine version 12: the tick engine
 
 > **Status:** Executable specification for `engine-v12` / `engine-rules-v11`, `tick-engine-v1`, implemented in
-> `src/TouchlineManager.MatchEngine/Tick` and `Spatial`. **Decision:** [ADR-0066](../architecture/adr/0066-engine-v12-discrete-tick-match-engine.md).
+> `src/TouchlineManager.MatchEngine/Tick` and `Spatial`. **Decision:** [ADR-0066](../architecture/adr/0066-engine-v12-discrete-tick-match-engine.md) and, for the film and the movement of §14.9–14.16, [ADR-0067](../architecture/adr/0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md).
 
 ### 14.1 What it is
 
@@ -1419,28 +1419,30 @@ Home advantage is the snapshot's `HomeAdvantageBasisPoints` less 10,000, added t
 | Mode | What it plays |
 |---|---|
 | `tick N` | N matches with the board's formations in turn, uniform players: the figures of the plan, the film's size and the time. |
+| `tickmotion N seed` | How the players and the ball move and how the ball is played, read from the recording (§14.8, §14.16). |
 | `tickmatrix N` | Every formation against every other, N matches each; `TICK_FORMS=0,1,5` picks formations, `TICK_ABILITY`, `TICK_INSTR=Pressing=2,Tempo=0`, `TICK_HOME_ATTR=16,Pace=9` change the sides. |
 | `ticksnap N file` | The stored snapshots of a database export (id, goals, goals, document, tab separated): real formations, instructions and attributes. `TICK_UNIFORM`, `TICK_FORM`, `TICK_FLAT` take the real thing apart. |
 
-The stored matches (205 snapshots of the development database, each played once):
+The stored matches (205 snapshots of the development database, each played once), as first calibrated (Milestone 9) and after the tick-film plan (§14.16):
 
-| | Measured | Plan band |
-|---|---|---|
-| Goals a match | 2.83 | 2.60–2.90 |
-| Shots a match | 28.3 | 22–28 |
-| Shots on target | 38% | 32–38% |
-| Pass completion | 76% | 75–85% |
-| Yellow cards | 4.0 | 3.0–4.5 |
-| Home / draw / away | 42 / 24 / 34 % | 42–48 / 22–26 / 28–34 % |
-| Fouls, penalties, corners, offsides | 22, 0.4, 5.1, 3.9 | |
+| | M9 | Now | Plan band |
+|---|---|---|---|
+| Goals a match | 2.83 | 2.68 | 2.60–2.90 |
+| Shots a match | 28.3 | 27.6 | 22–28 |
+| Shots on target | 38% | 31.0% | 32–38% |
+| Pass completion | 76% | 84.0% | 75–85% |
+| Yellow cards | 4.0 | 3.04 | 3.0–4.5 |
+| Home / draw / away | 42 / 24 / 34 % | 42.9 / 20.0 / 37.1 % | 42–48 / 22–26 / 28–34 % |
+| Fouls, penalties, corners, offsides | 22, 0.4, 5.1, 3.9 | 17.4, 0.27, 11.0, 1.7 | |
 
-Every formation against every other with uniform players of 13 gives about 2.3 goals and 26 shots a match, 78% pass completion, 3.4 yellow cards; at an
-ability of 8 and of 19 it gives 2.9 and 2.4 goals. A home side whose players are all 3 points better than the visitors wins 59% of the matches and loses
+At Milestone 9 every formation against every other with uniform players of 13 gave about 2.3 goals and 26 shots a match, 78% pass completion, 3.4 yellow cards; at an
+ability of 8 and of 19 it gave 2.9 and 2.4 goals. After the tick-film plan the same yardstick gives 1.70 goals and 19.2 shots (§14.16): uniform sides are the
+one yardstick that moved out of the band. A home side whose players are all 3 points better than the visitors wins 59% of the matches and loses
 18%. Each instruction at its extreme (a high press, a high tempo, a high or deep line, an aggressive tackle, the most defensive and the most attacking
 mentality) moves the goals between 1.9 and 3.1 and nothing runs away.
 
-What is not matched: a throw-in is taken about 14 times a match (a real match has about 35) and a corner 5 (about 10), because balls leave the pitch
-less often than they do in football; and the formations are not alike — a lone striker or three forwards shoots about twice as often as two strikers.
+What is not matched: a throw-in is taken about 14 times a match (a real match has about 35), because balls leave the pitch
+less often than they do in football (a corner is now taken 11 times a match on the stored squads, 8 on uniform sides); and the formations are not alike — a lone striker or three forwards shoots about twice as often as two strikers.
 
 ### 14.6 The film
 
@@ -1462,6 +1464,9 @@ and are joined by `jump`, `kick_off` and `half_time` cuts; the viewer reads it u
 | `TickMatchStateMachineTests`, `TickSetPiecesTests` | Every restart. |
 | `TickMatchLoopTests`, `TickTeamTests`, `TickMatchRecordingTests`, `TickFilmSelectorTests`, `TickReplaySynthesizerTests` | The loop, the sides, the recording and the film. |
 | `TickMoveFinderTests` | Where a move began, on recordings built to have one shape: a tackle, a capped possession snapped to a pass, the interval, a restart, a deflection, a loose ball. |
+| `TickBlameTests` | The four blame tags: a dispossessed carrier and his tackler, a beaten defender, a misplaced pass, a bypassed man not shown twice in 3 s; a blame is not a touch; the film carries and narrates them. |
+| `TickInterceptionTests`, `TickMotionTests` | The earliest point a man can meet the ball; walking about a place, the search for room and the defenders' steps, personal space. |
+| `TickCombinationsTests` | The return run and the third man's run: who is sent, where to, and when not. |
 
 ### 14.8 Motion and film baseline (the tick-film plan, Milestone 0)
 
@@ -1808,3 +1813,54 @@ Measured over 200 matches from seed 11 (`tickmotion`), 205 stored snapshots (`ti
 lever this small moves them by. The home share swings by several points between builds that differ by a tiny lever (the noise of 205 chaotic matches). The pressed man's ball to the wall-runner is intercepted 29%
 of the time, against 13% for passes in general, because the runner is moving toward a defender; that is the risk of the pass, and the film shows who lost it (`misplaced`). The runs add a little running (13.8 to 13.9 km),
 which was already above the 9.5 to 11.5 km aim.
+
+### 14.16 The tick-film plan, finished (Milestone 8)
+
+Nothing changes in play here: this is the plan's measurement at its end, against its start. The engine is as committed at `b68777e` (Milestone 7); the baseline is `5163b96`.
+Decision: [ADR-0067](../architecture/adr/0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md).
+
+**The five complaints, before and after** (`tickmotion 200 11`; the film from `tick 1 11 --dump`):
+
+| | Baseline (`5163b96`) | Now |
+|---|---|---|
+| Film length, passages, payload estimate | 9:30, 74, 704 KB | 15:49 to 16:42 (mean 16:20), 139 a film (p95 estimate 2 608 KB of 2 750), 1.2 MB Brotli on the wire |
+| Goals whose regain is before the film window | 6.4% | 0.0% (shots 8.5% to 0.2%) |
+| Ball speed at reception p50; slow tail | 2.4 m/s; 55% | 11.1 m/s; 0.3% |
+| Kick to reception p50 | 48 ticks | 9 ticks |
+| Receiver moving toward the ball | 2% | 81% |
+| Hold p50; first-time plays | 3 ticks; 1.6% | 6 ticks; 28% |
+| Standing (under 0.3 m/s) | 12.2% | 2.6% |
+| Stop-and-go per player-minute | 7.5 | 3.15 |
+| 12 or more outfielders under 0.5 m/s at once | 8.6% of frames | 0.0% |
+| Distance per outfield player per 90 | 13.6 km | 13.9 km |
+| Opponents under 1 m outside duels | 35% | 5.3% (both slower than 1.5 m/s: 0.0%) |
+| Drawn tokens with centres under 0.6 radius | 27% of steps | 0.0% |
+| Viewer stutters a film minute (seed 11) | 194 on the same viewer | 213 |
+
+The five complaints, in turn. **Short highlights:** answered (whole moves, and about 16 minutes), though about 10 of the 16 are spells of play and not chances (§14.10).
+**Stiff ball and receiver:** answered (the ball arrives at pace, the receiver meets it and plays first time more than a quarter of the time). **Chess motion:** answered in the engine
+(standing and stop-and-go fall by 79% and 58%, and the block no longer stops together), but **not in the viewer's stutter count**, which is no lower than before (213 against 194 on
+the same viewer: the dips are in the 100 to 300 ms keyframe sampling of players, and a softer push made it worse, §14.9). **Stacked tokens:** answered on screen (no covered pair); the engine
+still has opponents under 1 m in 5.3% of frames, men crossing, which the viewer pushes apart. **Smarter play:** the pressure on arrival, safe side, switch and drive are in but small in the totals
+(§14.14); the one-two (8 to 25 a match) and the cut-back (0 to 5) are visible, the third man's count is not (§14.15).
+
+**The balance, final.**
+
+| | Stored snapshots (205) | `tick` 3 000, uniform, board formations | `tickmatrix` 15 a pair (2 535) | Band |
+|---|---|---|---|---|
+| Goals a match | 2.68 | 1.81 | 1.70 | 2.60–2.90 |
+| Shots a match | 27.6 | 19.8 | 19.2 | 22–28 |
+| On target | 31.0% | 28.8% | 28.4% | 32–38% |
+| Pass completion | 84.0% | 83.1% | 83.6% | 75–85% |
+| Yellow cards | 3.04 | 1.73 | 1.79 | 3.0–4.5 |
+| Home / draw / away | 42.9 / 20.0 / 37.1 | 38.9 / 34.1 / 27.0 | 39.6 / 33.6 / 26.7 | 42–48 / 22–26 / 28–34 |
+
+**Outside the bands, and why.** The stored squads, the game's real matches, are in the band for goals, shots, completion and yellow cards; on target is a point under, and home / draw / away is
+within the noise of 205 matches. **Uniform sides are not**: they score 1.7 to 1.8 goals from 19 to 20 shots and get 1.7 yellow cards, a third under the band, and draw 34% of matches. That is the cost of
+the skill curve (`CurvePercent` 60 to 38, §14.12), which was set to stop real squads running away on the faster ball and so takes away the edge a *uniform* side gets from its attributes being at 13. The
+plan's bands were written for uniform 4-4-2 sides at Milestone 9; the game plays squads, so the stored matches are the yardstick that was kept. Of the 169 formation pairs 31 are inside 2.2 to 3.4 goals; 3-4-3
+against itself is the worst (3.87 goals, 30.9 shots) and 4-4-1-1 the weakest scorer (0.43 a side). These spreads were present at Milestone 9 (§14.5) and are not new. Play costs 657 ms a match with the live
+recording (alone, M4 measured 533 ms), 49 ms of it the film.
+
+**Not reached.** Distance per outfield player (13.9 km against the aim of 9.5 to 11.5, and 13.6 at the start) and viewer stutter (no lower). Matches stored under any earlier build of engine-v12 refuse to
+replay (MAT-9); new matches must be played, and a browser may need a hard reload to show a film re-made for an old match (a presentation is cached `immutable` for each URL).
