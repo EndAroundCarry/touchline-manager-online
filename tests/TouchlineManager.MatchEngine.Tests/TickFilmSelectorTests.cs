@@ -24,7 +24,9 @@ public sealed class TickFilmSelectorTests
     [Fact]
     public void The_stretches_are_in_order_and_never_overlap()
     {
-        var windows = Select(TickPlay.Even);
+        var sample = TickPlay.Even;
+        var windows = Select(sample);
+        var secondHalf = sample.Recording.SecondHalfFrame;
 
         windows.Should().NotBeEmpty();
 
@@ -32,7 +34,8 @@ public sealed class TickFilmSelectorTests
         {
             windows[index].Start.Should().BeLessThanOrEqualTo(windows[index].End);
 
-            if (index > 0)
+            // Stretches in different halves are never one, however near the interval they lie.
+            if (index > 0 && !(windows[index - 1].End < secondHalf && windows[index].Start >= secondHalf))
             {
                 windows[index].Start.Should().BeGreaterThan(windows[index - 1].End + TickFilmSelector.JoinGap, "stretches that near each other are one");
             }

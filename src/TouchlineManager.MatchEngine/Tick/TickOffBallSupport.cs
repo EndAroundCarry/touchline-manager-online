@@ -29,6 +29,12 @@ internal enum TickAttackingRole
 
     /// <summary>A full-back running into the flank a winger has left, to be crossed to.</summary>
     Overlap = 7,
+
+    /// <summary>The man who has just played a short pass to a team-mate under pressure, running past the defender who is on him for the ball back (a one-two).</summary>
+    Return = 8,
+
+    /// <summary>A midfielder running past a pressed forward who has his back to goal, for the lay-off (the third man).</summary>
+    ThirdMan = 9,
 }
 
 /// <summary>
@@ -97,6 +103,18 @@ internal readonly ref struct TickAttackingSituation
 
     /// <summary>Gets, per attacker, the share of top speed he walks to his square at, in basis points.</summary>
     public Span<int> OffsetPaces { get; init; }
+
+    /// <summary>Gets the man on a return run (`tick-film-v1`, Milestone 7), or 0 or less for none (seat 0 is the goalkeeper, who never runs): the one who has just played a short ball to a pressed team-mate.</summary>
+    public int ReturnSeat { get; init; }
+
+    /// <summary>Gets where the man on a return run is heading, in pitch units.</summary>
+    public SpatialPoint ReturnTarget { get; init; }
+
+    /// <summary>Gets the third man, or 0 or less for none: the midfielder running past a pressed forward who has his back to goal.</summary>
+    public int ThirdSeat { get; init; }
+
+    /// <summary>Gets where the third man is heading, in pitch units.</summary>
+    public SpatialPoint ThirdTarget { get; init; }
 }
 
 /// <summary>
@@ -110,6 +128,13 @@ internal readonly ref struct TickAttackingSituation
 /// gives every attacker exactly one job, in this order, each taking players the ones before it have not:
 /// </para>
 /// <list type="number">
+/// <item><description>
+/// <b>Combination runs</b> (`tick-film-v1`, Milestone 7). The loop decides when a short pass leaves the foot (<see cref="TickCombinations"/>)
+/// and passes the seats and points in: the passer's <see cref="TickAttackingRole.Return"/> run past the marker of the team-mate he passed to,
+/// and the <see cref="TickAttackingRole.ThirdMan"/> run of a midfielder past a pressed forward with his back to goal. They are given even
+/// while the ball is in the air, kept onside of the line as it stands, and end when the ball reaches the man, after their ticks, or at a
+/// change of possession.
+/// </description></item>
 /// <item><description>
 /// <b>Overlap.</b> When a winger (a wide midfielder or forward) has the ball and is cutting inside (his heading leans at
 /// least 30% of his speed towards the middle, at 1.5 m/s or more), the full-back on his flank sprints into the wide channel he
@@ -238,6 +263,12 @@ internal static class TickOffBallSupport
     /// <summary>The pace of a check into the pocket, in basis points of top speed.</summary>
     public const int PocketPaceBasisPoints = 8_500;
 
+    /// <summary>The pace of a return run, in basis points of top speed.</summary>
+    public const int ReturnPaceBasisPoints = 9_000;
+
+    /// <summary>The pace of the third man's run, in basis points of top speed.</summary>
+    public const int ThirdManPaceBasisPoints = 9_500;
+
     /// <summary>The distance from the middle of the pitch beyond which a player is wide, in pitch units (18 m).</summary>
     public const int WideThreshold = 1_800;
 
@@ -364,6 +395,9 @@ internal static class TickOffBallSupport
                 0);
         }
 
+        AssignCombination(situation, orders, busy, situation.ReturnSeat, situation.ReturnTarget, TickAttackingRole.Return, ReturnPaceBasisPoints);
+        AssignCombination(situation, orders, busy, situation.ThirdSeat, situation.ThirdTarget, TickAttackingRole.ThirdMan, ThirdManPaceBasisPoints);
+
         if (situation.CarrierIndex < 0)
         {
             return;
@@ -385,6 +419,31 @@ internal static class TickOffBallSupport
         AssignPocket(situation, frame, orders, busy);
         KeepOnside(situation, frame, orders);
         FindSpace(situation, frame, orders);
+    }
+
+    /// <summary>
+    /// Sends a man on a combination run (`tick-film-v1`, Milestone 7): the loop has decided who and where when the short pass left the foot,
+    /// and this keeps the point onside of the line as it stands now. The man with the ball is never sent.
+    /// </summary>
+    private static void AssignCombination(
+        in TickAttackingSituation situation,
+        Span<TickAttackingOrder> orders,
+        Span<bool> busy,
+        int seat,
+        SpatialPoint target,
+        TickAttackingRole role,
+        int pace)
+    {
+        if (seat < 1 || seat >= situation.Attackers.Length || seat == situation.CarrierIndex || busy[seat])
+        {
+            return;
+        }
+
+        busy[seat] = true;
+        orders[seat] = new TickAttackingOrder(
+            role,
+            ClampOnside(target, situation.IsHome, situation.IsHome ? 0 : SpatialPitch.PitchLength, situation.Defenders),
+            pace);
     }
 
     /// <summary>

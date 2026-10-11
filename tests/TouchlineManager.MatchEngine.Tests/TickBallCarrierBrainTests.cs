@@ -818,6 +818,110 @@ public sealed class TickBallCarrierBrainTests
         allocated.Should().BeLessThan(256, "54,000 decisions must not allocate");
     }
 
+    [Fact]
+    public void A_pressed_man_gives_the_ball_back_to_the_passer_who_has_run_past_his_marker_and_is_free()
+    {
+        // A striker (seat 10) is closed down; the midfielder who passed to him (seat 6) is in the clear beyond the marker and running on.
+        var attackers = Move(OwnHalf, (10, 6_000, 3_000), (6, 7_000, 3_400), (5, 500, 500), (7, 500, 600), (8, 500, 700), (9, 500, 800));
+        var defenders = Move(DeepBlock, (9, 6_250, 3_000));
+        var returnRun = new TickAttackingOrder[11];
+
+        returnRun[6] = new TickAttackingOrder(TickAttackingRole.Return, new SpatialPoint(7_500, 3_400), 9_000);
+
+        TickCarrierDecision Decide(TickAttackingOrder[] orders, SpatialPoint[] opposition) =>
+            new Scene(true, 10, attackers, opposition) { Orders = orders }
+                .Moving(6, 0, 600)
+                .WithVision(10, 1)
+                .WithSkill(10, skills => skills with { Passing = 20, Technique = 20, Composure = 20 })
+                .Decide();
+
+        var plain = Decide([], defenders);
+        var wall = Decide(returnRun, defenders);
+
+        wall.Receiver.Should().Be(6);
+        wall.Target.X.Should().BeGreaterThan(7_000, "ahead of where he is, to where he is going");
+        (wall.Utility - plain.Utility).Should().BeGreaterThan(TickBallCarrierBrain.WallPassBonus / 2, "a free man who has run past his marker is the wall pass");
+
+        // The runner stands still (so the ball is aimed at him whatever the role) with a defender just inside, then just outside, the four
+        // metres that make him free: the bonus is the difference.
+        TickCarrierDecision Boundary(int markerGap) =>
+            new Scene(true, 10, attackers, Move(defenders, (8, 7_000 + markerGap, 3_400))) { Orders = returnRun }
+                .WithVision(10, 1)
+                .WithSkill(10, skills => skills with { Passing = 20, Technique = 20, Composure = 20 })
+                .Decide();
+
+        var free = Boundary(TickBallCarrierBrain.FreeRunnerReach + 5);
+        var covered = Boundary(TickBallCarrierBrain.FreeRunnerReach - 5);
+
+        free.Receiver.Should().Be(6);
+        (free.Utility - covered.Utility).Should().BeGreaterThan(TickBallCarrierBrain.WallPassBonus / 3, "a man with a defender on him is not the wall pass");
+    }
+
+    [Fact]
+    public void A_pressed_forward_with_his_back_to_goal_lays_it_off_to_the_third_man_running_past_him()
+    {
+        var attackers = Move(OwnHalf, (10, 6_000, 3_000), (7, 7_000, 3_500), (5, 500, 500), (6, 500, 600), (8, 500, 700), (9, 500, 800));
+        var defenders = Move(DeepBlock, (9, 6_250, 3_000));
+        var third = new TickAttackingOrder[11];
+
+        third[7] = new TickAttackingOrder(TickAttackingRole.ThirdMan, new SpatialPoint(7_500, 3_500), 9_500);
+
+        TickCarrierDecision Decide(TickAttackingOrder[] orders, SpatialPoint[] opposition) =>
+            new Scene(true, 10, attackers, opposition) { Orders = orders }
+                .Moving(7, 0, 600)
+                .WithVision(10, 1)
+                .WithSkill(10, skills => skills with { Passing = 20, Technique = 20, Composure = 20 })
+                .Decide();
+
+        var plain = Decide([], defenders);
+        var layOff = Decide(third, defenders);
+
+        layOff.Receiver.Should().Be(7);
+        (layOff.Utility - plain.Utility).Should().BeGreaterThan(TickBallCarrierBrain.LayOffBonus / 2);
+
+        // A forward nobody is on has no lay-off to make.
+        var free = Decide(third, Move(DeepBlock, (9, 8_000, 3_000)));
+        var freePlain = Decide([], Move(DeepBlock, (9, 8_000, 3_000)));
+
+        (free.Utility - freePlain.Utility).Should().BeLessThan(TickBallCarrierBrain.LayOffBonus / 4);
+    }
+
+    [Fact]
+    public void A_winger_at_the_byline_cuts_the_ball_back_to_a_man_at_the_penalty_spot_and_the_better_the_finisher_the_more_it_is_worth()
+    {
+        // Seat 9 has the ball 5 m from the goal line, 16 m from the middle; seat 10 stands at the penalty spot with nobody near.
+        var attackers = Move(OwnHalf, (9, 9_500, 1_900), (10, 8_800, 3_450), (5, 500, 500), (6, 500, 600), (7, 500, 700), (8, 500, 800));
+        var defenders = Move(DeepBlock, (1, 9_700, 5_800), (2, 9_700, 5_900), (3, 9_700, 6_000), (4, 9_700, 6_100), (5, 9_700, 6_200), (6, 9_700, 6_300), (7, 9_700, 6_400), (8, 9_700, 6_500), (9, 9_700, 6_600), (10, 9_700, 6_700));
+
+        TickCarrierDecision Decide(int finishing) =>
+            new Scene(true, 9, attackers, defenders)
+                .WithVision(9, 5)
+                .WithSkill(10, skills => skills with { Finishing = finishing, Technique = finishing })
+                .Decide();
+
+        var skilled = Decide(20);
+        var poor = Decide(2);
+
+        skilled.Action.Should().Be(TickCarrierAction.Pass, "a cut-back is a pass for a shot, not a recycle");
+        skilled.Receiver.Should().Be(10);
+        skilled.Target.X.Should().BeInRange(TickBallCarrierBrain.CutBackZoneNear, TickBallCarrierBrain.CutBackZoneFar);
+        skilled.Target.X.Should().BeLessThan(9_500 - TickBallCarrierBrain.CutBackMinimumDrop);
+        skilled.Utility.Should().BeGreaterThan(poor.Utility, "the man it is for is worth what he can do with it");
+    }
+
+    [Fact]
+    public void A_ball_back_from_the_middle_of_the_pitch_is_not_a_cut_back()
+    {
+        // The same geometry shifted 20 m up the pitch from the goal line: the ball back is the old recycle, valued as before.
+        var attackers = Move(OwnHalf, (9, 7_500, 1_900), (10, 6_800, 3_450), (5, 500, 500), (6, 500, 600), (7, 500, 700), (8, 500, 800));
+        var decision = new Scene(true, 9, attackers, Move(DeepBlock, (1, 9_700, 5_800)))
+            .WithVision(9, 5)
+            .Decide();
+
+        (decision.Action == TickCarrierAction.Pass && decision.Target.X >= TickBallCarrierBrain.CutBackZoneNear && decision.Target.X < 7_500 - TickBallCarrierBrain.CutBackMinimumDrop)
+            .Should().BeFalse("the cut-back zone is only played to from within ten metres of the goal line");
+    }
+
     private static TickPlayerState Standing(int x, int y) => TickPlayerState.Standing(x, y, 0, 10_000);
 
     private static SpatialPoint[] Move(SpatialPoint[] layout, params (int Index, int X, int Y)[] moves)

@@ -169,6 +169,8 @@ internal sealed partial class TickMatchLoop
             foreach (var team in _teams)
             {
                 Array.Clear(team.HasOffset);
+                team.ReturnSlot = 0;
+                team.ThirdSlot = 0;
             }
         }
 
@@ -228,6 +230,8 @@ internal sealed partial class TickMatchLoop
             team.RefX = _ball.UnitX;
             team.RefY = _ball.UnitY;
             Array.Clear(team.HasOffset);
+            team.ReturnSlot = 0;
+            team.ThirdSlot = 0;
         }
 
         _microPossession = -1;
@@ -242,6 +246,19 @@ internal sealed partial class TickMatchLoop
         if (count == 0)
         {
             return;
+        }
+
+        var returnSeat = RunSeat(attackers, carrier, attackers.ReturnSlot, attackers.ReturnUntil, out var returnLive);
+        var thirdSeat = RunSeat(attackers, carrier, attackers.ThirdSlot, attackers.ThirdUntil, out var thirdLive);
+
+        if (!returnLive)
+        {
+            attackers.ReturnSlot = 0;
+        }
+
+        if (!thirdLive)
+        {
+            attackers.ThirdSlot = 0;
         }
 
         var situation = new TickAttackingSituation
@@ -261,6 +278,10 @@ internal sealed partial class TickMatchLoop
             Offsets = attackers.MicroOffset.AsSpan(0, count),
             HasOffset = attackers.HasOffset.AsSpan(0, count),
             OffsetPaces = attackers.MicroPace.AsSpan(0, count),
+            ReturnSeat = returnSeat,
+            ReturnTarget = attackers.ReturnTarget,
+            ThirdSeat = thirdSeat,
+            ThirdTarget = attackers.ThirdTarget,
         };
 
         var orders = attackers.AttackOrders.AsSpan(0, count);
@@ -277,6 +298,58 @@ internal sealed partial class TickMatchLoop
             // A man with a job goes where it sends him; one with none walks about his place, a back-line man in his line.
             attackers.UseMicro[seat] = orders[seat].Role == TickAttackingRole.Holding && family != MatchPositionFamily.Goalkeeper;
             attackers.Engaged[seat] = attackers.Body[seat].Lockout > 0;
+        }
+    }
+
+    /// <summary>
+    /// Gets the seat of a man on a combination run, or -1 when none is on: the run ends when its ticks are up, or when the ball reaches him
+    /// (a return or a lay-off played), or when the man has left the pitch.
+    /// </summary>
+    private int RunSeat(TickTeam team, int carrier, int slot, int until, out bool live)
+    {
+        live = false;
+
+        if (slot == 0 || _tick > until)
+        {
+            return -1;
+        }
+
+        var seat = team.SeatOfSlot(slot);
+
+        if (seat < 0 || seat == carrier)
+        {
+            return -1;
+        }
+
+        live = true;
+
+        return seat;
+    }
+
+    /// <summary>
+    /// A short pass has left the foot: the passer may run for the ball back (a one-two) and a midfielder may run past a pressed forward who has
+    /// his back to goal (the third man). Only the first run of each kind at a time is made.
+    /// </summary>
+    private void StartCombinations(int side, int passer, int receiver)
+    {
+        var team = _teams[side];
+        var opponents = _teams[1 - side];
+        var bodies = team.Body.AsSpan(0, team.Count);
+        var specs = team.Spec.AsSpan(0, team.Count);
+        var defenders = opponents.Body.AsSpan(0, opponents.Count);
+
+        if (team.ReturnSlot == 0 && TickCombinations.TryReturnRun(team.IsHome, bodies, specs, defenders, passer, receiver, out var back))
+        {
+            team.ReturnSlot = team.SlotNumber[passer];
+            team.ReturnTarget = back;
+            team.ReturnUntil = _tick + TickCombinations.ReturnTicks;
+        }
+
+        if (team.ThirdSlot == 0 && TickCombinations.TryThirdMan(team.IsHome, bodies, specs, defenders, passer, receiver, out var third, out var ahead))
+        {
+            team.ThirdSlot = team.SlotNumber[third];
+            team.ThirdTarget = ahead;
+            team.ThirdUntil = _tick + TickCombinations.ThirdManTicks;
         }
     }
 
@@ -841,6 +914,15 @@ internal sealed partial class TickMatchLoop
                             _ball.X,
                             opponents.Body.AsSpan(0, opponents.Count),
                             opponents.IsHome);
+                    }
+
+                    if (!fromRestart
+                        && decision.Action == TickCarrierAction.Pass
+                        && decision.Receiver > 0
+                        && decision.Receiver < team.Count
+                        && decision.Receiver != seat)
+                    {
+                        StartCombinations(side, seat, decision.Receiver);
                     }
 
                     break;

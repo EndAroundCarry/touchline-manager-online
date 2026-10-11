@@ -156,6 +156,13 @@ internal readonly ref struct TickCarrierSituation
 /// (<see cref="MeetingPoint"/>); when four or more defenders crowd the carrier's half of the width a ball across to a free man on the other half
 /// earns <see cref="SwitchBonus"/>; and a carry into ground the nearest defender is giving up (eight metres away and backing off) earns up to
 /// <see cref="DriveBonus"/>.</para>
+/// <para><b>Combination play</b> (`tick-film-v1`, Milestone 7). A ball to the man who has just passed and run past his marker
+/// (<see cref="TickAttackingRole.Return"/>), or to the third man running past a pressed forward (<see cref="TickAttackingRole.ThirdMan"/>), is aimed
+/// where the ball and the runner meet and earns <see cref="WallPassBonus"/> or <see cref="LayOffBonus"/> when the runner is free
+/// (<see cref="FreeRunnerReach"/> from the nearest defender); it is a pass to be played on, not a safe ball back, whichever way it goes. A
+/// <em>cut-back</em> (<see cref="IsCutBack"/>: a ground ball from within 10 m of the goal line and 20 m of the middle of the goal back to the zone
+/// round the penalty spot) is worth <see cref="CutBackWorthPercent"/> of the receiver's own chance of scoring from there, valued as a shot is, in
+/// place of the progress a ball back would lose, and competes with the cross.</para>
 /// <para>
 /// <see cref="Execute"/> hits the kick. The error is <c>BaseError × max(25%, 100 − (5 × Passing + Technique) / 2) × (1 +
 /// pressure)</c> in binary angle units (the plan's formula, flattened and floored so that a perfect player is not a machine and a poor
@@ -313,6 +320,33 @@ internal static class TickBallCarrierBrain
 
     /// <summary>What a switch of play to a free man on the far side of a crowded half is worth over any other pass, in utility.</summary>
     public const int SwitchBonus = 1_500;
+
+    /// <summary>How far from the nearest defender a man on a return run or a third man's run must be for the ball to be played to him as free, in pitch units (4 m).</summary>
+    public const int FreeRunnerReach = 400;
+
+    /// <summary>What a ball back to the man who has just passed and run past his marker (the wall pass) is worth over any other pass, in utility.</summary>
+    public const int WallPassBonus = 1_500;
+
+    /// <summary>What a lay-off to the midfielder running past a pressed forward who has his back to goal is worth over any other pass, in utility.</summary>
+    public const int LayOffBonus = 1_500;
+
+    /// <summary>The nearest to the goal line a cut-back is played from, in pitch units (10 m).</summary>
+    public const int CutBackMinimumX = 9_000;
+
+    /// <summary>The least a cut-back goes back, in pitch units (3 m).</summary>
+    public const int CutBackMinimumDrop = 300;
+
+    /// <summary>The farthest from the goal line the penalty-spot zone a cut-back is played to reaches, in pitch units (22 m).</summary>
+    public const int CutBackZoneNear = 7_800;
+
+    /// <summary>The nearest to the goal line the zone reaches, in pitch units (7 m).</summary>
+    public const int CutBackZoneFar = 9_300;
+
+    /// <summary>The farthest from the middle of the goal the zone reaches, laterally, in pitch units (16 m).</summary>
+    public const int CutBackZoneHalfWidth = 1_600;
+
+    /// <summary>The share of the receiver's own chance of scoring a cut-back is worth, in percent: he has still to hit it.</summary>
+    public const int CutBackWorthPercent = 35;
 
     /// <summary>The distance to the nearest defender beyond which the defence is backing off, in pitch units (8 m).</summary>
     public const int DriveGap = 800;
@@ -723,6 +757,7 @@ internal static class TickBallCarrierBrain
 
             var run = situation.Orders.Length > index ? situation.Orders[index].Role : TickAttackingRole.Holding;
             var through = run == TickAttackingRole.Runner && carrierSkills.Vision >= ThroughBallMinimumVision;
+            var combination = run is TickAttackingRole.Return or TickAttackingRole.ThirdMan;
 
             if (SeesOffside(situation, careless, index))
             {
@@ -736,7 +771,7 @@ internal static class TickBallCarrierBrain
             int aimX;
             int aimY;
 
-            if (through)
+            if (through || combination)
             {
                 MeetingPoint(view, x, y, velocityX, velocityY, out aimX, out aimY);
             }
@@ -760,8 +795,15 @@ internal static class TickBallCarrierBrain
             success = success * (BasisPoints - ArrivalPressure(length, lofted, markerSquared)) / BasisPoints;
 
             var gain = aimX - view.X;
+            var cutBack = !lofted && IsCutBack(view, aimX, aimY);
+            var free = marker < 0 || markerSquared >= (long)FreeRunnerReach * FreeRunnerReach;
+            var progress = cutBack
+                ? CutBackValue(situation, aimX, aimY, index)
+                : Math.Clamp(gain, -BackwardLimit, ForwardLimit) * progressPercent / 100;
             var value = PassBaseValue
-                + (Math.Clamp(gain, -BackwardLimit, ForwardLimit) * progressPercent / 100)
+                + progress
+                + (free && run == TickAttackingRole.Return ? WallPassBonus : 0)
+                + (free && run == TickAttackingRole.ThirdMan && view.Pressure >= TickCombinations.PressedReceiver ? LayOffBonus : 0)
                 + SpaceValue(marker < 0 ? long.MaxValue : markerSquared)
                 + (crowded && IsSwitch(view, aimY, marker < 0 ? long.MaxValue : markerSquared) ? SwitchBonus : 0)
                 + StyleValue(situation.Passing, gain, length)
@@ -770,7 +812,9 @@ internal static class TickBallCarrierBrain
                 + (run == TickAttackingRole.Overlap ? OverlapBonus : 0)
                 + (run == TickAttackingRole.Pocket ? PocketBonus : 0);
 
-            var backward = gain < -RecycleMinimumGain;
+            // A cut-back is a pass to a man to shoot, and a ball to a man on a combination run (the wall pass, the lay-off) is a pass for him
+            // to play on: neither is a ball given back to be safe.
+            var backward = gain < -RecycleMinimumGain && !cutBack && !combination;
 
             if (backward)
             {
@@ -852,14 +896,9 @@ internal static class TickBallCarrierBrain
         best.Consider(TickCarrierAction.Cross, receiver, targetX, targetY, Expected(success, value, LossOfBall(view)), 0);
     }
 
-    private static void ScoreShot(in TickCarrierSituation situation, in View view, ref Best best)
+    /// <summary>Counts the defenders standing on the line from a point to the middle of the goal, ahead of the point.</summary>
+    private static int Blockers(in TickCarrierSituation situation, int fromX, int fromY)
     {
-        if (situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper)
-        {
-            return;
-        }
-
-        var skills = situation.Skills[situation.CarrierIndex];
         var blockers = 0;
         var limit = (long)ShotBlockReach * ShotBlockReach;
 
@@ -868,11 +907,44 @@ internal static class TickBallCarrierBrain
             var x = MirrorX(TickSpatialUnits.ToUnits(situation.Defenders[index].X), situation.IsHome);
             var y = MirrorY(TickSpatialUnits.ToUnits(situation.Defenders[index].Y), situation.IsHome);
 
-            if (x > view.X && TickOffBallSupport.SegmentDistanceSquared(x, y, view.X, view.Y, SpatialPitch.PitchLength, SpatialPitch.GoalYCenter) < limit)
+            if (x > fromX && TickOffBallSupport.SegmentDistanceSquared(x, y, fromX, fromY, SpatialPitch.PitchLength, SpatialPitch.GoalYCenter) < limit)
             {
                 blockers++;
             }
         }
+
+        return blockers;
+    }
+
+    /// <summary>
+    /// Tells whether a ground ball is a cut-back: played from within <see cref="CutBackMinimumX"/> of the goal line and the width of the area, back
+    /// by at least <see cref="CutBackMinimumDrop"/>, to the zone round the penalty spot.
+    /// </summary>
+    private static bool IsCutBack(in View view, int aimX, int aimY) =>
+        view.X >= CutBackMinimumX
+        && Math.Abs(view.Y - SpatialPitch.GoalYCenter) <= AreaHalfWidth
+        && aimX <= view.X - CutBackMinimumDrop
+        && aimX >= CutBackZoneNear
+        && aimX <= CutBackZoneFar
+        && Math.Abs(aimY - SpatialPitch.GoalYCenter) <= CutBackZoneHalfWidth;
+
+    /// <summary>Gets what a cut-back is worth: <see cref="CutBackWorthPercent"/> of the chance the man it is for has of scoring from where he takes it, valued as a shot is.</summary>
+    private static int CutBackValue(in TickCarrierSituation situation, int aimX, int aimY, int receiver)
+    {
+        var chance = ExpectedGoals(aimX, aimY, Blockers(situation, aimX, aimY), situation.Skills[receiver]);
+
+        return chance * ShotValueMultiplier * ShotEagerness(situation.Mentality) / 100 * CutBackWorthPercent / 100;
+    }
+
+    private static void ScoreShot(in TickCarrierSituation situation, in View view, ref Best best)
+    {
+        if (situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper)
+        {
+            return;
+        }
+
+        var skills = situation.Skills[situation.CarrierIndex];
+        var blockers = Blockers(situation, view.X, view.Y);
 
         if (blockers > ShotMaximumBlockers)
         {

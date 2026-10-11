@@ -243,5 +243,5 @@ public sealed class TickEngineTests
 
     private const string GoldenInputHash = "5f74ae0160d042255a831b10ead014aa172a6e7cc951b2c0a0d1737dc906bda2";
 
-    private const string GoldenOutputHash = "5286dc389e8172c7d9cc53c34992b3ed77770e869e61b660fd34c88a5812a9f9";
+    private const string GoldenOutputHash = "19800ed9c6f301000d7b0e990da74a92b39a0a5dd04805ba57d8cc11859c4140";
 }

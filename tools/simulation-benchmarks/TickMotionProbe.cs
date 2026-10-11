@@ -110,6 +110,7 @@ internal static class TickMotionProbe
             Dips(recording, tally);
             Receptions(recording, tally);
             Overlap(recording, tally);
+            Combinations(recording, result, tally);
             tally.EnginePasses += result.PlayerLines.Sum(line => line.PassesAttempted);
             tally.EngineCompleted += result.PlayerLines.Sum(line => line.PassesCompleted);
             Film(recording, result, tally);
@@ -519,6 +520,256 @@ internal static class TickMotionProbe
         }
     }
 
+    // ---- Combinations -----------------------------------------------------------------------------------------------------------------
+
+    /// <summary>A one-two is a ball back to the passer within this many frames of the pass (6 s)...</summary>
+    private const int OneTwoFrames = 60;
+
+    /// <summary>...after a man he passed to, under pressure, kept it for no more than this many frames (2 s)...</summary>
+    private const int ComboHoldFrames = 20;
+
+    /// <summary>...and the passer takes the return this much farther up the pitch than he kicked from, in pitch units (4 m).</summary>
+    private const int OneTwoGain = 400;
+
+    /// <summary>A man is pressed when an opponent is within this many metres at his reception.</summary>
+    private const double PressedMetres = 6.0;
+
+    /// <summary>A third man takes the ball this much farther up the pitch than the pressed man who laid it off to him, in pitch units (8 m).</summary>
+    private const int ThirdManGain = 800;
+
+    /// <summary>The ball into the pressed man gains at least this much on the pitch, in pitch units (5 m).</summary>
+    private const int IntoFeetGain = 500;
+
+    /// <summary>A cut-back is played from this close to the goal line (10 m), within this far of the middle of the goal (20 m), back by this much (3 m), to a zone 7 to 22 m out and within 16 m of the middle.</summary>
+    private const int CutBackFromX = 9_000;
+    private const int CutBackFromHalfWidth = 2_000;
+    private const int CutBackDrop = 300;
+    private const int CutBackZoneNear = 7_800;
+    private const int CutBackZoneFar = 9_300;
+    private const int CutBackZoneHalfWidth = 1_600;
+
+    /// <summary>A shot follows a cut-back within this many frames (3 s).</summary>
+    private const int CutBackShotFrames = 30;
+
+    /// <summary>A pass completed to a team-mate: who kicked it, who took it, where the ball started and ended, in the side's own point of view.</summary>
+    private readonly record struct Link(int From, int To, int KickFrame, int ReceiveFrame, bool Cross, int StartX, int StartY, int EndX, int EndY);
+
+    /// <summary>
+    /// Counts the combinations the ball carrier's brain and the off-ball AI are asked for (Milestone 7): one-twos (a ball back to the man who
+    /// passed it, within 6 s), third-man balls (a ball from a man to a team-mate who passes it on within 3 s to a third man ten metres farther
+    /// up the pitch), cut-backs (a ground ball from within 10 m of the goal line back to the penalty-spot zone), and what each goal's last
+    /// ball was.
+    /// </summary>
+    private static void Combinations(TickMatchRecording recording, MatchResultV1 result, Tally tally)
+    {
+        var actions = recording.Actions;
+        var links = new List<Link>();
+        var kicks = new List<(TickActionStamp Kick, Link? Link)>();
+
+        for (var index = 0; index < actions.Count; index++)
+        {
+            var kick = actions[index];
+
+            if (!IsKick(kick.Action) || kick.Entity < 0 || kick.Frame >= recording.FrameCount || recording.State(kick.Frame) != TickPlayState.OpenPlay)
+            {
+                continue;
+            }
+
+            TickActionStamp? next = null;
+
+            for (var after = index + 1; after < actions.Count; after++)
+            {
+                if (EndsFlight(actions[after].Action))
+                {
+                    next = actions[after];
+
+                    break;
+                }
+            }
+
+            Link? link = null;
+
+            if (next is { Action: PassageAction.Receive } end
+                && end.Entity / Half == kick.Entity / Half
+                && end.Entity != kick.Entity
+                && end.Frame < recording.FrameCount)
+            {
+                var home = kick.Entity < Half;
+
+                link = new Link(
+                    kick.Entity,
+                    end.Entity,
+                    kick.Frame,
+                    end.Frame,
+                    kick.Action == PassageAction.Cross,
+                    home ? recording.BallX(kick.Frame) : 10_000 - recording.BallX(kick.Frame),
+                    home ? recording.BallY(kick.Frame) : 7_000 - recording.BallY(kick.Frame),
+                    home ? recording.BallX(end.Frame) : 10_000 - recording.BallX(end.Frame),
+                    home ? recording.BallY(end.Frame) : 7_000 - recording.BallY(end.Frame));
+                links.Add(link.Value);
+            }
+
+            kicks.Add((kick, link));
+        }
+
+        for (var index = 0; index < kicks.Count; index++)
+        {
+            if (kicks[index].Link is not { } first)
+            {
+                continue;
+            }
+
+            if (IsCutBack(first))
+            {
+                tally.CutBacks++;
+
+                if (ShotFollows(recording, first.To, first.ReceiveFrame))
+                {
+                    tally.CutBackShots++;
+                }
+            }
+
+            if (index + 1 >= kicks.Count || kicks[index + 1].Link is not { } second || second.From != first.To || second.KickFrame < first.ReceiveFrame)
+            {
+                continue;
+            }
+
+            if (IsOneTwo(recording, first, second))
+            {
+                tally.OneTwos++;
+            }
+            else if (IsThirdMan(recording, first, second))
+            {
+                tally.ThirdMen++;
+            }
+        }
+
+        var frameOf = recording.Events.ToDictionary(stamp => stamp.Sequence, stamp => Math.Min(stamp.Frame, recording.FrameCount - 1));
+
+        foreach (var matchEvent in result.Events)
+        {
+            if (matchEvent.Type != EngineEventType.Goal || !frameOf.TryGetValue(matchEvent.Sequence, out var frame))
+            {
+                continue;
+            }
+
+            var side = (int)matchEvent.Side;
+            var strike = StrikeOf(recording, side, frame);
+            var shooter = -1;
+
+            foreach (var stamp in actions)
+            {
+                if (stamp.Frame == strike && stamp.Entity >= 0 && stamp.Entity / Half == side && stamp.Action is PassageAction.Shot or PassageAction.FreeKick or PassageAction.Penalty)
+                {
+                    shooter = stamp.Entity;
+                }
+            }
+
+            var kind = "no assist";
+
+            if (shooter >= 0 && actions.Any(stamp => stamp.Frame == strike && stamp.Action is PassageAction.FreeKick or PassageAction.Penalty && stamp.Entity == shooter))
+            {
+                kind = "set piece";
+            }
+            else if (shooter >= 0)
+            {
+                var index = links.FindLastIndex(link => link.To == shooter && link.ReceiveFrame <= strike && strike - link.ReceiveFrame <= 40);
+
+                if (index >= 0)
+                {
+                    var last = links[index];
+                    var before = index > 0 ? links[index - 1] : (Link?)null;
+
+                    kind = last.Cross
+                        ? "cross"
+                        : IsCutBack(last)
+                            ? "cut-back"
+                            : before is { } earlier && IsOneTwo(recording, earlier, last)
+                                ? "one-two"
+                                : before is { } third && IsThirdMan(recording, third, last)
+                                    ? "third man"
+                                    : "other pass";
+                }
+            }
+
+            tally.Assists[kind] = tally.Assists.GetValueOrDefault(kind) + 1;
+        }
+    }
+
+    /// <summary>
+    /// Whether two completed balls in a row are a one-two: the man who took the first, with an opponent within 6 m, plays it back within 2 s,
+    /// and the return reaches the first passer within 6 s of his pass, 4 m or more farther up the pitch than he kicked from.
+    /// </summary>
+    private static bool IsOneTwo(TickMatchRecording recording, Link first, Link second) =>
+        second.From == first.To
+        && second.To == first.From
+        && second.KickFrame >= first.ReceiveFrame
+        && second.KickFrame - first.ReceiveFrame <= ComboHoldFrames
+        && second.ReceiveFrame - first.KickFrame <= OneTwoFrames
+        && second.EndX - first.StartX >= OneTwoGain
+        && NearestMetres(recording, first.To, first.ReceiveFrame) <= PressedMetres;
+
+    /// <summary>
+    /// Whether two completed balls in a row are a third-man ball: the first goes forward into a man with an opponent within 6 m, who plays it on
+    /// within 2 s to someone other than the first passer, 8 m or more farther up the pitch than he took it.
+    /// </summary>
+    private static bool IsThirdMan(TickMatchRecording recording, Link first, Link second) =>
+        second.From == first.To
+        && second.To != first.From
+        && second.KickFrame >= first.ReceiveFrame
+        && second.KickFrame - first.ReceiveFrame <= ComboHoldFrames
+        && first.EndX - first.StartX >= IntoFeetGain
+        && second.EndX - first.EndX >= ThirdManGain
+        && NearestMetres(recording, first.To, first.ReceiveFrame) <= PressedMetres;
+
+    /// <summary>The distance in metres from a man to the nearest opponent outfielder at a frame.</summary>
+    private static double NearestMetres(TickMatchRecording recording, int entity, int frame)
+    {
+        var side = entity / Half;
+        var x = recording.PlayerX(frame, entity);
+        var y = recording.PlayerY(frame, entity);
+        var nearest = double.MaxValue;
+
+        for (var other = (1 - side) * Half + 1; other < ((1 - side) * Half) + Half; other++)
+        {
+            if (recording.PlayerX(frame, other) < 0)
+            {
+                continue;
+            }
+
+            var dx = recording.PlayerX(frame, other) - x;
+            var dy = recording.PlayerY(frame, other) - y;
+
+            nearest = Math.Min(nearest, Math.Sqrt((dx * (double)dx) + (dy * (double)dy)) / 100.0);
+        }
+
+        return nearest;
+    }
+
+    /// <summary>Whether a completed ground ball is a cut-back: from within 10 m of the goal line and 20 m of the middle of it, back 3 m or more, to the zone round the penalty spot.</summary>
+    private static bool IsCutBack(Link link) =>
+        !link.Cross
+        && link.StartX >= CutBackFromX
+        && Math.Abs(link.StartY - 3_500) <= CutBackFromHalfWidth
+        && link.EndX <= link.StartX - CutBackDrop
+        && link.EndX >= CutBackZoneNear
+        && link.EndX <= CutBackZoneFar
+        && Math.Abs(link.EndY - 3_500) <= CutBackZoneHalfWidth;
+
+    /// <summary>Whether the man who took the ball shoots within three seconds.</summary>
+    private static bool ShotFollows(TickMatchRecording recording, int entity, int from)
+    {
+        foreach (var stamp in recording.Actions)
+        {
+            if (stamp.Frame >= from && stamp.Frame - from <= CutBackShotFrames && stamp.Entity == entity && stamp.Action == PassageAction.Shot)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // ---- Overlap ----------------------------------------------------------------------------------------------------------------------
 
     private static void Overlap(TickMatchRecording recording, Tally tally)
@@ -799,6 +1050,12 @@ internal static class TickMotionProbe
         Console.WriteLine($"  {"switches of play a match",-34} {tally.Switches / Math.Max(1.0, tally.Matches),8:F1}   {SwitchUnits / 100} m or more across the pitch, aim 8 - 20");
         Console.WriteLine($"  {"intercepted a match",-34} {tally.Intercepted / Math.Max(1.0, tally.Matches),8:F1}   {Share(tally.Intercepted, tally.StyleKicks)} of passes");
 
+        Console.WriteLine("  -- combinations (a match, both sides)");
+        Console.WriteLine($"  {"one-twos",-34} {tally.OneTwos / Math.Max(1.0, tally.Matches),8:F1}   a pressed man plays it straight back, 4 m farther up the pitch");
+        Console.WriteLine($"  {"third-man balls",-34} {tally.ThirdMen / Math.Max(1.0, tally.Matches),8:F1}   a pressed man plays it on to a third man 8 m farther up");
+        Console.WriteLine($"  {"cut-backs completed",-34} {tally.CutBacks / Math.Max(1.0, tally.Matches),8:F1}   {Share(tally.CutBackShots, tally.CutBacks)} followed by a shot within 3 s");
+        Console.WriteLine($"  {"goals by the last ball",-34} " + string.Join("   ", tally.Assists.OrderByDescending(pair => pair.Value).Select(pair => $"{pair.Key} {pair.Value / Math.Max(1.0, tally.Matches):F2}")));
+
         Console.WriteLine("  -- room (metres to the nearest opponent)");
         Console.WriteLine($"  {"on receiving",-34} {Spread(tally.ReceiveSpace)}");
         Console.WriteLine($"  {"on receiving, final third",-34} {Spread(tally.FinalThirdReceiveSpace)}   {tally.FinalThirdReceiveSpace.Count / Math.Max(1.0, tally.Matches):F0} a match");
@@ -846,6 +1103,16 @@ internal static class TickMotionProbe
         public long ForwardPasses { get; set; }
 
         public long Switches { get; set; }
+
+        public long OneTwos { get; set; }
+
+        public long ThirdMen { get; set; }
+
+        public long CutBacks { get; set; }
+
+        public long CutBackShots { get; set; }
+
+        public Dictionary<string, long> Assists { get; } = [];
 
         public long Intercepted { get; set; }
 

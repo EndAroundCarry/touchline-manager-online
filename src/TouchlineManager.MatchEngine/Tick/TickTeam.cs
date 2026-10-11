@@ -138,6 +138,27 @@ internal sealed class TickTeam
     /// <summary>Gets or sets the players who were running behind the line last tick, one bit a seat.</summary>
     public int RunnerMask { get; set; }
 
+    /// <summary>
+    /// Gets or sets the slot number (1…11) of the man on a return run, or 0 for none (`tick-film-v1`, Milestone 7). A slot, not a seat: a
+    /// sending-off closes the seats up, but a slot keeps its name.
+    /// </summary>
+    public int ReturnSlot { get; set; }
+
+    /// <summary>Gets or sets where the return run goes, in pitch units.</summary>
+    public SpatialPoint ReturnTarget { get; set; }
+
+    /// <summary>Gets or sets the last tick the return run is on.</summary>
+    public int ReturnUntil { get; set; }
+
+    /// <summary>Gets or sets the slot number of the third man, or 0 for none.</summary>
+    public int ThirdSlot { get; set; }
+
+    /// <summary>Gets or sets where the third man's run goes, in pitch units.</summary>
+    public SpatialPoint ThirdTarget { get; set; }
+
+    /// <summary>Gets or sets the last tick the third man's run is on.</summary>
+    public int ThirdUntil { get; set; }
+
     /// <summary>Gets or sets the seat that pressed last tick, or -1.</summary>
     public int PreviousPresser { get; set; } = -1;
 

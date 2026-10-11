@@ -1754,3 +1754,57 @@ Measured over 200 matches from seed 11 (`tickmotion`), 205 stored snapshots (`ti
 **Where it is outside the plan, and why.** The plan's aim for switches was reached before the milestone began, so the bonus adds nothing to the count. The home share of 205 matches is below its band
 (40.0 against 42–48, the away share 35.6 against 28–34) but moves by 4 to 8 points between builds that differ in one tiny lever (43 to 48 with the switch alone, the drive alone, the meeting point alone), which is the noise of 205 chaotic
 matches, not a trend. The stored-snapshot pass completion is 0.6 points over the band's 85%, inside the 3% accepted. Corners rise by a quarter (more crosses, fewer interceptions).
+
+### 14.15 Combination play: the wall pass, the third man and the cut-back (the tick-film plan, Milestone 7)
+
+Engine play changes (golden hash re-pinned to `19800ed9…`; engine-v12 keeps its label). Matches stored under the earlier build refuse to replay (MAT-9): play new ones. No random draw moved: the runs are
+chosen from positions, and the brain is still a pure function of the scene.
+
+| Piece | What it does |
+|---|---|
+| Return run (`TickCombinations.TryReturnRun`, role `Return`) | When a midfielder or forward plays a pass of under 15 m to a team-mate with a defender within about 5.5 m of him (raw pressure 3 000 or more), the passer runs for 20 ticks to a point 7 m beyond that defender and 4 m to the side the passer is on, at 90% of his top speed. Not made if the run gains under 3 m or is over 20 m long. A defender never makes it. |
+| Wall pass (`WallPassBonus` 1 500) | A ball to the returning passer is aimed where the ball and he meet (the through-ball rule) and earns the bonus when he has 4 m to the nearest defender (`FreeRunnerReach`). |
+| Third man (`TryThirdMan`, role `ThirdMan`) | A pass of 5 m or more forward into a forward who is pressed and has a defender at his shoulder on the goal side (6 m) sends the nearest midfielder (within 30 m, neither the passer nor the receiver, level with or behind the forward) to a point 10 m beyond the forward and 4 m away from his marker, for 25 ticks at 95%. |
+| Lay-off (`LayOffBonus` 1 500) | The pressed forward's ball to that runner, when he is free, earns the bonus. |
+| Cut-back (`IsCutBack`, `CutBackWorthPercent` 35) | A ground ball from within 10 m of the goal line and 20 m of the middle, back by 3 m or more to the zone 7 to 22 m out and within 16 m of the middle, is worth 35% of the receiver's own `ExpectedGoals` there (his blockers, his finishing), valued as a shot is (x3, by mentality), in place of the progress a ball back would lose. |
+
+Both runs are orders (`TickAttackingRole.Return`, `ThirdMan`) given by `TickOffBallSupport.Assign` before every other job, **also while the ball is in the air** (the passer is already moving when it is
+played), and clamped onside of the line as it stands. The loop holds them per side by slot number (a sending-off closes the seats up, a slot keeps its name) and ends them when the ball reaches the man,
+when their ticks are up, at a change of possession and at a dead ball. A ball to a man on a combination run, and a cut-back, are passes whichever way they go: they are not `Recycle` balls, which the loop
+does not follow (§14.14), so they get a pending pass, an early decision for the receiver, a `receive` or `interception` stamp and a completion.
+
+**What the measurements said.**
+
+- The counters in `tickmotion` first showed that "ball back to the passer within 6 s" counted 93 a match before this milestone existed (ping-pong between two men), so a one-two now needs a pressed first
+  receiver, a return within 2 s, and the passer 4 m farther up the pitch than he kicked from. A third-man ball needs the same pressed receiver, 5 m gained into him and 8 m gained out of him to someone else.
+- Counted in the loop with temporary counters (60 matches, before the last change below): the runs are started about 197 (return) and 203 (third man) times a match, both sides; 96 balls go to the returning
+  man (66 completed, 28 intercepted) and 121 to the third man (only 45 of them followed as passes then; the rest were backward balls, which is why the last change was made).
+- **Not changed, but worth knowing:** the third-man count in `tickmotion` does not move (61.4 to 60.4 a match). The run gives the forward a free man to play to and the loop uses it (about 120 balls a
+  match go to him), but those balls replace passes that would have gone forward to a midfielder anyway, so a chain of "pressed forward, ball on, 8 m gained" is as common as it was. The run is
+  visible in the film; the count of such chains is not a measure of it.
+- Joining the combination balls to the pass case lifts the passes the loop follows from 1 701 to 1 776 a match, interceptions from 241 to 249, and yellow cards from 3.19 to 3.04, and makes the lay-offs
+  real passes. It was kept; goals, shots and on target stayed in the band.
+
+Measured over 200 matches from seed 11 (`tickmotion`), 205 stored snapshots (`ticksnap`), 1 000 matches (`tick`) and 17 matches of each pair of the 13 formations (`tickmatrix`):
+
+| | Before (M6) | After |
+|---|---|---|
+| One-twos a match, both sides (pressed man, back within 2 s, 4 m farther up) | 8.2 | 24.6 |
+| Third-man balls a match (pressed man, on within 2 s, 8 m farther up) | 61.4 | 60.4 |
+| Cut-backs completed a match, followed by a shot within 3 s | 0.1, 14% | 5.3, 10% |
+| Goals by the last ball a match: cross / cut-back / one-two / third man / other pass | 0.12 / 0.00 / 0.00 / 0.03 / 0.67 | 0.09 / 0.02 / 0.06 / 0.02 / 0.64 |
+| Passes a man touches a match, forward share, share intercepted | 1 627, 91.3%, 13.2% | 1 776, 86.1%, 14.0% |
+| Final-third receptions a match, median room on receiving | 375, 5.2 m | 469, 4.9 m |
+| Crosses (stamps) a match | 36 | 40 |
+| Stored snapshots: goals, shots, on target | 2.70, 27.9, 30.4% | 2.68, 27.6, 31.0% |
+| Stored: pass completion, yellow cards, fouls | 85.6%, 3.45, 18.4 | 84.0%, 3.04, 17.4 |
+| Stored: home / draw / away | 40.0 / 24.4 / 35.6 | 42.9 / 20.0 / 37.1 |
+| Uniform sides, board formations (`tick`): goals, shots, corners | 1.80, 19.4, 8.4 | 1.77, 19.9, 8.2 |
+| All 169 formation pairs (`tickmatrix`): goals, shots | 1.72, 18.9 | 1.74, 19.6 |
+| Standing, stop-and-go, distance | 2.6%, 3.22, 13.8 km | 2.6%, 3.15, 13.9 km |
+| Opponents under 1 m outside duels | 5.1% | 5.3% |
+
+**Where it is outside the plan, and why.** The stored snapshots' on-target share (31.0%) is a point under the band's 32%, and the yellow cards (3.04) are at its edge: both inside the 3% accepted and within what a
+lever this small moves them by. The home share swings by several points between builds that differ by a tiny lever (the noise of 205 chaotic matches). The pressed man's ball to the wall-runner is intercepted 29%
+of the time, against 13% for passes in general, because the runner is moving toward a defender; that is the risk of the pass, and the film shows who lost it (`misplaced`). The runs add a little running (13.8 to 13.9 km),
+which was already above the 9.5 to 11.5 km aim.

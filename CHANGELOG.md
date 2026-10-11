@@ -4,6 +4,28 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Tick film, Milestone 7 — combination play: the wall pass, the third man, the cut-back
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.15. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its
+label): matches stored under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- **A one-two.** The man who plays a short pass to a team-mate with a defender on him runs past that defender for twenty ticks, and the ball is played back to him when he is free.
+- **The third man.** A pass forward into a pressed forward with his back to goal sends the nearest midfielder past him, and the forward looks for the lay-off.
+- **The cut-back.** From within ten metres of the goal line a ground ball back to the penalty-spot zone is valued at the receiver's chance of scoring and competes with the cross.
+- A ball to a man on a combination run is a pass to be followed (pending pass, early decision, completion), not an untracked safe ball back.
+- Per match, both sides: one-twos 8.2 to 24.6, cut-backs completed 0.1 to 5.3, passes a man touches 1 627 to 1 776; stored snapshots: goals 2.70 to 2.68, shots 27.9 to 27.6,
+  yellow cards 3.45 to 3.04.
+
+### Added
+
+- `TickCombinations` (who runs, and where), the `Return` and `ThirdMan` attacking roles, and the motion probe's combination counters (one-twos, third-man balls, cut-backs, goals by the last ball).
+
+### Known
+
+- The count of third-man chains does not move (61 to 60 a match): the run gives the forward a free man, but the pass would have gone forward to a midfielder anyway (§14.15).
+
 ## Tick film, Milestone 6 — passes read the receiver's situation
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.14. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its
