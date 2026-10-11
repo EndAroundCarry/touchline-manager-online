@@ -4,6 +4,33 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Keeper-gift plan, Milestone 3 — cautious goal kicks
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.19. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
+under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- At a goal kick the opposition keep 10 m from each split centre-back (`GoalKickReceiverClearance`); anyone the push would leave in the area is moved up the pitch instead.
+- A short goal kick goes only to a defender with no opponent within 8 m (`ShortGoalKickSpace`) and no opponent across the lane, the freest of the centre-backs and a full-back who has dropped in. ShortPassing goes long when none is safe; Mixed also needs one; Direct is unchanged.
+- Stored snapshots: goals straight off a keeper's kick 9.0% to 6.4% of goals, short goal kicks turned over 21% to 15%, goal kicks a match 26 to 25. Goals are in the band (2.65).
+
+## Keeper-gift plan, Milestone 2 — keeper long balls stay in play
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.18. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
+under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- A lofted pass or long kick (35 m and over, long goal kicks included) lands softly: the first bounce keeps 10% of the horizontal speed and 45% of the vertical (`TickBallPhysics.SoftLandingKeptBasisPoints`, `SoftLandingRestitutionBasisPoints`), so it no longer runs on over the far line. Crosses, clearances and free kicks are as before.
+- Such a ball is aimed no deeper than 88 m (`LongBallDeepestX`), in the pass scoring and in the long goal kick.
+- Stored snapshots: goal kicks put out by the keeper's own pass 4.5 to 0 a match, long goal kicks completed 55% to 65%, goal kicks a match 30 to 26. Goals are unchanged within noise.
+- The film no longer cuts a passage on the goal's own frame, which could leave the goal's passage holding only the celebration (`TickReplaySynthesizer.Naturals`).
+
+### Added
+
+- `TICK_REDRAW=n` for `ticksnap`: the stored squads with a different seed, to tell noise from an effect.
+
 ## Keeper-gift plan, Milestone 1 — no hoofing out of the opponent's half
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.17. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored

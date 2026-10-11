@@ -143,7 +143,11 @@ internal sealed class TickReplaySynthesizer
 
         foreach (var stoppage in _recording.Stoppages)
         {
-            frames.Add(stoppage.Frame);
+            // Not the goal itself: a passage cut on that frame hands the goal to the next one, which then holds the celebration and not the strike.
+            if (stoppage.State != TickPlayState.GoalCelebration)
+            {
+                frames.Add(stoppage.Frame);
+            }
         }
 
         foreach (var matchEvent in _result.Events)

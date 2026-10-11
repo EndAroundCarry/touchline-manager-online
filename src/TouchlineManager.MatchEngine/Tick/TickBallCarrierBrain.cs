@@ -444,6 +444,9 @@ internal static class TickBallCarrierBrain
     /// <summary>The deepest a clearance may be aimed, in pitch units (75 m), so it cannot drop into the byline zone.</summary>
     public const int ClearMaximumX = 7_500;
 
+    /// <summary>The deepest a lofted pass or long kick may land, in pitch units (88 m: 12 m from the goal line), so it cannot run on over it.</summary>
+    public const int LongBallDeepestX = 8_800;
+
     private const int BasisPoints = 10_000;
 
     private const int PassBaseValue = 1_200;
@@ -721,7 +724,8 @@ internal static class TickBallCarrierBrain
             default:
                 if (distance >= LoftedDistance)
                 {
-                    ball.LaunchLofted(ClampX(targetX), ClampY(targetY), LoftApex(distance));
+                    // A long ball comes down where the receiver is and checks on the turf (its depth is capped in the decision).
+                    ball.LaunchLofted(ClampX(targetX), ClampY(targetY), LoftApex(distance), softLanding: true);
                 }
                 else
                 {
@@ -791,6 +795,14 @@ internal static class TickBallCarrierBrain
 
             var length = Distance(view.X, view.Y, aimX, aimY);
             var lofted = length >= LoftedDistance;
+
+            if (lofted && aimX > LongBallDeepestX)
+            {
+                aimX = LongBallDeepestX;
+                length = Distance(view.X, view.Y, aimX, aimY);
+                lofted = length >= LoftedDistance;
+            }
+
             var marker = NearestDefenderTo(situation, aimX, aimY, out var markerSquared);
 
             var survive = LaneSurvival(situation, view.X, view.Y, aimX, aimY, lofted);

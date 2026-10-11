@@ -1886,3 +1886,55 @@ shields or dribbles, as he already could. A clearance from the own half aims `X 
 The ball now stays in play, so there are more turnovers in the final third and more shots (32.5, over the band's 22 to 28; M5 of the plan re-balances shot volume). Goals are inside the plan's
 2.4 to 3.0. `tickmotion` is unchanged in kind (standing 2.6%, distance 13.9 km, one-touch 29.8%). Short goal kicks still turn over 21% of the time (Milestone 3) and the keeper's long balls still
 roll out (Milestone 2).
+
+### 14.18 Keeper long balls stay in play (the keeper-gift plan, Milestone 2)
+
+A lofted ball was struck to land on its target and then kept going: it lost 15% of its horizontal speed at the first bounce and rolled on at 96% a tick, so a 35 m ball ran on about 66 m and a
+60 m one off the pitch. 4.5 goal kicks a match were the keeper's own long ball rolling out over the far line.
+
+**The change.** A lofted pass or long kick (a pass of 35 m or more, which includes every long goal kick) is launched with a *soft landing* (`TickBallPhysics.LaunchLofted(..., softLanding: true)`):
+the first bounce keeps 10% of the horizontal speed (`SoftLandingKeptBasisPoints`) and 45% of the vertical (`SoftLandingRestitutionBasisPoints`), so the ball checks on the turf, a 60 m ball stops
+within about 7 to 13 m of where it came down, and the receiver has it to play. Crosses, clearances and free kicks do not take the flag and land as they did. The decision also caps where such a
+ball is aimed: no deeper than `LongBallDeepestX` (88 m, 12 m from the goal line), in the pass scoring (`ScorePasses`) and in `TickSetPieces.DecideGoalKick`. A long goal kick was already aimed at
+the receiver's position, not past it.
+
+| Stored snapshots (205) | Before (M1) | Now |
+|---|---|---|
+| Goal kicks put out by the keeper's own pass a match | 4.5 | 0 |
+| Keeper's long goal kicks (45 m and over) a match; completed; turned over | 11.2; 55.3%; 44.7% | 13.5; 65.2%; 34.8% |
+| Keeper's goal kicks that leave the pitch a match | 5.8 | 0.2 |
+| Goal kicks a match | 30.1 | 26.0 |
+| Goals straight off a keeper's kick | 57 of 588 (9.7%) | 59 of 655 (9.0%) |
+| Pass completion; shots a match | 84.0%; 32.5 | 84.3%; 32.9 |
+
+Goals read 2.87 and 3.20 on the same 205 matches, which is noise: four draws of the squads (`TICK_REDRAW=n ticksnap`, a different seed on the same inputs) average 2.82 before and 2.91 now, and
+the 1,014 uniform matches of `tickmatrix 6` are 2.06 and 2.08. `tickmotion` is unchanged in kind (standing 2.8%, distance 13.87 km, one-touch 29.9%).
+
+**A film fix that this exposed.** Longer completed moves made a goal's lead long enough to be cut into ten-second passages, and the cutter took the goal's own frame (the stoppage that starts the
+celebration) as a natural place to cut. The goal then fell in the passage that held only the celebration, and the strike in the one before. `TickReplaySynthesizer.Naturals` no longer offers the
+goal-celebration stoppage as a cut. Film only; it changes no play.
+
+### 14.19 Cautious goal kicks (the keeper-gift plan, Milestone 3)
+
+A short goal kick went to the better-passing centre-back whatever stood round him. The layout only kept the opposition out of the penalty area, so a pressing side's forwards waited on the
+edge of it, a few metres from the man the keeper was about to play to, and every style but Direct played short regardless.
+
+**The layout.** The opposition keep at least 10 m (`GoalKickReceiverClearance`) from each split centre-back's spot. A player the push would leave in the area is moved up the pitch to the
+radius instead (`PushAwayUpfield`), so clearing the area never brings him back within it. A pressing side can still mark a full-back or a midfielder.
+
+**The decision.** Short is conditional for every style. The candidates are the defenders within 30 m of the ball (the two centre-backs, and a full-back who has dropped in); one counts only if
+no opponent is within 8 m of him (`ShortGoalKickSpace`) and none stands within the engine's intercept reach of the lane from the keeper (`TickOffBallSupport.InterceptReach`, the segment test
+`LaneClear` uses). The freest wins, the layout's better passer getting 3 m of head start (`ShortGoalKickPreference`). ShortPassing plays short to him, or goes long if nobody is safe; Mixed keeps
+its `pressed < 2` gate and also needs a safe man; Direct is unchanged.
+
+| Stored snapshots (205) | Before (M2) | Now |
+|---|---|---|
+| Goals straight off a keeper's kick | 59 of 655 (9.0%) | 35 of 544 (6.4%) |
+| Of which from goal kicks | not split | 10 (0.05 a match) |
+| Goal kicks a match; short (under 25 m); long (45 m and over) | 26.0; not split; 13.5 | 25.3; 9.2; 14.7 |
+| Short goal kicks turned over | 21% (the plan's baseline) | 15.3% |
+| Goals a match; shots | 2.9 (noise, see 14.18); 32.9 | 2.65; 32.1 |
+
+**Not reached.** The plan expected short goal kicks to be lost about 5% of the time. They are lost 15%: a receiver 8 to 10 m clear is reached by the press while the ball is still travelling 19 m,
+and a lost one still becomes a shot 41% of the time. A wider margin (15 m clearance, 12 m space) was tried: the loss was 13% on the same matches, within noise, and it cut the short kicks from
+9.2 to 7.1 a match, so the plan's margins stay. The goals that matter did fall: the goals from short goal kicks are 10 a 205 matches, from 124 for all goal kicks at the start of the plan. `tickmotion` is unchanged in kind (standing 2.6%, distance 13.89 km, one-touch 30.0%).

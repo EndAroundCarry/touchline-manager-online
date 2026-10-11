@@ -129,6 +129,38 @@ public sealed class TickBallPhysicsTests
     }
 
     [Fact]
+    public void A_long_ball_with_a_soft_landing_checks_on_the_turf_and_an_ordinary_lofted_ball_runs_on()
+    {
+        var ordinary = RunOutFrom(softLanding: false);
+        var soft = RunOutFrom(softLanding: true);
+
+        soft.Should().BeInRange(7_000, 7_000 + 1_500, "a 60 m ball with a soft landing stops within about 15 m of where it came down");
+        ordinary.Should().BeGreaterThan(7_000 + 3_000, "an ordinary lofted ball keeps most of its speed through the bounce and rolls on (here over the line)");
+
+        static int RunOutFrom(bool softLanding)
+        {
+            var ball = new TickBallPhysics();
+            ball.PlaceAt(1_000, 3_500);
+            ball.LaunchLofted(7_000, 3_500, apexZUnits: 45, softLanding);
+
+            for (var tick = 0; tick < 400; tick++)
+            {
+                if (ball.Step() != TickBallBoundary.InPlay)
+                {
+                    return int.MaxValue;
+                }
+
+                if (!ball.IsAirborne && ball.GroundSpeed == 0)
+                {
+                    break;
+                }
+            }
+
+            return ball.UnitX;
+        }
+    }
+
+    [Fact]
     public void A_ball_bounces_with_less_height_each_time_and_settles_on_the_grass()
     {
         var ball = new TickBallPhysics();

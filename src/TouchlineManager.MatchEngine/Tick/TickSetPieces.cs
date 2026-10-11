@@ -68,7 +68,8 @@ internal readonly ref struct TickSetPieceSituation
 /// </description></item>
 /// <item><description>
 /// <b>Goal kick.</b> The goalkeeper takes it. The centre-backs split wide of the box at 15 m either side of the middle, the
-/// best passer of them the short option; the opposition are kept out of the penalty area.
+/// best passer of them the short option; the opposition are kept out of the penalty area and 10 m from each of them. The kick is
+/// played short only to a defender who is free (8 m clear, lane open), otherwise long.
 /// </description></item>
 /// <item><description>
 /// <b>Throw-in.</b> The nearest outfield player throws; two teammates open an outlet 7 m and 15 m infield, and the nearest
@@ -133,6 +134,27 @@ internal static class TickSetPieces
 
     /// <summary>The X an opponent is pushed to when he stands in the goal kick's penalty area, in pitch units.</summary>
     public const int AreaExit = 1_750;
+
+    /// <summary>
+    /// The nearest an opponent stands to a split centre-back at a goal kick, in pitch units (10 m): the pressing side may still
+    /// mark a full-back or a midfielder, but not the man the keeper is about to play to.
+    /// </summary>
+    public const int GoalKickReceiverClearance = 1_000;
+
+    /// <summary>The nearest an opponent may be to the receiver of a short goal kick, in pitch units (8 m); closer and the keeper goes long.</summary>
+    public const int ShortGoalKickSpace = 800;
+
+    /// <summary>The farthest from the ball a short goal-kick receiver may stand, in pitch units (30 m): the centre-backs and a full-back who has dropped in.</summary>
+    public const int ShortGoalKickRange = 3_000;
+
+    /// <summary>
+    /// How much the better passer of the two centre-backs (the layout's short option) is worth over a freer team-mate, in
+    /// pitch units of space.
+    /// </summary>
+    public const int ShortGoalKickPreference = 300;
+
+    /// <summary>The space beyond which a short goal-kick receiver is no more welcome, in pitch units (20 m).</summary>
+    public const int ShortGoalKickSpaceCap = 2_000;
 
     /// <summary>How far inside the line the thrower stands, in pitch units.</summary>
     public const int ThrowerInset = 40;
@@ -547,6 +569,7 @@ internal static class TickSetPieces
         var option = -1;
         var optionPassing = int.MinValue;
         var lastSide = 0;
+        Span<bool> split = stackalloc bool[TeamSize];
 
         for (var index = 1; index < own.Length; index++)
         {
@@ -556,6 +579,8 @@ internal static class TickSetPieces
             {
                 continue;
             }
+
+            split[index] = true;
 
             var side = spec.OwnY < Middle ? -1 : (spec.OwnY > Middle ? 1 : (lastSide == 0 ? -1 : -lastSide));
 
@@ -574,6 +599,26 @@ internal static class TickSetPieces
             }
         }
 
+        // Out of the area first, then off the centre-backs, up the pitch rather than back into the area.
+        KeepOutOfGoalKickArea(opp);
+
+        for (var index = 1; index < own.Length; index++)
+        {
+            if (split[index])
+            {
+                for (var other = 0; other < opp.Length; other++)
+                {
+                    opp[other] = PushAwayUpfield(opp[other], own[index], GoalKickReceiverClearance);
+                }
+            }
+        }
+
+        return new TickSetPiecePlan(0, option);
+    }
+
+    /// <summary>Moves every opponent standing in the goal kick's penalty area out to <see cref="AreaExit"/>.</summary>
+    private static void KeepOutOfGoalKickArea(Span<SpatialPoint> opp)
+    {
         for (var index = 0; index < opp.Length; index++)
         {
             if (opp[index].X <= SpatialPitch.PenaltyBoxWidth && opp[index].Y >= SpatialPitch.PenaltyBoxYMin && opp[index].Y <= SpatialPitch.PenaltyBoxYMax)
@@ -581,8 +626,6 @@ internal static class TickSetPieces
                 opp[index] = new SpatialPoint(AreaExit, opp[index].Y);
             }
         }
-
-        return new TickSetPiecePlan(0, option);
     }
 
     private static TickSetPiecePlan LayOutThrowIn(in Layout layout)
@@ -1027,6 +1070,57 @@ internal static class TickSetPieces
         return new TickCarrierDecision(TickCarrierAction.Pass, plan.OptionIndex, view.Own[plan.OptionIndex], 0, 0, pressure);
     }
 
+    /// <summary>
+    /// Picks the defender a goal kick may be played short to: within <see cref="ShortGoalKickRange"/> of the ball, no opponent
+    /// within <see cref="ShortGoalKickSpace"/> of him and none across the lane. The freest wins, the layout's better passer
+    /// getting <see cref="ShortGoalKickPreference"/> of head start. Returns -1 when nobody is safe.
+    /// </summary>
+    private static int PickSafeGoalKickReceiver(in Layout view, in TickSetPiecePlan plan)
+    {
+        var receiver = -1;
+        var best = int.MinValue;
+        var keeper = view.Own[plan.TakerIndex];
+
+        for (var index = 1; index < view.Own.Length; index++)
+        {
+            var point = view.Own[index];
+
+            if (index == plan.TakerIndex || view.OwnSpecs[index].Family != MatchPositionFamily.Defence || Distance(point, view.Spot) > ShortGoalKickRange)
+            {
+                continue;
+            }
+
+            var space = (long)ShortGoalKickSpaceCap;
+            var laneClear = true;
+
+            for (var other = 0; other < view.Opp.Length; other++)
+            {
+                space = Math.Min(space, Distance(view.Opp[other], point));
+
+                if (TickOffBallSupport.SegmentDistanceSquared(view.Opp[other].X, view.Opp[other].Y, keeper.X, keeper.Y, point.X, point.Y)
+                    < (long)TickOffBallSupport.InterceptReach * TickOffBallSupport.InterceptReach)
+                {
+                    laneClear = false;
+                }
+            }
+
+            if (space < ShortGoalKickSpace || !laneClear)
+            {
+                continue;
+            }
+
+            var score = (int)space + (index == plan.OptionIndex ? ShortGoalKickPreference : 0);
+
+            if (score > best)
+            {
+                best = score;
+                receiver = index;
+            }
+        }
+
+        return receiver;
+    }
+
     private static TickCarrierDecision DecideGoalKick(in Layout view, in TickSetPiecePlan plan, MatchPassingStyle style)
     {
         var pressed = 0;
@@ -1046,9 +1140,12 @@ internal static class TickSetPieces
             _ => pressed < 2,
         };
 
-        if (playShort && plan.OptionIndex >= 0)
+        // Short only to a man who is free and whose lane is open; otherwise the keeper goes long.
+        var receiver = playShort ? PickSafeGoalKickReceiver(view, plan) : -1;
+
+        if (receiver >= 0)
         {
-            return PlayShort(view, plan, 0);
+            return new TickCarrierDecision(TickCarrierAction.Pass, receiver, view.Own[receiver], 0, 0, 0);
         }
 
         // Long: to the best header among the forwards (or, failing them, the midfield).
@@ -1073,9 +1170,15 @@ internal static class TickSetPieces
             }
         }
 
-        return target < 0
-            ? new TickCarrierDecision(TickCarrierAction.Clear, -1, new SpatialPoint(6_000, Middle), 0, 0, 0)
-            : new TickCarrierDecision(TickCarrierAction.Pass, target, view.Own[target], 0, 0, 0);
+        if (target < 0)
+        {
+            return new TickCarrierDecision(TickCarrierAction.Clear, -1, new SpatialPoint(6_000, Middle), 0, 0, 0);
+        }
+
+        // To where he stands, and no deeper than a long ball may land.
+        var spot = view.Own[target];
+
+        return new TickCarrierDecision(TickCarrierAction.Pass, target, new SpatialPoint(Math.Min(spot.X, TickBallCarrierBrain.LongBallDeepestX), spot.Y), 0, 0, 0);
     }
 
     private static TickCarrierDecision DecideOutlet(in Layout view, in TickSetPiecePlan plan, int range)
@@ -1239,6 +1342,25 @@ internal static class TickSetPieces
         return Inside(new SpatialPoint(
             centre.X + (int)(dx * radius / distance),
             centre.Y + (int)(dy * radius / distance)));
+    }
+
+    /// <summary>
+    /// <see cref="PushAway"/>, except that a point it would leave in the goal kick's penalty area is moved up the pitch to the
+    /// radius instead, on its own Y, so that clearing the area never brings it back within the radius.
+    /// </summary>
+    private static SpatialPoint PushAwayUpfield(SpatialPoint point, SpatialPoint centre, int radius)
+    {
+        var pushed = PushAway(point, centre, radius);
+
+        if (pushed.X > SpatialPitch.PenaltyBoxWidth || pushed.Y < SpatialPitch.PenaltyBoxYMin || pushed.Y > SpatialPitch.PenaltyBoxYMax)
+        {
+            return pushed;
+        }
+
+        long dy = pushed.Y - centre.Y;
+        var reach = SpatialMath.Sqrt(Math.Max(0, ((long)radius * radius) - (dy * dy)));
+
+        return Inside(new SpatialPoint(centre.X + (int)reach, pushed.Y));
     }
 
     private static void KeepClear(Span<SpatialPoint> side, SpatialPoint centre, int radius)

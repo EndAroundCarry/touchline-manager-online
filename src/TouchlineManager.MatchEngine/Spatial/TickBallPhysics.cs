@@ -88,6 +88,15 @@ public sealed class TickBallPhysics
     /// <summary>Horizontal speed kept by a bounce, in basis points.</summary>
     public const int BounceFrictionBasisPoints = 8_500;
 
+    /// <summary>
+    /// Horizontal speed kept by the first bounce of a ball launched with a soft landing, in basis points: a long pass or
+    /// kick is struck to land at the receiver, checks on the turf and does not run on to the far line.
+    /// </summary>
+    public const int SoftLandingKeptBasisPoints = 1_000;
+
+    /// <summary>Vertical speed kept by the first bounce of a ball launched with a soft landing, in basis points.</summary>
+    public const int SoftLandingRestitutionBasisPoints = 4_500;
+
     /// <summary>A bounce whose rebound is slower than this vertical speed settles the ball on the grass.</summary>
     public const int MinReboundFixed = 2_100;
 
@@ -141,6 +150,9 @@ public sealed class TickBallPhysics
     private int _arrivalSpeedY;
     private int _arrivalOffsetX;
     private int _arrivalOffsetY;
+
+    /// <summary>Whether the first bounce of the flight in the air is a soft landing (<see cref="LaunchLofted"/>).</summary>
+    private bool _softLanding;
 
     /// <summary>Gets the X position, in fixed units.</summary>
     public int X { get; private set; }
@@ -210,6 +222,7 @@ public sealed class TickBallPhysics
         _arrivalSpeedY = other._arrivalSpeedY;
         _arrivalOffsetX = other._arrivalOffsetX;
         _arrivalOffsetY = other._arrivalOffsetY;
+        _softLanding = other._softLanding;
     }
 
     /// <summary>Puts the ball at rest on the grass at a point.</summary>
@@ -226,6 +239,7 @@ public sealed class TickBallPhysics
         Mode = TickBallMode.Loose;
         ControllerIndex = -1;
         BounceCount = 0;
+        _softLanding = false;
     }
 
     /// <summary>
@@ -320,6 +334,7 @@ public sealed class TickBallPhysics
     {
         Mode = TickBallMode.Loose;
         ControllerIndex = -1;
+        _softLanding = false;
     }
 
     /// <summary>Gets whether a player at a position can take the ball this tick.</summary>
@@ -438,8 +453,12 @@ public sealed class TickBallPhysics
     /// <param name="targetXUnits">The landing X, in pitch units.</param>
     /// <param name="targetYUnits">The landing Y, in pitch units.</param>
     /// <param name="apexZUnits">The peak height, in Z units, above 0 and not above 100.</param>
+    /// <param name="softLanding">
+    /// True when the first bounce takes most of the speed off the ball (<see cref="SoftLandingKeptBasisPoints"/>), as a long
+    /// pass or kick aimed at a receiver does; a cross, a clearance and a free kick land as they always did.
+    /// </param>
     /// <returns>The flight time in ticks: the tick on which the ball lands.</returns>
-    public int LaunchLofted(int targetXUnits, int targetYUnits, int apexZUnits)
+    public int LaunchLofted(int targetXUnits, int targetYUnits, int apexZUnits, bool softLanding = false)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(apexZUnits, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(apexZUnits, TickSpatialUnits.MaxZUnits);
@@ -463,6 +482,7 @@ public sealed class TickBallPhysics
         }
 
         Release();
+        _softLanding = softLanding;
         Mode = TickBallMode.Flight;
         BounceCount = 0;
         VelocityX = (int)(dx * BasisPoints / reach);
@@ -574,12 +594,15 @@ public sealed class TickBallPhysics
 
     private void Bounce()
     {
-        var rebound = (int)((long)-VelocityZ * RestitutionBasisPoints / BasisPoints);
+        var soft = _softLanding && BounceCount == 0;
+        var restitution = soft ? SoftLandingRestitutionBasisPoints : RestitutionBasisPoints;
+        var kept = soft ? SoftLandingKeptBasisPoints : BounceFrictionBasisPoints;
+        var rebound = (int)((long)-VelocityZ * restitution / BasisPoints);
 
         BounceCount++;
         Z = 0;
-        VelocityX = (int)((long)VelocityX * BounceFrictionBasisPoints / BasisPoints);
-        VelocityY = (int)((long)VelocityY * BounceFrictionBasisPoints / BasisPoints);
+        VelocityX = (int)((long)VelocityX * kept / BasisPoints);
+        VelocityY = (int)((long)VelocityY * kept / BasisPoints);
 
         if (rebound < MinReboundFixed)
         {

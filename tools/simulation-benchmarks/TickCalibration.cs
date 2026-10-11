@@ -177,6 +177,12 @@ internal static class TickCalibration
                 input = Stand(input, preset, preset);
             }
 
+            if (Environment.GetEnvironmentVariable("TICK_REDRAW") is { Length: > 0 } redraw)
+            {
+                // The same squads and instructions with a different draw (the input seed), to tell noise from an effect.
+                input = input with { Seed = input.Seed ^ (ulong.Parse(redraw, CultureInfo.InvariantCulture) * 0x9E3779B97F4A7C15UL) };
+            }
+
             input = input with
             {
                 EngineVersion = EngineVersions.EngineLabel,

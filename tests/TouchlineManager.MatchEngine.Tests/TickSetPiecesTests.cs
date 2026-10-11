@@ -198,6 +198,84 @@ public sealed class TickSetPiecesTests
     }
 
     [Fact]
+    public void The_opposition_keep_their_distance_from_both_split_centre_backs_at_a_goal_kick()
+    {
+        var pressing = (TickAnchorSpec[])FourFourTwo.Clone();
+
+        // Their forwards would stand on the two centre-backs' spots.
+        pressing[9] = new TickAnchorSpec(8_100, 3_500 - TickSetPieces.SplitCentreBackOffset, MatchPositionFamily.Attack);
+        pressing[10] = new TickAnchorSpec(8_100, 3_500 + TickSetPieces.SplitCentreBackOffset, MatchPositionFamily.Attack);
+
+        var scene = new Scene(TickRestart.GoalKick(homeTakes: true, ballY: 3_500), otherSpecs: pressing);
+
+        scene.Place();
+
+        foreach (var centreBack in new[] { 2, 3 })
+        {
+            foreach (var point in scene.Opp)
+            {
+                Distance(point, scene.Own[centreBack]).Should().BeGreaterThanOrEqualTo(TickSetPieces.GoalKickReceiverClearance - 50, $"{point} crowds centre-back {centreBack}");
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("ShortPassing")]
+    [InlineData("MixedPassing")]
+    public void A_goal_kick_goes_long_when_every_short_option_is_marked(string style)
+    {
+        var scene = new Scene(TickRestart.GoalKick(homeTakes: true, ballY: 3_500), passing: Enum.Parse<MatchPassingStyle>(style));
+        var plan = scene.Place();
+
+        scene.StandAttackers();
+        scene.ClearOpponents();
+        scene.StandOpponent(9, MarkerAt(scene.Takers[2], 400));
+        scene.StandOpponent(10, MarkerAt(scene.Takers[3], 400));
+
+        var decision = scene.Decide(plan);
+
+        decision.Action.Should().Be(TickCarrierAction.Pass);
+        scene.Specs[decision.Receiver].Family.Should().NotBe(MatchPositionFamily.Defence, "nobody at the back is free, so he goes long");
+    }
+
+    [Fact]
+    public void A_goal_kick_is_played_to_the_free_centre_back_when_the_other_is_marked()
+    {
+        var scene = new Scene(
+            TickRestart.GoalKick(homeTakes: true, ballY: 3_500),
+            takerSkills: [(2, MatchAttributeName.Passing, 18)],
+            passing: MatchPassingStyle.ShortPassing);
+        var plan = scene.Place();
+
+        plan.OptionIndex.Should().Be(2, "the better passer is the layout's short option");
+
+        scene.StandAttackers();
+        scene.ClearOpponents();
+        scene.StandOpponent(9, MarkerAt(scene.Takers[2], 400));
+
+        scene.Decide(plan).Receiver.Should().Be(3, "the better passer is marked, the other centre-back is free");
+    }
+
+    [Fact]
+    public void A_goal_kick_is_not_played_down_a_lane_an_opponent_stands_in()
+    {
+        var scene = new Scene(TickRestart.GoalKick(homeTakes: true, ballY: 3_500), passing: MatchPassingStyle.ShortPassing);
+        var plan = scene.Place();
+
+        scene.StandAttackers();
+        scene.ClearOpponents();
+
+        // Between the keeper and the centre-back on the low side, 11 m from the receiver, so that he is free but the lane is covered.
+        var keeper = scene.Takers[0];
+        var receiver = scene.Takers[2];
+        scene.StandOpponent(9, TickPlayerState.Standing((keeper.X + receiver.X) / 2 / 1_000, ((keeper.Y + receiver.Y) / 2 / 1_000) + 100, 0, 10_000));
+
+        var decision = scene.Decide(plan);
+
+        decision.Receiver.Should().NotBe(2, "the lane to him is covered");
+    }
+
+    [Fact]
     public void A_long_goal_kick_goes_to_the_best_header_of_the_forwards()
     {
         var scene = new Scene(
@@ -207,6 +285,22 @@ public sealed class TickSetPiecesTests
         var plan = scene.Place();
 
         scene.Decide(plan).Receiver.Should().Be(10);
+    }
+
+    [Fact]
+    public void A_long_goal_kick_is_aimed_at_the_receiver_but_never_deeper_than_a_long_ball_may_land()
+    {
+        var deep = (TickAnchorSpec[])FourFourTwo.Clone();
+
+        deep[9] = new TickAnchorSpec(9_600, 3_000, MatchPositionFamily.Attack);
+        deep[10] = new TickAnchorSpec(9_600, 4_000, MatchPositionFamily.Attack);
+
+        var scene = new Scene(TickRestart.GoalKick(homeTakes: true, ballY: 3_500), takerSpecs: deep, passing: MatchPassingStyle.DirectPassing);
+        var plan = scene.Place();
+        var decision = scene.Decide(plan);
+
+        scene.Own[decision.Receiver].X.Should().BeGreaterThan(TickBallCarrierBrain.LongBallDeepestX, "the forward stands deeper than the cap");
+        decision.Target.X.Should().Be(TickBallCarrierBrain.LongBallDeepestX);
     }
 
     // ---- Throw-in ------------------------------------------------------------------------------------------------------------
@@ -900,6 +994,10 @@ public sealed class TickSetPiecesTests
             ? home
             : home with { TakerIsHome = false, SpotX = 10_000 - home.SpotX, SpotY = 7_000 - home.SpotY };
     }
+
+    /// <summary>An opponent standing the given number of pitch units up the pitch from a player (the home side's view).</summary>
+    private static TickPlayerState MarkerAt(TickPlayerState player, int ahead) =>
+        TickPlayerState.Standing((player.X / 1_000) + ahead, player.Y / 1_000, 0, 10_000);
 
     private static long Distance(SpatialPoint one, SpatialPoint other)
     {
