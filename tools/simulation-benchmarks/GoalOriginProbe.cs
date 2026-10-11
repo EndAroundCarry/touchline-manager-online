@@ -227,6 +227,36 @@ internal static class GoalOriginProbe
                     Blocked = row.Blocked + (type == EngineEventType.ShotBlocked ? 1 : 0),
                     DistanceSum = row.DistanceSum + distance,
                 };
+
+                if (spell.RestartKind is null)
+                {
+                    var band = ShotBandOf(distance);
+                    var bandRow = tally.ShotBands.GetValueOrDefault(band);
+
+                    tally.ShotBands[band] = bandRow with
+                    {
+                        Shots = bandRow.Shots + 1,
+                        Goals = bandRow.Goals + (type == EngineEventType.Goal ? 1 : 0),
+                        OnTarget = bandRow.OnTarget + (type is EngineEventType.Goal or EngineEventType.ShotSaved ? 1 : 0),
+                        Blocked = bandRow.Blocked + (type == EngineEventType.ShotBlocked ? 1 : 0),
+                        DistanceSum = bandRow.DistanceSum + distance,
+                    };
+                }
+            }
+
+            // Why a corner is given: the last man to touch the ball before it (a defender, or a keeper turning it round the post).
+            foreach (var stoppage in recording.Stoppages.Where(s => s.State == TickPlayState.CornerPending))
+            {
+                var last = touches.LastOrDefault(t => t.Frame <= stoppage.Frame);
+
+                if (last.Entity < 0 && last.Frame == 0)
+                {
+                    continue;
+                }
+
+                var key = $"{last.Action} by {families[last.Entity]}";
+
+                tally.CornerCauses[key] = tally.CornerCauses.GetValueOrDefault(key) + 1;
             }
 
             // Why the ball is in the goal-kick spot so often: the last man to touch it before each goal kick.
@@ -437,6 +467,11 @@ internal static class GoalOriginProbe
         return "end";
     }
 
+    private static readonly string[] ShotBandLabels = ["< 6 m", "6-12 m", "12-18 m", "18-24 m", "24 m +"];
+
+    /// <summary>Gets the distance band of a shot, in pitch units from the middle of the goal.</summary>
+    private static int ShotBandOf(long distance) => (int)Math.Min(ShotBandLabels.Length - 1, distance / 600);
+
     private static int Distance(TickMatchRecording recording, int from, int to)
     {
         var dx = (long)recording.BallX(to) - recording.BallX(from);
@@ -585,11 +620,27 @@ internal static class GoalOriginProbe
         }
 
         Console.WriteLine();
+        Console.WriteLine("-- open-play shots by distance from goal: count, goals, on target, blocked --");
+
+        foreach (var (band, row) in tally.ShotBands.OrderBy(pair => pair.Key))
+        {
+            Console.WriteLine($"  {ShotBandLabels[band],-10} {row.Shots,6} ({row.Shots / (double)matches,5:F1}/match)  goals {Share(row.Goals, row.Shots)}  on target {Share(row.OnTarget, row.Shots)}  blocked {Share(row.Blocked, row.Shots)}");
+        }
+
+        Console.WriteLine();
         Console.WriteLine($"-- what put the ball out for a goal kick (total {tally.GoalKickCauses.Values.Sum()}, {tally.GoalKickCauses.Values.Sum() / (double)matches:F1}/match) --");
 
         foreach (var (key, count) in tally.GoalKickCauses.OrderByDescending(pair => pair.Value).Take(12))
         {
             Console.WriteLine($"  {count,6}  {Share(count, tally.GoalKickCauses.Values.Sum())}  {key}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"-- what put the ball behind for a corner (total {tally.CornerCauses.Values.Sum()}, {tally.CornerCauses.Values.Sum() / (double)matches:F1}/match) --");
+
+        foreach (var (key, count) in tally.CornerCauses.OrderByDescending(pair => pair.Value).Take(8))
+        {
+            Console.WriteLine($"  {count,6}  {Share(count, tally.CornerCauses.Values.Sum())}  {key}");
         }
 
         Console.WriteLine();
@@ -680,7 +731,11 @@ internal static class GoalOriginProbe
 
         public Dictionary<string, ShotRow> ShotQuality { get; } = [];
 
+        public Dictionary<int, ShotRow> ShotBands { get; } = [];
+
         public Dictionary<string, int> GoalKickCauses { get; } = [];
+
+        public Dictionary<string, int> CornerCauses { get; } = [];
 
         public Dictionary<string, PassRow> PassGroups { get; } = [];
 

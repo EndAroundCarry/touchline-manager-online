@@ -39,7 +39,7 @@ internal static class TickPlay
 
     /// <summary>Builds a snapshot on the tactics board's own shape, so the film is not laid on its side.</summary>
     /// <param name="seed">The match seed.</param>
-    public static MatchInputV1 Fixture(ulong seed = 20_260_925) => TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed));
+    public static MatchInputV1 Fixture(ulong seed = 20_260_927) => TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed));
 
     /// <summary>Builds a snapshot, and the rules it is frozen against, in which most fouls draw a red card.</summary>
     /// <param name="rules">The rules.</param>

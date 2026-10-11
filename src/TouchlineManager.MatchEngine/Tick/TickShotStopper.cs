@@ -74,8 +74,8 @@ internal readonly record struct TickSaveAssessment(
 /// at what height and speed. Nothing is guessed: the forecast <em>is</em> the physics.
 /// </description></item>
 /// <item><description>
-/// <b><see cref="DiveIntent"/></b> each tick. The goalkeeper stands still for his reaction time (<c>350 ms − 10 ms × Reflexes</c>: 150 to
-/// 340 ms), then runs flat out across the line of the ball. Where he gets to is ordinary player physics, so a quick keeper
+/// <b><see cref="DiveIntent"/></b> each tick. The goalkeeper stands still for his reaction time (<c>250 ms − 10 ms × Reflexes</c>: 50 to
+/// 240 ms), then runs flat out across the line of the ball. Where he gets to is ordinary player physics, so a quick keeper
 /// covers more ground than a slow one and one on a good arc has less to cover.
 /// </description></item>
 /// <item><description>
@@ -104,7 +104,7 @@ internal static class TickShotStopper
     public const int ForecastTicks = 40;
 
     /// <summary>The goalkeeper's reaction time at Reflexes 0, in milliseconds.</summary>
-    public const int ReactionBaseMilliseconds = 350;
+    public const int ReactionBaseMilliseconds = 250;
 
     /// <summary>The reaction time saved per point of Reflexes, in milliseconds.</summary>
     public const int ReactionPerReflexes = 10;

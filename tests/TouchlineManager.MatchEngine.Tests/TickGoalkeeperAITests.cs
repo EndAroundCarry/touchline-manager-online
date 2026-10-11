@@ -220,6 +220,47 @@ public sealed class TickGoalkeeperAITests
             .Should().Be(TickKeeperMode.Guard, "it is nowhere near his area");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_ball_his_own_side_has_played_back_to_him_is_met_where_it_will_pass(bool isHome)
+    {
+        // A firm ground ball from the left of the area running to the goal line at Y 4,300: he is at 150, 3,500, 8 m from its line.
+        var ball = new TickBallPhysics();
+        var start = isHome ? new SpatialPoint(1_800, 4_300) : new SpatialPoint(SpatialPitch.PitchLength - 1_800, SpatialPitch.PitchWidth - 4_300);
+
+        ball.PlaceAt(start.X, start.Y);
+        ball.Kick(isHome ? -TickSpatialUnits.SpeedToFixedPerTick(1_000) : TickSpatialUnits.SpeedToFixedPerTick(1_000), 0, 0);
+
+        var order = new Scene(isHome, new SpatialPoint(1_800, 4_300)) { Possession = TickKeeperPossession.Loose, Ball = ball, PassedToHim = true }.Decide();
+        var meetY = isHome ? order.Intent.TargetYUnits : SpatialPitch.PitchWidth - order.Intent.TargetYUnits;
+        var meetX = isHome ? order.Intent.TargetXUnits : SpatialPitch.PitchLength - order.Intent.TargetXUnits;
+
+        order.Mode.Should().Be(TickKeeperMode.Guard, "he is not charging out of his area, only stepping into the line of the ball");
+        meetY.Should().BeCloseTo(4_300, 20, "he goes to where the ball is going, not to where the arc would put him");
+        meetX.Should().BeInRange(TickGoalkeeperAI.LineClearance, TickGoalkeeperAI.RushLimitX);
+        order.Intent.Arrive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_ball_not_played_to_him_or_one_running_away_is_not_met()
+    {
+        var towards = new TickBallPhysics();
+        var away = new TickBallPhysics();
+
+        towards.PlaceAt(1_800, 4_300);
+        towards.Kick(-TickSpatialUnits.SpeedToFixedPerTick(1_000), 0, 0);
+        away.PlaceAt(1_800, 4_300);
+        away.Kick(TickSpatialUnits.SpeedToFixedPerTick(1_000), 0, 0);
+
+        var theirs = new Scene(true, new SpatialPoint(1_800, 4_300)) { Possession = TickKeeperPossession.Loose, Ball = towards }.Decide();
+        var leaving = new Scene(true, new SpatialPoint(1_800, 4_300)) { Possession = TickKeeperPossession.Loose, Ball = away, PassedToHim = true }.Decide();
+        var guard = new Scene(true, new SpatialPoint(1_800, 4_300)) { Possession = TickKeeperPossession.Loose }.Decide();
+
+        theirs.Intent.Should().Be(guard.Intent, "it is not a pass to him");
+        leaving.Intent.Should().Be(guard.Intent, "it is going up the pitch");
+    }
+
     [Fact]
     public void A_ball_travelling_at_pace_is_a_shot_or_a_pass_and_not_a_loose_ball_to_collect()
     {
@@ -428,6 +469,8 @@ public sealed class TickGoalkeeperAITests
 
         public bool WasRushing { get; init; }
 
+        public bool PassedToHim { get; init; }
+
         public int KeeperLockout { get; init; }
 
         public TickKeeperOrder Decide()
@@ -464,6 +507,7 @@ public sealed class TickGoalkeeperAITests
                 Teammates = _teammates,
                 Opponents = _opponents!,
                 WasRushing = WasRushing,
+                PassedToHim = PassedToHim,
             });
         }
 

@@ -100,11 +100,11 @@ public sealed class TickShotStopperTests
     }
 
     [Fact]
-    public void Reflexes_set_the_reaction_time_between_150_and_340_milliseconds()
+    public void Reflexes_set_the_reaction_time_between_50_and_240_milliseconds()
     {
-        TickShotStopper.ReactionMilliseconds(Skills(20)).Should().Be(150);
-        TickShotStopper.ReactionMilliseconds(Skills(10)).Should().Be(250);
-        TickShotStopper.ReactionMilliseconds(Skills(1)).Should().Be(340);
+        TickShotStopper.ReactionMilliseconds(Skills(20)).Should().Be(50);
+        TickShotStopper.ReactionMilliseconds(Skills(10)).Should().Be(150);
+        TickShotStopper.ReactionMilliseconds(Skills(1)).Should().Be(240);
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class TickShotStopperTests
         var forecast = Forecast(Shot(1_100, 3_850), true);
         var keeper = Keeper();
 
-        foreach (var (reflexes, reactsAtTick) in new[] { (20, 2), (10, 3), (1, 4) })
+        foreach (var (reflexes, reactsAtTick) in new[] { (20, 1), (10, 2), (1, 3) })
         {
             var skills = Skills(10) with { Reflexes = reflexes };
 

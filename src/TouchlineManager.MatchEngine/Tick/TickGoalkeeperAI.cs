@@ -78,6 +78,9 @@ internal readonly ref struct TickKeeperSituation
     /// <summary>Gets the opposing side, as they stand at the start of the tick.</summary>
     public required ReadOnlySpan<TickPlayerState> Opponents { get; init; }
 
+    /// <summary>Gets a value indicating whether the ball in flight is a pass his own side has played to him, which he goes to meet.</summary>
+    public bool PassedToHim { get; init; }
+
     /// <summary>Gets a value indicating whether he was already charging out last tick, which stops him pulling up half way.</summary>
     public bool WasRushing { get; init; }
 }
@@ -170,6 +173,9 @@ internal static class TickGoalkeeperAI
     /// <summary>The distance a goalkeeper may be from a loose ball, as a share of the nearest opponent's, to go for it, in percent.</summary>
     public const int LooseRacePercent = 110;
 
+    /// <summary>The farthest from his goal line a ball played to the goalkeeper is met, in pitch units (25 m): beyond it it is a pass for the defenders.</summary>
+    public const int MeetPassDepth = 2_500;
+
     /// <summary>The ticks ahead of a moving ball a rush is aimed.</summary>
     public const int RushLeadTicks = 3;
 
@@ -229,6 +235,11 @@ internal static class TickGoalkeeperAI
         if (TryRush(situation, ballX, ballY, out var rush))
         {
             return new TickKeeperOrder(TickKeeperMode.Rush, new TickMoveIntent(rush.X, rush.Y, BasisPoints, false));
+        }
+
+        if (situation.PassedToHim && TryMeetPass(situation, ballX, ballY, out var meet))
+        {
+            return new TickKeeperOrder(TickKeeperMode.Guard, new TickMoveIntent(meet.X, meet.Y, BasisPoints, true));
         }
 
         return Guard(situation, ballX, ballY);
@@ -395,6 +406,44 @@ internal static class TickGoalkeeperAI
         var ownY = Math.Clamp(MirrorY(aimY, situation.IsHome), TickTacticalGeometry.Margin, SpatialPitch.PitchWidth - TickTacticalGeometry.Margin);
 
         target = new SpatialPoint(MirrorX(ownX, situation.IsHome), MirrorY(ownY, situation.IsHome));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Finds where the goalkeeper meets a ball his own side has played to him: the point of its line nearest to him, inside the area. It is a
+    /// ground ball running towards his goal; a ball moving away, or one that will not pass through the area, is not for him.
+    /// </summary>
+    private static bool TryMeetPass(in TickKeeperSituation situation, int ballX, int ballY, out SpatialPoint target)
+    {
+        target = default;
+
+        var ball = situation.Ball;
+        var velocityX = situation.IsHome ? ball.VelocityX : -ball.VelocityX;
+        var velocityY = situation.IsHome ? ball.VelocityY : -ball.VelocityY;
+
+        if (velocityX >= 0 || ball.UnitZ > TickBallPhysics.HeadReachZUnits || ballX > MeetPassDepth)
+        {
+            return false;
+        }
+
+        long fromBallX = MirrorX(TickSpatialUnits.ToUnits(situation.Keeper.X), situation.IsHome) - ballX;
+        long fromBallY = MirrorY(TickSpatialUnits.ToUnits(situation.Keeper.Y), situation.IsHome) - ballY;
+        var along = (fromBallX * velocityX) + (fromBallY * velocityY);
+
+        if (along <= 0)
+        {
+            return false;
+        }
+
+        var speedSquared = ((long)velocityX * velocityX) + ((long)velocityY * velocityY);
+        var meetX = Math.Clamp(ballX + (int)(velocityX * along / speedSquared), LineClearance, RushLimitX);
+        var meetY = Math.Clamp(
+            ballY + (int)(velocityY * along / speedSquared),
+            SpatialPitch.GoalYCenter - AreaHalfWidth,
+            SpatialPitch.GoalYCenter + AreaHalfWidth);
+
+        target = new SpatialPoint(MirrorX(meetX, situation.IsHome), MirrorY(meetY, situation.IsHome));
 
         return true;
     }

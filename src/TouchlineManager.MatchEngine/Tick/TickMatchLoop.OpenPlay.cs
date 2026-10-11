@@ -27,6 +27,9 @@ internal sealed partial class TickMatchLoop
     /// <summary>Where the pass in flight was meant to go, before the kick's error.</summary>
     private SpatialPoint _passAim;
     private TickRef _intended = TickRef.None;
+
+    /// <summary>The man a ball played back (a recycle) is for, until anybody touches the ball; a recycle is not a pass pending, so it has no intended receiver of its own.</summary>
+    private TickRef _recycledTo = TickRef.None;
     private bool _offsidePending;
 
     private TickRef _assistPasser = TickRef.None;
@@ -675,6 +678,7 @@ internal sealed partial class TickMatchLoop
                 Teammates = team.Body.AsSpan(0, team.Count),
                 Opponents = other.Body.AsSpan(0, other.Count),
                 WasRushing = team.KeeperRushing,
+                PassedToHim = ((_passPending && _intended == new TickRef(index, team.SlotNumber[0])) || _recycledTo == new TickRef(index, team.SlotNumber[0])),
             });
 
             team.KeeperRushing = order.Mode == TickKeeperMode.Rush;
@@ -930,6 +934,12 @@ internal sealed partial class TickMatchLoop
 
             default:
                 Tag(me, PassageAction.Pass);
+
+                if (decision.Action == TickCarrierAction.Recycle && decision.Receiver >= 0 && decision.Receiver < team.Count)
+                {
+                    _recycledTo = new TickRef(side, team.SlotNumber[decision.Receiver]);
+                }
+
                 break;
         }
 
@@ -938,6 +948,7 @@ internal sealed partial class TickMatchLoop
 
     private void Touch(TickRef who)
     {
+        _recycledTo = TickRef.None;
         _lastTouch = who;
         _lastTouchBySide[who.Side] = who;
     }

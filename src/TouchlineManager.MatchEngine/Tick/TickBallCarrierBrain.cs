@@ -180,10 +180,10 @@ internal static class TickBallCarrierBrain
     /// <summary>The share of an xG heuristic that becomes the chance of scoring, in basis points.</summary>
     public const int MaximumGoalChance = 6_500;
 
-    /// <summary>How many times a shot's chance is valued when it is weighed against a pass.</summary>
     /// <summary>The goal chance, in basis points, below which a carrier will not shoot: he keeps the ball.</summary>
-    public const int ShotMinimumChance = 1_850;
+    public const int ShotMinimumChance = 1_400;
 
+    /// <summary>How many times a shot's chance is valued when it is weighed against a pass.</summary>
     public const int ShotValueMultiplier = 3;
 
     /// <summary>How near a defender may stand to the line to goal before he blocks the shot, in pitch units (2.5 m).</summary>
@@ -241,7 +241,7 @@ internal static class TickBallCarrierBrain
     public const int PassBaseError = 30;
 
     /// <summary>The base error angle of a shot, in binary angle units: a snap shot under a defender's eye goes wide or high as often as it goes in.</summary>
-    public const int ShotBaseError = 200;
+    public const int ShotBaseError = 110;
 
     /// <summary>The base error angle of a shot from a still ball, a penalty or a direct free kick, in binary angle units: struck unhurried, with the man's feet set.</summary>
     public const int SetPieceShotBaseError = 50;

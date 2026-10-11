@@ -1962,3 +1962,41 @@ under its 10% aim, so the stricter pair is the one kept.
 **Not as planned.** The plan expected the keeper's open-play turnovers to fall from 5% to 2%. Those on short balls did (2.1%), but the keeper now kicks 8.7 balls a match that are not short, and a
 fifth of the medium ones are lost, so the keeper's overall turnover rate is 6.5%. These are lost 30 m or more from his goal, where 6 to 7% of them become a shot (49% of the short ones did). 1.6 a match of his
 clearances end without a receiver (out of play or loose). `tickmotion` is unchanged in kind.
+
+### 14.21 Shots from farther out, and a goalkeeper who meets a ball played back to him (the keeper-gift plan, Milestone 5)
+
+**Shots.** Only 1 open-play shot in 100 came from beyond 12 m: the threshold (`ShotMinimumChance`, 1,850) is on the heuristic chance, and in the final third nothing competes with a shot above it (a pass
+there has little forward gain left to earn, so its utility is small). The levers the plan names do almost nothing for that reason: `ShotValueMultiplier` 3 to 2 to 1 moved shots from 54 to 50 a match, and allowing
+one blocker instead of three, or widening the blocking lane to 4.5 m, changed nothing much (a third of the close shots are blocked in flight, not on the line at the decision). Paying a pass to a man in a shooting
+position a share of his own chance (as the cut-back already is) was tried at 30% to 150% and dropped: the move that ends in a pass to the man ends in his shot, so it raised the volume instead of lowering it. What works:
+
+- `ShotMinimumChance` 1,850 to 1,400: shots from 12 to 18 m go from 1.0 to 8.0 a match.
+- Calibration, since more shots from farther out doubled the goals: `TickShotStopper.ReactionBaseMilliseconds` 350 to 250 (the check is by whole 100 ms ticks, so only the tens digit of the base matters: 250 is a tick quicker for a goalkeeper of
+  reflexes 15, 260 and 290 are alike) and `ShotBaseError` 200 to 110 (the far shots had left on target at 22%).
+- `GoalOriginProbe` gets a shot-by-distance table and a "what put the ball behind for a corner" table.
+
+**A fault the change exposed.** With the threshold at 1,100 corners went from 10 to 24 a match. 84% were given by a defender's last touch: a defender pressed in his own area plays the ball back to his goalkeeper
+(`Recycle`) and the goalkeeper, who stood on his guard arc and treated a ball faster than 4 m/s as a pass or a shot rather than something to collect, let it run through to the line, or to an attacker. (7.6 corners a match were
+this even before the change, and 65 goals in 205 matches were "a pass by an opposing outfielder reached us, then a first-time shot"; about 15 are now.) The goalkeeper now steps into the line of a ball played back to him
+(`TickKeeperSituation.PassedToHim`, `TryMeetPass`: a ground ball running to his goal, met at the nearest point of its line, inside 25 m of the line, `MeetPassDepth`). `Recycle` is not a pass in the match loop (no
+pending pass, no intended receiver), so its receiver is kept in `_recycledTo`, cleared by any touch. That takes about 0.3 goals a match out of the old calibration, which is part of why the finishing is re-balanced above.
+
+| Stored snapshots (205) | Before (M4) | Now |
+|---|---|---|
+| Goals a match | 2.65 | 2.60 (three re-drawn sets: 2.55 to 2.68) |
+| Shots a match; on target | 32.2; 28.8% | 40.4; 39.4% |
+| Open-play shots a match under 6 m; 6 to 12 m; 12 to 18 m | 3.8; 17.6; 1.0 | 3.6; 18.4; 8.0 |
+| Mean distance of a built-up shot | 9.0 m | 9.6 m |
+| Goals from a move of 3 or more passes | 34% | 41% |
+| Passes a match (engine count); completion | 1,989; 84.2% | 1,990; 84.3% |
+| Corners; fouls; penalties a match | 10.1; 21.8; 0.37 | 4.3; 21.6; 0.36 |
+| Goal kicks a match | 26.1 | 25.2 |
+| Goals straight off a goalkeeper's kick | 20 of 544 (3.7%) | 53 of 534 (9.9%) |
+| Home / draw / away | 43 / 22 / 34% | 38.5 / 25 / 36.6% |
+
+**Not as planned.**
+- The plan wanted 25 to 30 shots a match at a mean distance of 14 to 16 m. The close shots (about 22 a match from under 12 m) do not depend on the threshold, so the shots from farther out are added to them: 40 shots (the band is 22 to 28), 39% on target (band 32 to 38%). Reaching 28 shots would
+  take fewer shots from inside the area, which no lever tried here does; that is a decision for the user. Nothing is shot from beyond 18 m (the heuristic range is 26.5 m) and the mean distance is 9.6 m: the far shots are a fifth of the total.
+- Goals off a goalkeeper's kick rose from 20 to 53 (9.9%, on the plan's aim) because the keeper now holds the ball when he is played back to, where before those back-passes ran past him; 65 goals of that kind used to be filed under "opposing outfielder".
+- Corners fell below the real figure (about 10): the old ones were mostly missed back-passes. A blocked or saved shot turned behind for a corner is rare in this engine (0.25 a match for the goalkeeper).
+- `TickPlay`'s default seed moved from 20,260,925 to 20,260,926: the old one is now a 0-0 draw and two film tests need a goal.

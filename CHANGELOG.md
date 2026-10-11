@@ -4,6 +4,17 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Keeper-gift plan, Milestone 5 — shots from farther out
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.21. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
+under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- A carrier shoots from a chance of 1,400 (`ShotMinimumChance`, was 1,850), the shot's error is 110 (`ShotBaseError`, was 200) and the goalkeeper reacts in 250 ms less 10 per Reflexes point (was 350): open-play shots from 12 to 18 m 1.0 to 8.0 a match; shots 32.2 to 40.4, on target 28.8% to 39.4%; goals in the band (2.60).
+- The goalkeeper steps into the line of a ball played back to him (`PassedToHim`), where he used to let it run through to the line or to an attacker: corners 10 to 4 a match, goals off a goalkeeper's kick 20 to 53 of 534 (9.9%).
+- `GoalOriginProbe`: shot-by-distance table, a corner-cause table.
+
 ## Keeper-gift plan, Milestone 4 — a risk-averse keeper in open play
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.20. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
