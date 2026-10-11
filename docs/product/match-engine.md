@@ -2000,3 +2000,34 @@ pending pass, no intended receiver), so its receiver is kept in `_recycledTo`, c
 - Goals off a goalkeeper's kick rose from 20 to 53 (9.9%, on the plan's aim) because the keeper now holds the ball when he is played back to, where before those back-passes ran past him; 65 goals of that kind used to be filed under "opposing outfielder".
 - Corners fell below the real figure (about 10): the old ones were mostly missed back-passes. A blocked or saved shot turned behind for a corner is rare in this engine (0.25 a match for the goalkeeper).
 - `TickPlay`'s default seed moved from 20,260,925 to 20,260,926: the old one is now a 0-0 draw and two film tests need a goal.
+
+### 14.22 Through balls that are played (the keeper-gift plan, Milestone 6)
+
+**Diagnosis.** A temporary counter (removed again) over the 205 stored matches: a carrier with a runner in sight chose the through ball in about 3,100 decisions, and in 900 separate streaks of them (4.4 a match), but only 20 were kicked (0.1 a match).
+The cause was the hold, not the offside check, the runners or the lane. A through ball was held like any pass: a free carrier takes his first touch and then looks up for up to 4 s (`HoldTicks`: 3 plus up to 40, 39 on average), and he re-decides every one or two ticks
+while he waits. 98% of the streaks flipped to something else after ten ticks on average (72% to an ordinary pass, 18% to a dribble, 8% to a recycle), by which time the run had gone. The rest of the suspects counted for little: the receiver was offside at the flip in 14% of the flips,
+the counter saw none lost to a tackle, and the meeting point was beyond the `LongBallDeepestX` cap in 16% of the evaluations.
+
+**Changes.**
+- A through ball is hit on the first tick however free the carrier is (`ThroughBallHoldTicks`, 1; was 3 to 43). That alone gave 3.9 kicked a match.
+- The brain judged the ball to a runner at 29% (`Accuracy` takes the ball to land within `CatchWidth`, 2.5 m, of a man standing), where 70% came off once they were kicked: a runner is running and adjusts his line to the ball. A ball to a runner now has `RunnerCatchWidth`, 3 m. The volume is
+  very sensitive to this (2.5 m 3.9 a match, 3.0 m 5.5, 3.5 m 7.3, 5.0 m 14.5) and nearly deaf to `ThroughBonus` (2,500, left as it was: 1,500 and 800 at 5.0 m gave 12.5 and 10.5), so the width is the knob.
+- Lane survival already uses the meeting point (it is the aim of the ball), so it was left alone.
+
+| Stored snapshots (205) | Before (M5) | Now |
+|---|---|---|
+| Through balls kicked a match | 0.1 | 5.5 |
+| ...reaching a team-mate; intercepted | n/a | 67%; 31% |
+| ...called offside | n/a | 0.005 a match (offsides in all 2.4 a match, as before) |
+| ...followed by a shot of the side within 10 s | n/a | 0.9 a match (24% of those that arrived) |
+| Goals a match | 2.60 | 2.76 (noise is about +-0.1 on 205 matches) |
+| Shots a match; on target | 40.4; 39.4% | 41.5; 39.3% |
+| Goals from a move of 3 or more passes | 41% | 42% |
+| Passes a match (engine count); completion | 1,990; 84.3% | 1,994; 84.3% |
+| Corners; fouls; yellow cards a match | 4.3; 21.6; 4.0 | 4.2; 21.7; 4.0 |
+| Goals straight off a goalkeeper's kick | 53 of 534 (9.9%) | 46 of 565 (8.1%) |
+
+**Not as planned.** The plan wanted through balls to score on par with a good forward pass by raising `ThroughBonus`; the bonus has almost no pull (a utility is the chance of success times a value, and the chance is what decides), so the lever is the estimate of the chance. 30% of the balls are still
+intercepted (a ball behind the line is a gamble). Offsides did not need watching: the receiver is judged at the moment of the kick, and the careless-reader rule already lets the odd one through.
+The reception-gap test (`A_received_ball_is_eased_to_the_foot...`) now has a 99th-percentile bound of 3 m and a maximum of 5 m, where it had a maximum of 4 m: two receptions in 600 are a runner taking a through ball at a sprint and pushing it ahead. The shots band of
+`Over_many_matches_between_the_board_formations...` goes to 18 to 40 (the committed engine read 35.0 against the old 36, and this milestone adds about 2 shots).

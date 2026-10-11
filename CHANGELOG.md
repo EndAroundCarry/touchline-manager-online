@@ -4,6 +4,17 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Keeper-gift plan, Milestone 6 — through balls that are played
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.22. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
+under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- A through ball is hit on the first tick (`ThroughBallHoldTicks`, was a first touch and up to 4 s of looking up, during which 98% of them were dropped for another action): 0.1 to 3.9 a match kicked.
+- A ball to a runner is judged with a 3 m catch (`RunnerCatchWidth`, was the 2.5 m of a man standing still): 5.5 through balls a match, 67% reach a team-mate, 0.9 shots a match follow; goals 2.76, shots 41.5, offsides unchanged (2.4).
+- Test bounds: the reception-gap maximum is 5 m (99th percentile 3 m), the shots band of the formations test is 18 to 40.
+
 ## Keeper-gift plan, Milestone 5 — shots from farther out
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.21. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored

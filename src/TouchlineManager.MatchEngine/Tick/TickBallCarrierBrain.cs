@@ -237,6 +237,12 @@ internal static class TickBallCarrierBrain
     /// <summary>The widest a receiver's catch is, laterally, in pitch units (the ball can be this far off and still be got to).</summary>
     public const int CatchWidth = 250;
 
+    /// <summary>
+    /// The lateral spread a ball played to a runner can have and still be met, in pitch units (3 m): he is running and adjusts his line to
+    /// the ball, where a man standing still has only <see cref="CatchWidth"/> to take it in.
+    /// </summary>
+    public const int RunnerCatchWidth = 300;
+
     /// <summary>The base error angle of a pass, in binary angle units (about 10°).</summary>
     public const int PassBaseError = 30;
 
@@ -815,7 +821,7 @@ internal static class TickBallCarrierBrain
             var marker = NearestDefenderTo(situation, aimX, aimY, out var markerSquared);
 
             var survive = LaneSurvival(situation, view.X, view.Y, aimX, aimY, lofted);
-            var accuracy = Accuracy(carrierSkills.Passing, carrierSkills.Technique, PassBaseError, length, lofted, view.Effective);
+            var accuracy = Accuracy(carrierSkills.Passing, carrierSkills.Technique, PassBaseError, length, lofted, view.Effective, through ? RunnerCatchWidth : CatchWidth);
             var success = survive * accuracy / BasisPoints;
 
             success = success * (BasisPoints - ArrivalPressure(length, lofted, markerSquared)) / BasisPoints;
@@ -1386,7 +1392,7 @@ internal static class TickBallCarrierBrain
     /// Gets the chance, in basis points, that a kick with a given error lands where its receiver can get to it: the share of
     /// the lateral spread of the error (a long ball spreads more) that falls inside the catch.
     /// </summary>
-    private static int Accuracy(int skill, int technique, int baseError, int length, bool lofted, int effective)
+    private static int Accuracy(int skill, int technique, int baseError, int length, bool lofted, int effective, int catchWidth = CatchWidth)
     {
         var error = ErrorAngle(skill, technique, baseError, effective);
 
@@ -1397,7 +1403,7 @@ internal static class TickBallCarrierBrain
 
         var spread = (long)length * TickTrigonometry.Sin(error) / TickTrigonometry.Scale;
 
-        return spread <= CatchWidth ? BasisPoints : (int)Math.Max(1_500, (long)CatchWidth * BasisPoints / spread);
+        return spread <= catchWidth ? BasisPoints : (int)Math.Max(1_500, (long)catchWidth * BasisPoints / spread);
     }
 
     private static int CrowdAround(in TickCarrierSituation situation, int x, int y)

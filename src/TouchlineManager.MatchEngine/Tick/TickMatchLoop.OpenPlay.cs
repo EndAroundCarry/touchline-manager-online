@@ -810,16 +810,28 @@ internal sealed partial class TickMatchLoop
     private const int MaximumDwellTicks = 40;
 
     /// <summary>
+    /// The ticks a man keeps the ball before a through ball leaves his foot (0.1 s): a run behind the line is on for a moment only, and a
+    /// man who waits for four seconds to look up is no longer playing the ball to the man who ran.
+    /// </summary>
+    private const int ThroughBallHoldTicks = 1;
+
+    /// <summary>
     /// Gets how long a man keeps the ball before the kick he has chosen leaves his foot: his first touch (three tenths of a second) and,
     /// while nobody is on him, the time he takes to look up and carry the ball, which shrinks to nothing as the pressure rises to
     /// <see cref="DwellScale"/>. A man with the Technique plays first time, with a single tick on the ball, when the pressure reaches
-    /// <see cref="OneTouchPressure"/> or he shoots. A shot takes its three tenths; a clearance is a flick. A goalkeeper has already waited.
+    /// <see cref="OneTouchPressure"/> or he shoots. A shot takes its three tenths; a clearance is a flick; a through ball is played on the
+    /// first tick (<see cref="ThroughBallHoldTicks"/>), however free he is. A goalkeeper has already waited.
     /// </summary>
-    private static int HoldTicks(in TickCarrierDecision decision, in TickPlayerSkills skills, MatchTempo tempo, bool keeper)
+    internal static int HoldTicks(in TickCarrierDecision decision, in TickPlayerSkills skills, MatchTempo tempo, bool keeper)
     {
         if (keeper)
         {
             return 0;
+        }
+
+        if (decision.Action == TickCarrierAction.ThroughBall)
+        {
+            return ThroughBallHoldTicks;
         }
 
         var firstTime = skills.Technique >= OneTouchTechnique

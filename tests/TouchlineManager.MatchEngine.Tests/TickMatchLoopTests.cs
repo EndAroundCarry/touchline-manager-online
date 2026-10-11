@@ -1,6 +1,7 @@
 using FluentAssertions;
 using TouchlineManager.MatchEngine.Configuration;
 using TouchlineManager.MatchEngine.Model;
+using TouchlineManager.MatchEngine.Spatial;
 using TouchlineManager.MatchEngine.Tick;
 
 namespace TouchlineManager.MatchEngine.Tests;
@@ -380,7 +381,20 @@ public sealed class TickMatchLoopTests
 
         gaps.Count.Should().BeGreaterThan(50);
         gaps.Order().ElementAt(gaps.Count / 2).Should().BeLessThan(100, "after the touch and the settling the ball is at his foot again");
-        gaps.Max().Should().BeLessThan(400, "and is never left behind");
+        gaps.Order().ElementAt(gaps.Count * 99 / 100).Should().BeLessThan(300, "and is hardly ever left behind");
+        gaps.Max().Should().BeLessThan(500, "a runner who takes a through ball at a sprint pushes it a few metres ahead, no more");
+    }
+
+    [Fact]
+    public void A_through_ball_is_played_on_the_first_tick_where_a_free_mans_pass_waits_while_he_looks_up()
+    {
+        var skills = default(TickPlayerSkills);
+        var through = new TickCarrierDecision(TickCarrierAction.ThroughBall, 9, new SpatialPoint(7_000, 3_000), 1_000, 10_000, 0);
+        var pass = through with { Action = TickCarrierAction.Pass };
+
+        TickMatchLoop.HoldTicks(through, skills, MatchTempo.Normal, keeper: false).Should().Be(TickMatchLoop.HoldTicks(through, skills, MatchTempo.Low, keeper: false));
+        TickMatchLoop.HoldTicks(through, skills, MatchTempo.Normal, keeper: false).Should().Be(1, "the run is on for a moment only");
+        TickMatchLoop.HoldTicks(pass, skills, MatchTempo.Normal, keeper: false).Should().BeGreaterThan(10, "a free man takes his time over an ordinary pass");
     }
 
     private static int Distance(int ax, int ay, int bx, int by)
