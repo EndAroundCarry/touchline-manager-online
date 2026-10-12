@@ -116,6 +116,43 @@ if (mode is "tick")
     TickProbe.Run(Math.Min(count, 600), seed, rules, dumpPath);
 }
 
+if (mode is "tickshowmany")
+{
+    // tickshowmany <homeAbility> <awayAbility> <matches> <seed> --dump <tsv file>
+    TickShowcase.Many(
+        positional[1],
+        positional[2],
+        Math.Min(int.Parse(positional[3], CultureInfo.InvariantCulture), 600),
+        ulong.Parse(positional[4], CultureInfo.InvariantCulture),
+        rules,
+        dumpPath!);
+}
+
+if (mode is "tickexp")
+{
+    // tickexp <label> <homeAbility> <awayAbility> <matches> <seed> <homeSpec> <awaySpec>   (TICK_SHOTS=1 adds the shot table)
+    TickShowcase.Experiment(
+        positional[1],
+        positional[2],
+        positional[3],
+        positional.Length > 6 ? positional[6] : string.Empty,
+        positional.Length > 7 ? positional[7] : string.Empty,
+        Math.Min(int.Parse(positional[4], CultureInfo.InvariantCulture), 500),
+        ulong.Parse(positional[5], CultureInfo.InvariantCulture),
+        rules);
+}
+
+if (mode is "tickshow")
+{
+    // tickshow <homeAbility> <awayAbility> (each a number or a range such as 17-20) <seed> --dump file
+    TickShowcase.Run(
+        positional.Length > 1 ? positional[1] : "17",
+        positional.Length > 2 ? positional[2] : "6",
+        positional.Length > 3 ? ulong.Parse(positional[3], CultureInfo.InvariantCulture) : seed,
+        rules,
+        dumpPath);
+}
+
 if (mode is "tickmotion")
 {
     TickMotionProbe.Run(Math.Min(count, 600), seed, rules);

@@ -603,3 +603,47 @@ window.film = {
 };
 
 show(0);
+
+/**
+ * `?play` (optionally `&speed=2`) plays the whole film through the real playback, loop and renderer, with the clock and the
+ * score above it: the way to watch a dumped match rather than measure it.
+ */
+const query = new URLSearchParams(location.search);
+
+if (query.has('play')) {
+  const speed = Number(query.get('speed') ?? '1') as PlaybackSpeed;
+  const playback = new MatchPlayback(
+    presentation.passages,
+    presentation.playback ?? [],
+    presentation.reel ?? [],
+    'full',
+  );
+  const edges = fadeEdgesFor(timeline.cuts, playback.windows);
+  const home = presentation.homeLineup?.clubName ?? 'Home';
+  const away = presentation.awayLineup?.clubName ?? 'Away';
+
+  playback.setSpeed(speed);
+  playback.play();
+
+  const loop = new RenderLoop((delta) => {
+    playback.advance(delta);
+
+    const position = playback.positionMs;
+    const goals = timeline.goals.filter((goal) => goal.filmMilliseconds <= position);
+    const homeGoals = goals.filter((goal) => goal.side === 'home').length;
+    const awayGoals = goals.filter((goal) => goal.side === 'away').length;
+
+    renderer.render(
+      position,
+      playback.currentState === 'playing' ? fadeAlpha(edges, position, speed) : 0,
+    );
+    status.textContent = `${home} ${homeGoals} - ${awayGoals} ${away}   ${timeline.clockAt(position).label}   (${speed}x)`;
+
+    if (playback.currentState !== 'playing') {
+      loop.stop();
+      status.textContent += '   full time';
+    }
+  });
+
+  loop.start();
+}
