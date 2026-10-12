@@ -181,7 +181,13 @@ internal static class TickBallCarrierBrain
     public const int MaximumGoalChance = 6_500;
 
     /// <summary>The goal chance, in basis points, below which a carrier will not shoot: he keeps the ball.</summary>
-    public const int ShotMinimumChance = 1_400;
+    public const int ShotMinimumChance = 1_700;
+
+    /// <summary>The distance from goal beyond which a shot is a long one and is judged against <see cref="LongShotMinimumChance"/>, in pitch units (16 m).</summary>
+    public const int LongShotRange = 1_600;
+
+    /// <summary>The goal chance, in basis points, below which a carrier will not shoot from beyond <see cref="LongShotRange"/>: a man with room and a good boot tries his luck from 16 to 20 m.</summary>
+    public const int LongShotMinimumChance = 1_150;
 
     /// <summary>How many times a shot's chance is valued when it is weighed against a pass.</summary>
     public const int ShotValueMultiplier = 3;
@@ -247,7 +253,7 @@ internal static class TickBallCarrierBrain
     public const int PassBaseError = 30;
 
     /// <summary>The base error angle of a shot, in binary angle units: a snap shot under a defender's eye goes wide or high as often as it goes in.</summary>
-    public const int ShotBaseError = 110;
+    public const int ShotBaseError = 130;
 
     /// <summary>The base error angle of a shot from a still ball, a penalty or a direct free kick, in binary angle units: struck unhurried, with the man's feet set.</summary>
     public const int SetPieceShotBaseError = 50;
@@ -386,6 +392,12 @@ internal static class TickBallCarrierBrain
 
     /// <summary>The most the recycle is worth over a pass, at full pressure, in utility.</summary>
     public const int RecycleBonusMaximum = 2_500;
+
+    /// <summary>The share of the recycle bonus a carrier in the final third keeps, in percent: a ball given back there is a move starting over.</summary>
+    public const int FinalThirdRecyclePercent = 70;
+
+    /// <summary>What a ball played back in the final third costs, in utility, over a pass that keeps the move going.</summary>
+    public const int FinalThirdBackwardCost = 150;
 
     /// <summary>The wide position from which a cross is possible: this far off the middle, in pitch units (18 m).</summary>
     public const int CrossWideThreshold = 1_800;
@@ -850,7 +862,11 @@ internal static class TickBallCarrierBrain
 
             if (backward)
             {
-                value += view.Effective * RecycleBonusMaximum / BasisPoints;
+                // In the final third the bonus shrinks and a ball back costs: a pressed carrier there beats a man or shoots rather than start over.
+                var inFinalThird = view.X >= MidfieldLimit;
+
+                value += view.Effective * RecycleBonusMaximum / BasisPoints * (inFinalThird ? FinalThirdRecyclePercent : 100) / 100;
+                value -= inFinalThird ? FinalThirdBackwardCost : 0;
             }
 
             var utility = Expected(success, value, loss);
@@ -1014,7 +1030,11 @@ internal static class TickBallCarrierBrain
 
         var chance = ExpectedGoals(view.X, view.Y, blockers, skills);
 
-        if (chance <= ShotMinimumChance)
+        var shotDx = (long)SpatialPitch.PitchLength - view.X;
+        var shotDy = (long)SpatialPitch.GoalYCenter - view.Y;
+        var far = ((shotDx * shotDx) + (shotDy * shotDy)) > (long)LongShotRange * LongShotRange;
+
+        if (chance <= (far ? LongShotMinimumChance : ShotMinimumChance))
         {
             return;
         }

@@ -212,8 +212,9 @@ internal static class GoalOriginProbe
             foreach (var spell in spells.Where(s => s.Shot && s.StrikeAction == PassageAction.Shot))
             {
                 var outcome = shotEvents.FirstOrDefault(s => (int)s.Event.Side == spell.Side && s.Frame >= spell.StrikeFrame && s.Frame - spell.StrikeFrame <= 100);
-                var ownX = spell.Side == 0 ? recording.BallX(spell.StrikeFrame) : 10_000 - recording.BallX(spell.StrikeFrame);
-                var ownY = spell.Side == 0 ? recording.BallY(spell.StrikeFrame) : 7_000 - recording.BallY(spell.StrikeFrame);
+                // The stamp lands a frame after the kick, when a shot has travelled 2 to 3 m: the distance is read from the frame before.
+                var ownX = spell.Side == 0 ? recording.BallX(Math.Max(0, spell.StrikeFrame - 1)) : 10_000 - recording.BallX(Math.Max(0, spell.StrikeFrame - 1));
+                var ownY = spell.Side == 0 ? recording.BallY(Math.Max(0, spell.StrikeFrame - 1)) : 7_000 - recording.BallY(Math.Max(0, spell.StrikeFrame - 1));
                 var distance = (long)Math.Sqrt(((10_000L - ownX) * (10_000L - ownX)) + ((3_500L - ownY) * (3_500L - ownY)));
                 var kind = spell.RestartKind is not null ? "restart" : (spell.Passes == 0 ? "turnover, 0 passes" : (spell.Passes <= 2 ? "turnover, 1-2 passes" : "built up, 3+ passes"));
                 var row = tally.ShotQuality.GetValueOrDefault(kind);
@@ -467,10 +468,10 @@ internal static class GoalOriginProbe
         return "end";
     }
 
-    private static readonly string[] ShotBandLabels = ["< 6 m", "6-12 m", "12-18 m", "18-24 m", "24 m +"];
+    private static readonly string[] ShotBandLabels = ["< 6 m", "6-12 m", "12-16 m", "16-25 m", "25 m +"];
 
     /// <summary>Gets the distance band of a shot, in pitch units from the middle of the goal.</summary>
-    private static int ShotBandOf(long distance) => (int)Math.Min(ShotBandLabels.Length - 1, distance / 600);
+    private static int ShotBandOf(long distance) => distance < 600 ? 0 : (distance < 1_200 ? 1 : (distance < 1_600 ? 2 : (distance < 2_500 ? 3 : 4)));
 
     private static int Distance(TickMatchRecording recording, int from, int to)
     {

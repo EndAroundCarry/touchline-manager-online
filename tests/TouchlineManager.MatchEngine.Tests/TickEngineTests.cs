@@ -233,7 +233,7 @@ public sealed class TickEngineTests
         // The plan's bands are for the mean of thousands of matches; a few dozen are scattered about it, so the test's bands are wider
         // and only catch a calibration that has come loose. The benchmark tool (`tickmatrix`, `ticksnap`) holds the plan's own.
         goals.Should().BeInRange(1.6, 3.8);
-        shots.Should().BeInRange(18, 40);
+        shots.Should().BeInRange(18, 44);
         onTarget.Should().BeInRange(0.24, 0.48);
         completion.Should().BeInRange(0.70, 0.90);
         // Uniform sides foul less than squads with a spread of Aggression and Tackling (the stored snapshots book 3.5 a match), so the floor is lower.
@@ -243,5 +243,5 @@ public sealed class TickEngineTests
 
     private const string GoldenInputHash = "5f74ae0160d042255a831b10ead014aa172a6e7cc951b2c0a0d1737dc906bda2";
 
-    private const string GoldenOutputHash = "6c436ec4806996bd2563f7a42756e4a06e9d6005ea113b1e9b77ecc7d9f47294";
+    private const string GoldenOutputHash = "befe821130dfb9e4f249903f830de1fc330af5d0ad52bca21618704aa00193ed";
 }

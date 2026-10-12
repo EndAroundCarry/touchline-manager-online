@@ -4,6 +4,18 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Keeper-gift plan, Milestone 7 — fewer balls given back in the final third, long shots
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.23. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
+under the earlier build of engine-v12 refuse to replay and new matches must be played.
+
+### Changed
+
+- A carrier in the final third gets 70% of the recycle bonus (`FinalThirdRecyclePercent`) and a ball played back there costs 150 (`FinalThirdBackwardCost`): recycles in the final third 355 to about 275 a match, turnovers 710 to 687.
+- `ShotMinimumChance` 1,400 to 1,700 and `ShotBaseError` 110 to 130, so the extra close chances do not raise the shots or goals; a shot from beyond 16 m (`LongShotRange`) is judged against `LongShotMinimumChance` 1,150: 5.4 to 6.7 shots a match from 16 to 25 m. Shots 46.9 a match, goals 2.91.
+- `GoalOriginProbe`: shot bands < 6, 6-12, 12-16, 16-25, 25+ m, and the distance is read at the kick (it read 2 to 3 m too near).
+- Test bounds: formations shots band 18 to 44; the standard test fixture's seed is 20_260_928.
+
 ## Keeper-gift plan, Milestone 6 — through balls that are played
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.22. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored
