@@ -4,6 +4,14 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 0 — the `tickbalance` yardstick
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.24. **The engine does not change** (the golden hash is the same).
+
+### Added
+
+- `tickbalance [matches] [seed] [quick]` in `tools/simulation-benchmarks`: a fixed table of 44 cells (S1-S4 scenarios against the five setups DEF, POS, ATT, COUNTER and BUS), with the results, shots, shots inside 16 m, finishing and breaks (a regain in the side own half that reaches a shot within 12 s). The baseline is in §14.24.
+
 ## Keeper-gift plan, Milestone 7 — fewer balls given back in the final third, long shots
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.23. **The engine's play changes** (the golden hash is re-pinned, engine-v12 keeps its label): matches stored

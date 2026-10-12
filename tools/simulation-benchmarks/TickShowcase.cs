@@ -20,6 +20,9 @@ namespace TouchlineManager.SimulationBenchmarks;
 /// </remarks>
 internal static class TickShowcase
 {
+    /// <summary>How long after a regain a shot still counts as the break: twelve seconds at ten frames a second.</summary>
+    private const int BreakFrames = 120;
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>Plays the match.</summary>
@@ -116,6 +119,113 @@ internal static class TickShowcase
     /// <param name="rules">The rules in force.</param>
     public static void Experiment(string label, string homeAbility, string awayAbility, string homeSpec, string awaySpec, int matches, ulong seed, EngineRulesV2 rules)
     {
+        var cell = Measure(homeAbility, awayAbility, homeSpec, awaySpec, matches, seed, rules);
+
+        Console.WriteLine(
+            $"{label,-34} n={matches} W/D/L {100.0 * cell.Wins / matches,3:F0}/{100.0 * cell.Draws / matches,3:F0}/{100.0 * cell.Losses / matches,3:F0}  pts {cell.HomePoints:F2}  goals {cell.Goals[0]:F2}-{cell.Goals[1]:F2}  shots {cell.Shots[0]:F1}-{cell.Shots[1]:F1}  sot {cell.OnTarget[0]:F1}-{cell.OnTarget[1]:F1}  goals/sot {100.0 * cell.GoalsPerOnTarget[0]:F0}%-{100.0 * cell.GoalsPerOnTarget[1]:F0}%  fouls {cell.Fouls[0]:F1}-{cell.Fouls[1]:F1}");
+
+        if (Environment.GetEnvironmentVariable("TICK_SHOTS") is not { Length: > 0 })
+        {
+            return;
+        }
+
+        foreach (var side in new[] { 0, 1 })
+        {
+            var tally = cell.PerShot[side];
+
+            Console.WriteLine($"    {(side == 0 ? "home" : "away")} open-play shots {tally.Shots} ({tally.Shots / (double)matches:F1}/match), mean distance {tally.DistanceSum / Math.Max(1, tally.Shots) / 100.0:F1} m, breaks {tally.Breaks / (double)matches:F2}/match of {tally.Regains / (double)matches:F1} regains");
+
+            for (var band = 0; band < ShotTally.Bands.Length; band++)
+            {
+                var n = tally.BandShots[band];
+
+                Console.WriteLine(
+                    $"      {ShotTally.Bands[band],-8} shots {n,5} ({100.0 * n / Math.Max(1, tally.Shots),4:F0}%)  goal {Share(tally.BandGoals[band], n)}  saved {Share(tally.BandSaved[band], n)}  blocked {Share(tally.BandBlocked[band], n)}  off {Share(tally.BandOff[band], n)}  goals/on-target {Share(tally.BandGoals[band], tally.BandGoals[band] + tally.BandSaved[band])}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Plays the fixed table of scenarios the tick engine's tactical balance is judged by and prints one row per cell: the results, the
+    /// shots and where they came from, and how often a ball won in a side's own half became a shot within twelve seconds (a break).
+    /// </summary>
+    /// <remarks>
+    /// Every scenario fixes both goalkeepers so the keeper cliff never enters. Four scenarios: S1 a side of 17-20 at home to 15-18, S2 17-20
+    /// to 13-15, S3 17-20 to 6, and S4 two sides of 16 in the full matrix of setups. Setups: DEF (the default), POS, ATT, COUNTER and BUS.
+    /// </remarks>
+    /// <param name="matches">How many matches a cell.</param>
+    /// <param name="seed">The base seed.</param>
+    /// <param name="quick">Whether to play only S1 and the S4 cells with COUNTER, for iterating.</param>
+    /// <param name="rules">The rules in force.</param>
+    public static void Balance(int matches, ulong seed, bool quick, EngineRulesV2 rules)
+    {
+        var setups = new Dictionary<string, string>
+        {
+            ["DEF"] = string.Empty,
+            ["POS"] = "ment=3,press=2,line=2,tempo=2",
+            ["ATT"] = "ment=4,press=2,line=2,tempo=2",
+            ["COUNTER"] = "form=12,ment=1,press=0,line=0,pass=2,counter=1",
+            ["BUS"] = "form=12,ment=0,press=0,line=0,counter=1,waste=1",
+        };
+        var scenarios = new List<(string Name, string Home, string Away, int HomeKeeper, int AwayKeeper, string[] HomeSetups, string[] AwaySetups)>
+        {
+            ("S1", "17-20", "15-18", 17, 15, ["DEF", "POS"], ["DEF", "POS", "COUNTER", "BUS"]),
+            ("S2", "17-20", "13-15", 17, 13, ["DEF", "POS"], ["DEF", "POS", "COUNTER", "BUS"]),
+            ("S3", "17-20", "6", 17, 6, ["DEF"], ["DEF", "COUNTER", "BUS"]),
+            ("S4", "16", "16", 16, 16, [.. setups.Keys], [.. setups.Keys]),
+        };
+
+        Console.WriteLine($"== tickbalance: {matches} matches a cell, seed {seed}{(quick ? ", quick subset" : string.Empty)} ==");
+        Console.WriteLine("   home v away (setup)                    W/D/L %  pts home-away  goals       shots       sot         <16 m shots  goals/sot  breaks/match (regains)");
+
+        foreach (var (name, home, away, homeKeeper, awayKeeper, homeSetups, awaySetups) in scenarios)
+        {
+            if (quick && name is "S2" or "S3")
+            {
+                continue;
+            }
+
+            foreach (var homeSetup in homeSetups)
+            {
+                foreach (var awaySetup in awaySetups)
+                {
+                    if (quick && name == "S4" && homeSetup != "COUNTER" && awaySetup != "COUNTER")
+                    {
+                        continue;
+                    }
+
+                    var cell = Measure(home, away, $"gk={homeKeeper}{Join(setups[homeSetup])}", $"gk={awayKeeper}{Join(setups[awaySetup])}", matches, seed, rules);
+                    var insideSixteen = cell.PerShot.Select(tally => (tally.BandShots[0] + tally.BandShots[1] + tally.BandShots[2]) / (double)matches).ToArray();
+                    var breaks = cell.PerShot.Select(tally => (Breaks: tally.Breaks / (double)matches, Regains: tally.Regains / (double)matches)).ToArray();
+
+                    Console.WriteLine(
+                        $"{name} {home,5} {homeSetup,-7} v {away,5} {awaySetup,-7} {100.0 * cell.Wins / matches,3:F0}/{100.0 * cell.Draws / matches,3:F0}/{100.0 * cell.Losses / matches,3:F0}  {cell.HomePoints:F2}-{cell.AwayPoints:F2}  {cell.Goals[0]:F2}-{cell.Goals[1]:F2}  {cell.Shots[0]:F1}-{cell.Shots[1]:F1}  {cell.OnTarget[0]:F1}-{cell.OnTarget[1]:F1}  {insideSixteen[0]:F1}-{insideSixteen[1]:F1}  {100.0 * cell.GoalsPerOnTarget[0]:F0}%-{100.0 * cell.GoalsPerOnTarget[1]:F0}%  {breaks[0].Breaks:F2} ({breaks[0].Regains:F1}) - {breaks[1].Breaks:F2} ({breaks[1].Regains:F1})");
+                }
+            }
+        }
+
+        static string Join(string spec) => spec.Length == 0 ? string.Empty : "," + spec;
+    }
+
+    /// <summary>One cell of an experiment: the per-match averages and the per-shot tallies of the many matches played.</summary>
+    private sealed record Cell(
+        int Wins,
+        int Draws,
+        int Losses,
+        double[] Goals,
+        double[] Shots,
+        double[] OnTarget,
+        double[] Fouls,
+        double[] GoalsPerOnTarget,
+        ShotTally[] PerShot)
+    {
+        public double HomePoints => ((3.0 * Wins) + Draws) / (Wins + Draws + Losses);
+
+        public double AwayPoints => ((3.0 * Losses) + Draws) / (Wins + Draws + Losses);
+    }
+
+    private static Cell Measure(string homeAbility, string awayAbility, string homeSpec, string awaySpec, int matches, ulong seed, EngineRulesV2 rules)
+    {
         var (homeLow, homeHigh) = Range(homeAbility);
         var (awayLow, awayHigh) = Range(awayAbility);
         var (homeForm, homeInstructions, homeKeeper) = Spec(homeSpec);
@@ -155,38 +265,23 @@ internal static class TickShowcase
             }
         });
 
-        double Average(int[,] table, int side) => Enumerable.Range(0, matches).Average(index => table[index, side]);
+        double[] Averages(int[,] table) => [.. Enumerable.Range(0, 2).Select(side => Enumerable.Range(0, matches).Average(index => table[index, side]))];
 
         var wins = Enumerable.Range(0, matches).Count(index => goals[index, 0] > goals[index, 1]);
         var draws = Enumerable.Range(0, matches).Count(index => goals[index, 0] == goals[index, 1]);
-        var points = ((3.0 * wins) + draws) / matches;
-        var homeGoals = Enumerable.Range(0, matches).Sum(index => goals[index, 0]);
-        var awayGoals = Enumerable.Range(0, matches).Sum(index => goals[index, 1]);
-        var homeOnTarget = Enumerable.Range(0, matches).Sum(index => onTarget[index, 0]);
-        var awayOnTarget = Enumerable.Range(0, matches).Sum(index => onTarget[index, 1]);
+        var totalGoals = Enumerable.Range(0, 2).Select(side => Enumerable.Range(0, matches).Sum(index => goals[index, side])).ToArray();
+        var totalOnTarget = Enumerable.Range(0, 2).Select(side => Enumerable.Range(0, matches).Sum(index => onTarget[index, side])).ToArray();
 
-        Console.WriteLine(
-            $"{label,-34} n={matches} W/D/L {100.0 * wins / matches,3:F0}/{100.0 * draws / matches,3:F0}/{100.0 * (matches - wins - draws) / matches,3:F0}  pts {points:F2}  goals {Average(goals, 0):F2}-{Average(goals, 1):F2}  shots {Average(shots, 0):F1}-{Average(shots, 1):F1}  sot {Average(onTarget, 0):F1}-{Average(onTarget, 1):F1}  goals/sot {100.0 * homeGoals / Math.Max(1, homeOnTarget):F0}%-{100.0 * awayGoals / Math.Max(1, awayOnTarget):F0}%  fouls {Average(fouls, 0):F1}-{Average(fouls, 1):F1}");
-
-        if (Environment.GetEnvironmentVariable("TICK_SHOTS") is not { Length: > 0 })
-        {
-            return;
-        }
-
-        foreach (var side in new[] { 0, 1 })
-        {
-            var tally = perShot[side];
-
-            Console.WriteLine($"    {(side == 0 ? "home" : "away")} open-play shots {tally.Shots} ({tally.Shots / (double)matches:F1}/match), mean distance {tally.DistanceSum / Math.Max(1, tally.Shots) / 100.0:F1} m");
-
-            for (var band = 0; band < ShotTally.Bands.Length; band++)
-            {
-                var n = tally.BandShots[band];
-
-                Console.WriteLine(
-                    $"      {ShotTally.Bands[band],-8} shots {n,5} ({100.0 * n / Math.Max(1, tally.Shots),4:F0}%)  goal {Share(tally.BandGoals[band], n)}  saved {Share(tally.BandSaved[band], n)}  blocked {Share(tally.BandBlocked[band], n)}  off {Share(tally.BandOff[band], n)}  goals/on-target {Share(tally.BandGoals[band], tally.BandGoals[band] + tally.BandSaved[band])}");
-            }
-        }
+        return new Cell(
+            wins,
+            draws,
+            matches - wins - draws,
+            Averages(goals),
+            Averages(shots),
+            Averages(onTarget),
+            Averages(fouls),
+            [.. Enumerable.Range(0, 2).Select(side => totalGoals[side] / (double)Math.Max(1, totalOnTarget[side]))],
+            perShot);
     }
 
     private static string Share(int part, int whole) => $"{100.0 * part / Math.Max(1, whole),3:F0}%";
@@ -199,6 +294,8 @@ internal static class TickShowcase
             .Where(e => e.Type is EngineEventType.Goal or EngineEventType.ShotSaved or EngineEventType.ShotBlocked or EngineEventType.ShotOffTarget or EngineEventType.Woodwork && frameOf.ContainsKey(e.Sequence))
             .Select(e => (Event: e, Frame: frameOf[e.Sequence]))
             .ToList();
+
+        CountBreaks(recording, sides);
 
         foreach (var stamp in recording.Actions.Where(stamp => stamp.Entity >= 0 && stamp.Frame < recording.FrameCount && stamp.Action == PassageAction.Shot))
         {
@@ -230,6 +327,60 @@ internal static class TickShowcase
                     tally.BandOff[band]++;
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Counts the balls a side won in open play in its own half (the other side had it last, with no stoppage between) and how many of them
+    /// became a shot by the side that won it within <see cref="BreakFrames"/>. A keeper picking the ball up is not a regain.
+    /// </summary>
+    private static void CountBreaks(TickMatchRecording recording, ShotTally[] sides)
+    {
+        const int half = TickMatchRecording.Entities / 2;
+        var shotFrames = new List<int>[] { [], [] };
+
+        foreach (var stamp in recording.Actions.Where(stamp => stamp.Entity >= 0 && stamp.Action == PassageAction.Shot))
+        {
+            shotFrames[stamp.Entity / half].Add(stamp.Frame);
+        }
+
+        var lastSide = -1;
+        var interrupted = false;
+
+        for (var frame = 0; frame < recording.FrameCount; frame++)
+        {
+            if (recording.State(frame) != TickPlayState.OpenPlay)
+            {
+                interrupted = true;
+                continue;
+            }
+
+            var controller = recording.Controller(frame);
+
+            if (controller < 0)
+            {
+                continue;
+            }
+
+            var side = controller / half;
+
+            if (side != lastSide && lastSide >= 0 && !interrupted && controller % half != 0)
+            {
+                var ownX = side == 0 ? recording.BallX(frame) : 10_000 - recording.BallX(frame);
+
+                if (ownX < 5_000)
+                {
+                    sides[side].Regains++;
+
+                    if (shotFrames[side].Any(shot => shot >= frame && shot - frame <= BreakFrames))
+                    {
+                        sides[side].Breaks++;
+                    }
+                }
+            }
+
+            lastSide = side;
+            interrupted = false;
         }
     }
 
@@ -305,6 +456,10 @@ internal static class TickShowcase
         public int Shots { get; set; }
 
         public long DistanceSum { get; set; }
+
+        public int Regains { get; set; }
+
+        public int Breaks { get; set; }
 
         public int[] BandShots { get; } = new int[5];
 

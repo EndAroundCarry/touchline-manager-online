@@ -142,6 +142,16 @@ if (mode is "tickexp")
         rules);
 }
 
+if (mode is "tickbalance")
+{
+    // tickbalance [matches a cell] [seed] [quick]   (quick: S1 and the S4 cells with COUNTER only)
+    TickShowcase.Balance(
+        positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var cellMatches) ? Math.Min(cellMatches, 500) : 300,
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var cellSeed) ? cellSeed : 90_000UL,
+        positional.Contains("quick"),
+        rules);
+}
+
 if (mode is "tickshow")
 {
     // tickshow <homeAbility> <awayAbility> (each a number or a range such as 17-20) <seed> --dump file

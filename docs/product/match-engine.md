@@ -2059,3 +2059,30 @@ it into shots: every way of making a carrier keep the ball (the recycle bonus cu
 **Not as planned.** The plan wanted turnovers to fall sharply and moves of five or more passes to convert to shots more than today. Neither came: turnovers fell 3%, and the shots per spell of five to seven passes stayed at about 5%. Most of the plan's other targets were already met before this milestone (passes completed 84%, goals from a long move 42%), and the pinball in
 the turnovers is the physics of a pass (65% of final-third attacker passes arrive), not a choice the brain makes: the loss weights could not move it. The recycle cut is what shows in play (fewer balls given back in the final third); the price was shots, which the thresholds hold at 47 a match (41.5 before).
 Tests: the shots band of `Over_many_matches_between_the_board_formations...` goes to 18 to 44 (it read 41.1), and the standard fixture's seed moves from 20_260_927 to 20_260_928 because the old one now draws a sending-off, which `Every_passage_has_the_ball_and_the_players_on_the_pitch_in_the_viewers_slots` (22 men in every passage) does not allow for.
+
+### 14.24 The tactical-balance yardstick and its baseline (the weaker-side plan, Milestone 0)
+
+**What was added.** `tickbalance [matches] [seed] [quick]` in `tools/simulation-benchmarks` (`TickShowcase.Balance`) plays a fixed table of 44 cells, 300 matches each by default (capped at 500), and prints one row per cell: results, points for both sides, goals, shots, shots on target, open-play shots inside 16 m, goals per shot on target, and **breaks**. A regain is a change of the controlling side in open play (no stoppage since the other side last had the ball, the winner is not the keeper, the ball is in the winner own half); a break is a regain followed by a shot by the same side within 12 s (120 frames). Regains are about 240 a side a match because a loose ball that changes hands counts, so the breaks figure is the one to read. Every cell fixes both keepers (`gk=`), so the keeper cliff never enters. `quick` plays S1 and the S4 cells with COUNTER. The engine is untouched: the golden hash does not move.
+
+Setups: DEF (default 4-4-2), POS (`ment=3,press=2,line=2,tempo=2`), ATT (`ment=4,...`), COUNTER (`form=12,ment=1,press=0,line=0,pass=2,counter=1`), BUS (`form=12,ment=0,press=0,line=0,counter=1,waste=1`). Scenarios, the stronger side at home: S1 17-20 v 15-18, S2 17-20 v 13-15, S3 17-20 v 6, S4 16 v 16 in the full 5 x 5 matrix.
+
+**Baseline (seed 90000, 300 matches a cell; standard error on points about 0.06).** Points of the weaker (away) side, by its setup:
+
+| Scenario, home setup | DEF | POS | COUNTER | BUS |
+|---|---|---|---|---|
+| S1 17-20 v 15-18, home DEF | 0.45 | 1.06 | 0.45 | 0.17 |
+| S1, home POS | 0.07 | 0.15 | 0.30 | 0.17 |
+| S2 17-20 v 13-15, home DEF | 0.12 | 0.26 | 0.18 | 0.18 |
+| S2, home POS | 0.00 | 0.05 | 0.11 | 0.06 |
+| S3 17-20 v 6, home DEF (wins + draws) | 0% | n/a | 0% | 0% |
+
+S4 (16 v 16), points of the away side against home DEF: DEF 0.91, POS 1.86, ATT 2.18, COUNTER 0.90, BUS 0.60. Away COUNTER earns less against a committed home side than against DEF: 0.63 against POS and 0.64 against ATT (home POS and ATT take 2.22 points each), so the counter does not yet punish committing. With the home side on COUNTER the picture is even: it takes 1.46 points against away POS (1.36) and 1.31 against ATT (1.51).
+
+**What the numbers say.**
+- COUNTER is a DEF side with fewer shots: S1 away COUNTER takes 13.3 shots against 15.1 and gets 2.89 breaks a match against 2.10; the opponent still takes 31.6 shots (36.2 against DEF). BUS holds the opponent to 34 shots and 3.12 goals (3.60 against DEF) and has 6.9 shots of its own, 0.70 goals and 0.17 points.
+- Committing forward is free: S1 home POS against away DEF takes 63 shots to 16 and 2.90 points (DEF 2.43); committing costs almost nothing in goals against: the away DEF side scores 1.40 a match against home DEF and 1.34 against home POS.
+- The weaker side best option in S1 is all-out attack (1.06 points), as the plan found. In S2 and S3 nothing helps.
+- S3 holds at baseline: the 6-skill side wins no match in any setup, and the guard for later milestones is that wins plus draws stay at or under 2%.
+- The S4 target "away COUNTER against DEF at least 0.85" is already met at baseline (0.90): that target is a floor to keep, not a gain to chase.
+
+The full table is in the weaker-side plan progress memory. It is the baseline that M5 compares against.
