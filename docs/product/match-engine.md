@@ -2086,3 +2086,31 @@ S4 (16 v 16), points of the away side against home DEF: DEF 0.91, POS 1.86, ATT 
 - The S4 target "away COUNTER against DEF at least 0.85" is already met at baseline (0.90): that target is a floor to keep, not a gain to chase.
 
 The full table is in the weaker-side plan progress memory. It is the baseline that M5 compares against.
+
+### 14.25 A counter-attack in the tick engine (the weaker-side plan, Milestone 1)
+
+**What changed.** `CounterAttack` is read by the tick engine for the first time. A side that has it is **on a break** for 7 s (`BreakTicks`) after it cuts out a pass in flight or wins a tackle in its own 60% of the pitch (`OpenBreak`, `TickMatchLoop.OpenPlay.cs`). The break ends at the first shot, ball played back (`Recycle`) or hoof (`Clear`), at a dead ball, or when the other side takes the ball (`TurnOver`). A loose ball picked up does not open a break: this engine changes hands about 250 times a side a match, and opening on every one put the side "on a break" for about 13 minutes of every match with no gain.
+
+While a side is breaking:
+- **Off the ball** (`TickOffBallSupport`): the run budget is at least 2 whatever the mentality (`BreakRunBudget`), wide midfielders count as runners, and runs start at once: the "nobody within 12 m" and "carrier past his own third" gates are skipped.
+- **On the ball** (`TickBallCarrierBrain`, `HoldTicks`): progress is worth 80 points more (`BreakProgressPercent`), a ball into a runner's path earns the direct side's long-ball value (`BreakRunnerBonus`, 900) whatever the passing style, the mind is 4 sharper (`BreakSharpness`: a decision every tick, not every other) and the dwell before a pass is 30% of its length (`BreakDwellPercent`). A through ball still needs the carrier's Vision, so a poor carrier does not become a good one.
+
+A side without `CounterAttack` is bit-for-bit what it was: every DEF, POS and ATT cell of the table is identical to the baseline, and the golden hash does not move.
+
+**Tried and dropped: the out-ball.** The plan had the side's most advanced forward stay up the pitch without the ball (no out-of-possession depth shift, no share of the ball shift). Measured at 400 matches on three cells (S1 COUNTER, S4 away COUNTER against DEF, S1 BUS) it lowered the weaker side's points in every form: full, phase shift only, ball shift only. Points of the weaker side in S1 / S4: no out-ball 0.56 / 1.14, full out-ball 0.47 / 0.93, phase only 0.40 / 1.02, ball shift only 0.42 / 1.02 (standard error about 0.05). A lone striker 10 m higher does not receive more balls, and the side scores less. It was removed, not left switched off. The break progress bonus is the lever that matters: at 30 the side's shots stay at 13 a match, at 80 they rise to 15-16, at 150 to 19 (but the opponent's goals do not fall, which is Milestone 2's job). The second runner of the budget never starts in a 5-4-1 (one forward, the wide midfielders sit behind the ball): the budget is not a lever here.
+
+**Result (seed 90000, 300 matches a cell; standard error on points about 0.06).** Points of the weaker (away) side, baseline (M0) to M1:
+
+| Scenario, home setup | COUNTER | BUS |
+|---|---|---|
+| S1 17-20 v 15-18, home DEF | 0.45 to 0.59 | 0.17 to 0.30 |
+| S1, home POS | 0.30 to 0.23 | 0.17 to 0.21 |
+| S2 17-20 v 13-15, home DEF | 0.18 to 0.28 | 0.18 to 0.19 |
+| S2, home POS | 0.11 to 0.10 | 0.06 to 0.05 |
+| S4 16 v 16, home DEF | 0.90 to 0.99 | 0.60 to 0.77 |
+| S4, home POS | 0.63 to 0.88 | 0.39 to 0.53 |
+| S4, home ATT | 0.64 to 0.70 | 0.36 to 0.51 |
+
+S3 (17-20 v 6): wins plus draws stay 0% in every setup (guard 2%). Breaks of the COUNTER side a match: S1 against DEF 2.89 to 6.37, against POS 2.67 to 6.72; S4 against DEF 2.96 to 7.14. The side's shots rise 13.3 to 16.1 in S1, and the stronger side's shots stay at 34-36, so the gain is small: **the targets of the plan (S1 COUNTER at least 0.95) are not reached by M1 alone.** The weaker side concedes 3.0 goals a match in S1 whatever it does: the low block of Milestone 2 is the other half.
+
+**Film check.** `tickshow 17-20 15-18 <seed> "gk=17" "form=12,ment=1,press=0,line=0,pass=2,counter=1,gk=15" --dump file` (`tickshow` now takes a home and an away setup after the seed).

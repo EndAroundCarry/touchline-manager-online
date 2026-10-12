@@ -154,13 +154,15 @@ if (mode is "tickbalance")
 
 if (mode is "tickshow")
 {
-    // tickshow <homeAbility> <awayAbility> (each a number or a range such as 17-20) <seed> --dump file
+    // tickshow <homeAbility> <awayAbility> (each a number or a range such as 17-20) <seed> [homeSpec] [awaySpec] --dump file
     TickShowcase.Run(
         positional.Length > 1 ? positional[1] : "17",
         positional.Length > 2 ? positional[2] : "6",
         positional.Length > 3 ? ulong.Parse(positional[3], CultureInfo.InvariantCulture) : seed,
         rules,
-        dumpPath);
+        dumpPath,
+        positional.Length > 4 ? positional[4] : string.Empty,
+        positional.Length > 5 ? positional[5] : string.Empty);
 }
 
 if (mode is "tickmotion")

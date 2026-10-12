@@ -159,6 +159,17 @@ internal sealed class TickTeam
     /// <summary>Gets or sets the last tick the third man's run is on.</summary>
     public int ThirdUntil { get; set; }
 
+    /// <summary>
+    /// Gets or sets the last tick the side's break is on (`weaker-side-v1`, Milestone 1), or -1 for none: it opens when a side with
+    /// <see cref="MatchInstructionsV1.CounterAttack"/> cuts out a pass or wins a tackle in its own 60%, and closes at the first backward pass,
+    /// a shot, a hoof, a dead ball or a turnover. A loose ball picked up is not a break: in this engine the ball changes hands too often.
+    /// </summary>
+    public int BreakUntilTick { get; set; } = -1;
+
+    /// <summary>Gets whether the side is breaking on a tick.</summary>
+    /// <param name="tick">The tick.</param>
+    public bool IsBreaking(int tick) => tick <= BreakUntilTick;
+
     /// <summary>Gets or sets the seat that pressed last tick, or -1.</summary>
     public int PreviousPresser { get; set; } = -1;
 

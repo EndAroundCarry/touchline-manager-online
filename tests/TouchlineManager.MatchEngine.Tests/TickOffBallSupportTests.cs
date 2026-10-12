@@ -328,6 +328,53 @@ public sealed class TickOffBallSupportTests
         Indices(closed.Assign(), TickAttackingRole.Runner).Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(MatchMentality.Defensive, 2)]
+    [InlineData(MatchMentality.Cautious, 2)]
+    [InlineData(MatchMentality.Balanced, 2)]
+    [InlineData(MatchMentality.Positive, 2)]
+    [InlineData(MatchMentality.Attacking, 3)]
+    public void A_side_on_a_break_runs_at_least_two_men_whatever_its_mentality(MatchMentality mentality, int runners)
+    {
+        TickOffBallSupport.RunBudget(mentality, breaking: true).Should().Be(runners);
+        TickOffBallSupport.RunBudget(mentality, breaking: false).Should().Be(TickOffBallSupport.RunBudget(mentality));
+    }
+
+    [Fact]
+    public void A_side_on_a_break_starts_its_run_at_once_with_a_defender_on_the_carrier_and_from_deep()
+    {
+        var pressed = (SpatialPoint[])CompactFourFourTwo.Clone();
+
+        // A defender 8 m from the ball: not free enough to start a run on an ordinary attack, but a break does not wait.
+        pressed[9] = new SpatialPoint(5_300, 3_500);
+
+        Indices(new Scene(isHome: true, 6, CentralMidfielderHasTheBall, pressed, MatchMentality.Defensive).Assign(), TickAttackingRole.Runner)
+            .Should().BeEmpty("a defensive side makes no runs");
+
+        var breaking = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, pressed, MatchMentality.Defensive) { Breaking = true };
+
+        Indices(breaking.Assign(), TickAttackingRole.Runner).Should().NotBeEmpty();
+        Indices(breaking.Assign(), TickAttackingRole.Runner).Should().OnlyContain(index => breaking.Specs[index].Family != MatchPositionFamily.Defence);
+
+        // The ball won 20 m from his own goal: an ordinary attack waits for the carrier to pass his own third.
+        var deep = (SpatialPoint[])CentralMidfielderHasTheBall.Clone();
+
+        deep[6] = new SpatialPoint(2_000, 3_500);
+
+        Indices(new Scene(isHome: true, 6, deep, CompactFourFourTwo, MatchMentality.Balanced).Assign(), TickAttackingRole.Runner).Should().BeEmpty();
+        Indices(new Scene(isHome: true, 6, deep, CompactFourFourTwo, MatchMentality.Balanced) { Breaking = true }.Assign(), TickAttackingRole.Runner).Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void A_wide_midfielder_runs_on_a_break_for_a_side_that_is_not_attacking()
+    {
+        var breaking = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Cautious) { Breaking = true };
+        var runners = Indices(breaking.Assign(), TickAttackingRole.Runner).ToArray();
+
+        runners.Should().HaveCount(2);
+        runners.Select(index => breaking.Specs[index].Family).Should().Contain(MatchPositionFamily.Attack);
+    }
+
     [Fact]
     public void A_forward_beyond_the_line_never_starts_a_run_and_one_held_back_is_kept_onside()
     {
@@ -886,6 +933,8 @@ public sealed class TickOffBallSupportTests
 
         public int PreviousRunners { get; set; }
 
+        public bool Breaking { get; init; }
+
         public int Tick { get; set; }
 
         public SpatialPoint[] Offsets { get; } = new SpatialPoint[11];
@@ -947,6 +996,7 @@ public sealed class TickOffBallSupportTests
                     Offsets = Offsets,
                     HasOffset = HasOffset,
                     OffsetPaces = OffsetPaces,
+                    Breaking = Breaking,
                 },
                 orders);
 

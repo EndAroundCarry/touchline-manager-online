@@ -92,6 +92,12 @@ internal readonly ref struct TickCarrierSituation
 
     /// <summary>Gets how many ticks the carrier has already spent shielding the ball, which wears the option out.</summary>
     public int ShieldTicks { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the carrier's side is on a break (`weaker-side-v1`, Milestone 1): it values going forward more, plays
+    /// a ball into a runner's path as a direct side does, and decides a little quicker.
+    /// </summary>
+    public bool Breaking { get; init; }
 }
 
 /// <summary>
@@ -163,6 +169,9 @@ internal readonly ref struct TickCarrierSituation
 /// <em>cut-back</em> (<see cref="IsCutBack"/>: a ground ball from within 10 m of the goal line and 20 m of the middle of the goal back to the zone
 /// round the penalty spot) is worth <see cref="CutBackWorthPercent"/> of the receiver's own chance of scoring from there, valued as a shot is, in
 /// place of the progress a ball back would lose, and competes with the cross.</para>
+/// <para><b>A break</b> (`weaker-side-v1`, Milestone 1). A carrier whose side has just cut out a pass or won a tackle in its own 60% and
+/// counter-attacks (<see cref="TickCarrierSituation.Breaking"/>) values progress <see cref="BreakProgressPercent"/> points more, a ball into a
+/// runner's path as a direct side's long ball (<see cref="BreakRunnerBonus"/>), and decides <see cref="BreakSharpness"/> sooner.</para>
 /// <para>
 /// <see cref="Execute"/> hits the kick. The error is <c>BaseError × max(25%, 100 − (5 × Passing + Technique) / 2) × (1 +
 /// pressure)</c> in binary angle units (the plan's formula, flattened and floored so that a perfect player is not a machine and a poor
@@ -500,14 +509,25 @@ internal static class TickBallCarrierBrain
     /// <summary>The share of a shot's chance left after N blockers, in basis points.</summary>
     private static readonly int[] BlockerFactors = [10_000, 5_500, 3_025, 1_664, 915];
 
+    /// <summary>The Decisions plus Anticipation a side on a break adds to its carrier's sharpness: he plays the ball at once, as at a high tempo.</summary>
+    public const int BreakSharpness = 4;
+
+    /// <summary>The percent of progress a pass or a carry is worth that a side on a break adds to its mentality's.</summary>
+    public const int BreakProgressPercent = 80;
+
+    /// <summary>The value a ball into a runner's path is given on a break, when it gains 15 m or more over 25 m or more: what a direct side's long forward ball earns.</summary>
+    public const int BreakRunnerBonus = 900;
+
     /// <summary>Gets how many ticks pass between the carrier's decisions: 1 for a sharp mind, otherwise 2.</summary>
     /// <param name="skills">The carrier's skills.</param>
     /// <param name="tempo">The side's tempo; a high one speeds the mind up and a low one slows it.</param>
-    public static int DecisionInterval(in TickPlayerSkills skills, MatchTempo tempo)
+    /// <param name="breaking">Whether the side is on a break, which speeds the mind up by <see cref="BreakSharpness"/>.</param>
+    public static int DecisionInterval(in TickPlayerSkills skills, MatchTempo tempo, bool breaking = false)
     {
         var sharpness = skills.Decisions + skills.Anticipation
             + (tempo == MatchTempo.High ? 4 : 0)
-            - (tempo == MatchTempo.Low ? 4 : 0);
+            - (tempo == MatchTempo.Low ? 4 : 0)
+            + (breaking ? BreakSharpness : 0);
 
         return sharpness >= QuickDecisionSum ? 1 : 2;
     }
@@ -767,7 +787,7 @@ internal static class TickBallCarrierBrain
         var carrierSkills = situation.Skills[situation.CarrierIndex];
         var vision = VisionBase + (VisionStep * carrierSkills.Vision);
         var careless = OffsideCarelessPercent(carrierSkills);
-        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo);
+        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.Breaking);
         var loss = LossOfBall(view);
         var crowded = Congestion(situation, view) >= SwitchCongestion;
         var keeper = situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper;
@@ -850,7 +870,7 @@ internal static class TickBallCarrierBrain
                 + (free && run == TickAttackingRole.ThirdMan && view.Pressure >= TickCombinations.PressedReceiver ? LayOffBonus : 0)
                 + SpaceValue(marker < 0 ? long.MaxValue : markerSquared)
                 + (crowded && IsSwitch(view, aimY, marker < 0 ? long.MaxValue : markerSquared) ? SwitchBonus : 0)
-                + StyleValue(situation.Passing, gain, length)
+                + Math.Max(StyleValue(situation.Passing, gain, length), situation.Breaking && run == TickAttackingRole.Runner ? BreakBallValue(gain, length) : 0)
                 + FocusValue(situation.Focus, aimY)
                 + (through ? ThroughBonus : 0)
                 + (run == TickAttackingRole.Overlap ? OverlapBonus : 0)
@@ -1057,7 +1077,7 @@ internal static class TickBallCarrierBrain
         var skills = situation.Skills[situation.CarrierIndex];
         var mean = ((2 * skills.Dribbling) + skills.Pace + skills.Acceleration) / 4;
         var success = Math.Clamp(5_500 + (250 * mean), 2_000, 9_800) * (BasisPoints - (view.Effective * 45 / 100)) / BasisPoints;
-        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo);
+        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.Breaking);
         var loss = LossOfBall(view);
         var toGoal = TickTrigonometry.AngleOf(SpatialPitch.PitchLength - view.X, SpatialPitch.GoalYCenter - view.Y);
 
@@ -1167,7 +1187,7 @@ internal static class TickBallCarrierBrain
     }
 
     /// <summary>Gets how much going forward is worth, in percent per unit gained: the mentality's and the tempo's.</summary>
-    private static int ProgressPercent(MatchMentality mentality, MatchTempo tempo)
+    private static int ProgressPercent(MatchMentality mentality, MatchTempo tempo, bool breaking)
     {
         var percent = mentality switch
         {
@@ -1178,7 +1198,7 @@ internal static class TickBallCarrierBrain
             _ => 120,
         };
 
-        return percent + (tempo == MatchTempo.High ? 15 : 0) - (tempo == MatchTempo.Low ? 15 : 0);
+        return percent + (tempo == MatchTempo.High ? 15 : 0) - (tempo == MatchTempo.Low ? 15 : 0) + (breaking ? BreakProgressPercent : 0);
     }
 
     private static int ShotEagerness(MatchMentality mentality) => mentality switch
@@ -1204,6 +1224,9 @@ internal static class TickBallCarrierBrain
         MatchPassingStyle.DirectPassing => gain >= 1_500 && length >= 2_500 ? 900 : (length <= 1_200 ? -500 : 0),
         _ => 0,
     };
+
+    /// <summary>Gets what a ball into a runner's path is worth on a break: a direct side's long forward ball, whatever the side's style.</summary>
+    private static int BreakBallValue(int gain, int length) => gain >= 1_500 && length >= 2_500 ? BreakRunnerBonus : 0;
 
     /// <summary>Gets the pass-focus bonus for a ball aimed at a lane, in the side's own point of view (Y counts from its left).</summary>
     private static int FocusValue(MatchPassFocus focus, int y)

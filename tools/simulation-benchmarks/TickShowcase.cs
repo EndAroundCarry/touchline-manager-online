@@ -31,15 +31,19 @@ internal static class TickShowcase
     /// <param name="seed">The match seed.</param>
     /// <param name="rules">The rules in force.</param>
     /// <param name="dump">Where to write the film, or null.</param>
-    public static void Run(string homeAbility, string awayAbility, ulong seed, EngineRulesV2 rules, string? dump)
+    /// <param name="homeSpec">The home side's setup in the <c>tickexp</c> spec language (<c>ment=1,counter=1,...</c>), or empty for the default 4-4-2.</param>
+    /// <param name="awaySpec">The away side's setup, likewise.</param>
+    public static void Run(string homeAbility, string awayAbility, ulong seed, EngineRulesV2 rules, string? dump, string homeSpec = "", string awaySpec = "")
     {
         var (homeLow, homeHigh) = Range(homeAbility);
         var (awayLow, awayHigh) = Range(awayAbility);
-        var built = LaboratoryFixtures.Build(seed, homeLow, awayLow, new(), new(), rules);
+        var (homeForm, homeInstructions, homeKeeper) = Spec(homeSpec);
+        var (awayForm, awayInstructions, awayKeeper) = Spec(awaySpec);
+        var built = LaboratoryFixtures.Build(seed, homeLow, awayLow, homeInstructions, awayInstructions, rules);
         var input = TickCalibration.Stand(
-            built with { Home = Spread(built.Home, homeLow, homeHigh), Away = Spread(built.Away, awayLow, awayHigh) },
-            FormationPreset.FourFourTwo,
-            FormationPreset.FourFourTwo);
+            built with { Home = Keeper(Spread(built.Home, homeLow, homeHigh), homeKeeper), Away = Keeper(Spread(built.Away, awayLow, awayHigh), awayKeeper) },
+            homeForm,
+            awayForm);
         var liveMetrics = new PlayerLiveMetricsRecorder();
         var recorder = new MatchPassageRecorder();
         var result = MatchSimulator.Simulate(input, rules, liveMetrics, recorder, TickMatchEngine.Instance);

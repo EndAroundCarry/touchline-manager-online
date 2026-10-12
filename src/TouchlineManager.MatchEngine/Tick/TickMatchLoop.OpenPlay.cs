@@ -228,6 +228,8 @@ internal sealed partial class TickMatchLoop
     /// <summary>While the ball is dead the references sit on it, so open play begins with the block where the restart is.</summary>
     private void SnapReferences()
     {
+        CloseBreak();
+
         foreach (var team in _teams)
         {
             team.RefX = _ball.UnitX;
@@ -285,6 +287,7 @@ internal sealed partial class TickMatchLoop
             ReturnTarget = attackers.ReturnTarget,
             ThirdSeat = thirdSeat,
             ThirdTarget = attackers.ThirdTarget,
+            Breaking = attackers.IsBreaking(_tick),
         };
 
         var orders = attackers.AttackOrders.AsSpan(0, count);
@@ -717,7 +720,8 @@ internal sealed partial class TickMatchLoop
         var keeper = team.IsKeeper(seat);
         var skills = team.Skills[seat];
         var instructions = team.Runtime.Instructions;
-        var interval = TickBallCarrierBrain.DecisionInterval(skills, instructions.Tempo);
+        var breaking = team.IsBreaking(_tick);
+        var interval = TickBallCarrierBrain.DecisionInterval(skills, instructions.Tempo, breaking);
 
         if (keeper && _heldTicks < KeeperHoldTicks)
         {
@@ -745,7 +749,7 @@ internal sealed partial class TickMatchLoop
                 break;
 
             default:
-                if (_heldTicks >= HoldTicks(_decision, skills, instructions.Tempo, keeper))
+                if (_heldTicks >= HoldTicks(_decision, skills, instructions.Tempo, keeper, breaking))
                 {
                     Kick(side, seat, _decision);
                 }
@@ -782,6 +786,7 @@ internal sealed partial class TickMatchLoop
             CarrierIndex = seat,
             Orders = team.AttackOrders.AsSpan(0, count),
             ShieldTicks = shieldTicks,
+            Breaking = team.IsBreaking(_tick),
         });
     }
 
@@ -806,6 +811,9 @@ internal sealed partial class TickMatchLoop
     /// <summary>The pressure, in basis points, at which a man has no time to dwell.</summary>
     private const int DwellScale = 8_000;
 
+    /// <summary>The share of his dwell a man on a break keeps, in percent: he looks up and plays at once, with the other side still running back.</summary>
+    private const int BreakDwellPercent = 30;
+
     /// <summary>The longest a man keeps the ball before he plays it when nothing forces him (4 s).</summary>
     private const int MaximumDwellTicks = 40;
 
@@ -822,7 +830,7 @@ internal sealed partial class TickMatchLoop
     /// <see cref="OneTouchPressure"/> or he shoots. A shot takes its three tenths; a clearance is a flick; a through ball is played on the
     /// first tick (<see cref="ThroughBallHoldTicks"/>), however free he is. A goalkeeper has already waited.
     /// </summary>
-    internal static int HoldTicks(in TickCarrierDecision decision, in TickPlayerSkills skills, MatchTempo tempo, bool keeper)
+    internal static int HoldTicks(in TickCarrierDecision decision, in TickPlayerSkills skills, MatchTempo tempo, bool keeper, bool breaking = false)
     {
         if (keeper)
         {
@@ -861,6 +869,11 @@ internal sealed partial class TickMatchLoop
             _ => dwell,
         };
 
+        if (breaking)
+        {
+            dwell = dwell * BreakDwellPercent / 100;
+        }
+
         return FirstTouchTicks + Math.Min(dwell, MaximumDwellTicks);
     }
 
@@ -891,6 +904,12 @@ internal sealed partial class TickMatchLoop
         _offsidePending = false;
         _passPending = false;
         Touch(me);
+
+        if (EndsBreak(decision.Action))
+        {
+            // A shot, a ball played back and a hoof end the break: it is over once the side stops going forward.
+            team.BreakUntilTick = -1;
+        }
 
         switch (decision.Action)
         {
@@ -1153,6 +1172,7 @@ internal sealed partial class TickMatchLoop
                 _controllerSide = 1 - side;
                 Touch(challengerRef);
                 TurnOver();
+                OpenBreak(1 - side);
                 break;
 
             case TickTackleOutcome.PokedLoose:
@@ -1363,9 +1383,55 @@ internal sealed partial class TickMatchLoop
 
     private static void Rate(TickTeam team, Guid id, int delta) => team.Runtime.AdjustLiveRating(id, delta);
 
+    /// <summary>The ticks a break lasts from the regain (7 s).</summary>
+    private const int BreakTicks = 70;
+
+    /// <summary>The farthest up the pitch the ball may be won for a break, in the winning side's own point of view (its own 60%).</summary>
+    private const int BreakZoneUnits = SpatialPitch.PitchLength * 6 / 10;
+
+    /// <summary>
+    /// A side has cut out a pass or won a tackle: if it counter-attacks and won the ball in its own 60% it is on a break for seven seconds
+    /// (`weaker-side-v1`, Milestone 1). It runs at once and plays forward until a ball goes back, a shot is taken or the ball goes dead
+    /// (<see cref="CloseBreak"/>), or the other side wins it back (<see cref="TurnOver"/>). A loose ball picked up does not open one.
+    /// </summary>
+    private void OpenBreak(int side)
+    {
+        var team = _teams[side];
+
+        if (!OpensBreak(team.Runtime.Instructions.CounterAttack, team.IsHome, _ball.UnitX))
+        {
+            return;
+        }
+
+        team.BreakUntilTick = _tick + BreakTicks;
+    }
+
+    /// <summary>Gets whether a ball cut out or tackled away opens a break: the side counter-attacks and won it in its own 60%.</summary>
+    /// <param name="counterAttack">Whether the side's instructions ask for the counter-attack.</param>
+    /// <param name="isHome">Whether the side is the home side.</param>
+    /// <param name="ballX">The X the ball was won at, in absolute pitch units.</param>
+    internal static bool OpensBreak(bool counterAttack, bool isHome, int ballX) =>
+        counterAttack && (isHome ? ballX : SpatialPitch.PitchLength - ballX) <= BreakZoneUnits;
+
+    /// <summary>Gets whether a kick ends the break: a shot, a ball played back and a hoof are the side no longer going forward.</summary>
+    /// <param name="action">What the man with the ball did.</param>
+    internal static bool EndsBreak(TickCarrierAction action) =>
+        action is TickCarrierAction.Shoot or TickCarrierAction.Recycle or TickCarrierAction.Clear;
+
+    /// <summary>The break of both sides is over.</summary>
+    private void CloseBreak()
+    {
+        foreach (var team in _teams)
+        {
+            team.BreakUntilTick = -1;
+        }
+    }
+
     /// <summary>The ball has changed hands: the old side's movement is forgotten and the new carrier decides afresh.</summary>
     private void TurnOver()
     {
+        CloseBreak();
+
         foreach (var team in _teams)
         {
             team.SupporterMask = 0;
@@ -1607,6 +1673,7 @@ internal sealed partial class TickMatchLoop
         var team = _teams[side];
         var me = new TickRef(side, team.SlotNumber[seat]);
         var changedSide = _lastTouch.IsNone || _lastTouch.Side != side;
+        var intercepted = _passPending && side != _passer.Side;
 
         if (_offsidePending)
         {
@@ -1653,6 +1720,11 @@ internal sealed partial class TickMatchLoop
         if (changedSide)
         {
             TurnOver();
+
+            if (intercepted && !team.IsKeeper(seat))
+            {
+                OpenBreak(side);
+            }
         }
     }
 

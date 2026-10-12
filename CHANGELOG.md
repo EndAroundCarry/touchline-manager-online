@@ -4,6 +4,20 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 1 — a counter-attack in the tick engine
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) §14.25. **The engine's play changes for a side with `CounterAttack`** (the golden hash does not move, no fixture has it on, and engine-v12 keeps its label): every other side plays as before.
+
+### Changed
+
+- `CounterAttack` is read by the tick engine. A side that cuts out a pass or wins a tackle in its own 60% is on a break for 7 s: at least 2 runners at once whatever the mentality, wide midfielders included; its carrier values going forward 80 points more, plays a ball into a runner's path as a direct side would, decides every tick and looks up for 30% of the usual time. The break ends at a shot, a ball played back, a hoof, a dead ball or a turnover.
+- S1 17-20 v 15-18: the weaker side on COUNTER 0.45 to 0.59 points against DEF, BUS 0.17 to 0.30; its breaks a match 2.9 to 6.4. The plan targets are not reached yet (Milestone 2, the low block, is the other half). The out-ball was tried and dropped: it lowered the side's points.
+- `tickshow` takes a home and an away setup after the seed.
+
+### Added
+
+- Tests: when a break opens and shuts, the run budget and immediate runs on a break, the carrier's quicker decision and release.
+
 ## Weaker-side plan, Milestone 0 â€” the `tickbalance` yardstick
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) Â§14.24. **The engine does not change** (the golden hash is the same).
