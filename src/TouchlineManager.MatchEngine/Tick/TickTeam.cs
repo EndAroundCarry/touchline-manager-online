@@ -166,6 +166,18 @@ internal sealed class TickTeam
     /// </summary>
     public int BreakUntilTick { get; set; } = -1;
 
+    /// <summary>
+    /// Gets or sets the fewest runners the side's break sends (`weaker-side-v1`, Milestone 1b), or 0 for the mentality's own number: set
+    /// with the window by <see cref="TickBreakGain.Plan"/>, from the opponent's posture and the two sides' speed.
+    /// </summary>
+    public int BreakRunners { get; set; }
+
+    /// <summary>Gets or sets the percent of progress the break's carrier values a ball forward at, on top of his mentality's (`weaker-side-v1`, Milestone 1b).</summary>
+    public int BreakProgressPercent { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether the break's runners start at once, without waiting for a free carrier.</summary>
+    public bool BreakImmediate { get; set; }
+
     /// <summary>Gets whether the side is breaking on a tick.</summary>
     /// <param name="tick">The tick.</param>
     public bool IsBreaking(int tick) => tick <= BreakUntilTick;

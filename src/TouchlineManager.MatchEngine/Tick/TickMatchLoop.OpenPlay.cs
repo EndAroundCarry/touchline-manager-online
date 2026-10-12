@@ -287,7 +287,8 @@ internal sealed partial class TickMatchLoop
             ReturnTarget = attackers.ReturnTarget,
             ThirdSeat = thirdSeat,
             ThirdTarget = attackers.ThirdTarget,
-            Breaking = attackers.IsBreaking(_tick),
+            BreakRunners = attackers.IsBreaking(_tick) ? attackers.BreakRunners : 0,
+            BreakImmediate = attackers.IsBreaking(_tick) && attackers.BreakImmediate,
         };
 
         var orders = attackers.AttackOrders.AsSpan(0, count);
@@ -787,6 +788,8 @@ internal sealed partial class TickMatchLoop
             Orders = team.AttackOrders.AsSpan(0, count),
             ShieldTicks = shieldTicks,
             Breaking = team.IsBreaking(_tick),
+            BreakProgress = team.IsBreaking(_tick) ? team.BreakProgressPercent : 0,
+            Waiting = instructions.CounterAttack && !team.IsBreaking(_tick),
         });
     }
 
@@ -1383,15 +1386,13 @@ internal sealed partial class TickMatchLoop
 
     private static void Rate(TickTeam team, Guid id, int delta) => team.Runtime.AdjustLiveRating(id, delta);
 
-    /// <summary>The ticks a break lasts from the regain (7 s).</summary>
-    private const int BreakTicks = 70;
-
     /// <summary>The farthest up the pitch the ball may be won for a break, in the winning side's own point of view (its own 60%).</summary>
     private const int BreakZoneUnits = SpatialPitch.PitchLength * 6 / 10;
 
     /// <summary>
-    /// A side has cut out a pass or won a tackle: if it counter-attacks and won the ball in its own 60% it is on a break for seven seconds
-    /// (`weaker-side-v1`, Milestone 1). It runs at once and plays forward until a ball goes back, a shot is taken or the ball goes dead
+    /// A side has cut out a pass or won a tackle: if it counter-attacks and won the ball in its own 60% it is on a break
+    /// (`weaker-side-v1`, Milestone 1) whose length, runners and start are set by <see cref="TickBreakGain.Plan"/> from the opponent's posture and
+    /// the two sides' speed (Milestone 1b). It plays forward until a ball goes back, a shot is taken or the ball goes dead
     /// (<see cref="CloseBreak"/>), or the other side wins it back (<see cref="TurnOver"/>). A loose ball picked up does not open one.
     /// </summary>
     private void OpenBreak(int side)
@@ -1403,7 +1404,15 @@ internal sealed partial class TickMatchLoop
             return;
         }
 
-        team.BreakUntilTick = _tick + BreakTicks;
+        var opponent = _teams[1 - side];
+        var edge = TickBreakGain.GroupSpeed(opponent, MatchPositionFamily.Defence, MatchPositionFamily.Midfield)
+            - TickBreakGain.GroupSpeed(team, MatchPositionFamily.Attack, MatchPositionFamily.Midfield);
+        var plan = TickBreakGain.Plan(TickTeamStyle.Posture(opponent.Runtime.Instructions), TickBreakGain.SpeedFactorPercent(edge));
+
+        team.BreakUntilTick = _tick + plan.Ticks;
+        team.BreakRunners = plan.Runners;
+        team.BreakImmediate = plan.Immediate;
+        team.BreakProgressPercent = plan.ProgressPercent;
     }
 
     /// <summary>Gets whether a ball cut out or tackled away opens a break: the side counter-attacks and won it in its own 60%.</summary>

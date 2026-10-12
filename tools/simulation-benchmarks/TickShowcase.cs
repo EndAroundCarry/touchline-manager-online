@@ -37,11 +37,11 @@ internal static class TickShowcase
     {
         var (homeLow, homeHigh) = Range(homeAbility);
         var (awayLow, awayHigh) = Range(awayAbility);
-        var (homeForm, homeInstructions, homeKeeper) = Spec(homeSpec);
-        var (awayForm, awayInstructions, awayKeeper) = Spec(awaySpec);
+        var (homeForm, homeInstructions, homeKeeper, homePace) = Spec(homeSpec);
+        var (awayForm, awayInstructions, awayKeeper, awayPace) = Spec(awaySpec);
         var built = LaboratoryFixtures.Build(seed, homeLow, awayLow, homeInstructions, awayInstructions, rules);
         var input = TickCalibration.Stand(
-            built with { Home = Keeper(Spread(built.Home, homeLow, homeHigh), homeKeeper), Away = Keeper(Spread(built.Away, awayLow, awayHigh), awayKeeper) },
+            built with { Home = Paced(Keeper(Spread(built.Home, homeLow, homeHigh), homeKeeper), homePace), Away = Paced(Keeper(Spread(built.Away, awayLow, awayHigh), awayKeeper), awayPace) },
             homeForm,
             awayForm);
         var liveMetrics = new PlayerLiveMetricsRecorder();
@@ -111,7 +111,7 @@ internal static class TickShowcase
     /// </summary>
     /// <remarks>
     /// A side spec is a comma-separated list of <c>key=value</c>: form (a <see cref="FormationPreset"/> number), ment, tempo, pass, width, focus, press,
-    /// line, tackle, waste (the enum numbers) and counter (0 or 1). Anything left out is the default.
+    /// line, tackle, waste (the enum numbers), counter (0 or 1), gk (the keeper's ability) and pace (Pace and Acceleration of every outfield player). Anything left out is the default.
     /// </remarks>
     /// <param name="label">What the row is called.</param>
     /// <param name="homeAbility">The home side's ability, a number or a range.</param>
@@ -161,7 +161,8 @@ internal static class TickShowcase
     /// <param name="seed">The base seed.</param>
     /// <param name="quick">Whether to play only S1 and the S4 cells with COUNTER, for iterating.</param>
     /// <param name="rules">The rules in force.</param>
-    public static void Balance(int matches, ulong seed, bool quick, EngineRulesV2 rules)
+    /// <param name="only">The names (or prefixes, such as S6) of the scenarios to play; empty plays S1 to S4.</param>
+    public static void Balance(int matches, ulong seed, bool quick, EngineRulesV2 rules, string[] only)
     {
         var setups = new Dictionary<string, string>
         {
@@ -170,19 +171,32 @@ internal static class TickShowcase
             ["ATT"] = "ment=4,press=2,line=2,tempo=2",
             ["COUNTER"] = "form=12,ment=1,press=0,line=0,pass=2,counter=1",
             ["BUS"] = "form=12,ment=0,press=0,line=0,counter=1,waste=1",
+            ["DEEP"] = "form=12,ment=0,press=0,line=0",
+            ["COUNTER0"] = "form=12,ment=1,press=0,line=0,pass=2,counter=0",
         };
-        var scenarios = new List<(string Name, string Home, string Away, int HomeKeeper, int AwayKeeper, string[] HomeSetups, string[] AwaySetups)>
+        string[] matrix = ["DEF", "POS", "ATT", "COUNTER", "BUS"];
+        string[] deepOrCounter = ["COUNTER", "COUNTER0", "DEEP"];
+        var scenarios = new List<(string Name, string Home, string Away, int HomeKeeper, int AwayKeeper, int HomePace, int AwayPace, string[] HomeSetups, string[] AwaySetups)>
         {
-            ("S1", "17-20", "15-18", 17, 15, ["DEF", "POS"], ["DEF", "POS", "COUNTER", "BUS"]),
-            ("S2", "17-20", "13-15", 17, 13, ["DEF", "POS"], ["DEF", "POS", "COUNTER", "BUS"]),
-            ("S3", "17-20", "6", 17, 6, ["DEF"], ["DEF", "COUNTER", "BUS"]),
-            ("S4", "16", "16", 16, 16, [.. setups.Keys], [.. setups.Keys]),
+            ("S1", "17-20", "15-18", 17, 15, 0, 0, ["DEF", "POS"], ["DEF", "POS", "COUNTER", "COUNTER0", "DEEP", "BUS"]),
+            ("S2", "17-20", "13-15", 17, 13, 0, 0, ["DEF", "POS"], ["DEF", "POS", "COUNTER", "COUNTER0", "DEEP", "BUS"]),
+            ("S3", "17-20", "6", 17, 6, 0, 0, ["DEF"], ["DEF", "COUNTER", "BUS"]),
+            ("S4", "16", "16", 16, 16, 0, 0, matrix, matrix),
+            ("S5", "16", "16", 16, 16, 0, 0, ["DEF", "POS", "ATT", "DEEP"], ["COUNTER", "COUNTER0"]),
+            ("S6n", "17-20", "15-18", 17, 15, 0, 0, ["DEF", "POS"], deepOrCounter),
+            ("S6a", "17-20", "15-18", 17, 15, 20, 16, ["DEF", "POS"], deepOrCounter),
+            ("S6b", "17-20", "15-18", 17, 15, 16, 19, ["DEF", "POS"], deepOrCounter),
+            ("S6c", "14", "14", 14, 14, 15, 13, ["DEF", "POS"], deepOrCounter),
         };
+        var awayOnly = (Environment.GetEnvironmentVariable("TB_AWAY") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries);
+        var chosen = only.Length > 0
+            ? scenarios.Where(scenario => only.Any(name => scenario.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase))).ToList()
+            : [.. scenarios.Where(scenario => scenario.Name is "S1" or "S2" or "S3" or "S4")];
 
         Console.WriteLine($"== tickbalance: {matches} matches a cell, seed {seed}{(quick ? ", quick subset" : string.Empty)} ==");
         Console.WriteLine("   home v away (setup)                    W/D/L %  pts home-away  goals       shots       sot         <16 m shots  goals/sot  breaks/match (regains)");
 
-        foreach (var (name, home, away, homeKeeper, awayKeeper, homeSetups, awaySetups) in scenarios)
+        foreach (var (name, home, away, homeKeeper, awayKeeper, homePace, awayPace, homeSetups, awaySetups) in chosen)
         {
             if (quick && name is "S2" or "S3")
             {
@@ -193,12 +207,19 @@ internal static class TickShowcase
             {
                 foreach (var awaySetup in awaySetups)
                 {
+                    if (awayOnly.Length > 0 && !awayOnly.Contains(awaySetup))
+                    {
+                        continue;
+                    }
+
                     if (quick && name == "S4" && homeSetup != "COUNTER" && awaySetup != "COUNTER")
                     {
                         continue;
                     }
 
-                    var cell = Measure(home, away, $"gk={homeKeeper}{Join(setups[homeSetup])}", $"gk={awayKeeper}{Join(setups[awaySetup])}", matches, seed, rules);
+                    var homeSpec = $"gk={homeKeeper}{(homePace > 0 ? $",pace={homePace}" : string.Empty)}{Join(setups[homeSetup])}";
+                    var awaySpec = $"gk={awayKeeper}{(awayPace > 0 ? $",pace={awayPace}" : string.Empty)}{Join(setups[awaySetup])}";
+                    var cell = Measure(home, away, homeSpec, awaySpec, matches, seed, rules);
                     var insideSixteen = cell.PerShot.Select(tally => (tally.BandShots[0] + tally.BandShots[1] + tally.BandShots[2]) / (double)matches).ToArray();
                     var breaks = cell.PerShot.Select(tally => (Breaks: tally.Breaks / (double)matches, Regains: tally.Regains / (double)matches)).ToArray();
 
@@ -232,8 +253,8 @@ internal static class TickShowcase
     {
         var (homeLow, homeHigh) = Range(homeAbility);
         var (awayLow, awayHigh) = Range(awayAbility);
-        var (homeForm, homeInstructions, homeKeeper) = Spec(homeSpec);
-        var (awayForm, awayInstructions, awayKeeper) = Spec(awaySpec);
+        var (homeForm, homeInstructions, homeKeeper, homePace) = Spec(homeSpec);
+        var (awayForm, awayInstructions, awayKeeper, awayPace) = Spec(awaySpec);
         var goals = new int[matches, 2];
         var shots = new int[matches, 2];
         var onTarget = new int[matches, 2];
@@ -245,7 +266,7 @@ internal static class TickShowcase
         {
             var built = LaboratoryFixtures.Build(seed + (ulong)index, homeLow, awayLow, homeInstructions, awayInstructions, rules);
             var input = TickCalibration.Stand(
-                built with { Home = Keeper(Spread(built.Home, homeLow, homeHigh), homeKeeper), Away = Keeper(Spread(built.Away, awayLow, awayHigh), awayKeeper) },
+                built with { Home = Paced(Keeper(Spread(built.Home, homeLow, homeHigh), homeKeeper), homePace), Away = Paced(Keeper(Spread(built.Away, awayLow, awayHigh), awayKeeper), awayPace) },
                 homeForm,
                 awayForm);
             var recorder = new MatchPassageRecorder();
@@ -396,9 +417,30 @@ internal static class TickShowcase
                 Squad = [.. side.Squad.Select(player => player.IsGoalkeeper ? player with { Attributes = PlayerAttributesV1.Uniform(ability.Value) } : player)],
             };
 
-    private static (FormationPreset Formation, MatchInstructionsV1 Instructions, int? Keeper) Spec(string spec)
+    /// <summary>Sets Pace and Acceleration of every outfield player to a value and leaves his other attributes as they are.</summary>
+    private static MatchSideV1 Paced(MatchSideV1 side, int? pace) =>
+        pace is null
+            ? side
+            : side with
+            {
+                Squad =
+                [
+                    .. side.Squad.Select(player => player.IsGoalkeeper
+                        ? player
+                        : player with
+                        {
+                            Attributes = PlayerAttributesV1.From(
+                            [
+                                .. player.Attributes.Values.Select((value, index) => index is (int)MatchAttributeName.Pace or (int)MatchAttributeName.Acceleration ? pace.Value : value),
+                            ]),
+                        }),
+                ],
+            };
+
+    private static (FormationPreset Formation, MatchInstructionsV1 Instructions, int? Keeper, int? Pace) Spec(string spec)
     {
         int? keeper = null;
+        int? pace = null;
         var formation = FormationPreset.FourFourTwo;
         var instructions = new MatchInstructionsV1();
 
@@ -411,6 +453,9 @@ internal static class TickShowcase
             {
                 case "gk":
                     keeper = value;
+                    break;
+                case "pace":
+                    pace = value;
                     break;
                 case "form":
                     formation = (FormationPreset)value;
@@ -450,7 +495,7 @@ internal static class TickShowcase
             }
         }
 
-        return (formation, instructions, keeper);
+        return (formation, instructions, keeper, pace);
     }
 
     private sealed class ShotTally

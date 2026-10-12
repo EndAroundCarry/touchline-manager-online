@@ -2114,3 +2114,41 @@ A side without `CounterAttack` is bit-for-bit what it was: every DEF, POS and AT
 S3 (17-20 v 6): wins plus draws stay 0% in every setup (guard 2%). Breaks of the COUNTER side a match: S1 against DEF 2.89 to 6.37, against POS 2.67 to 6.72; S4 against DEF 2.96 to 7.14. The side's shots rise 13.3 to 16.1 in S1, and the stronger side's shots stay at 34-36, so the gain is small: **the targets of the plan (S1 COUNTER at least 0.95) are not reached by M1 alone.** The weaker side concedes 3.0 goals a match in S1 whatever it does: the low block of Milestone 2 is the other half.
 
 **Film check.** `tickshow 17-20 15-18 <seed> "gk=17" "form=12,ment=1,press=0,line=0,pass=2,counter=1,gk=15" --dump file` (`tickshow` now takes a home and an away setup after the seed).
+
+### 14.26 The counter depends on the opponent (the weaker-side plan, Milestone 1b)
+
+**What changed.** The break of §14.25 is no longer the same against everyone. Its size is worked out at the regain (`OpenBreak`, `TickBreakGain.Plan`) from two things: how the opponent plays, and how quick the two sides are.
+
+- **Posture** (`TickTeamStyle.Posture`): mentality Defensive -2 to Attacking +2, defensive line Deep -1 to High +1, pressing LowBlock -1 to HighPress +1, clamped to -4..+4. DEF is 0, POS +3, ATT +4, BUS and a deep 5-4-1 -4. The formation does not count.
+- **Gain** (percent) = `GainAtBalancedPercent` (100) + `GainPerPosturePercent` (50) per point of posture, never below 0, times the **speed factor**. It sets the break's length (70 ticks per 100%), its runners (one per 50%, at most 3), whether they start at once (from 75%) and how much more the carrier values a ball forward (120 points per 100%, counted up to 100% so that it cannot run away: scaling it to 250% gave the side +0.75 points against POS; and times the speed factor twice over, so a break a quicker side can catch loses its hurry faster than its length).
+- **Speed** (`GroupSpeed`, `SpeedFactorPercent`): the breakers are the side's Attack and Midfield families, the recoverers the opponent's Defence and Midfield families, over the men on the pitch at the regain. A man's speed is `(Pace + Acceleration) / 2` read back from the physics profile (raw attributes: the `Skills` are pulled towards the average by the skill curve, which shrank a 2-point gap to under 1) and scaled by his energy as the physics scales his top speed. The factor is 100% at no edge, falls 15 points for each point the recoverers are quicker (floor 30%) and rises 15 for each point the breakers are quicker (ceiling 115%). It is relative: 13 against 15 counts as 18 against 20.
+- **The cost, paid against everyone** (`TickCarrierSituation.Waiting`, `WaitProgressPercent` 28): a side that counter-attacks and is not on a break does not force the play, so its carrier values going forward 28 points less. Against a side that attacks, the breaks make that up; against a side that sits deep, nothing does. This replaces the out-ball of the plan (dropped in §14.25) and the "hurry" of a minimum-length window: with a 3 s minimum window the flag was a *gain* of +0.26 points against DEEP, because the quick release and the forward bias only help against a side that does not attack. A deep opponent now gives no window at all (gain 0).
+
+A side without `CounterAttack` is bit-for-bit what it was; the golden hash does not move.
+
+**Result (500 matches a cell, seeds 90000 and 95000; the difference of two cells has a standard error of about 0.09, so about 0.065 for the mean of two seeds).** The flag's effect is the away side's points on COUNTER minus COUNTER0 (the same setup, `counter=0`). "Before" is §14.25; the two columns after it are the final constants (speed step 15, waiting cost 28, progress 120 capped at 100% and following the speed factor twice, ceiling 115%):
+
+| Cell | Before | Seed 90000 | Seed 95000 | Target |
+|---|---|---|---|---|
+| S5 16 v 16, home DEF | +0.08 | -0.04 | -0.05 | within 0.07 |
+| S5, home POS | +0.18 | +0.26 | +0.21 | at least +0.20 |
+| S5, home ATT | +0.17 | +0.28 | +0.27 | at least +0.20 |
+| S5, home DEEP | +0.26 | -0.37 | -0.43 | -0.10 or less |
+| S6a (opponent quicker by 4), home DEF | +0.03 | -0.10 | -0.14 | -0.05 to -0.15 |
+| S6a, home POS | 0.00 | -0.02 | -0.06 | -0.05 to -0.15 |
+| S6b (breakers quicker by 3), home DEF | +0.14 | +0.25 | +0.16 | (larger than at no edge) |
+| S6b, home POS | +0.07 | +0.32 | +0.43 | S5 POS +0.05 |
+| S6c (14 v 14, opponent quicker by 2), home DEF | +0.18 | -0.13 | -0.31 | a small minus |
+| S6c, home POS | +0.05 | -0.05 | -0.03 | a small minus |
+| S6n (17-20 v 15-18, no pace override), home DEF | n/a | -0.09 | -0.17 | (no target: the weaker side is about 2 points slower) |
+| S6n, home POS | n/a | -0.01 | +0.02 | (no target) |
+
+**How the step was settled.** The plan asks for a step of about 15% a point, and at 15% the gain against an attacking side barely moves with speed: the runners (at most 3) and the progress cap are already saturated, so a 15% loss left the flag at about zero against POS in S6a and S6c, whatever the cost. What turned it into a small minus was a larger cost and a larger gain together (waiting 14 to 28, progress 80 to 120) with the progress following the speed factor twice over and capped at the balanced gain. Seven variants were swept in two rounds (seed 90000, COUNTER cells only, the COUNTER0 cells reused as they cannot change), and the last one was confirmed on a second seed. **S6b** stays inside the caps with a lower ceiling (115%): the better side wins 63-68% and the weaker one 20-22%, which the plan allows up to about 25%. S6c against DEF is a larger minus on the second seed (-0.31) than the target's range: the two-seed mean is -0.22.
+
+Not reached: **DEEP at least as many points as COUNTER in S6a against DEF** (0.20 against 0.32). That target compares two setups, not the flag: COUNTER0 is Cautious and direct, DEEP is Defensive, and COUNTER0 alone has 0.42 against DEEP's 0.20. It belongs to Milestone 2 (the Defensive outlet).
+
+**Other guards (final constants).** S4 away COUNTER against home DEF is the S5 cell: 0.90 and 0.89 points on the two seeds (target 0.85). S3 (17-20 v 6, 300 matches): wins plus draws 0% for COUNTER and 1% for BUS (guard 2%). **S1 17-20 v 15-18, 300 matches:** the weaker side on COUNTER against DEF 0.34 points (0.25 with the old constants, 0.45 at baseline), against POS 0.26; BUS against DEF 0.15, against POS 0.18. The weaker side is about 2 points slower, so its speed factor is about 70% and the break is a little under a full break. Decided 2026-10-12: a counter works for a weaker side only if its forwards and midfielders are fast, because the real question is whether the opponent can catch up, reorganise and defend; the flag has no S1 target (its effect against POS in S1 was -0.01 and +0.02 on two seeds, against DEF -0.09 and -0.17). Lifting the weaker side in S1 is the work of the low block and a Defensive outlet (Milestone 2) and the size of the bonus (2b). `tickbalance` S1 and S2 now also play COUNTER0 and DEEP.
+
+**Global checks.** The full MatchEngine suite passes (1,585 tests, 3 min 54 s); the golden hash did not move. `tickmotion 200 1` runs and its film windows are healthy (goals and shots cut off 0.3% and 0.2%). `tick 500` gives 3.82 goals and 40 shots a match, outside the plan's 2.6-2.9 and 22-28 bands: that fixture has no counter flag, so nothing in this milestone changes it; it is the shot volume left by the keeper-gift work (the stored snapshots gave 2.9 goals and 47 shots). `ticksnap 205` was not run: it needs the database export and repeats what the golden hash already shows for a side without the flag.
+
+**Film check.** `tickshow 16 16 90003 "gk=16,ment=3,press=2,line=2,tempo=2" "gk=16,form=12,ment=1,press=0,line=0,pass=2,counter=1" --dump file` (against POS) and `... "gk=16,form=12,ment=0,press=0,line=0" ...` (against a deep side).

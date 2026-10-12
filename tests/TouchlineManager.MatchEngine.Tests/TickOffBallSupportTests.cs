@@ -336,8 +336,8 @@ public sealed class TickOffBallSupportTests
     [InlineData(MatchMentality.Attacking, 3)]
     public void A_side_on_a_break_runs_at_least_two_men_whatever_its_mentality(MatchMentality mentality, int runners)
     {
-        TickOffBallSupport.RunBudget(mentality, breaking: true).Should().Be(runners);
-        TickOffBallSupport.RunBudget(mentality, breaking: false).Should().Be(TickOffBallSupport.RunBudget(mentality));
+        TickOffBallSupport.RunBudget(mentality, breakRunners: 2).Should().Be(runners);
+        TickOffBallSupport.RunBudget(mentality, breakRunners: 0).Should().Be(TickOffBallSupport.RunBudget(mentality));
     }
 
     [Fact]
@@ -351,7 +351,7 @@ public sealed class TickOffBallSupportTests
         Indices(new Scene(isHome: true, 6, CentralMidfielderHasTheBall, pressed, MatchMentality.Defensive).Assign(), TickAttackingRole.Runner)
             .Should().BeEmpty("a defensive side makes no runs");
 
-        var breaking = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, pressed, MatchMentality.Defensive) { Breaking = true };
+        var breaking = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, pressed, MatchMentality.Defensive) { BreakRunners = 2, BreakImmediate = true };
 
         Indices(breaking.Assign(), TickAttackingRole.Runner).Should().NotBeEmpty();
         Indices(breaking.Assign(), TickAttackingRole.Runner).Should().OnlyContain(index => breaking.Specs[index].Family != MatchPositionFamily.Defence);
@@ -362,13 +362,13 @@ public sealed class TickOffBallSupportTests
         deep[6] = new SpatialPoint(2_000, 3_500);
 
         Indices(new Scene(isHome: true, 6, deep, CompactFourFourTwo, MatchMentality.Balanced).Assign(), TickAttackingRole.Runner).Should().BeEmpty();
-        Indices(new Scene(isHome: true, 6, deep, CompactFourFourTwo, MatchMentality.Balanced) { Breaking = true }.Assign(), TickAttackingRole.Runner).Should().NotBeEmpty();
+        Indices(new Scene(isHome: true, 6, deep, CompactFourFourTwo, MatchMentality.Balanced) { BreakRunners = 2, BreakImmediate = true }.Assign(), TickAttackingRole.Runner).Should().NotBeEmpty();
     }
 
     [Fact]
     public void A_wide_midfielder_runs_on_a_break_for_a_side_that_is_not_attacking()
     {
-        var breaking = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Cautious) { Breaking = true };
+        var breaking = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Cautious) { BreakRunners = 2, BreakImmediate = true };
         var runners = Indices(breaking.Assign(), TickAttackingRole.Runner).ToArray();
 
         runners.Should().HaveCount(2);
@@ -933,7 +933,9 @@ public sealed class TickOffBallSupportTests
 
         public int PreviousRunners { get; set; }
 
-        public bool Breaking { get; init; }
+        public int BreakRunners { get; init; }
+
+        public bool BreakImmediate { get; init; }
 
         public int Tick { get; set; }
 
@@ -996,7 +998,8 @@ public sealed class TickOffBallSupportTests
                     Offsets = Offsets,
                     HasOffset = HasOffset,
                     OffsetPaces = OffsetPaces,
-                    Breaking = Breaking,
+                    BreakRunners = BreakRunners,
+                    BreakImmediate = BreakImmediate,
                 },
                 orders);
 

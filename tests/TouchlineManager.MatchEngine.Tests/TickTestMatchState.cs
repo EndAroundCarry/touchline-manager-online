@@ -15,9 +15,11 @@ internal static class TickTestMatchState
 
     /// <summary>Builds a state for two evenly matched sides.</summary>
     /// <param name="seed">The match seed.</param>
-    public static MatchState Create(ulong seed = 20_260_925)
+    /// <param name="homeAbility">The home side's uniform attribute value.</param>
+    /// <param name="awayAbility">The away side's uniform attribute value.</param>
+    public static MatchState Create(ulong seed = 20_260_925, int homeAbility = 13, int awayAbility = 13)
     {
-        var input = TestMatchFactory.Even(seed);
+        var input = TestMatchFactory.Even(seed, homeAbility, awayAbility);
         var home = BuildSide(input.Home, MatchSide.Home);
         var away = BuildSide(input.Away, MatchSide.Away);
 

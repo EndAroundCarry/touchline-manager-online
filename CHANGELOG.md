@@ -4,6 +4,22 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) ยง16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 1b - the counter depends on the opponent
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.26. **The engine's play changes for a side with `CounterAttack`** (the golden hash does not move, no fixture has it on): every other side plays as before.
+
+### Changed
+
+- The break's length, runners, immediate start and the carrier's hunger for progress now come from the opponent's posture (mentality, defensive line and pressing, -4..+4) and from the speed edge between the breakers (Attack and Midfield) and the recoverers (Defence and Midfield). A counter against an attacking side is a clear plus, against a balanced one neutral, against a deep one a small minus; a side quicker than the breakers costs the counter, a slower one pays it more.
+- A side that counter-attacks and is not on a break does not force the play (28 points less progress): the fixed cost of the flag.
+- Speed factor: 15 points a point of edge (floor 30%, ceiling 115%), the break's progress follows it twice over and is capped at the balanced gain. Flag effect (points, COUNTER minus COUNTER0, mean of two seeds, 500 matches a cell): 16 v 16 against DEF -0.05, POS +0.24, ATT +0.28, DEEP -0.40; the opponent quicker by 4 points -0.12 / -0.04 against DEF / POS; the breakers quicker by 3 +0.21 / +0.38; 14 v 14 with the opponent quicker by 2 -0.22 / -0.04.
+- S1 17-20 v 15-18, weaker side on COUNTER against DEF: 0.59 to 0.25 points (the weaker side is the slower one: a counter pays only with fast forwards and midfielders, so the flag has no S1 target). Milestone 2 is the other half.
+
+### Added
+
+- `tickbalance` scenarios S5 (the flag against DEF, POS, ATT and DEEP), S6a, S6b, S6c and S6n (the speed edge), the `pace=` spec key and the `TB_AWAY` filter; `tickbalance 500 90000 S5 S6` plays only those.
+- Tests: the posture of a setup, the break plan by posture and by speed, the speed factor by edge and not by level (also on two real sides at 13/15 and 18/20).
+
 ## Weaker-side plan, Milestone 1 — a counter-attack in the tick engine
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) ง14.25. **The engine's play changes for a side with `CounterAttack`** (the golden hash does not move, no fixture has it on, and engine-v12 keeps its label): every other side plays as before.

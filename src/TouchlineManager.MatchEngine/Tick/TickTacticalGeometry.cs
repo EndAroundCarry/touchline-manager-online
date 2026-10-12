@@ -63,6 +63,24 @@ internal readonly record struct TickTeamStyle
     /// <summary>Gets how far the whole block leans towards the focused wing in possession, in pitch units (positive is right).</summary>
     public required int FocusLateralShift { get; init; }
 
+    /// <summary>
+    /// Gets how a side plays, from -4 (everything deep and defensive) to +4 (everything committed forward): what a counter-attack against it
+    /// is worth (`weaker-side-v1`, Milestone 1b). Mentality counts -2 (Defensive) to +2 (Attacking), the defensive line -1 (Deep) to +1
+    /// (High) and the pressing -1 (LowBlock) to +1 (HighPress); the sum is clamped. The formation does not count: it is how a side plays,
+    /// not its shape.
+    /// </summary>
+    /// <param name="instructions">The side's instructions.</param>
+    public static int Posture(MatchInstructionsV1 instructions)
+    {
+        ArgumentNullException.ThrowIfNull(instructions);
+
+        var posture = (int)instructions.Mentality - (int)MatchMentality.Balanced
+            + (int)instructions.DefensiveLine - (int)MatchDefensiveLine.Normal
+            + (int)instructions.Pressing - (int)MatchPressing.MidBlock;
+
+        return Math.Clamp(posture, -4, 4);
+    }
+
     /// <summary>Builds the style for a side's instructions.</summary>
     /// <param name="instructions">The side's instructions.</param>
     public static TickTeamStyle From(MatchInstructionsV1 instructions)

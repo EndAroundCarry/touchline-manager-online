@@ -62,6 +62,119 @@ public sealed class TickCounterAttackTests
             .Should().Be(TickMatchLoop.HoldTicks(through, default, MatchTempo.Normal, keeper: false));
     }
 
+    [Theory]
+    [InlineData(MatchMentality.Balanced, MatchPressing.MidBlock, MatchDefensiveLine.Normal, 0)]
+    [InlineData(MatchMentality.Positive, MatchPressing.HighPress, MatchDefensiveLine.High, 3)]
+    [InlineData(MatchMentality.Attacking, MatchPressing.HighPress, MatchDefensiveLine.High, 4)]
+    [InlineData(MatchMentality.Defensive, MatchPressing.LowBlock, MatchDefensiveLine.Deep, -4)]
+    [InlineData(MatchMentality.Cautious, MatchPressing.LowBlock, MatchDefensiveLine.Deep, -3)]
+    [InlineData(MatchMentality.Attacking, MatchPressing.LowBlock, MatchDefensiveLine.Deep, 0)]
+    [InlineData(MatchMentality.Balanced, MatchPressing.HighPress, MatchDefensiveLine.Normal, 1)]
+    public void The_posture_of_a_side_is_its_mentality_its_line_and_its_pressing_and_not_its_shape(
+        MatchMentality mentality,
+        MatchPressing pressing,
+        MatchDefensiveLine line,
+        int posture)
+    {
+        var instructions = new MatchInstructionsV1 { Mentality = mentality, Pressing = pressing, DefensiveLine = line };
+
+        TickTeamStyle.Posture(instructions).Should().Be(posture);
+    }
+
+    [Fact]
+    public void The_default_instructions_have_a_posture_of_nothing()
+    {
+        TickTeamStyle.Posture(new MatchInstructionsV1()).Should().Be(0);
+    }
+
+    [Fact]
+    public void A_break_is_longest_and_busiest_against_an_attacking_side_neutral_against_a_balanced_one_and_smallest_against_a_deep_one()
+    {
+        var attacking = TickBreakGain.Plan(4, 100);
+        var balanced = TickBreakGain.Plan(0, 100);
+        var deep = TickBreakGain.Plan(-4, 100);
+
+        attacking.Ticks.Should().BeGreaterThan(balanced.Ticks);
+        balanced.Ticks.Should().BeGreaterThan(deep.Ticks);
+        attacking.Runners.Should().BeGreaterThanOrEqualTo(balanced.Runners);
+        balanced.Runners.Should().BeGreaterThan(deep.Runners);
+        deep.Runners.Should().Be(0, "a packed defence is not run in behind");
+        deep.Immediate.Should().BeFalse("the runners wait for a free carrier against a packed defence");
+        deep.Ticks.Should().Be(0, "there is nothing to break into against a packed defence");
+        deep.ProgressPercent.Should().Be(0);
+        attacking.ProgressPercent.Should().BeGreaterThanOrEqualTo(balanced.ProgressPercent, "the hurry is capped at the balanced gain so that it cannot run away");
+        balanced.ProgressPercent.Should().BeGreaterThan(0);
+
+        for (var posture = -4; posture < 4; posture++)
+        {
+            TickBreakGain.Plan(posture + 1, 100).Ticks.Should().BeGreaterThanOrEqualTo(TickBreakGain.Plan(posture, 100).Ticks);
+        }
+    }
+
+    [Fact]
+    public void The_speed_factor_is_neutral_without_an_edge_falls_as_the_opponent_is_quicker_and_rises_as_the_breakers_are()
+    {
+        TickBreakGain.SpeedFactorPercent(0).Should().Be(100);
+        TickBreakGain.SpeedFactorPercent(100).Should().BeLessThan(100);
+        TickBreakGain.SpeedFactorPercent(200).Should().BeLessThan(TickBreakGain.SpeedFactorPercent(100));
+        TickBreakGain.SpeedFactorPercent(-50).Should().BeGreaterThan(100);
+        TickBreakGain.SpeedFactorPercent(-100).Should().BeGreaterThan(TickBreakGain.SpeedFactorPercent(-50));
+
+        TickBreakGain.SpeedFactorPercent(10_000).Should().Be(TickBreakGain.SpeedFloorPercent);
+        TickBreakGain.SpeedFactorPercent(-10_000).Should().Be(TickBreakGain.SpeedCeilingPercent);
+    }
+
+    [Fact]
+    public void The_speed_factor_depends_on_the_edge_and_not_on_the_level_of_the_two_groups()
+    {
+        // Two groups of the same speed are neutral at any level; a gap of two points counts the same at 13 against 15 as at 18 against 20.
+        static int Edge(int recoverers, int breakers) => (recoverers - breakers) * 100;
+
+        TickBreakGain.SpeedFactorPercent(Edge(13, 13)).Should().Be(100);
+        TickBreakGain.SpeedFactorPercent(Edge(19, 19)).Should().Be(100);
+        TickBreakGain.SpeedFactorPercent(Edge(15, 13)).Should().Be(TickBreakGain.SpeedFactorPercent(Edge(20, 18)));
+        TickBreakGain.SpeedFactorPercent(Edge(13, 15)).Should().Be(TickBreakGain.SpeedFactorPercent(Edge(18, 20)));
+    }
+
+    [Fact]
+    public void The_speed_edge_of_two_real_sides_is_the_same_at_every_level_and_neutral_when_they_are_equally_quick()
+    {
+        // The breakers are the countering side's Attack and Midfield men, the recoverers the opponent's Defence and Midfield men.
+        static int Edge(int recovererAbility, int breakerAbility)
+        {
+            var state = TickTestMatchState.Create(homeAbility: breakerAbility, awayAbility: recovererAbility);
+            var breakers = new TickTeam(state.Home);
+            var recoverers = new TickTeam(state.Away);
+
+            return TickBreakGain.GroupSpeed(recoverers, MatchPositionFamily.Defence, MatchPositionFamily.Midfield)
+                - TickBreakGain.GroupSpeed(breakers, MatchPositionFamily.Attack, MatchPositionFamily.Midfield);
+        }
+
+        Edge(13, 13).Should().BeInRange(-2, 2);
+        Edge(19, 19).Should().BeInRange(-2, 2);
+        TickBreakGain.SpeedFactorPercent(Edge(13, 13)).Should().Be(100);
+        TickBreakGain.SpeedFactorPercent(Edge(19, 19)).Should().Be(100);
+
+        Edge(15, 13).Should().BeInRange(170, 200, "two points of Pace and Acceleration, a little less because the men start a little below full energy");
+        Edge(20, 18).Should().BeCloseTo(Edge(15, 13), 3, "two points of speed are two points at 13 and at 18");
+        Edge(13, 15).Should().BeInRange(-200, -170);
+        TickBreakGain.SpeedFactorPercent(Edge(20, 18)).Should().BeCloseTo(TickBreakGain.SpeedFactorPercent(Edge(15, 13)), 1);
+        TickBreakGain.SpeedFactorPercent(Edge(13, 15)).Should().BeGreaterThan(100);
+    }
+
+    [Fact]
+    public void A_quicker_opponent_shrinks_the_break_and_quicker_breakers_grow_it()
+    {
+        var neutral = TickBreakGain.Plan(3, 100);
+        var caught = TickBreakGain.Plan(3, TickBreakGain.SpeedFloorPercent);
+        var away = TickBreakGain.Plan(3, TickBreakGain.SpeedCeilingPercent);
+
+        caught.Ticks.Should().BeLessThan(neutral.Ticks);
+        away.Ticks.Should().BeGreaterThan(neutral.Ticks);
+        caught.Runners.Should().BeLessThanOrEqualTo(neutral.Runners);
+        away.Runners.Should().BeGreaterThanOrEqualTo(neutral.Runners);
+    }
+
     private static TickPlayerSkills Skills(int value) =>
         TickPlayerSkills.From(PlayerAttributesV1.From(Enumerable.Repeat(value, MatchAttributeNames.Count).ToArray()));
 }

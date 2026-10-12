@@ -117,10 +117,14 @@ internal readonly ref struct TickAttackingSituation
     public SpatialPoint ThirdTarget { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the side is on a break (`weaker-side-v1`, Milestone 1): it has just won the ball in its own half and
-    /// means to hit the other side before it is back. It runs whatever its mentality, and from the first tick.
+    /// Gets the fewest players a side on a break sends running behind the line (`weaker-side-v1`, Milestones 1 and 1b), or 0 when it is not
+    /// on one or the break is worth no runner: it has just won the ball in its own half and means to hit the other side before it is back.
+    /// It sets how many run, whatever the side's mentality; wide midfielders count among them.
     /// </summary>
-    public bool Breaking { get; init; }
+    public int BreakRunners { get; init; }
+
+    /// <summary>Gets a value indicating whether the break's runners start from the first tick: from his own third and with a defender on the carrier.</summary>
+    public bool BreakImmediate { get; init; }
 }
 
 /// <summary>
@@ -168,8 +172,8 @@ internal readonly ref struct TickAttackingSituation
 /// midfielders) go first, up to a number set by
 /// mentality: none for Defensive, 1 for Cautious and Balanced, 2 for Positive, 3 for Attacking. A run in progress carries
 /// on until the carrier is closed down to 6 m. A forward already beyond the line never starts one. A side on a break
-/// (`weaker-side-v1`, Milestone 1: <see cref="TickAttackingSituation.Breaking"/>) sends at least two, wide midfielders included, from
-/// the first tick, with a defender on the carrier and from his own third.
+/// (`weaker-side-v1`, Milestones 1 and 1b: <see cref="TickAttackingSituation.BreakRunners"/>) sends at least that many, wide midfielders included,
+/// and, when the break is worth it, from the first tick, with a defender on the carrier and from his own third.
 /// </description></item>
 /// <item><description>
 /// <b>Pocket.</b> The forward left over who is nearest the carrier (and at least 12 m from him) drops to 5 m in front of the
@@ -371,13 +375,10 @@ internal static class TickOffBallSupport
         _ => MixedSupportDistance,
     };
 
-    /// <summary>The fewest players a side on a break sends running behind the line, whatever its mentality.</summary>
-    public const int BreakRunBudget = 2;
-
     /// <summary>Gets how many players a side with a mentality sends running behind the line at once.</summary>
     /// <param name="mentality">The mentality.</param>
-    /// <param name="breaking">Whether the side is on a break, which sends at least <see cref="BreakRunBudget"/> whatever the mentality.</param>
-    public static int RunBudget(MatchMentality mentality, bool breaking = false)
+    /// <param name="breakRunners">The fewest a break sends (<see cref="TickAttackingSituation.BreakRunners"/>), whatever the mentality.</param>
+    public static int RunBudget(MatchMentality mentality, int breakRunners = 0)
     {
         var budget = mentality switch
         {
@@ -387,7 +388,7 @@ internal static class TickOffBallSupport
             _ => 1,
         };
 
-        return breaking ? Math.Max(budget, BreakRunBudget) : budget;
+        return Math.Max(budget, breakRunners);
     }
 
     /// <summary>Gives every attacker his job for this tick.</summary>
@@ -908,18 +909,18 @@ internal static class TickOffBallSupport
 
     private static void AssignRuns(in TickAttackingSituation situation, in Frame frame, Span<TickAttackingOrder> orders, Span<bool> busy)
     {
-        var budget = RunBudget(situation.Mentality, situation.Breaking);
+        var budget = RunBudget(situation.Mentality, situation.BreakRunners);
         var space = frame.DefenderLine;
 
         // A side on a break runs from where it won the ball and at once: it does not wait for the carrier to pass his own third or to be free.
-        if (budget == 0 || space < MinimumRunSpace || (!situation.Breaking && frame.CarrierX < RunCarrierMinimum))
+        if (budget == 0 || space < MinimumRunSpace || (!situation.BreakImmediate && frame.CarrierX < RunCarrierMinimum))
         {
             return;
         }
 
         var free = (long)TickSpatialUnits.ToFixed(TickDefensiveAI.FreeCarrierDistance) * TickSpatialUnits.ToFixed(TickDefensiveAI.FreeCarrierDistance);
         var closed = (long)TickSpatialUnits.ToFixed(TickDefensiveAI.ClosedDownDistance) * TickSpatialUnits.ToFixed(TickDefensiveAI.ClosedDownDistance);
-        var mayStart = situation.Breaking || frame.NearestDefenderSquared > free;
+        var mayStart = situation.BreakImmediate || frame.NearestDefenderSquared > free;
         var mayContinue = frame.NearestDefenderSquared > closed;
 
         if (!mayContinue)
@@ -958,7 +959,7 @@ internal static class TickOffBallSupport
 
         Span<bool> gapUsed = stackalloc bool[TickTacticalGeometry.TeamSize + 1];
         Span<bool> tried = stackalloc bool[TickTacticalGeometry.TeamSize];
-        var wideRunners = situation.Breaking || situation.Mentality is MatchMentality.Positive or MatchMentality.Attacking;
+        var wideRunners = situation.BreakRunners > 0 || situation.Mentality is MatchMentality.Positive or MatchMentality.Attacking;
         var started = 0;
 
         while (started < budget)

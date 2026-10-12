@@ -144,12 +144,13 @@ if (mode is "tickexp")
 
 if (mode is "tickbalance")
 {
-    // tickbalance [matches a cell] [seed] [quick]   (quick: S1 and the S4 cells with COUNTER only)
+    // tickbalance [matches a cell] [seed] [quick] [S5 S6 ...]   (quick: S1 and the S4 cells with COUNTER only; scenario names or prefixes pick which to play)
     TickShowcase.Balance(
         positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var cellMatches) ? Math.Min(cellMatches, 500) : 300,
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var cellSeed) ? cellSeed : 90_000UL,
         positional.Contains("quick"),
-        rules);
+        rules,
+        [.. positional.Skip(1).Where(argument => argument.Length > 1 && argument[0] == 'S')]);
 }
 
 if (mode is "tickshow")
