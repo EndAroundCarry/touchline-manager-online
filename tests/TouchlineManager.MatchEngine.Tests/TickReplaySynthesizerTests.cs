@@ -49,13 +49,17 @@ public sealed class TickReplaySynthesizerTests
     public void Every_passage_has_the_ball_and_the_players_on_the_pitch_in_the_viewers_slots()
     {
         var expected = Enumerable.Range(1, 11).SelectMany(slot => new[] { $"H{slot}", $"A{slot}" }).Append("ball").Order(StringComparer.Ordinal).ToList();
+        var sample = TickPlay.Even;
+        var sentOff = sample.Result.Home.RedCards + sample.Result.Away.RedCards;
 
         foreach (var passage in Presentation.Passages)
         {
             var ids = passage.Entities.Select(entity => entity.EntityId).ToList();
 
             ids.Should().BeInAscendingOrder(StringComparer.Ordinal);
-            ids.Should().BeEquivalentTo(expected);
+            ids.Should().BeSubsetOf(expected);
+            ids.Count.Should().BeGreaterThanOrEqualTo(expected.Count - sentOff, "only a player sent off leaves his slot");
+            ids.Should().Contain("ball");
             passage.Entities.Where(entity => !entity.IsBall).Should().OnlyContain(entity => entity.ParticipantId != null && entity.Name != null && entity.Position != null);
             passage.Entities.Single(entity => entity.IsBall).ParticipantId.Should().BeNull();
         }

@@ -4,6 +4,20 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 3 - committing forward costs legs
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.29. **The engine's play changes for every side late in a match, and for a side that presses high, plays at a high tempo or has a committed mentality most of all**; the golden hash moves.
+
+### Changed
+
+- A side that presses high drains energy 130% faster, one at a high tempo 100% faster, and each step of mentality above Balanced adds 35%. A spent player now runs at 60% of his pace (was 70%) and his acceleration falls with his energy too. A default side's condition at 85 minutes is unchanged; an all-out attacking side ends at about 3,700.
+- The weaker side's own all-out attack at 17-20 v 15-18 wins about 17% of matches (was 27%), the stronger side about 71% (was 59%). The cap of 15% is not quite met. Rest defence needed no change (one full-back overlaps at a time already).
+- Tests: the board-formation test's goal ceiling 3.8 to 4.3; the replay test allows a sent-off player's slot to be missing.
+
+### Added
+
+- A mean-condition column (starters at minute 85) in `tickbalance`.
+
 ## Weaker-side plan, Milestone 2b - the size of the bonus (125%)
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.28. **The engine's play changes a little for a side with `CounterAttack`, a low block or a Defensive mentality**; the golden hash does not move.

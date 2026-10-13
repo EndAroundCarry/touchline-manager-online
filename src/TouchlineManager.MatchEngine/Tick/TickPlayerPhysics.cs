@@ -143,7 +143,8 @@ internal readonly record struct TickPlayerProfile
 /// <remarks>
 /// <para>
 /// <b>Top speed</b> is <c>560 + 21 × Pace</c> cm/s (5.8 m/s at Pace 1 to 9.8 m/s at Pace 20), scaled by condition:
-/// <c>70% + 30% × energy</c>, so a spent player is 30% slower, never stopped.
+/// <c>60% + 40% × energy</c>, so a spent player is 40% slower, never stopped. His acceleration is scaled the same way (`weaker-side-v1`,
+/// Milestone 3).
 /// </para>
 /// <para>
 /// <b>Acceleration</b> is <c>300 + 10 × Acceleration</c> cm/s² (about 2 seconds to top speed); <b>braking</b> is
@@ -160,7 +161,8 @@ internal readonly record struct TickPlayerProfile
 /// <b>Energy</b> falls at a rate set by speed: a walk (under 30% of top speed) recovers a little, a jog (30–70%) drains
 /// at 6 millionths of the tank a tick, and above 70% the drain climbs linearly to ten times that at top
 /// speed. The rate is multiplied by <c>14,500 − 450 × Stamina + 40 × WorkRate</c> basis points, so the average player
-/// (Stamina 10, WorkRate 10) loses about a quarter of the tank over 90 minutes of a typical mix of running.
+/// (Stamina 10, WorkRate 10) loses about a quarter of the tank over 90 minutes of a typical mix of running. A side that presses high, plays at a
+/// high tempo or has a committed mentality drains faster still (<see cref="DrainPercent"/>).
 /// </para>
 /// </remarks>
 internal static class TickPlayerPhysics
@@ -207,6 +209,15 @@ internal static class TickPlayerPhysics
     /// <summary>The drain per tick at top speed at the average multiplier, in energy units.</summary>
     public const int SprintDrain = 6_000;
 
+    /// <summary>The extra energy drain of a side that presses high, in percent of the usual: it chases more and sprints more.</summary>
+    public const int HighPressDrainPercent = 130;
+
+    /// <summary>The extra energy drain of a side that plays at a high tempo, in percent of the usual.</summary>
+    public const int HighTempoDrainPercent = 100;
+
+    /// <summary>The extra energy drain of a side for each step of mentality above Balanced (Positive one, Attacking two), in percent of the usual.</summary>
+    public const int MentalityDrainPercent = 35;
+
     /// <summary>Below this share of top speed (basis points) a player is walking and recovers.</summary>
     public const int WalkCeilingBasisPoints = 3_000;
 
@@ -218,8 +229,11 @@ internal static class TickPlayerPhysics
 
     private const int BasisPoints = 10_000;
 
-    /// <summary>The slowest a tired player runs, as a share of his fresh top speed, in basis points.</summary>
-    private const int TiredSpeedFloorBasisPoints = 7_000;
+    /// <summary>
+    /// The slowest a spent player runs and the least acceleration he has, as a share of his fresh top speed and acceleration, in basis
+    /// points (`weaker-side-v1`, Milestone 3: it was 70% for speed alone, which cost a pressing side almost nothing).
+    /// </summary>
+    private const int TiredSpeedFloorBasisPoints = 6_000;
 
     /// <summary>Below this speed (1 m/s) a player just faces where he is going.</summary>
     private static readonly int SnapSpeed = TickSpatialUnits.SpeedToFixedPerTick(100);
@@ -230,23 +244,43 @@ internal static class TickPlayerPhysics
     /// <summary>Within this distance (half a pitch unit) of an arrival point the player counts as there.</summary>
     private const int ArriveToleranceFixed = 500;
 
+    /// <summary>
+    /// Gets how fast a side's players use their energy, in percent of the usual (`weaker-side-v1`, Milestone 3): committing forward costs
+    /// legs. A high press adds <see cref="HighPressDrainPercent"/>, a high tempo <see cref="HighTempoDrainPercent"/> and each step of
+    /// mentality above Balanced <see cref="MentalityDrainPercent"/>; a side with none of them drains at the usual rate.
+    /// </summary>
+    /// <param name="instructions">The side's instructions.</param>
+    public static int DrainPercent(MatchInstructionsV1 instructions)
+    {
+        ArgumentNullException.ThrowIfNull(instructions);
+
+        return 100
+            + (instructions.Pressing == MatchPressing.HighPress ? HighPressDrainPercent : 0)
+            + (instructions.Tempo == MatchTempo.High ? HighTempoDrainPercent : 0)
+            + (Math.Max(0, (int)instructions.Mentality - (int)MatchMentality.Balanced) * MentalityDrainPercent);
+    }
+
+    /// <summary>Gets the share of his fresh pace and acceleration a player has at his current energy, in basis points.</summary>
+    private static int TirednessFactor(in TickPlayerState player)
+    {
+        var energyBasisPoints = (int)((long)player.Energy * BasisPoints / EnergyFull);
+
+        return TiredSpeedFloorBasisPoints + ((BasisPoints - TiredSpeedFloorBasisPoints) * energyBasisPoints / BasisPoints);
+    }
+
     /// <summary>Gets a player's top speed at his current energy, in fixed units per tick.</summary>
     /// <param name="player">The player.</param>
     /// <param name="profile">His athletic limits.</param>
     public static int EffectiveTopSpeed(in TickPlayerState player, in TickPlayerProfile profile)
     {
-        var energyBasisPoints = (int)((long)player.Energy * BasisPoints / EnergyFull);
-        var factor = TiredSpeedFloorBasisPoints
-            + ((BasisPoints - TiredSpeedFloorBasisPoints) * energyBasisPoints / BasisPoints);
-
-        return (int)((long)profile.TopSpeed * factor / BasisPoints);
+        return (int)((long)profile.TopSpeed * TirednessFactor(player) / BasisPoints);
     }
 
     /// <summary>Advances a player one tick (100 ms) towards an intent.</summary>
     /// <param name="player">The player, updated in place.</param>
     /// <param name="profile">His athletic limits.</param>
     /// <param name="intent">Where he wants to go.</param>
-    public static void Step(ref TickPlayerState player, in TickPlayerProfile profile, in TickMoveIntent intent)
+    public static void Step(ref TickPlayerState player, in TickPlayerProfile profile, in TickMoveIntent intent, int drainPercent = 100)
     {
         var dx = (long)TickSpatialUnits.ToFixed(intent.TargetXUnits) - player.X;
         var dy = (long)TickSpatialUnits.ToFixed(intent.TargetYUnits) - player.Y;
@@ -268,16 +302,18 @@ internal static class TickPlayerPhysics
                 : (int)Math.Min(speedCap, SpatialMath.Sqrt(2L * profile.Deceleration * distance));
         }
 
+        var acceleration = (int)((long)profile.Acceleration * TirednessFactor(player) / BasisPoints);
+
         var misalignment = Turn(ref player, profile, topSpeed, dx, dy);
         var alignment = Math.Max(MinAlignmentBasisPoints, TickTrigonometry.Cos(misalignment));
         var desiredSpeed = (int)((long)speedCap * alignment / BasisPoints);
 
         player.Speed = desiredSpeed > player.Speed
-            ? Math.Min(desiredSpeed, player.Speed + profile.Acceleration)
+            ? Math.Min(desiredSpeed, player.Speed + acceleration)
             : Math.Max(desiredSpeed, player.Speed - profile.Deceleration);
 
         Advance(ref player, intent.Arrive, distance);
-        SpendEnergy(ref player, profile);
+        SpendEnergy(ref player, profile, drainPercent);
     }
 
     /// <summary>Turns the player towards a vector as far as his agility allows and returns the angle still to go.</summary>
@@ -333,7 +369,7 @@ internal static class TickPlayerPhysics
             TickSpatialUnits.PitchWidthFixed);
     }
 
-    private static void SpendEnergy(ref TickPlayerState player, in TickPlayerProfile profile)
+    private static void SpendEnergy(ref TickPlayerState player, in TickPlayerProfile profile, int drainPercent)
     {
         var shareOfTop = profile.TopSpeed == 0
             ? 0
@@ -350,6 +386,6 @@ internal static class TickPlayerPhysics
             ? JogDrain
             : JogDrain + ((SprintDrain - JogDrain) * (shareOfTop - SprintFloorBasisPoints) / (BasisPoints - SprintFloorBasisPoints));
 
-        player.Energy = Math.Max(0, player.Energy - (int)((long)drain * profile.DrainBasisPoints / BasisPoints));
+        player.Energy = Math.Max(0, player.Energy - (int)((long)drain * profile.DrainBasisPoints / BasisPoints * drainPercent / 100));
     }
 }

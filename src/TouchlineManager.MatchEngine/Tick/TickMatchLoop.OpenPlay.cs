@@ -1062,10 +1062,11 @@ internal sealed partial class TickMatchLoop
         foreach (var team in _teams)
         {
             var count = team.Count;
+            var drain = TickPlayerPhysics.DrainPercent(team.Runtime.Instructions);
 
             for (var seat = 0; seat < count; seat++)
             {
-                TickPlayerPhysics.Step(ref team.Body[seat], team.Profile[seat], team.Intent[seat]);
+                TickPlayerPhysics.Step(ref team.Body[seat], team.Profile[seat], team.Intent[seat], drain);
             }
         }
     }

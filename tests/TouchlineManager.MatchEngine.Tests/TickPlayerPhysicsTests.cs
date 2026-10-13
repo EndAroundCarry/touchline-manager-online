@@ -173,8 +173,58 @@ public sealed class TickPlayerPhysicsTests
         var spent = TickPlayerState.Standing(100, 3_500, 0, 0);
 
         TickPlayerPhysics.EffectiveTopSpeed(spent, profile).Should().BeLessThan(TickPlayerPhysics.EffectiveTopSpeed(fresh, profile));
-        TickPlayerPhysics.EffectiveTopSpeed(spent, profile).Should().BeGreaterThan(profile.TopSpeed * 6 / 10);
+        TickPlayerPhysics.EffectiveTopSpeed(spent, profile).Should().BeGreaterThan(profile.TopSpeed * 4 / 10);
         TickPlayerPhysics.EffectiveTopSpeed(fresh, profile).Should().Be(profile.TopSpeed);
+    }
+
+    [Fact]
+    public void A_spent_player_accelerates_slower_than_a_fresh_one()
+    {
+        var profile = TickPlayerProfile.From(Attributes());
+        var fresh = TickPlayerState.Standing(1_000, 3_500, 0, 10_000);
+        var spent = TickPlayerState.Standing(1_000, 3_500, 0, 0);
+        var intent = new TickMoveIntent(9_500, 3_500, 10_000, Arrive: false);
+
+        TickPlayerPhysics.Step(ref fresh, profile, intent);
+        TickPlayerPhysics.Step(ref spent, profile, intent);
+
+        spent.Speed.Should().BeLessThan(fresh.Speed);
+        spent.Speed.Should().BeGreaterThan(0, "he is slower, not stopped");
+    }
+
+    [Fact]
+    public void A_side_that_commits_forward_drains_its_legs_faster()
+    {
+        TickPlayerPhysics.DrainPercent(new MatchInstructionsV1()).Should().Be(100);
+        TickPlayerPhysics.DrainPercent(new MatchInstructionsV1 { Pressing = MatchPressing.HighPress })
+            .Should().Be(100 + TickPlayerPhysics.HighPressDrainPercent);
+        TickPlayerPhysics.DrainPercent(new MatchInstructionsV1 { Tempo = MatchTempo.High })
+            .Should().Be(100 + TickPlayerPhysics.HighTempoDrainPercent);
+        TickPlayerPhysics.DrainPercent(new MatchInstructionsV1 { Mentality = MatchMentality.Positive })
+            .Should().Be(100 + TickPlayerPhysics.MentalityDrainPercent);
+        TickPlayerPhysics.DrainPercent(new MatchInstructionsV1 { Mentality = MatchMentality.Attacking })
+            .Should().Be(100 + (2 * TickPlayerPhysics.MentalityDrainPercent));
+        TickPlayerPhysics.DrainPercent(new MatchInstructionsV1 { Mentality = MatchMentality.Defensive, Pressing = MatchPressing.LowBlock, Tempo = MatchTempo.Low })
+            .Should().Be(100, "defending deep and slow costs nothing extra");
+    }
+
+    [Fact]
+    public void The_drain_percent_scales_the_energy_a_run_costs()
+    {
+        var profile = TickPlayerProfile.From(Attributes());
+        var usual = TickPlayerState.Standing(100, 3_500, 0, 10_000);
+        var pressing = TickPlayerState.Standing(100, 3_500, 0, 10_000);
+
+        for (var tick = 0; tick < 300; tick++)
+        {
+            TickPlayerPhysics.Step(ref usual, profile, new TickMoveIntent(9_900, 3_500, 10_000, Arrive: false));
+            TickPlayerPhysics.Step(ref pressing, profile, new TickMoveIntent(9_900, 3_500, 10_000, Arrive: false), 200);
+        }
+
+        var usualLoss = TickPlayerPhysics.EnergyFull - usual.Energy;
+        var pressingLoss = TickPlayerPhysics.EnergyFull - pressing.Energy;
+
+        pressingLoss.Should().BeInRange((usualLoss * 18 / 10) - 1, (usualLoss * 22 / 10) + 1);
     }
 
     [Fact]
