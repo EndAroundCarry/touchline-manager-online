@@ -142,6 +142,15 @@ if (mode is "tickexp")
         rules);
 }
 
+if (mode is "tickwhy")
+{
+    // tickwhy [matches] [seed]   (why an all-out attacking weaker side takes more points than one that sits deep)
+    TickShowcase.Why(
+        positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var whyMatches) ? Math.Min(whyMatches, 500) : 200,
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var whySeed) ? whySeed : 7_000UL,
+        rules);
+}
+
 if (mode is "tickbalance")
 {
     // tickbalance [matches a cell] [seed] [quick] [S5 S6 ...]   (quick: S1 and the S4 cells with COUNTER only; scenario names or prefixes pick which to play)

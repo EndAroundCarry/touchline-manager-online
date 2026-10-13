@@ -367,6 +367,275 @@ internal static class TickShowcase
             [.. Enumerable.Range(0, 2).Select(side => Enumerable.Range(0, matches).Sum(index => held[index, side]))]);
     }
 
+    /// <summary>The numbers of one `tickwhy` cell: sums over the matches, divided by the match count when printed.</summary>
+    private sealed class WhyTally
+    {
+        public int Wins;
+        public int Draws;
+        public int Losses;
+        public double GoalsStrong;
+        public double GoalsWeak;
+        public double ShotsStrong;
+        public double ShotsWeak;
+        public double PossessionFramesWeak;
+        public double OpenFrames;
+        public double StrongRegains;
+        public double StrongRegainsInOwnHalf;
+        public double StrongTransitionShots;
+        public double StrongTransitionGoals;
+        public double StrongTransitionShotsOwnHalf;
+        public double BehindOwnHalf;
+        public double BehindOppHalf;
+        public double LineDepthOwnHalf;
+        public double LineDepthOppHalf;
+        public double WeakRegains;
+        public double WeakRegainsHigh;
+        public double WeakTransitionShots;
+        public double WeakTransitionGoals;
+        public double[] ExposedRegains { get; } = new double[11];
+        public double[] ExposedShots { get; } = new double[11];
+        public double[] WeakGoalsByPeriod { get; } = new double[6];
+        public double[] StrongGoalsByPeriod { get; } = new double[6];
+        public double[] WeakShotsByPeriod { get; } = new double[6];
+        public double[] StrongShotsByPeriod { get; } = new double[6];
+    }
+
+    /// <summary>
+    /// `tickwhy`: why does a weaker side that attacks all-out take more points than one that sits deep? Plays an 18-19 side at home to a
+    /// 15-16 side in four setups and reads from the recording what happens when the weaker side loses the ball (how many of its players are
+    /// behind the ball, how deep its line is, what the stronger side makes of it) and when it wins it (a high regain, a shot from it).
+    /// </summary>
+    /// <param name="matches">How many matches a cell.</param>
+    /// <param name="seed">The base seed.</param>
+    /// <param name="rules">The rules in force.</param>
+    public static void Why(int matches, ulong seed, EngineRulesV2 rules)
+    {
+        (string Name, string Spec)[] setups =
+        [
+            ("DEF", string.Empty),
+            ("POS", "ment=3,press=2,line=2,tempo=2"),
+            ("ATT", "ment=4,press=2,line=2,tempo=2"),
+            ("COUNTER", "ment=1,press=0,line=0,pass=2,counter=1"),
+        ];
+
+        Console.WriteLine($"== tickwhy: 18-19 at home to 15-16 (gk 18 / 15), the weaker side setup varies, {matches} matches a cell, seed {seed} ==");
+
+        foreach (var (name, setup) in setups)
+        {
+            var tally = new WhyTally();
+            var gate = new object();
+            var (homeForm, homeInstructions, homeKeeper, homePace) = Spec("gk=18");
+            var (awayForm, awayInstructions, awayKeeper, awayPace) = Spec("gk=15" + (setup.Length == 0 ? string.Empty : "," + setup));
+
+            Parallel.For(0, matches, index =>
+            {
+                var built = LaboratoryFixtures.Build(seed + (ulong)index, 18, 15, homeInstructions, awayInstructions, rules);
+                var input = TickCalibration.Stand(
+                    built with { Home = Paced(Keeper(Spread(built.Home, 18, 19), homeKeeper), homePace), Away = Paced(Keeper(Spread(built.Away, 15, 16), awayKeeper), awayPace) },
+                    homeForm,
+                    awayForm);
+                var recorder = new MatchPassageRecorder();
+                var result = MatchSimulator.Simulate(input, rules, null, recorder, TickMatchEngine.Instance);
+
+                if (recorder.Tick is { } recording)
+                {
+                    lock (gate)
+                    {
+                        WhyRead(result, recording, tally);
+                    }
+                }
+            });
+
+            var n = (double)matches;
+            string Per(double value) => $"{value / n,6:F2}";
+            var strongRegainsOpp = tally.StrongRegains - tally.StrongRegainsInOwnHalf;
+
+            Console.WriteLine();
+            Console.WriteLine($"-- weaker side {name}: strong W/D/L {100.0 * tally.Wins / n:F0}/{100.0 * tally.Draws / n:F0}/{100.0 * tally.Losses / n:F0}%  weaker points {((3.0 * tally.Losses) + tally.Draws) / n:F2}  goals {tally.GoalsStrong / n:F2}-{tally.GoalsWeak / n:F2}  shots {tally.ShotsStrong / n:F1}-{tally.ShotsWeak / n:F1}");
+            var weakShare = tally.PossessionFramesWeak / tally.OpenFrames;
+            Console.WriteLine($"   possession of the weaker side {100.0 * weakShare:F0}%; shots per 100 s of possession: stronger {100.0 * tally.ShotsStrong / n / (5_400.0 * (1 - weakShare)):F2}, weaker {100.0 * tally.ShotsWeak / n / (5_400.0 * weakShare):F2}");
+            Console.WriteLine("   stronger side regains by weaker players behind the ball (0..10), a match / share followed by its shot within 8 s: " + string.Join("  ", Enumerable.Range(0, 11).Where(k => tally.ExposedRegains[k] > 0).Select(k => $"{k}: {tally.ExposedRegains[k] / n:F1}/{100.0 * tally.ExposedShots[k] / tally.ExposedRegains[k]:F0}%")));
+            Console.WriteLine($"   weaker side loses the ball (stronger side regains) {Per(tally.StrongRegains)} a match: {Per(tally.StrongRegainsInOwnHalf)} in the stronger own half, {Per(strongRegainsOpp)} in the weaker half");
+            Console.WriteLine($"     weaker players behind the ball at those regains: {tally.BehindOwnHalf / Math.Max(1, tally.StrongRegainsInOwnHalf):F1} (ball in the stronger half), {tally.BehindOppHalf / Math.Max(1, strongRegainsOpp):F1} (ball in the weaker half)");
+            Console.WriteLine($"     weaker back four, mean depth from its own goal (m): {tally.LineDepthOwnHalf / Math.Max(1, tally.StrongRegainsInOwnHalf):F1} / {tally.LineDepthOppHalf / Math.Max(1, strongRegainsOpp):F1}");
+            Console.WriteLine($"   stronger side shots within 12 s of a regain {Per(tally.StrongTransitionShots)} a match ({100.0 * tally.StrongTransitionShots / Math.Max(1, tally.StrongRegains):F1}% of regains; {Per(tally.StrongTransitionShotsOwnHalf)} of them from its own-half regains), goals from them {Per(tally.StrongTransitionGoals)}");
+            Console.WriteLine($"   weaker side regains {Per(tally.WeakRegains)} a match, {Per(tally.WeakRegainsHigh)} in the stronger half; shots within 12 s of a regain {Per(tally.WeakTransitionShots)} of its {tally.ShotsWeak / n:F1}, goals from them {Per(tally.WeakTransitionGoals)}");
+            Console.WriteLine("   by quarter-hour (weaker goals/stronger goals, weaker shots/stronger shots): " + string.Join("  ", Enumerable.Range(0, 6).Select(period => $"{tally.WeakGoalsByPeriod[period] / n:F2}/{tally.StrongGoalsByPeriod[period] / n:F2} {tally.WeakShotsByPeriod[period] / n:F1}/{tally.StrongShotsByPeriod[period] / n:F1}")));
+        }
+    }
+
+    private static void WhyRead(MatchResultV1 result, TickMatchRecording recording, WhyTally tally)
+    {
+        const int half = TickMatchRecording.Entities / 2;
+        var frameOf = recording.Events.ToDictionary(stamp => stamp.Sequence, stamp => Math.Min(stamp.Frame, recording.FrameCount - 1));
+        var goalFrames = new List<int>[] { [], [] };
+        var shotFrames = new List<int>[] { [], [] };
+
+        foreach (var goal in result.Events.Where(e => e.IsGoal && frameOf.ContainsKey(e.Sequence)))
+        {
+            goalFrames[(int)goal.Side].Add(frameOf[goal.Sequence]);
+        }
+
+        foreach (var stamp in recording.Actions.Where(stamp => stamp.Entity >= 0 && stamp.Frame < recording.FrameCount && stamp.Action == PassageAction.Shot))
+        {
+            shotFrames[stamp.Entity / half].Add(stamp.Frame);
+
+            var period = Math.Min(5, recording.ClockSecond(stamp.Frame) / 900);
+
+            if (stamp.Entity / half == 0)
+            {
+                tally.StrongShotsByPeriod[period]++;
+            }
+            else
+            {
+                tally.WeakShotsByPeriod[period]++;
+            }
+        }
+
+        foreach (var goal in result.Events.Where(e => e.IsGoal))
+        {
+            var period = Math.Min(5, Math.Max(0, goal.Minute - 1) / 15);
+
+            if ((int)goal.Side == 0)
+            {
+                tally.StrongGoalsByPeriod[period]++;
+            }
+            else
+            {
+                tally.WeakGoalsByPeriod[period]++;
+            }
+        }
+
+        tally.GoalsStrong += result.HomeGoals;
+        tally.GoalsWeak += result.AwayGoals;
+        tally.ShotsStrong += result.Home.Shots;
+        tally.ShotsWeak += result.Away.Shots;
+
+        if (result.HomeGoals > result.AwayGoals)
+        {
+            tally.Wins++;
+        }
+        else if (result.HomeGoals == result.AwayGoals)
+        {
+            tally.Draws++;
+        }
+        else
+        {
+            tally.Losses++;
+        }
+
+        var lastSide = -1;
+        var interrupted = false;
+        var depths = new int[half - 1];
+
+        for (var frame = 0; frame < recording.FrameCount; frame++)
+        {
+            if (recording.State(frame) != TickPlayState.OpenPlay)
+            {
+                interrupted = true;
+                continue;
+            }
+
+            var controller = recording.Controller(frame);
+
+            if (controller < 0)
+            {
+                continue;
+            }
+
+            var side = controller / half;
+
+            tally.OpenFrames++;
+
+            if (side == 1)
+            {
+                tally.PossessionFramesWeak++;
+            }
+
+            if (side != lastSide && lastSide >= 0 && !interrupted && controller % half != 0)
+            {
+                var ballX = recording.BallX(frame);
+                var shotSoon = shotFrames[side].Any(shot => shot >= frame && shot - frame <= BreakFrames);
+                var goalSoon = shotSoon && goalFrames[side].Any(goal => goal >= frame && goal - frame <= BreakFrames + 100);
+
+                if (side == 0)
+                {
+                    // The stronger side wins the ball: the weaker side (entities 12 to 21) defends the goal at X = 10 000.
+                    var ownHalf = ballX < 5_000;
+                    var behind = 0;
+
+                    for (var seat = 1; seat < half; seat++)
+                    {
+                        var x = recording.PlayerX(frame, half + seat);
+
+                        if (x > ballX)
+                        {
+                            behind++;
+                        }
+
+                        depths[seat - 1] = 10_000 - x;
+                    }
+
+                    Array.Sort(depths);
+                    var backFour = (depths[0] + depths[1] + depths[2] + depths[3]) / 4.0 * 105.0 / 10_000.0;
+
+                    tally.StrongRegains++;
+                    tally.ExposedRegains[behind]++;
+
+                    if (shotFrames[0].Any(shot => shot >= frame && shot - frame <= 80))
+                    {
+                        tally.ExposedShots[behind]++;
+                    }
+
+                    if (ownHalf)
+                    {
+                        tally.StrongRegainsInOwnHalf++;
+                        tally.BehindOwnHalf += behind;
+                        tally.LineDepthOwnHalf += backFour;
+                    }
+                    else
+                    {
+                        tally.BehindOppHalf += behind;
+                        tally.LineDepthOppHalf += backFour;
+                    }
+
+                    if (shotSoon)
+                    {
+                        tally.StrongTransitionShots++;
+                        tally.StrongTransitionShotsOwnHalf += ownHalf ? 1 : 0;
+                    }
+
+                    if (goalSoon)
+                    {
+                        tally.StrongTransitionGoals++;
+                    }
+                }
+                else
+                {
+                    tally.WeakRegains++;
+
+                    if (ballX < 5_000)
+                    {
+                        tally.WeakRegainsHigh++;
+                    }
+
+                    if (shotSoon)
+                    {
+                        tally.WeakTransitionShots++;
+                    }
+
+                    if (goalSoon)
+                    {
+                        tally.WeakTransitionGoals++;
+                    }
+                }
+            }
+
+            lastSide = side;
+            interrupted = false;
+        }
+    }
+
     private static string Share(int part, int whole) => $"{100.0 * part / Math.Max(1, whole),3:F0}%";
 
     private static void Tally(MatchResultV1 result, TickMatchRecording recording, ShotTally[] sides)

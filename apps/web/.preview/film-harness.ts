@@ -78,7 +78,8 @@ interface RunReport {
 
 const status = document.getElementById('status') as HTMLElement;
 const canvas = document.getElementById('pitch') as HTMLCanvasElement;
-const response = await fetch('/presentation.json');
+const gameQuery = new URLSearchParams(location.search).get('game');
+const response = await fetch(gameQuery ? `/presentation.json?game=${encodeURIComponent(gameQuery)}` : '/presentation.json');
 const presentation = (await response.json()) as MatchPresentation;
 const timeline = buildFilmTimeline(presentation);
 const pace = (presentation.paceMilli ?? 2_200) / 1_000;
@@ -646,4 +647,167 @@ if (query.has('play')) {
   });
 
   loop.start();
+}
+
+/**
+ * `?watch&game=a1` (a served folder of dumped matches) is `?play` with controls: play and pause, the speed, a slider to seek,
+ * jumps of 10 s, a jump to each goal, and links to the other games. Keys: space, left and right arrows, 1 to 5 for the speeds.
+ */
+if (query.has('watch')) {
+  const playback = new MatchPlayback(
+    presentation.passages,
+    presentation.playback ?? [],
+    presentation.reel ?? [],
+    'full',
+  );
+  const edges = fadeEdgesFor(timeline.cuts, playback.windows);
+  const home = presentation.homeLineup?.clubName ?? 'Home';
+  const away = presentation.awayLineup?.clubName ?? 'Away';
+  const speeds: PlaybackSpeed[] = [0.5, 1, 2, 4, 8];
+  const gameLabel = ({ a: '18-19 v 15-16', b: '18-19 v 13-14', c: '18-19 v 18-19' } as Record<string, string>)[(gameQuery ?? '')[0]] ?? (gameQuery ?? 'game');
+  const labelled = fetch('/games.json').then((reply) => reply.json() as Promise<{ name: string; label: string }[]>).then((entries) => entries.find((entry) => typeof entry !== 'string' && entry.name === gameQuery)?.label).catch(() => undefined);
+  let shownLabel = gameLabel;
+  void labelled.then((value) => { if (value !== undefined) { shownLabel = value; } });
+  const bar = document.createElement('div');
+
+  bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0;max-width:1120px';
+  status.after(bar);
+
+  const button = (label: string, onClick: () => void): HTMLButtonElement => {
+    const element = document.createElement('button');
+
+    element.textContent = label;
+    element.style.cssText = 'background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit';
+    element.addEventListener('click', onClick);
+    bar.append(element);
+
+    return element;
+  };
+
+  const seekBy = (deltaMs: number) => playback.seekToMilliseconds(playback.elapsedMilliseconds + deltaMs);
+  const toggle = () => {
+    if (playback.currentState === 'playing') {
+      playback.pause();
+    } else {
+      if (playback.currentState === 'finished') {
+        playback.replay();
+      }
+
+      playback.play();
+    }
+  };
+
+  button('-30 s', () => seekBy(-30_000));
+  button('-10 s', () => seekBy(-10_000));
+  const playButton = button('pause', toggle);
+  button('+10 s', () => seekBy(10_000));
+  button('+30 s', () => seekBy(30_000));
+
+  const speedButtons = speeds.map((value) =>
+    button(`${value}x`, () => playback.setSpeed(value)),
+  );
+  const slider = document.createElement('input');
+
+  slider.type = 'range';
+  slider.min = '0';
+  slider.max = String(Math.floor(playback.totalMilliseconds));
+  slider.value = '0';
+  slider.style.cssText = 'flex:1 1 100%;min-width:300px';
+  slider.addEventListener('input', () => playback.seekToMilliseconds(Number(slider.value)));
+  bar.append(slider);
+
+  let goalNumber = 0;
+
+  for (const goal of timeline.goals) {
+    goalNumber += 1;
+    const at = playback.playlistMillisecondsForFilm(goal.filmMilliseconds);
+
+    if (at !== null) {
+      button(`goal ${goalNumber} (${goal.side})`, () => playback.seekToMilliseconds(Math.max(0, at - 12_000)));
+    }
+  }
+
+  fetch('/games.json')
+    .then((reply) => reply.json() as Promise<(string | { name: string; label: string })[]>)
+    .then((entries) => {
+      const games = entries.map((entry) => (typeof entry === 'string' ? { name: entry, label: entry } : entry));
+      const holder = document.createElement('div');
+
+      holder.style.cssText = 'flex:1 1 100%;margin-top:6px';
+      holder.append('game: ');
+
+      const choose = document.createElement('select');
+
+      choose.style.cssText = 'background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px;font:inherit;max-width:80%';
+
+      for (const game of games) {
+        const option = document.createElement('option');
+
+        option.value = game.name;
+        option.textContent = game.label;
+        option.selected = game.name === gameQuery;
+        choose.append(option);
+      }
+
+      const go = (name: string | undefined) => {
+        if (name !== undefined) {
+          location.search = `?watch&game=${name}`;
+        }
+      };
+      const index = games.findIndex((game) => game.name === gameQuery);
+
+      choose.addEventListener('change', () => go(choose.value));
+
+      const previous = document.createElement('button');
+      const next = document.createElement('button');
+
+      for (const [element, label, target] of [
+        [previous, '< previous game', games[index - 1]?.name],
+        [next, 'next game >', games[index + 1]?.name],
+      ] as const) {
+        element.textContent = label;
+        element.style.cssText = 'background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit;margin:0 6px';
+        element.addEventListener('click', () => go(target));
+      }
+
+      holder.append(previous, choose, next);
+      bar.append(holder);
+    })
+    .catch(() => undefined);
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === ' ') {
+      event.preventDefault();
+      toggle();
+    } else if (event.key === 'ArrowLeft') {
+      seekBy(event.shiftKey ? -30_000 : -10_000);
+    } else if (event.key === 'ArrowRight') {
+      seekBy(event.shiftKey ? 30_000 : 10_000);
+    } else if (event.key >= '1' && event.key <= '5') {
+      playback.setSpeed(speeds[Number(event.key) - 1]);
+    }
+  });
+
+  playback.setSpeed(1);
+  playback.play();
+
+  new RenderLoop((delta) => {
+    playback.advance(delta);
+
+    const position = playback.positionMs;
+    const goals = timeline.goals.filter((goal) => goal.filmMilliseconds <= position);
+    const homeGoals = goals.filter((goal) => goal.side === 'home').length;
+    const awayGoals = goals.filter((goal) => goal.side === 'away').length;
+
+    renderer.render(position, playback.currentState === 'playing' ? fadeAlpha(edges, position, playback.speed) : 0);
+    status.textContent = `[${shownLabel}] ${home} ${homeGoals} - ${awayGoals} ${away}   ${timeline.clockAt(position).label}   (${playback.speed}x, ${playback.currentState})`;
+    playButton.textContent = playback.currentState === 'playing' ? 'pause' : playback.currentState === 'finished' ? 'replay' : 'play';
+    speedButtons.forEach((element, index) => {
+      element.style.background = speeds[index] === playback.speed ? '#0369a1' : '#1e293b';
+    });
+
+    if (document.activeElement !== slider) {
+      slider.value = String(Math.floor(playback.elapsedMilliseconds));
+    }
+  }).start();
 }

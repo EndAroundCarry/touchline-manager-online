@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -47,6 +47,7 @@ export async function bundleHarness() {
 export async function startServer({ presentation, port = 0 }) {
   const bundle = await bundleHarness();
   const presentationPath = resolve(presentation);
+  const presentationIsFolder = (await stat(presentationPath)).isDirectory();
 
   const server = createServer(async (request, response) => {
     // Forward slashes on every platform, so the comparisons below read the same on Windows.
@@ -67,9 +68,29 @@ export async function startServer({ presentation, port = 0 }) {
         return;
       }
 
-      if (path === '/presentation.json') {
+      if (path === '/games.json') {
+        let names = [];
+
+        if (presentationIsFolder) {
+          try {
+            names = JSON.parse(await readFile(join(presentationPath, 'manifest.json'), 'utf8')).map((game) => ({ name: game.name, label: game.label }));
+          } catch {
+            names = (await readdir(presentationPath)).filter((name) => name.endsWith('.json') && name !== 'manifest.json').map((name) => name.slice(0, -5)).sort();
+          }
+        }
+
         response.writeHead(200, { 'content-type': types['.json'], 'cache-control': 'no-store' });
-        response.end(await readFile(presentationPath));
+        response.end(JSON.stringify(names));
+
+        return;
+      }
+
+      if (path === '/presentation.json') {
+        const game = new URL(request.url ?? '/', 'http://localhost').searchParams.get('game') ?? '';
+        const file = presentationIsFolder ? join(presentationPath, `${/^[\w-]+$/.test(game) ? game : 'missing'}.json`) : presentationPath;
+
+        response.writeHead(200, { 'content-type': types['.json'], 'cache-control': 'no-store' });
+        response.end(await readFile(file));
 
         return;
       }
