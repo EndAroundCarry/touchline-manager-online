@@ -48,6 +48,9 @@ internal sealed partial class TickMatchLoop
     /// <summary>The ticks a goalkeeper holds the ball before he plays it (2.5 s).</summary>
     public const int KeeperHoldTicks = 25;
 
+    /// <summary>The ticks a goalkeeper whose side wastes time holds the ball on top of <see cref="KeeperHoldTicks"/> (4 s).</summary>
+    public const int KeeperWastedTicks = 40;
+
     /// <summary>The seconds between injury rolls.</summary>
     public const int InjuryRollSeconds = 30;
 

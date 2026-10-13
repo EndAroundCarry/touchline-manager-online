@@ -222,6 +222,28 @@ internal sealed class TickMatchStateMachine
         _ => 15,
     };
 
+    /// <summary>The ticks a side that wastes time holds its own goal kick on top of the usual hold (5 s).</summary>
+    public const int WastedGoalKickTicks = 50;
+
+    /// <summary>The ticks a side that wastes time holds its own throw-in on top of the usual hold (4 s).</summary>
+    public const int WastedThrowInTicks = 40;
+
+    /// <summary>The ticks a side that wastes time holds its own free kick on top of the usual hold (3 s).</summary>
+    public const int WastedFreeKickTicks = 30;
+
+    /// <summary>
+    /// Gets the ticks a side that wastes time adds to the hold of its own restart: a goal kick, a throw-in and a free kick are put off, a
+    /// corner, a penalty and a kick-off are not.
+    /// </summary>
+    /// <param name="kind">The kind of restart.</param>
+    public static int WastedTicks(TickRestartKind kind) => kind switch
+    {
+        TickRestartKind.GoalKick => WastedGoalKickTicks,
+        TickRestartKind.ThrowIn => WastedThrowInTicks,
+        TickRestartKind.FreeKick => WastedFreeKickTicks,
+        _ => 0,
+    };
+
     /// <summary>Gets the pending state a kind of restart puts the machine in.</summary>
     /// <param name="kind">The kind of restart.</param>
     public static TickPlayState PendingStateOf(TickRestartKind kind) => kind switch
@@ -268,8 +290,9 @@ internal sealed class TickMatchStateMachine
 
     /// <summary>Advances the machine one tick.</summary>
     /// <param name="takerReady">Whether the taker is standing at the ball (see <see cref="TickSetPieces.IsTakerReady"/>).</param>
+    /// <param name="takerWastesTime">Whether the side taking the restart is wasting time, which holds it longer (see <see cref="WastedTicks"/>).</param>
     /// <returns>What the loop does about the restart this tick.</returns>
-    public TickRestartSignal Step(bool takerReady)
+    public TickRestartSignal Step(bool takerReady, bool takerWastesTime = false)
     {
         switch (State)
         {
@@ -294,7 +317,9 @@ internal sealed class TickMatchStateMachine
             default:
                 TicksInState++;
 
-                if (TicksInState >= MaximumSetupTicks || (takerReady && TicksInState >= SetupTicks(Restart.Kind)))
+                var hold = SetupTicks(Restart.Kind) + (takerWastesTime ? WastedTicks(Restart.Kind) : 0);
+
+                if (TicksInState >= MaximumSetupTicks || (takerReady && TicksInState >= hold))
                 {
                     State = TickPlayState.OpenPlay;
                     TicksInState = 0;

@@ -69,6 +69,52 @@ public sealed class TickMatchStateMachineTests
         }
     }
 
+    [Theory]
+    [InlineData("GoalKick", 10, 50)]
+    [InlineData("ThrowIn", 8, 40)]
+    [InlineData("FreeKick", 15, 30)]
+    [InlineData("Corner", 15, 0)]
+    [InlineData("Penalty", 15, 0)]
+    [InlineData("KickOff", 12, 0)]
+    public void A_side_that_wastes_time_holds_its_own_goal_kick_throw_in_and_free_kick_longer(string kind, int setup, int wasted)
+    {
+        var restartKind = Enum.Parse<TickRestartKind>(kind);
+
+        TickMatchStateMachine.WastedTicks(restartKind).Should().Be(wasted);
+
+        var machine = new TickMatchStateMachine();
+
+        machine.Begin(Restart(restartKind));
+
+        for (var tick = 1; tick < setup + wasted; tick++)
+        {
+            machine.Step(takerReady: true, takerWastesTime: true).Should().Be(TickRestartSignal.Waiting, $"tick {tick} is inside the longer hold");
+        }
+
+        machine.Step(takerReady: true, takerWastesTime: true).Should().Be(TickRestartSignal.Execute);
+    }
+
+    [Fact]
+    public void A_side_that_does_not_waste_time_is_held_as_before_and_no_hold_outlasts_the_ceiling()
+    {
+        var machine = new TickMatchStateMachine();
+
+        machine.Begin(Restart(TickRestartKind.GoalKick));
+
+        for (var tick = 1; tick < TickMatchStateMachine.SetupTicks(TickRestartKind.GoalKick); tick++)
+        {
+            machine.Step(takerReady: true, takerWastesTime: false).Should().Be(TickRestartSignal.Waiting);
+        }
+
+        machine.Step(takerReady: true, takerWastesTime: false).Should().Be(TickRestartSignal.Execute);
+
+        foreach (var kind in Enum.GetValues<TickRestartKind>())
+        {
+            (TickMatchStateMachine.SetupTicks(kind) + TickMatchStateMachine.WastedTicks(kind))
+                .Should().BeLessThanOrEqualTo(TickMatchStateMachine.MaximumSetupTicks, "wasting time must not run into the ceiling that keeps a match moving");
+        }
+    }
+
     [Fact]
     public void A_restart_waits_for_a_taker_who_is_not_at_the_ball_and_then_goes_the_tick_he_arrives()
     {

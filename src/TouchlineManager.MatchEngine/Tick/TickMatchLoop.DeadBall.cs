@@ -502,7 +502,7 @@ internal sealed partial class TickMatchLoop
             && _plan.TakerIndex < taker.Count
             && TickSetPieces.IsTakerReady(taker.Body[_plan.TakerIndex], _ball.X, _ball.Y);
 
-        var signal = _machine.Step(ready);
+        var signal = _machine.Step(ready, taker.Runtime.WastingTime);
 
         MoveTeams();
 

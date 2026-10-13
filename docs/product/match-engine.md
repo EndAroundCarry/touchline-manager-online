@@ -2280,3 +2280,35 @@ The floor is the lever that matters, and it is also a global one: a lower floor 
 - S3 (17-20 v 6): the 6-skill side wins 0-1% in every setup; its draws are 9% on COUNTER (baseline 6%) and 1% on BUS.
 - `tick 500`: goals 3.85 (3.82 before; above the 2.6-2.9 band before this milestone), shots 39.3, on target 34.2%, pass completion 84.1%. `tickmotion 200 1` film health unchanged. `ticksnap 205` was not run (needs the DB export); nothing in the stored squads sets a different instruction mix than the one `tick 500` plays.
 - Test changes: the board-formation test's upper goal band 3.8 to 4.3 (the true mean is 3.85; 72 matches scatter by 0.3); the replay test allows a slot to be missing for a player sent off (the fixed film match now has a red card); the spent-player pace floor in the physics test 60% to 40%.
+
+### 14.30 Time-wasting in the tick engine (the weaker-side plan, Milestone 4)
+
+**Why.** `TimeWasting` (Off, Situational, On) was read only by the possession engine's ratings and the film's counter logic, so a tick match ignored it. A side that was ahead could not run down the clock.
+
+**What changed** (`TickMatchStateMachine`, `TickMatchLoop`; no existing fixture sets the instruction, so the golden hash is unchanged and every cell without time-wasting is bit-identical to Milestone 3):
+
+| Where | Extra hold for a side that wastes time |
+|---|---|
+| Its own goal kick (`WastedGoalKickTicks`) | +5 s |
+| Its own throw-in (`WastedThrowInTicks`) | +4 s |
+| Its own free kick (`WastedFreeKickTicks`) | +3 s |
+| The goalkeeper holding a ball he has caught or picked up (`KeeperWastedTicks`) | +4 s (6.5 s in all) |
+| Corner, penalty, kick-off | none |
+
+`SideRuntime.WastingTime` decides whether the side wastes time: always for On, and for Situational only while the side leads (the lead is read at the end of each minute, as the ratings do). The clock runs through the longer hold, so the wasted seconds are taken from open play. The hold is still cut off at `MaximumSetupTicks` (10 s). The cost named in the plan, that the side attacks less, comes from the same seconds: there is less play for both sides. Open-play moves, the break window and the counter flag are not touched.
+
+**Result** (300 matches a cell, seed 90000; `tickbalance` got an open-play-seconds column `live` and a `led70` column, the matches in which a side led after 70 minutes and the number it then won; scenarios S7, S7h and S7e):
+
+| Cell | W/D/L % | Points | Open play | Led at 70' (won) |
+|---|---|---|---|---|
+| 16 v 16, away DEF (default) | 58/17/25 | 1.92-0.92 | 5,718 s | 82 (61) |
+| 16 v 16, away On | 50/22/28 | 1.72-1.06 | 5,580 s | 77 (65) |
+| 17-20 v 15-18, home DEF | 76/13/11 | 2.41-0.47 | 5,714 s | 203 (196) |
+| same, home Situational | 74/14/12 | 2.37-0.50 | 5,642 s | 206 (196) |
+| same, home On | 78/14/8 | 2.49-0.37 | 5,590 s | 223 (209) |
+
+- **Effective playing time falls by about 2.2% when it is On** (5,718 to 5,580 s of open play in a match, the clock's 5,400 s plus stoppages), about 1.3% when it is Situational for the stronger side that leads most of the match. Both sides' shots fall by about 5%.
+- **Between equal sides** the side that wastes time gains about 0.14 points and 5 points of draws, and holds more of its leads (65 of 77 against 61 of 82). Read these as the size of the effect, not as precise figures: a flag effect at 300 matches has an error of about 0.1 points.
+- **Caps (BUS, the only setup with `waste=1`, Situational):** S1 home DEF v BUS 87/9/4 (BUS with the flag off 89/9/2), home POS v BUS 89/8/3; stronger side wins 87-92% in all three BUS variants, weaker side at most 4%. S3 BUS 99/1/0 (limit 2% for wins and draws together). A BUS that wastes time while trailing (On) concedes more (3.44 to 3.96 goals, probably through the longer goal kicks and keeper holds that let the press set up), which is what the instruction should cost.
+- **The counter flag is unchanged:** S5 home DEF v COUNTER 57/20/23 (1.92-0.88), identical to Milestone 3.
+- Test changes: `TickMatchStateMachineTests` (the longer hold per restart kind, no hold above the ceiling), `TickMatchLoopTests` (a side on On leaves less open play, Off equals the default).

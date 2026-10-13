@@ -725,7 +725,7 @@ internal sealed partial class TickMatchLoop
         var breaking = team.IsBreaking(_tick);
         var interval = TickBallCarrierBrain.DecisionInterval(skills, instructions.Tempo, breaking);
 
-        if (keeper && _heldTicks < KeeperHoldTicks)
+        if (keeper && _heldTicks < KeeperHoldTicks + (team.Runtime.WastingTime ? KeeperWastedTicks : 0))
         {
             return;
         }

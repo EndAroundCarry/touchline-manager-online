@@ -149,6 +149,29 @@ public sealed class TickMatchLoopTests
     }
 
     [Fact]
+    public void A_side_that_wastes_time_leaves_less_of_the_match_in_open_play_and_one_that_does_not_changes_nothing()
+    {
+        static int OpenPlayFrames(TickSample sample) =>
+            Enumerable.Range(0, sample.Recording.FrameCount).Count(frame => sample.Recording.State(frame) == TickPlayState.OpenPlay);
+
+        static MatchInputV1 Wasting(MatchInputV1 input, MatchTimeWasting setting) =>
+            input with
+            {
+                Home = input.Home with { Instructions = input.Home.Instructions with { TimeWasting = setting } },
+                Away = input.Away with { Instructions = input.Away.Instructions with { TimeWasting = setting } },
+            };
+
+        ulong[] seeds = [31, 32, 33];
+        var off = seeds.Sum(seed => OpenPlayFrames(TickPlay.Play(Wasting(TickPlay.Fixture(seed), MatchTimeWasting.Off))));
+        var on = seeds.Sum(seed => OpenPlayFrames(TickPlay.Play(Wasting(TickPlay.Fixture(seed), MatchTimeWasting.On))));
+        var untouched = seeds.Sum(seed => OpenPlayFrames(TickPlay.Play(TickPlay.Fixture(seed))));
+
+        off.Should().Be(untouched, "Off is the default instruction");
+        on.Should().BeLessThan(off, "both sides holding their goal kicks, throw-ins, free kicks and the keeper's ball longer leaves less play");
+        on.Should().BeGreaterThan(off * 9 / 10, "time-wasting is a small effect, not a way to stop the match");
+    }
+
+    [Fact]
     public void Recording_the_match_changes_nothing_about_it()
     {
         var recorded = TickPlay.Play(TickPlay.Fixture(13), record: true);

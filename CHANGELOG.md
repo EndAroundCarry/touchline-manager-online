@@ -4,6 +4,19 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 4 - time-wasting
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.30. **A side set to waste time now holds its own restarts longer in a tick match**; no existing fixture sets the instruction, so the golden hash is unchanged.
+
+### Changed
+
+- The tick engine reads `TimeWasting`: a side that wastes time (always for On, only while leading for Situational) holds its own goal kicks 5 s longer, throw-ins 4 s and free kicks 3 s, and its goalkeeper holds a caught ball 4 s longer. Corners, penalties and kick-offs are not delayed. Open play loses about 2% of its time with On; between equal sides the side gains about 5 points of draws.
+
+### Added
+
+- `tickbalance`: an open-play-seconds column, a led-at-70-minutes column, BUS0, BUS2, DEFW1 and DEFW2 setups, and scenarios S7, S7h and S7e.
+- Tests: the longer restart holds (`TickMatchStateMachineTests`) and a match played with and without time-wasting (`TickMatchLoopTests`).
+
 ## Weaker-side plan, Milestone 3 - committing forward costs legs
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.29. **The engine's play changes for every side late in a match, and for a side that presses high, plays at a high tempo or has a committed mentality most of all**; the golden hash moves.

@@ -171,6 +171,10 @@ internal static class TickShowcase
             ["ATT"] = "ment=4,press=2,line=2,tempo=2",
             ["COUNTER"] = "form=12,ment=1,press=0,line=0,pass=2,counter=1",
             ["BUS"] = "form=12,ment=0,press=0,line=0,counter=1,waste=1",
+            ["BUS0"] = "form=12,ment=0,press=0,line=0,counter=1,waste=0",
+            ["BUS2"] = "form=12,ment=0,press=0,line=0,counter=1,waste=2",
+            ["DEFW2"] = "waste=2",
+            ["DEFW1"] = "waste=1",
             ["DEEP"] = "form=12,ment=0,press=0,line=0",
             ["COUNTER0"] = "form=12,ment=1,press=0,line=0,pass=2,counter=0",
         };
@@ -183,6 +187,9 @@ internal static class TickShowcase
             ("S3", "17-20", "6", 17, 6, 0, 0, ["DEF"], ["DEF", "COUNTER", "BUS"]),
             ("S4", "16", "16", 16, 16, 0, 0, matrix, matrix),
             ("S5", "16", "16", 16, 16, 0, 0, ["DEF", "POS", "ATT", "DEEP"], ["COUNTER", "COUNTER0"]),
+            ("S7", "17-20", "15-18", 17, 15, 0, 0, ["DEF", "POS"], ["BUS0", "BUS", "BUS2"]),
+            ("S7h", "17-20", "15-18", 17, 15, 0, 0, ["DEF", "DEFW1", "DEFW2"], ["DEF"]),
+            ("S7e", "16", "16", 16, 16, 0, 0, ["DEF"], ["DEF", "DEFW2"]),
             ("S6n", "17-20", "15-18", 17, 15, 0, 0, ["DEF", "POS"], deepOrCounter),
             ("S6a", "17-20", "15-18", 17, 15, 20, 16, ["DEF", "POS"], deepOrCounter),
             ("S6b", "17-20", "15-18", 17, 15, 16, 19, ["DEF", "POS"], deepOrCounter),
@@ -225,7 +232,7 @@ internal static class TickShowcase
                     var breaks = cell.PerShot.Select(tally => (Breaks: tally.Breaks / (double)matches, Regains: tally.Regains / (double)matches)).ToArray();
 
                     Console.WriteLine(
-                        $"{name} {home,5} {homeSetup,-7} v {away,5} {awaySetup,-7} {100.0 * cell.Wins / matches,3:F0}/{100.0 * cell.Draws / matches,3:F0}/{100.0 * cell.Losses / matches,3:F0}  {cell.HomePoints:F2}-{cell.AwayPoints:F2}  {cell.Goals[0]:F2}-{cell.Goals[1]:F2}  {cell.Shots[0]:F1}-{cell.Shots[1]:F1}  {cell.OnTarget[0]:F1}-{cell.OnTarget[1]:F1}  {insideSixteen[0]:F1}-{insideSixteen[1]:F1}  {100.0 * cell.GoalsPerOnTarget[0]:F0}%-{100.0 * cell.GoalsPerOnTarget[1]:F0}%  {breaks[0].Breaks:F2} ({breaks[0].Regains:F1}) - {breaks[1].Breaks:F2} ({breaks[1].Regains:F1})  cond {cell.Condition[0]:F0}-{cell.Condition[1]:F0}");
+                        $"{name} {home,5} {homeSetup,-7} v {away,5} {awaySetup,-7} {100.0 * cell.Wins / matches,3:F0}/{100.0 * cell.Draws / matches,3:F0}/{100.0 * cell.Losses / matches,3:F0}  {cell.HomePoints:F2}-{cell.AwayPoints:F2}  {cell.Goals[0]:F2}-{cell.Goals[1]:F2}  {cell.Shots[0]:F1}-{cell.Shots[1]:F1}  {cell.OnTarget[0]:F1}-{cell.OnTarget[1]:F1}  {insideSixteen[0]:F1}-{insideSixteen[1]:F1}  {100.0 * cell.GoalsPerOnTarget[0]:F0}%-{100.0 * cell.GoalsPerOnTarget[1]:F0}%  {breaks[0].Breaks:F2} ({breaks[0].Regains:F1}) - {breaks[1].Breaks:F2} ({breaks[1].Regains:F1})  cond {cell.Condition[0]:F0}-{cell.Condition[1]:F0}  live {cell.LiveSeconds:F0} s  led70 {cell.Led70[0]:F0}/{cell.Held[0]:F0}-{cell.Led70[1]:F0}/{cell.Held[1]:F0}");
                 }
             }
         }
@@ -244,7 +251,10 @@ internal static class TickShowcase
         double[] Fouls,
         double[] GoalsPerOnTarget,
         ShotTally[] PerShot,
-        double[] Condition)
+        double[] Condition,
+        double LiveSeconds,
+        int[] Led70,
+        int[] Held)
     {
         public double HomePoints => ((3.0 * Wins) + Draws) / (Wins + Draws + Losses);
 
@@ -263,6 +273,9 @@ internal static class TickShowcase
         var fouls = new int[matches, 2];
         var perShot = new ShotTally[] { new(), new() };
         var condition = new double[matches, 2];
+        var live = new double[matches];
+        var led70 = new int[matches, 2];
+        var held = new int[matches, 2];
         var gate = new object();
 
         Parallel.For(0, matches, index =>
@@ -273,15 +286,15 @@ internal static class TickShowcase
                 homeForm,
                 awayForm);
             var recorder = new MatchPassageRecorder();
-            var live = new PlayerLiveMetricsRecorder();
-            var result = MatchSimulator.Simulate(input, rules, live, recorder, TickMatchEngine.Instance);
+            var liveMetrics = new PlayerLiveMetricsRecorder();
+            var result = MatchSimulator.Simulate(input, rules, liveMetrics, recorder, TickMatchEngine.Instance);
 
             foreach (var side in Enumerable.Range(0, 2))
             {
                 var starters = (side == 0 ? input.Home : input.Away).Slots.Where(slot => slot.Family != MatchPositionFamily.Goalkeeper).Select(slot => slot.ParticipantId).ToHashSet();
                 var last = new Dictionary<Guid, (int Minute, int Condition)>();
 
-                foreach (var metric in live.Metrics.Where(metric => starters.Contains(metric.ParticipantId) && metric.Minute <= 85))
+                foreach (var metric in liveMetrics.Metrics.Where(metric => starters.Contains(metric.ParticipantId) && metric.Minute <= 85))
                 {
                     if (!last.TryGetValue(metric.ParticipantId, out var seen) || metric.Minute >= seen.Minute)
                     {
@@ -290,6 +303,23 @@ internal static class TickShowcase
                 }
 
                 condition[index, side] = last.Count == 0 ? 0 : last.Values.Average(entry => entry.Condition);
+            }
+
+            var early = new int[2];
+
+            foreach (var goal in result.Events.Where(e => e.IsGoal && e.Minute <= 70))
+            {
+                early[(int)goal.Side]++;
+            }
+
+            foreach (var side in Enumerable.Range(0, 2))
+            {
+                var ahead = early[side] > early[1 - side];
+                var mine = side == 0 ? result.HomeGoals : result.AwayGoals;
+                var theirs = side == 0 ? result.AwayGoals : result.HomeGoals;
+
+                led70[index, side] = ahead ? 1 : 0;
+                held[index, side] = ahead && mine > theirs ? 1 : 0;
             }
 
             goals[index, 0] = result.HomeGoals;
@@ -303,6 +333,8 @@ internal static class TickShowcase
 
             if (recorder.Tick is { } recording)
             {
+                live[index] = Enumerable.Range(0, recording.FrameCount).Count(frame => recording.State(frame) == TickPlayState.OpenPlay) / 10.0;
+
                 lock (gate)
                 {
                     Tally(result, recording, perShot);
@@ -329,7 +361,10 @@ internal static class TickShowcase
             Averages(fouls),
             [.. Enumerable.Range(0, 2).Select(side => totalGoals[side] / (double)Math.Max(1, totalOnTarget[side]))],
             perShot,
-            Averages2(condition));
+            Averages2(condition),
+            live.Average(),
+            [.. Enumerable.Range(0, 2).Select(side => Enumerable.Range(0, matches).Sum(index => led70[index, side]))],
+            [.. Enumerable.Range(0, 2).Select(side => Enumerable.Range(0, matches).Sum(index => held[index, side]))]);
     }
 
     private static string Share(int part, int whole) => $"{100.0 * part / Math.Max(1, whole),3:F0}%";
