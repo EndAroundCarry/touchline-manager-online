@@ -74,3 +74,5 @@ infra/docker/data/
 infra/scan/.artifacts/
 infra/restore-drill/.artifacts/
 tests/load/.artifacts/
+.run-logs
+recordings
