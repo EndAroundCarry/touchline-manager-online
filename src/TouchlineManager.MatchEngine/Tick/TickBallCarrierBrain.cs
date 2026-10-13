@@ -519,7 +519,7 @@ internal static class TickBallCarrierBrain
     public const int BreakSharpness = 4;
 
     /// <summary>The percent of progress a pass or a carry is worth that a side waiting for a break gives up: it does not force the play.</summary>
-    public const int WaitProgressPercent = 28;
+    public const int WaitProgressPercent = 35;
 
     /// <summary>The percent of progress a pass or a carry is worth that a side on a break adds to its mentality's.</summary>
     public const int BreakProgressPercent = 120;

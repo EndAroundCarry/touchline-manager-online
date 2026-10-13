@@ -28,7 +28,7 @@ internal readonly record struct TickBreakPlan(int Ticks, int Runners, bool Immed
 /// of the opponent's posture (<see cref="TickTeamStyle.Posture"/>), times the speed factor (<see cref="SpeedFactorPercent"/>). It sets the
 /// window's length (<see cref="TicksPerGainPercent"/>), the runners (one for every <see cref="GainPerRunnerPercent"/>, up to
 /// <see cref="MaximumRunners"/>), whether they start at once (from <see cref="ImmediateGainPercent"/>) and how much more the carrier values a
-/// ball forward (<see cref="TickBallCarrierBrain.BreakProgressPercent"/> at 100%, up to <see cref="MaximumProgressGainPercent"/>). The progress follows the speed factor twice over: a break that a quicker side can catch loses its hurry faster than it loses its length, which is what turns a counter against an attacking side from a plus into a small minus at a 2-point edge.
+/// ball forward (<see cref="TickBallCarrierBrain.BreakProgressPercent"/> per 100% of gain, counted up to <see cref="MaximumProgressGainPercent"/>). The progress follows the speed factor twice over: a break that a quicker side can catch loses its hurry faster than it loses its length, which is what turns a counter against an attacking side from a plus into a small minus at a 2-point edge.
 /// </para>
 /// <para>
 /// <b>Speed.</b> The breakers are the side's Attack and Midfield families, the recoverers the opponent's Defence and Midfield families; a
@@ -40,10 +40,10 @@ internal readonly record struct TickBreakPlan(int Ticks, int Runners, bool Immed
 internal static class TickBreakGain
 {
     /// <summary>The gain against a balanced opponent (posture 0), in percent.</summary>
-    public const int GainAtBalancedPercent = 100;
+    public const int GainAtBalancedPercent = 125;
 
     /// <summary>The gain added for every point of the opponent's posture, in percent.</summary>
-    public const int GainPerPosturePercent = 50;
+    public const int GainPerPosturePercent = 63;
 
     /// <summary>The ticks a break lasts for every 100% of gain (7 s).</summary>
     public const int TicksPerGainPercent = 70;
@@ -58,16 +58,16 @@ internal static class TickBreakGain
     public const int ImmediateGainPercent = 75;
 
     /// <summary>The most gain, in percent, the carrier's hunger for progress grows with.</summary>
-    public const int MaximumProgressGainPercent = 100;
+    public const int MaximumProgressGainPercent = 125;
 
-    /// <summary>The ticks a Defensive side's outlet lasts from the regain (5 s).</summary>
-    public const int OutletTicks = 50;
+    /// <summary>The ticks a Defensive side's outlet lasts from the regain (6.2 s).</summary>
+    public const int OutletTicks = 62;
 
     /// <summary>The runners a Defensive side's outlet sends.</summary>
     public const int OutletRunners = 1;
 
     /// <summary>The percent of progress a Defensive side's carrier values a ball forward at while its outlet is open: a mild lift on its mentality's 90.</summary>
-    public const int OutletProgressPercent = 15;
+    public const int OutletProgressPercent = 18;
 
     /// <summary>The percent the gain moves for every point the recoverers are quicker (down) or slower (up) than the breakers.</summary>
     public const int GainPerSpeedPointPercent = 15;

@@ -4,6 +4,19 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 2b - the size of the bonus (125%)
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.28. **The engine's play changes a little for a side with `CounterAttack`, a low block or a Defensive mentality**; the golden hash does not move.
+
+### Changed
+
+- The mechanisms of Milestones 1b and 2 are 125% of the size they were tuned at: the break's gain (125 at a balanced opponent, 63 a point of posture), the counter's waiting cost (28 to 35), the low block (compactness +7, midfield takes 91% of a deep line, 3 midfield markers, 3 extra screens) and the Defensive outlet (6.2 s, +18 progress). The size was chosen by the user from a sweep of 0% to 150% (500 matches a cell). The counter flag is neutral against a default opponent (+0.04) and +0.38 against an all-out attack at 16 v 16, and +0.26 / +0.50 with breakers 3 points quicker; 150% broke the fast-breakers cap, so 125% is the largest size inside it.
+- The weaker side's points in 17-20 v 15-18 do not rise when it defends deep, at any size (0.15-0.33 against 0.43 for its default): the plan's 0.6-0.8 is not reached and is left to Milestone 3.
+
+### Added
+
+- The `TB_HOME` filter of `tickbalance` (like `TB_AWAY`, for the home side's setups).
+
 ## Weaker-side plan, Milestone 2 - a low block that packs the box, and a Defensive outlet
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.27. **The engine's play changes for a side that defends deep** (LowBlock pressing, a Deep line under a Defensive or Cautious mentality, or a Defensive mentality); the golden hash does not move.

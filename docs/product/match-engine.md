@@ -2190,3 +2190,53 @@ The outlet did more. It was swept at 0, 15, 30 and 45 points of progress and at 
 Not reached: **the weaker side's S1 points against the all-out attack of the stronger side's DEF are 0.22-0.25, not the 0.6-0.8 the plan hopes for.** The weaker side's own all-out attack (POS) is still its best option at 1.00 points (57/15/28), which is M3's first aim. `ticksnap 205` was not run (it needs a database export; the golden hash does not move).
 
 **Tests.** `IsLowBlock` on the setups, the exact anchor of a midfielder inside and outside the box, no outfield player of a low block within 8 m of his goal line, midfield markers and extra screens only when the low block packs the box, and the outlet against a bigger and a smaller counter.
+
+### 14.28 The size of the bonus (the weaker-side plan, Milestone 2b)
+
+**What changed.** Nothing new is built: the user chose how big the mechanisms of Milestones 1b and 2 are, **125%** of the sizes they were tuned at, and the constants now carry that size. The temporary scale (`TickDiag`, an environment variable `TD_BONUS`) that the sweep ran on is removed. The golden hash does not move: no fixture has the counter flag, a low block or a Defensive mentality.
+
+| Constant | Before | Now |
+|---|---|---|
+| `TickBreakGain.GainAtBalancedPercent` | 100 | 125 |
+| `TickBreakGain.GainPerPosturePercent` | 50 | 63 (62.5 rounded) |
+| `TickBreakGain.MaximumProgressGainPercent` | 100 | 125 |
+| `TickBallCarrierBrain.WaitProgressPercent` (the counter's cost) | 28 | 35 |
+| `TickTacticalGeometry.LowBlockCompactnessGain` | 6 | 7 |
+| `TickTacticalGeometry.LowBlockMidfieldLineGain` | 25 | 31 |
+| `TickDefensiveAI.LowBlockMidfieldMarkers` | 2 | 3 |
+| `TickDefensiveAI.LowBlockExtraScreens` | 2 | 3 |
+| `TickBreakGain.OutletTicks` | 50 (5 s) | 62 (6.2 s) |
+| `TickBreakGain.OutletProgressPercent` | 15 | 18 |
+
+The speed factor (step 15, floor 30%, ceiling 115%) was not scaled. The outlet's single runner stays at 1.
+
+**The sweep.** Six sizes (0%, 50%, 75%, 100%, 125%, 150%), 500 matches a cell, seed 90000, one scale on the break's gain and cost, the low-block levers and the outlet together (cells a size cannot change were played once). A cell's standard error is about 0.045 points, a flag effect (two cells) about 0.09.
+
+Weaker side's points, S1 (17-20 at home v 15-18, the stronger side plays its default; the weaker side's own default scores 0.43):
+
+| Size | Sits deep | Sits deep and counters | Parks the bus |
+|---|---|---|---|
+| 0% | 0.20 | 0.46 (flag does nothing) | 0.20 |
+| 50% | 0.24 | 0.28 | 0.21 |
+| 75% | 0.23 | 0.28 | 0.19 |
+| 100% | 0.25 | 0.22 | 0.23 |
+| **125%** | 0.23 | 0.31 | 0.15 |
+| 150% | 0.19 | 0.33 | 0.30 |
+
+The size does not lift a weaker side that defends deep: it stays under its own default (0.43) at every size, and S2 (17-20 v 13-15) is flat too (0.08-0.20 against 0.12). **The plan's 0.6-0.8 points is not reached at any size**; the low block and the outlet barely move the result, and the size mostly scales the counter flag. The stronger side wins 83-91% in every S1 cell and the weaker side at most 7% (cap 15%).
+
+The counter flag's effect (COUNTER minus COUNTER0, points):
+
+| Situation | 75% | 100% | **125%** | 150% |
+|---|---|---|---|---|
+| 16 v 16, opponent plays its default (neutral) | -0.09 | 0.00 | +0.04 | +0.20 |
+| 16 v 16, opponent attacks all-out (at least +0.20) | +0.10 | +0.18 | +0.38 | +0.42 |
+| 17-20 v 15-18 (no target), default / all-out | -0.18 / +0.03 | -0.19 / +0.04 | -0.14 / +0.07 | -0.07 / +0.08 |
+| Opponent 4 points quicker, default / all-out (small minus) | -0.16 / -0.09 | -0.10 / -0.08 | -0.24 / -0.05 | -0.14 / 0.00 |
+| Breakers 3 points quicker, default / all-out | +0.03 / +0.28 | +0.16 / +0.29 | +0.26 / +0.50 | +0.62 / +0.64 |
+
+With the breakers quicker (S6b, home default) the stronger side wins 71 / 66 / 61 / **50**% and the weaker side 15 / 19 / 22 / **33**% at 75 / 100 / 125 / 150%: the 150% row breaks the caps (60% and about 25%), so 125% is the largest size that stays inside them. S3 (17-20 v 6), wins plus draws of the 6-skill side in 500 matches, COUNTER / BUS: 1 / 1, 1 / 1, 6 / 0 and 8 / 2 at 75 / 100 / 125 / 150%: all within the 2% guard.
+
+**Check of the shipped constants (300 matches a cell, seed 90000, the first 300 matches of the sweep).** Flag effect, 16 v 16, home default / all-out: +0.15 / +0.34 (500 at 125%: +0.04 / +0.38); breakers quicker, home default / all-out: +0.28 / +0.46 (+0.26 / +0.50), the stronger side winning 57% / 65% (61% / 64%) and the weaker side 22% / 20%; S3 COUNTER 7 of 300 (2.3%, against 6 of 500), BUS 0; S1 weaker side on COUNTER / DEEP / BUS 0.28 / 0.21 / 0.18. The differences from the sweep are the smaller sample (a flag effect at 300 matches has an error of about 0.11); the two readings that sit outside a target, the neutral cell (+0.15 against 0.07) and the S3 leak (2.3% against 2%), are inside that error and were not tuned.
+
+**Open.** The S1 target is still unmet. The next steps are Milestone 3 (what committing forward costs, whose first aim is to bring the weaker side's own all-out attack inside the cap) and then a look at whether the low block can be made to cut the stronger side's shots at all. Later sweeps play 300 matches a cell and the sizes 75%, 100% and 125% only.

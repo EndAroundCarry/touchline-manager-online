@@ -189,6 +189,7 @@ internal static class TickShowcase
             ("S6c", "14", "14", 14, 14, 15, 13, ["DEF", "POS"], deepOrCounter),
         };
         var awayOnly = (Environment.GetEnvironmentVariable("TB_AWAY") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries);
+        var homeOnly = (Environment.GetEnvironmentVariable("TB_HOME") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries);
         var chosen = only.Length > 0
             ? scenarios.Where(scenario => only.Any(name => scenario.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase))).ToList()
             : [.. scenarios.Where(scenario => scenario.Name is "S1" or "S2" or "S3" or "S4")];
@@ -203,7 +204,7 @@ internal static class TickShowcase
                 continue;
             }
 
-            foreach (var homeSetup in homeSetups)
+            foreach (var homeSetup in homeSetups.Where(setup => homeOnly.Length == 0 || homeOnly.Contains(setup)))
             {
                 foreach (var awaySetup in awaySetups)
                 {

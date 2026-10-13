@@ -184,8 +184,8 @@ public sealed class TickTacticalGeometryTests
         });
         var midfielder = FourFourTwo[6];
 
-        // Ball at 2,000 (packing): 4,800 + (2,000 - 5,000) x (30 + 6)% - 500 (phase) - 700 x (60 + 25)% (line).
-        TickTacticalGeometry.Resolve(midfielder, style, true, false, 2_000, 3_500).X.Should().Be(2_625);
+        // Ball at 2,000 (packing): 4,800 + (2,000 - 5,000) x (30 + 7)% - 500 (phase) - 700 x (60 + 31)% (line).
+        TickTacticalGeometry.Resolve(midfielder, style, true, false, 2_000, 3_500).X.Should().Be(2_553);
 
         // Ball at 6,000 (not packing): 4,800 + 1,000 x 30% - 500 - 700 x 60%.
         TickTacticalGeometry.Resolve(midfielder, style, true, false, 6_000, 3_500).X.Should().Be(4_180);

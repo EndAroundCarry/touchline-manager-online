@@ -197,10 +197,10 @@ internal static class TickDefensiveAI
     public const int MaximumScreens = 3;
 
     /// <summary>The screens a low block packing its box adds (`weaker-side-v1`, Milestone 2).</summary>
-    public const int LowBlockExtraScreens = 2;
+    public const int LowBlockExtraScreens = 3;
 
     /// <summary>The most midfielders a low block packing its box sets to mark, after the back line has picked (`weaker-side-v1`, Milestone 2).</summary>
-    public const int LowBlockMidfieldMarkers = 2;
+    public const int LowBlockMidfieldMarkers = 3;
 
     /// <summary>The share of the lane a screen stands along it, in percent.</summary>
     public const int ScreenLanePercent = 40;
