@@ -162,6 +162,66 @@ public sealed class TickTacticalGeometryTests
     }
 
     [Fact]
+    public void A_low_block_is_lowblock_pressing_or_a_deep_line_under_a_defensive_or_cautious_mentality()
+    {
+        TickTeamStyle.IsLowBlock(new MatchInstructionsV1 { Pressing = MatchPressing.LowBlock }).Should().BeTrue();
+        TickTeamStyle.IsLowBlock(new MatchInstructionsV1 { Pressing = MatchPressing.MidBlock, DefensiveLine = MatchDefensiveLine.Deep, Mentality = MatchMentality.Cautious }).Should().BeTrue();
+        TickTeamStyle.IsLowBlock(new MatchInstructionsV1 { Pressing = MatchPressing.MidBlock, DefensiveLine = MatchDefensiveLine.Deep, Mentality = MatchMentality.Defensive }).Should().BeTrue();
+        TickTeamStyle.IsLowBlock(new MatchInstructionsV1 { Pressing = MatchPressing.MidBlock, DefensiveLine = MatchDefensiveLine.Deep, Mentality = MatchMentality.Positive }).Should().BeFalse("a deep line under an attacking side is not a block");
+        TickTeamStyle.IsLowBlock(new MatchInstructionsV1 { Pressing = MatchPressing.MidBlock, DefensiveLine = MatchDefensiveLine.Normal, Mentality = MatchMentality.Defensive }).Should().BeFalse();
+        TickTeamStyle.From(new MatchInstructionsV1 { Pressing = MatchPressing.LowBlock }).LowBlock.Should().BeTrue();
+        TickTeamStyle.From(new MatchInstructionsV1()).LowBlock.Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_low_block_follows_the_ball_deeper_and_drops_its_midfield_further_only_while_the_ball_is_in_its_last_45_per_cent()
+    {
+        var style = TickTeamStyle.From(new MatchInstructionsV1
+        {
+            Pressing = MatchPressing.MidBlock,
+            DefensiveLine = MatchDefensiveLine.Deep,
+            Mentality = MatchMentality.Cautious,
+        });
+        var midfielder = FourFourTwo[6];
+
+        // Ball at 2,000 (packing): 4,800 + (2,000 - 5,000) x (30 + 6)% - 500 (phase) - 700 x (60 + 25)% (line).
+        TickTacticalGeometry.Resolve(midfielder, style, true, false, 2_000, 3_500).X.Should().Be(2_625);
+
+        // Ball at 6,000 (not packing): 4,800 + 1,000 x 30% - 500 - 700 x 60%.
+        TickTacticalGeometry.Resolve(midfielder, style, true, false, 6_000, 3_500).X.Should().Be(4_180);
+
+        // With the ball nothing changes.
+        TickTacticalGeometry.Resolve(midfielder, style, true, true, 2_000, 3_500).X
+            .Should().Be(TickTacticalGeometry.Resolve(midfielder, style with { LowBlock = false }, true, true, 2_000, 3_500).X);
+    }
+
+    [Fact]
+    public void A_low_block_never_stands_an_outfield_player_in_the_goalmouth()
+    {
+        var style = TickTeamStyle.From(new MatchInstructionsV1
+        {
+            Pressing = MatchPressing.LowBlock,
+            DefensiveLine = MatchDefensiveLine.Deep,
+            Mentality = MatchMentality.Defensive,
+        });
+
+        // A midfielder drawn deep on the board is driven below the six-yard box by every shift at once, with the ball on the goal line.
+        TickAnchorSpec[] specs = [.. FourFourTwo, new(1_500, 3_500, MatchPositionFamily.Midfield), new(1_200, 2_000, MatchPositionFamily.Attack)];
+
+        foreach (var ballX in new[] { 0, 500, 1_500, 3_000, 4_500 })
+        {
+            foreach (var spec in specs.Where(spec => spec.Family != MatchPositionFamily.Goalkeeper))
+            {
+                var home = TickTacticalGeometry.Resolve(spec, style, true, false, ballX, 3_500);
+                var away = TickTacticalGeometry.Resolve(spec, style, false, false, SpatialPitch.PitchLength - ballX, SpatialPitch.PitchWidth - 3_500);
+
+                home.X.Should().BeGreaterThanOrEqualTo(800, $"{spec} with the ball at {ballX}");
+                (SpatialPitch.PitchLength - away.X).Should().BeGreaterThanOrEqualTo(800);
+            }
+        }
+    }
+
+    [Fact]
     public void Width_and_pass_focus_set_how_far_the_block_spreads_and_which_flank_it_leans_to()
     {
         var winger = FourFourTwo[8];

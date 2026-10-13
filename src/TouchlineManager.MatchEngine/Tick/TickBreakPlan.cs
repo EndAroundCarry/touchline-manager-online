@@ -60,6 +60,15 @@ internal static class TickBreakGain
     /// <summary>The most gain, in percent, the carrier's hunger for progress grows with.</summary>
     public const int MaximumProgressGainPercent = 100;
 
+    /// <summary>The ticks a Defensive side's outlet lasts from the regain (5 s).</summary>
+    public const int OutletTicks = 50;
+
+    /// <summary>The runners a Defensive side's outlet sends.</summary>
+    public const int OutletRunners = 1;
+
+    /// <summary>The percent of progress a Defensive side's carrier values a ball forward at while its outlet is open: a mild lift on its mentality's 90.</summary>
+    public const int OutletProgressPercent = 15;
+
     /// <summary>The percent the gain moves for every point the recoverers are quicker (down) or slower (up) than the breakers.</summary>
     public const int GainPerSpeedPointPercent = 15;
 
@@ -114,6 +123,19 @@ internal static class TickBreakGain
 
         return count == 0 ? 0 : (int)(sum / count);
     }
+
+    /// <summary>
+    /// Gets the break with a Defensive side's outlet added (`weaker-side-v1`, Milestone 2): a side that sits deep with the attack switched off
+    /// still has one man to play a ball won in its own half to. It is the larger of the counter's break and the outlet, so a counter against a
+    /// deep side, worth nothing of its own, keeps the outlet.
+    /// </summary>
+    /// <param name="plan">The break the counter-attack opens, or the default for a side without the flag.</param>
+    public static TickBreakPlan WithOutlet(TickBreakPlan plan) =>
+        new(
+            Math.Max(plan.Ticks, OutletTicks),
+            Math.Max(plan.Runners, OutletRunners),
+            true,
+            Math.Max(plan.ProgressPercent, OutletProgressPercent));
 
     /// <summary>Gets the break a regain opens.</summary>
     /// <param name="posture">The opponent's posture, -4..+4.</param>

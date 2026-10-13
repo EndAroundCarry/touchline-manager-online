@@ -39,6 +39,13 @@ internal readonly record struct TickAnchorSpec(int OwnX, int OwnY, MatchPosition
 /// </remarks>
 internal readonly record struct TickTeamStyle
 {
+    /// <summary>
+    /// Gets a value indicating whether the side defends in a low block (`weaker-side-v1`, Milestone 2): LowBlock pressing, or a Deep line
+    /// under a Defensive or Cautious mentality. While the ball is deep in its half such a side packs the box (see
+    /// <see cref="TickTacticalGeometry.LowBlockBallLimit"/>).
+    /// </summary>
+    public bool LowBlock { get; init; }
+
     /// <summary>Gets how far the block pushes up the pitch with the ball, in pitch units.</summary>
     public required int PossessionDepthShift { get; init; }
 
@@ -79,6 +86,17 @@ internal readonly record struct TickTeamStyle
             + (int)instructions.Pressing - (int)MatchPressing.MidBlock;
 
         return Math.Clamp(posture, -4, 4);
+    }
+
+    /// <summary>Tells whether a side's instructions are a low block (see <see cref="LowBlock"/>).</summary>
+    /// <param name="instructions">The side's instructions.</param>
+    public static bool IsLowBlock(MatchInstructionsV1 instructions)
+    {
+        ArgumentNullException.ThrowIfNull(instructions);
+
+        return instructions.Pressing == MatchPressing.LowBlock
+            || (instructions.DefensiveLine == MatchDefensiveLine.Deep
+                && instructions.Mentality is MatchMentality.Defensive or MatchMentality.Cautious);
     }
 
     /// <summary>Builds the style for a side's instructions.</summary>
@@ -123,6 +141,7 @@ internal readonly record struct TickTeamStyle
 
         return new TickTeamStyle
         {
+            LowBlock = IsLowBlock(instructions),
             PossessionDepthShift = inPossession,
             OutOfPossessionDepthShift = outOfPossession,
             LineShift = instructions.DefensiveLine switch
@@ -204,6 +223,18 @@ internal static class TickTacticalGeometry
     /// <summary>The deepest into the pitch a goalkeeper's anchor may go, in pitch units.</summary>
     public const int GoalkeeperLimit = 1_100;
 
+    /// <summary>
+    /// The farthest up the pitch the ball is, in the defending side's own X, for its low block to pack the box (`weaker-side-v1`, Milestone
+    /// 2): the last 45% of the pitch it defends.
+    /// </summary>
+    public const int LowBlockBallLimit = 4_500;
+
+    /// <summary>The compactness a low block packing its box adds without the ball, in percent: the block follows the ball deeper.</summary>
+    public const int LowBlockCompactnessGain = 6;
+
+    /// <summary>The share of a deep line a midfielder takes over his usual 60% under a low block packing its box, in percent.</summary>
+    public const int LowBlockMidfieldLineGain = 25;
+
     private const int BasisPoints = 10_000;
 
     /// <summary>The share of the ball shift each family takes, in percent.</summary>
@@ -216,10 +247,10 @@ internal static class TickTacticalGeometry
     };
 
     /// <summary>The share of the defensive-line shift each family takes, in percent.</summary>
-    private static int LineShiftPercent(MatchPositionFamily family) => family switch
+    private static int LineShiftPercent(MatchPositionFamily family, bool lowBlock) => family switch
     {
         MatchPositionFamily.Defence => 100,
-        MatchPositionFamily.Midfield => 60,
+        MatchPositionFamily.Midfield => lowBlock ? 60 + LowBlockMidfieldLineGain : 60,
         MatchPositionFamily.Attack => 30,
         _ => 0,
     };
@@ -244,7 +275,10 @@ internal static class TickTacticalGeometry
         var ownBallY = isHome ? ballYUnits : SpatialPitch.PitchWidth - ballYUnits;
         var middleY = SpatialPitch.GoalYCenter;
 
-        var compactness = hasPossession ? style.PossessionCompactnessPercent : style.OutOfPossessionCompactnessPercent;
+        var lowBlock = !hasPossession && style.LowBlock && ownBallX <= LowBlockBallLimit;
+        var compactness = hasPossession
+            ? style.PossessionCompactnessPercent
+            : style.OutOfPossessionCompactnessPercent + (lowBlock ? LowBlockCompactnessGain : 0);
         var ballShift = (ownBallX - (SpatialPitch.PitchLength / 2)) * compactness / 100 * BallShiftPercent(spec.Family) / 100;
 
         int ownX;
@@ -258,7 +292,7 @@ internal static class TickTacticalGeometry
         else
         {
             var phaseShift = hasPossession ? style.PossessionDepthShift : style.OutOfPossessionDepthShift;
-            var lineShift = style.LineShift * LineShiftPercent(spec.Family) / 100;
+            var lineShift = style.LineShift * LineShiftPercent(spec.Family, lowBlock) / 100;
 
             ownX = spec.OwnX + ballShift + phaseShift + lineShift;
 
@@ -269,7 +303,10 @@ internal static class TickTacticalGeometry
             ownY = middleY + ((spec.OwnY - middleY) * widthBasisPoints / BasisPoints) + lean + slide;
         }
 
-        ownX = Math.Clamp(ownX, spec.Family == MatchPositionFamily.Defence ? DefenceMinimumX : Margin, SpatialPitch.PitchLength - AttackMarginX);
+        // A low block keeps every outfield player out of the goalmouth, not only the back line.
+        var floor = spec.Family == MatchPositionFamily.Defence || (lowBlock && spec.Family != MatchPositionFamily.Goalkeeper) ? DefenceMinimumX : Margin;
+
+        ownX = Math.Clamp(ownX, floor, SpatialPitch.PitchLength - AttackMarginX);
         ownY = Math.Clamp(ownY, Margin, SpatialPitch.PitchWidth - Margin);
 
         return isHome

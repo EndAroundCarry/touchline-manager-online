@@ -4,6 +4,16 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 2 - a low block that packs the box, and a Defensive outlet
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.27. **The engine's play changes for a side that defends deep** (LowBlock pressing, a Deep line under a Defensive or Cautious mentality, or a Defensive mentality); the golden hash does not move.
+
+### Changed
+
+- A low block, while the ball is in the last 45% of the pitch it defends: +6 points of compactness, midfielders take 85% of a deep line, up to 2 midfielders mark runners the back line has no one left for, and 2 more passing lanes are screened. No outfield player of a low block stands within 8 m of his goal line.
+- A Defensive side that wins the ball in its own 60% has one runner at once for 5 s, and its carrier values going forward 15 points more, with or without the counter flag. S1 17-20 v 15-18 against DEF, weaker side's points: DEEP 0.18 to 0.25, BUS 0.14 to 0.23, COUNTER 0.34 to 0.22.
+- The low-block levers do not cut the stronger side's shots or goals at 1 to 3 times the shipped size (shots 34-37 a match, goals 3.0-3.6); the plan's 0.6-0.8 points for the weaker side is not reached. The counter flag stays neutral against DEF (0.00) and S3 stays at 1%.
+
 ## Weaker-side plan, Milestone 1b - the counter depends on the opponent
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.26. **The engine's play changes for a side with `CounterAttack`** (the golden hash does not move, no fixture has it on): every other side plays as before.

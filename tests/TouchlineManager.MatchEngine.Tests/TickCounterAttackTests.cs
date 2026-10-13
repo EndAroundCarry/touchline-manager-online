@@ -28,6 +28,25 @@ public sealed class TickCounterAttackTests
     }
 
     [Fact]
+    public void A_defensive_sides_outlet_is_one_runner_at_once_and_a_mild_lift_that_a_bigger_counter_break_keeps()
+    {
+        var outlet = TickBreakGain.WithOutlet(default);
+
+        outlet.Runners.Should().Be(TickBreakGain.OutletRunners);
+        outlet.Ticks.Should().Be(TickBreakGain.OutletTicks);
+        outlet.Immediate.Should().BeTrue();
+        outlet.ProgressPercent.Should().Be(TickBreakGain.OutletProgressPercent);
+
+        // A counter against an attacking side is bigger than the outlet and stays as it was.
+        var big = TickBreakGain.Plan(posture: 4, speedFactorPercent: 100);
+
+        TickBreakGain.WithOutlet(big).Should().Be(big);
+
+        // Against a side that sits as deep as it does the counter is worth nothing, and the outlet is what is left.
+        TickBreakGain.WithOutlet(TickBreakGain.Plan(posture: -4, speedFactorPercent: 100)).Should().Be(outlet);
+    }
+
+    [Fact]
     public void A_break_ends_with_a_shot_a_ball_played_back_or_a_hoof_and_not_with_a_ball_played_forward()
     {
         foreach (var action in new[] { TickCarrierAction.Shoot, TickCarrierAction.Recycle, TickCarrierAction.Clear })

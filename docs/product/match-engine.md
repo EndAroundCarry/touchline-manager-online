@@ -2152,3 +2152,41 @@ Not reached: **DEEP at least as many points as COUNTER in S6a against DEF** (0.2
 **Global checks.** The full MatchEngine suite passes (1,585 tests, 3 min 54 s); the golden hash did not move. `tickmotion 200 1` runs and its film windows are healthy (goals and shots cut off 0.3% and 0.2%). `tick 500` gives 3.82 goals and 40 shots a match, outside the plan's 2.6-2.9 and 22-28 bands: that fixture has no counter flag, so nothing in this milestone changes it; it is the shot volume left by the keeper-gift work (the stored snapshots gave 2.9 goals and 47 shots). `ticksnap 205` was not run: it needs the database export and repeats what the golden hash already shows for a side without the flag.
 
 **Film check.** `tickshow 16 16 90003 "gk=16,ment=3,press=2,line=2,tempo=2" "gk=16,form=12,ment=1,press=0,line=0,pass=2,counter=1" --dump file` (against POS) and `... "gk=16,form=12,ment=0,press=0,line=0" ...` (against a deep side).
+
+### 14.27 A low block that packs the box, and an outlet for a Defensive side (the weaker-side plan, Milestone 2)
+
+**What changed.** Two things, both for a side that defends deep. Neither touches a side that does not: the golden hash does not move.
+
+- **The low block** (`TickTeamStyle.IsLowBlock`, `TickTeamStyle.LowBlock`): LowBlock pressing, or a Deep line under a Defensive or Cautious mentality. While the ball is in the last 45% of the pitch the side defends (`LowBlockBallLimit`), it packs its box:
+  - **Shape** (`TickTacticalGeometry.Resolve`): out-of-possession compactness +6 points (`LowBlockCompactnessGain`, so a low block follows the ball 30% and a mid block with a deep line 36%), and a midfielder takes 85% of a deep line instead of 60% (`LowBlockMidfieldLineGain`). No outfield player of a low block stands closer than 8 m to his goal line (the old 8 m floor applied only to the back line).
+  - **Marking** (`TickDefensiveAI`): after the back line has picked, up to 2 midfielders (`LowBlockMidfieldMarkers`) mark runners in the defensive third that nobody is left for.
+  - **Screens**: 2 more lanes are screened (`LowBlockExtraScreens`, 3 to 5).
+- **The Defensive outlet** (`TickBreakGain.WithOutlet`, `OpenBreak`): a Defensive side that wins the ball in its own 60% opens a 5 s window with 1 runner, starting at once, and its carrier values going forward 15 points more (`OutletTicks`, `OutletRunners`, `OutletProgressPercent`). It needs no counter flag. With the flag the window is the larger of the counter's and the outlet, so a counter against a side as deep as BUS (gain 0) keeps the outlet and the flag's cost stays as it was.
+
+**Result (S1 17-20 v 15-18, home DEF, 500 matches a cell, seed 90000; weaker side's points, the standard error of a cell about 0.06).**
+
+| Weaker side | Before (M1b, 250) | Now | W/D/L of the stronger side |
+|---|---|---|---|
+| COUNTER | 0.34 | 0.22 | 86/10/4 |
+| COUNTER0 | n/a | 0.41 | 76/16/8 |
+| DEEP | 0.18 | 0.25 | 86/8/6 |
+| BUS | 0.14 | 0.23 | 87/8/5 |
+
+The levers were swept at 250 matches a cell (`TickDiag`, removed) at the plan's sizes and at 2 to 3 times them (compactness +20 and +40, midfield line +40 and +100, 3 and 4 midfield markers, 3 and 4 extra screens, a press radius of 18 m and 25 m inside the box). **None of them cuts the stronger side's shots or goals.** Its shots stay at 34-37 a match, those inside 16 m at 24-26, and its goals at 3.0-3.6, whatever the size; the 40% compactness only lowered the weaker side's own goals (0.92 to 0.59), because its forwards drop with the block. The plan's expected 25-35% fewer shots inside 16 m is not reached, and the weaker side's gain from the low block is within the noise. The levers are shipped at the plan's sizes because the single scale of M2b needs something to scale; **whether they are worth keeping is the open question for the user.**
+
+The outlet did more. It was swept at 0, 15, 30 and 45 points of progress and at 5 s and 10 s (250 matches a cell): DEEP against DEF 0.18 without, 0.26-0.29 with (the size hardly matters, so a mild 15), BUS 0.14 without and about 0.36 with. DEEP is now within 0.1 of COUNTER against DEF (0.25 against 0.22) and, in S6a, level with it (0.25 against 0.27 against DEF, 0.08 against 0.14 against POS: not reached against POS).
+
+**Guards (500 matches a cell).**
+
+| Check | Result | Target |
+|---|---|---|
+| S5 flag effect, home DEF | 0.00 | within 0.07 |
+| S5, home POS / ATT | +0.18 / +0.29 | at least +0.20 |
+| S5, home DEEP | -0.37 | -0.10 or less |
+| S6a flag effect, home DEF / POS | -0.10 / -0.08 | -0.05 to -0.15 |
+| S3 (17-20 v 6) wins plus draws, COUNTER / BUS | 1% / 1% | 2% or less |
+| S1 stronger side's wins against COUNTER / DEEP / BUS | 86% / 86% / 87% | at least 60% |
+
+Not reached: **the weaker side's S1 points against the all-out attack of the stronger side's DEF are 0.22-0.25, not the 0.6-0.8 the plan hopes for.** The weaker side's own all-out attack (POS) is still its best option at 1.00 points (57/15/28), which is M3's first aim. `ticksnap 205` was not run (it needs a database export; the golden hash does not move).
+
+**Tests.** `IsLowBlock` on the setups, the exact anchor of a midfielder inside and outside the box, no outfield player of a low block within 8 m of his goal line, midfield markers and extra screens only when the low block packs the box, and the outlet against a bigger and a smaller counter.

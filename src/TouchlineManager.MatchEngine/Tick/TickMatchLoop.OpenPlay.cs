@@ -373,6 +373,7 @@ internal sealed partial class TickMatchLoop
         {
             IsHome = defenders.IsHome,
             Pressing = defenders.Runtime.Instructions.Pressing,
+            LowBlock = defenders.Style.LowBlock,
             Defenders = defenders.Body.AsSpan(0, count),
             Specs = defenders.Spec.AsSpan(0, count),
             Anchors = defenders.Anchor.AsSpan(0, count),
@@ -1392,14 +1393,18 @@ internal sealed partial class TickMatchLoop
     /// <summary>
     /// A side has cut out a pass or won a tackle: if it counter-attacks and won the ball in its own 60% it is on a break
     /// (`weaker-side-v1`, Milestone 1) whose length, runners and start are set by <see cref="TickBreakGain.Plan"/> from the opponent's posture and
-    /// the two sides' speed (Milestone 1b). It plays forward until a ball goes back, a shot is taken or the ball goes dead
+    /// the two sides' speed (Milestone 1b). A Defensive side opens one too, with or without the flag, and gets at least the outlet of
+    /// <see cref="TickBreakGain.WithOutlet"/>: one runner and a mild lift for the ball won in its own 60% (Milestone 2). It plays forward until a ball goes back, a shot is taken or the ball goes dead
     /// (<see cref="CloseBreak"/>), or the other side wins it back (<see cref="TurnOver"/>). A loose ball picked up does not open one.
     /// </summary>
     private void OpenBreak(int side)
     {
         var team = _teams[side];
 
-        if (!OpensBreak(team.Runtime.Instructions.CounterAttack, team.IsHome, _ball.UnitX))
+        var instructions = team.Runtime.Instructions;
+        var outlet = instructions.Mentality == MatchMentality.Defensive;
+
+        if (!OpensBreak(instructions.CounterAttack || outlet, team.IsHome, _ball.UnitX))
         {
             return;
         }
@@ -1407,7 +1412,14 @@ internal sealed partial class TickMatchLoop
         var opponent = _teams[1 - side];
         var edge = TickBreakGain.GroupSpeed(opponent, MatchPositionFamily.Defence, MatchPositionFamily.Midfield)
             - TickBreakGain.GroupSpeed(team, MatchPositionFamily.Attack, MatchPositionFamily.Midfield);
-        var plan = TickBreakGain.Plan(TickTeamStyle.Posture(opponent.Runtime.Instructions), TickBreakGain.SpeedFactorPercent(edge));
+        var plan = instructions.CounterAttack
+            ? TickBreakGain.Plan(TickTeamStyle.Posture(opponent.Runtime.Instructions), TickBreakGain.SpeedFactorPercent(edge))
+            : default;
+
+        if (outlet)
+        {
+            plan = TickBreakGain.WithOutlet(plan);
+        }
 
         team.BreakUntilTick = _tick + plan.Ticks;
         team.BreakRunners = plan.Runners;

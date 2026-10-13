@@ -49,6 +49,9 @@ internal readonly ref struct TickDefensiveSituation
     /// <summary>Gets the defending side's pressing instruction.</summary>
     public required MatchPressing Pressing { get; init; }
 
+    /// <summary>Gets a value indicating whether the defending side plays a low block (<see cref="TickTeamStyle.LowBlock"/>).</summary>
+    public bool LowBlock { get; init; }
+
     /// <summary>Gets the defending side's players, as they stand at the start of the tick.</summary>
     public required ReadOnlySpan<TickPlayerState> Defenders { get; init; }
 
@@ -116,13 +119,15 @@ internal readonly ref struct TickDefensiveSituation
 /// <b>Mark.</b> A defender (back-line family) not pressing takes the nearest unmarked attacker inside the defensive
 /// third, within 15 m, and stands goal-side of him: 5.7 m away at Marking 1, 2.7 m at Marking 20 (the plan's tight mark
 /// is under 3 m). The pairs are picked nearest first across the whole back line, so the choice does not depend on the
-/// order the players are listed in.
+/// order the players are listed in. A low block packing its box (<see cref="TickTeamStyle.LowBlock"/>, the ball in the last 45% of the pitch
+/// it defends: `weaker-side-v1`, Milestone 2) then lets up to <see cref="LowBlockMidfieldMarkers"/> midfielders mark the runners the back
+/// line has no one left for.
 /// </description></item>
 /// <item><description>
 /// <b>Screen.</b> Midfielders and forwards not otherwise used stand in the passing lanes: for each of the three most
 /// dangerous receivers within range (deepest first, between 14 m and 40 m from the ball), the nearest free player takes
 /// the point 40% of the way from the ball to the receiver (never closer than 7 m to the ball) and keeps to it in
-/// proportion to his Positioning (52% at 1, 100% at 20, the rest of the pull being his own shape position).
+/// proportion to his Positioning (52% at 1, 100% at 20, the rest of the pull being his own shape position). A low block packing its box casts <see cref="LowBlockExtraScreens"/> more.
 /// </description></item>
 /// <item><description>
 /// <b>Hold the line.</b> The back line's players still holding stand on one shared height: the mean of their anchors,
@@ -191,6 +196,12 @@ internal static class TickDefensiveAI
     /// <summary>How many receivers one side screens at once.</summary>
     public const int MaximumScreens = 3;
 
+    /// <summary>The screens a low block packing its box adds (`weaker-side-v1`, Milestone 2).</summary>
+    public const int LowBlockExtraScreens = 2;
+
+    /// <summary>The most midfielders a low block packing its box sets to mark, after the back line has picked (`weaker-side-v1`, Milestone 2).</summary>
+    public const int LowBlockMidfieldMarkers = 2;
+
     /// <summary>The share of the lane a screen stands along it, in percent.</summary>
     public const int ScreenLanePercent = 40;
 
@@ -256,6 +267,13 @@ internal static class TickDefensiveAI
     /// <summary>The pace of an adjustment, in basis points of top speed (a jog).</summary>
     private const int AdjustPaceBasisPoints = 3_000;
 
+    /// <summary>
+    /// Tells whether a low block is packing its box: the side plays one and the ball is in the last
+    /// <see cref="TickTacticalGeometry.LowBlockBallLimit"/> of the pitch it defends (`weaker-side-v1`, Milestone 2).
+    /// </summary>
+    private static bool PacksTheBox(in TickDefensiveSituation situation) =>
+        situation.LowBlock && Own(situation.BallX, situation.IsHome) <= TickTacticalGeometry.LowBlockBallLimit;
+
     /// <summary>Gets the radius a pressing instruction closes the ball down from, in pitch units.</summary>
     /// <param name="pressing">The instruction.</param>
     public static int PressRadius(MatchPressing pressing) => pressing switch
@@ -291,7 +309,14 @@ internal static class TickDefensiveAI
         }
 
         AssignPress(situation, orders, busy);
-        AssignMarkers(situation, orders, busy, dealtWith);
+        AssignMarkers(situation, orders, busy, dealtWith, MatchPositionFamily.Defence, int.MaxValue);
+
+        if (PacksTheBox(situation))
+        {
+            // The back line has picked; midfielders pick up the runners it has no one left for.
+            AssignMarkers(situation, orders, busy, dealtWith, MatchPositionFamily.Midfield, LowBlockMidfieldMarkers);
+        }
+
         AssignScreens(situation, orders, busy, dealtWith);
         AssignLine(situation, orders);
         AssignAdjustments(situation, orders);
@@ -467,12 +492,15 @@ internal static class TickDefensiveAI
         in TickDefensiveSituation situation,
         Span<TickDefensiveOrder> orders,
         Span<bool> busy,
-        Span<bool> claimed)
+        Span<bool> claimed,
+        MatchPositionFamily family,
+        int limit)
     {
+        var picked = 0;
         var zone = (long)TickSpatialUnits.ToFixed(MarkingZone) * TickSpatialUnits.ToFixed(MarkingZone);
         var goalX = situation.IsHome ? 0 : SpatialPitch.PitchLength;
 
-        while (true)
+        while (picked < limit)
         {
             var bestDefender = -1;
             var bestAttacker = -1;
@@ -480,7 +508,7 @@ internal static class TickDefensiveAI
 
             for (var defender = 0; defender < situation.Defenders.Length; defender++)
             {
-                if (busy[defender] || situation.Specs[defender].Family != MatchPositionFamily.Defence)
+                if (busy[defender] || situation.Specs[defender].Family != family)
                 {
                     continue;
                 }
@@ -513,6 +541,7 @@ internal static class TickDefensiveAI
             var man = situation.Attackers[bestAttacker];
             var standOff = LooseMarkingStandOff - (MarkingStandOffStep * situation.Skills[bestDefender].Marking);
 
+            picked++;
             busy[bestDefender] = true;
             claimed[bestAttacker] = true;
             orders[bestDefender] = new TickDefensiveOrder(
@@ -541,7 +570,9 @@ internal static class TickDefensiveAI
         var farthest = (long)TickSpatialUnits.ToFixed(MaximumScreenReach) * TickSpatialUnits.ToFixed(MaximumScreenReach);
         var range = (long)TickSpatialUnits.ToFixed(ScreenerRange) * TickSpatialUnits.ToFixed(ScreenerRange);
 
-        for (var screen = 0; screen < MaximumScreens; screen++)
+        var screens = MaximumScreens + (PacksTheBox(situation) ? LowBlockExtraScreens : 0);
+
+        for (var screen = 0; screen < screens; screen++)
         {
             // The most dangerous receiver left: the one nearest the defender's own goal line.
             var receiver = -1;

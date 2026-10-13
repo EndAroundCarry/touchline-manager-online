@@ -249,6 +249,58 @@ public sealed class TickDefensiveAITests
     }
 
     [Fact]
+    public void A_low_block_packing_its_box_sets_midfielders_to_mark_the_runners_the_back_line_has_no_one_left_for()
+    {
+        var attackers = (SpatialPoint[])WingerAtTheByline.Clone();
+
+        // Four attackers in the box besides the winger on the ball: the three players of the back line who are not pressing take three of them.
+        attackers[6] = new SpatialPoint(2_300, 2_000);
+        attackers[7] = new SpatialPoint(2_300, 5_000);
+
+        var open = new Scene(isHome: true, MatchPressing.LowBlock, 1_800, 700, attackers, carrier: 5).Assign();
+        var packed = new Scene(isHome: true, MatchPressing.LowBlock, 1_800, 700, attackers, carrier: 5) { LowBlock = true }.Assign();
+
+        MidfieldMarkers(open).Should().BeEmpty("without the low block only the back line marks");
+        MidfieldMarkers(packed).Should().NotBeEmpty();
+        MidfieldMarkers(packed).Count().Should().BeLessThanOrEqualTo(TickDefensiveAI.LowBlockMidfieldMarkers);
+
+        // The ball is out of the last 45% of the pitch the defending side holds: no longer packing.
+        var farBall = new Scene(isHome: true, MatchPressing.LowBlock, 6_000, 700, attackers, carrier: 5) { LowBlock = true }.Assign();
+
+        MidfieldMarkers(farBall).Should().BeEmpty();
+
+        static IEnumerable<int> MidfieldMarkers(TickDefensiveOrder[] orders) =>
+            Roles(orders, TickDefensiveRole.Marker).Where(index => FourFourTwo[index].Family == MatchPositionFamily.Midfield);
+    }
+
+    [Fact]
+    public void A_low_block_packing_its_box_screens_more_lanes_than_other_sides()
+    {
+        // The carrier is on the edge of the box area with five receivers spread round him, none inside the defensive third.
+        var attackers = new[]
+        {
+            new SpatialPoint(9_500, 3_500),
+            new SpatialPoint(3_800, 1_000),
+            new SpatialPoint(3_800, 6_000),
+            new SpatialPoint(3_800, 2_000),
+            new SpatialPoint(3_800, 5_000),
+            new SpatialPoint(4_000, 3_500),
+            new SpatialPoint(5_600, 3_500),
+            new SpatialPoint(5_600, 2_200),
+            new SpatialPoint(5_600, 4_800),
+            new SpatialPoint(6_000, 1_500),
+            new SpatialPoint(6_000, 5_500),
+        };
+
+        var plain = Roles(new Scene(isHome: true, MatchPressing.LowBlock, 4_000, 3_500, attackers, carrier: 5).Assign(), TickDefensiveRole.Screen).Count();
+        var packed = Roles(new Scene(isHome: true, MatchPressing.LowBlock, 4_000, 3_500, attackers, carrier: 5) { LowBlock = true }.Assign(), TickDefensiveRole.Screen).Count();
+
+        plain.Should().BeLessThanOrEqualTo(TickDefensiveAI.MaximumScreens);
+        packed.Should().BeGreaterThan(plain);
+        packed.Should().BeLessThanOrEqualTo(TickDefensiveAI.MaximumScreens + TickDefensiveAI.LowBlockExtraScreens);
+    }
+
+    [Fact]
     public void The_pairs_picked_do_not_depend_on_the_order_the_players_are_listed_in()
     {
         var forward = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
@@ -818,6 +870,8 @@ public sealed class TickDefensiveAITests
 
         public MatchPressing Pressing { get; }
 
+        public bool LowBlock { get; init; }
+
         public TickAnchorSpec[] Specs { get; private set; }
 
         public SpatialPoint[] Anchors { get; private set; }
@@ -866,6 +920,7 @@ public sealed class TickDefensiveAITests
             {
                 IsHome = IsHome,
                 Pressing = Pressing,
+                LowBlock = LowBlock,
                 Defenders = Defenders,
                 Specs = Specs,
                 Anchors = Anchors,
