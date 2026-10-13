@@ -241,6 +241,47 @@ public sealed class TickEngineTests
         lines.Count(line => line.HomeWin == 1 || line.Draw == 1).Should().BeLessThan(Matches, "the away side wins some");
     }
 
+    [Fact]
+    public void A_weaker_side_that_defends_deep_and_counters_earns_a_result_now_and_then_and_never_becomes_the_better_side()
+    {
+        // `weaker-side-v1` Milestone 5, the yardstick's S1 in miniature: a side of 17 at home in the default 4-4-2 against a side of 16 that sits
+        // in a low block and counters. 300 matches, so the standard error of the points is about 0.06; the bounds are wide enough for the
+        // scatter and tight enough to catch a bonus that has vanished (the weaker side never scores or draws) or grown into a superpower.
+        const int Matches = 300;
+        var counter = new MatchInstructionsV1
+        {
+            Mentality = MatchMentality.Cautious,
+            Pressing = MatchPressing.LowBlock,
+            DefensiveLine = MatchDefensiveLine.Deep,
+            Passing = MatchPassingStyle.DirectPassing,
+            CounterAttack = true,
+        };
+        var results = new (int Home, int Away)[Matches];
+
+        Parallel.For(0, Matches, index =>
+        {
+            var input = Restand(TestMatchFactory.Build(5_000UL + (ulong)index, 17, 16, new MatchInstructionsV1(), counter), FourFourTwo, FourFourTwo) with
+            {
+                EngineVersion = EngineVersions.EngineLabel,
+                RuleSetVersion = EngineVersions.RuleSetLabel,
+                FormulaConfigurationHash = EngineConfiguration.HashOf(EngineRulesV2.Default, EngineVersions.RuleSetLabel),
+            };
+            var result = MatchSimulator.Simulate(input);
+
+            results[index] = (result.HomeGoals, result.AwayGoals);
+        });
+
+        var strongerWins = results.Count(result => result.Home > result.Away) / (double)Matches;
+        var weakerWins = results.Count(result => result.Away > result.Home) / (double)Matches;
+        var draws = results.Count(result => result.Home == result.Away) / (double)Matches;
+        var weakerPoints = (3 * weakerWins) + draws;
+
+        strongerWins.Should().BeGreaterThanOrEqualTo(0.60, $"the better side mostly wins (stronger {strongerWins:P0}, draws {draws:P0}, weaker {weakerWins:P0}, weaker points {weakerPoints:F2})");
+        weakerWins.Should().BeLessThanOrEqualTo(0.20, "a counter-attacking side is no superpower");
+        draws.Should().BeGreaterThanOrEqualTo(0.08, "a side that defends deep earns draws");
+        weakerPoints.Should().BeInRange(0.25, 0.80, "a side that defends deep and counters earns something, so the bonus has not gone, and it is no superpower either");
+    }
+
     private const string GoldenInputHash = "5f74ae0160d042255a831b10ead014aa172a6e7cc951b2c0a0d1737dc906bda2";
 
     private const string GoldenOutputHash = "eccfb3078ef8e0da48f30da99e1dda2d1c2b62382b808671cb58ca6634049ca9";

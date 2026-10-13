@@ -85,6 +85,7 @@ the system is shaped the way it is.
 | [0065](0065-stadium-picture-in-three-dimensions.md) | The stadium picture is a three-dimensional drawing with sectors, rows and seats in the club's two colours | Accepted |
 | [0066](0066-engine-v12-discrete-tick-match-engine.md) | Engine-v12 plays a match as a discrete tick simulation, and the possession engine is kept for the matches it played | Accepted |
 | [0067](0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md) | The tick film shows whole moves, the players keep moving and the ball is played with a purpose | Accepted |
+| [0068](0068-tactics-in-the-tick-engine-counter-attack-low-block-and-time-wasting.md) | Tactics in the tick engine: counter-attack, low block and time-wasting | Accepted |
 
 ## Rules for changing an ADR
 

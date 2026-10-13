@@ -230,10 +230,10 @@ internal static class TickTacticalGeometry
     public const int LowBlockBallLimit = 4_500;
 
     /// <summary>The compactness a low block packing its box adds without the ball, in percent: the block follows the ball deeper.</summary>
-    public const int LowBlockCompactnessGain = 7;
+    public const int LowBlockCompactnessGain = 6;
 
     /// <summary>The share of a deep line a midfielder takes over his usual 60% under a low block packing its box, in percent.</summary>
-    public const int LowBlockMidfieldLineGain = 31;
+    public const int LowBlockMidfieldLineGain = 25;
 
     private const int BasisPoints = 10_000;
 

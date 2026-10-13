@@ -4,6 +4,20 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side plan, Milestone 5 - calibration and wrap-up
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.31 and [ADR-0068](docs/architecture/adr/0068-tactics-in-the-tick-engine-counter-attack-low-block-and-time-wasting.md). **The counter-attack, low-block and outlet bonus goes from 125% to 100% of the sizes it was tuned at**, chosen by the user from a 125/100/75 re-run after the legs and time-wasting changed the play; the golden hash is unchanged.
+
+### Changed
+
+- At 125% a 6-skill side on COUNTER took wins plus draws in 10% of matches (cap 2%) and the fast-breaker cell broke its caps; at 100% S3 is 2%, the fast breakers are inside their caps and the counter flag is neutral against a balanced side (+0.06). Constants: break gain 100 / 50 per posture, waiting cost 28, low block compactness 6, midfield line 25, two midfield markers, two extra screens, outlet 5 s and 14.
+- Not met and left open: a weaker side that sits deep still earns less (0.2-0.3 points at 18 v 16) than one that plays its default (0.47), and all-out attack still beats the counter between equal sides.
+
+### Added
+
+- A statistical guard in `TickEngineTests`: a 17-skill side at home to a 16-skill side in a low block that counters, 300 matches.
+- ADR-0068.
+
 ## Weaker-side plan, Milestone 4 - time-wasting
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.30. **A side set to waste time now holds its own restarts longer in a tick match**; no existing fixture sets the instruction, so the golden hash is unchanged.

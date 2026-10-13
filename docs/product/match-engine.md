@@ -2312,3 +2312,78 @@ The floor is the lever that matters, and it is also a global one: a lower floor 
 - **Caps (BUS, the only setup with `waste=1`, Situational):** S1 home DEF v BUS 87/9/4 (BUS with the flag off 89/9/2), home POS v BUS 89/8/3; stronger side wins 87-92% in all three BUS variants, weaker side at most 4%. S3 BUS 99/1/0 (limit 2% for wins and draws together). A BUS that wastes time while trailing (On) concedes more (3.44 to 3.96 goals, probably through the longer goal kicks and keeper holds that let the press set up), which is what the instruction should cost.
 - **The counter flag is unchanged:** S5 home DEF v COUNTER 57/20/23 (1.92-0.88), identical to Milestone 3.
 - Test changes: `TickMatchStateMachineTests` (the longer hold per restart kind, no hold above the ceiling), `TickMatchLoopTests` (a side on On leaves less open play, Off equals the default).
+
+### 14.31 Calibration, guard and wrap-up: the bonus is set at 100% (the weaker-side plan, Milestone 5)
+
+**Why the size moved.** Milestone 2b shipped the break, low-block and outlet mechanisms at 125% of the sizes they were tuned at. Milestones 3 (tired legs) and 4 (time-wasting) then changed the play they sit in, so the plan asked for the table to be re-run at 125%, 100% and 75% (300 matches a cell, seed 90000; a temporary `TickDiag` scale of the shipped constants by value / 125, removed again). At 125% two caps no longer held, at 100% all of them do, and **the user chose 100%** (2026-10-13). The constants are back at the Milestone 2 / 1b sizes:
+
+| Constant | 125% | Now (100%) |
+|---|---|---|
+| `TickBreakGain.GainAtBalancedPercent` | 125 | 100 |
+| `TickBreakGain.GainPerPosturePercent` | 63 | 50 |
+| `TickBreakGain.MaximumProgressGainPercent` | 125 | 100 |
+| `TickBallCarrierBrain.WaitProgressPercent` | 35 | 28 |
+| `TickTacticalGeometry.LowBlockCompactnessGain` | 7 | 6 |
+| `TickTacticalGeometry.LowBlockMidfieldLineGain` | 31 | 25 |
+| `TickDefensiveAI.LowBlockMidfieldMarkers` / `LowBlockExtraScreens` | 3 / 3 | 2 / 2 |
+| `TickBreakGain.OutletTicks` | 62 | 50 |
+| `TickBreakGain.OutletProgressPercent` | 18 | 14 (the Milestone 2 value was 15; 14 is what the 100% cells ran) |
+
+The golden hash does not move (the fixture sets no counter flag, low block or Defensive mentality).
+
+**What broke at 125%, and what each size does** (300 matches a cell, seed 90000; the stronger side's W/D/L, the weaker side's points):
+
+| Check | Target | 75% | 100% | 125% |
+|---|---|---|---|---|
+| S3 (17-20 v 6), weaker side's wins + draws on COUNTER | at most 2% | 1% | **2%** | **10%** (the stronger side shoots 19 times, not 38) |
+| S6b (breakers 3 points quicker), home default v COUNTER | stronger side at least 60%, weaker at most about 25% | 68 / 14 / 18 | 66 / 14 / 21 | 59 / 16 / 25 |
+| S6b, home all-out v COUNTER | the same | 68 / 15 / 16 | 62 / 17 / 21 | **54 / 18 / 28** |
+| Counter flag against a balanced side (S5 DEF) | within 0.07 | **-0.18** | +0.06 | +0.04 |
+| Counter flag against all-out attack (S5 POS / ATT) | at least +0.20 | +0.20 / +0.29 | +0.26 / +0.45 | +0.34 / +0.53 |
+| Counter flag against a deep side (S5 DEEP) | at most -0.10 | -0.31 | -0.51 | -0.51 |
+| S6a (opponent 4 quicker), flag vs default / all-out | -0.05 to -0.15 | -0.07 / -0.13 | -0.14 / -0.07 | -0.14 / -0.06 |
+| S6b, flag vs all-out | at least S5 + 0.05 | +0.15 (**fails**) | +0.37 | +0.59 |
+| S6c (14 v 14, 2 points quicker), flag vs default / all-out | a small minus | -0.35 / -0.12 | -0.30 / +0.08 | -0.21 / -0.07 |
+
+- **S3 at 125%.** What is measured: a 6-skill side on COUNTER draws 9% at 125% and about 1% at 100%; the stronger side then makes 19 shots a match (38 against BUS, 62 against the default) and the two sides change the ball only 44 and 86 times a match (142 and 191 against the default); the same 6-skill side with `counter=0` loses 99 / 1 / 0 with 45 shots. So the flag itself, not the low block or the formation, is what slows the match. The likely cause (not isolated) is the waiting cost: at 35 points a Cautious carrier values going forward at 70 where it would at 105, and it keeps the ball in its own half where the stronger side's default press does not take it. At 100% (cost 28, value 77) it is 99 / 1 / 1. Nothing gates the waiting cost by skill, so the cap is met by the size, not by design.
+- **75%** is not neutral against a balanced side (-0.18) and fails the fast-breaker comparison, so 100% is the largest size that keeps every cap.
+- **S6c** (the flag against the default at low level, a 2-point edge) is more negative than the -0.05 to -0.15 target at every size (-0.30 at 100%), and against all-out attack the sign is noise (-0.12, +0.08, -0.07). The error of a flag effect at 300 matches is about 0.11.
+
+**The table, baseline (Milestone 0) against final** (300 matches a cell, seed 90000, weaker side's points; the stronger side is at home; new columns in the final row only):
+
+| Cell | Weaker side DEF | POS | COUNTER | DEEP | BUS |
+|---|---|---|---|---|---|
+| S1, home DEF: baseline | 0.45 | 1.06 | 0.45 | n/a | 0.17 |
+| S1, home DEF: final | 0.47 | 0.59 | 0.31 | 0.21 | 0.22 |
+| S1, home POS: baseline | 0.07 | 0.15 | 0.30 | n/a | 0.17 |
+| S1, home POS: final | 0.15 | 0.23 | 0.30 | 0.20 | 0.12 |
+| S2, home DEF: baseline | 0.12 | 0.26 | 0.18 | n/a | 0.18 |
+| S2, home DEF: final | 0.09 | 0.23 | 0.16 | 0.12 | 0.10 |
+| S2, home POS: baseline | 0.00 | 0.05 | 0.11 | n/a | 0.06 |
+| S2, home POS: final | 0.05 | 0.02 | 0.13 | 0.08 | 0.08 |
+
+The stronger side's results in the final S1 cells (W / D / L %): home DEF v POS 71 / 13 / 15 (baseline 55 / 14 / 31), v COUNTER 83 / 11 / 7, v DEEP 87 / 10 / 4, v BUS 88 / 6 / 5; home POS v POS 90 / 3 / 7. S3 (17-20 v 6): wins plus draws for the 6-skill side 0% on DEF, 2% on COUNTER, 1% on BUS.
+
+S4 (16 v 16), points of the home side - the away side, by setup (rows home, columns away):
+
+| | DEF | POS | ATT | COUNTER | BUS |
+|---|---|---|---|---|---|
+| DEF | 1.92-0.92 | 1.26-1.58 | 1.19-1.61 | 1.96-0.84 | 2.29-0.54 |
+| POS | 2.28-0.58 | 2.03-0.85 | 1.82-1.08 | 1.80-1.00 | 2.17-0.68 |
+| ATT | 2.42-0.48 | 2.03-0.87 | 2.01-0.87 | 1.85-0.98 | 2.20-0.63 |
+| COUNTER | 1.38-1.35 | 1.92-0.96 | 1.80-1.00 | 1.45-1.08 | 1.48-1.09 |
+| BUS | 0.98-1.77 | 1.29-1.48 | 1.31-1.49 | 1.20-1.33 | 1.39-1.06 |
+
+Baseline away points against a home default: DEF 0.91, POS 1.86, ATT 2.18, COUNTER 0.90, BUS 0.60; final 0.92, 1.58, 1.61, 0.84, 0.54. Mean points over all ten cells a setup plays in: ATT 1.66, POS 1.58, DEF 1.37, COUNTER 1.33, BUS 1.02.
+
+**Targets met, not met.**
+- **Met:** the S1 caps (the stronger side at least 60%, the weaker at most 15% in every cell, 71 / 13 / 15 at the limit); S2 stronger side at least 75% and the best defensive setup at 1.5 times the default's points (COUNTER 0.16 against 0.09); S3 at 2%; S5 (+0.06 / +0.26 / +0.45 / -0.51); S6a; S6b with both caps; ticksnap goals 2.80.
+- **Not met, and not tuned further:**
+  - **S1 weaker side's best defensive setup 0.6-0.8 points.** It is 0.31 (COUNTER), 0.21 (DEEP), 0.22 (BUS), under the weaker side's own default (0.47). The size of the bonus did not move it in Milestone 2b, the low-block levers did not cut the stronger side's shots (Milestone 2), and the tired-legs floor that would is global (Milestone 3). DEEP is 0.10 under COUNTER against the default side (target: within 0.1), and S2 draws are 8% (target at least 10%).
+  - **S4: all-out attack still beats the counter.** Away against a default home side POS takes 1.58 points and ATT 1.61, COUNTER 0.84 (target at least 0.85: missed by 0.01), and ATT is the best setup on average. Milestone 3's legs cut the gap (baseline 1.86 and 2.18) but did not close it.
+  - **S6c** is noise-limited and more negative than its band against the default.
+- **Global checks.** `ticksnap 300` on the 1,501 stored squads: goals **2.80** (band 2.6-2.9; the plan's 2.4-3.0), shots 42.6 (band 22-28; the shot volume the keeper-gift plan left open), on target 36.8%, pass completion 84.2%, yellow cards 3.9. `tick 500` (default instructions, so unchanged from Milestone 3): goals 3.85, shots 39.3, on target 34.2%, pass completion 84.1%. `tickmotion 200 1`: standing share 2.8%, no synchronised stops, 83.7% forward passes, 8.0 switches a match, distance 13.42 km a player (aim 9.5-11.5; 13.8 before the tired legs), film health in line with Milestone 3.
+
+**The statistical guard** (`TickEngineTests`): 300 matches of a 17-skill side at home in the default 4-4-2 against a 16-skill side in a low block that counters (Cautious, Deep line, Direct, `CounterAttack`). It measures 75 / 18 / 7% (stronger side / draws / weaker side), 0.40 points for the weaker side, and asserts the stronger side wins at least 60%, the weaker side at most 20%, at least 8% draws, and the weaker side's points in 0.25-0.80. It catches a bonus that has vanished (no draws, no points) as well as one that has grown into a superpower. The break window's opening, closing and posture rules, the low block's marking and screens, and the 8 m guard on outfield anchors were already covered by `TickCounterAttackTests`, `TickDefensiveAITests` and `TickTacticalGeometryTests`; the low-block anchor test is back to 2,625.
+
+The full MatchEngine suite passes (1,603 tests; the allocation test in `TickSetPiecesTests` failed once under the load of the benchmarks running beside it and passes alone). Logs: `.run-logs/m5-*.txt`.
