@@ -142,6 +142,15 @@ if (mode is "tickexp")
         rules);
 }
 
+if (mode is "tickflank")
+{
+    // tickflank [matches a cell] [seed]   (a weak defender of the stronger side, a star forward and a pass focus aimed at him, by mentality)
+    TickShowcase.Flank(
+        positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var flankMatches) ? Math.Min(flankMatches, 500) : 50,
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var flankSeed) ? flankSeed : 11_000UL,
+        rules);
+}
+
 if (mode is "tickwhy")
 {
     // tickwhy [matches] [seed]   (why an all-out attacking weaker side takes more points than one that sits deep)

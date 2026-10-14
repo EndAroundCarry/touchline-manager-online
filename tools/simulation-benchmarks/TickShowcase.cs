@@ -636,6 +636,205 @@ internal static class TickShowcase
         }
     }
 
+    private static readonly MatchAttributeName[] FlankDefenderCore =
+    [
+        MatchAttributeName.Tackling,
+        MatchAttributeName.Marking,
+        MatchAttributeName.Heading,
+        MatchAttributeName.Positioning,
+        MatchAttributeName.Anticipation,
+        MatchAttributeName.Pace,
+        MatchAttributeName.Acceleration,
+    ];
+
+    private static readonly MatchAttributeName[] FlankForwardCore =
+    [
+        MatchAttributeName.Finishing,
+        MatchAttributeName.Dribbling,
+        MatchAttributeName.FirstTouch,
+        MatchAttributeName.Technique,
+        MatchAttributeName.Composure,
+        MatchAttributeName.Pace,
+        MatchAttributeName.Acceleration,
+    ];
+
+    /// <summary>Sets some attributes of one occupant of a side to a value and leaves the rest of his attributes as they are.</summary>
+    private static MatchSideV1 WithCore(MatchSideV1 side, Guid participant, MatchAttributeName[] names, int value) =>
+        side with
+        {
+            Squad =
+            [
+                .. side.Squad.Select(player => player.ParticipantId != participant
+                    ? player
+                    : player with
+                    {
+                        Attributes = PlayerAttributesV1.From([.. player.Attributes.Values.Select((current, index) => names.Contains((MatchAttributeName)index) ? value : current)]),
+                    }),
+            ],
+        };
+
+    /// <summary>
+    /// `tickflank`: an 18-19 side at home to a 15-16 side. On each of three lanes the home defender there may be weak (core skills 15), the away
+    /// forward who plays him may be a star (core skills 17, two above the defender), and the away pass focus is aimed at the lane. Each mentality
+    /// of the away side is played against the control (nobody changed), the star forward alone, the weak defender alone and both, so the effect of
+    /// each change can be read apart. Prints one machine-readable line a cell.
+    /// </summary>
+    /// <param name="matches">How many matches a cell.</param>
+    /// <param name="seed">The base seed (the same matches are played in every cell).</param>
+    /// <param name="rules">The rules in force.</param>
+    public static void Flank(int matches, ulong seed, EngineRulesV2 rules)
+    {
+        (string Name, MatchMentality Value)[] mentalities =
+        [
+            ("ATTK", MatchMentality.Attacking),
+            ("BALANCE", MatchMentality.Balanced),
+            ("DEF", MatchMentality.Defensive),
+        ];
+        (string Name, int DefenderSlot)[] lanes = [("Left", 5), ("Centre", 4), ("Right", 2)];
+        // Each cell: the lane, whether the home defender there is weak, whether the away forward facing him is a star, and whether the pass focus is aimed at the lane.
+        var cells = new List<(string Lane, bool WeakDefender, bool StarForward, bool Focus)> { (string.Empty, false, false, false) };
+
+        foreach (var (lane, _) in lanes)
+        {
+            cells.Add((lane, false, true, true));
+            cells.Add((lane, true, false, true));
+            cells.Add((lane, true, true, true));
+        }
+
+        Console.WriteLine($"== tickflank: 18-19 at home to 15-16, {matches} matches a cell, seed {seed} ==");
+        Console.WriteLine("CELL\tmentality\tlane\tskills\tfocus\tn\tweakWins\tdraws\tweakLosses\tgoalsStrong\tgoalsWeak\tshotsStrong\tshotsWeak\tfwdShots\tfwdGoals\tfinalThirdLowY%\tfinalThirdMidY%\tfinalThirdHighY%\tdefY\tfwdY\tfocusUsed");
+
+        foreach (var (mentalityName, mentality) in mentalities)
+        {
+            foreach (var (lane, weakDefender, starForward, focus) in cells)
+            {
+                var tracked = lane.Length > 0;
+                var defenderSlotNumber = lane.Length == 0 ? 0 : lanes.Single(entry => entry.Name == lane).DefenderSlot;
+                var results = new (int HomeGoals, int AwayGoals, int HomeShots, int AwayShots, int FwdShots, int FwdGoals, int ThirdLow, int ThirdMid, int ThirdHigh, double DefY, double FwdY)[matches];
+                var focusUsed = MatchPassFocus.Balanced;
+
+                Parallel.For(0, matches, index =>
+                {
+                    var homeInstructions = new MatchInstructionsV1();
+                    var awayInstructions = new MatchInstructionsV1 { Mentality = mentality };
+                    var built = LaboratoryFixtures.Build(seed + (ulong)index, 18, 15, homeInstructions, awayInstructions, rules);
+                    var input = TickCalibration.Stand(
+                        built with { Home = Keeper(Spread(built.Home, 18, 19), 18), Away = Keeper(Spread(built.Away, 15, 16), 15) },
+                        FormationPreset.FourFourTwo,
+                        FormationPreset.FourFourTwo);
+                    var defender = Guid.Empty;
+                    var forward = Guid.Empty;
+                    var defenderY = 0;
+
+                    if (tracked)
+                    {
+                        var defenderSlot = input.Home.Slots.Single(slot => slot.SlotNumber == defenderSlotNumber);
+                        var forwardSlot = input.Away.Slots
+                            .Where(slot => slot.Family == MatchPositionFamily.Attack)
+                            .OrderBy(slot => Math.Abs((10_000 - slot.Y) - defenderSlot.Y))
+                            .First();
+
+                        defender = defenderSlot.ParticipantId;
+                        forward = forwardSlot.ParticipantId;
+                        defenderY = defenderSlot.Y;
+                        input = input with
+                        {
+                            Home = weakDefender ? WithCore(input.Home, defender, FlankDefenderCore, 15) : input.Home,
+                            Away = starForward ? WithCore(input.Away, forward, FlankForwardCore, 17) : input.Away,
+                        };
+
+                        if (focus)
+                        {
+                            var chosen = forwardSlot.Y > 6_500 ? MatchPassFocus.CentreAndRight : (forwardSlot.Y < 3_500 ? MatchPassFocus.CentreAndLeft : MatchPassFocus.Centre);
+
+                            focusUsed = chosen;
+                            input = input with { Away = input.Away with { Instructions = input.Away.Instructions with { PassFocus = chosen } } };
+                        }
+                    }
+
+                    var recorder = new MatchPassageRecorder();
+                    var result = MatchSimulator.Simulate(input, rules, null, recorder, TickMatchEngine.Instance);
+                    var fwdShots = 0;
+                    var thirds = new int[3];
+                    double defY = 0;
+                    double fwdY = 0;
+
+                    if (recorder.Tick is { } recording)
+                    {
+                        const int half = TickMatchRecording.Entities / 2;
+                        var defenderEntity = tracked ? Array.IndexOf(recording.Starters, defender) : -1;
+                        var forwardEntity = tracked ? Array.IndexOf(recording.Starters, forward) : -1;
+                        var samples = 0;
+
+                        foreach (var stamp in recording.Actions.Where(stamp => stamp.Entity == forwardEntity && stamp.Frame < recording.FrameCount && stamp.Action == PassageAction.Shot))
+                        {
+                            fwdShots++;
+                        }
+
+                        for (var frame = 0; frame < recording.FrameCount; frame += 5)
+                        {
+                            if (recording.State(frame) != TickPlayState.OpenPlay)
+                            {
+                                continue;
+                            }
+
+                            // The weaker side (away, entities 11 to 21) in possession with the ball in the final third it attacks (X below a third).
+                            if (recording.Controller(frame) >= half && recording.BallX(frame) < 3_333)
+                            {
+                                var ballY = recording.BallY(frame) / 0.7;
+
+                                thirds[ballY < 3_333 ? 0 : (ballY < 6_667 ? 1 : 2)]++;
+                            }
+
+                            if (tracked)
+                            {
+                                defY += recording.PlayerY(frame, defenderEntity) / 0.7;
+                                fwdY += recording.PlayerY(frame, forwardEntity) / 0.7;
+                                samples++;
+                            }
+                        }
+
+                        defY /= Math.Max(1, samples);
+                        fwdY /= Math.Max(1, samples);
+                    }
+
+                    var fwdGoals = tracked ? result.Events.Count(e => e.IsGoal && e.ParticipantId == forward) : 0;
+
+                    results[index] = (result.HomeGoals, result.AwayGoals, result.Home.Shots, result.Away.Shots, fwdShots, fwdGoals, thirds[0], thirds[1], thirds[2], defY, fwdY);
+                });
+
+                var weakWins = results.Count(entry => entry.AwayGoals > entry.HomeGoals);
+                var draws = results.Count(entry => entry.AwayGoals == entry.HomeGoals);
+                var thirdTotal = Math.Max(1, results.Sum(entry => entry.ThirdLow + entry.ThirdMid + entry.ThirdHigh));
+
+                Console.WriteLine(
+                    string.Join(
+                        '\t',
+                        "CELL",
+                        mentalityName,
+                        lane.Length == 0 ? "-" : lane,
+                        (weakDefender ? "D" : string.Empty) + (starForward ? "F" : string.Empty) + (tracked ? string.Empty : "-"),
+                        focus ? "1" : "0",
+                        matches.ToString(CultureInfo.InvariantCulture),
+                        weakWins.ToString(CultureInfo.InvariantCulture),
+                        draws.ToString(CultureInfo.InvariantCulture),
+                        (matches - weakWins - draws).ToString(CultureInfo.InvariantCulture),
+                        results.Average(entry => entry.HomeGoals).ToString("F2", CultureInfo.InvariantCulture),
+                        results.Average(entry => entry.AwayGoals).ToString("F2", CultureInfo.InvariantCulture),
+                        results.Average(entry => entry.HomeShots).ToString("F1", CultureInfo.InvariantCulture),
+                        results.Average(entry => entry.AwayShots).ToString("F1", CultureInfo.InvariantCulture),
+                        results.Average(entry => entry.FwdShots).ToString("F2", CultureInfo.InvariantCulture),
+                        results.Average(entry => entry.FwdGoals).ToString("F2", CultureInfo.InvariantCulture),
+                        (100.0 * results.Sum(entry => entry.ThirdLow) / thirdTotal).ToString("F0", CultureInfo.InvariantCulture),
+                        (100.0 * results.Sum(entry => entry.ThirdMid) / thirdTotal).ToString("F0", CultureInfo.InvariantCulture),
+                        (100.0 * results.Sum(entry => entry.ThirdHigh) / thirdTotal).ToString("F0", CultureInfo.InvariantCulture),
+                        tracked ? results.Average(entry => entry.DefY).ToString("F0", CultureInfo.InvariantCulture) : "-",
+                        tracked ? results.Average(entry => entry.FwdY).ToString("F0", CultureInfo.InvariantCulture) : "-",
+                        focusUsed));
+            }
+        }
+    }
+
     private static string Share(int part, int whole) => $"{100.0 * part / Math.Max(1, whole),3:F0}%";
 
     private static void Tally(MatchResultV1 result, TickMatchRecording recording, ShotTally[] sides)
