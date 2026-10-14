@@ -168,6 +168,53 @@ public sealed class TickBallCarrierBrainTests
     }
 
     [Fact]
+    public void Cover_counts_only_outfield_defenders_ahead_of_the_shooter_inside_the_corridor_up_to_the_cap()
+    {
+        static TickPlayerState At(int x, int y) => new() { X = x * TickSpatialUnits.FixedScale, Y = y * TickSpatialUnits.FixedScale };
+
+        const int Y = SpatialPitch.GoalYCenter;
+        var corridor = TickBallCarrierBrain.ShotCoverCorridor;
+
+        // The goalkeeper (index 0) stands on the line and is not counted; the rest are the cases.
+        TickPlayerState[] defenders =
+        [
+            At(9_900, Y),
+            At(8_500, Y + corridor - 10),
+            At(8_500, Y + corridor + 10),
+            At(6_000, Y),
+        ];
+
+        TickBallCarrierBrain.ShotCover(7_000, Y, attacksHighX: true, defenders, keeperIndex: 0)
+            .Should().Be(1, "only the man on the line, 10 units inside the corridor, counts: the keeper, the man wide of it and the man behind the shooter do not");
+        TickBallCarrierBrain.ShotCover(7_000, Y, attacksHighX: true, defenders, keeperIndex: -1)
+            .Should().Be(2, "with no keeper named the man in the goal counts too");
+
+        TickPlayerState[] mirrored = [At(10_000 - 8_500, Y), At(10_000 - 6_000, Y)];
+
+        TickBallCarrierBrain.ShotCover(10_000 - 7_000, Y, attacksHighX: false, mirrored, keeperIndex: -1)
+            .Should().Be(1, "the side attacking the low end counts the men with a lower X, not a higher one");
+
+        var crowd = new TickPlayerState[8];
+
+        for (var index = 0; index < crowd.Length; index++)
+        {
+            crowd[index] = At(8_000 + (100 * index), Y);
+        }
+
+        TickBallCarrierBrain.ShotCover(7_000, Y, attacksHighX: true, crowd, keeperIndex: -1)
+            .Should().Be(TickBallCarrierBrain.ShotCoverMaximum);
+    }
+
+    [Fact]
+    public void More_cover_gives_a_shot_a_wider_error_angle()
+    {
+        var open = TickBallCarrierBrain.ErrorAngle(14, 14, TickBallCarrierBrain.ShotBaseError, 2_000);
+        var covered = TickBallCarrierBrain.ErrorAngle(14, 14, TickBallCarrierBrain.ShotBaseError, 2_000 + (TickBallCarrierBrain.ShotCoverMaximum * TickBallCarrierBrain.ShotCoverPressure));
+
+        covered.Should().BeGreaterThan(open, "bodies in the corridor add pressure to the strike");
+    }
+
+    [Fact]
     public void The_xG_falls_with_distance_and_angle_and_blockers_and_rises_with_finishing()
     {
         var average = Skills(10);

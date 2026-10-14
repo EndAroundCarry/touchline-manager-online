@@ -2441,3 +2441,34 @@ The cells with no committed side (4-4-2 default, 5-4-1 default, Cautious, counte
 - **The scoreline guard fails.** The plan limits the stronger side to 4.5 goals against the all-out attack. The fall from 0.90 points (30%) to 0.51 (40%) comes with 4.21 and 4.92 goals: no value meets both the points target (at most 0.55) and the guard. The extra goals come from shots (39 to 48-52 a match) rather than from better shots. The user picked 40%, which is baked.
 - **Guards at 40%** (seed 90000): a 6-skill side takes no points (S3: 100/0/0 in all three setups); between equal sides no setup beats every other, and the away counter-attack against a home default takes 0.96 points (target at least 0.85); all-out attack against all-out attack is 6.46-4.76 goals (5.75-4.30 before). `ticksnap 150`: 3.05 goals a match (2.73 after Milestone 1), 0.05 over the plan band 2.4-3.0.
 - Test changes: `TickCounterAttackTests` (the exposed break opens only without the flag and against a posture above 0; it is a part of the counter break that grows with posture and speed).
+
+### 14.34 Bodies between the shooter and the goal spoil the shot: the covered shot (the weaker-side v2 plan, Milestone 3)
+
+**Why.** The plan assumed that a packed defence should lower the quality of the chances it concedes. It did not: the stronger side scored about 10% of its shots against every shape. `ExpectedGoals` already discounts the blockers on the line when a man *chooses* to shoot, but a defender crowding the shooter did nothing to the strike itself.
+
+**What changed** (`TickBallCarrierBrain.ShotCover`, `TickMatchLoop.OpenPlay.Kick`):
+
+| Before | Now |
+|---|---|
+| a shot's error angle depended on the shooter's skill and the pressure on him | in open play the pressure is also raised by `ShotCoverPressure` (5,000 bp) for each outfield defender **ahead of the shooter and within `ShotCoverCorridor` (4 m) of the line from him to the middle of the goal**, up to `ShotCoverMaximum` (4) |
+| nothing | the choice to shoot is unchanged (the decision handed on to `AfterKick` is the original one); set pieces are untouched |
+
+`ShotCover` is a pure static function over the opposing side's players, unit-tested (ahead of the shooter only, inside the corridor, no goalkeeper, capped, both directions of play) with a test that more cover gives a wider error angle. No new random draws.
+
+**Sweep** (150 matches a cell, seed 7000, 16 v 18-19; the weaker side's points, then the stronger side's goals; `ShotCoverPressure` 0 is the state after Milestone 2):
+
+| Setup | 0 | 2,500 | 5,000 |
+|---|---|---|---|
+| 4-4-2 default | 0.50, 3.37 | 0.37, 3.39 | 0.57, 2.93 |
+| 4-4-2 Positive | 0.53, 4.65 | 0.47, 4.59 | 0.73, 4.21 |
+| 4-4-2 all-out attack | 0.51, 4.92 | 0.67, 4.66 | 0.75, 4.51 |
+| 4-4-2 counter-attack | 0.16, 3.69 | 0.23, 3.29 | 0.39, 3.15 |
+| 5-4-1 default | 0.91, 2.52 | 0.97, 2.41 | 0.84, 2.29 |
+| 5-4-1 Cautious | 0.65, 2.49 | 0.79, 2.45 | 0.72, 2.33 |
+| 5-4-1 counter-attack | 0.38, 3.31 | 0.53, 2.83 | 0.55, 2.68 |
+| 5-4-1 deep Defensive | 0.27, 3.09 | 0.22, 3.37 | 0.29, 2.85 |
+
+- **Goals fall, but not where the plan wanted.** The stronger side's goals fall against every setup, most against the all-out attack (4.92 to 4.51) and the counter-attack, and least against the 5-4-1 default (2.52 to 2.29). The weaker side's own goals do not fall, so the attacking setups gain 0.2 to 0.25 points, which is *against* the plan's target (all-out attack and Positive at most 0.55). The covered shot is a goal-volume lever, not a lever for defence; the attack-edge milestone has to take the points back from the attacking setups. At 13-14 the cells move within noise (all-out attack 0.05 to 0.08; the 5-4-1 default stays 0.31).
+- **Calibration.** `ticksnap 150`: goals a match fall from 3.05 to 2.77 (plan band 2.4-3.0, tool band 2.6-2.9), so `ShotBaseError` is **not** changed. The stronger side's goals against the all-out attack, 4.51, meet the scoreline guard of 4.5 (to within noise) that the exposed break (§14.33) missed.
+- **Guards at 5,000** (seed 90000): a 6-skill side still takes at most 2% of the points (S3: 100/0/0, 99/1/0, 98/2/0); between equal sides the away counter-attack against a home default takes 1.18 points (target at least 0.85), and the home all-out attack still does not lose to any setup.
+- Chosen: `ShotCoverPressure` = 5,000, the one value that meets the scoreline guard. 2,500 left the stronger side at 4.66 goals against the all-out attack.

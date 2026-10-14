@@ -885,8 +885,30 @@ internal sealed partial class TickMatchLoop
     {
         var team = _teams[side];
         var origin = new SpatialPoint(_ball.UnitX, _ball.UnitY);
+        var kicked = decision;
 
-        if (!TickBallCarrierBrain.Execute(decision, team.Skills[seat], _ball, _random))
+        if (decision.Action == TickCarrierAction.Shoot)
+        {
+            // Bodies between the shooter and the goal spoil the strike; his choice to shoot was already made with them in mind.
+            var opponents = _teams[1 - side];
+            var keeper = -1;
+
+            for (var other = 0; other < opponents.Count && keeper < 0; other++)
+            {
+                keeper = opponents.IsKeeper(other) ? other : -1;
+            }
+
+            var cover = TickBallCarrierBrain.ShotCover(
+                TickSpatialUnits.ToUnits(team.Body[seat].X),
+                TickSpatialUnits.ToUnits(team.Body[seat].Y),
+                team.IsHome,
+                opponents.Body.AsSpan(0, opponents.Count),
+                keeper);
+
+            kicked = decision with { EffectivePressure = decision.EffectivePressure + (TickBallCarrierBrain.ShotCoverPressure * cover) };
+        }
+
+        if (!TickBallCarrierBrain.Execute(kicked, team.Skills[seat], _ball, _random))
         {
             return;
         }

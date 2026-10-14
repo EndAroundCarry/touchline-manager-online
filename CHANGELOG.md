@@ -4,6 +4,18 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side v2 plan, Milestone 3 - bodies between the shooter and the goal spoil the shot
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.34. **An open-play shot with defenders in the corridor between the shooter and the goal is struck under more pressure**; the golden hash moves (engine behaviour).
+
+### Changed
+
+- `Kick` adds `ShotCoverPressure` (5,000 bp) per covering defender (up to `ShotCoverMaximum` 4, within `ShotCoverCorridor` 4 m of the line to goal) to a shot's pressure; the shooter's choice and set pieces are unchanged. Goals a match 3.05 to 2.77 (`ShotBaseError` untouched); the stronger side's goals against all-out attack 4.92 to 4.51. Not what the plan aimed at: the weaker side's attacking setups gain 0.2 to 0.25 points (all-out attack 0.51 to 0.75), the defensive ones move within noise.
+
+### Added
+
+- `TickBallCarrierBrain.ShotCover`, with tests in `TickBallCarrierBrainTests`.
+
 ## Weaker-side v2 plan, Milestone 2 - a side that commits forward leaves space behind it
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.33. **A side without the counter flag that wins the ball off a side committed forward now gets part of a counter-attack's break (an exposed break)**; the golden hash is unchanged. The percent is 40, picked by the user.

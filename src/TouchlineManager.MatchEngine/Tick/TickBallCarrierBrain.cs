@@ -210,6 +210,15 @@ internal static class TickBallCarrierBrain
     /// <summary>The share of a shot's chance left by each blocker, in percent.</summary>
     public const int ShotBlockPercent = 55;
 
+    /// <summary>How near a defender may stand to the line from the shooter to the middle of the goal before he covers the shot, in pitch units (4 m): wider than <see cref="ShotBlockReach"/>, since a man who only crowds the shooter spoils his strike without standing in its way.</summary>
+    public const int ShotCoverCorridor = 400;
+
+    /// <summary>The covering defenders beyond which another spoils the shot no further.</summary>
+    public const int ShotCoverMaximum = 4;
+
+    /// <summary>The pressure, in basis points, each covering defender adds to a shot's error (the shooter's choice is unchanged).</summary>
+    public const int ShotCoverPressure = 5_000;
+
     /// <summary>The blockers beyond which no shot is attempted.</summary>
     public const int ShotMaximumBlockers = 3;
 
@@ -623,6 +632,41 @@ internal static class TickBallCarrierBrain
         var error = baseError * percent * (BasisPoints + Math.Max(0, effectivePressure)) / (100 * BasisPoints);
 
         return Math.Max(1, error);
+    }
+
+    /// <summary>
+    /// Counts the outfield defenders who cover a shot: ahead of the shooter and within <see cref="ShotCoverCorridor"/> of the line from him
+    /// to the middle of the goal, up to <see cref="ShotCoverMaximum"/>. Positions are in pitch units.
+    /// </summary>
+    /// <param name="shooterX">The shooter's X, in pitch units.</param>
+    /// <param name="shooterY">The shooter's Y, in pitch units.</param>
+    /// <param name="attacksHighX">Whether the shooter attacks the goal at the high end of X.</param>
+    /// <param name="defenders">The opposing side's players, with their positions in fixed units.</param>
+    /// <param name="keeperIndex">The index of the opposing goalkeeper, who is not counted; -1 for none.</param>
+    public static int ShotCover(long shooterX, long shooterY, bool attacksHighX, ReadOnlySpan<TickPlayerState> defenders, int keeperIndex)
+    {
+        long goalX = attacksHighX ? SpatialPitch.PitchLength : 0;
+        var limit = (long)ShotCoverCorridor * ShotCoverCorridor;
+        var cover = 0;
+
+        for (var index = 0; index < defenders.Length && cover < ShotCoverMaximum; index++)
+        {
+            if (index == keeperIndex)
+            {
+                continue;
+            }
+
+            long x = TickSpatialUnits.ToUnits(defenders[index].X);
+            long y = TickSpatialUnits.ToUnits(defenders[index].Y);
+            var ahead = attacksHighX ? x > shooterX : x < shooterX;
+
+            if (ahead && TickOffBallSupport.SegmentDistanceSquared(x, y, shooterX, shooterY, goalX, SpatialPitch.GoalYCenter) < limit)
+            {
+                cover++;
+            }
+        }
+
+        return cover;
     }
 
     /// <summary>
