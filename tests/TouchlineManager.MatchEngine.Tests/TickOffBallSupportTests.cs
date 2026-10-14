@@ -340,6 +340,44 @@ public sealed class TickOffBallSupportTests
         TickOffBallSupport.RunBudget(mentality, breakRunners: 0).Should().Be(TickOffBallSupport.RunBudget(mentality));
     }
 
+    [Theory]
+    [InlineData(MatchMentality.Defensive, 0, 0)]
+    [InlineData(MatchMentality.Cautious, 0, 0)]
+    [InlineData(MatchMentality.Balanced, 0, 0)]
+    [InlineData(MatchMentality.Positive, 0, 1)]
+    [InlineData(MatchMentality.Attacking, 0, 2)]
+    [InlineData(MatchMentality.Balanced, 2, 2)]
+    [InlineData(MatchMentality.Positive, 2, 2)]
+    [InlineData(MatchMentality.Attacking, 2, 2)]
+    public void A_side_that_keeps_men_back_for_a_counter_sends_one_runner_fewer_and_never_fewer_than_its_break(MatchMentality mentality, int breakRunners, int runners)
+    {
+        TickOffBallSupport.RunBudget(mentality, breakRunners, holding: true).Should().Be(runners);
+        TickOffBallSupport.RunBudget(mentality, breakRunners, holding: false).Should().Be(TickOffBallSupport.RunBudget(mentality, breakRunners));
+
+        if (breakRunners == 0)
+        {
+            TickOffBallSupport.RunBudget(mentality, holding: true).Should().Be(Math.Max(0, TickOffBallSupport.RunBudget(mentality) - TickOffBallSupport.HoldingRunnerCut));
+        }
+    }
+
+    [Fact]
+    public void A_side_that_keeps_men_back_for_a_counter_runs_one_man_fewer_in_play_and_sends_no_full_back_overlapping()
+    {
+        var open = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Attacking);
+        var holding = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, MatchMentality.Attacking) { Holding = true };
+
+        Indices(open.Assign(), TickAttackingRole.Runner).Should().HaveCount(3);
+        Indices(holding.Assign(), TickAttackingRole.Runner).Should().HaveCount(2);
+
+        var attackers = (SpatialPoint[])CentralMidfielderHasTheBall.Clone();
+
+        attackers[5] = new SpatialPoint(6_000, 900);
+
+        var winger = new Scene(isHome: true, carrier: 5, attackers, CompactFourFourTwo) { Holding = true }.Moving(5, heading: 128, centimetresPerSecond: 500);
+
+        Indices(winger.Assign(), TickAttackingRole.Overlap).Should().BeEmpty("a side waiting for a break keeps its full-backs home");
+    }
+
     [Fact]
     public void A_side_on_a_break_starts_its_run_at_once_with_a_defender_on_the_carrier_and_from_deep()
     {
@@ -937,6 +975,8 @@ public sealed class TickOffBallSupportTests
 
         public bool BreakImmediate { get; init; }
 
+        public bool Holding { get; init; }
+
         public int Tick { get; set; }
 
         public SpatialPoint[] Offsets { get; } = new SpatialPoint[11];
@@ -1000,6 +1040,7 @@ public sealed class TickOffBallSupportTests
                     OffsetPaces = OffsetPaces,
                     BreakRunners = BreakRunners,
                     BreakImmediate = BreakImmediate,
+                    Holding = Holding,
                 },
                 orders);
 

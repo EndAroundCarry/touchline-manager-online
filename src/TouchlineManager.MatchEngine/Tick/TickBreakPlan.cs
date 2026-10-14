@@ -19,9 +19,10 @@ internal readonly record struct TickBreakPlan(int Ticks, int Runners, bool Immed
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The cost is the same against everyone.</b> A side that counter-attacks does not force the play while it waits for a break: its
-/// carrier values going forward <see cref="TickBallCarrierBrain.WaitProgressPercent"/> points less (<see cref="TickCarrierSituation.Waiting"/>).
-/// Against a side that attacks, the waiting is made up for by the breaks; against one that sits deep it is not, and the counter is a net minus.
+/// <b>The cost is the same against everyone.</b> A side that counter-attacks and is not on a break keeps men back (`weaker-side-v2`,
+/// Milestone 1): one runner fewer than its mentality sends, and no overlapping full-back (<see cref="TickAttackingSituation.Holding"/>). Its
+/// carrier plays as any other does, so the side does not sit on the ball in its own half. Against a side that attacks, the men kept back are made
+/// up for by the breaks; against one that sits deep they are not, and the counter is a small minus.
 /// </para>
 /// <para>
 /// <b>The gain is a percentage.</b> <see cref="GainAtBalancedPercent"/> at posture 0 plus <see cref="GainPerPosturePercent"/> for every point

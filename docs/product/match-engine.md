@@ -2387,3 +2387,29 @@ Baseline away points against a home default: DEF 0.91, POS 1.86, ATT 2.18, COUNT
 **The statistical guard** (`TickEngineTests`): 300 matches of a 17-skill side at home in the default 4-4-2 against a 16-skill side in a low block that counters (Cautious, Deep line, Direct, `CounterAttack`). It measures 75 / 18 / 7% (stronger side / draws / weaker side), 0.40 points for the weaker side, and asserts the stronger side wins at least 60%, the weaker side at most 20%, at least 8% draws, and the weaker side's points in 0.25-0.80. It catches a bonus that has vanished (no draws, no points) as well as one that has grown into a superpower. The break window's opening, closing and posture rules, the low block's marking and screens, and the 8 m guard on outfield anchors were already covered by `TickCounterAttackTests`, `TickDefensiveAITests` and `TickTacticalGeometryTests`; the low-block anchor test is back to 2,625.
 
 The full MatchEngine suite passes (1,603 tests; the allocation test in `TickSetPiecesTests` failed once under the load of the benchmarks running beside it and passes alone). Logs: `.run-logs/m5-*.txt`.
+
+### 14.32 The counter flag no longer holds the ball (the weaker-side v2 plan, Milestone 1)
+
+**Why.** `WaitProgressPercent` (28) took 28 points off the value of going forward for a side with the counter flag that was not on a break. It made the side keep the ball in its own half (60% of the ball at 13-14 against 18-19, 2 shots) and lose it there. A real counter-attacking side gives the ball up high or plays it forward early; its cost is fewer men in a settled attack.
+
+**What changed** (`TickBallCarrierBrain`, `TickOffBallSupport`, `TickMatchLoop.OpenPlay`):
+
+| Before | Now |
+|---|---|
+| `TickCarrierSituation.Waiting` and `WaitProgressPercent` lowered `ProgressPercent` by 28 | removed; the carrier of a counter side values going forward as any other carrier of its mentality and tempo does |
+| nothing in the shape of the attack | `TickAttackingSituation.Holding` (the flag is set and the side is not on a break): `RunBudget` is `HoldingRunnerCut` (1) lower, never below the break's runners and never below 0, and `AssignOverlap` returns early as it does for Defensive |
+
+The golden hash does not move (the fixture sets no counter flag).
+
+**Result** (150 matches a cell, seed 7000; the weaker side's points, before then after):
+
+| Weaker side setup | 16 v 18-19 | 13-14 v 18-19 |
+|---|---|---|
+| 4-4-2 counter-attack | 0.12 to 0.16 | 0.09 to 0.11 |
+| 5-4-1 counter-attack | 0.32 to 0.38 | 0.15 to 0.16 |
+| every other setup (no flag) | bit-identical | bit-identical |
+
+- **Possession** of a counter-attack side at 13-14 falls from 60% to 50% (4-4-2) and from 58% to 48% (5-4-1); shots per 100 s of possession rise from 0.07 to 0.18 and from 0.15 to 0.35. The prototype that only removed the cost (`TD_WAIT=0`) gave 0.27 for the 4-4-2 counter at 16 v 18-19; the rest defence takes about 0.1 of that back, and the cell stays far below the plan target for the 5-4-1 counter (0.7), which the later milestones carry.
+- **Guards** (300 matches a cell, seed 90000): a 6-skill side takes no points in any setup (S3: 100/0/0 against default, counter and bus); between equal sides the away counter-attack against a home default takes 0.96 points (0.84 before; target at least 0.85), against a home all-out attack 1.27 (0.98), and the bus setup, which also holds the flag, takes 0.74 and 0.78 away (0.54 and 0.63); no setup beats every other. `ticksnap 150`: goals 2.73 a match (2.51 before; band 2.4-3.0).
+- `HoldingRunnerCut = 2` was not tried: S3 did not leak.
+- Test changes: `TickOffBallSupportTests` (the run budget with `holding`, a holding side runs one man fewer in play and sends no overlap).

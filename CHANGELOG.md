@@ -4,6 +4,14 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side v2 plan, Milestone 1 - the counter flag stops holding the ball
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.32. **A side with the counter-attack flag no longer plays slowly out of its own half; it keeps men back instead**; the golden hash is unchanged.
+
+### Changed
+
+- The waiting cost (`WaitProgressPercent`, 28 points off the value of going forward) is removed. A counter side not on a break sends one runner fewer than its mentality and its full-backs do not overlap. At 13-14 against 18-19 its possession falls from 60% to 50%; its points at 16 against 18-19 go from 0.12 to 0.16 (4-4-2) and 0.32 to 0.38 (5-4-1). Goals a match 2.51 to 2.73.
+
 ## Weaker-side plan, Milestone 5 - calibration and wrap-up
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.31 and [ADR-0068](docs/architecture/adr/0068-tactics-in-the-tick-engine-counter-attack-low-block-and-time-wasting.md). **The counter-attack, low-block and outlet bonus goes from 125% to 100% of the sizes it was tuned at**, chosen by the user from a 125/100/75 re-run after the legs and time-wasting changed the play; the golden hash is unchanged.

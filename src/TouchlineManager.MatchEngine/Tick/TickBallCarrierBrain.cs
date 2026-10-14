@@ -99,9 +99,6 @@ internal readonly ref struct TickCarrierSituation
     /// </summary>
     public bool Breaking { get; init; }
 
-    /// <summary>Gets a value indicating whether the carrier's side counter-attacks and is not on a break: it sits and waits for one.</summary>
-    public bool Waiting { get; init; }
-
     /// <summary>Gets the percent of progress a side on a break values a ball forward at, on top of its mentality's (<see cref="TickBreakGain.Plan"/>).</summary>
     public int BreakProgress { get; init; }
 }
@@ -518,9 +515,6 @@ internal static class TickBallCarrierBrain
     /// <summary>The Decisions plus Anticipation a side on a break adds to its carrier's sharpness: he plays the ball at once, as at a high tempo.</summary>
     public const int BreakSharpness = 4;
 
-    /// <summary>The percent of progress a pass or a carry is worth that a side waiting for a break gives up: it does not force the play.</summary>
-    public const int WaitProgressPercent = 28;
-
     /// <summary>The percent of progress a pass or a carry is worth that a side on a break adds to its mentality's.</summary>
     public const int BreakProgressPercent = 120;
 
@@ -796,7 +790,7 @@ internal static class TickBallCarrierBrain
         var carrierSkills = situation.Skills[situation.CarrierIndex];
         var vision = VisionBase + (VisionStep * carrierSkills.Vision);
         var careless = OffsideCarelessPercent(carrierSkills);
-        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.Waiting);
+        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress);
         var loss = LossOfBall(view);
         var crowded = Congestion(situation, view) >= SwitchCongestion;
         var keeper = situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper;
@@ -1086,7 +1080,7 @@ internal static class TickBallCarrierBrain
         var skills = situation.Skills[situation.CarrierIndex];
         var mean = ((2 * skills.Dribbling) + skills.Pace + skills.Acceleration) / 4;
         var success = Math.Clamp(5_500 + (250 * mean), 2_000, 9_800) * (BasisPoints - (view.Effective * 45 / 100)) / BasisPoints;
-        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.Waiting);
+        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress);
         var loss = LossOfBall(view);
         var toGoal = TickTrigonometry.AngleOf(SpatialPitch.PitchLength - view.X, SpatialPitch.GoalYCenter - view.Y);
 
@@ -1196,7 +1190,7 @@ internal static class TickBallCarrierBrain
     }
 
     /// <summary>Gets how much going forward is worth, in percent per unit gained: the mentality's and the tempo's.</summary>
-    private static int ProgressPercent(MatchMentality mentality, MatchTempo tempo, int breakProgress, bool waiting)
+    private static int ProgressPercent(MatchMentality mentality, MatchTempo tempo, int breakProgress)
     {
         var percent = mentality switch
         {
@@ -1207,7 +1201,7 @@ internal static class TickBallCarrierBrain
             _ => 120,
         };
 
-        return percent + (tempo == MatchTempo.High ? 15 : 0) - (tempo == MatchTempo.Low ? 15 : 0) + breakProgress - (waiting ? WaitProgressPercent : 0);
+        return percent + (tempo == MatchTempo.High ? 15 : 0) - (tempo == MatchTempo.Low ? 15 : 0) + breakProgress;
     }
 
     private static int ShotEagerness(MatchMentality mentality) => mentality switch

@@ -125,6 +125,12 @@ internal readonly ref struct TickAttackingSituation
 
     /// <summary>Gets a value indicating whether the break's runners start from the first tick: from his own third and with a defender on the carrier.</summary>
     public bool BreakImmediate { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the side counter-attacks and is not on a break (`weaker-side-v2`, Milestone 1): it keeps men back for
+    /// the one it waits for, so it sends one runner fewer than its mentality does and its full-backs do not overlap.
+    /// </summary>
+    public bool Holding { get; init; }
 }
 
 /// <summary>
@@ -148,7 +154,8 @@ internal readonly ref struct TickAttackingSituation
 /// <item><description>
 /// <b>Overlap.</b> When a winger (a wide midfielder or forward) has the ball and is cutting inside (his heading leans at
 /// least 30% of his speed towards the middle, at 1.5 m/s or more), the full-back on his flank sprints into the wide channel he
-/// has left: 10 m beyond the winger, 9 m from the touchline, 85–95% of top speed by WorkRate. A defensive side never does it.
+/// has left: 10 m beyond the winger, 9 m from the touchline, 85–95% of top speed by WorkRate. A defensive side never does it, nor does one
+/// that counter-attacks and is not on a break (<see cref="TickAttackingSituation.Holding"/>).
 /// </description></item>
 /// <item><description>
 /// <b>Triangle.</b> The carrier always has two short options. Each of two slots, one either side of the carrier, is a point
@@ -170,7 +177,8 @@ internal readonly ref struct TickAttackingSituation
 /// full pace into a gap between the back line's players (the widest within 25 m across, never one already taken), to 10 m
 /// behind the line. The highest scorers on Pace + Acceleration + Positioning + Anticipation (strikers 4 ahead of wide
 /// midfielders) go first, up to a number set by
-/// mentality: none for Defensive, 1 for Cautious and Balanced, 2 for Positive, 3 for Attacking. A run in progress carries
+/// mentality: none for Defensive, 1 for Cautious and Balanced, 2 for Positive, 3 for Attacking, one fewer for a side that counter-attacks and
+/// is not on a break. A run in progress carries
 /// on until the carrier is closed down to 6 m. A forward already beyond the line never starts one. A side on a break
 /// (`weaker-side-v1`, Milestones 1 and 1b: <see cref="TickAttackingSituation.BreakRunners"/>) sends at least that many, wide midfielders included,
 /// and, when the break is worth it, from the first tick, with a defender on the carrier and from his own third.
@@ -363,6 +371,9 @@ internal static class TickOffBallSupport
     /// <summary>The angles tried for a support slot, in binary angle units: 45°, 30°, 60°, 38°, 52° from the line of attack.</summary>
     private static readonly int[] SupportAngles = [128, 85, 171, 107, 149];
 
+    /// <summary>How many runners fewer than its mentality sends a side that counter-attacks and is not on a break does: the men it keeps back (`weaker-side-v2`, Milestone 1).</summary>
+    public const int HoldingRunnerCut = 1;
+
     /// <summary>The slowest a winger may be moving to count as cutting inside (1.5 m/s), in fixed units per tick.</summary>
     private static readonly int MinimumCutSpeed = TickSpatialUnits.SpeedToFixedPerTick(150);
 
@@ -378,7 +389,8 @@ internal static class TickOffBallSupport
     /// <summary>Gets how many players a side with a mentality sends running behind the line at once.</summary>
     /// <param name="mentality">The mentality.</param>
     /// <param name="breakRunners">The fewest a break sends (<see cref="TickAttackingSituation.BreakRunners"/>), whatever the mentality.</param>
-    public static int RunBudget(MatchMentality mentality, int breakRunners = 0)
+    /// <param name="holding">Whether the side keeps men back for a counter (<see cref="TickAttackingSituation.Holding"/>): <see cref="HoldingRunnerCut"/> fewer.</param>
+    public static int RunBudget(MatchMentality mentality, int breakRunners = 0, bool holding = false)
     {
         var budget = mentality switch
         {
@@ -388,7 +400,7 @@ internal static class TickOffBallSupport
             _ => 1,
         };
 
-        return Math.Max(budget, breakRunners);
+        return Math.Max(holding ? Math.Max(0, budget - HoldingRunnerCut) : budget, breakRunners);
     }
 
     /// <summary>Gives every attacker his job for this tick.</summary>
@@ -653,7 +665,7 @@ internal static class TickOffBallSupport
 
     private static void AssignOverlap(in TickAttackingSituation situation, in Frame frame, Span<TickAttackingOrder> orders, Span<bool> busy)
     {
-        if (situation.Mentality == MatchMentality.Defensive)
+        if (situation.Mentality == MatchMentality.Defensive || situation.Holding)
         {
             return;
         }
@@ -909,7 +921,7 @@ internal static class TickOffBallSupport
 
     private static void AssignRuns(in TickAttackingSituation situation, in Frame frame, Span<TickAttackingOrder> orders, Span<bool> busy)
     {
-        var budget = RunBudget(situation.Mentality, situation.BreakRunners);
+        var budget = RunBudget(situation.Mentality, situation.BreakRunners, situation.Holding);
         var space = frame.DefenderLine;
 
         // A side on a break runs from where it won the ball and at once: it does not wait for the carrier to pass his own third or to be free.
