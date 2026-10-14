@@ -148,7 +148,8 @@ if (mode is "tickflank")
     TickShowcase.Flank(
         positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var flankMatches) ? Math.Min(flankMatches, 500) : 50,
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var flankSeed) ? flankSeed : 11_000UL,
-        rules);
+        rules,
+        positional.Length > 3 ? positional[3] : "15-16");
 }
 
 if (mode is "tickwhy")
@@ -157,7 +158,8 @@ if (mode is "tickwhy")
     TickShowcase.Why(
         positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var whyMatches) ? Math.Min(whyMatches, 500) : 200,
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var whySeed) ? whySeed : 7_000UL,
-        rules);
+        rules,
+        positional.Length > 3 ? positional[3] : "15-16");
 }
 
 if (mode is "tickbalance")

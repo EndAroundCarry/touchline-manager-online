@@ -408,32 +408,64 @@ internal static class TickShowcase
     /// <param name="matches">How many matches a cell.</param>
     /// <param name="seed">The base seed.</param>
     /// <param name="rules">The rules in force.</param>
-    public static void Why(int matches, ulong seed, EngineRulesV2 rules)
+    /// <param name="weak">The weaker side's ability, a number or a range.</param>
+    public static void Why(int matches, ulong seed, EngineRulesV2 rules, string weak = "15-16")
     {
+        var (weakLow, weakHigh) = Range(weak);
+
         (string Name, string Spec)[] setups =
         [
             ("DEF", string.Empty),
             ("POS", "ment=3,press=2,line=2,tempo=2"),
             ("ATT", "ment=4,press=2,line=2,tempo=2"),
             ("COUNTER", "ment=1,press=0,line=0,pass=2,counter=1"),
+            ("DEEP", "ment=0,press=0,line=0"),
+            ("DEF532", "form=5"),
+            ("DEEP541", "form=12,ment=0,press=0,line=0"),
+            ("CTR541", "form=12,ment=1,press=0,line=0,pass=2,counter=1"),
+            ("CTR532", "form=5,ment=1,press=0,line=0,pass=2,counter=1"),
+            ("DEF541", "form=12"),
+            ("CAU532", "form=5,ment=1"),
+            ("CAU541", "form=12,ment=1"),
         ];
+        var whyOnly = (Environment.GetEnvironmentVariable("TW_ONLY") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries);
 
-        Console.WriteLine($"== tickwhy: 18-19 at home to 15-16 (gk 18 / 15), the weaker side setup varies, {matches} matches a cell, seed {seed} ==");
+        setups = [.. setups.Where(setup => whyOnly.Length == 0 || whyOnly.Contains(setup.Name))];
+
+        // The attack edge (plan zesty-chipmunk): the weaker side's attack group, and the stronger side's Defence family, get one value on their core skills.
+        int? awayForward = int.TryParse(Environment.GetEnvironmentVariable("TW_AWAY_FWD"), CultureInfo.InvariantCulture, out var forwardValue) ? forwardValue : null;
+        int? homeDefence = int.TryParse(Environment.GetEnvironmentVariable("TW_HOME_DEF"), CultureInfo.InvariantCulture, out var defenceValue) ? defenceValue : null;
+
+        Console.WriteLine($"== tickwhy: 18-19 at home to {weak} (gk 18 / {weakLow}), the weaker side setup varies, {matches} matches a cell, seed {seed}, weaker attack group {(awayForward is null ? "as spread" : awayForward)}, stronger defence {(homeDefence is null ? "as spread" : homeDefence)} ==");
 
         foreach (var (name, setup) in setups)
         {
             var tally = new WhyTally();
             var gate = new object();
             var (homeForm, homeInstructions, homeKeeper, homePace) = Spec("gk=18");
-            var (awayForm, awayInstructions, awayKeeper, awayPace) = Spec("gk=15" + (setup.Length == 0 ? string.Empty : "," + setup));
+            var (awayForm, awayInstructions, awayKeeper, awayPace) = Spec($"gk={weakLow}" + (setup.Length == 0 ? string.Empty : "," + setup));
 
             Parallel.For(0, matches, index =>
             {
-                var built = LaboratoryFixtures.Build(seed + (ulong)index, 18, 15, homeInstructions, awayInstructions, rules);
+                var built = LaboratoryFixtures.Build(seed + (ulong)index, 18, weakLow, homeInstructions, awayInstructions, rules);
                 var input = TickCalibration.Stand(
-                    built with { Home = Paced(Keeper(Spread(built.Home, 18, 19), homeKeeper), homePace), Away = Paced(Keeper(Spread(built.Away, 15, 16), awayKeeper), awayPace) },
+                    built with { Home = Paced(Keeper(Spread(built.Home, 18, 19), homeKeeper), homePace), Away = Paced(Keeper(Spread(built.Away, weakLow, weakHigh), awayKeeper), awayPace) },
                     homeForm,
                     awayForm);
+
+                // Applied after the formation is stood, because the groups are read from the slots' family and depth.
+                if (awayForward is { } forwardSkill)
+                {
+                    input = input with { Away = WithCore(input.Away, AttackGroup(input.Away), FlankForwardCore, forwardSkill) };
+                }
+
+                if (homeDefence is { } defenceSkill)
+                {
+                    var defenders = input.Home.Slots.Where(slot => slot.Family == MatchPositionFamily.Defence).Select(slot => slot.ParticipantId).ToList();
+
+                    input = input with { Home = WithCore(input.Home, defenders, DefenderCore, defenceSkill) };
+                }
+
                 var recorder = new MatchPassageRecorder();
                 var result = MatchSimulator.Simulate(input, rules, null, recorder, TickMatchEngine.Instance);
 
@@ -658,13 +690,27 @@ internal static class TickShowcase
         MatchAttributeName.Acceleration,
     ];
 
+    private static readonly MatchAttributeName[] DefenderCore =
+    [
+        MatchAttributeName.Tackling,
+        MatchAttributeName.Marking,
+        MatchAttributeName.Positioning,
+        MatchAttributeName.Pace,
+        MatchAttributeName.Acceleration,
+        MatchAttributeName.Strength,
+    ];
+
     /// <summary>Sets some attributes of one occupant of a side to a value and leaves the rest of his attributes as they are.</summary>
     private static MatchSideV1 WithCore(MatchSideV1 side, Guid participant, MatchAttributeName[] names, int value) =>
+        WithCore(side, [participant], names, value);
+
+    /// <summary>Sets some attributes of several occupants of a side to a value and leaves the rest of their attributes as they are.</summary>
+    private static MatchSideV1 WithCore(MatchSideV1 side, IReadOnlyCollection<Guid> participants, MatchAttributeName[] names, int value) =>
         side with
         {
             Squad =
             [
-                .. side.Squad.Select(player => player.ParticipantId != participant
+                .. side.Squad.Select(player => !participants.Contains(player.ParticipantId)
                     ? player
                     : player with
                     {
@@ -672,6 +718,16 @@ internal static class TickShowcase
                     }),
             ],
         };
+
+    /// <summary>
+    /// The weaker side's attack group: its Attack-family outfield players and its two most advanced midfielders (by shape depth). Read from the
+    /// side's slots, so it must be called after the formation has been stood.
+    /// </summary>
+    private static List<Guid> AttackGroup(MatchSideV1 side) =>
+    [
+        .. side.Slots.Where(slot => slot.Family == MatchPositionFamily.Attack).Select(slot => slot.ParticipantId),
+        .. side.Slots.Where(slot => slot.Family == MatchPositionFamily.Midfield).OrderByDescending(slot => slot.X).Take(2).Select(slot => slot.ParticipantId),
+    ];
 
     /// <summary>
     /// `tickflank`: an 18-19 side at home to a 15-16 side. On each of three lanes the home defender there may be weak (core skills 15), the away
@@ -682,8 +738,11 @@ internal static class TickShowcase
     /// <param name="matches">How many matches a cell.</param>
     /// <param name="seed">The base seed (the same matches are played in every cell).</param>
     /// <param name="rules">The rules in force.</param>
-    public static void Flank(int matches, ulong seed, EngineRulesV2 rules)
+    /// <param name="weak">The weaker side's ability, a number or a range.</param>
+    public static void Flank(int matches, ulong seed, EngineRulesV2 rules, string weak = "15-16")
     {
+        var (weakLow, weakHigh) = Range(weak);
+
         (string Name, MatchMentality Value)[] mentalities =
         [
             ("ATTK", MatchMentality.Attacking),
@@ -701,7 +760,7 @@ internal static class TickShowcase
             cells.Add((lane, true, true, true));
         }
 
-        Console.WriteLine($"== tickflank: 18-19 at home to 15-16, {matches} matches a cell, seed {seed} ==");
+        Console.WriteLine($"== tickflank: 18-19 at home to {weak}, {matches} matches a cell, seed {seed} ==");
         Console.WriteLine("CELL\tmentality\tlane\tskills\tfocus\tn\tweakWins\tdraws\tweakLosses\tgoalsStrong\tgoalsWeak\tshotsStrong\tshotsWeak\tfwdShots\tfwdGoals\tfinalThirdLowY%\tfinalThirdMidY%\tfinalThirdHighY%\tdefY\tfwdY\tfocusUsed");
 
         foreach (var (mentalityName, mentality) in mentalities)
@@ -717,9 +776,9 @@ internal static class TickShowcase
                 {
                     var homeInstructions = new MatchInstructionsV1();
                     var awayInstructions = new MatchInstructionsV1 { Mentality = mentality };
-                    var built = LaboratoryFixtures.Build(seed + (ulong)index, 18, 15, homeInstructions, awayInstructions, rules);
+                    var built = LaboratoryFixtures.Build(seed + (ulong)index, 18, weakLow, homeInstructions, awayInstructions, rules);
                     var input = TickCalibration.Stand(
-                        built with { Home = Keeper(Spread(built.Home, 18, 19), 18), Away = Keeper(Spread(built.Away, 15, 16), 15) },
+                        built with { Home = Keeper(Spread(built.Home, 18, 19), 18), Away = Keeper(Spread(built.Away, weakLow, weakHigh), weakLow) },
                         FormationPreset.FourFourTwo,
                         FormationPreset.FourFourTwo);
                     var defender = Guid.Empty;
