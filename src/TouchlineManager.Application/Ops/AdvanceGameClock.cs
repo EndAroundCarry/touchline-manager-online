@@ -1,12 +1,14 @@
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Abstractions.Ops;
+using TouchlineManager.Application.Abstractions.World;
 using TouchlineManager.Application.Jobs;
+using TouchlineManager.Domain.Competition;
 
 namespace TouchlineManager.Application.Ops;
 
 /// <summary>The result of asking to advance the stepped game clock.</summary>
-/// <param name="Target">The step kind, <c>day</c> or <c>matchday</c>.</param>
+/// <param name="Target">The step kind, <c>day</c>, <c>matchday</c> or <c>season-end</c>.</param>
 /// <param name="TargetInstantUtc">The instant the step will land on.</param>
 /// <param name="BusinessKey">The business key of the enqueued job.</param>
 /// <param name="Enqueued"><see langword="true"/> when a new job row was inserted.</param>
@@ -32,6 +34,11 @@ public sealed record AdvanceGameClockResult(
 /// is resolved against the same frozen "now" every host sees, not against a poller's copy.
 /// </para>
 /// <para>
+/// A <c>matchday</c> step with no round left is the end of the season: it lands on the active season's end (never earlier than now)
+/// and makes sure the season's rollover job is on the queue, reviving one that was dead-lettered, so the toolbar's last press closes the
+/// season and opens the next. The worker still runs the rollover, preflight and all.
+/// </para>
+/// <para>
 /// It is reachable only from a development-flagged endpoint and is never mapped in production (§17.12).
 /// </para>
 /// </remarks>
@@ -43,13 +50,15 @@ public sealed class AdvanceGameClock
     private readonly IGameClockStore _clockStore;
     private readonly IMatchdayRepository _matchdays;
     private readonly IJobQueue _jobs;
+    private readonly IWorldRepository _world;
 
     /// <summary>Initializes the use case.</summary>
-    public AdvanceGameClock(IGameClockStore clockStore, IMatchdayRepository matchdays, IJobQueue jobs)
+    public AdvanceGameClock(IGameClockStore clockStore, IMatchdayRepository matchdays, IJobQueue jobs, IWorldRepository world)
     {
         _clockStore = clockStore;
         _matchdays = matchdays;
         _jobs = jobs;
+        _world = world;
     }
 
     /// <summary>Resolves the target instant and enqueues the advance job, due now.</summary>
@@ -62,7 +71,12 @@ public sealed class AdvanceGameClock
             : ClockJobPayload.Day;
 
         var now = await _clockStore.ReadAsync(cancellationToken);
-        var next = await ResolveTargetAsync(kind, now, cancellationToken);
+        var (next, closing) = await ResolveTargetAsync(kind, now, cancellationToken);
+
+        if (closing is not null)
+        {
+            kind = ClockJobPayload.SeasonEnd;
+        }
 
         if (next < now)
         {
@@ -81,10 +95,15 @@ public sealed class AdvanceGameClock
             },
             cancellationToken);
 
+        if (closing is not null)
+        {
+            await EnsureRolloverAsync(closing, next, cancellationToken);
+        }
+
         return new AdvanceGameClockResult(kind, next, businessKey, enqueued);
     }
 
-    private async Task<DateTimeOffset> ResolveTargetAsync(
+    private async Task<(DateTimeOffset Target, Season? Closing)> ResolveTargetAsync(
         string kind,
         DateTimeOffset now,
         CancellationToken cancellationToken)
@@ -98,11 +117,43 @@ public sealed class AdvanceGameClock
 
             if (upcoming.Count > 0)
             {
-                return upcoming[0].KickoffAt;
+                return (upcoming[0].KickoffAt, null);
+            }
+
+            // No round left: the step that remains is the end of the season, which is what lets its rollover run.
+            var season = await ClockSeason.FindActiveAsync(_world, cancellationToken);
+
+            if (season is not null)
+            {
+                return (season.EndsAt > now ? season.EndsAt : now, season);
             }
         }
 
         // The start of the next game day: the step that always makes progress when no round is upcoming.
-        return new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero).AddDays(1);
+        return (new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero).AddDays(1), null);
+    }
+
+    /// <summary>
+    /// Puts the season's rollover job on the queue. A dead-lettered one (its retries ran out before the season's last round was
+    /// published) goes back to the queue; otherwise one is enqueued, which the business key makes a no-op when it is already there.
+    /// </summary>
+    private async Task EnsureRolloverAsync(Season season, DateTimeOffset dueAt, CancellationToken cancellationToken)
+    {
+        var businessKey = SeasonRolloverJobTypes.RolloverKey(season.Id);
+
+        if (await _jobs.RequeueAsync(SeasonRolloverJobTypes.Rollover, businessKey, cancellationToken))
+        {
+            return;
+        }
+
+        await _jobs.EnqueueAsync(
+            new JobEnqueueRequest
+            {
+                JobType = SeasonRolloverJobTypes.Rollover,
+                BusinessKey = businessKey,
+                PayloadJson = SeasonRolloverJobPayload.For(season.Id),
+                DueAt = dueAt,
+            },
+            cancellationToken);
     }
 }

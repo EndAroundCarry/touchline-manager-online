@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
 import { GameClockApi } from './game-clock-api';
-import { GameClockStatus, GameClockTarget } from './game-clock.models';
+import { GameClockStatus, GameClockTarget, SEASON_END_STEP } from './game-clock.models';
 
 /**
  * The non-production season-stepping toolbar's state (ADR-0049).
@@ -30,6 +30,7 @@ export class GameClockStore implements OnDestroy {
   private readonly availableSignal = signal(false);
   private readonly gameNowSignal = signal<string | null>(null);
   private readonly nextMatchdaySignal = signal<string | null>(null);
+  private readonly seasonEndsSignal = signal<string | null>(null);
   private readonly busySignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
   private readonly completedSignal = signal(0);
@@ -44,6 +45,12 @@ export class GameClockStore implements OnDestroy {
 
   /** The next round's kickoff, or null when the season has no round left to play. */
   readonly nextMatchdayAt = this.nextMatchdaySignal.asReadonly();
+
+  /**
+   * The active season's end when no round is left, or null. While it is set the toolbar offers to end the season:
+   * the step that lets its rollover run and opens the next one.
+   */
+  readonly seasonEndsAt = this.seasonEndsSignal.asReadonly();
 
   /** Whether a step is in flight. */
   readonly busy = this.busySignal.asReadonly();
@@ -69,6 +76,7 @@ export class GameClockStore implements OnDestroy {
         this.availableSignal.set(false);
         this.gameNowSignal.set(null);
         this.nextMatchdaySignal.set(null);
+        this.seasonEndsSignal.set(null);
       },
     });
   }
@@ -83,7 +91,8 @@ export class GameClockStore implements OnDestroy {
     this.errorSignal.set(null);
 
     this.api.advance(target).subscribe({
-      next: (result) => this.poll(Date.parse(result.targetInstantUtc), 0),
+      next: (result) =>
+        this.poll(Date.parse(result.targetInstantUtc), 0, result.target === SEASON_END_STEP),
       error: (error: unknown) => {
         this.busySignal.set(false);
         this.errorSignal.set(this.message(error));
@@ -97,6 +106,7 @@ export class GameClockStore implements OnDestroy {
     this.availableSignal.set(false);
     this.gameNowSignal.set(null);
     this.nextMatchdaySignal.set(null);
+    this.seasonEndsSignal.set(null);
     this.busySignal.set(false);
     this.errorSignal.set(null);
     this.completedSignal.set(0);
@@ -107,7 +117,11 @@ export class GameClockStore implements OnDestroy {
     this.cancelTimer();
   }
 
-  private poll(target: number, attempts: number): void {
+  /**
+   * Waits for a step to land. Closing a season is more than the clock moving: the worker then runs the rollover, so the step is
+   * done only when the next season's first round is on offer.
+   */
+  private poll(target: number, attempts: number, closingSeason: boolean): void {
     if (attempts >= GameClockStore.MaxPolls) {
       this.busySignal.set(false);
       this.errorSignal.set('The step is taking longer than expected; check the worker.');
@@ -120,16 +134,19 @@ export class GameClockStore implements OnDestroy {
         next: (status) => {
           this.apply(status);
 
-          if (Date.parse(status.gameNow) >= target) {
+          const landed = Date.parse(status.gameNow) >= target;
+          const settled = !closingSeason || status.nextMatchdayAt !== null;
+
+          if (landed && settled) {
             // The clock has reached the target; let the day's jobs finish, then refresh the screen.
             this.timer = setTimeout(() => this.finish(), GameClockStore.SettleMs);
 
             return;
           }
 
-          this.poll(target, attempts + 1);
+          this.poll(target, attempts + 1, closingSeason);
         },
-        error: () => this.poll(target, attempts + 1),
+        error: () => this.poll(target, attempts + 1, closingSeason),
       });
     }, GameClockStore.PollIntervalMs);
   }
@@ -143,6 +160,7 @@ export class GameClockStore implements OnDestroy {
   private apply(status: GameClockStatus): void {
     this.gameNowSignal.set(status.gameNow);
     this.nextMatchdaySignal.set(status.nextMatchdayAt);
+    this.seasonEndsSignal.set(status.seasonEndsAt ?? null);
   }
 
   private cancelTimer(): void {

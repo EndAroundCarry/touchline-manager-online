@@ -220,7 +220,7 @@ internal static class OpsEndpoints
     {
         var result = await status.ExecuteAsync(cancellationToken);
 
-        return Results.Ok(new GameClockStatusResponse(result.GameNow, result.NextMatchdayAt));
+        return Results.Ok(new GameClockStatusResponse(result.GameNow, result.NextMatchdayAt, result.SeasonEndsAt));
     }
 
     private static async Task<IResult> AdvanceGameClockAsync(
@@ -494,7 +494,8 @@ internal sealed record AdvanceClockRequest(string? Target);
 /// <summary>Response of the stepped-clock read.</summary>
 /// <param name="GameNow">The current game instant.</param>
 /// <param name="NextMatchdayAt">The next round's kickoff, or null when none remains.</param>
-internal sealed record GameClockStatusResponse(DateTimeOffset GameNow, DateTimeOffset? NextMatchdayAt);
+/// <param name="SeasonEndsAt">The active season's end when no round remains, or null.</param>
+internal sealed record GameClockStatusResponse(DateTimeOffset GameNow, DateTimeOffset? NextMatchdayAt, DateTimeOffset? SeasonEndsAt);
 
 /// <summary>Response of the stepped-clock advance.</summary>
 /// <param name="Target">The step kind that was requested.</param>

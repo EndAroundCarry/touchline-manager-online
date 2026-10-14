@@ -10,7 +10,13 @@
         <time>{{ gameNowLabel() }}</time>
       </span>
 
-      <span class="hidden text-amber-200 sm:inline"> Next round: {{ nextMatchdayLabel() }} </span>
+      <span class="hidden text-amber-200 sm:inline">
+        @if (endsSeason()) {
+          No round left: the season ends {{ seasonEndsLabel() }}
+        } @else {
+          Next round: {{ nextMatchdayLabel() }}
+        }
+      </span>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <button
@@ -25,10 +31,10 @@
         <button
           type="button"
           class="inline-flex min-h-11 items-center rounded border border-amber-500/50 bg-panel px-3 font-semibold hover:bg-amber-500/15 disabled:opacity-50"
-          [disabled]="busy() || nextMatchdayAt() === null"
+          [disabled]="busy() || (nextMatchdayAt() === null && !endsSeason())"
           (click)="nextMatchday()"
         >
-          Next matchday
+          {{ endsSeason() ? 'End season' : 'Next matchday' }}
         </button>
 
         <span role="status" class="text-amber-200">

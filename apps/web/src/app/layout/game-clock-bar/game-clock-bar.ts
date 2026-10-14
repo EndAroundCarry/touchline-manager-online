@@ -5,7 +5,7 @@ import { GameClockStore } from '../../core/devtools/game-clock-store';
  * The non-production season-stepping toolbar (ADR-0049).
  *
  * A slim bar under the header with the current game date and two buttons: step one game day, or jump to the
- * next round's kickoff. It is the visible half of the stepped clock, and it renders only when the API reports
+ * next round's kickoff. With no round left the second button ends the season, so its rollover runs and the next season opens. It is the visible half of the stepped clock, and it renders only when the API reports
  * one — a real-time, compressed, or production host has no such route, so a manager never sees it.
  *
  * After a step lands and the day's jobs have run, it reloads the page, so whatever screen the manager is
@@ -27,6 +27,14 @@ export class GameClockBar implements OnInit {
   /** The next round's kickoff, or null. */
   protected readonly nextMatchdayAt = this.store.nextMatchdayAt;
 
+  /** The active season's end when no round is left, or null. */
+  protected readonly seasonEndsAt = this.store.seasonEndsAt;
+
+  /** Whether the matchday step is the end of the season: no round is left and the season can be closed. */
+  protected readonly endsSeason = computed(
+    () => this.nextMatchdayAt() === null && this.seasonEndsAt() !== null,
+  );
+
   /** Whether a step is in flight. */
   protected readonly busy = this.store.busy;
 
@@ -38,6 +46,9 @@ export class GameClockBar implements OnInit {
 
   /** The next round's kickoff, rendered in UTC. */
   protected readonly nextMatchdayLabel = computed(() => this.format(this.nextMatchdayAt()));
+
+  /** The season's end, rendered in UTC. */
+  protected readonly seasonEndsLabel = computed(() => this.format(this.seasonEndsAt()));
 
   constructor() {
     // A completed step is the moment to show the new day, once the day itself has finished processing.
@@ -58,7 +69,7 @@ export class GameClockBar implements OnInit {
     this.store.advance('day');
   }
 
-  /** Steps to the next round's kickoff. */
+  /** Steps to the next round's kickoff, or, with no round left, closes the season and opens the next. */
   protected nextMatchday(): void {
     this.store.advance('matchday');
   }

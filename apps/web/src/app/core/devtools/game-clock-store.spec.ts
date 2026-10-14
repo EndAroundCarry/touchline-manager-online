@@ -136,4 +136,62 @@ describe('GameClockStore', () => {
     vi.advanceTimersByTime(1_000 * 120);
     expect(store.completedTick()).toBe(0);
   });
+
+  it('offers to end the season when no round is left', () => {
+    const store = create();
+
+    api.status.mockReturnValue(
+      of({
+        gameNow: '2026-12-15T19:00:00Z',
+        nextMatchdayAt: null,
+        seasonEndsAt: '2026-12-22T19:00:00Z',
+      }),
+    );
+
+    store.probe();
+
+    expect(store.nextMatchdayAt()).toBeNull();
+    expect(store.seasonEndsAt()).toBe('2026-12-22T19:00:00Z');
+  });
+
+  it('reports the end of the season done only once the next season has a round to play', () => {
+    const store = create();
+
+    api.advance.mockReturnValue(
+      of({
+        target: 'season-end',
+        targetInstantUtc: '2026-12-22T19:00:00Z',
+        businessKey: 'clock:season-end:x',
+        enqueued: true,
+      }),
+    );
+
+    api.status
+      // The clock has landed on the season's end, but the rollover has not run yet.
+      .mockReturnValueOnce(
+        of({
+          gameNow: '2026-12-22T19:00:00Z',
+          nextMatchdayAt: null,
+          seasonEndsAt: '2026-12-22T19:00:00Z',
+        }),
+      )
+      // The rollover has run: the new season's first round is on offer.
+      .mockReturnValue(
+        of({ gameNow: '2026-12-22T19:00:00Z', nextMatchdayAt: '2026-12-29T19:00:00Z' }),
+      );
+
+    store.advance('matchday');
+
+    vi.advanceTimersByTime(1_000);
+    vi.advanceTimersByTime(1_500);
+    expect(store.completedTick()).toBe(0);
+    expect(store.busy()).toBe(true);
+
+    vi.advanceTimersByTime(1_000);
+    vi.advanceTimersByTime(1_500);
+
+    expect(store.busy()).toBe(false);
+    expect(store.completedTick()).toBe(1);
+    expect(store.seasonEndsAt()).toBeNull();
+  });
 });

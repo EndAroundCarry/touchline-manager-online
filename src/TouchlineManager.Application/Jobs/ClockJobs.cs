@@ -41,6 +41,9 @@ public static class ClockJobPayload
     /// <summary>Step to the next round that has not yet been played, falling back to a day.</summary>
     public const string Matchday = "matchday";
 
+    /// <summary>Step to the end of the active season when no round is left, so its rollover can run.</summary>
+    public const string SeasonEnd = "season-end";
+
     /// <summary>Builds the payload naming the instant to step to.</summary>
     /// <param name="targetInstantUtc">The instant the step lands on.</param>
     public static string For(DateTimeOffset targetInstantUtc) =>

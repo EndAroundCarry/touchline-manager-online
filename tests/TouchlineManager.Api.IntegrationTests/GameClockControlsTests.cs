@@ -73,6 +73,7 @@ public sealed class GameClockControlsTests
 
         ReadInstant(read, "gameNow").Should().Be(InitialNow);
         read.TryGetProperty("nextMatchdayAt", out _).Should().BeTrue();
+        read.TryGetProperty("seasonEndsAt", out _).Should().BeTrue("the toolbar needs it to offer the end of the season");
 
         var first = await client.PostAsJsonAsync(AdvancePath, new { target = "day" });
 
