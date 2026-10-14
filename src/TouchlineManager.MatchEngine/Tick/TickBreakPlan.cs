@@ -70,6 +70,12 @@ internal static class TickBreakGain
     /// <summary>The percent of progress a Defensive side's carrier values a ball forward at while its outlet is open: a mild lift on its mentality's 90.</summary>
     public const int OutletProgressPercent = 14;
 
+    /// <summary>The part of a counter-attack's break, in percent, that a side without the flag gets for a ball won off a side committed forward (an exposed break).</summary>
+    public const int ExposedBreakPercent = 40;
+
+    /// <summary>The opponent's posture above which its regained ball opens an exposed break: any side that attacks at all leaves space behind it.</summary>
+    public const int ExposedPostureMinimum = 1;
+
     /// <summary>The percent the gain moves for every point the recoverers are quicker (down) or slower (up) than the breakers.</summary>
     public const int GainPerSpeedPointPercent = 15;
 
@@ -137,6 +143,26 @@ internal static class TickBreakGain
             Math.Max(plan.Runners, OutletRunners),
             true,
             Math.Max(plan.ProgressPercent, OutletProgressPercent));
+
+    /// <summary>Gets whether a regain opens an exposed break: the side has no counter flag (which keeps its own plan) and the opponent is committed forward.</summary>
+    /// <param name="counterAttack">Whether the regaining side's instructions ask for the counter-attack.</param>
+    /// <param name="opponentPosture">The opponent's posture, -4..+4.</param>
+    public static bool IsExposed(bool counterAttack, int opponentPosture) =>
+        !counterAttack && opponentPosture >= ExposedPostureMinimum;
+
+    /// <summary>
+    /// Gets the part of a counter-attack's break that a side without the flag gets when it wins the ball off a side committed forward
+    /// (`weaker-side-v2`, Milestone 2): the ticks, the runners and the progress scale by <paramref name="percent"/>, and the runners start at once
+    /// only when the break is whole.
+    /// </summary>
+    /// <param name="full">The break a counter-attack would open against this opponent, from <see cref="Plan"/>.</param>
+    /// <param name="percent">The part of it the regaining side gets, in percent.</param>
+    public static TickBreakPlan Exposed(TickBreakPlan full, int percent) =>
+        new(
+            full.Ticks * percent / 100,
+            full.Runners * percent / 100,
+            full.Immediate && percent >= 100,
+            full.ProgressPercent * percent / 100);
 
     /// <summary>Gets the break a regain opens.</summary>
     /// <param name="posture">The opponent's posture, -4..+4.</param>

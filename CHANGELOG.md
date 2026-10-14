@@ -4,6 +4,19 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side v2 plan, Milestone 2 - a side that commits forward leaves space behind it
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.33. **A side without the counter flag that wins the ball off a side committed forward now gets part of a counter-attack's break (an exposed break)**; the golden hash is unchanged. The percent is 40, picked by the user.
+
+### Changed
+
+- `OpenBreak` opens an exposed break for any side without the flag when the opponent's posture is at least 1: `ExposedBreakPercent` (40) of the counter break (ticks, runners, progress). Against all-out attack at 16 v 18-19 the weaker side's points fall from 1.24 to 0.51 and the stronger side's goals rise from 3.55 to 4.92 (guard limit 4.5, not met); Positive 0.70 to 0.53; setups with no committed side are bit-identical.
+- `OpensBreak`'s first parameter is renamed `opens`.
+
+### Added
+
+- `TickBreakGain.IsExposed` and `TickBreakGain.Exposed`, with tests in `TickCounterAttackTests`.
+
 ## Weaker-side v2 plan, Milestone 1 - the counter flag stops holding the ball
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.32. **A side with the counter-attack flag no longer plays slowly out of its own half; it keeps men back instead**; the golden hash is unchanged.

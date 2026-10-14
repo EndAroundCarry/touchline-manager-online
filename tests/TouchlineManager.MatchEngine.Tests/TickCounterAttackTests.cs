@@ -16,15 +16,15 @@ public sealed class TickCounterAttackTests
     {
         var sixty = SpatialPitch.PitchLength * 6 / 10;
 
-        TickMatchLoop.OpensBreak(counterAttack: true, isHome: true, ballX: sixty).Should().BeTrue();
-        TickMatchLoop.OpensBreak(counterAttack: true, isHome: true, ballX: sixty + 1).Should().BeFalse("the ball was won too far up the pitch to be a break");
-        TickMatchLoop.OpensBreak(counterAttack: true, isHome: true, ballX: 0).Should().BeTrue();
-        TickMatchLoop.OpensBreak(counterAttack: false, isHome: true, ballX: 2_000).Should().BeFalse("a side that does not counter-attack has no break");
+        TickMatchLoop.OpensBreak(opens: true, isHome: true, ballX: sixty).Should().BeTrue();
+        TickMatchLoop.OpensBreak(opens: true, isHome: true, ballX: sixty + 1).Should().BeFalse("the ball was won too far up the pitch to be a break");
+        TickMatchLoop.OpensBreak(opens: true, isHome: true, ballX: 0).Should().BeTrue();
+        TickMatchLoop.OpensBreak(opens: false, isHome: true, ballX: 2_000).Should().BeFalse("a side that does not counter-attack has no break");
 
         // The away side defends the high end: its own 60% is the other way round.
-        TickMatchLoop.OpensBreak(counterAttack: true, isHome: false, ballX: SpatialPitch.PitchLength - sixty).Should().BeTrue();
-        TickMatchLoop.OpensBreak(counterAttack: true, isHome: false, ballX: SpatialPitch.PitchLength - sixty - 1).Should().BeFalse();
-        TickMatchLoop.OpensBreak(counterAttack: true, isHome: false, ballX: SpatialPitch.PitchLength - 500).Should().BeTrue();
+        TickMatchLoop.OpensBreak(opens: true, isHome: false, ballX: SpatialPitch.PitchLength - sixty).Should().BeTrue();
+        TickMatchLoop.OpensBreak(opens: true, isHome: false, ballX: SpatialPitch.PitchLength - sixty - 1).Should().BeFalse();
+        TickMatchLoop.OpensBreak(opens: true, isHome: false, ballX: SpatialPitch.PitchLength - 500).Should().BeTrue();
     }
 
     [Fact]
@@ -44,6 +44,39 @@ public sealed class TickCounterAttackTests
 
         // Against a side that sits as deep as it does the counter is worth nothing, and the outlet is what is left.
         TickBreakGain.WithOutlet(TickBreakGain.Plan(posture: -4, speedFactorPercent: 100)).Should().Be(outlet);
+    }
+
+    [Fact]
+    public void An_exposed_break_opens_only_without_the_counter_flag_and_only_against_a_side_committed_forward()
+    {
+        TickBreakGain.IsExposed(counterAttack: false, opponentPosture: 1).Should().BeTrue();
+        TickBreakGain.IsExposed(counterAttack: false, opponentPosture: 4).Should().BeTrue();
+        TickBreakGain.IsExposed(counterAttack: false, opponentPosture: 0).Should().BeFalse("a balanced side leaves no space behind it");
+        TickBreakGain.IsExposed(counterAttack: false, opponentPosture: -3).Should().BeFalse();
+        TickBreakGain.IsExposed(counterAttack: true, opponentPosture: 4).Should().BeFalse("a side with the flag keeps its own counter plan");
+    }
+
+    [Fact]
+    public void An_exposed_break_is_a_part_of_the_counter_break_that_grows_with_posture_and_speed_and_starts_at_once_only_when_whole()
+    {
+        var full = TickBreakGain.Plan(posture: 4, speedFactorPercent: 100);
+        var part = TickBreakGain.Exposed(full, TickBreakGain.ExposedBreakPercent);
+
+        part.Ticks.Should().Be(full.Ticks * TickBreakGain.ExposedBreakPercent / 100).And.BeLessThan(full.Ticks);
+        part.Runners.Should().BeLessThanOrEqualTo(full.Runners);
+        part.ProgressPercent.Should().Be(full.ProgressPercent * TickBreakGain.ExposedBreakPercent / 100);
+        part.Immediate.Should().BeFalse("only a whole break sends the runners from the first tick");
+        TickBreakGain.Exposed(full, 100).Should().Be(full);
+
+        // More posture and more speed make a bigger exposed break.
+        var attacking = TickBreakGain.Exposed(TickBreakGain.Plan(4, 100), 60);
+        var positive = TickBreakGain.Exposed(TickBreakGain.Plan(1, 100), 60);
+        var caught = TickBreakGain.Exposed(TickBreakGain.Plan(4, TickBreakGain.SpeedFloorPercent), 60);
+
+        attacking.Ticks.Should().BeGreaterThan(positive.Ticks);
+        attacking.ProgressPercent.Should().BeGreaterThanOrEqualTo(positive.ProgressPercent);
+        attacking.Ticks.Should().BeGreaterThan(caught.Ticks);
+        TickBreakGain.Exposed(default, 60).Should().Be(default(TickBreakPlan));
     }
 
     [Fact]

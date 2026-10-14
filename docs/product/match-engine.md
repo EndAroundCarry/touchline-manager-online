@@ -2413,3 +2413,31 @@ The golden hash does not move (the fixture sets no counter flag).
 - **Guards** (300 matches a cell, seed 90000): a 6-skill side takes no points in any setup (S3: 100/0/0 against default, counter and bus); between equal sides the away counter-attack against a home default takes 0.96 points (0.84 before; target at least 0.85), against a home all-out attack 1.27 (0.98), and the bus setup, which also holds the flag, takes 0.74 and 0.78 away (0.54 and 0.63); no setup beats every other. `ticksnap 150`: goals 2.73 a match (2.51 before; band 2.4-3.0).
 - `HoldingRunnerCut = 2` was not tried: S3 did not leak.
 - Test changes: `TickOffBallSupportTests` (the run budget with `holding`, a holding side runs one man fewer in play and sends no overlap).
+
+### 14.33 A side that commits forward leaves space behind it: the exposed break (the weaker-side v2 plan, Milestone 2)
+
+**Why.** Attacking had no cost. Winning the ball off a committed side gave the winner nothing extra, because a break opened only for a side with the counter flag or a Defensive mentality (`OpenBreak`). The stronger side scored 3.55 goals against an all-out attack and 3.37 against a default 4-4-2.
+
+**What changed** (`TickMatchLoop.OpenPlay.OpenBreak`, `TickBreakGain`):
+
+| Before | Now |
+|---|---|
+| a regain opened a break only for the counter flag or a Defensive mentality | a side **without** the flag that wins the ball in its own 60% off a side with posture of at least `ExposedPostureMinimum` (1) opens an **exposed break**: `TickBreakGain.Exposed(Plan(opponent posture, speed factor), ExposedBreakPercent)` |
+| nothing | the exposed break is `ExposedBreakPercent` (40) of the counter break against that opponent: ticks, runners and progress scale by it; the runners start at once only at 100 |
+| a flagged side's plan | unchanged; a Defensive side takes the larger of each field of the exposed break and its outlet (`WithOutlet`) |
+
+`OpensBreak`'s first parameter is now `opens`. `TickBreakGain.IsExposed(counterAttack, opponentPosture)` and `TickBreakGain.Exposed(full, percent)` are pure and unit-tested. No new random draws. The golden hash does not move (the fixture's sides are balanced).
+
+**Sweep** (150 matches a cell, seed 7000, 16 v 18-19; the weaker side's points, then the stronger side's goals; baseline in the first column):
+
+| Setup | Baseline | 20% | 30% | 40% | 50% | 60% |
+|---|---|---|---|---|---|---|
+| 4-4-2 all-out attack | 1.24, 3.55 | 1.08, 3.95 | 0.90, 4.21 | 0.51, 4.92 | 0.47, 5.38 | 0.45, 5.39 |
+| 4-4-2 Positive | 0.70, 3.95 | 0.63, 4.16 | 0.58, 4.52 | 0.53, 4.65 | 0.25, 5.03 | 0.45, 5.29 |
+| 5-4-1 default | 0.91 | | | 0.91 | 0.91 | 0.91 |
+
+The cells with no committed side (4-4-2 default, 5-4-1 default, Cautious, counter-attack, deep Defensive) are bit-identical at every value. Against the 13-14 side the attacking cells fall from 0.27 to 0.05-0.08 and the stronger side scores 6.3-7.1 goals (baseline 5.25).
+
+- **The scoreline guard fails.** The plan limits the stronger side to 4.5 goals against the all-out attack. The fall from 0.90 points (30%) to 0.51 (40%) comes with 4.21 and 4.92 goals: no value meets both the points target (at most 0.55) and the guard. The extra goals come from shots (39 to 48-52 a match) rather than from better shots. The user picked 40%, which is baked.
+- **Guards at 40%** (seed 90000): a 6-skill side takes no points (S3: 100/0/0 in all three setups); between equal sides no setup beats every other, and the away counter-attack against a home default takes 0.96 points (target at least 0.85); all-out attack against all-out attack is 6.46-4.76 goals (5.75-4.30 before). `ticksnap 150`: 3.05 goals a match (2.73 after Milestone 1), 0.05 over the plan band 2.4-3.0.
+- Test changes: `TickCounterAttackTests` (the exposed break opens only without the flag and against a posture above 0; it is a part of the counter break that grows with posture and speed).

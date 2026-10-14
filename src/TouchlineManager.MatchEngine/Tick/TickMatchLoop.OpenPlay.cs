@@ -1404,18 +1404,21 @@ internal sealed partial class TickMatchLoop
 
         var instructions = team.Runtime.Instructions;
         var outlet = instructions.Mentality == MatchMentality.Defensive;
+        var opponent = _teams[1 - side];
+        var opponentPosture = TickTeamStyle.Posture(opponent.Runtime.Instructions);
+        var exposed = TickBreakGain.IsExposed(instructions.CounterAttack, opponentPosture);
 
-        if (!OpensBreak(instructions.CounterAttack || outlet, team.IsHome, _ball.UnitX))
+        if (!OpensBreak(instructions.CounterAttack || outlet || exposed, team.IsHome, _ball.UnitX))
         {
             return;
         }
 
-        var opponent = _teams[1 - side];
         var edge = TickBreakGain.GroupSpeed(opponent, MatchPositionFamily.Defence, MatchPositionFamily.Midfield)
             - TickBreakGain.GroupSpeed(team, MatchPositionFamily.Attack, MatchPositionFamily.Midfield);
-        var plan = instructions.CounterAttack
-            ? TickBreakGain.Plan(TickTeamStyle.Posture(opponent.Runtime.Instructions), TickBreakGain.SpeedFactorPercent(edge))
+        var full = instructions.CounterAttack || exposed
+            ? TickBreakGain.Plan(opponentPosture, TickBreakGain.SpeedFactorPercent(edge))
             : default;
+        var plan = exposed ? TickBreakGain.Exposed(full, TickBreakGain.ExposedBreakPercent) : full;
 
         if (outlet)
         {
@@ -1428,12 +1431,12 @@ internal sealed partial class TickMatchLoop
         team.BreakProgressPercent = plan.ProgressPercent;
     }
 
-    /// <summary>Gets whether a ball cut out or tackled away opens a break: the side counter-attacks and won it in its own 60%.</summary>
-    /// <param name="counterAttack">Whether the side's instructions ask for the counter-attack.</param>
+    /// <summary>Gets whether a ball cut out or tackled away opens a break: the side can break (the counter flag, a Defensive outlet or an opponent committed forward) and won it in its own 60%.</summary>
+    /// <param name="opens">Whether the side's instructions, or the opponent's posture, allow a break.</param>
     /// <param name="isHome">Whether the side is the home side.</param>
     /// <param name="ballX">The X the ball was won at, in absolute pitch units.</param>
-    internal static bool OpensBreak(bool counterAttack, bool isHome, int ballX) =>
-        counterAttack && (isHome ? ballX : SpatialPitch.PitchLength - ballX) <= BreakZoneUnits;
+    internal static bool OpensBreak(bool opens, bool isHome, int ballX) =>
+        opens && (isHome ? ballX : SpatialPitch.PitchLength - ballX) <= BreakZoneUnits;
 
     /// <summary>Gets whether a kick ends the break: a shot, a ball played back and a hoof are the side no longer going forward.</summary>
     /// <param name="action">What the man with the ball did.</param>
