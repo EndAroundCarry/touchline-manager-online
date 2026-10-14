@@ -23,6 +23,18 @@ internal static class TickShowcase
     /// <summary>How long after a regain a shot still counts as the break: twelve seconds at ten frames a second.</summary>
     private const int BreakFrames = 120;
 
+    /// <summary>Where the weaker side's own third starts: it defends the goal at X = 10 000, so a third is 3 333 units.</summary>
+    private const int OwnThirdFromX = 6_667;
+
+    /// <summary>How long the weaker side must keep a regain to count as kept: ten seconds.</summary>
+    private const int KeptFrames = 100;
+
+    /// <summary>How soon after a regain a loss counts as quick: five seconds.</summary>
+    private const int QuickFrames = 50;
+
+    /// <summary>The longest flight a pass is followed for to see where it ends: six seconds.</summary>
+    private const int FlightFrames = 60;
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>Plays the match.</summary>
@@ -392,6 +404,20 @@ internal static class TickShowcase
         public double WeakRegainsHigh;
         public double WeakTransitionShots;
         public double WeakTransitionGoals;
+        public double OwnThirdRegains;
+        public double OwnThirdKept;
+        public double OwnThirdLostQuick;
+        public double OwnThirdLostSlow;
+        public double OwnThirdStopped;
+        public double OwnThirdNearest;
+        public double OwnThirdLostStrongShots;
+        public double[] OwnThirdLostHow { get; } = new double[4];
+        public double[] OwnThirdLostWhere { get; } = new double[3];
+        public double[] OwnThirdLostKick { get; } = new double[6];
+        public double[] OwnThirdKickWeakThird { get; } = new double[6];
+        public double[] OwnThirdKickShots { get; } = new double[6];
+        public double[] OwnThirdFirst { get; } = new double[7];
+        public double[] OwnThirdFirstLost { get; } = new double[7];
         public double[] ExposedRegains { get; } = new double[11];
         public double[] ExposedShots { get; } = new double[11];
         public double[] WeakGoalsByPeriod { get; } = new double[6];
@@ -492,6 +518,17 @@ internal static class TickShowcase
             Console.WriteLine($"     weaker back four, mean depth from its own goal (m): {tally.LineDepthOwnHalf / Math.Max(1, tally.StrongRegainsInOwnHalf):F1} / {tally.LineDepthOppHalf / Math.Max(1, strongRegainsOpp):F1}");
             Console.WriteLine($"   stronger side shots within 12 s of a regain {Per(tally.StrongTransitionShots)} a match ({100.0 * tally.StrongTransitionShots / Math.Max(1, tally.StrongRegains):F1}% of regains; {Per(tally.StrongTransitionShotsOwnHalf)} of them from its own-half regains), goals from them {Per(tally.StrongTransitionGoals)}");
             Console.WriteLine($"   weaker side regains {Per(tally.WeakRegains)} a match, {Per(tally.WeakRegainsHigh)} in the stronger half; shots within 12 s of a regain {Per(tally.WeakTransitionShots)} of its {tally.ShotsWeak / n:F1}, goals from them {Per(tally.WeakTransitionGoals)}");
+            string Share(double part, double whole) => $"{100.0 * part / Math.Max(1, whole):F0}%";
+            var lostQuick = Math.Max(1, tally.OwnThirdLostQuick);
+            var firstNames = new[] { "pass <20 m", "pass 20-40 m", "pass 40 m+", "shot", "none", "clear", "recycle" };
+
+            Console.WriteLine($"   weaker side regains in its own third {Per(tally.OwnThirdRegains)} a match: kept 10 s+ {Share(tally.OwnThirdKept, tally.OwnThirdRegains)}, lost within 5 s {Share(tally.OwnThirdLostQuick, tally.OwnThirdRegains)}, lost 5-10 s {Share(tally.OwnThirdLostSlow, tally.OwnThirdRegains)}, play stopped {Share(tally.OwnThirdStopped, tally.OwnThirdRegains)}; nearest outfield teammate at the regain {tally.OwnThirdNearest / Math.Max(1, tally.OwnThirdRegains):F1} m");
+            Console.WriteLine($"     lost within 5 s, how: tackled {Share(tally.OwnThirdLostHow[0], lostQuick)}, pass intercepted {Share(tally.OwnThirdLostHow[1], lostQuick)}, loose ball/other {Share(tally.OwnThirdLostHow[2], lostQuick)}, header {Share(tally.OwnThirdLostHow[3], lostQuick)}; won by the stronger side in: weaker third {Share(tally.OwnThirdLostWhere[0], lostQuick)}, middle {Share(tally.OwnThirdLostWhere[1], lostQuick)}, stronger third {Share(tally.OwnThirdLostWhere[2], lostQuick)}; a stronger shot within 12 s of the loss {Share(tally.OwnThirdLostStrongShots, lostQuick)} ({Per(tally.OwnThirdLostStrongShots)} a match)");
+            Console.WriteLine($"     lost within 5 s, what the weaker side did last: kicked it <20 m {Share(tally.OwnThirdLostKick[0], lostQuick)}, 20-40 m {Share(tally.OwnThirdLostKick[1], lostQuick)}, 40 m+ {Share(tally.OwnThirdLostKick[2], lostQuick)}, clearance {Share(tally.OwnThirdLostKick[4], lostQuick)}, recycle {Share(tally.OwnThirdLostKick[5], lostQuick)}; carrier lost it with no kick {Share(tally.OwnThirdLostKick[3], lostQuick)}");
+            var kickNames = new[] { "pass <20 m", "pass 20-40 m", "pass 40 m+", "no kick", "clear", "recycle" };
+
+            Console.WriteLine("     by the last kick, a match / won in the weaker third / followed by a stronger shot within 12 s: " + string.Join("  ", Enumerable.Range(0, 6).Select(k => $"{kickNames[k]} {Per(tally.OwnThirdLostKick[k])}/{Share(tally.OwnThirdKickWeakThird[k], tally.OwnThirdLostKick[k])}/{Share(tally.OwnThirdKickShots[k], tally.OwnThirdLostKick[k])}")));
+            Console.WriteLine("     first action (share of regains / share of that action lost within 5 s): " + string.Join("  ", Enumerable.Range(0, 7).Select(k => $"{firstNames[k]} {Share(tally.OwnThirdFirst[k], tally.OwnThirdRegains)}/{Share(tally.OwnThirdFirstLost[k], tally.OwnThirdFirst[k])}")));
             Console.WriteLine("   by quarter-hour (weaker goals/stronger goals, weaker shots/stronger shots): " + string.Join("  ", Enumerable.Range(0, 6).Select(period => $"{tally.WeakGoalsByPeriod[period] / n:F2}/{tally.StrongGoalsByPeriod[period] / n:F2} {tally.WeakShotsByPeriod[period] / n:F1}/{tally.StrongShotsByPeriod[period] / n:F1}")));
         }
     }
@@ -559,6 +596,17 @@ internal static class TickShowcase
         var lastSide = -1;
         var interrupted = false;
         var depths = new int[half - 1];
+        var firstAction = new int[recording.FrameCount + 1];
+
+        for (int frame = 0, at = 0; frame <= recording.FrameCount; frame++)
+        {
+            while (at < recording.Actions.Count && recording.Actions[at].Frame < frame)
+            {
+                at++;
+            }
+
+            firstAction[frame] = at;
+        }
 
         for (var frame = 0; frame < recording.FrameCount; frame++)
         {
@@ -651,6 +699,11 @@ internal static class TickShowcase
                         tally.WeakRegainsHigh++;
                     }
 
+                    if (ballX >= OwnThirdFromX)
+                    {
+                        WhyOwnThirdRegain(recording, frame, controller, firstAction, shotFrames[0], tally);
+                    }
+
                     if (shotSoon)
                     {
                         tally.WeakTransitionShots++;
@@ -665,6 +718,203 @@ internal static class TickShowcase
 
             lastSide = side;
             interrupted = false;
+        }
+    }
+
+    /// <summary>
+    /// Follows one regain by the weaker side in its own third (M5 of plan zesty-chipmunk): how long it keeps the ball, how it loses it and
+    /// where, what its first action is and how far its nearest outfield teammate stands. A clearance and a back-pass are both stamped
+    /// <see cref="PassageAction.Pass"/> by the engine, so the "clear" and "recycle" counts read zero unless the engine is built with the
+    /// diagnostic tags in `.run-logs/v2-m5-knobs.patch` (Header for a clearance, Dive for a back-pass); without them both land under the pass lengths.
+    /// </summary>
+    private static void WhyOwnThirdRegain(TickMatchRecording recording, int frame, int controller, int[] firstAction, List<int> strongShots, WhyTally tally)
+    {
+        const int half = TickMatchRecording.Entities / 2;
+        var last = Math.Min(recording.FrameCount - 1, frame + KeptFrames);
+        var lostAt = -1;
+        var stopped = false;
+
+        for (var at = frame + 1; at <= last && lostAt < 0 && !stopped; at++)
+        {
+            if (recording.State(at) != TickPlayState.OpenPlay)
+            {
+                stopped = true;
+            }
+            else if (recording.Controller(at) >= 0 && recording.Controller(at) / half == 0)
+            {
+                lostAt = at;
+            }
+        }
+
+        // The first thing the regaining side does with the ball, before it loses it or play stops.
+        var until = lostAt >= 0 ? lostAt : last;
+        var first = 4;
+
+        for (var index = firstAction[frame]; index < recording.Actions.Count && recording.Actions[index].Frame <= until; index++)
+        {
+            var stamp = recording.Actions[index];
+
+            if (stamp.Entity / half != 1 || stamp.Action is not (PassageAction.Pass or PassageAction.Cross or PassageAction.Shot or PassageAction.Header or PassageAction.Dive))
+            {
+                continue;
+            }
+
+            if (stamp.Action == PassageAction.Shot)
+            {
+                first = 3;
+            }
+            else if (stamp.Action is PassageAction.Header or PassageAction.Dive)
+            {
+                first = stamp.Action == PassageAction.Header ? 5 : 6;
+            }
+            else
+            {
+                var end = stamp.Frame + 1;
+
+                while (end < stamp.Frame + FlightFrames && end < recording.FrameCount - 1 && recording.Controller(end) < 0)
+                {
+                    end++;
+                }
+
+                var dx = (double)(recording.BallX(end) - recording.BallX(stamp.Frame));
+                var dy = (double)(recording.BallY(end) - recording.BallY(stamp.Frame));
+                var length = Math.Sqrt((dx * dx) + (dy * dy)) * 105.0 / 10_000.0;
+
+                first = length < 20 ? 0 : length < 40 ? 1 : 2;
+            }
+
+            break;
+        }
+
+        tally.OwnThirdRegains++;
+        tally.OwnThirdFirst[first]++;
+
+        var nearest = double.MaxValue;
+        var carrierX = recording.PlayerX(frame, controller);
+        var carrierY = recording.PlayerY(frame, controller);
+
+        for (var mate = (controller / half * half) + 1; mate < (controller / half * half) + half; mate++)
+        {
+            if (mate == controller || recording.PlayerX(frame, mate) < 0)
+            {
+                continue;
+            }
+
+            var dx = (double)(recording.PlayerX(frame, mate) - carrierX);
+            var dy = (double)(recording.PlayerY(frame, mate) - carrierY);
+
+            nearest = Math.Min(nearest, Math.Sqrt((dx * dx) + (dy * dy)));
+        }
+
+        tally.OwnThirdNearest += nearest * 105.0 / 10_000.0;
+
+        if (lostAt < 0)
+        {
+            if (stopped)
+            {
+                tally.OwnThirdStopped++;
+            }
+            else
+            {
+                tally.OwnThirdKept++;
+            }
+
+            return;
+        }
+
+        tally.OwnThirdFirstLost[first] += lostAt - frame <= QuickFrames ? 1 : 0;
+
+        if (lostAt - frame > QuickFrames)
+        {
+            tally.OwnThirdLostSlow++;
+
+            return;
+        }
+
+        tally.OwnThirdLostQuick++;
+
+        // How the stronger side got it: its action stamped on the tick it took the ball.
+        var how = 2;
+
+        for (var index = firstAction[Math.Max(0, lostAt - 2)]; index < recording.Actions.Count && recording.Actions[index].Frame <= lostAt + 1; index++)
+        {
+            var stamp = recording.Actions[index];
+
+            if (stamp.Entity / half != 0)
+            {
+                continue;
+            }
+
+            if (stamp.Action == PassageAction.Tackle)
+            {
+                how = 0;
+
+                break;
+            }
+
+            if (stamp.Action == PassageAction.Interception)
+            {
+                how = 1;
+            }
+            else if (stamp.Action == PassageAction.Header && how == 2)
+            {
+                how = 3;
+            }
+        }
+
+        tally.OwnThirdLostHow[how]++;
+
+        // Was the ball kicked away, or did the carrier lose it? The last frame the weaker side held it, and a kick stamped from there on.
+        var heldTo = lostAt - 1;
+
+        while (heldTo > frame && (recording.Controller(heldTo) < 0 || recording.Controller(heldTo) / half != 1))
+        {
+            heldTo--;
+        }
+
+        var kick = 3;
+
+        for (var index = firstAction[heldTo]; index < recording.Actions.Count && recording.Actions[index].Frame <= lostAt; index++)
+        {
+            var stamp = recording.Actions[index];
+
+            if (stamp.Entity / half != 1 || stamp.Action is not (PassageAction.Pass or PassageAction.Cross or PassageAction.Header or PassageAction.Dive))
+            {
+                continue;
+            }
+
+            if (stamp.Action is PassageAction.Header or PassageAction.Dive)
+            {
+                kick = stamp.Action == PassageAction.Header ? 4 : 5;
+
+                continue;
+            }
+
+            var end = stamp.Frame + 1;
+
+            while (end < lostAt && recording.Controller(end) < 0)
+            {
+                end++;
+            }
+
+            var dx = (double)(recording.BallX(end) - recording.BallX(stamp.Frame));
+            var dy = (double)(recording.BallY(end) - recording.BallY(stamp.Frame));
+            var length = Math.Sqrt((dx * dx) + (dy * dy)) * 105.0 / 10_000.0;
+
+            kick = length < 20 ? 0 : length < 40 ? 1 : 2;
+        }
+
+        tally.OwnThirdLostKick[kick]++;
+
+        var ballX = recording.BallX(lostAt);
+
+        tally.OwnThirdLostWhere[ballX >= OwnThirdFromX ? 0 : ballX >= 3_333 ? 1 : 2]++;
+        tally.OwnThirdKickWeakThird[kick] += ballX >= OwnThirdFromX ? 1 : 0;
+
+        if (strongShots.Any(shot => shot >= lostAt && shot - lostAt <= BreakFrames))
+        {
+            tally.OwnThirdLostStrongShots++;
+            tally.OwnThirdKickShots[kick]++;
         }
     }
 
