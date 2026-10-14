@@ -81,6 +81,18 @@ internal sealed class TickTeam
     /// <summary>Gets the board positions, by seat.</summary>
     public TickAnchorSpec[] Spec { get; } = new TickAnchorSpec[Capacity];
 
+    /// <summary>Gets each seat's raw attacking quality, by seat, in hundredths of an attribute point (<see cref="TickAttackEdge"/>).</summary>
+    public int[] AttackQuality { get; } = new int[Capacity];
+
+    /// <summary>Gets each seat's raw defending quality, by seat, in hundredths of an attribute point.</summary>
+    public int[] DefenceQuality { get; } = new int[Capacity];
+
+    /// <summary>
+    /// Gets or sets how much of Positive's and Attacking's extras the side gets, in percent (`weaker-side-v2`, Milestone 6): worked out
+    /// from its attackers against the other side's defenders by <see cref="TickAttackEdge.Refresh"/>.
+    /// </summary>
+    public int AttackEdgeFactorPercent { get; set; } = TickAttackEdge.NeutralPercent;
+
     /// <summary>Gets each seat's player, by seat.</summary>
     public Guid[] Id { get; } = new Guid[Capacity];
 
@@ -384,6 +396,8 @@ internal sealed class TickTeam
         Spec[seat] = TickAnchorSpec.From(slot.Slot);
         Skills[seat] = TickPlayerSkills.Rated(attributes);
         Profile[seat] = TickPlayerProfile.From(attributes, slot.Slot.Family == MatchPositionFamily.Goalkeeper);
+        AttackQuality[seat] = TickAttackEdge.AttackQuality(attributes);
+        DefenceQuality[seat] = TickAttackEdge.DefenceQuality(attributes);
         _startCondition[seat] = condition;
         _startEnergy[seat] = Math.Clamp(condition, 0, 10_000) * (TickPlayerPhysics.EnergyFull / 10_000);
         Body[seat] = new TickPlayerState { Energy = _startEnergy[seat] };
@@ -397,6 +411,8 @@ internal sealed class TickTeam
         {
             Body[index] = Body[index + 1];
             Profile[index] = Profile[index + 1];
+            AttackQuality[index] = AttackQuality[index + 1];
+            DefenceQuality[index] = DefenceQuality[index + 1];
             Skills[index] = Skills[index + 1];
             Spec[index] = Spec[index + 1];
             Id[index] = Id[index + 1];
@@ -444,6 +460,8 @@ internal sealed class TickTeam
         {
             (Body[0], Body[best]) = (Body[best], Body[0]);
             (Profile[0], Profile[best]) = (Profile[best], Profile[0]);
+            (AttackQuality[0], AttackQuality[best]) = (AttackQuality[best], AttackQuality[0]);
+            (DefenceQuality[0], DefenceQuality[best]) = (DefenceQuality[best], DefenceQuality[0]);
             (Skills[0], Skills[best]) = (Skills[best], Skills[0]);
             (Spec[0], Spec[best]) = (Spec[best], Spec[0]);
             (Id[0], Id[best]) = (Id[best], Id[0]);

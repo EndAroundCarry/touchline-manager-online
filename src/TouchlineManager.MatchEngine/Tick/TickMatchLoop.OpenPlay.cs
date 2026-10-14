@@ -290,6 +290,7 @@ internal sealed partial class TickMatchLoop
             BreakRunners = attackers.IsBreaking(_tick) ? attackers.BreakRunners : 0,
             BreakImmediate = attackers.IsBreaking(_tick) && attackers.BreakImmediate,
             Holding = attackers.Runtime.Instructions.CounterAttack && !attackers.IsBreaking(_tick),
+            EdgeFactorPercent = attackers.AttackEdgeFactorPercent,
         };
 
         var orders = attackers.AttackOrders.AsSpan(0, count);
@@ -791,6 +792,7 @@ internal sealed partial class TickMatchLoop
             ShieldTicks = shieldTicks,
             Breaking = team.IsBreaking(_tick),
             BreakProgress = team.IsBreaking(_tick) ? team.BreakProgressPercent : 0,
+            EdgeFactorPercent = team.AttackEdgeFactorPercent,
         });
     }
 

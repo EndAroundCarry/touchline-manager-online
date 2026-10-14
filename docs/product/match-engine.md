@@ -2472,3 +2472,50 @@ The cells with no committed side (4-4-2 default, 5-4-1 default, Cautious, counte
 - **Calibration.** `ticksnap 150`: goals a match fall from 3.05 to 2.77 (plan band 2.4-3.0, tool band 2.6-2.9), so `ShotBaseError` is **not** changed. The stronger side's goals against the all-out attack, 4.51, meet the scoreline guard of 4.5 (to within noise) that the exposed break (§14.33) missed.
 - **Guards at 5,000** (seed 90000): a 6-skill side still takes at most 2% of the points (S3: 100/0/0, 99/1/0, 98/2/0); between equal sides the away counter-attack against a home default takes 1.18 points (target at least 0.85), and the home all-out attack still does not lose to any setup.
 - Chosen: `ShotCoverPressure` = 5,000, the one value that meets the scoreline guard. 2,500 left the stronger side at 4.66 goals against the all-out attack.
+
+### 14.35 Cautious and Defensive buy no defence: tried, nothing shipped (the weaker-side v2 plan, Milestone 4)
+
+**Why tried.** A 5-4-1 Cautious side concedes about the same as the 5-4-1 default (2.49 goals against 2.52) but scores 0.6 fewer, so the plan asked for a Cautious or Defensive mentality that also defends better.
+
+**What was tried** (each behind a temporary knob): no overlap for Cautious and supporters at most 10 m ahead of the ball for Cautious and Defensive; +4 and +8 on the compactness of the block without the ball; one extra screen with the ball in the last 45% of the pitch the side defends.
+
+**Result.** None moved the 5-4-1 Cautious cell by the 0.15 points the plan asked for (best +0.09, and it reversed at +8), and the stronger side's goals against it never fell 0.3 below its goals against the 5-4-1 default. The rest-defence and compactness changes also hurt the counter-attacking setups the plan wants to raise (4-4-2 counter-attack 0.37 to 0.28, 5-4-1 counter-attack 0.60 to 0.46), because those are Cautious or Defensive in mentality too. Nothing was shipped.
+
+### 14.36 A deep side's losses are clearances, back-passes and short passes: tried, nothing shipped (the weaker-side v2 plan, Milestone 5)
+
+**Why tried.** A deep side concedes about 30 shots within 12 s of a regain, so the plan asked for the cause before a fix.
+
+**Probe** (`tickwhy`, the weaker side's regains in its own third; 5-4-1 deep Defensive against 5-4-1 default, 16 v 18-19): 40% against 34% of the regains are lost within 5 s. What the side did last: a clearance 34% against 38%, a back-pass 28% against 25%, a short pass 30% against 26%, the carrier dispossessed 6% against 9%. The plan's guesses did not hold: an intercepted pass is only about 30% of the losses, and the stronger side wins the ball in its own third only 3% of the time, so it is not a counter-press. A clearance and a back-pass are never an interception in the engine (`AfterKick` sets a pass pending only for a pass, a through ball and a cross).
+
+**Fix tried.** The own-third cost of losing the ball at 150% and 200% for Cautious and Defensive: 5-4-1 deep Defensive 0.29 to 0.30 and 0.37 (target 0.5), 5-4-1 Cautious 0.72 to 0.57, 4-4-2 counter-attack 0.39 to 0.28 and 0.23, and the stronger side's shots within 12 s of a regain only 26.9 to 26.0 and 24.7 (target a third fewer). Nothing was shipped.
+
+### 14.37 Attacking pays only with the players for it: the attack edge (the weaker-side v2 plan, Milestone 6)
+
+**Why.** The user's second requirement: an attacking mentality should pay when a side's forwards are better than the other side's defenders, and cost when they are not, in the way a team with the better defenders gains in real life. Until now Positive and Attacking were worth the same against every defence.
+
+**What changed** (`TickAttackEdge`, `TickTeam.AttackEdgeFactorPercent`):
+
+| Before | Now |
+|---|---|
+| Positive and Attacking added fixed extras to Balanced's forward progress (+15 and +30), shot eagerness (+15 and +30) and runners (+1 and +2) | the extras are multiplied by the side's **factor**: `100 + 30 × edge`, between `FloorPercent` -50 and `CeilingPercent` 130, where the edge is in attribute points |
+| nothing | the **edge** is the mean of the raw Finishing, Dribbling, FirstTouch, Technique, Composure, Pace and Acceleration of the side's Attack family and its two most advanced midfielders, less the mean of the raw Tackling, Marking, Positioning, Strength, Pace and Acceleration of the other side's Defence family; worked out at kick-off and again after any substitution or sending-off |
+
+- **A cost below Balanced.** A factor of 100 is today's behaviour, 0 is Balanced, and below 0 the extras turn into a cost: at the floor an all-out attack plays with Balanced's progress less 15, shot eagerness less 15 and **no** runner (Balanced sends one). With 30 a point that needs a gap of about 3.3 points between the forwards and the defenders; a smaller gap only shrinks the bonus.
+- **Only Positive and Attacking move.** Balanced, Cautious and Defensive are never scaled, so the counter-attacking and deep setups are untouched (the lesson of §14.35).
+- **Two equal sides** have an edge of about 0 and play as before; the golden hash did not move.
+- The scaling is the pure static `TickAttackEdge.Scaled` (the nearest whole, a half away from zero); `TickAttackEdgeTests` cover the factor and its limits, Balanced and the cautious mentalities never scaling, the extras at 100, 0 and the floor, and the edge between two real sides.
+
+**Sweep** (150 matches a cell, seed 7000; the weaker side's points; the slope in percent a point):
+
+| Setup (16 v 18-19, edge about -2.5) | off | 20 | 30 | 40 | 60 |
+|---|---|---|---|---|---|
+| 4-4-2 all-out attack | 0.75 | 0.56 | **0.46** | 0.43 | 0.30 |
+| 4-4-2 Positive | 0.73 | 0.54 | **0.40** | 0.40 | 0.35 |
+
+With the attackers 19 and the stronger side's defenders 14 (edge +5, the ceiling at every slope) the all-out attack takes 1.52 points against 1.41 for the 5-4-1 default, and Positive 1.26. The slope of 30 was chosen: at 20 the all-out attack sits on the 0.55 limit, and at 30 the factor falls below Balanced only for a real mismatch.
+
+**Result** (slope 30):
+
+- **16 v 18-19.** All-out attack 0.75 to 0.46 and Positive 0.73 to 0.40 (the plan: at most 0.55 and 0.3 below the 5-4-1 default's 0.84); the stronger side's goals against the all-out attack 4.51 and the weaker side's 2.80 to 2.24. Every other setup is bit-identical to Milestone 3.
+- **13-14 v 18-19** (edge about -5, the floor): all-out attack 0.05 and Positive 0.06 (0.08 and 0.13 after Milestone 3); the 5-4-1 default 0.31, Cautious 0.21, counter-attack 0.10, deep Defensive 0.13, 4-4-2 default 0.16, 4-4-2 counter-attack 0.07. The best defensive setup takes six times the all-out attack's points.
+- **Guards** (seed 90000): a 6-skill side takes at most 2% of the points (S3: 100/0/0, 99/1/0, 98/2/0); between equal sides the away counter-attack against a home default takes 1.18 points (target at least 0.85) and the home all-out attack against a default takes 2.33 points (2.42 at the plan baseline); `ticksnap 150`: 2.79 goals a match (2.77 after Milestone 3).

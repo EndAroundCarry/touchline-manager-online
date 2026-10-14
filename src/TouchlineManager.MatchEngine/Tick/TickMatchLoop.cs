@@ -82,6 +82,7 @@ internal sealed partial class TickMatchLoop
         _rules = state.Rules;
         _random = state.Random;
         _teams = [new TickTeam(state.Home), new TickTeam(state.Away)];
+        TickAttackEdge.Refresh(_teams[0], _teams[1]);
         _recording = state.Passages is { } recorder ? recorder.StartTickRecording() : null;
 
         if (_recording is not null)
@@ -385,9 +386,16 @@ internal sealed partial class TickMatchLoop
         SubstitutionPlanner.ConsiderBothSides(_state);
         _state.LastPlannerMinute = _state.Minute;
 
+        var changed = false;
+
         foreach (var team in _teams)
         {
-            team.Sync(_recording);
+            changed |= team.Sync(_recording);
+        }
+
+        if (changed)
+        {
+            TickAttackEdge.Refresh(_teams[0], _teams[1]);
         }
     }
 }

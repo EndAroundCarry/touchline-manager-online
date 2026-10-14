@@ -50,6 +50,12 @@ internal readonly record struct TickAttackingOrder(TickAttackingRole Role, Spati
 /// </summary>
 internal readonly ref struct TickAttackingSituation
 {
+    /// <summary>Initializes a situation whose attackers have no edge (<see cref="TickAttackingSituation.EdgeFactorPercent"/> 100).</summary>
+    public TickAttackingSituation()
+    {
+        EdgeFactorPercent = TickAttackEdge.NeutralPercent;
+    }
+
     /// <summary>Gets a value indicating whether the attacking side is the home side (attacking towards high X).</summary>
     public required bool IsHome { get; init; }
 
@@ -131,6 +137,9 @@ internal readonly ref struct TickAttackingSituation
     /// the one it waits for, so it sends one runner fewer than its mentality does and its full-backs do not overlap.
     /// </summary>
     public bool Holding { get; init; }
+
+    /// <summary>Gets how much of Positive's and Attacking's extras the side gets, in percent (<see cref="TickAttackEdge"/>); 100 when the attackers have no edge.</summary>
+    public int EdgeFactorPercent { get; init; }
 }
 
 /// <summary>
@@ -390,13 +399,14 @@ internal static class TickOffBallSupport
     /// <param name="mentality">The mentality.</param>
     /// <param name="breakRunners">The fewest a break sends (<see cref="TickAttackingSituation.BreakRunners"/>), whatever the mentality.</param>
     /// <param name="holding">Whether the side keeps men back for a counter (<see cref="TickAttackingSituation.Holding"/>): <see cref="HoldingRunnerCut"/> fewer.</param>
-    public static int RunBudget(MatchMentality mentality, int breakRunners = 0, bool holding = false)
+    /// <param name="edgeFactor">How much of Positive's and Attacking's extra runners the side gets, in percent (<see cref="TickAttackEdge.Factor"/>).</param>
+    public static int RunBudget(MatchMentality mentality, int breakRunners = 0, bool holding = false, int edgeFactor = TickAttackEdge.NeutralPercent)
     {
         var budget = mentality switch
         {
             MatchMentality.Defensive => 0,
-            MatchMentality.Positive => 2,
-            MatchMentality.Attacking => 3,
+            MatchMentality.Positive => Math.Max(0, 1 + TickAttackEdge.Scaled(1, edgeFactor)),
+            MatchMentality.Attacking => Math.Max(0, 1 + TickAttackEdge.Scaled(2, edgeFactor)),
             _ => 1,
         };
 
@@ -921,7 +931,7 @@ internal static class TickOffBallSupport
 
     private static void AssignRuns(in TickAttackingSituation situation, in Frame frame, Span<TickAttackingOrder> orders, Span<bool> busy)
     {
-        var budget = RunBudget(situation.Mentality, situation.BreakRunners, situation.Holding);
+        var budget = RunBudget(situation.Mentality, situation.BreakRunners, situation.Holding, situation.EdgeFactorPercent);
         var space = frame.DefenderLine;
 
         // A side on a break runs from where it won the ball and at once: it does not wait for the carrier to pass his own third or to be free.

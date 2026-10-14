@@ -4,6 +4,18 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Weaker-side v2 plan, Milestone 6 - attacking pays only with the players for it (the attack edge)
+
+Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.37 (Milestones 4 and 5 tried nothing that worked: 14.35 and 14.36). **How much Positive and Attacking add to Balanced now depends on the side's forwards against the other side's defenders, and below a clear gap they cost more than they give: the team with the better defenders gains**; the golden hash is unchanged (the fixture's sides are even).
+
+### Changed
+
+- The extras of Positive and Attacking in forward progress, shot eagerness and runners are multiplied by a factor of `100 + 30 x edge` (limits -50 and 130; 100 is the old behaviour, 0 is Balanced, below 0 a cost). Balanced, Cautious and Defensive never move. 16 v 18-19: all-out attack 0.75 to 0.46 points, Positive 0.73 to 0.40, every other setup unchanged; with attackers 19 against defenders 14 the all-out attack still takes 1.52 points, more than the 5-4-1 default's 1.41. Goals a match 2.79.
+
+### Added
+
+- `TickAttackEdge` (the edge from raw attributes, refreshed at kick-off and after any substitution or sending-off), `TickTeam.AttackEdgeFactorPercent`, and `TickAttackEdgeTests`.
+
 ## Weaker-side v2 plan, Milestone 3 - bodies between the shooter and the goal spoil the shot
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.34. **An open-play shot with defenders in the corridor between the shooter and the goal is struck under more pressure**; the golden hash moves (engine behaviour).

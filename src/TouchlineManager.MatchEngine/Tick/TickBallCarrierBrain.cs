@@ -54,6 +54,12 @@ internal readonly record struct TickCarrierDecision(
 /// </summary>
 internal readonly ref struct TickCarrierSituation
 {
+    /// <summary>Initializes a situation whose attackers have no edge (<see cref="TickCarrierSituation.EdgeFactorPercent"/> 100).</summary>
+    public TickCarrierSituation()
+    {
+        EdgeFactorPercent = TickAttackEdge.NeutralPercent;
+    }
+
     /// <summary>Gets a value indicating whether the carrier's side is the home side (attacking towards high X).</summary>
     public required bool IsHome { get; init; }
 
@@ -101,6 +107,9 @@ internal readonly ref struct TickCarrierSituation
 
     /// <summary>Gets the percent of progress a side on a break values a ball forward at, on top of its mentality's (<see cref="TickBreakGain.Plan"/>).</summary>
     public int BreakProgress { get; init; }
+
+    /// <summary>Gets how much of Positive's and Attacking's extras the side gets, in percent (<see cref="TickAttackEdge"/>); 100 when the attackers have no edge.</summary>
+    public int EdgeFactorPercent { get; init; }
 }
 
 /// <summary>
@@ -834,7 +843,7 @@ internal static class TickBallCarrierBrain
         var carrierSkills = situation.Skills[situation.CarrierIndex];
         var vision = VisionBase + (VisionStep * carrierSkills.Vision);
         var careless = OffsideCarelessPercent(carrierSkills);
-        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress);
+        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.EdgeFactorPercent);
         var loss = LossOfBall(view);
         var crowded = Congestion(situation, view) >= SwitchCongestion;
         var keeper = situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper;
@@ -1077,7 +1086,7 @@ internal static class TickBallCarrierBrain
     {
         var chance = ExpectedGoals(aimX, aimY, Blockers(situation, aimX, aimY), situation.Skills[receiver]);
 
-        return chance * ShotValueMultiplier * ShotEagerness(situation.Mentality) / 100 * CutBackWorthPercent / 100;
+        return chance * ShotValueMultiplier * ShotEagerness(situation.Mentality, situation.EdgeFactorPercent) / 100 * CutBackWorthPercent / 100;
     }
 
     private static void ScoreShot(in TickCarrierSituation situation, in View view, ref Best best)
@@ -1106,7 +1115,7 @@ internal static class TickBallCarrierBrain
             return;
         }
 
-        var utility = chance * ShotValueMultiplier * ShotEagerness(situation.Mentality) / 100;
+        var utility = chance * ShotValueMultiplier * ShotEagerness(situation.Mentality, situation.EdgeFactorPercent) / 100;
         var aimY = view.Y <= SpatialPitch.GoalYCenter
             ? SpatialPitch.GoalYCenter + ShotAimOffset
             : SpatialPitch.GoalYCenter - ShotAimOffset;
@@ -1124,7 +1133,7 @@ internal static class TickBallCarrierBrain
         var skills = situation.Skills[situation.CarrierIndex];
         var mean = ((2 * skills.Dribbling) + skills.Pace + skills.Acceleration) / 4;
         var success = Math.Clamp(5_500 + (250 * mean), 2_000, 9_800) * (BasisPoints - (view.Effective * 45 / 100)) / BasisPoints;
-        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress);
+        var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.EdgeFactorPercent);
         var loss = LossOfBall(view);
         var toGoal = TickTrigonometry.AngleOf(SpatialPitch.PitchLength - view.X, SpatialPitch.GoalYCenter - view.Y);
 
@@ -1234,26 +1243,26 @@ internal static class TickBallCarrierBrain
     }
 
     /// <summary>Gets how much going forward is worth, in percent per unit gained: the mentality's and the tempo's.</summary>
-    private static int ProgressPercent(MatchMentality mentality, MatchTempo tempo, int breakProgress)
+    internal static int ProgressPercent(MatchMentality mentality, MatchTempo tempo, int breakProgress, int edgeFactor = TickAttackEdge.NeutralPercent)
     {
         var percent = mentality switch
         {
             MatchMentality.Defensive => 90,
             MatchMentality.Cautious => 105,
-            MatchMentality.Positive => 135,
-            MatchMentality.Attacking => 150,
+            MatchMentality.Positive => 120 + TickAttackEdge.Scaled(15, edgeFactor),
+            MatchMentality.Attacking => 120 + TickAttackEdge.Scaled(30, edgeFactor),
             _ => 120,
         };
 
         return percent + (tempo == MatchTempo.High ? 15 : 0) - (tempo == MatchTempo.Low ? 15 : 0) + breakProgress;
     }
 
-    private static int ShotEagerness(MatchMentality mentality) => mentality switch
+    internal static int ShotEagerness(MatchMentality mentality, int edgeFactor = TickAttackEdge.NeutralPercent) => mentality switch
     {
         MatchMentality.Defensive => 70,
         MatchMentality.Cautious => 85,
-        MatchMentality.Positive => 115,
-        MatchMentality.Attacking => 130,
+        MatchMentality.Positive => 100 + TickAttackEdge.Scaled(15, edgeFactor),
+        MatchMentality.Attacking => 100 + TickAttackEdge.Scaled(30, edgeFactor),
         _ => 100,
     };
 
