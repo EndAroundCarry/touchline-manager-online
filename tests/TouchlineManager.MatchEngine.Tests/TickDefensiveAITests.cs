@@ -138,6 +138,33 @@ public sealed class TickDefensiveAITests
     }
 
     [Fact]
+    public void A_side_left_alone_in_its_own_end_for_long_enough_is_pressed_all_the_same()
+    {
+        // The ball is in the opponent's own box, past where a high press stops, and a midfielder is 8 m from it.
+        bool Presses(int unpressedTicks)
+        {
+            var attackers = (SpatialPoint[])WingerAtTheByline.Clone();
+
+            attackers[5] = new SpatialPoint(9_500, 3_500);
+
+            var scene = new Scene(isHome: true, MatchPressing.HighPress, 9_500, 3_500, attackers, carrier: 5) { Unpressed = unpressedTicks };
+
+            for (var index = 1; index < scene.Defenders.Length; index++)
+            {
+                scene.Defenders[index] = TickPlayerState.Standing(10_000, 0, 0, 10_000);
+            }
+
+            scene.Defenders[6] = TickPlayerState.Standing(8_700, 3_500, 0, 10_000);
+
+            return Roles(scene.Assign(), TickDefensiveRole.Presser).Contains(6);
+        }
+
+        Presses(0).Should().BeFalse("a high press leaves the keeper and the back line alone in their own box");
+        Presses(TickDefensiveAI.StalePossessionTicks - 1).Should().BeFalse();
+        Presses(TickDefensiveAI.StalePossessionTicks).Should().BeTrue("two men cannot pass the ball between them for the rest of the match");
+    }
+
+    [Fact]
     public void The_goalkeeper_never_presses_and_a_defender_off_balance_is_passed_over()
     {
         var scene = new Scene(isHome: true, MatchPressing.HighPress, 1_800, 3_500, WingerAtTheByline, carrier: 5);
@@ -890,6 +917,8 @@ public sealed class TickDefensiveAITests
 
         public int Previous { get; set; } = -1;
 
+        public int Unpressed { get; set; }
+
         public int Tick { get; set; }
 
         public SpatialPoint[] Offsets { get; } = new SpatialPoint[11];
@@ -930,6 +959,7 @@ public sealed class TickDefensiveAITests
                 BallY = BallY,
                 CarrierIndex = Carrier,
                 PreviousPresser = Previous,
+                UnpressedTicks = Unpressed,
                 Tick = Tick,
                 Offsets = Offsets,
                 HasOffset = HasOffset,

@@ -197,6 +197,12 @@ internal sealed class TickTeam
     /// <summary>Gets or sets the seat that pressed last tick, or -1.</summary>
     public int PreviousPresser { get; set; } = -1;
 
+    /// <summary>
+    /// Gets or sets how many ticks in a row the side has defended with the ball somewhere its pressing instruction does not press (the
+    /// ball in the opponent's own end): a side that has been let alone that long is pressed anyway (<see cref="TickDefensiveAI.StalePossessionTicks"/>).
+    /// </summary>
+    public int UnpressedTicks { get; set; }
+
     /// <summary>Gets or sets whether the goalkeeper was charging out last tick.</summary>
     public bool KeeperRushing { get; set; }
 

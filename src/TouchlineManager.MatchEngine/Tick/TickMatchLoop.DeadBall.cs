@@ -402,6 +402,7 @@ internal sealed partial class TickMatchLoop
             team.SupporterMask = 0;
             team.RunnerMask = 0;
             team.PreviousPresser = -1;
+            team.UnpressedTicks = 0;
             team.KeeperRushing = false;
         }
     }

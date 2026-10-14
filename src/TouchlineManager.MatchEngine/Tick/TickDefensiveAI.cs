@@ -82,6 +82,12 @@ internal readonly ref struct TickDefensiveSituation
     /// </summary>
     public required int PreviousPresser { get; init; }
 
+    /// <summary>
+    /// Gets how many ticks in a row the ball has been where the defending side's pressing instruction does not press it while the other side
+    /// had it. Past <see cref="TickDefensiveAI.StalePossessionTicks"/> the press applies anyway.
+    /// </summary>
+    public int UnpressedTicks { get; init; }
+
     /// <summary>Gets the tick the match is on, which staggers the adjustments of the defenders; with no <see cref="Offsets"/> it is unused.</summary>
     public int Tick { get; init; }
 
@@ -113,7 +119,8 @@ internal readonly ref struct TickDefensiveSituation
 /// only while the ball is in the defender's own half), 20 m under a mid block (not in the opponent's final third), 32 m
 /// under a high press. A defender who is off balance after a challenge does not press. Only <em>one</em> player presses.
 /// A second does so only under a high press when the ball is within 10 m of a touchline, to trap it there. Everyone else
-/// is forbidden from charging the ball, which is what stops the schoolyard swarm.
+/// is forbidden from charging the ball, which is what stops the schoolyard swarm. Where the instruction does not press (the ball in the
+/// opponent's own end) the press still applies once the side has had the ball there for <see cref="StalePossessionTicks"/>.
 /// </description></item>
 /// <item><description>
 /// <b>Mark.</b> A defender (back-line family) not pressing takes the nearest unmarked attacker inside the defensive
@@ -168,6 +175,14 @@ internal static class TickDefensiveAI
     /// the side stretched behind it, so an unlimited press was worth a goal and a half a match to the side it was played against.
     /// </summary>
     public const int HighPressLimit = 7_800;
+
+    /// <summary>
+    /// How long a side may keep the ball where the press does not reach it before it is pressed anyway, in ticks (30 s). The press limits
+    /// leave the opponent's goalkeeper and back line alone in their own end; without this, two of them could pass the ball between them
+    /// for the rest of the match, with nobody to take it off them and the pass between them always the safest. At 8 s the rule gave the
+    /// pressing side a goal a match more; at 30 s the measured scoring is the same as without it.
+    /// </summary>
+    public const int StalePossessionTicks = 300;
 
     /// <summary>The own-X below which an attacker is in the defensive third, in pitch units.</summary>
     public const int DefensiveThird = 3_500;
@@ -397,18 +412,26 @@ internal static class TickDefensiveAI
         state.Emit(attackingSide, EngineEventType.Offside, receiverId, passerId);
     }
 
-    private static void AssignPress(in TickDefensiveSituation situation, Span<TickDefensiveOrder> orders, Span<bool> busy)
+    /// <summary>Tells whether a pressing instruction closes the ball down where it is.</summary>
+    /// <param name="pressing">The instruction.</param>
+    /// <param name="ballX">The ball's X, in pitch units.</param>
+    /// <param name="isHome">Whether the defending side is the home side.</param>
+    public static bool PressApplies(MatchPressing pressing, int ballX, bool isHome)
     {
-        var ownBallX = Own(situation.BallX, situation.IsHome);
-        var applies = situation.Pressing switch
+        var ownBallX = Own(ballX, isHome);
+
+        return pressing switch
         {
             MatchPressing.LowBlock => ownBallX <= SpatialPitch.PitchLength / 2,
             MatchPressing.MidBlock => ownBallX <= MidBlockLimit,
             MatchPressing.HighPress => ownBallX <= HighPressLimit,
             _ => true,
         };
+    }
 
-        if (!applies)
+    private static void AssignPress(in TickDefensiveSituation situation, Span<TickDefensiveOrder> orders, Span<bool> busy)
+    {
+        if (!PressApplies(situation.Pressing, situation.BallX, situation.IsHome) && situation.UnpressedTicks < StalePossessionTicks)
         {
             return;
         }

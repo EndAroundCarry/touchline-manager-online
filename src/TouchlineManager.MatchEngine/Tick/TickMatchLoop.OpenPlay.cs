@@ -371,6 +371,12 @@ internal sealed partial class TickMatchLoop
             return;
         }
 
+        // The side with the ball is not defending: it starts its count again whenever it loses the ball.
+        attackers.UnpressedTicks = 0;
+        defenders.UnpressedTicks = TickDefensiveAI.PressApplies(defenders.Runtime.Instructions.Pressing, _ball.UnitX, defenders.IsHome)
+            ? 0
+            : defenders.UnpressedTicks + 1;
+
         var situation = new TickDefensiveSituation
         {
             IsHome = defenders.IsHome,
@@ -385,6 +391,7 @@ internal sealed partial class TickMatchLoop
             BallY = _ball.UnitY,
             CarrierIndex = carrier,
             PreviousPresser = defenders.PreviousPresser,
+            UnpressedTicks = defenders.UnpressedTicks,
             Tick = _tick,
             Offsets = defenders.MicroOffset.AsSpan(0, count),
             HasOffset = defenders.HasOffset.AsSpan(0, count),
@@ -1486,6 +1493,7 @@ internal sealed partial class TickMatchLoop
             team.SupporterMask = 0;
             team.RunnerMask = 0;
             team.PreviousPresser = -1;
+            team.UnpressedTicks = 0;
         }
 
         _decisionOwner = TickRef.None;
