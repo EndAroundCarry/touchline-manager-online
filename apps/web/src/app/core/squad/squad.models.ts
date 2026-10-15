@@ -163,6 +163,38 @@ export interface PlayerSeasonStats {
 
   /** Take-ons won, a subset of those attempted. */
   readonly dribblesCompleted: number;
+  /** Challenges the player made for the ball. */
+  readonly tacklesAttempted: number;
+
+  /** Challenges that won the ball, a subset of those attempted. */
+  readonly tacklesWon: number;
+
+  /** Crosses attempted in open play; a corner is not counted. */
+  readonly crossesAttempted: number;
+
+  /** Crosses that found a teammate, a subset of those attempted. */
+  readonly crossesCompleted: number;
+
+  /** Penalties taken. */
+  readonly penaltiesTaken: number;
+
+  /** Penalties scored, a subset of those taken. */
+  readonly penaltiesScored: number;
+
+  /** Penalties faced as goalkeeper. */
+  readonly penaltiesFaced: number;
+
+  /** Penalties saved, a subset of those faced. */
+  readonly penaltiesSaved: number;
+
+  /** Direct free kicks taken. */
+  readonly freeKicksTaken: number;
+
+  /** Direct free kicks scored, a subset of those taken. */
+  readonly freeKicksScored: number;
+
+  /** Shots on target faced as goalkeeper: the saves plus the goals conceded. */
+  readonly shotsOnTargetFaced: number;
   readonly yellowCards: number;
   readonly redCards: number;
 
@@ -310,6 +342,38 @@ export interface PlayerMatchStat {
 
   /** Take-ons won, a subset of those attempted. */
   readonly dribblesCompleted: number;
+  /** Challenges the player made for the ball. */
+  readonly tacklesAttempted: number;
+
+  /** Challenges that won the ball, a subset of those attempted. */
+  readonly tacklesWon: number;
+
+  /** Crosses attempted in open play; a corner is not counted. */
+  readonly crossesAttempted: number;
+
+  /** Crosses that found a teammate, a subset of those attempted. */
+  readonly crossesCompleted: number;
+
+  /** Penalties taken. */
+  readonly penaltiesTaken: number;
+
+  /** Penalties scored, a subset of those taken. */
+  readonly penaltiesScored: number;
+
+  /** Penalties faced as goalkeeper. */
+  readonly penaltiesFaced: number;
+
+  /** Penalties saved, a subset of those faced. */
+  readonly penaltiesSaved: number;
+
+  /** Direct free kicks taken. */
+  readonly freeKicksTaken: number;
+
+  /** Direct free kicks scored, a subset of those taken. */
+  readonly freeKicksScored: number;
+
+  /** Shots on target faced as goalkeeper: the saves plus the goals conceded. */
+  readonly shotsOnTargetFaced: number;
   readonly yellowCards: number;
   readonly redCards: number;
 

@@ -30,6 +30,17 @@ function stats(goals: number): PlayerSeasonStats {
     passesCompleted: 320,
     dribblesAttempted: 50,
     dribblesCompleted: 20,
+    tacklesAttempted: 60,
+    tacklesWon: 36,
+    crossesAttempted: 30,
+    crossesCompleted: 9,
+    penaltiesTaken: 4,
+    penaltiesScored: 3,
+    penaltiesFaced: 5,
+    penaltiesSaved: 2,
+    freeKicksTaken: 8,
+    freeKicksScored: 1,
+    shotsOnTargetFaced: 40,
     yellowCards: 1,
     redCards: 0,
     averageRating: 7.1,
@@ -59,6 +70,17 @@ function match(fixtureId: string, seasonNumber: number, round: number): PlayerMa
     passesCompleted: 32,
     dribblesAttempted: 6,
     dribblesCompleted: 3,
+    tacklesAttempted: 7,
+    tacklesWon: 4,
+    crossesAttempted: 5,
+    crossesCompleted: 2,
+    penaltiesTaken: 1,
+    penaltiesScored: 1,
+    penaltiesFaced: 2,
+    penaltiesSaved: 1,
+    freeKicksTaken: 3,
+    freeKicksScored: 0,
+    shotsOnTargetFaced: 6,
     yellowCards: 0,
     redCards: 0,
     rating: 7.5,
@@ -167,6 +189,7 @@ describe('PlayerProfile', () => {
   let fixture: ComponentFixture<PlayerProfile>;
   let root: HTMLElement;
   let mine: WritableSignal<MyFixtures | null>;
+  let playerState: WritableSignal<Player>;
   let trainingStore: {
     history: WritableSignal<null>;
     loading: WritableSignal<boolean>;
@@ -178,8 +201,10 @@ describe('PlayerProfile', () => {
     localStorage.clear();
     mine = signal<MyFixtures | null>(NOTHING_PLAYED);
 
+    playerState = signal(player);
+
     const store = {
-      player: signal(player),
+      player: playerState,
       playerMatches: signal(matches),
       loadPlayer: () => of(player),
       loadPlayerMatches: () => of(matches),
@@ -349,6 +374,79 @@ describe('PlayerProfile', () => {
     expect(table.querySelector('tbody tr')!.textContent).toContain('80%');
     expect(table.querySelector('tfoot tr')!.textContent).toContain('Career');
     expect(table.querySelector('tfoot tr')!.textContent).toContain('20/50');
+  });
+
+  it('shows an outfield player the tackles, crosses, penalties and free kicks, not the saves', async () => {
+    await openTab('Statistics');
+
+    const seasons = root.querySelector('[data-testid="season-stats"] table')!;
+    const headings = Array.from(seasons.querySelectorAll('thead th')).map((cell) =>
+      cell.textContent?.trim(),
+    );
+
+    expect(headings).toEqual(
+      expect.arrayContaining(['Crosses', 'Tackles', 'Pens', 'Free kicks', 'Shots']),
+    );
+    expect(headings).not.toContain('Saves');
+    expect(headings).not.toContain('Pens saved');
+
+    const season = seasons.querySelector('tbody tr')!.textContent;
+
+    expect(season).toContain('9/30');
+    expect(season).toContain('36/60');
+    expect(season).toContain('3/4');
+    expect(season).toContain('1/8');
+
+    const matchTable = root.querySelector('[data-testid="match-stats"]')!;
+    const matchHeadings = Array.from(matchTable.querySelectorAll('th')).map((cell) =>
+      cell.textContent?.trim(),
+    );
+
+    expect(matchHeadings).toEqual(expect.arrayContaining(['Crs', 'Tkl', 'Pen', 'FK', 'Shots']));
+    expect(matchHeadings).not.toContain('Saves');
+
+    const row = matchTable.querySelector('tbody tr')!.textContent;
+
+    expect(row).toContain('2/5');
+    expect(row).toContain('4/7');
+    expect(row).toContain('1/1');
+    expect(row).toContain('0/3');
+  });
+
+  it('shows a goalkeeper the saves out of the shots faced and the penalties saved', async () => {
+    playerState.set({ ...player, primaryPosition: 'gk' });
+    await openTab('Statistics');
+
+    const seasons = root.querySelector('[data-testid="season-stats"] table')!;
+    const headings = Array.from(seasons.querySelectorAll('thead th')).map((cell) =>
+      cell.textContent?.trim(),
+    );
+
+    expect(headings).toEqual(expect.arrayContaining(['Saves', 'Save %', 'Pens saved']));
+    expect(headings).not.toContain('Tackles');
+    expect(headings).not.toContain('Dribbles');
+    expect(headings).not.toContain('Shots');
+
+    const season = seasons.querySelector('tbody tr')!.textContent;
+
+    // Saves 0 of 40 shots on target, and 2 of 5 penalties saved.
+    expect(season).toContain('0/40');
+    expect(season).toContain('0%');
+    expect(season).toContain('2/5');
+
+    const matchTable = root.querySelector('[data-testid="match-stats"]')!;
+    const matchHeadings = Array.from(matchTable.querySelectorAll('th')).map((cell) =>
+      cell.textContent?.trim(),
+    );
+
+    expect(matchHeadings).toEqual(expect.arrayContaining(['Saves', 'Pens']));
+    expect(matchHeadings).not.toContain('Dribbles');
+    expect(matchHeadings).not.toContain('Shots');
+
+    const row = matchTable.querySelector('tbody tr')!.textContent;
+
+    expect(row).toContain('0/6');
+    expect(row).toContain('1/2');
   });
 
   it('shows the current season first and an earlier season on request', async () => {

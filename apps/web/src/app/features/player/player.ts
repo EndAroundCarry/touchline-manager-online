@@ -7,10 +7,12 @@ import {
   attributeGroups,
   availabilityLabel,
   footLabel,
+  isGoalkeeperPosition,
+  matchCells,
+  matchColumnsFor,
   positionLabel,
-  ratioLabel,
   statCells,
-  STAT_COLUMNS,
+  statColumnsFor,
   seasonsPlayedLabel,
   squadStatusLabel,
   stateRows,
@@ -83,19 +85,31 @@ export class PlayerProfile implements OnInit {
     return player === null ? [] : stateRows(player.state);
   });
 
-  /** The columns of the season table (`STA-2`). */
-  protected readonly statColumns = STAT_COLUMNS;
+  /** Whether the player is a goalkeeper, whose statistics are the saves he made rather than the tackles and shots. */
+  protected readonly isKeeper = computed(() =>
+    isGoalkeeperPosition(this.player()?.primaryPosition),
+  );
 
-  /** The classes of a season-table cell or heading: a lower-priority column gives way on a narrower screen. */
-  protected statCellClass(index: number): string {
+  /** The columns of the season table: a keeper's set or an outfield player's (`STA-2`). */
+  protected readonly statColumns = computed(() => statColumnsFor(this.player()?.primaryPosition));
+
+  /** The columns of the match table, after the round, the fixture and the result: again a keeper's or an outfield player's. */
+  protected readonly matchColumns = computed(() => matchColumnsFor(this.player()?.primaryPosition));
+
+  /** The classes of a statistics cell or heading: a lower-priority column gives way on a narrower screen. */
+  protected statCellClass(tier: 1 | 2 | 3 | 4): string {
     const base = 'px-1.5 py-2 text-right';
-    const tier = this.statColumns[index].tier;
 
-    if (tier === 3) {
-      return `${base} max-lg:hidden`;
+    switch (tier) {
+      case 4:
+        return `${base} max-2xl:hidden`;
+      case 3:
+        return `${base} max-lg:hidden`;
+      case 2:
+        return `${base} max-md:hidden`;
+      default:
+        return base;
     }
-
-    return tier === 2 ? `${base} max-md:hidden` : base;
   }
 
   /** One table row per season the player has a line for, most recent first (`STA-2`). */
@@ -104,7 +118,7 @@ export class PlayerProfile implements OnInit {
       key: `${season.seasonNumber}-${season.clubId}`,
       season: season.seasonLabel,
       club: season.clubName,
-      cells: statCells(season.stats),
+      cells: statCells(season.stats, this.statColumns()),
     })),
   );
 
@@ -112,7 +126,9 @@ export class PlayerProfile implements OnInit {
   protected readonly careerRow = computed(() => {
     const career = this.player()?.careerStats;
 
-    return career === null || career === undefined ? null : statCells(career.totals);
+    return career === null || career === undefined
+      ? null
+      : statCells(career.totals, this.statColumns());
   });
 
   /** The player's seasons, most recent first, or an empty list (`STA-2`). */
@@ -177,7 +193,9 @@ export class PlayerProfile implements OnInit {
 
     const season = choice === CURRENT_SEASON ? this.currentSeasonNumber() : Number(choice);
 
-    return history.matches.filter((match) => match.seasonNumber === season);
+    return history.matches
+      .filter((match) => match.seasonNumber === season)
+      .map((match) => ({ match, cells: matchCells(match, this.matchColumns()) }));
   });
 
   protected readonly pageHeadingClass = PAGE_HEADING;
@@ -217,16 +235,6 @@ export class PlayerProfile implements OnInit {
         );
       },
     });
-  }
-
-  /** Formats a completed count against an attempted one for the match table (`engine-v7`). */
-  protected ratio(completed: number, attempted: number): string {
-    return ratioLabel(completed, attempted);
-  }
-
-  /** Formats a match rating to one decimal, or a dash when the player was not rated (`TRN-8`). */
-  protected matchRating(value: number | null): string {
-    return value === null ? '—' : value.toFixed(1);
   }
 
   /** Formats an amount for display. */

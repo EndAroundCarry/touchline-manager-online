@@ -8,7 +8,13 @@
  */
 
 import { averageRatingLabel } from '../competition/competition-presentation';
-import type { PlayerAttributes, PlayerSeasonStats, PlayerState, SquadPlayer } from './squad.models';
+import type {
+  PlayerAttributes,
+  PlayerMatchStat,
+  PlayerSeasonStats,
+  PlayerState,
+  SquadPlayer,
+} from './squad.models';
 
 /** How strong a value reads: the band is what gives colour-free meaning to an attribute or a state value. */
 export type PerformanceBand = 'low' | 'average' | 'strong';
@@ -349,89 +355,356 @@ export interface StatColumn {
   readonly value: (stats: PlayerSeasonStats) => string;
 
   /**
-   * How much room the column needs to be worth showing: 1 is always shown, 2 from a tablet's width up, and 3
-   * from a laptop's, so the table fits the width it has without scrolling sideways.
+   * How much room the column needs to be worth showing: 1 is always shown, 2 from a tablet's width up, 3
+   * from a laptop's and 4 from a desktop's, so the table fits the width it has without scrolling sideways.
    */
-  readonly tier: 1 | 2 | 3;
+  readonly tier: 1 | 2 | 3 | 4;
 
   /** Whether the column holds a `completed/attempted` pair, which needs a wider column than a single count. */
   readonly wide?: boolean;
 }
 
+/** One column of the Statistics tab's match-by-match table, on the same terms as {@link StatColumn}. */
+export interface MatchStatColumn {
+  /** The short heading. */
+  readonly label: string;
+
+  /** The full name, read out and shown on hover where the heading is abbreviated. */
+  readonly title: string;
+
+  /** Formats the column's cell from one match line. */
+  readonly value: (match: PlayerMatchStat) => string;
+
+  /** How much room the column needs to be worth showing, as for {@link StatColumn.tier}. */
+  readonly tier: 1 | 2 | 3 | 4;
+}
+
+/** Whether a position code (lower-case, as the API sends it) is the goalkeeper's. */
+export function isGoalkeeperPosition(position: string | null | undefined): boolean {
+  return position === 'gk';
+}
+
+const APPS: StatColumn = {
+  label: 'Apps',
+  title: 'Appearances',
+  value: (stats) => `${stats.appearances}`,
+  tier: 2,
+};
+
+const STARTS: StatColumn = {
+  label: 'Starts',
+  title: 'Starts',
+  value: (stats) => `${stats.starts}`,
+  tier: 4,
+};
+
+const MINUTES: StatColumn = {
+  label: 'Min',
+  title: 'Minutes played',
+  value: (stats) => `${stats.minutesPlayed}`,
+  tier: 3,
+};
+
+const GOALS: StatColumn = {
+  label: 'Goals',
+  title: 'Goals',
+  value: (stats) => `${stats.goals}`,
+  tier: 1,
+};
+
+const ASSISTS: StatColumn = {
+  label: 'Assists',
+  title: 'Assists',
+  value: (stats) => `${stats.assists}`,
+  tier: 1,
+};
+
+const PASSES: StatColumn = {
+  label: 'Passes',
+  title: 'Passes completed / attempted',
+  value: (stats) => ratioLabel(stats.passesCompleted, stats.passesAttempted),
+  tier: 1,
+  wide: true,
+};
+
+const PASS_PERCENT: StatColumn = {
+  label: 'Pass %',
+  title: 'Pass accuracy',
+  value: (stats) => percentageLabel(stats.passesCompleted, stats.passesAttempted),
+  tier: 2,
+};
+
+const YELLOW: StatColumn = {
+  label: 'Yellow',
+  title: 'Yellow cards',
+  value: (stats) => `${stats.yellowCards}`,
+  tier: 3,
+};
+
+const RED: StatColumn = {
+  label: 'Red',
+  title: 'Red cards',
+  value: (stats) => `${stats.redCards}`,
+  tier: 4,
+};
+
+const RATING: StatColumn = {
+  label: 'Rating',
+  title: 'Average rating',
+  value: (stats) => averageRatingLabel(stats.averageRating),
+  tier: 1,
+};
+
 /**
- * The columns of the season table, in the order a manager reads them: how much, what they did, what it cost.
+ * The columns of the season table for an outfield player, in the order a manager reads them: how much, what
+ * they did, what it cost.
  *
  * One definition drives both the season rows and the career row, so the two cannot format a number
- * differently, and the passes and take-ons read as `completed / attempted` with their rate beside them.
+ * differently, and the passes, crosses, tackles, take-ons and set pieces read as `completed / attempted`
+ * with their rate beside the ones that are not obvious from the pair.
  */
-export const STAT_COLUMNS: readonly StatColumn[] = [
+export const OUTFIELD_STAT_COLUMNS: readonly StatColumn[] = [
+  APPS,
+  STARTS,
+  MINUTES,
+  GOALS,
+  ASSISTS,
+  PASSES,
+  PASS_PERCENT,
   {
-    label: 'Apps',
-    title: 'Appearances',
-    value: (stats) => `${stats.appearances}`,
-    tier: 2,
-  },
-  { label: 'Starts', title: 'Starts', value: (stats) => `${stats.starts}`, tier: 3 },
-  {
-    label: 'Min',
-    title: 'Minutes played',
-    value: (stats) => `${stats.minutesPlayed}`,
-    tier: 2,
-  },
-  { label: 'Goals', title: 'Goals', value: (stats) => `${stats.goals}`, tier: 1 },
-  { label: 'Assists', title: 'Assists', value: (stats) => `${stats.assists}`, tier: 1 },
-  {
-    label: 'Passes',
-    title: 'Passes completed / attempted',
-    value: (stats) => ratioLabel(stats.passesCompleted, stats.passesAttempted),
-    tier: 1,
+    label: 'Crosses',
+    title: 'Crosses completed / attempted, corners not counted',
+    value: (stats) => ratioLabel(stats.crossesCompleted, stats.crossesAttempted),
+    tier: 3,
     wide: true,
   },
   {
-    label: 'Pass %',
-    title: 'Pass accuracy',
-    value: (stats) => percentageLabel(stats.passesCompleted, stats.passesAttempted),
-    tier: 2,
+    label: 'Tackles',
+    title: 'Tackles won / attempted',
+    value: (stats) => ratioLabel(stats.tacklesWon, stats.tacklesAttempted),
+    tier: 1,
+    wide: true,
   },
   {
     label: 'Dribbles',
     title: 'Dribbles won / attempted',
     value: (stats) => ratioLabel(stats.dribblesCompleted, stats.dribblesAttempted),
-    tier: 1,
+    tier: 2,
     wide: true,
   },
   {
     label: 'Dribble %',
     title: 'Dribble success',
     value: (stats) => percentageLabel(stats.dribblesCompleted, stats.dribblesAttempted),
-    tier: 3,
+    tier: 4,
   },
-  { label: 'Shots', title: 'Shots', value: (stats) => `${stats.shots}`, tier: 2 },
+  { label: 'Shots', title: 'Shots', value: (stats) => `${stats.shots}`, tier: 3 },
   {
     label: 'On tgt',
     title: 'Shots on target',
     value: (stats) => `${stats.shotsOnTarget}`,
-    tier: 3,
+    tier: 4,
   },
-  { label: 'Saves', title: 'Saves', value: (stats) => `${stats.saves}`, tier: 3 },
   {
-    label: 'Yellow',
-    title: 'Yellow cards',
-    value: (stats) => `${stats.yellowCards}`,
-    tier: 2,
+    label: 'Pens',
+    title: 'Penalties scored / taken',
+    value: (stats) => ratioLabel(stats.penaltiesScored, stats.penaltiesTaken),
+    tier: 4,
+    wide: true,
   },
-  { label: 'Red', title: 'Red cards', value: (stats) => `${stats.redCards}`, tier: 3 },
   {
-    label: 'Rating',
-    title: 'Average rating',
-    value: (stats) => averageRatingLabel(stats.averageRating),
-    tier: 1,
+    label: 'Free kicks',
+    title: 'Direct free kicks scored / taken',
+    value: (stats) => ratioLabel(stats.freeKicksScored, stats.freeKicksTaken),
+    tier: 4,
+    wide: true,
   },
+  YELLOW,
+  RED,
+  RATING,
 ];
 
-/** The cells of one season line, in the order of {@link STAT_COLUMNS}. */
-export function statCells(stats: PlayerSeasonStats): readonly string[] {
-  return STAT_COLUMNS.map((column) => column.value(stats));
+/**
+ * The columns of the season table for a goalkeeper: the saves and penalties saved stand where an outfield
+ * player's crosses, tackles, take-ons and shots would, since a keeper's season is told by the shots he faced.
+ */
+export const KEEPER_STAT_COLUMNS: readonly StatColumn[] = [
+  APPS,
+  STARTS,
+  MINUTES,
+  PASSES,
+  PASS_PERCENT,
+  {
+    label: 'Saves',
+    title: 'Saves / shots on target faced',
+    value: (stats) => ratioLabel(stats.saves, stats.shotsOnTargetFaced),
+    tier: 1,
+    wide: true,
+  },
+  {
+    label: 'Save %',
+    title: 'Save percentage',
+    value: (stats) => percentageLabel(stats.saves, stats.shotsOnTargetFaced),
+    tier: 2,
+  },
+  {
+    label: 'Pens saved',
+    title: 'Penalties saved / faced',
+    value: (stats) => ratioLabel(stats.penaltiesSaved, stats.penaltiesFaced),
+    tier: 1,
+    wide: true,
+  },
+  { ...GOALS, tier: 3 },
+  { ...ASSISTS, tier: 3 },
+  YELLOW,
+  RED,
+  RATING,
+];
+
+/** The season table's columns for a player of the given position (a lower-case code, `gk` for a keeper). */
+export function statColumnsFor(position: string | null | undefined): readonly StatColumn[] {
+  return isGoalkeeperPosition(position) ? KEEPER_STAT_COLUMNS : OUTFIELD_STAT_COLUMNS;
+}
+
+/** The cells of one season line, in the order of the given columns. */
+export function statCells(
+  stats: PlayerSeasonStats,
+  columns: readonly StatColumn[],
+): readonly string[] {
+  return columns.map((column) => column.value(stats));
+}
+
+const MATCH_MINUTES: MatchStatColumn = {
+  label: 'Min',
+  title: 'Minutes played',
+  value: (match) => `${match.minutesPlayed}`,
+  tier: 2,
+};
+
+const MATCH_GOALS: MatchStatColumn = {
+  label: 'Goals',
+  title: 'Goals',
+  value: (match) => `${match.goals}`,
+  tier: 1,
+};
+
+const MATCH_ASSISTS: MatchStatColumn = {
+  label: 'Assists',
+  title: 'Assists',
+  value: (match) => `${match.assists}`,
+  tier: 1,
+};
+
+const MATCH_PASSES: MatchStatColumn = {
+  label: 'Passes',
+  title: 'Passes completed / attempted',
+  value: (match) => ratioLabel(match.passesCompleted, match.passesAttempted),
+  tier: 1,
+};
+
+const MATCH_YELLOW: MatchStatColumn = {
+  label: 'Yellow',
+  title: 'Yellow cards',
+  value: (match) => `${match.yellowCards}`,
+  tier: 2,
+};
+
+const MATCH_RED: MatchStatColumn = {
+  label: 'Red',
+  title: 'Red cards',
+  value: (match) => `${match.redCards}`,
+  tier: 3,
+};
+
+const MATCH_RATING: MatchStatColumn = {
+  label: 'Rating',
+  title: 'Match rating',
+  value: (match) => averageRatingLabel(match.rating),
+  tier: 1,
+};
+
+/** The match-by-match columns for an outfield player, after the round, the fixture and the result. */
+export const OUTFIELD_MATCH_COLUMNS: readonly MatchStatColumn[] = [
+  MATCH_MINUTES,
+  MATCH_GOALS,
+  MATCH_ASSISTS,
+  MATCH_PASSES,
+  {
+    label: 'Crs',
+    title: 'Crosses completed / attempted, corners not counted',
+    value: (match) => ratioLabel(match.crossesCompleted, match.crossesAttempted),
+    tier: 3,
+  },
+  {
+    label: 'Tkl',
+    title: 'Tackles won / attempted',
+    value: (match) => ratioLabel(match.tacklesWon, match.tacklesAttempted),
+    tier: 3,
+  },
+  {
+    label: 'Dribbles',
+    title: 'Dribbles won / attempted',
+    value: (match) => ratioLabel(match.dribblesCompleted, match.dribblesAttempted),
+    tier: 1,
+  },
+  { label: 'Shots', title: 'Shots', value: (match) => `${match.shots}`, tier: 3 },
+  {
+    label: 'On tgt',
+    title: 'Shots on target',
+    value: (match) => `${match.shotsOnTarget}`,
+    tier: 3,
+  },
+  {
+    label: 'Pen',
+    title: 'Penalties scored / taken',
+    value: (match) => ratioLabel(match.penaltiesScored, match.penaltiesTaken),
+    tier: 4,
+  },
+  {
+    label: 'FK',
+    title: 'Direct free kicks scored / taken',
+    value: (match) => ratioLabel(match.freeKicksScored, match.freeKicksTaken),
+    tier: 4,
+  },
+  MATCH_YELLOW,
+  MATCH_RED,
+  MATCH_RATING,
+];
+
+/** The match-by-match columns for a goalkeeper: saves and penalties saved in place of take-ons and shots. */
+export const KEEPER_MATCH_COLUMNS: readonly MatchStatColumn[] = [
+  MATCH_MINUTES,
+  MATCH_GOALS,
+  MATCH_ASSISTS,
+  MATCH_PASSES,
+  {
+    label: 'Saves',
+    title: 'Saves / shots on target faced',
+    value: (match) => ratioLabel(match.saves, match.shotsOnTargetFaced),
+    tier: 1,
+  },
+  {
+    label: 'Pens',
+    title: 'Penalties saved / faced',
+    value: (match) => ratioLabel(match.penaltiesSaved, match.penaltiesFaced),
+    tier: 2,
+  },
+  MATCH_YELLOW,
+  MATCH_RED,
+  MATCH_RATING,
+];
+
+/** The match-by-match columns for a player of the given position (a lower-case code, `gk` for a keeper). */
+export function matchColumnsFor(position: string | null | undefined): readonly MatchStatColumn[] {
+  return isGoalkeeperPosition(position) ? KEEPER_MATCH_COLUMNS : OUTFIELD_MATCH_COLUMNS;
+}
+
+/** The cells of one match line, in the order of the given columns. */
+export function matchCells(
+  match: PlayerMatchStat,
+  columns: readonly MatchStatColumn[],
+): readonly string[] {
+  return columns.map((column) => column.value(match));
 }
 
 /** A completed count against an attempted one, as `completed / attempted` (`engine-v7`). */

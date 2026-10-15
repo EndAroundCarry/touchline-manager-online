@@ -10,14 +10,26 @@ import {
   positionLabel,
   progressReadOut,
   progressText,
-  STAT_COLUMNS,
+  KEEPER_MATCH_COLUMNS,
+  KEEPER_STAT_COLUMNS,
+  matchCells,
+  matchColumnsFor,
+  OUTFIELD_MATCH_COLUMNS,
+  OUTFIELD_STAT_COLUMNS,
   statCells,
+  statColumnsFor,
   seasonsPlayedLabel,
   squadStatusLabel,
   stateBand,
   stateRows,
 } from './squad-presentation';
-import { PlayerAttributes, PlayerSeasonStats, PlayerState, SquadPlayer } from './squad.models';
+import {
+  PlayerAttributes,
+  PlayerMatchStat,
+  PlayerSeasonStats,
+  PlayerState,
+  SquadPlayer,
+} from './squad.models';
 
 /**
  * The squad presentation helpers.
@@ -271,21 +283,39 @@ describe('squad presentation', () => {
       assists: 1,
       shots: 6,
       shotsOnTarget: 3,
-      saves: 0,
+      saves: 9,
       passesAttempted: 120,
       passesCompleted: 96,
       dribblesAttempted: 14,
       dribblesCompleted: 7,
+      tacklesAttempted: 20,
+      tacklesWon: 12,
+      crossesAttempted: 10,
+      crossesCompleted: 3,
+      penaltiesTaken: 2,
+      penaltiesScored: 1,
+      penaltiesFaced: 4,
+      penaltiesSaved: 1,
+      freeKicksTaken: 5,
+      freeKicksScored: 2,
+      shotsOnTargetFaced: 12,
       yellowCards: 1,
       redCards: 0,
       averageRating: 7.5,
     };
 
-    const cell = (label: string, line: PlayerSeasonStats = stats): string | undefined =>
-      statCells(line)[STAT_COLUMNS.findIndex((column) => column.label === label)];
+    const labels = (columns: readonly { readonly label: string }[]): string[] =>
+      columns.map((column) => column.label);
 
-    it('lays the season out as columns, in the order a manager reads them (STA-2)', () => {
-      expect(STAT_COLUMNS.map((column) => column.label)).toEqual([
+    const cell = (
+      label: string,
+      line: PlayerSeasonStats = stats,
+      columns = OUTFIELD_STAT_COLUMNS,
+    ): string | undefined =>
+      statCells(line, columns)[columns.findIndex((column) => column.label === label)];
+
+    it('lays an outfield season out as columns, in the order a manager reads them (STA-2)', () => {
+      expect(labels(OUTFIELD_STAT_COLUMNS)).toEqual([
         'Apps',
         'Starts',
         'Min',
@@ -293,19 +323,48 @@ describe('squad presentation', () => {
         'Assists',
         'Passes',
         'Pass %',
+        'Crosses',
+        'Tackles',
         'Dribbles',
         'Dribble %',
         'Shots',
         'On tgt',
-        'Saves',
+        'Pens',
+        'Free kicks',
         'Yellow',
         'Red',
         'Rating',
       ]);
-      expect(statCells(stats)).toHaveLength(STAT_COLUMNS.length);
+      expect(statCells(stats, OUTFIELD_STAT_COLUMNS)).toHaveLength(OUTFIELD_STAT_COLUMNS.length);
       expect(cell('Goals')).toBe('2');
       expect(cell('Min')).toBe('200');
       expect(cell('Rating')).toBe('7.5');
+    });
+
+    it('lays a goalkeeper season out around the saves instead of the outfield actions', () => {
+      expect(labels(KEEPER_STAT_COLUMNS)).toEqual([
+        'Apps',
+        'Starts',
+        'Min',
+        'Passes',
+        'Pass %',
+        'Saves',
+        'Save %',
+        'Pens saved',
+        'Goals',
+        'Assists',
+        'Yellow',
+        'Red',
+        'Rating',
+      ]);
+      expect(statCells(stats, KEEPER_STAT_COLUMNS)).toHaveLength(KEEPER_STAT_COLUMNS.length);
+    });
+
+    it('picks the keeper set for a goalkeeper and the outfield set for everyone else', () => {
+      expect(statColumnsFor('gk')).toBe(KEEPER_STAT_COLUMNS);
+      expect(statColumnsFor('st')).toBe(OUTFIELD_STAT_COLUMNS);
+      expect(statColumnsFor('cb')).toBe(OUTFIELD_STAT_COLUMNS);
+      expect(statColumnsFor(undefined)).toBe(OUTFIELD_STAT_COLUMNS);
     });
 
     it('shows the passes and dribbles as a count and a rate (engine-v7)', () => {
@@ -315,6 +374,19 @@ describe('squad presentation', () => {
       expect(cell('Dribble %')).toBe('50%');
     });
 
+    it('shows the tackles, crosses, penalties and free kicks as won out of attempted', () => {
+      expect(cell('Tackles')).toBe('12/20');
+      expect(cell('Crosses')).toBe('3/10');
+      expect(cell('Pens')).toBe('1/2');
+      expect(cell('Free kicks')).toBe('2/5');
+    });
+
+    it('shows a goalkeeper saves against the shots on target faced, with the rate', () => {
+      expect(cell('Saves', stats, KEEPER_STAT_COLUMNS)).toBe('9/12');
+      expect(cell('Save %', stats, KEEPER_STAT_COLUMNS)).toBe('75%');
+      expect(cell('Pens saved', stats, KEEPER_STAT_COLUMNS)).toBe('1/4');
+    });
+
     it('shows a dash rather than a zero rate when nothing was attempted (engine-v7)', () => {
       const idle = {
         ...stats,
@@ -322,14 +394,90 @@ describe('squad presentation', () => {
         passesCompleted: 0,
         dribblesAttempted: 0,
         dribblesCompleted: 0,
+        saves: 0,
+        shotsOnTargetFaced: 0,
       };
 
-      expect(cell('Pass %', idle)).toBe('\u2014');
-      expect(cell('Dribble %', idle)).toBe('\u2014');
+      expect(cell('Pass %', idle)).toBe('—');
+      expect(cell('Dribble %', idle)).toBe('—');
+      expect(cell('Save %', idle, KEEPER_STAT_COLUMNS)).toBe('—');
     });
 
     it('shows a dash for the rating before the player has been rated (TRN-8)', () => {
-      expect(cell('Rating', { ...stats, averageRating: null })).toBe('\u2014');
+      expect(cell('Rating', { ...stats, averageRating: null })).toBe('—');
+    });
+  });
+
+  describe('matchCells', () => {
+    const match: PlayerMatchStat = {
+      fixtureId: 'f1',
+      seasonNumber: 1,
+      seasonLabel: 'Season 1',
+      round: 3,
+      playedAt: '2026-09-28T14:00:00Z',
+      opponentClubId: 'club-2',
+      opponentName: 'Vale Rovers',
+      home: true,
+      goalsFor: 2,
+      goalsAgainst: 1,
+      started: true,
+      minutesPlayed: 90,
+      goals: 1,
+      assists: 0,
+      shots: 3,
+      shotsOnTarget: 2,
+      saves: 4,
+      passesAttempted: 40,
+      passesCompleted: 32,
+      dribblesAttempted: 6,
+      dribblesCompleted: 3,
+      tacklesAttempted: 5,
+      tacklesWon: 3,
+      crossesAttempted: 4,
+      crossesCompleted: 1,
+      penaltiesTaken: 1,
+      penaltiesScored: 1,
+      penaltiesFaced: 2,
+      penaltiesSaved: 1,
+      freeKicksTaken: 2,
+      freeKicksScored: 0,
+      shotsOnTargetFaced: 6,
+      yellowCards: 0,
+      redCards: 0,
+      rating: 7.5,
+    };
+
+    const cell = (label: string, columns = OUTFIELD_MATCH_COLUMNS): string | undefined =>
+      matchCells(match, columns)[columns.findIndex((column) => column.label === label)];
+
+    it('shows an outfield match with its crosses, tackles, penalties and free kicks', () => {
+      expect(cell('Crs')).toBe('1/4');
+      expect(cell('Tkl')).toBe('3/5');
+      expect(cell('Dribbles')).toBe('3/6');
+      expect(cell('Pen')).toBe('1/1');
+      expect(cell('FK')).toBe('0/2');
+      expect(cell('Rating')).toBe('7.5');
+    });
+
+    it('shows a goalkeeper match with saves and penalties saved in place of the shots', () => {
+      expect(KEEPER_MATCH_COLUMNS.map((column) => column.label)).toEqual([
+        'Min',
+        'Goals',
+        'Assists',
+        'Passes',
+        'Saves',
+        'Pens',
+        'Yellow',
+        'Red',
+        'Rating',
+      ]);
+      expect(cell('Saves', KEEPER_MATCH_COLUMNS)).toBe('4/6');
+      expect(cell('Pens', KEEPER_MATCH_COLUMNS)).toBe('1/2');
+    });
+
+    it('picks the set by position', () => {
+      expect(matchColumnsFor('gk')).toBe(KEEPER_MATCH_COLUMNS);
+      expect(matchColumnsFor('lw')).toBe(OUTFIELD_MATCH_COLUMNS);
     });
   });
 
