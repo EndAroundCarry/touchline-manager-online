@@ -217,6 +217,17 @@ public static class CanonicalMatchSerializer
             lines.Add(Field($"{prefix}.passesCompleted", line.PassesCompleted));
             lines.Add(Field($"{prefix}.dribblesAttempted", line.DribblesAttempted));
             lines.Add(Field($"{prefix}.dribblesCompleted", line.DribblesCompleted));
+            lines.Add(Field($"{prefix}.tacklesAttempted", line.TacklesAttempted));
+            lines.Add(Field($"{prefix}.tacklesWon", line.TacklesWon));
+            lines.Add(Field($"{prefix}.crossesAttempted", line.CrossesAttempted));
+            lines.Add(Field($"{prefix}.crossesCompleted", line.CrossesCompleted));
+            lines.Add(Field($"{prefix}.penaltiesTaken", line.PenaltiesTaken));
+            lines.Add(Field($"{prefix}.penaltiesScored", line.PenaltiesScored));
+            lines.Add(Field($"{prefix}.penaltiesFaced", line.PenaltiesFaced));
+            lines.Add(Field($"{prefix}.penaltiesSaved", line.PenaltiesSaved));
+            lines.Add(Field($"{prefix}.freeKicksTaken", line.FreeKicksTaken));
+            lines.Add(Field($"{prefix}.freeKicksScored", line.FreeKicksScored));
+            lines.Add(Field($"{prefix}.shotsOnTargetFaced", line.ShotsOnTargetFaced));
             lines.Add(Field($"{prefix}.yellowCards", line.YellowCards));
             lines.Add(Field($"{prefix}.sentOff", line.SentOff));
             lines.Add(Field($"{prefix}.absenceFixtures", line.AbsenceFixtures));

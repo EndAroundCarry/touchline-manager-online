@@ -171,5 +171,5 @@ public sealed class DeterminismTests
         "6b4d48a40ce45b42f8e43d8b8d3db3b2223e6d748cad43c824ea2ee91451b3e5";
 
     private const string GoldenOutputHash =
-        "5c64e3100e3bd21ac9d2c3044f3ed06e99aa3574d4fd980c32cd2ccb61802277";
+        "d5723c396418b29146d972818d5ff18f0e19f7d305f4b1cdfb6cc15b67192f4d";
 }

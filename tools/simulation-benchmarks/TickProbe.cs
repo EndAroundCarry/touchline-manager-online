@@ -59,6 +59,9 @@ internal static class TickProbe
         var keyframes = new double[matches];
         var homeWins = 0;
         var draws = 0;
+        var lineTotals = new long[11];
+        var eventDigest = 14_695_981_039_346_656_037UL;
+        var eventCount = 0L;
         var play = new Stopwatch();
         var film = new Stopwatch();
 
@@ -80,6 +83,23 @@ internal static class TickProbe
             var presentation = ReplayDirector.Build(input, result, recorder, liveMetrics: liveMetrics.Metrics);
             film.Stop();
 
+            foreach (var line in result.PlayerLines)
+            {
+                lineTotals[0] += line.TacklesAttempted;
+                lineTotals[1] += line.TacklesWon;
+                lineTotals[2] += line.CrossesAttempted;
+                lineTotals[3] += line.CrossesCompleted;
+                lineTotals[4] += line.PenaltiesTaken;
+                lineTotals[5] += line.PenaltiesScored;
+                lineTotals[6] += line.PenaltiesFaced;
+                lineTotals[7] += line.PenaltiesSaved;
+                lineTotals[8] += line.FreeKicksTaken;
+                lineTotals[9] += line.FreeKicksScored;
+                lineTotals[10] += line.ShotsOnTargetFaced;
+            }
+
+            eventDigest = FoldEvents(eventDigest, result);
+            eventCount += result.Events.Count;
             goals[index] = result.HomeGoals + result.AwayGoals;
             shots[index] = result.Home.Shots + result.Away.Shots;
             onTarget[index] = result.Home.ShotsOnTarget + result.Away.ShotsOnTarget;
@@ -122,6 +142,11 @@ internal static class TickProbe
         static string Row(string label, double[] values, string target) =>
             $"  {label,-24} {values.Average(),10:F2}   {target}";
 
+        Console.WriteLine($"  {"events (count / digest)",-24} {eventCount,10} {eventDigest:x16}   the same before and after a change that only counts");
+        double PerSide(int slot) => lineTotals[slot] / (2.0 * matches);
+
+        Console.WriteLine($"  per side per match: tackles {PerSide(0):F1} attempted, {PerSide(1):F1} won; crosses {PerSide(2):F1} attempted, {PerSide(3):F1} completed");
+        Console.WriteLine($"  per match: penalties {2 * PerSide(4):F2} taken, {2 * PerSide(5):F2} scored, {2 * PerSide(6):F2} faced, {2 * PerSide(7):F2} saved; free-kick shots {2 * PerSide(8):F2}, {2 * PerSide(9):F2} scored; keepers faced {2 * PerSide(10):F2} shots on target");
         Console.WriteLine(Row("goals per match", goals, "target 2.60 - 2.90"));
         Console.WriteLine(Row("shots per match", shots, "target 22 - 28"));
         Console.WriteLine($"  {"shots on target",-24} {100.0 * onTarget.Sum() / Math.Max(1, shots.Sum()),9:F1}%   target 32% - 38%");
@@ -145,6 +170,27 @@ internal static class TickProbe
         Console.WriteLine($"  {"film (ms per match)",-24} {film.Elapsed.TotalMilliseconds / matches,10:F0}");
         Console.WriteLine();
     }
+
+    /// <summary>Folds a match's events into an FNV-1a digest: what happened, to whom, where and when, but not the counts on the player lines.</summary>
+    private static ulong FoldEvents(ulong digest, MatchResultV1 result)
+    {
+        foreach (var item in result.Events)
+        {
+            digest = Fold(digest, item.Sequence);
+            digest = Fold(digest, item.Minute);
+            digest = Fold(digest, item.StoppageMinute);
+            digest = Fold(digest, (int)item.Side);
+            digest = Fold(digest, (int)item.Type);
+            digest = Fold(digest, item.ParticipantId?.GetHashCode() ?? 0);
+            digest = Fold(digest, item.SecondaryParticipantId?.GetHashCode() ?? 0);
+            digest = Fold(digest, item.QualityBasisPoints ?? -1);
+            digest = Fold(digest, item.X ?? -1);
+        }
+
+        return Fold(digest, result.HomeGoals * 100 + result.AwayGoals);
+    }
+
+    private static ulong Fold(ulong digest, int value) => (digest ^ (uint)value) * 1_099_511_628_211UL;
 
     private static double Percentile(double[] values, double share)
     {

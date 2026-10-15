@@ -20,6 +20,9 @@ internal sealed partial class TickMatchLoop
 
     private bool _passPending;
 
+    /// <summary>Whether the pass in flight is a cross that counts as one on the passer's line: any cross but a corner's.</summary>
+    private bool _passIsCross;
+
     /// <summary>The opponents who have already had their chance to cut out the pass in flight: one bit per side and seat.</summary>
     private ulong _passTried;
     private TickRef _passer = TickRef.None;
@@ -938,6 +941,7 @@ internal sealed partial class TickMatchLoop
         _earlyOwner = TickRef.None;
         _offsidePending = false;
         _passPending = false;
+        _passIsCross = false;
         Touch(me);
 
         if (EndsBreak(decision.Action))
@@ -971,6 +975,13 @@ internal sealed partial class TickMatchLoop
                         : TickRef.None;
 
                     team.Runtime.PassesAttempted[id] = team.Runtime.PassesAttempted.GetValueOrDefault(id) + 1;
+
+                    if (decision.Action == TickCarrierAction.Cross && !(fromRestart && kind == TickRestartKind.Corner))
+                    {
+                        _passIsCross = true;
+                        team.Runtime.CrossesAttempted[id] = team.Runtime.CrossesAttempted.GetValueOrDefault(id) + 1;
+                    }
+
                     Tag(me, decision.Action == TickCarrierAction.Cross ? PassageAction.Cross : PassageAction.Pass);
 
                     if (decision.Receiver >= 0
@@ -1200,6 +1211,7 @@ internal sealed partial class TickMatchLoop
         switch (outcome)
         {
             case TickTackleOutcome.Won:
+                Tackled(opponents, challengerId, won: true);
                 Dribbled(team, carrierId, completed: false);
                 Rate(opponents, challengerId, _rules.LiveRatingTackleBonusBasisPoints);
                 Rate(team, carrierId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
@@ -1212,6 +1224,7 @@ internal sealed partial class TickMatchLoop
                 break;
 
             case TickTackleOutcome.PokedLoose:
+                Tackled(opponents, challengerId, won: true);
                 Dribbled(team, carrierId, completed: false);
                 Rate(opponents, challengerId, _rules.LiveRatingTackleBonusBasisPoints);
                 Rate(team, carrierId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
@@ -1224,6 +1237,7 @@ internal sealed partial class TickMatchLoop
                 break;
 
             case TickTackleOutcome.Beaten:
+                Tackled(opponents, challengerId, won: false);
                 Dribbled(team, carrierId, completed: true);
                 Rate(team, carrierId, _rules.LiveRatingTackleBonusBasisPoints);
                 Rate(opponents, challengerId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
@@ -1232,6 +1246,7 @@ internal sealed partial class TickMatchLoop
                 break;
 
             default:
+                Tackled(opponents, challengerId, won: false);
                 Rate(opponents, challengerId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
                 Tag(challengerRef, PassageAction.Tackle);
                 FoulBy(1 - side, challengerId, side, spot);
@@ -1417,6 +1432,19 @@ internal sealed partial class TickMatchLoop
         }
     }
 
+    /// <summary>A defender went in for the ball in the carrier duel: it is a tackle attempted, and a tackle won when he took the ball or poked it loose.</summary>
+    private static void Tackled(TickTeam team, Guid id, bool won)
+    {
+        var runtime = team.Runtime;
+
+        runtime.TacklesAttempted[id] = runtime.TacklesAttempted.GetValueOrDefault(id) + 1;
+
+        if (won)
+        {
+            runtime.TacklesWon[id] = runtime.TacklesWon.GetValueOrDefault(id) + 1;
+        }
+    }
+
     private static void Rate(TickTeam team, Guid id, int delta) => team.Runtime.AdjustLiveRating(id, delta);
 
     /// <summary>The farthest up the pitch the ball may be won for a break, in the winning side's own point of view (its own 60%).</summary>
@@ -1500,6 +1528,7 @@ internal sealed partial class TickMatchLoop
         _assistPasser = TickRef.None;
         _assistReceiver = TickRef.None;
         _passPending = false;
+        _passIsCross = false;
         _offsidePending = false;
     }
 
@@ -1756,6 +1785,11 @@ internal sealed partial class TickMatchLoop
                     var passerId = passerTeam.Id[passerSeat];
 
                     passerTeam.Runtime.PassesCompleted[passerId] = passerTeam.Runtime.PassesCompleted.GetValueOrDefault(passerId) + 1;
+
+                    if (_passIsCross)
+                    {
+                        passerTeam.Runtime.CrossesCompleted[passerId] = passerTeam.Runtime.CrossesCompleted.GetValueOrDefault(passerId) + 1;
+                    }
                 }
 
                 Tag(me, PassageAction.Receive);
@@ -1770,6 +1804,7 @@ internal sealed partial class TickMatchLoop
             }
 
             _passPending = false;
+            _passIsCross = false;
         }
 
         Attach(side, seat, cushioned: !team.IsKeeper(seat));
@@ -1816,6 +1851,7 @@ internal sealed partial class TickMatchLoop
             Tag(new TickRef(side, team.SlotNumber[seat]), PassageAction.Interception);
             _controllerSide = -1;
             _passPending = false;
+            _passIsCross = false;
             Touch(new TickRef(side, team.SlotNumber[seat]));
             TurnOver();
             PredictRest();
@@ -1831,6 +1867,7 @@ internal sealed partial class TickMatchLoop
         Tag(blocker, PassageAction.Interception);
         _controllerSide = -1;
         _passPending = false;
+        _passIsCross = false;
         Touch(blocker);
         TurnOver();
         PredictRest();

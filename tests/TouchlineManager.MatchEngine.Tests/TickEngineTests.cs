@@ -282,7 +282,87 @@ public sealed class TickEngineTests
         weakerPoints.Should().BeInRange(0.25, 0.80, "a side that defends deep and counters earns something, so the bonus has not gone, and it is no superpower either");
     }
 
+    [Fact]
+    public void The_player_lines_count_tackles_crosses_and_set_pieces_in_step_with_the_events()
+    {
+        const int Matches = 60;
+        var matches = new (MatchInputV1 Input, MatchResultV1 Result)[Matches];
+
+        Parallel.For(0, Matches, index =>
+        {
+            var input = Current(3_000UL + (ulong)index, index % Shapes.Length, (index / Shapes.Length) % Shapes.Length);
+
+            matches[index] = (input, MatchSimulator.Simulate(input));
+        });
+
+        foreach (var (input, result) in matches)
+        {
+            var keepers = input.Home.Squad.Concat(input.Away.Squad)
+                .Where(participant => participant.Position == MatchPosition.Goalkeeper)
+                .Select(participant => participant.ParticipantId)
+                .ToHashSet();
+
+            var keptGoal = input.Home.Slots.Concat(input.Away.Slots)
+                .Where(slot => slot.Family == MatchPositionFamily.Goalkeeper)
+                .Select(slot => slot.ParticipantId)
+                .ToHashSet();
+
+            foreach (var line in result.PlayerLines)
+            {
+
+                line.TacklesWon.Should().BeLessThanOrEqualTo(line.TacklesAttempted);
+                line.CrossesCompleted.Should().BeLessThanOrEqualTo(line.CrossesAttempted);
+                line.PenaltiesScored.Should().BeLessThanOrEqualTo(line.PenaltiesTaken);
+                line.PenaltiesSaved.Should().BeLessThanOrEqualTo(line.PenaltiesFaced);
+                line.FreeKicksScored.Should().BeLessThanOrEqualTo(line.FreeKicksTaken);
+                line.CrossesAttempted.Should().BeLessThanOrEqualTo(line.PassesAttempted, "a cross is a pass");
+
+                var saves = result.Events.Count(matchEvent => matchEvent.Type == EngineEventType.ShotSaved && matchEvent.SecondaryParticipantId == line.ParticipantId);
+                var conceded = result.Events.Count(matchEvent => matchEvent.Type == EngineEventType.Goal && matchEvent.SecondaryParticipantId == line.ParticipantId);
+
+                line.ShotsOnTargetFaced.Should().Be(saves + conceded, "a keeper faces the shots he saves and the goals he lets in, penalties apart");
+
+                if (!keepers.Contains(line.ParticipantId))
+                {
+                    line.PenaltiesFaced.Should().Be(0);
+                    line.PenaltiesSaved.Should().Be(0);
+                    line.ShotsOnTargetFaced.Should().Be(0);
+                }
+
+                if (keptGoal.Contains(line.ParticipantId) && line.SubbedOutMinute is null && !line.SentOff)
+                {
+                    // A bench goalkeeper can come on as an outfield player, so only the starter who never left is known to have stayed in goal.
+                    line.TacklesAttempted.Should().Be(0, "a keeper's smother is not a tackle");
+                    line.CrossesAttempted.Should().Be(0);
+                    line.PenaltiesTaken.Should().Be(0);
+                }
+            }
+
+            foreach (var side in new[] { MatchSide.Home, MatchSide.Away })
+            {
+                var own = result.PlayerLines.Where(line => line.Side == side).ToList();
+                var other = result.PlayerLines.Where(line => line.Side != side).ToList();
+                var ownEvents = result.Events.Where(matchEvent => matchEvent.Side == side).ToList();
+                var taken = ownEvents.Count(matchEvent => matchEvent.Type is EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed);
+
+                own.Sum(line => line.PenaltiesTaken).Should().Be(taken);
+                own.Sum(line => line.PenaltiesScored).Should().Be(ownEvents.Count(matchEvent => matchEvent.Type == EngineEventType.PenaltyGoal));
+                other.Sum(line => line.PenaltiesFaced).Should().Be(taken, "the opposing goalkeeper faces every penalty a side takes");
+                own.Sum(line => line.FreeKicksTaken).Should().Be(ownEvents.Count(matchEvent => matchEvent.Type == EngineEventType.FreeKickShot));
+            }
+        }
+
+        var lines = matches.SelectMany(match => match.Result.PlayerLines).ToList();
+
+        lines.Sum(line => line.TacklesAttempted).Should().BeGreaterThan(0);
+        lines.Sum(line => line.CrossesAttempted).Should().BeGreaterThan(0);
+        lines.Sum(line => line.CrossesCompleted).Should().BeGreaterThan(0);
+        lines.Sum(line => line.PenaltiesTaken).Should().BeGreaterThan(0);
+        lines.Sum(line => line.FreeKicksTaken).Should().BeGreaterThan(0);
+        lines.Sum(line => line.ShotsOnTargetFaced).Should().BeGreaterThan(0);
+    }
+
     private const string GoldenInputHash = "5f74ae0160d042255a831b10ead014aa172a6e7cc951b2c0a0d1737dc906bda2";
 
-    private const string GoldenOutputHash = "dbbdc53594a8a0dfa8256be5973e6717b7b214dd180a55af241897c1cc942c55";
+    private const string GoldenOutputHash = "27735a84e0fc2e08409fd82fcd1e59d2ff39a8c82c666fe89cef399185cb7a57";
 }

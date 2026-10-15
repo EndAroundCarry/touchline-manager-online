@@ -66,6 +66,40 @@ internal sealed class SideRuntime
     /// <summary>Gets the take-ons each participant has won, a subset of those attempted (`engine-v7`).</summary>
     public Dictionary<Guid, int> DribblesCompleted { get; } = [];
 
+    /// <summary>Gets the challenges each participant has made on the man with the ball (`engine-v12`).</summary>
+    /// <remarks>Every resolved challenge in the carrier duel counts, whatever its outcome; a goalkeeper's smother does not.</remarks>
+    public Dictionary<Guid, int> TacklesAttempted { get; } = [];
+
+    /// <summary>Gets the challenges each participant has won, a subset of those attempted (`engine-v12`).</summary>
+    public Dictionary<Guid, int> TacklesWon { get; } = [];
+
+    /// <summary>Gets the crosses each participant has attempted from open play and free kicks, corners excluded (`engine-v12`).</summary>
+    public Dictionary<Guid, int> CrossesAttempted { get; } = [];
+
+    /// <summary>Gets the crosses that found a teammate, a subset of those attempted (`engine-v12`).</summary>
+    public Dictionary<Guid, int> CrossesCompleted { get; } = [];
+
+    /// <summary>Gets the penalties each participant has taken (`engine-v12`).</summary>
+    public Dictionary<Guid, int> PenaltiesTaken { get; } = [];
+
+    /// <summary>Gets the penalties each participant has scored, a subset of those taken (`engine-v12`).</summary>
+    public Dictionary<Guid, int> PenaltiesScored { get; } = [];
+
+    /// <summary>Gets the penalties each goalkeeper has faced (`engine-v12`).</summary>
+    public Dictionary<Guid, int> PenaltiesFaced { get; } = [];
+
+    /// <summary>Gets the penalties each goalkeeper has saved, a subset of those faced (`engine-v12`).</summary>
+    public Dictionary<Guid, int> PenaltiesSaved { get; } = [];
+
+    /// <summary>Gets the direct free kicks each participant has shot (`engine-v12`).</summary>
+    public Dictionary<Guid, int> FreeKicksTaken { get; } = [];
+
+    /// <summary>Gets the direct free kicks each participant has scored, a subset of those taken (`engine-v12`).</summary>
+    public Dictionary<Guid, int> FreeKicksScored { get; } = [];
+
+    /// <summary>Gets the shots on target, penalties apart, each goalkeeper has faced: the saves he made and the goals he conceded (`engine-v12`).</summary>
+    public Dictionary<Guid, int> ShotsOnTargetFaced { get; } = [];
+
     /// <summary>
     /// Gets each participant's morale at kickoff, which is the baseline the scoreline's drift is measured
     /// from. Without it, "morale may only drift so far" has nothing to be a drift from, and a heavy defeat

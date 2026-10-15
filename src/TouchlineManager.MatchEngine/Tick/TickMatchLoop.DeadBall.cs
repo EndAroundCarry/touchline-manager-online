@@ -49,8 +49,24 @@ internal sealed partial class TickMatchLoop
 
         _forecast = TickShotStopper.Forecast(_ball, _scratch, opponents.IsHome, keeperX);
 
+        var takerId = team.Id[seat];
+
+        if (penalty)
+        {
+            team.Runtime.PenaltiesTaken[takerId] = team.Runtime.PenaltiesTaken.GetValueOrDefault(takerId) + 1;
+
+            if (opponents.Count > 0 && opponents.IsKeeper(0))
+            {
+                var faced = opponents.Id[0];
+
+                opponents.Runtime.PenaltiesFaced[faced] = opponents.Runtime.PenaltiesFaced.GetValueOrDefault(faced) + 1;
+            }
+        }
+
         if (freeKick)
         {
+            team.Runtime.FreeKicksTaken[takerId] = team.Runtime.FreeKicksTaken.GetValueOrDefault(takerId) + 1;
+
             Emit(
                 team.Side,
                 EngineEventType.FreeKickShot,
@@ -102,6 +118,16 @@ internal sealed partial class TickMatchLoop
         var keeperRef = new TickRef(1 - _shooter.Side, keepers.SlotNumber[0]);
         var shooters = _teams[_shooter.Side];
         var shooterSeat = shooters.SeatOfSlot(_shooter.Slot);
+        var keeperLineId = keepers.Id[0];
+
+        if (_shotPenalty)
+        {
+            keepers.Runtime.PenaltiesSaved[keeperLineId] = keepers.Runtime.PenaltiesSaved.GetValueOrDefault(keeperLineId) + 1;
+        }
+        else
+        {
+            keepers.Runtime.ShotsOnTargetFaced[keeperLineId] = keepers.Runtime.ShotsOnTargetFaced.GetValueOrDefault(keeperLineId) + 1;
+        }
 
         EmitShotResult(EngineEventType.ShotSaved);
 
@@ -225,9 +251,24 @@ internal sealed partial class TickMatchLoop
         runtime.Goals[scorerId] = runtime.Goals.GetValueOrDefault(scorerId) + 1;
         Rate(attackers, scorerId, _rules.LiveRatingGoalBonusBasisPoints);
 
+        if (penalty)
+        {
+            runtime.PenaltiesScored[scorerId] = runtime.PenaltiesScored.GetValueOrDefault(scorerId) + 1;
+        }
+
+        if (live && _shotFreeKick)
+        {
+            runtime.FreeKicksScored[scorerId] = runtime.FreeKicksScored.GetValueOrDefault(scorerId) + 1;
+        }
+
         if (keeperId is Guid beaten)
         {
             Rate(defenders, beaten, -_rules.LiveRatingGoalConcededPenaltyBasisPoints);
+
+            if (!penalty)
+            {
+                defenders.Runtime.ShotsOnTargetFaced[beaten] = defenders.Runtime.ShotsOnTargetFaced.GetValueOrDefault(beaten) + 1;
+            }
         }
 
         if (!penalty
@@ -390,6 +431,7 @@ internal sealed partial class TickMatchLoop
         _shotResolved = false;
         _forecast = TickShotForecast.None;
         _passPending = false;
+        _passIsCross = false;
         _offsidePending = false;
         _controllerSide = -1;
         _kicker = TickRef.None;

@@ -111,6 +111,13 @@ public static class EngineVersions
     /// the outcome decides: the goal mouth, the goalkeeper, wide or over, the woodwork, or a block. Everything
     /// the recorder captures is drawn from the possession's own geometry stream and never moves a play draw.
     /// </para>
+    /// <para>
+    /// The tick engine's player lines count tackles (every resolved challenge in the carrier duel, won when the ball is
+    /// taken or poked loose), crosses (open play and free kicks, never a corner's; completed as a pass is), penalties
+    /// taken, scored, faced and saved, direct free kicks taken and scored, and the shots on target a goalkeeper faced.
+    /// They are read off decisions the loop already makes and draw nothing, so no scoreline or event moves: only the
+    /// lines, the canonical serialization and the output hash do.
+    /// </para>
     /// </remarks>
     public const string EngineLabel = "engine-v12";
 

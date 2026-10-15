@@ -102,8 +102,8 @@ public sealed record MatchPlayerLineV1
     /// <summary>Gets the passes the player attempted in open play (`engine-v7`).</summary>
     /// <remarks>
     /// Counted by the simulation as the possessions are played, for the reason assists are: the event stream
-    /// carries no pass, so a pass is a fact the engine decided and it lives on the line. Set pieces other than
-    /// a corner that set a goal up are not counted, and neither is a goalkeeper's distribution.
+    /// carries no pass, so a pass is a fact the engine decided and it lives on the line. The tick engine counts
+    /// every pass, through ball and cross, including the deliveries from set pieces such as corners and throw-ins.
     /// </remarks>
     public int PassesAttempted { get; init; }
 
@@ -115,6 +115,40 @@ public sealed record MatchPlayerLineV1
 
     /// <summary>Gets the take-ons the player won, a subset of <see cref="DribblesAttempted"/> (`engine-v7`).</summary>
     public int DribblesCompleted { get; init; }
+
+    /// <summary>Gets the challenges the player made on the man with the ball (`engine-v12`).</summary>
+    /// <remarks>Counted for every resolved challenge in the carrier duel. A goalkeeper's smother is not a tackle.</remarks>
+    public int TacklesAttempted { get; init; }
+
+    /// <summary>Gets the challenges the player won, a subset of <see cref="TacklesAttempted"/> (`engine-v12`).</summary>
+    public int TacklesWon { get; init; }
+
+    /// <summary>Gets the crosses the player attempted from open play and free kicks; corners are not crosses here (`engine-v12`).</summary>
+    public int CrossesAttempted { get; init; }
+
+    /// <summary>Gets the crosses that found a teammate, a subset of <see cref="CrossesAttempted"/> (`engine-v12`).</summary>
+    public int CrossesCompleted { get; init; }
+
+    /// <summary>Gets the penalties the player took (`engine-v12`).</summary>
+    public int PenaltiesTaken { get; init; }
+
+    /// <summary>Gets the penalties the player scored, a subset of <see cref="PenaltiesTaken"/> (`engine-v12`).</summary>
+    public int PenaltiesScored { get; init; }
+
+    /// <summary>Gets the penalties the goalkeeper faced (`engine-v12`).</summary>
+    public int PenaltiesFaced { get; init; }
+
+    /// <summary>Gets the penalties the goalkeeper saved, a subset of <see cref="PenaltiesFaced"/> (`engine-v12`).</summary>
+    public int PenaltiesSaved { get; init; }
+
+    /// <summary>Gets the direct free kicks the player shot at goal (`engine-v12`).</summary>
+    public int FreeKicksTaken { get; init; }
+
+    /// <summary>Gets the direct free kicks the player scored, a subset of <see cref="FreeKicksTaken"/> (`engine-v12`).</summary>
+    public int FreeKicksScored { get; init; }
+
+    /// <summary>Gets the shots on target the goalkeeper faced, penalties apart: the saves he made and the goals he conceded (`engine-v12`).</summary>
+    public int ShotsOnTargetFaced { get; init; }
 
     /// <summary>Gets yellow cards received.</summary>
     public required int YellowCards { get; init; }
