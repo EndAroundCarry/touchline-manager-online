@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DOCUMENT, DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TableModule } from 'primeng/table';
@@ -111,6 +111,7 @@ interface RatingBasis {
   templateUrl: './tactics.html',
 })
 export class Tactics {
+  private readonly document = inject(DOCUMENT);
   private readonly store = inject(TacticsStore);
   private readonly squadStore = inject(SquadStore);
   private readonly maintenance = inject(MaintenanceStore);
@@ -517,7 +518,31 @@ export class Tactics {
 
     if (event.dataTransfer !== null) {
       event.dataTransfer.effectAllowed = 'move';
+      this.showDragDot(event.dataTransfer, row);
     }
+  }
+
+  /**
+   * Replaces the browser's faded copy of the table row with a dot like the ones on the pitch and under it, so the
+   * player is carried as the thing they will become.
+   *
+   * The browser takes its picture of the element when the drag starts, so the dot is built, handed over, and
+   * removed again on the next turn. It is built off screen because it only has to exist to be photographed.
+   */
+  private showDragDot(transfer: DataTransfer, row: RosterRow): void {
+    if (typeof transfer.setDragImage !== 'function') {
+      return;
+    }
+
+    const dot = this.document.createElement('div');
+
+    dot.textContent = row.shortName;
+    dot.className =
+      'fixed -left-[1000px] -top-[1000px] flex h-12 w-12 items-center justify-center rounded-full border-2 ' +
+      'border-white/80 bg-panel px-0.5 text-center text-[10px] font-semibold leading-tight text-ink shadow';
+    this.document.body.appendChild(dot);
+    transfer.setDragImage(dot, dot.offsetWidth / 2, dot.offsetHeight / 2);
+    setTimeout(() => dot.remove());
   }
 
   /** Allows a player row to be dropped on a slot, and nothing else. */
