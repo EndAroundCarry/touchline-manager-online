@@ -122,7 +122,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/onboarding/colours/colours').then((m) => m.ClubColoursChoice),
         canActivate: [requireAuthentication, requireVerifiedEmail],
-        title: 'Choose your colours — Touchline Manager',
+        title: 'Choose your colours and crest — Touchline Manager',
       },
       {
         path: 'dashboard',

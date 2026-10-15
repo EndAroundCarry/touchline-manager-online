@@ -1,0 +1,55 @@
+<fieldset [disabled]="disabled()" class="min-w-0">
+  <legend class="text-sm font-medium text-ink">Crest</legend>
+  <p class="text-xs text-muted">
+    The badge your club wears, drawn in your two colours. Choose its shape, then the stripes it
+    carries: any shape can wear any stripes.
+  </p>
+
+  <div class="mt-3 flex flex-col gap-6 sm:flex-row sm:items-start">
+    <figure class="mx-auto shrink-0 sm:mx-0" data-testid="crest-preview">
+      <app-club-crest
+        class="h-36"
+        [shape]="shape()"
+        [pattern]="pattern()"
+        [primary]="primary()"
+        [secondary]="secondary()"
+        label="Your crest"
+      />
+      <figcaption class="mt-1 text-center text-xs text-muted">Your crest</figcaption>
+    </figure>
+
+    <div class="flex flex-1 flex-col gap-4">
+      <div>
+        <label class="block text-sm font-medium text-ink" [for]="shapeId">Crest shape</label>
+        <select
+          [id]="shapeId"
+          [class]="selectClass"
+          [value]="shape()"
+          (change)="shape.set($any($event.target).value)"
+        >
+          @for (option of shapes; track option.code) {
+            <option [value]="option.code" [selected]="option.code === shape()">
+              {{ option.label }}
+            </option>
+          }
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-ink" [for]="patternId">Stripes</label>
+        <select
+          [id]="patternId"
+          [class]="selectClass"
+          [value]="pattern()"
+          (change)="pattern.set($any($event.target).value)"
+        >
+          @for (option of patterns; track option.code) {
+            <option [value]="option.code" [selected]="option.code === pattern()">
+              {{ option.label }}
+            </option>
+          }
+        </select>
+      </div>
+    </div>
+  </div>
+</fieldset>

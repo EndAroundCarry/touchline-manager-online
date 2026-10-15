@@ -68,6 +68,18 @@ public sealed class Club
     /// </summary>
     public string? SecondaryColour { get; private set; }
 
+    /// <summary>
+    /// Gets the crest shape the club's manager chose (a <see cref="CrestDesigns.Shapes"/> code), or null while
+    /// the club wears the shape generated from its badge seed.
+    /// </summary>
+    public string? CrestShape { get; private set; }
+
+    /// <summary>
+    /// Gets the stripes the club's manager chose for the crest (a <see cref="CrestDesigns.Patterns"/> code), or
+    /// null while the club wears the stripes generated from its badge seed.
+    /// </summary>
+    public string? CrestPattern { get; private set; }
+
     /// <summary>Gets the game year the club was founded, which is a game year and not a real one.</summary>
     public int FoundingGameYear { get; private set; }
 
@@ -221,6 +233,28 @@ public sealed class Club
 
         PrimaryColour = normalizedPrimary;
         SecondaryColour = normalizedSecondary;
+
+        Touch(now);
+    }
+
+    /// <summary>Sets the shape and the stripes of the crest the club wears. Any shape can wear any stripes.</summary>
+    /// <param name="shape">A <see cref="CrestDesigns.Shapes"/> code.</param>
+    /// <param name="pattern">A <see cref="CrestDesigns.Patterns"/> code.</param>
+    /// <param name="now">The current instant.</param>
+    public void ChangeCrest(string shape, string pattern, DateTimeOffset now)
+    {
+        if (!CrestDesigns.IsKnownShape(shape))
+        {
+            throw new ArgumentException("That crest shape does not exist.");
+        }
+
+        if (!CrestDesigns.IsKnownPattern(pattern))
+        {
+            throw new ArgumentException("Those stripes do not exist.");
+        }
+
+        CrestShape = shape;
+        CrestPattern = pattern;
 
         Touch(now);
     }

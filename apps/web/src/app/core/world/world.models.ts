@@ -117,19 +117,33 @@ export interface ClubTenureSummary {
   readonly secondaryColour: string;
   /** Whether the manager has chosen the colours, rather than wearing the generated ones. */
   readonly hasChosenColours: boolean;
+  /** The code of the crest shape the club wears: the one the manager chose, or the generated one. */
+  readonly crestShape: string;
+  /** The code of the stripes on the crest: the ones the manager chose, or the generated ones. */
+  readonly crestPattern: string;
 }
 
-/** The colours a club plays in. */
+/** The colours and crest a club wears. */
 export interface ClubColours {
   readonly clubId: string;
   readonly primaryColour: string;
   readonly secondaryColour: string;
+  readonly crestShape: string;
+  readonly crestPattern: string;
 }
 
-/** The body of a request to choose the club's colours. */
+/** A crest as a manager chooses it: a shape, and the stripes on it. Any shape can wear any stripes. */
+export interface CrestChoice {
+  readonly shape: string;
+  readonly pattern: string;
+}
+
+/** The body of a request to choose the club's colours and crest. */
 export interface ChangeClubColoursPayload {
   readonly primaryColour: string;
   readonly secondaryColour: string;
+  readonly crestShape: string;
+  readonly crestPattern: string;
 }
 
 /** Where an account stands in onboarding. */

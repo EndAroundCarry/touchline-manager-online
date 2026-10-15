@@ -36,6 +36,11 @@ import {
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
 import { controlError, errorId } from '../../shared/forms/form-support';
+import {
+  DEFAULT_CREST_PATTERN,
+  DEFAULT_CREST_SHAPE,
+} from '../../shared/ui/club-crest/crest-designs';
+import { CrestPicker } from '../../shared/ui/crest-picker/crest-picker';
 import { KitColourPicker } from '../../shared/ui/kit-colour-picker/kit-colour-picker';
 
 /** Requires the deletion confirmation to be ticked. */
@@ -100,7 +105,7 @@ function withCurrent(options: readonly string[], current: string | null): readon
  */
 @Component({
   selector: 'app-settings',
-  imports: [KitColourPicker, ReactiveFormsModule, RouterLink],
+  imports: [CrestPicker, KitColourPicker, ReactiveFormsModule, RouterLink],
   templateUrl: './settings.html',
 })
 export class Settings {
@@ -167,25 +172,29 @@ export class Settings {
   /** The club the manager holds, which carries the colours it plays in. */
   protected readonly tenure = computed(() => this.onboarding.state()?.tenure ?? null);
 
-  /** The colours being edited, seeded from the club's own and applied only on save. */
+  /** The colours and crest being edited, seeded from the club's own and applied only on save. */
   protected readonly kitPrimary = signal('#1f4e79');
   protected readonly kitSecondary = signal('#d6e4f0');
+  protected readonly kitCrestShape = signal(DEFAULT_CREST_SHAPE.code);
+  protected readonly kitCrestPattern = signal(DEFAULT_CREST_PATTERN.code);
   protected readonly kitSaving = signal(false);
   protected readonly kitSaved = signal(false);
   protected readonly kitError = signal<string | null>(null);
 
-  /** Whether the edited pair differs from the one the club plays in. */
+  /** Whether the edited colours or crest differ from the ones the club wears. */
   protected readonly kitChanged = computed(() => {
     const current = this.tenure();
 
     return (
       current !== null &&
       (current.primaryColour !== this.kitPrimary() ||
-        current.secondaryColour !== this.kitSecondary())
+        current.secondaryColour !== this.kitSecondary() ||
+        current.crestShape !== this.kitCrestShape() ||
+        current.crestPattern !== this.kitCrestPattern())
     );
   });
 
-  /** Which club and colours the editor was last seeded from, so a background reload leaves an edit alone. */
+  /** Which club, colours and crest the editor was last seeded from, so a background reload leaves an edit alone. */
   private kitSeededFor: string | null = null;
 
   protected readonly deleteForm = inject(FormBuilder).nonNullable.group({
@@ -276,8 +285,8 @@ export class Settings {
       }
     });
 
-    // Seed the colour editor from the club once it arrives, and again whenever the club's colours change
-    // underneath it. A reload that brings nothing new does not reseed, so it cannot undo an edit.
+    // Seed the colour and crest editor from the club once it arrives, and again whenever the club's look
+    // changes underneath it. A reload that brings nothing new does not reseed, so it cannot undo an edit.
     effect(() => {
       const club = this.tenure();
 
@@ -285,17 +294,19 @@ export class Settings {
         return;
       }
 
-      const key = `${club.clubId}|${club.primaryColour}|${club.secondaryColour}`;
+      const key = `${club.clubId}|${club.primaryColour}|${club.secondaryColour}|${club.crestShape}|${club.crestPattern}`;
 
       if (key !== this.kitSeededFor) {
         this.kitSeededFor = key;
         this.kitPrimary.set(club.primaryColour);
         this.kitSecondary.set(club.secondaryColour);
+        this.kitCrestShape.set(club.crestShape);
+        this.kitCrestPattern.set(club.crestPattern);
       }
     });
   }
 
-  /** Saves the club's colours. */
+  /** Saves the club's colours and crest. */
   protected saveColours(picker: KitColourPicker): void {
     if (this.kitSaving() || !picker.valid() || this.tenure() === null) {
       return;
@@ -305,18 +316,23 @@ export class Settings {
     this.kitError.set(null);
     this.kitSaving.set(true);
 
-    this.onboarding.changeClubColours(this.kitPrimary(), this.kitSecondary()).subscribe({
-      next: () => {
-        this.kitSaving.set(false);
-        this.kitSaved.set(true);
-      },
-      error: (error: unknown) => {
-        this.kitSaving.set(false);
-        this.kitError.set(
-          error instanceof ApiError ? error.detail : 'Your colours could not be saved.',
-        );
-      },
-    });
+    this.onboarding
+      .changeClubColours(this.kitPrimary(), this.kitSecondary(), {
+        shape: this.kitCrestShape(),
+        pattern: this.kitCrestPattern(),
+      })
+      .subscribe({
+        next: () => {
+          this.kitSaving.set(false);
+          this.kitSaved.set(true);
+        },
+        error: (error: unknown) => {
+          this.kitSaving.set(false);
+          this.kitError.set(
+            error instanceof ApiError ? error.detail : 'Your colours and crest could not be saved.',
+          );
+        },
+      });
   }
 
   /** Reads the manager profile, which carries the formatting preferences. */

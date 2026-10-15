@@ -6,6 +6,7 @@ import { WorldApi } from './world-api';
 import {
   AvailableClubs,
   ClubColours,
+  CrestChoice,
   ClubDashboard,
   CountryCapacity,
   CountrySummary,
@@ -261,27 +262,40 @@ export class OnboardingStore {
   }
 
   /**
-   * Chooses the colours the manager's club plays in, and adopts them in the cached tenure so every screen
-   * that draws the club reads the new pair without another round trip.
+   * Chooses the colours and crest the manager's club wears, and adopts them in the cached tenure so every
+   * screen that draws the club reads the new look without another round trip.
    */
-  changeClubColours(primaryColour: string, secondaryColour: string): Observable<ClubColours> {
-    return this.api.changeClubColours({ primaryColour, secondaryColour }).pipe(
-      tap((colours) =>
-        this.stateSignal.update((state) =>
-          state === null || state.tenure === null
-            ? state
-            : {
-                ...state,
-                tenure: {
-                  ...state.tenure,
-                  primaryColour: colours.primaryColour,
-                  secondaryColour: colours.secondaryColour,
-                  hasChosenColours: true,
+  changeClubColours(
+    primaryColour: string,
+    secondaryColour: string,
+    crest: CrestChoice,
+  ): Observable<ClubColours> {
+    return this.api
+      .changeClubColours({
+        primaryColour,
+        secondaryColour,
+        crestShape: crest.shape,
+        crestPattern: crest.pattern,
+      })
+      .pipe(
+        tap((colours) =>
+          this.stateSignal.update((state) =>
+            state === null || state.tenure === null
+              ? state
+              : {
+                  ...state,
+                  tenure: {
+                    ...state.tenure,
+                    primaryColour: colours.primaryColour,
+                    secondaryColour: colours.secondaryColour,
+                    crestShape: colours.crestShape,
+                    crestPattern: colours.crestPattern,
+                    hasChosenColours: true,
+                  },
                 },
-              },
+          ),
         ),
-      ),
-    );
+      );
   }
 
   /** Resigns from the manager's club. */

@@ -1,5 +1,5 @@
 <section class="max-w-3xl">
-  <h1 [class]="pageHeadingClass">Choose your colours</h1>
+  <h1 [class]="pageHeadingClass">Choose your colours and crest</h1>
 
   @if (loading()) {
     <p class="mt-6 text-sm text-ink-2" role="status">Loading your club…</p>
@@ -7,8 +7,8 @@
     <p [class]="formErrorClass" role="alert">{{ message }}</p>
   } @else if (clubName(); as name) {
     <p class="mt-2 text-sm text-ink-2">
-      Pick the two colours {{ name }} plays in. They are drawn on your stadium and on the pitch in
-      every match from now on.
+      Pick the two colours {{ name }} plays in, then the crest they are worn on. The colours are
+      drawn on your stadium and on the pitch in every match from now on.
     </p>
 
     <div class="mt-6 rounded border border-line bg-panel p-6">
@@ -16,6 +16,16 @@
         #picker
         [(primary)]="primary"
         [(secondary)]="secondary"
+        [disabled]="saving()"
+      />
+    </div>
+
+    <div class="mt-6 rounded border border-line bg-panel p-6">
+      <app-crest-picker
+        [(shape)]="crestShape"
+        [(pattern)]="crestPattern"
+        [primary]="primary()"
+        [secondary]="secondary()"
         [disabled]="saving()"
       />
     </div>
@@ -31,7 +41,7 @@
         [disabled]="saving() || !picker.valid() || !canMutate()"
         (click)="confirm(picker)"
       >
-        {{ saving() ? 'Saving…' : 'Confirm colours' }}
+        {{ saving() ? 'Saving…' : 'Confirm colours and crest' }}
       </button>
       <a routerLink="/dashboard" [class]="linkClass">Decide later in Settings</a>
     </div>

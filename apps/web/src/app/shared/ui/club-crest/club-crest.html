@@ -1,0 +1,47 @@
+<svg
+  [attr.viewBox]="box"
+  class="block h-full w-auto"
+  [attr.role]="label() ? 'img' : null"
+  [attr.aria-label]="label() || null"
+  [attr.aria-hidden]="label() ? null : 'true'"
+  focusable="false"
+>
+  <defs>
+    <clipPath [attr.id]="clipId">
+      <path [attr.d]="outline()" />
+    </clipPath>
+  </defs>
+
+  <g [attr.clip-path]="'url(#' + clipId + ')'">
+    <rect x="0" y="0" [attr.width]="width" [attr.height]="height" [attr.fill]="primary()" />
+
+    @for (piece of pieces(); track $index) {
+      @if (piece.kind === 'fill') {
+        <path [attr.d]="piece.d" [attr.fill]="secondary()" />
+      } @else {
+        <path
+          [attr.d]="piece.d"
+          fill="none"
+          [attr.stroke]="secondary()"
+          [attr.stroke-width]="piece.width"
+        />
+      }
+    }
+
+    <path
+      [attr.d]="outline()"
+      fill="none"
+      [attr.stroke]="secondary()"
+      [attr.stroke-width]="border"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <path
+    [attr.d]="outline()"
+    fill="none"
+    stroke="rgba(0,0,0,0.5)"
+    stroke-width="1.5"
+    stroke-linejoin="round"
+  />
+</svg>

@@ -109,6 +109,18 @@ public sealed class ChangeClubColours
 
         club.ChangeColours(request.PrimaryColour, request.SecondaryColour, _clock.UtcNow);
 
+        // The shape and the stripes are chosen independently: one that is left out stays as the club has it.
+        if (request.CrestShape is not null || request.CrestPattern is not null)
+        {
+            club.ChangeCrest(
+                request.CrestShape ?? CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape),
+                request.CrestPattern ?? CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern),
+                _clock.UtcNow);
+        }
+
+        var shape = CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape);
+        var pattern = CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern);
+
         _audit.Record(new AuditEntry(
             WorldAuditActions.ClubColoursChanged,
             AuditActorTypes.User,
@@ -117,13 +129,13 @@ public sealed class ChangeClubColours
             club.Id,
             _requestContext.CorrelationId,
             _secureTokens.HashClientValue(_requestContext.IpAddress),
-            Reason: $"{club.PrimaryColour} {club.SecondaryColour}"));
+            Reason: $"{club.PrimaryColour} {club.SecondaryColour} {shape} {pattern}"));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ChangeClubColoursResult(
             ChangeClubColoursOutcome.Changed,
-            new ClubColoursResponse(club.Id, club.PrimaryColour!, club.SecondaryColour!));
+            new ClubColoursResponse(club.Id, club.PrimaryColour!, club.SecondaryColour!, shape, pattern));
     }
 
     private static ChangeClubColoursResult Refused(ChangeClubColoursOutcome outcome) => new(outcome, null);

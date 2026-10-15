@@ -40,7 +40,18 @@
     </section>
   } @else if (club(); as inherited) {
     <section>
-      <h1 #clubHeading tabindex="-1" [class]="pageHeadingClass">{{ inherited.club.name }}</h1>
+      <div class="flex items-center gap-3">
+        @if (tenure(); as kit) {
+          <app-club-crest
+            class="h-12 shrink-0"
+            [shape]="kit.crestShape"
+            [pattern]="kit.crestPattern"
+            [primary]="kit.primaryColour"
+            [secondary]="kit.secondaryColour"
+          />
+        }
+        <h1 #clubHeading tabindex="-1" [class]="pageHeadingClass">{{ inherited.club.name }}</h1>
+      </div>
       <p class="mt-1 text-sm text-ink-2">
         {{ inherited.country.displayName }} · {{ inherited.division.displayName }} · tier
         {{ inherited.division.tierNumber }} · {{ inherited.season.displayLabel }} ·
@@ -108,12 +119,22 @@
 
                 <div class="mt-4 flex items-center justify-center gap-5">
                   <div class="flex w-24 flex-col items-center gap-2 text-center">
-                    <span
-                      class="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent bg-raised font-display text-xl font-bold"
-                      aria-hidden="true"
-                    >
-                      {{ badge(inherited.club.shortName) }}
-                    </span>
+                    @if (tenure(); as kit) {
+                      <app-club-crest
+                        class="h-16"
+                        [shape]="kit.crestShape"
+                        [pattern]="kit.crestPattern"
+                        [primary]="kit.primaryColour"
+                        [secondary]="kit.secondaryColour"
+                      />
+                    } @else {
+                      <span
+                        class="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent bg-raised font-display text-xl font-bold"
+                        aria-hidden="true"
+                      >
+                        {{ badge(inherited.club.shortName) }}
+                      </span>
+                    }
                     <span class="text-xs text-ink-2">{{ inherited.club.name }}</span>
                   </div>
                   <span class="font-display text-2xl font-bold text-muted" aria-hidden="true">

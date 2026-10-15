@@ -167,6 +167,8 @@ public sealed record ManagerProfileResponse(
 /// <param name="PrimaryColour">The club's primary kit colour as <c>#rrggbb</c>: the one chosen, or the generated one.</param>
 /// <param name="SecondaryColour">The club's secondary kit colour as <c>#rrggbb</c>: the one chosen, or the generated one.</param>
 /// <param name="HasChosenColours">Whether the manager has chosen the colours, rather than wearing the generated ones.</param>
+/// <param name="CrestShape">The code of the crest shape the club wears: the one chosen, or the generated one.</param>
+/// <param name="CrestPattern">The code of the stripes on the crest: the ones chosen, or the generated ones.</param>
 public sealed record ClubTenureSummaryResponse(
     Guid Id,
     Guid ClubId,
@@ -181,13 +183,22 @@ public sealed record ClubTenureSummaryResponse(
     long Version,
     string PrimaryColour,
     string SecondaryColour,
-    bool HasChosenColours);
+    bool HasChosenColours,
+    string CrestShape,
+    string CrestPattern);
 
-/// <summary>The colours a club plays in, as the manager's change left them.</summary>
+/// <summary>The colours and crest a club wears, as the manager's change left them.</summary>
 /// <param name="ClubId">The club.</param>
 /// <param name="PrimaryColour">The primary kit colour as <c>#rrggbb</c>.</param>
 /// <param name="SecondaryColour">The secondary kit colour as <c>#rrggbb</c>.</param>
-public sealed record ClubColoursResponse(Guid ClubId, string PrimaryColour, string SecondaryColour);
+/// <param name="CrestShape">The code of the crest shape the club wears.</param>
+/// <param name="CrestPattern">The code of the stripes on the crest.</param>
+public sealed record ClubColoursResponse(
+    Guid ClubId,
+    string PrimaryColour,
+    string SecondaryColour,
+    string CrestShape,
+    string CrestPattern);
 
 /// <summary>
 /// Where an account stands in onboarding: no profile, a profile but no club, or a club.

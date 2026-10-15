@@ -118,7 +118,9 @@ public static class WorldMapping
             tenure.Version,
             colours.Primary,
             colours.Secondary,
-            club.PrimaryColour is not null && club.SecondaryColour is not null);
+            club.PrimaryColour is not null && club.SecondaryColour is not null,
+            CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape),
+            CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern));
     }
 
     /// <summary>

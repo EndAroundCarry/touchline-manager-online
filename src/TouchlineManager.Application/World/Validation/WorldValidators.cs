@@ -76,6 +76,16 @@ public sealed class ChangeClubColoursRequestValidator : AbstractValidator<Change
             .When(request => Club.IsHexColour(request.PrimaryColour) && Club.IsHexColour(request.SecondaryColour))
             .WithName(nameof(ChangeClubColoursRequest.SecondaryColour))
             .WithMessage("Choose two different colours.");
+
+        RuleFor(request => request.CrestShape)
+            .Must(CrestDesigns.IsKnownShape)
+            .When(request => request.CrestShape is not null)
+            .WithMessage("Choose a crest from the list.");
+
+        RuleFor(request => request.CrestPattern)
+            .Must(CrestDesigns.IsKnownPattern)
+            .When(request => request.CrestPattern is not null)
+            .WithMessage("Choose stripes from the list.");
     }
 }
 

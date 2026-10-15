@@ -45,6 +45,8 @@ const STATE: OnboardingState = {
     primaryColour: '#1f4e79',
     secondaryColour: '#d6e4f0',
     hasChosenColours: false,
+    crestShape: 'shield',
+    crestPattern: 'stripes',
   },
   serverTime: '2026-09-30T12:00:00Z',
 };

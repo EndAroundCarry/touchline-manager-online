@@ -57,6 +57,56 @@ public sealed class ChangeClubColoursRequestValidatorTests
             .Which.PropertyName.Should().Be(nameof(ChangeClubColoursRequest.SecondaryColour));
     }
 
-    private static ChangeClubColoursRequest Request(string primary, string secondary) =>
-        new() { PrimaryColour = primary, SecondaryColour = secondary };
+    [Fact]
+    public void A_request_that_names_no_crest_keeps_the_one_the_club_has()
+    {
+        _validator.Validate(Request("#1f4e79", "#d6e4f0")).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("shield", "stripes")]
+    [InlineData("wide-oval", "plain")]
+    [InlineData("hexagon", "checks")]
+    public void Any_shape_with_any_stripes_from_the_catalogue_is_accepted(string shape, string pattern)
+    {
+        _validator.Validate(Request("#1f4e79", "#d6e4f0", shape, pattern)).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void The_shape_and_the_stripes_can_each_be_left_out_to_keep_what_the_club_has()
+    {
+        _validator.Validate(Request("#1f4e79", "#d6e4f0", shape: "round")).IsValid.Should().BeTrue();
+        _validator.Validate(Request("#1f4e79", "#d6e4f0", pattern: "hoops")).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("SHIELD")]
+    [InlineData("stripes")]
+    [InlineData("dragon")]
+    public void A_shape_that_is_not_in_the_catalogue_is_refused_on_the_shape_field(string shape)
+    {
+        var result = _validator.Validate(Request("#1f4e79", "#d6e4f0", shape: shape));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle()
+            .Which.PropertyName.Should().Be(nameof(ChangeClubColoursRequest.CrestShape));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("STRIPES")]
+    [InlineData("shield")]
+    [InlineData("polka-dots")]
+    public void Stripes_that_are_not_in_the_catalogue_are_refused_on_the_stripes_field(string pattern)
+    {
+        var result = _validator.Validate(Request("#1f4e79", "#d6e4f0", pattern: pattern));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle()
+            .Which.PropertyName.Should().Be(nameof(ChangeClubColoursRequest.CrestPattern));
+    }
+
+    private static ChangeClubColoursRequest Request(string primary, string secondary, string? shape = null, string? pattern = null) =>
+        new() { PrimaryColour = primary, SecondaryColour = secondary, CrestShape = shape, CrestPattern = pattern };
 }

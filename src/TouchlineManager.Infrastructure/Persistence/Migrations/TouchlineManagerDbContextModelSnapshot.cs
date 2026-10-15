@@ -3477,6 +3477,16 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CrestPattern")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("crest_pattern");
+
+                    b.Property<string>("CrestShape")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("crest_shape");
+
                     b.Property<int>("FoundingGameYear")
                         .HasColumnType("integer")
                         .HasColumnName("founding_game_year");

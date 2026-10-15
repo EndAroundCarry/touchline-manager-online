@@ -154,6 +154,49 @@ public sealed class ClubTests
     }
 
     [Fact]
+    public void A_club_that_never_chose_a_crest_has_none_stored_and_wears_the_generated_one()
+    {
+        var club = Generate(tier: 1);
+
+        club.CrestShape.Should().BeNull();
+        club.CrestPattern.Should().BeNull();
+        CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape).Should().Be(CrestDesigns.GeneratedShape(club.BadgeSeed));
+        CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern).Should().Be(CrestDesigns.GeneratedPattern(club.BadgeSeed));
+    }
+
+    [Fact]
+    public void Choosing_a_crest_stores_the_shape_and_the_stripes_and_is_a_change_to_the_club()
+    {
+        var club = Generate(tier: 1);
+
+        club.ChangeCrest("round", "hoops", Now.AddMinutes(1));
+
+        club.CrestShape.Should().Be("round");
+        club.CrestPattern.Should().Be("hoops");
+        club.Version.Should().Be(2);
+        club.UpdatedAt.Should().Be(Now.AddMinutes(1));
+    }
+
+    [Theory]
+    [InlineData("", "stripes")]
+    [InlineData("Shield", "stripes")]
+    [InlineData("dragon", "stripes")]
+    [InlineData("shield", "")]
+    [InlineData("shield", "Stripes")]
+    [InlineData("shield", "polka-dots")]
+    public void A_shape_or_stripes_that_are_not_in_the_catalogue_are_refused_and_nothing_changes(string shape, string pattern)
+    {
+        var club = Generate(tier: 1);
+
+        var act = () => club.ChangeCrest(shape, pattern, Now);
+
+        act.Should().Throw<ArgumentException>();
+        club.CrestShape.Should().BeNull();
+        club.CrestPattern.Should().BeNull();
+        club.Version.Should().Be(1);
+    }
+
+    [Fact]
     public void A_six_digit_hex_colour_is_recognised_in_either_case()
     {
         Club.IsHexColour("#1f4e79").Should().BeTrue();

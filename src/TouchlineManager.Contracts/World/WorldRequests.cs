@@ -31,10 +31,12 @@ public sealed record UpdateManagerProfileRequest
     public required string TimeZone { get; init; }
 }
 
-/// <summary>Request to choose the two colours the manager's club plays in.</summary>
+/// <summary>Request to choose the two colours and the crest the manager's club wears.</summary>
 /// <remarks>
 /// The club is never named in the body: it is the club the authenticated manager holds. Colours are written
-/// as <c>#rrggbb</c>, which is what a colour picker produces and what the renderer draws.
+/// as <c>#rrggbb</c>, which is what a colour picker produces and what the renderer draws. The crest is drawn
+/// in those same two colours, which is why it is chosen in the same request. Its shape and its stripes are
+/// chosen independently, so any shape can wear any stripes.
 /// </remarks>
 public sealed record ChangeClubColoursRequest
 {
@@ -43,6 +45,12 @@ public sealed record ChangeClubColoursRequest
 
     /// <summary>Gets the secondary kit colour, e.g. <c>#d6e4f0</c>. It must differ from the primary.</summary>
     public required string SecondaryColour { get; init; }
+
+    /// <summary>Gets the crest shape code, e.g. <c>shield</c>. Omit it to keep the shape as it is.</summary>
+    public string? CrestShape { get; init; }
+
+    /// <summary>Gets the crest stripes code, e.g. <c>hoops</c>. Omit it to keep the stripes as they are.</summary>
+    public string? CrestPattern { get; init; }
 }
 
 /// <summary>Request to take over an AI-controlled club (master plan §7.6).</summary>

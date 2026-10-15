@@ -220,6 +220,8 @@ describe('OnboardingStore', () => {
       primaryColour: '#1f4e79',
       secondaryColour: '#d6e4f0',
       hasChosenColours: false,
+      crestShape: 'shield',
+      crestPattern: 'stripes',
     } as unknown as ClubTenureSummary;
 
     api.state.mockReturnValue(
@@ -227,20 +229,32 @@ describe('OnboardingStore', () => {
     );
     await firstValueFrom(store.loadState());
     api.changeClubColours.mockReturnValue(
-      of({ clubId: 'club-1', primaryColour: '#c0392b', secondaryColour: '#fcd116' }),
+      of({
+        clubId: 'club-1',
+        primaryColour: '#c0392b',
+        secondaryColour: '#fcd116',
+        crestShape: 'round',
+        crestPattern: 'hoops',
+      }),
     );
 
-    await firstValueFrom(store.changeClubColours('#c0392b', '#fcd116'));
+    await firstValueFrom(
+      store.changeClubColours('#c0392b', '#fcd116', { shape: 'round', pattern: 'hoops' }),
+    );
 
     expect(api.changeClubColours).toHaveBeenCalledWith({
       primaryColour: '#c0392b',
       secondaryColour: '#fcd116',
+      crestShape: 'round',
+      crestPattern: 'hoops',
     });
     expect(api.state).toHaveBeenCalledTimes(1);
     expect(store.state()?.tenure).toMatchObject({
       clubName: 'Ashvale United',
       primaryColour: '#c0392b',
       secondaryColour: '#fcd116',
+      crestShape: 'round',
+      crestPattern: 'hoops',
       hasChosenColours: true,
     });
   });
@@ -252,7 +266,11 @@ describe('OnboardingStore', () => {
     await firstValueFrom(store.loadState());
     api.changeClubColours.mockReturnValue(throwError(() => new Error('refused')));
 
-    await expect(firstValueFrom(store.changeClubColours('#c0392b', '#c0392b'))).rejects.toThrow();
+    await expect(
+      firstValueFrom(
+        store.changeClubColours('#c0392b', '#c0392b', { shape: 'shield', pattern: 'stripes' }),
+      ),
+    ).rejects.toThrow();
 
     expect(store.state()?.tenure).toBeNull();
   });

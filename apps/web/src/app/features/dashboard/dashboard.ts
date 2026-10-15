@@ -38,6 +38,7 @@ import {
   statLeaders,
   tableWindow,
 } from './dashboard-presentation';
+import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
 import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
 /**
@@ -58,7 +59,7 @@ import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, ResultHidden],
+  imports: [ClubCrest, RouterLink, ResultHidden],
   templateUrl: './dashboard.html',
 })
 export class Dashboard {
@@ -71,6 +72,9 @@ export class Dashboard {
   private readonly inbox = inject(InboxStore);
 
   protected readonly state = this.store.state;
+
+  /** The club the manager holds, which carries the colours and crest it wears. */
+  protected readonly tenure = computed(() => this.state()?.tenure ?? null);
   protected readonly club = signal<ClubDashboard | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);

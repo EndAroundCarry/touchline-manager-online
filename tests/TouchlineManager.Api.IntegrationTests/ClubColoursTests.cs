@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using TouchlineManager.Application.World;
 using TouchlineManager.Contracts.World;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Api.IntegrationTests;
 
@@ -130,6 +131,125 @@ public sealed class ClubColoursTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_club_always_reports_a_crest_shape_and_stripes_chosen_or_generated()
+    {
+        using var client = CreateClient();
+        await SignInAndOnboardAsync(client);
+
+        var tenure = await ReadTenureAsync(client);
+
+        tenure.CrestShape.Should().BeOneOf(CrestDesigns.Shapes);
+        tenure.CrestPattern.Should().BeOneOf(CrestDesigns.Patterns);
+
+        await ResignAsync(client);
+    }
+
+    [Fact]
+    public async Task Choosing_a_shape_and_stripes_saves_both_and_the_tenure_reports_them()
+    {
+        using var client = CreateClient();
+        await SignInAndOnboardAsync(client);
+
+        var response = await PutAsync(
+            client,
+            new { primaryColour = "#c0392b", secondaryColour = "#fcd116", crestShape = "hexagon", crestPattern = "checks" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var saved = (await response.Content.ReadFromJsonAsync<ClubColoursResponse>())!;
+
+        saved.CrestShape.Should().Be("hexagon");
+        saved.CrestPattern.Should().Be("checks");
+
+        var tenure = await ReadTenureAsync(client);
+
+        tenure.CrestShape.Should().Be("hexagon");
+        tenure.CrestPattern.Should().Be("checks");
+
+        await ResignAsync(client);
+    }
+
+    [Fact]
+    public async Task Changing_only_the_stripes_keeps_the_shape_and_changing_only_the_shape_keeps_the_stripes()
+    {
+        using var client = CreateClient();
+        await SignInAndOnboardAsync(client);
+
+        (await PutAsync(client, new { primaryColour = "#c0392b", secondaryColour = "#fcd116", crestShape = "arch", crestPattern = "pale" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await PutAsync(client, new { primaryColour = "#c0392b", secondaryColour = "#fcd116", crestPattern = "saltire" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var afterStripes = await ReadTenureAsync(client);
+
+        afterStripes.CrestShape.Should().Be("arch");
+        afterStripes.CrestPattern.Should().Be("saltire");
+
+        (await PutAsync(client, new { primaryColour = "#c0392b", secondaryColour = "#fcd116", crestShape = "round" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var afterShape = await ReadTenureAsync(client);
+
+        afterShape.CrestShape.Should().Be("round");
+        afterShape.CrestPattern.Should().Be("saltire");
+
+        await ResignAsync(client);
+    }
+
+    [Fact]
+    public async Task Changing_only_the_colours_keeps_the_crest_the_club_has()
+    {
+        using var client = CreateClient();
+        await SignInAndOnboardAsync(client);
+
+        (await PutAsync(client, new { primaryColour = "#c0392b", secondaryColour = "#fcd116", crestShape = "oval", crestPattern = "pale" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await PutColoursAsync(client, "#12284c", "#ffffff")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var tenure = await ReadTenureAsync(client);
+
+        tenure.PrimaryColour.Should().Be("#12284c");
+        tenure.CrestShape.Should().Be("oval");
+        tenure.CrestPattern.Should().Be("pale");
+
+        await ResignAsync(client);
+    }
+
+    [Theory]
+    [InlineData("dragon", "stripes", "CrestShape")]
+    [InlineData("", "stripes", "CrestShape")]
+    [InlineData("SHIELD", "stripes", "CrestShape")]
+    [InlineData("shield", "polka-dots", "CrestPattern")]
+    [InlineData("shield", "", "CrestPattern")]
+    [InlineData("shield", "shield", "CrestPattern")]
+    public async Task A_shape_or_stripes_that_are_not_in_the_catalogue_are_refused_and_nothing_changes(
+        string shape,
+        string pattern,
+        string field)
+    {
+        using var client = CreateClient();
+        await SignInAndOnboardAsync(client);
+
+        var before = await ReadTenureAsync(client);
+        var response = await PutAsync(
+            client,
+            new { primaryColour = "#c0392b", secondaryColour = "#fcd116", crestShape = shape, crestPattern = pattern });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain(field);
+
+        var after = await ReadTenureAsync(client);
+
+        after.CrestShape.Should().Be(before.CrestShape);
+        after.CrestPattern.Should().Be(before.CrestPattern);
+        after.PrimaryColour.Should().Be(before.PrimaryColour);
+        after.HasChosenColours.Should().Be(before.HasChosenColours);
+
+        await ResignAsync(client);
+    }
+
+    [Fact]
     public async Task A_manager_with_no_club_has_no_colours_to_choose()
     {
         using var client = CreateClient();
@@ -214,9 +334,10 @@ public sealed class ClubColoursTests : IAsyncLifetime
     }
 
     private static Task<HttpResponseMessage> PutColoursAsync(HttpClient client, string primary, string secondary) =>
-        client.PutAsJsonAsync(
-            "/api/v1/club-tenure/colours",
-            new { primaryColour = primary, secondaryColour = secondary });
+        PutAsync(client, new { primaryColour = primary, secondaryColour = secondary });
+
+    private static Task<HttpResponseMessage> PutAsync<T>(HttpClient client, T body) =>
+        client.PutAsJsonAsync("/api/v1/club-tenure/colours", body);
 
     private static Task<HttpResponseMessage> ResignAsync(HttpClient client) =>
         client.PostAsync("/api/v1/club-tenure/resign", content: null);

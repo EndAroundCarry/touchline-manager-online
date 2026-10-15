@@ -4,6 +4,19 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Club crests - choose the badge your club wears
+
+**A manager chooses a crest shape from one dropdown and the stripes on it from another, in the same step and the same Settings card as the club's two colours; any shape can wear any stripes, drawn in those colours.** There are 20 shapes (classic, pointed and Spanish-style shields, roundel, oval, wide oval, hexagon, octagon, diamond, arch and more) and 16 kinds of stripes (vertical, horizontal and diagonal stripes, halves, quarters, sash, cross, saltire, chevron, central stripe, band, chequered, star, plain). They are the shapes and divisions real clubs' crests are built from, each drawn from scratch: no real mark, name, letter or animal (`FIC-3`).
+
+### Added
+
+- `CrestDesigns` (the shape and stripes codes, and a stable generated default for each from the badge seed, hashed with a finalizer so the two vary independently), `Club.CrestShape`, `Club.CrestPattern` and `ChangeCrest`, migration `ClubCrest` (nullable `crest_shape` and `crest_pattern`). `PUT /club-tenure/colours` takes optional `crestShape` and `crestPattern` (a field left out keeps what the club has; an unknown code is a 400 on that field); the tenure and colours responses report the shape and stripes the club wears, chosen or generated.
+- Web: `ClubCrest` (SVG), `CrestPicker` (two dropdowns and a live preview), shown on the colours step, in Settings, and on the dashboard (heading and next-match panel). The colours step is now "Choose your colours and crest".
+
+### Not yet
+
+- Opponents and other clubs still show the initials badge, and a locked match replay does not draw crests: neither the fixture nor the match snapshot carries another club's crest.
+
 ## Weaker-side v2 plan, Milestone 6 - attacking pays only with the players for it (the attack edge)
 
 Specified in [`docs/product/match-engine.md`](docs/product/match-engine.md) 14.37 (Milestones 4 and 5 tried nothing that worked: 14.35 and 14.36). **How much Positive and Attacking add to Balanced now depends on the side's forwards against the other side's defenders, and below a clear gap they cost more than they give: the team with the better defenders gains**; the golden hash is unchanged (the fixture's sides are even).

@@ -25,6 +25,8 @@ describe('ClubColoursChoice', () => {
             primaryColour: '#1f4e79',
             secondaryColour: '#d6e4f0',
             hasChosenColours: false,
+            crestShape: 'shield',
+            crestPattern: 'stripes',
           } as unknown as OnboardingState['tenure'])
         : null,
       serverTime: '2026-09-01T00:00:00Z',
@@ -57,7 +59,7 @@ describe('ClubColoursChoice', () => {
 
   function confirmButton(): HTMLButtonElement {
     return Array.from(root.querySelectorAll('button')).find(
-      (button) => button.textContent?.trim() === 'Confirm colours',
+      (button) => button.textContent?.trim() === 'Confirm colours and crest',
     )!;
   }
 
@@ -75,20 +77,35 @@ describe('ClubColoursChoice', () => {
 
   it('saves the pair as it stands and opens the dashboard', async () => {
     store.changeClubColours.mockReturnValue(
-      of({ clubId: 'club-1', primaryColour: '#1f4e79', secondaryColour: '#d6e4f0' }),
+      of({
+        clubId: 'club-1',
+        primaryColour: '#1f4e79',
+        secondaryColour: '#d6e4f0',
+        crestShape: 'shield',
+        crestPattern: 'stripes',
+      }),
     );
     await open(state(true));
 
     confirmButton().click();
     await fixture.whenStable();
 
-    expect(store.changeClubColours).toHaveBeenCalledWith('#1f4e79', '#d6e4f0');
+    expect(store.changeClubColours).toHaveBeenCalledWith('#1f4e79', '#d6e4f0', {
+      shape: 'shield',
+      pattern: 'stripes',
+    });
     expect(navigate).toHaveBeenCalledWith('/dashboard');
   });
 
   it('saves a colour chosen from the picker', async () => {
     store.changeClubColours.mockReturnValue(
-      of({ clubId: 'club-1', primaryColour: '#c0392b', secondaryColour: '#d6e4f0' }),
+      of({
+        clubId: 'club-1',
+        primaryColour: '#c0392b',
+        secondaryColour: '#d6e4f0',
+        crestShape: 'shield',
+        crestPattern: 'stripes',
+      }),
     );
     await open(state(true));
 
@@ -100,7 +117,42 @@ describe('ClubColoursChoice', () => {
     confirmButton().click();
     await fixture.whenStable();
 
-    expect(store.changeClubColours).toHaveBeenCalledWith('#c0392b', '#d6e4f0');
+    expect(store.changeClubColours).toHaveBeenCalledWith('#c0392b', '#d6e4f0', {
+      shape: 'shield',
+      pattern: 'stripes',
+    });
+  });
+
+  it('starts the crest on the one the club wears and saves the shape and stripes picked instead', async () => {
+    store.changeClubColours.mockReturnValue(
+      of({
+        clubId: 'club-1',
+        primaryColour: '#1f4e79',
+        secondaryColour: '#d6e4f0',
+        crestShape: 'round',
+        crestPattern: 'hoops',
+      }),
+    );
+    await open(state(true));
+
+    const shape = root.querySelector('select[id^="crest-shape"]') as HTMLSelectElement;
+    const pattern = root.querySelector('select[id^="crest-pattern"]') as HTMLSelectElement;
+
+    expect(shape.value).toBe('shield');
+    expect(pattern.value).toBe('stripes');
+
+    shape.value = 'round';
+    shape.dispatchEvent(new Event('change'));
+    pattern.value = 'hoops';
+    pattern.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    confirmButton().click();
+    await fixture.whenStable();
+
+    expect(store.changeClubColours).toHaveBeenCalledWith('#1f4e79', '#d6e4f0', {
+      shape: 'round',
+      pattern: 'hoops',
+    });
   });
 
   it('will not save the same colour twice', async () => {

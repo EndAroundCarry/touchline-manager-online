@@ -9,18 +9,23 @@ import {
   PAGE_HEADING,
   PRIMARY_BUTTON,
 } from '../../../shared/forms/control-styles';
+import { CrestPicker } from '../../../shared/ui/crest-picker/crest-picker';
+import {
+  DEFAULT_CREST_PATTERN,
+  DEFAULT_CREST_SHAPE,
+} from '../../../shared/ui/club-crest/crest-designs';
 import { KitColourPicker } from '../../../shared/ui/kit-colour-picker/kit-colour-picker';
 
 /**
- * The colours step of onboarding, shown once a club has been taken over.
+ * The colours and crest step of onboarding, shown once a club has been taken over.
  *
- * The club arrives wearing the colours it was generated with, so they are what the picker starts on and a
- * manager who likes them confirms in one click. Choosing is never a gate: leaving without saving keeps the
- * generated colours, and the same picker is in Settings for as long as the club is theirs.
+ * The club arrives wearing the colours and crest it was generated with, so they are what the pickers start on
+ * and a manager who likes them confirms in one click. Choosing is never a gate: leaving without saving keeps
+ * the generated look, and the same pickers are in Settings for as long as the club is theirs.
  */
 @Component({
   selector: 'app-club-colours-choice',
-  imports: [KitColourPicker, RouterLink],
+  imports: [CrestPicker, KitColourPicker, RouterLink],
   templateUrl: './colours.html',
 })
 export class ClubColoursChoice {
@@ -38,6 +43,8 @@ export class ClubColoursChoice {
 
   protected readonly primary = signal('#1f4e79');
   protected readonly secondary = signal('#d6e4f0');
+  protected readonly crestShape = signal(DEFAULT_CREST_SHAPE.code);
+  protected readonly crestPattern = signal(DEFAULT_CREST_PATTERN.code);
 
   /** Whether a write is allowed; offline or read-only the colours cannot be saved. */
   protected readonly canMutate = this.maintenance.canMutate;
@@ -59,6 +66,8 @@ export class ClubColoursChoice {
         this.clubName.set(state.tenure.clubName);
         this.primary.set(state.tenure.primaryColour);
         this.secondary.set(state.tenure.secondaryColour);
+        this.crestShape.set(state.tenure.crestShape);
+        this.crestPattern.set(state.tenure.crestPattern);
       },
       error: (error: unknown) => {
         this.loading.set(false);
@@ -69,7 +78,7 @@ export class ClubColoursChoice {
     });
   }
 
-  /** Saves the pair, then opens the club's dashboard. */
+  /** Saves the colours and crest, then opens the club's dashboard. */
   protected confirm(picker: KitColourPicker): void {
     if (this.saving() || !picker.valid()) {
       return;
@@ -78,16 +87,21 @@ export class ClubColoursChoice {
     this.saveError.set(null);
     this.saving.set(true);
 
-    this.store.changeClubColours(this.primary(), this.secondary()).subscribe({
-      next: () => void this.router.navigateByUrl('/dashboard'),
-      error: (error: unknown) => {
-        this.saving.set(false);
-        this.saveError.set(
-          error instanceof ApiError
-            ? error.detail
-            : 'The colours could not be saved. Try again, or choose them later in Settings.',
-        );
-      },
-    });
+    this.store
+      .changeClubColours(this.primary(), this.secondary(), {
+        shape: this.crestShape(),
+        pattern: this.crestPattern(),
+      })
+      .subscribe({
+        next: () => void this.router.navigateByUrl('/dashboard'),
+        error: (error: unknown) => {
+          this.saving.set(false);
+          this.saveError.set(
+            error instanceof ApiError
+              ? error.detail
+              : 'Your colours and crest could not be saved. Try again, or choose them later in Settings.',
+          );
+        },
+      });
   }
 }
