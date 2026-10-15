@@ -3,7 +3,7 @@
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
 } @else if (squad(); as inherited) {
-  <section class="max-w-6xl">
+  <section>
     <h1 [class]="pageHeadingClass">{{ inherited.clubName }} squad</h1>
     <p class="mt-1 text-sm text-ink-2">
       {{ inherited.countryCode }} · season {{ inherited.seasonNumber }} ·
@@ -22,7 +22,7 @@
 
     <h2 class="sr-only">Squad filters</h2>
 
-    <div class="mt-6 grid gap-3 sm:grid-cols-3">
+    <div class="mt-6 grid max-w-6xl gap-3 sm:grid-cols-3">
       <label class="block">
         <span class="text-sm font-medium text-ink-2">Search by name</span>
         <input
@@ -78,7 +78,7 @@
     >
       <p-table
         [value]="players()"
-        [tableStyle]="{ 'min-width': '72rem' }"
+        [tableStyle]="{ 'min-width': 'max-content' }"
         [pt]="{ table: { 'aria-label': 'Squad roster' } }"
       >
         <ng-template #header>
