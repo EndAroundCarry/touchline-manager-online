@@ -148,6 +148,21 @@ internal static class TickShotStopper
     /// <summary>How far outside the nearer post a ball tipped round it is sent, in pitch units.</summary>
     public const int TipWideOfPost = 600;
 
+    /// <summary>How far in from a post, in pitch units, a free kick still counts as placed in the corner (1.6 m).</summary>
+    public const int CornerWidth = 200;
+
+    /// <summary>The height, in Z units, below which a free kick is no nearer the top corner than the goalkeeper's own reach.</summary>
+    public const int CornerLowZUnits = 14;
+
+    /// <summary>The height, in Z units, at which a free kick is in the top corner.</summary>
+    public const int CornerHighZUnits = 26;
+
+    /// <summary>The farthest, in pitch units, a perfectly placed free kick is taken from a goalkeeper (2.5 m): added to what he must cover.</summary>
+    public const int PlacementStretch = 300;
+
+    /// <summary>The share of the stretch, in percent, that a ball close to a post or to the bar earns on its own, without being in the corner.</summary>
+    public const int PlacementEdgeShare = 20;
+
     private const int BasisPoints = 10_000;
     private const int HoldBase = 3_500;
     private const int HoldPerHandling = 330;
@@ -242,13 +257,31 @@ internal static class TickShotStopper
     public static bool ShouldResolve(in TickShotForecast forecast, int ticksSinceShot) =>
         forecast.OnTarget && forecast.PlaneTicks - ticksSinceShot <= 1;
 
+    /// <summary>
+    /// Gets how much farther than its line a free kick is from the goalkeeper because of where it is placed, in pitch units: nothing for
+    /// a ball into his body, <see cref="PlacementStretch"/> for one in the top corner. Close to a post and close to the bar each earn
+    /// <see cref="PlacementEdgeShare"/> of it, and the corner itself the rest. The ball is judged where it passes him.
+    /// </summary>
+    /// <param name="forecast">The shot's forecast.</param>
+    public static int PlacementOf(in TickShotForecast forecast)
+    {
+        var edgeDistance = TickSpatialUnits.GoalMouthMaxUnits - SpatialPitch.GoalYCenter - Math.Abs(forecast.PlaneY - SpatialPitch.GoalYCenter);
+        var edge = Math.Clamp((CornerWidth - edgeDistance) * BasisPoints / CornerWidth, 0, BasisPoints);
+        var high = Math.Clamp((forecast.PlaneZ - CornerLowZUnits) * BasisPoints / (CornerHighZUnits - CornerLowZUnits), 0, BasisPoints);
+        var corner = edge * high / BasisPoints;
+        var share = (Math.Max(edge, high) * PlacementEdgeShare / 100) + (corner * (100 - PlacementEdgeShare) / 100);
+
+        return PlacementStretch * share / BasisPoints;
+    }
+
     /// <summary>Works out what the goalkeeper can do about the shot from where he stands.</summary>
     /// <param name="keeper">The goalkeeper's body, as it is when the ball reaches him.</param>
     /// <param name="skills">The goalkeeper's skills.</param>
     /// <param name="forecast">The shot's forecast.</param>
-    public static TickSaveAssessment Assess(in TickPlayerState keeper, in TickPlayerSkills skills, in TickShotForecast forecast)
+    /// <param name="placement">How much farther the ball is from him for where it is placed (<see cref="PlacementOf"/>), or 0.</param>
+    public static TickSaveAssessment Assess(in TickPlayerState keeper, in TickPlayerSkills skills, in TickShotForecast forecast, int placement = 0)
     {
-        var needed = Math.Abs(forecast.PlaneY - TickSpatialUnits.ToUnits(keeper.Y));
+        var needed = Math.Abs(forecast.PlaneY - TickSpatialUnits.ToUnits(keeper.Y)) + placement;
         var parry = BodyReach + DiveBase + (DivePerAgility * (skills.Agility + skills.Reflexes) / 2);
         var share = CatchShareBase + (CatchSharePerHandlingTenths * skills.Handling / 10);
         var height = HeightBase + ((skills.JumpingReach + skills.AerialAbility) * 2 / 5);

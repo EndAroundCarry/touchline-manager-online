@@ -89,6 +89,9 @@ internal readonly record struct TickPlayerSkills
     /// <summary>Gets the SetPieces attribute: striking a dead ball, which picks the corner, free-kick and penalty takers.</summary>
     public required int SetPieces { get; init; }
 
+    /// <summary>Gets the attributes these skills were curved from, or null when they were not curved (<see cref="Uncurved"/>).</summary>
+    public PlayerAttributesV1? Natural { get; init; }
+
     /// <summary>The pitch's average attribute, which the engine's skill curve is centred on.</summary>
     public const int CurveCentre = 13;
 
@@ -112,8 +115,14 @@ internal readonly record struct TickPlayerSkills
             values[index] = CurveCentre + (((attributes.Values[index]) - CurveCentre) * CurvePercent / 100);
         }
 
-        return From(PlayerAttributesV1.From(values));
+        return From(PlayerAttributesV1.From(values)) with { Natural = attributes };
     }
+
+    /// <summary>
+    /// Gets the player's attributes as he has them, before the skill curve: what a dead ball, where one man faces another with
+    /// time to spare, is decided on. Skills not built by <see cref="Rated"/> have no curve to undo and are returned as they are.
+    /// </summary>
+    public TickPlayerSkills Uncurved() => Natural is null ? this : From(Natural);
 
     /// <summary>Builds a player's skills from his frozen attributes.</summary>
     /// <param name="attributes">The player's attributes.</param>

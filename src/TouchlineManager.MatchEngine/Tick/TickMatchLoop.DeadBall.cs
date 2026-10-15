@@ -17,6 +17,7 @@ internal sealed partial class TickMatchLoop
     private int _shotQuality;
     private ShotZone _shotZone;
     private bool _shotPenalty;
+    private bool _shotFreeKick;
     private SpatialPoint _shotOrigin;
 
     private TickSetPiecePlan _plan = new(0, -1);
@@ -35,6 +36,7 @@ internal sealed partial class TickMatchLoop
         _shooter = new TickRef(side, team.SlotNumber[seat]);
         _shotTicks = 0;
         _shotPenalty = penalty;
+        _shotFreeKick = freeKick;
         _shotOrigin = origin;
         _shotQuality = penalty
             ? PenaltyQuality
@@ -85,7 +87,8 @@ internal sealed partial class TickMatchLoop
     private void ResolveSave()
     {
         var keepers = _teams[1 - _shooter.Side];
-        var assessment = TickShotStopper.Assess(keepers.Body[0], keepers.Skills[0], _forecast);
+        var placement = _shotFreeKick ? TickShotStopper.PlacementOf(_forecast) : 0;
+        var assessment = TickShotStopper.Assess(keepers.Body[0], _shotFreeKick ? keepers.Skills[0].Uncurved() : keepers.Skills[0], _forecast, placement);
         var outcome = TickShotStopper.Resolve(assessment, _forecast.PlaneZ, _random, out var deflect);
 
         TickShotStopper.Apply(outcome, ref keepers.Body[0], 0, keepers.IsHome, _ball, deflect);

@@ -196,6 +196,21 @@ if (mode is "tickmatrix")
     TickCalibration.Matrix(Math.Min(count, 100), seed, rules);
 }
 
+if (mode is "tickfk")
+{
+    FreeKickProbe.Run(Math.Min(count, 600), seed, rules);
+}
+
+if (mode is "tickfkgrid")
+{
+    FreeKickProbe.Grid(Math.Min(count, 600), seed, rules);
+}
+
+if (mode is "tickfkshape")
+{
+    FreeKickShapeProbe.Run(Math.Min(count, 20_000));
+}
+
 if (mode is "goalorigin")
 {
     GoalOriginProbe.Run(positional[2], Math.Min(count, 600), rules);

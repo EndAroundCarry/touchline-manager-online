@@ -170,6 +170,37 @@ public sealed class TickShotStopperTests
     }
 
     [Fact]
+    public void A_free_kick_placed_in_the_top_corner_is_farther_from_the_goalkeeper_than_one_at_his_body()
+    {
+        TickShotForecast Forecast(int planeY, int planeZ) => new(true, TickBallBoundary.GoalHomeEnd, 6, 5, planeY, planeZ, ShotSpeed);
+
+        var postSide = TickSpatialUnits.GoalMouthMinUnits + 40;
+        var atHim = TickShotStopper.PlacementOf(Forecast(3_500, 8));
+        var lowCorner = TickShotStopper.PlacementOf(Forecast(postSide, 8));
+        var highCentre = TickShotStopper.PlacementOf(Forecast(3_500, 28));
+        var topCorner = TickShotStopper.PlacementOf(Forecast(postSide, 28));
+
+        atHim.Should().Be(0);
+        lowCorner.Should().BeGreaterThan(0).And.BeLessThan(topCorner);
+        highCentre.Should().BeGreaterThan(0).And.BeLessThan(topCorner);
+        topCorner.Should().BeGreaterThan(TickShotStopper.PlacementStretch / 2);
+        TickShotStopper.PlacementOf(Forecast(postSide, 28)).Should().Be(TickShotStopper.PlacementOf(Forecast(3_877 - 40, 28)), "either post");
+    }
+
+    [Fact]
+    public void A_placement_adds_to_what_the_goalkeeper_has_to_cover()
+    {
+        var keeper = Keeper();
+        var forecast = new TickShotForecast(true, TickBallBoundary.GoalHomeEnd, 6, 5, 3_560, 0, ShotSpeed);
+        var plain = TickShotStopper.Assess(keeper, Skills(10), forecast);
+        var placed = TickShotStopper.Assess(keeper, Skills(10), forecast, 120);
+
+        placed.Needed.Should().Be(plain.Needed + 120);
+        placed.ParryReach.Should().Be(plain.ParryReach);
+        placed.TipBasisPoints.Should().BeGreaterThan(plain.TipBasisPoints);
+    }
+
+    [Fact]
     public void A_faster_ball_is_harder_to_hold_and_a_stretched_save_is_more_likely_to_go_behind()
     {
         var keeper = Keeper();

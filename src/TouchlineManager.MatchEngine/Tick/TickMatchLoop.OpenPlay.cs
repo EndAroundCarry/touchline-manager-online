@@ -663,7 +663,7 @@ internal sealed partial class TickMatchLoop
 
             if (_shotLive && _shooter.Side != index && _forecast.OnTarget && !_shotResolved)
             {
-                team.Intent[0] = TickShotStopper.DiveIntent(keeper, team.Skills[0], _forecast, _shotTicks);
+                team.Intent[0] = TickShotStopper.DiveIntent(keeper, _shotFreeKick ? team.Skills[0].Uncurved() : team.Skills[0], _forecast, _shotTicks);
                 team.HasIntent[0] = true;
 
                 continue;

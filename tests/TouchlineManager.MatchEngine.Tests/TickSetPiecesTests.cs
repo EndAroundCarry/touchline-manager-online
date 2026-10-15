@@ -670,11 +670,82 @@ public sealed class TickSetPiecesTests
         var high = new Scene(TickRestart.FreeKick(homeTakes: true, 7_300, 4_400));
         var lowDecision = low.Decide(low.Place());
         var highDecision = high.Decide(high.Place());
+        var inset = TickSetPieces.FreeKickInsetPoor - ((TickSetPieces.FreeKickInsetPoor - TickSetPieces.FreeKickInsetBest) * TickSetPieces.Craft(low.TakerSkills[low.Place().TakerIndex]) / 10_000);
 
         lowDecision.Action.Should().Be(TickCarrierAction.Shoot);
-        lowDecision.Target.Y.Should().Be(3_500 + (TickSpatialUnits.GoalMouthMaxUnits - 3_500 - TickBallCarrierBrain.ShotAimOffset), "far post from the low side");
-        highDecision.Target.Y.Should().Be(3_500 - (TickSpatialUnits.GoalMouthMaxUnits - 3_500 - TickBallCarrierBrain.ShotAimOffset));
+        lowDecision.Target.Y.Should().Be(3_500 + (TickSpatialUnits.GoalMouthMaxUnits - 3_500 - inset), "far post from the low side");
+        highDecision.Target.Y.Should().Be(3_500 - (TickSpatialUnits.GoalMouthMaxUnits - 3_500 - inset));
         lowDecision.Target.X.Should().BeGreaterThan(10_000, "the aim is beyond the line");
+    }
+
+    [Fact]
+    public void A_free_kick_is_judged_on_the_attributes_a_player_has_not_the_ones_the_skill_curve_leaves_him()
+    {
+        var weak = TickPlayerSkills.Rated(PlayerAttributesV1.Uniform(6));
+        var strong = TickPlayerSkills.Rated(PlayerAttributesV1.Uniform(20));
+
+        weak.SetPieces.Should().BeGreaterThan(6, "the curve pulls a weak player towards the average");
+        strong.SetPieces.Should().BeLessThan(20);
+        weak.Uncurved().SetPieces.Should().Be(6);
+        strong.Uncurved().SetPieces.Should().Be(20);
+        TickSetPieces.Craft(strong.Uncurved()).Should().BeGreaterThan(TickSetPieces.Craft(weak.Uncurved()) * 2);
+        Skill(12).Uncurved().SetPieces.Should().Be(12, "skills that were never curved are left as they are");
+    }
+
+    [Fact]
+    public void A_free_kick_taker_with_craft_aims_closer_to_the_post_than_one_without()
+    {
+        var restart = TickRestart.FreeKick(homeTakes: true, 7_300, 2_600);
+        var crafty = new Scene(restart, takerSkills: [.. Enumerable.Range(0, 11).SelectMany(index => new[] { (index, MatchAttributeName.SetPieces, 20), (index, MatchAttributeName.Technique, 20) })]);
+        var clumsy = new Scene(restart, takerSkills: [.. Enumerable.Range(0, 11).SelectMany(index => new[] { (index, MatchAttributeName.SetPieces, 1), (index, MatchAttributeName.Technique, 1) })]);
+        var craftyAim = crafty.Decide(crafty.Place()).Target.Y;
+        var clumsyAim = clumsy.Decide(clumsy.Place()).Target.Y;
+
+        craftyAim.Should().BeGreaterThan(clumsyAim, "the far post is the high side from a low spot");
+        TickSpatialUnits.GoalMouthMaxUnits.Should().BeGreaterThan(craftyAim);
+        (clumsyAim - 3_500).Should().BeLessThan(100, "a taker without craft hits it at the goalkeeper");
+    }
+
+    [Fact]
+    public void A_free_kick_of_a_taker_with_craft_is_higher_and_closer_to_the_post_as_it_passes_the_goalkeeper()
+    {
+        var restart = TickRestart.FreeKick(homeTakes: true, 7_300, 3_500);
+        var crafty = new Scene(restart, takerSkills: [.. Enumerable.Range(0, 11).SelectMany(index => new[] { (index, MatchAttributeName.SetPieces, 20), (index, MatchAttributeName.Technique, 20) })]);
+        var clumsy = new Scene(restart, takerSkills: [.. Enumerable.Range(0, 11).SelectMany(index => new[] { (index, MatchAttributeName.SetPieces, 1), (index, MatchAttributeName.Technique, 1) })]);
+
+        double Height(Scene scene, TickPlayerSkills skills)
+        {
+            var decision = scene.Decide(scene.Place());
+            long total = 0;
+            var counted = 0;
+
+            for (ulong seed = 1; seed <= 200; seed++)
+            {
+                var ball = new TickBallPhysics();
+
+                ball.PlaceAt(restart.SpotX, restart.SpotY);
+                TickSetPieces.Execute(TickRestartKind.FreeKick, decision, skills, ball, new Pcg32(seed)).Should().BeTrue();
+
+                var boundary = TickBallBoundary.InPlay;
+                var height = 0;
+
+                for (var tick = 0; tick < 80 && boundary == TickBallBoundary.InPlay && ball.UnitX < 10_000 - TickSetPieces.FreeKickKeeperPlane; tick++)
+                {
+                    boundary = ball.Step();
+                    height = ball.UnitZ;
+                }
+
+                if (ball.UnitX >= 10_000 - TickSetPieces.FreeKickKeeperPlane - 300)
+                {
+                    total += height;
+                    counted++;
+                }
+            }
+
+            return (double)total / Math.Max(1, counted);
+        }
+
+        Height(crafty, Skill(20)).Should().BeGreaterThan(Height(clumsy, Skill(1)) + 8, "a taker with craft places the ball high, one without leaves it where a goalkeeper can reach");
     }
 
     [Fact]

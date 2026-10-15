@@ -201,8 +201,44 @@ internal static class TickSetPieces
     /// <summary>How far in front of the line the keeper stands behind a wall, in pitch units.</summary>
     public const int WallKeeperDepth = 150;
 
-    /// <summary>The peak height of a free-kick shot, in Z units: high enough to clear the wall, low enough to dip under the bar.</summary>
+    /// <summary>The lowest peak of a free-kick shot, in Z units: high enough to clear the wall and low enough to dip under the bar.</summary>
     public const int FreeKickApex = 44;
+
+    /// <summary>The highest peak a free-kick shot is given, in Z units.</summary>
+    public const int FreeKickMaxApex = 90;
+
+    /// <summary>
+    /// The height, in Z units, above the grass that a free kick must be at the wall (it stands <see cref="WallDistance"/> out), before
+    /// the taker's error: above a jumping wall player's reach (<see cref="TickBallPhysics.HeadReachZUnits"/>) with a hand's breadth to spare.
+    /// </summary>
+    public const int WallClearance = 41;
+
+    /// <summary>How far in front of the goal line the goalkeeper's plane is taken to be when a free kick is aimed, in pitch units (2 m).</summary>
+    public const int FreeKickKeeperPlane = 200;
+
+    /// <summary>The height, in Z units, at which a taker of no craft sends the ball past the goalkeeper: at his chest.</summary>
+    public const int FreeKickAimLow = 2;
+
+    /// <summary>The height, in Z units, at which a taker of full craft sends the ball past the goalkeeper: at the top of his reach.</summary>
+    public const int FreeKickAimHigh = 26;
+
+    /// <summary>How far inside the post, in pitch units, a taker of no craft aims: near enough to the goalkeeper to be at him (3.5 m).</summary>
+    public const int FreeKickInsetPoor = 350;
+
+    /// <summary>How far inside the post, in pitch units, a taker of full craft aims: into the corner (0.6 m).</summary>
+    public const int FreeKickInsetBest = 160;
+
+    /// <summary>The most Z units a kick's height at the goal line strays from its aim, as a percentage of the kick's error angle.</summary>
+    public const int FreeKickHeightErrorPercent = 22;
+
+    /// <summary>The share of a wall's clearance that the kick's height error also takes from the wall: a flatter strike clips it.</summary>
+    public const int WallClearanceErrorPercent = 100;
+
+    /// <summary>How wide a free kick strays from its aim, as a percentage of a penalty's error angle: a wall in front of the man and a run of 25 m or more against it.</summary>
+    public const int FreeKickErrorPercent = 160;
+
+    /// <summary>The skill, on the 1-20 scale, that is full craft: <c>(2 × SetPieces + Technique) / 3</c> at or above it.</summary>
+    public const int CraftCeiling = 20;
 
     /// <summary>The raw pressure on a free-kick shot, in basis points (the crowd and the wall).</summary>
     public const int FreeKickPressure = 1_500;
@@ -437,7 +473,7 @@ internal static class TickSetPieces
             TickRestartKind.GoalKick => DecideGoalKick(view, plan, situation.TakerPassing),
             TickRestartKind.ThrowIn => DecideOutlet(view, plan, ThrowRange),
             TickRestartKind.Corner => DecideCorner(view, plan, situation.TakerPassing),
-            TickRestartKind.FreeKick => DecideFreeKick(view, plan, composure),
+            TickRestartKind.FreeKick => DecideFreeKick(view, plan, situation.TakerSkills[plan.TakerIndex].Uncurved()),
             _ => DecidePenalty(view, plan, composure),
         };
 
@@ -469,21 +505,88 @@ internal static class TickSetPieces
         ArgumentNullException.ThrowIfNull(ball);
         ArgumentNullException.ThrowIfNull(random);
 
-        var error = TickBallCarrierBrain.ErrorAngle(skills.SetPieces, skills.Technique, TickBallCarrierBrain.SetPieceShotBaseError, decision.EffectivePressure);
-        var turn = random.NextRange(-error, error);
+        // A free kick is struck at leisure: the man's own craft counts, not the curve the game's pace is kept by.
+        var natural = skills.Uncurved();
+
+        var error = TickBallCarrierBrain.ErrorAngle(natural.SetPieces, natural.Technique, TickBallCarrierBrain.SetPieceShotBaseError, decision.EffectivePressure);
+        error = Math.Max(1, error * FreeKickErrorPercent / 100);
+
+        var spread = Math.Max(1, error * FreeKickHeightErrorPercent / 100);
+
+        // One draw is split into the sideways and the vertical error of the strike.
+        var draw = random.NextUInt32();
+        var turn = (int)((draw & 0xFFFF) % (uint)((2 * error) + 1)) - error;
+        var heightError = (int)((draw >> 16) % (uint)((2 * spread) + 1)) - spread;
+        var craft = Craft(natural);
+        var aimHeight = FreeKickAimLow + ((FreeKickAimHigh - FreeKickAimLow) * craft / 10_000) + heightError;
+        var clearance = WallClearance + (heightError * WallClearanceErrorPercent / 100);
         var fromX = ball.UnitX;
         var fromY = ball.UnitY;
         long dx = decision.Target.X - fromX;
         long dy = decision.Target.Y - fromY;
         var cos = TickTrigonometry.Cos(turn);
         var sin = TickTrigonometry.Sin(turn);
+        var aimX = (dx * cos) - (dy * sin);
+        var aimY = (dx * sin) + (dy * cos);
+        var unitsX = aimX / TickTrigonometry.Scale;
+        var unitsY = aimY / TickTrigonometry.Scale;
+        var goalX = unitsX >= 0 ? PitchLength : 0;
+        var toGoal = Math.Abs(goalX - (long)fromX);
+
+        if (unitsX == 0 || toGoal == 0)
+        {
+            ball.LaunchLofted(fromX + (int)unitsX, fromY + (int)unitsY, FreeKickApex);
+
+            return true;
+        }
+
+        // Where the kick crosses the goal line, and how far that is along the ball's way.
+        var crossY = unitsY * toGoal / Math.Abs(unitsX);
+        var lineDistance = SpatialMath.Sqrt((toGoal * toGoal) + (crossY * crossY));
+
+        // The kick is solved backwards from where it is to be as it passes the goalkeeper's plane: the peak that clears the wall (and gives
+        // that height) fixes how much of the flight is left there, and so where the ball comes down.
+        var planeDistance = Math.Max(lineDistance / 2, lineDistance - FreeKickKeeperPlane);
+        var height = Math.Clamp(aimHeight, 1, FreeKickMaxApex - 6);
+        var apex = (long)FreeKickApex;
+        long landing = planeDistance;
+
+        for (var pass = 0; pass < 4; pass++)
+        {
+            var remaining = Math.Max(0, 10_000 - (height * 10_000 / apex));
+            var root = SpatialMath.Sqrt(remaining * 10_000);
+            var planeShare = Math.Clamp((10_000 + root) / 2, 5_000, 10_000);
+
+            landing = planeDistance * 10_000 / planeShare;
+
+            var wallShare = Math.Min(9_000, WallDistance * 10_000L / Math.Max(1, landing));
+            var wallShape = Math.Max(500, 4 * wallShare * (10_000 - wallShare) / 10_000);
+
+            apex = Math.Clamp(Math.Max(Math.Max(FreeKickApex, clearance * 10_000L / wallShape), (height * 10_000L / 9_500) + 1), FreeKickApex, FreeKickMaxApex);
+        }
+
+        var stretch = landing * 10_000 / Math.Max(1, lineDistance);
+        var landX = goalX >= fromX ? toGoal : -toGoal;
 
         ball.LaunchLofted(
-            fromX + (int)(((dx * cos) - (dy * sin)) / TickTrigonometry.Scale),
-            fromY + (int)(((dx * sin) + (dy * cos)) / TickTrigonometry.Scale),
-            FreeKickApex);
+            fromX + (int)(landX * stretch / 10_000),
+            fromY + (int)(crossY * stretch / 10_000),
+            (int)apex);
 
         return true;
+    }
+
+    /// <summary>
+    /// Gets how much a taker can do with a dead ball, in basis points: <c>(2 × SetPieces + Technique) / 3</c> against
+    /// <see cref="CraftCeiling"/>. It sets where a free kick is aimed and how well it is struck.
+    /// </summary>
+    /// <param name="skills">The taker's skills.</param>
+    public static int Craft(in TickPlayerSkills skills)
+    {
+        var linear = Math.Clamp(((2 * skills.SetPieces) + skills.Technique) * 10_000 / (3 * CraftCeiling), 0, 10_000);
+
+        // Mostly eased: most of what a taker can do with a dead ball he has by the middle of the scale, and the last points are the specialist's.
+        return (linear + (3 * (linear * ((2 * 10_000) - linear) / 10_000))) / 4;
     }
 
     // ---- Layouts -------------------------------------------------------------------------------------------------------------
@@ -1276,17 +1379,18 @@ internal static class TickSetPieces
             : new TickCarrierDecision(TickCarrierAction.Cross, receiver, view.Own[receiver], 0, 0, pressure);
     }
 
-    private static TickCarrierDecision DecideFreeKick(in Layout view, in TickSetPiecePlan plan, int composure)
+    private static TickCarrierDecision DecideFreeKick(in Layout view, in TickSetPiecePlan plan, in TickPlayerSkills taker)
     {
         var spot = view.Spot;
 
         if (IsShootingRange(spot.X, spot.Y))
         {
-            // At the far post, away from the wall's side.
+            // At the far post, away from the wall's side: a taker of craft aims for the corner, one without at the goalkeeper.
             var nearSign = spot.Y <= Middle ? -1 : 1;
-            var aim = new SpatialPoint(PitchLength + TickBallCarrierBrain.ShotOvershoot, Middle - (nearSign * (TickSpatialUnits.GoalMouthMaxUnits - Middle - TickBallCarrierBrain.ShotAimOffset)));
+            var inset = FreeKickInsetPoor - ((FreeKickInsetPoor - FreeKickInsetBest) * Craft(taker) / 10_000);
+            var aim = new SpatialPoint(PitchLength + TickBallCarrierBrain.ShotOvershoot, Middle - (nearSign * (TickSpatialUnits.GoalMouthMaxUnits - Middle - inset)));
 
-            return new TickCarrierDecision(TickCarrierAction.Shoot, -1, aim, 0, 0, TickBallCarrierBrain.EffectivePressure(FreeKickPressure, composure));
+            return new TickCarrierDecision(TickCarrierAction.Shoot, -1, aim, 0, 0, TickBallCarrierBrain.EffectivePressure(FreeKickPressure, taker.Composure));
         }
 
         return spot.X >= CrossFreeKickX
