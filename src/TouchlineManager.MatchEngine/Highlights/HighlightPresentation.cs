@@ -129,6 +129,60 @@ public sealed record MatchLineupPlayerV1
     public int? SubbedInMinute { get; init; }
     public bool IsInjured { get; init; }
 
+    /// <summary>Gets the passes attempted (`replay-v17`).</summary>
+    public int PassesAttempted { get; init; }
+
+    /// <summary>Gets the passes that found a teammate (`replay-v17`).</summary>
+    public int PassesCompleted { get; init; }
+
+    /// <summary>Gets the take-ons attempted (`replay-v17`).</summary>
+    public int DribblesAttempted { get; init; }
+
+    /// <summary>Gets the take-ons won (`replay-v17`).</summary>
+    public int DribblesCompleted { get; init; }
+
+    /// <summary>Gets the challenges made on the man with the ball (`replay-v17`).</summary>
+    public int TacklesAttempted { get; init; }
+
+    /// <summary>Gets the challenges won (`replay-v17`).</summary>
+    public int TacklesWon { get; init; }
+
+    /// <summary>Gets the crosses attempted from open play and free kicks (`replay-v17`).</summary>
+    public int CrossesAttempted { get; init; }
+
+    /// <summary>Gets the crosses that found a teammate (`replay-v17`).</summary>
+    public int CrossesCompleted { get; init; }
+
+    /// <summary>Gets the shots, counted from the events on the rules the season statistics use (`replay-v17`).</summary>
+    public int Shots { get; init; }
+
+    /// <summary>Gets the shots on target, counted from the events (`replay-v17`).</summary>
+    public int ShotsOnTarget { get; init; }
+
+    /// <summary>Gets the saves a goalkeeper made, counted from the events (`replay-v17`).</summary>
+    public int Saves { get; init; }
+
+    /// <summary>Gets the shots on target a goalkeeper faced, penalties apart (`replay-v17`).</summary>
+    public int ShotsOnTargetFaced { get; init; }
+
+    /// <summary>Gets the penalties taken (`replay-v17`).</summary>
+    public int PenaltiesTaken { get; init; }
+
+    /// <summary>Gets the penalties scored (`replay-v17`).</summary>
+    public int PenaltiesScored { get; init; }
+
+    /// <summary>Gets the penalties a goalkeeper faced (`replay-v17`).</summary>
+    public int PenaltiesFaced { get; init; }
+
+    /// <summary>Gets the penalties a goalkeeper saved (`replay-v17`).</summary>
+    public int PenaltiesSaved { get; init; }
+
+    /// <summary>Gets the direct free kicks shot at goal (`replay-v17`).</summary>
+    public int FreeKicksTaken { get; init; }
+
+    /// <summary>Gets the direct free kicks scored (`replay-v17`).</summary>
+    public int FreeKicksScored { get; init; }
+
     /// <summary>
     /// Gets an estimate of the serialized payload this line contributes.
     /// </summary>
@@ -137,7 +191,10 @@ public sealed record MatchLineupPlayerV1
     /// engine has no serializer and should not acquire one, and because the match center's budget is
     /// enforced by the sum rather than by measuring one field.
     /// </remarks>
-    public int EstimatedPayloadBytes => 96 + (Name.Length * 2) + (Position.Length * 2);
+    public int EstimatedPayloadBytes => 96 + StatsPayloadBytes + (Name.Length * 2) + (Position.Length * 2);
+
+    /// <summary>What the eighteen counting fields add to a line: a name and a small number each (`replay-v17`).</summary>
+    private const int StatsPayloadBytes = 400;
 }
 
 /// <summary>One team's lineup and tactical setup for the match center.</summary>

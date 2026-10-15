@@ -153,6 +153,75 @@ public sealed class MatchLineupTests
         }
     }
 
+    [Fact]
+    public void A_lineup_carries_the_counting_stats_of_the_line_and_the_shots_of_the_events()
+    {
+        var shotsSeen = 0;
+        var savesSeen = 0;
+        var triedSeen = 0;
+
+        // The counts are the tick engine's: the legacy engine leaves them at nothing.
+        for (var seed = 1UL; seed <= 6; seed++)
+        {
+            var sample = TickPlay.Play(TickPlay.Fixture(seed), record: false);
+            var result = sample.Result;
+            var home = MatchLineupBuilder.Build(sample.Input, result, MatchSide.Home);
+            var away = MatchLineupBuilder.Build(sample.Input, result, MatchSide.Away);
+            var players = home.Starters.Concat(home.Bench).Concat(away.Starters).Concat(away.Bench).ToList();
+            var lines = result.PlayerLines.ToDictionary(line => line.ParticipantId);
+
+            foreach (var player in players)
+            {
+                var line = lines[player.ParticipantId];
+
+                player.PassesAttempted.Should().Be(line.PassesAttempted);
+                player.PassesCompleted.Should().Be(line.PassesCompleted);
+                player.DribblesAttempted.Should().Be(line.DribblesAttempted);
+                player.DribblesCompleted.Should().Be(line.DribblesCompleted);
+                player.TacklesAttempted.Should().Be(line.TacklesAttempted);
+                player.TacklesWon.Should().Be(line.TacklesWon);
+                player.CrossesAttempted.Should().Be(line.CrossesAttempted);
+                player.CrossesCompleted.Should().Be(line.CrossesCompleted);
+                player.PenaltiesTaken.Should().Be(line.PenaltiesTaken);
+                player.PenaltiesScored.Should().Be(line.PenaltiesScored);
+                player.PenaltiesFaced.Should().Be(line.PenaltiesFaced);
+                player.PenaltiesSaved.Should().Be(line.PenaltiesSaved);
+                player.FreeKicksTaken.Should().Be(line.FreeKicksTaken);
+                player.FreeKicksScored.Should().Be(line.FreeKicksScored);
+                player.ShotsOnTargetFaced.Should().Be(line.ShotsOnTargetFaced);
+                player.ShotsOnTarget.Should().BeLessThanOrEqualTo(player.Shots);
+                player.Saves.Should().BeLessThanOrEqualTo(player.ShotsOnTargetFaced);
+            }
+
+            // The shots are counted from the events, on the rules the season statistics use.
+            var shots = result.Events
+                .Where(matchEvent => matchEvent.ParticipantId is not null && matchEvent.Type
+                    is EngineEventType.Goal or EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed
+                    or EngineEventType.ShotSaved or EngineEventType.ShotBlocked or EngineEventType.ShotOffTarget
+                    or EngineEventType.Woodwork)
+                .GroupBy(matchEvent => matchEvent.ParticipantId!.Value)
+                .ToDictionary(group => group.Key, group => group.Count());
+            var saves = result.Events
+                .Where(matchEvent => matchEvent.Type == EngineEventType.ShotSaved && matchEvent.SecondaryParticipantId is not null)
+                .GroupBy(matchEvent => matchEvent.SecondaryParticipantId!.Value)
+                .ToDictionary(group => group.Key, group => group.Count());
+
+            foreach (var player in players)
+            {
+                player.Shots.Should().Be(shots.GetValueOrDefault(player.ParticipantId));
+                player.Saves.Should().Be(saves.GetValueOrDefault(player.ParticipantId));
+            }
+
+            shotsSeen += players.Sum(player => player.Shots);
+            savesSeen += players.Sum(player => player.Saves);
+            triedSeen += players.Sum(player => player.TacklesAttempted + player.CrossesAttempted + player.PassesAttempted);
+        }
+
+        shotsSeen.Should().BeGreaterThan(0);
+        savesSeen.Should().BeGreaterThan(0);
+        triedSeen.Should().BeGreaterThan(0, "the tick engine counts tackles, crosses and passes onto the lines");
+    }
+
     [Theory]
     [MemberData(nameof(StandardShapes))]
     public void Every_standard_shape_is_named_exactly(string code, MatchRole[] roles)

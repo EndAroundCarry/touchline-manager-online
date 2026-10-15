@@ -62,6 +62,7 @@ public static class MatchLineupBuilder
             }
         }
 
+        var shotCounts = CountShots(result.Events);
         var colours = ClubPalette.Resolve(frozen.ClubId, frozen.PrimaryColour, frozen.SecondaryColour);
 
         return new MatchLineupV1
@@ -79,6 +80,7 @@ public static class MatchLineupBuilder
                 .. slots.Select(slot => Line(
                     participants[slot.ParticipantId],
                     lines[slot.ParticipantId],
+                    shotCounts.GetValueOrDefault(slot.ParticipantId),
                     isStarter: true,
                     slot.SlotNumber,
                     slot.Family,
@@ -91,6 +93,7 @@ public static class MatchLineupBuilder
                     .Select(participant => Line(
                         participant,
                         lines[participant.ParticipantId],
+                        shotCounts.GetValueOrDefault(participant.ParticipantId),
                         isStarter: false,
                         NoSlot,
                         participant.Position.FamilyOf(),
@@ -102,6 +105,7 @@ public static class MatchLineupBuilder
     /// <summary>Projects one player into their match center line.</summary>
     /// <param name="participant">The player, from the frozen squad.</param>
     /// <param name="line">The player's own result line.</param>
+    /// <param name="shots">The player's shots and saves, counted from the events.</param>
     /// <param name="isStarter">Whether they were in the eleven.</param>
     /// <param name="slotNumber">The slot they started in, or zero for a substitute.</param>
     /// <param name="family">The band they played in: the slot's for a starter, their own for a substitute.</param>
@@ -109,6 +113,7 @@ public static class MatchLineupBuilder
     private static MatchLineupPlayerV1 Line(
         MatchParticipantV1 participant,
         MatchPlayerLineV1 line,
+        ShotCounts shots,
         bool isStarter,
         int slotNumber,
         MatchPositionFamily family,
@@ -138,7 +143,80 @@ public static class MatchLineupBuilder
             SubbedOutMinute = line.SubbedOutMinute,
             SubbedInMinute = line.SubbedInMinute,
             IsInjured = line.IsInjured,
+            PassesAttempted = line.PassesAttempted,
+            PassesCompleted = line.PassesCompleted,
+            DribblesAttempted = line.DribblesAttempted,
+            DribblesCompleted = line.DribblesCompleted,
+            TacklesAttempted = line.TacklesAttempted,
+            TacklesWon = line.TacklesWon,
+            CrossesAttempted = line.CrossesAttempted,
+            CrossesCompleted = line.CrossesCompleted,
+            Shots = shots.Shots,
+            ShotsOnTarget = shots.OnTarget,
+            Saves = shots.Saves,
+            ShotsOnTargetFaced = line.ShotsOnTargetFaced,
+            PenaltiesTaken = line.PenaltiesTaken,
+            PenaltiesScored = line.PenaltiesScored,
+            PenaltiesFaced = line.PenaltiesFaced,
+            PenaltiesSaved = line.PenaltiesSaved,
+            FreeKicksTaken = line.FreeKicksTaken,
+            FreeKicksScored = line.FreeKicksScored,
         };
+
+    /// <summary>
+    /// Counts each participant's shots, shots on target, and saves from the match's events.
+    /// </summary>
+    /// <remarks>
+    /// The same rules as the season statistics' own count (`SeasonStatisticsCalculator`), so a match's panel and
+    /// the season it adds to cannot disagree: a shot is any event that ends a strike at goal, on target when it
+    /// scored or was saved, and a save is credited to the goalkeeper a saved shot names.
+    /// </remarks>
+    /// <param name="events">The match's events.</param>
+    private static Dictionary<Guid, ShotCounts> CountShots(IEnumerable<EngineEventV1> events)
+    {
+        var counts = new Dictionary<Guid, ShotCounts>();
+
+        foreach (var matchEvent in events)
+        {
+            if (matchEvent.Type == EngineEventType.ShotSaved && matchEvent.SecondaryParticipantId is Guid keeper)
+            {
+                var kept = counts.GetValueOrDefault(keeper);
+                counts[keeper] = kept with { Saves = kept.Saves + 1 };
+            }
+
+            if (matchEvent.ParticipantId is not Guid shooter || !IsShot(matchEvent.Type))
+            {
+                continue;
+            }
+
+            var current = counts.GetValueOrDefault(shooter);
+
+            counts[shooter] = current with
+            {
+                Shots = current.Shots + 1,
+                OnTarget = current.OnTarget + (IsOnTarget(matchEvent.Type) ? 1 : 0),
+            };
+        }
+
+        return counts;
+    }
+
+    private static bool IsShot(EngineEventType type) => type
+        is EngineEventType.Goal
+        or EngineEventType.PenaltyGoal
+        or EngineEventType.PenaltyMissed
+        or EngineEventType.ShotSaved
+        or EngineEventType.ShotBlocked
+        or EngineEventType.ShotOffTarget
+        or EngineEventType.Woodwork;
+
+    private static bool IsOnTarget(EngineEventType type) => type
+        is EngineEventType.Goal
+        or EngineEventType.PenaltyGoal
+        or EngineEventType.ShotSaved;
+
+    /// <summary>One participant's shots and saves in a match.</summary>
+    private readonly record struct ShotCounts(int Shots, int OnTarget, int Saves);
 
     /// <summary>
     /// Names the shape a side played, from its own roles.

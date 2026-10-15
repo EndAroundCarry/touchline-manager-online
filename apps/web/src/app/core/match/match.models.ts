@@ -148,6 +148,31 @@ export interface MatchLineupPlayer {
   readonly subbedOutMinute: number | null;
   readonly subbedInMinute: number | null;
   readonly isInjured: boolean;
+  /** Passes completed and attempted, set pieces included. */
+  readonly passesAttempted: number;
+  readonly passesCompleted: number;
+  /** Take-ons won and attempted. */
+  readonly dribblesAttempted: number;
+  readonly dribblesCompleted: number;
+  /** Challenges on the man with the ball, won and attempted. */
+  readonly tacklesAttempted: number;
+  readonly tacklesWon: number;
+  /** Crosses from open play and free kicks; corners do not count. */
+  readonly crossesAttempted: number;
+  readonly crossesCompleted: number;
+  readonly shots: number;
+  readonly shotsOnTarget: number;
+  /** A goalkeeper's saves, out of the shots on target he faced (penalties apart). */
+  readonly saves: number;
+  readonly shotsOnTargetFaced: number;
+  readonly penaltiesTaken: number;
+  readonly penaltiesScored: number;
+  /** Penalties a goalkeeper faced and saved. */
+  readonly penaltiesFaced: number;
+  readonly penaltiesSaved: number;
+  /** Direct free kicks shot at goal, and scored. */
+  readonly freeKicksTaken: number;
+  readonly freeKicksScored: number;
 }
 
 /** One team's tactical lineup setup for the match center. */

@@ -262,7 +262,25 @@ public static class MatchMapping
             player.SentOff,
             player.SubbedOutMinute,
             player.SubbedInMinute,
-            player.IsInjured);
+            player.IsInjured,
+            player.PassesAttempted,
+            player.PassesCompleted,
+            player.DribblesAttempted,
+            player.DribblesCompleted,
+            player.TacklesAttempted,
+            player.TacklesWon,
+            player.CrossesAttempted,
+            player.CrossesCompleted,
+            player.Shots,
+            player.ShotsOnTarget,
+            player.Saves,
+            player.ShotsOnTargetFaced,
+            player.PenaltiesTaken,
+            player.PenaltiesScored,
+            player.PenaltiesFaced,
+            player.PenaltiesSaved,
+            player.FreeKicksTaken,
+            player.FreeKicksScored);
 
     /// <summary>Projects one live metric snapshot.</summary>
     public static PlayerLiveMetricResponse ToResponse(this PlayerLiveMetricV1 metric) =>

@@ -26,11 +26,14 @@ import {
   formatConditionPercent,
   formatMatchRating,
   isGoalCommentary,
+  attemptRatio,
   isGoalOutcome,
   matchClockLabel,
   matchStatisticRows,
   outcomeLabel,
   passageIndexForLine,
+  PerformanceSide,
+  performanceSide,
   playbackClockLabel,
   ratingColorClass,
   scoreLine,
@@ -342,6 +345,15 @@ export class MatchViewer implements OnDestroy {
    */
   private readonly lineupIndex = computed(() => lineupIndexOf(this.presentation()));
 
+  /** The two sides of the Player Performance tab, home first; a side without a lineup is left out. */
+  protected readonly performanceSides = computed<readonly PerformanceSide[]>(() => {
+    const view = this.presentation();
+
+    return [view?.homeLineup, view?.awayLineup]
+      .filter((lineup) => lineup !== null && lineup !== undefined)
+      .map((lineup) => performanceSide(lineup));
+  });
+
   /** The match minute the live panels show: kickoff before the replay starts, the film's clock after. */
   private readonly metricMinute = computed(() =>
     this.state() === 'idle' ? 0 : this.clockMinute(),
@@ -634,6 +646,11 @@ export class MatchViewer implements OnDestroy {
     const hasCurve = (this.presentation()?.liveMetrics?.length ?? 0) > 0;
 
     return player !== null && !hasCurve ? player.finalRating : 0;
+  }
+
+  /** A completed count against an attempted one, or a dash when nothing was attempted. */
+  protected ratio(completed: number, attempted: number): string {
+    return attemptRatio(completed, attempted);
   }
 
   /** Formats a live rating, e.g. `7.4`, or a dash before one exists. */

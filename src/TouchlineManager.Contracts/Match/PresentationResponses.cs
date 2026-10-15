@@ -135,6 +135,24 @@ public sealed record HighlightEntityResponse(
     string? Position = null);
 
 /// <summary>One player's full match participation line for the match center lineups.</summary>
+/// <param name="PassesAttempted">The passes attempted.</param>
+/// <param name="PassesCompleted">The passes that found a teammate.</param>
+/// <param name="DribblesAttempted">The take-ons attempted.</param>
+/// <param name="DribblesCompleted">The take-ons won.</param>
+/// <param name="TacklesAttempted">The challenges made on the man with the ball.</param>
+/// <param name="TacklesWon">The challenges won.</param>
+/// <param name="CrossesAttempted">The crosses attempted from open play and free kicks; corners do not count.</param>
+/// <param name="CrossesCompleted">The crosses that found a teammate.</param>
+/// <param name="Shots">The shots taken.</param>
+/// <param name="ShotsOnTarget">The shots on target.</param>
+/// <param name="Saves">The saves a goalkeeper made.</param>
+/// <param name="ShotsOnTargetFaced">The shots on target a goalkeeper faced, penalties apart.</param>
+/// <param name="PenaltiesTaken">The penalties taken.</param>
+/// <param name="PenaltiesScored">The penalties scored.</param>
+/// <param name="PenaltiesFaced">The penalties a goalkeeper faced.</param>
+/// <param name="PenaltiesSaved">The penalties a goalkeeper saved.</param>
+/// <param name="FreeKicksTaken">The direct free kicks shot at goal.</param>
+/// <param name="FreeKicksScored">The direct free kicks scored.</param>
 public sealed record MatchLineupPlayerResponse(
     Guid ParticipantId,
     Guid PlayerId,
@@ -153,7 +171,25 @@ public sealed record MatchLineupPlayerResponse(
     bool SentOff,
     int? SubbedOutMinute,
     int? SubbedInMinute,
-    bool IsInjured);
+    bool IsInjured,
+    int PassesAttempted,
+    int PassesCompleted,
+    int DribblesAttempted,
+    int DribblesCompleted,
+    int TacklesAttempted,
+    int TacklesWon,
+    int CrossesAttempted,
+    int CrossesCompleted,
+    int Shots,
+    int ShotsOnTarget,
+    int Saves,
+    int ShotsOnTargetFaced,
+    int PenaltiesTaken,
+    int PenaltiesScored,
+    int PenaltiesFaced,
+    int PenaltiesSaved,
+    int FreeKicksTaken,
+    int FreeKicksScored);
 
 /// <summary>One team's lineup and tactical setup for the match center.</summary>
 public sealed record MatchLineupResponse(

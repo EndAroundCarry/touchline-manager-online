@@ -1,4 +1,11 @@
-import { CommentaryLine, MatchStatistics, Passage } from './match.models';
+import { ratioLabel } from '../squad/squad-presentation';
+import {
+  CommentaryLine,
+  MatchLineup,
+  MatchLineupPlayer,
+  MatchStatistics,
+  Passage,
+} from './match.models';
 
 /**
  * Client-side presentation helpers for the match center.
@@ -448,4 +455,41 @@ export function ratingColorClass(basisPoints: number): string {
   }
 
   return 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+}
+
+/** One side's rows of the Player Performance tab: who played, outfield apart from goalkeepers. */
+export interface PerformanceSide {
+  readonly clubName: string;
+  readonly outfield: readonly MatchLineupPlayer[];
+  readonly keepers: readonly MatchLineupPlayer[];
+}
+
+/**
+ * The players who took part, as the Player Performance tab lists them: the eleven that started and the
+ * substitutes who came on, in the order the lineup names them. A goalkeeper has his own figures, so he is
+ * kept apart from the outfield players.
+ */
+export function performanceSide(lineup: MatchLineup): PerformanceSide {
+  const played = [...lineup.starters, ...lineup.bench.filter((p) => p.subbedInMinute !== null)];
+
+  return {
+    clubName: lineup.clubName,
+    outfield: played.filter((player) => !isKeeper(player)),
+    keepers: played.filter(isKeeper),
+  };
+}
+
+/**
+ * Whether a player's figures are a goalkeeper's. A starter's family is his slot's; a substitute's is his own
+ * position, which is not where he played when an outfield player had to go in goal, so facing a shot counts too.
+ */
+function isKeeper(player: MatchLineupPlayer): boolean {
+  return (
+    player.family === 'goalkeeper' || player.shotsOnTargetFaced > 0 || player.penaltiesFaced > 0
+  );
+}
+
+/** A completed count against an attempted one, or a dash when nothing was attempted. */
+export function attemptRatio(completed: number, attempted: number): string {
+  return attempted === 0 ? '-' : ratioLabel(completed, attempted);
 }

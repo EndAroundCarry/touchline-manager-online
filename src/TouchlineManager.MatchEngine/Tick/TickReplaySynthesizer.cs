@@ -33,7 +33,7 @@ namespace TouchlineManager.MatchEngine.Tick;
 internal sealed class TickReplaySynthesizer
 {
     /// <summary>The version label of a film made from a tick recording.</summary>
-    public const string Version = "tick-replay-v2";
+    public const string Version = "tick-replay-v3";
 
     /// <summary>The cut that covers a jump to a stretch of the match that is not the one before it.</summary>
     public const string JumpCut = "jump";

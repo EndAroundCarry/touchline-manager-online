@@ -6,6 +6,7 @@ import {
   CommentaryLine,
   HighlightKeyframe,
   Match,
+  MatchLineupPlayer,
   MatchPresentation,
   Passage,
 } from '../../core/match/match.models';
@@ -109,6 +110,49 @@ function line(): CommentaryLine {
   };
 }
 
+/** A starter with every counting figure at nothing, so a test names only the figures it cares about. */
+function lineupPlayer(overrides: Partial<MatchLineupPlayer> = {}): MatchLineupPlayer {
+  return {
+    participantId: 'p1',
+    playerId: 'pl1',
+    shirtNumber: 9,
+    name: 'A Scorer',
+    position: 'ST',
+    family: 'attack',
+    isStarter: true,
+    slotNumber: 9,
+    kickoffCondition: 10_000,
+    finalCondition: 6_000,
+    finalRating: 7_200,
+    goals: 0,
+    assists: 0,
+    yellowCards: 0,
+    sentOff: false,
+    subbedOutMinute: null,
+    subbedInMinute: null,
+    isInjured: false,
+    passesAttempted: 0,
+    passesCompleted: 0,
+    dribblesAttempted: 0,
+    dribblesCompleted: 0,
+    tacklesAttempted: 0,
+    tacklesWon: 0,
+    crossesAttempted: 0,
+    crossesCompleted: 0,
+    shots: 0,
+    shotsOnTarget: 0,
+    saves: 0,
+    shotsOnTargetFaced: 0,
+    penaltiesTaken: 0,
+    penaltiesScored: 0,
+    penaltiesFaced: 0,
+    penaltiesSaved: 0,
+    freeKicksTaken: 0,
+    freeKicksScored: 0,
+    ...overrides,
+  };
+}
+
 function presentation(): MatchPresentation {
   return {
     matchId: 'm1',
@@ -135,28 +179,7 @@ function presentation(): MatchPresentation {
       primaryColour: '#1f6f43',
       secondaryColour: '#ffffff',
       formation: '4-4-2',
-      starters: [
-        {
-          participantId: 'p1',
-          playerId: 'pl1',
-          shirtNumber: 9,
-          name: 'A Scorer',
-          position: 'ST',
-          family: 'attack',
-          isStarter: true,
-          slotNumber: 9,
-          kickoffCondition: 10_000,
-          finalCondition: 6_000,
-          finalRating: 7_200,
-          goals: 1,
-          assists: 0,
-          yellowCards: 0,
-          sentOff: false,
-          subbedOutMinute: null,
-          subbedInMinute: null,
-          isInjured: false,
-        },
-      ],
+      starters: [lineupPlayer({ goals: 1, passesAttempted: 20, passesCompleted: 15 })],
       bench: [],
     },
     awayLineup: null,
@@ -382,6 +405,123 @@ describe('MatchViewer', () => {
 
     expect(native.textContent).toContain('Player Performance');
     expect(native.textContent).toContain('A Scorer');
+  });
+
+  describe('the Player Performance tab', () => {
+    /** Loads a match whose home side fields an outfield player, a keeper, and two substitutes, one of whom came on. */
+    async function loadWithSquad(): Promise<HTMLElement> {
+      const native = await load();
+      const base = presentation();
+
+      store.presentation.set({
+        ...base,
+        homeLineup: {
+          ...base.homeLineup!,
+          starters: [
+            lineupPlayer({
+              goals: 1,
+              passesAttempted: 20,
+              passesCompleted: 15,
+              crossesAttempted: 4,
+              crossesCompleted: 1,
+              tacklesAttempted: 3,
+              tacklesWon: 2,
+              dribblesAttempted: 5,
+              dribblesCompleted: 3,
+              penaltiesTaken: 1,
+              penaltiesScored: 1,
+              freeKicksTaken: 2,
+              freeKicksScored: 0,
+            }),
+            lineupPlayer({
+              participantId: 'p2',
+              playerId: 'pl2',
+              shirtNumber: 1,
+              name: 'The Keeper',
+              position: 'GK',
+              family: 'goalkeeper',
+              slotNumber: 1,
+              passesAttempted: 10,
+              passesCompleted: 8,
+              saves: 4,
+              shotsOnTargetFaced: 5,
+              penaltiesFaced: 1,
+              penaltiesSaved: 1,
+            }),
+          ],
+          bench: [
+            lineupPlayer({
+              participantId: 'p12',
+              playerId: 'pl12',
+              shirtNumber: 14,
+              name: 'The Sub On',
+              isStarter: false,
+              slotNumber: 0,
+              subbedInMinute: 61,
+            }),
+            lineupPlayer({
+              participantId: 'p13',
+              playerId: 'pl13',
+              shirtNumber: 15,
+              name: 'The Unused Sub',
+              isStarter: false,
+              slotNumber: 0,
+            }),
+          ],
+        },
+      });
+      buttonByText(native, 'Show result')!.click();
+      await fixture.whenStable();
+      buttonByText(native, 'Players')!.click();
+      await fixture.whenStable();
+
+      return native;
+    }
+
+    it('lists a substitute who came on, with the minute, and leaves out one who did not', async () => {
+      const native = await loadWithSquad();
+      const rows = [...native.querySelectorAll('[data-testid="performance-row"]')].map(
+        (row) => row.textContent ?? '',
+      );
+
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toContain('The Sub On');
+      expect(rows[1]).toContain("61'");
+      expect(native.textContent).not.toContain('The Unused Sub');
+    });
+
+    it('shows the outfield ratios, and a dash where nothing was attempted', async () => {
+      const native = await loadWithSquad();
+      const [scorer, sub] = [...native.querySelectorAll('[data-testid="performance-row"]')];
+      const cell = (row: Element, id: string) =>
+        row.querySelector(`[data-testid="${id}"]`)?.textContent?.trim();
+
+      expect(cell(scorer, 'stat-pass')).toBe('15/20');
+      expect(cell(scorer, 'stat-cross')).toBe('1/4');
+      expect(cell(scorer, 'stat-tackle')).toBe('2/3');
+      expect(cell(scorer, 'stat-dribble')).toBe('3/5');
+      expect(cell(scorer, 'stat-penalty')).toBe('1/1');
+      expect(cell(scorer, 'stat-free-kick')).toBe('0/2');
+      expect(cell(sub, 'stat-cross')).toBe('-');
+      expect(cell(sub, 'stat-tackle')).toBe('-');
+    });
+
+    it("shows the goalkeeper's saves and penalty saves in a table of his own", async () => {
+      const native = await loadWithSquad();
+      const keeper = native.querySelector('[data-testid="keeper-row"]')!;
+
+      expect(keeper.textContent).toContain('The Keeper');
+      expect(keeper.querySelector('[data-testid="stat-saves"]')?.textContent?.trim()).toBe('4/5');
+      expect(
+        keeper.querySelector('[data-testid="stat-penalties-saved"]')?.textContent?.trim(),
+      ).toBe('1/1');
+      expect(native.querySelectorAll('[data-testid="performance-row"]')).toHaveLength(2);
+      expect(
+        [...native.querySelectorAll('[data-testid="performance-row"]')].some((row) =>
+          row.textContent?.includes('The Keeper'),
+        ),
+      ).toBe(false);
+    });
   });
 
   describe('the result is kept back until it has been seen', () => {
