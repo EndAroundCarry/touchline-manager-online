@@ -25,55 +25,88 @@
   }
 
   <header class="border-b border-line bg-rail">
-    <div class="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
-      @if (navItems().length > 0) {
-        <button
-          type="button"
-          class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line-strong bg-panel text-ink hover:bg-raised md:hidden"
-          [attr.aria-expanded]="mobileNavOpen()"
-          [attr.aria-controls]="mobileNavOpen() ? 'mobile-main-nav' : null"
-          aria-label="Menu"
-          (click)="toggleMobileNav()"
-        >
-          <i [class]="mobileNavOpen() ? 'pi pi-times' : 'pi pi-bars'" aria-hidden="true"></i>
-        </button>
+    <!--
+      Three zones from `lg`: the game on the left, the manager's club in the middle, the actions on the right. The
+      outer zones share the spare width equally, so the club stays centred whatever either side holds. Below `lg`
+      there is no room for the club, so the screens that need its name show it themselves.
+    -->
+    <div
+      class="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 lg:grid lg:grid-cols-[1fr_auto_1fr]"
+    >
+      <div class="flex items-center gap-3">
+        @if (navItems().length > 0) {
+          <button
+            type="button"
+            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line-strong bg-panel text-ink hover:bg-raised md:hidden"
+            [attr.aria-expanded]="mobileNavOpen()"
+            [attr.aria-controls]="mobileNavOpen() ? 'mobile-main-nav' : null"
+            aria-label="Menu"
+            (click)="toggleMobileNav()"
+          >
+            <i [class]="mobileNavOpen() ? 'pi pi-times' : 'pi pi-bars'" aria-hidden="true"></i>
+          </button>
 
-        <!-- History arrows: the control a manager reaches for after following a link into a profile. -->
-        <div class="hidden gap-1 md:flex">
-          <button
-            type="button"
-            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line bg-panel text-ink-2 hover:bg-raised hover:text-ink"
-            aria-label="Back"
-            (click)="back()"
+          <!-- History arrows: the control a manager reaches for after following a link into a profile. -->
+          <div class="hidden gap-1 md:flex">
+            <button
+              type="button"
+              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line bg-panel text-ink-2 hover:bg-raised hover:text-ink"
+              aria-label="Back"
+              (click)="back()"
+            >
+              <i class="pi pi-angle-left" aria-hidden="true"></i>
+            </button>
+            <button
+              type="button"
+              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line bg-panel text-ink-2 hover:bg-raised hover:text-ink"
+              aria-label="Forward"
+              (click)="forward()"
+            >
+              <i class="pi pi-angle-right" aria-hidden="true"></i>
+            </button>
+          </div>
+        }
+
+        <a
+          routerLink="/welcome"
+          class="flex items-center gap-2.5 font-display text-xl font-semibold tracking-tight"
+          aria-label="Touchline Manager, home"
+        >
+          <span
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent text-base font-bold text-on-accent"
+            aria-hidden="true"
           >
-            <i class="pi pi-angle-left" aria-hidden="true"></i>
-          </button>
-          <button
-            type="button"
-            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-line bg-panel text-ink-2 hover:bg-raised hover:text-ink"
-            aria-label="Forward"
-            (click)="forward()"
-          >
-            <i class="pi pi-angle-right" aria-hidden="true"></i>
-          </button>
+            TM
+          </span>
+          <span class="hidden sm:inline">Touchline Manager</span>
+        </a>
+      </div>
+
+      @if (club(); as current) {
+        <div
+          class="hidden min-w-0 items-center justify-center gap-3 lg:flex"
+          aria-label="Your club"
+          role="group"
+        >
+          <app-club-crest
+            class="h-9 shrink-0"
+            [shape]="current.crestShape"
+            [pattern]="current.crestPattern"
+            [primary]="current.primaryColour"
+            [secondary]="current.secondaryColour"
+          />
+          <div class="min-w-0 leading-tight">
+            <p class="truncate font-display text-xl font-semibold tracking-tight">
+              {{ current.name }}
+            </p>
+            <p class="truncate text-xs text-ink-2">{{ current.subtitle }}</p>
+          </div>
         </div>
+      } @else {
+        <div class="hidden lg:block"></div>
       }
 
-      <a
-        routerLink="/welcome"
-        class="flex items-center gap-2.5 font-display text-xl font-semibold tracking-tight"
-        aria-label="Touchline Manager, home"
-      >
-        <span
-          class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent text-base font-bold text-on-accent"
-          aria-hidden="true"
-        >
-          TM
-        </span>
-        <span class="hidden sm:inline">Touchline Manager</span>
-      </a>
-
-      <div class="ml-auto flex flex-wrap items-center gap-3">
+      <div class="ml-auto flex flex-wrap items-center gap-3 lg:justify-self-end">
         <!-- A pressed toggle rather than a "switch to X" button: the label stays, the state is what changes. -->
         <button
           type="button"
@@ -141,11 +174,11 @@
       -->
       <nav
         aria-label="Main"
-        class="hidden border-r border-line bg-rail px-2 py-3 md:sticky md:top-0 md:block md:max-h-dvh md:w-60 md:shrink-0 md:self-start md:overflow-y-auto"
+        class="hidden border-r border-line bg-rail px-2 py-3 md:sticky md:top-0 md:block md:max-h-[calc(100dvh-6.75rem)] md:w-60 md:shrink-0 md:self-start md:overflow-y-auto"
       >
         @for (group of railGroups(); track group.name) {
           <p
-            class="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-widest text-muted first:pt-1"
+            class="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-widest text-muted first:pt-1"
           >
             {{ group.name }}
           </p>
@@ -155,7 +188,7 @@
                 <a
                   [routerLink]="item.path"
                   routerLinkActive="bg-accent/15 text-accent"
-                  class="flex min-h-11 items-center gap-3 whitespace-nowrap rounded px-3 py-2 font-display text-base font-semibold tracking-wide text-ink-2 hover:bg-raised hover:text-ink"
+                  class="flex min-h-11 items-center gap-3 whitespace-nowrap rounded px-3 py-2 pointer-fine:min-h-8 pointer-fine:py-1 font-display text-base font-semibold tracking-wide text-ink-2 hover:bg-raised hover:text-ink"
                 >
                   <i [class]="item.icon" aria-hidden="true"></i>
                   {{ item.label }}
@@ -204,7 +237,7 @@
       }
     }
 
-    <main id="main-content" tabindex="-1" class="min-w-0 flex-1 px-4 py-5 md:px-6 md:py-6">
+    <main id="main-content" tabindex="-1" class="min-w-0 flex-1 px-4 py-5 md:px-6 md:py-4">
       <router-outlet />
     </main>
   </div>

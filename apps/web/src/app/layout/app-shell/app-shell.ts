@@ -27,6 +27,7 @@ import { TacticsStore } from '../../core/tactics/tactics-store';
 import { PlayerTrainingStore } from '../../core/training/player-training-store';
 import { TrainingStore } from '../../core/training/training-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
+import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
 import { GameClockBar } from '../game-clock-bar/game-clock-bar';
 import { SystemNotices } from '../system-notices/system-notices';
 import { AVAILABLE_NAV_ITEMS, NavItem } from '../navigation/nav-items';
@@ -40,7 +41,7 @@ import { AVAILABLE_NAV_ITEMS, NavItem } from '../navigation/nav-items';
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, SystemNotices, GameClockBar],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, SystemNotices, GameClockBar, ClubCrest],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.css',
 })
@@ -70,6 +71,9 @@ export class AppShell implements OnDestroy {
   /** Whether the initial navigation has been seen, so focus is not stolen on first load. */
   private isInitialNavigation = true;
 
+  /** Whether the onboarding position has been asked for in this session, so it is read once. */
+  private positionRequested = false;
+
   constructor() {
     // The poll starts with the shell and stops with it, so the badge is fresh on every screen and no timer
     // outlives the shell that owns it (§11.2).
@@ -86,6 +90,22 @@ export class AppShell implements OnDestroy {
         this.competition.fixturesError() === null
       ) {
         this.competition.loadFixtures();
+      }
+    });
+
+    // The top bar names the manager's club on every screen, but only the dashboard, the squad and the settings read
+    // the onboarding position, so it is read once here when none has. Like the fixtures above, one attempt: a
+    // failed read leaves the bar without a club name rather than retrying in a loop.
+    effect(() => {
+      if (!this.session.isAuthenticated()) {
+        this.positionRequested = false;
+
+        return;
+      }
+
+      if (this.onboarding.state() === null && !this.positionRequested) {
+        this.positionRequested = true;
+        this.onboarding.loadState().subscribe({ error: () => undefined });
       }
     });
 
@@ -158,6 +178,34 @@ export class AppShell implements OnDestroy {
       id: fixture.id,
       label: `${venueLabel(fixture.venue)} v ${fixture.opponentShortName}`,
       countdown: lockCountdown(fixture.lockAt, new Date()),
+    };
+  });
+
+  /**
+   * The club the manager holds, for the middle of the top bar: its crest and name, and the competition it plays in,
+   * or null while the manager holds no club or the position has not been read yet.
+   */
+  protected readonly club = computed(() => {
+    const tenure = this.onboarding.state()?.tenure;
+
+    if (tenure === undefined || tenure === null) {
+      return null;
+    }
+
+    const season = this.competition.fixtures()?.seasonLabel;
+
+    return {
+      name: tenure.clubName,
+      crestShape: tenure.crestShape,
+      crestPattern: tenure.crestPattern,
+      primaryColour: tenure.primaryColour,
+      secondaryColour: tenure.secondaryColour,
+      subtitle: [
+        tenure.countryDisplayName,
+        tenure.divisionName,
+        `tier ${tenure.tierNumber}`,
+        ...(season === undefined ? [] : [season]),
+      ].join(' · '),
     };
   });
 

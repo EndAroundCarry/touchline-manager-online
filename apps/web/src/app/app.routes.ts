@@ -128,7 +128,7 @@ export const routes: Routes = [
         path: 'dashboard',
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
         canActivate: [requireAuthentication, requireVerifiedEmail],
-        title: 'Dashboard — Touchline Manager',
+        title: 'Office — Touchline Manager',
       },
       {
         path: 'squad',

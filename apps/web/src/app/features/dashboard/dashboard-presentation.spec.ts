@@ -5,7 +5,13 @@ import {
 } from '../../core/competition/competition.models';
 import { PlayerAttributes, SquadPlayer } from '../../core/squad/squad.models';
 import { MyMarketBid, TransferListing } from '../../core/transfers/transfers.models';
-import { calendarEvents, squadStatus, statLeaders, tableWindow } from './dashboard-presentation';
+import {
+  calendarEvents,
+  limitStatusGroups,
+  squadStatus,
+  statLeaders,
+  tableWindow,
+} from './dashboard-presentation';
 
 /**
  * The dashboard's widgets as pure functions: which table rows to show, who is a concern, what is next on the
@@ -55,6 +61,39 @@ describe('tableWindow', () => {
   it('shows the whole table when it is shorter than the window, and the top when there is no club', () => {
     expect(tableWindow(TABLE.slice(0, 5), 'club-3', 9)).toHaveLength(5);
     expect(tableWindow(TABLE, null, 9)[0].rank).toBe(1);
+  });
+});
+
+describe('tableWindow in the office', () => {
+  it('shows the club with three clubs above it and three below in a window of seven', () => {
+    const window = tableWindow(TABLE, 'club-10', 7);
+
+    expect(window.map((r) => r.rank)).toEqual([7, 8, 9, 10, 11, 12, 13]);
+  });
+});
+
+describe('limitStatusGroups', () => {
+  const players = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `p${i}`,
+      name: `Player ${i}`,
+      detail: '1 fixture',
+    }));
+
+  it('keeps the first players of each group and counts the rest', () => {
+    const limited = limitStatusGroups(
+      [
+        { kind: 'injured', label: 'Injured', players: players(1) },
+        { kind: 'expiring', label: 'Contract ending', players: players(6) },
+      ],
+      2,
+    );
+
+    expect(limited.map((g) => [g.kind, g.players.length, g.more])).toEqual([
+      ['injured', 1, 0],
+      ['expiring', 2, 4],
+    ]);
+    expect(limited[1].players.map((p) => p.id)).toEqual(['p0', 'p1']);
   });
 });
 

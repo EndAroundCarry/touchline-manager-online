@@ -3,7 +3,7 @@
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
   <div class="mt-4">
-    <a routerLink="/dashboard" [class]="secondaryButtonClass">Back to the dashboard</a>
+    <a routerLink="/dashboard" [class]="secondaryButtonClass">Back to the office</a>
   </div>
 } @else if (tactics(); as club) {
   @if (draft(); as plan) {

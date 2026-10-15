@@ -122,6 +122,27 @@ export function squadStatus(players: readonly SquadPlayer[]): readonly SquadStat
     .map((kind) => ({ kind, label: GROUP_LABELS[kind], players: groups[kind] }));
 }
 
+/** A squad-status group cut down to what fits the office's panel, with the count of players left out. */
+export interface SquadStatusGlance extends SquadStatusGroup {
+  /** How many players of the group are not listed. */
+  readonly more: number;
+}
+
+/**
+ * Cuts each group to its first few players, so the squad-status panel keeps one height however many players are
+ * hurt or tired. The players left out are counted, so the panel says there are more and the squad screen has the rest.
+ */
+export function limitStatusGroups(
+  groups: readonly SquadStatusGroup[],
+  perGroup = 2,
+): readonly SquadStatusGlance[] {
+  return groups.map((group) => ({
+    ...group,
+    players: group.players.slice(0, perGroup),
+    more: Math.max(group.players.length - perGroup, 0),
+  }));
+}
+
 /** What a calendar entry is. */
 export type CalendarEventKind = 'match' | 'deadline' | 'auction';
 

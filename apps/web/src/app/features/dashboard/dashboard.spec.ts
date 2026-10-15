@@ -254,6 +254,26 @@ describe('Dashboard', () => {
     expect(element.textContent).toContain('Calendar');
   });
 
+  it('lists only the next four calendar events, so the office keeps one height', async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const upcoming = [1, 2, 3, 4, 5, 6].map((days): ClubFixture => ({
+      ...NEXT_FIXTURE,
+      id: `fixture-${days}`,
+      roundNumber: days,
+      kickoffAt: new Date(Date.now() + days * day).toISOString(),
+      lockAt: new Date(Date.now() + days * day - 1_800_000).toISOString(),
+    }));
+
+    fixtures.set({ ...FIXTURES, nextFixtureId: 'fixture-1', fixtures: upcoming });
+
+    const element = await render();
+    const calendar = [...element.querySelectorAll('h3')].find(
+      (heading) => heading.textContent?.trim() === 'Calendar',
+    );
+
+    expect(calendar?.nextElementSibling?.querySelectorAll('li')).toHaveLength(4);
+  });
+
   describe("while a result of the manager's own is unseen", () => {
     function notices(element: HTMLElement): number {
       return element.querySelectorAll('[data-testid="result-hidden"]').length;

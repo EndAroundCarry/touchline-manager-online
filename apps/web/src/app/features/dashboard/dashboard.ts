@@ -34,6 +34,7 @@ import {
 import {
   CalendarEventKind,
   calendarEvents,
+  limitStatusGroups,
   squadStatus,
   statLeaders,
   tableWindow,
@@ -41,13 +42,26 @@ import {
 import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
 import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
+/** The clubs shown in the league-table widget: the manager's club with three above it and three below. */
+const TABLE_ROWS = 7;
+
+/** The calendar entries shown beside the next match. */
+const CALENDAR_EVENTS = 4;
+
+/** The bids, and the listings, the pending-transfers widget lists before it says there are more. */
+const MARKET_ROWS = 2;
+
 /**
- * The club dashboard (master plan §11.1).
+ * The manager's office (master plan §11.1), the screen the router calls `/dashboard`.
  *
  * With a club it is a grid of widgets, each answering one question a manager asks on arriving: the next match and the
  * calendar around it, the league table, the club's record, the inbox, the squad's status, the market, and the
  * division's leaders. Each widget reads its own store and fails on its own, so one slow or failed read leaves the rest
  * of the screen intact.
+ *
+ * It is built to fit a full-HD laptop without scrolling, so every widget is bounded: a handful of calendar entries,
+ * table rows, messages and players, with a link into the screen that has the rest. The club's name and crest are in
+ * the top bar (`AppShell`); the heading here is for small screens and screen readers.
  *
  * It is also the router for onboarding: with no manager profile it offers the profile step, with a profile
  * but no club it offers the country step, and with a club it shows what the manager inherited. Deciding
@@ -113,9 +127,16 @@ export class Dashboard {
    */
   protected readonly resultsHeldBack = this.gate.hiding;
 
-  /** The rows of the division table around the manager's club, for the league-table widget. */
+  /**
+   * The rows of the division table around the manager's club, for the league-table widget: the club, three clubs
+   * above it and three below, so the widget keeps one height whatever the size of the division.
+   */
   protected readonly tableRows = computed(() =>
-    tableWindow(this.competition.divisionTable()?.rows ?? [], this.club()?.club.id ?? null, 12),
+    tableWindow(
+      this.competition.divisionTable()?.rows ?? [],
+      this.club()?.club.id ?? null,
+      TABLE_ROWS,
+    ),
   );
 
   /** Whether the division table has been read, so the widget can tell "still loading" from "empty". */
@@ -133,14 +154,14 @@ export class Dashboard {
 
   /** The squad's concerns, grouped, for the squad-status widget. */
   protected readonly squadGroups = computed(() =>
-    squadStatus(this.squadStore.squad()?.players ?? []),
+    limitStatusGroups(squadStatus(this.squadStore.squad()?.players ?? [])),
   );
 
   /** The squad itself, once read. */
   protected readonly squadRead = this.squadStore.squad;
 
   /** The latest inbox messages, for the inbox widget. */
-  protected readonly latestMessages = computed(() => this.inbox.messages().slice(0, 4));
+  protected readonly latestMessages = computed(() => this.inbox.messages().slice(0, 3));
   protected readonly unreadCount = this.inbox.unreadCount;
   protected readonly inboxLoading = this.inbox.loading;
   protected readonly inboxError = this.inbox.error;
@@ -148,6 +169,15 @@ export class Dashboard {
   /** The club's own market activity, for the pending-transfers widget. */
   protected readonly myBids = this.transfers.myBids;
   protected readonly myListings = this.transfers.myListings;
+
+  /** The bids and listings the widget has room for, with how many more there are of each. */
+  protected readonly shownBids = computed(() => this.myBids().slice(0, MARKET_ROWS));
+  protected readonly shownListings = computed(() => this.myListings().slice(0, MARKET_ROWS));
+  protected readonly moreMarket = computed(
+    () =>
+      Math.max(this.myBids().length - MARKET_ROWS, 0) +
+      Math.max(this.myListings().length - MARKET_ROWS, 0),
+  );
   protected readonly marketLoading = this.transfers.loading;
   protected readonly marketError = this.transfers.error;
 
@@ -159,7 +189,7 @@ export class Dashboard {
 
   /** What is next on the calendar: matches, the team-sheet deadline, and auctions closing. */
   protected readonly calendar = computed(() =>
-    calendarEvents(this.fixtures(), this.myBids(), this.myListings(), new Date()),
+    calendarEvents(this.fixtures(), this.myBids(), this.myListings(), new Date(), CALENDAR_EVENTS),
   );
 
   protected readonly pageHeadingClass = PAGE_HEADING;
