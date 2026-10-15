@@ -59,6 +59,18 @@ describe('Training screen', () => {
     expect(cardSelect).not.toBeNull();
   });
 
+  it('links each player, in the table and on the cards, to their profile', () => {
+    const tableLink = table().querySelector<HTMLAnchorElement>(
+      'a[aria-label="Open Alaric Alderwick"]',
+    );
+    const cardLink = cards().querySelector<HTMLAnchorElement>(
+      'a[aria-label="Open Alaric Alderwick"]',
+    );
+
+    expect(tableLink?.getAttribute('href')).toMatch(/^\/players\/.+/);
+    expect(cardLink?.getAttribute('href')).toBe(tableLink?.getAttribute('href'));
+  });
+
   it('offers the position default first, naming the programme it means, then the catalogue', () => {
     const select = table().querySelector<HTMLSelectElement>(
       'select[aria-label="Training programme for Alaric Alderwick"]',
