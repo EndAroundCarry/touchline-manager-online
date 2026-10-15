@@ -232,6 +232,17 @@ public sealed record PlayerResponse(
 /// <param name="PassesCompleted">Passes that found a teammate.</param>
 /// <param name="DribblesAttempted">Take-ons attempted.</param>
 /// <param name="DribblesCompleted">Take-ons won.</param>
+/// <param name="TacklesAttempted">Challenges made for the ball.</param>
+/// <param name="TacklesWon">Challenges won.</param>
+/// <param name="CrossesAttempted">Open-play crosses attempted (corners excluded).</param>
+/// <param name="CrossesCompleted">Crosses that found a teammate.</param>
+/// <param name="PenaltiesTaken">Penalties taken.</param>
+/// <param name="PenaltiesScored">Penalties scored.</param>
+/// <param name="PenaltiesFaced">Penalties faced as goalkeeper.</param>
+/// <param name="PenaltiesSaved">Penalties saved.</param>
+/// <param name="FreeKicksTaken">Direct free kicks taken.</param>
+/// <param name="FreeKicksScored">Direct free kicks scored.</param>
+/// <param name="ShotsOnTargetFaced">Shots on target faced as goalkeeper.</param>
 /// <param name="YellowCards">Bookings accumulated (`DIS-2`).</param>
 /// <param name="RedCards">Sendings-off accumulated (`DIS-4`).</param>
 /// <param name="AverageRating">
@@ -251,6 +262,17 @@ public sealed record PlayerSeasonStatsResponse(
     int PassesCompleted,
     int DribblesAttempted,
     int DribblesCompleted,
+    int TacklesAttempted,
+    int TacklesWon,
+    int CrossesAttempted,
+    int CrossesCompleted,
+    int PenaltiesTaken,
+    int PenaltiesScored,
+    int PenaltiesFaced,
+    int PenaltiesSaved,
+    int FreeKicksTaken,
+    int FreeKicksScored,
+    int ShotsOnTargetFaced,
     int YellowCards,
     int RedCards,
     decimal? AverageRating);
@@ -412,6 +434,17 @@ public sealed record ContractsResponse(
 /// <param name="PassesCompleted">Passes that found a teammate.</param>
 /// <param name="DribblesAttempted">Take-ons attempted.</param>
 /// <param name="DribblesCompleted">Take-ons won.</param>
+/// <param name="TacklesAttempted">Challenges made for the ball.</param>
+/// <param name="TacklesWon">Challenges won.</param>
+/// <param name="CrossesAttempted">Open-play crosses attempted (corners excluded).</param>
+/// <param name="CrossesCompleted">Crosses that found a teammate.</param>
+/// <param name="PenaltiesTaken">Penalties taken.</param>
+/// <param name="PenaltiesScored">Penalties scored.</param>
+/// <param name="PenaltiesFaced">Penalties faced as goalkeeper.</param>
+/// <param name="PenaltiesSaved">Penalties saved.</param>
+/// <param name="FreeKicksTaken">Direct free kicks taken.</param>
+/// <param name="FreeKicksScored">Direct free kicks scored.</param>
+/// <param name="ShotsOnTargetFaced">Shots on target faced as goalkeeper.</param>
 /// <param name="YellowCards">Bookings received.</param>
 /// <param name="RedCards">Sendings-off.</param>
 /// <param name="Rating">The match rating on a 0.0–10.0 scale, or null when the player was not rated (`TRN-8`).</param>
@@ -437,6 +470,17 @@ public sealed record PlayerMatchStatResponse(
     int PassesCompleted,
     int DribblesAttempted,
     int DribblesCompleted,
+    int TacklesAttempted,
+    int TacklesWon,
+    int CrossesAttempted,
+    int CrossesCompleted,
+    int PenaltiesTaken,
+    int PenaltiesScored,
+    int PenaltiesFaced,
+    int PenaltiesSaved,
+    int FreeKicksTaken,
+    int FreeKicksScored,
+    int ShotsOnTargetFaced,
     int YellowCards,
     int RedCards,
     decimal? Rating);

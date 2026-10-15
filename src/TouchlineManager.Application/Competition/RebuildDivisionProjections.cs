@@ -267,6 +267,17 @@ public sealed class RebuildDivisionProjections
         || stat.PassesCompleted != line.PassesCompleted
         || stat.DribblesAttempted != line.DribblesAttempted
         || stat.DribblesCompleted != line.DribblesCompleted
+        || stat.TacklesAttempted != line.TacklesAttempted
+        || stat.TacklesWon != line.TacklesWon
+        || stat.CrossesAttempted != line.CrossesAttempted
+        || stat.CrossesCompleted != line.CrossesCompleted
+        || stat.PenaltiesTaken != line.PenaltiesTaken
+        || stat.PenaltiesScored != line.PenaltiesScored
+        || stat.PenaltiesFaced != line.PenaltiesFaced
+        || stat.PenaltiesSaved != line.PenaltiesSaved
+        || stat.FreeKicksTaken != line.FreeKicksTaken
+        || stat.FreeKicksScored != line.FreeKicksScored
+        || stat.ShotsOnTargetFaced != line.ShotsOnTargetFaced
         || stat.YellowCards != line.YellowCards
         || stat.RedCards != line.RedCards
         || stat.RatingBasisPointsTotal != line.RatingBasisPointsTotal

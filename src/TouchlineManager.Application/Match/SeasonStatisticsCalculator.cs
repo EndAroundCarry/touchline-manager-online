@@ -31,8 +31,11 @@ namespace TouchlineManager.Application.Match;
 public static class SeasonStatisticsCalculator
 {
     /// <summary>A stable version for the rule, so a change to what is counted is a named change.</summary>
-    /// <remarks>Version 2 adds the passes and take-ons the engine's player line carries (`engine-v7`).</remarks>
-    public const string Version = "season-stats-v2";
+    /// <remarks>
+    /// Version 2 adds the passes and take-ons the engine's player line carries (`engine-v7`); version 3 adds its
+    /// tackles, crosses, penalties, direct free kicks and shots faced (`engine-v12`).
+    /// </remarks>
+    public const string Version = "season-stats-v3";
 
     /// <summary>Aggregates a matchday's results per player.</summary>
     /// <param name="matches">The published fixtures of the round, with their stored result documents.</param>
@@ -86,6 +89,17 @@ public static class SeasonStatisticsCalculator
                     PassesCompleted = line.PassesCompleted,
                     DribblesAttempted = line.DribblesAttempted,
                     DribblesCompleted = line.DribblesCompleted,
+                    TacklesAttempted = line.TacklesAttempted,
+                    TacklesWon = line.TacklesWon,
+                    CrossesAttempted = line.CrossesAttempted,
+                    CrossesCompleted = line.CrossesCompleted,
+                    PenaltiesTaken = line.PenaltiesTaken,
+                    PenaltiesScored = line.PenaltiesScored,
+                    PenaltiesFaced = line.PenaltiesFaced,
+                    PenaltiesSaved = line.PenaltiesSaved,
+                    FreeKicksTaken = line.FreeKicksTaken,
+                    FreeKicksScored = line.FreeKicksScored,
+                    ShotsOnTargetFaced = line.ShotsOnTargetFaced,
                     YellowCards = line.YellowCards,
                     RedCards = line.SentOff ? 1 : 0,
                     RatingBasisPoints = line.RatingBasisPoints,
@@ -137,6 +151,17 @@ public static class SeasonStatisticsCalculator
                     PassesCompleted = group.Sum(line => line.PassesCompleted),
                     DribblesAttempted = group.Sum(line => line.DribblesAttempted),
                     DribblesCompleted = group.Sum(line => line.DribblesCompleted),
+                    TacklesAttempted = group.Sum(line => line.TacklesAttempted),
+                    TacklesWon = group.Sum(line => line.TacklesWon),
+                    CrossesAttempted = group.Sum(line => line.CrossesAttempted),
+                    CrossesCompleted = group.Sum(line => line.CrossesCompleted),
+                    PenaltiesTaken = group.Sum(line => line.PenaltiesTaken),
+                    PenaltiesScored = group.Sum(line => line.PenaltiesScored),
+                    PenaltiesFaced = group.Sum(line => line.PenaltiesFaced),
+                    PenaltiesSaved = group.Sum(line => line.PenaltiesSaved),
+                    FreeKicksTaken = group.Sum(line => line.FreeKicksTaken),
+                    FreeKicksScored = group.Sum(line => line.FreeKicksScored),
+                    ShotsOnTargetFaced = group.Sum(line => line.ShotsOnTargetFaced),
                     YellowCards = group.Sum(line => line.YellowCards),
                     RedCards = group.Sum(line => line.RedCards),
                     RatingBasisPointsTotal = group.Sum(line => (long)line.RatingBasisPoints),

@@ -50,6 +50,39 @@ public sealed record PlayerMatchStatLine
     /// <summary>Gets the take-ons won (a subset of those attempted).</summary>
     public required int DribblesCompleted { get; init; }
 
+    /// <summary>Gets the challenges made for the ball.</summary>
+    public required int TacklesAttempted { get; init; }
+
+    /// <summary>Gets the challenges won (a subset of those attempted).</summary>
+    public required int TacklesWon { get; init; }
+
+    /// <summary>Gets the open-play crosses attempted (corners excluded).</summary>
+    public required int CrossesAttempted { get; init; }
+
+    /// <summary>Gets the crosses that found a teammate (a subset of those attempted).</summary>
+    public required int CrossesCompleted { get; init; }
+
+    /// <summary>Gets the penalties taken.</summary>
+    public required int PenaltiesTaken { get; init; }
+
+    /// <summary>Gets the penalties scored (a subset of those taken).</summary>
+    public required int PenaltiesScored { get; init; }
+
+    /// <summary>Gets the penalties faced as goalkeeper.</summary>
+    public required int PenaltiesFaced { get; init; }
+
+    /// <summary>Gets the penalties saved (a subset of those faced).</summary>
+    public required int PenaltiesSaved { get; init; }
+
+    /// <summary>Gets the direct free kicks taken.</summary>
+    public required int FreeKicksTaken { get; init; }
+
+    /// <summary>Gets the direct free kicks scored (a subset of those taken).</summary>
+    public required int FreeKicksScored { get; init; }
+
+    /// <summary>Gets the shots on target faced as goalkeeper (the saves plus the goals conceded from open play).</summary>
+    public required int ShotsOnTargetFaced { get; init; }
+
     /// <summary>Gets the bookings received, counting a second yellow as the booking it was.</summary>
     public required int YellowCards { get; init; }
 
@@ -113,6 +146,39 @@ public sealed record PlayerSeasonStatLine
 
     /// <summary>Gets the take-ons won (a subset of those attempted).</summary>
     public required int DribblesCompleted { get; init; }
+
+    /// <summary>Gets the challenges made for the ball.</summary>
+    public required int TacklesAttempted { get; init; }
+
+    /// <summary>Gets the challenges won (a subset of those attempted).</summary>
+    public required int TacklesWon { get; init; }
+
+    /// <summary>Gets the open-play crosses attempted (corners excluded).</summary>
+    public required int CrossesAttempted { get; init; }
+
+    /// <summary>Gets the crosses that found a teammate (a subset of those attempted).</summary>
+    public required int CrossesCompleted { get; init; }
+
+    /// <summary>Gets the penalties taken.</summary>
+    public required int PenaltiesTaken { get; init; }
+
+    /// <summary>Gets the penalties scored (a subset of those taken).</summary>
+    public required int PenaltiesScored { get; init; }
+
+    /// <summary>Gets the penalties faced as goalkeeper.</summary>
+    public required int PenaltiesFaced { get; init; }
+
+    /// <summary>Gets the penalties saved (a subset of those faced).</summary>
+    public required int PenaltiesSaved { get; init; }
+
+    /// <summary>Gets the direct free kicks taken.</summary>
+    public required int FreeKicksTaken { get; init; }
+
+    /// <summary>Gets the direct free kicks scored (a subset of those taken).</summary>
+    public required int FreeKicksScored { get; init; }
+
+    /// <summary>Gets the shots on target faced as goalkeeper (the saves plus the goals conceded from open play).</summary>
+    public required int ShotsOnTargetFaced { get; init; }
 
     /// <summary>Gets the league bookings accumulated.</summary>
     public required int YellowCards { get; init; }
@@ -201,6 +267,39 @@ public sealed class PlayerSeasonStat
 
     /// <summary>Gets the take-ons won.</summary>
     public int DribblesCompleted { get; private set; }
+
+    /// <summary>Gets the challenges made for the ball.</summary>
+    public int TacklesAttempted { get; private set; }
+
+    /// <summary>Gets the challenges won (a subset of those attempted).</summary>
+    public int TacklesWon { get; private set; }
+
+    /// <summary>Gets the open-play crosses attempted (corners excluded).</summary>
+    public int CrossesAttempted { get; private set; }
+
+    /// <summary>Gets the crosses that found a teammate (a subset of those attempted).</summary>
+    public int CrossesCompleted { get; private set; }
+
+    /// <summary>Gets the penalties taken.</summary>
+    public int PenaltiesTaken { get; private set; }
+
+    /// <summary>Gets the penalties scored (a subset of those taken).</summary>
+    public int PenaltiesScored { get; private set; }
+
+    /// <summary>Gets the penalties faced as goalkeeper.</summary>
+    public int PenaltiesFaced { get; private set; }
+
+    /// <summary>Gets the penalties saved (a subset of those faced).</summary>
+    public int PenaltiesSaved { get; private set; }
+
+    /// <summary>Gets the direct free kicks taken.</summary>
+    public int FreeKicksTaken { get; private set; }
+
+    /// <summary>Gets the direct free kicks scored (a subset of those taken).</summary>
+    public int FreeKicksScored { get; private set; }
+
+    /// <summary>Gets the shots on target faced as goalkeeper (the saves plus the goals conceded from open play).</summary>
+    public int ShotsOnTargetFaced { get; private set; }
 
     /// <summary>Gets the league bookings accumulated.</summary>
     public int YellowCards { get; private set; }
@@ -365,6 +464,17 @@ public sealed class PlayerSeasonStat
         PassesCompleted += line.PassesCompleted;
         DribblesAttempted += line.DribblesAttempted;
         DribblesCompleted += line.DribblesCompleted;
+        TacklesAttempted += line.TacklesAttempted;
+        TacklesWon += line.TacklesWon;
+        CrossesAttempted += line.CrossesAttempted;
+        CrossesCompleted += line.CrossesCompleted;
+        PenaltiesTaken += line.PenaltiesTaken;
+        PenaltiesScored += line.PenaltiesScored;
+        PenaltiesFaced += line.PenaltiesFaced;
+        PenaltiesSaved += line.PenaltiesSaved;
+        FreeKicksTaken += line.FreeKicksTaken;
+        FreeKicksScored += line.FreeKicksScored;
+        ShotsOnTargetFaced += line.ShotsOnTargetFaced;
         YellowCards += line.YellowCards;
         RedCards += line.RedCards;
 
@@ -395,6 +505,17 @@ public sealed class PlayerSeasonStat
         PassesCompleted = line.PassesCompleted;
         DribblesAttempted = line.DribblesAttempted;
         DribblesCompleted = line.DribblesCompleted;
+        TacklesAttempted = line.TacklesAttempted;
+        TacklesWon = line.TacklesWon;
+        CrossesAttempted = line.CrossesAttempted;
+        CrossesCompleted = line.CrossesCompleted;
+        PenaltiesTaken = line.PenaltiesTaken;
+        PenaltiesScored = line.PenaltiesScored;
+        PenaltiesFaced = line.PenaltiesFaced;
+        PenaltiesSaved = line.PenaltiesSaved;
+        FreeKicksTaken = line.FreeKicksTaken;
+        FreeKicksScored = line.FreeKicksScored;
+        ShotsOnTargetFaced = line.ShotsOnTargetFaced;
         YellowCards = line.YellowCards;
         RedCards = line.RedCards;
         RatingBasisPointsTotal = line.RatingBasisPointsTotal;
@@ -420,6 +541,17 @@ public sealed class PlayerSeasonStat
             (nameof(line.PassesCompleted), line.PassesCompleted),
             (nameof(line.DribblesAttempted), line.DribblesAttempted),
             (nameof(line.DribblesCompleted), line.DribblesCompleted),
+            (nameof(line.TacklesAttempted), line.TacklesAttempted),
+            (nameof(line.TacklesWon), line.TacklesWon),
+            (nameof(line.CrossesAttempted), line.CrossesAttempted),
+            (nameof(line.CrossesCompleted), line.CrossesCompleted),
+            (nameof(line.PenaltiesTaken), line.PenaltiesTaken),
+            (nameof(line.PenaltiesScored), line.PenaltiesScored),
+            (nameof(line.PenaltiesFaced), line.PenaltiesFaced),
+            (nameof(line.PenaltiesSaved), line.PenaltiesSaved),
+            (nameof(line.FreeKicksTaken), line.FreeKicksTaken),
+            (nameof(line.FreeKicksScored), line.FreeKicksScored),
+            (nameof(line.ShotsOnTargetFaced), line.ShotsOnTargetFaced),
             (nameof(line.YellowCards), line.YellowCards),
             (nameof(line.RedCards), line.RedCards),
             (nameof(line.RatingBasisPointsTotal), line.RatingBasisPointsTotal),
@@ -465,6 +597,36 @@ public sealed class PlayerSeasonStat
             throw new ArgumentException("Successful dribbles are a subset of attempted dribbles.", nameof(line));
         }
 
+        if (line.TacklesWon > line.TacklesAttempted)
+        {
+            throw new ArgumentException("Tackles won are a subset of attempted tackles.", nameof(line));
+        }
+
+        if (line.CrossesCompleted > line.CrossesAttempted)
+        {
+            throw new ArgumentException("Completed crosses are a subset of attempted crosses.", nameof(line));
+        }
+
+        if (line.PenaltiesScored > line.PenaltiesTaken)
+        {
+            throw new ArgumentException("Penalties scored are a subset of penalties taken.", nameof(line));
+        }
+
+        if (line.PenaltiesSaved > line.PenaltiesFaced)
+        {
+            throw new ArgumentException("Penalties saved are a subset of penalties faced.", nameof(line));
+        }
+
+        if (line.FreeKicksScored > line.FreeKicksTaken)
+        {
+            throw new ArgumentException("Free kicks scored are a subset of free kicks taken.", nameof(line));
+        }
+
+        if (line.Saves > line.ShotsOnTargetFaced)
+        {
+            throw new ArgumentException("Saves are a subset of the shots on target faced.", nameof(line));
+        }
+
         if (line.RatedAppearances > line.Appearances)
         {
             throw new ArgumentException("A rating belongs to an appearance.", nameof(line));
@@ -494,6 +656,17 @@ public sealed class PlayerSeasonStat
             (nameof(line.PassesCompleted), line.PassesCompleted),
             (nameof(line.DribblesAttempted), line.DribblesAttempted),
             (nameof(line.DribblesCompleted), line.DribblesCompleted),
+            (nameof(line.TacklesAttempted), line.TacklesAttempted),
+            (nameof(line.TacklesWon), line.TacklesWon),
+            (nameof(line.CrossesAttempted), line.CrossesAttempted),
+            (nameof(line.CrossesCompleted), line.CrossesCompleted),
+            (nameof(line.PenaltiesTaken), line.PenaltiesTaken),
+            (nameof(line.PenaltiesScored), line.PenaltiesScored),
+            (nameof(line.PenaltiesFaced), line.PenaltiesFaced),
+            (nameof(line.PenaltiesSaved), line.PenaltiesSaved),
+            (nameof(line.FreeKicksTaken), line.FreeKicksTaken),
+            (nameof(line.FreeKicksScored), line.FreeKicksScored),
+            (nameof(line.ShotsOnTargetFaced), line.ShotsOnTargetFaced),
             (nameof(line.YellowCards), line.YellowCards),
             (nameof(line.RedCards), line.RedCards),
             (nameof(line.RatingBasisPoints), line.RatingBasisPoints),
@@ -537,6 +710,36 @@ public sealed class PlayerSeasonStat
         if (line.DribblesCompleted > line.DribblesAttempted)
         {
             throw new ArgumentException("Successful dribbles are a subset of attempted dribbles.", nameof(line));
+        }
+
+        if (line.TacklesWon > line.TacklesAttempted)
+        {
+            throw new ArgumentException("Tackles won are a subset of attempted tackles.", nameof(line));
+        }
+
+        if (line.CrossesCompleted > line.CrossesAttempted)
+        {
+            throw new ArgumentException("Completed crosses are a subset of attempted crosses.", nameof(line));
+        }
+
+        if (line.PenaltiesScored > line.PenaltiesTaken)
+        {
+            throw new ArgumentException("Penalties scored are a subset of penalties taken.", nameof(line));
+        }
+
+        if (line.PenaltiesSaved > line.PenaltiesFaced)
+        {
+            throw new ArgumentException("Penalties saved are a subset of penalties faced.", nameof(line));
+        }
+
+        if (line.FreeKicksScored > line.FreeKicksTaken)
+        {
+            throw new ArgumentException("Free kicks scored are a subset of free kicks taken.", nameof(line));
+        }
+
+        if (line.Saves > line.ShotsOnTargetFaced)
+        {
+            throw new ArgumentException("Saves are a subset of the shots on target faced.", nameof(line));
         }
 
         if (line.RatingBasisPoints > 10_000)

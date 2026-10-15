@@ -488,7 +488,13 @@ internal sealed class PlayerSeasonStatConfiguration : IEntityTypeConfiguration<P
                 + "and rating_basis_points_total >= 0 and rated_appearances >= 0 "
                 + "and passes_attempted >= 0 and passes_completed >= 0 and passes_completed <= passes_attempted "
                 + "and dribbles_attempted >= 0 and dribbles_completed >= 0 "
-                + "and dribbles_completed <= dribbles_attempted");
+                + "and dribbles_completed <= dribbles_attempted "
+                + "and tackles_attempted >= 0 and tackles_won >= 0 and tackles_won <= tackles_attempted "
+                + "and crosses_attempted >= 0 and crosses_completed >= 0 and crosses_completed <= crosses_attempted "
+                + "and penalties_taken >= 0 and penalties_scored >= 0 and penalties_scored <= penalties_taken "
+                + "and penalties_faced >= 0 and penalties_saved >= 0 and penalties_saved <= penalties_faced "
+                + "and free_kicks_taken >= 0 and free_kicks_scored >= 0 and free_kicks_scored <= free_kicks_taken "
+                + "and shots_on_target_faced >= 0 and saves <= shots_on_target_faced");
             table.HasCheckConstraint(
                 "ck_player_season_stats_rating",
                 "case when rated_appearances = 0 then 0 "
@@ -512,6 +518,17 @@ internal sealed class PlayerSeasonStatConfiguration : IEntityTypeConfiguration<P
         builder.Property(stat => stat.PassesCompleted).HasColumnName("passes_completed").IsRequired();
         builder.Property(stat => stat.DribblesAttempted).HasColumnName("dribbles_attempted").IsRequired();
         builder.Property(stat => stat.DribblesCompleted).HasColumnName("dribbles_completed").IsRequired();
+        builder.Property(stat => stat.TacklesAttempted).HasColumnName("tackles_attempted").IsRequired();
+        builder.Property(stat => stat.TacklesWon).HasColumnName("tackles_won").IsRequired();
+        builder.Property(stat => stat.CrossesAttempted).HasColumnName("crosses_attempted").IsRequired();
+        builder.Property(stat => stat.CrossesCompleted).HasColumnName("crosses_completed").IsRequired();
+        builder.Property(stat => stat.PenaltiesTaken).HasColumnName("penalties_taken").IsRequired();
+        builder.Property(stat => stat.PenaltiesScored).HasColumnName("penalties_scored").IsRequired();
+        builder.Property(stat => stat.PenaltiesFaced).HasColumnName("penalties_faced").IsRequired();
+        builder.Property(stat => stat.PenaltiesSaved).HasColumnName("penalties_saved").IsRequired();
+        builder.Property(stat => stat.FreeKicksTaken).HasColumnName("free_kicks_taken").IsRequired();
+        builder.Property(stat => stat.FreeKicksScored).HasColumnName("free_kicks_scored").IsRequired();
+        builder.Property(stat => stat.ShotsOnTargetFaced).HasColumnName("shots_on_target_faced").IsRequired();
         builder.Property(stat => stat.YellowCards).HasColumnName("yellow_cards").IsRequired();
         builder.Property(stat => stat.RedCards).HasColumnName("red_cards").IsRequired();
         builder.Property(stat => stat.RatingBasisPointsTotal)

@@ -41,6 +41,17 @@ public sealed class PlayerMatchMappingTests
         response.PassesCompleted.Should().Be(41);
         response.DribblesAttempted.Should().Be(6);
         response.DribblesCompleted.Should().Be(3);
+        response.TacklesAttempted.Should().Be(11);
+        response.TacklesWon.Should().Be(7);
+        response.CrossesAttempted.Should().Be(8);
+        response.CrossesCompleted.Should().Be(3);
+        response.PenaltiesTaken.Should().Be(2);
+        response.PenaltiesScored.Should().Be(1);
+        response.PenaltiesFaced.Should().Be(4);
+        response.PenaltiesSaved.Should().Be(2);
+        response.FreeKicksTaken.Should().Be(5);
+        response.FreeKicksScored.Should().Be(1);
+        response.ShotsOnTargetFaced.Should().Be(12);
         response.RedCards.Should().Be(0);
         response.Rating.Should().Be(8.0m, "TRN-8: the rating crosses the wire on its display scale");
     }
@@ -133,6 +144,17 @@ public sealed class PlayerMatchMappingTests
             PassesCompleted = minutes == 0 ? 0 : 41,
             DribblesAttempted = minutes == 0 ? 0 : 6,
             DribblesCompleted = minutes == 0 ? 0 : 3,
+            TacklesAttempted = minutes == 0 ? 0 : 11,
+            TacklesWon = minutes == 0 ? 0 : 7,
+            CrossesAttempted = minutes == 0 ? 0 : 8,
+            CrossesCompleted = minutes == 0 ? 0 : 3,
+            PenaltiesTaken = minutes == 0 ? 0 : 2,
+            PenaltiesScored = minutes == 0 ? 0 : 1,
+            PenaltiesFaced = minutes == 0 ? 0 : 4,
+            PenaltiesSaved = minutes == 0 ? 0 : 2,
+            FreeKicksTaken = minutes == 0 ? 0 : 5,
+            FreeKicksScored = minutes == 0 ? 0 : 1,
+            ShotsOnTargetFaced = minutes == 0 ? 0 : 12,
         };
 
     private static MatchStatisticsV1 Statistics() => new()

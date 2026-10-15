@@ -107,6 +107,21 @@ public sealed class MatchDocumentTests
         content.PlayerLines.Should().Equal(
             result.PlayerLines,
             "publication reads the minutes a result's player lines carry (TRN-11)");
+        content.PlayerLines[0].TacklesWon.Should().Be(7, "the counts the engine added in v12 survive the document");
+        content.PlayerLines[0].ShotsOnTargetFaced.Should().Be(12);
+    }
+
+    [Fact]
+    public void A_statistics_document_of_the_previous_schema_is_refused_by_name()
+    {
+        var json = MatchStatisticsDocument
+            .Write(SimulatedMatch(seed: 5UL))
+            .Replace(MatchStatisticsDocument.Schema, "match-statistics-v5", StringComparison.Ordinal);
+
+        var act = () => MatchStatisticsDocument.Read(json);
+
+        act.Should().Throw<InvalidMatchInputException>()
+            .WithMessage($"*{MatchStatisticsDocument.Schema}*");
     }
 
     [Fact]
@@ -208,6 +223,17 @@ public sealed class MatchDocumentTests
                 AbsenceFixtures = 0,
                 RatingBasisPoints = 8_500,
                 FinalConditionBasisPoints = 6_000,
+                TacklesAttempted = 11,
+                TacklesWon = 7,
+                CrossesAttempted = 8,
+                CrossesCompleted = 3,
+                PenaltiesTaken = 2,
+                PenaltiesScored = 1,
+                PenaltiesFaced = 4,
+                PenaltiesSaved = 2,
+                FreeKicksTaken = 5,
+                FreeKicksScored = 1,
+                ShotsOnTargetFaced = 12,
             },
         ],
         TotalMinutesPlayed = 94,

@@ -108,6 +108,17 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
                     PassesCompleted = 240,
                     DribblesAttempted = 40,
                     DribblesCompleted = 18,
+                    TacklesAttempted = 100,
+                    TacklesWon = 60,
+                    CrossesAttempted = 50,
+                    CrossesCompleted = 20,
+                    PenaltiesTaken = 3,
+                    PenaltiesScored = 2,
+                    PenaltiesFaced = 4,
+                    PenaltiesSaved = 1,
+                    FreeKicksTaken = 10,
+                    FreeKicksScored = 1,
+                    ShotsOnTargetFaced = 30,
                     YellowCards = 1,
                     RedCards = 0,
                     RatingBasisPointsTotal = 72_000,
@@ -134,6 +145,17 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
                     PassesCompleted = 170,
                     DribblesAttempted = 30,
                     DribblesCompleted = 15,
+                    TacklesAttempted = 80,
+                    TacklesWon = 40,
+                    CrossesAttempted = 30,
+                    CrossesCompleted = 10,
+                    PenaltiesTaken = 2,
+                    PenaltiesScored = 2,
+                    PenaltiesFaced = 1,
+                    PenaltiesSaved = 0,
+                    FreeKicksTaken = 6,
+                    FreeKicksScored = 0,
+                    ShotsOnTargetFaced = 20,
                     YellowCards = 0,
                     RedCards = 0,
                     RatingBasisPointsTotal = 64_000,
@@ -162,6 +184,17 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
             career.Totals.PassesCompleted.Should().Be(410);
             career.Totals.DribblesAttempted.Should().Be(70);
             career.Totals.DribblesCompleted.Should().Be(33);
+            career.Totals.TacklesAttempted.Should().Be(180);
+            career.Totals.TacklesWon.Should().Be(100);
+            career.Totals.CrossesAttempted.Should().Be(80);
+            career.Totals.CrossesCompleted.Should().Be(30);
+            career.Totals.PenaltiesTaken.Should().Be(5);
+            career.Totals.PenaltiesScored.Should().Be(4);
+            career.Totals.PenaltiesFaced.Should().Be(5);
+            career.Totals.PenaltiesSaved.Should().Be(1);
+            career.Totals.FreeKicksTaken.Should().Be(16);
+            career.Totals.FreeKicksScored.Should().Be(1);
+            career.Totals.ShotsOnTargetFaced.Should().Be(50);
 
             // The rating is recomputed from the summed basis points and rated appearances, not averaged from
             // the season averages (TRN-8).
@@ -171,6 +204,7 @@ public sealed class PlayerCareerStatsTests : IAsyncLifetime, IDisposable
             career.Seasons[0].SeasonNumber.Should().Be(2, "the most recent season is first");
             career.Seasons[0].Stats.Goals.Should().Be(6);
             career.Seasons[0].Stats.PassesCompleted.Should().Be(170);
+            career.Seasons[0].Stats.TacklesWon.Should().Be(40);
             career.Seasons[0].ClubName.Should().NotBeNullOrWhiteSpace();
             career.Seasons[1].SeasonNumber.Should().Be(1);
             career.Seasons[1].Stats.Goals.Should().Be(4);

@@ -30,6 +30,17 @@ public sealed class PlayerSeasonStatsMappingTests
             PassesCompleted: 96,
             DribblesAttempted: 14,
             DribblesCompleted: 7,
+            TacklesAttempted: 31,
+            TacklesWon: 17,
+            CrossesAttempted: 22,
+            CrossesCompleted: 9,
+            PenaltiesTaken: 3,
+            PenaltiesScored: 2,
+            PenaltiesFaced: 4,
+            PenaltiesSaved: 1,
+            FreeKicksTaken: 8,
+            FreeKicksScored: 2,
+            ShotsOnTargetFaced: 19,
             YellowCards: 1,
             RedCards: 0,
             AverageRatingBasisPoints: 7_500);
@@ -43,13 +54,25 @@ public sealed class PlayerSeasonStatsMappingTests
         response.PassesCompleted.Should().Be(96);
         response.DribblesAttempted.Should().Be(14);
         response.DribblesCompleted.Should().Be(7);
+        response.TacklesAttempted.Should().Be(31);
+        response.TacklesWon.Should().Be(17);
+        response.CrossesAttempted.Should().Be(22);
+        response.CrossesCompleted.Should().Be(9);
+        response.PenaltiesTaken.Should().Be(3);
+        response.PenaltiesScored.Should().Be(2);
+        response.PenaltiesFaced.Should().Be(4);
+        response.PenaltiesSaved.Should().Be(1);
+        response.FreeKicksTaken.Should().Be(8);
+        response.FreeKicksScored.Should().Be(2);
+        response.ShotsOnTargetFaced.Should().Be(19);
         response.AverageRating.Should().Be(7.5m, "TRN-8: the rating crosses the wire on its display scale");
     }
 
     [Fact]
     public void An_unrated_player_has_no_average_rather_than_a_zero()
     {
-        var stat = new SquadSeasonStatRow(1, 1, 90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, AverageRatingBasisPoints: null);
+        var stat = new SquadSeasonStatRow(
+            1, 1, 90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, AverageRatingBasisPoints: null);
 
         stat.ToResponse().AverageRating.Should().BeNull("STA-5: a player with no rated appearance has no average");
     }

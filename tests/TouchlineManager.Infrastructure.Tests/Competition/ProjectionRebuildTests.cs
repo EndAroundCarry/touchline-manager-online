@@ -381,5 +381,37 @@ public sealed class ProjectionRebuildTests
                 line.RedCards,
                 line.RatingBasisPointsTotal,
                 line.RatedAppearances)));
+
+        // The columns the engine added in v12 are rebuilt from the same stored lines.
+        stored
+            .Select(stat => (
+                stat.PlayerId,
+                stat.ClubId,
+                stat.TacklesAttempted,
+                stat.TacklesWon,
+                stat.CrossesAttempted,
+                stat.CrossesCompleted,
+                stat.PenaltiesTaken,
+                stat.PenaltiesScored,
+                stat.PenaltiesFaced,
+                stat.PenaltiesSaved,
+                stat.FreeKicksTaken,
+                stat.FreeKicksScored,
+                stat.ShotsOnTargetFaced))
+            .Should()
+            .BeEquivalentTo(expected.Select(line => (
+                line.PlayerId,
+                line.ClubId,
+                line.TacklesAttempted,
+                line.TacklesWon,
+                line.CrossesAttempted,
+                line.CrossesCompleted,
+                line.PenaltiesTaken,
+                line.PenaltiesScored,
+                line.PenaltiesFaced,
+                line.PenaltiesSaved,
+                line.FreeKicksTaken,
+                line.FreeKicksScored,
+                line.ShotsOnTargetFaced)));
     }
 }

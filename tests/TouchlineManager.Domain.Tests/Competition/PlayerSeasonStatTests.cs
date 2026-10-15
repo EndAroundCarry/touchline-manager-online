@@ -102,6 +102,104 @@ public sealed class PlayerSeasonStatTests
         act.Should().Throw<ArgumentException>();
     }
 
+    [Theory]
+    [InlineData("tackles")]
+    [InlineData("crosses")]
+    [InlineData("penalties scored")]
+    [InlineData("penalties saved")]
+    [InlineData("free kicks")]
+    [InlineData("saves")]
+    public void A_match_line_whose_subset_exceeds_its_whole_is_refused(string rule)
+    {
+        var line = rule switch
+        {
+            "tackles" => Line() with { TacklesAttempted = 2, TacklesWon = 3 },
+            "crosses" => Line() with { CrossesAttempted = 2, CrossesCompleted = 3 },
+            "penalties scored" => Line() with { PenaltiesTaken = 1, PenaltiesScored = 2 },
+            "penalties saved" => Line() with { PenaltiesFaced = 1, PenaltiesSaved = 2 },
+            "free kicks" => Line() with { FreeKicksTaken = 1, FreeKicksScored = 2 },
+            _ => Line() with { Saves = 5, ShotsOnTargetFaced = 4 },
+        };
+
+        var act = () => Open().Accumulate(line, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("tackles")]
+    [InlineData("crosses")]
+    [InlineData("penalties scored")]
+    [InlineData("penalties saved")]
+    [InlineData("free kicks")]
+    [InlineData("saves")]
+    public void A_season_line_whose_subset_exceeds_its_whole_is_refused(string rule)
+    {
+        var line = rule switch
+        {
+            "tackles" => SeasonLine() with { TacklesAttempted = 2, TacklesWon = 3 },
+            "crosses" => SeasonLine() with { CrossesAttempted = 2, CrossesCompleted = 3 },
+            "penalties scored" => SeasonLine() with { PenaltiesTaken = 1, PenaltiesScored = 2 },
+            "penalties saved" => SeasonLine() with { PenaltiesFaced = 1, PenaltiesSaved = 2 },
+            "free kicks" => SeasonLine() with { FreeKicksTaken = 1, FreeKicksScored = 2 },
+            _ => SeasonLine() with { Saves = 5, ShotsOnTargetFaced = 4 },
+        };
+
+        var act = () => Open().Rebuild(line, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void A_negative_tackle_cross_or_set_piece_count_is_refused()
+    {
+        Open().Invoking(stat => stat.Accumulate(Line() with { TacklesAttempted = -1 }, Now))
+            .Should().Throw<ArgumentException>();
+        Open().Invoking(stat => stat.Accumulate(Line() with { ShotsOnTargetFaced = -1 }, Now))
+            .Should().Throw<ArgumentException>();
+        Open().Invoking(stat => stat.Rebuild(SeasonLine() with { FreeKicksTaken = -1 }, Now))
+            .Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Accumulating_sums_the_tackles_crosses_and_set_pieces()
+    {
+        var stat = Open();
+
+        stat.Accumulate(Line(), Now);
+        stat.Accumulate(Line() with { TacklesAttempted = 4, TacklesWon = 1, PenaltiesFaced = 0, PenaltiesSaved = 0 }, Now);
+
+        stat.TacklesAttempted.Should().Be(10 + 4);
+        stat.TacklesWon.Should().Be(6 + 1);
+        stat.CrossesAttempted.Should().Be(8 * 2);
+        stat.CrossesCompleted.Should().Be(3 * 2);
+        stat.PenaltiesTaken.Should().Be(2 * 2);
+        stat.PenaltiesScored.Should().Be(1 * 2);
+        stat.PenaltiesFaced.Should().Be(3);
+        stat.PenaltiesSaved.Should().Be(1);
+        stat.FreeKicksTaken.Should().Be(5 * 2);
+        stat.FreeKicksScored.Should().Be(1 * 2);
+        stat.ShotsOnTargetFaced.Should().Be(9 * 2);
+    }
+
+    [Fact]
+    public void Rebuild_copies_the_tackles_crosses_and_set_pieces()
+    {
+        var stat = PlayerSeasonStat.Create(Guid.CreateVersion7(), DivisionSeasonId, SeasonLine(), Now);
+
+        stat.TacklesAttempted.Should().Be(100);
+        stat.TacklesWon.Should().Be(60);
+        stat.CrossesAttempted.Should().Be(80);
+        stat.CrossesCompleted.Should().Be(30);
+        stat.PenaltiesTaken.Should().Be(5);
+        stat.PenaltiesScored.Should().Be(4);
+        stat.PenaltiesFaced.Should().Be(6);
+        stat.PenaltiesSaved.Should().Be(2);
+        stat.FreeKicksTaken.Should().Be(20);
+        stat.FreeKicksScored.Should().Be(3);
+        stat.ShotsOnTargetFaced.Should().Be(90);
+    }
+
     [Fact]
     public void A_negative_pass_count_is_refused()
     {
@@ -257,6 +355,17 @@ public sealed class PlayerSeasonStatTests
         PassesCompleted = 32,
         DribblesAttempted = 5,
         DribblesCompleted = 2,
+        TacklesAttempted = 10,
+        TacklesWon = 6,
+        CrossesAttempted = 8,
+        CrossesCompleted = 3,
+        PenaltiesTaken = 2,
+        PenaltiesScored = 1,
+        PenaltiesFaced = 3,
+        PenaltiesSaved = 1,
+        FreeKicksTaken = 5,
+        FreeKicksScored = 1,
+        ShotsOnTargetFaced = 9,
         YellowCards = 0,
         RedCards = 0,
         RatingBasisPoints = 7_000,
@@ -278,6 +387,17 @@ public sealed class PlayerSeasonStatTests
         PassesCompleted = 320,
         DribblesAttempted = 50,
         DribblesCompleted = 20,
+        TacklesAttempted = 100,
+        TacklesWon = 60,
+        CrossesAttempted = 80,
+        CrossesCompleted = 30,
+        PenaltiesTaken = 5,
+        PenaltiesScored = 4,
+        PenaltiesFaced = 6,
+        PenaltiesSaved = 2,
+        FreeKicksTaken = 20,
+        FreeKicksScored = 3,
+        ShotsOnTargetFaced = 90,
         YellowCards = 2,
         RedCards = 0,
         RatingBasisPointsTotal = 70_000,

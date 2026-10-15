@@ -633,8 +633,8 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `training_progression_version` | `training-v3` | TRN-9 (FIC-8) |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
-| `match_statistics_schema` | `match-statistics-v5` (carries the player lines, the assists, the rating, and the passes and take-ons) | JSN-1, TRN-11 |
-| `season_stats_version` | `season-stats-v2` | STA-1 (FIC-8) |
+| `match_statistics_schema` | `match-statistics-v6` (carries the player lines, the assists, the rating, the passes and take-ons, and the tackles, crosses, penalties, free kicks and shots faced) | JSN-1, TRN-11 |
+| `season_stats_version` | `season-stats-v3` | STA-1 (FIC-8) |
 | `match_rating_scale` | 0–10,000 basis points (displayed 0.0–10.0) | TRN-8, STA-2 |
 | `match_rating_base_bp` | 6,000 | STA-5 (balancing) |
 | `match_rating_win_bp` / `_draw_bp` / `_loss_bp` | 600 / 120 / 350 | STA-5 (balancing) |

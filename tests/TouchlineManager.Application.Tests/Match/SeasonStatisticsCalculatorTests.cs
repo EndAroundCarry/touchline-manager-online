@@ -60,6 +60,26 @@ public sealed class SeasonStatisticsCalculatorTests
     }
 
     [Fact]
+    public void The_line_carries_the_tackles_crosses_and_set_pieces_the_result_recorded()
+    {
+        var lines = SeasonStatisticsCalculator.Calculate([Row()], []);
+
+        var striker = lines.Single(line => line.PlayerId == Striker);
+
+        striker.TacklesAttempted.Should().Be(11);
+        striker.TacklesWon.Should().Be(7);
+        striker.CrossesAttempted.Should().Be(8);
+        striker.CrossesCompleted.Should().Be(3);
+        striker.PenaltiesTaken.Should().Be(2);
+        striker.PenaltiesScored.Should().Be(1);
+        striker.PenaltiesFaced.Should().Be(4);
+        striker.PenaltiesSaved.Should().Be(2);
+        striker.FreeKicksTaken.Should().Be(5);
+        striker.FreeKicksScored.Should().Be(1);
+        striker.ShotsOnTargetFaced.Should().Be(12);
+    }
+
+    [Fact]
     public void Shots_and_saves_are_counted_from_the_event_stream()
     {
         MatchStatEvent[] events =
@@ -155,6 +175,30 @@ public sealed class SeasonStatisticsCalculatorTests
     }
 
     [Fact]
+    public void Aggregate_sums_the_tackles_crosses_and_set_pieces_across_matches()
+    {
+        var lines = SeasonStatisticsCalculator.Aggregate(
+        [
+            MatchLine(Striker, ClubId, minutes: 90, goals: 0, rating: 7_000, setPieces: 1),
+            MatchLine(Striker, ClubId, minutes: 90, goals: 0, rating: 7_000, setPieces: 2),
+        ]);
+
+        var season = lines.Should().ContainSingle().Subject;
+
+        season.TacklesAttempted.Should().Be(11 * 3);
+        season.TacklesWon.Should().Be(7 * 3);
+        season.CrossesAttempted.Should().Be(8 * 3);
+        season.CrossesCompleted.Should().Be(3 * 3);
+        season.PenaltiesTaken.Should().Be(2 * 3);
+        season.PenaltiesScored.Should().Be(1 * 3);
+        season.PenaltiesFaced.Should().Be(4 * 3);
+        season.PenaltiesSaved.Should().Be(2 * 3);
+        season.FreeKicksTaken.Should().Be(5 * 3);
+        season.FreeKicksScored.Should().Be(1 * 3);
+        season.ShotsOnTargetFaced.Should().Be(12 * 3);
+    }
+
+    [Fact]
     public void Aggregate_counts_only_rated_appearances()
     {
         var lines = SeasonStatisticsCalculator.Aggregate(
@@ -169,7 +213,7 @@ public sealed class SeasonStatisticsCalculatorTests
     }
 
     /// <summary>One player's contribution to one match, as the calculator would produce it.</summary>
-    private static PlayerMatchStatLine MatchLine(Guid playerId, Guid clubId, int minutes, int goals, int rating, int passes = 0) => new()
+    private static PlayerMatchStatLine MatchLine(Guid playerId, Guid clubId, int minutes, int goals, int rating, int passes = 0, int setPieces = 0) => new()
     {
         PlayerId = playerId,
         ClubId = clubId,
@@ -185,6 +229,17 @@ public sealed class SeasonStatisticsCalculatorTests
         PassesCompleted = passes * 4 / 5,
         DribblesAttempted = 0,
         DribblesCompleted = 0,
+        TacklesAttempted = 11 * setPieces,
+        TacklesWon = 7 * setPieces,
+        CrossesAttempted = 8 * setPieces,
+        CrossesCompleted = 3 * setPieces,
+        PenaltiesTaken = 2 * setPieces,
+        PenaltiesScored = 1 * setPieces,
+        PenaltiesFaced = 4 * setPieces,
+        PenaltiesSaved = 2 * setPieces,
+        FreeKicksTaken = 5 * setPieces,
+        FreeKicksScored = 1 * setPieces,
+        ShotsOnTargetFaced = 12 * setPieces,
         YellowCards = 0,
         RedCards = 0,
         RatingBasisPoints = rating,
@@ -245,6 +300,17 @@ public sealed class SeasonStatisticsCalculatorTests
             PassesCompleted = minutes == 0 ? 0 : 41,
             DribblesAttempted = minutes == 0 ? 0 : 6,
             DribblesCompleted = minutes == 0 ? 0 : 3,
+            TacklesAttempted = minutes == 0 ? 0 : 11,
+            TacklesWon = minutes == 0 ? 0 : 7,
+            CrossesAttempted = minutes == 0 ? 0 : 8,
+            CrossesCompleted = minutes == 0 ? 0 : 3,
+            PenaltiesTaken = minutes == 0 ? 0 : 2,
+            PenaltiesScored = minutes == 0 ? 0 : 1,
+            PenaltiesFaced = minutes == 0 ? 0 : 4,
+            PenaltiesSaved = minutes == 0 ? 0 : 2,
+            FreeKicksTaken = minutes == 0 ? 0 : 5,
+            FreeKicksScored = minutes == 0 ? 0 : 1,
+            ShotsOnTargetFaced = minutes == 0 ? 0 : 12,
         };
 
     private static MatchStatisticsV1 Statistics() => new()

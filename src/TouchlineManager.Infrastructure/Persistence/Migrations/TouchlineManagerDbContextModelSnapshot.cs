@@ -1007,6 +1007,14 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("CrossesAttempted")
+                        .HasColumnType("integer")
+                        .HasColumnName("crosses_attempted");
+
+                    b.Property<int>("CrossesCompleted")
+                        .HasColumnType("integer")
+                        .HasColumnName("crosses_completed");
+
                     b.Property<Guid>("DivisionSeasonId")
                         .HasColumnType("uuid")
                         .HasColumnName("division_season_id");
@@ -1018,6 +1026,14 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                     b.Property<int>("DribblesCompleted")
                         .HasColumnType("integer")
                         .HasColumnName("dribbles_completed");
+
+                    b.Property<int>("FreeKicksScored")
+                        .HasColumnType("integer")
+                        .HasColumnName("free_kicks_scored");
+
+                    b.Property<int>("FreeKicksTaken")
+                        .HasColumnType("integer")
+                        .HasColumnName("free_kicks_taken");
 
                     b.Property<int>("Goals")
                         .HasColumnType("integer")
@@ -1034,6 +1050,22 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                     b.Property<int>("PassesCompleted")
                         .HasColumnType("integer")
                         .HasColumnName("passes_completed");
+
+                    b.Property<int>("PenaltiesFaced")
+                        .HasColumnType("integer")
+                        .HasColumnName("penalties_faced");
+
+                    b.Property<int>("PenaltiesSaved")
+                        .HasColumnType("integer")
+                        .HasColumnName("penalties_saved");
+
+                    b.Property<int>("PenaltiesScored")
+                        .HasColumnType("integer")
+                        .HasColumnName("penalties_scored");
+
+                    b.Property<int>("PenaltiesTaken")
+                        .HasColumnType("integer")
+                        .HasColumnName("penalties_taken");
 
                     b.Property<Guid>("PlayerId")
                         .HasColumnType("uuid")
@@ -1063,9 +1095,21 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("shots_on_target");
 
+                    b.Property<int>("ShotsOnTargetFaced")
+                        .HasColumnType("integer")
+                        .HasColumnName("shots_on_target_faced");
+
                     b.Property<int>("Starts")
                         .HasColumnType("integer")
                         .HasColumnName("starts");
+
+                    b.Property<int>("TacklesAttempted")
+                        .HasColumnType("integer")
+                        .HasColumnName("tackles_attempted");
+
+                    b.Property<int>("TacklesWon")
+                        .HasColumnType("integer")
+                        .HasColumnName("tackles_won");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1094,7 +1138,7 @@ namespace TouchlineManager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("player_season_stats", "competition", t =>
                         {
-                            t.HasCheckConstraint("ck_player_season_stats_counts", "appearances >= 0 and starts >= 0 and starts <= appearances and minutes_played >= 0 and goals >= 0 and assists >= 0 and shots >= 0 and shots_on_target >= 0 and shots_on_target <= shots and saves >= 0 and yellow_cards >= 0 and red_cards >= 0 and rating_basis_points_total >= 0 and rated_appearances >= 0 and passes_attempted >= 0 and passes_completed >= 0 and passes_completed <= passes_attempted and dribbles_attempted >= 0 and dribbles_completed >= 0 and dribbles_completed <= dribbles_attempted");
+                            t.HasCheckConstraint("ck_player_season_stats_counts", "appearances >= 0 and starts >= 0 and starts <= appearances and minutes_played >= 0 and goals >= 0 and assists >= 0 and shots >= 0 and shots_on_target >= 0 and shots_on_target <= shots and saves >= 0 and yellow_cards >= 0 and red_cards >= 0 and rating_basis_points_total >= 0 and rated_appearances >= 0 and passes_attempted >= 0 and passes_completed >= 0 and passes_completed <= passes_attempted and dribbles_attempted >= 0 and dribbles_completed >= 0 and dribbles_completed <= dribbles_attempted and tackles_attempted >= 0 and tackles_won >= 0 and tackles_won <= tackles_attempted and crosses_attempted >= 0 and crosses_completed >= 0 and crosses_completed <= crosses_attempted and penalties_taken >= 0 and penalties_scored >= 0 and penalties_scored <= penalties_taken and penalties_faced >= 0 and penalties_saved >= 0 and penalties_saved <= penalties_faced and free_kicks_taken >= 0 and free_kicks_scored >= 0 and free_kicks_scored <= free_kicks_taken and shots_on_target_faced >= 0 and saves <= shots_on_target_faced");
 
                             t.HasCheckConstraint("ck_player_season_stats_rating", "case when rated_appearances = 0 then 0 else rating_basis_points_total / rated_appearances end between 0 and 10000");
                         });
