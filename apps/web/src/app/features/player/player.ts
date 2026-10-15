@@ -96,21 +96,8 @@ export class PlayerProfile implements OnInit {
   /** The columns of the match table, after the round, the fixture and the result: again a keeper's or an outfield player's. */
   protected readonly matchColumns = computed(() => matchColumnsFor(this.player()?.primaryPosition));
 
-  /** The classes of a statistics cell or heading: a lower-priority column gives way on a narrower screen. */
-  protected statCellClass(tier: 1 | 2 | 3 | 4): string {
-    const base = 'px-1.5 py-2 text-right';
-
-    switch (tier) {
-      case 4:
-        return `${base} max-2xl:hidden`;
-      case 3:
-        return `${base} max-lg:hidden`;
-      case 2:
-        return `${base} max-md:hidden`;
-      default:
-        return base;
-    }
-  }
+  /** The classes of a numeric statistics cell or heading; every column stays, and a narrow screen scrolls the table sideways. */
+  protected readonly statCellClass = 'px-2 py-2 text-right';
 
   /** One table row per season the player has a line for, most recent first (`STA-2`). */
   protected readonly seasonTableRows = computed(() =>

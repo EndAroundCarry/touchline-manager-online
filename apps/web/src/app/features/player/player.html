@@ -6,7 +6,7 @@
     <a routerLink="/squad" [class]="secondaryButtonClass">Back to the squad</a>
   </div>
 } @else if (player(); as profile) {
-  <section [class]="activeTab() === 'statistics' ? 'max-w-4xl 2xl:max-w-6xl' : 'max-w-4xl'">
+  <section [class]="activeTab() === 'statistics' ? '' : 'max-w-4xl'">
     <p class="text-sm">
       <a routerLink="/squad" [class]="linkClass">Back to the squad</a>
     </p>
@@ -63,7 +63,7 @@
           <button
             type="button"
             role="tab"
-            class="min-h-11 shrink-0 border-b-2 px-3 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            class="min-h-11 shrink-0 border-b-2 px-2 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             [class.border-accent]="activeTab() === tab.key"
             [class.text-ink]="activeTab() === tab.key"
             [class.border-transparent]="activeTab() !== tab.key"
@@ -160,38 +160,21 @@
             </p>
 
             <div
-              class="mt-3 rounded border border-line bg-panel"
+              class="mt-3 overflow-x-auto rounded border border-line bg-panel"
               role="group"
               aria-label="Season statistics"
               data-testid="season-stats"
             >
-              <table class="w-full table-fixed border-collapse text-[11px] sm:text-xs xl:text-sm">
+              <table class="w-full min-w-max border-collapse whitespace-nowrap text-xs xl:text-sm">
                 <caption class="sr-only">
                   Season-by-season statistics, most recent first, with the career total.
                 </caption>
                 <thead>
                   <tr class="border-b border-line text-ink-2">
-                    <th
-                      scope="col"
-                      class="w-[14%] px-1.5 py-2 text-left font-medium md:w-[9%] lg:w-[8%] 2xl:w-[7%]"
-                    >
-                      Season
-                    </th>
-                    <th
-                      scope="col"
-                      class="w-[16%] px-1.5 py-2 text-left font-medium md:w-[14%] lg:w-[12%] 2xl:w-[9%]"
-                    >
-                      Club
-                    </th>
+                    <th scope="col" class="px-2 py-2 text-left font-medium">Season</th>
+                    <th scope="col" class="px-2 py-2 text-left font-medium">Club</th>
                     @for (column of statColumns(); track column.label) {
-                      <th
-                        scope="col"
-                        [class]="
-                          statCellClass(column.tier) +
-                          ' font-medium' +
-                          (column.wide ? ' w-[17%] md:w-[9%] lg:w-16 2xl:w-[68px]' : '')
-                        "
-                      >
+                      <th scope="col" [class]="statCellClass + ' font-medium'">
                         <abbr [title]="column.title">{{ column.label }}</abbr>
                       </th>
                     }
@@ -200,19 +183,22 @@
                 <tbody>
                   @for (row of seasonTableRows(); track row.key) {
                     <tr class="border-b border-line-soft">
-                      <th scope="row" class="px-1.5 py-2 text-left font-medium">
+                      <th scope="row" class="px-2 py-2 text-left font-medium">
                         {{ row.season }}
                       </th>
-                      <td class="px-1.5 py-2 text-left">{{ row.club }}</td>
+                      <td class="px-2 py-2 text-left">{{ row.club }}</td>
                       @for (cell of row.cells; track $index) {
-                        <td [class]="statCellClass(statColumns()[$index].tier) + ' tabular-nums'">
+                        <td [class]="statCellClass + ' tabular-nums'">
                           {{ cell }}
                         </td>
                       }
                     </tr>
                   } @empty {
                     <tr>
-                      <td [attr.colspan]="statColumns().length + 2" class="px-2 py-3 text-ink-2">
+                      <td
+                        [attr.colspan]="statColumns().length + 2"
+                        class="whitespace-normal px-3 py-3 text-ink-2"
+                      >
                         This player has not taken the pitch yet, so there are no season statistics.
                       </td>
                     </tr>
@@ -221,11 +207,11 @@
                 @if (careerRow(); as career) {
                   <tfoot>
                     <tr class="border-t border-line-strong bg-ground font-semibold">
-                      <th scope="row" class="px-1.5 py-2 text-left" colspan="2">
+                      <th scope="row" class="px-2 py-2 text-left" colspan="2">
                         Career ({{ seasonsPlayed() }})
                       </th>
                       @for (cell of career; track $index) {
-                        <td [class]="statCellClass(statColumns()[$index].tier) + ' tabular-nums'">
+                        <td [class]="statCellClass + ' tabular-nums'">
                           {{ cell }}
                         </td>
                       }
@@ -265,22 +251,24 @@
               </p>
 
               <div
-                class="mt-3 rounded border border-line bg-panel"
+                class="mt-3 overflow-x-auto rounded border border-line bg-panel"
                 role="group"
                 aria-label="Match statistics"
                 data-testid="match-stats"
               >
-                <table class="w-full table-fixed border-collapse text-[11px] sm:text-xs xl:text-sm">
+                <table
+                  class="w-full min-w-max border-collapse whitespace-nowrap text-xs xl:text-sm"
+                >
                   <caption class="sr-only">
                     Match-by-match statistics, most recent first.
                   </caption>
                   <thead>
                     <tr class="border-b border-line text-ink-2">
-                      <th scope="col" class="w-[6%] px-1.5 py-2 text-left font-medium">Rd</th>
-                      <th scope="col" class="w-[18%] px-1.5 py-2 text-left font-medium">Match</th>
-                      <th scope="col" class="w-[9%] px-1.5 py-2 text-left font-medium">Result</th>
+                      <th scope="col" class="px-2 py-2 text-left font-medium">Rd</th>
+                      <th scope="col" class="px-2 py-2 text-left font-medium">Match</th>
+                      <th scope="col" class="px-2 py-2 text-left font-medium">Result</th>
                       @for (column of matchColumns(); track column.label) {
-                        <th scope="col" [class]="statCellClass(column.tier) + ' font-medium'">
+                        <th scope="col" [class]="statCellClass + ' font-medium'">
                           <abbr [title]="column.title">{{ column.label }}</abbr>
                         </th>
                       }
@@ -289,24 +277,25 @@
                   <tbody>
                     @for (row of matchRows(); track row.match.fixtureId) {
                       <tr class="border-b border-line-soft last:border-b-0">
-                        <td class="px-1.5 py-2 tabular-nums">{{ row.match.round }}</td>
-                        <td class="px-1.5 py-2">
+                        <td class="px-2 py-2 tabular-nums">{{ row.match.round }}</td>
+                        <td class="px-2 py-2">
                           {{ row.match.home ? 'vs' : 'at' }} {{ row.match.opponentName }}
                         </td>
-                        <td class="px-1.5 py-2 tabular-nums">
+                        <td class="px-2 py-2 tabular-nums">
                           {{ row.match.goalsFor }}&ndash;{{ row.match.goalsAgainst }}
                         </td>
                         @for (cell of row.cells; track $index) {
-                          <td
-                            [class]="statCellClass(matchColumns()[$index].tier) + ' tabular-nums'"
-                          >
+                          <td [class]="statCellClass + ' tabular-nums'">
                             {{ cell }}
                           </td>
                         }
                       </tr>
                     } @empty {
                       <tr>
-                        <td [attr.colspan]="matchColumns().length + 3" class="px-2 py-3 text-ink-2">
+                        <td
+                          [attr.colspan]="matchColumns().length + 3"
+                          class="whitespace-normal px-3 py-3 text-ink-2"
+                        >
                           This player has no matches for that season: they have not taken the pitch
                           in it.
                         </td>
