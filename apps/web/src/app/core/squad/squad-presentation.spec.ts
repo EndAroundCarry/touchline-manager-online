@@ -7,6 +7,7 @@ import {
   filterSquad,
   footLabel,
   positionFamilyOf,
+  positionAbbreviation,
   positionLabel,
   progressReadOut,
   progressText,
@@ -137,6 +138,9 @@ describe('squad presentation', () => {
     it('names a position, and falls back to the code rather than showing nothing', () => {
       expect(positionLabel('cb')).toBe('Centre back');
       expect(positionLabel('xyz')).toBe('xyz');
+      expect(positionAbbreviation('st')).toBe('FC');
+      expect(positionAbbreviation('lw')).toBe('LW');
+      expect(positionAbbreviation('xyz')).toBe('xyz');
       expect(familyLabel('defence')).toBe('Defenders');
       expect(squadStatusLabel('key_player')).toBe('Key player');
       expect(squadStatusLabel('unknown')).toBe('unknown');

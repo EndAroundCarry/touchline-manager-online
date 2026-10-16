@@ -8,6 +8,7 @@ import {
   SquadFilter,
   availabilityLabel,
   filterSquad,
+  positionAbbreviation,
   positionLabel,
   squadStatusLabel,
   stateBand,
@@ -165,6 +166,11 @@ export class Squad {
   /** Names a position code. */
   protected position(code: string): string {
     return positionLabel(code);
+  }
+
+  /** The short code for a position code, shown in the tables. */
+  protected positionShort(code: string): string {
+    return positionAbbreviation(code);
   }
 
   /** Names a squad status. */

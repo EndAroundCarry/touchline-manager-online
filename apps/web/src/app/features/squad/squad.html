@@ -127,7 +127,11 @@
                 {{ player.shortName }} · {{ player.nationalityCode }}
               </span>
             </th>
-            <td>{{ position(player.primaryPosition) }}</td>
+            <td>
+              <abbr [title]="position(player.primaryPosition)" class="no-underline">{{
+                positionShort(player.primaryPosition)
+              }}</abbr>
+            </td>
             <td>{{ player.age }}</td>
             <td>
               <span [class]="conditionClass(player.state.condition)">
@@ -315,7 +319,11 @@
                   <th scope="row" class="py-1 pr-4 text-left font-medium text-ink">
                     {{ contract.playerName }}
                   </th>
-                  <td class="py-1 pr-4">{{ position(contract.primaryPosition) }}</td>
+                  <td class="py-1 pr-4">
+                    <abbr [title]="position(contract.primaryPosition)" class="no-underline">{{
+                      positionShort(contract.primaryPosition)
+                    }}</abbr>
+                  </td>
                   <td class="py-1 pr-4">{{ contract.age }}</td>
                   <td class="py-1 pr-4">
                     {{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }} ({{

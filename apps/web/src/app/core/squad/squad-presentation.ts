@@ -103,6 +103,19 @@ const POSITION_LABELS: Record<string, string> = {
   st: 'Striker',
 };
 
+const POSITION_ABBREVIATIONS: Record<string, string> = {
+  gk: 'GK',
+  rb: 'RB',
+  cb: 'CB',
+  lb: 'LB',
+  dm: 'DM',
+  cm: 'CM',
+  am: 'AM',
+  rw: 'RW',
+  lw: 'LW',
+  st: 'FC',
+};
+
 const FAMILY_LABELS: Record<PositionFamily, string> = {
   goalkeeper: 'Goalkeepers',
   defence: 'Defenders',
@@ -144,6 +157,14 @@ export const POSITION_FAMILY_OPTIONS: readonly PositionFamilyOption[] = [
 /** Names a position code, falling back to the raw code so an unmodelled one is visible rather than blank. */
 export function positionLabel(code: string): string {
   return POSITION_LABELS[code] ?? code;
+}
+
+/**
+ * The short code a table shows for a position (`FC` for a striker), with the full name left to
+ * {@link positionLabel} for the hover. Falls back to the raw code on the same terms as that function.
+ */
+export function positionAbbreviation(code: string): string {
+  return POSITION_ABBREVIATIONS[code] ?? code;
 }
 
 /** Names a position family, for grouping headers. */
