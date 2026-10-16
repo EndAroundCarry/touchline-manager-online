@@ -71,7 +71,7 @@ the system is shaped the way it is.
 | [0052](0052-replay-v3-film-and-reel.md) | Replay-v3 turns a match into one continuous film with a companion highlights reel | Accepted (decisions 2 and 3 superseded by ADR-0054) |
 | [0053](0053-engine-v5-half-time-clock-and-restart-ownership.md) | Engine-v5 resets the half-time clock, gives every dead ball an owner, and completes the passage record | Accepted |
 | [0055](0055-engine-v6-skills-where-the-design-says.md) | Engine-v6 puts skills where the design says they are: tiredness, shot contest scale, duel fouls, corner takers | Accepted |
-| [0054](0054-replay-v4-constant-pace-film.md) | Replay-v4 plays the whole match as one constant-pace film on one continuous timeline | Accepted |
+| [0054](0054-replay-v4-constant-pace-film.md) | Replay-v4 plays the whole match as one constant-pace film on one continuous timeline | Accepted (decision 6's build-up gap superseded for the tick film by ADR-0069) |
 | [0056](0056-engine-v7-passes-and-take-ons.md) | Engine-v7 counts passes and take-ons on the player line, and the season statistics store them | Accepted |
 | [0057](0057-training-programmes-age-curve-and-hidden-aptitude.md) | Training programmes, an age curve, and hidden aptitude (`training-v2`) | Accepted (decisions 2, 4 and 6 superseded by ADR-0060) |
 | [0058](0058-engine-v8-pass-focus.md) | Engine-v8 lets a manager direct the ball through the centre and a flank (the pass focus) | Accepted (shots and crosses added by ADR-0059) |
@@ -86,6 +86,7 @@ the system is shaped the way it is.
 | [0066](0066-engine-v12-discrete-tick-match-engine.md) | Engine-v12 plays a match as a discrete tick simulation, and the possession engine is kept for the matches it played | Accepted |
 | [0067](0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md) | The tick film shows whole moves, the players keep moving and the ball is played with a purpose | Accepted |
 | [0068](0068-tactics-in-the-tick-engine-counter-attack-low-block-and-time-wasting.md) | Tactics in the tick engine: counter-attack, low block and time-wasting | Accepted |
+| [0069](0069-commentary-narrates-every-action-at-its-start.md) | Commentary narrates every action at its start | Accepted |
 
 ## Rules for changing an ADR
 

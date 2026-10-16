@@ -935,7 +935,7 @@ carries `PaceMilli`. Players are sampled every 200 ms and the ball every 100 ms 
 
 **Commentary.** A line is read when its beat happens — the pass when it is played, the cross when it is delivered,
 the shot when it is struck — and the outcome line 0.6 s after the strike. Build-up lines are at least 2.5 s of film
-apart; events always get theirs. The templates are `commentary-v3`'s.
+apart; events always get theirs. The templates are `commentary-v3`'s. (This is the possession engine's film, `FilmAssembler`; the tick film's rule is in §14.6.)
 
 **One reel.** `ReelBuilder` selects the chance clips: **goals always**, plus the best chances by
 `QualityBasisPoints` above `MinQualityForShotBasisPoints` = 700, count-capped at `MaxReelClips` = 12 with
@@ -1448,9 +1448,21 @@ less often than they do in football (a corner is now taken 11 times a match on t
 
 With a `MatchPassageRecorder` attached the loop records each tick (`TickMatchRecording`: the 22 players and the ball as shorts, plus the actions, events,
 rosters and stoppages), and `ReplayDirector.Build(input, result, recorder)` cuts a film from it (`TickFilmSelector`, `TickReplaySynthesizer`,
-`tick-replay-v2`). The film is a selection at twice the pace — sixteen to twenty minutes of kick-offs, every goal and every good chance as the whole move
+`tick-replay-v4`). The film is a selection at twice the pace — sixteen to twenty minutes of kick-offs, every goal and every good chance as the whole move
 that made it, cards, the other chances and the set pieces, topped up with spells of play at the ends of the pitch — in passages that share a boundary frame
 and are joined by `jump`, `kick_off` and `half_time` cuts; the viewer reads it unchanged (§14.10).
+
+**Commentary (`tick-replay-v4`, `commentary-v6`, ADR-0069).** The banner narrates every action at its start. The loop stamps the intent into the recording (never the
+result or the hash): `TickActionStamp` carries a `Target` (the intended receiver of a pass, the defender a dribble is aimed at, the carrier a tackle was made on, the
+shooter of a save or block) and a `TickActionDetail` (through ball, long ball, clearance, recycle, tackle won or poked loose, caught, parried or tipped save,
+smother, block, loose ball, long range); `TakeOn` and `Break` are stamped once when a dribble begins. `TickReplaySynthesizer.Commentary` gives each action a line,
+with no receiver look-ahead unless `Target` is missing, and none for a completed pass: the receiver's next action is the next line. A failed pass names who cut it out
+or says it ran out of play. Outcomes in one frame are one line, and an event beats an action beat in the same frame. It replaces the 2.5 s gap with two rules:
+**key dwell** (`CommentaryKeyDwellMilliseconds` = 1_200: after a key beat — an event, shot, save, header or cross — routine beats in the next 1.2 s of film are dropped)
+and **collision** (`CommentaryMinGapMilliseconds` = 250: of two routine beats closer than that, the higher priority stays, or the later on a tie). A shot's outcome line is held
+`CommentaryStrikeHoldMilliseconds` = 300 ms after the strike; `ShotOffTarget` is placed where the ball leaves the pitch; a passage with no beat in its first
+`CommentaryOpenerWithinMilliseconds` = 400 ms gets an opener (the restart, or "{club} have the ball"). The film stays at twice the pace. The viewer shows one fixed
+line, bold for a key line, and a hidden live region announces key lines only.
 
 ### 14.7 Tests
 

@@ -1,6 +1,6 @@
 # ADR-0054: Replay-v4 plays the whole match as one constant-pace film on one continuous timeline
 
-- **Status:** Accepted
+- **Status:** Accepted (the build-up line gap in decision 6 is superseded for the tick film by ADR-0069)
 - **Date:** 2026-10-03
 - **Stage:** Engine roadmap, fluid match film milestone (M2–M4 of `engine-v5-fluid-match-film.md`)
 - **Related:** [ADR-0004](0004-deterministic-match-engine.md), [ADR-0006](0006-semantic-highlight-keyframes.md), [ADR-0051](0051-engine-v4-continuous-passages.md), [ADR-0052](0052-replay-v3-film-and-reel.md) (decisions 2 and 3 superseded), [ADR-0053](0053-engine-v5-half-time-clock-and-restart-ownership.md), game rules `MAT-8`, `MAT-11`, `MAT-12`
