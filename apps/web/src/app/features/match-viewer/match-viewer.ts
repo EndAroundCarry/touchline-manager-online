@@ -111,9 +111,9 @@ interface ReplayMarker {
  * do not animate. The lineups are live: as the film advances, each panel's condition bars and rating badges
  * move to the figures the server captured minute by minute.
  *
- * Two playlists share one film: *Full match* plays it whole, *Highlights* plays only the reel's chance
- * clips over the same film clock, so a chance is always preceded by the move that produced it. Both are the
- * same data; the toggle only chooses which windows of film time play.
+ * Two playlists share one film: *Extended highlights* plays all of it, *Highlights* plays only the reel's
+ * chance clips over the same film clock, so a chance is always preceded by the move that produced it. Both
+ * are the same data; the toggle only chooses which windows of film time play.
  *
  * The film is *one* thing on screen (`replay-v4`). The presentation's passages are built into a
  * `FilmTimeline` once, and the viewer makes one renderer for it and draws global film time: the passage the

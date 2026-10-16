@@ -196,16 +196,16 @@ test.describe('the matchday', () => {
 
       const fullMilliseconds = Number(await scrubber.getAttribute('max'));
 
-      await page.getByRole('button', { name: 'Highlights' }).click();
-      await expect(page.getByRole('button', { name: 'Highlights' })).toHaveAttribute('aria-pressed', 'true');
+      await page.getByRole('button', { name: 'Highlights', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Highlights', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
       const reelMilliseconds = Number(await scrubber.getAttribute('max'));
 
       expect(reelMilliseconds).toBeGreaterThan(0);
       expect(reelMilliseconds).toBeLessThanOrEqual(fullMilliseconds);
 
-      await page.getByRole('button', { name: 'Full match' }).click();
-      await expect(page.getByRole('button', { name: 'Full match' })).toHaveAttribute('aria-pressed', 'true');
+      await page.getByRole('button', { name: 'Extended highlights' }).click();
+      await expect(page.getByRole('button', { name: 'Extended highlights' })).toHaveAttribute('aria-pressed', 'true');
       expect(Number(await scrubber.getAttribute('max'))).toBe(fullMilliseconds);
 
       // Driven at 8x so the assertions observe progress rather than waiting out a film at normal speed:

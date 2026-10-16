@@ -655,10 +655,10 @@ describe('MatchViewer', () => {
     });
   });
 
-  it('offers the full match by default and switches to the highlights reel on request', async () => {
+  it('offers extended highlights by default and switches to the highlights reel on request', async () => {
     const native = await load();
 
-    const full = buttonByText(native, 'Full match')!;
+    const full = buttonByText(native, 'Extended highlights')!;
     const highlights = buttonByText(native, 'Highlights')!;
 
     expect(full.getAttribute('aria-pressed')).toBe('true');
