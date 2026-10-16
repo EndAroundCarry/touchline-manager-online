@@ -338,7 +338,9 @@ internal sealed partial class TickMatchLoop
         }
     }
 
-    private void Tag(TickRef who, PassageAction action) => _recording?.AddAction(EntityOf(who), action);
+    /// <summary>Stamps an action on the recording (nothing without one). The target and detail are for the commentary and change no state.</summary>
+    private void Tag(TickRef who, PassageAction action, TickRef? target = null, TickActionDetail detail = TickActionDetail.None) =>
+        _recording?.AddAction(EntityOf(who), action, target is { } named ? EntityOf(named) : -1, detail);
 
     private static int EntityOf(TickRef who) => who.IsNone ? -1 : (who.Side == 0 ? 0 : TickMatchRecording.Entities / 2) + who.Slot - 1;
 

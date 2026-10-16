@@ -779,7 +779,8 @@ internal sealed class TickReplaySynthesizer
 
         foreach (var stamp in item.Marks)
         {
-            if (stamp.Entity != entity)
+            // Intent stamps feed the commentary only: a renderer has no pose for them and they must not force a keyframe.
+            if (stamp.Entity != entity || stamp.Action is PassageAction.TakeOn or PassageAction.Break)
             {
                 continue;
             }
@@ -952,7 +953,10 @@ internal sealed class TickReplaySynthesizer
                 break;
             }
 
-            if (next.Action == PassageAction.Receive && next.Entity >= 0 && FilmRoster.SideOf(next.Entity) == side)
+            if (next.Action == PassageAction.Receive
+                && next.Detail != TickActionDetail.LooseBall
+                && next.Entity >= 0
+                && FilmRoster.SideOf(next.Entity) == side)
             {
                 var receiver = item.Occupants[next.Entity];
 

@@ -81,6 +81,36 @@ internal sealed partial class TickMatchLoop
     /// <summary>The tick each defender began watching the carrier.</summary>
     private readonly int[] _bypassSince = new int[TickMatchRecording.Entities];
 
+    /// <summary>The dribble the carrier is on, as the commentary has been told of it: no dribble yet.</summary>
+    private const int NoDribble = -1;
+
+    /// <summary>The dribble the carrier is on is a plain carry, which the commentary is not told of.</summary>
+    private const int PlainCarry = -2;
+
+    /// <summary>The dribble the carrier is on is a break into open space.</summary>
+    private const int BreakAway = -3;
+
+    /// <summary>How near a defender, ahead of a dribbling carrier, must be for the run to be a take-on (4 m).</summary>
+    private const int TakeOnUnits = 400;
+
+    /// <summary>How far ahead of a dribbling carrier no defender may stand for the run to be a break into space (8 m).</summary>
+    private const int BreakClearUnits = 800;
+
+    /// <summary>The ticks that must pass before the commentary is told of another dribble by the same carrier (1 s).</summary>
+    private const int DribbleStampGapTicks = 10;
+
+    /// <summary>The distance from which a pass is called a long ball (30 m).</summary>
+    private const int LongBallUnits = 3_000;
+
+    /// <summary>The distance from goal beyond which a shot is called a long-range effort (22 m).</summary>
+    private const int LongRangeShotUnits = 2_200;
+
+    /// <summary>What the carrier's dribble was last stamped as: a defender's slot entity, <see cref="PlainCarry"/>, <see cref="BreakAway"/> or <see cref="NoDribble"/>. Recording only.</summary>
+    private int _dribbleKey = NoDribble;
+
+    /// <summary>The tick each slot entity's dribble was last told to the commentary.</summary>
+    private readonly int[] _dribbleStampTick = Enumerable.Repeat(int.MinValue / 2, TickMatchRecording.Entities).ToArray();
+
     private void StepOpenPlay()
     {
         var controlled = _ball.Mode == TickBallMode.Controlled;
@@ -717,6 +747,7 @@ internal sealed partial class TickMatchLoop
             _decided = false;
             _heldTicks = 0;
             _shieldTicks = 0;
+            _dribbleKey = NoDribble;
 
             if (_earlyOwner == me && _tick - _earlyTick <= EarlyDecisionTicks)
             {
@@ -755,14 +786,18 @@ internal sealed partial class TickMatchLoop
             case TickCarrierAction.Dribble:
                 team.Anchor[seat] = _decision.Target;
                 team.Pace[seat] = _decision.PaceBasisPoints;
+                NoteDribble(side, seat);
                 break;
 
             case TickCarrierAction.Shield:
+                _dribbleKey = NoDribble;
                 team.Anchor[seat] = new SpatialPoint(TickSpatialUnits.ToUnits(team.Body[seat].X), TickSpatialUnits.ToUnits(team.Body[seat].Y));
                 team.Pace[seat] = 0;
                 break;
 
             default:
+                _dribbleKey = NoDribble;
+
                 if (_heldTicks >= HoldTicks(_decision, skills, instructions.Tempo, keeper, breaking))
                 {
                     Kick(side, seat, _decision);
@@ -775,6 +810,84 @@ internal sealed partial class TickMatchLoop
                 }
 
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Tells the commentary what a dribbling carrier means to do, once per run: a defender within four metres ahead of him is a take-on,
+    /// and open ground ahead past halfway is a break. A plain carry is not told. Recording only: it reads the bodies, draws nothing and
+    /// changes no state the match reads.
+    /// </summary>
+    private void NoteDribble(int side, int seat)
+    {
+        if (_recording is null)
+        {
+            return;
+        }
+
+        var team = _teams[side];
+        var opponents = _teams[1 - side];
+        var carrierX = TickSpatialUnits.ToUnits(team.Body[seat].X);
+        var carrierY = TickSpatialUnits.ToUnits(team.Body[seat].Y);
+        long aheadX = _decision.Target.X - carrierX;
+        long aheadY = _decision.Target.Y - carrierY;
+        var nearest = -1;
+        var nearestSquared = long.MaxValue;
+        var blocked = false;
+
+        for (var other = 0; other < opponents.Count; other++)
+        {
+            if (opponents.IsKeeper(other))
+            {
+                continue;
+            }
+
+            long dx = TickSpatialUnits.ToUnits(opponents.Body[other].X) - carrierX;
+            long dy = TickSpatialUnits.ToUnits(opponents.Body[other].Y) - carrierY;
+
+            if ((dx * aheadX) + (dy * aheadY) <= 0)
+            {
+                continue;
+            }
+
+            var squared = (dx * dx) + (dy * dy);
+
+            blocked |= squared <= (long)BreakClearUnits * BreakClearUnits;
+
+            if (squared <= (long)TakeOnUnits * TakeOnUnits && squared < nearestSquared)
+            {
+                nearestSquared = squared;
+                nearest = other;
+            }
+        }
+
+        var pastHalfway = team.IsHome ? carrierX > SpatialPitch.PitchLength / 2 : carrierX < SpatialPitch.PitchLength / 2;
+        var key = nearest >= 0 ? opponents.Entity(nearest) : (!blocked && pastHalfway ? BreakAway : PlainCarry);
+
+        if (key == _dribbleKey)
+        {
+            return;
+        }
+
+        _dribbleKey = key;
+
+        var me = new TickRef(side, team.SlotNumber[seat]);
+        var entity = EntityOf(me);
+
+        if (key == PlainCarry || _tick - _dribbleStampTick[entity] < DribbleStampGapTicks)
+        {
+            return;
+        }
+
+        _dribbleStampTick[entity] = _tick;
+
+        if (key == BreakAway)
+        {
+            Tag(me, PassageAction.Break);
+        }
+        else
+        {
+            Tag(me, PassageAction.TakeOn, new TickRef(1 - side, opponents.SlotNumber[nearest]));
         }
     }
 
@@ -957,7 +1070,13 @@ internal sealed partial class TickMatchLoop
                     var penalty = fromRestart && kind == TickRestartKind.Penalty;
                     var freeKick = fromRestart && kind == TickRestartKind.FreeKick;
 
-                    Tag(me, penalty ? PassageAction.Penalty : freeKick ? PassageAction.FreeKick : PassageAction.Shot);
+                    var goal = new SpatialPoint(team.IsHome ? SpatialPitch.PitchLength : 0, SpatialPitch.GoalYCenter);
+                    var longRange = !penalty && !freeKick && SpatialMath.Distance(origin, goal) > LongRangeShotUnits;
+
+                    Tag(
+                        me,
+                        penalty ? PassageAction.Penalty : freeKick ? PassageAction.FreeKick : PassageAction.Shot,
+                        detail: longRange ? TickActionDetail.LongRange : TickActionDetail.None);
                     StartShot(side, seat, decision, origin, penalty, freeKick);
                     break;
                 }
@@ -982,7 +1101,14 @@ internal sealed partial class TickMatchLoop
                         team.Runtime.CrossesAttempted[id] = team.Runtime.CrossesAttempted.GetValueOrDefault(id) + 1;
                     }
 
-                    Tag(me, decision.Action == TickCarrierAction.Cross ? PassageAction.Cross : PassageAction.Pass);
+                    var passDetail = decision.Action switch
+                    {
+                        TickCarrierAction.ThroughBall => TickActionDetail.ThroughBall,
+                        TickCarrierAction.Pass when SpatialMath.Distance(origin, decision.Target) >= LongBallUnits => TickActionDetail.LongBall,
+                        _ => TickActionDetail.None,
+                    };
+
+                    Tag(me, decision.Action == TickCarrierAction.Cross ? PassageAction.Cross : PassageAction.Pass, _intended, passDetail);
 
                     if (decision.Receiver >= 0
                         && decision.Receiver < team.Count
@@ -1010,14 +1136,24 @@ internal sealed partial class TickMatchLoop
                 }
 
             default:
-                Tag(me, PassageAction.Pass);
-
-                if (decision.Action == TickCarrierAction.Recycle && decision.Receiver >= 0 && decision.Receiver < team.Count)
                 {
-                    _recycledTo = new TickRef(side, team.SlotNumber[decision.Receiver]);
-                }
+                    var receiver = decision.Receiver >= 0 && decision.Receiver < team.Count
+                        ? new TickRef(side, team.SlotNumber[decision.Receiver])
+                        : TickRef.None;
 
-                break;
+                    Tag(
+                        me,
+                        PassageAction.Pass,
+                        decision.Action == TickCarrierAction.Clear ? null : receiver,
+                        decision.Action == TickCarrierAction.Clear ? TickActionDetail.Clear : TickActionDetail.Recycle);
+
+                    if (decision.Action == TickCarrierAction.Recycle && !receiver.IsNone)
+                    {
+                        _recycledTo = receiver;
+                    }
+
+                    break;
+                }
         }
 
         PredictRest();
@@ -1215,8 +1351,8 @@ internal sealed partial class TickMatchLoop
                 Dribbled(team, carrierId, completed: false);
                 Rate(opponents, challengerId, _rules.LiveRatingTackleBonusBasisPoints);
                 Rate(team, carrierId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
-                Tag(challengerRef, PassageAction.Tackle);
-                Tag(carrierRef, PassageAction.Dispossessed);
+                Tag(challengerRef, PassageAction.Tackle, carrierRef, TickActionDetail.TackleWon);
+                Tag(carrierRef, PassageAction.Dispossessed, challengerRef);
                 _controllerSide = 1 - side;
                 Touch(challengerRef);
                 TurnOver();
@@ -1228,8 +1364,8 @@ internal sealed partial class TickMatchLoop
                 Dribbled(team, carrierId, completed: false);
                 Rate(opponents, challengerId, _rules.LiveRatingTackleBonusBasisPoints);
                 Rate(team, carrierId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
-                Tag(challengerRef, PassageAction.Tackle);
-                Tag(carrierRef, PassageAction.Dispossessed);
+                Tag(challengerRef, PassageAction.Tackle, carrierRef, TickActionDetail.PokedLoose);
+                Tag(carrierRef, PassageAction.Dispossessed, challengerRef);
                 _controllerSide = -1;
                 Touch(challengerRef);
                 TurnOver();
@@ -1241,14 +1377,14 @@ internal sealed partial class TickMatchLoop
                 Dribbled(team, carrierId, completed: true);
                 Rate(team, carrierId, _rules.LiveRatingTackleBonusBasisPoints);
                 Rate(opponents, challengerId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
-                Tag(carrierRef, PassageAction.Carry);
+                Tag(carrierRef, PassageAction.Carry, challengerRef);
                 TagBlame(challengerRef, PassageAction.Beaten);
                 break;
 
             default:
                 Tackled(opponents, challengerId, won: false);
                 Rate(opponents, challengerId, -_rules.LiveRatingTackleLostPenaltyBasisPoints);
-                Tag(challengerRef, PassageAction.Tackle);
+                Tag(challengerRef, PassageAction.Tackle, carrierRef);
                 FoulBy(1 - side, challengerId, side, spot);
                 break;
         }
@@ -1271,6 +1407,7 @@ internal sealed partial class TickMatchLoop
         TickGoalkeeperAI.ApplySmother(outcome, ref keeperTeam.Body[0], ref team.Body[seat], 0, keeperTeam.IsHome, _ball);
 
         var keeperRef = new TickRef(1 - side, keeperTeam.SlotNumber[0]);
+        var attackerRef = new TickRef(side, team.SlotNumber[seat]);
 
         switch (outcome)
         {
@@ -1279,7 +1416,7 @@ internal sealed partial class TickMatchLoop
                 Rate(keeperTeam, keeperId, _rules.LiveRatingTackleBonusBasisPoints);
                 _controllerSide = 1 - side;
                 Touch(keeperRef);
-                Tag(keeperRef, PassageAction.Save);
+                Tag(keeperRef, PassageAction.Save, attackerRef, TickActionDetail.Smothered);
                 TurnOver();
                 break;
 
@@ -1287,13 +1424,14 @@ internal sealed partial class TickMatchLoop
                 Dribbled(team, attackerId, completed: false);
                 _controllerSide = -1;
                 Touch(keeperRef);
-                Tag(keeperRef, PassageAction.Save);
+                Tag(keeperRef, PassageAction.Save, attackerRef, TickActionDetail.Spilled);
                 TurnOver();
                 PredictRest();
                 break;
 
             case TickSmotherOutcome.Beaten:
                 Dribbled(team, attackerId, completed: true);
+                Tag(attackerRef, PassageAction.Carry, keeperRef);
                 Tag(keeperRef, PassageAction.Dive);
                 TagBlame(keeperRef, PassageAction.Beaten);
                 break;
@@ -1760,6 +1898,7 @@ internal sealed partial class TickMatchLoop
         var me = new TickRef(side, team.SlotNumber[seat]);
         var changedSide = _lastTouch.IsNone || _lastTouch.Side != side;
         var intercepted = _passPending && side != _passer.Side;
+        var looseBall = !_passPending && _recycledTo != me;
 
         if (_offsidePending)
         {
@@ -1792,19 +1931,23 @@ internal sealed partial class TickMatchLoop
                     }
                 }
 
-                Tag(me, PassageAction.Receive);
+                Tag(me, PassageAction.Receive, _passer);
                 _assistPasser = _passer;
                 _assistReceiver = me;
                 _assistTick = _tick;
             }
             else if (side != _passer.Side)
             {
-                Tag(me, PassageAction.Interception);
+                Tag(me, PassageAction.Interception, _passer);
                 TagMisplacedPass();
             }
 
             _passPending = false;
             _passIsCross = false;
+        }
+        else if (looseBall)
+        {
+            Tag(me, PassageAction.Receive, detail: TickActionDetail.LooseBall);
         }
 
         Attach(side, seat, cushioned: !team.IsKeeper(seat));
@@ -1848,7 +1991,7 @@ internal sealed partial class TickMatchLoop
             var wideY = _ball.UnitY >= SpatialPitch.GoalYCenter ? SpatialPitch.GoalYMax + BlockWideOfPost : SpatialPitch.GoalYMin - BlockWideOfPost;
 
             _ball.LaunchRolling(lineX, wideY, TickSpatialUnits.SpeedToFixedPerTick(BlockCornerSpeed));
-            Tag(new TickRef(side, team.SlotNumber[seat]), PassageAction.Interception);
+            Tag(new TickRef(side, team.SlotNumber[seat]), PassageAction.Interception, _shooter);
             _controllerSide = -1;
             _passPending = false;
             _passIsCross = false;
@@ -1864,7 +2007,7 @@ internal sealed partial class TickMatchLoop
             (int)(TickTrigonometry.Sin(heading) * speed / TickTrigonometry.Scale),
             0);
 
-        Tag(blocker, PassageAction.Interception);
+        Tag(blocker, PassageAction.Interception, _shooter);
         _controllerSide = -1;
         _passPending = false;
         _passIsCross = false;

@@ -174,6 +174,16 @@ public enum PassageAction
 
     /// <summary>Was bypassed (`tick-film-v1`): a defender the carrier outran or turned without a challenge. Not a touch of the ball.</summary>
     Bypassed = 17,
+
+    /// <summary>
+    /// Took a man on (`tick-replay-v4`): the carrier who commits to running at a defender. Commentary only, never a keyframe action.
+    /// </summary>
+    TakeOn = 18,
+
+    /// <summary>
+    /// Broke clear (`tick-replay-v4`): the carrier who runs into open space or clean through on goal. Commentary only, never a keyframe action.
+    /// </summary>
+    Break = 19,
 }
 
 /// <summary>Stable codes for the passage vocabulary, so a replay and a renderer agree on a spelling.</summary>
@@ -214,6 +224,8 @@ public static class PassageVocabulary
         PassageAction.Dispossessed => "dispossessed",
         PassageAction.Misplaced => "misplaced",
         PassageAction.Bypassed => "bypassed",
+        PassageAction.TakeOn => "take_on",
+        PassageAction.Break => "break",
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Unknown action."),
     };
 

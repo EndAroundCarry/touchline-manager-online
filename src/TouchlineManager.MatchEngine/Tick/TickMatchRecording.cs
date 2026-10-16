@@ -16,11 +16,65 @@ internal enum TickFrameFlags : byte
     PlayersPlaced = 2,
 }
 
+/// <summary>
+/// What kind of pass, save or loss an action was, beyond the <see cref="PassageAction"/> it is stamped as. Commentary reads it to say
+/// "threads it through" rather than "plays it", and "parries" rather than "saves"; nothing else does.
+/// </summary>
+internal enum TickActionDetail : byte
+{
+    /// <summary>Nothing more to say.</summary>
+    None = 0,
+
+    /// <summary>A pass into the space behind the line, for a man running onto it.</summary>
+    ThroughBall = 1,
+
+    /// <summary>A pass over a long distance or through the air.</summary>
+    LongBall = 2,
+
+    /// <summary>A hoof upfield to be rid of the ball.</summary>
+    Clear = 3,
+
+    /// <summary>A ball given back to a safe teammate behind the man.</summary>
+    Recycle = 4,
+
+    /// <summary>A tackle that left the ball at the defender's feet.</summary>
+    TackleWon = 5,
+
+    /// <summary>A tackle that poked the ball free, loose for whoever gets there.</summary>
+    PokedLoose = 6,
+
+    /// <summary>A shot the goalkeeper held.</summary>
+    Caught = 7,
+
+    /// <summary>A shot the goalkeeper pushed away, still in play.</summary>
+    Parried = 8,
+
+    /// <summary>A shot the goalkeeper turned round the post or over the bar.</summary>
+    TippedAround = 9,
+
+    /// <summary>A goalkeeper who gathered the ball at an attacker's feet.</summary>
+    Smothered = 10,
+
+    /// <summary>A goalkeeper who got a hand to the ball at an attacker's feet and knocked it loose.</summary>
+    Spilled = 11,
+
+    /// <summary>A man who took the ball when no pass was on its way to a team-mate: after a poke, a parry or a clearance.</summary>
+    LooseBall = 12,
+
+    /// <summary>A shot struck from a long way out.</summary>
+    LongRange = 13,
+}
+
 /// <summary>A player's action at a frame: a tag a film keyframe carries so a renderer and a commentary line can synchronize to it.</summary>
 /// <param name="Frame">The frame the action happened at.</param>
 /// <param name="Entity">The slot entity (0..10 home, 11..21 away) that acted, or -1 for the ball.</param>
 /// <param name="Action">What was done.</param>
-internal readonly record struct TickActionStamp(int Frame, int Entity, PassageAction Action);
+/// <param name="Target">
+/// The slot entity the action was aimed at or done to: the man a pass was meant for, the defender a dribble ran at, the shooter a save
+/// was made from. -1 when there is none. Commentary only: it names the second person in a line.
+/// </param>
+/// <param name="Detail">What kind of pass, save or loss it was.</param>
+internal readonly record struct TickActionStamp(int Frame, int Entity, PassageAction Action, int Target = -1, TickActionDetail Detail = TickActionDetail.None);
 
 /// <summary>An event's place in the recording: the frame it was emitted at.</summary>
 /// <param name="Frame">The frame.</param>
@@ -157,7 +211,10 @@ internal sealed class TickMatchRecording
     /// <summary>Tags an action on the frame about to be recorded (the tick being simulated is recorded when it ends).</summary>
     /// <param name="entity">The slot entity that acted, or -1 for the ball.</param>
     /// <param name="action">What was done.</param>
-    public void AddAction(int entity, PassageAction action) => Actions.Add(new TickActionStamp(FrameCount, entity, action));
+    /// <param name="target">The slot entity it was aimed at or done to, or -1.</param>
+    /// <param name="detail">What kind of pass, save or loss it was.</param>
+    public void AddAction(int entity, PassageAction action, int target = -1, TickActionDetail detail = TickActionDetail.None) =>
+        Actions.Add(new TickActionStamp(FrameCount, entity, action, target, detail));
 
     /// <summary>Notes that an event was emitted during the tick about to be recorded.</summary>
     /// <param name="sequence">The event's sequence number.</param>

@@ -137,7 +137,16 @@ internal sealed partial class TickMatchLoop
         }
 
         Rate(keepers, keepers.Id[0], _rules.LiveRatingSaveBonusBasisPoints);
-        Tag(keeperRef, PassageAction.Save);
+        Tag(
+            keeperRef,
+            PassageAction.Save,
+            _shooter,
+            outcome switch
+            {
+                TickSaveOutcome.Caught => TickActionDetail.Caught,
+                TickSaveOutcome.Parried => TickActionDetail.Parried,
+                _ => TickActionDetail.TippedAround,
+            });
         Tag(keeperRef, PassageAction.Dive);
         _shotLive = false;
         Touch(keeperRef);
