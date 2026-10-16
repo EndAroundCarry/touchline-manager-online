@@ -15,7 +15,7 @@ namespace Tactical11Manager.Domain.Tests.Squad;
 /// </remarks>
 public sealed class AiClubPolicyTests
 {
-    /// <summary>Twenty-two players in the generated composition: three goalkeepers and nineteen outfielders.</summary>
+    /// <summary>Twenty-four players in the generated composition: three goalkeepers and twenty-one outfielders.</summary>
     private static readonly PlayerPosition[] Composition =
     [
         PlayerPosition.Goalkeeper,
@@ -35,6 +35,8 @@ public sealed class AiClubPolicyTests
         PlayerPosition.DefensiveMidfielder,
         PlayerPosition.CentralMidfielder,
         PlayerPosition.AttackingMidfielder,
+        PlayerPosition.RightMidfielder,
+        PlayerPosition.LeftMidfielder,
         PlayerPosition.RightWinger,
         PlayerPosition.LeftWinger,
         PlayerPosition.Striker,

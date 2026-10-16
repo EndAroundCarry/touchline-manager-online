@@ -385,7 +385,7 @@
                   </th>
                   <td>
                     <span [attr.title]="position(row.position)">{{
-                      row.position.toUpperCase()
+                      positionCode(row.position)
                     }}</span>
                   </td>
                   <td [class]="skillClass(row.ratings?.goalkeeping ?? null)">

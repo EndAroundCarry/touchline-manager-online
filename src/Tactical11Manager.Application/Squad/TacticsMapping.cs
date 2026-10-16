@@ -63,7 +63,11 @@ public static class TacticsMapping
                         player.IsUnavailable)
                     : null,
                 slot.AssignedPlayer is { } assigned
-                    && IsOutOfPosition(assigned.PrimaryPosition, assigned.SecondaryPositions, slot.PositionFamily)))
+                    && IsOutOfPosition(
+                        assigned.PrimaryPosition,
+                        assigned.SecondaryPositions,
+                        slot.PositionFamily,
+                        slot.Role)))
             .ToList();
 
         var bench = plan.Bench
@@ -114,7 +118,7 @@ public static class TacticsMapping
                 DescribeAssigned(slot.AssignedPlayerId, selectablePlayers),
                 slot.AssignedPlayerId is { } id
                     && selectablePlayers.TryGetValue(id, out var player)
-                    && IsOutOfPosition(player.PrimaryPosition, player.SecondaryPositions, slot.PositionFamily)))
+                    && IsOutOfPosition(player.PrimaryPosition, player.SecondaryPositions, slot.PositionFamily, slot.Role)))
             .ToList();
 
         var bench = record.Bench
@@ -194,17 +198,19 @@ public static class TacticsMapping
     }
 
     /// <summary>
-    /// Whether a player is not at home in a slot's family, primary or secondary (`INS-10`).
+    /// Whether a player is not at home in a slot, by family or by the role's natural positions, primary or
+    /// secondary (`INS-10`).
     /// </summary>
     /// <param name="primary">The player's primary position.</param>
     /// <param name="secondary">The player's other positions.</param>
     /// <param name="family">The slot's family.</param>
+    /// <param name="role">The slot's role.</param>
     public static bool IsOutOfPosition(
         PlayerPosition primary,
         IReadOnlyList<PlayerPosition> secondary,
-        PositionFamily family) =>
-        PlayerPositions.FamilyOf(primary) != family
-        && !secondary.Any(position => PlayerPositions.FamilyOf(position) == family);
+        PositionFamily family,
+        PlayerRole role) =>
+        !RolePositions.IsAtHome(primary, secondary, family, role);
 
     private static AssignedPlayerResponse? DescribeAssigned(
         Guid? playerId,

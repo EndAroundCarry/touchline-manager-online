@@ -5,6 +5,7 @@ import {
   familyLabel,
   instructionEffect,
   isKeeperPlace,
+  isNaturalForRole,
   issueMessage,
   pitchStyle,
   roleLabel,
@@ -42,6 +43,7 @@ describe('tactics presentation', () => {
 
       expect(roleLabel('centre_back')).toBe('Centre back');
       expect(roleLabel('wing_back')).toBe('Wing back');
+      expect(roleLabel('wide_midfielder')).toBe('Wide midfield');
       expect(roleLabel('unknown_role')).toBe('unknown_role');
     });
 
@@ -52,9 +54,33 @@ describe('tactics presentation', () => {
         'full_back',
         'wing_back',
       ]);
-      expect(rolesForFamily('midfield')).toHaveLength(3);
+      expect(rolesForFamily('midfield').map((option) => option.value)).toEqual([
+        'defensive_midfielder',
+        'central_midfielder',
+        'attacking_midfielder',
+        'wide_midfielder',
+      ]);
       expect(rolesForFamily('attack').map((option) => option.value)).toEqual(['winger', 'striker']);
       expect(rolesForFamily('sweeper')).toEqual([]);
+    });
+  });
+
+  describe('which players a role accepts', () => {
+    it('accepts a winger or a full back at wide midfield, as the server does', () => {
+      expect(isNaturalForRole('wide_midfielder', 'rm')).toBe(true);
+      expect(isNaturalForRole('wide_midfielder', 'lw')).toBe(true);
+      expect(isNaturalForRole('wide_midfielder', 'rb')).toBe(true);
+      expect(isNaturalForRole('wide_midfielder', 'cb')).toBe(false);
+      expect(isNaturalForRole('wide_midfielder', 'st')).toBe(false);
+    });
+
+    it('lets a wide midfielder cover wing back and winger', () => {
+      expect(isNaturalForRole('wing_back', 'lm')).toBe(true);
+      expect(isNaturalForRole('winger', 'rm')).toBe(true);
+    });
+
+    it('knows no natural position for a role it has not heard of', () => {
+      expect(isNaturalForRole('libero', 'cb')).toBe(false);
     });
   });
 

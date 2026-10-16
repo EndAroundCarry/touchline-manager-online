@@ -5,7 +5,12 @@ import { TableModule } from 'primeng/table';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { SkillGroup, skillGroups } from '../../core/squad/position-ratings';
 import { SquadStore } from '../../core/squad/squad-store';
-import { attributeBand, positionLabel, stateBand } from '../../core/squad/squad-presentation';
+import {
+  attributeBand,
+  positionAbbreviation,
+  positionLabel,
+  stateBand,
+} from '../../core/squad/squad-presentation';
 import { Squad } from '../../core/squad/squad.models';
 import {
   COUNTER_ATTACK,
@@ -16,6 +21,7 @@ import {
   benchPlacementRefusal,
   familyLabel,
   isKeeperPlace,
+  isNaturalForRole,
   issueMessage,
   pitchStyle,
   positionForRole,
@@ -190,7 +196,10 @@ export class Tactics {
         role: slot.role,
         style: pitchStyle(slot),
         player,
-        isOutOfPosition: player !== null && player.positionFamily !== slot.positionFamily,
+        isOutOfPosition:
+          player !== null &&
+          player.positionFamily !== slot.positionFamily &&
+          !isNaturalForRole(slot.role, player.primaryPosition),
         isUnavailable: player?.isUnavailable ?? false,
         isSelected: selected === slot.slotNumber,
         issueCount: (issues.get(slot.slotNumber) ?? []).length,
@@ -418,6 +427,11 @@ export class Tactics {
   /** Names a position. */
   protected position(code: string): string {
     return positionLabel(code);
+  }
+
+  /** The short code a table shows for a position. */
+  protected positionCode(code: string): string {
+    return positionAbbreviation(code);
   }
 
   /**

@@ -80,7 +80,7 @@ public static class PlayerGenerator
     /// and version must reproduce the same squads; the same seed and a different version must not be
     /// expected to.
     /// </remarks>
-    public const string Version = "player-gen-v1";
+    public const string Version = "player-gen-v2";
 
     /// <summary>
     /// The positional composition of a generated squad, ordered goalkeeper outwards. Its length is the
@@ -105,6 +105,8 @@ public static class PlayerGenerator
         PlayerPosition.CentralMidfielder,
         PlayerPosition.AttackingMidfielder,
         PlayerPosition.AttackingMidfielder,
+        PlayerPosition.LeftMidfielder,
+        PlayerPosition.RightMidfielder,
         PlayerPosition.LeftWinger,
         PlayerPosition.RightWinger,
         PlayerPosition.Striker,
@@ -117,14 +119,16 @@ public static class PlayerGenerator
         new Dictionary<PlayerPosition, PlayerPosition[]>
         {
             [PlayerPosition.Goalkeeper] = [],
-            [PlayerPosition.RightBack] = [PlayerPosition.CentreBack, PlayerPosition.RightWinger],
-            [PlayerPosition.LeftBack] = [PlayerPosition.CentreBack, PlayerPosition.LeftWinger],
+            [PlayerPosition.RightBack] = [PlayerPosition.CentreBack, PlayerPosition.RightMidfielder],
+            [PlayerPosition.LeftBack] = [PlayerPosition.CentreBack, PlayerPosition.LeftMidfielder],
             [PlayerPosition.CentreBack] = [PlayerPosition.DefensiveMidfielder, PlayerPosition.RightBack],
             [PlayerPosition.DefensiveMidfielder] = [PlayerPosition.CentralMidfielder, PlayerPosition.CentreBack],
             [PlayerPosition.CentralMidfielder] = [PlayerPosition.DefensiveMidfielder, PlayerPosition.AttackingMidfielder],
             [PlayerPosition.AttackingMidfielder] = [PlayerPosition.CentralMidfielder, PlayerPosition.Striker],
-            [PlayerPosition.RightWinger] = [PlayerPosition.AttackingMidfielder, PlayerPosition.RightBack],
-            [PlayerPosition.LeftWinger] = [PlayerPosition.AttackingMidfielder, PlayerPosition.LeftBack],
+            [PlayerPosition.RightMidfielder] = [PlayerPosition.RightWinger, PlayerPosition.RightBack],
+            [PlayerPosition.LeftMidfielder] = [PlayerPosition.LeftWinger, PlayerPosition.LeftBack],
+            [PlayerPosition.RightWinger] = [PlayerPosition.RightMidfielder, PlayerPosition.AttackingMidfielder],
+            [PlayerPosition.LeftWinger] = [PlayerPosition.LeftMidfielder, PlayerPosition.AttackingMidfielder],
             [PlayerPosition.Striker] = [PlayerPosition.AttackingMidfielder, PlayerPosition.RightWinger],
         };
 

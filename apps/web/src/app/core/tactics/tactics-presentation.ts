@@ -193,6 +193,7 @@ const ROLE_LABELS: Record<string, string> = {
   attacking_midfielder: 'Attacking midfield',
   winger: 'Winger',
   striker: 'Striker',
+  wide_midfielder: 'Wide midfield',
 };
 
 /**
@@ -204,7 +205,12 @@ const ROLE_LABELS: Record<string, string> = {
 const ROLES_BY_FAMILY: Record<string, readonly string[]> = {
   goalkeeper: ['goalkeeper'],
   defence: ['centre_back', 'full_back', 'wing_back'],
-  midfield: ['defensive_midfielder', 'central_midfielder', 'attacking_midfielder'],
+  midfield: [
+    'defensive_midfielder',
+    'central_midfielder',
+    'attacking_midfielder',
+    'wide_midfielder',
+  ],
   attack: ['winger', 'striker'],
 };
 
@@ -234,7 +240,31 @@ const POSITION_BY_ROLE: Record<string, string> = {
   attacking_midfielder: 'am',
   winger: 'rw',
   striker: 'st',
+  wide_midfielder: 'rm',
 };
+
+/**
+ * The positions each role naturally asks for, mirroring `RolePositions.NaturalFor` on the server. A player whose
+ * primary position is on the list is at home in the slot even from another family: a winger at wide midfield, a
+ * full back at wing back.
+ */
+const NATURAL_POSITIONS_BY_ROLE: Record<string, readonly string[]> = {
+  goalkeeper: ['gk'],
+  centre_back: ['cb'],
+  full_back: ['rb', 'lb'],
+  wing_back: ['rb', 'lb', 'rm', 'lm', 'rw', 'lw'],
+  defensive_midfielder: ['dm', 'cm'],
+  central_midfielder: ['cm', 'dm', 'am'],
+  attacking_midfielder: ['am', 'cm'],
+  wide_midfielder: ['rm', 'lm', 'rw', 'lw', 'rb', 'lb'],
+  winger: ['rw', 'lw', 'rm', 'lm', 'am'],
+  striker: ['st', 'am'],
+};
+
+/** Whether a position code is one the role naturally asks for, whatever family it sits in. */
+export function isNaturalForRole(role: string, position: string): boolean {
+  return NATURAL_POSITIONS_BY_ROLE[role]?.includes(position) ?? false;
+}
 
 /** The position code a slot's role is rated as, or null for a role the client does not know. */
 export function positionForRole(role: string): string | null {

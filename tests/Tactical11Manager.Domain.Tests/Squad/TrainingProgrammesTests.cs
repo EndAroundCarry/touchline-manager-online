@@ -94,6 +94,8 @@ public sealed class TrainingProgrammesTests
         TrainingProgrammes.DefaultFor(PlayerPosition.DefensiveMidfielder).Should().Be(TrainingProgramme.Midfielder);
         TrainingProgrammes.DefaultFor(PlayerPosition.CentralMidfielder).Should().Be(TrainingProgramme.Midfielder);
         TrainingProgrammes.DefaultFor(PlayerPosition.AttackingMidfielder).Should().Be(TrainingProgramme.Midfielder);
+        TrainingProgrammes.DefaultFor(PlayerPosition.RightMidfielder).Should().Be(TrainingProgramme.WideMidfielder);
+        TrainingProgrammes.DefaultFor(PlayerPosition.LeftMidfielder).Should().Be(TrainingProgramme.WideMidfielder);
         TrainingProgrammes.DefaultFor(PlayerPosition.RightWinger).Should().Be(TrainingProgramme.Winger);
         TrainingProgrammes.DefaultFor(PlayerPosition.LeftWinger).Should().Be(TrainingProgramme.Winger);
         TrainingProgrammes.DefaultFor(PlayerPosition.Striker).Should().Be(TrainingProgramme.Forward);

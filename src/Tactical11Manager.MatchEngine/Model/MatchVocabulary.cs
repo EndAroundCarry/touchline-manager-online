@@ -203,6 +203,12 @@ public enum MatchPosition
 
     /// <summary>Striker.</summary>
     Striker = 9,
+
+    /// <summary>Right midfielder.</summary>
+    RightMidfielder = 10,
+
+    /// <summary>Left midfielder.</summary>
+    LeftMidfielder = 11,
 }
 
 /// <summary>The broad band a position belongs to.</summary>
@@ -250,6 +256,9 @@ public enum MatchRole
 
     /// <summary>Leads the line.</summary>
     Striker = 8,
+
+    /// <summary>Runs the flank and crosses, tracks back, and rarely shoots.</summary>
+    WideMidfielder = 9,
 }
 
 /// <summary>The team's overall approach (`INS-1`).</summary>
@@ -452,7 +461,9 @@ public static class MatchVocabulary
             MatchPositionFamily.Defence,
         MatchPosition.DefensiveMidfielder
             or MatchPosition.CentralMidfielder
-            or MatchPosition.AttackingMidfielder => MatchPositionFamily.Midfield,
+            or MatchPosition.AttackingMidfielder
+            or MatchPosition.RightMidfielder
+            or MatchPosition.LeftMidfielder => MatchPositionFamily.Midfield,
         MatchPosition.RightWinger or MatchPosition.LeftWinger or MatchPosition.Striker =>
             MatchPositionFamily.Attack,
         _ => throw new ArgumentOutOfRangeException(nameof(position), position, "Unknown position."),
@@ -466,7 +477,8 @@ public static class MatchVocabulary
         MatchRole.CentreBack or MatchRole.FullBack or MatchRole.WingBack => MatchPositionFamily.Defence,
         MatchRole.DefensiveMidfielder
             or MatchRole.CentralMidfielder
-            or MatchRole.AttackingMidfielder => MatchPositionFamily.Midfield,
+            or MatchRole.AttackingMidfielder
+            or MatchRole.WideMidfielder => MatchPositionFamily.Midfield,
         MatchRole.Winger or MatchRole.Striker => MatchPositionFamily.Attack,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown role."),
     };

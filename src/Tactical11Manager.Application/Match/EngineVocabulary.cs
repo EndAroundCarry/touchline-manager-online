@@ -38,6 +38,8 @@ public static class EngineVocabulary
         PlayerPosition.RightWinger => MatchPosition.RightWinger,
         PlayerPosition.LeftWinger => MatchPosition.LeftWinger,
         PlayerPosition.Striker => MatchPosition.Striker,
+        PlayerPosition.RightMidfielder => MatchPosition.RightMidfielder,
+        PlayerPosition.LeftMidfielder => MatchPosition.LeftMidfielder,
         _ => throw new ArgumentOutOfRangeException(nameof(position), position, "Unknown position."),
     };
 
@@ -65,6 +67,7 @@ public static class EngineVocabulary
         PlayerRole.AttackingMidfielder => MatchRole.AttackingMidfielder,
         PlayerRole.Winger => MatchRole.Winger,
         PlayerRole.Striker => MatchRole.Striker,
+        PlayerRole.WideMidfielder => MatchRole.WideMidfielder,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown role."),
     };
 

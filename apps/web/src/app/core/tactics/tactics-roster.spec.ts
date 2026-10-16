@@ -137,6 +137,7 @@ describe('positionForRole', () => {
     expect(positionForRole('centre_back')).toBe('cb');
     expect(positionForRole('wing_back')).toBe('rb');
     expect(positionForRole('striker')).toBe('st');
+    expect(positionForRole('wide_midfielder')).toBe('rm');
   });
 
   it('has no position for a role it does not know', () => {

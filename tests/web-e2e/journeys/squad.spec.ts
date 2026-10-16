@@ -9,7 +9,7 @@ import { confirmKitColours } from '../support/kit-colours';
  *
  * A manager onboards, reads the squad the club was generated with, sorts and filters it, and opens a
  * player. The two things this journey exists to prove are the ones a unit test cannot: that the squad a
- * takeover inherits is the twenty-two players the generator produced, and that an attribute on screen
+ * takeover inherits is the twenty-four players the generator produced, and that an attribute on screen
  * carries a number **and** the word for its band, because master plan §11.3 forbids colour being the only
  * signal.
  *
@@ -48,10 +48,10 @@ test.describe('squad', () => {
 
     await expect(roster).toBeVisible();
 
-    // The inherited squad is the generated one: twenty-two players, each with a profile to open (SQ-1).
-    await expect(rows).toHaveCount(22);
-    await expect(roster.getByRole('link', { name: /^Open / })).toHaveCount(22);
-    await expect(page.getByText(/22 players/)).toBeVisible();
+    // The inherited squad is the generated one: twenty-four players, each with a profile to open (SQ-1).
+    await expect(rows).toHaveCount(24);
+    await expect(roster.getByRole('link', { name: /^Open / })).toHaveCount(24);
+    await expect(page.getByText(/24 players/)).toBeVisible();
 
     // Sorting is the table's own, and it announces the direction rather than only tinting the header
     // (master plan §11.1, §11.3). The compact card list filters but does not sort, so this is the
@@ -75,11 +75,11 @@ test.describe('squad', () => {
 
     await page.getByLabel('Search by name').fill(surname);
 
-    await expect(page.getByText(/Showing \d+ of 22 players/)).toBeVisible();
+    await expect(page.getByText(/Showing \d+ of 24 players/)).toBeVisible();
     await expect(rows.first()).toContainText(surname);
 
     await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect(rows).toHaveCount(22);
+    await expect(rows).toHaveCount(24);
 
     // The player profile is where the attribute grid lives (F-17).
     await roster.getByRole('link', { name: /^Open / }).first().click();

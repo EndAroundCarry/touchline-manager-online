@@ -73,7 +73,7 @@ test.describe('training', () => {
     const roster = compact ? page.getByTestId('training-cards') : page.getByTestId('training-table');
 
     await expect(roster).toBeVisible();
-    await expect(roster.getByLabel(/^Training programme for /)).toHaveCount(22);
+    await expect(roster.getByLabel(/^Training programme for /)).toHaveCount(24);
 
     // Set the club's intensity and save it. A re-used club may already hold a plan, so either answer is correct.
     await page.getByLabel('Intensity').selectOption('intense');

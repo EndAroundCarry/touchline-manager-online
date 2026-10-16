@@ -4,6 +4,23 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Wide midfielders plan, Milestone 1 - left and right midfielders exist (no formation uses them yet)
+
+**The game has two new positions, left midfielder (LM) and right midfielder (RM), between the full-backs and the wingers, and a new role, wide midfielder, that a slot can ask for.** Every club's generated squad grows from 22 to 24 players (one LM and one RM added) and the registration ceiling from 25 to 27, so the headroom for a transfer or a youth signing is still 3. No formation names the role yet and the match engine plays it as any other midfielder, so a match is played exactly as before: the tick engine golden hash does not move.
+
+### Added
+
+- Domain: `PlayerPosition.RightMidfielder` / `LeftMidfielder` (codes `rm`, `lm`, midfield family), `PlayerRole.WideMidfielder` (`wide_midfielder`, midfield family) and the `TrainingProgramme.WideMidfielder` programme (`widemid`: crossing, stamina and work rate core; pace, acceleration, dribbling and passing important), the default for RM and LM. All appended, nothing renumbered.
+- A wide midfielder's generated profile sits between a full-back's and a winger's: more dribbling and finishing than a full-back and less than a winger, better tackling and marking than a winger and less than a full-back, the best crossing, stamina and work rate of the three. `player-attr-v2`, `player-gen-v2`, rule set `world-rules-v11`.
+- `RolePositions` (domain): the positions each role naturally asks for, so a winger or a full-back at wide midfield, or a wide midfielder at wing back or winger, is not flagged out of position. The tactics board's out-of-position badge, the AI club's and the snapshot builder's choice of player for a slot (a player natural for the role ranks first) and the engine's role familiarity (a natural position of another band grades as a secondary position) all use it.
+- Migration `WideMidfielders`: the check constraints on `players.primary_position`, `tactical_slots.role`, `team_sheet_entries.role_override` and the two training-programme columns accept the new codes.
+- Web: RM / LM in the squad, training and tactics tables (through `positionAbbreviation`: the tactics and training tables showed the raw code in capitals, so a striker read ST there and FC elsewhere), a wide-midfielder rating profile (between the full-back's and the winger's on finishing, dribbling and tackling), the "Wide midfield" role in the midfield role picker and the `widemid` regime in the training chart.
+
+### Changed
+
+- `GeneratorSquadTarget` 22 to 24, `GeneratedMidfielders` 7 to 9, `SquadMaximumRegistered` 25 to 27, `AiMarketTargetSquadSize` 21 to 23.
+- Dev worlds must be wiped and reseeded: old squads have no LM or RM and the check constraints changed.
+
 ## Calendar - what is happening at the club, day by day
 
 **A new Calendar page in the Season menu shows the club's days like a calendar app: a month grid with each day's events stacked as one-line chips and "n more" when they do not fit, and a click on a day opens an hourly view of it, each event at the time it happens and events in the same hour sharing the width. It shows the matches played and coming, the weekly finance run and every other money movement, and injuries and recoveries.** It is built so that new kinds of event cost one class on the server and nothing else: the page draws whatever kinds arrive, with a neutral marker for one it has never heard of.

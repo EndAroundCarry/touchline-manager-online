@@ -56,6 +56,8 @@ public sealed partial class SettleSquadContinuity
         PlayerPosition.RightWinger,
         PlayerPosition.DefensiveMidfielder,
         PlayerPosition.AttackingMidfielder,
+        PlayerPosition.LeftMidfielder,
+        PlayerPosition.RightMidfielder,
     ];
 
     /// <summary>The length, in seasons, of the deal the board gives a present manager's expiring player (`CON-11`).</summary>

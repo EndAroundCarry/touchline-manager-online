@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tactical11Manager.Application.Squad;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Training;
 using Tactical11Manager.Infrastructure.Persistence;
@@ -40,9 +41,9 @@ public sealed class DailyProgressionRunTests
     {
         var day = new DateOnly(2026, 9, 25);
 
-        // Six countries, one tier each, eighteen clubs apiece, twenty-two players apiece (WORLD-4, SQ-1).
+        // Six countries, one tier each, eighteen clubs apiece, the target squad apiece (WORLD-4, SQ-1).
         const int clubs = 6 * 18;
-        const int players = clubs * 22;
+        const int players = clubs * WorldRuleSet.GeneratorSquadTarget;
 
         await using (var scope = _fixture.CreateScope())
         {

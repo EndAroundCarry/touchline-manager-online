@@ -37,6 +37,9 @@ public enum TrainingProgramme
 
     /// <summary>No development, in exchange for faster recovery from fatigue.</summary>
     Recovery = 8,
+
+    /// <summary>Delivery, running power, and tracking back for a left or right midfielder.</summary>
+    WideMidfielder = 9,
 }
 
 /// <summary>One attribute a programme trains, and how much it matters to it.</summary>
@@ -221,6 +224,21 @@ public static class TrainingProgrammes
             "Recovery",
             "No development this period; clears fatigue faster.",
             []),
+        Define(
+            TrainingProgramme.WideMidfielder,
+            "widemid",
+            "Wide midfielder",
+            "Up and down the flank: delivery, running power and tracking back.",
+            (AttributeName.Crossing, 3),
+            (AttributeName.Stamina, 3),
+            (AttributeName.WorkRate, 3),
+            (AttributeName.Pace, 2),
+            (AttributeName.Acceleration, 2),
+            (AttributeName.Dribbling, 2),
+            (AttributeName.Passing, 2),
+            (AttributeName.Tackling, 1),
+            (AttributeName.Positioning, 1),
+            (AttributeName.Technique, 1)),
     ];
 
     /// <summary>Gets one programme's definition.</summary>
@@ -239,6 +257,7 @@ public static class TrainingProgrammes
         PlayerPosition.DefensiveMidfielder
             or PlayerPosition.CentralMidfielder
             or PlayerPosition.AttackingMidfielder => TrainingProgramme.Midfielder,
+        PlayerPosition.RightMidfielder or PlayerPosition.LeftMidfielder => TrainingProgramme.WideMidfielder,
         PlayerPosition.RightWinger or PlayerPosition.LeftWinger => TrainingProgramme.Winger,
         PlayerPosition.Striker => TrainingProgramme.Forward,
         _ => throw new ArgumentOutOfRangeException(nameof(position), position, "Unknown position."),

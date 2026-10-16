@@ -132,6 +132,8 @@ describe('squad presentation', () => {
       expect(positionFamilyOf('cb')).toBe('defence');
       expect(positionFamilyOf('cm')).toBe('midfield');
       expect(positionFamilyOf('st')).toBe('attack');
+      expect(positionFamilyOf('rm')).toBe('midfield');
+      expect(positionFamilyOf('lm')).toBe('midfield');
       expect(positionFamilyOf('keeper')).toBeNull();
     });
 
@@ -140,6 +142,10 @@ describe('squad presentation', () => {
       expect(positionLabel('xyz')).toBe('xyz');
       expect(positionAbbreviation('st')).toBe('FC');
       expect(positionAbbreviation('lw')).toBe('LW');
+      expect(positionAbbreviation('rm')).toBe('RM');
+      expect(positionAbbreviation('lm')).toBe('LM');
+      expect(positionLabel('rm')).toBe('Right midfield');
+      expect(positionLabel('lm')).toBe('Left midfield');
       expect(positionAbbreviation('xyz')).toBe('xyz');
       expect(familyLabel('defence')).toBe('Defenders');
       expect(squadStatusLabel('key_player')).toBe('Key player');

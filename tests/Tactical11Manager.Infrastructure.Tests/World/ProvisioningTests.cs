@@ -5,6 +5,7 @@ using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Competition;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.World;
 using Tactical11Manager.Domain.World.Generation;
@@ -61,7 +62,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
         result.Outcome.Should().Be(ProvisionDivisionOutcome.Completed);
         result.TargetTier.Should().Be(2);
         result.Clubs.Should().Be(18, "PYR-4: a tier holds eighteen clubs");
-        result.Players.Should().Be(18 * 22, "SQ-1: the generator produces twenty-two players per club");
+        result.Players.Should().Be(18 * WorldRuleSet.GeneratorSquadTarget, "SQ-1: the generator produces its target squad per club");
         result.Accounts.Should().Be(18);
 
         await using (var verify = _fixture.CreateScope())

@@ -227,7 +227,7 @@ public sealed class WorldSeedingTests : WorldTestBase
     }
 
     [Fact]
-    public async Task Every_club_has_a_legal_twenty_two_player_squad()
+    public async Task Every_club_has_a_legal_squad_of_the_target_size()
     {
         await using var scope = Fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -240,6 +240,32 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         squadSizes.Should().HaveCount(108);
         squadSizes.Should().OnlyContain(club => club.Count == WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+    }
+
+    [Fact]
+    public async Task Every_club_has_one_left_and_one_right_midfielder()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var wide = await db.PlayerContracts
+            .Where(contract => contract.Status == ContractStatus.Active)
+            .Join(
+                db.Players,
+                contract => contract.PlayerId,
+                player => player.Id,
+                (contract, player) => new { contract.ClubId, player.PrimaryPosition })
+            .Where(entry => entry.PrimaryPosition == PlayerPosition.LeftMidfielder
+                || entry.PrimaryPosition == PlayerPosition.RightMidfielder)
+            .ToListAsync();
+
+        var byClub = wide.GroupBy(entry => entry.ClubId).ToList();
+
+        byClub.Should().HaveCount(108, "every club has wide midfielders");
+        byClub.Should().OnlyContain(
+            club => club.Count(entry => entry.PrimaryPosition == PlayerPosition.LeftMidfielder) == 1
+                && club.Count(entry => entry.PrimaryPosition == PlayerPosition.RightMidfielder) == 1,
+            "SQ-1: one left and one right midfielder a club");
     }
 
     [Fact]

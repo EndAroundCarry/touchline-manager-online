@@ -25,6 +25,8 @@ namespace Tactical11Manager.Domain.Rules;
 /// prices, and the crowd that fills them — which lives in <see cref="StadiumRuleSet"/> (`STAD-*`).
 /// Stage 12 added the rollover-continuity values: the contract-continuity AI's target squad size, and the
 /// retirement rule's start age, growth, forced caps, and ability and fitness gate (`CON-6`, `CON-8`).
+/// The wide-midfielder milestone grew the generated squad from twenty-two to twenty-four (one left and one
+/// right midfielder) and the registration ceiling from twenty-five to twenty-seven (`SQ-1`, `SQ-3`).
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -32,7 +34,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v10";
+    public const string Version = "world-rules-v11";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -94,7 +96,7 @@ public static class WorldRuleSet
     public static readonly TimeSpan DeadlineReminderLead = TimeSpan.FromHours(24);
 
     /// <summary>The number of senior players the generator aims for per club (`SQ-1`).</summary>
-    public const int GeneratorSquadTarget = 22;
+    public const int GeneratorSquadTarget = 24;
 
     /// <summary>Opening cash for a tier-1 club, in minor units. A balancing value (see remarks).</summary>
     /// <remarks>
@@ -411,8 +413,11 @@ public static class WorldRuleSet
     /// <summary>The number of defenders the generator gives each club (`SQ-1`).</summary>
     public const int GeneratedDefenders = 7;
 
-    /// <summary>The number of midfielders the generator gives each club (`SQ-1`).</summary>
-    public const int GeneratedMidfielders = 7;
+    /// <summary>
+    /// The number of midfielders the generator gives each club (`SQ-1`): two defensive, three central, two
+    /// attacking, and one left and one right midfielder.
+    /// </summary>
+    public const int GeneratedMidfielders = 9;
 
     /// <summary>The number of attackers the generator gives each club (`SQ-1`).</summary>
     public const int GeneratedAttackers = 5;
@@ -424,7 +429,11 @@ public static class WorldRuleSet
     public const int MinimumGoalkeepers = 2;
 
     /// <summary>The largest registered senior squad a club may hold (`SQ-3`).</summary>
-    public const int SquadMaximumRegistered = 25;
+    /// <remarks>
+    /// Three above the generator's target of twenty-four, the headroom for a transfer or a youth signing that
+    /// a squad of twenty-two had under the earlier limit of twenty-five.
+    /// </remarks>
+    public const int SquadMaximumRegistered = 27;
 
     /// <summary>Starters named on a match team sheet (`SQ-4`).</summary>
     public const int TeamSheetStarters = 11;
@@ -678,10 +687,10 @@ public static class WorldRuleSet
     /// The squad size an AI club trims toward when it lists a surplus player (`TRF-12`).
     /// </summary>
     /// <remarks>
-    /// One below the generator's target, so a generated squad of twenty-two has exactly one player the AI
+    /// One below the generator's target, so a generated squad of twenty-four has exactly one player the AI
     /// would move on and stays a manageable size without ever approaching the minimum `SQ-2` requires.
     /// </remarks>
-    public const int AiMarketTargetSquadSize = 21;
+    public const int AiMarketTargetSquadSize = 23;
 
     /// <summary>
     /// The squad size a club nobody manages renews toward at rollover (`CON-6`, `CON-8`).

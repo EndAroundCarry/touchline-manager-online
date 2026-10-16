@@ -85,6 +85,66 @@ public sealed class PlayerGeneratorTests
     }
 
     [Fact]
+    public void A_generated_squad_has_one_left_and_one_right_midfielder()
+    {
+        var positions = Generate().Select(member => member.Player.PrimaryPosition).ToList();
+
+        positions.Count(position => position == PlayerPosition.LeftMidfielder).Should().Be(1, "SQ-1");
+        positions.Count(position => position == PlayerPosition.RightMidfielder).Should().Be(1, "SQ-1");
+    }
+
+    [Fact]
+    public void A_wide_midfielder_profile_sits_between_a_full_back_and_a_winger()
+    {
+        static int Bonus(PlayerPosition position, AttributeName name) =>
+            PlayerAttributeProfiles.BonusFor(position, name);
+
+        // More attacking than a full back and less than a winger: finishing and dribbling rise from the full
+        // back through the wide midfielder to the winger, and tackling and marking fall.
+        foreach (var name in new[] { AttributeName.Finishing, AttributeName.Dribbling })
+        {
+            Bonus(PlayerPosition.RightBack, name).Should().BeLessThan(Bonus(PlayerPosition.RightMidfielder, name), $"{name}");
+            Bonus(PlayerPosition.RightMidfielder, name).Should().BeLessThan(Bonus(PlayerPosition.RightWinger, name), $"{name}");
+        }
+
+        foreach (var name in new[] { AttributeName.Tackling, AttributeName.Marking })
+        {
+            Bonus(PlayerPosition.RightWinger, name).Should().BeLessThan(Bonus(PlayerPosition.RightMidfielder, name), $"{name}");
+            Bonus(PlayerPosition.RightMidfielder, name).Should().BeLessThan(Bonus(PlayerPosition.RightBack, name), $"{name}");
+        }
+
+        // The delivery and the engine are what he is for.
+        Bonus(PlayerPosition.RightMidfielder, AttributeName.Crossing)
+            .Should().BeGreaterThanOrEqualTo(Bonus(PlayerPosition.RightWinger, AttributeName.Crossing));
+        Bonus(PlayerPosition.RightMidfielder, AttributeName.Stamina)
+            .Should().BeGreaterThan(Bonus(PlayerPosition.RightWinger, AttributeName.Stamina));
+        Bonus(PlayerPosition.RightMidfielder, AttributeName.WorkRate)
+            .Should().BeGreaterThan(Bonus(PlayerPosition.RightWinger, AttributeName.WorkRate));
+    }
+
+    [Fact]
+    public void The_two_flanks_share_a_wide_midfielder_profile_and_it_is_no_stronger_than_the_others()
+    {
+        static int Sum(PlayerPosition position) =>
+            AttributeNames.All.Sum(name => PlayerAttributeProfiles.BonusFor(position, name));
+
+        Sum(PlayerPosition.RightMidfielder).Should().Be(Sum(PlayerPosition.LeftMidfielder));
+
+        // A profile total bonus is its overall quality against the squad mean: a new position must not be
+        // stronger than the best outfield profile nor weaker than the weakest.
+        var outfield = PlayerPositions.All
+            .Where(position => position is not (PlayerPosition.Goalkeeper
+                or PlayerPosition.RightMidfielder
+                or PlayerPosition.LeftMidfielder))
+            .Select(Sum)
+            .ToList();
+
+        Sum(PlayerPosition.RightMidfielder).Should().BeInRange(outfield.Min(), outfield.Max());
+
+        PlayerAttributeProfiles.PhysicalRangeFor(PlayerPosition.LeftMidfielder).Should().NotBeNull();
+    }
+
+    [Fact]
     public void Every_generated_attribute_is_on_the_displayed_scale()
     {
         var attributes = Generate().Select(member => member.Attributes.ToSet());
@@ -194,7 +254,7 @@ public sealed class PlayerGeneratorTests
         squad.Take(3).Select(member => member.Player.FullName)
             .Should().Equal("Alaric Alderwick", "Bramwell Brambleby", "Corin Cawthorne");
 
-        GoldenDigest(squad).Should().Be("9bcc43b9c216e880");
+        GoldenDigest(squad).Should().Be("941aab8c455dbc46");
     }
 
     private static string GoldenDigest(IReadOnlyList<GeneratedSquadMember> squad) =>

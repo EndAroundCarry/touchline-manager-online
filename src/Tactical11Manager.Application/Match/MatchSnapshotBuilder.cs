@@ -377,7 +377,7 @@ public static class MatchSnapshotBuilder
             .Where(player => wantsGoalkeeper
                 ? player.PrimaryPosition == PlayerPosition.Goalkeeper
                 : player.PrimaryPosition != PlayerPosition.Goalkeeper)
-            .OrderByDescending(player => Suitability(player, slot.PositionFamily))
+            .OrderByDescending(player => Suitability(player, slot))
             .ThenByDescending(player => player.ConditionBp)
             .ThenByDescending(Ability)
             .ThenBy(player => player.PlayerId)
@@ -500,18 +500,12 @@ public static class MatchSnapshotBuilder
     }
 
     /// <summary>
-    /// How at home a player is in a slot's family: 2 for the position they play, 1 for one they cover,
-    /// 0 for neither (`INS-10`'s familiarity, used here only to choose between candidates).
+    /// How at home a player is in a slot: 3 for the position the role asks for, 2 for another in its family,
+    /// 1 for one they cover, 0 for neither (`INS-10`'s familiarity, used here only to choose between
+    /// candidates).
     /// </summary>
-    private static int Suitability(SnapshotPlayerRow player, PositionFamily family)
-    {
-        if (PlayerPositions.FamilyOf(player.PrimaryPosition) == family)
-        {
-            return 2;
-        }
-
-        return player.SecondaryPositions.Any(position => PlayerPositions.FamilyOf(position) == family) ? 1 : 0;
-    }
+    private static int Suitability(SnapshotPlayerRow player, SnapshotSlotRow slot) =>
+        RolePositions.Suitability(player.PrimaryPosition, player.SecondaryPositions, slot.PositionFamily, slot.Role);
 
     /// <summary>
     /// A player's standing among their team-mates, as the mean of their twenty-eight attributes.

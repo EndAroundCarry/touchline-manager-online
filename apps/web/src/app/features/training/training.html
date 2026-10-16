@@ -261,7 +261,7 @@
                     class="z-10 w-12 min-w-12 border-b border-line bg-panel py-1 pr-2 lg:sticky lg:left-[8.5rem]"
                   >
                     <abbr [title]="position(row.player.primaryPosition)" aria-hidden="true">{{
-                      row.player.primaryPosition.toUpperCase()
+                      positionCode(row.player.primaryPosition)
                     }}</abbr>
                     <span class="sr-only">{{ position(row.player.primaryPosition) }}</span>
                   </td>

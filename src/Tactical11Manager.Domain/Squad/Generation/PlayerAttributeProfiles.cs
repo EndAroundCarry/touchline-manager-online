@@ -28,7 +28,7 @@ public sealed record PhysicalRange(int MinHeightCm, int MaxHeightCm, int MinWeig
 public static class PlayerAttributeProfiles
 {
     /// <summary>The profile version, bumped whenever a bonus or a curve changes.</summary>
-    public const string Version = "player-attr-v1";
+    public const string Version = "player-attr-v2";
 
     /// <summary>The most a single attribute moves from the position's base, from its own random draw.</summary>
     public const int AttributeJitter = 2;
@@ -179,6 +179,8 @@ public static class PlayerAttributeProfiles
                 (AttributeName.Positioning, -2),
                 (AttributeName.WorkRate, -1),
                 (AttributeName.JumpingReach, -3)),
+            [PlayerPosition.RightMidfielder] = WideMidfielderBonuses(),
+            [PlayerPosition.LeftMidfielder] = WideMidfielderBonuses(),
             [PlayerPosition.RightWinger] = WingerBonuses(),
             [PlayerPosition.LeftWinger] = WingerBonuses(),
             [PlayerPosition.Striker] = Bonuses(
@@ -218,6 +220,8 @@ public static class PlayerAttributeProfiles
             [PlayerPosition.DefensiveMidfielder] = new(175, 188, 70, 84),
             [PlayerPosition.CentralMidfielder] = new(170, 184, 66, 80),
             [PlayerPosition.AttackingMidfielder] = new(168, 181, 64, 77),
+            [PlayerPosition.RightMidfielder] = new(168, 182, 64, 78),
+            [PlayerPosition.LeftMidfielder] = new(168, 182, 64, 78),
             [PlayerPosition.RightWinger] = new(166, 180, 62, 76),
             [PlayerPosition.LeftWinger] = new(166, 180, 62, 76),
             [PlayerPosition.Striker] = new(176, 191, 72, 88),
@@ -292,6 +296,38 @@ public static class PlayerAttributeProfiles
         (AttributeName.Vision, -1),
         (AttributeName.Composure, -1),
         (AttributeName.JumpingReach, -2));
+
+    /// <summary>
+    /// A wide midfielder sits between a full back and a winger: the full back's engine and delivery with more
+    /// of the winger's pace and dribbling, and better tackling than a winger but not a full back's. He does
+    /// not finish, which is the striker's job.
+    /// </summary>
+    private static Dictionary<AttributeName, int> WideMidfielderBonuses() => Bonuses(
+        (AttributeName.Crossing, 5),
+        (AttributeName.Stamina, 5),
+        (AttributeName.WorkRate, 4),
+        (AttributeName.Pace, 4),
+        (AttributeName.Acceleration, 4),
+        (AttributeName.Dribbling, 3),
+        (AttributeName.Agility, 3),
+        (AttributeName.Passing, 2),
+        (AttributeName.Technique, 2),
+        (AttributeName.FirstTouch, 2),
+        (AttributeName.Tackling, 1),
+        (AttributeName.Positioning, 1),
+        (AttributeName.Anticipation, 1),
+        (AttributeName.Decisions, 1),
+        (AttributeName.Vision, 1),
+        (AttributeName.Marking, -1),
+        (AttributeName.Finishing, -3),
+        (AttributeName.Heading, -3),
+        (AttributeName.Strength, -2),
+        (AttributeName.JumpingReach, -2),
+        (AttributeName.SetPieces, -1),
+        (AttributeName.Handling, -9),
+        (AttributeName.Reflexes, -9),
+        (AttributeName.OneOnOnes, -9),
+        (AttributeName.AerialAbility, -6));
 
     private static Dictionary<AttributeName, int> WingerBonuses() => Bonuses(
         (AttributeName.Pace, 5),

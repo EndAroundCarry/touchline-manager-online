@@ -231,6 +231,64 @@ public sealed class UnitRatingTests
             .Should().Be(rules.SecondaryPositionPenaltyBasisPoints);
     }
 
+    [Theory]
+    [InlineData(MatchPosition.RightMidfielder, 10_000)]
+    [InlineData(MatchPosition.LeftMidfielder, 10_000)]
+    public void A_wide_midfielder_in_a_wide_midfield_slot_is_fully_familiar(MatchPosition position, int expected)
+    {
+        var rules = EngineRulesV2.Default;
+        var player = WideMidfieldCandidate(position);
+
+        LineupResolver.FamiliarityOf(player, WideMidfieldSlot(player), rules).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(MatchPosition.RightWinger)]
+    [InlineData(MatchPosition.LeftBack)]
+    public void A_winger_or_a_full_back_in_a_wide_midfield_slot_grades_as_a_secondary_position(MatchPosition position)
+    {
+        var rules = EngineRulesV2.Default;
+        var player = WideMidfieldCandidate(position);
+
+        LineupResolver.FamiliarityOf(player, WideMidfieldSlot(player), rules)
+            .Should().Be(rules.SecondaryPositionPenaltyBasisPoints);
+    }
+
+    [Fact]
+    public void A_central_midfielder_in_a_wide_midfield_slot_is_in_the_band_but_in_the_wrong_job()
+    {
+        var rules = EngineRulesV2.Default;
+        var player = WideMidfieldCandidate(MatchPosition.CentralMidfielder);
+
+        LineupResolver.FamiliarityOf(player, WideMidfieldSlot(player), rules)
+            .Should().Be(rules.UnfamiliarRolePenaltyBasisPoints);
+    }
+
+    [Fact]
+    public void A_centre_back_in_a_wide_midfield_slot_is_out_of_position_unless_he_covers_the_flank()
+    {
+        var rules = EngineRulesV2.Default;
+        var player = WideMidfieldCandidate(MatchPosition.CentreBack);
+
+        LineupResolver.FamiliarityOf(player, WideMidfieldSlot(player), rules)
+            .Should().Be(rules.OutOfPositionPenaltyBasisPoints);
+
+        var covering = player with { SecondaryPositions = [MatchPosition.RightMidfielder] };
+
+        LineupResolver.FamiliarityOf(covering, WideMidfieldSlot(covering), rules)
+            .Should().Be(rules.SecondaryPositionPenaltyBasisPoints);
+    }
+
+    [Fact]
+    public void A_right_midfielder_covers_a_winger_slot_as_a_secondary_position()
+    {
+        var rules = EngineRulesV2.Default;
+        var player = WideMidfieldCandidate(MatchPosition.RightMidfielder);
+        var slot = WideMidfieldSlot(player) with { Family = MatchPositionFamily.Attack, Role = MatchRole.Winger };
+
+        LineupResolver.FamiliarityOf(player, slot, rules).Should().Be(rules.SecondaryPositionPenaltyBasisPoints);
+    }
+
     [Fact]
     public void A_striker_slotted_into_central_midfield_is_out_of_position()
     {
@@ -261,6 +319,26 @@ public sealed class UnitRatingTests
             ratings.Of(unit).Should().BeInRange(0, rules.MaxUnitRating);
         }
     }
+
+    private static MatchParticipantV1 WideMidfieldCandidate(MatchPosition position) =>
+        TestMatchFactory.Side(7, "Wing Town", 13, new MatchInstructionsV1())
+            .Squad.First(participant => participant.Position == MatchPosition.LeftWinger)
+            with
+        {
+            Position = position,
+            SecondaryPositions = [],
+        };
+
+    private static MatchSlotV1 WideMidfieldSlot(MatchParticipantV1 player) =>
+        new()
+        {
+            SlotNumber = 6,
+            Family = MatchPositionFamily.Midfield,
+            Role = MatchRole.WideMidfielder,
+            X = 5_800,
+            Y = 8_300,
+            ParticipantId = player.ParticipantId,
+        };
 
     private static IReadOnlyList<ActiveSlot> RatingsLineup(int ability) =>
         [.. LineupResolver

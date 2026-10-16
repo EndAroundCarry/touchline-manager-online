@@ -2573,7 +2573,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_players_preferred_foot", "preferred_foot in ('left', 'right', 'both')");
 
-                            t.HasCheckConstraint("ck_players_primary_position", "primary_position in ('gk', 'rb', 'cb', 'lb', 'dm', 'cm', 'am', 'rw', 'lw', 'st')");
+                            t.HasCheckConstraint("ck_players_primary_position", "primary_position in ('gk', 'rb', 'cb', 'lb', 'dm', 'cm', 'am', 'rw', 'lw', 'st', 'rm', 'lm')");
 
                             t.HasCheckConstraint("ck_players_retirement_announced", "retirement_announced_season_number is null or retirement_announced_season_number >= 1");
 
@@ -2994,7 +2994,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_player_training_days_intensity", "intensity in ('light', 'normal', 'intense')");
 
-                            t.HasCheckConstraint("ck_player_training_days_programme", "programme in ('goalkeeper', 'defender', 'wingback', 'midfielder', 'winger', 'forward', 'mental', 'physical', 'recovery')");
+                            t.HasCheckConstraint("ck_player_training_days_programme", "programme in ('goalkeeper', 'defender', 'wingback', 'midfielder', 'winger', 'forward', 'mental', 'physical', 'recovery', 'widemid')");
                         });
                 });
 
@@ -3050,7 +3050,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("player_training_focus", "squad", t =>
                         {
-                            t.HasCheckConstraint("ck_player_training_focus_programme", "programme in ('goalkeeper', 'defender', 'wingback', 'midfielder', 'winger', 'forward', 'mental', 'physical', 'recovery')");
+                            t.HasCheckConstraint("ck_player_training_focus_programme", "programme in ('goalkeeper', 'defender', 'wingback', 'midfielder', 'winger', 'forward', 'mental', 'physical', 'recovery', 'widemid')");
                         });
                 });
 
@@ -3378,7 +3378,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_tactical_slots_position_family", "position_family in ('goalkeeper', 'defence', 'midfield', 'attack')");
 
-                            t.HasCheckConstraint("ck_tactical_slots_role", "role in ('goalkeeper', 'centre_back', 'full_back', 'wing_back', 'defensive_midfielder', 'central_midfielder', 'attacking_midfielder', 'winger', 'striker')");
+                            t.HasCheckConstraint("ck_tactical_slots_role", "role in ('goalkeeper', 'centre_back', 'full_back', 'wing_back', 'defensive_midfielder', 'central_midfielder', 'attacking_midfielder', 'winger', 'striker', 'wide_midfielder')");
                         });
                 });
 
@@ -3440,7 +3440,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_team_sheet_entries_designation", "designation in ('starter', 'substitute')");
 
-                            t.HasCheckConstraint("ck_team_sheet_entries_role_override", "role_override is null or role_override in ('goalkeeper', 'centre_back', 'full_back', 'wing_back', 'defensive_midfielder', 'central_midfielder', 'attacking_midfielder', 'winger', 'striker')");
+                            t.HasCheckConstraint("ck_team_sheet_entries_role_override", "role_override is null or role_override in ('goalkeeper', 'centre_back', 'full_back', 'wing_back', 'defensive_midfielder', 'central_midfielder', 'attacking_midfielder', 'winger', 'striker', 'wide_midfielder')");
 
                             t.HasCheckConstraint("ck_team_sheet_entries_slot", "slot_number between 1 and 18");
                         });

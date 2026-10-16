@@ -168,9 +168,9 @@ season it opens are distinct rows, so a finished season's membership, results, a
 
 | Ref | Rule | Value |
 |---|---|---|
-| SQ-1 | Generator target squad size | **22 senior players** |
+| SQ-1 | Generator target squad size | **24 senior players** |
 | SQ-2 | Minimum registered senior squad | **18**, including **at least 2 goalkeepers** |
-| SQ-3 | Maximum registered senior squad | **25** |
+| SQ-3 | Maximum registered senior squad | **27** |
 | SQ-4 | Match team sheet | exactly **11 starters**, up to **7 substitutes** |
 | SQ-5 | Maximum substitutions per match | **5**, chosen by deterministic engine rules because matches are asynchronous |
 | SQ-6 | A player has exactly one active club contract and one current registration. | — |
@@ -244,8 +244,8 @@ merely inactive (`OCC-8`) — is never considered.
 
 | Ref | Rule | Value |
 |---|---|---|
-| TRN-1 | A player trains one **programme**: a weighted list of attributes (3 core, 2 important, 1 supporting). The programmes are `goalkeeper`, `defender`, `wingback`, `midfielder`, `winger`, `forward`, `mental`, `physical`, and `recovery`. The catalogue is served by the API, never repeated by a client. `recovery` trains no attributes and recovers extra fatigue. | 9 programmes |
-| TRN-2 | Programmes are per player only; there is no club-wide programme. A player trains the programme that matches their primary position (gk → goalkeeper; cb → defender; rb, lb → wingback; dm, cm, am → midfielder; rw, lw → winger; st → forward) unless the manager sets an override, and clearing it returns them to that default. Intensity (light, normal, intense) is the one club-wide training setting. | — |
+| TRN-1 | A player trains one **programme**: a weighted list of attributes (3 core, 2 important, 1 supporting). The programmes are `goalkeeper`, `defender`, `wingback`, `midfielder`, `winger`, `forward`, `mental`, `physical`, `recovery`, and `widemid` (the wide midfielder's). The catalogue is served by the API, never repeated by a client. `recovery` trains no attributes and recovers extra fatigue. | 10 programmes |
+| TRN-2 | Programmes are per player only; there is no club-wide programme. A player trains the programme that matches their primary position (gk → goalkeeper; cb → defender; rb, lb → wingback; dm, cm, am → midfielder; rm, lm → widemid; rw, lw → winger; st → forward) unless the manager sets an override, and clearing it returns them to that default. Intensity (light, normal, intense) is the one club-wide training setting. | — |
 | TRN-3 | Daily progression job runs | **02:00 UTC** |
 | TRN-4 | Attribute scale | **1–20** displayed; neither development nor decline can push a displayed attribute outside 1–20, and development never lifts one above the player's hidden potential |
 | TRN-5 | Condition | **0–10,000** basis points |
@@ -597,10 +597,10 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `points_win` / `points_draw` / `points_loss` | 3 / 1 / 0 | TBL-1 |
 | `promoted_per_tier` / `relegated_per_tier` | 3 / 3 | PR-1 |
 | `promotion_relegation_version` | `promotion-relegation-v1` | PR-1 (FIC-8) |
-| `squad_target` | 22 | SQ-1 |
+| `squad_target` | 24 | SQ-1 |
 | `squad_min` | 18 | SQ-2 |
 | `squad_min_goalkeepers` | 2 | SQ-2 |
-| `squad_max` | 25 | SQ-3 |
+| `squad_max` | 27 | SQ-3 |
 | `starters` | 11 | SQ-4 |
 | `substitutes_max` | 7 | SQ-4 |
 | `substitutions_max` | 5 | SQ-5 |
@@ -648,7 +648,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `match_morale_win_bp` / `_draw_bp` / `_loss_bp` | 350 / 40 / 350 | TRN-13 (balancing) |
 | `name_pools_version` | `name-pools-v1` | FIC-8 |
 | `club_name_capacity_per_pool` | 1,980 (220 × 9) | FIC-4, PYR-11 |
-| `squad_composition` | 3 GK / 7 defenders / 7 midfielders / 5 attackers | SQ-1 (balancing) |
+| `squad_composition` | 3 GK / 7 defenders / 9 midfielders (one a left and one a right midfielder) / 5 attackers | SQ-1 (balancing) |
 | `player_age_range` | 17–34 game years | SQ-1 (balancing) |
 | `ability_mean_tier1` | 13 / 20 | TRN-4 (balancing) |
 | `ability_drop_per_tier` | 2 | TRN-4 (balancing) |

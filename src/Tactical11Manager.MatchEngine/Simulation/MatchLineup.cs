@@ -126,14 +126,20 @@ public static class LineupResolver
         ArgumentNullException.ThrowIfNull(slot);
         ArgumentNullException.ThrowIfNull(rules);
 
+        var natural = NaturalPositionsOf(slot.Role);
+
         if (participant.Position.FamilyOf() == slot.Family)
         {
-            return NaturalPositionsOf(slot.Role).Contains(participant.Position)
+            return natural.Contains(participant.Position)
                 ? EngineRulesV2.Certain
                 : rules.UnfamiliarRolePenaltyBasisPoints;
         }
 
-        if (participant.SecondaryPositions.Any(position => position.FamilyOf() == slot.Family))
+        // A position the role names is covered even from another band: a winger at wide midfield, a full back at
+        // wing back. It grades as a secondary position, because the player is not out of position for the job.
+        if (natural.Contains(participant.Position)
+            || participant.SecondaryPositions.Any(position => position.FamilyOf() == slot.Family
+                || natural.Contains(position)))
         {
             return rules.SecondaryPositionPenaltyBasisPoints;
         }
@@ -152,13 +158,35 @@ public static class LineupResolver
         MatchRole.CentreBack => [MatchPosition.CentreBack],
         MatchRole.FullBack => [MatchPosition.RightBack, MatchPosition.LeftBack],
         MatchRole.WingBack =>
-            [MatchPosition.RightBack, MatchPosition.LeftBack, MatchPosition.RightWinger, MatchPosition.LeftWinger],
+        [
+            MatchPosition.RightBack,
+            MatchPosition.LeftBack,
+            MatchPosition.RightMidfielder,
+            MatchPosition.LeftMidfielder,
+            MatchPosition.RightWinger,
+            MatchPosition.LeftWinger,
+        ],
         MatchRole.DefensiveMidfielder => [MatchPosition.DefensiveMidfielder, MatchPosition.CentralMidfielder],
         MatchRole.CentralMidfielder =>
             [MatchPosition.CentralMidfielder, MatchPosition.DefensiveMidfielder, MatchPosition.AttackingMidfielder],
         MatchRole.AttackingMidfielder => [MatchPosition.AttackingMidfielder, MatchPosition.CentralMidfielder],
+        MatchRole.WideMidfielder =>
+        [
+            MatchPosition.RightMidfielder,
+            MatchPosition.LeftMidfielder,
+            MatchPosition.RightWinger,
+            MatchPosition.LeftWinger,
+            MatchPosition.RightBack,
+            MatchPosition.LeftBack,
+        ],
         MatchRole.Winger =>
-            [MatchPosition.RightWinger, MatchPosition.LeftWinger, MatchPosition.AttackingMidfielder],
+        [
+            MatchPosition.RightWinger,
+            MatchPosition.LeftWinger,
+            MatchPosition.RightMidfielder,
+            MatchPosition.LeftMidfielder,
+            MatchPosition.AttackingMidfielder,
+        ],
         MatchRole.Striker => [MatchPosition.Striker, MatchPosition.AttackingMidfielder],
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown role."),
     };

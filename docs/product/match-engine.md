@@ -155,7 +155,7 @@ Each slot's occupant is resolved once, at kickoff, into a *familiarity* multipli
 |---|---|
 | The player's position is one the role naturally asks for | 10_000 (no penalty) |
 | Right band, wrong job (a centre back at full back; a winger at striker) | `UnfamiliarRolePenaltyBasisPoints` = 9_400 |
-| A secondary position covers the slot's band | `SecondaryPositionPenaltyBasisPoints` = 9_600 |
+| A secondary position covers the slot's band, or the player's position is one the role names from another band (a winger at wide midfield, a full back at wing back) | `SecondaryPositionPenaltyBasisPoints` = 9_600 |
 | Out of position entirely | `OutOfPositionPenaltyBasisPoints` = 8_800 |
 
 Out of position is a **penalty and never a refusal**: `INS-10` makes a makeshift side a legitimate choice
@@ -169,11 +169,12 @@ against a plan version keeps referring to the same eleven positions.
 | Goalkeeper | Goalkeeper |
 | Centre back | Centre back |
 | Full back | Right back, left back |
-| Wing back | Right back, left back, right winger, left winger |
+| Wing back | Right back, left back, right midfielder, left midfielder, right winger, left winger |
 | Defensive midfielder | Defensive midfielder, central midfielder |
 | Central midfielder | Central, defensive, attacking midfielder |
 | Attacking midfielder | Attacking midfielder, central midfielder |
-| Winger | Right winger, left winger, attacking midfielder |
+| Wide midfielder | Right midfielder, left midfielder, right winger, left winger, right back, left back |
+| Winger | Right winger, left winger, right midfielder, left midfielder, attacking midfielder |
 | Striker | Striker, attacking midfielder |
 
 ---

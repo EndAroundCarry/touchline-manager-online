@@ -33,7 +33,7 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
                 "preferred_foot in ('left', 'right', 'both')");
             table.HasCheckConstraint(
                 "ck_players_primary_position",
-                "primary_position in ('gk', 'rb', 'cb', 'lb', 'dm', 'cm', 'am', 'rw', 'lw', 'st')");
+                "primary_position in ('gk', 'rb', 'cb', 'lb', 'dm', 'cm', 'am', 'rw', 'lw', 'st', 'rm', 'lm')");
             table.HasCheckConstraint(
                 "ck_players_birth_day_of_year",
                 "birth_day_of_year between 1 and 366");
@@ -580,7 +580,7 @@ internal sealed class TacticalSlotConfiguration : IEntityTypeConfiguration<Tacti
             table.HasCheckConstraint(
                 "ck_tactical_slots_role",
                 "role in ('goalkeeper', 'centre_back', 'full_back', 'wing_back', 'defensive_midfielder', "
-                + "'central_midfielder', 'attacking_midfielder', 'winger', 'striker')");
+                + "'central_midfielder', 'attacking_midfielder', 'winger', 'striker', 'wide_midfielder')");
         });
 
         builder.HasKey(slot => slot.Id);
@@ -930,7 +930,7 @@ internal sealed class TeamSheetEntryConfiguration : IEntityTypeConfiguration<Tea
                 "ck_team_sheet_entries_role_override",
                 "role_override is null or role_override in ('goalkeeper', 'centre_back', 'full_back', "
                 + "'wing_back', 'defensive_midfielder', 'central_midfielder', 'attacking_midfielder', "
-                + "'winger', 'striker')");
+                + "'winger', 'striker', 'wide_midfielder')");
         });
 
         builder.HasKey(entry => entry.Id);

@@ -1,7 +1,11 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
-import { positionLabel, stateBand } from '../../core/squad/squad-presentation';
+import {
+  positionAbbreviation,
+  positionLabel,
+  stateBand,
+} from '../../core/squad/squad-presentation';
 import {
   ATTRIBUTE_FAMILY_COLUMNS,
   WEIGHT_STYLES,
@@ -135,6 +139,11 @@ export class Training {
   /** Names a position code. */
   protected position(code: string): string {
     return positionLabel(code);
+  }
+
+  /** The short code a table shows for a position. */
+  protected positionCode(code: string): string {
+    return positionAbbreviation(code);
   }
 
   /** The tint for a state value where higher is better. */

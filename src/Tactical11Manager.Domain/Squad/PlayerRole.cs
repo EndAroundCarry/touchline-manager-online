@@ -36,6 +36,9 @@ public enum PlayerRole
 
     /// <summary>Leads the line.</summary>
     Striker = 8,
+
+    /// <summary>Runs the flank and crosses, tracks the opposing wide man back, and rarely shoots.</summary>
+    WideMidfielder = 9,
 }
 
 /// <summary>Stable codes and storage representation for <see cref="PlayerRole"/>.</summary>
@@ -68,6 +71,9 @@ public static class PlayerRoles
     /// <summary>The code for <see cref="PlayerRole.Striker"/>.</summary>
     public const string StrikerCode = "striker";
 
+    /// <summary>The code for <see cref="PlayerRole.WideMidfielder"/>.</summary>
+    public const string WideMidfielderCode = "wide_midfielder";
+
     /// <summary>The longest stable code, so a column can be sized to hold every value.</summary>
     public const int MaxCodeLength = 21;
 
@@ -84,6 +90,7 @@ public static class PlayerRoles
         PlayerRole.AttackingMidfielder => AttackingMidfielderCode,
         PlayerRole.Winger => WingerCode,
         PlayerRole.Striker => StrikerCode,
+        PlayerRole.WideMidfielder => WideMidfielderCode,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown role."),
     };
 
@@ -100,6 +107,7 @@ public static class PlayerRoles
         AttackingMidfielderCode => PlayerRole.AttackingMidfielder,
         WingerCode => PlayerRole.Winger,
         StrikerCode => PlayerRole.Striker,
+        WideMidfielderCode => PlayerRole.WideMidfielder,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown role code."),
     };
 
@@ -111,7 +119,8 @@ public static class PlayerRoles
         PlayerRole.CentreBack or PlayerRole.FullBack or PlayerRole.WingBack => PositionFamily.Defence,
         PlayerRole.DefensiveMidfielder
             or PlayerRole.CentralMidfielder
-            or PlayerRole.AttackingMidfielder => PositionFamily.Midfield,
+            or PlayerRole.AttackingMidfielder
+            or PlayerRole.WideMidfielder => PositionFamily.Midfield,
         PlayerRole.Winger or PlayerRole.Striker => PositionFamily.Attack,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown role."),
     };

@@ -21,7 +21,7 @@ public sealed class WorldRuleSetTests
         WorldRuleSet.RolloverDays.Should().Be(7, "CAL-6");
         WorldRuleSet.PromotedPerTier.Should().Be(3, "PR-1");
         WorldRuleSet.RelegatedPerTier.Should().Be(3, "PR-1");
-        WorldRuleSet.GeneratorSquadTarget.Should().Be(22, "SQ-1");
+        WorldRuleSet.GeneratorSquadTarget.Should().Be(24, "SQ-1");
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class WorldRuleSetTests
         // SQ-2, SQ-3, SQ-4, TRN-4
         WorldRuleSet.SquadMinimumRegistered.Should().Be(18);
         WorldRuleSet.MinimumGoalkeepers.Should().Be(2);
-        WorldRuleSet.SquadMaximumRegistered.Should().Be(25);
+        WorldRuleSet.SquadMaximumRegistered.Should().Be(27);
         WorldRuleSet.SquadMinimumRegistered.Should().BeLessThan(WorldRuleSet.SquadMaximumRegistered);
         WorldRuleSet.GeneratorSquadTarget.Should().BeInRange(
             WorldRuleSet.SquadMinimumRegistered,

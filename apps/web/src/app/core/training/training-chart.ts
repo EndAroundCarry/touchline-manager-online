@@ -109,6 +109,7 @@ const REGIME_ORDER = [
   'mental',
   'physical',
   'recovery',
+  'widemid',
 ];
 
 /** The look of one regime: colour, dash and point style, which together are unique across the programmes. */

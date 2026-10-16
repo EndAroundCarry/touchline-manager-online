@@ -4,7 +4,7 @@ namespace Tactical11Manager.Domain.Squad;
 /// The specific position a player is most at home in (master plan §6.5).
 /// </summary>
 /// <remarks>
-/// The ten values are the ones a formation slot can name. A player also carries secondary positions, so
+/// The twelve values are the ones a formation slot can name. A player also carries secondary positions, so
 /// one primary value plus the secondaries is what the selection validator compares against a slot's
 /// <see cref="PositionFamily"/> to apply the out-of-position familiarity penalty (`INS-10`).
 /// </remarks>
@@ -39,6 +39,12 @@ public enum PlayerPosition
 
     /// <summary>Striker.</summary>
     Striker = 9,
+
+    /// <summary>Right midfielder: the wide man of a midfield four, between the right back and the right winger.</summary>
+    RightMidfielder = 10,
+
+    /// <summary>Left midfielder: the wide man of a midfield four, between the left back and the left winger.</summary>
+    LeftMidfielder = 11,
 }
 
 /// <summary>
@@ -46,7 +52,7 @@ public enum PlayerPosition
 /// </summary>
 /// <remarks>
 /// Quotas, familiarity, and the selection validator all work at this granularity rather than at the
-/// ten-position grain, so a formation can be checked without hard-coding each preset's exact shape.
+/// twelve-position grain, so a formation can be checked without hard-coding each preset's exact shape.
 /// </remarks>
 public enum PositionFamily
 {
@@ -96,6 +102,12 @@ public static class PlayerPositions
     /// <summary>The code for <see cref="PlayerPosition.Striker"/>.</summary>
     public const string StrikerCode = "st";
 
+    /// <summary>The code for <see cref="PlayerPosition.RightMidfielder"/>.</summary>
+    public const string RightMidfielderCode = "rm";
+
+    /// <summary>The code for <see cref="PlayerPosition.LeftMidfielder"/>.</summary>
+    public const string LeftMidfielderCode = "lm";
+
     /// <summary>Every position, in declaration order.</summary>
     public static readonly IReadOnlyList<PlayerPosition> All =
     [
@@ -109,6 +121,8 @@ public static class PlayerPositions
         PlayerPosition.RightWinger,
         PlayerPosition.LeftWinger,
         PlayerPosition.Striker,
+        PlayerPosition.RightMidfielder,
+        PlayerPosition.LeftMidfielder,
     ];
 
     /// <summary>The longest stable code, so a column can be sized to hold every value.</summary>
@@ -128,6 +142,8 @@ public static class PlayerPositions
         PlayerPosition.RightWinger => RightWingerCode,
         PlayerPosition.LeftWinger => LeftWingerCode,
         PlayerPosition.Striker => StrikerCode,
+        PlayerPosition.RightMidfielder => RightMidfielderCode,
+        PlayerPosition.LeftMidfielder => LeftMidfielderCode,
         _ => throw new ArgumentOutOfRangeException(nameof(position), position, "Unknown position."),
     };
 
@@ -145,6 +161,8 @@ public static class PlayerPositions
         RightWingerCode => PlayerPosition.RightWinger,
         LeftWingerCode => PlayerPosition.LeftWinger,
         StrikerCode => PlayerPosition.Striker,
+        RightMidfielderCode => PlayerPosition.RightMidfielder,
+        LeftMidfielderCode => PlayerPosition.LeftMidfielder,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown position code."),
     };
 
@@ -157,7 +175,9 @@ public static class PlayerPositions
             PositionFamily.Defence,
         PlayerPosition.DefensiveMidfielder
             or PlayerPosition.CentralMidfielder
-            or PlayerPosition.AttackingMidfielder => PositionFamily.Midfield,
+            or PlayerPosition.AttackingMidfielder
+            or PlayerPosition.RightMidfielder
+            or PlayerPosition.LeftMidfielder => PositionFamily.Midfield,
         PlayerPosition.RightWinger or PlayerPosition.LeftWinger or PlayerPosition.Striker =>
             PositionFamily.Attack,
         _ => throw new ArgumentOutOfRangeException(nameof(position), position, "Unknown position."),

@@ -88,6 +88,8 @@ const POSITION_FAMILIES: Record<string, PositionFamily> = {
   rw: 'attack',
   lw: 'attack',
   st: 'attack',
+  rm: 'midfield',
+  lm: 'midfield',
 };
 
 const POSITION_LABELS: Record<string, string> = {
@@ -101,6 +103,8 @@ const POSITION_LABELS: Record<string, string> = {
   rw: 'Right wing',
   lw: 'Left wing',
   st: 'Striker',
+  rm: 'Right midfield',
+  lm: 'Left midfield',
 };
 
 const POSITION_ABBREVIATIONS: Record<string, string> = {
@@ -114,6 +118,8 @@ const POSITION_ABBREVIATIONS: Record<string, string> = {
   rw: 'RW',
   lw: 'LW',
   st: 'FC',
+  rm: 'RM',
+  lm: 'LM',
 };
 
 const FAMILY_LABELS: Record<PositionFamily, string> = {

@@ -17,7 +17,7 @@ import { PlayerAttributes, SquadPlayer } from './squad.models';
  * the same everywhere.
  */
 
-const POSITIONS = ['gk', 'rb', 'cb', 'lb', 'dm', 'cm', 'am', 'rw', 'lw', 'st'];
+const POSITIONS = ['gk', 'rb', 'cb', 'lb', 'dm', 'cm', 'am', 'rm', 'lm', 'rw', 'lw', 'st'];
 
 function flat(value: number): PlayerAttributes {
   return {
@@ -83,7 +83,30 @@ describe('position ratings', () => {
       for (const attribute of ['tackling', 'crossing', 'pace', 'dribbling', 'finishing']) {
         expect(attributeWeight('lb', attribute)).toBe(attributeWeight('rb', attribute));
         expect(attributeWeight('lw', attribute)).toBe(attributeWeight('rw', attribute));
+        expect(attributeWeight('lm', attribute)).toBe(attributeWeight('rm', attribute));
       }
+    });
+
+    it('puts a wide midfielder between a full back and a winger', () => {
+      // Finishing: a full back and a wide midfielder do not count it, a winger does.
+      expect(attributeWeight('rb', 'finishing')).toBe(0.5);
+      expect(attributeWeight('rm', 'finishing')).toBe(0.5);
+      expect(attributeWeight('rw', 'finishing')).toBe(1);
+
+      // Dribbling rises from the full back to the winger.
+      expect(attributeWeight('rb', 'dribbling')).toBe(1);
+      expect(attributeWeight('rm', 'dribbling')).toBe(1.5);
+      expect(attributeWeight('rw', 'dribbling')).toBe(2);
+
+      // Tackling falls from the full back, who is judged on it, to the winger, who is not.
+      expect(attributeWeight('rb', 'tackling')).toBe(1.5);
+      expect(attributeWeight('rm', 'tackling')).toBe(1.5);
+      expect(attributeWeight('rw', 'tackling')).toBe(0.5);
+
+      // Delivery and engine are what he is for.
+      expect(attributeImportance('rm', 'crossing')).toBe('key');
+      expect(attributeImportance('rm', 'stamina')).toBe('key');
+      expect(attributeImportance('rm', 'workRate')).toBe('key');
     });
 
     it('leaves every attribute neutral at a position the client does not know', () => {

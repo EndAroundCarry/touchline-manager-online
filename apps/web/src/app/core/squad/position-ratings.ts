@@ -58,6 +58,31 @@ const FULL_BACK: PositionProfile = {
   marginal: ['finishing', 'heading', 'setPieces', 'vision', 'leadership', ...OUTFIELD_GOALKEEPING],
 };
 
+/**
+ * Between a full back and a winger: the full back's engine and delivery, more of the winger's dribbling and pace,
+ * and a winger's tackling kept for a defender's job. He is not judged on finishing, which is the striker's.
+ */
+const WIDE_MIDFIELDER: PositionProfile = {
+  key: ['crossing', 'stamina', 'workRate'],
+  important: [
+    'pace',
+    'acceleration',
+    'dribbling',
+    'passing',
+    'tackling',
+    'positioning',
+    'decisions',
+  ],
+  marginal: [
+    'finishing',
+    'heading',
+    'strength',
+    'jumpingReach',
+    'leadership',
+    ...OUTFIELD_GOALKEEPING,
+  ],
+};
+
 const WINGER: PositionProfile = {
   key: ['dribbling', 'pace', 'acceleration'],
   important: ['crossing', 'firstTouch', 'technique', 'agility'],
@@ -179,6 +204,8 @@ const POSITION_PROFILES: Readonly<Record<string, PositionProfile>> = {
       ...OUTFIELD_GOALKEEPING,
     ],
   },
+  rm: WIDE_MIDFIELDER,
+  lm: WIDE_MIDFIELDER,
   rw: WINGER,
   lw: WINGER,
   st: {

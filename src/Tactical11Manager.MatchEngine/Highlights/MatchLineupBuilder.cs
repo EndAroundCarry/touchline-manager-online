@@ -497,6 +497,7 @@ public static class MatchLineupBuilder
         MatchRole.DefensiveMidfielder => "DM",
         MatchRole.CentralMidfielder => "MC",
         MatchRole.AttackingMidfielder => "AM",
+        MatchRole.WideMidfielder => Flank("RM", "LM", slot.Y),
         MatchRole.Winger => Flank("RW", "LW", slot.Y),
         MatchRole.Striker => "ST",
         _ => "??",
@@ -516,6 +517,8 @@ public static class MatchLineupBuilder
         MatchPosition.RightWinger => "RW",
         MatchPosition.LeftWinger => "LW",
         MatchPosition.Striker => "ST",
+        MatchPosition.RightMidfielder => "RM",
+        MatchPosition.LeftMidfielder => "LM",
         _ => "??",
     };
 

@@ -276,7 +276,7 @@ in every other environment (see `.env.example`).
 A new database has no world in it, so create one before anyone can register a club:
 
 ```bash
-npm run seed          # six countries, one 18-club tier each, 22 players per club, funded accounts
+npm run seed          # six countries, one 18-club tier each, 24 players per club, funded accounts
 ```
 
 The seeder is idempotent, so running it again reports the world it already found and writes nothing.
