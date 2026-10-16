@@ -199,7 +199,9 @@ public sealed record MatchLineupResponse(
     string SecondaryColour,
     string Formation,
     IReadOnlyList<MatchLineupPlayerResponse> Starters,
-    IReadOnlyList<MatchLineupPlayerResponse> Bench);
+    IReadOnlyList<MatchLineupPlayerResponse> Bench,
+    string CrestShape,
+    string CrestPattern);
 
 /// <summary>A player's live condition and rating at a specific minute in the match.</summary>
 public sealed record PlayerLiveMetricResponse(

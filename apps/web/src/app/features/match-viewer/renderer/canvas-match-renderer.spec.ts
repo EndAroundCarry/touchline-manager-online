@@ -252,6 +252,8 @@ function filmOf(
       primaryColour: '#1f4e79',
       secondaryColour: '#d6e4f0',
       formation: '4-4-2',
+      crestShape: 'shield',
+      crestPattern: 'hoops',
       starters: [],
       bench: [],
     },
@@ -412,6 +414,8 @@ describe('CanvasMatchRenderer', () => {
           primaryColour: '#1f4e79',
           secondaryColour: '#d6e4f0',
           formation: '4-4-2',
+          crestShape: 'shield',
+          crestPattern: 'hoops',
           starters: [
             {
               participantId: 'p9',

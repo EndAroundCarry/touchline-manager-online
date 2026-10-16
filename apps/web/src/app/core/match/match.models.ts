@@ -184,6 +184,10 @@ export interface MatchLineup {
   readonly formation: string;
   readonly starters: readonly MatchLineupPlayer[];
   readonly bench: readonly MatchLineupPlayer[];
+  /** The code of the crest shape the club wears. */
+  readonly crestShape: string;
+  /** The code of the stripes on the club's crest. */
+  readonly crestPattern: string;
 }
 
 /** A player's live condition and rating at a specific minute in the match. */

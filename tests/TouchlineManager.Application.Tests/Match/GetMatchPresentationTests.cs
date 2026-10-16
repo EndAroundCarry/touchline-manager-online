@@ -37,7 +37,9 @@ public sealed class GetMatchPresentationTests
         var read = await query.ExecuteAsync(matchId, CancellationToken.None);
 
         read.Outcome.Should().Be(MatchReadOutcome.Found);
-        read.EntityTag.Should().Be($"{result.OutputHash}:tick-replay-v4", "the replay is cached under the result and its presentation version");
+        read.EntityTag.Should().Be(
+            $"{result.OutputHash}:tick-replay-v4:shield.hoops:round.sash",
+            "the replay is cached under the result, its presentation version and the crests the clubs wear now");
         read.Presentation.Should().NotBeNull();
 
         var presentation = read.Presentation!;
@@ -57,6 +59,10 @@ public sealed class GetMatchPresentationTests
         }
 
         presentation.HomeLineup!.ShortName.Should().Be("HOM", "the short name is derived from the frozen club name");
+        presentation.HomeLineup.CrestShape.Should().Be("shield", "each lineup wears its own club's crest");
+        presentation.HomeLineup.CrestPattern.Should().Be("hoops");
+        presentation.AwayLineup!.CrestShape.Should().Be("round");
+        presentation.AwayLineup.CrestPattern.Should().Be("sash");
 
         // The curve ends where the panel's last bar and badge end, so the panel and the replay describe the
         // same match rather than two derivations of it.
@@ -155,8 +161,8 @@ public sealed class GetMatchPresentationTests
             result.AwayGoals,
             MatchStatisticsDocument.Write(result),
             result.OutputHash,
-            new MatchClubRow(HomeClubId, "Home Town", "HOM"),
-            new MatchClubRow(AwayClubId, "Away City", "AWY"),
+            new MatchClubRow(HomeClubId, "Home Town", "HOM", "shield", "hoops"),
+            new MatchClubRow(AwayClubId, "Away City", "AWY", "round", "sash"),
             snapshot);
 
     /// <summary>A club with a full squad and nothing prepared, so the builder lays out the default shape.</summary>

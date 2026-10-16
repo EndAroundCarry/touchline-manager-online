@@ -154,14 +154,16 @@ public sealed class ClubTests
     }
 
     [Fact]
-    public void A_club_that_never_chose_a_crest_has_none_stored_and_wears_the_generated_one()
+    public void A_generated_club_is_given_a_crest_from_its_badge_seed_and_wears_it()
     {
         var club = Generate(tier: 1);
 
-        club.CrestShape.Should().BeNull();
-        club.CrestPattern.Should().BeNull();
-        CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape).Should().Be(CrestDesigns.GeneratedShape(club.BadgeSeed));
-        CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern).Should().Be(CrestDesigns.GeneratedPattern(club.BadgeSeed));
+        club.CrestShape.Should().Be(CrestDesigns.GeneratedShape(club.BadgeSeed));
+        club.CrestPattern.Should().Be(CrestDesigns.GeneratedPattern(club.BadgeSeed));
+        CrestDesigns.IsKnownShape(club.CrestShape).Should().BeTrue();
+        CrestDesigns.IsKnownPattern(club.CrestPattern).Should().BeTrue();
+        CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape).Should().Be(club.CrestShape);
+        CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern).Should().Be(club.CrestPattern);
     }
 
     [Fact]
@@ -187,12 +189,14 @@ public sealed class ClubTests
     public void A_shape_or_stripes_that_are_not_in_the_catalogue_are_refused_and_nothing_changes(string shape, string pattern)
     {
         var club = Generate(tier: 1);
+        var generatedShape = club.CrestShape;
+        var generatedPattern = club.CrestPattern;
 
         var act = () => club.ChangeCrest(shape, pattern, Now);
 
         act.Should().Throw<ArgumentException>();
-        club.CrestShape.Should().BeNull();
-        club.CrestPattern.Should().BeNull();
+        club.CrestShape.Should().Be(generatedShape);
+        club.CrestPattern.Should().Be(generatedPattern);
         club.Version.Should().Be(1);
     }
 

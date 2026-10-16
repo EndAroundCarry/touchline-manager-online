@@ -39,14 +39,25 @@
               }}</span>
               <span class="text-xs text-slate-400">{{ result.home.shortName }}</span>
             </div>
-            <!-- The kit swatch: the club's own two generated colours, the identity the pitch draws it in. -->
-            <span
-              class="inline-flex h-5 w-5 shrink-0 overflow-hidden rounded border border-slate-600"
-              aria-hidden="true"
-            >
-              <span class="h-full w-1/2" [style.background]="homeColour()"></span>
-              <span class="h-full w-1/2" [style.background]="homeSecondaryColour()"></span>
-            </span>
+            <!-- The club's crest, in the two colours the pitch draws it in; a swatch until the lineup loads. -->
+            @if (homeCrest(); as crest) {
+              <app-club-crest
+                class="h-10 shrink-0"
+                data-testid="home-crest"
+                [shape]="crest.shape"
+                [pattern]="crest.pattern"
+                [primary]="homeColour()"
+                [secondary]="homeSecondaryColour()"
+              />
+            } @else {
+              <span
+                class="inline-flex h-5 w-5 shrink-0 overflow-hidden rounded border border-slate-600"
+                aria-hidden="true"
+              >
+                <span class="h-full w-1/2" [style.background]="homeColour()"></span>
+                <span class="h-full w-1/2" [style.background]="homeSecondaryColour()"></span>
+              </span>
+            }
           </div>
 
           <div class="flex items-center gap-3">
@@ -91,13 +102,24 @@
             }
           </div>
           <div class="flex min-w-[140px] items-center justify-start gap-2">
-            <span
-              class="inline-flex h-5 w-5 shrink-0 overflow-hidden rounded border border-slate-600"
-              aria-hidden="true"
-            >
-              <span class="h-full w-1/2" [style.background]="awayColour()"></span>
-              <span class="h-full w-1/2" [style.background]="awaySecondaryColour()"></span>
-            </span>
+            @if (awayCrest(); as crest) {
+              <app-club-crest
+                class="h-10 shrink-0"
+                data-testid="away-crest"
+                [shape]="crest.shape"
+                [pattern]="crest.pattern"
+                [primary]="awayColour()"
+                [secondary]="awaySecondaryColour()"
+              />
+            } @else {
+              <span
+                class="inline-flex h-5 w-5 shrink-0 overflow-hidden rounded border border-slate-600"
+                aria-hidden="true"
+              >
+                <span class="h-full w-1/2" [style.background]="awayColour()"></span>
+                <span class="h-full w-1/2" [style.background]="awaySecondaryColour()"></span>
+              </span>
+            }
             <div class="flex flex-col items-start">
               <span class="text-lg font-bold tracking-wide text-slate-100">{{
                 result.away.name
@@ -309,7 +331,7 @@
                           @for (player of lineup.starters; track player.participantId) {
                             <tr
                               class="group border-b border-slate-800/50 transition hover:bg-slate-800/40"
-                              [class.opacity-50]="player.sentOff"
+                              [class.opacity-50]="sentOffShown(player)"
                             >
                               <td class="py-1 pr-1 text-right tabular-nums text-slate-400">
                                 {{ player.shirtNumber }}
@@ -322,18 +344,18 @@
                               </td>
                               <td class="truncate px-1 py-1 font-medium text-slate-200">
                                 {{ player.name }}
-                                @if (player.yellowCards > 0 && !player.sentOff) {
+                                @if (yellowShown(player)) {
                                   <span class="ml-1 text-yellow-400" aria-label="Yellow card"
                                     >Y</span
                                   >
                                 }
-                                @if (player.sentOff) {
+                                @if (sentOffShown(player)) {
                                   <span class="ml-1 text-red-500" aria-label="Red card">R</span>
                                 }
-                                @if (player.isInjured) {
+                                @if (injuredShown(player)) {
                                   <span class="ml-1 text-orange-400" aria-label="Injured">+</span>
                                 }
-                                @if (player.subbedOutMinute !== null) {
+                                @if (subbedOutShown(player)) {
                                   <span class="ml-1 text-[9px] text-slate-400"
                                     >{{ player.subbedOutMinute }}'&#8595;</span
                                   >
@@ -383,7 +405,7 @@
                                 player.shirtNumber
                               }}</span>
                               <span class="truncate font-medium">{{ player.name }}</span>
-                              @if (player.subbedInMinute !== null) {
+                              @if (subbedInShown(player)) {
                                 <span class="ml-auto text-[9px] text-emerald-600"
                                   >{{ player.subbedInMinute }}'&#8593;</span
                                 >
@@ -546,7 +568,7 @@
                           @for (player of lineup.starters; track player.participantId) {
                             <tr
                               class="group border-b border-slate-800/50 transition hover:bg-slate-800/40"
-                              [class.opacity-50]="player.sentOff"
+                              [class.opacity-50]="sentOffShown(player)"
                             >
                               <td class="py-1 pr-1 text-left">
                                 <span
@@ -578,18 +600,18 @@
                                 </div>
                               </td>
                               <td class="truncate px-1 py-1 text-right font-medium text-slate-200">
-                                @if (player.subbedOutMinute !== null) {
+                                @if (subbedOutShown(player)) {
                                   <span class="mr-1 text-[9px] text-slate-400"
                                     >{{ player.subbedOutMinute }}'&#8595;</span
                                   >
                                 }
-                                @if (player.isInjured) {
+                                @if (injuredShown(player)) {
                                   <span class="mr-1 text-orange-400" aria-label="Injured">+</span>
                                 }
-                                @if (player.sentOff) {
+                                @if (sentOffShown(player)) {
                                   <span class="mr-1 text-red-500" aria-label="Red card">R</span>
                                 }
-                                @if (player.yellowCards > 0 && !player.sentOff) {
+                                @if (yellowShown(player)) {
                                   <span class="mr-1 text-yellow-400" aria-label="Yellow card"
                                     >Y</span
                                   >
@@ -622,7 +644,7 @@
                                 player.shirtNumber
                               }}</span>
                               <span class="truncate font-medium">{{ player.name }}</span>
-                              @if (player.subbedInMinute !== null) {
+                              @if (subbedInShown(player)) {
                                 <span class="mr-auto text-[9px] text-emerald-600"
                                   >{{ player.subbedInMinute }}'&#8593;</span
                                 >

@@ -179,6 +179,8 @@ function presentation(): MatchPresentation {
       primaryColour: '#1f6f43',
       secondaryColour: '#ffffff',
       formation: '4-4-2',
+      crestShape: 'shield',
+      crestPattern: 'hoops',
       starters: [lineupPlayer({ goals: 1, passesAttempted: 20, passesCompleted: 15 })],
       bench: [],
     },
@@ -314,6 +316,14 @@ describe('MatchViewer', () => {
 
     return native;
   }
+
+  it("draws each club's own crest beside its name, and a colour swatch only where no lineup came", async () => {
+    const native = await load();
+
+    // The fixture has a home lineup and no away one.
+    expect(native.querySelector('[data-testid="home-crest"] svg')).not.toBeNull();
+    expect(native.querySelector('[data-testid="away-crest"]')).toBeNull();
+  });
 
   it('builds its replay from the presentation, so Play starts it', async () => {
     const native = await load();

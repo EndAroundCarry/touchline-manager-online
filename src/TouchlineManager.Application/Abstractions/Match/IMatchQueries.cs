@@ -6,7 +6,14 @@ namespace TouchlineManager.Application.Abstractions.Match;
 /// <param name="Id">The club identity.</param>
 /// <param name="Name">The generated club name.</param>
 /// <param name="ShortName">The abbreviation.</param>
-public sealed record MatchClubRow(Guid Id, string Name, string ShortName);
+/// <param name="CrestShape">The code of the crest shape the club wears now: the stored one, or the derived one.</param>
+/// <param name="CrestPattern">The code of the stripes on the club's crest now.</param>
+public sealed record MatchClubRow(
+    Guid Id,
+    string Name,
+    string ShortName,
+    string CrestShape,
+    string CrestPattern);
 
 /// <summary>
 /// A published match, with everything its summary and its replay are built from (master plan §9.5).

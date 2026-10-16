@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TouchlineManager.Application.Abstractions.Match;
 using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.World;
 
 namespace TouchlineManager.Infrastructure.Persistence.Repositories;
 
@@ -89,8 +90,20 @@ internal sealed class MatchQueries : IMatchQueries
             row.Match.AwayGoals,
             row.Match.StatisticsJson,
             row.Match.OutputHash,
-            new MatchClubRow(row.Home.Id, row.Home.Name, row.Home.ShortName),
-            new MatchClubRow(row.Away.Id, row.Away.Name, row.Away.ShortName),
+            ClubRowOf(row.Home),
+            ClubRowOf(row.Away),
             snapshot);
     }
+
+    /// <summary>
+    /// Reads a club's identity as the match sees it. The crest is the club's own today, not the one frozen with
+    /// the match, so a manager who redesigns it sees the new one on the old matches too.
+    /// </summary>
+    private static MatchClubRow ClubRowOf(Club club) =>
+        new(
+            club.Id,
+            club.Name,
+            club.ShortName,
+            CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape),
+            CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern));
 }

@@ -79,6 +79,11 @@ public sealed class GetMatchPresentation
         return new GetMatchPresentationResult(
             MatchReadOutcome.Found,
             snapshot.ToResponse(presentation, commentary),
-            $"{snapshot.OutputHash}:{presentation.PresentationVersion}");
+
+            // The crests are read today, not frozen with the match, so a redesign has to change the tag or a
+            // cached replay would keep drawing the old one.
+            $"{snapshot.OutputHash}:{presentation.PresentationVersion}"
+            + $":{snapshot.Home.CrestShape}.{snapshot.Home.CrestPattern}"
+            + $":{snapshot.Away.CrestShape}.{snapshot.Away.CrestPattern}");
     }
 }

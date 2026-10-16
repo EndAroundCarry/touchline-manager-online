@@ -78,18 +78,25 @@ public static class MatchMapping
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        return presentation.ToResponse(snapshot.MatchId, commentary);
+        return presentation.ToResponse(snapshot.MatchId, commentary, snapshot.Home, snapshot.Away);
     }
 
     /// <summary>Projects a presentation and its commentary to the replay the API returns.</summary>
     /// <param name="presentation">The presentation.</param>
     /// <param name="matchId">The match it presents.</param>
     /// <param name="commentary">The commentary, in event order.</param>
+    /// <param name="home">The host club, whose crest the home lineup wears.</param>
+    /// <param name="away">The visitor club, whose crest the away lineup wears.</param>
     public static MatchPresentationResponse ToResponse(
         this MatchPresentationV1 presentation,
         Guid matchId,
-        IReadOnlyList<CommentaryToken> commentary)
+        IReadOnlyList<CommentaryToken> commentary,
+        MatchClubRow home,
+        MatchClubRow away)
     {
+        ArgumentNullException.ThrowIfNull(home);
+        ArgumentNullException.ThrowIfNull(away);
+
         ArgumentNullException.ThrowIfNull(presentation);
         ArgumentNullException.ThrowIfNull(commentary);
 
@@ -103,8 +110,8 @@ public static class MatchMapping
             [.. presentation.Passages.Select(ToResponse)],
             [.. presentation.Reel.Select(ToResponse)],
             presentation.EstimatedPayloadBytes,
-            presentation.HomeLineup is { } homeLineup ? ToResponse(homeLineup) : null,
-            presentation.AwayLineup is { } awayLineup ? ToResponse(awayLineup) : null,
+            presentation.HomeLineup is { } homeLineup ? ToResponse(homeLineup, home) : null,
+            presentation.AwayLineup is { } awayLineup ? ToResponse(awayLineup, away) : null,
             presentation.LiveMetrics is { } metrics ? [.. metrics.Select(ToResponse)] : null,
             presentation.Playback.Count > 0 ? [.. presentation.Playback.Select(ToResponse)] : null,
             presentation.TotalPlaybackMilliseconds,
@@ -231,8 +238,10 @@ public static class MatchMapping
     public static HighlightKeyframeResponse ToResponse(this HighlightKeyframeV1 keyframe) =>
         new(keyframe.TimeMilliseconds, keyframe.X, keyframe.Y, keyframe.Z, keyframe.Speed, keyframe.Action);
 
-    /// <summary>Projects one team's lineup.</summary>
-    public static MatchLineupResponse ToResponse(this MatchLineupV1 lineup) =>
+    /// <summary>Projects one team's lineup, with the crest its club wears.</summary>
+    /// <param name="lineup">The lineup.</param>
+    /// <param name="club">The club the lineup belongs to.</param>
+    public static MatchLineupResponse ToResponse(this MatchLineupV1 lineup, MatchClubRow club) =>
         new(
             lineup.ClubName,
             lineup.ShortName,
@@ -240,7 +249,9 @@ public static class MatchMapping
             lineup.SecondaryColour,
             lineup.Formation,
             [.. lineup.Starters.Select(ToResponse)],
-            [.. lineup.Bench.Select(ToResponse)]);
+            [.. lineup.Bench.Select(ToResponse)],
+            club.CrestShape,
+            club.CrestPattern);
 
     /// <summary>Projects one player's lineup line.</summary>
     public static MatchLineupPlayerResponse ToResponse(this MatchLineupPlayerV1 player) =>

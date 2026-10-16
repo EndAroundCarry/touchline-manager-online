@@ -13,6 +13,13 @@ import { ActivatedRoute } from '@angular/router';
 import { FadeEdge, fadeAlpha, fadeEdgesFor } from '../../core/match/film-fade';
 import { bannerPalette } from '../../core/match/commentary-banner';
 import { FeedRow, FilmTimeline, buildFilmTimeline } from '../../core/match/film-timeline';
+import {
+  EVERYTHING_HAS_HAPPENED,
+  NOTHING_HAS_HAPPENED,
+  PlayerEventMinutes,
+  hasHappened,
+  playerEventMinutes,
+} from '../../core/match/match-lineup-events';
 import { lineupIndexOf } from '../../core/match/match-lineups';
 import {
   MatchPlayback,
@@ -43,6 +50,7 @@ import {
 } from '../../core/match/match-presentation';
 import {
   CommentaryLine,
+  MatchLineup,
   MatchLineupPlayer,
   MatchPresentation,
   PlayerLiveMetric,
@@ -50,6 +58,7 @@ import {
 import { MatchStore } from '../../core/match/match-store';
 import { ResultRevealStore } from '../../core/match/result-reveal-store';
 import { formatInstant } from '../../core/world/presentation';
+import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
 import { CanvasMatchRenderer } from './renderer/canvas-match-renderer';
 import { RenderLoop } from './renderer/render-loop';
 
@@ -69,6 +78,18 @@ const PITCH_SCALE = 10_000;
 
 /** How coarsely the scrubber's elapsed time is published, so a 60 Hz frame does not drive change detection. */
 const ELAPSED_QUANTUM_MILLISECONDS = 250;
+
+/** The crest a lineup's club wears, or null when there is no lineup to read it from. */
+function crestOf(
+  lineup: MatchLineup | null | undefined,
+): { readonly shape: string; readonly pattern: string } | null {
+  return lineup === null || lineup === undefined
+    ? null
+    : { shape: lineup.crestShape, pattern: lineup.crestPattern };
+}
+
+/** A player with no booked, sent-off or injury event on record. */
+const NO_EVENT_MINUTES: PlayerEventMinutes = { yellow: null, red: null, injury: null };
 
 /** One marker on the progress scrubber: a goal or a shot. */
 interface ReplayMarker {
@@ -109,6 +130,7 @@ interface ReplayMarker {
 @Component({
   selector: 'app-match-viewer',
   templateUrl: './match-viewer.html',
+  imports: [ClubCrest],
   // The viewer is drawn on dark ground in either theme, so it keeps the dark tokens (`.theme-dark`, styles.css).
   host: { class: 'theme-dark block' },
 })
@@ -366,6 +388,11 @@ export class MatchViewer implements OnDestroy {
   protected readonly awayShots = computed(() =>
     this.shotMap().filter((shot) => shot.side === 'away'),
   );
+  /** The crest the home club wears, or null until its lineup is known. */
+  protected readonly homeCrest = computed(() => crestOf(this.presentation()?.homeLineup));
+
+  /** The crest the away club wears, or null until its lineup is known. */
+  protected readonly awayCrest = computed(() => crestOf(this.presentation()?.awayLineup));
   protected readonly homeColour = computed(
     () => this.presentation()?.homeLineup?.primaryColour ?? '#38bdf8',
   );
@@ -396,6 +423,23 @@ export class MatchViewer implements OnDestroy {
       .filter((lineup) => lineup !== null && lineup !== undefined)
       .map((lineup) => performanceSide(lineup));
   });
+
+  /** When each player was booked, sent off or hurt, so the lineup panels can show it as it happens. */
+  private readonly playerEvents = computed(() =>
+    playerEventMinutes(this.presentation()?.commentary ?? [], this.lineupIndex()),
+  );
+
+  /**
+   * How far the lineup panels' cards, injuries and substitutions have got: nothing before the replay starts,
+   * the film's clock while it plays, and the whole match once it is idle with its result already seen.
+   */
+  private readonly shownMinute = computed(() =>
+    this.state() === 'idle'
+      ? this.revealed()
+        ? EVERYTHING_HAS_HAPPENED
+        : NOTHING_HAS_HAPPENED
+      : this.clockMinute(),
+  );
 
   /** The match minute the live panels show: kickoff before the replay starts, the film's clock after. */
   private readonly metricMinute = computed(() =>
@@ -737,6 +781,41 @@ export class MatchViewer implements OnDestroy {
   /** A shot marker's tooltip, naming the outcome and the clock. */
   protected shotTitle(shot: ShotMapEntry): string {
     return `${outcomeLabel(shot.outcomeCode)} \u2014 ${matchClockLabel(shot.minute, shot.stoppageMinute)}`;
+  }
+
+  /** Whether a player has been sent off at the shown minute, which greys the row and shows the red card. */
+  protected sentOffShown(player: MatchLineupPlayer): boolean {
+    return player.sentOff && hasHappened(this.eventMinutes(player).red, this.shownMinute());
+  }
+
+  /** Whether a player's yellow card has been shown at the shown minute; a red card takes its place. */
+  protected yellowShown(player: MatchLineupPlayer): boolean {
+    return (
+      player.yellowCards > 0 &&
+      !this.sentOffShown(player) &&
+      hasHappened(this.eventMinutes(player).yellow, this.shownMinute())
+    );
+  }
+
+  /** Whether a player's injury has happened at the shown minute. */
+  protected injuredShown(player: MatchLineupPlayer): boolean {
+    return player.isInjured && hasHappened(this.eventMinutes(player).injury, this.shownMinute());
+  }
+
+  /** Whether a player has been taken off at the shown minute. */
+  protected subbedOutShown(player: MatchLineupPlayer): boolean {
+    return (
+      player.subbedOutMinute !== null && hasHappened(player.subbedOutMinute, this.shownMinute())
+    );
+  }
+
+  /** Whether a player has come on at the shown minute. */
+  protected subbedInShown(player: MatchLineupPlayer): boolean {
+    return player.subbedInMinute !== null && hasHappened(player.subbedInMinute, this.shownMinute());
+  }
+
+  private eventMinutes(player: MatchLineupPlayer): PlayerEventMinutes {
+    return this.playerEvents().get(player.participantId) ?? NO_EVENT_MINUTES;
   }
 
   private lineupPlayer(participantId: string): MatchLineupPlayer | null {

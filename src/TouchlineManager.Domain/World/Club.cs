@@ -69,14 +69,15 @@ public sealed class Club
     public string? SecondaryColour { get; private set; }
 
     /// <summary>
-    /// Gets the crest shape the club's manager chose (a <see cref="CrestDesigns.Shapes"/> code), or null while
-    /// the club wears the shape generated from its badge seed.
+    /// Gets the crest shape the club wears (a <see cref="CrestDesigns.Shapes"/> code): the one generated when
+    /// the club was created, or the one its manager chose. Null only for a club stored before crests were
+    /// generated, which wears the shape derived from its badge seed.
     /// </summary>
     public string? CrestShape { get; private set; }
 
     /// <summary>
-    /// Gets the stripes the club's manager chose for the crest (a <see cref="CrestDesigns.Patterns"/> code), or
-    /// null while the club wears the stripes generated from its badge seed.
+    /// Gets the stripes the club wears on its crest (a <see cref="CrestDesigns.Patterns"/> code), on the same
+    /// terms as <see cref="CrestShape"/>.
     /// </summary>
     public string? CrestPattern { get; private set; }
 
@@ -130,6 +131,13 @@ public sealed class Club
             City = identity.City.Trim(),
             Region = identity.Region.Trim(),
             BadgeSeed = identity.BadgeSeed,
+
+            // Every generated club is given its crest here, so a seeded world, a reseeded one and a production
+            // one all leave the AI clubs wearing a stored, varied crest rather than none. The pick hashes the
+            // badge seed, so the same world seed gives the same crests (PYR-14). A manager's own choice
+            // replaces it through ChangeCrest.
+            CrestShape = CrestDesigns.GeneratedShape(identity.BadgeSeed),
+            CrestPattern = CrestDesigns.GeneratedPattern(identity.BadgeSeed),
             FoundingGameYear = foundingGameYear,
             Status = ClubStatus.Active,
             Reputation = WorldRuleSet.OpeningReputationForTier(tier),
