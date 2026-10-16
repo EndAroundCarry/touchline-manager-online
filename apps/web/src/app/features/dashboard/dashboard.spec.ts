@@ -100,6 +100,10 @@ const NEXT_FIXTURE: ClubFixture = {
   opponentClubId: 'club-2',
   opponentName: 'Barrow Town',
   opponentShortName: 'BAR',
+  opponentPrimaryColour: '#1f4e79',
+  opponentSecondaryColour: '#d6e4f0',
+  opponentCrestShape: 'round',
+  opponentCrestPattern: 'sash',
   kickoffAt: '2026-10-06T19:00:00Z',
   lockAt: '2026-10-06T18:30:00Z',
   status: 'scheduled',
@@ -252,6 +256,12 @@ describe('Dashboard', () => {
 
     expect(element.textContent).toContain('Barrow Town');
     expect(element.textContent).toContain('Calendar');
+  });
+
+  it("draws the next opponent's crest, not a text badge", async () => {
+    const element = await render();
+
+    expect(element.querySelector('[data-testid="opponent-crest"] svg')).not.toBeNull();
   });
 
   it('lists only the next four calendar events, so the office keeps one height', async () => {

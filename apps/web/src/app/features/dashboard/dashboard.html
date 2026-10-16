@@ -149,12 +149,14 @@
                     {{ next.venue === 'home' ? 'V' : '@' }}
                   </span>
                   <div class="flex w-28 flex-col items-center gap-1 text-center">
-                    <span
-                      class="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-line-strong bg-raised font-display text-base font-bold"
-                      aria-hidden="true"
-                    >
-                      {{ badge(next.opponentShortName) }}
-                    </span>
+                    <app-club-crest
+                      class="h-12"
+                      data-testid="opponent-crest"
+                      [shape]="next.opponentCrestShape"
+                      [pattern]="next.opponentCrestPattern"
+                      [primary]="next.opponentPrimaryColour"
+                      [secondary]="next.opponentSecondaryColour"
+                    />
                     <span class="text-xs leading-tight text-ink-2">{{ next.opponentName }}</span>
                   </div>
                 </div>

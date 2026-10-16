@@ -221,6 +221,14 @@ export interface ClubFixture {
   readonly opponentClubId: string;
   readonly opponentName: string;
   readonly opponentShortName: string;
+  /** The opponent's main kit colour as `#rrggbb`, which its crest is drawn in. */
+  readonly opponentPrimaryColour: string;
+  /** The opponent's second kit colour as `#rrggbb`. */
+  readonly opponentSecondaryColour: string;
+  /** The code of the crest shape the opponent wears. */
+  readonly opponentCrestShape: string;
+  /** The code of the stripes on the opponent's crest. */
+  readonly opponentCrestPattern: string;
   readonly kickoffAt: string;
   readonly lockAt: string;
   readonly status: string;

@@ -74,6 +74,11 @@ public sealed record DivisionFixturesSnapshot(
 /// <param name="OpponentClubId">The other club.</param>
 /// <param name="OpponentName">The other club's name.</param>
 /// <param name="OpponentShortName">The other club's abbreviation.</param>
+/// <param name="OpponentBadgeSeed">The other club's badge seed, which a crest it never stored is derived from.</param>
+/// <param name="OpponentPrimaryColour">The primary kit colour the other club chose, or null for the generated one.</param>
+/// <param name="OpponentSecondaryColour">The secondary kit colour the other club chose, or null for the generated one.</param>
+/// <param name="OpponentCrestShape">The crest shape the other club stored, or null.</param>
+/// <param name="OpponentCrestPattern">The crest stripes the other club stored, or null.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="LockAt">When team sheets lock.</param>
 /// <param name="Status">The lifecycle state.</param>
@@ -88,6 +93,11 @@ public sealed record ClubFixtureRow(
     Guid OpponentClubId,
     string OpponentName,
     string OpponentShortName,
+    string OpponentBadgeSeed,
+    string? OpponentPrimaryColour,
+    string? OpponentSecondaryColour,
+    string? OpponentCrestShape,
+    string? OpponentCrestPattern,
     DateTimeOffset KickoffAt,
     DateTimeOffset LockAt,
     FixtureStatus Status,

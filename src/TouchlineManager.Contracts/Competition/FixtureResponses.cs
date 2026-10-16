@@ -92,6 +92,10 @@ public sealed record DivisionFixturesResponse(
 /// <param name="OpponentClubId">The other club.</param>
 /// <param name="OpponentName">The other club's generated name.</param>
 /// <param name="OpponentShortName">The other club's abbreviation.</param>
+/// <param name="OpponentPrimaryColour">The other club's main kit colour as <c>#rrggbb</c>: the one chosen, or the generated one.</param>
+/// <param name="OpponentSecondaryColour">The other club's second kit colour as <c>#rrggbb</c>.</param>
+/// <param name="OpponentCrestShape">The code of the crest shape the other club wears.</param>
+/// <param name="OpponentCrestPattern">The code of the stripes on the other club's crest.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="LockAt">When team sheets lock (`CAL-3`).</param>
 /// <param name="Status">The lifecycle state.</param>
@@ -107,6 +111,10 @@ public sealed record ClubFixtureResponse(
     Guid OpponentClubId,
     string OpponentName,
     string OpponentShortName,
+    string OpponentPrimaryColour,
+    string OpponentSecondaryColour,
+    string OpponentCrestShape,
+    string OpponentCrestPattern,
     DateTimeOffset KickoffAt,
     DateTimeOffset LockAt,
     string Status,

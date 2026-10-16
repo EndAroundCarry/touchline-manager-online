@@ -2,6 +2,8 @@ using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Squad;
 using TouchlineManager.Contracts.Competition;
 using TouchlineManager.Domain.Competition;
+using TouchlineManager.Domain.World;
+using TouchlineManager.MatchEngine.Highlights;
 
 namespace TouchlineManager.Application.Competition;
 
@@ -372,6 +374,10 @@ public static class FixtureMapping
         ArgumentNullException.ThrowIfNull(fixture);
 
         var (home, away, matchId) = Visible(fixture.Status, fixture.HomeScore, fixture.AwayScore, fixture.MatchId);
+        var colours = ClubPalette.Resolve(
+            fixture.OpponentClubId,
+            fixture.OpponentPrimaryColour,
+            fixture.OpponentSecondaryColour);
 
         return new ClubFixtureResponse(
             fixture.Id,
@@ -380,6 +386,10 @@ public static class FixtureMapping
             fixture.OpponentClubId,
             fixture.OpponentName,
             fixture.OpponentShortName,
+            colours.Primary,
+            colours.Secondary,
+            CrestDesigns.ResolveShape(fixture.OpponentBadgeSeed, fixture.OpponentCrestShape),
+            CrestDesigns.ResolvePattern(fixture.OpponentBadgeSeed, fixture.OpponentCrestPattern),
             fixture.KickoffAt,
             fixture.LockAt,
             fixture.Status.ToCode(),
