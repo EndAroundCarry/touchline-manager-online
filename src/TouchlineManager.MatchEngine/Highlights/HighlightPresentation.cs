@@ -654,6 +654,24 @@ public sealed record HighlightOptionsV1
     /// <summary>Gets how long after a strike the line that says where it went is shown, in milliseconds.</summary>
     public int CommentaryOutcomeDelayMilliseconds { get; init; } = 600;
 
+    /// <summary>
+    /// Gets how long a key line (an event, a shot, a save, a header, a cross) holds the banner in a tick film's commentary, in milliseconds
+    /// of film: a routine line that would fall inside it is dropped, and another key line still shows (`tick-replay-v4`).
+    /// </summary>
+    public int CommentaryKeyDwellMilliseconds { get; init; } = 1_200;
+
+    /// <summary>
+    /// Gets the least film time between two routine lines in a tick film's commentary, in milliseconds: of two that fall closer, the
+    /// stronger stays, or the later on a tie, so no line is shown for one frame only (`tick-replay-v4`).
+    /// </summary>
+    public int CommentaryMinGapMilliseconds { get; init; } = 250;
+
+    /// <summary>Gets how long a strike is left alone on the banner before the line that says how it ended, in milliseconds of film (`tick-replay-v4`).</summary>
+    public int CommentaryStrikeHoldMilliseconds { get; init; } = 300;
+
+    /// <summary>Gets how long into a passage that follows a cut the banner may go without a line before an opening one is added, in milliseconds (`tick-replay-v4`).</summary>
+    public int CommentaryOpenerWithinMilliseconds { get; init; } = 400;
+
     // ---- The reel -------------------------------------------------------------------------------------------------
 
     /// <summary>Gets the match seconds a reel clip's lead-in reaches back over (about ten minutes).</summary>

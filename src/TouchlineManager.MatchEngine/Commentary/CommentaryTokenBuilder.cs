@@ -1,4 +1,5 @@
 using TouchlineManager.MatchEngine.Model;
+using TouchlineManager.MatchEngine.Tick;
 
 namespace TouchlineManager.MatchEngine.Commentary;
 
@@ -139,6 +140,63 @@ public enum PassageBeatKind
 
     /// <summary>A player got past a defender, beating him or outrunning him (`tick-film-v1`). The beat names the carrier and the man left behind.</summary>
     Skipped = 15,
+
+    /// <summary>A pass into the space behind the line (`commentary-v6`). The beat names the passer and, when known, the man it is for.</summary>
+    ThroughBall = 16,
+
+    /// <summary>A ball given back to a team-mate behind the man (`commentary-v6`).</summary>
+    Recycle = 17,
+
+    /// <summary>A ball hoofed upfield to be rid of it (`commentary-v6`).</summary>
+    Clearance = 18,
+
+    /// <summary>A carrier who runs at a defender (`commentary-v6`). The beat names the carrier and the defender.</summary>
+    TakeOn = 19,
+
+    /// <summary>A carrier who runs into open space (`commentary-v6`).</summary>
+    Break = 20,
+
+    /// <summary>A carrier who got past a defender with the ball (`commentary-v6`). The beat names the carrier and the man left behind.</summary>
+    Beat = 21,
+
+    /// <summary>A tackle that won the ball (`commentary-v6`). The beat names the tackler and the man dispossessed.</summary>
+    Tackled = 22,
+
+    /// <summary>A tackle that poked the ball away from the carrier (`commentary-v6`). The beat names the tackler and the carrier.</summary>
+    PokedAway = 23,
+
+    /// <summary>A pass cut out (`commentary-v6`). The beat names the interceptor and, when known, the passer.</summary>
+    Intercepted = 24,
+
+    /// <summary>A pass that ran out of play (`commentary-v6`). The beat names the passer.</summary>
+    PassOut = 25,
+
+    /// <summary>A man who picked up a ball no team-mate had played to him (`commentary-v6`).</summary>
+    LooseBall = 26,
+
+    /// <summary>A shot from a long way out (`commentary-v6`).</summary>
+    ShotLong = 27,
+
+    /// <summary>A goalkeeper who held a shot (`commentary-v6`).</summary>
+    SaveHeld = 28,
+
+    /// <summary>A goalkeeper who pushed a shot away, still in play (`commentary-v6`).</summary>
+    SaveParried = 29,
+
+    /// <summary>A goalkeeper who turned a shot round the post or over the bar (`commentary-v6`).</summary>
+    SaveTipped = 30,
+
+    /// <summary>A goalkeeper who gathered the ball at an attacker's feet (`commentary-v6`). The beat names the keeper and the attacker.</summary>
+    Smother = 31,
+
+    /// <summary>A carrier who went round the goalkeeper (`commentary-v6`). The beat names the carrier and the keeper.</summary>
+    RoundsKeeper = 32,
+
+    /// <summary>A shot blocked by a defender (`commentary-v6`). The beat names the blocker.</summary>
+    Block = 33,
+
+    /// <summary>A side that has the ball, said when a passage opens on play that has no action to name (`commentary-v6`).</summary>
+    HaveBall = 34,
 }
 
 /// <summary>
@@ -184,7 +242,7 @@ public sealed record PassageBeatV1(
 public static class CommentaryTokenBuilder
 {
     /// <summary>The version label of this template set.</summary>
-    public const string Version = "commentary-v5";
+    public const string Version = "commentary-v6";
 
     /// <summary>The delay between a strike and the line that reports where it ended up.</summary>
     private const int OutcomeDelayMilliseconds = 900;
@@ -297,6 +355,45 @@ public static class CommentaryTokenBuilder
     };
 
     /// <summary>
+    /// Maps a stamped action and what kind of action it was to the build-up family that narrates it, or null for one not narrated
+    /// (`commentary-v6`). The tick film's mapping: a stamp says what was meant, so the line can too.
+    /// </summary>
+    /// <param name="action">What the player did.</param>
+    /// <param name="detail">What kind of pass, tackle or save it was.</param>
+    internal static PassageBeatKind? KindOf(PassageAction action, TickActionDetail detail) => action switch
+    {
+        PassageAction.Pass => detail switch
+        {
+            TickActionDetail.ThroughBall => PassageBeatKind.ThroughBall,
+            TickActionDetail.LongBall => PassageBeatKind.LongPass,
+            TickActionDetail.Recycle => PassageBeatKind.Recycle,
+            TickActionDetail.Clear => PassageBeatKind.Clearance,
+            _ => PassageBeatKind.Pass,
+        },
+        PassageAction.Receive => detail == TickActionDetail.LooseBall ? PassageBeatKind.LooseBall : null,
+        PassageAction.Cross => PassageBeatKind.Cross,
+        PassageAction.Header => PassageBeatKind.Header,
+        PassageAction.TakeOn => PassageBeatKind.TakeOn,
+        PassageAction.Break => PassageBeatKind.Break,
+        PassageAction.Carry or PassageAction.Bypassed => PassageBeatKind.Beat,
+        PassageAction.Tackle => detail == TickActionDetail.PokedLoose ? PassageBeatKind.PokedAway : PassageBeatKind.Tackled,
+        PassageAction.Dispossessed => PassageBeatKind.LosesBall,
+        PassageAction.Interception => detail == TickActionDetail.Blocked ? PassageBeatKind.Block : PassageBeatKind.Intercepted,
+        PassageAction.Misplaced => PassageBeatKind.PassOut,
+        PassageAction.Save => detail switch
+        {
+            TickActionDetail.Caught => PassageBeatKind.SaveHeld,
+            TickActionDetail.Parried or TickActionDetail.Spilled => PassageBeatKind.SaveParried,
+            TickActionDetail.TippedAround => PassageBeatKind.SaveTipped,
+            TickActionDetail.Smothered => PassageBeatKind.Smother,
+            _ => PassageBeatKind.Save,
+        },
+        PassageAction.Shot or PassageAction.Penalty or PassageAction.FreeKick =>
+            detail == TickActionDetail.LongRange ? PassageBeatKind.ShotLong : PassageBeatKind.Chance,
+        _ => null,
+    };
+
+    /// <summary>
     /// Builds the synchronized commentary for a film passage from its beats (`replay-v3`, `commentary-v3`).
     /// </summary>
     /// <remarks>
@@ -371,6 +468,25 @@ public static class CommentaryTokenBuilder
         PassageBeatKind.GoalKick => BuildTemplates["goal_kick"],
         PassageBeatKind.KeeperBall => BuildTemplates["keeper_ball"],
         PassageBeatKind.FreeKick => BuildTemplates["free_kick"],
+        PassageBeatKind.ThroughBall => BuildTemplates["through_ball"],
+        PassageBeatKind.Recycle => BuildTemplates["recycle"],
+        PassageBeatKind.Clearance => BuildTemplates["clearance"],
+        PassageBeatKind.TakeOn => BuildTemplates["take_on"],
+        PassageBeatKind.Break => BuildTemplates["break"],
+        PassageBeatKind.Beat => BuildTemplates["beat"],
+        PassageBeatKind.Tackled => BuildTemplates["tackled"],
+        PassageBeatKind.PokedAway => BuildTemplates["poked_away"],
+        PassageBeatKind.Intercepted => BuildTemplates["intercepted"],
+        PassageBeatKind.PassOut => BuildTemplates["pass_out"],
+        PassageBeatKind.LooseBall => BuildTemplates["loose_ball"],
+        PassageBeatKind.ShotLong => BuildTemplates["shot_long"],
+        PassageBeatKind.SaveHeld => BuildTemplates["save_held"],
+        PassageBeatKind.SaveParried => BuildTemplates["save_parried"],
+        PassageBeatKind.SaveTipped => BuildTemplates["save_tipped"],
+        PassageBeatKind.Smother => BuildTemplates["smother"],
+        PassageBeatKind.RoundsKeeper => BuildTemplates["rounds_keeper"],
+        PassageBeatKind.Block => BuildTemplates["block"],
+        PassageBeatKind.HaveBall => BuildTemplates["have_ball"],
         _ => null,
     };
 
@@ -770,6 +886,143 @@ public static class CommentaryTokenBuilder
                 "{player} goes round {second}.",
                 "{player} leaves {second} behind.",
                 "{player} gets the better of {second}.",
+            ]),
+
+        // What each action starts as, in the present tense, one short line (`commentary-v6`). A variant that names a second man is only used when he is known.
+        ["through_ball"] = new(
+            "match.build.through_ball",
+            [
+                "{player} tries to slip {second} in.",
+                "{player} threads it through for {second}.",
+                "{player} slides it through.",
+            ]),
+        ["recycle"] = new(
+            "match.build.recycle",
+            [
+                "{player} plays it back to {second}.",
+                "{player} plays it back.",
+                "{player} gives it back to {second}.",
+            ]),
+        ["clearance"] = new(
+            "match.build.clearance",
+            [
+                "{player} hoofs it clear.",
+                "{player} clears.",
+                "{player} gets rid of it.",
+            ]),
+        ["take_on"] = new(
+            "match.build.take_on",
+            [
+                "{player} runs at {second}.",
+                "{player} tries to go past {second}.",
+                "{player} takes on his man.",
+            ]),
+        ["break"] = new(
+            "match.build.break",
+            [
+                "{player} breaks clear!",
+                "{player} has space to run into.",
+                "{player} races away.",
+            ]),
+        ["beat"] = new(
+            "match.build.beat",
+            [
+                "{player} skips past {second}.",
+                "{player} beats {second}.",
+                "{player} leaves {second} behind.",
+                "{player} gets past his man.",
+            ]),
+        ["tackled"] = new(
+            "match.build.tackled",
+            [
+                "{player} wins it off {second}.",
+                "{second} is dispossessed by {player}.",
+                "{player} takes it off {second}.",
+                "{player} wins the ball.",
+            ]),
+        ["poked_away"] = new(
+            "match.build.poked_away",
+            [
+                "{player} pokes it away from {second}.",
+                "{player} knocks it off {second}.",
+                "{player} gets a foot in.",
+            ]),
+        ["intercepted"] = new(
+            "match.build.intercepted",
+            [
+                "Cut out by {player}.",
+                "{player} reads it and intercepts.",
+                "{player} steps in to cut it out.",
+            ]),
+        ["pass_out"] = new(
+            "match.build.pass_out",
+            [
+                "{player}'s pass runs out of play.",
+                "{player} overhits it.",
+                "{player} sends it out of play.",
+            ]),
+        ["loose_ball"] = new(
+            "match.build.loose_ball",
+            [
+                "{player} picks up the loose ball.",
+                "{player} gets to the loose ball first.",
+                "{player} gathers it.",
+            ]),
+        ["shot_long"] = new(
+            "match.build.shot_long",
+            [
+                "{player} tries his luck from distance!",
+                "{player} lets fly from long range!",
+                "{player} shoots from way out!",
+            ]),
+        ["save_held"] = new(
+            "match.build.save_held",
+            [
+                "{player} holds on.",
+                "{player} gathers it safely.",
+                "{player} takes it comfortably.",
+            ]),
+        ["save_parried"] = new(
+            "match.build.save_parried",
+            [
+                "{player} parries it away!",
+                "{player} beats it away!",
+                "{player} pushes it away!",
+            ]),
+        ["save_tipped"] = new(
+            "match.build.save_tipped",
+            [
+                "{player} tips it round!",
+                "{player} gets a hand to it and tips it behind!",
+                "{player} tips it away!",
+            ]),
+        ["smother"] = new(
+            "match.build.smother",
+            [
+                "{player} smothers at {second}'s feet.",
+                "{player} dives at {second}'s feet and gathers.",
+                "{player} comes out and smothers it.",
+            ]),
+        ["rounds_keeper"] = new(
+            "match.build.rounds_keeper",
+            [
+                "{player} rounds {second}!",
+                "{player} takes it round {second}!",
+                "{player} is past the keeper!",
+            ]),
+        ["block"] = new(
+            "match.build.block",
+            [
+                "Blocked by {player}!",
+                "{player} throws himself in the way!",
+                "{player} blocks it!",
+            ]),
+        ["have_ball"] = new(
+            "match.build.have_ball",
+            [
+                "{club} have the ball.",
+                "{club} are in possession.",
+                "{club} on the ball.",
             ]),
 
         // The restarts a continuous film shows (`commentary-v4`).

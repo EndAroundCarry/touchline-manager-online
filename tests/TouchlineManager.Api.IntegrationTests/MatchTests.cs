@@ -85,7 +85,7 @@ public sealed class MatchTests : IAsyncLifetime
             $"/api/v1/matches/{matchId}/presentation"))!;
 
         presentation.MatchId.Should().Be(matchId);
-        presentation.PresentationVersion.Should().Be("tick-replay-v3");
+        presentation.PresentationVersion.Should().Be("tick-replay-v4");
         presentation.Commentary.Should().NotBeEmpty();
         presentation.Commentary.Select(line => line.TemplateKey).Should()
             .Contain(["match.kickoff", "match.full_time"], "a match is narrated from kick-off to full time");

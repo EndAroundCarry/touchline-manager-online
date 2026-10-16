@@ -63,6 +63,9 @@ internal enum TickActionDetail : byte
 
     /// <summary>A shot struck from a long way out.</summary>
     LongRange = 13,
+
+    /// <summary>A defender who put himself in the way of a shot and stopped it.</summary>
+    Blocked = 14,
 }
 
 /// <summary>A player's action at a frame: a tag a film keyframe carries so a renderer and a commentary line can synchronize to it.</summary>

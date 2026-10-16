@@ -1991,7 +1991,7 @@ internal sealed partial class TickMatchLoop
             var wideY = _ball.UnitY >= SpatialPitch.GoalYCenter ? SpatialPitch.GoalYMax + BlockWideOfPost : SpatialPitch.GoalYMin - BlockWideOfPost;
 
             _ball.LaunchRolling(lineX, wideY, TickSpatialUnits.SpeedToFixedPerTick(BlockCornerSpeed));
-            Tag(new TickRef(side, team.SlotNumber[seat]), PassageAction.Interception, _shooter);
+            Tag(new TickRef(side, team.SlotNumber[seat]), PassageAction.Interception, _shooter, TickActionDetail.Blocked);
             _controllerSide = -1;
             _passPending = false;
             _passIsCross = false;
@@ -2007,7 +2007,7 @@ internal sealed partial class TickMatchLoop
             (int)(TickTrigonometry.Sin(heading) * speed / TickTrigonometry.Scale),
             0);
 
-        Tag(blocker, PassageAction.Interception, _shooter);
+        Tag(blocker, PassageAction.Interception, _shooter, TickActionDetail.Blocked);
         _controllerSide = -1;
         _passPending = false;
         _passIsCross = false;

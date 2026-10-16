@@ -33,7 +33,7 @@ namespace TouchlineManager.MatchEngine.Tick;
 internal sealed class TickReplaySynthesizer
 {
     /// <summary>The version label of a film made from a tick recording.</summary>
-    public const string Version = "tick-replay-v3";
+    public const string Version = "tick-replay-v4";
 
     /// <summary>The cut that covers a jump to a stretch of the match that is not the one before it.</summary>
     public const string JumpCut = "jump";
@@ -818,9 +818,83 @@ internal sealed class TickReplaySynthesizer
 
     // ---- Commentary --------------------------------------------------------------------------------------------------------------------------
 
+    /// <summary>A line for the banner while the passage's commentary is being chosen.</summary>
+    private sealed class Candidate
+    {
+        /// <summary>The film time the line is shown at, in milliseconds from the passage's first frame.</summary>
+        public int Time;
+
+        /// <summary>The frame the action or event happened at, before any shift for display.</summary>
+        public int Frame;
+
+        /// <summary>How much the line matters: the stronger one stays when two fall close, and 60 and over are key lines.</summary>
+        public int Priority;
+
+        public PassageBeatV1 Beat = null!;
+        public PassageBeatKind Kind;
+
+        /// <summary>The event a key line narrates, or null for a line cut from an action stamp.</summary>
+        public EngineEventV1? Event;
+
+        public bool IsKey => Priority >= KeyPriority;
+
+        /// <summary>Whether the line says how a shot ended, so it must not cover the line that says it was struck.</summary>
+        public bool IsShotOutcome =>
+            Kind is PassageBeatKind.SaveHeld or PassageBeatKind.SaveParried or PassageBeatKind.SaveTipped or PassageBeatKind.Save or PassageBeatKind.Block
+            || Event is { Type: EngineEventType.ShotSaved or EngineEventType.ShotBlocked or EngineEventType.ShotOffTarget or EngineEventType.Woodwork
+                or EngineEventType.Goal or EngineEventType.PenaltyGoal or EngineEventType.PenaltyMissed };
+
+        public bool IsStrike => Kind is PassageBeatKind.Chance or PassageBeatKind.ShotLong;
+    }
+
+    /// <summary>The priority from which a line is a key line: it holds the banner for a moment and is never thinned for a routine one.</summary>
+    private const int KeyPriority = 60;
+
+    private const int EventPriority = 100;
+
+    /// <summary>How far before its strike a shot's outcome may fall and still be that shot's (3 s of film).</summary>
+    private const int StrikeReachMilliseconds = 3_000;
+
+    /// <summary>How far before a bypass a carry past the same man may be for the bypass to be the same moment told twice (2 s of film).</summary>
+    private const int BypassEchoMilliseconds = 2_000;
+
+    /// <summary>How near in frames a save or a block must be to the event that reports it for the save to be the line that is shown.</summary>
+    private const int SaveEventFrames = 2;
+
+    private static int PriorityOf(PassageBeatKind kind) => kind switch
+    {
+        PassageBeatKind.Chance or PassageBeatKind.ShotLong => 80,
+        PassageBeatKind.SaveHeld or PassageBeatKind.SaveParried or PassageBeatKind.SaveTipped or PassageBeatKind.Smother or PassageBeatKind.Save => 75,
+        PassageBeatKind.Cross => 70,
+        PassageBeatKind.Block => 65,
+        PassageBeatKind.Header => 60,
+        PassageBeatKind.RoundsKeeper => 55,
+        PassageBeatKind.Intercepted or PassageBeatKind.Interception => 50,
+        PassageBeatKind.Tackled or PassageBeatKind.PokedAway or PassageBeatKind.LosesBall or PassageBeatKind.Tackle => 45,
+        PassageBeatKind.Break => 42,
+        PassageBeatKind.TakeOn => 40,
+        PassageBeatKind.Beat or PassageBeatKind.Skipped => 38,
+        PassageBeatKind.PassOut => 30,
+        PassageBeatKind.ThroughBall => 26,
+        PassageBeatKind.LongPass => 24,
+        PassageBeatKind.Clearance => 22,
+        PassageBeatKind.LooseBall => 18,
+        PassageBeatKind.HaveBall => 10,
+        _ => 20,
+    };
+
+    /// <summary>
+    /// Chooses the lines the banner shows for a passage: one for every action as it starts (`tick-replay-v4`).
+    /// </summary>
+    /// <remarks>
+    /// A pass is told when it is kicked, and again only if it fails; a completed pass has no line of its own, because the next action is
+    /// the next line. Where an outcome is stamped twice (a tackle and the dispossession, a cut-out pass and the misplaced one) it is told
+    /// once. A key line (an event, a shot, a save, a header, a cross) holds the banner for <see cref="HighlightOptionsV1.CommentaryKeyDwellMilliseconds"/>,
+    /// and a shot's outcome waits <see cref="HighlightOptionsV1.CommentaryStrikeHoldMilliseconds"/> after the strike so "shoots!" can be read.
+    /// </remarks>
     private IReadOnlyList<HighlightCommentaryV1> Commentary(Item item)
     {
-        var candidates = new List<(int Time, int Priority, PassageBeatV1 Beat)>();
+        var candidates = new List<Candidate>();
 
         foreach (var matchEvent in item.Events)
         {
@@ -829,96 +903,434 @@ internal sealed class TickReplaySynthesizer
                 continue;
             }
 
-            var time = (Math.Clamp(frame, item.First, item.Last) - item.First) * _msPerFrame;
+            var shown = Math.Clamp(ShownFrameOf(item, matchEvent, frame), item.First, item.Last);
+            var time = (shown - item.First) * _msPerFrame;
 
-            candidates.Add((time, 100, new PassageBeatV1(time, matchEvent.Side, matchEvent.ParticipantId, PassageBeatKind.Event, matchEvent, matchEvent.Sequence)));
+            candidates.Add(new Candidate
+            {
+                Time = time,
+                Frame = Math.Clamp(frame, item.First, item.Last),
+                Priority = EventPriority,
+                Kind = PassageBeatKind.Event,
+                Event = matchEvent,
+                Beat = new PassageBeatV1(time, matchEvent.Side, matchEvent.ParticipantId, PassageBeatKind.Event, matchEvent, matchEvent.Sequence),
+            });
         }
 
         for (var index = 0; index < item.Marks.Count; index++)
         {
-            var stamp = item.Marks[index];
-
-            if (CommentaryTokenBuilder.KindOf(stamp.Action) is not { } kind)
+            if (StampCandidate(item, index) is { } candidate)
             {
-                continue;
+                candidates.Add(candidate);
+            }
+        }
+
+        ResolveSameFrame(candidates);
+        HoldStrikes(candidates);
+
+        var chosen = Thin(candidates);
+
+        if (item.CutKind is not null && !item.IsHalfTime && chosen.All(line => line.Time >= _options.CommentaryOpenerWithinMilliseconds)
+            && Opener(item) is { } opener)
+        {
+            chosen.Insert(0, opener);
+        }
+
+        var ordered = chosen
+            .Select(line => line.Beat with { TimeMilliseconds = int.Clamp(line.Time, 0, item.DurationMs) })
+            .ToList();
+
+        return [.. CommentaryTokenBuilder.BuildPassageCommentary(_input, ordered, Math.Max(1, item.DurationMs))];
+    }
+
+    /// <summary>
+    /// The frame an event's line is shown at. A shot that missed is reported when the engine gives up on it, which can be long after the
+    /// ball left the pitch; the line is shown on the first frame the ball is outside, when that frame is in the passage.
+    /// </summary>
+    private int ShownFrameOf(Item item, EngineEventV1 matchEvent, int frame)
+    {
+        if (matchEvent.Type != EngineEventType.ShotOffTarget)
+        {
+            return frame;
+        }
+
+        var strike = -1;
+
+        foreach (var stamp in item.Marks)
+        {
+            if (stamp.Frame > frame)
+            {
+                break;
             }
 
-            if (stamp.Entity < 0 || item.Occupants[stamp.Entity] == Guid.Empty || stamp.Action == PassageAction.Receive)
+            if (stamp.Action is PassageAction.Shot or PassageAction.Penalty or PassageAction.FreeKick
+                && stamp.Entity >= 0
+                && item.Occupants[stamp.Entity] == matchEvent.ParticipantId)
             {
-                continue;
+                strike = stamp.Frame;
             }
+        }
 
-            var actor = item.Occupants[stamp.Entity];
-            var side = FilmRoster.SideOf(stamp.Entity);
-            var time = (stamp.Frame - item.First) * _msPerFrame;
-            Guid? target = null;
+        if (strike < 0)
+        {
+            return frame;
+        }
 
-            if (kind == PassageBeatKind.Pass || kind == PassageBeatKind.Cross)
+        for (var at = strike + 1; at < frame; at++)
+        {
+            if (_recording.BallX(at) < 0
+                || _recording.BallX(at) > SpatialPitch.PitchLength
+                || _recording.BallY(at) < 0
+                || _recording.BallY(at) > SpatialPitch.PitchWidth)
             {
+                return at;
+            }
+        }
+
+        return frame;
+    }
+
+    /// <summary>The line an action stamp starts, or null when the stamp is not narrated or is told by another.</summary>
+    private Candidate? StampCandidate(Item item, int index)
+    {
+        var stamp = item.Marks[index];
+
+        if (stamp.Entity < 0 || item.Occupants[stamp.Entity] == Guid.Empty || CommentaryTokenBuilder.KindOf(stamp.Action, stamp.Detail) is not { } kind)
+        {
+            return null;
+        }
+
+        var actor = item.Occupants[stamp.Entity];
+        var side = FilmRoster.SideOf(stamp.Entity);
+        var named = stamp.Target >= 0 && item.Occupants[stamp.Target] != Guid.Empty ? item.Occupants[stamp.Target] : (Guid?)null;
+        Guid? target = named;
+
+        switch (kind)
+        {
+            case PassageBeatKind.Pass or PassageBeatKind.LongPass or PassageBeatKind.Cross when target is null:
+                // A stamp with no named receiver is told by who took the ball next, and said without a name when nobody did.
                 target = Receiver(item, index, side, actor);
-            }
 
-            if (kind == PassageBeatKind.Pass && target is null)
-            {
-                continue;
-            }
+                break;
 
-            if (kind == PassageBeatKind.LosesBall)
-            {
-                // The loser is the actor; the man who won it is the other side's tackle or interception at the same frame, if there is one.
-                var winner = WinnerOf(item, stamp);
-
-                target = winner is { } won ? item.Occupants[won] : null;
-            }
-            else if (kind == PassageBeatKind.Skipped)
-            {
-                // The stamp is on the man left behind; the beat is about the man who was on the ball and went past him.
-                var carrier = _recording.Controller(Math.Min(stamp.Frame, _recording.FrameCount - 1));
-
-                if (carrier < 0 || item.Occupants[carrier] == Guid.Empty || FilmRoster.SideOf(carrier) == side)
+            case PassageBeatKind.Beat when stamp.Action == PassageAction.Carry:
+                // The carrier went past the man the stamp names; past the goalkeeper is a different line.
+                if (named is null)
                 {
-                    continue;
+                    return null;
+                }
+
+                if (_slots[stamp.Target].Family == MatchPositionFamily.Goalkeeper)
+                {
+                    kind = PassageBeatKind.RoundsKeeper;
+                }
+
+                break;
+
+            case PassageBeatKind.Beat:
+                // A bypass is stamped on the man left behind, later than the carry that left him; the beat is about the man who went past.
+                if (EchoesCarry(item, index) || BypassedBy(stamp) is not { } carrier || item.Occupants[carrier] == Guid.Empty)
+                {
+                    return null;
                 }
 
                 target = actor;
                 actor = item.Occupants[carrier];
                 side = FilmRoster.SideOf(carrier);
-            }
 
-            var priority = kind switch
-            {
-                PassageBeatKind.Chance => 80,
-                PassageBeatKind.Cross => 70,
-                PassageBeatKind.Header or PassageBeatKind.Save => 60,
-                PassageBeatKind.Interception => 50,
-                PassageBeatKind.LosesBall => 45,
-                PassageBeatKind.Tackle => 40,
-                PassageBeatKind.Skipped => 35,
-                PassageBeatKind.Carry => 30,
-                _ => 20,
-            };
+                break;
 
-            candidates.Add((time, priority, new PassageBeatV1(time, side, actor, kind, null, item.First + stamp.Frame + index, target)));
+            case PassageBeatKind.LosesBall:
+                // Told with the tackle that took the ball, if there was one.
+                if (item.Marks.Any(other => other.Frame == stamp.Frame && other.Action == PassageAction.Tackle && other.Target == stamp.Entity))
+                {
+                    return null;
+                }
+
+                target = named ?? (WinnerOf(item, stamp) is { } won ? item.Occupants[won] : null);
+
+                break;
+
+            case PassageBeatKind.PassOut:
+                // A pass cut out is told by the man who cut it out.
+                if (item.Marks.Any(other => other.Frame == stamp.Frame && other.Action == PassageAction.Interception && other.Target == stamp.Entity))
+                {
+                    return null;
+                }
+
+                target = null;
+
+                break;
+
+            case PassageBeatKind.SaveHeld or PassageBeatKind.SaveParried or PassageBeatKind.SaveTipped or PassageBeatKind.Save or PassageBeatKind.Clearance:
+                target = null;
+
+                break;
         }
 
-        var accepted = new List<(int Time, PassageBeatV1 Beat)>();
-
-        foreach (var candidate in candidates.OrderByDescending(entry => entry.Priority).ThenBy(entry => entry.Time))
+        if (target == actor)
         {
-            var always = candidate.Priority >= 60;
+            target = null;
+        }
 
-            if (always || accepted.All(other => Math.Abs(other.Time - candidate.Time) >= _options.CommentaryGapMilliseconds))
+        var time = (stamp.Frame - item.First) * _msPerFrame;
+
+        return new Candidate
+        {
+            Time = time,
+            Frame = stamp.Frame,
+            Priority = PriorityOf(kind),
+            Kind = kind,
+            Beat = new PassageBeatV1(time, side, actor, kind, null, item.First + stamp.Frame + index, target),
+        };
+    }
+
+    /// <summary>Whether a bypass is the carry that left the same man told twice: a carry past him, a moment before.</summary>
+    private bool EchoesCarry(Item item, int index)
+    {
+        var bypass = item.Marks[index];
+        var reach = BypassEchoMilliseconds / _msPerFrame;
+
+        for (var before = index - 1; before >= 0 && bypass.Frame - item.Marks[before].Frame <= reach; before--)
+        {
+            if (item.Marks[before].Action == PassageAction.Carry && item.Marks[before].Target == bypass.Entity)
             {
-                accepted.Add((candidate.Time, candidate.Beat));
+                return true;
             }
         }
 
-        var ordered = accepted
-            .OrderBy(line => line.Time)
-            .Select(line => line.Beat with { TimeMilliseconds = int.Clamp(line.Time, 0, item.DurationMs) })
-            .ToList();
+        return false;
+    }
 
-        return [.. CommentaryTokenBuilder.BuildPassageCommentary(_input, ordered, Math.Max(1, item.DurationMs))];
+    /// <summary>The slot entity that was on the ball when a man was bypassed, or null when the other side had it.</summary>
+    private int? BypassedBy(TickActionStamp bypass)
+    {
+        var carrier = _recording.Controller(Math.Min(bypass.Frame, _recording.FrameCount - 1));
+
+        return carrier < 0 || FilmRoster.SideOf(carrier) == FilmRoster.SideOf(bypass.Entity) ? null : carrier;
+    }
+
+    /// <summary>
+    /// Settles the lines that tell one frame twice. An event wins over the action beside it (a foul over the tackle), except that a save
+    /// or a block that says how the keeper or the defender stopped it wins over the generic line that reports the same shot.
+    /// </summary>
+    private static void ResolveSameFrame(List<Candidate> candidates)
+    {
+        var events = candidates.Where(candidate => candidate.Event is not null).ToList();
+        var dropped = new HashSet<Candidate>();
+
+        foreach (var report in events)
+        {
+            foreach (var action in candidates)
+            {
+                if (action.Event is not null)
+                {
+                    continue;
+                }
+
+                var saves = report.Event!.Type == EngineEventType.ShotSaved
+                    && action.Kind is PassageBeatKind.SaveHeld or PassageBeatKind.SaveParried or PassageBeatKind.SaveTipped
+                    && Math.Abs(action.Frame - report.Frame) <= SaveEventFrames;
+                var blocks = report.Event.Type == EngineEventType.ShotBlocked
+                    && action.Kind == PassageBeatKind.Block
+                    && Math.Abs(action.Frame - report.Frame) <= SaveEventFrames;
+
+                if (saves || blocks)
+                {
+                    dropped.Add(report);
+                }
+                else if (action.Frame == report.Frame)
+                {
+                    dropped.Add(action);
+                }
+            }
+        }
+
+        candidates.RemoveAll(dropped.Contains);
+    }
+
+    /// <summary>Moves the line that says how a shot ended to a little after the line that says it was struck, so both can be read.</summary>
+    private void HoldStrikes(List<Candidate> candidates)
+    {
+        var strikes = candidates.Where(candidate => candidate.IsStrike).OrderBy(candidate => candidate.Time).ToList();
+
+        foreach (var outcome in candidates.Where(candidate => candidate.IsShotOutcome))
+        {
+            var strike = strikes.LastOrDefault(shot => shot.Time <= outcome.Time && outcome.Time - shot.Time <= StrikeReachMilliseconds);
+
+            if (strike is not null)
+            {
+                outcome.Time = Math.Max(outcome.Time, strike.Time + _options.CommentaryStrikeHoldMilliseconds);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Thins the lines to those that can be read: a routine line inside a key line's dwell is dropped, and of two lines that fall
+    /// closer than the minimum gap the stronger stays, or the later on a tie.
+    /// </summary>
+    private List<Candidate> Thin(List<Candidate> candidates)
+    {
+        var ordered = candidates.OrderBy(candidate => candidate.Time).ThenBy(candidate => candidate.Priority).ToList();
+        var held = new List<Candidate>(ordered.Count);
+        var lastKey = int.MinValue / 2;
+
+        foreach (var candidate in ordered)
+        {
+            if (candidate.IsKey)
+            {
+                lastKey = candidate.Time;
+            }
+            else if (candidate.Time > lastKey && candidate.Time - lastKey < _options.CommentaryKeyDwellMilliseconds)
+            {
+                continue;
+            }
+
+            held.Add(candidate);
+        }
+
+        var kept = new List<Candidate>(held.Count);
+
+        foreach (var candidate in held)
+        {
+            if (kept.Count > 0 && candidate.Time - kept[^1].Time < _options.CommentaryMinGapMilliseconds)
+            {
+                if (candidate.Priority < kept[^1].Priority)
+                {
+                    continue;
+                }
+
+                kept.RemoveAt(kept.Count - 1);
+            }
+
+            kept.Add(candidate);
+        }
+
+        return kept;
+    }
+
+    /// <summary>
+    /// The line that opens a passage the film cut to: the restart about to be taken, or whose ball it is. Without it the banner would
+    /// still show the last line of what came before the cut.
+    /// </summary>
+    private Candidate? Opener(Item item)
+    {
+        var frame = item.First;
+        var state = _recording.State(frame);
+
+        if (state is TickPlayState.GoalCelebration or TickPlayState.HalfTime)
+        {
+            return null;
+        }
+
+        var taker = TakerAt(frame);
+        var controller = _recording.Controller(frame);
+        var side = taker is { } home ? (home ? MatchSide.Home : MatchSide.Away) : FilmRoster.SideOf(controller >= 0 ? controller : NearestToBall(item, null));
+        PassageBeatKind kind;
+        int? actor = null;
+
+        if (state == TickPlayState.GoalKickPending)
+        {
+            kind = PassageBeatKind.GoalKick;
+            actor = KeeperOf(item, side);
+        }
+        else if (state == TickPlayState.FreeKickPending)
+        {
+            kind = PassageBeatKind.FreeKick;
+            actor = NearestToBall(item, side);
+        }
+        else if (state == TickPlayState.OpenPlay && controller >= 0 && _slots[controller].Family == MatchPositionFamily.Goalkeeper)
+        {
+            kind = PassageBeatKind.KeeperBall;
+            actor = controller;
+        }
+        else
+        {
+            kind = PassageBeatKind.HaveBall;
+        }
+
+        if (kind != PassageBeatKind.HaveBall && (actor is null || item.Occupants[actor.Value] == Guid.Empty))
+        {
+            kind = PassageBeatKind.HaveBall;
+            actor = null;
+        }
+
+        var player = actor is { } entity ? item.Occupants[entity] : (Guid?)null;
+
+        return new Candidate
+        {
+            Time = 0,
+            Frame = frame,
+            Priority = PriorityOf(kind),
+            Kind = kind,
+            Beat = new PassageBeatV1(0, side, player, kind, null, item.First),
+        };
+    }
+
+    /// <summary>Whether the home side takes the restart that is set up at a frame, or null when none is.</summary>
+    private bool? TakerAt(int frame)
+    {
+        if (_recording.State(frame) is TickPlayState.OpenPlay)
+        {
+            return null;
+        }
+
+        TickStoppageStamp? latest = null;
+
+        foreach (var stoppage in _recording.Stoppages)
+        {
+            if (stoppage.Frame > frame)
+            {
+                break;
+            }
+
+            latest = stoppage;
+        }
+
+        return latest?.TakerIsHome;
+    }
+
+    private int? KeeperOf(Item item, MatchSide side)
+    {
+        for (var entity = 0; entity < TickMatchRecording.Entities; entity++)
+        {
+            if (FilmRoster.SideOf(entity) == side && _slots[entity].Family == MatchPositionFamily.Goalkeeper && item.Occupants[entity] != Guid.Empty)
+            {
+                return entity;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The outfield slot entity nearest the ball at the passage's first frame, of one side or of either.</summary>
+    private int NearestToBall(Item item, MatchSide? side)
+    {
+        var best = 0;
+        var bestSquared = long.MaxValue;
+
+        for (var entity = 0; entity < TickMatchRecording.Entities; entity++)
+        {
+            if (item.Occupants[entity] == Guid.Empty
+                || _recording.PlayerX(item.First, entity) < 0
+                || (side is { } wanted && FilmRoster.SideOf(entity) != wanted)
+                || _slots[entity].Family == MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            long dx = _recording.PlayerX(item.First, entity) - _recording.BallX(item.First);
+            long dy = _recording.PlayerY(item.First, entity) - _recording.BallY(item.First);
+            var squared = (dx * dx) + (dy * dy);
+
+            if (squared < bestSquared)
+            {
+                bestSquared = squared;
+                best = entity;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>Finds the slot entity that took the ball off a man who lost it: the other side's tackle or interception at the same frame.</summary>
