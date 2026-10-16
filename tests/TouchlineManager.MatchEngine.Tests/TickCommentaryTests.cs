@@ -218,12 +218,52 @@ public sealed class TickCommentaryTests
             without.Should().HaveCount(alone.Count);
             withSecond.Select(line => line.Text).Should().OnlyContain(text => !text.Contains('{') && !text.Contains('}') && text.Length > 0, kind.ToString());
 
-            if (kind is not (PassageBeatKind.Skipped or PassageBeatKind.Pass))
+            if (kind != PassageBeatKind.Skipped)
             {
-                // The possession engine's "skipped" always names the man left behind, and the pass family has a variant that says
-                // "a team-mate" in so many words, which this check cannot tell from a placeholder it filled in as one.
+                // The possession engine's "skipped" always names the man left behind.
                 without.Select(line => line.Text).Should().OnlyContain(text => !text.Contains("a team-mate"), $"{kind} has a variant that needs no second man");
             }
         }
+    }
+
+    [Fact]
+    public void Every_build_up_line_is_short_enough_for_one_line_of_the_banner_at_phone_width()
+    {
+        var input = TickPlay.Even.Input;
+        var first = input.Home.Squad[0].ParticipantId;
+        var second = input.Home.Squad[1].ParticipantId;
+
+        // The families only the possession engine's film still uses keep their old, longer lines.
+        PassageBeatKind[] possessionOnly = [PassageBeatKind.Event, PassageBeatKind.Carry, PassageBeatKind.Dribble, PassageBeatKind.Tackle, PassageBeatKind.Interception, PassageBeatKind.Skipped];
+        var kinds = Enum.GetValues<PassageBeatKind>().Except(possessionOnly);
+
+        foreach (var kind in kinds)
+        {
+            var beats = Enumerable.Range(0, 24).Select(seed => new PassageBeatV1(0, MatchSide.Home, first, kind, null, seed, second)).ToList();
+
+            foreach (var line in CommentaryTokenBuilder.BuildPassageCommentary(input, beats, 1_000))
+            {
+                // About eight words, and a club or a name can take a word or two more than a placeholder does.
+                line.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length.Should().BeLessThanOrEqualTo(11, line.VariantKey);
+                line.Text.Length.Should().BeLessThanOrEqualTo(64, line.VariantKey);
+            }
+        }
+    }
+
+    [Fact]
+    public void A_goal_line_can_say_the_keeper_was_beaten()
+    {
+        var goals = new List<CommentaryToken>();
+
+        for (var seed = 1UL; seed <= 12; seed++)
+        {
+            var input = TestMatchFactory.Even(seed);
+            var result = MatchSimulator.Simulate(input);
+
+            goals.AddRange(CommentaryTokenBuilder.Build(input, result).Where(token => token.TemplateKey == "match.goal"));
+        }
+
+        goals.Should().NotBeEmpty();
+        goals.Should().Contain(token => token.Text.Contains("is beaten by") || token.Text.Contains("scores past") || token.Text.Contains("slots it past") || token.Text.Contains(" beats "));
     }
 }

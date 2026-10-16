@@ -778,23 +778,19 @@ public static class CommentaryTokenBuilder
         ["pass"] = new(
             "match.build.pass",
             [
+                "{player} looks for {second}.",
+                "{player} tries to find {second}.",
+                "{player} plays it to {second}.",
                 "{player} plays it forward.",
-                "{player} finds a team-mate.",
                 "{player} moves it on.",
-                "{player} keeps the move going.",
-                "{player} plays a neat one-two with {second}.",
-                "{player} threads a delicate ball through to {second}.",
-                "{player} picks out {second} with a sharp pass.",
-                "{player} lays it off to {second}.",
-                "{player} looks up and finds {second}.",
             ]),
         ["long_pass"] = new(
             "match.build.long_pass",
             [
-                "{player} looks up and sprays a long diagonal pass out to {second}.",
-                "{player} sends a long ball towards {second}.",
-                "{player} goes long, looking for {second}.",
+                "{player} goes long for {second}.",
+                "{player} sends a long ball to {second}.",
                 "{player} lofts it forward.",
+                "{player} hits it long.",
             ]),
         ["carry"] = new(
             "match.build.carry",
@@ -815,19 +811,19 @@ public static class CommentaryTokenBuilder
         ["cross"] = new(
             "match.build.cross",
             [
-                "{player} swings in a cross.",
-                "{player} delivers into the box.",
+                "{player} crosses, looking for {second}.",
+                "{player} floats one in for {second}.",
                 "{player} whips it in.",
-                "{player} sends a cross over.",
-                "{player} swings a cross in towards {second}.",
+                "{player} swings a cross in.",
+                "{player} delivers into the box.",
             ]),
         ["header"] = new(
             "match.build.header",
             [
                 "{player} rises to head it.",
-                "{player} meets it with his head.",
                 "{player} wins the header.",
                 "{player} heads it on.",
+                "{player} gets a head to it.",
             ]),
         ["tackle"] = new(
             "match.build.tackle",
@@ -853,19 +849,15 @@ public static class CommentaryTokenBuilder
                 "{player} gets a hand to it.",
                 "{player} keeps it out.",
                 "A save by {player}.",
-                "{player} reacts brilliantly to get across and stop it.",
-                "{player} gets down well to smother it.",
             ]),
         ["chance"] = new(
             "match.build.chance",
             [
-                "{player} has a go.",
-                "{player} lets fly.",
-                "The chance falls to {player}.",
-                "{player} goes for goal.",
-                "{player} works some space and lets fly!",
-                "{player} pounces on the loose ball and shoots!",
-                "{player} strikes it with power...",
+                "{player} shoots!",
+                "{player} lets fly!",
+                "{player} has a go!",
+                "{player} goes for goal!",
+                "{player} strikes it!",
             ]),
 
         // Who erred and who was beaten (`tick-film-v1`). A variant that names the man who won the ball is only used when he is known.
@@ -895,6 +887,7 @@ public static class CommentaryTokenBuilder
                 "{player} tries to slip {second} in.",
                 "{player} threads it through for {second}.",
                 "{player} slides it through.",
+                "{player} plays it in behind.",
             ]),
         ["recycle"] = new(
             "match.build.recycle",
@@ -909,20 +902,23 @@ public static class CommentaryTokenBuilder
                 "{player} hoofs it clear.",
                 "{player} clears.",
                 "{player} gets rid of it.",
+                "{player} lumps it upfield.",
             ]),
         ["take_on"] = new(
             "match.build.take_on",
             [
                 "{player} runs at {second}.",
                 "{player} tries to go past {second}.",
-                "{player} takes on his man.",
+                "{player} takes on {second}.",
+                "{player} runs at the defence.",
             ]),
         ["break"] = new(
             "match.build.break",
             [
                 "{player} breaks clear!",
                 "{player} has space to run into.",
-                "{player} races away.",
+                "{player} races away!",
+                "{player} bursts forward!",
             ]),
         ["beat"] = new(
             "match.build.beat",
@@ -930,7 +926,7 @@ public static class CommentaryTokenBuilder
                 "{player} skips past {second}.",
                 "{player} beats {second}.",
                 "{player} leaves {second} behind.",
-                "{player} gets past his man.",
+                "{player} gets past a defender.",
             ]),
         ["tackled"] = new(
             "match.build.tackled",
@@ -939,6 +935,7 @@ public static class CommentaryTokenBuilder
                 "{second} is dispossessed by {player}.",
                 "{player} takes it off {second}.",
                 "{player} wins the ball.",
+                "{player} robs {second}.",
             ]),
         ["poked_away"] = new(
             "match.build.poked_away",
@@ -953,6 +950,7 @@ public static class CommentaryTokenBuilder
                 "Cut out by {player}.",
                 "{player} reads it and intercepts.",
                 "{player} steps in to cut it out.",
+                "{player} intercepts.",
             ]),
         ["pass_out"] = new(
             "match.build.pass_out",
@@ -960,6 +958,7 @@ public static class CommentaryTokenBuilder
                 "{player}'s pass runs out of play.",
                 "{player} overhits it.",
                 "{player} sends it out of play.",
+                "{player}'s pass goes out.",
             ]),
         ["loose_ball"] = new(
             "match.build.loose_ball",
@@ -967,6 +966,7 @@ public static class CommentaryTokenBuilder
                 "{player} picks up the loose ball.",
                 "{player} gets to the loose ball first.",
                 "{player} gathers it.",
+                "{player} pounces on it.",
             ]),
         ["shot_long"] = new(
             "match.build.shot_long",
@@ -993,14 +993,14 @@ public static class CommentaryTokenBuilder
             "match.build.save_tipped",
             [
                 "{player} tips it round!",
-                "{player} gets a hand to it and tips it behind!",
+                "{player} tips it behind!",
                 "{player} tips it away!",
             ]),
         ["smother"] = new(
             "match.build.smother",
             [
                 "{player} smothers at {second}'s feet.",
-                "{player} dives at {second}'s feet and gathers.",
+                "{player} dives at {second}'s feet.",
                 "{player} comes out and smothers it.",
             ]),
         ["rounds_keeper"] = new(
@@ -1014,8 +1014,8 @@ public static class CommentaryTokenBuilder
             "match.build.block",
             [
                 "Blocked by {player}!",
-                "{player} throws himself in the way!",
                 "{player} blocks it!",
+                "{player} gets in the way!",
             ]),
         ["have_ball"] = new(
             "match.build.have_ball",
@@ -1029,22 +1029,22 @@ public static class CommentaryTokenBuilder
         ["goal_kick"] = new(
             "match.restart.goal_kick",
             [
-                "{player} takes the goal kick for {club}.",
-                "Goal kick, and {player} sends it long for {club}.",
-                "{player} restarts for {club} from the goal kick.",
+                "{player} takes the goal kick.",
+                "{player} sends the goal kick long.",
+                "Goal kick for {club}.",
             ]),
         ["keeper_ball"] = new(
             "match.restart.keeper_ball",
             [
-                "{player} has it, and {club} start again from the back.",
-                "{player} collects it and rolls it out for {club}.",
-                "The keeper, {player}, gets {club} going again.",
+                "{player} has it, and {club} start again.",
+                "{player} collects it and rolls it out.",
+                "{player} gets {club} going again.",
             ]),
         ["free_kick"] = new(
             "match.restart.free_kick",
             [
-                "{player} takes the free kick quickly for {club}.",
-                "A free kick to {club}, and {player} wastes no time.",
+                "{player} takes the free kick quickly.",
+                "Free kick to {club}, taken quickly.",
                 "{player} plays the free kick on.",
             ]),
     };
@@ -1091,6 +1091,8 @@ public static class CommentaryTokenBuilder
                     "{player} calmly slots it past {goalkeeper}!",
                     "WHAT A STRIKE! {player} beats {goalkeeper} for {club}!",
                     "DRAMA IN STOPPAGE TIME! {player} scores for {club} at {stoppage}!",
+                    "{goalkeeper} is beaten by {player}!",
+                    "{player} scores past {goalkeeper}!",
                 ]),
             [EngineEventType.PenaltyAwarded] = new(
                 "match.penalty.awarded",
