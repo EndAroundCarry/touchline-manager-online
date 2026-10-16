@@ -25,6 +25,9 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tickmotion N seed` reads how the tick engine's players and ball move (standing, stop-and-go, receiving, opponents on top of each
 // other) and how much of a move the film shows, from the recording alone (tick-film-v1, Milestone 0). Not part of `all`.
 //
+// `tickroles N seed [cell]` reads what each kind of slot does (shots, crosses, tackles, where he stands with and without the ball), per
+// player per match, for the wide-midfielder plan. Not part of `all`.
+//
 // `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
 // snapshots (see TickCalibration). Neither is part of `all`.
 //
@@ -194,6 +197,16 @@ if (mode is "tickmotion")
 if (mode is "tickmatrix")
 {
     TickCalibration.Matrix(Math.Min(count, 100), seed, rules);
+}
+
+if (mode is "tickroles")
+{
+    // tickroles <matches a cell> <seed> [442v433|442v442|343v4231]   (what each kind of slot does, per player per match; .run-logs/roles-*.tsv)
+    TickRoleProbe.Run(
+        Math.Min(count, 600),
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var rolesSeed) ? rolesSeed : 7_000UL,
+        rules,
+        positional.Length > 3 ? positional[3] : string.Empty);
 }
 
 if (mode is "tickfk")
