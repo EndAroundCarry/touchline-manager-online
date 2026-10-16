@@ -194,7 +194,7 @@ export class AppShell implements OnDestroy {
       return null;
     }
 
-    const season = this.competition.fixtures()?.seasonLabel;
+    const seasonNumber = this.competition.fixtures()?.seasonNumber;
 
     return {
       name: tenure.clubName,
@@ -206,7 +206,7 @@ export class AppShell implements OnDestroy {
         tenure.countryDisplayName,
         tenure.divisionName,
         `tier ${tenure.tierNumber}`,
-        ...(season === undefined ? [] : [season]),
+        ...(seasonNumber === undefined ? [] : [`season ${seasonNumber}`]),
       ].join(' · '),
     };
   });
