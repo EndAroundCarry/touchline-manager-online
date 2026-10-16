@@ -92,7 +92,10 @@ test.describe('the matchday', () => {
 
     // Prepare through the prepare-match screen, the way a manager does (SQ-4, CAL-3, §11.1).
     await page.goto('/fixtures');
-    await page.getByRole('link', { name: /Prepare your side for/ }).first().click();
+    await page
+      .getByRole('link', { name: /Prepare your side for/ })
+      .first()
+      .click();
 
     await expect(page).toHaveURL(/\/fixtures\/[0-9a-f-]+\/prepare$/);
 
@@ -128,9 +131,7 @@ test.describe('the matchday', () => {
     await page.goto('/fixtures');
 
     await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /Show the result of the match against/ }).first(),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /Show the result of the match against/ }).first()).toBeVisible();
     await expect(page.getByText(scoreline)).toHaveCount(0);
 
     const watch = page.getByRole('link', { name: /Watch the highlights of the match against/ }).first();
@@ -196,10 +197,7 @@ test.describe('the matchday', () => {
       const fullMilliseconds = Number(await scrubber.getAttribute('max'));
 
       await page.getByRole('button', { name: 'Highlights' }).click();
-      await expect(page.getByRole('button', { name: 'Highlights' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
+      await expect(page.getByRole('button', { name: 'Highlights' })).toHaveAttribute('aria-pressed', 'true');
 
       const reelMilliseconds = Number(await scrubber.getAttribute('max'));
 
@@ -207,10 +205,7 @@ test.describe('the matchday', () => {
       expect(reelMilliseconds).toBeLessThanOrEqual(fullMilliseconds);
 
       await page.getByRole('button', { name: 'Full match' }).click();
-      await expect(page.getByRole('button', { name: 'Full match' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
+      await expect(page.getByRole('button', { name: 'Full match' })).toHaveAttribute('aria-pressed', 'true');
       expect(Number(await scrubber.getAttribute('max'))).toBe(fullMilliseconds);
 
       // Driven at 8x so the assertions observe progress rather than waiting out a film at normal speed:
@@ -247,7 +242,12 @@ test.describe('the matchday', () => {
           },
           { timeout: 30_000 },
         )
-        .toBeGreaterThan(2);
+        .toBeGreaterThan(5);
+
+      // The banner is one fixed line and not a live region: at this pace a pass is struck every second or two,
+      // so only the hidden key-line region is announced.
+      await expect(banner).not.toHaveAttribute('aria-live', /.*/);
+      await expect(page.getByTestId('match-commentary-announcement')).toHaveAttribute('aria-live', 'polite');
 
       // The half-time interval. The film is one timeline over both halves, so the clock is watched through
       // it: every reading is recorded as it changes, the playhead is moved to just before the interval, and
@@ -284,14 +284,12 @@ test.describe('the matchday', () => {
         { timeout: 60_000 },
       );
 
-      const readings = await page.evaluate(
-        () => (window as unknown as { __clockLog: string[] }).__clockLog,
-      );
+      const readings = await page.evaluate(() => (window as unknown as { __clockLog: string[] }).__clockLog);
 
       expect(readings, 'the interval is read as HT').toContain('HT');
       expect(
         readings.slice(0, readings.indexOf("46'")).filter((label) => /^4[6-9]'$/.test(label)),
-        'the second half starts at 46\', not at the 48\' or 49\' the first half\'s stoppage used to carry on to',
+        "the second half starts at 46', not at the 48' or 49' the first half's stoppage used to carry on to",
       ).toEqual([]);
 
       let previous = -1;

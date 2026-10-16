@@ -416,18 +416,32 @@
                     playhead, in the colours of the side it is about, which gives way to the next beat as the
                     film plays. The full commentary lives on the Report tab.
                   -->
+                  <!--
+                    One line at a fixed height, so a new line never moves the pitch. The background fades
+                    between sides; the text switches at once, because animating it would bring the lag back.
+                    The banner itself is not a live region (at 2x it would read every pass); the hidden one
+                    below follows the key lines only.
+                  -->
                   <div
                     data-testid="match-commentary"
-                    class="flex min-h-9 items-center justify-center px-4 py-2 text-center text-sm transition-colors duration-200"
-                    [class.font-bold]="currentLine()?.isGoal"
-                    [class.font-medium]="!currentLine()?.isGoal"
+                    class="flex h-10 items-center justify-center px-4 text-center text-sm transition-colors duration-200"
+                    [class.font-bold]="currentLine()?.isKey"
+                    [class.font-medium]="!currentLine()?.isKey"
                     [style.background]="bannerStyle().background"
                     [style.color]="bannerStyle().color"
+                  >
+                    <span class="min-w-0 truncate">
+                      {{ currentLine()?.text ?? 'Press play to follow the match.' }}
+                    </span>
+                  </div>
+                  <p
+                    data-testid="match-commentary-announcement"
+                    class="sr-only"
                     role="status"
                     aria-live="polite"
                   >
-                    {{ currentLine()?.text ?? 'Press play to follow the match.' }}
-                  </div>
+                    {{ announcement() }}
+                  </p>
                   @if (!textOnly()) {
                     <div
                       class="flex flex-1 items-center justify-center overflow-hidden bg-[#090d16] p-2"

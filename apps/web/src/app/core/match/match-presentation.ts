@@ -94,6 +94,35 @@ export function isGoalCommentary(templateKey: string): boolean {
   return GOAL_TEMPLATES.has(templateKey);
 }
 
+/** The build-up template keys that narrate a shot or what becomes of it. */
+const KEY_BUILD_TEMPLATES = new Set([
+  'match.build.chance',
+  'match.build.shot_long',
+  'match.build.save',
+  'match.build.save_held',
+  'match.build.save_parried',
+  'match.build.save_tipped',
+  'match.build.smother',
+  'match.build.rounds_keeper',
+  'match.build.block',
+]);
+
+/**
+ * Whether a commentary line is a key one: a shot, a save, a goal, a card or a foul. The server holds these on
+ * screen a little longer, and the banner sets them in bold and announces them to a screen reader; the routine
+ * passes and tackles around them are shown but not announced.
+ */
+export function isKeyCommentary(templateKey: string): boolean {
+  return (
+    KEY_BUILD_TEMPLATES.has(templateKey) ||
+    templateKey === 'match.goal' ||
+    templateKey === 'match.foul' ||
+    templateKey.startsWith('match.penalty.') ||
+    templateKey.startsWith('match.shot.') ||
+    templateKey.startsWith('match.card.')
+  );
+}
+
 /** Formats a published scoreline, e.g. `2–1`. */
 export function scoreLine(home: number, away: number): string {
   return `${home}\u2013${away}`;

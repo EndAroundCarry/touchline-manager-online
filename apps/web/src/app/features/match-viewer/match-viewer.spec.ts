@@ -1118,6 +1118,67 @@ describe('MatchViewer: one continuous film', () => {
       expect(banner.style.color).not.toBe('');
     });
 
+    it('keeps the banner one fixed line that is not itself a live region', async () => {
+      const native = await load({ textOnly: true });
+      const banner = native.querySelector<HTMLElement>('[data-testid="match-commentary"]')!;
+
+      expect(banner.classList.contains('h-10')).toBe(true);
+      expect(banner.classList.contains('min-h-9')).toBe(false);
+      expect(banner.querySelector('.truncate')).not.toBeNull();
+      expect(banner.hasAttribute('aria-live')).toBe(false);
+    });
+
+    it('sets a key line in bold and tells a screen reader about it, but not the routine lines around it', async () => {
+      const native = await load({ textOnly: true });
+      const view = filmPresentation();
+      const fourth = view.passages[3];
+      const line = (timeMilliseconds: number, templateKey: string, text: string) => ({
+        timeMilliseconds,
+        templateKey,
+        variantKey: `${templateKey}.v1`,
+        parameters: [],
+        text,
+      });
+
+      store.presentation.set({
+        ...view,
+        passages: [
+          ...view.passages.slice(0, 3),
+          {
+            ...fourth,
+            commentary: [
+              line(1_000, 'match.build.pass', 'Smith looks for Jones'),
+              line(2_000, 'match.build.chance', 'Jones shoots!'),
+              line(3_000, 'match.build.pass', 'Brown plays it on'),
+            ],
+          },
+          view.passages[4],
+        ],
+      });
+
+      await settle();
+
+      const banner = () => native.querySelector<HTMLElement>('[data-testid="match-commentary"]')!;
+      const announced = () =>
+        native.querySelector('[data-testid="match-commentary-announcement"]')?.textContent?.trim();
+
+      // The fourth passage starts at 11,000 ms of film.
+      await scrubTo(native, 12_500);
+      expect(banner().textContent?.trim()).toBe('Smith looks for Jones');
+      expect(banner().classList.contains('font-medium')).toBe(true);
+      expect(announced()).toBe('');
+
+      await scrubTo(native, 13_500);
+      expect(banner().textContent?.trim()).toBe('Jones shoots!');
+      expect(banner().classList.contains('font-bold')).toBe(true);
+      expect(announced()).toBe('Jones shoots!');
+
+      await scrubTo(native, 14_500);
+      expect(banner().textContent?.trim()).toBe('Brown plays it on');
+      expect(banner().classList.contains('font-medium')).toBe(true);
+      expect(announced()).toBe('Jones shoots!');
+    });
+
     it('moves the live panels on to the minute of the half the film is in', async () => {
       const native = await load({ textOnly: true });
 

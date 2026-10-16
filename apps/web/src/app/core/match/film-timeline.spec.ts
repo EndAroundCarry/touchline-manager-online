@@ -598,6 +598,42 @@ describe('buildFilmTimeline: the feed', () => {
     expect(timeline.feedCountAt(2_500)).toBe(2);
     expect(timeline.feedCountAt(60_000)).toBe(2);
   });
+
+  it('flags the key rows: a shot, a save, a goal, a card or a foul, and not a routine pass or tackle', () => {
+    const keys = [
+      ['match.build.pass', false],
+      ['match.build.tackled', false],
+      ['match.build.take_on', false],
+      ['match.build.loose_ball', false],
+      ['match.restart.goal_kick', false],
+      ['match.corner', false],
+      ['match.build.chance', true],
+      ['match.build.shot_long', true],
+      ['match.build.save_parried', true],
+      ['match.build.save_held', true],
+      ['match.build.smother', true],
+      ['match.build.block', true],
+      ['match.shot.off_target', true],
+      ['match.goal', true],
+      ['match.penalty.missed', true],
+      ['match.card.yellow', true],
+      ['match.foul', true],
+    ] as const;
+    const timeline = buildFilmTimeline(
+      presentation([
+        passage({
+          duration: 40_000,
+          commentary: keys.map(([templateKey], index) =>
+            token(1_000 * (index + 1), templateKey, templateKey),
+          ),
+        }),
+      ]),
+    );
+
+    expect(timeline.feed.map((row) => [row.text, row.isKey])).toEqual(
+      keys.map(([templateKey, isKey]) => [templateKey, isKey]),
+    );
+  });
 });
 
 describe('buildFilmTimeline: cards', () => {

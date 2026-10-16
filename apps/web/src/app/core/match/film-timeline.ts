@@ -6,6 +6,7 @@ import {
   cardKindFor,
   isGoalCommentary,
   isGoalOutcome,
+  isKeyCommentary,
   isShotOutcome,
   isStrikeTag,
   matchClockFromSeconds,
@@ -115,6 +116,8 @@ export interface FeedRow {
   readonly side: string;
   readonly text: string;
   readonly isGoal: boolean;
+  /** A shot, save, goal, card or foul: set in bold and announced, where a routine line is neither. */
+  readonly isKey: boolean;
 }
 
 /** A goal or a shot on the progress scrubber. */
@@ -656,6 +659,7 @@ export function buildFilmTimeline(presentation: MatchPresentation | null): FilmT
       side: tokenSide(source.token, lineups),
       text: source.token.text,
       isGoal: isGoalCommentary(source.token.templateKey),
+      isKey: isKeyCommentary(source.token.templateKey),
     }));
 
   return new FilmTimeline({ ...timelineWithoutFeed, feed });

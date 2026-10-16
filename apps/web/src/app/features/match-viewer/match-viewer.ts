@@ -232,6 +232,25 @@ export class MatchViewer implements OnDestroy {
     return count === 0 ? null : (this.film().feed[count - 1] ?? null);
   });
 
+  /**
+   * The text a screen reader is told: the latest key line (a shot, save, goal, card or foul) the playhead has
+   * reached. At 2× a pass is struck every second or two, so announcing every banner change would drown the
+   * match; the live region follows only the lines that matter and stays put through the routine ones.
+   */
+  protected readonly announcement = computed(() => {
+    const feed = this.film().feed;
+
+    for (let index = this.feedCount() - 1; index >= 0; index -= 1) {
+      const row = feed[index];
+
+      if (row?.isKey) {
+        return row.text;
+      }
+    }
+
+    return '';
+  });
+
   /** The banner's colours for each side, kept distinguishable even when the two kits are alike. */
   private readonly bannerColours = computed(() =>
     bannerPalette(
