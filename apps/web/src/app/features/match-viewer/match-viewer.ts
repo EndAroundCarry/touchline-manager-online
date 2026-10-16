@@ -11,7 +11,8 @@ import {
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FadeEdge, fadeAlpha, fadeEdgesFor } from '../../core/match/film-fade';
-import { FilmTimeline, buildFilmTimeline } from '../../core/match/film-timeline';
+import { bannerPalette } from '../../core/match/commentary-banner';
+import { FeedRow, FilmTimeline, buildFilmTimeline } from '../../core/match/film-timeline';
 import { lineupIndexOf } from '../../core/match/match-lineups';
 import {
   MatchPlayback,
@@ -117,7 +118,6 @@ export class MatchViewer implements OnDestroy {
   private readonly reveals = inject(ResultRevealStore);
   private readonly matchId = this.route.snapshot.paramMap.get('matchId');
   private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('pitch');
-  private readonly feedScroll = viewChild<ElementRef<HTMLElement>>('feedScroll');
 
   private playback = new MatchPlayback([]);
   private renderer: CanvasMatchRenderer | null = null;
@@ -188,9 +188,6 @@ export class MatchViewer implements OnDestroy {
   /** How many feed rows the playhead has reached. */
   protected readonly feedCount = signal(0);
 
-  /** Whether the feed is scrolled to its newest row. */
-  protected readonly feedPinned = signal(true);
-
   /** The goals struck so far at the playhead, home and away: what the scoreboard shows while the film plays. */
   private readonly liveScore = signal<{ home: number; away: number }>({ home: 0, away: 0 });
 
@@ -225,8 +222,35 @@ export class MatchViewer implements OnDestroy {
   protected readonly elapsedLabel = computed(() => playbackClockLabel(this.elapsedMs()));
   protected readonly totalLabel = computed(() => playbackClockLabel(this.totalMs()));
 
-  /** The feed rows the playhead has reached, oldest first. */
-  protected readonly feed = computed(() => this.film().feed.slice(0, this.feedCount()));
+  /**
+   * The commentary line at the playhead: the latest beat the film has reached, which gives way to the next
+   * one as the action unfolds. Null before the first beat.
+   */
+  protected readonly currentLine = computed<FeedRow | null>(() => {
+    const count = this.feedCount();
+
+    return count === 0 ? null : (this.film().feed[count - 1] ?? null);
+  });
+
+  /** The banner's colours for each side, kept distinguishable even when the two kits are alike. */
+  private readonly bannerColours = computed(() =>
+    bannerPalette(
+      this.homeColour(),
+      this.homeSecondaryColour(),
+      this.awayColour(),
+      this.awaySecondaryColour(),
+    ),
+  );
+
+  /** The background and ink of the banner for the line shown: the colours of the side the line is about. */
+  protected readonly bannerStyle = computed(() => {
+    const line = this.currentLine();
+    const palette = this.bannerColours();
+    const colours =
+      line?.side === 'home' ? palette.home : line?.side === 'away' ? palette.away : palette.neutral;
+
+    return { background: colours.background, color: colours.ink };
+  });
 
   /** The goal and shot markers the scrubber draws. */
   protected readonly markers = computed<readonly ReplayMarker[]>(() => {
@@ -411,7 +435,6 @@ export class MatchViewer implements OnDestroy {
       const timeline = buildFilmTimeline(presentation);
 
       this.feedCount.set(0);
-      this.feedPinned.set(true);
 
       this.playback = new MatchPlayback(
         presentation?.passages ?? [],
@@ -579,32 +602,6 @@ export class MatchViewer implements OnDestroy {
   /** Whether a commentary line has a passage behind it, so the report can offer one. */
   protected hasPassage(line: CommentaryLine): boolean {
     return passageIndexForLine(this.presentation()?.passages ?? [], line) >= 0;
-  }
-
-  /** Marks which end a feed row belongs to. */
-  protected sideClass(side: string): string {
-    return side === 'home' ? 'text-sky-300' : side === 'away' ? 'text-rose-300' : 'text-slate-300';
-  }
-
-  /** Re-pins the feed and scrolls to its newest row. */
-  protected jumpToLive(): void {
-    this.feedPinned.set(true);
-    this.scrollFeedToBottom();
-  }
-
-  /** Tracks whether the feed is scrolled to its newest row, or the manager has scrolled up. */
-  protected onFeedScroll(): void {
-    const element = this.feedScroll()?.nativeElement;
-
-    if (element === undefined) {
-      return;
-    }
-
-    const pinned = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
-
-    if (pinned !== this.feedPinned()) {
-      this.feedPinned.set(pinned);
-    }
   }
 
   /** A player's condition at the shown minute, on the 0–10,000 scale. */
@@ -822,16 +819,12 @@ export class MatchViewer implements OnDestroy {
     }
   }
 
-  /** Publishes the feed's visible length as the playhead passes each row's film time. */
+  /** Publishes how many commentary beats the playhead has passed, which the banner follows. */
   private updateFeed(): void {
     const count = this.film().feedCountAt(this.playback.positionMs);
 
     if (count !== this.feedCount()) {
       this.feedCount.set(count);
-
-      if (this.feedPinned()) {
-        setTimeout(() => this.scrollFeedToBottom(), 0);
-      }
     }
   }
 
@@ -868,15 +861,6 @@ export class MatchViewer implements OnDestroy {
 
     if (elapsed !== this.elapsedMs()) {
       this.elapsedMs.set(elapsed);
-    }
-  }
-
-  /** Scrolls the feed to its newest row, when the element exists. */
-  private scrollFeedToBottom(): void {
-    const element = this.feedScroll()?.nativeElement;
-
-    if (element !== undefined) {
-      element.scrollTop = element.scrollHeight;
     }
   }
 }

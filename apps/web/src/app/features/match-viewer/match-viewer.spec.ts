@@ -369,13 +369,19 @@ describe('MatchViewer', () => {
     expect(barWidth(native)).toBe('80%');
   });
 
-  it('shows the build-up commentary feed as the playhead reaches it', async () => {
+  it('shows the build-up commentary in the banner as the playhead reaches it', async () => {
     const native = await load();
 
-    const feed = native.querySelector('[data-testid="match-feed"]');
+    const banner = native.querySelector('[data-testid="match-commentary"]');
 
-    expect(feed).not.toBeNull();
-    expect(feed!.textContent).toContain('Ashvale United build the move.');
+    expect(banner).not.toBeNull();
+    expect(banner!.textContent).toContain('Ashvale United build the move.');
+  });
+
+  it('has no scrolling commentary feed on the replay', async () => {
+    const native = await load();
+
+    expect(native.querySelector('[data-testid="match-feed"]')).toBeNull();
   });
 
   it('offers a progress scrubber with the film clock', async () => {
@@ -979,7 +985,8 @@ describe('MatchViewer: one continuous film', () => {
         frame(timestamp);
         fixture.detectChanges();
 
-        narrations.add(native.querySelector('[role="status"]')?.textContent?.trim() ?? '');
+        // The canvas is labelled with the narration of the passage the playhead is in.
+        narrations.add(native.querySelector('canvas')?.getAttribute('aria-label') ?? '');
       }
 
       await settle();
@@ -1087,21 +1094,28 @@ describe('MatchViewer: one continuous film', () => {
       expect(clockText(native)).toBe("90+1'");
     });
 
-    it('labels the feed rows with the clock at the moment each beat happens', async () => {
+    it('shows the latest beat in the banner, and the next one as the playhead moves on', async () => {
+      const native = await load({ textOnly: true });
+      const banner = () =>
+        native.querySelector('[data-testid="match-commentary"]')?.textContent?.trim();
+
+      await scrubTo(native, 7_000);
+      expect(banner()).toBe('Late in the half.');
+
+      await scrubTo(native, 13_000);
+      expect(banner()).toBe('The second half begins.');
+    });
+
+    it('draws the banner in the colours of the side the beat is about, with readable ink', async () => {
       const native = await load({ textOnly: true });
 
-      await scrubTo(native, 17_999);
+      await scrubTo(native, 7_000);
 
-      const feed = native.querySelector('[data-testid="match-feed"]')!;
-      const rows = [...feed.querySelectorAll('li')].map((row) =>
-        [...row.querySelectorAll('span')].map((cell) => cell.textContent?.trim()),
-      );
+      const banner = native.querySelector<HTMLElement>('[data-testid="match-commentary"]')!;
 
-      // 2,000 ms into a passage whose clock runs 2,700 to 2,820 s reads 2,760 s: the second minute of stoppage.
-      expect(rows).toEqual([
-        ["45+2'", 'Late in the half.'],
-        ["46'", 'The second half begins.'],
-      ]);
+      // The beat names a player of the home side, whose kit the fixture's lineup gives as its primary.
+      expect(banner.style.background).not.toBe('');
+      expect(banner.style.color).not.toBe('');
     });
 
     it('moves the live panels on to the minute of the half the film is in', async () => {

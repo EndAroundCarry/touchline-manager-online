@@ -233,18 +233,21 @@ test.describe('the matchday', () => {
         .poll(async () => (await ratings.allTextContents()).join('|'), { timeout: 30_000 })
         .not.toBe(ratingsAtStart);
 
-      // ...and the commentary feed accumulates rows as the playhead passes each row's film time, every one
-      // of them stamped with a valid clock.
-      const feed = page.getByTestId('match-feed');
-      const feedAtStart = await feed.locator('li').count();
+      // ...and the commentary banner moves on to the next beat as the playhead passes each one's film time.
+      const banner = page.getByTestId('match-commentary');
+      const lineAtStart = (await banner.textContent())?.trim();
+      const seen = new Set<string | undefined>([lineAtStart]);
 
       await expect
-        .poll(() => feed.locator('li').count(), { timeout: 30_000 })
-        .toBeGreaterThan(feedAtStart);
+        .poll(
+          async () => {
+            seen.add((await banner.textContent())?.trim());
 
-      for (const label of await feed.locator('li > span:first-child').allTextContents()) {
-        expect(label.trim()).toMatch(clockLabel);
-      }
+            return seen.size;
+          },
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(2);
 
       // The half-time interval. The film is one timeline over both halves, so the clock is watched through
       // it: every reading is recorded as it changes, the playhead is moved to just before the interval, and
