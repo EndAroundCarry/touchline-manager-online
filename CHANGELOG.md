@@ -4,6 +4,16 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Wide midfielders plan, Milestone 2 - six formations use the wide midfielder, and the role reaches the tick engine
+
+**4-4-2, 4-1-4-1, 4-4-1-1 and 4-5-1 now field a left and a right midfielder where they had wingers, 5-4-1 does where it had its outer central midfielders, and 3-4-3 does where it had wing-backs.** 3-5-2 and 3-4-2-1 keep their wing-backs, and 4-3-3 and 4-2-3-1 keep their wingers. The wide men are in the midfield family now, so they take the midfield's 60 % of the line shift instead of the attack's 30 %. The slot's role is carried into the tick engine (`TickAnchorSpec.Role`) but nothing reads it yet: a wide midfielder plays as any other midfielder until Milestone 3 gives him his own behaviour.
+
+### Changed
+
+- `FormationLayouts`: slots 6 and 9 of 4-4-2 and 4-4-1-1, 7 and 10 of 4-1-4-1, 6 and 10 of 4-5-1, 7 and 10 of 5-4-1 and 5 and 9 of 3-4-3 are `Midfield / WideMidfielder`. 5-4-1's outer men move out from 7,400 / 2,600 to 8,000 / 2,000 (they stood inside the engine's wide threshold, so they never counted as wide), and 3-4-3's from the back line at (4,200, 9,200 / 800) into the midfield line at (5,000, 8,800 / 1,200).
+- The match center's formation labels (`MatchLineupBuilder`) read the six shapes by their new roles, so a 4-4-2 is named exactly and not by the fall-back that groups slots by depth.
+- The tick engine's golden input and output hashes are re-pinned (the board 4-4-2 changed); the legacy engine's are not (it plays the test fixture's own shape). The carnage fixture of the film tests uses seed 8 (seed 7 drew no yellow card once the 4-4-2 changed), and one free-kick pack bound is 8.0 where it was 8.5 (the eight-seed sample moved by one player: 8.4).
+
 ## Wide midfielders plan, Milestone 1 - left and right midfielders exist (no formation uses them yet)
 
 **The game has two new positions, left midfielder (LM) and right midfielder (RM), between the full-backs and the wingers, and a new role, wide midfielder, that a slot can ask for.** Every club's generated squad grows from 22 to 24 players (one LM and one RM added) and the registration ceiling from 25 to 27, so the headroom for a transfer or a youth signing is still 3. No formation names the role yet and the match engine plays it as any other midfielder, so a match is played exactly as before: the tick engine golden hash does not move.

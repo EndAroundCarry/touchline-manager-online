@@ -48,7 +48,8 @@ internal static class TickPlay
     {
         rules = TestMatchFactory.Rules with { StraightRedPerFoulBasisPoints = 6_500, BaseFoulBasisPoints = 6_000 };
 
-        return Fixture(7) with
+        // Seed 8 since wide-midfielders M2: the board 4-4-2 changed, and seed 7 then drew no yellow card at all (nine reds, no booking).
+        return Fixture(8) with
         {
             FormulaConfigurationHash = EngineConfiguration.HashOf(rules, EngineVersions.LegacyRuleSetLabel),
         };

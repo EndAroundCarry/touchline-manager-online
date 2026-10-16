@@ -15,8 +15,34 @@ namespace Tactical11Manager.MatchEngine.Tick;
 /// <param name="OwnX">The base X, towards the goal the side attacks.</param>
 /// <param name="OwnY">The base Y, across the pitch from the side's left.</param>
 /// <param name="Family">The position family, which sets how much of each shift the player takes.</param>
-internal readonly record struct TickAnchorSpec(int OwnX, int OwnY, MatchPositionFamily Family)
+/// <param name="Role">
+/// The role the slot asks for (`wide-midfielders-v1`). A role is carried so a behaviour can tell a wide midfielder from a winger,
+/// though both stand on a flank: the family alone cannot. Nothing reads it yet apart from the family it implies.
+/// </param>
+internal readonly record struct TickAnchorSpec(int OwnX, int OwnY, MatchPositionFamily Family, MatchRole Role)
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TickAnchorSpec"/> struct with the plainest role of the family: a centre-back, a
+    /// central midfielder or a striker.
+    /// </summary>
+    /// <param name="ownX">The base X, towards the goal the side attacks.</param>
+    /// <param name="ownY">The base Y, across the pitch from the side's left.</param>
+    /// <param name="family">The position family.</param>
+    public TickAnchorSpec(int ownX, int ownY, MatchPositionFamily family)
+        : this(ownX, ownY, family, PlainRoleOf(family))
+    {
+    }
+
+    /// <summary>Gets the role a slot of the family has when nothing more specific is known.</summary>
+    /// <param name="family">The position family.</param>
+    public static MatchRole PlainRoleOf(MatchPositionFamily family) => family switch
+    {
+        MatchPositionFamily.Goalkeeper => MatchRole.Goalkeeper,
+        MatchPositionFamily.Defence => MatchRole.CentreBack,
+        MatchPositionFamily.Midfield => MatchRole.CentralMidfielder,
+        _ => MatchRole.Striker,
+    };
+
     /// <summary>Builds the anchor for a team-sheet slot.</summary>
     /// <param name="slot">The slot, with the tactics board's 0..10,000 coordinates.</param>
     public static TickAnchorSpec From(MatchSlotV1 slot)
@@ -26,7 +52,8 @@ internal readonly record struct TickAnchorSpec(int OwnX, int OwnY, MatchPosition
         return new TickAnchorSpec(
             slot.X * SpatialPitch.PitchLength / EngineRulesV2.SlotCoordinateScale,
             slot.Y * SpatialPitch.PitchWidth / EngineRulesV2.SlotCoordinateScale,
-            slot.Family);
+            slot.Family,
+            slot.Role);
     }
 }
 

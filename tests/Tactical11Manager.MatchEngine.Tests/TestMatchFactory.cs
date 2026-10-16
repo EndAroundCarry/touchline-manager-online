@@ -314,10 +314,10 @@ internal static class TestMatchFactory
             (MatchPositionFamily.Defence, MatchRole.CentreBack, 1_800, 6_000),
             (MatchPositionFamily.Defence, MatchRole.CentreBack, 1_800, 4_000),
             (MatchPositionFamily.Defence, MatchRole.FullBack, 2_000, 2_000),
-            (MatchPositionFamily.Attack, MatchRole.Winger, 5_800, 8_300),
+            (MatchPositionFamily.Midfield, MatchRole.WideMidfielder, 5_800, 8_300),
             (MatchPositionFamily.Midfield, MatchRole.CentralMidfielder, 5_200, 6_200),
             (MatchPositionFamily.Midfield, MatchRole.CentralMidfielder, 5_200, 3_800),
-            (MatchPositionFamily.Attack, MatchRole.Winger, 5_800, 1_700),
+            (MatchPositionFamily.Midfield, MatchRole.WideMidfielder, 5_800, 1_700),
             (MatchPositionFamily.Attack, MatchRole.Striker, 8_200, 6_200),
             (MatchPositionFamily.Attack, MatchRole.Striker, 8_200, 3_800),
         ];

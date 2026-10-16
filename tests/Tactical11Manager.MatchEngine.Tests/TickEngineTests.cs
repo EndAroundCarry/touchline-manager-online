@@ -20,10 +20,10 @@ public sealed class TickEngineTests
         (MatchPositionFamily.Defence, MatchRole.CentreBack, 1_800, 6_000),
         (MatchPositionFamily.Defence, MatchRole.CentreBack, 1_800, 4_000),
         (MatchPositionFamily.Defence, MatchRole.FullBack, 2_000, 2_000),
-        (MatchPositionFamily.Attack, MatchRole.Winger, 5_800, 8_300),
+        (MatchPositionFamily.Midfield, MatchRole.WideMidfielder, 5_800, 8_300),
         (MatchPositionFamily.Midfield, MatchRole.CentralMidfielder, 5_200, 6_200),
         (MatchPositionFamily.Midfield, MatchRole.CentralMidfielder, 5_200, 3_800),
-        (MatchPositionFamily.Attack, MatchRole.Winger, 5_800, 1_700),
+        (MatchPositionFamily.Midfield, MatchRole.WideMidfielder, 5_800, 1_700),
         (MatchPositionFamily.Attack, MatchRole.Striker, 8_200, 6_200),
         (MatchPositionFamily.Attack, MatchRole.Striker, 8_200, 3_800),
     ];
@@ -161,7 +161,7 @@ public sealed class TickEngineTests
         var result = MatchSimulator.Simulate(Current(20_260_925));
 
         result.InputHash.Should().Be(GoldenInputHash);
-        result.OutputHash.Should().Be(GoldenOutputHash, "a change to the tick engine's behaviour is an engine-version change (ADR-0004)");
+        result.OutputHash.Should().Be(GoldenOutputHash, "a change to the tick engine's behaviour is an engine-version change (ADR-0004); re-pinned at wide-midfielders M2, when the 4-4-2 wide men became wide midfielders (was 27735a84e0fc2e08)");
     }
 
     [Fact]
@@ -362,7 +362,7 @@ public sealed class TickEngineTests
         lines.Sum(line => line.ShotsOnTargetFaced).Should().BeGreaterThan(0);
     }
 
-    private const string GoldenInputHash = "5f74ae0160d042255a831b10ead014aa172a6e7cc951b2c0a0d1737dc906bda2";
+    private const string GoldenInputHash = "624b1cc3bd04834400ba8f7cfa37c2205c8f560830a0d458edeaadd520c0716f";
 
-    private const string GoldenOutputHash = "27735a84e0fc2e08409fd82fcd1e59d2ff39a8c82c666fe89cef399185cb7a57";
+    private const string GoldenOutputHash = "881fefd371d6b429f9aaa446c505c6431c81db097a172e2d970c47047b5be73a";
 }

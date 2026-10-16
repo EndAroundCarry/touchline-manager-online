@@ -19,10 +19,10 @@ public sealed class TickDefensiveAITests
         new(2_000, 2_500, MatchPositionFamily.Defence),
         new(2_000, 4_500, MatchPositionFamily.Defence),
         new(2_200, 6_100, MatchPositionFamily.Defence),
-        new(5_000, 900, MatchPositionFamily.Midfield),
+        new(5_000, 900, MatchPositionFamily.Midfield, MatchRole.WideMidfielder),
         new(4_800, 2_600, MatchPositionFamily.Midfield),
         new(4_800, 4_400, MatchPositionFamily.Midfield),
-        new(5_000, 6_100, MatchPositionFamily.Midfield),
+        new(5_000, 6_100, MatchPositionFamily.Midfield, MatchRole.WideMidfielder),
         new(7_500, 2_600, MatchPositionFamily.Attack),
         new(7_500, 4_400, MatchPositionFamily.Attack),
     ];
