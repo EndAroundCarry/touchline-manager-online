@@ -17,9 +17,5 @@
     <span [class]="wordClass()" aria-hidden="true">{{ band().label }}</span>
   </span>
   <span class="sr-only"
-    >{{ value() }}, {{ band().label }}
-    @if (progressSpoken(); as spoken) {
-      , {{ spoken }}
-    }
-  </span>
+    >{{ value() }}, {{ band().label }}@if (progressSpoken(); as spoken) {, {{ spoken }}}</span>
 </div>
