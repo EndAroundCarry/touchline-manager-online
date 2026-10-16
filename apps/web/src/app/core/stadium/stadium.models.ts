@@ -1,7 +1,7 @@
 /**
  * The stadium's transport mirror (`STAD-1`…`STAD-6`).
  *
- * Hand-written to match `TouchlineManager.Contracts.World`, in minor units of the one canonical currency.
+ * Hand-written to match `Tactical11Manager.Contracts.World`, in minor units of the one canonical currency.
  * Prices, costs and crowds are never derived here; the server owns every piece of arithmetic that matters
  * and the screen only multiplies a quoted cost by the places a manager is considering.
  */

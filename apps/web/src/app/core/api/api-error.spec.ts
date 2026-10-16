@@ -13,7 +13,7 @@ describe('ApiError', () => {
       url: '/api/v1/club-claims',
       headers: new HttpHeaders({ 'X-Correlation-Id': 'corr-123' }),
       error: {
-        type: 'https://touchline.example/problems/club-already-claimed',
+        type: 'https://tactical11.example/problems/club-already-claimed',
         title: 'Club already claimed',
         status: 409,
         detail: 'Another manager took this club first.',

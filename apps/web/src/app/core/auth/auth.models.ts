@@ -1,7 +1,7 @@
 /**
  * The auth module's transport shapes.
  *
- * These mirror `TouchlineManager.Contracts.Auth` on the server. They are handwritten for now because
+ * These mirror `Tactical11Manager.Contracts.Auth` on the server. They are handwritten for now because
  * the generated client arrives with the OpenAPI pipeline (`tools/openapi-client`); when that lands,
  * these interfaces are replaced by its output and the handwritten copies are deleted rather than kept
  * in step by hand.
@@ -58,7 +58,7 @@ export interface ProfileSnapshot {
 /**
  * The account's own data as one document (`F-07`, master plan §12.4).
  *
- * Mirrors `TouchlineManager.Contracts.Auth.AccountExportResponse`. It carries no secret or hidden value:
+ * Mirrors `Tactical11Manager.Contracts.Auth.AccountExportResponse`. It carries no secret or hidden value:
  * no password hash, token hash, or client-fingerprint hash.
  */
 export interface AccountExport {

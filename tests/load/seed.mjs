@@ -86,7 +86,7 @@ function prepareStack() {
 
   run('docker', ['compose', '-f', 'infra/compose.yaml', 'up', '-d', '--wait']);
   run('dotnet', ['tool', 'restore']);
-  run('dotnet', ['dotnet-ef', 'database', 'update', '--project', 'src/TouchlineManager.Infrastructure', '--startup-project', 'src/TouchlineManager.Infrastructure']);
+  run('dotnet', ['dotnet-ef', 'database', 'update', '--project', 'src/Tactical11Manager.Infrastructure', '--startup-project', 'src/Tactical11Manager.Infrastructure']);
   run('dotnet', ['run', '--project', 'tools/world-seeder']);
 }
 

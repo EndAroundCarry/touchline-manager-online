@@ -1,7 +1,7 @@
 /**
  * Transport shapes for the comms module (master plan §10.7, F-41).
  *
- * Hand-written mirror of `TouchlineManager.Contracts.Comms`, like the other module models and for the same
+ * Hand-written mirror of `Tactical11Manager.Contracts.Comms`, like the other module models and for the same
  * reason: the OpenAPI-generated client is a later stage, and until then the compiler is the check that these
  * stay in step. Everything is `readonly`.
  *

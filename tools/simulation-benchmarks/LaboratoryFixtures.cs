@@ -1,10 +1,10 @@
-using TouchlineManager.Application.Match;
-using TouchlineManager.Domain.Squad;
-using TouchlineManager.MatchEngine;
-using TouchlineManager.MatchEngine.Configuration;
-using TouchlineManager.MatchEngine.Model;
+using Tactical11Manager.Application.Match;
+using Tactical11Manager.Domain.Squad;
+using Tactical11Manager.MatchEngine;
+using Tactical11Manager.MatchEngine.Configuration;
+using Tactical11Manager.MatchEngine.Model;
 
-namespace TouchlineManager.SimulationBenchmarks;
+namespace Tactical11Manager.SimulationBenchmarks;
 
 /// <summary>
 /// Builds the squads the laboratory simulates.

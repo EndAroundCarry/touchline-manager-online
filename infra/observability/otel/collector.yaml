@@ -21,7 +21,7 @@ exporters:
   prometheus:
     endpoint: 0.0.0.0:8889
     # Without this the resource attributes stay on the resource and there is no `service_name` label, so
-    # `touchline-api` and `touchline-worker` would be indistinguishable in every query. It is the one
+    # `tactical11-api` and `tactical11-worker` would be indistinguishable in every query. It is the one
     # setting that makes the dashboards able to tell the two hosts apart.
     resource_to_telemetry_conversion:
       enabled: true

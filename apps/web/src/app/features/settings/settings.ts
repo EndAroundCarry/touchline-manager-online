@@ -459,7 +459,7 @@ export class Settings {
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = `touchline-manager-account-${data.generatedAt.slice(0, 10)}.json`;
+    link.download = `tactical11-manager-account-${data.generatedAt.slice(0, 10)}.json`;
     link.click();
 
     URL.revokeObjectURL(url);

@@ -2,7 +2,7 @@
 <html lang="en" class="app-dark">
   <head>
     <meta charset="utf-8" />
-    <title>Touchline Manager</title>
+    <title>Tactical11 Manager</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
@@ -12,12 +12,12 @@
     <meta name="theme-color" content="#0b0f14" />
     <meta name="color-scheme" content="dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Touchline" />
+    <meta name="apple-mobile-web-app-title" content="Tactical11" />
     <script>
       // Applies the stored colour theme before the first paint, so a manager who chose light never sees a dark flash.
       // `ThemeStore` adopts the same value once the app starts.
       try {
-        if (localStorage.getItem('touchline.theme') === 'light') {
+        if (localStorage.getItem('tactical11.theme') === 'light') {
           document.documentElement.classList.remove('app-dark');
           document.documentElement.classList.add('app-light');
         }
@@ -31,6 +31,6 @@
   </head>
   <body>
     <app-root></app-root>
-    <noscript>Touchline Manager needs JavaScript. Enable it and reload the page.</noscript>
+    <noscript>Tactical11 Manager needs JavaScript. Enable it and reload the page.</noscript>
   </body>
 </html>

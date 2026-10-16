@@ -2,7 +2,7 @@
   "uid": "touchline-slo-overview",
   "title": "SLO overview",
   "description": "Master plan §14.1's objectives: 99.9% availability and the 500 ms read / 800 ms command p95 budgets. Availability is shown over the selected range; the monthly objective itself needs the production telemetry backend, because this stack keeps fifteen days of samples (ADR-0048).",
-  "tags": ["touchline", "slo"],
+  "tags": ["tactical11", "slo"],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,

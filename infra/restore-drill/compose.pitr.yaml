@@ -8,15 +8,15 @@
 # This is a drill, not a deployment: production runs managed PostgreSQL with provider PITR (ADR-0008),
 # and the procedure below is what that maps to. Nothing here is wired into CI (ADR-0046).
 
-name: touchline-restore-drill
+name: tactical11-restore-drill
 
 services:
   primary:
     image: postgres:17-alpine
-    container_name: touchline-pitr-primary
+    container_name: tactical11-pitr-primary
     environment:
-      POSTGRES_DB: touchline
-      POSTGRES_USER: touchline_app
+      POSTGRES_DB: tactical11
+      POSTGRES_USER: tactical11_app
       POSTGRES_PASSWORD: local_dev_password_change_me
     # A distinct host port so the drill never contends with the development stack's 55432.
     ports:
@@ -36,7 +36,7 @@ services:
     volumes:
       - pitr-archive:/archive
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U touchline_app -d touchline"]
+      test: ["CMD-SHELL", "pg_isready -U tactical11_app -d tactical11"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -44,13 +44,13 @@ services:
 
   restore:
     image: postgres:17-alpine
-    container_name: touchline-pitr-restore
+    container_name: tactical11-pitr-restore
     # Started only when the driver passes --profile restore, after the base backup exists.
     profiles: ["restore"]
     environment:
       PGDATA: /archive/base
-      POSTGRES_DB: touchline
-      POSTGRES_USER: touchline_app
+      POSTGRES_DB: tactical11
+      POSTGRES_USER: tactical11_app
       POSTGRES_PASSWORD: local_dev_password_change_me
     volumes:
       - pitr-archive:/archive
@@ -71,4 +71,4 @@ services:
 
 volumes:
   pitr-archive:
-    name: touchline-pitr-archive
+    name: tactical11-pitr-archive

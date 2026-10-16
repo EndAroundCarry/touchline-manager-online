@@ -26,7 +26,7 @@ daemon is reachable rather than failing.
 
 | Check | Source of truth | Fails when |
 |---|---|---|
-| `deps` | `dotnet list TouchlineManager.slnx package --vulnerable --include-transitive --format json` | any package carries an advisory |
+| `deps` | `dotnet list Tactical11Manager.slnx package --vulnerable --include-transitive --format json` | any package carries an advisory |
 | `deps-web` | `npm audit --json` in `apps/web` and `tests/web-e2e` | any `high` or `critical` advisory |
 | `licenses` | each resolved package's `.nuspec` from the NuGet global packages folder | a licence on the denylist |
 | `licenses-web` | the `license` field in each `package-lock.json` entry | a licence on the denylist |

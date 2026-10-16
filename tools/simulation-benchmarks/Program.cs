@@ -1,13 +1,13 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
-using TouchlineManager.Application.Match;
-using TouchlineManager.MatchEngine;
-using TouchlineManager.MatchEngine.Commentary;
-using TouchlineManager.MatchEngine.Configuration;
-using TouchlineManager.MatchEngine.Highlights;
-using TouchlineManager.MatchEngine.Model;
-using TouchlineManager.SimulationBenchmarks;
+using Tactical11Manager.Application.Match;
+using Tactical11Manager.MatchEngine;
+using Tactical11Manager.MatchEngine.Commentary;
+using Tactical11Manager.MatchEngine.Configuration;
+using Tactical11Manager.MatchEngine.Highlights;
+using Tactical11Manager.MatchEngine.Model;
+using Tactical11Manager.SimulationBenchmarks;
 
 // The simulation laboratory (master plan §8.5, §16 Stage 5).
 //

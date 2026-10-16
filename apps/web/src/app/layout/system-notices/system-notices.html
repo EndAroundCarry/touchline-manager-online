@@ -4,7 +4,7 @@
     role="status"
     aria-live="polite"
   >
-    Touchline is read-only for a moment. You can still read; changes are disabled until it returns.
+    Tactical11 is read-only for a moment. You can still read; changes are disabled until it returns.
     @if (readOnlyMessage(); as reason) {
       {{ reason }}
     }
@@ -43,9 +43,9 @@
   >
     <p role="status" aria-live="polite">
       @if (unrecoverable()) {
-        This version of Touchline can no longer load its files.
+        This version of Tactical11 can no longer load its files.
       } @else {
-        A new version of Touchline is ready.
+        A new version of Tactical11 is ready.
       }
     </p>
     <button type="button" [class]="secondaryButtonClass" (click)="reload()">Reload</button>

@@ -1,7 +1,7 @@
 /**
  * Transport shapes for the match center (master plan §9.5, §11.1).
  *
- * Hand-written mirrors of `TouchlineManager.Contracts.Match`, as the rest of the app's shapes are. Every
+ * Hand-written mirrors of `Tactical11Manager.Contracts.Match`, as the rest of the app's shapes are. Every
  * field is `readonly`: a response is a fact the server produced, and the screen never edits one — the
  * replay is played, not changed.
  */

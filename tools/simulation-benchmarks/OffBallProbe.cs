@@ -1,10 +1,10 @@
 using System.Globalization;
-using TouchlineManager.MatchEngine;
-using TouchlineManager.MatchEngine.Configuration;
-using TouchlineManager.MatchEngine.Highlights;
-using TouchlineManager.MatchEngine.Model;
+using Tactical11Manager.MatchEngine;
+using Tactical11Manager.MatchEngine.Configuration;
+using Tactical11Manager.MatchEngine.Highlights;
+using Tactical11Manager.MatchEngine.Model;
 
-namespace TouchlineManager.SimulationBenchmarks;
+namespace Tactical11Manager.SimulationBenchmarks;
 
 /// <summary>
 /// The off-ball probe (engine-v10): measures what the manager sees of how players take up positions and who

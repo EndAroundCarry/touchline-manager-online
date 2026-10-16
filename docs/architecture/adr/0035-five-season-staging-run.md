@@ -32,7 +32,7 @@ many seasons cannot ship with.
 assertion, and the plan already routes the multi-season runs to "staging". There is no staging deployment
 yet (Stage 14/16), and no product need for an endpoint that plays seasons. So the run is a test over the
 real worker's own composition and a real PostgreSQL 17 container, in
-`tests/TouchlineManager.Worker.IntegrationTests`. It is the CI gate the criterion names, and it adds no
+`tests/Tactical11Manager.Worker.IntegrationTests`. It is the CI gate the criterion names, and it adds no
 HTTP route, CLI, or configuration an operator must reason about.
 
 **2. The run drives the real durable pipeline, not the use case.** Each season's rollover is enqueued

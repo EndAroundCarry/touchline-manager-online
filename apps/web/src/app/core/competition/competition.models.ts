@@ -3,7 +3,7 @@ import type { AssignedPlayer, SelectablePlayer } from '../tactics/tactics.models
 /**
  * Transport shapes for the competition module (master plan §10.5, §11.1).
  *
- * Hand-written mirror of `TouchlineManager.Contracts.Competition`, like `squad.models.ts` and
+ * Hand-written mirror of `Tactical11Manager.Contracts.Competition`, like `squad.models.ts` and
  * `tactics.models.ts` and for the same reason: the OpenAPI-generated client is a later stage, and until
  * then the compiler is the check that these stay in step. Everything is `readonly`.
  *

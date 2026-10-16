@@ -11,12 +11,12 @@ Who uses the system, and what it depends on.
 
 ```mermaid
 C4Context
-    title Touchline Manager — System Context
+    title Tactical11 Manager — System Context
 
     Person(manager, "Manager", "Plays the game: prepares squads, sets tactics, bids in auctions, watches matches. Uses desktop or phone.")
     Person(ops, "Operator / Admin", "Runs the live game: monitors jobs and matchdays, resumes failures, suspends accounts, makes audited repairs.")
 
-    System(touchline, "Touchline Manager", "Persistent, asynchronous, server-authoritative football-management MMO. Resolves scheduled matchdays for six fictional national pyramids without client action.")
+    System(touchline, "Tactical11 Manager", "Persistent, asynchronous, server-authoritative football-management MMO. Resolves scheduled matchdays for six fictional national pyramids without client action.")
 
     System_Ext(email, "Postmark", "Transactional email: verification, password reset, deadline reminders, inactivity notices.")
     System_Ext(cdn, "Cloudflare", "DNS, TLS termination, WAF, CDN, static PWA hosting and SPA fallback.")
@@ -44,12 +44,12 @@ path, and no club/player licensing feed — all identity is generated fiction.
 
 ```mermaid
 C4Container
-    title Touchline Manager — Containers
+    title Tactical11 Manager — Containers
 
     Person(manager, "Manager", "Human player")
     Person(ops, "Operator", "Live-ops and support")
 
-    System_Boundary(tm, "Touchline Manager") {
+    System_Boundary(tm, "Tactical11 Manager") {
         Container(web, "Web application (PWA)", "Angular standalone components, Signals, PrimeNG, Tailwind, TypeScript Canvas renderer", "All manager-facing screens. Renders tables, tactics board, commentary, and 2D highlight keyframes. Holds the access token in memory only.")
         Container(api, "API", "ASP.NET Core Minimal APIs, .NET 10", "The only public writer. Authentication, authorization, validation, queries, and commands. Enqueues durable jobs; never simulates matches.")
         Container(worker, "Worker", "ASP.NET Core hosted service, .NET 10", "Executes every deadline: fixture locks, matchday simulation and publication, auctions, daily progression, weekly finance, inactivity, provisioning, season rollover, outbox and email dispatch.")

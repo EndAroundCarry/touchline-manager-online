@@ -189,7 +189,7 @@ before Stages 8 and 12 respectively; neither blocks Stage 1.
 
 Per master plan §16 Stage 1, once confirmed:
 
-1. `TouchlineManager.slnx`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`,
+1. `Tactical11Manager.slnx`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`,
    `.editorconfig`, lockfiles, strict analyzers, root README, `CHANGELOG.md`.
 2. Project scaffold for Domain, Application, Infrastructure, Contracts, MatchEngine, Api,
    Worker, the Angular PWA, and all test projects.

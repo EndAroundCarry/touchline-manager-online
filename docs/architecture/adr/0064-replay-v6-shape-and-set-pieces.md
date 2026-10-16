@@ -13,7 +13,7 @@ nobody touching the ball; every free kick had the same wall and three attackers 
 a penalty put nine players inside the 9.15 m arc. The reference was fifteen Football Manager 2D screenshots (open
 play, wing attacks, low and mid blocks, long balls); throw-ins are out of scope.
 
-All of it is the film layer (`src/TouchlineManager.MatchEngine/Highlights/`), which turns a match that has already
+All of it is the film layer (`src/Tactical11Manager.MatchEngine/Highlights/`), which turns a match that has already
 been played into keyframes. Verified in code before the work began:
 
 1. `FilmShape.FillOpen` pulled one centroid per side to the ball (0.40 along, 0.30 across), so the whole block

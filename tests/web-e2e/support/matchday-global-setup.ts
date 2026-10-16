@@ -38,9 +38,9 @@ export default function globalSetup(): void {
       'drop',
       '--force',
       '--project',
-      'src/TouchlineManager.Infrastructure',
+      'src/Tactical11Manager.Infrastructure',
       '--startup-project',
-      'src/TouchlineManager.Infrastructure',
+      'src/Tactical11Manager.Infrastructure',
     ],
     matchdayEnvironment,
   );
@@ -52,9 +52,9 @@ export default function globalSetup(): void {
       'database',
       'update',
       '--project',
-      'src/TouchlineManager.Infrastructure',
+      'src/Tactical11Manager.Infrastructure',
       '--startup-project',
-      'src/TouchlineManager.Infrastructure',
+      'src/Tactical11Manager.Infrastructure',
     ],
     matchdayEnvironment,
   );

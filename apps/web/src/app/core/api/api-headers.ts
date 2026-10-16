@@ -1,7 +1,7 @@
 /**
  * Custom HTTP headers that are part of the API contract.
  *
- * Mirrors `TouchlineManager.Contracts.Http.ApiHeaders` on the server. Later stages generate the
+ * Mirrors `Tactical11Manager.Contracts.Http.ApiHeaders` on the server. Later stages generate the
  * DTO types from the committed OpenAPI document; these names stay handwritten until then because
  * they are transport concerns rather than payload types.
  */

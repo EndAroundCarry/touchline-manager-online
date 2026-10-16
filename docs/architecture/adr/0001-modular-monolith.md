@@ -33,7 +33,7 @@ Adopt a **modular monolith**:
 Module boundaries are made explicit in two places at once, so an extraction later is a
 mechanical exercise rather than a rewrite:
 
-1. **C# namespaces and projects** — `TouchlineManager.Domain`, `.Application`,
+1. **C# namespaces and projects** — `Tactical11Manager.Domain`, `.Application`,
    `.Infrastructure`, `.Contracts`, `.MatchEngine`, with bounded modules expressed as
    namespaces and feature folders inside them.
 2. **PostgreSQL schemas** — `auth`, `world`, `squad`, `competition`, `match`, `market`,

@@ -1,0 +1,89 @@
+using Tactical11Manager.Application.Abstractions.Match;
+using Tactical11Manager.Contracts.Match;
+using Tactical11Manager.MatchEngine;
+using Tactical11Manager.MatchEngine.Commentary;
+using Tactical11Manager.MatchEngine.Configuration;
+using Tactical11Manager.MatchEngine.Highlights;
+using Tactical11Manager.MatchEngine.Model;
+
+namespace Tactical11Manager.Application.Match;
+
+/// <summary>The result of reading a match's replay.</summary>
+/// <param name="Outcome">What happened.</param>
+/// <param name="Presentation">The replay, when the read succeeded.</param>
+/// <param name="EntityTag">The strong entity tag the replay is cached under, when the read succeeded.</param>
+public sealed record GetMatchPresentationResult(
+    MatchReadOutcome Outcome,
+    MatchPresentationResponse? Presentation,
+    string? EntityTag);
+
+/// <summary>
+/// Reads a played match's commentary and highlights (master plan §9.5, §10.5).
+/// </summary>
+/// <remarks>
+/// <para>
+/// The replay is re-derived rather than stored: the engine is pure and deterministic, the snapshot is
+/// frozen and verified, and re-simulating from it reproduces the published result byte for byte. That is
+/// what makes the commentary, the highlights, the lineups, and the live condition and rating curve
+/// impossible to drift from the result they describe — a stored presentation would be a second copy that a
+/// later change could leave behind (`MAT-8`, `MAT-9`).
+/// </para>
+/// <para>
+/// The live metrics are captured by the same pass that reproduces the result. Capturing consumes no draw
+/// and changes no state, so the hash check below still proves the run is the published match, and the
+/// curve the match center draws is the one the live panels showed rather than an interpolation between
+/// kickoff and full time.
+/// </para>
+/// <para>
+/// The re-derived output hash is compared with the stored one before anything is returned. A mismatch means
+/// the engine changed without a version bump, which is a deployment defect rather than a manager's problem,
+/// so it fails loudly instead of serving a replay of a different match.
+/// </para>
+/// </remarks>
+public sealed class GetMatchPresentation
+{
+    private readonly IMatchQueries _queries;
+
+    /// <summary>Initializes the query.</summary>
+    public GetMatchPresentation(IMatchQueries queries) => _queries = queries;
+
+    /// <summary>Reads a match's replay.</summary>
+    /// <param name="matchId">The match.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<GetMatchPresentationResult> ExecuteAsync(
+        Guid matchId,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await _queries.GetMatchAsync(matchId, cancellationToken);
+
+        if (snapshot is null)
+        {
+            return new GetMatchPresentationResult(MatchReadOutcome.MatchNotFound, null, null);
+        }
+
+        var input = MatchSnapshotFactory.ReadVerified(snapshot.Snapshot);
+        var liveMetrics = new PlayerLiveMetricsRecorder();
+        var passages = new MatchPassageRecorder();
+        var result = MatchSimulator.Simulate(input, EngineRulesV2.Default, liveMetrics, passages);
+
+        if (!string.Equals(result.OutputHash, snapshot.OutputHash, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Re-simulating match {snapshot.MatchId:D} did not reproduce its stored output hash. "
+                + "The engine or its rules changed without a version bump (MAT-9).");
+        }
+
+        var commentary = CommentaryTokenBuilder.Build(input, result);
+        var presentation = ReplayDirector.Build(input, result, passages, liveMetrics: liveMetrics.Metrics);
+
+        return new GetMatchPresentationResult(
+            MatchReadOutcome.Found,
+            snapshot.ToResponse(presentation, commentary),
+
+            // The crests are read today, not frozen with the match, so a redesign has to change the tag or a
+            // cached replay would keep drawing the old one.
+            $"{snapshot.OutputHash}:{presentation.PresentationVersion}"
+            + $":{snapshot.Home.CrestShape}.{snapshot.Home.CrestPattern}"
+            + $":{snapshot.Away.CrestShape}.{snapshot.Away.CrestPattern}");
+    }
+}

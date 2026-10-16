@@ -1,7 +1,7 @@
 /**
  * Transport shapes for the squad module (master plan §10.3).
  *
- * Hand-written mirror of `TouchlineManager.Contracts.Squad`, like `world.models.ts` and for the same
+ * Hand-written mirror of `Tactical11Manager.Contracts.Squad`, like `world.models.ts` and for the same
  * reason: the OpenAPI-generated client is a later stage, and until then the compiler is the check that
  * these stay in step. Everything is `readonly`, and money is integer minor units.
  *

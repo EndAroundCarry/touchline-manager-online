@@ -1,7 +1,7 @@
 /**
  * The stepped-clock transport shapes (ADR-0049).
  *
- * These mirror `TouchlineManager.Api.Endpoints.OpsEndpoints` on the server. They exist only in
+ * These mirror `Tactical11Manager.Api.Endpoints.OpsEndpoints` on the server. They exist only in
  * non-production: the endpoints they call are mapped only when the stepped clock is in force.
  */
 

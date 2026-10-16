@@ -8,7 +8,7 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    stack: touchline-observability
+    stack: tactical11-observability
 
 rule_files:
   - /etc/prometheus/rules/*.yml

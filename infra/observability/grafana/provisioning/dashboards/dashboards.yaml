@@ -5,9 +5,9 @@
 apiVersion: 1
 
 providers:
-  - name: touchline
+  - name: tactical11
     orgId: 1
-    folder: Touchline Manager
+    folder: Tactical11 Manager
     type: file
     disableDeletion: false
     updateIntervalSeconds: 30

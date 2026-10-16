@@ -1,0 +1,344 @@
+using FluentAssertions;
+using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.Squad;
+
+namespace Tactical11Manager.Domain.Tests.Squad;
+
+/// <summary>
+/// The player aggregates: identity, attributes, state, contract, and registration invariants
+/// (`SQ-6`, `TRN-4`, `TRN-5..TRN-7`, `CON-1`, `CON-8`).
+/// </summary>
+public sealed class PlayerAggregateTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 9, 24, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void A_player_is_created_active_with_its_identity_normalised()
+    {
+        var player = GeneratedPlayer();
+
+        player.Status.Should().Be(PlayerStatus.Active);
+        player.NationalityCode.Should().Be("ENG");
+        player.FullName.Should().Be("Corin Alderwick");
+        player.Version.Should().Be(1);
+        player.CreatedAt.Should().Be(Now);
+        player.SecondaryPositionCodes.Should().Be("cb");
+        player.SecondaryPositions.Should().Equal(PlayerPosition.CentreBack);
+    }
+
+    [Fact]
+    public void Secondary_positions_are_stored_in_a_stable_order()
+    {
+        var player = Player.Generate(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Identity() with
+            {
+                SecondaryPositions = [PlayerPosition.Striker, PlayerPosition.CentreBack, PlayerPosition.Striker],
+            },
+            Now);
+
+        // Ordered by enum value and de-duplicated, so a regenerated squad compares row for row.
+        player.SecondaryPositionCodes.Should().Be("cb,st");
+    }
+
+    [Fact]
+    public void A_player_knows_its_age_in_a_game_year()
+    {
+        var player = GeneratedPlayer();
+
+        player.AgeIn(2026).Should().Be(2026 - player.BirthGameYear);
+    }
+
+    [Fact]
+    public void A_player_is_at_home_in_a_family_through_either_a_primary_or_a_secondary_position()
+    {
+        var player = GeneratedPlayer();
+
+        player.PlaysIn(PositionFamily.Defence).Should().BeTrue("centre back is a secondary position");
+        player.PrimaryPosition.Should().Be(PlayerPosition.RightBack);
+    }
+
+    [Fact]
+    public void An_impossible_birth_day_or_physique_is_a_programming_error()
+    {
+        var badDay = () => Player.Generate(Guid.CreateVersion7(), Guid.CreateVersion7(), Identity() with { BirthDayOfYear = 0 }, Now);
+        var tall = () => Player.Generate(Guid.CreateVersion7(), Guid.CreateVersion7(), Identity() with { HeightCm = 0 }, Now);
+        var heavy = () => Player.Generate(Guid.CreateVersion7(), Guid.CreateVersion7(), Identity() with { WeightKg = -1 }, Now);
+
+        badDay.Should().Throw<ArgumentOutOfRangeException>();
+        tall.Should().Throw<ArgumentOutOfRangeException>();
+        heavy.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void A_hidden_value_outside_the_attribute_scale_is_a_programming_error()
+    {
+        var badPotential = () => Player.Generate(Guid.CreateVersion7(), Guid.CreateVersion7(), Identity() with { Potential = 21 }, Now);
+        var badReputation = () => Player.Generate(Guid.CreateVersion7(), Guid.CreateVersion7(), Identity() with { Reputation = 0 }, Now);
+
+        badPotential.Should().Throw<ArgumentOutOfRangeException>();
+        badReputation.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void A_player_lifecycle_move_updates_the_version_and_status()
+    {
+        var player = GeneratedPlayer();
+
+        player.Retire(Now.AddDays(1));
+
+        player.Status.Should().Be(PlayerStatus.Retired);
+        player.Version.Should().Be(2);
+        player.UpdatedAt.Should().Be(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void A_retirement_announcement_is_recorded_once_and_only_once()
+    {
+        var player = GeneratedPlayer();
+
+        player.IsRetirementAnnounced.Should().BeFalse();
+        player.RetirementAnnouncedSeasonNumber.Should().BeNull();
+
+        player.AnnounceRetirement(3, Now.AddDays(1));
+
+        player.IsRetirementAnnounced.Should().BeTrue();
+        player.RetirementAnnouncedSeasonNumber.Should().Be(3);
+        player.Status.Should().Be(PlayerStatus.Active, "an announcement is not a retirement");
+
+        var version = player.Version;
+
+        player.AnnounceRetirement(4, Now.AddDays(2));
+
+        player.RetirementAnnouncedSeasonNumber.Should().Be(3, "the first announcement stands");
+        player.Version.Should().Be(version, "a repeat is a no-op (CON-6)");
+    }
+
+    [Fact]
+    public void Announcing_a_retirement_for_an_impossible_season_is_a_programming_error()
+    {
+        var act = () => GeneratedPlayer().AnnounceRetirement(0, Now);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Attributes_are_checksummed_over_their_canonical_order()
+    {
+        var attributes = PlayerAttributes.Create(Guid.CreateVersion7(), Attributes());
+
+        attributes.SchemaVersion.Should().Be(PlayerAttributes.CurrentSchemaVersion);
+        attributes.ChecksumMatches().Should().BeTrue();
+        attributes.Checksum.Should().HaveLength(64);
+        attributes.ToSet().Should().Be(Attributes());
+    }
+
+    [Fact]
+    public void An_attribute_outside_the_displayed_scale_is_rejected()
+    {
+        var act = () => PlayerAttributes.Create(
+            Guid.CreateVersion7(),
+            Attributes() with { Finishing = WorldRuleSet.AttributeMax + 1 });
+
+        act.Should().Throw<ArgumentOutOfRangeException>("TRN-4");
+    }
+
+    [Fact]
+    public void An_attribute_set_needs_exactly_the_canonical_number_of_values()
+    {
+        var act = () => PlayerAttributeSet.FromValues([1, 2, 3]);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void An_attribute_is_addressable_by_its_canonical_name()
+    {
+        var set = Attributes();
+
+        set.ValueOf(AttributeName.Finishing).Should().Be(set.Finishing);
+        set.ValueOf(AttributeName.AerialAbility).Should().Be(set.AerialAbility);
+        set.OfFamily(AttributeFamily.Goalkeeping).Should().HaveCount(set.Goalkeeping.Count);
+    }
+
+    [Fact]
+    public void A_state_row_opens_rested_unloaded_and_neutral()
+    {
+        var state = PlayerState.Open(Guid.CreateVersion7());
+
+        state.ConditionBp.Should().Be(WorldRuleSet.StateBasisPointsMax);
+        state.FatigueBp.Should().Be(WorldRuleSet.StateBasisPointsMin);
+        state.MoraleBp.Should().Be(PlayerState.NeutralBasisPoints);
+        state.MatchSharpnessBp.Should().Be(PlayerState.NeutralBasisPoints);
+        state.AttributeProgress.Should().HaveCount(AttributeNames.Count).And.OnlyContain(progress => progress == 0);
+        state.LastProgressionDate.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_match_load_moves_condition_fatigue_and_morale_by_its_deltas()
+    {
+        var state = PlayerState.Create(Guid.CreateVersion7(), 9_000, 200, 5_000, 5_000, null);
+
+        state.ApplyMatchLoad(conditionDeltaBp: -900, fatigueDeltaBp: 600, moraleDeltaBp: 350);
+
+        state.ConditionBp.Should().Be(8_100, "a match consumes condition (TRN-11)");
+        state.FatigueBp.Should().Be(800, "a match adds fatigue (TRN-11)");
+        state.MoraleBp.Should().Be(5_350, "the result moves morale (TRN-13)");
+        state.Version.Should().Be(2, "the row this writes is a new version of the aggregate (CONC-1)");
+    }
+
+    [Fact]
+    public void A_match_load_never_pushes_a_state_value_off_its_scale()
+    {
+        var state = PlayerState.Create(Guid.CreateVersion7(), 100, 9_900, 9_900, 5_000, null);
+
+        state.ApplyMatchLoad(conditionDeltaBp: -5_000, fatigueDeltaBp: 5_000, moraleDeltaBp: 5_000);
+
+        state.ConditionBp.Should().Be(WorldRuleSet.StateBasisPointsMin);
+        state.FatigueBp.Should().Be(WorldRuleSet.StateBasisPointsMax);
+        state.MoraleBp.Should().Be(WorldRuleSet.StateBasisPointsMax);
+    }
+
+    [Fact]
+    public void A_state_value_outside_its_scale_is_rejected()
+    {
+        var act = () => PlayerState.Create(Guid.CreateVersion7(), 10_001, 0, 0, 0, null);
+
+        act.Should().Throw<ArgumentOutOfRangeException>("TRN-5");
+    }
+
+    [Fact]
+    public void Attribute_progress_is_stored_and_read_back_per_attribute()
+    {
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)AttributeName.Finishing] = 850_000;
+        progress[(int)AttributeName.Pace] = -400_000;
+
+        var state = PlayerState.Create(Guid.CreateVersion7(), 9_000, 200, 5_000, 5_000, null, progress);
+
+        state.AttributeProgress.Should().Equal(progress);
+        state.AttributeProgressJson.Should().Be("[[0,850000],[18,-400000]]", "only attributes with progress are stored");
+    }
+
+    [Fact]
+    public void Applying_a_progression_replaces_the_attribute_progress()
+    {
+        var state = PlayerState.Open(Guid.CreateVersion7());
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)AttributeName.Composure] = 120_000;
+
+        state.ApplyProgression(8_000, 100, 5_000, 5_000, progress, new DateOnly(2026, 10, 1));
+
+        state.AttributeProgress.Should().Equal(progress);
+        state.LastProgressionDate.Should().Be(new DateOnly(2026, 10, 1));
+        state.Version.Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData(1_000_000)]
+    [InlineData(-1_000_000)]
+    public void Attribute_progress_of_a_whole_point_or_more_is_rejected(int value)
+    {
+        var progress = new int[AttributeNames.Count];
+
+        progress[(int)AttributeName.Finishing] = value;
+
+        var act = () => PlayerState.Create(Guid.CreateVersion7(), 0, 0, 0, 0, null, progress);
+
+        act.Should().Throw<ArgumentOutOfRangeException>("a whole point is spent, never stored (TRN-10)");
+    }
+
+    [Fact]
+    public void Attribute_progress_must_have_one_value_per_attribute()
+    {
+        var act = () => PlayerState.Create(Guid.CreateVersion7(), 0, 0, 0, 0, null, [1, 2, 3]);
+
+        act.Should().Throw<ArgumentOutOfRangeException>("TRN-10");
+    }
+
+    [Fact]
+    public void A_contract_covers_one_to_three_game_seasons()
+    {
+        var contract = PlayerContract.Sign(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            startSeasonNumber: 1, endSeasonNumber: 3, weeklyWageMinor: 5_000,
+            SquadStatus.FirstTeam, Now);
+
+        contract.IsActive.Should().BeTrue("SQ-6");
+        contract.CreatedAt.Should().Be(Now);
+
+        var tooShort = () => PlayerContract.Sign(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 2, 1, 0, SquadStatus.Rotation, Now);
+        var tooLong = () => PlayerContract.Sign(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 1, 5, 0, SquadStatus.Rotation, Now);
+
+        tooShort.Should().Throw<ArgumentOutOfRangeException>("CON-1: a term never ends before it starts");
+        tooLong.Should().Throw<ArgumentOutOfRangeException>("CON-1: a contract is at most three seasons");
+    }
+
+    [Fact]
+    public void Closing_a_contract_records_a_known_reason_once()
+    {
+        var contract = PlayerContract.Sign(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 1, 1, 1_000, SquadStatus.Prospect, Now);
+
+        contract.Close(PlayerContractCloseReasons.Transferred, Now.AddDays(1));
+
+        contract.Status.Should().Be(ContractStatus.Closed);
+        contract.ClosedReason.Should().Be(PlayerContractCloseReasons.Transferred);
+        contract.IsActive.Should().BeFalse();
+
+        var again = () => contract.Close(PlayerContractCloseReasons.Released, Now.AddDays(2));
+        var unknown = () => PlayerContract.Sign(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 1, 1, 1_000, SquadStatus.Prospect, Now)
+            .Close("vanished", Now);
+
+        again.Should().Throw<InvalidOperationException>();
+        unknown.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void A_registration_records_its_fixture_boundary_and_ends_once()
+    {
+        var registration = PlayerRegistration.Register(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            effectiveFixtureBoundaryRound: 7, Now);
+
+        registration.IsActive.Should().BeTrue("SQ-6");
+        registration.EffectiveFixtureBoundaryRound.Should().Be(7);
+
+        registration.End(Now.AddDays(1));
+        registration.Status.Should().Be(RegistrationStatus.Ended);
+
+        var again = () => registration.End(Now.AddDays(2));
+        var negative = () => PlayerRegistration.Register(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), -1, Now);
+
+        again.Should().Throw<InvalidOperationException>();
+        negative.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    private static Player GeneratedPlayer() =>
+        Player.Generate(Guid.CreateVersion7(), Guid.CreateVersion7(), Identity(), Now);
+
+    private static PlayerIdentity Identity() => new(
+        "Corin Alderwick",
+        "C. Alderwick",
+        "eng",
+        "name-seed",
+        BirthGameYear: 2000,
+        BirthDayOfYear: 100,
+        PreferredFoot.Right,
+        HeightCm: 178,
+        WeightKg: 74,
+        PlayerPosition.RightBack,
+        [PlayerPosition.CentreBack],
+        Potential: 15,
+        Reputation: 12);
+
+    private static PlayerAttributeSet Attributes() => PlayerAttributeSet.FromValues(
+        [.. Enumerable.Repeat(10, AttributeNames.Count)]);
+}

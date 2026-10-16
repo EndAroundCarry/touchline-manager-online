@@ -23,12 +23,12 @@ const repositoryRoot = resolve(here, '..', '..');
 const COMPOSE_FILE = resolve(here, 'compose.pitr.yaml');
 const COMPOSE = ['compose', '-f', COMPOSE_FILE];
 
-const PRIMARY = 'touchline-pitr-primary';
-const RESTORE = 'touchline-pitr-restore';
+const PRIMARY = 'tactical11-pitr-primary';
+const RESTORE = 'tactical11-pitr-restore';
 
 const PORT = process.env.PITR_PRIMARY_PORT ?? '55433';
 const PASSWORD = 'local_dev_password_change_me';
-const CONNECTION = `Host=localhost;Port=${PORT};Database=touchline;Username=touchline_app;Password=${PASSWORD}`;
+const CONNECTION = `Host=localhost;Port=${PORT};Database=tactical11;Username=tactical11_app;Password=${PASSWORD}`;
 
 main()
   .then((ok) => {
@@ -50,7 +50,7 @@ async function main() {
   // Alpine and Debian variants) and the archiver can write to them.
   step('Preparing the archive volume');
   compose(['create', 'primary']);
-  sh('docker run --rm -v touchline-pitr-archive:/archive postgres:17-alpine sh -c "mkdir -p /archive/wal /archive/base && chown -R postgres:postgres /archive"');
+  sh('docker run --rm -v tactical11-pitr-archive:/archive postgres:17-alpine sh -c "mkdir -p /archive/wal /archive/base && chown -R postgres:postgres /archive"');
 
   step('Starting the archive-enabled primary');
   compose(['up', '-d', '--wait', 'primary']);
@@ -58,8 +58,8 @@ async function main() {
   step('Migrating and seeding a world into the drill database');
   run('dotnet', ['tool', 'restore']);
   run('dotnet', ['dotnet-ef', 'database', 'update',
-    '--project', 'src/TouchlineManager.Infrastructure',
-    '--startup-project', 'src/TouchlineManager.Infrastructure'], { env: { ConnectionStrings__Database: CONNECTION } });
+    '--project', 'src/Tactical11Manager.Infrastructure',
+    '--startup-project', 'src/Tactical11Manager.Infrastructure'], { env: { ConnectionStrings__Database: CONNECTION } });
   run('dotnet', ['run', '--project', 'tools/world-seeder'],
     { env: { ConnectionStrings__Database: CONNECTION } });
 
@@ -74,7 +74,7 @@ async function main() {
 
   step('Taking the base backup');
   docker(['exec', '-e', `PGPASSWORD=${PASSWORD}`, '-u', 'postgres', PRIMARY,
-    'pg_basebackup', '-h', 'localhost', '-U', 'touchline_app',
+    'pg_basebackup', '-h', 'localhost', '-U', 'tactical11_app',
     '-D', '/archive/base', '--wal-method=stream', '--checkpoint=fast']);
 
   // The recovery target must be after the base backup's start, so it is recorded now, and the data that
@@ -137,10 +137,10 @@ async function waitForArchive() {
 /** Waits until the restored cluster has finished recovery and is serving. */
 async function waitForPromotion() {
   for (let attempt = 0; attempt < 60; attempt++) {
-    const state = spawnSync('docker', ['exec', RESTORE, 'pg_isready', '-U', 'touchline_app', '-d', 'touchline'], { encoding: 'utf8' });
+    const state = spawnSync('docker', ['exec', RESTORE, 'pg_isready', '-U', 'tactical11_app', '-d', 'tactical11'], { encoding: 'utf8' });
 
     if (state.status === 0) {
-      const recovering = spawnSync('docker', ['exec', RESTORE, 'psql', '-U', 'touchline_app', '-d', 'touchline', '-tAc', 'select pg_is_in_recovery()'], { encoding: 'utf8' });
+      const recovering = spawnSync('docker', ['exec', RESTORE, 'psql', '-U', 'tactical11_app', '-d', 'tactical11', '-tAc', 'select pg_is_in_recovery()'], { encoding: 'utf8' });
 
       if (recovering.stdout.trim() === 'f') {
         return true;
@@ -159,14 +159,14 @@ async function waitForPromotion() {
 
 /** Runs SQL in the primary and returns stdout. */
 function primary(sql) {
-  const result = docker(['exec', PRIMARY, 'psql', '-U', 'touchline_app', '-d', 'touchline', '-tAc', sql]);
+  const result = docker(['exec', PRIMARY, 'psql', '-U', 'tactical11_app', '-d', 'tactical11', '-tAc', sql]);
 
   return result.stdout;
 }
 
 /** Runs a SQL script in the restored cluster, showing its output, and returns whether it succeeded. */
 function restoreScript(file) {
-  const result = docker(['exec', RESTORE, 'psql', '-U', 'touchline_app', '-d', 'touchline', '-v', 'ON_ERROR_STOP=1', '-f', file]);
+  const result = docker(['exec', RESTORE, 'psql', '-U', 'tactical11_app', '-d', 'tactical11', '-v', 'ON_ERROR_STOP=1', '-f', file]);
 
   if (result.stdout) {
     process.stdout.write(result.stdout);
@@ -237,7 +237,7 @@ function cleanup() {
 
   // The archive volume holds a base backup; a stale one would make the next run's pg_basebackup refuse
   // a non-empty target, so it is removed explicitly rather than left to Compose.
-  spawnSync('docker', ['volume', 'rm', '-f', 'touchline-pitr-archive'], { stdio: 'ignore' });
+  spawnSync('docker', ['volume', 'rm', '-f', 'tactical11-pitr-archive'], { stdio: 'ignore' });
 }
 
 function sleep(milliseconds) {

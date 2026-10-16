@@ -61,7 +61,7 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'dotnet run --project apps/api/TouchlineManager.Api',
+      command: 'dotnet run --project apps/api/Tactical11Manager.Api',
       cwd: repositoryRoot,
       url: 'http://localhost:5080/health/live',
       reuseExistingServer: !isContinuousIntegration,

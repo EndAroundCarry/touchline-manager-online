@@ -1,15 +1,15 @@
 using System.Text.Json;
-using TouchlineManager.Application.Match;
-using TouchlineManager.Domain.Squad;
-using TouchlineManager.MatchEngine;
-using TouchlineManager.MatchEngine.Commentary;
-using TouchlineManager.MatchEngine.Configuration;
-using TouchlineManager.MatchEngine.Highlights;
-using TouchlineManager.MatchEngine.Model;
-using TouchlineManager.MatchEngine.Tick;
+using Tactical11Manager.Application.Match;
+using Tactical11Manager.Domain.Squad;
+using Tactical11Manager.MatchEngine;
+using Tactical11Manager.MatchEngine.Commentary;
+using Tactical11Manager.MatchEngine.Configuration;
+using Tactical11Manager.MatchEngine.Highlights;
+using Tactical11Manager.MatchEngine.Model;
+using Tactical11Manager.MatchEngine.Tick;
 using System.Globalization;
 
-namespace TouchlineManager.SimulationBenchmarks;
+namespace Tactical11Manager.SimulationBenchmarks;
 
 /// <summary>
 /// Plays one match between two uniform sides of chosen ability on the tick engine, prints what it came to and writes its film.

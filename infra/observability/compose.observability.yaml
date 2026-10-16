@@ -5,19 +5,19 @@
 # traces and metrics, Prometheus scrapes the collector and evaluates the SLO alert rules, Alertmanager holds
 # the firing alerts, Tempo stores the traces, and Grafana reads both.
 #
-# It is a separate compose project (`touchline-observability`) with its own file, exactly like the restore
+# It is a separate compose project (`tactical11-observability`) with its own file, exactly like the restore
 # drill, so it can never tear down the development stack. It runs locally and by hand (`npm run obs:up`);
 # nothing is wired into CI, and routing the alerts to a real receiver is the deployment milestone's work
 # (ADR-0048).
 #
 # This stack has no authentication and is meant for a developer's machine only. Never publish it.
 
-name: touchline-observability
+name: tactical11-observability
 
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.161.0
-    container_name: touchline-obs-otel-collector
+    container_name: tactical11-obs-otel-collector
     restart: unless-stopped
     command: ["--config=/etc/otelcol-contrib/collector.yaml"]
     volumes:
@@ -47,7 +47,7 @@ services:
 
   tempo:
     image: grafana/tempo:3.1.0
-    container_name: touchline-obs-tempo
+    container_name: tactical11-obs-tempo
     restart: unless-stopped
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     volumes:
@@ -67,7 +67,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.15.0
-    container_name: touchline-obs-prometheus
+    container_name: tactical11-obs-prometheus
     restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -94,7 +94,7 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.34.1
-    container_name: touchline-obs-alertmanager
+    container_name: tactical11-obs-alertmanager
     restart: unless-stopped
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
@@ -115,7 +115,7 @@ services:
 
   grafana:
     image: grafana/grafana:13.2.3
-    container_name: touchline-obs-grafana
+    container_name: tactical11-obs-grafana
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${OBS_GRAFANA_ADMIN_PASSWORD:-local_dev_password_change_me}
@@ -147,10 +147,10 @@ services:
 
 volumes:
   prometheus-data:
-    name: touchline-obs-prometheus-data
+    name: tactical11-obs-prometheus-data
   alertmanager-data:
-    name: touchline-obs-alertmanager-data
+    name: tactical11-obs-alertmanager-data
   grafana-data:
-    name: touchline-obs-grafana-data
+    name: tactical11-obs-grafana-data
   tempo-data:
-    name: touchline-obs-tempo-data
+    name: tactical11-obs-tempo-data

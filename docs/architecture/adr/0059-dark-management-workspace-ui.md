@@ -64,7 +64,7 @@ now sits on a dark page rather than inside a light one.
   `/45`) with the 200 shade of the band colour as text; the chart series colours were lifted to read on a dark
   panel. The specs that assert those class names were updated with them.
 - **Light theme.** A toggle in the top bar switches between dark (the default) and light. The choice is a preference of
-  the device, kept in `localStorage` under `touchline.theme` and applied as `app-dark` or `app-light` on `<html>`; an
+  the device, kept in `localStorage` under `tactical11.theme` and applied as `app-dark` or `app-light` on `<html>`; an
   inline script in `index.html` applies it before first paint. The light theme is a second set of values for the same
   tokens plus darker values for the status text shades, in `styles.css`; PrimeNG gets a light scheme in the preset. The
   match viewer and the tactics pitch are dark in both themes (`.theme-dark` restores the dark tokens inside them).

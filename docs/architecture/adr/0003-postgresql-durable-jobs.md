@@ -22,7 +22,7 @@ the two creates a permanently stuck country.
 
 ## Decision
 
-Implement `PostgresJobQueue` in `TouchlineManager.Infrastructure/Jobs` on top of `ops.jobs`.
+Implement `PostgresJobQueue` in `Tactical11Manager.Infrastructure/Jobs` on top of `ops.jobs`.
 
 **Enqueue**
 

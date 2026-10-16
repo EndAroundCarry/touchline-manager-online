@@ -26,18 +26,18 @@ Logical model detail is in [`data-model.md`](data-model.md) and master plan §6.
 
 ## 2. Project dependency direction
 
-Enforced by architecture tests (`tests/TouchlineManager.ArchitectureTests`). A violation fails
+Enforced by architecture tests (`tests/Tactical11Manager.ArchitectureTests`). A violation fails
 the build.
 
 ```mermaid
 flowchart TD
-    Api["TouchlineManager.Api<br/>(composition root)"]
-    Worker["TouchlineManager.Worker<br/>(composition root)"]
-    Infra["TouchlineManager.Infrastructure<br/>persistence, jobs, email, providers"]
-    App["TouchlineManager.Application<br/>commands, queries, policies, validators, ports"]
-    Domain["TouchlineManager.Domain<br/>aggregates, invariants, domain events"]
-    Engine["TouchlineManager.MatchEngine<br/>pure deterministic library"]
-    Contracts["TouchlineManager.Contracts<br/>transport DTOs, stable error codes"]
+    Api["Tactical11Manager.Api<br/>(composition root)"]
+    Worker["Tactical11Manager.Worker<br/>(composition root)"]
+    Infra["Tactical11Manager.Infrastructure<br/>persistence, jobs, email, providers"]
+    App["Tactical11Manager.Application<br/>commands, queries, policies, validators, ports"]
+    Domain["Tactical11Manager.Domain<br/>aggregates, invariants, domain events"]
+    Engine["Tactical11Manager.MatchEngine<br/>pure deterministic library"]
+    Contracts["Tactical11Manager.Contracts<br/>transport DTOs, stable error codes"]
 
     Api --> App
     Api --> Infra

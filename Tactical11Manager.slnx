@@ -1,0 +1,27 @@
+<Solution>
+  <Folder Name="/apps/">
+    <Project Path="apps/api/Tactical11Manager.Api/Tactical11Manager.Api.csproj" />
+    <Project Path="apps/worker/Tactical11Manager.Worker/Tactical11Manager.Worker.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Tactical11Manager.Application/Tactical11Manager.Application.csproj" />
+    <Project Path="src/Tactical11Manager.Contracts/Tactical11Manager.Contracts.csproj" />
+    <Project Path="src/Tactical11Manager.Domain/Tactical11Manager.Domain.csproj" />
+    <Project Path="src/Tactical11Manager.Infrastructure/Tactical11Manager.Infrastructure.csproj" />
+    <Project Path="src/Tactical11Manager.MatchEngine/Tactical11Manager.MatchEngine.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tactical11Manager.Api.IntegrationTests/Tactical11Manager.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Tactical11Manager.Application.Tests/Tactical11Manager.Application.Tests.csproj" />
+    <Project Path="tests/Tactical11Manager.ArchitectureTests/Tactical11Manager.ArchitectureTests.csproj" />
+    <Project Path="tests/Tactical11Manager.Domain.Tests/Tactical11Manager.Domain.Tests.csproj" />
+    <Project Path="tests/Tactical11Manager.Infrastructure.Tests/Tactical11Manager.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Tactical11Manager.MatchEngine.Tests/Tactical11Manager.MatchEngine.Tests.csproj" />
+    <Project Path="tests/Tactical11Manager.Worker.IntegrationTests/Tactical11Manager.Worker.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/access-admin/Tactical11Manager.AccessAdmin.csproj" />
+    <Project Path="tools/simulation-benchmarks/Tactical11Manager.SimulationBenchmarks.csproj" />
+    <Project Path="tools/world-seeder/Tactical11Manager.WorldSeeder.csproj" />
+  </Folder>
+</Solution>

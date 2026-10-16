@@ -1,7 +1,7 @@
 /**
  * The transfers module's transport mirror (master plan §10.6; `TRF-4`, `INT-6`).
  *
- * Hand-written to match `TouchlineManager.Contracts.Market`. Amounts are minor units; the screens format
+ * Hand-written to match `Tactical11Manager.Contracts.Market`. Amounts are minor units; the screens format
  * them and the server does every piece of arithmetic that matters (`INT-1`).
  */
 

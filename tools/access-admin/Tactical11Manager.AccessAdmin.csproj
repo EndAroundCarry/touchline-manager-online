@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Tactical11Manager.Infrastructure\Tactical11Manager.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Tactical11Manager.Application\Tactical11Manager.Application.csproj" />
+    <ProjectReference Include="..\..\src\Tactical11Manager.Domain\Tactical11Manager.Domain.csproj" />
+  </ItemGroup>
+
+  <!--
+    The tool reads its configuration from a file beside the binary, so the file has to travel with it.
+    The generic host does not copy appsettings.json on its own; only the web SDK does.
+  -->
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Tactical11Manager.AccessAdmin</RootNamespace>
+    <AssemblyName>Tactical11Manager.AccessAdmin</AssemblyName>
+  </PropertyGroup>
+
+</Project>

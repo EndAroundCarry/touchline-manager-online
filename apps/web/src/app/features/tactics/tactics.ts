@@ -37,7 +37,7 @@ import {
 } from '../../shared/forms/control-styles';
 
 /** The drag payload for a player row, so a drop on a slot can assign them. */
-const PLAYER_MIME = 'application/x-touchline-player';
+const PLAYER_MIME = 'application/x-tactical11-player';
 
 /** The skills popup's size (`w-[34rem]` and its usual height), which its placement keeps inside the window. */
 const POPUP_WIDTH = 544;

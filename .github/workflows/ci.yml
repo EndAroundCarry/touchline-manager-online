@@ -42,16 +42,16 @@ jobs:
       - name: Restore with lockfiles
         # Locked mode fails the build if a dependency drifts from its lockfile, which is the point:
         # an unreviewed dependency change must not reach production.
-        run: dotnet restore TouchlineManager.slnx --locked-mode
+        run: dotnet restore Tactical11Manager.slnx --locked-mode
 
       - name: Formatting and static analysis
-        run: dotnet format TouchlineManager.slnx --verify-no-changes --no-restore
+        run: dotnet format Tactical11Manager.slnx --verify-no-changes --no-restore
 
       - name: Build (warnings as errors)
-        run: dotnet build TouchlineManager.slnx --no-restore --configuration Release
+        run: dotnet build Tactical11Manager.slnx --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test TouchlineManager.slnx --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+        run: dotnet test Tactical11Manager.slnx --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
 
       - name: Upload test results
         if: always()
@@ -66,8 +66,8 @@ jobs:
         # producing it here proves the migrations are applyable in the pipeline.
         run: |
           dotnet dotnet-ef migrations script \
-            --project src/TouchlineManager.Infrastructure \
-            --startup-project src/TouchlineManager.Infrastructure \
+            --project src/Tactical11Manager.Infrastructure \
+            --startup-project src/Tactical11Manager.Infrastructure \
             --idempotent \
             --output migration-script.sql
 

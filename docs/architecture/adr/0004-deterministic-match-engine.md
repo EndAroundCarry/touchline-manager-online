@@ -22,7 +22,7 @@ parallelised, so it must not be tangled with infrastructure.
 
 ## Decision
 
-**Isolation.** `TouchlineManager.MatchEngine` is a pure library. No method may touch the
+**Isolation.** `Tactical11Manager.MatchEngine` is a pure library. No method may touch the
 database, system clock, network, filesystem, current culture, `Random.Shared`, or thread
 scheduling. It depends on domain-neutral contracts only. Enforced by architecture and unit
 tests.

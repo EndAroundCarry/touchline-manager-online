@@ -20,14 +20,15 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Company>Touchline Manager</Company>
-    <Product>Touchline Manager</Product>
+    <Company>Tactical11 Manager</Company>
+    <Product>Tactical11 Manager</Product>
     <NeutralLanguage>en</NeutralLanguage>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <PropertyGroup>
-    <NoWarn>$(NoWarn);CA1062;CA1303;CA1305;CA1812;CA1848;CA2007;CA1031;CA1304;CA1310</NoWarn>
+    <NoWarn>$(NoWarn);CA1062;CA1303;CA1305;CA1812;CA1848;CA2007;CA1031;CA1304;CA1310;NU1901;NU1902;NU1903;NU1904</NoWarn>
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
   </PropertyGroup>
 
 </Project>

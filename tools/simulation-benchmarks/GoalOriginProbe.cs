@@ -1,14 +1,14 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
-using TouchlineManager.Application.Match;
-using TouchlineManager.MatchEngine;
-using TouchlineManager.MatchEngine.Configuration;
-using TouchlineManager.MatchEngine.Highlights;
-using TouchlineManager.MatchEngine.Model;
-using TouchlineManager.MatchEngine.Tick;
+using Tactical11Manager.Application.Match;
+using Tactical11Manager.MatchEngine;
+using Tactical11Manager.MatchEngine.Configuration;
+using Tactical11Manager.MatchEngine.Highlights;
+using Tactical11Manager.MatchEngine.Model;
+using Tactical11Manager.MatchEngine.Tick;
 
-namespace TouchlineManager.SimulationBenchmarks;
+namespace Tactical11Manager.SimulationBenchmarks;
 
 /// <summary>
 /// Goal origin probe: for every goal, how did the scoring side's possession begin, and what did the goalkeepers' kicks cost. Reads the

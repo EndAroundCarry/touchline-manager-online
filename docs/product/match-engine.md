@@ -7,7 +7,7 @@
 > (discipline, injuries, substitutions, ratings), the possession model in §7 is not used by version 12.
 
 > **Status:** Executable specification for `engine-v11` / `engine-rules-v10`, implemented in
-> `src/TouchlineManager.MatchEngine`.
+> `src/Tactical11Manager.MatchEngine`.
 > **Applies to:** engine version `11`, engine rules version `10`, commentary `commentary-v3`, replay `replay-v16`.
 > The rating weights and tactical modifiers carry their own versions (§6.1, §6.5).
 > **Engine versions 6 to 10** are described in the sections that name them: the skill model (§7.9, `engine-v6`),
@@ -1336,7 +1336,7 @@ a test that is switched off catches nothing.
 ## 14. Engine version 12: the tick engine
 
 > **Status:** Executable specification for `engine-v12` / `engine-rules-v11`, `tick-engine-v1`, implemented in
-> `src/TouchlineManager.MatchEngine/Tick` and `Spatial`. **Decision:** [ADR-0066](../architecture/adr/0066-engine-v12-discrete-tick-match-engine.md) and, for the film and the movement of §14.9–14.16, [ADR-0067](../architecture/adr/0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md).
+> `src/Tactical11Manager.MatchEngine/Tick` and `Spatial`. **Decision:** [ADR-0066](../architecture/adr/0066-engine-v12-discrete-tick-match-engine.md) and, for the film and the movement of §14.9–14.16, [ADR-0067](../architecture/adr/0067-tick-film-whole-moves-fluid-motion-and-smarter-play.md).
 
 ### 14.1 What it is
 

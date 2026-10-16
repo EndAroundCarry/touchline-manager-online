@@ -1,4 +1,4 @@
-# Touchline Manager
+# Tactical11 Manager
 
 An old-school football management game with a modern online structure: a persistent,
 server-authoritative MMO where managers prepare a club asynchronously and compete against each
@@ -164,7 +164,7 @@ starts the API and the web client itself, and drives them through Chromium — s
 start by hand first.
 
 The walking skeleton is exercised end to end by
-`tests/TouchlineManager.Worker.IntegrationTests`: a job is enqueued against a real PostgreSQL 17
+`tests/Tactical11Manager.Worker.IntegrationTests`: a job is enqueued against a real PostgreSQL 17
 container and the worker is asserted to claim, execute and complete it without the API being
 involved. With the API running in Development you can also drive it by hand:
 
@@ -359,11 +359,11 @@ apps/
   worker/       Background worker — executes every deadline
   web/          Angular PWA
 src/
-  TouchlineManager.Domain          Aggregates and invariants. Depends on nothing.
-  TouchlineManager.Application     Use cases, ports, validators, policies
-  TouchlineManager.Infrastructure  Persistence, durable jobs, logging, providers
-  TouchlineManager.Contracts       Transport DTOs, header and error-code constants
-  TouchlineManager.MatchEngine     Pure, deterministic, versioned simulation library
+  Tactical11Manager.Domain          Aggregates and invariants. Depends on nothing.
+  Tactical11Manager.Application     Use cases, ports, validators, policies
+  Tactical11Manager.Infrastructure  Persistence, durable jobs, logging, providers
+  Tactical11Manager.Contracts       Transport DTOs, header and error-code constants
+  Tactical11Manager.MatchEngine     Pure, deterministic, versioned simulation library
 tests/          Unit, architecture, and Testcontainers integration tests
   web-e2e/      Playwright journeys against the real stack
 tools/          world-seeder, simulation-benchmarks
@@ -371,7 +371,7 @@ infra/          Docker Compose for local backing services
 docs/           Product rules, architecture, security, operations
 ```
 
-Dependency direction is enforced by `tests/TouchlineManager.ArchitectureTests` and fails the build
+Dependency direction is enforced by `tests/Tactical11Manager.ArchitectureTests` and fails the build
 when crossed — the domain layer cannot reach for EF Core, and the match engine cannot reach outside
 its own inputs.
 

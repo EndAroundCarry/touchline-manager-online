@@ -9,7 +9,7 @@ failures cheap to localise: a broken rule should fail a fast unit test, not a Pl
 
 ---
 
-## Layer 1 — Domain unit tests (`tests/TouchlineManager.Domain.Tests`)
+## Layer 1 — Domain unit tests (`tests/Tactical11Manager.Domain.Tests`)
 
 Pure logic with no dependencies: invariant calculations, ordering rules, retry schedules, tie-break
 comparators, money arithmetic, schedule generation properties.
@@ -20,7 +20,7 @@ Appendix B vectors and its acceptance window (`TotpTests`), the base32 encoding 
 defines (`Base32Tests`), and the credential's lifecycle — confirmation, secret replacement,
 single-use recovery codes (`MfaCredentialTests`).
 
-## Layer 2 — Application unit tests (`tests/TouchlineManager.Application.Tests`)
+## Layer 2 — Application unit tests (`tests/Tactical11Manager.Application.Tests`)
 
 Use cases and policies with ports replaced by hand-written doubles. No database, no HTTP.
 
@@ -33,7 +33,7 @@ cannot disable it (`MfaUseCasesTests`). Stage 14 added the operator console's pa
 audit cursors round-trip, treat no cursor as the first page, and refuse a value the server did not produce
 (`AdminCursorTests`).
 
-## Layer 3 — Architecture tests (`tests/TouchlineManager.ArchitectureTests`)
+## Layer 3 — Architecture tests (`tests/Tactical11Manager.ArchitectureTests`)
 
 Assert the dependency rules from [`docs/architecture/modules.md`](../architecture/modules.md) §2 by
 inspecting each assembly's real references. These are the guardrail that keeps a modular monolith
@@ -43,7 +43,7 @@ from decaying into a ball of mud.
 never reaches outward), DEP-4/DEP-8 (composition roots are leaves), DEP-6 (Contracts stay transport
 only).
 
-## Layer 4 — Infrastructure integration tests against real PostgreSQL (`tests/TouchlineManager.Infrastructure.Tests`)
+## Layer 4 — Infrastructure integration tests against real PostgreSQL (`tests/Tactical11Manager.Infrastructure.Tests`)
 
 Testcontainers PostgreSQL 17. **Never** an in-memory EF provider: the behaviour under test is
 partial unique indexes, check constraints, `FOR UPDATE SKIP LOCKED`, and lease expiry, none of which
@@ -62,7 +62,7 @@ added the second factor's storage contract (`MfaPersistenceTests`): the raw colu
 ciphertext — version-prefixed, and containing neither the base32 nor the raw secret — recovery codes
 are rows that cascade with the credential, and one account has one authenticator at the database.
 
-## Layer 5 — API integration tests (`tests/TouchlineManager.Api.IntegrationTests`)
+## Layer 5 — API integration tests (`tests/Tactical11Manager.Api.IntegrationTests`)
 
 The real composition root over a real database, driven through `WebApplicationFactory<Program>`.
 These catch wiring faults that unit tests cannot: option validation, middleware order, endpoint
@@ -90,7 +90,7 @@ refused by name, a matchday returns its nine fixtures with their club names, an 
 `404`, and the audit search returns a recorded suspension without its hashed IP (`F-46`, `F-47`,
 ADR-0043).
 
-## Layer 6 — Worker integration tests (`tests/TouchlineManager.Worker.IntegrationTests`)
+## Layer 6 — Worker integration tests (`tests/Tactical11Manager.Worker.IntegrationTests`)
 
 The worker's own composition over a real database, asserting that a job enqueued by one component is
 claimed, executed, and completed by another **without API involvement**. This is the walking
@@ -176,7 +176,7 @@ Stage 13 also added the guided-help journey (`F-53`, ADR-0040). `journeys/help.s
 
 Golden output hashes per engine version, byte-identical repetition across supported platforms,
 changed-seed behaviour, a 100,000-simulation distribution suite against documented ranges, and
-fuzz/property tests. These live in `tests/TouchlineManager.MatchEngine.Tests` plus the benchmark
+fuzz/property tests. These live in `tests/Tactical11Manager.MatchEngine.Tests` plus the benchmark
 tool in `tools/simulation-benchmarks`.
 
 ## Layer 10 — Load, security, and restore — Stage 14

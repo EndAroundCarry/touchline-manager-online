@@ -14,16 +14,16 @@
 # The telemetry stack is a separate project in its own file (infra/observability/, `npm run obs:up`),
 # so the backing services and the observability stack start and stop independently (ADR-0048).
 
-name: touchline-manager
+name: tactical11-manager
 
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: touchline-postgres
+    container_name: tactical11-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-touchline}
-      POSTGRES_USER: ${POSTGRES_USER:-touchline_app}
+      POSTGRES_DB: ${POSTGRES_DB:-tactical11}
+      POSTGRES_USER: ${POSTGRES_USER:-tactical11_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_dev_password_change_me}
     ports:
       # 55432 on the host, not 5432. A developer machine frequently already has a PostgreSQL on
@@ -34,7 +34,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-touchline_app} -d ${POSTGRES_DB:-touchline}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tactical11_app} -d ${POSTGRES_DB:-tactical11}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -42,7 +42,7 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.27
-    container_name: touchline-mailpit
+    container_name: tactical11-mailpit
     restart: unless-stopped
     ports:
       - "1025:1025"
@@ -58,4 +58,4 @@ services:
 
 volumes:
   postgres-data:
-    name: touchline-postgres-data
+    name: tactical11-postgres-data

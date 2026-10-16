@@ -1,7 +1,7 @@
 /**
  * Transport shapes for the public service status (master plan §16 Stage 15, `F-55`, ADR-0050).
  *
- * Hand-written mirror of `TouchlineManager.Contracts.Status`, like the other module models and for the same
+ * Hand-written mirror of `Tactical11Manager.Contracts.Status`, like the other module models and for the same
  * reason: the generated client is a later stage, and until then the compiler is the check that these stay in
  * step. Everything is `readonly`.
  *

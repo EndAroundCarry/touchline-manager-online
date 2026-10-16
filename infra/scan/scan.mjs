@@ -138,7 +138,7 @@ process.exit(failed ? 1 : 0);
 function scanDotnetDependencies() {
   const result = run('dotnet', [
     'list',
-    'TouchlineManager.slnx',
+    'Tactical11Manager.slnx',
     'package',
     '--vulnerable',
     '--include-transitive',
@@ -374,7 +374,7 @@ function scanImages() {
       'run',
       '--rm',
       '-v',
-      'touchline-trivy-cache:/root/.cache/',
+      'tactical11-trivy-cache:/root/.cache/',
       TRIVY_IMAGE,
       'image',
       '--severity',

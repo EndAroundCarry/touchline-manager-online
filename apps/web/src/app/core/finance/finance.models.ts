@@ -1,7 +1,7 @@
 /**
  * The finance module's transport mirror (master plan §10.7; `FIN-3`…`FIN-9`).
  *
- * Hand-written to match `TouchlineManager.Contracts.Finance`, in minor units of the one canonical currency.
+ * Hand-written to match `Tactical11Manager.Contracts.Finance`, in minor units of the one canonical currency.
  * Amounts are never divided here; the screens format for display and the server does every piece of
  * arithmetic that matters.
  */

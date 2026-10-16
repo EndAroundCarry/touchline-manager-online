@@ -1,7 +1,7 @@
 /**
  * The calendar's transport mirror.
  *
- * Hand-written to match `TouchlineManager.Contracts.Calendar`. The text of an event is finished prose from the
+ * Hand-written to match `Tactical11Manager.Contracts.Calendar`. The text of an event is finished prose from the
  * server and the kind is an open string, so a new kind of event reaches the screen without a model change.
  */
 

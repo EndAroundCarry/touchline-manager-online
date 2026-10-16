@@ -208,7 +208,7 @@ export const INFO_DOCUMENTS: readonly InfoDocument[] = [
   {
     id: 'terms',
     title: 'Terms of service',
-    summary: 'The agreement between you and Touchline Manager for using the game.',
+    summary: 'The agreement between you and Tactical11 Manager for using the game.',
     versioned: true,
     sections: [
       {

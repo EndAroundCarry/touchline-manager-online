@@ -5,7 +5,7 @@
 # below is deliberate and reviewed: it is the difference between a meaningful scan and a noisy one.
 # Run it with `npm run scan:secrets`; see docs/operations/supply-chain.md.
 
-title = "Touchline Manager"
+title = "Tactical11 Manager"
 
 [extend]
 useDefault = true

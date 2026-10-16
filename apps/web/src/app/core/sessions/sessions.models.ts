@@ -1,7 +1,7 @@
 /**
  * The session-management transport shapes (`F-07`).
  *
- * These mirror `TouchlineManager.Contracts.Auth` on the server. A session carries no token, token hash,
+ * These mirror `Tactical11Manager.Contracts.Auth` on the server. A session carries no token, token hash,
  * or client-fingerprint hash: a manager lists sessions to recognise and revoke them, not to inspect
  * them.
  */

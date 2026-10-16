@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tactical11Manager.MatchEngine.Tests" />
+    <InternalsVisibleTo Include="Tactical11Manager.SimulationBenchmarks" />
+  </ItemGroup>
+
+</Project>

@@ -1,13 +1,13 @@
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using TouchlineManager.Application;
-using TouchlineManager.Application.Abstractions.Auth;
-using TouchlineManager.Application.Abstractions.Ops;
-using TouchlineManager.Application.Abstractions.Persistence;
-using TouchlineManager.Application.Auth;
-using TouchlineManager.Domain.Auth;
-using TouchlineManager.Infrastructure;
+using Tactical11Manager.Application;
+using Tactical11Manager.Application.Abstractions.Auth;
+using Tactical11Manager.Application.Abstractions.Ops;
+using Tactical11Manager.Application.Abstractions.Persistence;
+using Tactical11Manager.Application.Auth;
+using Tactical11Manager.Domain.Auth;
+using Tactical11Manager.Infrastructure;
 
 // The access-administration tool (master plan §10.8, ADR-0042).
 //
@@ -210,7 +210,7 @@ static AccessArguments ParseArguments(string[] arguments)
 
 static void PrintUsage() => Console.WriteLine(
     """
-    Touchline Manager access administration.
+    Tactical11 Manager access administration.
 
       grant  <email> <role> [--reason <text>]   Grants operator, support, or admin to an account.
       revoke <email> <role> [--reason <text>]   Revokes a role (the base player role cannot be revoked).

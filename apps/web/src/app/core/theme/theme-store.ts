@@ -4,7 +4,7 @@ import { Injectable, signal } from '@angular/core';
 export type ThemeMode = 'dark' | 'light';
 
 /** The key the choice is kept under on this device. */
-export const THEME_STORAGE_KEY = 'touchline.theme';
+export const THEME_STORAGE_KEY = 'tactical11.theme';
 
 /** The browser chrome colour for each theme, so the installed app's title bar matches the page behind it. */
 const THEME_COLORS: Record<ThemeMode, string> = { dark: '#0b0f14', light: '#e6ebf2' };

@@ -1,10 +1,10 @@
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using TouchlineManager.Application;
-using TouchlineManager.Application.Abstractions;
-using TouchlineManager.Application.World;
-using TouchlineManager.Infrastructure;
+using Tactical11Manager.Application;
+using Tactical11Manager.Application.Abstractions;
+using Tactical11Manager.Application.World;
+using Tactical11Manager.Infrastructure;
 
 // The world seeder (master plan §16 Stage 3).
 //
@@ -148,7 +148,7 @@ static string ValueFor(string[] arguments, ref int index)
 
 static void PrintUsage() => Console.WriteLine(
     """
-    Touchline Manager world seeder.
+    Tactical11 Manager world seeder.
 
       --seed <value>            The generation seed (PYR-14). Defaults to World:GenerationSeed.
       --first-matchday <date>   yyyy-MM-dd. The calendar rounds forward to the next

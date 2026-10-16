@@ -5,7 +5,7 @@
  * the journey resolves an auction, and a resolved auction permanently moves a player between two clubs, so
  * it cannot share the persistent world the other journeys read.
  */
-export const marketDatabase = process.env['E2E_MARKET_DATABASE'] ?? 'touchline_e2e_market';
+export const marketDatabase = process.env['E2E_MARKET_DATABASE'] ?? 'tactical11_e2e_market';
 
 /**
  * The connection string the setup and the stack both use.
@@ -15,4 +15,4 @@ export const marketDatabase = process.env['E2E_MARKET_DATABASE'] ?? 'touchline_e
  */
 export const marketConnectionString =
   process.env['E2E_MARKET_CONNECTION_STRING'] ??
-  `Host=localhost;Port=55432;Database=${marketDatabase};Username=touchline_app;Password=local_dev_password_change_me`;
+  `Host=localhost;Port=55432;Database=${marketDatabase};Username=tactical11_app;Password=local_dev_password_change_me`;

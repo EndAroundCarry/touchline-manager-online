@@ -168,7 +168,7 @@ test.describe('@a11y the light theme meets WCAG 2.2 AA', () => {
 
   test('no screen has an accessibility violation in the light theme', async ({ page, request }) => {
     // The choice is stored before the first paint, exactly as a returning manager's would be.
-    await page.addInitScript(() => localStorage.setItem('touchline.theme', 'light'));
+    await page.addInitScript(() => localStorage.setItem('tactical11.theme', 'light'));
 
     const audit = auditor(page);
     const account = createAccount();

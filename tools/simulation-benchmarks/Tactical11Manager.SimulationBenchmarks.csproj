@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Tactical11Manager.MatchEngine\Tactical11Manager.MatchEngine.csproj" />
+    <ProjectReference Include="..\..\src\Tactical11Manager.Domain\Tactical11Manager.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Tactical11Manager.Application\Tactical11Manager.Application.csproj" />
+    <ProjectReference Include="..\..\src\Tactical11Manager.Contracts\Tactical11Manager.Contracts.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Tactical11Manager.SimulationBenchmarks</RootNamespace>
+    <AssemblyName>Tactical11Manager.SimulationBenchmarks</AssemblyName>
+  </PropertyGroup>
+
+</Project>

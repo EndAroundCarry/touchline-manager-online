@@ -40,14 +40,14 @@ const KNOWN_METRICS = [
   'http_server_request_duration_seconds',
   'http_server_active_requests',
   'http_client_request_duration_seconds',
-  'touchline_analytics_onboarding_total',
-  'touchline_analytics_tenure_total',
+  'tactical11_analytics_onboarding_total',
+  'tactical11_analytics_tenure_total',
 ];
 
 // A metric reference in PromQL or in a dashboard expression: the exporter's own families plus the two
 // custom instruments. Anchored on those prefixes so PromQL's functions and operators are never mistaken
 // for a metric name.
-const METRIC_REFERENCE = /\b(?:http_server|http_client|touchline)_[a-z0-9_]+\b/g;
+const METRIC_REFERENCE = /\b(?:http_server|http_client|tactical11)_[a-z0-9_]+\b/g;
 
 // The suffix the prometheus exporter adds for a histogram's parts and a counter's `_total`.
 const SUFFIXES = /_(?:bucket|count|sum|total)$/;

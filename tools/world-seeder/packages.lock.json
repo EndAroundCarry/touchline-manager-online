@@ -331,25 +331,25 @@
         "resolved": "10.0.0",
         "contentHash": "UPWqLSygJlFerRi9XNIuM0a1VC8gHUIufyP24xQ0sc+XimqUAEcjpOz9DhKpyDjH+5B/wO3RpC0KpkEeDj/ddg=="
       },
-      "touchlinemanager.application": {
+      "tactical11manager.application": {
         "type": "Project",
         "dependencies": {
           "FluentValidation": "[12.1.1, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Options": "[10.0.12, )",
-          "TouchlineManager.Contracts": "[1.0.0, )",
-          "TouchlineManager.Domain": "[1.0.0, )",
-          "TouchlineManager.MatchEngine": "[1.0.0, )"
+          "Tactical11Manager.Contracts": "[1.0.0, )",
+          "Tactical11Manager.Domain": "[1.0.0, )",
+          "Tactical11Manager.MatchEngine": "[1.0.0, )"
         }
       },
-      "touchlinemanager.contracts": {
+      "tactical11manager.contracts": {
         "type": "Project"
       },
-      "touchlinemanager.domain": {
+      "tactical11manager.domain": {
         "type": "Project"
       },
-      "touchlinemanager.infrastructure": {
+      "tactical11manager.infrastructure": {
         "type": "Project",
         "dependencies": {
           "MailKit": "[4.18.0, )",
@@ -364,11 +364,11 @@
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.12, )",
           "Microsoft.IdentityModel.JsonWebTokens": "[8.19.2, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "TouchlineManager.Application": "[1.0.0, )",
-          "TouchlineManager.Domain": "[1.0.0, )"
+          "Tactical11Manager.Application": "[1.0.0, )",
+          "Tactical11Manager.Domain": "[1.0.0, )"
         }
       },
-      "touchlinemanager.matchengine": {
+      "tactical11manager.matchengine": {
         "type": "Project"
       },
       "FluentValidation": {

@@ -1,0 +1,284 @@
+using System.Globalization;
+using System.Text;
+using Tactical11Manager.Domain.Rules;
+
+namespace Tactical11Manager.Domain.World;
+
+/// <summary>
+/// A football club. The unit of competition, and the thing a manager controls for a while.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A club carries no reference to a human manager (`WORLD-7`). Control is derived from the active
+/// <see cref="ClubTenure"/>, so a club survives a manager resigning, going inactive, or being closed
+/// out by the inactivity ladder without a single write to its own row.
+/// </para>
+/// <para>
+/// Identity is generated, not entered (`WORLD-3`). <see cref="NormalizedName"/> and <see cref="Slug"/>
+/// are derived from <see cref="Name"/> rather than supplied, so the unique indexes cannot be defeated
+/// by a name and a slug that disagree.
+/// </para>
+/// </remarks>
+public sealed class Club
+{
+    /// <summary>Initializes an empty instance for materialization by the persistence layer.</summary>
+    private Club()
+    {
+    }
+
+    /// <summary>Gets the club identity (UUIDv7, server-generated).</summary>
+    public Guid Id { get; private set; }
+
+    /// <summary>Gets the owning world.</summary>
+    public Guid WorldId { get; private set; }
+
+    /// <summary>Gets the country whose pyramid the club belongs to.</summary>
+    public Guid CountryId { get; private set; }
+
+    /// <summary>Gets the generated club name.</summary>
+    public string Name { get; private set; } = string.Empty;
+
+    /// <summary>Gets the derived comparison form of <see cref="Name"/>, which carries the unique index.</summary>
+    public string NormalizedName { get; private set; } = string.Empty;
+
+    /// <summary>Gets the abbreviated name for tables and the match viewer.</summary>
+    public string ShortName { get; private set; } = string.Empty;
+
+    /// <summary>Gets the derived URL-safe identifier, which carries the unique index.</summary>
+    public string Slug { get; private set; } = string.Empty;
+
+    /// <summary>Gets the generated home city.</summary>
+    public string City { get; private set; } = string.Empty;
+
+    /// <summary>Gets the generated region or state.</summary>
+    public string Region { get; private set; } = string.Empty;
+
+    /// <summary>Gets the deterministic seed a procedurally drawn badge is derived from.</summary>
+    public string BadgeSeed { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Gets the primary kit colour the club's manager chose as <c>#rrggbb</c>, or null while the club
+    /// wears the colours generated from its identity.
+    /// </summary>
+    public string? PrimaryColour { get; private set; }
+
+    /// <summary>
+    /// Gets the secondary kit colour the club's manager chose as <c>#rrggbb</c>, or null while the club
+    /// wears the colours generated from its identity.
+    /// </summary>
+    public string? SecondaryColour { get; private set; }
+
+    /// <summary>
+    /// Gets the crest shape the club wears (a <see cref="CrestDesigns.Shapes"/> code): the one generated when
+    /// the club was created, or the one its manager chose. Null only for a club stored before crests were
+    /// generated, which wears the shape derived from its badge seed.
+    /// </summary>
+    public string? CrestShape { get; private set; }
+
+    /// <summary>
+    /// Gets the stripes the club wears on its crest (a <see cref="CrestDesigns.Patterns"/> code), on the same
+    /// terms as <see cref="CrestShape"/>.
+    /// </summary>
+    public string? CrestPattern { get; private set; }
+
+    /// <summary>Gets the game year the club was founded, which is a game year and not a real one.</summary>
+    public int FoundingGameYear { get; private set; }
+
+    /// <summary>Gets the lifecycle state.</summary>
+    public ClubStatus Status { get; private set; }
+
+    /// <summary>Gets the club's reputation, on the same 1–100 scale as manager reputation.</summary>
+    public int Reputation { get; private set; }
+
+    /// <summary>Gets when the club was created.</summary>
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <summary>Gets when the club was last modified.</summary>
+    public DateTimeOffset UpdatedAt { get; private set; }
+
+    /// <summary>Gets the optimistic concurrency version.</summary>
+    public long Version { get; private set; }
+
+    /// <summary>Generates a club for a tier, with its finances and reputation scaled to that tier.</summary>
+    /// <param name="id">A server-generated identity.</param>
+    /// <param name="worldId">The owning world.</param>
+    /// <param name="countryId">The owning country.</param>
+    /// <param name="identity">The generated identity.</param>
+    /// <param name="tier">The tier number the club starts in, which sets its baseline scale.</param>
+    /// <param name="foundingGameYear">The game year the club is founded in.</param>
+    /// <param name="now">The current instant.</param>
+    public static Club Generate(
+        Guid id,
+        Guid worldId,
+        Guid countryId,
+        ClubIdentity identity,
+        int tier,
+        int foundingGameYear,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identity.Name);
+
+        return new Club
+        {
+            Id = id,
+            WorldId = worldId,
+            CountryId = countryId,
+            Name = identity.Name.Trim(),
+            NormalizedName = NormalizeName(identity.Name),
+            ShortName = identity.ShortName.Trim(),
+            Slug = SlugFrom(identity.Name),
+            City = identity.City.Trim(),
+            Region = identity.Region.Trim(),
+            BadgeSeed = identity.BadgeSeed,
+
+            // Every generated club is given its crest here, so a seeded world, a reseeded one and a production
+            // one all leave the AI clubs wearing a stored, varied crest rather than none. The pick hashes the
+            // badge seed, so the same world seed gives the same crests (PYR-14). A manager's own choice
+            // replaces it through ChangeCrest.
+            CrestShape = CrestDesigns.GeneratedShape(identity.BadgeSeed),
+            CrestPattern = CrestDesigns.GeneratedPattern(identity.BadgeSeed),
+            FoundingGameYear = foundingGameYear,
+            Status = ClubStatus.Active,
+            Reputation = WorldRuleSet.OpeningReputationForTier(tier),
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = 1,
+        };
+    }
+
+    /// <summary>Gets the comparison form of a club name, which is what uniqueness is enforced on.</summary>
+    public static string NormalizeName(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        return name.Trim().ToUpperInvariant();
+    }
+
+    /// <summary>
+    /// Derives a URL-safe slug from a club name.
+    /// </summary>
+    /// <remarks>
+    /// Accented characters are folded to their base letters rather than dropped, so "Atlético" and
+    /// "Atletico" produce the same slug and a generated identity cannot collide with itself across
+    /// locales. Non-letter, non-digit runs collapse to a single hyphen.
+    /// </remarks>
+    public static string SlugFrom(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        var decomposed = name.Trim().Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(decomposed.Length);
+        var lastWasSeparator = false;
+
+        foreach (var character in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(char.ToLowerInvariant(character));
+                lastWasSeparator = false;
+
+                continue;
+            }
+
+            if (!lastWasSeparator && builder.Length > 0)
+            {
+                builder.Append('-');
+                lastWasSeparator = true;
+            }
+        }
+
+        return builder.ToString().TrimEnd('-');
+    }
+
+    /// <summary>Checks that a value is a six-digit hexadecimal colour such as <c>#1f4e79</c>.</summary>
+    /// <param name="value">The value to check.</param>
+    public static bool IsHexColour(string? value)
+    {
+        if (value is not { Length: 7 } || value[0] != '#')
+        {
+            return false;
+        }
+
+        foreach (var digit in value.AsSpan(1))
+        {
+            if (!char.IsAsciiHexDigit(digit))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Sets the two colours the club plays in, stored in a single canonical lower-case form.</summary>
+    /// <remarks>
+    /// The pair must be two different colours: a kit whose trim is its own base colour cannot be told apart
+    /// from a plain one, which is the one thing a second colour is for.
+    /// </remarks>
+    /// <param name="primary">The primary colour as <c>#rrggbb</c>.</param>
+    /// <param name="secondary">The secondary colour as <c>#rrggbb</c>.</param>
+    /// <param name="now">The current instant.</param>
+    public void ChangeColours(string primary, string secondary, DateTimeOffset now)
+    {
+        if (!IsHexColour(primary) || !IsHexColour(secondary))
+        {
+            throw new ArgumentException("Colours must be written as #rrggbb.");
+        }
+
+        var normalizedPrimary = primary.ToLowerInvariant();
+        var normalizedSecondary = secondary.ToLowerInvariant();
+
+        if (normalizedPrimary == normalizedSecondary)
+        {
+            throw new ArgumentException("The two colours must differ.");
+        }
+
+        PrimaryColour = normalizedPrimary;
+        SecondaryColour = normalizedSecondary;
+
+        Touch(now);
+    }
+
+    /// <summary>Sets the shape and the stripes of the crest the club wears. Any shape can wear any stripes.</summary>
+    /// <param name="shape">A <see cref="CrestDesigns.Shapes"/> code.</param>
+    /// <param name="pattern">A <see cref="CrestDesigns.Patterns"/> code.</param>
+    /// <param name="now">The current instant.</param>
+    public void ChangeCrest(string shape, string pattern, DateTimeOffset now)
+    {
+        if (!CrestDesigns.IsKnownShape(shape))
+        {
+            throw new ArgumentException("That crest shape does not exist.");
+        }
+
+        if (!CrestDesigns.IsKnownPattern(pattern))
+        {
+            throw new ArgumentException("Those stripes do not exist.");
+        }
+
+        CrestShape = shape;
+        CrestPattern = pattern;
+
+        Touch(now);
+    }
+
+    /// <summary>Retires the club through an audited administrative repair (`WORLD-6`).</summary>
+    /// <param name="now">The current instant.</param>
+    public void Retire(DateTimeOffset now)
+    {
+        Status = ClubStatus.Retired;
+
+        Touch(now);
+    }
+
+    private void Touch(DateTimeOffset now)
+    {
+        UpdatedAt = now;
+        Version++;
+    }
+}

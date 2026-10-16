@@ -1,0 +1,265 @@
+namespace Tactical11Manager.MatchEngine.Model;
+
+/// <summary>
+/// One side's match statistics.
+/// </summary>
+/// <remarks>
+/// Every count here is derived from the event sequence rather than accumulated separately, so the
+/// reconciliation rule holds by construction: the score equals the goal events, and each statistic equals
+/// the events of its type (MAT-5, master plan §8.5). Accumulating in two places is how a scoreboard and a
+/// stats panel come to disagree after a refactor.
+/// </remarks>
+public sealed record MatchStatisticsV1
+{
+    /// <summary>Gets the share of possession, in basis points.</summary>
+    public required int PossessionBasisPoints { get; init; }
+
+    /// <summary>Gets goals scored.</summary>
+    public required int Goals { get; init; }
+
+    /// <summary>Gets shots taken, which is every shot event whatever its outcome.</summary>
+    public required int Shots { get; init; }
+
+    /// <summary>Gets shots on target: goals plus saves.</summary>
+    public required int ShotsOnTarget { get; init; }
+
+    /// <summary>Gets shots that missed the target.</summary>
+    public required int ShotsOffTarget { get; init; }
+
+    /// <summary>Gets shots blocked by a defender.</summary>
+    public required int ShotsBlocked { get; init; }
+
+    /// <summary>Gets shots that hit the woodwork.</summary>
+    public required int WoodworkHits { get; init; }
+
+    /// <summary>Gets saves made by the goalkeeper.</summary>
+    public required int Saves { get; init; }
+
+    /// <summary>Gets corners won.</summary>
+    public required int Corners { get; init; }
+
+    /// <summary>Gets offsides given against the side.</summary>
+    public required int Offsides { get; init; }
+
+    /// <summary>Gets fouls committed.</summary>
+    public required int Fouls { get; init; }
+
+    /// <summary>Gets yellow cards shown.</summary>
+    public required int YellowCards { get; init; }
+
+    /// <summary>Gets red cards shown, counting a second yellow.</summary>
+    public required int RedCards { get; init; }
+
+    /// <summary>Gets penalties awarded to the side.</summary>
+    public required int PenaltiesAwarded { get; init; }
+
+    /// <summary>Gets penalties scored by the side.</summary>
+    public required int PenaltiesScored { get; init; }
+
+    /// <summary>Gets injuries suffered by the side.</summary>
+    public required int Injuries { get; init; }
+
+    /// <summary>Gets substitutions made by the side.</summary>
+    public required int Substitutions { get; init; }
+}
+
+/// <summary>
+/// One player's participation in the match.
+/// </summary>
+/// <remarks>
+/// The record of who played and for how long. Contract renewal's inputs include playing time (`CON-3`),
+/// and the discipline and injury stages apply suspensions and absences from these lines rather than from
+/// re-reading the event stream, so the line is part of the output contract rather than a convenience.
+/// </remarks>
+public sealed record MatchPlayerLineV1
+{
+    /// <summary>Gets the participant.</summary>
+    public required Guid ParticipantId { get; init; }
+
+    /// <summary>Gets the club.</summary>
+    public required Guid ClubId { get; init; }
+
+    /// <summary>Gets which side the player played for.</summary>
+    public required MatchSide Side { get; init; }
+
+    /// <summary>Gets whether the player was in the eleven rather than on the bench.</summary>
+    public required bool Started { get; init; }
+
+    /// <summary>Gets how many minutes the player was on the pitch.</summary>
+    public required int MinutesPlayed { get; init; }
+
+    /// <summary>Gets goals scored.</summary>
+    public required int Goals { get; init; }
+
+    /// <summary>Gets goals this player set up.</summary>
+    /// <remarks>
+    /// Attributed at the goal rather than re-derived from the event stream, because the scorer is the only
+    /// participant a goal event names: an assister is a fact the engine decided, so it lives on the line
+    /// beside the goals (`engine-v2`).
+    /// </remarks>
+    public required int Assists { get; init; }
+
+    /// <summary>Gets the passes the player attempted in open play (`engine-v7`).</summary>
+    /// <remarks>
+    /// Counted by the simulation as the possessions are played, for the reason assists are: the event stream
+    /// carries no pass, so a pass is a fact the engine decided and it lives on the line. The tick engine counts
+    /// every pass, through ball and cross, including the deliveries from set pieces such as corners and throw-ins.
+    /// </remarks>
+    public int PassesAttempted { get; init; }
+
+    /// <summary>Gets the passes that found a teammate, a subset of <see cref="PassesAttempted"/> (`engine-v7`).</summary>
+    public int PassesCompleted { get; init; }
+
+    /// <summary>Gets the take-ons the player attempted: the 1v1 duels they carried the ball into (`engine-v7`).</summary>
+    public int DribblesAttempted { get; init; }
+
+    /// <summary>Gets the take-ons the player won, a subset of <see cref="DribblesAttempted"/> (`engine-v7`).</summary>
+    public int DribblesCompleted { get; init; }
+
+    /// <summary>Gets the challenges the player made on the man with the ball (`engine-v12`).</summary>
+    /// <remarks>Counted for every resolved challenge in the carrier duel. A goalkeeper's smother is not a tackle.</remarks>
+    public int TacklesAttempted { get; init; }
+
+    /// <summary>Gets the challenges the player won, a subset of <see cref="TacklesAttempted"/> (`engine-v12`).</summary>
+    public int TacklesWon { get; init; }
+
+    /// <summary>Gets the crosses the player attempted from open play and free kicks; corners are not crosses here (`engine-v12`).</summary>
+    public int CrossesAttempted { get; init; }
+
+    /// <summary>Gets the crosses that found a teammate, a subset of <see cref="CrossesAttempted"/> (`engine-v12`).</summary>
+    public int CrossesCompleted { get; init; }
+
+    /// <summary>Gets the penalties the player took (`engine-v12`).</summary>
+    public int PenaltiesTaken { get; init; }
+
+    /// <summary>Gets the penalties the player scored, a subset of <see cref="PenaltiesTaken"/> (`engine-v12`).</summary>
+    public int PenaltiesScored { get; init; }
+
+    /// <summary>Gets the penalties the goalkeeper faced (`engine-v12`).</summary>
+    public int PenaltiesFaced { get; init; }
+
+    /// <summary>Gets the penalties the goalkeeper saved, a subset of <see cref="PenaltiesFaced"/> (`engine-v12`).</summary>
+    public int PenaltiesSaved { get; init; }
+
+    /// <summary>Gets the direct free kicks the player shot at goal (`engine-v12`).</summary>
+    public int FreeKicksTaken { get; init; }
+
+    /// <summary>Gets the direct free kicks the player scored, a subset of <see cref="FreeKicksTaken"/> (`engine-v12`).</summary>
+    public int FreeKicksScored { get; init; }
+
+    /// <summary>Gets the shots on target the goalkeeper faced, penalties apart: the saves he made and the goals he conceded (`engine-v12`).</summary>
+    public int ShotsOnTargetFaced { get; init; }
+
+    /// <summary>Gets yellow cards received.</summary>
+    public required int YellowCards { get; init; }
+
+    /// <summary>Gets whether the player was sent off.</summary>
+    public required bool SentOff { get; init; }
+
+    /// <summary>Gets how many fixtures an injury rules the player out for, or zero when uninjured.</summary>
+    public required int AbsenceFixtures { get; init; }
+
+    /// <summary>
+    /// Gets the player's match rating in basis points, or zero when they did not appear.
+    /// </summary>
+    /// <remarks>
+    /// The engine's own summary of a player's match, on the 0–10,000 scale the API converts to a 0–10.0
+    /// figure (`TRN-8`). It is derived from facts the match already records — minutes, goals, assists,
+    /// cards, saves, and the result — so it carries no hidden value, and it is produced once with the
+    /// result rather than re-derived by the season-statistics projection.
+    /// </remarks>
+    public required int RatingBasisPoints { get; init; }
+
+    /// <summary>
+    /// Gets the player's condition at the moment they left the match, in basis points (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// A player who played the full match carries their condition at the final whistle; a substitute who
+    /// never came on carries the condition they arrived with. It is the match center's condition bar and
+    /// the load the publication applies to the squad, read from the simulation rather than re-derived.
+    /// </remarks>
+    public required int FinalConditionBasisPoints { get; init; }
+
+    /// <summary>Gets the minute the player was substituted off, when they were.</summary>
+    public int? SubbedOutMinute { get; init; }
+
+    /// <summary>Gets the minute the player came on as a substitute, when they did.</summary>
+    public int? SubbedInMinute { get; init; }
+
+    /// <summary>Gets whether the player was injured during the match (DIS-1).</summary>
+    /// <remarks>
+    /// Duplicates the absence rather than replacing it: the absence counts fixtures, and this says the
+    /// injury happened in this match, which a zero-absence injury would otherwise lose.
+    /// </remarks>
+    public bool IsInjured { get; init; }
+
+    /// <summary>
+    /// Gets the live, fluctuating match rating the player last held on the pitch (`engine-v3`).
+    /// </summary>
+    /// <remarks>
+    /// The figure the match viewer showed while the match was being played, carried through so a replay
+    /// shows the same numbers the live panels did. Zero when the player did not appear; the season's
+    /// average continues to read <see cref="RatingBasisPoints"/>, which is derived once from the match's
+    /// facts rather than accumulated from contested live adjustments.
+    /// </remarks>
+    public int LiveRatingBasisPoints { get; init; }
+}
+
+/// <summary>
+/// The complete, immutable result of simulating one match.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Carries both hashes. The input hash pins the exact snapshot simulated; the output hash pins the exact
+/// result, so re-running the same snapshot, seed, and engine version reproduces it byte for byte (MAT-9).
+/// A disputed result is re-derived rather than argued about, and an engine defect is found by a golden hash
+/// failing rather than by a manager noticing.
+/// </para>
+/// <para>
+/// Nothing here reveals a hidden value: the output carries no potential, no reputation, and no raw seed
+/// material (MAT-11).
+/// </para>
+/// </remarks>
+public sealed record MatchResultV1
+{
+    /// <summary>Gets the engine version that produced the result.</summary>
+    public required string EngineVersion { get; init; }
+
+    /// <summary>Gets the rules version the result was produced under.</summary>
+    public required string RuleSetVersion { get; init; }
+
+    /// <summary>Gets the home side's goals.</summary>
+    public required int HomeGoals { get; init; }
+
+    /// <summary>Gets the away side's goals.</summary>
+    public required int AwayGoals { get; init; }
+
+    /// <summary>Gets the home side's statistics.</summary>
+    public required MatchStatisticsV1 Home { get; init; }
+
+    /// <summary>Gets the away side's statistics.</summary>
+    public required MatchStatisticsV1 Away { get; init; }
+
+    /// <summary>Gets every event, in sequence order.</summary>
+    public required IReadOnlyList<EngineEventV1> Events { get; init; }
+
+    /// <summary>Gets every participant's line, ordered by club and then participant identity.</summary>
+    public required IReadOnlyList<MatchPlayerLineV1> PlayerLines { get; init; }
+
+    /// <summary>Gets how many minutes were played, regulation plus stoppage.</summary>
+    public required int TotalMinutesPlayed { get; init; }
+
+    /// <summary>Gets the hash of the input snapshot this result was produced from.</summary>
+    public required string InputHash { get; init; }
+
+    /// <summary>Gets the hash of this result.</summary>
+    public required string OutputHash { get; init; }
+
+    /// <summary>Gets one side's statistics.</summary>
+    /// <param name="side">Which side.</param>
+    public MatchStatisticsV1 StatsOf(MatchSide side) => side == MatchSide.Home ? Home : Away;
+
+    /// <summary>Gets one side's goals.</summary>
+    /// <param name="side">Which side.</param>
+    public int GoalsOf(MatchSide side) => side == MatchSide.Home ? HomeGoals : AwayGoals;
+}

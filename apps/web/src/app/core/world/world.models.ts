@@ -1,7 +1,7 @@
 /**
  * The world and onboarding transport shapes.
  *
- * These mirror `TouchlineManager.Contracts.World` on the server. They are handwritten for now, like the
+ * These mirror `Tactical11Manager.Contracts.World` on the server. They are handwritten for now, like the
  * auth shapes, because the generated client arrives with the OpenAPI pipeline (`tools/openapi-client`);
  * when it lands these interfaces are replaced by its output rather than kept in step by hand.
  */

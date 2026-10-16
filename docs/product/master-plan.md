@@ -414,7 +414,7 @@ Create this structure during the scaffold stage:
 
 ```text
 /
-├─ TouchlineManager.slnx
+├─ Tactical11Manager.slnx
 ├─ global.json
 ├─ Directory.Build.props
 ├─ Directory.Packages.props
@@ -425,14 +425,14 @@ Create this structure during the scaffold stage:
 ├─ CHANGELOG.md
 ├─ apps/
 │  ├─ api/
-│  │  ├─ TouchlineManager.Api.csproj
+│  │  ├─ Tactical11Manager.Api.csproj
 │  │  ├─ Program.cs
 │  │  ├─ Endpoints/
 │  │  ├─ Middleware/
 │  │  ├─ Auth/
 │  │  └─ OpenApi/
 │  ├─ worker/
-│  │  ├─ TouchlineManager.Worker.csproj
+│  │  ├─ Tactical11Manager.Worker.csproj
 │  │  ├─ Program.cs
 │  │  └─ HostedServices/
 │  └─ web/
@@ -460,19 +460,19 @@ Create this structure during the scaffold stage:
 │        ├─ app/features/settings/
 │        └─ app/features/admin/
 ├─ src/
-│  ├─ TouchlineManager.Domain/
-│  ├─ TouchlineManager.Application/
-│  ├─ TouchlineManager.Infrastructure/
-│  ├─ TouchlineManager.Contracts/
-│  └─ TouchlineManager.MatchEngine/
+│  ├─ Tactical11Manager.Domain/
+│  ├─ Tactical11Manager.Application/
+│  ├─ Tactical11Manager.Infrastructure/
+│  ├─ Tactical11Manager.Contracts/
+│  └─ Tactical11Manager.MatchEngine/
 ├─ tests/
-│  ├─ TouchlineManager.Domain.Tests/
-│  ├─ TouchlineManager.Application.Tests/
-│  ├─ TouchlineManager.Infrastructure.Tests/
-│  ├─ TouchlineManager.Api.IntegrationTests/
-│  ├─ TouchlineManager.Worker.IntegrationTests/
-│  ├─ TouchlineManager.MatchEngine.Tests/
-│  ├─ TouchlineManager.ArchitectureTests/
+│  ├─ Tactical11Manager.Domain.Tests/
+│  ├─ Tactical11Manager.Application.Tests/
+│  ├─ Tactical11Manager.Infrastructure.Tests/
+│  ├─ Tactical11Manager.Api.IntegrationTests/
+│  ├─ Tactical11Manager.Worker.IntegrationTests/
+│  ├─ Tactical11Manager.MatchEngine.Tests/
+│  ├─ Tactical11Manager.ArchitectureTests/
 │  ├─ web-unit/
 │  ├─ web-e2e/
 │  └─ performance/
@@ -874,7 +874,7 @@ Use columns rather than JSONB because scouting filters and match formulas depend
 
 ### 7.1 Durable job mechanics
 
-Implement `PostgresJobQueue` in `TouchlineManager.Infrastructure/Jobs`:
+Implement `PostgresJobQueue` in `Tactical11Manager.Infrastructure/Jobs`:
 
 1. Enqueue jobs transactionally with a unique business key.
 2. Workers claim ready rows using `FOR UPDATE SKIP LOCKED`, set a lease owner and expiry, and commit quickly.
@@ -983,7 +983,7 @@ Every step stores a unique checkpoint and can be resumed. A country failure must
 Create:
 
 ```text
-src/TouchlineManager.MatchEngine/
+src/Tactical11Manager.MatchEngine/
 ├─ MatchEngine.cs
 ├─ Model/MatchInput.cs
 ├─ Model/MatchOutput.cs

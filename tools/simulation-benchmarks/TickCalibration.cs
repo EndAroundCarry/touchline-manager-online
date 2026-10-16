@@ -1,12 +1,12 @@
 using System.Globalization;
-using TouchlineManager.Application.Match;
-using TouchlineManager.Domain.Squad;
-using TouchlineManager.MatchEngine;
-using TouchlineManager.MatchEngine.Configuration;
-using TouchlineManager.MatchEngine.Highlights;
-using TouchlineManager.MatchEngine.Model;
+using Tactical11Manager.Application.Match;
+using Tactical11Manager.Domain.Squad;
+using Tactical11Manager.MatchEngine;
+using Tactical11Manager.MatchEngine.Configuration;
+using Tactical11Manager.MatchEngine.Highlights;
+using Tactical11Manager.MatchEngine.Model;
 
-namespace TouchlineManager.SimulationBenchmarks;
+namespace Tactical11Manager.SimulationBenchmarks;
 
 /// <summary>
 /// The tick engine's calibration runs (`tick-engine-v1`, Milestone 9): the plan's statistical bands, read over the board's formations

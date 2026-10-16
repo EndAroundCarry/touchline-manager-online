@@ -2,7 +2,7 @@
   "uid": "touchline-product-funnels",
   "title": "Product funnels",
   "description": "The two counters of the privacy-safe operational funnels (F-54, ADR-0041), shown over the selected range. These are the same numbers GET /ops/analytics/funnels returns: counts of accounts that reached a step and of tenures that ended, with no per-manager row and no address.",
-  "tags": ["touchline", "product"],
+  "tags": ["tactical11", "product"],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
@@ -36,7 +36,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (step) (increase(touchline_analytics_onboarding_total{service_name=\"touchline-api\"}[$__range]))",
+          "expr": "sum by (step) (increase(tactical11_analytics_onboarding_total{service_name=\"tactical11-api\"}[$__range]))",
           "legendFormat": "{{step}}"
         }
       ]
@@ -64,7 +64,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (event, reason) (increase(touchline_analytics_tenure_total{service_name=\"touchline-api\"}[$__range]))",
+          "expr": "sum by (event, reason) (increase(tactical11_analytics_tenure_total{service_name=\"tactical11-api\"}[$__range]))",
           "legendFormat": "{{event}} {{reason}}"
         }
       ]
@@ -92,7 +92,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (step) (rate(touchline_analytics_onboarding_total{service_name=\"touchline-api\"}[$__rate_interval]))",
+          "expr": "sum by (step) (rate(tactical11_analytics_onboarding_total{service_name=\"tactical11-api\"}[$__rate_interval]))",
           "legendFormat": "{{step}}"
         }
       ]

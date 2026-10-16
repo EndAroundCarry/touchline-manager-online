@@ -26,9 +26,9 @@ export default function globalSetup(): void {
     'database',
     'update',
     '--project',
-    'src/TouchlineManager.Infrastructure',
+    'src/Tactical11Manager.Infrastructure',
     '--startup-project',
-    'src/TouchlineManager.Infrastructure',
+    'src/Tactical11Manager.Infrastructure',
   ]);
 
   // Onboarding needs a world; the seeder is idempotent, so this is a no-op against an existing one.

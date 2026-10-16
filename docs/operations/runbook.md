@@ -495,7 +495,7 @@ are still answered.
    points at a saturated resource instead of a slow query.
 3. Read the **outbound client p95** panel. If that is also elevated, the API is waiting on something else and
    the route is a symptom.
-4. Pull a trace: in Grafana, **Explore → Tempo**, filter `service.name = touchline-api`, and sort the window's
+4. Pull a trace: in Grafana, **Explore → Tempo**, filter `service.name = tactical11-api`, and sort the window's
    spans by duration. The slowest span names where the time actually goes.
 
 **Action.** There is no command to run. This is a defect investigation: capture the route, the time window,

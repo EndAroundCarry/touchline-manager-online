@@ -23,7 +23,7 @@ continuous evidence about a running game is whatever an operator happens to quer
 
 What exists to display is also much less than §14.1 lists. The instruments registered today are the
 ASP.NET Core and HttpClient auto-instrumentation, plus the two `F-54` counters
-(`touchline.analytics.onboarding`, `touchline.analytics.tenure`). §14.1's remaining names — job lag and dead
+(`tactical11.analytics.onboarding`, `tactical11.analytics.tenure`). §14.1's remaining names — job lag and dead
 count, simulation duration, matchday publication delay, auction lag, login failures, active managers, club
 occupancy, database pool saturation, payload sizes, and front-end errors — have no instrument at all, and
 neither does §7.1's requirement to expose queue depth, oldest due age, failures, retries, and execution
@@ -39,7 +39,7 @@ objectives by hand, once, and nothing observes them while the game runs.
    `docs/architecture/context.md`, which already declares an external "Telemetry backend — OTLP collector".
 
 2. **It runs locally and by hand, as its own compose project.** `infra/observability/`, named
-   `touchline-observability`, brought up with `npm run obs:up`, with its own ports so it can never tear down
+   `tactical11-observability`, brought up with `npm run obs:up`, with its own ports so it can never tear down
    the development stack. The precedent is the restore drill and the load suite
    ([ADR-0046](0046-load-supply-chain-and-restore-drills.md)); nothing is wired into CI, which is `F-50`'s.
 

@@ -55,7 +55,7 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'dotnet run --project apps/api/TouchlineManager.Api',
+      command: 'dotnet run --project apps/api/Tactical11Manager.Api',
       cwd: repositoryRoot,
       url: 'http://localhost:5080/health/live',
       reuseExistingServer: false,
@@ -76,7 +76,7 @@ export default defineConfig({
       // The worker has no HTTP surface, so this entry has no `url` and no `port`: Playwright starts the
       // process and moves on rather than waiting for a readiness it cannot observe. The journey polls for
       // the published result, so a worker that is a second late costs a second and nothing else.
-      command: 'dotnet run --project apps/worker/TouchlineManager.Worker',
+      command: 'dotnet run --project apps/worker/Tactical11Manager.Worker',
       cwd: repositoryRoot,
       reuseExistingServer: false,
       timeout: 180_000,

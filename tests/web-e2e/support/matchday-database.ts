@@ -6,7 +6,7 @@
  * played round permanently advances a season. It therefore gets its own database, reset and reseeded by its
  * global setup every run, so the shared world can never be exhausted by repeated local runs.
  */
-export const matchdayDatabase = process.env['E2E_MATCHDAY_DATABASE'] ?? 'touchline_e2e_matchday';
+export const matchdayDatabase = process.env['E2E_MATCHDAY_DATABASE'] ?? 'tactical11_e2e_matchday';
 
 /**
  * The connection string the setup and the stack both use.
@@ -16,4 +16,4 @@ export const matchdayDatabase = process.env['E2E_MATCHDAY_DATABASE'] ?? 'touchli
  */
 export const matchdayConnectionString =
   process.env['E2E_MATCHDAY_CONNECTION_STRING'] ??
-  `Host=localhost;Port=55432;Database=${matchdayDatabase};Username=touchline_app;Password=local_dev_password_change_me`;
+  `Host=localhost;Port=55432;Database=${matchdayDatabase};Username=tactical11_app;Password=local_dev_password_change_me`;

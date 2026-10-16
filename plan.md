@@ -1,6 +1,6 @@
-# Touchline Manager: 2D Match Engine & Replay Center Master Plan (`plan.md`)
+# Tactical11 Manager: 2D Match Engine & Replay Center Master Plan (`plan.md`)
 
-This document outlines the complete specification, mathematical modeling, and staged execution plan to recreate the **Match Engine** and **Match Viewer** for Touchline Manager. The system is inspired by the iconic **Football Manager** (Sports Interactive) and **Championship Manager** engines.
+This document outlines the complete specification, mathematical modeling, and staged execution plan to recreate the **Match Engine** and **Match Viewer** for Tactical11 Manager. The system is inspired by the iconic **Football Manager** (Sports Interactive) and **Championship Manager** engines.
 
 > **Status:** This is the original seven-stage plan that built the engine and the match center. Stages 1–6
 > are delivered and stage 7's tuning and validation is the ongoing work. The engine has since advanced to
@@ -65,7 +65,7 @@ Stage 7: Calibration, Validation Suite & Final Polish
 **Goal**: Establish versioned data contracts for `engine-v3` and `replay-v2` across both backend (.NET 10) and frontend (Angular) while maintaining backward compatibility with past matches.
 
 #### Deliverables:
-1. **Backend Contracts (`TouchlineManager.Contracts/Match`)**:
+1. **Backend Contracts (`Tactical11Manager.Contracts/Match`)**:
    - `HighlightKeyframeResponse`: Enhance with `int Z` (ball altitude 0–100), `int Speed`, and `string? Action` (e.g. tackle, shot, pass, header).
    - `HighlightEntityResponse`: Add `string? Name` and `string? Position` (e.g. GK, DC, MC, ST).
    - `MatchLineupPlayerResponse`: Full player record (ParticipantId, PlayerId, ShirtNumber, Name, Position, Family, IsStarter, SlotNumber, KickoffCondition, FinalCondition, FinalRating, Goals, Assists, YellowCards, SentOff, SubbedOutMinute, SubbedInMinute, IsInjured).
@@ -77,13 +77,13 @@ Stage 7: Calibration, Validation Suite & Final Polish
    - Add formatting helpers in `match-presentation.ts` for live ratings (`formatMatchRating`), condition percentage (`formatConditionPercent`), and color classes.
 
 #### Pausing Checkpoint:
-- C# builds cleanly with zero warnings (`dotnet build TouchlineManager.slnx`).
+- C# builds cleanly with zero warnings (`dotnet build Tactical11Manager.slnx`).
 - Angular tests pass (`npm --prefix apps/web test:ci`).
 - No gameplay logic changed; wire contracts ready.
 
 ---
 
-### Stage 2: Spatial 2D Match Engine (`TouchlineManager.MatchEngine v3`)
+### Stage 2: Spatial 2D Match Engine (`Tactical11Manager.MatchEngine v3`)
 
 **Goal**: Build the core spatial simulation engine that executes a 90+ minute match on a 2D pitch coordinate system ($10,000 \times 7,000$), calculating player movements, duels, passing decisions, set pieces, fatigue, and tactical adjustments.
 
