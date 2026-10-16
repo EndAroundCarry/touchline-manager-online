@@ -109,6 +109,7 @@ interface RatingBasis {
   selector: 'app-tactics',
   imports: [DecimalPipe, RouterLink, TableModule],
   templateUrl: './tactics.html',
+  host: { class: 'block fit:min-h-0 fit:flex-1' },
 })
 export class Tactics {
   private readonly document = inject(DOCUMENT);

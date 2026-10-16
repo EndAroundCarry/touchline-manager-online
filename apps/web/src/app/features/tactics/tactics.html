@@ -7,60 +7,78 @@
   </div>
 } @else if (tactics(); as club) {
   @if (draft(); as plan) {
-    <section class="max-w-6xl 2xl:max-w-[96rem]">
-      <h1 [class]="pageHeadingClass">{{ club.clubName }} tactics</h1>
-      <p class="mt-1 text-sm text-ink-2">
-        {{ club.countryCode }} · season {{ club.seasonNumber }} · {{ plans().length }} saved
-        {{ plans().length === 1 ? 'plan' : 'plans' }} · {{ assignedCount() }} of
-        {{ plan.slots.length }} slots filled · {{ benchCount() }} of {{ benchSize }} substitutes
-      </p>
+    <section
+      class="max-w-6xl 2xl:max-w-[96rem] fit:flex fit:h-full fit:min-h-0 fit:max-w-none fit:flex-col"
+    >
+      <div class="fit:flex fit:shrink-0 fit:items-end fit:justify-between fit:gap-6">
+        <div>
+          <h1 [class]="pageHeadingClass" class="fit:text-2xl">{{ club.clubName }} tactics</h1>
+          <p class="mt-1 text-sm text-ink-2">
+            {{ club.countryCode }} · season {{ club.seasonNumber }} · {{ plans().length }} saved
+            {{ plans().length === 1 ? 'plan' : 'plans' }} · {{ assignedCount() }} of
+            {{ plan.slots.length }} slots filled · {{ benchCount() }} of {{ benchSize }} substitutes
+          </p>
+        </div>
 
-      <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="block">
-          <span class="text-sm font-medium text-ink-2">Plan</span>
-          <select
-            [class]="textInputClass"
-            [value]="selectedPlan()?.id ?? ''"
-            (change)="onPlanChange($event)"
-          >
-            <option value="">New plan</option>
-            @for (saved of plans(); track saved.id) {
-              <option [value]="saved.id">
-                {{ saved.name }}
-                @if (saved.isDefault) {
-                  &nbsp;(default)
-                }
-              </option>
-            }
-          </select>
-        </label>
+        <div
+          class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 fit:mt-0 fit:flex fit:items-end fit:gap-3"
+        >
+          <label class="block fit:w-48">
+            <span class="text-sm font-medium text-ink-2">Plan</span>
+            <select
+              [class]="textInputClass"
+              class="fit:min-h-8 fit:py-1"
+              [value]="selectedPlan()?.id ?? ''"
+              (change)="onPlanChange($event)"
+            >
+              <option value="">New plan</option>
+              @for (saved of plans(); track saved.id) {
+                <option [value]="saved.id">
+                  {{ saved.name }}
+                  @if (saved.isDefault) {
+                    &nbsp;(default)
+                  }
+                </option>
+              }
+            </select>
+          </label>
 
-        <label class="block">
-          <span class="text-sm font-medium text-ink-2">Plan name</span>
-          <input
-            type="text"
-            [class]="textInputClass"
-            [value]="plan.name"
-            [attr.maxlength]="maxNameLength"
-            (input)="onNameInput($event)"
-          />
-        </label>
+          <label class="block fit:w-48">
+            <span class="text-sm font-medium text-ink-2">Plan name</span>
+            <input
+              type="text"
+              [class]="textInputClass"
+              class="fit:min-h-8 fit:py-1"
+              [value]="plan.name"
+              [attr.maxlength]="maxNameLength"
+              (input)="onNameInput($event)"
+            />
+          </label>
 
-        <label class="block">
-          <span class="text-sm font-medium text-ink-2">Formation</span>
-          <select
-            [class]="textInputClass"
-            [value]="plan.formationPreset"
-            (change)="onFormationChange($event)"
-          >
-            @for (formation of formations(); track formation.code) {
-              <option [value]="formation.code">{{ formation.code }}</option>
-            }
-          </select>
-        </label>
+          <label class="block fit:w-28">
+            <span class="text-sm font-medium text-ink-2">Formation</span>
+            <select
+              [class]="textInputClass"
+              class="fit:min-h-8 fit:py-1"
+              [value]="plan.formationPreset"
+              (change)="onFormationChange($event)"
+            >
+              @for (formation of formations(); track formation.code) {
+                <option [value]="formation.code">{{ formation.code }}</option>
+              }
+            </select>
+          </label>
 
-        <div class="flex items-end">
-          <button type="button" [class]="secondaryButtonClass" (click)="newPlan()">New plan</button>
+          <div class="flex items-end">
+            <button
+              type="button"
+              [class]="secondaryButtonClass"
+              class="fit:min-h-8 fit:whitespace-nowrap fit:py-1"
+              (click)="newPlan()"
+            >
+              New plan
+            </button>
+          </div>
         </div>
       </div>
 
@@ -115,57 +133,61 @@
       }
 
       <div
-        class="mt-8 grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[22rem_minmax(0,1fr)_17rem]"
+        class="mt-8 grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[22rem_minmax(0,1fr)_17rem] fit:mt-3 fit:min-h-0 fit:flex-1 fit:grid-cols-[17rem_minmax(0,1fr)_24rem] fit:grid-rows-[minmax(0,1fr)] fit:gap-4"
       >
-        <div class="lg:row-span-2 2xl:row-span-1">
+        <div class="flex min-h-0 flex-col lg:row-span-2 2xl:row-span-1 fit:row-span-1">
           <h2 class="text-lg font-semibold text-ink">Formation</h2>
-          <p class="mt-1 text-sm text-ink-2">
+          <p class="mt-1 text-sm text-ink-2 fit:hidden">
             Positions are set by the formation. Drag a player from the table onto a slot, or select
             a slot and then press the player's name. The seven dots under the pitch are your
             substitutes: the first is the reserve goalkeeper, the other six can be anyone.
           </p>
 
           <div
-            class="relative mt-3 aspect-[3/4] w-full max-w-sm theme-dark overflow-hidden rounded-lg border border-line pitch-surface"
+            class="mt-3 flex justify-center fit:mt-2 fit:min-h-0 fit:flex-1 fit:[container-type:size]"
           >
             <div
-              class="pointer-events-none absolute left-0 right-0 top-1/2 border-t border-white/50"
-            ></div>
-            <div
-              class="pointer-events-none absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/50"
-            ></div>
-            <div
-              class="pointer-events-none absolute bottom-0 left-1/2 h-8 w-24 -translate-x-1/2 border-x border-t border-white/50"
-            ></div>
+              class="relative aspect-[3/4] w-full max-w-sm theme-dark overflow-hidden rounded-lg border border-line pitch-surface fit:w-[min(100cqw,75cqh)] fit:max-w-none"
+            >
+              <div
+                class="pointer-events-none absolute left-0 right-0 top-1/2 border-t border-white/50"
+              ></div>
+              <div
+                class="pointer-events-none absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/50"
+              ></div>
+              <div
+                class="pointer-events-none absolute bottom-0 left-1/2 h-8 w-24 -translate-x-1/2 border-x border-t border-white/50"
+              ></div>
 
-            @for (slot of slotViews(); track slot.slotNumber) {
-              <button
-                type="button"
-                [class]="slotClasses(slot)"
-                [style.left]="slot.style['left']"
-                [style.bottom]="slot.style['bottom']"
-                [attr.aria-pressed]="slot.isSelected"
-                [attr.aria-label]="slotLabel(slot)"
-                (click)="selectSlot(slot.slotNumber)"
-                (dragover)="onSlotDragOver($event)"
-                (drop)="onSlotDrop($event, slot.slotNumber)"
-              >
-                @if (slot.player; as player) {
-                  <span aria-hidden="true">{{ player.shortName }}</span>
-                  @if (slot.isOutOfPosition) {
-                    <span class="text-[9px] font-normal" aria-hidden="true">out of position</span>
-                  } @else if (slot.isUnavailable) {
-                    <span class="text-[9px] font-normal" aria-hidden="true">unavailable</span>
+              @for (slot of slotViews(); track slot.slotNumber) {
+                <button
+                  type="button"
+                  [class]="slotClasses(slot)"
+                  [style.left]="slot.style['left']"
+                  [style.bottom]="slot.style['bottom']"
+                  [attr.aria-pressed]="slot.isSelected"
+                  [attr.aria-label]="slotLabel(slot)"
+                  (click)="selectSlot(slot.slotNumber)"
+                  (dragover)="onSlotDragOver($event)"
+                  (drop)="onSlotDrop($event, slot.slotNumber)"
+                >
+                  @if (slot.player; as player) {
+                    <span aria-hidden="true">{{ player.shortName }}</span>
+                    @if (slot.isOutOfPosition) {
+                      <span class="text-[9px] font-normal" aria-hidden="true">out of position</span>
+                    } @else if (slot.isUnavailable) {
+                      <span class="text-[9px] font-normal" aria-hidden="true">unavailable</span>
+                    }
+                  } @else {
+                    <span aria-hidden="true">{{ slot.slotNumber }}</span>
+                    <span class="text-[9px] font-normal" aria-hidden="true">empty</span>
                   }
-                } @else {
-                  <span aria-hidden="true">{{ slot.slotNumber }}</span>
-                  <span class="text-[9px] font-normal" aria-hidden="true">empty</span>
-                }
-              </button>
-            }
+                </button>
+              }
+            </div>
           </div>
 
-          <div class="mt-3 max-w-sm" data-testid="bench">
+          <div class="mt-3 max-w-sm fit:mt-2 fit:shrink-0" data-testid="bench">
             <h3 class="text-sm font-medium text-ink-2">
               Substitutes
               <span class="font-normal text-muted">({{ benchCount() }} of {{ benchSize }})</span>
@@ -220,7 +242,7 @@
           </div>
 
           @if (selectedSlotView(); as slot) {
-            <p class="mt-3 text-sm text-ink-2" role="status">
+            <p class="mt-3 text-sm text-ink-2 fit:mt-2 fit:shrink-0 fit:text-xs" role="status">
               Slot {{ slot.slotNumber }} is selected ({{ family(slot.positionFamily) }}). Press a
               player's name in the table to pick them, or
               <button type="button" [class]="linkClass" (click)="clearSlot(slot.slotNumber)">
@@ -228,12 +250,13 @@
               >.
             </p>
 
-            <label class="mt-2 block max-w-sm">
+            <label class="mt-2 block max-w-sm fit:mt-1 fit:shrink-0">
               <span class="text-sm font-medium text-ink-2"
                 >Role for slot {{ slot.slotNumber }}</span
               >
               <select
                 [class]="textInputClass"
+                class="fit:min-h-8 fit:py-1"
                 [value]="slot.role"
                 (change)="onRoleChange(slot.slotNumber, $event)"
               >
@@ -245,23 +268,27 @@
           }
         </div>
 
-        <div class="min-w-0">
+        <div class="min-w-0 fit:flex fit:min-h-0 fit:flex-col">
           <h2 class="text-lg font-semibold text-ink">Players</h2>
           <p class="mt-1 text-sm text-ink-2">
-            Drag a player onto a slot, or select a slot and press the player's name. Hover a row to
-            see every skill.
+            Drag a player onto a slot, or select a slot and press the player's name.
+            <span class="hidden fit:inline"
+              >The seven dots under the pitch are your substitutes: the first is the reserve
+              goalkeeper, the other six can be anyone.</span
+            >
+            Hover a row to see every skill.
           </p>
 
           @if (ratingBasis(); as basis) {
             <p
-              class="mt-2 rounded border border-line-strong bg-raised px-3 py-1.5 text-sm text-ink"
+              class="mt-2 rounded border border-line-strong bg-raised px-3 py-1.5 text-sm text-ink fit:shrink-0"
               role="status"
             >
               Averages are weighted for slot {{ basis.slotNumber }}, {{ basis.roleLabel }}. Select
               the slot again to rate each player at their own position.
             </p>
           } @else {
-            <p class="mt-2 text-sm text-ink-2">
+            <p class="mt-2 text-sm text-ink-2 fit:shrink-0">
               Averages are weighted for each player's own position; select a slot to rate everyone
               for it. None is above 20.
             </p>
@@ -275,7 +302,7 @@
           }
 
           <div
-            class="mt-3 overflow-x-auto [&_td]:!px-2 [&_th]:!px-2"
+            class="mt-3 overflow-x-auto [&_td]:!px-2 [&_th]:!px-2 fit:mt-2 fit:min-h-0 fit:flex-1 fit:overflow-auto fit:text-[13px] fit:[&_td]:whitespace-nowrap fit:[&_td]:!py-1 fit:[&_th]:!py-1 fit:[&_thead_th]:sticky fit:[&_thead_th]:top-0 fit:[&_thead_th]:z-10 fit:[&_thead_th]:bg-panel"
             data-testid="players-table"
             tabindex="0"
             role="group"
@@ -283,7 +310,7 @@
           >
             <p-table
               [value]="roster()"
-              [tableStyle]="{ 'min-width': '44rem' }"
+              [tableStyle]="{ 'min-width': '40rem' }"
               [pt]="{ table: { 'aria-label': 'Players' } }"
             >
               <ng-template #header>
@@ -376,11 +403,15 @@
                   <td>{{ row.age ?? '–' }}</td>
                   <td [class]="stateClass(row.condition, true)">
                     {{ row.condition ?? '–' }}
-                    <span class="block text-[10px]">{{ stateWord(row.condition, true) }}</span>
+                    <span class="block text-[10px] fit:ml-1 fit:inline">{{
+                      stateWord(row.condition, true)
+                    }}</span>
                   </td>
                   <td [class]="stateClass(row.fatigue, false)">
                     {{ row.fatigue ?? '–' }}
-                    <span class="block text-[10px]">{{ stateWord(row.fatigue, false) }}</span>
+                    <span class="block text-[10px] fit:ml-1 fit:inline">{{
+                      stateWord(row.fatigue, false)
+                    }}</span>
                   </td>
                 </tr>
               </ng-template>
@@ -394,19 +425,24 @@
           </div>
         </div>
 
-        <div class="min-w-0 lg:col-start-2 2xl:col-start-3 2xl:row-start-1">
+        <div
+          class="min-w-0 lg:col-start-2 2xl:col-start-3 2xl:row-start-1 fit:col-start-3 fit:row-start-1"
+        >
           <h2 class="text-lg font-semibold text-ink">Team instructions</h2>
-          <p class="mt-1 text-sm text-ink-2">
+          <p class="mt-1 text-sm text-ink-2 fit:hidden">
             Every instruction has a bounded effect and a trade-off (INS-9).
           </p>
 
-          <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-1">
+          <div
+            class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-1 fit:mt-2 fit:grid-cols-2 fit:gap-x-3 fit:gap-y-2"
+          >
             @for (field of instructionFields; track field.key) {
               <div>
                 <label class="block">
                   <span class="text-sm font-medium text-ink-2">{{ field.label }}</span>
                   <select
                     [class]="textInputClass"
+                    class="fit:min-h-8 fit:py-1"
                     [value]="plan.instructions[field.key]"
                     [attr.aria-describedby]="
                       instructionEffect(field, plan.instructions[field.key])
@@ -432,7 +468,7 @@
               </div>
             }
 
-            <div>
+            <div class="fit:col-span-2">
               <label class="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -504,7 +540,7 @@
         </div>
       }
 
-      <div class="mt-6 flex flex-wrap items-center gap-3">
+      <div class="mt-6 flex flex-wrap items-center gap-3 fit:mt-3 fit:shrink-0">
         <button
           type="button"
           [class]="primaryButtonClass"

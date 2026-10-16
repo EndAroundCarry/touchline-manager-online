@@ -21,6 +21,12 @@
 @import 'primeicons/primeicons.css';
 
 /*
+ * `fit`: a desktop window wide and tall enough for a screen to be drawn in one view, with no page scroll
+ * (the tactics board). Below it the screen falls back to its ordinary stacked layout and the page scrolls.
+ */
+@custom-variant fit (@media (min-width: 80rem) and (min-height: 48rem));
+
+/*
  * Self-hosted type, so no request leaves for a font CDN (the privacy policy promises none) and the
  * service worker can cache it with the rest of the shell. Latin subsets only: the game's copy is English.
  */
@@ -277,6 +283,32 @@
       #21422f 12.5%,
       #21422f 25%
     );
+  }
+
+  /*
+   * A screen that must fit the window (the tactics board) makes the shell exactly one window tall instead of
+   * at least one: the notices, the header and the footer keep their own height, and the screen takes what is
+   * left, so a notice appearing shrinks the screen rather than pushing the page into a scroll. Only the
+   * shell's own wrappers are named here; the screen lays out its own insides (`fit:` utilities).
+   */
+  @media (min-width: 80rem) and (min-height: 48rem) {
+    app-shell > div:has(app-tactics) {
+      height: 100dvh;
+    }
+
+    app-shell > div:has(app-tactics) > div:has(> #main-content) {
+      min-height: 0;
+    }
+
+    app-shell > div:has(app-tactics) nav[aria-label='Main'] {
+      max-height: 100% !important;
+    }
+
+    #main-content:has(> app-tactics) {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
   }
 
   /*
