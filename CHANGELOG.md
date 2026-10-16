@@ -4,6 +4,20 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) §16, with engine milestones named by their
 engine version.
 
+## Calendar - what is happening at the club, day by day
+
+**A new Calendar page in the Season menu shows the club's days like a calendar app: a month grid with each day's events stacked as one-line chips and "n more" when they do not fit, and a click on a day opens an hourly view of it, each event at the time it happens and events in the same hour sharing the width. It shows the matches played and coming, the weekly finance run and every other money movement, and injuries and recoveries.** It is built so that new kinds of event cost one class on the server and nothing else: the page draws whatever kinds arrive, with a neutral marker for one it has never heard of.
+
+### Added
+
+- `GET /calendar?from=&to=` (at most 70 days; no bounds gives the game clock's month with padding), `ICalendarEventSource` (the extension point), `GetCalendar` (merges every registered source in time order and marks each event `done` or `upcoming` against the one game clock), and `ICalendarQueries` (the narrow cross-module reads the sources share). Sources today: `MatchCalendarSource` (built on the fixture list, so a score follows the same visibility rule), `FinanceCalendarSource` (ledger lines grouped by operation, so a week's sponsorship, wages and running costs are one event with the net; plus the coming Sunday runs, projected only while the weekly run is switched on) and `InjuryCalendarSource` (the day a player is hurt and the day the injury clears). Adding a kind of event is a new `ICalendarEventSource` registered in `AddCalendarUseCases`.
+- Web: `/calendar` with a month grid in the manager's own zone and week start (chips stacked in each cell, "n more" past three rows, icons only on a phone), an hourly day view (24 hour rows, each event a one-hour block at its time, clusters of overlapping events split into equal columns, a line for the game clock's now on today, scrolled to the day's first event), previous and next day, a legend that filters by kind, today taken from the game clock rather than the device, each event's time, text, signed amount and link, and a played match's result held back behind "Show result" like everywhere else. `CalendarStore` drops a slow answer for a month the manager has already left.
+
+### Not yet
+
+- Treatment of injured players and finished construction do not exist in the game yet, so nothing is on the calendar for them; each becomes an event the day it is added as a source. Suspensions are not shown.
+- Only the club's own season is covered: other clubs' matches and the season's start and end are not events.
+
 ## Club crests - choose the badge your club wears
 
 **A manager chooses a crest shape from one dropdown and the stripes on it from another, in the same step and the same Settings card as the club's two colours; any shape can wear any stripes, drawn in those colours.** There are 20 shapes (classic, pointed and Spanish-style shields, roundel, oval, wide oval, hexagon, octagon, diamond, arch and more) and 16 kinds of stripes (vertical, horizontal and diagonal stripes, halves, quarters, sash, cross, saltire, chevron, central stripe, band, chequered, star, plain). They are the shapes and divisions real clubs' crests are built from, each drawn from scratch: no real mark, name, letter or animal (`FIC-3`).

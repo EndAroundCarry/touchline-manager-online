@@ -1,9 +1,11 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using TouchlineManager.Application.Abstractions.Calendar;
 using TouchlineManager.Application.Abstractions.Comms;
 using TouchlineManager.Application.Abstractions.Jobs;
 using TouchlineManager.Application.Auth;
 using TouchlineManager.Application.Auth.Validation;
+using TouchlineManager.Application.Calendar;
 using TouchlineManager.Application.Comms;
 using TouchlineManager.Application.Competition;
 using TouchlineManager.Application.Finance;
@@ -70,6 +72,7 @@ public static class DependencyInjection
         AddCommsUseCases(services);
         AddFinanceUseCases(services);
         AddMarketUseCases(services);
+        AddCalendarUseCases(services);
 
         // Operator account administration (master plan §13, F-46, ADR-0042).
         services.AddScoped<SuspendAccount>();
@@ -92,6 +95,22 @@ public static class DependencyInjection
         services.AddScoped<GetPublicStatus>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the club calendar and the sources that feed it.
+    /// </summary>
+    /// <remarks>
+    /// This list is the calendar's extension point: a new kind of event is a new
+    /// <see cref="ICalendarEventSource"/> registered on one more line here, and nothing else changes.
+    /// </remarks>
+    private static void AddCalendarUseCases(IServiceCollection services)
+    {
+        services.AddScoped<GetCalendar>();
+
+        services.AddScoped<ICalendarEventSource, MatchCalendarSource>();
+        services.AddScoped<ICalendarEventSource, FinanceCalendarSource>();
+        services.AddScoped<ICalendarEventSource, InjuryCalendarSource>();
     }
 
     /// <summary>

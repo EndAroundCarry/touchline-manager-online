@@ -12,6 +12,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { Subscription, filter } from 'rxjs';
 import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
+import { CalendarStore } from '../../core/calendar/calendar-store';
 import { lockCountdown, venueLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { GameClockStore } from '../../core/devtools/game-clock-store';
@@ -54,6 +55,7 @@ export class AppShell implements OnDestroy {
   private readonly training = inject(TrainingStore);
   private readonly playerTraining = inject(PlayerTrainingStore);
   private readonly competition = inject(CompetitionStore);
+  private readonly calendar = inject(CalendarStore);
   private readonly inbox = inject(InboxStore);
   private readonly news = inject(NewsStore);
   private readonly notifications = inject(NotificationPreferencesStore);
@@ -282,6 +284,7 @@ export class AppShell implements OnDestroy {
       this.training.clear();
       this.playerTraining.clear();
       this.competition.clear();
+      this.calendar.clear();
       this.inbox.clear();
       this.news.clear();
       this.notifications.clear();

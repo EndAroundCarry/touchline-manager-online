@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using TouchlineManager.Application.Abstractions;
 using TouchlineManager.Application.Abstractions.Auth;
+using TouchlineManager.Application.Abstractions.Calendar;
 using TouchlineManager.Application.Abstractions.Comms;
 using TouchlineManager.Application.Abstractions.Competition;
 using TouchlineManager.Application.Abstractions.Finance;
@@ -152,6 +153,9 @@ public static class DependencyInjection
             .Validate(
                 options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
                 "Finance:CheckIntervalSeconds must be between 30 and 86400.");
+
+        // What the calendar may promise about the coming weekly settlement is what the scheduler will do.
+        services.AddSingleton<IWeeklyFinanceRunSettings, WeeklyFinanceRunSettings>();
     }
 
     /// <summary>
@@ -429,6 +433,7 @@ public static class DependencyInjection
         services.AddScoped<IClubAccountRepository, ClubAccountRepository>();
         services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IFinanceQueries, FinanceQueries>();
+        services.AddScoped<ICalendarQueries, CalendarQueries>();
         services.AddScoped<IClubSeasonFinanceRepository, ClubSeasonFinanceRepository>();
         services.AddScoped<IOnboardingQueries, OnboardingQueries>();
         services.AddScoped<IAdvisoryLock, PostgresAdvisoryLock>();

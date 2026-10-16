@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Options;
 using TouchlineManager.Api.Auth;
+using TouchlineManager.Api.Calendar;
 using TouchlineManager.Api.Comms;
 using TouchlineManager.Api.Competition;
 using TouchlineManager.Api.Configuration;
@@ -285,6 +286,7 @@ app.MapTeamSheetEndpoints();
 app.MapMatchEndpoints();
 app.MapCommsEndpoints();
 app.MapFinanceEndpoints();
+app.MapCalendarEndpoints();
 app.MapStadiumEndpoints();
 app.MapMarketEndpoints();
 

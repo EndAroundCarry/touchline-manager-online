@@ -52,6 +52,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     available: true,
     group: 'Season',
   },
+  {
+    path: '/calendar',
+    label: 'Calendar',
+    icon: 'pi pi-calendar-clock',
+    available: true,
+    group: 'Season',
+  },
   { path: '/scouting', label: 'Scouting', icon: 'pi pi-search', available: true, group: 'Market' },
   {
     path: '/transfers',

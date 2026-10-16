@@ -1250,6 +1250,7 @@ Listing, cancellation, and bid commands require `Idempotency-Key`. Deadlines and
 ```text
 GET    /api/v1/finances/summary
 GET    /api/v1/finances/ledger?cursor=
+GET    /api/v1/calendar?from=&to=
 GET    /api/v1/inbox?cursor=&unread=
 POST   /api/v1/inbox/{messageId}/read
 POST   /api/v1/inbox/read-all
@@ -1257,6 +1258,8 @@ GET    /api/v1/sync?cursor=
 ```
 
 `sync` returns lightweight changed-resource hints and unread counts; it does not duplicate full feature payloads.
+
+`calendar` returns what is happening at the caller's club inside a window of at most 70 days (no bounds: the game clock's month with a week either side), as one list of events, oldest first. Each event carries a stable `kind` code, its UTC instant, whether it is `done` or `upcoming` against the game clock, finished text, an optional app `link` and an optional signed `amountMinor`. The endpoint knows no kind of event: every event comes from an `ICalendarEventSource` registered in the application layer, so a new kind (a finished building, an injured player's treatment) is one new source class and one registration, with no change to the endpoint, the contract or the screen. The response's `serverTime` is the game clock's instant and is what "today" means on the page.
 
 ### 10.8 Administration
 
@@ -1313,6 +1316,7 @@ Authenticated shell:
 - `/scouting`: global server-side search.
 - `/transfers`: listings, bids, own activity/history.
 - `/finances`: balance, commitments, category summaries, ledger.
+- `/calendar`: a month grid of the club's days (matches, finance runs and movements, injuries and recoveries, and any source added later) with each day's events stacked as chips and "n more" when they do not fit; a click on a day opens an hourly view where each event sits at its time and events in the same hour share the width; a filter by kind; and a played match's result held back until seen.
 - `/inbox`: categorized messages.
 - `/settings`: profile, timezone, reduced motion, score hiding, sessions, account deletion.
 - `/admin`: lazy-loaded and role protected.

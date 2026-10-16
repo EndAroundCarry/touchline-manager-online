@@ -227,6 +227,13 @@ export const routes: Routes = [
         title: 'Fixtures — Touchline Manager',
       },
       {
+        // What is happening at the club on each day: matches, finances, injuries and whatever sources join them.
+        path: 'calendar',
+        loadComponent: () => import('./features/calendar/calendar').then((m) => m.Calendar),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Calendar — Touchline Manager',
+      },
+      {
         path: 'inbox',
         loadComponent: () => import('./features/inbox/inbox').then((m) => m.Inbox),
         canActivate: [requireAuthentication, requireVerifiedEmail],
