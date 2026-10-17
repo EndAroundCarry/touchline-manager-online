@@ -1,6 +1,7 @@
 using Tactical11Manager.Api.Endpoints;
 using Tactical11Manager.Api.Http;
 using Tactical11Manager.Application.Match;
+using Tactical11Manager.Contracts.Auth;
 using Tactical11Manager.Contracts.Match;
 
 namespace Tactical11Manager.Api.Match;
@@ -50,7 +51,37 @@ internal static class MatchEndpoints
             .Produces<MatchPresentationResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/matches/{matchId:guid}/my-instructions", GetMatchInstructionNamesAsync)
+            .WithName("GetMatchInstructionNames")
+            .WithSummary("Reads the names of the match instructions the caller's own club played with in a match.")
+            .WithDescription(
+                "The replay names a rule only by its place in the side's list. A rule's name is the manager's own, so "
+                + "it is answered to the club that wrote it and to nobody else: a caller whose club did not play gets an empty list.")
+            .Produces<MatchInstructionNamesResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return endpoints;
+    }
+
+    private static async Task<IResult> GetMatchInstructionNamesAsync(
+        HttpContext httpContext,
+        Guid matchId,
+        GetMatchInstructionNames query,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(httpContext.User.FindFirst(AuthClaimNames.Subject)?.Value, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, matchId, cancellationToken);
+
+        // Answers for one caller, so nothing shared may keep it.
+        httpContext.Response.Headers.CacheControl = "private, no-store";
+
+        return result.Outcome == MatchReadOutcome.Found
+            ? Results.Ok(result.Names)
+            : NotFound();
     }
 
     private static async Task<IResult> GetMatchAsync(

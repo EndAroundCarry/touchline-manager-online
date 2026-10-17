@@ -191,10 +191,18 @@ public sealed record EngineEventV1
     public MatchMentality? Mentality { get; init; }
 
     /// <summary>
-    /// Gets the 1-based place in the side's list of the match rule that fired, on a <see cref="EngineEventType.TacticalChange"/>
-    /// (`match-instructions-v1`), so the match centre can name it.
+    /// Gets the 1-based place in the side's list of the match rule that fired, on a <see cref="EngineEventType.TacticalChange"/> or on
+    /// a substitution that rule made (`match-instructions-v1`), so the match centre can name it. Only the tactical change writes it
+    /// into the canonical text: a rule's substitution carries it for the commentary alone.
     /// </summary>
     public int? RuleOrdinal { get; init; }
+
+    /// <summary>
+    /// Gets the instructions (other than the mentality, which has its own field) a <see cref="EngineEventType.TacticalChange"/> actually changed,
+    /// as <c>name=value</c> pairs joined by <c>;</c> in a fixed order (<c>tempo=High;pressing=HighPress</c>), or null. For the commentary alone: like the
+    /// rule name it is not written into the canonical text, so it can never move a hash.
+    /// </summary>
+    public string? InstructionChanges { get; init; }
 
     /// <summary>Gets whether the event is one of the two halves' boundaries.</summary>
     public bool IsPeriodBoundary =>

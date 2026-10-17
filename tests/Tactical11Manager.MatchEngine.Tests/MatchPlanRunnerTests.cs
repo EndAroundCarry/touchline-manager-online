@@ -292,6 +292,17 @@ public sealed class MatchPlanRunnerTests
     }
 
     [Fact]
+    public void A_substitution_a_rule_makes_carries_the_rules_place_and_an_injury_substitution_carries_none()
+    {
+        var swap = new MatchRuleSubstitutionV1 { Off = MatchRuleOff.Player, OffParticipantId = Starter(9), On = MatchRuleOn.Player, OnParticipantId = Bench(4) };
+        var state = Create(Plan(new MatchRuleV1 { Ordinal = 3, Substitutions = [swap] }));
+
+        MatchPlanRunner.Consider(state, MatchSide.Home);
+
+        Of(state, EngineEventType.Substitution).Single().RuleOrdinal.Should().Be(3);
+    }
+
+    [Fact]
     public void When_two_players_are_booked_the_one_rated_lowest_is_the_subject()
     {
         var swap = new MatchRuleSubstitutionV1 { Off = MatchRuleOff.Subject, On = MatchRuleOn.Player, OnParticipantId = Bench(2) };
@@ -416,6 +427,7 @@ public sealed class MatchPlanRunnerTests
 
         var change = Of(state, EngineEventType.TacticalChange).Single();
         change.Mentality.Should().Be(MatchMentality.Cautious);
+        change.InstructionChanges.Should().Be("pressing=HighPress;counterAttack=True", "the event says which other instructions actually moved, in a fixed order");
         change.FormationCode.Should().BeNull("the shape was not changed");
         change.RuleOrdinal.Should().Be(1);
     }

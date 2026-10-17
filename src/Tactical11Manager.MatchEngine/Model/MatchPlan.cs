@@ -203,6 +203,12 @@ public sealed record MatchRuleV1
     /// <summary>Gets the rule's place in the manager's list, from 1: the tactical-change event carries it.</summary>
     public required int Ordinal { get; init; }
 
+    /// <summary>
+    /// Gets the name the manager gave the rule, or null. For presentation only: it is not part of the canonical text, so
+    /// renaming a rule can never change what a match does or its hash. The match centre shows it to the rule's own manager.
+    /// </summary>
+    public string? Name { get; init; }
+
     /// <summary>Gets the first minute the rule may fire in (the displayed minute, 0…90).</summary>
     public int FromMinute { get; init; }
 

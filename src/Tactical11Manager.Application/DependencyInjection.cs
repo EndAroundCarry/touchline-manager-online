@@ -218,6 +218,7 @@ public static class DependencyInjection
     {
         services.AddScoped<GetMatch>();
         services.AddScoped<GetMatchPresentation>();
+        services.AddScoped<GetMatchInstructionNames>();
     }
 
     private static void AddAuthUseCases(IServiceCollection services)

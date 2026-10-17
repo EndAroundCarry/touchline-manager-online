@@ -205,6 +205,7 @@ public sealed class CommentaryTests
         var neither = tokens.Single(token => token.EventSequence == withNeither.Sequence);
 
         both.TemplateKey.Should().Be("match.tactical_change");
+        both.Parameters.Should().Contain(new CommentaryParameter("ruleOrdinal", "1"), "the replay names the rule by its place, never by the manager's own name for it");
         both.Text.Should().Contain(clubName);
         neither.TemplateKey.Should().Be("match.tactical_change");
         neither.Text.Should().Contain(clubName).And.NotContain("{").And.NotContain("4-2-4");
@@ -215,6 +216,46 @@ public sealed class CommentaryTests
                 .Single(token => token.EventSequence == sequence);
 
             variant.Text.Should().Contain(clubName).And.NotContain("{").And.NotContain("a team-mate");
+        }
+    }
+
+    [Fact]
+    public void A_tactical_change_says_everything_it_changed()
+    {
+        var input = TestMatchFactory.Even();
+        var result = MatchSimulator.Simulate(input);
+        var last = result.Events[^1].Sequence;
+
+        EngineEventV1 Change(int sequence, string? formation, MatchMentality? mentality, string? changes) => result.Events[^1] with
+        {
+            Sequence = sequence,
+            Type = EngineEventType.TacticalChange,
+            Side = MatchSide.Home,
+            ClubId = input.Home.ClubId,
+            ParticipantId = null,
+            SecondaryParticipantId = null,
+            FormationCode = formation,
+            Mentality = mentality,
+            InstructionChanges = changes,
+            RuleOrdinal = 1,
+        };
+
+        var everything = Change(last + 1, "4-2-4", MatchMentality.Attacking, "tempo=High;pressing=HighPress;counterAttack=True");
+        var instructionsOnly = Change(last + 100, null, null, "pressing=LowBlock");
+        var nothingSaid = Change(last + 200, null, null, null);
+
+        for (var variant = 0; variant < 6; variant++)
+        {
+            var shifted = new[] { everything, instructionsOnly, nothingSaid }
+                .Select(matchEvent => matchEvent with { Sequence = matchEvent.Sequence + variant })
+                .ToList();
+            var tokens = CommentaryTokenBuilder.Build(input, result with { Events = [.. result.Events, .. shifted] });
+            var texts = shifted.Select(matchEvent => tokens.Single(token => token.EventSequence == matchEvent.Sequence).Text).ToList();
+
+            texts[0].Should().Contain("switch to 4-2-4, take on an attacking mentality, raise the tempo, press high up the pitch and look to hit on the counter");
+            texts[1].Should().Contain("drop into a low block").And.NotContain("switch to");
+            texts[2].Should().Contain("change their tactics");
+            texts.Should().OnlyContain(text => text.Contains(input.Home.ClubName) && !text.Contains('{') && !text.Contains("a team-mate"));
         }
     }
 
@@ -231,6 +272,7 @@ public sealed class CommentaryTests
         var squad = input.SideOf(tactical.Side).Squad;
 
         token.TemplateKey.Should().Be("match.substitution.tactical");
+        token.Parameters.Should().NotContain(parameter => parameter.Name == "ruleOrdinal", "an injury or fatigue change names no rule");
         token.Text.Should().Contain(squad.Single(participant => participant.ParticipantId == tactical.ParticipantId).DisplayName);
         token.Text.Should().Contain(squad.Single(participant => participant.ParticipantId == tactical.SecondaryParticipantId).DisplayName);
     }

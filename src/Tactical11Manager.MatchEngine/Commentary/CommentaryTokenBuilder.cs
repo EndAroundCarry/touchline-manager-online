@@ -674,6 +674,18 @@ public static class CommentaryTokenBuilder
             facts["formation"] = formation;
         }
 
+        // Which of the side's rules did it: a number, never the rule's name. A replay is public, and a manager's name for a rule is
+        // theirs alone; the match centre asks for the names of the caller's own side separately.
+        if (matchEvent.Type == EngineEventType.TacticalChange)
+        {
+            facts["change"] = DescribeTacticalChange(matchEvent);
+        }
+
+        if (matchEvent.RuleOrdinal is int ruleOrdinal)
+        {
+            facts["ruleOrdinal"] = ruleOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         if (matchEvent.Mentality is MatchMentality mentality)
         {
             facts["mentality"] = mentality.ToString().ToLowerInvariant();
@@ -681,6 +693,80 @@ public static class CommentaryTokenBuilder
 
         return facts;
     }
+
+    /// <summary>
+    /// Says what a tactical change did, as a clause that follows the club name: the new shape, the new mentality, then every other instruction it
+    /// changed (<c>switch to 4-2-4, take on an attacking mentality and press high up the pitch</c>).
+    /// </summary>
+    private static string DescribeTacticalChange(EngineEventV1 matchEvent)
+    {
+        var parts = new List<string>();
+
+        if (matchEvent.FormationCode is { Length: > 0 } formation)
+        {
+            parts.Add($"switch to {formation}");
+        }
+
+        if (matchEvent.Mentality is MatchMentality mentality)
+        {
+            parts.Add(mentality switch
+            {
+                MatchMentality.Defensive => "take on a defensive mentality",
+                MatchMentality.Cautious => "take on a cautious mentality",
+                MatchMentality.Balanced => "take on a balanced mentality",
+                MatchMentality.Positive => "take on a positive mentality",
+                _ => "take on an attacking mentality",
+            });
+        }
+
+        foreach (var pair in (matchEvent.InstructionChanges ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (InstructionPhrases.TryGetValue(pair, out var phrase))
+            {
+                parts.Add(phrase);
+            }
+        }
+
+        return parts.Count switch
+        {
+            0 => "change their tactics",
+            1 => parts[0],
+            _ => $"{string.Join(", ", parts.Take(parts.Count - 1))} and {parts[^1]}",
+        };
+    }
+
+    /// <summary>What each changed instruction reads as in a tactical-change line, keyed by <c>name=value</c> as the event carries it.</summary>
+    private static readonly Dictionary<string, string> InstructionPhrases = new(StringComparer.Ordinal)
+    {
+        ["tempo=Low"] = "slow the tempo",
+        ["tempo=Normal"] = "go back to a normal tempo",
+        ["tempo=High"] = "raise the tempo",
+        ["passing=ShortPassing"] = "play it short",
+        ["passing=MixedPassing"] = "mix up their passing",
+        ["passing=DirectPassing"] = "go more direct",
+        ["width=Narrow"] = "narrow the play",
+        ["width=Normal"] = "go back to normal width",
+        ["width=Wide"] = "stretch the play wide",
+        ["passFocus=Balanced"] = "pass through every lane",
+        ["passFocus=Centre"] = "work the ball through the middle",
+        ["passFocus=CentreAndLeft"] = "work the ball through the middle and down the left",
+        ["passFocus=CentreAndRight"] = "work the ball through the middle and down the right",
+        ["passFocus=Wings"] = "get the ball out to the wings",
+        ["pressing=LowBlock"] = "drop into a low block",
+        ["pressing=MidBlock"] = "settle into a mid block",
+        ["pressing=HighPress"] = "press high up the pitch",
+        ["defensiveLine=Deep"] = "drop the defensive line deeper",
+        ["defensiveLine=Normal"] = "set a normal defensive line",
+        ["defensiveLine=High"] = "push the defensive line up",
+        ["tackling=StayOnFeet"] = "stay on their feet",
+        ["tackling=Normal"] = "tackle normally",
+        ["tackling=Aggressive"] = "tackle harder",
+        ["timeWasting=Off"] = "stop running down the clock",
+        ["timeWasting=Situational"] = "run down the clock when they can",
+        ["timeWasting=On"] = "start killing time",
+        ["counterAttack=True"] = "look to hit on the counter",
+        ["counterAttack=False"] = "stop playing for the counter",
+    };
 
     /// <summary>Renders a template, substituting <c>{name}</c> placeholders and dropping unknown ones.</summary>
     private static string Render(string template, IReadOnlyDictionary<string, string> facts)
@@ -1243,11 +1329,9 @@ public static class CommentaryTokenBuilder
             [EngineEventType.TacticalChange] = new(
                 "match.tactical_change",
                 [
-                    "{club} switch to {formation}.",
-                    "{club} change shape to {formation}.",
-                    "{club} move to a {mentality} mentality.",
-                    "{club} switch to {formation} with a {mentality} mentality.",
-                    "{club} change their tactics.",
+                    "{club} {change}.",
+                    "A tactical change: {club} {change}.",
+                    "{club} rethink things. They {change}.",
                 ]),
         };
 

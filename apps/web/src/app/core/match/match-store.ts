@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { ApiError } from '../api/api-error';
 import { MatchApi } from './match-api';
-import { Match, MatchPresentation } from './match.models';
+import { Match, MatchInstructionNames, MatchPresentation } from './match.models';
 
 /**
  * The match center's view state (master plan §9.5, §11.1).
@@ -20,14 +20,24 @@ export class MatchStore {
 
   private readonly matchSignal = signal<Match | null>(null);
   private readonly presentationSignal = signal<MatchPresentation | null>(null);
+  private readonly instructionNamesSignal = signal<MatchInstructionNames | null>(null);
   private readonly loadingSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
+
+  /** The match last asked for, so a slow answer about the one before it is dropped. */
+  private requestedMatchId: string | null = null;
 
   /** The match summary last read. */
   readonly match = this.matchSignal.asReadonly();
 
   /** The replay last read: commentary and highlights. */
   readonly presentation = this.presentationSignal.asReadonly();
+
+  /**
+   * The names of the caller's own match instructions in this match, or null until read or when they could not be.
+   * They only decorate the commentary, so a failure to read them never stops the screen.
+   */
+  readonly instructionNames = this.instructionNamesSignal.asReadonly();
 
   /** Whether the match center is reading the server. */
   readonly loading = this.loadingSignal.asReadonly();
@@ -41,6 +51,17 @@ export class MatchStore {
     this.errorSignal.set(null);
     this.matchSignal.set(null);
     this.presentationSignal.set(null);
+    this.instructionNamesSignal.set(null);
+    this.requestedMatchId = matchId;
+
+    this.api.instructionNames(matchId).subscribe({
+      next: (names) => {
+        if (this.requestedMatchId === matchId) {
+          this.instructionNamesSignal.set(names);
+        }
+      },
+      error: () => undefined,
+    });
 
     forkJoin({
       match: this.api.get(matchId),
@@ -62,8 +83,10 @@ export class MatchStore {
 
   /** Forgets everything read. Called when the session ends. */
   clear(): void {
+    this.requestedMatchId = null;
     this.matchSignal.set(null);
     this.presentationSignal.set(null);
+    this.instructionNamesSignal.set(null);
     this.loadingSignal.set(false);
     this.errorSignal.set(null);
   }

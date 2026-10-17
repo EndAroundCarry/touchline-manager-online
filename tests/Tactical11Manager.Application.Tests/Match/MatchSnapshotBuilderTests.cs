@@ -391,6 +391,7 @@ public sealed class MatchSnapshotBuilderTests
 
         plan.AssistantFatigueSubstitutions.Should().BeTrue();
         engineRule.Ordinal.Should().Be(1);
+        engineRule.Name.Should().Be("Chase the game", "the manager's own name travels with the frozen rule, for the match centre");
         engineRule.FromMinute.Should().Be(60);
         engineRule.UntilMinute.Should().Be(85);
         engineRule.Score.Should().Be(MatchRuleScore.Trailing);

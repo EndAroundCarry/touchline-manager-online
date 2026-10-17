@@ -390,6 +390,7 @@ public static class MatchSnapshotBuilder
         return new MatchRuleV1
         {
             Ordinal = ordinal,
+            Name = string.IsNullOrWhiteSpace(instruction.Name) ? null : instruction.Name,
             FromMinute = instruction.FromMinute,
             UntilMinute = instruction.UntilMinute,
             Score = EngineVocabulary.RuleScore(instruction.Score),

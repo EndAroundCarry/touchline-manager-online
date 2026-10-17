@@ -164,7 +164,7 @@ internal static class MatchPlanRunner
     {
         foreach (var substitution in rule.Substitutions)
         {
-            Substitute(state, which, side, substitution, subject);
+            Substitute(state, which, side, rule.Ordinal, substitution, subject);
         }
 
         var before = side.Instructions;
@@ -195,12 +195,43 @@ internal static class MatchPlanRunner
                 EngineEventType.TacticalChange,
                 formationCode: reshaped ? rule.FormationCode : null,
                 mentality: after.Mentality != before.Mentality ? after.Mentality : null,
-                ruleOrdinal: rule.Ordinal);
+                ruleOrdinal: rule.Ordinal,
+                instructionChanges: ChangedInstructions(before, after));
         }
     }
 
+    /// <summary>
+    /// Names the instructions, apart from the mentality, that differ between two sets as <c>name=value</c> pairs joined by <c>;</c>, in a fixed
+    /// order, or null when none do. What the commentary says a tactical change did.
+    /// </summary>
+    internal static string? ChangedInstructions(MatchInstructionsV1 before, MatchInstructionsV1 after)
+    {
+        var changed = new List<string>();
+
+        void Note<T>(string name, T was, T now)
+            where T : notnull
+        {
+            if (!EqualityComparer<T>.Default.Equals(was, now))
+            {
+                changed.Add($"{name}={now}");
+            }
+        }
+
+        Note("tempo", before.Tempo, after.Tempo);
+        Note("passing", before.Passing, after.Passing);
+        Note("width", before.Width, after.Width);
+        Note("passFocus", before.PassFocus, after.PassFocus);
+        Note("pressing", before.Pressing, after.Pressing);
+        Note("defensiveLine", before.DefensiveLine, after.DefensiveLine);
+        Note("tackling", before.Tackling, after.Tackling);
+        Note("timeWasting", before.TimeWasting, after.TimeWasting);
+        Note("counterAttack", before.CounterAttack, after.CounterAttack);
+
+        return changed.Count == 0 ? null : string.Join(';', changed);
+    }
+
     /// <summary>Makes one of a rule's substitutions, or leaves it out when nobody can be taken off or brought on.</summary>
-    private static void Substitute(MatchState state, MatchSide which, SideRuntime side, MatchRuleSubstitutionV1 substitution, Guid? subject)
+    private static void Substitute(MatchState state, MatchSide which, SideRuntime side, int ruleOrdinal, MatchRuleSubstitutionV1 substitution, Guid? subject)
     {
         var rules = state.Rules;
 
@@ -236,7 +267,7 @@ internal static class MatchPlanRunner
             return;
         }
 
-        SubstitutionPlanner.Substitute(state, which, side, outgoing, replacement, MatchSubstitutionReason.Tactical, rules);
+        SubstitutionPlanner.Substitute(state, which, side, outgoing, replacement, MatchSubstitutionReason.Tactical, rules, ruleOrdinal);
     }
 
     private static ActiveSlot? OnPitch(SideRuntime side, Guid? participantId) =>

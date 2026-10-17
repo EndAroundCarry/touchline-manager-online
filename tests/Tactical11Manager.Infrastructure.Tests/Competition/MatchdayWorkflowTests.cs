@@ -256,6 +256,7 @@ public sealed class MatchdayWorkflowTests
             var content = MatchSnapshotDocument.Read(stored.SnapshotJson);
 
             content.Input.Home.MatchPlan.Rules.Select(rule => rule.Ordinal).Should().Equal(1, 2);
+            content.Input.Home.MatchPlan.Rules.Select(rule => rule.Name).Should().Equal("Open up", "Fresh midfield");
             content.Input.Home.MatchPlan.Rules[0].FormationCode.Should().Be("3-4-3");
             content.Input.Home.MatchPlan.Rules[0].Slots.Should().HaveCount(11);
             content.Input.Home.MatchPlan.Rules[0].Instructions!.Pressing.Should().Be(MatchEngine.Model.MatchPressing.HighPress);

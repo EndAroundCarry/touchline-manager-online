@@ -6,6 +6,7 @@ import {
   CommentaryLine,
   HighlightKeyframe,
   Match,
+  MatchInstructionNames,
   MatchLineupPlayer,
   MatchPresentation,
   Passage,
@@ -272,6 +273,7 @@ describe('MatchViewer', () => {
     presentation: ReturnType<typeof signal<MatchPresentation | null>>;
     loading: ReturnType<typeof signal<boolean>>;
     error: ReturnType<typeof signal<string | null>>;
+    instructionNames: ReturnType<typeof signal<MatchInstructionNames | null>>;
     load: ReturnType<typeof vi.fn>;
     clear: ReturnType<typeof vi.fn>;
   };
@@ -284,6 +286,7 @@ describe('MatchViewer', () => {
       presentation: signal<MatchPresentation | null>(null),
       loading: signal(false),
       error: signal<string | null>(null),
+      instructionNames: signal<MatchInstructionNames | null>(null),
       load: vi.fn(),
       clear: vi.fn(),
     };
@@ -421,6 +424,87 @@ describe('MatchViewer', () => {
 
     expect(native.textContent).toContain('Player Performance');
     expect(native.textContent).toContain('A Scorer');
+  });
+
+  describe('what a match instruction did', () => {
+    /** The report with a tactical change and a plan substitution by each side, after the result was asked for. */
+    async function loadReport(names: MatchInstructionNames | null): Promise<HTMLElement> {
+      const native = await load();
+      const base = presentation();
+      const tactical = (
+        sequence: number,
+        side: string,
+        templateKey: string,
+        text: string,
+        rule: string,
+      ): CommentaryLine => ({
+        sequence,
+        minute: 62,
+        stoppageMinute: 0,
+        side,
+        templateKey,
+        variantKey: `${templateKey}.v1`,
+        parameters: [{ name: 'ruleOrdinal', value: rule }],
+        text,
+      });
+
+      store.instructionNames.set(names);
+      store.presentation.set({
+        ...base,
+        commentary: [
+          ...base.commentary,
+          tactical(6, 'home', 'match.tactical_change', 'Ashvale switch to 4-2-4.', '1'),
+          tactical(7, 'home', 'match.substitution.tactical', 'A tactical change for Ashvale.', '2'),
+          tactical(
+            8,
+            'away',
+            'match.tactical_change',
+            'Bramford move to a defensive mentality.',
+            '1',
+          ),
+        ],
+      });
+
+      buttonByText(native, 'Show result')!.click();
+      await fixture.whenStable();
+      buttonByText(native, 'Report')!.click();
+      await fixture.whenStable();
+
+      return native;
+    }
+
+    const own: MatchInstructionNames = {
+      side: 'home',
+      rules: [{ ordinal: 1, name: 'Open up' }],
+    };
+
+    it('tags the lines a match instruction produced, on both sides, and no others', async () => {
+      const native = await loadReport(null);
+      const tags = [...native.querySelectorAll('[data-testid="tactical-tag"]')].map((node) =>
+        node.textContent?.trim(),
+      );
+
+      expect(tags).toEqual(['Tactics', 'Plan', 'Tactics']);
+      expect(native.textContent).toContain('Ashvale switch to 4-2-4.');
+      expect(native.textContent).toContain('Bramford move to a defensive mentality.');
+    });
+
+    it("names the manager's own rule on their own side's lines only", async () => {
+      const native = await loadReport(own);
+      const named = [...native.querySelectorAll('[data-testid="instruction-name"]')].map((node) =>
+        node.textContent?.replace(/\s+/g, ' ').trim(),
+      );
+
+      expect(named, 'rule 2 has no name and rule 1 of the visitors is not theirs').toEqual([
+        '\u00b7 Open up',
+      ]);
+    });
+
+    it('names nothing when the caller has no side in the match', async () => {
+      const native = await loadReport({ side: null, rules: [] });
+
+      expect(native.querySelector('[data-testid="instruction-name"]')).toBeNull();
+    });
   });
 
   describe('the Player Performance tab', () => {
@@ -855,6 +939,7 @@ describe('MatchViewer: one continuous film', () => {
     presentation: ReturnType<typeof signal<MatchPresentation | null>>;
     loading: ReturnType<typeof signal<boolean>>;
     error: ReturnType<typeof signal<string | null>>;
+    instructionNames: ReturnType<typeof signal<MatchInstructionNames | null>>;
     load: ReturnType<typeof vi.fn>;
     clear: ReturnType<typeof vi.fn>;
   };
@@ -885,6 +970,7 @@ describe('MatchViewer: one continuous film', () => {
       presentation: signal<MatchPresentation | null>(null),
       loading: signal(false),
       error: signal<string | null>(null),
+      instructionNames: signal<MatchInstructionNames | null>(null),
       load: vi.fn(),
       clear: vi.fn(),
     };

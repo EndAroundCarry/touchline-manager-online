@@ -1,6 +1,7 @@
 import { ratioLabel } from '../squad/squad-presentation';
 import {
   CommentaryLine,
+  MatchInstructionNames,
   MatchLineup,
   MatchLineupPlayer,
   MatchStatistics,
@@ -92,6 +93,43 @@ const GOAL_TEMPLATES = new Set(['match.goal', 'match.penalty.goal']);
 /** Whether a commentary line reports a goal, which the report highlights and the scoreboard lists. */
 export function isGoalCommentary(templateKey: string): boolean {
   return GOAL_TEMPLATES.has(templateKey);
+}
+
+/** The commentary template keys a side's match instructions produce: a change of shape or instructions, and a substitution one made. */
+const TACTICAL_TEMPLATES: Readonly<Record<string, string>> = {
+  'match.tactical_change': 'Tactics',
+  'match.substitution.tactical': 'Plan',
+};
+
+/** The short tag a tactical commentary line carries in the report, or null when the line is not one a match instruction produced. */
+export function tacticalLineTag(templateKey: string): string | null {
+  return TACTICAL_TEMPLATES[templateKey] ?? null;
+}
+
+/**
+ * The name the caller gave the match instruction behind a commentary line, or null.
+ *
+ * The replay is public and carries a rule only by its place in the side's list. The name is the manager's own and
+ * is known only for their own side, so the line is named only when it belongs to that side and the rule is one
+ * they named.
+ */
+export function instructionNameFor(
+  line: CommentaryLine,
+  names: MatchInstructionNames | null,
+): string | null {
+  if (names === null || names.side === null || line.side !== names.side) {
+    return null;
+  }
+
+  if (tacticalLineTag(line.templateKey) === null) {
+    return null;
+  }
+
+  const ordinal = Number(
+    line.parameters.find((parameter) => parameter.name === 'ruleOrdinal')?.value,
+  );
+
+  return names.rules.find((rule) => rule.ordinal === ordinal)?.name ?? null;
 }
 
 /** The build-up template keys that narrate a shot or what becomes of it. */

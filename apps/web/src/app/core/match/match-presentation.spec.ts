@@ -6,6 +6,7 @@ import {
   conditionColorClass,
   isGoalCommentary,
   isGoalOutcome,
+  instructionNameFor,
   isShotOutcome,
   matchClockFromSeconds,
   matchClockLabel,
@@ -17,6 +18,7 @@ import {
   possessionPercent,
   scoreLine,
   shotMapEntries,
+  tacticalLineTag,
 } from './match-presentation';
 import { CommentaryLine, HighlightKeyframe, MatchStatistics, Passage } from './match.models';
 
@@ -204,6 +206,59 @@ describe('match presentation helpers', () => {
     expect(isGoalCommentary('match.goal')).toBe(true);
     expect(isGoalCommentary('match.penalty.goal')).toBe(true);
     expect(isGoalCommentary('match.shot.saved')).toBe(false);
+  });
+
+  it('tags the lines a match instruction produces and no others', () => {
+    expect(tacticalLineTag('match.tactical_change')).toBe('Tactics');
+    expect(tacticalLineTag('match.substitution.tactical')).toBe('Plan');
+    expect(tacticalLineTag('match.substitution')).toBeNull();
+    expect(tacticalLineTag('match.goal')).toBeNull();
+  });
+
+  describe('naming the instruction behind a line', () => {
+    const names = {
+      side: 'home',
+      rules: [
+        { ordinal: 1, name: 'Open up' },
+        { ordinal: 3, name: 'Fresh midfield' },
+      ],
+    };
+
+    function tactical(
+      overrides: Partial<CommentaryLine> & { rule?: string | null } = {},
+    ): CommentaryLine {
+      const { rule = '1', ...rest } = overrides;
+
+      return {
+        ...line(7),
+        side: 'home',
+        templateKey: 'match.tactical_change',
+        parameters: rule === null ? [] : [{ name: 'ruleOrdinal', value: rule }],
+        ...rest,
+      };
+    }
+
+    it("names the caller's own rule from its place", () => {
+      expect(instructionNameFor(tactical(), names)).toBe('Open up');
+      expect(
+        instructionNameFor(
+          tactical({ rule: '3', templateKey: 'match.substitution.tactical' }),
+          names,
+        ),
+      ).toBe('Fresh midfield');
+    });
+
+    it('never names the other side, a line with no rule, a rule with no name, or a line that is not tactical', () => {
+      expect(instructionNameFor(tactical({ side: 'away' }), names)).toBeNull();
+      expect(instructionNameFor(tactical({ rule: null }), names)).toBeNull();
+      expect(instructionNameFor(tactical({ rule: '2' }), names)).toBeNull();
+      expect(instructionNameFor(tactical({ templateKey: 'match.goal' }), names)).toBeNull();
+    });
+
+    it('names nothing when the caller has no side in the match or the names could not be read', () => {
+      expect(instructionNameFor(tactical(), { side: null, rules: [] })).toBeNull();
+      expect(instructionNameFor(tactical(), null)).toBeNull();
+    });
   });
 
   it('colours a condition bar green through red as a player tires', () => {

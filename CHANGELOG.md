@@ -4,6 +4,13 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Match instructions plan, Milestone 5 - the match centre shows what the plan did
+
+- The Report tab tags the lines a match instruction produced: a change of shape or instructions ("Ashvale switch to 4-2-4 with an attacking mentality") carries a **Tactics** tag and a substitution a rule made carries a **Plan** tag, for both sides. The lines were already in the replay (the commentary is re-derived from the frozen snapshot, so no stored-event columns or migration were needed); the tag makes them readable at a glance.
+- A manager sees the **name of their own rule** after the line ("... - Chase the game"). The replay is public and immutable, so it names a rule only by its place in the side's list (`ruleOrdinal` on the tactical change and on a rule's substitution). The name is frozen in the snapshot (`MatchRuleV1.Name`, presentation only: it is not in the canonical text, so renaming a rule never moves a hash) and is read through a new `GET /matches/{id}/my-instructions`, which answers for the caller's own club and no one else's (a caller whose club did not play gets an empty list; the answer is never cached).
+- The tactical-change line now says **everything the rule changed**: the new shape, the new mentality and every other instruction that actually moved ("Ashvale switch to 4-2-4, take on an attacking mentality, raise the tempo and press high up the pitch."). The runner records which instructions differed before and after (`EngineEventV1.InstructionChanges`, for the commentary alone and not in the canonical text, like the rule name), so a rule that sets something already in force says nothing about it.
+- Checked on a recording: a shape change plus a substitution at 30' leaves nobody jumping (no player step over 4.5 m outside a placed frame, three seeds), so the film needs nothing new. Golden hashes are unchanged.
+
 ## Match instructions plan, Milestone 4 - the Tactics page gets two tabs and a Match instructions editor
 
 - The Tactics page now has **Match tactics** (today's page, moved into a panel) and **Match instructions**, with a tablist, roving tabindex, arrow/Home/End keys and `?tab=instructions` in the address. The plan select, name, formation and the Save/Make default row stay above and below both tabs, so both edit one plan and save together.

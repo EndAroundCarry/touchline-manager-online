@@ -33,6 +33,7 @@ import {
   conditionColorClass,
   formatConditionPercent,
   formatMatchRating,
+  instructionNameFor,
   isGoalCommentary,
   attemptRatio,
   isGoalOutcome,
@@ -47,6 +48,7 @@ import {
   scoreLine,
   ShotMapEntry,
   shotMapEntries,
+  tacticalLineTag,
 } from '../../core/match/match-presentation';
 import {
   CommentaryLine,
@@ -171,6 +173,9 @@ export class MatchViewer implements OnDestroy {
 
   protected readonly match = this.store.match;
   protected readonly presentation = this.store.presentation;
+
+  /** The names the manager gave the match instructions their own club played with in this match, if it played. */
+  private readonly instructionNames = this.store.instructionNames;
   protected readonly loading = this.store.loading;
   protected readonly loadError = this.store.error;
 
@@ -750,6 +755,16 @@ export class MatchViewer implements OnDestroy {
   /** Whether a commentary line reports a goal, which the report highlights. */
   protected isGoalCommentaryLine(line: CommentaryLine): boolean {
     return isGoalCommentary(line.templateKey);
+  }
+
+  /** The short tag a line carries when a side's match instruction produced it, or null. */
+  protected tacticalTag(line: CommentaryLine): string | null {
+    return tacticalLineTag(line.templateKey);
+  }
+
+  /** The name the manager gave the instruction behind a line, shown only on their own side's lines. */
+  protected instructionName(line: CommentaryLine): string | null {
+    return instructionNameFor(line, this.instructionNames());
   }
 
   /** Names the end a commentary line belongs to. */

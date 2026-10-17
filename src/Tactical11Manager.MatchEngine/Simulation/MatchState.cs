@@ -371,7 +371,8 @@ internal sealed class MatchState
     /// </param>
     /// <param name="formationCode">The formation a tactical change moved to, if it changed the shape.</param>
     /// <param name="mentality">The mentality a tactical change moved to, if it changed it.</param>
-    /// <param name="ruleOrdinal">The place of the match rule that fired, on a tactical change.</param>
+    /// <param name="ruleOrdinal">The place of the match rule that fired, on a tactical change or a substitution that rule made.</param>
+    /// <param name="instructionChanges">The instructions, apart from the mentality, a tactical change changed.</param>
     /// <returns>The event, so a caller can count it without re-reading the log.</returns>
     public EngineEventV1 Emit(
         MatchSide side,
@@ -385,7 +386,8 @@ internal sealed class MatchState
         SpatialPoint? at = null,
         string? formationCode = null,
         MatchMentality? mentality = null,
-        int? ruleOrdinal = null)
+        int? ruleOrdinal = null,
+        string? instructionChanges = null)
     {
         var matchEvent = new EngineEventV1
         {
@@ -406,6 +408,7 @@ internal sealed class MatchState
             FormationCode = formationCode,
             Mentality = mentality,
             RuleOrdinal = ruleOrdinal,
+            InstructionChanges = instructionChanges,
         };
 
         Events.Add(matchEvent);

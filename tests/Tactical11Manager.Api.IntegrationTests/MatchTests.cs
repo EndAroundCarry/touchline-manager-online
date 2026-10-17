@@ -72,6 +72,43 @@ public sealed class MatchTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_caller_whose_club_did_not_play_is_told_there_are_no_instruction_names_to_show()
+    {
+        using var client = _fixture.CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture.Email, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var matchId = await PublishNextRoundAsync();
+
+        var response = await client.GetAsync($"/api/v1/matches/{matchId}/my-instructions");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.CacheControl!.NoStore.Should().BeTrue("the answer is for one caller");
+
+        var names = (await response.Content.ReadFromJsonAsync<MatchInstructionNamesResponse>())!;
+
+        names.Side.Should().BeNull();
+        names.Rules.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_instruction_names_of_an_unknown_match_are_not_found_and_need_a_sign_in()
+    {
+        using var client = _fixture.CreateClient();
+
+        (await client.GetAsync($"/api/v1/matches/{Guid.NewGuid()}/my-instructions")).StatusCode
+            .Should().Be(HttpStatusCode.Unauthorized);
+
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture.Email, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        (await client.GetAsync($"/api/v1/matches/{Guid.NewGuid()}/my-instructions")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task A_replay_carries_commentary_for_every_narrated_event_and_a_highlight_for_every_goal()
     {
         using var client = _fixture.CreateClient();

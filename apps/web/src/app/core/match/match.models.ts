@@ -272,3 +272,21 @@ export interface MatchPresentation {
   /** The one pace the whole film plays at, in thousandths of real time: 2200 is 2.2 times (`replay-v4`). */
   readonly paceMilli?: number;
 }
+
+/** One match instruction the caller's club played with: its place in their list and the name they gave it. */
+export interface MatchInstructionName {
+  readonly ordinal: number;
+  readonly name: string;
+}
+
+/**
+ * The names of the caller's own match instructions in one match.
+ *
+ * The replay is public, so it names a rule only by its place in the side's list; the name is the manager's own and
+ * comes from this read, for the club that wrote it and for nobody else's. `side` is the end the caller's club
+ * played, or null when it did not play, in which case there are no rules.
+ */
+export interface MatchInstructionNames {
+  readonly side: string | null;
+  readonly rules: readonly MatchInstructionName[];
+}

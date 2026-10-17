@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
-import { Match, MatchPresentation } from './match.models';
+import { Match, MatchInstructionNames, MatchPresentation } from './match.models';
 
 /**
  * The match module's HTTP surface (master plan §9.5, §10.5).
@@ -22,5 +22,14 @@ export class MatchApi {
   /** Reads a played match's commentary timeline and keyframe highlights. */
   presentation(matchId: string): Observable<MatchPresentation> {
     return this.api.get<MatchPresentation>(`/matches/${matchId}/presentation`);
+  }
+
+  /**
+   * Reads the names of the match instructions the caller's own club played with in a match.
+   *
+   * Unlike the other two reads this one answers for the caller, so the server does not let it be cached.
+   */
+  instructionNames(matchId: string): Observable<MatchInstructionNames> {
+    return this.api.get<MatchInstructionNames>(`/matches/${matchId}/my-instructions`);
   }
 }

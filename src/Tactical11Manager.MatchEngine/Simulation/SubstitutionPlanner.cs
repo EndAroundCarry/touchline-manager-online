@@ -207,6 +207,7 @@ internal static class SubstitutionPlanner
     /// <param name="replacement">The substitute, who must be on the side's bench.</param>
     /// <param name="reason">Why the change is made.</param>
     /// <param name="rules">The rules in force.</param>
+    /// <param name="ruleOrdinal">The place of the match rule that decided on the change, or null for an injury or the assistant's rule.</param>
     internal static void Substitute(
         MatchState state,
         MatchSide which,
@@ -214,7 +215,8 @@ internal static class SubstitutionPlanner
         ActiveSlot outgoing,
         MatchParticipantV1 replacement,
         MatchSubstitutionReason reason,
-        EngineRulesV2 rules)
+        EngineRulesV2 rules,
+        int? ruleOrdinal = null)
     {
         var slotNumber = outgoing.Slot.SlotNumber;
 
@@ -227,7 +229,8 @@ internal static class SubstitutionPlanner
             EngineEventType.Substitution,
             outgoing.Participant.ParticipantId,
             replacement.ParticipantId,
-            substitutionReason: reason);
+            substitutionReason: reason,
+            ruleOrdinal: ruleOrdinal);
 
         state.AddSubstitutionStoppage();
     }

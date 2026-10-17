@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { ApiError } from '../api/api-error';
 import { MatchApi } from './match-api';
-import { Match, MatchPresentation } from './match.models';
+import { Match, MatchInstructionNames, MatchPresentation } from './match.models';
 import { MatchStore } from './match-store';
 
 /**
@@ -99,7 +99,12 @@ function presentation(): MatchPresentation {
 }
 
 function createApiStub() {
-  return { get: vi.fn(), presentation: vi.fn() };
+  return {
+    get: vi.fn(),
+    presentation: vi.fn(),
+    // The names only decorate the commentary: unless a test says otherwise the club has none to show.
+    instructionNames: vi.fn(() => of<MatchInstructionNames>({ side: null, rules: [] })),
+  };
 }
 
 describe('MatchStore', () => {
@@ -170,6 +175,48 @@ describe('MatchStore', () => {
     expect(store.presentation()).toBeNull();
   });
 
+  it("reads the caller's own instruction names beside the replay", () => {
+    api.get.mockReturnValue(of(match()));
+    api.presentation.mockReturnValue(of(presentation()));
+    api.instructionNames.mockReturnValue(
+      of({ side: 'home', rules: [{ ordinal: 1, name: 'Chase the game' }] }),
+    );
+
+    store.load('m1');
+
+    expect(api.instructionNames).toHaveBeenCalledWith('m1');
+    expect(store.instructionNames()).toEqual({
+      side: 'home',
+      rules: [{ ordinal: 1, name: 'Chase the game' }],
+    });
+  });
+
+  it('shows the match even when the instruction names cannot be read', () => {
+    api.get.mockReturnValue(of(match()));
+    api.presentation.mockReturnValue(of(presentation()));
+    api.instructionNames.mockReturnValue(throwError(() => new Error('offline')));
+
+    store.load('m1');
+
+    expect(store.match()?.matchId).toBe('m1');
+    expect(store.instructionNames()).toBeNull();
+    expect(store.error()).toBeNull();
+  });
+
+  it('drops a slow answer about the match before the one now open', () => {
+    const slow = new Subject<MatchInstructionNames>();
+
+    api.get.mockReturnValue(of(match()));
+    api.presentation.mockReturnValue(of(presentation()));
+    api.instructionNames.mockReturnValueOnce(slow);
+    store.load('m1');
+    store.load('m2');
+
+    slow.next({ side: 'home', rules: [{ ordinal: 1, name: 'From the match before' }] });
+
+    expect(store.instructionNames()).toEqual({ side: null, rules: [] });
+  });
+
   it('forgets everything when the session ends', () => {
     api.get.mockReturnValue(of(match()));
     api.presentation.mockReturnValue(of(presentation()));
@@ -179,6 +226,7 @@ describe('MatchStore', () => {
 
     expect(store.match()).toBeNull();
     expect(store.presentation()).toBeNull();
+    expect(store.instructionNames()).toBeNull();
     expect(store.error()).toBeNull();
     expect(store.loading()).toBe(false);
   });

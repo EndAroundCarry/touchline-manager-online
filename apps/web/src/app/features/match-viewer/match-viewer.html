@@ -742,7 +742,20 @@
                         : 'text-slate-300'
                     "
                   >
-                    <span class="sr-only">{{ side(line.side) }}: </span>{{ line.text }}
+                    <span class="sr-only">{{ side(line.side) }}: </span>
+                    @if (tacticalTag(line); as tag) {
+                      <span
+                        class="mr-1.5 rounded border border-sky-800 px-1.5 py-px align-middle text-[10px] font-medium tracking-wide text-sky-400 uppercase"
+                        data-testid="tactical-tag"
+                        >{{ tag }}</span
+                      >
+                    }
+                    {{ line.text }}
+                    @if (instructionName(line); as ruleName) {
+                      <span class="text-slate-400" data-testid="instruction-name">
+                        &middot; {{ ruleName }}</span
+                      >
+                    }
                   </span>
                   @if (hasPassage(line)) {
                     <button

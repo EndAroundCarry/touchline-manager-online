@@ -218,6 +218,16 @@ public sealed class MatchPlanInputTests
     }
 
     [Fact]
+    public void A_rules_name_is_for_presentation_only_and_never_changes_the_hash()
+    {
+        var unnamed = WithRule(Chase());
+        var named = WithRule(Chase() with { Name = "Chase the game" });
+
+        CanonicalMatchSerializer.CanonicalText(named).Should().NotContain("Chase the game");
+        CanonicalMatchSerializer.InputHash(named).Should().Be(CanonicalMatchSerializer.InputHash(unnamed));
+    }
+
+    [Fact]
     public void The_order_of_the_rules_is_part_of_the_hash_because_it_is_the_order_they_are_checked_in()
     {
         var first = Chase(1) with { FromMinute = 20 };
@@ -304,6 +314,61 @@ public sealed class MatchPlanInputTests
                 recording.PlayerX(at, entity) != plain.PlayerX(at, entity) || recording.PlayerY(at, entity) != plain.PlayerY(at, entity)));
 
         moved.Should().BeTrue("the players walk to the new anchors");
+    }
+
+    [Fact]
+    public void A_change_of_shape_and_a_substitution_make_nobody_teleport_on_the_recording_the_film_is_cut_from()
+    {
+        var rule = new MatchRuleV1
+        {
+            Ordinal = 1,
+            FromMinute = 30,
+            FormationCode = "4-3-3",
+            Slots = TestShapes.FourThreeThree,
+            Instructions = new MatchInstructionChangesV1 { Mentality = MatchMentality.Attacking },
+            Substitutions = [new MatchRuleSubstitutionV1 { Off = MatchRuleOff.Player, OffParticipantId = Starter(11), On = MatchRuleOn.Player, OnParticipantId = Bench(7) }],
+        };
+
+        foreach (var seed in new ulong[] { 1, 2, 3 })
+        {
+            var played = TickPlay.Play(WithHomePlan(TickPlay.Fixture(seed), new MatchPlanV1 { Rules = [rule] }));
+            var recording = played.Recording;
+            var change = played.Result.Events.Single(matchEvent => matchEvent.Type == EngineEventType.TacticalChange);
+            var changeFrame = recording.Events.Single(stamp => stamp.Sequence == change.Sequence).Frame;
+            var jumps = 0;
+            var biggestStep = 0.0;
+
+            for (var frame = 1; frame < recording.FrameCount; frame++)
+            {
+                var placed = recording.Flags(frame).HasFlag(TickFrameFlags.PlayersPlaced);
+
+                for (var entity = 0; entity < TickMatchRecording.Entities; entity++)
+                {
+                    if (recording.PlayerX(frame, entity) < 0 || recording.PlayerX(frame - 1, entity) < 0)
+                    {
+                        continue;
+                    }
+
+                    var step = Math.Sqrt(
+                        Math.Pow(recording.PlayerX(frame, entity) - recording.PlayerX(frame - 1, entity), 2)
+                        + Math.Pow(recording.PlayerY(frame, entity) - recording.PlayerY(frame - 1, entity), 2));
+
+                    // The same limit the film's own check uses: a sprint is under a metre a tick, a keeper's dive a few.
+                    if (step > 450 && !placed)
+                    {
+                        jumps++;
+                    }
+
+                    if (frame >= changeFrame && frame < changeFrame + 600 && !placed)
+                    {
+                        biggestStep = Math.Max(biggestStep, step);
+                    }
+                }
+            }
+
+            jumps.Should().Be(0, $"seed {seed}: players walk to their new places, they are not put there");
+            biggestStep.Should().BeLessThanOrEqualTo(450, $"seed {seed}: nobody covers a pitch's width in the seconds after the change");
+        }
     }
 
     [Fact]
