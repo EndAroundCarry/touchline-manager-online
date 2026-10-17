@@ -52,6 +52,13 @@ internal static class MarketEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        group.MapGet("/scouting/players/{playerId:guid}", GetPlayerCardAsync)
+            .WithName("GetScoutedPlayer")
+            .WithSummary("Reads one player's exact public attributes, as scouting shows them.")
+            .Produces<PlayerSearchResultResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/shortlist", ListShortlistAsync)
             .WithName("ListShortlist")
             .WithSummary("Reads the manager's private shortlist.")
@@ -135,6 +142,24 @@ internal static class MarketEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
         return endpoints;
+    }
+
+    private static async Task<IResult> GetPlayerCardAsync(
+        HttpContext httpContext,
+        GetPlayerCard useCase,
+        Guid playerId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await useCase.ExecuteAsync(userId, playerId, cancellationToken);
+
+        return result.Outcome == MarketOutcome.Found
+            ? Results.Ok(result.Player!.ToResponse())
+            : Refusal(result.Outcome);
     }
 
     private static async Task<IResult> SearchPlayersAsync(

@@ -59,6 +59,8 @@ import { MatchStore } from '../../core/match/match-store';
 import { ResultRevealStore } from '../../core/match/result-reveal-store';
 import { formatInstant } from '../../core/world/presentation';
 import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
+import { PlayerCardService } from '../../shared/ui/player-card/player-card.service';
 import { CanvasMatchRenderer } from './renderer/canvas-match-renderer';
 import { RenderLoop } from './renderer/render-loop';
 
@@ -130,7 +132,7 @@ interface ReplayMarker {
 @Component({
   selector: 'app-match-viewer',
   templateUrl: './match-viewer.html',
-  imports: [ClubCrest],
+  imports: [ClubCrest, PlayerCardTrigger],
   // The viewer is drawn on dark ground in either theme, so it keeps the dark tokens (`.theme-dark`, styles.css).
   host: { class: 'theme-dark block' },
 })
@@ -138,6 +140,7 @@ export class MatchViewer implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(MatchStore);
   private readonly reveals = inject(ResultRevealStore);
+  private readonly playerCards = inject(PlayerCardService);
   private readonly matchId = this.route.snapshot.paramMap.get('matchId');
   private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('pitch');
 
@@ -532,13 +535,27 @@ export class MatchViewer implements OnDestroy {
         return;
       }
 
-      this.renderer = new CanvasMatchRenderer(canvas.nativeElement, film, { kits, reducedMotion });
+      this.renderer = new CanvasMatchRenderer(canvas.nativeElement, film, {
+        kits,
+        reducedMotion,
+        onHover: (hover) => {
+          const playerId =
+            hover === null ? null : (this.lineupPlayer(hover.participantId)?.playerId ?? null);
+
+          if (hover === null || playerId === null) {
+            this.playerCards.hide();
+          } else {
+            this.playerCards.show(playerId, hover);
+          }
+        },
+      });
       this.renderFrame();
     });
   }
 
   /** Stops the loop and drops the renderer, so nothing outlives the screen. */
   ngOnDestroy(): void {
+    this.playerCards.hide();
     this.loop.dispose();
     this.renderer?.dispose();
     this.renderer = null;

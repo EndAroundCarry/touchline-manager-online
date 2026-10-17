@@ -69,8 +69,21 @@ export interface FrameMetrics {
   readonly milliseconds: number;
 }
 
+/** The player the pointer has come to rest over, and where on the page they are, for a card to be drawn beside. */
+export interface PlayerHover {
+  readonly participantId: string;
+
+  /** The pointer's x, and the top and bottom of the token, in viewport pixels. */
+  readonly x: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
 /** What the renderer needs beyond the film itself. */
 export interface RendererOptions {
+  /** Told when the pointer moves onto a player (with where), and with null when it leaves them. */
+  readonly onHover?: (hover: PlayerHover | null) => void;
+
   readonly kits?: Partial<TeamKits>;
   /** When set, a paused frame is drawn without its time-based pulses, for `prefers-reduced-motion`. */
   readonly reducedMotion?: boolean;

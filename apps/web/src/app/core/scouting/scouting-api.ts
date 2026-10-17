@@ -1,7 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
-import { PlayerSearchPage, ScoutingFilters, Shortlist } from './scouting.models';
+import {
+  PlayerSearchPage,
+  PlayerSearchResult,
+  ScoutingFilters,
+  Shortlist,
+} from './scouting.models';
 
 /**
  * The scouting module's HTTP surface (master plan §10.6; `SCT-1`, `SCT-3`).
@@ -45,6 +50,11 @@ export class ScoutingApi {
     }
 
     return this.api.get<PlayerSearchPage>(`/scouting/players?${query.toString()}`);
+  }
+
+  /** Reads one player's exact public attributes, as the search shows them: what a hover card draws. */
+  player(playerId: string): Observable<PlayerSearchResult> {
+    return this.api.get<PlayerSearchResult>(`/scouting/players/${playerId}`);
   }
 
   /** Reads the manager's private shortlist. */

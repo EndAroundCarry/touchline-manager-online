@@ -167,6 +167,7 @@
                   [style.bottom]="slot.style['bottom']"
                   [attr.aria-pressed]="slot.isSelected"
                   [attr.aria-label]="slotLabel(slot)"
+                  [appPlayerCard]="slot.player?.id"
                   (click)="selectSlot(slot.slotNumber)"
                   (dragover)="onSlotDragOver($event)"
                   (drop)="onSlotDrop($event, slot.slotNumber)"
@@ -202,6 +203,7 @@
                     [attr.data-testid]="'bench-' + place.slotNumber"
                     [attr.aria-pressed]="place.isSelected"
                     [attr.aria-label]="benchLabel(place)"
+                    [appPlayerCard]="place.player?.id"
                     (click)="selectSlot(place.slotNumber)"
                     (dragover)="onSlotDragOver($event)"
                     (drop)="onSlotDrop($event, place.slotNumber)"
@@ -500,43 +502,12 @@
           [style.left.px]="card.left"
           [style.top.px]="card.top"
         >
-          <div class="flex flex-wrap items-baseline justify-between gap-x-3">
-            <p class="text-sm font-semibold text-ink">{{ card.row.fullName }}</p>
-            <p class="text-muted">
-              {{ position(card.row.position) }} · age {{ card.row.age ?? '–' }}
-            </p>
-          </div>
-          <p class="mt-0.5 text-ink-2">
-            Averages weighted for {{ card.basisLabel }}. Skills marked ×2 or ×1.5 count most there.
-          </p>
-
-          <div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-            @for (group of card.groups; track group.key) {
-              <section>
-                <h3
-                  class="flex justify-between border-b border-line pb-0.5 text-xs font-semibold text-ink"
-                >
-                  <span>{{ group.label }}</span>
-                  <span [class]="skillClass(group.average)">
-                    {{ group.average | number: '1.1-1' }}
-                  </span>
-                </h3>
-                <ul class="mt-1 space-y-0.5" role="list">
-                  @for (skill of group.rows; track skill.label) {
-                    <li class="flex justify-between gap-1">
-                      <span [class]="skill.weight > 1 ? 'font-semibold text-ink' : 'text-ink-2'">
-                        {{ skill.label }}
-                        <span class="font-normal text-muted">{{
-                          multiplierLabel(skill.weight)
-                        }}</span>
-                      </span>
-                      <span [class]="skillClass(skill.value)">{{ skill.value }}</span>
-                    </li>
-                  }
-                </ul>
-              </section>
-            }
-          </div>
+          <app-player-skills-card
+            [name]="card.row.fullName"
+            [subtitle]="position(card.row.position) + ' · age ' + (card.row.age ?? '–')"
+            [basisLabel]="card.basisLabel"
+            [groups]="card.groups"
+          />
         </div>
       }
 

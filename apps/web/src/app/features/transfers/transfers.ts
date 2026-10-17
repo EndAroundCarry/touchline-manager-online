@@ -10,6 +10,7 @@ import {
   SECONDARY_BUTTON,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /**
  * The transfers screen (master plan §11.1; `TRF-1`, `TRF-4`, `TRF-6`, `INT-6`).
@@ -20,6 +21,7 @@ import {
  */
 @Component({
   selector: 'app-transfers',
+  imports: [PlayerCardTrigger],
   templateUrl: './transfers.html',
 })
 export class Transfers {

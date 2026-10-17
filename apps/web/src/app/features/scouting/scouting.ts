@@ -10,6 +10,7 @@ import {
   SECONDARY_BUTTON,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /** The position families a manager may filter by (`SCT-1`). */
 const POSITION_FAMILIES = ['Goalkeeper', 'Defence', 'Midfield', 'Attack'] as const;
@@ -22,6 +23,7 @@ const POSITION_FAMILIES = ['Goalkeeper', 'Defence', 'Midfield', 'Attack'] as con
  */
 @Component({
   selector: 'app-scouting',
+  imports: [PlayerCardTrigger],
   templateUrl: './scouting.html',
 })
 export class Scouting {

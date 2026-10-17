@@ -25,6 +25,7 @@ import {
   STATUS_MESSAGE,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /**
  * The training screen (master plan §11.1, F-20).
@@ -42,7 +43,7 @@ import {
  */
 @Component({
   selector: 'app-training',
-  imports: [RouterLink],
+  imports: [RouterLink, PlayerCardTrigger],
   templateUrl: './training.html',
 })
 export class Training {

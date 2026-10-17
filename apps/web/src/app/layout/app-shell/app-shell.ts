@@ -29,6 +29,7 @@ import { PlayerTrainingStore } from '../../core/training/player-training-store';
 import { TrainingStore } from '../../core/training/training-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
+import { PlayerCardPopup } from '../../shared/ui/player-card/player-card-popup';
 import { GameClockBar } from '../game-clock-bar/game-clock-bar';
 import { SystemNotices } from '../system-notices/system-notices';
 import { AVAILABLE_NAV_ITEMS, NavItem } from '../navigation/nav-items';
@@ -42,7 +43,15 @@ import { AVAILABLE_NAV_ITEMS, NavItem } from '../navigation/nav-items';
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, SystemNotices, GameClockBar, ClubCrest],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    SystemNotices,
+    GameClockBar,
+    ClubCrest,
+    PlayerCardPopup,
+  ],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.css',
 })

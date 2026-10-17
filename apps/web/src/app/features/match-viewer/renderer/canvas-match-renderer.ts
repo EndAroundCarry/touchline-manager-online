@@ -27,6 +27,7 @@ import {
   FrameEntity,
   FrameMetrics,
   PitchRect,
+  PlayerHover,
   RendererEntity,
   RendererOptions,
   TeamKit,
@@ -118,6 +119,7 @@ export class CanvasMatchRenderer {
   private lastOverlay = 0;
   private hasRendered = false;
   private hoveredEntityId: string | null = null;
+  private readonly onHover: ((hover: PlayerHover | null) => void) | null;
   private metricsValue: FrameMetrics = {
     entities: 0,
     interpolated: 0,
@@ -149,6 +151,7 @@ export class CanvasMatchRenderer {
       awaySecondary: readableInk(this.kits.away.secondary),
     };
     this.reducedMotion = options.reducedMotion ?? false;
+    this.onHover = options.onHover ?? null;
     this.createPitchLayer = options.createPitchLayer ?? defaultPitchLayer;
     this.interpolators = timeline.slots.map((slot) => new TrackInterpolator(slot.track, true));
     this.ballInterpolator = new TrackInterpolator(timeline.ball, false);
@@ -292,7 +295,12 @@ export class CanvasMatchRenderer {
     this.observer = null;
     this.layer = null;
     this.layerContext = null;
-    this.hoveredEntityId = null;
+
+    if (this.hoveredEntityId !== null) {
+      this.hoveredEntityId = null;
+      this.onHover?.(null);
+    }
+
     this.hasRendered = false;
   }
 
@@ -1176,6 +1184,7 @@ export class CanvasMatchRenderer {
     const rect = pitchRect(this.cssWidth, this.cssHeight);
     const radius = playerRadius(rect) + 4;
     let hovered: string | null = null;
+    let hoveredParticipant: string | null = null;
 
     // The frame the last render drew is where the tokens are, so there is nothing to sample again.
     for (const player of this.players) {
@@ -1184,6 +1193,7 @@ export class CanvasMatchRenderer {
 
       if (Math.hypot(x - pointerX, y - pointerY) <= radius) {
         hovered = player.entity.id;
+        hoveredParticipant = player.entity.participantId;
 
         break;
       }
@@ -1192,6 +1202,17 @@ export class CanvasMatchRenderer {
     if (hovered !== this.hoveredEntityId) {
       this.hoveredEntityId = hovered;
       this.render(this.lastTimeMs, this.lastOverlay);
+
+      this.onHover?.(
+        hoveredParticipant === null
+          ? null
+          : {
+              participantId: hoveredParticipant,
+              x: event.clientX + 16,
+              top: event.clientY - radius,
+              bottom: event.clientY + radius,
+            },
+      );
     }
   };
 
@@ -1199,6 +1220,7 @@ export class CanvasMatchRenderer {
     if (this.hoveredEntityId !== null) {
       this.hoveredEntityId = null;
       this.render(this.lastTimeMs, this.lastOverlay);
+      this.onHover?.(null);
     }
   };
 }

@@ -73,7 +73,9 @@
           <tbody>
             @for (row of competition.rows; track row.playerId + row.clubId) {
               <tr class="border-b border-line-soft last:border-b-0">
-                <th scope="row" class="px-3 py-2 text-left font-medium">{{ row.playerName }}</th>
+                <th scope="row" class="px-3 py-2 text-left font-medium">
+                  <span [appPlayerCard]="row.playerId">{{ row.playerName }}</span>
+                </th>
                 <td class="px-3 py-2 text-left">
                   <abbr [title]="row.clubName">{{ row.clubShortName }}</abbr>
                 </td>

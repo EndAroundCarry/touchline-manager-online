@@ -233,6 +233,11 @@ public interface IMarketQueries
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<PlayerSearchPage> SearchPlayersAsync(PlayerSearchFilter filter, CancellationToken cancellationToken);
 
+    /// <summary>Reads one player as a scouting result reads them, or null when they hold no active contract.</summary>
+    /// <param name="playerId">The player.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<PlayerSearchRow?> GetPlayerAsync(Guid playerId, CancellationToken cancellationToken);
+
     /// <summary>Reads a manager's private shortlist (`SCT-3`).</summary>
     /// <param name="managerId">The manager.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

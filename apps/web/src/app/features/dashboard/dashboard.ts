@@ -41,6 +41,7 @@ import {
 } from './dashboard-presentation';
 import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
 import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /** The clubs shown in the league-table widget: the manager's club with three above it and three below. */
 const TABLE_ROWS = 7;
@@ -73,7 +74,7 @@ const MARKET_ROWS = 2;
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [ClubCrest, RouterLink, ResultHidden],
+  imports: [ClubCrest, RouterLink, ResultHidden, PlayerCardTrigger],
   templateUrl: './dashboard.html',
 })
 export class Dashboard {

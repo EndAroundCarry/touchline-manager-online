@@ -52,27 +52,7 @@ internal sealed class MarketQueries : IMarketQueries
                 .ToList()
             : null;
 
-        var query =
-            from player in _dbContext.Players
-            join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
-            join contract in _dbContext.PlayerContracts on player.Id equals contract.PlayerId
-            join club in _dbContext.Clubs on contract.ClubId equals club.Id
-            join entry in _dbContext.ClubSeasonEntries on club.Id equals entry.ClubId
-            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
-            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
-            where contract.Status == ContractStatus.Active
-                && divisionSeason.SeasonId == season.SeasonId
-            select new Candidate
-            {
-                Player = player,
-                Attributes = attributes,
-                ClubId = club.Id,
-                ClubName = club.Name,
-                TierNumber = division.TierNumber,
-                DivisionId = division.Id,
-                DivisionName = division.DisplayName,
-                Age = season.GameYear - player.BirthGameYear,
-            };
+        var query = CandidatesOf(season);
 
         if (!string.IsNullOrWhiteSpace(filter.Name))
         {
@@ -148,6 +128,46 @@ internal sealed class MarketQueries : IMarketQueries
             : null;
 
         return new PlayerSearchPage(players, nextCursor);
+    }
+
+    /// <inheritdoc />
+    public async Task<PlayerSearchRow?> GetPlayerAsync(Guid playerId, CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var candidate = await CandidatesOf(season)
+            .Where(row => row.Player.Id == playerId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (candidate is null)
+        {
+            return null;
+        }
+
+        var listed = await ListedPlayerIdsAsync([playerId], cancellationToken);
+
+        return new PlayerSearchRow(
+            candidate.Player.Id,
+            candidate.Player.FullName,
+            candidate.Player.ShortName,
+            candidate.Player.NationalityCode,
+            candidate.Player.BirthGameYear,
+            candidate.Player.PrimaryPosition,
+            candidate.Player.SecondaryPositions,
+            candidate.Player.PreferredFoot,
+            candidate.Attributes.ToSet(),
+            candidate.ClubId,
+            candidate.ClubName,
+            candidate.TierNumber,
+            candidate.DivisionId,
+            candidate.DivisionName,
+            season.GameYear,
+            listed.Contains(playerId));
     }
 
     /// <inheritdoc />
@@ -511,6 +531,28 @@ internal sealed class MarketQueries : IMarketQueries
         PlayerSort.Ability => row.Ability.ToString("D4", System.Globalization.CultureInfo.InvariantCulture),
         _ => row.Candidate.Player.FullName,
     };
+
+    private IQueryable<Candidate> CandidatesOf(CurrentSeason season) =>
+        from player in _dbContext.Players
+        join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
+        join contract in _dbContext.PlayerContracts on player.Id equals contract.PlayerId
+        join club in _dbContext.Clubs on contract.ClubId equals club.Id
+        join entry in _dbContext.ClubSeasonEntries on club.Id equals entry.ClubId
+        join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+        join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+        where contract.Status == ContractStatus.Active
+            && divisionSeason.SeasonId == season.SeasonId
+        select new Candidate
+        {
+            Player = player,
+            Attributes = attributes,
+            ClubId = club.Id,
+            ClubName = club.Name,
+            TierNumber = division.TierNumber,
+            DivisionId = division.Id,
+            DivisionName = division.DisplayName,
+            Age = season.GameYear - player.BirthGameYear,
+        };
 
     private sealed record Candidate
     {

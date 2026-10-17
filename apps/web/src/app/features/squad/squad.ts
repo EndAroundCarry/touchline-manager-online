@@ -26,6 +26,10 @@ import {
   SECONDARY_BUTTON,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
+
+/** The squad screen's tabs. */
+export type SquadTab = 'players' | 'contracts';
 
 /**
  * The squad screen (master plan §11.1, F-16).
@@ -40,8 +44,9 @@ import {
  */
 @Component({
   selector: 'app-squad',
-  imports: [DecimalPipe, RouterLink, TableModule],
+  imports: [DecimalPipe, RouterLink, TableModule, PlayerCardTrigger],
   templateUrl: './squad.html',
+  host: { class: 'block fit:min-h-0 fit:flex-1' },
 })
 export class Squad {
   private readonly store = inject(SquadStore);
@@ -57,6 +62,15 @@ export class Squad {
   protected readonly availableOnly = signal(false);
 
   protected readonly familyOptions = POSITION_FAMILY_OPTIONS;
+
+  /** The tabs, in the order they are shown. The players are the default; the contracts are one tab away. */
+  protected readonly tabs: readonly { readonly key: SquadTab; readonly label: string }[] = [
+    { key: 'players', label: 'Players' },
+    { key: 'contracts', label: 'Contracts' },
+  ];
+
+  /** The tab currently open. */
+  protected readonly activeTab = signal<SquadTab>('players');
 
   /**
    * The rows on screen: the squad with the filter applied, each rated for the position they are listed at.
@@ -134,6 +148,34 @@ export class Squad {
       next: () => this.loading.set(false),
       error: () => this.loading.set(false),
     });
+  }
+
+  /** Opens a tab. */
+  protected selectTab(tab: SquadTab): void {
+    this.activeTab.set(tab);
+  }
+
+  /** Moves between tabs with the arrow keys, Home and End, as the tabs pattern expects. */
+  protected onTabKeydown(event: KeyboardEvent, index: number): void {
+    const last = this.tabs.length - 1;
+    const target =
+      event.key === 'ArrowRight'
+        ? (index + 1) % this.tabs.length
+        : event.key === 'ArrowLeft'
+          ? (index + last) % this.tabs.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : -1;
+
+    if (target < 0) {
+      return;
+    }
+
+    event.preventDefault();
+    this.selectTab(this.tabs[target].key);
+    (document.getElementById(`squad-tab-${this.tabs[target].key}`) as HTMLElement | null)?.focus();
   }
 
   /** Applies a name filter as the manager types. */

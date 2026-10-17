@@ -123,7 +123,7 @@
               @for (player of results(); track player.playerId) {
                 <tr>
                   <td class="px-3 py-2 text-ink">
-                    {{ player.fullName }}
+                    <span [appPlayerCard]="player.playerId">{{ player.fullName }}</span>
                     <span class="text-muted">({{ player.shortName }})</span>
                   </td>
                   <td class="px-3 py-2 text-ink-2">{{ player.primaryPosition }}</td>
@@ -169,7 +169,7 @@
             <li class="rounded border border-line bg-panel p-3">
               <div class="flex flex-wrap items-baseline justify-between gap-x-2">
                 <h3 class="text-sm font-semibold text-ink">
-                  {{ player.fullName }}
+                  <span [appPlayerCard]="player.playerId">{{ player.fullName }}</span>
                   <span class="font-normal text-muted">({{ player.shortName }})</span>
                 </h3>
                 <span class="text-xs text-muted">Ability {{ abilityOf(player) }}</span>
@@ -229,7 +229,9 @@
           @for (entry of shortlist(); track entry.playerId) {
             <li class="flex items-start justify-between gap-3">
               <div>
-                <p class="text-sm font-medium text-ink">{{ entry.playerName }}</p>
+                <p class="text-sm font-medium text-ink">
+                  <span [appPlayerCard]="entry.playerId">{{ entry.playerName }}</span>
+                </p>
                 <p class="text-sm text-ink-2">
                   {{ entry.primaryPosition }} &middot; age {{ entry.age }}
                 </p>

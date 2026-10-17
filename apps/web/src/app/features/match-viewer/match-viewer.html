@@ -343,7 +343,7 @@
                                 >
                               </td>
                               <td class="truncate px-1 py-1 font-medium text-slate-200">
-                                {{ player.name }}
+                                <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
                                 @if (yellowShown(player)) {
                                   <span class="ml-1 text-yellow-400" aria-label="Yellow card"
                                     >Y</span
@@ -404,7 +404,11 @@
                               <span class="w-4 text-right tabular-nums text-slate-400">{{
                                 player.shirtNumber
                               }}</span>
-                              <span class="truncate font-medium">{{ player.name }}</span>
+                              <span
+                                class="truncate font-medium"
+                                [appPlayerCard]="player.playerId"
+                                >{{ player.name }}</span
+                              >
                               @if (subbedInShown(player)) {
                                 <span class="ml-auto text-[9px] text-emerald-600"
                                   >{{ player.subbedInMinute }}'&#8593;</span
@@ -616,7 +620,7 @@
                                     >Y</span
                                   >
                                 }
-                                {{ player.name }}
+                                <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
                               </td>
                               <td class="px-1 py-1">
                                 <span
@@ -643,7 +647,11 @@
                               <span class="w-4 text-left tabular-nums text-slate-400">{{
                                 player.shirtNumber
                               }}</span>
-                              <span class="truncate font-medium">{{ player.name }}</span>
+                              <span
+                                class="truncate font-medium"
+                                [appPlayerCard]="player.playerId"
+                                >{{ player.name }}</span
+                              >
                               @if (subbedInShown(player)) {
                                 <span class="mr-auto text-[9px] text-emerald-600"
                                   >{{ player.subbedInMinute }}'&#8593;</span
@@ -951,7 +959,7 @@
                             {{ player.shirtNumber }}
                           </td>
                           <td class="py-1.5 font-medium text-slate-200">
-                            {{ player.name }}
+                            <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
                             @if (!player.isStarter && player.subbedInMinute !== null) {
                               <span class="text-[9px] text-emerald-600" data-testid="sub-on"
                                 >{{ player.subbedInMinute }}'&#8593;</span
@@ -1059,7 +1067,7 @@
                               {{ player.shirtNumber }}
                             </td>
                             <td class="py-1.5 font-medium text-slate-200">
-                              {{ player.name }}
+                              <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
                               @if (!player.isStarter && player.subbedInMinute !== null) {
                                 <span class="text-[9px] text-emerald-600" data-testid="sub-on"
                                   >{{ player.subbedInMinute }}'&#8593;</span

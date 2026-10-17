@@ -132,6 +132,7 @@ public static class DependencyInjection
         services.AddScoped<IBidWriter, BidWriter>();
 
         services.AddScoped<SearchPlayers>();
+        services.AddScoped<GetPlayerCard>();
         services.AddScoped<Shortlists>();
         services.AddScoped<ListListings>();
         services.AddScoped<CreateListing>();

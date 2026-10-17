@@ -6,6 +6,7 @@ import { ResultGate } from '../../core/match/result-gate';
 import { formatInstant } from '../../core/world/presentation';
 import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/control-styles';
 import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /**
  * The division statistics screen (master plan §11.1, §10.5).
@@ -18,7 +19,7 @@ import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
  */
 @Component({
   selector: 'app-competition-statistics',
-  imports: [RouterLink, ResultHidden],
+  imports: [RouterLink, ResultHidden, PlayerCardTrigger],
   templateUrl: './statistics.html',
 })
 export class CompetitionStatistics {

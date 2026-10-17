@@ -93,7 +93,9 @@
           <tbody class="divide-y divide-line-soft">
             @for (listing of listings(); track listing.listingId) {
               <tr>
-                <td class="px-3 py-2 text-ink">{{ listing.playerName }}</td>
+                <td class="px-3 py-2 text-ink">
+                  <span [appPlayerCard]="listing.playerId">{{ listing.playerName }}</span>
+                </td>
                 <td class="px-3 py-2 text-ink-2">{{ listing.sellerClubName }}</td>
                 <td class="px-3 py-2 text-right text-ink-2">
                   {{ funds(listing.minimumFeeMinor) }}
@@ -139,7 +141,9 @@
       <ul class="mt-2 flex flex-col gap-3 md:hidden" data-testid="listings-cards">
         @for (listing of listings(); track listing.listingId) {
           <li class="rounded border border-line bg-panel p-3">
-            <h3 class="text-sm font-semibold text-ink">{{ listing.playerName }}</h3>
+            <h3 class="text-sm font-semibold text-ink">
+              <span [appPlayerCard]="listing.playerId">{{ listing.playerName }}</span>
+            </h3>
             <p class="text-sm text-ink-2">{{ listing.sellerClubName }}</p>
             <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
               <div class="flex justify-between gap-2">
@@ -211,7 +215,9 @@
           @for (listing of myListings(); track listing.listingId) {
             <li class="flex items-center justify-between gap-3">
               <div>
-                <p class="text-sm font-medium text-ink">{{ listing.playerName }}</p>
+                <p class="text-sm font-medium text-ink">
+                  <span [appPlayerCard]="listing.playerId">{{ listing.playerName }}</span>
+                </p>
                 <p class="text-sm text-ink-2">
                   {{ listing.status }} &middot; minimum
                   {{ funds(listing.minimumFeeMinor) }} &middot; closes {{ instant(listing.endsAt) }}
@@ -242,7 +248,9 @@
         <ul class="mt-2 flex flex-col gap-3">
           @for (bid of myBids(); track bid.listingId) {
             <li>
-              <p class="text-sm font-medium text-ink">{{ bid.playerName }}</p>
+              <p class="text-sm font-medium text-ink">
+                <span [appPlayerCard]="bid.playerId">{{ bid.playerName }}</span>
+              </p>
               <p class="text-sm text-ink-2">
                 {{ funds(bid.amountMinor) }} &middot; {{ bid.status }} &middot; closes
                 {{ instant(bid.endsAt) }}
@@ -277,7 +285,9 @@
           <tbody class="divide-y divide-line-soft">
             @for (entry of history(); track entry.listingId) {
               <tr>
-                <td class="px-3 py-2 text-ink">{{ entry.playerName }}</td>
+                <td class="px-3 py-2 text-ink">
+                  <span [appPlayerCard]="entry.playerId">{{ entry.playerName }}</span>
+                </td>
                 <td class="px-3 py-2 text-ink-2">{{ entry.sellerClubName }}</td>
                 <td class="px-3 py-2 text-ink-2">{{ entry.buyerClubName }}</td>
                 <td class="px-3 py-2 text-right font-medium text-ink">

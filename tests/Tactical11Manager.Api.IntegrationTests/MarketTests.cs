@@ -52,6 +52,44 @@ public sealed class MarketTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_manager_reads_any_player_by_identity_as_scouting_shows_them()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var search = await client.GetFromJsonAsync<PlayerSearchResponse>("/api/v1/scouting/players?pageSize=5");
+        var listed = search!.Players[0];
+
+        var card = await client.GetFromJsonAsync<PlayerSearchResultResponse>(
+            $"/api/v1/scouting/players/{listed.PlayerId}");
+
+        card.Should().NotBeNull();
+        card!.PlayerId.Should().Be(listed.PlayerId);
+        card.FullName.Should().Be(listed.FullName);
+        card.Attributes.Should().BeEquivalentTo(listed.Attributes, "the card is the search's own row (SCT-1)");
+
+        var unknown = await client.GetAsync($"/api/v1/scouting/players/{Guid.CreateVersion7()}");
+
+        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task A_player_card_refuses_an_unauthenticated_caller()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync($"/api/v1/scouting/players/{Guid.CreateVersion7()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task A_manager_searches_players_and_keeps_a_shortlist()
     {
         using var client = CreateClient();

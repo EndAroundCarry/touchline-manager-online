@@ -248,6 +248,7 @@
                   >
                     <a
                       [routerLink]="['/players', row.player.id]"
+                      [appPlayerCard]="row.player.id"
                       [class]="linkClass"
                       [attr.aria-label]="'Open ' + row.player.fullName"
                     >
@@ -344,6 +345,7 @@
                 <h3 class="text-sm font-semibold text-ink">
                   <a
                     [routerLink]="['/players', row.player.id]"
+                    [appPlayerCard]="row.player.id"
                     [class]="linkClass"
                     [attr.aria-label]="'Open ' + row.player.fullName"
                   >

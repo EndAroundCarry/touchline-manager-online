@@ -3,16 +3,18 @@
 } @else if (loadError(); as message) {
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
 } @else if (squad(); as inherited) {
-  <section>
-    <h1 [class]="pageHeadingClass">{{ inherited.clubName }} squad</h1>
-    <p class="mt-1 text-sm text-ink-2">
+  <section class="fit:flex fit:h-full fit:min-h-0 fit:flex-col">
+    <h1 [class]="pageHeadingClass" class="fit:shrink-0 fit:text-2xl">
+      {{ inherited.clubName }} squad
+    </h1>
+    <p class="mt-1 text-sm text-ink-2 fit:shrink-0">
       {{ inherited.countryCode }} · season {{ inherited.seasonNumber }} ·
       {{ inherited.summary.playerCount }} players · {{ inherited.summary.goalkeepers }} goalkeepers
       · {{ funds(inherited.summary.weeklyWageTotalMinor) }} weekly wages
     </p>
 
     @if (!inherited.summary.meetsMinimum || !inherited.summary.hasMinimumGoalkeepers) {
-      <p [class]="formErrorClass" role="alert">
+      <p [class]="formErrorClass" class="fit:shrink-0" role="alert">
         This squad is below the minimum a club must field —
         {{ inherited.summary.playerCount }} players and
         {{ inherited.summary.goalkeepers }} goalkeepers. It must be repaired before the next team
@@ -20,357 +22,422 @@
       </p>
     }
 
-    <h2 class="sr-only">Squad filters</h2>
-
-    <div class="mt-6 grid max-w-6xl gap-3 sm:grid-cols-3">
-      <label class="block">
-        <span class="text-sm font-medium text-ink-2">Search by name</span>
-        <input
-          type="search"
-          [class]="textInputClass"
-          [value]="nameFilter()"
-          (input)="onNameInput($event)"
-        />
-      </label>
-
-      <label class="block">
-        <span class="text-sm font-medium text-ink-2">Position</span>
-        <select
-          [class]="textInputClass"
-          [value]="positionFilter()"
-          (change)="onPositionChange($event)"
-        >
-          @for (option of familyOptions; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-          }
-        </select>
-      </label>
-
-      <label [class]="checkboxRowClass">
-        <input
-          type="checkbox"
-          [class]="checkboxClass"
-          [checked]="availableOnly()"
-          (change)="onAvailableChange($event)"
-        />
-        <span class="text-sm font-medium text-ink-2">Available only</span>
-      </label>
-    </div>
-
-    @if (filtersActive()) {
-      <p class="mt-2 text-sm text-ink-2" role="status">
-        Showing {{ players().length }} of {{ inherited.summary.playerCount }} players.
-        <button type="button" [class]="linkClass" (click)="clearFilters()">Clear filters</button>
-      </p>
-    }
-
-    <p class="mt-4 text-sm text-ink-2">
-      Averages are weighted for each player's position, so the skills that matter most there count
-      most. None is above 20.
-    </p>
-
     <div
-      class="mt-2 hidden overflow-x-auto md:block"
-      data-testid="squad-table"
-      tabindex="0"
-      role="group"
-      aria-label="Squad roster"
+      class="mt-4 fit:mt-2 fit:shrink-0"
+      role="tablist"
+      aria-label="Squad sections"
+      data-testid="squad-tabs"
     >
-      <p-table
-        [value]="players()"
-        [tableStyle]="{ 'min-width': 'max-content' }"
-        [pt]="{ table: { 'aria-label': 'Squad roster' } }"
-      >
-        <ng-template #header>
-          <tr>
-            <th scope="col" pSortableColumn="fullName">Player <p-sort-icon field="fullName" /></th>
-            <th scope="col" pSortableColumn="primaryPosition">
-              Position <p-sort-icon field="primaryPosition" />
-            </th>
-            <th scope="col" pSortableColumn="age">Age <p-sort-icon field="age" /></th>
-            <th scope="col" pSortableColumn="state.condition">
-              Condition <p-sort-icon field="state.condition" />
-            </th>
-            <th scope="col" pSortableColumn="state.fatigue">
-              Fatigue <p-sort-icon field="state.fatigue" />
-            </th>
-            <th scope="col" pSortableColumn="ratings.goalkeeping">
-              Avg goalkeeping <p-sort-icon field="ratings.goalkeeping" />
-            </th>
-            <th scope="col" pSortableColumn="ratings.technical">
-              Avg technical <p-sort-icon field="ratings.technical" />
-            </th>
-            <th scope="col" pSortableColumn="ratings.mental">
-              Avg mental <p-sort-icon field="ratings.mental" />
-            </th>
-            <th scope="col" pSortableColumn="ratings.physical">
-              Avg physical <p-sort-icon field="ratings.physical" />
-            </th>
-            <th scope="col" pSortableColumn="contract.endSeasonNumber">
-              Contract <p-sort-icon field="contract.endSeasonNumber" />
-            </th>
-            <th scope="col">Status</th>
-          </tr>
-        </ng-template>
-
-        <ng-template #body let-player>
-          <tr>
-            <th scope="row" class="whitespace-nowrap text-left font-medium text-ink">
-              <a
-                [routerLink]="['/players', player.id]"
-                [class]="linkClass"
-                [attr.aria-label]="'Open ' + player.fullName"
-              >
-                {{ player.fullName }}
-              </a>
-              <span class="block text-xs font-normal text-muted">
-                {{ player.shortName }} · {{ player.nationalityCode }}
-              </span>
-            </th>
-            <td>
-              <abbr [title]="position(player.primaryPosition)" class="no-underline">{{
-                positionShort(player.primaryPosition)
-              }}</abbr>
-            </td>
-            <td>{{ player.age }}</td>
-            <td>
-              <span [class]="conditionClass(player.state.condition)">
-                {{ player.state.condition }}
-              </span>
-              <span class="text-xs" [class]="conditionClass(player.state.condition)">
-                {{ conditionWord(player.state.condition) }}
-              </span>
-            </td>
-            <td>
-              <span [class]="fatigueClass(player.state.fatigue)">{{ player.state.fatigue }}</span>
-              <span class="text-xs" [class]="fatigueClass(player.state.fatigue)">
-                {{ fatigueWord(player.state.fatigue) }}
-              </span>
-            </td>
-            <td>{{ player.ratings.goalkeeping | number: '1.1-1' }}</td>
-            <td>{{ player.ratings.technical | number: '1.1-1' }}</td>
-            <td>{{ player.ratings.mental | number: '1.1-1' }}</td>
-            <td>{{ player.ratings.physical | number: '1.1-1' }}</td>
-            <td>
-              @if (player.contract; as contract) {
-                <span class="block">to season {{ contract.endSeasonNumber }}</span>
-                <span class="block text-xs text-muted">
-                  {{ contract.seasonsRemaining }} left · {{ squadStatus(contract.squadStatus) }}
-                </span>
-              } @else {
-                <span class="text-muted">No contract</span>
-              }
-            </td>
-            <td>
-              @if (player.availability.length === 0) {
-                <span class="text-xs font-medium text-emerald-200">Available</span>
-              } @else {
-                @for (record of player.availability; track record.id) {
-                  <span class="block text-xs font-medium text-red-300">
-                    {{ availability(record.type, record.remainingFixtures) }}
-                  </span>
-                }
-              }
-            </td>
-          </tr>
-        </ng-template>
-
-        <ng-template #emptymessage>
-          <tr>
-            <td colspan="11" class="text-sm text-ink-2">No player matches the filter.</td>
-          </tr>
-        </ng-template>
-      </p-table>
+      <div class="flex gap-1 overflow-x-auto border-b border-line">
+        @for (tab of tabs; track tab.key; let index = $index) {
+          <button
+            type="button"
+            role="tab"
+            class="min-h-11 shrink-0 border-b-2 px-2 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent fit:min-h-9 fit:py-1"
+            [class.border-accent]="activeTab() === tab.key"
+            [class.text-ink]="activeTab() === tab.key"
+            [class.border-transparent]="activeTab() !== tab.key"
+            [class.text-ink-2]="activeTab() !== tab.key"
+            [id]="'squad-tab-' + tab.key"
+            [attr.aria-selected]="activeTab() === tab.key"
+            [attr.aria-controls]="'squad-panel-' + tab.key"
+            [attr.tabindex]="activeTab() === tab.key ? 0 : -1"
+            (click)="selectTab(tab.key)"
+            (keydown)="onTabKeydown($event, index)"
+          >
+            {{ tab.label }}
+          </button>
+        }
+      </div>
     </div>
 
-    <!--
+    @if (activeTab() === 'players') {
+      <div
+        id="squad-panel-players"
+        role="tabpanel"
+        aria-labelledby="squad-tab-players"
+        class="fit:flex fit:min-h-0 fit:flex-1 fit:flex-col"
+      >
+        <h2 class="sr-only">Squad filters</h2>
+
+        <div
+          class="mt-6 grid max-w-6xl gap-3 sm:grid-cols-3 fit:mt-3 fit:flex fit:shrink-0 fit:items-end fit:gap-3"
+        >
+          <label class="block fit:w-64">
+            <span class="text-sm font-medium text-ink-2">Search by name</span>
+            <input
+              type="search"
+              [class]="textInputClass"
+              class="fit:min-h-8 fit:py-1"
+              [value]="nameFilter()"
+              (input)="onNameInput($event)"
+            />
+          </label>
+
+          <label class="block fit:w-64">
+            <span class="text-sm font-medium text-ink-2">Position</span>
+            <select
+              [class]="textInputClass"
+              class="fit:min-h-8 fit:py-1"
+              [value]="positionFilter()"
+              (change)="onPositionChange($event)"
+            >
+              @for (option of familyOptions; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </label>
+
+          <label [class]="checkboxRowClass">
+            <input
+              type="checkbox"
+              [class]="checkboxClass"
+              [checked]="availableOnly()"
+              (change)="onAvailableChange($event)"
+            />
+            <span class="text-sm font-medium text-ink-2">Available only</span>
+          </label>
+        </div>
+
+        @if (filtersActive()) {
+          <p class="mt-2 text-sm text-ink-2 fit:shrink-0" role="status">
+            Showing {{ players().length }} of {{ inherited.summary.playerCount }} players.
+            <button type="button" [class]="linkClass" (click)="clearFilters()">
+              Clear filters
+            </button>
+          </p>
+        }
+
+        <p class="mt-4 text-sm text-ink-2 fit:mt-2 fit:shrink-0">
+          Averages are weighted for each player's position, so the skills that matter most there
+          count most. None is above 20.
+        </p>
+
+        <div
+          class="mt-2 hidden overflow-x-auto md:block fit:flex-1 [&_td]:!px-2 [&_th]:!px-2 fit:min-h-0 fit:overflow-auto fit:text-[13px] fit:[&_td]:whitespace-nowrap fit:[&_td]:!py-1 fit:[&_th]:!py-1 fit:[&_thead_th]:sticky fit:[&_thead_th]:top-0 fit:[&_thead_th]:z-10 fit:[&_thead_th]:bg-panel"
+          data-testid="squad-table"
+          tabindex="0"
+          role="group"
+          aria-label="Squad roster"
+        >
+          <p-table
+            [value]="players()"
+            [tableStyle]="{ 'min-width': 'max-content' }"
+            [pt]="{ table: { 'aria-label': 'Squad roster' } }"
+          >
+            <ng-template #header>
+              <tr>
+                <th scope="col" pSortableColumn="fullName">
+                  Player <p-sort-icon field="fullName" />
+                </th>
+                <th scope="col" pSortableColumn="primaryPosition">
+                  Position <p-sort-icon field="primaryPosition" />
+                </th>
+                <th scope="col" pSortableColumn="age">Age <p-sort-icon field="age" /></th>
+                <th scope="col" pSortableColumn="state.condition">
+                  Condition <p-sort-icon field="state.condition" />
+                </th>
+                <th scope="col" pSortableColumn="state.fatigue">
+                  Fatigue <p-sort-icon field="state.fatigue" />
+                </th>
+                <th scope="col" pSortableColumn="ratings.goalkeeping">
+                  <span class="fit:sr-only">Avg goalkeeping</span
+                  ><span class="hidden fit:inline" aria-hidden="true">GK</span>
+                  <p-sort-icon field="ratings.goalkeeping" />
+                </th>
+                <th scope="col" pSortableColumn="ratings.technical">
+                  <span class="fit:sr-only">Avg technical</span
+                  ><span class="hidden fit:inline" aria-hidden="true">Tech</span>
+                  <p-sort-icon field="ratings.technical" />
+                </th>
+                <th scope="col" pSortableColumn="ratings.mental">
+                  <span class="fit:sr-only">Avg mental</span
+                  ><span class="hidden fit:inline" aria-hidden="true">Mental</span>
+                  <p-sort-icon field="ratings.mental" />
+                </th>
+                <th scope="col" pSortableColumn="ratings.physical">
+                  <span class="fit:sr-only">Avg physical</span
+                  ><span class="hidden fit:inline" aria-hidden="true">Phys</span>
+                  <p-sort-icon field="ratings.physical" />
+                </th>
+                <th scope="col" pSortableColumn="contract.endSeasonNumber">
+                  Contract <p-sort-icon field="contract.endSeasonNumber" />
+                </th>
+                <th scope="col">Status</th>
+              </tr>
+            </ng-template>
+
+            <ng-template #body let-player>
+              <tr>
+                <th scope="row" class="whitespace-nowrap text-left font-medium text-ink">
+                  <a
+                    [routerLink]="['/players', player.id]"
+                    [appPlayerCard]="player.id"
+                    [class]="linkClass"
+                    class="fit:min-h-6"
+                    [attr.aria-label]="'Open ' + player.fullName"
+                  >
+                    {{ player.fullName }}
+                  </a>
+                </th>
+                <td>
+                  <abbr [title]="position(player.primaryPosition)" class="no-underline">{{
+                    positionShort(player.primaryPosition)
+                  }}</abbr>
+                </td>
+                <td>{{ player.age }}</td>
+                <td>
+                  <span [class]="conditionClass(player.state.condition)">
+                    {{ player.state.condition }}
+                  </span>
+                  <span class="text-xs" [class]="conditionClass(player.state.condition)">
+                    {{ conditionWord(player.state.condition) }}
+                  </span>
+                </td>
+                <td>
+                  <span [class]="fatigueClass(player.state.fatigue)">{{
+                    player.state.fatigue
+                  }}</span>
+                  <span class="text-xs" [class]="fatigueClass(player.state.fatigue)">
+                    {{ fatigueWord(player.state.fatigue) }}
+                  </span>
+                </td>
+                <td>{{ player.ratings.goalkeeping | number: '1.1-1' }}</td>
+                <td>{{ player.ratings.technical | number: '1.1-1' }}</td>
+                <td>{{ player.ratings.mental | number: '1.1-1' }}</td>
+                <td>{{ player.ratings.physical | number: '1.1-1' }}</td>
+                <td>
+                  @if (player.contract; as contract) {
+                    <span class="block fit:inline">to season {{ contract.endSeasonNumber }}</span>
+                    <span class="block text-xs text-muted fit:ml-1 fit:inline">
+                      {{ contract.seasonsRemaining }} left · {{ squadStatus(contract.squadStatus) }}
+                    </span>
+                  } @else {
+                    <span class="text-muted">No contract</span>
+                  }
+                </td>
+                <td>
+                  @if (player.availability.length === 0) {
+                    <span class="text-xs font-medium text-emerald-200">Available</span>
+                  } @else {
+                    @for (record of player.availability; track record.id) {
+                      <span class="block text-xs font-medium text-red-300">
+                        {{ availability(record.type, record.remainingFixtures) }}
+                      </span>
+                    }
+                  }
+                </td>
+              </tr>
+            </ng-template>
+
+            <ng-template #emptymessage>
+              <tr>
+                <td colspan="11" class="text-sm text-ink-2">No player matches the filter.</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+
+        <!--
       The same players as cards below `md`, so a phone does not present a 52rem table it can only
       scroll sideways (`F-44`). Every value here is the value the table shows, including the band
       word beside each condition and fatigue number.
     -->
-    <ul class="mt-4 flex flex-col gap-3 md:hidden" data-testid="squad-cards">
-      @for (player of players(); track player.id) {
-        <li class="rounded border border-line bg-panel p-3">
-          <div class="flex flex-wrap items-baseline justify-between gap-x-2">
-            <h3 class="text-sm font-semibold text-ink">
-              <a
-                [routerLink]="['/players', player.id]"
-                [class]="linkClass"
-                [attr.aria-label]="'Open ' + player.fullName"
-              >
-                {{ player.fullName }}
-              </a>
-            </h3>
-            <span class="text-xs text-muted">
-              {{ player.shortName }} · {{ player.nationalityCode }}
-            </span>
-          </div>
-
-          <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Position</dt>
-              <dd class="text-ink">{{ position(player.primaryPosition) }}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Age</dt>
-              <dd class="text-ink">{{ player.age }}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Condition</dt>
-              <dd [class]="conditionClass(player.state.condition)">
-                {{ player.state.condition }} {{ conditionWord(player.state.condition) }}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Fatigue</dt>
-              <dd [class]="fatigueClass(player.state.fatigue)">
-                {{ player.state.fatigue }} {{ fatigueWord(player.state.fatigue) }}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Avg goalkeeping</dt>
-              <dd class="text-ink">
-                {{ player.ratings.goalkeeping | number: '1.1-1' }}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Avg technical</dt>
-              <dd class="text-ink">
-                {{ player.ratings.technical | number: '1.1-1' }}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Avg mental</dt>
-              <dd class="text-ink">{{ player.ratings.mental | number: '1.1-1' }}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted">Avg physical</dt>
-              <dd class="text-ink">
-                {{ player.ratings.physical | number: '1.1-1' }}
-              </dd>
-            </div>
-            <div class="col-span-2 flex justify-between gap-2">
-              <dt class="text-muted">Contract</dt>
-              <dd class="text-right text-ink">
-                @if (player.contract; as contract) {
-                  to season {{ contract.endSeasonNumber }} · {{ contract.seasonsRemaining }} left ·
-                  {{ squadStatus(contract.squadStatus) }}
-                } @else {
-                  No contract
-                }
-              </dd>
-            </div>
-            <div class="col-span-2 flex justify-between gap-2">
-              <dt class="text-muted">Status</dt>
-              <dd class="text-right">
-                @if (player.availability.length === 0) {
-                  <span class="text-xs font-medium text-emerald-200">Available</span>
-                } @else {
-                  @for (record of player.availability; track record.id) {
-                    <span class="block text-xs font-medium text-red-300">
-                      {{ availability(record.type, record.remainingFixtures) }}
-                    </span>
-                  }
-                }
-              </dd>
-            </div>
-          </dl>
-        </li>
-      } @empty {
-        <li class="rounded border border-line bg-panel p-3 text-sm text-ink-2">
-          No player matches the filter.
-        </li>
-      }
-    </ul>
-
-    @if (contracts(); as payroll) {
-      <section class="mt-10">
-        <h2 class="text-lg font-semibold text-ink">Contracts</h2>
-        <p class="mt-1 text-sm text-ink-2">
-          {{ payroll.contracts.length }} contracts ·
-          {{ funds(payroll.weeklyWageTotalMinor) }} committed each week, charged after the Sunday
-          matchday (CON-2).
-        </p>
-
-        <div
-          class="mt-3 hidden overflow-x-auto md:block"
-          data-testid="contracts-table"
-          tabindex="0"
-          role="group"
-          aria-label="Contracts"
-        >
-          <table class="w-full border-collapse text-left text-sm">
-            <caption class="sr-only">
-              Contracts, closest to expiring first
-            </caption>
-            <thead>
-              <tr class="border-b border-line-strong">
-                <th scope="col" class="py-1 pr-4 font-semibold">Player</th>
-                <th scope="col" class="py-1 pr-4 font-semibold">Position</th>
-                <th scope="col" class="py-1 pr-4 font-semibold">Age</th>
-                <th scope="col" class="py-1 pr-4 font-semibold">Seasons</th>
-                <th scope="col" class="py-1 pr-4 font-semibold">Standing</th>
-                <th scope="col" class="py-1 font-semibold">Weekly wage</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (contract of payroll.contracts; track contract.id) {
-                <tr class="border-b border-line">
-                  <th scope="row" class="py-1 pr-4 text-left font-medium text-ink">
-                    {{ contract.playerName }}
-                  </th>
-                  <td class="py-1 pr-4">
-                    <abbr [title]="position(contract.primaryPosition)" class="no-underline">{{
-                      positionShort(contract.primaryPosition)
-                    }}</abbr>
-                  </td>
-                  <td class="py-1 pr-4">{{ contract.age }}</td>
-                  <td class="py-1 pr-4">
-                    {{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }} ({{
-                      contract.seasonsRemaining
-                    }}
-                    left)
-                  </td>
-                  <td class="py-1 pr-4">{{ squadStatus(contract.squadStatus) }}</td>
-                  <td class="py-1">{{ funds(contract.weeklyWageMinor) }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-
-        <ul class="mt-3 flex flex-col gap-3 md:hidden" data-testid="contracts-cards">
-          @for (contract of payroll.contracts; track contract.id) {
+        <ul class="mt-4 flex flex-col gap-3 md:hidden" data-testid="squad-cards">
+          @for (player of players(); track player.id) {
             <li class="rounded border border-line bg-panel p-3">
               <div class="flex flex-wrap items-baseline justify-between gap-x-2">
-                <h3 class="text-sm font-semibold text-ink">{{ contract.playerName }}</h3>
-                <span class="text-xs text-muted">
-                  {{ position(contract.primaryPosition) }} · age {{ contract.age }}
-                </span>
+                <h3 class="text-sm font-semibold text-ink">
+                  <a
+                    [routerLink]="['/players', player.id]"
+                    [appPlayerCard]="player.id"
+                    [class]="linkClass"
+                    [attr.aria-label]="'Open ' + player.fullName"
+                  >
+                    {{ player.fullName }}
+                  </a>
+                </h3>
               </div>
+
               <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
                 <div class="flex justify-between gap-2">
-                  <dt class="text-muted">Seasons</dt>
-                  <dd class="text-ink">
-                    {{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }} ({{
-                      contract.seasonsRemaining
-                    }}
-                    left)
+                  <dt class="text-muted">Position</dt>
+                  <dd class="text-ink">{{ position(player.primaryPosition) }}</dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <dt class="text-muted">Age</dt>
+                  <dd class="text-ink">{{ player.age }}</dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <dt class="text-muted">Condition</dt>
+                  <dd [class]="conditionClass(player.state.condition)">
+                    {{ player.state.condition }} {{ conditionWord(player.state.condition) }}
                   </dd>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <dt class="text-muted">Standing</dt>
-                  <dd class="text-ink">{{ squadStatus(contract.squadStatus) }}</dd>
+                  <dt class="text-muted">Fatigue</dt>
+                  <dd [class]="fatigueClass(player.state.fatigue)">
+                    {{ player.state.fatigue }} {{ fatigueWord(player.state.fatigue) }}
+                  </dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <dt class="text-muted">Avg goalkeeping</dt>
+                  <dd class="text-ink">
+                    {{ player.ratings.goalkeeping | number: '1.1-1' }}
+                  </dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <dt class="text-muted">Avg technical</dt>
+                  <dd class="text-ink">
+                    {{ player.ratings.technical | number: '1.1-1' }}
+                  </dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <dt class="text-muted">Avg mental</dt>
+                  <dd class="text-ink">{{ player.ratings.mental | number: '1.1-1' }}</dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <dt class="text-muted">Avg physical</dt>
+                  <dd class="text-ink">
+                    {{ player.ratings.physical | number: '1.1-1' }}
+                  </dd>
                 </div>
                 <div class="col-span-2 flex justify-between gap-2">
-                  <dt class="text-muted">Weekly wage</dt>
-                  <dd class="text-ink">{{ funds(contract.weeklyWageMinor) }}</dd>
+                  <dt class="text-muted">Contract</dt>
+                  <dd class="text-right text-ink">
+                    @if (player.contract; as contract) {
+                      to season {{ contract.endSeasonNumber }} ·
+                      {{ contract.seasonsRemaining }} left ·
+                      {{ squadStatus(contract.squadStatus) }}
+                    } @else {
+                      No contract
+                    }
+                  </dd>
+                </div>
+                <div class="col-span-2 flex justify-between gap-2">
+                  <dt class="text-muted">Status</dt>
+                  <dd class="text-right">
+                    @if (player.availability.length === 0) {
+                      <span class="text-xs font-medium text-emerald-200">Available</span>
+                    } @else {
+                      @for (record of player.availability; track record.id) {
+                        <span class="block text-xs font-medium text-red-300">
+                          {{ availability(record.type, record.remainingFixtures) }}
+                        </span>
+                      }
+                    }
+                  </dd>
                 </div>
               </dl>
             </li>
+          } @empty {
+            <li class="rounded border border-line bg-panel p-3 text-sm text-ink-2">
+              No player matches the filter.
+            </li>
           }
         </ul>
-      </section>
+      </div>
+    } @else {
+      <div
+        id="squad-panel-contracts"
+        role="tabpanel"
+        aria-labelledby="squad-tab-contracts"
+        class="mt-4 fit:mt-2 fit:flex fit:min-h-0 fit:flex-1 fit:flex-col"
+      >
+        @if (contracts(); as payroll) {
+          <section class="fit:flex fit:min-h-0 fit:flex-1 fit:flex-col">
+            <h2 class="sr-only">Contracts</h2>
+            <p class="text-sm text-ink-2 fit:shrink-0">
+              {{ payroll.contracts.length }} contracts ·
+              {{ funds(payroll.weeklyWageTotalMinor) }} committed each week, charged after the
+              Sunday matchday (CON-2).
+            </p>
+
+            <div
+              class="mt-3 hidden overflow-x-auto md:block fit:mt-2 fit:flex-1 [&_td]:!px-2 [&_th]:!px-2 fit:min-h-0 fit:overflow-auto fit:text-[13px] fit:[&_td]:whitespace-nowrap fit:[&_td]:!py-1 fit:[&_th]:!py-1 fit:[&_thead_th]:sticky fit:[&_thead_th]:top-0 fit:[&_thead_th]:z-10 fit:[&_thead_th]:bg-panel"
+              data-testid="contracts-table"
+              tabindex="0"
+              role="group"
+              aria-label="Contracts"
+            >
+              <table class="w-full border-collapse text-left text-sm">
+                <caption class="sr-only">
+                  Contracts, closest to expiring first
+                </caption>
+                <thead>
+                  <tr class="border-b border-line-strong">
+                    <th scope="col" class="py-1 pr-4 font-semibold">Player</th>
+                    <th scope="col" class="py-1 pr-4 font-semibold">Position</th>
+                    <th scope="col" class="py-1 pr-4 font-semibold">Age</th>
+                    <th scope="col" class="py-1 pr-4 font-semibold">Seasons</th>
+                    <th scope="col" class="py-1 pr-4 font-semibold">Standing</th>
+                    <th scope="col" class="py-1 font-semibold">Weekly wage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (contract of payroll.contracts; track contract.id) {
+                    <tr class="border-b border-line">
+                      <th scope="row" class="py-1 pr-4 text-left font-medium text-ink">
+                        <span [appPlayerCard]="contract.playerId">{{ contract.playerName }}</span>
+                      </th>
+                      <td class="py-1 pr-4">
+                        <abbr [title]="position(contract.primaryPosition)" class="no-underline">{{
+                          positionShort(contract.primaryPosition)
+                        }}</abbr>
+                      </td>
+                      <td class="py-1 pr-4">{{ contract.age }}</td>
+                      <td class="py-1 pr-4">
+                        {{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }} ({{
+                          contract.seasonsRemaining
+                        }}
+                        left)
+                      </td>
+                      <td class="py-1 pr-4">{{ squadStatus(contract.squadStatus) }}</td>
+                      <td class="py-1">{{ funds(contract.weeklyWageMinor) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <ul class="mt-3 flex flex-col gap-3 md:hidden" data-testid="contracts-cards">
+              @for (contract of payroll.contracts; track contract.id) {
+                <li class="rounded border border-line bg-panel p-3">
+                  <div class="flex flex-wrap items-baseline justify-between gap-x-2">
+                    <h3 class="text-sm font-semibold text-ink">
+                      <span [appPlayerCard]="contract.playerId">{{ contract.playerName }}</span>
+                    </h3>
+                    <span class="text-xs text-muted">
+                      {{ position(contract.primaryPosition) }} · age {{ contract.age }}
+                    </span>
+                  </div>
+                  <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Seasons</dt>
+                      <dd class="text-ink">
+                        {{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }} ({{
+                          contract.seasonsRemaining
+                        }}
+                        left)
+                      </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Standing</dt>
+                      <dd class="text-ink">{{ squadStatus(contract.squadStatus) }}</dd>
+                    </div>
+                    <div class="col-span-2 flex justify-between gap-2">
+                      <dt class="text-muted">Weekly wage</dt>
+                      <dd class="text-ink">{{ funds(contract.weeklyWageMinor) }}</dd>
+                    </div>
+                  </dl>
+                </li>
+              }
+            </ul>
+          </section>
+        } @else {
+          <p class="text-sm text-ink-2" role="status">The contracts could not be loaded.</p>
+        }
+      </div>
     }
   </section>
 } @else {

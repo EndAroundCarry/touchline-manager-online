@@ -391,7 +391,11 @@
                   <ul>
                     @for (item of group.players; track $index) {
                       <li class="flex justify-between gap-2">
-                        <a [routerLink]="['/players', item.id]" class="truncate hover:text-accent">
+                        <a
+                          [routerLink]="['/players', item.id]"
+                          [appPlayerCard]="item.id"
+                          class="truncate hover:text-accent"
+                        >
                           {{ item.name }}
                         </a>
                         <span class="shrink-0 text-muted">{{ item.detail }}</span>
@@ -431,7 +435,9 @@
                 <ul>
                   @for (bid of shownBids(); track bid.listingId) {
                     <li class="flex justify-between gap-2">
-                      <span class="truncate">{{ bid.playerName }}</span>
+                      <span class="truncate" [appPlayerCard]="bid.playerId">{{
+                        bid.playerName
+                      }}</span>
                       <span class="shrink-0 text-muted">{{ funds(bid.amountMinor) }}</span>
                     </li>
                   }

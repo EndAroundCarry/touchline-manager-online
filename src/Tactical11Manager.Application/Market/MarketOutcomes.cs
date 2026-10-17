@@ -63,6 +63,11 @@ public enum MarketOutcome
 /// <param name="Page">The page, when the search ran.</param>
 public sealed record SearchPlayersResult(MarketOutcome Outcome, PlayerSearchPage? Page);
 
+/// <summary>A single player read's result (`SCT-1`).</summary>
+/// <param name="Outcome">What happened.</param>
+/// <param name="Player">The player, when they were found.</param>
+public sealed record PlayerCardResult(MarketOutcome Outcome, PlayerSearchRow? Player);
+
 /// <summary>A shortlist read's or write's result (`SCT-3`).</summary>
 /// <param name="Outcome">What happened.</param>
 /// <param name="Shortlist">The shortlist after the operation, when it succeeded.</param>

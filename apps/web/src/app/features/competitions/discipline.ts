@@ -4,6 +4,7 @@ import { suspensionRemainingLabel } from '../../core/competition/competition-pre
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { formatInstant } from '../../core/world/presentation';
 import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/control-styles';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /**
  * The division discipline screen (master plan §10.5, `DIS-2`…`DIS-5`).
@@ -19,7 +20,7 @@ import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/con
  */
 @Component({
   selector: 'app-competition-discipline',
-  imports: [RouterLink],
+  imports: [RouterLink, PlayerCardTrigger],
   templateUrl: './discipline.html',
 })
 export class CompetitionDiscipline {

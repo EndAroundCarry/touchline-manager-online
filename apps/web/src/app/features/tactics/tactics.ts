@@ -32,6 +32,8 @@ import { RosterRow, buildRoster } from '../../core/tactics/tactics-roster';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { BENCH_SIZE, CodedInstructionKey } from '../../core/tactics/tactics-draft';
 import { SelectablePlayer } from '../../core/tactics/tactics.models';
+import { PlayerSkillsCard } from '../../shared/ui/player-card/player-skills-card';
+import { placeCard } from '../../shared/ui/player-card/player-card-placement';
 import {
   FORM_ERROR,
   LINK_ACTION,
@@ -41,14 +43,10 @@ import {
   STATUS_MESSAGE,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /** The drag payload for a player row, so a drop on a slot can assign them. */
 const PLAYER_MIME = 'application/x-tactical11-player';
-
-/** The skills popup's size (`w-[34rem]` and its usual height), which its placement keeps inside the window. */
-const POPUP_WIDTH = 544;
-const POPUP_HEIGHT = 360;
-const POPUP_MARGIN = 8;
 
 /** One slot as the board draws it: the layout, its occupant, and how both should read. */
 interface SlotView {
@@ -113,7 +111,7 @@ interface RatingBasis {
  */
 @Component({
   selector: 'app-tactics',
-  imports: [DecimalPipe, RouterLink, TableModule],
+  imports: [DecimalPipe, RouterLink, TableModule, PlayerSkillsCard, PlayerCardTrigger],
   templateUrl: './tactics.html',
   host: { class: 'block fit:min-h-0 fit:flex-1' },
 })
@@ -594,22 +592,23 @@ export class Tactics {
     }
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const pointerX = event instanceof MouseEvent ? event.clientX + 16 : rect.left + 16;
-    const fitsBelow = rect.bottom + POPUP_MARGIN + POPUP_HEIGHT < window.innerHeight;
+    const placement = placeCard(
+      {
+        x: event instanceof MouseEvent ? event.clientX + 16 : rect.left + 16,
+        top: rect.top,
+        bottom: rect.bottom,
+      },
+      window.innerWidth,
+      window.innerHeight,
+    );
     const basis = this.ratingBasis();
 
     this.popup.set({
       row,
       groups: skillGroups(row.attributes, row.ratedAs),
       basisLabel: basis === null ? positionLabel(row.position) : basis.roleLabel,
-      left: Math.max(
-        POPUP_MARGIN,
-        Math.min(pointerX, window.innerWidth - POPUP_WIDTH - POPUP_MARGIN),
-      ),
-      top: Math.max(
-        POPUP_MARGIN,
-        fitsBelow ? rect.bottom + POPUP_MARGIN : rect.top - POPUP_HEIGHT - POPUP_MARGIN,
-      ),
+      left: placement.left,
+      top: placement.top,
     });
   }
 
@@ -631,11 +630,6 @@ export class Tactics {
   /** The band word beside a state value, so colour is never the only signal (§11.3). */
   protected stateWord(value: number | null, higherIsBetter: boolean): string {
     return value === null ? '' : stateBand(value, higherIsBetter).label;
-  }
-
-  /** How a multiplier reads beside an attribute in the popup; nothing for the neutral ×1. */
-  protected multiplierLabel(weight: number): string {
-    return weight === 1 ? '' : `×${weight}`;
   }
 
   /** What pressing a row's name does, as the button's accessible name. */
