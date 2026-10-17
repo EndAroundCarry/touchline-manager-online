@@ -4,6 +4,12 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Wide midfielders plan, Milestone 4 - balance guards and documentation
+
+- No engine change. Guards at the committed code: `CalibrationTests` and `DistributionTests` (500 matches) pass; the weaker side at 16 against 18-19 takes 0.87 points with the 5-4-1 default (0.89 before) and 0.45 with an all-out attack (0.55 before; the stronger side's 4.07 goals are under the 4.5 guard); 4-4-2 against 4-4-2 and 3-4-3 against 4-2-3-1 are inside the noise.
+- One margin is left for the product owner: a 4-4-2 takes +0.21 home points more from a 4-3-3 than before (+0.25, +0.18 and +0.20 on seeds 7000, 8000 and 9000, 300 matches each; goals and shots a match unchanged). The band was 0.2.
+- Documentation: `match-engine.md` §14.38 (the role in the tick engine, the measured table, the plan's six targets), the position and role table of §5, the formation note in `game-rules.md` (`TAC-1`…`TAC-17`), and ADR-0070 (the slot's role is read by the tick engine).
+
 ## Wide midfielders plan, Milestone 3 - the wide midfielder plays his role in the tick engine
 
 - New `Tick/TickRoleProfile.cs` holds every per-role number. With the ball a wide midfielder needs a goal chance of 27% (a winger 17%) to shoot and never shoots from beyond 16 m; he crosses from 68 m (a winger from 75 m) and values a cross 300 points more. He makes the wide runs of a Balanced side too, but not at Defensive or while his side keeps men back for a counter.

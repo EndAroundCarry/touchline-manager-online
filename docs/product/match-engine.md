@@ -2532,3 +2532,59 @@ With the attackers 19 and the stronger side's defenders 14 (edge +5, the ceiling
 - **16 v 18-19.** All-out attack 0.75 to 0.46 and Positive 0.73 to 0.40 (the plan: at most 0.55 and 0.3 below the 5-4-1 default's 0.84); the stronger side's goals against the all-out attack 4.51 and the weaker side's 2.80 to 2.24. Every other setup is bit-identical to Milestone 3.
 - **13-14 v 18-19** (edge about -5, the floor): all-out attack 0.05 and Positive 0.06 (0.08 and 0.13 after Milestone 3); the 5-4-1 default 0.31, Cautious 0.21, counter-attack 0.10, deep Defensive 0.13, 4-4-2 default 0.16, 4-4-2 counter-attack 0.07. The best defensive setup takes six times the all-out attack's points.
 - **Guards** (seed 90000): a 6-skill side takes at most 2% of the points (S3: 100/0/0, 99/1/0, 98/2/0); between equal sides the away counter-attack against a home default takes 1.18 points (target at least 0.85) and the home all-out attack against a default takes 2.33 points (2.42 at the plan baseline); `ticksnap 150`: 2.79 goals a match (2.77 after Milestone 3).
+
+### 14.38 Wide midfielders track back and cross; wingers stay high (the wide midfielders plan, Milestones 1-4)
+
+**Why.** The game had no left or right midfielder: the wide men of a 4-4-2 were wingers, so they never tracked back, crossed from the byline and shot like forwards. The product owner wanted the position football has: a wide midfielder who is more attacking than a full-back and less than a winger, defends better than a winger, runs the flank and crosses, and rarely shoots. Football Manager's wide midfielder and winger were the model.
+
+**What changed.**
+
+| Part | Now |
+|---|---|
+| Vocabulary | positions `RightMidfielder` and `LeftMidfielder` (RM, LM; Midfield family), role `WideMidfielder`, training programme `widemid`; squads of 24 (one LM and one RM added) |
+| Formations | the wide slots of 4-4-2, 4-1-4-1, 4-4-1-1 and 4-5-1, and the outer central midfielders of 5-4-1 (moved out to 80 m and 20 m across the pitch, beyond the wide threshold), are `Midfield / WideMidfielder`. 3-5-2, 3-4-2-1 and **3-4-3** keep their wing-backs; 4-3-3 and 4-2-3-1 keep their wingers. |
+| Slot role | `TickAnchorSpec` carries the slot's `MatchRole`; `TickRoleProfile` holds every per-role number |
+| Fit | a winger, full-back or either midfielder in a wide-midfielder slot is at home (the role's natural list); the engine grades a natural position of another band as the secondary penalty |
+
+**With the ball** (`TickRoleProfile`, read by `TickBallCarrierBrain` and `TickOffBallSupport`):
+
+- **Shots.** A wide midfielder needs a goal chance of 27% to shoot (a winger 17%) and never shoots beyond the long-shot range. A winger shoots as before.
+- **Crosses.** A wide midfielder crosses from 68 m from his own goal line (a winger from 75 m), and a cross is worth 300 utility more to him: he delivers early, from deep. A winger still goes to the byline.
+- **Runs.** A wide midfielder makes the wide runs at every mentality but Defensive and never while his side holds men back (`RunsWide`); he takes no striker preference, so forwards and wingers get the run budget first.
+
+**Without the ball** (`TickDefensiveAI`):
+
+- **Tracking** (`AssignTrackers`, new `TickDefensiveRole.Tracker`, after the back-line markers and before the screens). A wide midfielder takes the most advanced unclaimed opponent who is at least `WideThreshold` off the middle on his anchor side, in his own half and within `TrackZone` = 25 m, and stands `TrackStandOff` = 15 m goal-side of him at `TrackPaceBasisPoints` = 50% of top speed. A closer, faster shadow (6 m, 70%) made 5-4-1 default matches 0.6 goals longer, so the shadow is loose.
+- **Winger stays high.** A winger is never sent to screen a passing lane (`Screens`). The out-of-possession depth drop is the Midfield family's 60% for the wide midfielder and the Attack family's for the winger, unchanged.
+- **Attack edge** (§14.37) is unchanged: wide midfielders count only when they are among the side's two most advanced midfielders.
+
+**Measured** (`tickroles`, 300 matches a cell, seed 7000; per player per match; the baseline is the pre-feature code, where the 4-4-2 wide men are wingers):
+
+| | Baseline winger (4-4-2) | Wide midfielder (4-4-2) | Winger (4-3-3) | Full-back (4-4-2) |
+|---|---|---|---|---|
+| Shots from open play | 0.77 | **0.08** | 0.84 | 0 |
+| Crosses | 8.3 | **14.5** | 11.9 | 0.0 |
+| Tackles attempted | 2.8 | **3.4** | 1.9 | 9.2 |
+| Mean distance from own goal without the ball | 59.6 m | **59.3 m** | 77.0 m | 20.7 m |
+| Out-of-possession ticks in own half | 14.5% | **18.7%** | 0.7% | 99.9% |
+
+The probe reads shots from open play (`open`), because the lab sides have identical skills and the free kicks go to the first seat in the lineup, the 4-4-2 wide midfielder's: 0.54 to 0.62 of his 0.70 shots a match are free kicks.
+
+**Targets** (the plan's T1-T6):
+
+| Target | Result |
+|---|---|
+| T1 wide midfielders rarely shoot | met: 0.08 open-play shots a match, a tenth of a winger's |
+| T2 wingers still shoot | met: 4-3-3 winger 0.84 against 0.89 before; 3-4-3 winger 1.51 against 1.54 |
+| T3 wide midfielders run the wing and cross | met in the 4-4-2 (122% of a winger's crosses; a full-back's are 0); 3-4-3 has no wide midfielder |
+| T4 they defend somewhat | met: 1.8 times a winger's tackles, 0.37 of a full-back's |
+| T5 they track back, wingers stay high | met: 59 m against 77 m without the ball, 19% against 0.7% of out-of-possession ticks in their own half |
+| T6 no balance break | met except one margin, below |
+
+**T6 guards.** `CalibrationTests` and `DistributionTests` pass (500 matches). Weaker side at 16 against 18-19 (150 matches, seed 7000): 5-4-1 default 0.87 points (0.89 before; goals 1.92-1.04), all-out attack 0.45 (0.55 before; the stronger side's 4.07 goals are under the 4.5 guard). 4-4-2 against 4-4-2 and 3-4-3 against 4-2-3-1 are inside the noise (goals 2.83 and 3.63, shots 35.4 and 45.4, home points 1.70 and 1.23, against 3.09, 3.58, 35.8, 45.4, 1.71 and 1.27).
+
+**The one margin: 4-4-2 against 4-3-3.** Home points rise from 1.47 to 1.72 (seed 7000), 1.52 to 1.70 (8000) and 1.58 to 1.78 (9000), a mean of +0.21 against the 0.2 band, with goals and shots a match unchanged (3.17 to 3.34, 38.3 to 39.4 on seed 7000). Wide midfielders cross 45% more than the 4-4-2 wingers did, because the Midfield family has no ball-shift cap and follows the ball more. It was left as it is.
+
+**Tried and dropped.** Wide runs at Balanced moved nothing (the striker or the winger already takes the single run). Cross minimum X of 6,000 to 6,800 and track zones of 1,500 to 3,000 were inside the noise. A tighter, faster track (6 m, 70%) lengthened 5-4-1 default matches. The 3-4-3 with wide midfielders instead of wing-backs gave 3.5 crosses against the winger's 13 (they stand at 50 m and never reach the cross line) and cost the 3-4-3 0.35 points, so it was put back to wing-backs.
+
+**Probe.** `tickroles <matches> <seed> [442v433|442v442|343v4231]` in `tools/simulation-benchmarks/TickRoleProbe.cs` prints per role and slot family, per player per match: shots (and free kicks and open play), goals, crosses, tackles, passes, dribbles, mean own-X with and without the ball, the share of out-of-possession ticks in the own half and the distance covered.
