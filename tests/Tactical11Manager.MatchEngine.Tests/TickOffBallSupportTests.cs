@@ -414,6 +414,26 @@ public sealed class TickOffBallSupportTests
     }
 
     [Fact]
+    public void A_wide_midfielder_makes_the_run_of_a_balanced_side_when_no_forward_can_but_a_plain_midfielder_does_not()
+    {
+        // Both strikers are already past the line, so the one run a balanced side makes goes to a wide man or to nobody.
+        var attackers = (SpatialPoint[])CentralMidfielderHasTheBall.Clone();
+
+        attackers[9] = new SpatialPoint(8_600, 2_800);
+        attackers[10] = new SpatialPoint(8_600, 4_200);
+
+        var wide = new Scene(isHome: true, 6, attackers, CompactFourFourTwo, MatchMentality.Balanced);
+        var plain = new Scene(isHome: true, 6, attackers, CompactFourFourTwo, MatchMentality.Balanced)
+            .WithRole(5, MatchRole.CentralMidfielder)
+            .WithRole(8, MatchRole.CentralMidfielder);
+        var defensive = new Scene(isHome: true, 6, attackers, CompactFourFourTwo, MatchMentality.Defensive);
+
+        Indices(wide.Assign(), TickAttackingRole.Runner).Should().ContainSingle().Which.Should().BeOneOf(5, 8);
+        Indices(plain.Assign(), TickAttackingRole.Runner).Should().BeEmpty("a midfielder on the wing is not sent on a run at Balanced");
+        Indices(defensive.Assign(), TickAttackingRole.Runner).Should().BeEmpty();
+    }
+
+    [Fact]
     public void A_forward_beyond_the_line_never_starts_a_run_and_one_held_back_is_kept_onside()
     {
         var attackers = (SpatialPoint[])CentralMidfielderHasTheBall.Clone();
@@ -956,6 +976,14 @@ public sealed class TickOffBallSupportTests
         public SpatialPoint[] Anchors { get; private set; }
 
         public TickPlayerState[] Attackers { get; private set; }
+
+        /// <summary>Gives a seat another role, keeping his family and place.</summary>
+        public Scene WithRole(int seat, MatchRole role)
+        {
+            Specs = [.. Specs.Select((spec, index) => index == seat ? spec with { Role = role } : spec)];
+
+            return this;
+        }
 
         public TickPlayerState[] Defenders { get; }
 

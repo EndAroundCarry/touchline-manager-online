@@ -992,9 +992,11 @@ internal static class TickBallCarrierBrain
 
     private static void ScoreCross(in TickCarrierSituation situation, in View view, ref Best best)
     {
-        if (situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper
+        var carrierSpec = situation.Specs[situation.CarrierIndex];
+
+        if (carrierSpec.Family == MatchPositionFamily.Goalkeeper
             || Math.Abs(view.Y - SpatialPitch.GoalYCenter) < CrossWideThreshold
-            || view.X < CrossMinimumX)
+            || view.X < TickRoleProfile.CrossMinimumX(carrierSpec.Role))
         {
             return;
         }
@@ -1044,7 +1046,8 @@ internal static class TickBallCarrierBrain
         var value = CrossBaseValue
             + (CrossPerAttacker * Math.Min(3, inArea))
             - (CrossPerDefender * Math.Min(3, crowding))
-            + (view.X >= ByLineX ? CrossByLineBonus : 0);
+            + (view.X >= ByLineX ? CrossByLineBonus : 0)
+            + TickRoleProfile.CrossBonus(carrierSpec.Role);
 
         best.Consider(TickCarrierAction.Cross, receiver, targetX, targetY, Expected(success, value, LossOfBall(view)), 0);
     }
@@ -1110,7 +1113,7 @@ internal static class TickBallCarrierBrain
         var shotDy = (long)SpatialPitch.GoalYCenter - view.Y;
         var far = ((shotDx * shotDx) + (shotDy * shotDy)) > (long)LongShotRange * LongShotRange;
 
-        if (chance <= (far ? LongShotMinimumChance : ShotMinimumChance))
+        if (chance <= TickRoleProfile.ShotMinimumChance(situation.Specs[situation.CarrierIndex].Role, far))
         {
             return;
         }

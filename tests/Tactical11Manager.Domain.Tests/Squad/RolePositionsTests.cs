@@ -100,6 +100,24 @@ public sealed class RolePositionsTests
             .Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(PlayerPosition.RightMidfielder)]
+    [InlineData(PlayerPosition.LeftMidfielder)]
+    [InlineData(PlayerPosition.RightBack)]
+    [InlineData(PlayerPosition.LeftWinger)]
+    public void The_wing_back_slots_of_the_three_four_three_accept_a_wide_midfielder_without_a_warning(PlayerPosition primary)
+    {
+        var wingBacks = FormationLayouts.DefaultSlots(FormationPreset.ThreeFourThree)
+            .Where(slot => slot.Role == PlayerRole.WingBack)
+            .ToList();
+
+        wingBacks.Should().HaveCount(2).And.OnlyContain(slot => slot.PositionFamily == PositionFamily.Defence);
+        foreach (var slot in wingBacks)
+        {
+            RolePositions.IsAtHome(primary, [], slot.PositionFamily, slot.Role).Should().BeTrue($"slot {slot.SlotNumber}");
+        }
+    }
+
     [Fact]
     public void Suitability_ranks_the_role_first_then_the_band_then_cover_then_nothing()
     {

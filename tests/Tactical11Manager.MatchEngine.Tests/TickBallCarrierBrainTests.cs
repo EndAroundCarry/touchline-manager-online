@@ -315,6 +315,45 @@ public sealed class TickBallCarrierBrainTests
     }
 
     [Fact]
+    public void A_wide_midfielder_keeps_the_ball_where_a_winger_would_take_a_shot_that_is_not_a_good_one()
+    {
+        // Alone at 11 m: a chance above a plain shot's minimum and below a wide midfielder's.
+        var chance = TickBallCarrierBrain.ExpectedGoals(8_900, 3_500, 0, Skills(10));
+
+        chance.Should().BeGreaterThan(TickBallCarrierBrain.ShotMinimumChance).And.BeLessThanOrEqualTo(TickRoleProfile.WideMidfielderShotMinimumChance);
+
+        var attackers = Move(OwnHalf, (9, 8_900, 3_500));
+        var winger = new Scene(true, 9, attackers, DeepBlock) { CarrierRole = MatchRole.Winger }.Decide();
+        var wide = new Scene(true, 9, attackers, DeepBlock) { CarrierRole = MatchRole.WideMidfielder }.Decide();
+
+        winger.Action.Should().Be(TickCarrierAction.Shoot);
+        wide.Action.Should().NotBe(TickCarrierAction.Shoot);
+    }
+
+    [Fact]
+    public void A_wide_midfielder_never_tries_his_luck_from_long_range()
+    {
+        TickRoleProfile.ShotMinimumChance(MatchRole.Striker, far: true).Should().Be(TickBallCarrierBrain.LongShotMinimumChance);
+        TickRoleProfile.ShotMinimumChance(MatchRole.WideMidfielder, far: true)
+            .Should().BeGreaterThan(TickBallCarrierBrain.MaximumGoalChance, "no chance a shot can have is enough");
+    }
+
+    [Fact]
+    public void A_wide_midfielder_crosses_from_deeper_and_values_the_cross_more_than_a_winger()
+    {
+        TickRoleProfile.CrossMinimumX(MatchRole.Winger).Should().Be(TickBallCarrierBrain.CrossMinimumX);
+        TickRoleProfile.CrossMinimumX(MatchRole.WideMidfielder).Should().BeLessThan(TickBallCarrierBrain.CrossMinimumX);
+
+        var attackers = Move(OwnHalf, (8, 9_500, 6_300), (9, 9_000, 3_000), (10, 9_000, 4_200));
+        var winger = new Scene(true, 8, attackers, DeepBlock) { CarrierRole = MatchRole.Winger }.Decide();
+        var wide = new Scene(true, 8, attackers, DeepBlock) { CarrierRole = MatchRole.WideMidfielder }.Decide();
+
+        winger.Action.Should().Be(TickCarrierAction.Cross);
+        wide.Action.Should().Be(TickCarrierAction.Cross);
+        wide.Utility.Should().BeGreaterThan(winger.Utility);
+    }
+
+    [Fact]
     public void A_winger_with_nobody_in_the_area_still_crosses_to_the_penalty_spot()
     {
         var decision = new Scene(true, 8, Move(OwnHalf, (8, 9_500, 6_300)), DeepBlock).Decide();
@@ -1047,6 +1086,8 @@ public sealed class TickBallCarrierBrainTests
 
         public int ShieldTicks { get; init; }
 
+        public MatchRole? CarrierRole { get; init; }
+
         public TickAttackingOrder[] Orders { get; init; }
 
         public TickPlayerState[] Attackers { get; }
@@ -1104,13 +1145,16 @@ public sealed class TickBallCarrierBrainTests
                 Passing = Passing,
                 Focus = Focus,
                 Attackers = Attackers,
-                Specs = FourFourTwo,
+                Specs = CarrierRole is null ? FourFourTwo : WithCarrierRole(CarrierRole.Value),
                 Skills = Skills,
                 Defenders = Defenders,
                 CarrierIndex = Carrier,
                 Orders = Orders,
                 ShieldTicks = ShieldTicks,
             };
+
+        private TickAnchorSpec[] WithCarrierRole(MatchRole role) =>
+            [.. FourFourTwo.Select((spec, index) => index == Carrier ? spec with { Role = role } : spec)];
 
         private SpatialPoint Mirror(SpatialPoint point) =>
             _isHome ? point : new SpatialPoint(SpatialPitch.PitchLength - point.X, SpatialPitch.PitchWidth - point.Y);

@@ -101,7 +101,7 @@ internal static class TickRoleProbe
             });
 
             Console.WriteLine($"== tickroles {cell.Name}: {cell.HomeLabel} at home to {cell.AwayLabel}, {matches} matches, seed {seed}; goals {goals / matches:F2}, shots {shots / matches:F1}, home points {homePoints / matches:F2} ==");
-            Console.WriteLine($"  {"group",-30} {"n",3} {"shots",6} {"goals",6} {"cross",6} {"done",6} {"tackle",6} {"won",6} {"pass",6} {"drib",6} {"xWith",6} {"xWout",6} {"ownHf%",6} {"km",6}   (per player per match; x in m from own goal)");
+            Console.WriteLine($"  {"group",-30} {"n",3} {"shots",6} {"fk",6} {"open",6} {"goals",6} {"cross",6} {"done",6} {"tackle",6} {"won",6} {"pass",6} {"drib",6} {"xWith",6} {"xWout",6} {"ownHf%",6} {"km",6}   (per player per match; x in m from own goal)");
 
             foreach (var (key, group) in groups.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
@@ -115,7 +115,7 @@ internal static class TickRoleProbe
                 var ownHalf = group.FramesWithout == 0 ? 0 : 100.0 * group.OutOfPossessionOwnHalf / group.FramesWithout;
                 var km = group.DistanceUnits / UnitsPerMetre / 1_000.0 / players;
 
-                Console.WriteLine($"  {key,-30} {perSlot,3:F0} {Per(group.Shots),6:F2} {Per(group.Goals),6:F2} {Per(group.CrossesAttempted),6:F2} {Per(group.CrossesCompleted),6:F2} {Per(group.TacklesAttempted),6:F2} {Per(group.TacklesWon),6:F2} {Per(group.Passes),6:F1} {Per(group.Dribbles),6:F2} {with,6:F1} {without,6:F1} {ownHalf,6:F1} {km,6:F2}");
+                Console.WriteLine($"  {key,-30} {perSlot,3:F0} {Per(group.Shots),6:F2} {Per(group.FreeKickShots),6:F2} {Per(group.Shots - group.FreeKickShots),6:F2} {Per(group.Goals),6:F2} {Per(group.CrossesAttempted),6:F2} {Per(group.CrossesCompleted),6:F2} {Per(group.TacklesAttempted),6:F2} {Per(group.TacklesWon),6:F2} {Per(group.Passes),6:F1} {Per(group.Dribbles),6:F2} {with,6:F1} {without,6:F1} {ownHalf,6:F1} {km,6:F2}");
                 tsv.Append(CultureInfo.InvariantCulture, $"{cell.Name}\t{key}\t{perSlot:F0}\t{Per(group.Shots):F3}\t{Per(group.Goals):F3}\t{Per(group.CrossesAttempted):F3}\t{Per(group.CrossesCompleted):F3}\t{Per(group.TacklesAttempted):F3}\t{Per(group.TacklesWon):F3}\t{Per(group.Passes):F2}\t{Per(group.Dribbles):F3}\t{with:F2}\t{without:F2}\t{ownHalf:F2}\t{km:F3}\n");
             }
 
@@ -188,6 +188,11 @@ internal static class TickRoleProbe
             if (matchEvent.Type == EngineEventType.Goal)
             {
                 Of(entity).Goals++;
+            }
+
+            if (matchEvent.Type == EngineEventType.FreeKickShot)
+            {
+                Of(entity).FreeKickShots++;
             }
         }
 
@@ -278,6 +283,8 @@ internal static class TickRoleProbe
 
         public long Shots { get; set; }
 
+        public long FreeKickShots { get; set; }
+
         public long Goals { get; set; }
 
         public long CrossesAttempted { get; set; }
@@ -308,6 +315,7 @@ internal static class TickRoleProbe
         {
             Players += other.Players;
             Shots += other.Shots;
+            FreeKickShots += other.FreeKickShots;
             Goals += other.Goals;
             CrossesAttempted += other.CrossesAttempted;
             CrossesCompleted += other.CrossesCompleted;

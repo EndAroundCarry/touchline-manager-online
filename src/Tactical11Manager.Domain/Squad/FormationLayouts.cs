@@ -199,11 +199,11 @@ public static class FormationLayouts
         new(2, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 7_200),
         new(3, PositionFamily.Defence, PlayerRole.CentreBack, 1_700, 5_000),
         new(4, PositionFamily.Defence, PlayerRole.CentreBack, 1_800, 2_800),
-        new(5, PositionFamily.Midfield, PlayerRole.WideMidfielder, 5_000, 8_800),
+        new(5, PositionFamily.Defence, PlayerRole.WingBack, 4_200, 9_200),
         new(6, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_400, 6_200),
         new(7, PositionFamily.Midfield, PlayerRole.CentralMidfielder, 5_400, 3_800),
         new(8, PositionFamily.Attack, PlayerRole.Winger, 8_000, 8_200),
-        new(9, PositionFamily.Midfield, PlayerRole.WideMidfielder, 5_000, 1_200),
+        new(9, PositionFamily.Defence, PlayerRole.WingBack, 4_200, 800),
         new(10, PositionFamily.Attack, PlayerRole.Striker, 8_600, 5_000),
         new(11, PositionFamily.Attack, PlayerRole.Winger, 8_000, 1_800),
     ];

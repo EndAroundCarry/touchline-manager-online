@@ -998,7 +998,9 @@ internal static class TickOffBallSupport
 
                 var spec = situation.Specs[index];
                 var forward = spec.Family == MatchPositionFamily.Attack
-                    || (wideRunners && spec.Family == MatchPositionFamily.Midfield && Math.Abs(spec.OwnY - SpatialPitch.GoalYCenter) >= WideThreshold);
+                    || (spec.Family == MatchPositionFamily.Midfield
+                        && Math.Abs(spec.OwnY - SpatialPitch.GoalYCenter) >= WideThreshold
+                        && (wideRunners || TickRoleProfile.RunsWide(spec.Role, situation.Mentality, situation.Holding)));
 
                 if (!forward)
                 {

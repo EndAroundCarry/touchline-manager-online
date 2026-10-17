@@ -63,6 +63,68 @@ public sealed class TickDefensiveAITests
         orders[3].Target.X.Should().BeLessThan(scene.Attackers[10].X / TickSpatialUnits.FixedScale);
     }
 
+    [Fact]
+    public void A_wide_midfielder_tracks_the_most_advanced_opponent_on_his_flank_and_stands_goal_side_of_him()
+    {
+        var attackers = TrackingScene();
+
+        attackers[5] = new SpatialPoint(4_200, 1_000);
+        attackers[6] = new SpatialPoint(3_700, 1_300);
+        attackers[7] = new SpatialPoint(3_900, 5_800);
+
+        var scene = new Scene(isHome: true, MatchPressing.MidBlock, 5_500, 3_500, attackers, carrier: 9);
+        var orders = scene.Assign();
+
+        orders[5].Role.Should().Be(TickDefensiveRole.Tracker);
+        orders[5].Opponent.Should().Be(6, "the more advanced of the two on his side");
+        orders[5].PaceBasisPoints.Should().Be(TickRoleProfile.TrackPaceBasisPoints);
+        orders[5].Target.X.Should().BeLessThan(scene.Attackers[6].X / TickSpatialUnits.FixedScale, "goal-side of his man, whose goal is at X = 0");
+        orders[8].Role.Should().Be(TickDefensiveRole.Tracker);
+        orders[8].Opponent.Should().Be(7, "the other wide midfielder has the other flank");
+        Roles(orders, TickDefensiveRole.Marker).Should().BeEmpty("nobody in the defensive third needs the back line");
+    }
+
+    [Theory]
+    [InlineData(6_000, 1_000, false, "he is in the opponent's half")]
+    [InlineData(4_200, 3_000, false, "he is not wide")]
+    [InlineData(4_200, 5_900, false, "he is on the other flank")]
+    [InlineData(4_200, 1_000, true, "he has the ball, and the presser has him")]
+    public void A_wide_midfielder_tracks_nobody_who_is_not_on_his_flank_in_his_half_or_free_of_the_ball(int x, int y, bool hasTheBall, string reason)
+    {
+        var attackers = TrackingScene();
+
+        attackers[6] = new SpatialPoint(x, y);
+
+        var carrier = hasTheBall ? 6 : 9;
+        var orders = new Scene(isHome: true, MatchPressing.MidBlock, attackers[carrier].X, attackers[carrier].Y, attackers, carrier).Assign();
+
+        orders[5].Role.Should().NotBe(TickDefensiveRole.Tracker, reason);
+    }
+
+    [Fact]
+    public void A_winger_tracks_nobody_and_is_never_sent_to_screen_a_lane()
+    {
+        var attackers = TrackingScene();
+
+        attackers[5] = new SpatialPoint(4_200, 1_000);
+
+        var scene = new Scene(isHome: true, MatchPressing.MidBlock, 5_500, 3_500, attackers, carrier: 9);
+
+        scene.Assign()[5].Role.Should().Be(TickDefensiveRole.Tracker, "the control: a wide midfielder tracks him");
+        scene.WithRole(5, MatchRole.Winger).Assign()[5].Role.Should().NotBe(TickDefensiveRole.Tracker);
+
+        var control = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
+        var wingers = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
+
+        foreach (var seat in new[] { 5, 6, 7, 8, 9, 10 })
+        {
+            wingers.WithRole(seat, MatchRole.Winger);
+        }
+
+        Roles(control.Assign(), TickDefensiveRole.Screen).Should().NotBeEmpty("the control: midfielders and forwards screen the lanes");
+        Roles(wingers.Assign(), TickDefensiveRole.Screen).Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData(MatchPressing.LowBlock)]
     [InlineData(MatchPressing.MidBlock)]
@@ -737,6 +799,21 @@ public sealed class TickDefensiveAITests
         return -1;
     }
 
+    /// <summary>The attackers of a scene with a central carrier at 55 m and everybody else far from the wing in the opponent's half.</summary>
+    private static SpatialPoint[] TrackingScene()
+    {
+        var attackers = (SpatialPoint[])WingerAtTheByline.Clone();
+
+        attackers[5] = new SpatialPoint(8_000, 3_000);
+        attackers[6] = new SpatialPoint(8_000, 4_000);
+        attackers[7] = new SpatialPoint(8_300, 3_500);
+        attackers[8] = new SpatialPoint(8_300, 2_800);
+        attackers[9] = new SpatialPoint(5_500, 3_500);
+        attackers[10] = new SpatialPoint(8_300, 4_200);
+
+        return attackers;
+    }
+
     private static IEnumerable<int> Roles(TickDefensiveOrder[] orders, TickDefensiveRole role) =>
         orders.Select((order, index) => (order, index)).Where(pair => pair.order.Role == role).Select(pair => pair.index);
 
@@ -940,6 +1017,14 @@ public sealed class TickDefensiveAITests
             copy.Skills = [.. map.Select(index => Skills[index])];
 
             return copy;
+        }
+
+        /// <summary>Gives a seat another role, keeping his family and place.</summary>
+        public Scene WithRole(int seat, MatchRole role)
+        {
+            Specs = [.. Specs.Select((spec, index) => index == seat ? spec with { Role = role } : spec)];
+
+            return this;
         }
 
         public TickDefensiveOrder[] Assign()

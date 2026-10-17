@@ -27,6 +27,9 @@ internal enum TickDefensiveRole
 
     /// <summary>A player standing in the passing lane between the ball and a receiver (a cover shadow).</summary>
     Screen = 6,
+
+    /// <summary>A wide midfielder shadowing the most advanced opponent on his flank (`wide-midfielders`, Milestone 3).</summary>
+    Tracker = 7,
 }
 
 /// <summary>
@@ -332,6 +335,7 @@ internal static class TickDefensiveAI
             AssignMarkers(situation, orders, busy, dealtWith, MatchPositionFamily.Midfield, LowBlockMidfieldMarkers);
         }
 
+        AssignTrackers(situation, orders, busy, dealtWith);
         AssignScreens(situation, orders, busy, dealtWith);
         AssignLine(situation, orders);
         AssignAdjustments(situation, orders);
@@ -575,6 +579,69 @@ internal static class TickDefensiveAI
         }
     }
 
+    /// <summary>
+    /// Sends each wide midfielder not otherwise used after the most advanced opponent on his flank (`wide-midfielders`, Milestone 3): a man
+    /// at least <see cref="TickOffBallSupport.WideThreshold"/> off the middle on his side, in his own half, within
+    /// <see cref="TickRoleProfile.TrackZone"/> of him. He stands <see cref="TickRoleProfile.TrackStandOff"/> goal-side of the man at a jog:
+    /// the follow of the opposing full-back or winger, which a winger does not do.
+    /// </summary>
+    private static void AssignTrackers(
+        in TickDefensiveSituation situation,
+        Span<TickDefensiveOrder> orders,
+        Span<bool> busy,
+        Span<bool> claimed)
+    {
+        var zone = (long)TickSpatialUnits.ToFixed(TickRoleProfile.TrackZone) * TickSpatialUnits.ToFixed(TickRoleProfile.TrackZone);
+        var goalX = situation.IsHome ? 0 : SpatialPitch.PitchLength;
+
+        for (var defender = 0; defender < situation.Defenders.Length; defender++)
+        {
+            if (busy[defender] || !TickRoleProfile.Tracks(situation.Specs[defender].Role))
+            {
+                continue;
+            }
+
+            var side = situation.Anchors[defender].Y >= SpatialPitch.GoalYCenter ? 1 : -1;
+            var man = -1;
+            var manDepth = int.MaxValue;
+
+            for (var attacker = 1; attacker < situation.Attackers.Length; attacker++)
+            {
+                if (claimed[attacker] || attacker == situation.CarrierIndex)
+                {
+                    continue;
+                }
+
+                var y = TickSpatialUnits.ToUnits(situation.Attackers[attacker].Y) - SpatialPitch.GoalYCenter;
+                var depth = Own(TickSpatialUnits.ToUnits(situation.Attackers[attacker].X), situation.IsHome);
+
+                if (y * side < TickOffBallSupport.WideThreshold
+                    || depth > SpatialPitch.PitchLength / 2
+                    || depth >= manDepth
+                    || DistanceSquared(situation.Defenders[defender], situation.Attackers[attacker]) > zone)
+                {
+                    continue;
+                }
+
+                manDepth = depth;
+                man = attacker;
+            }
+
+            if (man < 0)
+            {
+                continue;
+            }
+
+            busy[defender] = true;
+            claimed[man] = true;
+            orders[defender] = new TickDefensiveOrder(
+                TickDefensiveRole.Tracker,
+                RunThrough(situation.Attackers[man], goalX, SpatialPitch.GoalYCenter, TickRoleProfile.TrackStandOff, fromPlayer: true),
+                TickRoleProfile.TrackPaceBasisPoints,
+                man);
+        }
+    }
+
     private static void AssignScreens(
         in TickDefensiveSituation situation,
         Span<TickDefensiveOrder> orders,
@@ -639,7 +706,9 @@ internal static class TickDefensiveAI
             {
                 var family = situation.Specs[defender].Family;
 
-                if (busy[defender] || (family != MatchPositionFamily.Midfield && family != MatchPositionFamily.Attack))
+                if (busy[defender]
+                    || (family != MatchPositionFamily.Midfield && family != MatchPositionFamily.Attack)
+                    || !TickRoleProfile.Screens(situation.Specs[defender].Role))
                 {
                     continue;
                 }

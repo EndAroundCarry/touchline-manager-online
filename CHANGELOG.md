@@ -4,13 +4,21 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Wide midfielders plan, Milestone 3 - the wide midfielder plays his role in the tick engine
+
+- New `Tick/TickRoleProfile.cs` holds every per-role number. With the ball a wide midfielder needs a goal chance of 27% (a winger 17%) to shoot and never shoots from beyond 16 m; he crosses from 68 m (a winger from 75 m) and values a cross 300 points more. He makes the wide runs of a Balanced side too, but not at Defensive or while his side keeps men back for a counter.
+- Without the ball a wide midfielder tracks the most advanced opponent on his flank (at least 18 m off the middle, in his own half, within 25 m of him), standing 15 m goal-side of him at half his top speed (new `TickDefensiveRole.Tracker`). A winger is never sent to screen a lane, so he stays high.
+- Measured (300 matches a cell): 4-4-2 wide midfielders take 0.08 shots a match from open play (a winger 0.84), cross 14.5 times (a winger 11.9), attempt 3.4 tackles (a winger 1.9, a full-back 9.2) and stand 59 m from their goal without the ball (full-back 21 m, winger 77 m). The tick golden output hash is re-pinned.
+- 3-4-3 keeps its wing-backs, as before the left and right midfielders existed: its two wide slots went back to Defence / wing back at X 4,200 (M2 had made them wide midfielders), and the winger does the crossing. A left or right midfielder in a wing-back slot is at home (no out-of-position warning), as a winger or full-back already was. Measured, 3-4-3 v 4-2-3-1: goals 3.63, shots 45.4, home points 1.23 against 3.58, 45.4, 1.27 before the wide midfielders.
+
+
 ## Wide midfielders plan, Milestone 2 - six formations use the wide midfielder, and the role reaches the tick engine
 
-**4-4-2, 4-1-4-1, 4-4-1-1 and 4-5-1 now field a left and a right midfielder where they had wingers, 5-4-1 does where it had its outer central midfielders, and 3-4-3 does where it had wing-backs.** 3-5-2 and 3-4-2-1 keep their wing-backs, and 4-3-3 and 4-2-3-1 keep their wingers. The wide men are in the midfield family now, so they take the midfield's 60 % of the line shift instead of the attack's 30 %. The slot's role is carried into the tick engine (`TickAnchorSpec.Role`) but nothing reads it yet: a wide midfielder plays as any other midfielder until Milestone 3 gives him his own behaviour.
+**4-4-2, 4-1-4-1, 4-4-1-1 and 4-5-1 now field a left and a right midfielder where they had wingers, and 5-4-1 does where it had its outer central midfielders (3-4-3 went the same way in this milestone and was put back to wing-backs in Milestone 3).** 3-5-2 and 3-4-2-1 keep their wing-backs, and 4-3-3 and 4-2-3-1 keep their wingers. The wide men are in the midfield family now, so they take the midfield's 60 % of the line shift instead of the attack's 30 %. The slot's role is carried into the tick engine (`TickAnchorSpec.Role`) but nothing reads it yet: a wide midfielder plays as any other midfielder until Milestone 3 gives him his own behaviour.
 
 ### Changed
 
-- `FormationLayouts`: slots 6 and 9 of 4-4-2 and 4-4-1-1, 7 and 10 of 4-1-4-1, 6 and 10 of 4-5-1, 7 and 10 of 5-4-1 and 5 and 9 of 3-4-3 are `Midfield / WideMidfielder`. 5-4-1's outer men move out from 7,400 / 2,600 to 8,000 / 2,000 (they stood inside the engine's wide threshold, so they never counted as wide), and 3-4-3's from the back line at (4,200, 9,200 / 800) into the midfield line at (5,000, 8,800 / 1,200).
+- `FormationLayouts`: slots 6 and 9 of 4-4-2 and 4-4-1-1, 7 and 10 of 4-1-4-1, 6 and 10 of 4-5-1, 7 and 10 of 5-4-1 (and 5 and 9 of 3-4-3, until Milestone 3) are `Midfield / WideMidfielder`. 5-4-1's outer men move out from 7,400 / 2,600 to 8,000 / 2,000 (they stood inside the engine's wide threshold, so they never counted as wide), and 3-4-3's from the back line at (4,200, 9,200 / 800) into the midfield line at (5,000, 8,800 / 1,200).
 - The match center's formation labels (`MatchLineupBuilder`) read the six shapes by their new roles, so a 4-4-2 is named exactly and not by the fall-back that groups slots by depth.
 - The tick engine's golden input and output hashes are re-pinned (the board 4-4-2 changed); the legacy engine's are not (it plays the test fixture's own shape). The carnage fixture of the film tests uses seed 8 (seed 7 drew no yellow card once the 4-4-2 changed), and one free-kick pack bound is 8.0 where it was 8.5 (the eight-seed sample moved by one player: 8.4).
 
