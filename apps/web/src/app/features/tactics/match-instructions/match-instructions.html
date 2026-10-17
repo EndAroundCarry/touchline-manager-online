@@ -1,0 +1,711 @@
+<section aria-labelledby="match-instructions-heading" data-testid="match-instructions">
+  <h2 id="match-instructions-heading" class="text-lg font-semibold text-ink">Match instructions</h2>
+  <p class="mt-1 max-w-3xl text-sm text-ink-2">
+    Rules you set before the match, which your side carries out when their conditions are met. Each
+    one waits for a minute, a score or an event, then changes the shape, the team instructions or
+    the players on the pitch. A rule fires once, and they are checked in the order listed.
+  </p>
+
+  <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1">
+    <label [class]="checkboxRowClass">
+      <input
+        type="checkbox"
+        [class]="checkboxClass"
+        data-testid="assistant-fatigue"
+        aria-describedby="assistant-fatigue-note"
+        [checked]="draft()?.assistantFatigueSubstitutions ?? true"
+        (change)="onAssistantChange($event)"
+      />
+      <span class="text-sm font-medium text-ink-2">Assistant makes fatigue substitutions</span>
+    </label>
+    <p
+      class="text-sm"
+      [class.text-ink-2]="plannedCount() <= substitutionLimit"
+      [class.text-amber-200]="plannedCount() > substitutionLimit"
+      data-testid="substitution-count"
+    >
+      {{ substitutionsNote() }}
+    </p>
+  </div>
+  <p id="assistant-fatigue-note" class="text-xs text-ink-2">
+    On, your assistant swaps tired players at the usual windows after your instructions have had
+    their say. Off, only your own substitutions are made, and injuries are still covered.
+  </p>
+
+  <div class="mt-4">
+    <button
+      type="button"
+      [class]="secondaryButtonClass"
+      data-testid="add-instruction"
+      aria-controls="instruction-templates"
+      [attr.aria-expanded]="menuOpen()"
+      [disabled]="isFull()"
+      (click)="menuOpen.set(!menuOpen())"
+    >
+      Add instruction
+    </button>
+    <span class="ml-3 text-sm text-ink-2" data-testid="instruction-count"
+      >{{ rules().length }} of {{ maxRules }}</span
+    >
+
+    @if (menuOpen()) {
+      <ul
+        id="instruction-templates"
+        class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
+        role="list"
+        data-testid="template-menu"
+      >
+        @for (template of templates; track template.key) {
+          <li>
+            <button
+              type="button"
+              class="block h-full w-full rounded border border-line-strong bg-panel p-3 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              [attr.data-testid]="'template-' + template.key"
+              (click)="addFrom(template)"
+            >
+              <span class="block text-sm font-semibold text-ink">{{ template.label }}</span>
+              <span class="mt-0.5 block text-xs text-ink-2">{{ template.description }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+
+  @for (message of listProblems(); track message) {
+    <p class="mt-3 text-sm text-red-200" role="alert">{{ message }}</p>
+  }
+
+  @if (ruleViews().length === 0) {
+    <p class="mt-4 rounded border border-dashed border-line-strong p-4 text-sm text-ink-2">
+      No instructions yet. Add one to protect a lead, chase a game, answer a red card or plan a
+      change at a set minute. Without any, your side keeps its shape and instructions all match.
+    </p>
+  } @else {
+    <ol class="mt-4 space-y-3" role="list" data-testid="instruction-list">
+      @for (view of ruleViews(); track view.index) {
+        <li
+          class="rounded border bg-panel"
+          [class.border-line]="view.problems.length === 0"
+          [class.border-red-400]="view.problems.length > 0"
+          [attr.data-testid]="'instruction-' + view.ordinal"
+        >
+          <div class="flex flex-wrap items-start gap-x-3 gap-y-2 p-3">
+            <label class="flex min-h-11 items-center">
+              <input
+                type="checkbox"
+                [class]="checkboxClass"
+                [checked]="view.rule.isEnabled"
+                [attr.aria-label]="'Instruction ' + view.ordinal + ' is on'"
+                [attr.data-testid]="'enabled-' + view.ordinal"
+                (change)="setEnabled(view, $event)"
+              />
+            </label>
+
+            <div class="min-w-0 flex-1" [class.opacity-60]="!view.rule.isEnabled">
+              <button
+                type="button"
+                class="block w-full min-h-11 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                [attr.aria-expanded]="view.isOpen"
+                [attr.aria-controls]="'instruction-editor-' + view.ordinal"
+                [attr.data-testid]="'toggle-' + view.ordinal"
+                (click)="toggle(view.index)"
+              >
+                <span class="block text-sm font-semibold text-ink">
+                  {{ view.ordinal }}. {{ view.rule.name }}
+                  @if (!view.rule.isEnabled) {
+                    <span class="font-normal text-muted">(off)</span>
+                  }
+                </span>
+                <span
+                  class="mt-0.5 block text-sm text-ink-2"
+                  [attr.data-testid]="'summary-' + view.ordinal"
+                  >{{ view.summary }}</span
+                >
+              </button>
+
+              @if (view.isInert) {
+                <p class="mt-1 text-xs text-amber-200">
+                  This instruction changes nothing yet: pick a formation, a team instruction or a
+                  substitution.
+                </p>
+              }
+              @for (message of view.problems; track message) {
+                <p class="mt-1 text-xs text-red-200" role="alert">{{ message }}</p>
+              }
+            </div>
+
+            <div
+              class="flex w-full flex-wrap gap-1 sm:w-auto"
+              role="group"
+              [attr.aria-label]="'Instruction ' + view.ordinal + ' actions'"
+            >
+              <button
+                type="button"
+                [class]="secondaryButtonClass"
+                class="!px-3 !text-xs"
+                [disabled]="view.index === 0"
+                [attr.aria-label]="'Move instruction ' + view.ordinal + ' earlier'"
+                [attr.data-testid]="'up-' + view.ordinal"
+                (click)="move(view.index, -1)"
+              >
+                Earlier
+              </button>
+              <button
+                type="button"
+                [class]="secondaryButtonClass"
+                class="!px-3 !text-xs"
+                [disabled]="view.index === rules().length - 1"
+                [attr.aria-label]="'Move instruction ' + view.ordinal + ' later'"
+                [attr.data-testid]="'down-' + view.ordinal"
+                (click)="move(view.index, 1)"
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                [class]="secondaryButtonClass"
+                class="!px-3 !text-xs"
+                [disabled]="isFull()"
+                [attr.aria-label]="'Duplicate instruction ' + view.ordinal"
+                [attr.data-testid]="'duplicate-' + view.ordinal"
+                (click)="duplicate(view.index)"
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                [class]="secondaryButtonClass"
+                class="!px-3 !text-xs"
+                [attr.aria-label]="'Delete instruction ' + view.ordinal"
+                [attr.data-testid]="'delete-' + view.ordinal"
+                (click)="remove(view.index)"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+
+          @if (view.isOpen) {
+            <div
+              class="grid gap-6 border-t border-line p-3 xl:grid-cols-2"
+              [id]="'instruction-editor-' + view.ordinal"
+              [attr.data-testid]="'editor-' + view.ordinal"
+            >
+              <div>
+                <h3 class="text-sm font-semibold text-ink">When</h3>
+
+                <label class="mt-2 block">
+                  <span class="text-sm font-medium text-ink-2">Name</span>
+                  <input
+                    type="text"
+                    [class]="textInputClass"
+                    [attr.maxlength]="maxNameLength"
+                    [value]="view.rule.name"
+                    data-testid="rule-name"
+                    (input)="setName(view, $event)"
+                  />
+                </label>
+
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                  <label class="block">
+                    <span class="text-sm font-medium text-ink-2">From minute</span>
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      [max]="maxMinute"
+                      [class]="textInputClass"
+                      [value]="view.rule.fromMinute"
+                      data-testid="rule-from"
+                      (input)="setFromMinute(view, $event)"
+                    />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm font-medium text-ink-2">Until minute (optional)</span>
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      [max]="maxMinute"
+                      [class]="textInputClass"
+                      [value]="view.rule.untilMinute ?? ''"
+                      data-testid="rule-until"
+                      (input)="setUntilMinute(view, $event)"
+                    />
+                  </label>
+                </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                  <label class="block">
+                    <span class="text-sm font-medium text-ink-2">Score</span>
+                    <select
+                      [class]="textInputClass"
+                      data-testid="rule-score"
+                      (change)="setScore(view, $event)"
+                    >
+                      @for (option of scoreOptions; track option.value) {
+                        <option
+                          [value]="option.value"
+                          [selected]="option.value === view.rule.score"
+                        >
+                          {{ option.label }}
+                        </option>
+                      }
+                    </select>
+                  </label>
+                  @if (view.rule.score === 'leading' || view.rule.score === 'trailing') {
+                    <label class="block">
+                      <span class="text-sm font-medium text-ink-2">Goals, or more</span>
+                      <input
+                        type="number"
+                        inputmode="numeric"
+                        min="1"
+                        [max]="maxScoreMargin"
+                        [class]="textInputClass"
+                        [value]="view.rule.scoreMargin"
+                        data-testid="rule-margin"
+                        (input)="setScoreMargin(view, $event)"
+                      />
+                    </label>
+                  }
+                </div>
+
+                <label class="mt-3 block">
+                  <span class="text-sm font-medium text-ink-2">And when</span>
+                  <select
+                    [class]="textInputClass"
+                    data-testid="rule-event"
+                    (change)="setEvent(view, $event)"
+                  >
+                    @for (option of eventOptions; track option.value) {
+                      <option [value]="option.value" [selected]="option.value === view.rule.event">
+                        {{ option.label }}
+                      </option>
+                    }
+                  </select>
+                </label>
+
+                @if (takesFamily(view.rule)) {
+                  <label class="mt-3 block">
+                    <span class="text-sm font-medium text-ink-2">Position</span>
+                    <select
+                      [class]="textInputClass"
+                      data-testid="rule-event-family"
+                      (change)="setEventFamily(view, $event)"
+                    >
+                      @for (option of eventFamilies; track option.value) {
+                        <option
+                          [value]="option.value"
+                          [selected]="option.value === (view.rule.eventFamily ?? '')"
+                        >
+                          {{ option.label }}
+                        </option>
+                      }
+                    </select>
+                  </label>
+                }
+
+                @if (view.rule.event === events.playingBadly) {
+                  <label class="mt-3 block">
+                    <span class="text-sm font-medium text-ink-2"
+                      >Rated below (leave empty for the lowest rated of the position)</span
+                    >
+                    <input
+                      type="number"
+                      inputmode="decimal"
+                      min="3"
+                      max="10"
+                      step="0.1"
+                      [class]="textInputClass"
+                      [value]="ratingValue(view.rule)"
+                      data-testid="rule-threshold"
+                      (input)="setRatingThreshold(view, $event)"
+                    />
+                  </label>
+                } @else if (view.rule.event === events.tired) {
+                  <label class="mt-3 block">
+                    <span class="text-sm font-medium text-ink-2">Condition below (percent)</span>
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      max="100"
+                      step="5"
+                      [class]="textInputClass"
+                      [value]="conditionValue(view.rule)"
+                      data-testid="rule-threshold"
+                      (input)="setConditionThreshold(view, $event)"
+                    />
+                  </label>
+                } @else if (takesThreshold(view.rule)) {
+                  <label class="mt-3 block">
+                    <span class="text-sm font-medium text-ink-2">Mentality</span>
+                    <select
+                      [class]="textInputClass"
+                      data-testid="rule-threshold"
+                      (change)="setMentalityThreshold(view, $event)"
+                    >
+                      @for (option of mentalityNumbers; track option.value) {
+                        <option
+                          [value]="option.value"
+                          [selected]="option.value === (view.rule.eventThreshold ?? 2)"
+                        >
+                          {{ option.label }}
+                        </option>
+                      }
+                    </select>
+                  </label>
+                }
+              </div>
+
+              <div>
+                <h3 class="text-sm font-semibold text-ink">Then</h3>
+
+                <label class="mt-2 block">
+                  <span class="text-sm font-medium text-ink-2">Formation</span>
+                  <select
+                    [class]="textInputClass"
+                    data-testid="rule-formation"
+                    (change)="setFormation(view, $event)"
+                  >
+                    <option value="" [selected]="'' === (view.rule.formation ?? '')">
+                      Keep the shape
+                    </option>
+                    @for (code of formationCodes(); track code) {
+                      <option [value]="code" [selected]="code === (view.rule.formation ?? '')">
+                        {{ code }}
+                      </option>
+                    }
+                  </select>
+                </label>
+
+                @if (view.rule.formation !== null) {
+                  @if (starters().length === 0) {
+                    <p class="mt-2 text-sm text-ink-2">
+                      Pick your starting eleven on the Match tactics tab to see where they would
+                      stand in {{ view.rule.formation }}.
+                    </p>
+                  } @else if (shape(); as slots) {
+                    <p class="mt-2 text-sm text-ink-2">
+                      Your eleven fitted into {{ view.rule.formation }}. Select a slot to choose who
+                      stands there; the rest are fitted around your choice. A player who has been
+                      sent off or substituted is replaced in the fit on the day.
+                    </p>
+
+                    <div class="mt-3 flex justify-center">
+                      <div
+                        class="relative aspect-[3/4] w-full max-w-xs theme-dark overflow-hidden rounded-lg border border-line pitch-surface"
+                        data-testid="shape-pitch"
+                      >
+                        <div
+                          class="pointer-events-none absolute left-0 right-0 top-1/2 border-t border-white/50"
+                        ></div>
+                        <div
+                          class="pointer-events-none absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/50"
+                        ></div>
+                        <div
+                          class="pointer-events-none absolute bottom-0 left-1/2 h-7 w-20 -translate-x-1/2 border-x border-t border-white/50"
+                        ></div>
+
+                        @for (slot of slots; track slot.slotNumber) {
+                          <button
+                            type="button"
+                            [class]="shapeSlotClasses(slot)"
+                            [style.left]="slot.style['left']"
+                            [style.bottom]="slot.style['bottom']"
+                            [disabled]="slot.isKeeper"
+                            [attr.aria-pressed]="slot.isSelected"
+                            [attr.aria-label]="slot.label"
+                            [attr.data-testid]="'shape-slot-' + slot.slotNumber"
+                            (click)="selectShapeSlot(slot.slotNumber)"
+                          >
+                            @if (slot.player; as player) {
+                              <span class="max-w-full truncate px-0.5" aria-hidden="true">{{
+                                player.shortName
+                              }}</span>
+                              @if (slot.isChosen) {
+                                <span class="text-[9px] font-normal" aria-hidden="true">set</span>
+                              }
+                            } @else {
+                              <span aria-hidden="true">{{ slot.slotNumber }}</span>
+                              <span class="text-[9px] font-normal" aria-hidden="true">empty</span>
+                            }
+                          </button>
+                        }
+                      </div>
+                    </div>
+
+                    @if (selectedShapeSlot(); as picked) {
+                      <div
+                        class="mt-3"
+                        role="group"
+                        [attr.aria-label]="'Who stands in slot ' + picked.slotNumber"
+                      >
+                        <p class="text-sm text-ink-2" role="status">
+                          Slot {{ picked.slotNumber }} is selected. Choose who stands there:
+                        </p>
+                        <ul class="mt-2 flex flex-wrap gap-2" role="list">
+                          @for (player of starters(); track player.id) {
+                            @if (player.positionFamily !== 'goalkeeper') {
+                              <li>
+                                <button
+                                  type="button"
+                                  [class]="secondaryButtonClass"
+                                  class="!px-3 !text-xs"
+                                  [class.border-accent]="picked.player?.id === player.id"
+                                  [attr.aria-pressed]="picked.player?.id === player.id"
+                                  [attr.aria-label]="placeLabel(player)"
+                                  [attr.data-testid]="'place-' + player.id"
+                                  (click)="placeInSelected(player)"
+                                >
+                                  {{ player.fullName }}
+                                </button>
+                              </li>
+                            }
+                          }
+                        </ul>
+                      </div>
+                    }
+
+                    @if (view.rule.overrides.length > 0) {
+                      <button
+                        type="button"
+                        [class]="linkClass"
+                        data-testid="reset-placements"
+                        (click)="resetPlacements(view)"
+                      >
+                        Reset to best fit
+                      </button>
+                    }
+                  }
+                }
+
+                <h4 class="mt-4 text-sm font-medium text-ink-2">Team instructions</h4>
+                <div class="mt-1 grid grid-cols-2 gap-3">
+                  <label class="block">
+                    <span class="text-sm text-ink-2">Mentality</span>
+                    <select
+                      [class]="textInputClass"
+                      data-testid="rule-mentality"
+                      (change)="setMentalityChoice(view, $event)"
+                    >
+                      @for (option of mentalityChoices; track option.value) {
+                        <option
+                          [value]="option.value"
+                          [selected]="option.value === mentalityChoice(view.rule)"
+                        >
+                          {{ option.label }}
+                        </option>
+                      }
+                    </select>
+                  </label>
+
+                  @for (field of changeFields; track field.key) {
+                    <label class="block">
+                      <span class="text-sm text-ink-2">{{ field.label }}</span>
+                      <select
+                        [class]="textInputClass"
+                        [attr.data-testid]="'rule-' + field.key"
+                        (change)="setChange(view, $any(field.key), $event)"
+                      >
+                        <option value="" [selected]="'' === changeValue(view.rule, field)">
+                          No change
+                        </option>
+                        @for (option of field.options; track option.value) {
+                          <option
+                            [value]="option.value"
+                            [selected]="option.value === changeValue(view.rule, field)"
+                          >
+                            {{ option.label }}
+                          </option>
+                        }
+                      </select>
+                    </label>
+                  }
+
+                  <label class="block">
+                    <span class="text-sm text-ink-2">Counter-attack</span>
+                    <select
+                      [class]="textInputClass"
+                      data-testid="rule-counterAttack"
+                      (change)="setCounterChoice(view, $event)"
+                    >
+                      <option value="" [selected]="'' === counterChoice(view.rule)">
+                        No change
+                      </option>
+                      <option value="on" [selected]="'on' === counterChoice(view.rule)">On</option>
+                      <option value="off" [selected]="'off' === counterChoice(view.rule)">
+                        Off
+                      </option>
+                    </select>
+                  </label>
+                </div>
+
+                <h4 class="mt-4 text-sm font-medium text-ink-2">
+                  Substitutions
+                  <span class="font-normal text-muted"
+                    >({{ view.rule.substitutions.length }} of {{ maxRuleSubstitutions }})</span
+                  >
+                </h4>
+
+                <ul class="mt-1 space-y-3" role="list">
+                  @for (substitution of view.rule.substitutions; track $index; let place = $index) {
+                    <li
+                      class="rounded border border-line-soft p-2"
+                      [attr.data-testid]="'substitution-' + view.ordinal + '-' + (place + 1)"
+                    >
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        <label class="block">
+                          <span class="text-sm text-ink-2">Take off</span>
+                          <select
+                            [class]="textInputClass"
+                            data-testid="sub-off"
+                            (change)="setOff(view, place, $event)"
+                          >
+                            @for (option of offChoicesFor(view.rule); track option.value) {
+                              <option
+                                [value]="option.value"
+                                [selected]="option.value === substitution.off"
+                              >
+                                {{ option.label }}
+                              </option>
+                            }
+                          </select>
+                        </label>
+
+                        @if (substitution.off === 'player') {
+                          <label class="block">
+                            <span class="text-sm text-ink-2">Player off</span>
+                            <select
+                              [class]="textInputClass"
+                              data-testid="sub-off-player"
+                              (change)="setOffPlayer(view, place, $event)"
+                            >
+                              <option value="" [selected]="'' === (substitution.offPlayerId ?? '')">
+                                Choose a player
+                              </option>
+                              @for (choice of offPlayers(substitution); track choice.id) {
+                                <option
+                                  [value]="choice.id"
+                                  [selected]="choice.id === (substitution.offPlayerId ?? '')"
+                                >
+                                  {{ choice.label }}
+                                </option>
+                              }
+                            </select>
+                          </label>
+                        } @else if (substitution.off !== 'subject') {
+                          <label class="block">
+                            <span class="text-sm text-ink-2">Position off</span>
+                            <select
+                              [class]="textInputClass"
+                              data-testid="sub-off-family"
+                              (change)="setOffFamily(view, place, $event)"
+                            >
+                              @for (option of outfieldFamilies; track option.value) {
+                                <option
+                                  [value]="option.value"
+                                  [selected]="
+                                    option.value === (substitution.offFamily ?? 'midfield')
+                                  "
+                                >
+                                  {{ option.label }}
+                                </option>
+                              }
+                            </select>
+                          </label>
+                        }
+
+                        <label class="block">
+                          <span class="text-sm text-ink-2">Bring on</span>
+                          <select
+                            [class]="textInputClass"
+                            data-testid="sub-on"
+                            (change)="setOn(view, place, $event)"
+                          >
+                            @for (option of onOptions; track option.value) {
+                              <option
+                                [value]="option.value"
+                                [selected]="option.value === substitution.on"
+                              >
+                                {{ option.label }}
+                              </option>
+                            }
+                          </select>
+                        </label>
+
+                        @if (substitution.on === 'player') {
+                          <label class="block">
+                            <span class="text-sm text-ink-2">Substitute on</span>
+                            <select
+                              [class]="textInputClass"
+                              data-testid="sub-on-player"
+                              (change)="setOnPlayer(view, place, $event)"
+                            >
+                              <option value="" [selected]="'' === (substitution.onPlayerId ?? '')">
+                                Choose a substitute
+                              </option>
+                              @for (choice of onPlayers(substitution); track choice.id) {
+                                <option
+                                  [value]="choice.id"
+                                  [selected]="choice.id === (substitution.onPlayerId ?? '')"
+                                >
+                                  {{ choice.label }}
+                                </option>
+                              }
+                            </select>
+                          </label>
+                        } @else {
+                          <label class="block">
+                            <span class="text-sm text-ink-2">Position on</span>
+                            <select
+                              [class]="textInputClass"
+                              data-testid="sub-on-family"
+                              (change)="setOnFamily(view, place, $event)"
+                            >
+                              @for (option of outfieldFamilies; track option.value) {
+                                <option
+                                  [value]="option.value"
+                                  [selected]="option.value === (substitution.onFamily ?? 'attack')"
+                                >
+                                  {{ option.label }}
+                                </option>
+                              }
+                            </select>
+                          </label>
+                        }
+                      </div>
+
+                      <button
+                        type="button"
+                        [class]="linkClass"
+                        [attr.aria-label]="
+                          'Remove substitution ' + (place + 1) + ' of instruction ' + view.ordinal
+                        "
+                        (click)="removeSubstitution(view, place)"
+                      >
+                        Remove substitution
+                      </button>
+                    </li>
+                  }
+                </ul>
+
+                <button
+                  type="button"
+                  [class]="secondaryButtonClass"
+                  class="mt-2"
+                  data-testid="add-substitution"
+                  [disabled]="view.rule.substitutions.length >= maxRuleSubstitutions"
+                  (click)="addSubstitution(view)"
+                >
+                  Add substitution
+                </button>
+              </div>
+            </div>
+          }
+        </li>
+      }
+    </ol>
+  }
+</section>

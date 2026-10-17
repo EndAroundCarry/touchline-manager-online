@@ -54,6 +54,97 @@ export interface TacticalBenchSlot {
   readonly assignedPlayer: AssignedPlayer;
 }
 
+/**
+ * One match instruction of a plan: a rule the engine carries out during a match when its conditions hold (`MAT-6`).
+ *
+ * Mirror of `MatchInstructionModel`; the same shape goes up in a save and comes back in a read. All codes are the server's. A client
+ * that changes the kind of event clears the family and threshold the old kind used, because the server refuses an event with a
+ * parameter it does not take.
+ */
+export interface MatchInstruction {
+  /** The manager-facing name, at most 48 characters. */
+  readonly name: string;
+  readonly isEnabled: boolean;
+
+  /** The first minute the instruction may fire in, 0–90. */
+  readonly fromMinute: number;
+
+  /** The last minute it may fire in, or null for the rest of the match. */
+  readonly untilMinute: number | null;
+
+  /** `any`, `leading`, `level`, `trailing`, `not_winning` or `not_losing`. */
+  readonly score: string;
+
+  /** The goal margin for `leading` and `trailing`, 1–5. */
+  readonly scoreMargin: number;
+
+  /** `none`, `own_sent_off`, `opponent_sent_off`, `own_booked`, `playing_badly`, `tired`, `opponent_mentality_at_least` or `_at_most`. */
+  readonly event: string;
+
+  /** The position family the event is narrowed to, or null for any outfield player. */
+  readonly eventFamily: string | null;
+
+  /** A live rating or a condition (basis points), or a mentality number (0 defensive … 4 attacking), by the event. */
+  readonly eventThreshold: number | null;
+
+  /** The formation preset the instruction moves to, or null when it keeps the shape. */
+  readonly formation: string | null;
+
+  /** The manager's own placements in the new shape; the server fits everybody else. */
+  readonly overrides: readonly MatchInstructionOverride[];
+  readonly changes: MatchInstructionChanges;
+
+  /** At most 3. */
+  readonly substitutions: readonly MatchInstructionSubstitution[];
+}
+
+/** A manager's placement of one player in an instruction's new shape. */
+export interface MatchInstructionOverride {
+  readonly playerId: string;
+
+  /** The slot of the new shape he takes, 2–11. */
+  readonly slotNumber: number;
+}
+
+/** The team instructions a match instruction changes: each is a code, or null for no change. */
+export interface MatchInstructionChanges {
+  readonly mentality: string | null;
+
+  /** How many steps to move the mentality after it is set: positive more attacking, negative more defensive, −2…2. */
+  readonly mentalitySteps: number;
+  readonly tempo: string | null;
+  readonly passing: string | null;
+  readonly width: string | null;
+  readonly passFocus: string | null;
+  readonly pressing: string | null;
+  readonly defensiveLine: string | null;
+  readonly tackling: string | null;
+  readonly timeWasting: string | null;
+  readonly counterAttack: boolean | null;
+}
+
+/** One substitution a match instruction makes. */
+export interface MatchInstructionSubstitution {
+  /** `player`, `subject`, `most_tired_in_family` or `lowest_rated_in_family`. */
+  readonly off: string;
+  readonly offPlayerId: string | null;
+  readonly offFamily: string | null;
+
+  /** `player` or `best_fit_in_family`. */
+  readonly on: string;
+  readonly onPlayerId: string | null;
+  readonly onFamily: string | null;
+}
+
+/** Something about a plan's match instructions that deserves a look but does not stop a save. */
+export interface MatchInstructionWarning {
+  /** `INSTRUCTION_DOES_NOTHING`. */
+  readonly code: string;
+
+  /** The instruction's place in the list, from 1. */
+  readonly ordinal: number;
+}
+
 /** One saved tactical plan (`INS-11`). */
 export interface TacticalPlan {
   readonly id: string;
@@ -68,6 +159,13 @@ export interface TacticalPlan {
 
   /** The substitutes the plan names, in slot order. Empty when it names none. */
   readonly bench: readonly TacticalBenchSlot[];
+
+  /** The plan's match instructions, in the order the engine checks them (`MAT-6`). Empty when it has none. */
+  readonly matchInstructions: readonly MatchInstruction[];
+
+  /** Whether the assistant makes the fatigue substitutions at the usual windows. */
+  readonly assistantFatigueSubstitutions: boolean;
+  readonly matchInstructionWarnings: readonly MatchInstructionWarning[];
 }
 
 /** A player who may be assigned to a slot. */
@@ -113,6 +211,9 @@ export interface TacticalPlanIssue {
   readonly code: string;
   readonly slotNumber: number | null;
   readonly playerId: string | null;
+
+  /** The match instruction the issue concerns, by its place in the list from 1 (`MAT-6`). */
+  readonly instructionOrdinal?: number | null;
 }
 
 /** Why a plan was refused, as a validation preview (§10.4). */
@@ -156,4 +257,10 @@ export interface SaveTacticalPlanRequest extends TeamInstructions {
    * one of them a goalkeeper (`SQ-4`): the server answers `BENCH_INCOMPLETE` or `BENCH_NEEDS_GOALKEEPER`.
    */
   readonly bench: readonly TacticalLineupEntryRequest[] | null;
+
+  /** The plan's match instructions, or null to keep the stored ones (`MAT-6`). An empty list clears them. */
+  readonly matchInstructions: readonly MatchInstruction[] | null;
+
+  /** Whether the assistant makes the fatigue substitutions, or null to keep the stored choice. */
+  readonly assistantFatigueSubstitutions: boolean | null;
 }

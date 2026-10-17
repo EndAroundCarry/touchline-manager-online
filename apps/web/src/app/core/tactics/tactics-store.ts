@@ -13,14 +13,20 @@ import {
   isDirty,
   toRequest,
   withAssignment,
+  withAssistantFatigue,
   withBenchAssignment,
   withCounterAttack,
+  withDuplicatedInstruction,
   withFormation,
   withInstruction,
+  withInstructionOrder,
+  withMatchInstruction,
   withName,
   withRole,
+  withoutMatchInstruction,
 } from './tactics-draft';
 import {
+  MatchInstruction,
   SaveTacticalPlanRequest,
   TacticalPlan,
   TacticalPlanIssue,
@@ -213,6 +219,31 @@ export class TacticsStore {
     }
 
     this.edit((draft) => withFormation(draft, formation));
+  }
+
+  /** Replaces the match instruction at an index, or adds it at the end when the index is the list's length (`MAT-6`). */
+  setMatchInstruction(index: number, instruction: MatchInstruction): void {
+    this.edit((draft) => withMatchInstruction(draft, index, instruction));
+  }
+
+  /** Removes the match instruction at an index. */
+  removeMatchInstruction(index: number): void {
+    this.edit((draft) => withoutMatchInstruction(draft, index));
+  }
+
+  /** Moves the match instruction at an index one place earlier or later: the engine checks them in order. */
+  moveMatchInstruction(index: number, delta: -1 | 1): void {
+    this.edit((draft) => withInstructionOrder(draft, index, delta));
+  }
+
+  /** Copies the match instruction at an index to the place after it. */
+  duplicateMatchInstruction(index: number): void {
+    this.edit((draft) => withDuplicatedInstruction(draft, index));
+  }
+
+  /** Switches the assistant's fatigue substitutions on or off. */
+  setAssistantFatigue(on: boolean): void {
+    this.edit((draft) => withAssistantFatigue(draft, on));
   }
 
   /** Assigns a player to a slot: one of the eleven starting places, or a bench place from 12. */

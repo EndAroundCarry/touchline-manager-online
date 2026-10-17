@@ -77,6 +77,9 @@ function plan(): TacticalPlan {
       isOutOfPosition: false,
     })),
     bench: [],
+    matchInstructions: [],
+    assistantFatigueSubstitutions: true,
+    matchInstructionWarnings: [],
   };
 }
 

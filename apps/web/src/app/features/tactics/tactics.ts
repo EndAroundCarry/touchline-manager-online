@@ -1,6 +1,6 @@
 import { DOCUMENT, DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TableModule } from 'primeng/table';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { SkillGroup, skillGroups } from '../../core/squad/position-ratings';
@@ -28,6 +28,10 @@ import {
   roleLabel,
   rolesForFamily,
 } from '../../core/tactics/tactics-presentation';
+import {
+  instructionIssueMessage,
+  isInstructionIssue,
+} from '../../core/tactics/match-instructions-presentation';
 import { RosterRow, buildRoster } from '../../core/tactics/tactics-roster';
 import { TacticsStore } from '../../core/tactics/tactics-store';
 import { BENCH_SIZE, CodedInstructionKey } from '../../core/tactics/tactics-draft';
@@ -44,6 +48,18 @@ import {
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
 import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
+import { MatchInstructions } from './match-instructions/match-instructions';
+
+/** The tactics screen's tabs: the formation and the team instructions, and the rules the engine carries out during the match. */
+export type TacticsTab = 'tactics' | 'instructions';
+
+/** The query parameter that remembers the open tab, so a reload or a shared link lands on the same one. */
+const TAB_PARAMETER = 'tab';
+
+/** The tab each value of the query parameter names. */
+const TAB_BY_PARAMETER: Readonly<Record<string, TacticsTab>> = {
+  instructions: 'instructions',
+};
 
 /** The drag payload for a player row, so a drop on a slot can assign them. */
 const PLAYER_MIME = 'application/x-tactical11-player';
@@ -111,7 +127,14 @@ interface RatingBasis {
  */
 @Component({
   selector: 'app-tactics',
-  imports: [DecimalPipe, RouterLink, TableModule, PlayerSkillsCard, PlayerCardTrigger],
+  imports: [
+    DecimalPipe,
+    RouterLink,
+    TableModule,
+    PlayerSkillsCard,
+    PlayerCardTrigger,
+    MatchInstructions,
+  ],
   templateUrl: './tactics.html',
   host: { class: 'block fit:min-h-0 fit:flex-1' },
 })
@@ -120,6 +143,8 @@ export class Tactics {
   private readonly store = inject(TacticsStore);
   private readonly squadStore = inject(SquadStore);
   private readonly maintenance = inject(MaintenanceStore);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private requestedClubId: string | null = null;
 
   protected readonly draft = this.store.draft;
@@ -138,6 +163,17 @@ export class Tactics {
   protected readonly benchCount = this.store.benchCount;
   protected readonly benchSize = BENCH_SIZE;
   protected readonly tactics = this.store.tactics;
+
+  /** The tabs, in the order they are shown. */
+  protected readonly tabs: readonly { readonly key: TacticsTab; readonly label: string }[] = [
+    { key: 'tactics', label: 'Match tactics' },
+    { key: 'instructions', label: 'Match instructions' },
+  ];
+
+  /** The tab currently open. The address mirrors it (`?tab=instructions`); this is what the page reads. */
+  protected readonly activeTab = signal<TacticsTab>(
+    TAB_BY_PARAMETER[this.route.snapshot.queryParamMap.get(TAB_PARAMETER) ?? ''] ?? 'tactics',
+  );
 
   /** The slot the manager has focused, or 0 when none is. Assigning a player needs a target slot. */
   protected readonly selectedSlot = signal(0);
@@ -266,7 +302,15 @@ export class Tactics {
     ),
   ]);
 
-  /** The refusal's reasons in words, each naming its slot or player. */
+  /** Each player's other positions, which the match instructions' shape preview fits by. */
+  protected readonly secondaryPositions = computed<ReadonlyMap<string, readonly string[]>>(
+    () => new Map((this.squad()?.players ?? []).map((p) => [p.id, p.secondaryPositions])),
+  );
+
+  /** How many match instructions the plan holds, for the tab. */
+  protected readonly instructionCount = computed(() => this.draft()?.matchInstructions.length ?? 0);
+
+  /** The refusal's reasons in words, each naming its slot, player or match instruction. */
   protected readonly issueMessages = computed(() => {
     const validation = this.validation();
 
@@ -277,8 +321,22 @@ export class Tactics {
     const names = new Map(
       this.store.selectablePlayers().map((player) => [player.id, player.fullName]),
     );
+    const rules = this.draft()?.matchInstructions ?? [];
 
-    return validation.issues.map((issue) => issueMessage(issue, names));
+    return validation.issues.map((issue) => {
+      if (!isInstructionIssue(issue.code)) {
+        return issueMessage(issue, names);
+      }
+
+      const ordinal = issue.instructionOrdinal ?? null;
+      const name = ordinal === null ? undefined : rules[ordinal - 1]?.name;
+      const which =
+        ordinal === null
+          ? 'Match instructions'
+          : `Match instruction ${ordinal}${name ? ` (${name})` : ''}`;
+
+      return `${which}: ${instructionIssueMessage(issue, names)}`;
+    });
   });
 
   constructor() {
@@ -298,6 +356,40 @@ export class Tactics {
         error: () => this.detailsError.set(true),
       });
     });
+  }
+
+  /** Opens a tab and records it in the address without adding a history entry. */
+  protected selectTab(tab: TacticsTab): void {
+    this.activeTab.set(tab);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { [TAB_PARAMETER]: tab === 'tactics' ? null : tab },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /** Moves between tabs with the arrow keys, Home and End, as the tabs pattern expects. */
+  protected onTabKeydown(event: KeyboardEvent, index: number): void {
+    const last = this.tabs.length - 1;
+    const target =
+      event.key === 'ArrowRight'
+        ? (index + 1) % this.tabs.length
+        : event.key === 'ArrowLeft'
+          ? (index + last) % this.tabs.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : -1;
+
+    if (target < 0) {
+      return;
+    }
+
+    event.preventDefault();
+    this.selectTab(this.tabs[target].key);
+    this.document.getElementById(`tactics-tab-${this.tabs[target].key}`)?.focus();
   }
 
   /** Selects a slot, or clears the selection when it is already the focused one. */

@@ -7,8 +7,10 @@
  * bindings at the call site.
  */
 
+import { MAX_INSTRUCTION_NAME_LENGTH, MAX_MATCH_INSTRUCTIONS } from './match-instructions';
 import type {
   FormationPreset,
+  MatchInstruction,
   SaveTacticalPlanRequest,
   TacticalLineupEntryRequest,
   TacticalPlan,
@@ -57,6 +59,18 @@ export interface PlanDraft {
 
   /** Always seven places, slots 12–18, filled or not. */
   readonly bench: readonly BenchDraft[];
+
+  /** The plan's match instructions, in the order the engine checks them (`MAT-6`). */
+  readonly matchInstructions: readonly MatchInstruction[];
+
+  /**
+   * Whether the manager has touched the match instructions since the plan was read. A save sends them only then: one that sends none
+   * keeps the stored instructions, so changing the lineup does not make the server judge instructions the manager never opened.
+   */
+  readonly matchInstructionsEdited: boolean;
+
+  /** Whether the assistant makes the fatigue substitutions at the usual windows. */
+  readonly assistantFatigueSubstitutions: boolean;
 }
 
 /** The neutral instructions a new plan starts from (`INS-1`…`INS-8`). */
@@ -105,6 +119,9 @@ export function draftFromPlan(plan: TacticalPlan): PlanDraft {
       playerId: slot.assignedPlayer?.id ?? null,
     })),
     bench: benchOf(new Map(plan.bench.map((place) => [place.slotNumber, place.assignedPlayer.id]))),
+    matchInstructions: plan.matchInstructions,
+    matchInstructionsEdited: false,
+    assistantFatigueSubstitutions: plan.assistantFatigueSubstitutions,
   };
 }
 
@@ -125,6 +142,9 @@ export function draftFromFormation(formation: FormationPreset, name = NEW_PLAN_N
       playerId: null,
     })),
     bench: benchOf(new Map()),
+    matchInstructions: [],
+    matchInstructionsEdited: false,
+    assistantFatigueSubstitutions: true,
   };
 }
 
@@ -232,6 +252,85 @@ export function withCounterAttack(draft: PlanDraft, on: boolean): PlanDraft {
   return { ...draft, instructions: { ...draft.instructions, counterAttack: on } };
 }
 
+/**
+ * Replaces the match instruction at an index, or adds it at the end when the index is the list's length and the plan has room.
+ * Any change marks the instructions as edited, so the next save sends them.
+ */
+export function withMatchInstruction(
+  draft: PlanDraft,
+  index: number,
+  instruction: MatchInstruction,
+): PlanDraft {
+  if (index === draft.matchInstructions.length) {
+    return draft.matchInstructions.length >= MAX_MATCH_INSTRUCTIONS
+      ? draft
+      : {
+          ...draft,
+          matchInstructions: [...draft.matchInstructions, instruction],
+          matchInstructionsEdited: true,
+        };
+  }
+
+  return {
+    ...draft,
+    matchInstructions: draft.matchInstructions.map((current, place) =>
+      place === index ? instruction : current,
+    ),
+    matchInstructionsEdited: true,
+  };
+}
+
+/** Removes the match instruction at an index. */
+export function withoutMatchInstruction(draft: PlanDraft, index: number): PlanDraft {
+  return {
+    ...draft,
+    matchInstructions: draft.matchInstructions.filter((_, place) => place !== index),
+    matchInstructionsEdited: true,
+  };
+}
+
+/** Moves the match instruction at an index one place earlier (`delta` −1) or later (`delta` 1). The engine checks them in this order. */
+export function withInstructionOrder(draft: PlanDraft, index: number, delta: -1 | 1): PlanDraft {
+  const target = index + delta;
+
+  if (
+    index < 0 ||
+    index >= draft.matchInstructions.length ||
+    target < 0 ||
+    target >= draft.matchInstructions.length
+  ) {
+    return draft;
+  }
+
+  const moved = [...draft.matchInstructions];
+
+  [moved[index], moved[target]] = [moved[target], moved[index]];
+
+  return { ...draft, matchInstructions: moved, matchInstructionsEdited: true };
+}
+
+/** Copies the match instruction at an index to the place after it, named as a copy, unless the plan is full. */
+export function withDuplicatedInstruction(draft: PlanDraft, index: number): PlanDraft {
+  const original = draft.matchInstructions[index];
+
+  if (original === undefined || draft.matchInstructions.length >= MAX_MATCH_INSTRUCTIONS) {
+    return draft;
+  }
+
+  const suffix = ' (copy)';
+  const name = `${original.name.slice(0, MAX_INSTRUCTION_NAME_LENGTH - suffix.length)}${suffix}`;
+  const copy = [...draft.matchInstructions];
+
+  copy.splice(index + 1, 0, { ...original, name });
+
+  return { ...draft, matchInstructions: copy, matchInstructionsEdited: true };
+}
+
+/** Switches the assistant's fatigue substitutions on or off. */
+export function withAssistantFatigue(draft: PlanDraft, on: boolean): PlanDraft {
+  return { ...draft, assistantFatigueSubstitutions: on };
+}
+
 /** Renames the plan. */
 export function withName(draft: PlanDraft, name: string): PlanDraft {
   return { ...draft, name };
@@ -286,6 +385,8 @@ export function toRequest(draft: PlanDraft): SaveTacticalPlanRequest {
     })),
     lineup: lineup.length === 0 ? null : lineup,
     bench: bench.length === 0 ? null : bench,
+    matchInstructions: draft.matchInstructionsEdited ? draft.matchInstructions : null,
+    assistantFatigueSubstitutions: draft.assistantFatigueSubstitutions,
   };
 }
 
@@ -301,5 +402,12 @@ export function isDirty(draft: PlanDraft, saved: TacticalPlan | null): boolean {
     return true;
   }
 
-  return JSON.stringify(toRequest(draft)) !== JSON.stringify(toRequest(draftFromPlan(saved)));
+  // The instructions are compared as they stand, whether or not a save would send them: an edit that puts them back as they were is
+  // not a change, and one that does not is, even though the request keeps the stored list when they were never opened.
+  return JSON.stringify(comparable(draft)) !== JSON.stringify(comparable(draftFromPlan(saved)));
+}
+
+/** The request a draft would send, with its match instructions always included so two drafts can be compared. */
+function comparable(draft: PlanDraft): SaveTacticalPlanRequest {
+  return { ...toRequest(draft), matchInstructions: draft.matchInstructions };
 }

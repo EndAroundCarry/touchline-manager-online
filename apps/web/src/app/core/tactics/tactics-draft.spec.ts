@@ -96,6 +96,9 @@ function savedPlan(overrides: Partial<TacticalPlan> = {}): TacticalPlan {
       isOutOfPosition: false,
     })),
     bench: [],
+    matchInstructions: [],
+    assistantFatigueSubstitutions: true,
+    matchInstructionWarnings: [],
     ...overrides,
   };
 }
