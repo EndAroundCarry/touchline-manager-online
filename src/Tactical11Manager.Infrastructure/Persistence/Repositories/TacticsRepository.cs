@@ -32,6 +32,12 @@ internal sealed class TacticsRepository : ITacticsRepository
     public void RemoveBenchSlot(TacticalBenchSlot benchSlot) => _dbContext.TacticalBenchSlots.Remove(benchSlot);
 
     /// <inheritdoc />
+    public void AddInstruction(MatchInstruction instruction) => _dbContext.MatchInstructions.Add(instruction);
+
+    /// <inheritdoc />
+    public void RemoveInstruction(MatchInstruction instruction) => _dbContext.MatchInstructions.Remove(instruction);
+
+    /// <inheritdoc />
     public Task<TacticalPlanRecord?> FindAsync(Guid planId, CancellationToken cancellationToken) =>
         LoadAsync(_dbContext.TacticalPlans.Where(plan => plan.Id == planId), cancellationToken);
 
@@ -62,6 +68,11 @@ internal sealed class TacticsRepository : ITacticsRepository
             .OrderBy(place => place.SlotNumber)
             .ToListAsync(cancellationToken);
 
-        return new TacticalPlanRecord(plan, slots, bench);
+        var instructions = await _dbContext.MatchInstructions
+            .Where(instruction => instruction.PlanId == plan.Id)
+            .OrderBy(instruction => instruction.Ordinal)
+            .ToListAsync(cancellationToken);
+
+        return new TacticalPlanRecord(plan, slots, bench) { Instructions = instructions };
     }
 }

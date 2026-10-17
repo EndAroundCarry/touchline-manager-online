@@ -150,6 +150,110 @@ public static class EngineVocabulary
         };
     }
 
+    /// <summary>Maps a domain mentality to the engine's.</summary>
+    /// <param name="mentality">The mentality.</param>
+    public static MatchMentality MentalityOf(Mentality mentality) => mentality switch
+    {
+        Mentality.Defensive => MatchMentality.Defensive,
+        Mentality.Cautious => MatchMentality.Cautious,
+        Mentality.Balanced => MatchMentality.Balanced,
+        Mentality.Positive => MatchMentality.Positive,
+        Mentality.Attacking => MatchMentality.Attacking,
+        _ => throw new ArgumentOutOfRangeException(nameof(mentality), mentality, "Unknown mentality."),
+    };
+
+    /// <summary>Maps a match instruction's score condition to the engine's.</summary>
+    /// <param name="score">The score condition.</param>
+    public static MatchRuleScore RuleScore(MatchInstructionScore score) => score switch
+    {
+        MatchInstructionScore.Any => MatchRuleScore.Any,
+        MatchInstructionScore.Leading => MatchRuleScore.Leading,
+        MatchInstructionScore.Level => MatchRuleScore.Level,
+        MatchInstructionScore.Trailing => MatchRuleScore.Trailing,
+        MatchInstructionScore.NotWinning => MatchRuleScore.NotWinning,
+        MatchInstructionScore.NotLosing => MatchRuleScore.NotLosing,
+        _ => throw new ArgumentOutOfRangeException(nameof(score), score, "Unknown score condition."),
+    };
+
+    /// <summary>Maps a match instruction's event to the engine's.</summary>
+    /// <param name="value">The event.</param>
+    public static MatchRuleEvent RuleEvent(MatchInstructionEvent value) => value switch
+    {
+        MatchInstructionEvent.None => MatchRuleEvent.None,
+        MatchInstructionEvent.OwnSentOff => MatchRuleEvent.OwnSentOff,
+        MatchInstructionEvent.OpponentSentOff => MatchRuleEvent.OpponentSentOff,
+        MatchInstructionEvent.OwnBooked => MatchRuleEvent.OwnBooked,
+        MatchInstructionEvent.PlayingBadly => MatchRuleEvent.PlayingBadly,
+        MatchInstructionEvent.Tired => MatchRuleEvent.Tired,
+        MatchInstructionEvent.OpponentMentalityAtLeast => MatchRuleEvent.OpponentMentalityAtLeast,
+        MatchInstructionEvent.OpponentMentalityAtMost => MatchRuleEvent.OpponentMentalityAtMost,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown match instruction event."),
+    };
+
+    /// <summary>Maps a match instruction's take-off selector to the engine's.</summary>
+    /// <param name="value">The selector.</param>
+    public static MatchRuleOff RuleOff(MatchInstructionOff value) => value switch
+    {
+        MatchInstructionOff.Player => MatchRuleOff.Player,
+        MatchInstructionOff.Subject => MatchRuleOff.Subject,
+        MatchInstructionOff.MostTiredInFamily => MatchRuleOff.MostTiredInFamily,
+        MatchInstructionOff.LowestRatedInFamily => MatchRuleOff.LowestRatedInFamily,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown take-off selector."),
+    };
+
+    /// <summary>Maps a match instruction's bring-on selector to the engine's.</summary>
+    /// <param name="value">The selector.</param>
+    public static MatchRuleOn RuleOn(MatchInstructionOn value) => value switch
+    {
+        MatchInstructionOn.Player => MatchRuleOn.Player,
+        MatchInstructionOn.BestFitInFamily => MatchRuleOn.BestFitInFamily,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown bring-on selector."),
+    };
+
+    /// <summary>Maps the team instructions a match instruction changes to the engine's.</summary>
+    /// <param name="changes">The changes.</param>
+    /// <returns>The engine's changes, or null when nothing changes.</returns>
+    public static MatchInstructionChangesV1? InstructionChanges(MatchInstructionChanges changes)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+
+        if (changes.IsEmpty)
+        {
+            return null;
+        }
+
+        // Each field goes through the same member-by-member mapping as a plan's own instructions, by laying it over the neutral
+        // set and reading the result back, so there is one mapping of each word and not two.
+        var neutral = TeamInstructionSet.Neutral;
+        var mapped = Instructions(neutral with
+        {
+            Mentality = changes.Mentality ?? neutral.Mentality,
+            Tempo = changes.Tempo ?? neutral.Tempo,
+            Passing = changes.Passing ?? neutral.Passing,
+            Width = changes.Width ?? neutral.Width,
+            PassFocus = changes.PassFocus ?? neutral.PassFocus,
+            Pressing = changes.Pressing ?? neutral.Pressing,
+            DefensiveLine = changes.DefensiveLine ?? neutral.DefensiveLine,
+            Tackling = changes.Tackling ?? neutral.Tackling,
+            TimeWasting = changes.TimeWasting ?? neutral.TimeWasting,
+        });
+
+        return new MatchInstructionChangesV1
+        {
+            Mentality = changes.Mentality is null ? null : mapped.Mentality,
+            MentalitySteps = changes.MentalitySteps,
+            Tempo = changes.Tempo is null ? null : mapped.Tempo,
+            Passing = changes.Passing is null ? null : mapped.Passing,
+            Width = changes.Width is null ? null : mapped.Width,
+            PassFocus = changes.PassFocus is null ? null : mapped.PassFocus,
+            Pressing = changes.Pressing is null ? null : mapped.Pressing,
+            DefensiveLine = changes.DefensiveLine is null ? null : mapped.DefensiveLine,
+            Tackling = changes.Tackling is null ? null : mapped.Tackling,
+            TimeWasting = changes.TimeWasting is null ? null : mapped.TimeWasting,
+            CounterAttack = changes.CounterAttack,
+        };
+    }
+
     /// <summary>Maps a domain event type to the stored one, which mirrors the engine's by value (`MAT-8`).</summary>
     /// <param name="type">The engine's event type.</param>
     public static StoredEventType EventType(EngineEventType type) => type switch
@@ -176,6 +280,7 @@ public static class EngineVocabulary
         EngineEventType.Substitution => StoredEventType.Substitution,
         EngineEventType.FreeKickWon => StoredEventType.FreeKickWon,
         EngineEventType.FreeKickShot => StoredEventType.FreeKickShot,
+        EngineEventType.TacticalChange => StoredEventType.TacticalChange,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown engine event type."),
     };
 

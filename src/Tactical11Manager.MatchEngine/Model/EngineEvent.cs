@@ -76,6 +76,9 @@ public enum EngineEventType
 
     /// <summary>A direct free kick was struck at goal (`engine-v3`).</summary>
     FreeKickShot = 21,
+
+    /// <summary>A side changed its shape or its instructions because one of its match rules fired (`match-instructions-v1`).</summary>
+    TacticalChange = 22,
 }
 
 /// <summary>Why a substitution was made, which the determinant planner records.</summary>
@@ -174,6 +177,24 @@ public sealed record EngineEventV1
 
     /// <summary>Gets where down the pitch the event happened, in normalized coordinates (`engine-v3`).</summary>
     public int? Y { get; init; }
+
+    /// <summary>
+    /// Gets the code of the formation a side moved to, on a <see cref="EngineEventType.TacticalChange"/> that changed the shape
+    /// (`match-instructions-v1`), or null.
+    /// </summary>
+    public string? FormationCode { get; init; }
+
+    /// <summary>
+    /// Gets the mentality a side moved to, on a <see cref="EngineEventType.TacticalChange"/> that changed it (`match-instructions-v1`),
+    /// or null.
+    /// </summary>
+    public MatchMentality? Mentality { get; init; }
+
+    /// <summary>
+    /// Gets the 1-based place in the side's list of the match rule that fired, on a <see cref="EngineEventType.TacticalChange"/>
+    /// (`match-instructions-v1`), so the match centre can name it.
+    /// </summary>
+    public int? RuleOrdinal { get; init; }
 
     /// <summary>Gets whether the event is one of the two halves' boundaries.</summary>
     public bool IsPeriodBoundary =>

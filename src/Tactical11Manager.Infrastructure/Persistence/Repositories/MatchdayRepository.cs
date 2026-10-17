@@ -423,6 +423,17 @@ internal sealed class MatchdayRepository : IMatchdayRepository
                     slot.NormalizedY))
                 .ToListAsync(cancellationToken);
 
+        // The match instructions are read from the same plan as the shape and the team instructions, so a rule always refers to the
+        // formation and the sheet it was written against (MAT-6). Those that are off are carried here and left out by the builder.
+        var matchInstructions = plan is null
+            ? []
+            : (await _dbContext.MatchInstructions
+                .Where(instruction => instruction.PlanId == plan.Id)
+                .OrderBy(instruction => instruction.Ordinal)
+                .ToListAsync(cancellationToken))
+                .Select(instruction => instruction.Definition)
+                .ToList();
+
         var sheet = sheets.FirstOrDefault(candidate => candidate.ClubId == clubId);
 
         var selection = sheet is null
@@ -482,6 +493,8 @@ internal sealed class MatchdayRepository : IMatchdayRepository
                 row.state.MatchSharpnessBp,
                 !unavailableIds.Contains(row.player.Id)))],
             identity.PrimaryColour,
-            identity.SecondaryColour);
+            identity.SecondaryColour,
+            matchInstructions,
+            plan?.AssistantFatigueSubstitutions ?? true);
     }
 }

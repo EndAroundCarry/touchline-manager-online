@@ -2,14 +2,18 @@ using Tactical11Manager.Domain.Squad;
 
 namespace Tactical11Manager.Application.Abstractions.Squad;
 
-/// <summary>A plan, its slots, and its bench, loaded together because none is meaningful alone.</summary>
+/// <summary>A plan, its slots, its bench, and its match instructions, loaded together because none is meaningful alone.</summary>
 /// <param name="Plan">The plan.</param>
 /// <param name="Slots">The plan's eleven slots.</param>
 /// <param name="Bench">The substitutes the plan names, in slot order. Empty when it names none.</param>
 public sealed record TacticalPlanRecord(
     TacticalPlan Plan,
     IReadOnlyList<TacticalSlot> Slots,
-    IReadOnlyList<TacticalBenchSlot> Bench);
+    IReadOnlyList<TacticalBenchSlot> Bench)
+{
+    /// <summary>Gets the plan's match instructions, in the order they are checked. Empty when it has none.</summary>
+    public IReadOnlyList<MatchInstruction> Instructions { get; init; } = [];
+}
 
 /// <summary>
 /// Persistence for the squad module's tactical plans.
@@ -42,6 +46,14 @@ public interface ITacticsRepository
     /// <summary>Stages the removal of a bench place the manager has emptied.</summary>
     /// <param name="benchSlot">The bench place.</param>
     void RemoveBenchSlot(TacticalBenchSlot benchSlot);
+
+    /// <summary>Stages a new match instruction.</summary>
+    /// <param name="instruction">The match instruction.</param>
+    void AddInstruction(MatchInstruction instruction);
+
+    /// <summary>Stages the removal of a match instruction the manager has deleted.</summary>
+    /// <param name="instruction">The match instruction.</param>
+    void RemoveInstruction(MatchInstruction instruction);
 
     /// <summary>Loads a plan and its slots, or returns null if no such plan exists.</summary>
     /// <param name="planId">The plan to load.</param>

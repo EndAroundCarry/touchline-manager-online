@@ -197,6 +197,178 @@ public sealed class TacticsPersistenceTests
         snapshot.SelectablePlayers.Single(player => player.Id == injuredId).IsUnavailable.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task A_plans_match_instructions_survive_a_save_and_a_read_in_order_with_their_lists()
+    {
+        Guid clubId;
+        Guid planId;
+
+        var keeper = Guid.CreateVersion7();
+        var bench = Guid.CreateVersion7();
+
+        var chase = new MatchInstructionDefinition
+        {
+            Name = "Chase the game",
+            FromMinute = 60,
+            UntilMinute = 88,
+            Score = MatchInstructionScore.Trailing,
+            ScoreMargin = 2,
+            Event = MatchInstructionEvent.Tired,
+            EventFamily = PositionFamily.Midfield,
+            EventThreshold = 6_000,
+            Formation = FormationPreset.ThreeFourThree,
+            Overrides = [new MatchInstructionOverride(keeper, 9)],
+            Changes = new MatchInstructionChanges
+            {
+                Mentality = Mentality.Positive,
+                MentalitySteps = 1,
+                Tempo = Tempo.High,
+                Passing = PassingStyle.DirectPassing,
+                Width = Width.Wide,
+                PassFocus = PassFocus.Wings,
+                Pressing = Pressing.HighPress,
+                DefensiveLine = DefensiveLine.High,
+                Tackling = TacklingStyle.Aggressive,
+                TimeWasting = TimeWasting.Off,
+                CounterAttack = false,
+            },
+            Substitutions =
+            [
+                new MatchInstructionSubstitution(MatchInstructionOff.Player, keeper, null, MatchInstructionOn.Player, bench, null),
+                new MatchInstructionSubstitution(
+                    MatchInstructionOff.LowestRatedInFamily, null, PositionFamily.Attack, MatchInstructionOn.BestFitInFamily, null, PositionFamily.Attack),
+            ],
+        };
+        var protect = new MatchInstructionDefinition { Name = "Protect the lead", FromMinute = 70, Score = MatchInstructionScore.Leading };
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+            (clubId, _) = await ArrangeAsync(seeding);
+
+            var plan = TacticalPlan.Create(
+                Guid.CreateVersion7(), clubId, "With rules", FormationPreset.FourFourTwo, Instructions(), true, DateTimeOffset.UnixEpoch,
+                assistantFatigueSubstitutions: false);
+
+            planId = plan.Id;
+            db.TacticalPlans.Add(plan);
+            db.MatchInstructions.Add(MatchInstruction.Place(Guid.CreateVersion7(), plan.Id, 2, protect, DateTimeOffset.UnixEpoch));
+            db.MatchInstructions.Add(MatchInstruction.Place(Guid.CreateVersion7(), plan.Id, 1, chase, DateTimeOffset.UnixEpoch));
+            await db.SaveChangesAsync();
+        }
+
+        await using var reading = _fixture.CreateScope();
+        var readDb = reading.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var stored = await readDb.MatchInstructions.AsNoTracking().Where(instruction => instruction.PlanId == planId)
+            .OrderBy(instruction => instruction.Ordinal).ToListAsync();
+
+        stored.Select(instruction => instruction.Name).Should().Equal("Chase the game", "Protect the lead");
+        stored[0].Definition.Should().BeEquivalentTo(chase);
+        stored[1].Definition.Should().BeEquivalentTo(protect);
+
+        // The lists are real jsonb, which the database can look into.
+        var overridden = await readDb.Database
+            .SqlQuery<int>($"select count(*)::int as \"Value\" from squad.tactical_plan_instructions where plan_id = {planId} and overrides @> {$"[{{\"playerId\":\"{keeper}\"}}]"}::jsonb")
+            .SingleAsync();
+
+        overridden.Should().Be(1);
+
+        // The repository hands the plan back with its instructions, in order, and with the assistant setting.
+        var repository = reading.ServiceProvider.GetRequiredService<ITacticsRepository>();
+        var record = await repository.FindAsync(planId, CancellationToken.None);
+
+        record!.Plan.AssistantFatigueSubstitutions.Should().BeFalse();
+        record.Instructions.Select(instruction => instruction.Ordinal).Should().Equal(1, 2);
+
+        var queries = reading.ServiceProvider.GetRequiredService<ITacticsQueries>();
+        var snapshot = await queries.GetTacticsAsync(clubId, CancellationToken.None);
+
+        snapshot!.Plans.Single().MatchInstructions.Should().BeEquivalentTo([chase, protect], options => options.WithStrictOrdering());
+        snapshot.Plans.Single().AssistantFatigueSubstitutions.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_plan_without_instructions_has_the_assistant_on_and_no_rows()
+    {
+        Guid clubId;
+
+        await using (var seeding = _fixture.CreateScope())
+        {
+            var db = seeding.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+            (clubId, _) = await ArrangeAsync(seeding);
+
+            db.TacticalPlans.Add(Plan(clubId, isDefault: true));
+            await db.SaveChangesAsync();
+        }
+
+        await using var reading = _fixture.CreateScope();
+        var queries = reading.ServiceProvider.GetRequiredService<ITacticsQueries>();
+
+        var snapshot = await queries.GetTacticsAsync(clubId, CancellationToken.None);
+
+        snapshot!.Plans.Single().MatchInstructions.Should().BeEmpty();
+        snapshot.Plans.Single().AssistantFatigueSubstitutions.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Two_instructions_cannot_share_a_place_in_a_plan()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var (clubId, _) = await ArrangeAsync(scope);
+        var plan = Plan(clubId, isDefault: true);
+
+        db.TacticalPlans.Add(plan);
+        db.MatchInstructions.Add(MatchInstruction.Place(Guid.CreateVersion7(), plan.Id, 1, new MatchInstructionDefinition { Name = "One" }, _fixture.Clock.UtcNow));
+        db.MatchInstructions.Add(MatchInstruction.Place(Guid.CreateVersion7(), plan.Id, 1, new MatchInstructionDefinition { Name = "Two" }, _fixture.Clock.UtcNow));
+
+        var act = async () => await db.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateException>("a plan's list has one instruction in each place");
+    }
+
+    [Theory]
+    [InlineData(95, null, 1, 0)]
+    [InlineData(60, 59, 1, 0)]
+    [InlineData(60, null, 6, 0)]
+    [InlineData(60, null, 1, 3)]
+    [InlineData(60, null, 1, -3)]
+    public async Task The_database_refuses_an_instruction_that_breaks_the_rules_the_domain_validator_enforces(
+        int from,
+        int? until,
+        int margin,
+        int steps)
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var (clubId, _) = await ArrangeAsync(scope);
+        var plan = Plan(clubId, isDefault: true);
+
+        db.TacticalPlans.Add(plan);
+        db.MatchInstructions.Add(MatchInstruction.Place(
+            Guid.CreateVersion7(),
+            plan.Id,
+            1,
+            new MatchInstructionDefinition
+            {
+                Name = "Out of bounds",
+                FromMinute = from,
+                UntilMinute = until,
+                ScoreMargin = margin,
+                Changes = new MatchInstructionChanges { MentalitySteps = steps },
+            },
+            _fixture.Clock.UtcNow));
+
+        var act = async () => await db.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateException>("the check constraints back the validator");
+    }
+
     private static TeamInstructionSet Instructions() => new()
     {
         Mentality = Mentality.Balanced,

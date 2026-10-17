@@ -95,7 +95,93 @@ public sealed class SaveTacticalPlanRequestValidator : AbstractValidator<SaveTac
                 entry.RuleFor(candidate => candidate.PlayerId).NotEmpty();
             });
         });
+
+        When(request => request.MatchInstructions is not null, () =>
+        {
+            // Only what a field can be wrong about: a code that names nothing, a name that is empty or too long, a list
+            // that is too long. Whether a minute is in range, an event has the parameter it needs, or a named player is in
+            // the plan's lineup is the domain validator's, so a club's AI plan is held to the same rules (INS-12).
+            RuleFor(request => request.MatchInstructions!)
+                .Must(instructions => instructions.Count <= MatchInstruction.MaxPerPlan)
+                .WithMessage($"A plan has at most {MatchInstruction.MaxPerPlan} match instructions.");
+
+            RuleForEach(request => request.MatchInstructions!).ChildRules(instruction =>
+            {
+                instruction.RuleFor(candidate => candidate.Name)
+                    .NotEmpty().WithMessage("Give the instruction a name.")
+                    .MaximumLength(MatchInstruction.MaxNameLength);
+                instruction.RuleFor(candidate => candidate.Score).Must(IsScore).WithMessage("Unknown score condition.");
+                instruction.RuleFor(candidate => candidate.Event).Must(IsEvent).WithMessage("Unknown event.");
+                instruction.RuleFor(candidate => candidate.EventFamily).Must(IsPositionFamilyOrNone)
+                    .WithMessage("Unknown position family.");
+                instruction.RuleFor(candidate => candidate.Formation).Must(IsFormationPresetOrNone)
+                    .WithMessage("Choose a supported formation.");
+
+                instruction.When(candidate => candidate.Changes is not null, () =>
+                {
+                    instruction.RuleFor(candidate => candidate.Changes.Mentality).Must(IsMentalityOrNone)
+                        .WithMessage("Unknown mentality.");
+                    instruction.RuleFor(candidate => candidate.Changes.Tempo).Must(IsTempoOrNone).WithMessage("Unknown tempo.");
+                    instruction.RuleFor(candidate => candidate.Changes.Passing).Must(IsPassingOrNone)
+                        .WithMessage("Unknown passing style.");
+                    instruction.RuleFor(candidate => candidate.Changes.Width).Must(IsWidthOrNone).WithMessage("Unknown width.");
+                    instruction.RuleFor(candidate => candidate.Changes.PassFocus).Must(IsPassFocusOrNone)
+                        .WithMessage("Unknown pass focus.");
+                    instruction.RuleFor(candidate => candidate.Changes.Pressing).Must(IsPressingOrNone)
+                        .WithMessage("Unknown pressing scheme.");
+                    instruction.RuleFor(candidate => candidate.Changes.DefensiveLine).Must(IsDefensiveLineOrNone)
+                        .WithMessage("Unknown defensive line.");
+                    instruction.RuleFor(candidate => candidate.Changes.Tackling).Must(IsTacklingOrNone)
+                        .WithMessage("Unknown tackling style.");
+                    instruction.RuleFor(candidate => candidate.Changes.TimeWasting).Must(IsTimeWastingOrNone)
+                        .WithMessage("Unknown time-wasting setting.");
+                });
+
+                instruction.When(candidate => candidate.Substitutions is not null, () =>
+                {
+                    instruction.RuleForEach(candidate => candidate.Substitutions).ChildRules(substitution =>
+                    {
+                        substitution.RuleFor(candidate => candidate.Off).Must(IsOff).WithMessage("Unknown selector.");
+                        substitution.RuleFor(candidate => candidate.On).Must(IsOn).WithMessage("Unknown selector.");
+                        substitution.RuleFor(candidate => candidate.OffFamily).Must(IsPositionFamilyOrNone)
+                            .WithMessage("Unknown position family.");
+                        substitution.RuleFor(candidate => candidate.OnFamily).Must(IsPositionFamilyOrNone)
+                            .WithMessage("Unknown position family.");
+                    });
+                });
+            });
+        });
     }
+
+    private static bool IsScore(string? code) => IsKnown(MatchInstructionCodes.ScoreFromCode, code);
+
+    private static bool IsEvent(string? code) => IsKnown(MatchInstructionCodes.EventFromCode, code);
+
+    private static bool IsOff(string? code) => IsKnown(MatchInstructionCodes.OffFromCode, code);
+
+    private static bool IsOn(string? code) => IsKnown(MatchInstructionCodes.OnFromCode, code);
+
+    private static bool IsPositionFamilyOrNone(string? code) => code is null || IsPositionFamily(code);
+
+    private static bool IsFormationPresetOrNone(string? code) => code is null || IsFormationPreset(code);
+
+    private static bool IsMentalityOrNone(string? code) => code is null || IsMentality(code);
+
+    private static bool IsTempoOrNone(string? code) => code is null || IsTempo(code);
+
+    private static bool IsPassingOrNone(string? code) => code is null || IsPassing(code);
+
+    private static bool IsWidthOrNone(string? code) => code is null || IsWidth(code);
+
+    private static bool IsPassFocusOrNone(string? code) => code is null || IsPassFocus(code);
+
+    private static bool IsPressingOrNone(string? code) => code is null || IsPressing(code);
+
+    private static bool IsDefensiveLineOrNone(string? code) => code is null || IsDefensiveLine(code);
+
+    private static bool IsTacklingOrNone(string? code) => code is null || IsTackling(code);
+
+    private static bool IsTimeWastingOrNone(string? code) => code is null || IsTimeWasting(code);
 
     private static bool IsFormationPreset(string? code) =>
         IsKnown(FormationPresets.FromCode, code);

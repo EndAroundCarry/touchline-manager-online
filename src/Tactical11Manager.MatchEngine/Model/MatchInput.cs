@@ -227,6 +227,12 @@ public sealed record MatchSideV1
     /// <summary>Gets the team instructions.</summary>
     public required MatchInstructionsV1 Instructions { get; init; }
 
+    /// <summary>
+    /// Gets the side's match plan: the rules the tick engine carries out during the match, and whether the assistant still makes the
+    /// fatigue substitutions (`match-instructions-v1`). The default plan is empty and leaves the match as it was.
+    /// </summary>
+    public MatchPlanV1 MatchPlan { get; init; } = MatchPlanV1.None;
+
     /// <summary>Gets the participants named in the eleven slots, matched by identity.</summary>
     /// <returns>The starters, in slot-number order.</returns>
     public IReadOnlyList<MatchParticipantV1> Starters()
@@ -459,6 +465,191 @@ public sealed record MatchInputV1
         {
             throw new InvalidMatchInputException(
                 $"{label} must field exactly one recognised goalkeeper in the eleven (SQ-2).");
+        }
+
+        ValidatePlan(side.MatchPlan, label, participantIds);
+    }
+
+    private static void ValidatePlan(MatchPlanV1 plan, string label, HashSet<Guid> participantIds)
+    {
+        if (plan is null)
+        {
+            throw new InvalidMatchInputException($"{label} has no match plan; an empty one is MatchPlanV1.None.");
+        }
+
+        if (plan.Rules.Count > MatchPlanV1.MaxRules)
+        {
+            throw new InvalidMatchInputException(
+                $"{label}'s plan has {plan.Rules.Count} rules, more than the {MatchPlanV1.MaxRules} permitted.");
+        }
+
+        var ordinals = new HashSet<int>();
+
+        foreach (var rule in plan.Rules)
+        {
+            ValidateRule(rule, label, participantIds, ordinals);
+        }
+    }
+
+    private static void ValidateRule(MatchRuleV1 rule, string label, HashSet<Guid> participantIds, HashSet<int> ordinals)
+    {
+        var name = $"{label}'s rule {rule.Ordinal}";
+
+        if (rule.Ordinal < 1 || !ordinals.Add(rule.Ordinal))
+        {
+            throw new InvalidMatchInputException($"{name} needs a place in the list that is at least 1 and not used by another rule.");
+        }
+
+        if (rule.FromMinute is < 0 or > MatchRuleV1.MaxMinute
+            || (rule.UntilMinute is { } until && (until < rule.FromMinute || until > MatchRuleV1.MaxMinute)))
+        {
+            throw new InvalidMatchInputException(
+                $"{name} runs from minute {rule.FromMinute} until {rule.UntilMinute?.ToString() ?? "the end"}, which is not within 0..{MatchRuleV1.MaxMinute}.");
+        }
+
+        if (!Enum.IsDefined(rule.Score) || !Enum.IsDefined(rule.Event))
+        {
+            throw new InvalidMatchInputException($"{name} has a score condition or an event that is not known.");
+        }
+
+        if (rule.ScoreMargin is < 1 or > MatchRuleV1.MaxScoreMargin)
+        {
+            throw new InvalidMatchInputException($"{name} asks for a margin of {rule.ScoreMargin} goals, outside 1..{MatchRuleV1.MaxScoreMargin}.");
+        }
+
+        ValidateRuleEvent(rule, name);
+        ValidateRuleShape(rule, name, participantIds);
+
+        if (rule.Instructions is { } changes
+            && (changes.MentalitySteps is < -MatchInstructionChangesV1.MaxMentalitySteps or > MatchInstructionChangesV1.MaxMentalitySteps
+                || (changes.Mentality is { } mentality && !Enum.IsDefined(mentality))))
+        {
+            throw new InvalidMatchInputException(
+                $"{name} moves the mentality by {changes.MentalitySteps} steps, outside +-{MatchInstructionChangesV1.MaxMentalitySteps}, or names one that is not known.");
+        }
+
+        if (rule.Substitutions.Count > MatchPlanV1.MaxSubstitutionsPerRule)
+        {
+            throw new InvalidMatchInputException(
+                $"{name} makes {rule.Substitutions.Count} substitutions, more than the {MatchPlanV1.MaxSubstitutionsPerRule} permitted.");
+        }
+
+        foreach (var substitution in rule.Substitutions)
+        {
+            ValidateRuleSubstitution(substitution, name, rule.Event, participantIds);
+        }
+    }
+
+    private static void ValidateRuleEvent(MatchRuleV1 rule, string name)
+    {
+        switch (rule.Event)
+        {
+            case MatchRuleEvent.PlayingBadly when rule.EventThreshold is null && rule.EventFamily is null:
+                throw new InvalidMatchInputException($"{name} waits for a player playing badly, so it needs a rating threshold or a family.");
+
+            case MatchRuleEvent.Tired when rule.EventThreshold is not { } condition || condition is < 0 or > Configuration.EngineRulesV2.Certain:
+                throw new InvalidMatchInputException($"{name} waits for a tired player, so it needs a condition threshold within 0..{Configuration.EngineRulesV2.Certain}.");
+
+            case MatchRuleEvent.OpponentMentalityAtLeast or MatchRuleEvent.OpponentMentalityAtMost
+                when rule.EventThreshold is not { } level || !Enum.IsDefined((MatchMentality)level):
+                throw new InvalidMatchInputException($"{name} waits on the opponent's mentality, so it needs a mentality as its threshold.");
+        }
+
+        if (rule.EventFamily is { } family && !Enum.IsDefined(family))
+        {
+            throw new InvalidMatchInputException($"{name} names a family that is not known.");
+        }
+    }
+
+    private static void ValidateRuleShape(MatchRuleV1 rule, string name, HashSet<Guid> participantIds)
+    {
+        if (rule.Slots is null)
+        {
+            if (rule.Overrides.Count > 0)
+            {
+                throw new InvalidMatchInputException($"{name} places players in a shape but does not change the shape.");
+            }
+
+            return;
+        }
+
+        if (rule.Slots.Count != StartersOnPitch)
+        {
+            throw new InvalidMatchInputException($"{name} has a new shape of {rule.Slots.Count} slots; a shape has exactly {StartersOnPitch}.");
+        }
+
+        var numbers = new HashSet<int>();
+        var places = new HashSet<(int X, int Y)>();
+
+        foreach (var slot in rule.Slots)
+        {
+            if (slot.SlotNumber is < 1 or > StartersOnPitch || !numbers.Add(slot.SlotNumber))
+            {
+                throw new InvalidMatchInputException($"{name}'s new shape has slot number {slot.SlotNumber}, which is outside 1..{StartersOnPitch} or repeated.");
+            }
+
+            if (slot.Role.FamilyOf() != slot.Family)
+            {
+                throw new InvalidMatchInputException($"{name}'s new slot {slot.SlotNumber} asks for {slot.Role}, which is not a {slot.Family} role (TAC-8).");
+            }
+
+            if (slot.X is < 0 or > Configuration.EngineRulesV2.SlotCoordinateScale
+                || slot.Y is < 0 or > Configuration.EngineRulesV2.SlotCoordinateScale
+                || !places.Add((slot.X, slot.Y)))
+            {
+                throw new InvalidMatchInputException($"{name}'s new slot {slot.SlotNumber} is outside the pitch or shares its place with another (TAC-9).");
+            }
+        }
+
+        var keeperSlots = rule.Slots.Where(slot => slot.Family == MatchPositionFamily.Goalkeeper).Select(slot => slot.SlotNumber).ToList();
+
+        if (keeperSlots is not [1])
+        {
+            throw new InvalidMatchInputException($"{name}'s new shape must have the goalkeeper, and only him, in slot 1.");
+        }
+
+        var placed = new HashSet<Guid>();
+        var taken = new HashSet<int>();
+
+        foreach (var placement in rule.Overrides)
+        {
+            if (!participantIds.Contains(placement.ParticipantId)
+                || !placed.Add(placement.ParticipantId)
+                || !taken.Add(placement.SlotNumber)
+                || placement.SlotNumber is < 2 or > StartersOnPitch)
+            {
+                throw new InvalidMatchInputException(
+                    $"{name} places participant {placement.ParticipantId} in slot {placement.SlotNumber}, which is a stranger, a repeat, or not an outfield slot.");
+            }
+        }
+    }
+
+    private static void ValidateRuleSubstitution(MatchRuleSubstitutionV1 substitution, string name, MatchRuleEvent trigger, HashSet<Guid> participantIds)
+    {
+        if (!Enum.IsDefined(substitution.Off) || !Enum.IsDefined(substitution.On))
+        {
+            throw new InvalidMatchInputException($"{name} has a substitution with a selector that is not known.");
+        }
+
+        var offIsNamed = substitution.Off == MatchRuleOff.Player;
+        var offIsSubject = substitution.Off == MatchRuleOff.Subject;
+        var onIsNamed = substitution.On == MatchRuleOn.Player;
+
+        if ((offIsNamed && (substitution.OffParticipantId is not { } off || !participantIds.Contains(off)))
+            || (onIsNamed && (substitution.OnParticipantId is not { } on || !participantIds.Contains(on))))
+        {
+            throw new InvalidMatchInputException($"{name} has a substitution that names a player who is not in the squad.");
+        }
+
+        if ((!offIsNamed && !offIsSubject && substitution.OffFamily is null)
+            || (!onIsNamed && substitution.OnFamily is null))
+        {
+            throw new InvalidMatchInputException($"{name} has a substitution that picks from a family without naming it.");
+        }
+
+        if (offIsSubject && trigger is not (MatchRuleEvent.OwnBooked or MatchRuleEvent.PlayingBadly or MatchRuleEvent.Tired))
+        {
+            throw new InvalidMatchInputException($"{name} takes off the player its event is about, but its event is about nobody.");
         }
     }
 }

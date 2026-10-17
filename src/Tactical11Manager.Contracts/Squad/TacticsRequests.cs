@@ -85,6 +85,19 @@ public sealed record SaveTacticalPlanRequest
     /// <c>BENCH_NEEDS_GOALKEEPER</c> rather than saving a bench that cannot cover an injured keeper.
     /// </remarks>
     public IReadOnlyList<TacticalLineupEntryRequest>? Bench { get; init; }
+
+    /// <summary>
+    /// Gets the plan's match instructions, or null to keep the ones it has (`MAT-6`).
+    /// </summary>
+    /// <remarks>
+    /// The whole list, in the order the engine checks it: a list sent replaces the stored one, and an empty list clears it. At most ten.
+    /// </remarks>
+    public IReadOnlyList<MatchInstructionModel>? MatchInstructions { get; init; }
+
+    /// <summary>
+    /// Gets whether the assistant makes the fatigue substitutions at the usual windows, or null to keep the plan's setting (on for a new plan).
+    /// </summary>
+    public bool? AssistantFatigueSubstitutions { get; init; }
 }
 
 /// <summary>One slot's layout in a submitted plan (`TAC-7`…`TAC-9`).</summary>

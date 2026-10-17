@@ -481,7 +481,7 @@ internal sealed class TickReplaySynthesizer
             // A booking carried over from a stretch the film skipped says nothing about this passage.
             var inPlay = item.Events
                 .Where(matchEvent => !matchEvent.IsPeriodBoundary
-                    && matchEvent.Type != EngineEventType.Substitution
+                    && matchEvent.Type is not (EngineEventType.Substitution or EngineEventType.TacticalChange)
                     && !(matchEvent.Type == EngineEventType.YellowCard && _eventFrame.GetValueOrDefault(matchEvent.Sequence) < item.First))
                 .ToList();
 

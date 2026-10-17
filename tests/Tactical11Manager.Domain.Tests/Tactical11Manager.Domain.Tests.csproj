@@ -23,4 +23,8 @@
     <ProjectReference Include="..\..\src\Tactical11Manager.Domain\Tactical11Manager.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\shared\shape-fit-cases.json" Link="shape-fit-cases.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

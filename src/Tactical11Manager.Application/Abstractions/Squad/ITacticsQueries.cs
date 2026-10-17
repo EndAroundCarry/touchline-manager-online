@@ -54,7 +54,14 @@ public sealed record TacticsPlanRow(
     bool IsDefault,
     long Version,
     IReadOnlyList<TacticsSlotRow> Slots,
-    IReadOnlyList<TacticsBenchRow> Bench);
+    IReadOnlyList<TacticsBenchRow> Bench)
+{
+    /// <summary>Gets the plan's match instructions, in the order they are checked. Empty when it has none.</summary>
+    public IReadOnlyList<MatchInstructionDefinition> MatchInstructions { get; init; } = [];
+
+    /// <summary>Gets whether the assistant makes the fatigue substitutions at the usual windows.</summary>
+    public bool AssistantFatigueSubstitutions { get; init; } = true;
+}
 
 /// <summary>A player who may be assigned to a slot.</summary>
 /// <param name="Id">The player identity.</param>

@@ -174,4 +174,64 @@ public sealed class CommentaryTests
         tokens.Should().OnlyContain(token => token.StoppageMinute >= 0);
         tokens.Should().OnlyContain(token => token.Minute >= 1 && token.Minute <= 90);
     }
+
+    [Fact]
+    public void A_tactical_change_names_the_club_and_what_it_changed_to()
+    {
+        var input = TestMatchFactory.Even();
+        var result = MatchSimulator.Simulate(input);
+        var clubName = input.Home.ClubName;
+
+        EngineEventV1 Change(int sequence, string? formation, MatchMentality? mentality) => result.Events[^1] with
+        {
+            Sequence = sequence,
+            Type = EngineEventType.TacticalChange,
+            Side = MatchSide.Home,
+            ClubId = input.Home.ClubId,
+            ParticipantId = null,
+            SecondaryParticipantId = null,
+            FormationCode = formation,
+            Mentality = mentality,
+            RuleOrdinal = 1,
+        };
+
+        var last = result.Events[^1].Sequence;
+        var withBoth = Change(last + 1, "4-2-4", MatchMentality.Attacking);
+        var withNeither = Change(last + 2, null, null);
+        var edited = result with { Events = [.. result.Events, withBoth, withNeither] };
+
+        var tokens = CommentaryTokenBuilder.Build(input, edited);
+        var both = tokens.Single(token => token.EventSequence == withBoth.Sequence);
+        var neither = tokens.Single(token => token.EventSequence == withNeither.Sequence);
+
+        both.TemplateKey.Should().Be("match.tactical_change");
+        both.Text.Should().Contain(clubName);
+        neither.TemplateKey.Should().Be("match.tactical_change");
+        neither.Text.Should().Contain(clubName).And.NotContain("{").And.NotContain("4-2-4");
+
+        for (var sequence = last + 1; sequence < last + 40; sequence++)
+        {
+            var variant = CommentaryTokenBuilder.Build(input, result with { Events = [.. result.Events, Change(sequence, "4-2-4", MatchMentality.Attacking)] })
+                .Single(token => token.EventSequence == sequence);
+
+            variant.Text.Should().Contain(clubName).And.NotContain("{").And.NotContain("a team-mate");
+        }
+    }
+
+    [Fact]
+    public void A_tactical_substitution_has_its_own_line_that_names_both_players()
+    {
+        var input = TestMatchFactory.Even();
+        var result = MatchSimulator.Simulate(input);
+        var substitution = result.Events.First(matchEvent => matchEvent.Type == EngineEventType.Substitution);
+        var tactical = substitution with { SubstitutionReason = MatchSubstitutionReason.Tactical };
+        var edited = result with { Events = [.. result.Events.Select(matchEvent => matchEvent == substitution ? tactical : matchEvent)] };
+
+        var token = CommentaryTokenBuilder.Build(input, edited).Single(candidate => candidate.EventSequence == tactical.Sequence);
+        var squad = input.SideOf(tactical.Side).Squad;
+
+        token.TemplateKey.Should().Be("match.substitution.tactical");
+        token.Text.Should().Contain(squad.Single(participant => participant.ParticipantId == tactical.ParticipantId).DisplayName);
+        token.Text.Should().Contain(squad.Single(participant => participant.ParticipantId == tactical.SecondaryParticipantId).DisplayName);
+    }
 }

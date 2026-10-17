@@ -76,7 +76,10 @@ internal sealed partial class TickMatchLoop
     private TickFrameFlags _pendingFlags;
     private bool _celebrationScorerIsHome;
 
-    private TickMatchLoop(MatchState state)
+    /// <summary>Gets the two teams, home then away, which the tests look at.</summary>
+    internal IReadOnlyList<TickTeam> Teams => _teams;
+
+    internal TickMatchLoop(MatchState state)
     {
         _state = state;
         _rules = state.Rules;
@@ -199,11 +202,20 @@ internal sealed partial class TickMatchLoop
         }
     }
 
-    /// <summary>The interval: the legs and the fatigue recover and the bench is looked at.</summary>
-    private void TakeInterval()
+    /// <summary>
+    /// The interval: the sides' match rules are looked at while the legs are still as the half left them, then the legs and the fatigue
+    /// recover.
+    /// </summary>
+    internal void TakeInterval()
     {
         _machine.BeginHalfTime();
         PushConditions();
+
+        if (MatchPlanRunner.HasRules(_state))
+        {
+            MatchPlanRunner.ConsiderBothSides(_state);
+            AdoptRuntimeChanges();
+        }
 
         foreach (var team in _teams)
         {
@@ -380,20 +392,30 @@ internal sealed partial class TickMatchLoop
 
     /// <summary>
     /// Play has stopped: the possession engine's planners get their chance. A card has already taken a player off (the discipline
-    /// rules remove him), an injured player is replaced or leaves, and a tired one is changed if a window has opened.
+    /// rules remove him), an injured player is replaced or leaves, the sides' match rules are carried out, and a tired player is
+    /// changed if a window has opened.
     /// </summary>
     private void Stoppage()
     {
         PushConditions();
         _state.MoveBall(new SpatialPoint(_ball.UnitX, _ball.UnitY), _ball.UnitZ);
-        SubstitutionPlanner.ConsiderBothSides(_state);
+        SubstitutionPlanner.ConsiderBothSides(_state, applyMatchPlans: true);
         _state.LastPlannerMinute = _state.Minute;
+        AdoptRuntimeChanges();
+    }
 
+    /// <summary>
+    /// Brings both teams into line with their runtimes after the planners have worked: substitutes take their seats, a new shape moves the
+    /// anchors, new instructions change the style, and what depends on both teams is worked out again.
+    /// </summary>
+    private void AdoptRuntimeChanges()
+    {
         var changed = false;
 
         foreach (var team in _teams)
         {
             changed |= team.Sync(_recording);
+            changed |= team.AdoptPlanChanges();
         }
 
         if (changed)

@@ -44,6 +44,9 @@ public sealed record TacticsResponse(
 /// <param name="IsComplete">Whether all eleven slots name a player.</param>
 /// <param name="Slots">The eleven slots, in slot order.</param>
 /// <param name="Bench">The substitutes the plan names, in slot order (12–18). Empty when it names none.</param>
+/// <param name="MatchInstructions">The plan's match instructions, in the order the engine checks them (`MAT-6`). Empty when it has none.</param>
+/// <param name="AssistantFatigueSubstitutions">Whether the assistant makes the fatigue substitutions at the usual windows.</param>
+/// <param name="MatchInstructionWarnings">What deserves a look in the match instructions but did not stop the save.</param>
 public sealed record TacticalPlanResponse(
     Guid Id,
     string Name,
@@ -54,7 +57,10 @@ public sealed record TacticalPlanResponse(
     int AssignedCount,
     bool IsComplete,
     IReadOnlyList<TacticalSlotResponse> Slots,
-    IReadOnlyList<TacticalBenchSlotResponse> Bench);
+    IReadOnlyList<TacticalBenchSlotResponse> Bench,
+    IReadOnlyList<MatchInstructionModel> MatchInstructions,
+    bool AssistantFatigueSubstitutions,
+    IReadOnlyList<MatchInstructionWarningResponse> MatchInstructionWarnings);
 
 /// <summary>One substitute on a saved plan's bench (`SQ-4`).</summary>
 /// <param name="SlotNumber">The bench slot number, 12–18.</param>
@@ -174,7 +180,11 @@ public sealed record TacticalPlanValidationResponse(
 /// <param name="Code">The stable issue code, e.g. <c>DUPLICATE_PLAYER</c>.</param>
 /// <param name="SlotNumber">The slot the issue concerns, when it concerns one.</param>
 /// <param name="PlayerId">The player the issue concerns, when it concerns one.</param>
+/// <param name="InstructionOrdinal">
+/// The match instruction the issue concerns, by its place in the list from 1, when it concerns one (`MAT-6`).
+/// </param>
 public sealed record TacticalPlanIssueResponse(
     string Code,
     int? SlotNumber,
-    Guid? PlayerId);
+    Guid? PlayerId,
+    int? InstructionOrdinal = null);

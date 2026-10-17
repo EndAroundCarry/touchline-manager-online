@@ -9,6 +9,7 @@ using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Match;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Infrastructure.Persistence;
 using Tactical11Manager.MatchEngine;
 using Tactical11Manager.MatchEngine.Configuration;
@@ -189,6 +190,102 @@ public sealed class MatchdayWorkflowTests
         stopwatch.Elapsed.Should().BeLessThan(
             TimeSpan.FromSeconds(2),
             "a nine-fixture round is the unit the matchday worker runs (§7.4)");
+    }
+
+    [Fact]
+    public async Task A_clubs_match_instructions_are_frozen_with_its_side_and_carried_out_in_the_match()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var matchdayId = await ClaimRoundAsync(scope);
+        var fixture = (await FixturesOfAsync(db, matchdayId)).First();
+        var now = DateTimeOffset.UnixEpoch;
+
+        // The home club's default plan: a 4-4-2 that moves to 3-4-3 and presses higher at the first stoppage, and swaps a
+        // tired midfielder after half-time.
+        var plan = TacticalPlan.Create(
+            Guid.CreateVersion7(), fixture.HomeClubId, "Instructed", FormationPreset.FourFourTwo, TeamInstructionSet.Neutral, true, now);
+
+        var slots = FormationLayouts.DefaultSlots(FormationPreset.FourFourTwo)
+            .Select(slot => TacticalSlot.Place(
+                Guid.CreateVersion7(), plan.Id, slot.SlotNumber, slot.PositionFamily, slot.Role, slot.NormalizedX, slot.NormalizedY, null, now))
+            .ToList();
+
+        var instructions = new[]
+        {
+            MatchInstruction.Place(
+                Guid.CreateVersion7(),
+                plan.Id,
+                1,
+                new MatchInstructionDefinition
+                {
+                    Name = "Open up",
+                    Formation = FormationPreset.ThreeFourThree,
+                    Changes = new MatchInstructionChanges { MentalitySteps = 1, Pressing = Pressing.HighPress },
+                },
+                now),
+            MatchInstruction.Place(
+                Guid.CreateVersion7(),
+                plan.Id,
+                2,
+                new MatchInstructionDefinition
+                {
+                    Name = "Fresh midfield",
+                    FromMinute = 46,
+                    Substitutions =
+                    [
+                        new MatchInstructionSubstitution(
+                            MatchInstructionOff.MostTiredInFamily, null, PositionFamily.Midfield,
+                            MatchInstructionOn.BestFitInFamily, null, PositionFamily.Midfield),
+                    ],
+                },
+                now),
+        };
+
+        db.TacticalPlans.Add(plan);
+        db.TacticalSlots.AddRange(slots);
+        db.MatchInstructions.AddRange(instructions);
+        await db.SaveChangesAsync();
+
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<LockMatchday>()
+                .ExecuteAsync(matchdayId, CancellationToken.None);
+
+            var stored = await db.InputSnapshots.AsNoTracking().SingleAsync(snapshot => snapshot.FixtureId == fixture.Id);
+            var content = MatchSnapshotDocument.Read(stored.SnapshotJson);
+
+            content.Input.Home.MatchPlan.Rules.Select(rule => rule.Ordinal).Should().Equal(1, 2);
+            content.Input.Home.MatchPlan.Rules[0].FormationCode.Should().Be("3-4-3");
+            content.Input.Home.MatchPlan.Rules[0].Slots.Should().HaveCount(11);
+            content.Input.Home.MatchPlan.Rules[0].Instructions!.Pressing.Should().Be(MatchEngine.Model.MatchPressing.HighPress);
+            content.Input.Home.MatchPlan.Rules[1].Substitutions.Should().ContainSingle();
+            content.Input.Away.MatchPlan.HasContent.Should().BeFalse("the visitors have no plan");
+
+            var resolved = await scope.ServiceProvider.GetRequiredService<ResolveMatchday>()
+                .ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
+
+            resolved.Outcome.Should().Be(ResolveMatchdayOutcome.Resolved);
+            resolved.Simulated.Should().Be(9);
+
+            var matchId = await db.Matches.Where(match => match.FixtureId == fixture.Id).Select(match => match.Id).SingleAsync();
+
+            var changes = await db.MatchEvents.AsNoTracking()
+                .Where(@event => @event.MatchId == matchId && @event.Type == MatchEventType.TacticalChange)
+                .ToListAsync();
+
+            changes.Should().NotBeEmpty("a rule that asks for nothing but the minute fires at the first stoppage, and at half-time at the latest");
+            changes.Should().OnlyContain(@event => @event.ClubId == fixture.HomeClubId, "only the home club has a plan");
+        }
+        finally
+        {
+            // The club keeps playing in later rounds that other tests claim: leave it with no plan, as the world was seeded.
+            db.MatchInstructions.RemoveRange(instructions);
+            db.TacticalSlots.RemoveRange(slots);
+            await db.SaveChangesAsync();
+            db.TacticalPlans.Remove(plan);
+            await db.SaveChangesAsync();
+        }
     }
 
     [Fact]

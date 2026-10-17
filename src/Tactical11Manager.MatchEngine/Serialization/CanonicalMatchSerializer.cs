@@ -165,6 +165,82 @@ public static class CanonicalMatchSerializer
             lines.Add(Field($"{prefix}.y", slot.Y));
             lines.Add(Field($"{prefix}.participantId", slot.ParticipantId));
         }
+
+        WritePlan(lines, label, side.MatchPlan);
+    }
+
+    /// <summary>
+    /// Writes a side's match plan, and writes nothing for a side whose plan says nothing, so that every snapshot made before match
+    /// instructions existed keeps its hash. The rules are written in the order the plan lists them, because that order is the order they
+    /// are checked in; everything else is in a fixed order of its own.
+    /// </summary>
+    private static void WritePlan(List<string> lines, string label, MatchPlanV1 plan)
+    {
+        if (!plan.HasContent)
+        {
+            return;
+        }
+
+        lines.Add($"plan.{label}");
+        lines.Add(Field($"{label}.plan.assistantFatigueSubstitutions", plan.AssistantFatigueSubstitutions));
+        lines.Add(Field($"{label}.plan.rules", plan.Rules.Count));
+
+        foreach (var rule in plan.Rules)
+        {
+            var prefix = $"{label}.plan.rule.{rule.Ordinal}";
+
+            lines.Add($"plan.rule.{label}.{rule.Ordinal}");
+            lines.Add(Field($"{prefix}.fromMinute", rule.FromMinute));
+            lines.Add(Field($"{prefix}.untilMinute", rule.UntilMinute));
+            lines.Add(Field($"{prefix}.score", (int)rule.Score));
+            lines.Add(Field($"{prefix}.scoreMargin", rule.ScoreMargin));
+            lines.Add(Field($"{prefix}.event", (int)rule.Event));
+            lines.Add(Field($"{prefix}.eventFamily", rule.EventFamily is null ? null : (int)rule.EventFamily.Value));
+            lines.Add(Field($"{prefix}.eventThreshold", rule.EventThreshold));
+            lines.Add(Field($"{prefix}.formation", rule.FormationCode ?? "-"));
+
+            foreach (var slot in (rule.Slots ?? []).OrderBy(slot => slot.SlotNumber))
+            {
+                var slotPrefix = $"{prefix}.slot.{slot.SlotNumber}";
+
+                lines.Add(Field($"{slotPrefix}.family", (int)slot.Family));
+                lines.Add(Field($"{slotPrefix}.role", (int)slot.Role));
+                lines.Add(Field($"{slotPrefix}.x", slot.X));
+                lines.Add(Field($"{slotPrefix}.y", slot.Y));
+            }
+
+            foreach (var placement in rule.Overrides.OrderBy(placement => placement.SlotNumber))
+            {
+                lines.Add(Field($"{prefix}.override.{placement.SlotNumber}", placement.ParticipantId));
+            }
+
+            var changes = rule.Instructions ?? new MatchInstructionChangesV1();
+
+            lines.Add(Field($"{prefix}.mentality", changes.Mentality is null ? null : (int)changes.Mentality.Value));
+            lines.Add(Field($"{prefix}.mentalitySteps", changes.MentalitySteps));
+            lines.Add(Field($"{prefix}.tempo", changes.Tempo is null ? null : (int)changes.Tempo.Value));
+            lines.Add(Field($"{prefix}.passing", changes.Passing is null ? null : (int)changes.Passing.Value));
+            lines.Add(Field($"{prefix}.width", changes.Width is null ? null : (int)changes.Width.Value));
+            lines.Add(Field($"{prefix}.passFocus", changes.PassFocus is null ? null : (int)changes.PassFocus.Value));
+            lines.Add(Field($"{prefix}.pressing", changes.Pressing is null ? null : (int)changes.Pressing.Value));
+            lines.Add(Field($"{prefix}.defensiveLine", changes.DefensiveLine is null ? null : (int)changes.DefensiveLine.Value));
+            lines.Add(Field($"{prefix}.tackling", changes.Tackling is null ? null : (int)changes.Tackling.Value));
+            lines.Add(Field($"{prefix}.timeWasting", changes.TimeWasting is null ? null : (int)changes.TimeWasting.Value));
+            lines.Add(Field($"{prefix}.counterAttack", changes.CounterAttack is null ? null : changes.CounterAttack.Value ? 1 : 0));
+
+            for (var index = 0; index < rule.Substitutions.Count; index++)
+            {
+                var substitution = rule.Substitutions[index];
+                var subPrefix = $"{prefix}.substitution.{index + 1}";
+
+                lines.Add(Field($"{subPrefix}.off", (int)substitution.Off));
+                lines.Add(Field($"{subPrefix}.offParticipantId", substitution.OffParticipantId));
+                lines.Add(Field($"{subPrefix}.offFamily", substitution.OffFamily is null ? null : (int)substitution.OffFamily.Value));
+                lines.Add(Field($"{subPrefix}.on", (int)substitution.On));
+                lines.Add(Field($"{subPrefix}.onParticipantId", substitution.OnParticipantId));
+                lines.Add(Field($"{subPrefix}.onFamily", substitution.OnFamily is null ? null : (int)substitution.OnFamily.Value));
+            }
+        }
     }
 
     private static string CanonicalResultText(MatchResultV1 result)
@@ -201,6 +277,14 @@ public static class CanonicalMatchSerializer
             lines.Add(Field($"{prefix}.substitutionReason", matchEvent.SubstitutionReason is null ? null : (int)matchEvent.SubstitutionReason.Value));
             lines.Add(Field($"{prefix}.x", matchEvent.X));
             lines.Add(Field($"{prefix}.y", matchEvent.Y));
+
+            // Only a tactical change carries these, and only it writes them: every other event hashes exactly as it did before they existed.
+            if (matchEvent.Type == EngineEventType.TacticalChange)
+            {
+                lines.Add(Field($"{prefix}.formation", matchEvent.FormationCode ?? "-"));
+                lines.Add(Field($"{prefix}.mentality", matchEvent.Mentality is null ? null : (int)matchEvent.Mentality.Value));
+                lines.Add(Field($"{prefix}.ruleOrdinal", matchEvent.RuleOrdinal));
+            }
         }
 
         foreach (var line in result.PlayerLines.OrderBy(line => line.ClubId).ThenBy(line => line.ParticipantId))

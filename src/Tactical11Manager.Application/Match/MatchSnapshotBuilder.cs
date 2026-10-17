@@ -269,6 +269,8 @@ public static class MatchSnapshotBuilder
             Slots = [.. Slots(selection, slots, placed)],
         };
 
+        side = side with { MatchPlan = BuildPlan(source, [.. side.Squad.Select(participant => participant.ParticipantId)]) };
+
         // A repair knows which player took the slot it opened, including the ones whose club choice was
         // rejected — the replacement is chosen in pass two, after the rejection was recorded.
         var completed = repairs
@@ -280,6 +282,127 @@ public static class MatchSnapshotBuilder
             .ToList();
 
         return new BuiltSide(side, completed);
+    }
+
+    /// <summary>
+    /// Turns the plan's match instructions into the engine's match plan (`MAT-6`).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A side whose plan has no enabled instruction and leaves the assistant on gets <see cref="MatchPlanV1.None"/>, which is what every side
+    /// had before the feature, so its snapshot hashes as it always did. An instruction that is off is left out, and the ones that remain keep
+    /// the place the manager gave them (so the match event can say which rule fired).
+    /// </para>
+    /// <para>
+    /// The squad is who this sheet fields: its eleven and its bench. A placement or a named substitution that refers to anyone else is dropped,
+    /// because the engine refuses a plan that names a stranger and the club can no longer do anything about it at lock time. An instruction that
+    /// ends up changing nothing is dropped too.
+    /// </para>
+    /// </remarks>
+    private static MatchPlanV1 BuildPlan(ClubSideSource source, HashSet<Guid> squad)
+    {
+        var rules = new List<MatchRuleV1>();
+        var instructions = source.MatchInstructions ?? [];
+
+        for (var index = 0; index < instructions.Count && rules.Count < MatchPlanV1.MaxRules; index++)
+        {
+            if (!instructions[index].IsEnabled)
+            {
+                continue;
+            }
+
+            if (BuildRule(instructions[index], index + 1, squad) is { } rule)
+            {
+                rules.Add(rule);
+            }
+        }
+
+        return rules.Count == 0 && source.AssistantFatigueSubstitutions
+            ? MatchPlanV1.None
+            : new MatchPlanV1 { Rules = rules, AssistantFatigueSubstitutions = source.AssistantFatigueSubstitutions };
+    }
+
+    private static MatchRuleV1? BuildRule(MatchInstructionDefinition instruction, int ordinal, HashSet<Guid> squad)
+    {
+        // The opponent's mentality arrives as the domain's number and leaves as the engine's.
+        int? threshold = instruction.EventThreshold;
+
+        if (instruction.Event is MatchInstructionEvent.OpponentMentalityAtLeast or MatchInstructionEvent.OpponentMentalityAtMost)
+        {
+            if (threshold is not { } level || !Enum.IsDefined((Mentality)level))
+            {
+                return null;
+            }
+
+            threshold = (int)EngineVocabulary.MentalityOf((Mentality)level);
+        }
+
+        List<MatchSlotV1>? slots = instruction.Formation is { } formation
+            ? [.. FormationLayouts.DefaultSlots(formation).Select(slot => new MatchSlotV1
+            {
+                SlotNumber = slot.SlotNumber,
+                Family = EngineVocabulary.Family(slot.PositionFamily),
+                Role = EngineVocabulary.Role(slot.Role),
+                X = slot.NormalizedX,
+                Y = slot.NormalizedY,
+
+                // The new shape is a set of places, not of people: the engine fits whoever is on the pitch when the rule fires.
+                ParticipantId = Guid.Empty,
+            })]
+            : null;
+
+        var placed = new HashSet<Guid>();
+        var taken = new HashSet<int>();
+
+        var overrides = slots is null
+            ? []
+            : instruction.Overrides
+                .Where(placement => squad.Contains(placement.PlayerId)
+                    && placement.SlotNumber is > TacticalSlot.FirstSlotNumber and <= TacticalSlot.LastSlotNumber
+                    && placed.Add(placement.PlayerId)
+                    && taken.Add(placement.SlotNumber))
+                .Select(placement => new MatchSlotOverrideV1(placement.PlayerId, placement.SlotNumber))
+                .ToList();
+
+        var substitutions = instruction.Substitutions
+            .Where(substitution =>
+                (substitution.Off != MatchInstructionOff.Player || (substitution.OffPlayerId is { } off && squad.Contains(off)))
+                && (substitution.On != MatchInstructionOn.Player || (substitution.OnPlayerId is { } on && squad.Contains(on))))
+            .Take(MatchPlanV1.MaxSubstitutionsPerRule)
+            .Select(substitution => new MatchRuleSubstitutionV1
+            {
+                Off = EngineVocabulary.RuleOff(substitution.Off),
+                OffParticipantId = substitution.Off == MatchInstructionOff.Player ? substitution.OffPlayerId : null,
+                OffFamily = substitution.OffFamily is { } offFamily ? EngineVocabulary.Family(offFamily) : null,
+                On = EngineVocabulary.RuleOn(substitution.On),
+                OnParticipantId = substitution.On == MatchInstructionOn.Player ? substitution.OnPlayerId : null,
+                OnFamily = substitution.OnFamily is { } onFamily ? EngineVocabulary.Family(onFamily) : null,
+            })
+            .ToList();
+
+        var changes = EngineVocabulary.InstructionChanges(instruction.Changes ?? MatchInstructionChanges.None);
+
+        if (slots is null && changes is null && substitutions.Count == 0)
+        {
+            return null;
+        }
+
+        return new MatchRuleV1
+        {
+            Ordinal = ordinal,
+            FromMinute = instruction.FromMinute,
+            UntilMinute = instruction.UntilMinute,
+            Score = EngineVocabulary.RuleScore(instruction.Score),
+            ScoreMargin = instruction.ScoreMargin,
+            Event = EngineVocabulary.RuleEvent(instruction.Event),
+            EventFamily = instruction.EventFamily is { } family ? EngineVocabulary.Family(family) : null,
+            EventThreshold = threshold,
+            FormationCode = instruction.Formation?.ToCode(),
+            Slots = slots,
+            Overrides = overrides,
+            Instructions = changes,
+            Substitutions = substitutions,
+        };
     }
 
     private static IEnumerable<MatchSlotV1> Slots(

@@ -1,0 +1,1371 @@
+{
+  "description": "Cases for the shape fit, shared by the engine, the domain and the web app. A player's slot is where he stands now; expected maps player to the new slot number; a player missing from expected was not placed.",
+  "cases": [
+    {
+      "name": "the same shape keeps everyone where he is",
+      "players": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "position": "Goalkeeper",
+          "secondary": [],
+          "slot": {
+            "family": "Goalkeeper",
+            "role": "Goalkeeper",
+            "x": 500,
+            "y": 5000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "position": "RightBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 8000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000003",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 6000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000004",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 4000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000005",
+          "position": "LeftBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 2000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000006",
+          "position": "RightMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 8300
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000007",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000008",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 3800
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000009",
+          "position": "LeftMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 1700
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000010",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000011",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 3800
+          }
+        }
+      ],
+      "newSlots": [
+        {
+          "slot": 1,
+          "family": "Goalkeeper",
+          "role": "Goalkeeper",
+          "x": 500,
+          "y": 5000
+        },
+        {
+          "slot": 2,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 8000
+        },
+        {
+          "slot": 3,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 6000
+        },
+        {
+          "slot": 4,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 4000
+        },
+        {
+          "slot": 5,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 2000
+        },
+        {
+          "slot": 6,
+          "family": "Midfield",
+          "role": "WideMidfielder",
+          "x": 5800,
+          "y": 8300
+        },
+        {
+          "slot": 7,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 6200
+        },
+        {
+          "slot": 8,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 3800
+        },
+        {
+          "slot": 9,
+          "family": "Midfield",
+          "role": "WideMidfielder",
+          "x": 5800,
+          "y": 1700
+        },
+        {
+          "slot": 10,
+          "family": "Attack",
+          "role": "Striker",
+          "x": 8200,
+          "y": 6200
+        },
+        {
+          "slot": 11,
+          "family": "Attack",
+          "role": "Striker",
+          "x": 8200,
+          "y": 3800
+        }
+      ],
+      "overrides": {},
+      "expected": {
+        "00000000-0000-0000-0000-000000000001": 1,
+        "00000000-0000-0000-0000-000000000002": 2,
+        "00000000-0000-0000-0000-000000000003": 3,
+        "00000000-0000-0000-0000-000000000004": 4,
+        "00000000-0000-0000-0000-000000000005": 5,
+        "00000000-0000-0000-0000-000000000006": 6,
+        "00000000-0000-0000-0000-000000000007": 7,
+        "00000000-0000-0000-0000-000000000008": 8,
+        "00000000-0000-0000-0000-000000000009": 9,
+        "00000000-0000-0000-0000-000000000010": 10,
+        "00000000-0000-0000-0000-000000000011": 11
+      }
+    },
+    {
+      "name": "four-four-two to four-three-three",
+      "players": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "position": "Goalkeeper",
+          "secondary": [],
+          "slot": {
+            "family": "Goalkeeper",
+            "role": "Goalkeeper",
+            "x": 500,
+            "y": 5000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "position": "RightBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 8000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000003",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 6000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000004",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 4000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000005",
+          "position": "LeftBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 2000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000006",
+          "position": "RightMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 8300
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000007",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000008",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 3800
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000009",
+          "position": "LeftMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 1700
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000010",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000011",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 3800
+          }
+        }
+      ],
+      "newSlots": [
+        {
+          "slot": 1,
+          "family": "Goalkeeper",
+          "role": "Goalkeeper",
+          "x": 500,
+          "y": 5000
+        },
+        {
+          "slot": 2,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 8000
+        },
+        {
+          "slot": 3,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 6000
+        },
+        {
+          "slot": 4,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 4000
+        },
+        {
+          "slot": 5,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 2000
+        },
+        {
+          "slot": 6,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 6800
+        },
+        {
+          "slot": 7,
+          "family": "Midfield",
+          "role": "DefensiveMidfielder",
+          "x": 4200,
+          "y": 5000
+        },
+        {
+          "slot": 8,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 3200
+        },
+        {
+          "slot": 9,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 8500
+        },
+        {
+          "slot": 10,
+          "family": "Attack",
+          "role": "Striker",
+          "x": 8500,
+          "y": 5000
+        },
+        {
+          "slot": 11,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 1500
+        }
+      ],
+      "overrides": {},
+      "expected": {
+        "00000000-0000-0000-0000-000000000001": 1,
+        "00000000-0000-0000-0000-000000000002": 2,
+        "00000000-0000-0000-0000-000000000003": 3,
+        "00000000-0000-0000-0000-000000000004": 4,
+        "00000000-0000-0000-0000-000000000005": 5,
+        "00000000-0000-0000-0000-000000000006": 6,
+        "00000000-0000-0000-0000-000000000007": 7,
+        "00000000-0000-0000-0000-000000000008": 8,
+        "00000000-0000-0000-0000-000000000010": 9,
+        "00000000-0000-0000-0000-000000000011": 10,
+        "00000000-0000-0000-0000-000000000009": 11
+      }
+    },
+    {
+      "name": "ten men moving to four-three-three leave a slot empty",
+      "players": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "position": "Goalkeeper",
+          "secondary": [],
+          "slot": {
+            "family": "Goalkeeper",
+            "role": "Goalkeeper",
+            "x": 500,
+            "y": 5000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "position": "RightBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 8000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000003",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 6000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000004",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 4000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000005",
+          "position": "LeftBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 2000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000006",
+          "position": "RightMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 8300
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000007",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000008",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 3800
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000009",
+          "position": "LeftMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 1700
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000010",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 6200
+          }
+        }
+      ],
+      "newSlots": [
+        {
+          "slot": 1,
+          "family": "Goalkeeper",
+          "role": "Goalkeeper",
+          "x": 500,
+          "y": 5000
+        },
+        {
+          "slot": 2,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 8000
+        },
+        {
+          "slot": 3,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 6000
+        },
+        {
+          "slot": 4,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 4000
+        },
+        {
+          "slot": 5,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 2000
+        },
+        {
+          "slot": 6,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 6800
+        },
+        {
+          "slot": 7,
+          "family": "Midfield",
+          "role": "DefensiveMidfielder",
+          "x": 4200,
+          "y": 5000
+        },
+        {
+          "slot": 8,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 3200
+        },
+        {
+          "slot": 9,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 8500
+        },
+        {
+          "slot": 10,
+          "family": "Attack",
+          "role": "Striker",
+          "x": 8500,
+          "y": 5000
+        },
+        {
+          "slot": 11,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 1500
+        }
+      ],
+      "overrides": {},
+      "expected": {
+        "00000000-0000-0000-0000-000000000001": 1,
+        "00000000-0000-0000-0000-000000000002": 2,
+        "00000000-0000-0000-0000-000000000003": 3,
+        "00000000-0000-0000-0000-000000000004": 4,
+        "00000000-0000-0000-0000-000000000005": 5,
+        "00000000-0000-0000-0000-000000000006": 6,
+        "00000000-0000-0000-0000-000000000007": 7,
+        "00000000-0000-0000-0000-000000000008": 8,
+        "00000000-0000-0000-0000-000000000010": 10,
+        "00000000-0000-0000-0000-000000000009": 11
+      }
+    },
+    {
+      "name": "the manager's placements go first",
+      "players": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "position": "Goalkeeper",
+          "secondary": [],
+          "slot": {
+            "family": "Goalkeeper",
+            "role": "Goalkeeper",
+            "x": 500,
+            "y": 5000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "position": "RightBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 8000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000003",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 6000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000004",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 4000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000005",
+          "position": "LeftBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 2000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000006",
+          "position": "RightMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 8300
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000007",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000008",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 3800
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000009",
+          "position": "LeftMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 1700
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000010",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000011",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 3800
+          }
+        }
+      ],
+      "newSlots": [
+        {
+          "slot": 1,
+          "family": "Goalkeeper",
+          "role": "Goalkeeper",
+          "x": 500,
+          "y": 5000
+        },
+        {
+          "slot": 2,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 8000
+        },
+        {
+          "slot": 3,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 6000
+        },
+        {
+          "slot": 4,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 4000
+        },
+        {
+          "slot": 5,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 2000
+        },
+        {
+          "slot": 6,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 6800
+        },
+        {
+          "slot": 7,
+          "family": "Midfield",
+          "role": "DefensiveMidfielder",
+          "x": 4200,
+          "y": 5000
+        },
+        {
+          "slot": 8,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 3200
+        },
+        {
+          "slot": 9,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 8500
+        },
+        {
+          "slot": 10,
+          "family": "Attack",
+          "role": "Striker",
+          "x": 8500,
+          "y": 5000
+        },
+        {
+          "slot": 11,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 1500
+        }
+      ],
+      "overrides": {
+        "00000000-0000-0000-0000-000000000003": 10,
+        "00000000-0000-0000-0000-000000000010": 3
+      },
+      "expected": {
+        "00000000-0000-0000-0000-000000000001": 1,
+        "00000000-0000-0000-0000-000000000002": 2,
+        "00000000-0000-0000-0000-000000000010": 3,
+        "00000000-0000-0000-0000-000000000004": 4,
+        "00000000-0000-0000-0000-000000000005": 5,
+        "00000000-0000-0000-0000-000000000006": 6,
+        "00000000-0000-0000-0000-000000000007": 7,
+        "00000000-0000-0000-0000-000000000008": 8,
+        "00000000-0000-0000-0000-000000000011": 9,
+        "00000000-0000-0000-0000-000000000003": 10,
+        "00000000-0000-0000-0000-000000000009": 11
+      }
+    },
+    {
+      "name": "placements for the keeper, his slot, a missing player or a taken slot are ignored",
+      "players": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "position": "Goalkeeper",
+          "secondary": [],
+          "slot": {
+            "family": "Goalkeeper",
+            "role": "Goalkeeper",
+            "x": 500,
+            "y": 5000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "position": "RightBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 8000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000003",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 6000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000004",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 4000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000005",
+          "position": "LeftBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 2000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000006",
+          "position": "RightMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 8300
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000007",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000008",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 3800
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000009",
+          "position": "LeftMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 1700
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000010",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000011",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 3800
+          }
+        }
+      ],
+      "newSlots": [
+        {
+          "slot": 1,
+          "family": "Goalkeeper",
+          "role": "Goalkeeper",
+          "x": 500,
+          "y": 5000
+        },
+        {
+          "slot": 2,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 8000
+        },
+        {
+          "slot": 3,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 6000
+        },
+        {
+          "slot": 4,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 4000
+        },
+        {
+          "slot": 5,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 2000
+        },
+        {
+          "slot": 6,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 6800
+        },
+        {
+          "slot": 7,
+          "family": "Midfield",
+          "role": "DefensiveMidfielder",
+          "x": 4200,
+          "y": 5000
+        },
+        {
+          "slot": 8,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 3200
+        },
+        {
+          "slot": 9,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 8500
+        },
+        {
+          "slot": 10,
+          "family": "Attack",
+          "role": "Striker",
+          "x": 8500,
+          "y": 5000
+        },
+        {
+          "slot": 11,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 1500
+        }
+      ],
+      "overrides": {
+        "00000000-0000-0000-0000-000000000001": 9,
+        "00000000-0000-0000-0000-000000000002": 1,
+        "00000000-0000-0000-0000-000000000099": 6,
+        "00000000-0000-0000-0000-000000000005": 9,
+        "00000000-0000-0000-0000-000000000006": 9
+      },
+      "expected": {
+        "00000000-0000-0000-0000-000000000001": 1,
+        "00000000-0000-0000-0000-000000000002": 2,
+        "00000000-0000-0000-0000-000000000003": 3,
+        "00000000-0000-0000-0000-000000000004": 4,
+        "00000000-0000-0000-0000-000000000009": 5,
+        "00000000-0000-0000-0000-000000000006": 6,
+        "00000000-0000-0000-0000-000000000007": 7,
+        "00000000-0000-0000-0000-000000000008": 8,
+        "00000000-0000-0000-0000-000000000005": 9,
+        "00000000-0000-0000-0000-000000000010": 10,
+        "00000000-0000-0000-0000-000000000011": 11
+      }
+    },
+    {
+      "name": "equal costs break on the slot number, then on identity",
+      "players": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "position": "Goalkeeper",
+          "secondary": [],
+          "slot": {
+            "family": "Goalkeeper",
+            "role": "Goalkeeper",
+            "x": 500,
+            "y": 5000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000009",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 5000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000005",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 5000
+          }
+        }
+      ],
+      "newSlots": [
+        {
+          "slot": 1,
+          "family": "Goalkeeper",
+          "role": "Goalkeeper",
+          "x": 500,
+          "y": 5000
+        },
+        {
+          "slot": 2,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 5000
+        },
+        {
+          "slot": 3,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 5000
+        }
+      ],
+      "overrides": {},
+      "expected": {
+        "00000000-0000-0000-0000-000000000001": 1,
+        "00000000-0000-0000-0000-000000000005": 2,
+        "00000000-0000-0000-0000-000000000009": 3
+      }
+    },
+    {
+      "name": "a goalkeeper sent off leaves his slot empty and nobody is put there",
+      "players": [
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "position": "RightBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 8000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000003",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 6000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000004",
+          "position": "CentreBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "CentreBack",
+            "x": 1800,
+            "y": 4000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000005",
+          "position": "LeftBack",
+          "secondary": [],
+          "slot": {
+            "family": "Defence",
+            "role": "FullBack",
+            "x": 2000,
+            "y": 2000
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000006",
+          "position": "RightMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 8300
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000007",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000008",
+          "position": "CentralMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "CentralMidfielder",
+            "x": 5200,
+            "y": 3800
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000009",
+          "position": "LeftMidfielder",
+          "secondary": [],
+          "slot": {
+            "family": "Midfield",
+            "role": "WideMidfielder",
+            "x": 5800,
+            "y": 1700
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000010",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 6200
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000011",
+          "position": "Striker",
+          "secondary": [],
+          "slot": {
+            "family": "Attack",
+            "role": "Striker",
+            "x": 8200,
+            "y": 3800
+          }
+        }
+      ],
+      "newSlots": [
+        {
+          "slot": 1,
+          "family": "Goalkeeper",
+          "role": "Goalkeeper",
+          "x": 500,
+          "y": 5000
+        },
+        {
+          "slot": 2,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 8000
+        },
+        {
+          "slot": 3,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 6000
+        },
+        {
+          "slot": 4,
+          "family": "Defence",
+          "role": "CentreBack",
+          "x": 1800,
+          "y": 4000
+        },
+        {
+          "slot": 5,
+          "family": "Defence",
+          "role": "FullBack",
+          "x": 2000,
+          "y": 2000
+        },
+        {
+          "slot": 6,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 6800
+        },
+        {
+          "slot": 7,
+          "family": "Midfield",
+          "role": "DefensiveMidfielder",
+          "x": 4200,
+          "y": 5000
+        },
+        {
+          "slot": 8,
+          "family": "Midfield",
+          "role": "CentralMidfielder",
+          "x": 5200,
+          "y": 3200
+        },
+        {
+          "slot": 9,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 8500
+        },
+        {
+          "slot": 10,
+          "family": "Attack",
+          "role": "Striker",
+          "x": 8500,
+          "y": 5000
+        },
+        {
+          "slot": 11,
+          "family": "Attack",
+          "role": "Winger",
+          "x": 8000,
+          "y": 1500
+        }
+      ],
+      "overrides": {},
+      "expected": {
+        "00000000-0000-0000-0000-000000000002": 2,
+        "00000000-0000-0000-0000-000000000003": 3,
+        "00000000-0000-0000-0000-000000000004": 4,
+        "00000000-0000-0000-0000-000000000005": 5,
+        "00000000-0000-0000-0000-000000000006": 6,
+        "00000000-0000-0000-0000-000000000007": 7,
+        "00000000-0000-0000-0000-000000000008": 8,
+        "00000000-0000-0000-0000-000000000010": 9,
+        "00000000-0000-0000-0000-000000000011": 10,
+        "00000000-0000-0000-0000-000000000009": 11
+      }
+    }
+  ]
+}

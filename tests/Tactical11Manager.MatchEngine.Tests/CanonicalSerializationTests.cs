@@ -159,4 +159,30 @@ public sealed class CanonicalSerializationTests
         text.Should().Contain("side.home");
         text.Should().Contain("slot.home.1");
     }
+
+    [Fact]
+    public void Only_a_tactical_change_writes_the_fields_that_describe_one()
+    {
+        var result = MatchSimulator.Simulate(TestMatchFactory.Even());
+
+        result.Events.Should().NotContain(matchEvent => matchEvent.Type == EngineEventType.TacticalChange);
+        CanonicalMatchSerializer.CanonicalText(result).Should().NotContain(".formation=").And.NotContain(".ruleOrdinal=");
+
+        var change = result.Events[^1] with
+        {
+            Sequence = result.Events[^1].Sequence + 1,
+            Type = EngineEventType.TacticalChange,
+            FormationCode = "4-2-4",
+            Mentality = MatchMentality.Attacking,
+            RuleOrdinal = 2,
+        };
+
+        var edited = result with { Events = [.. result.Events, change] };
+        var text = CanonicalMatchSerializer.CanonicalText(edited);
+
+        text.Should().Contain($"event.{change.Sequence}.formation=4-2-4");
+        text.Should().Contain($"event.{change.Sequence}.mentality={(int)MatchMentality.Attacking}");
+        text.Should().Contain($"event.{change.Sequence}.ruleOrdinal=2");
+        CanonicalMatchSerializer.OutputHash(edited).Should().NotBe(CanonicalMatchSerializer.OutputHash(result));
+    }
 }

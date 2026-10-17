@@ -71,6 +71,12 @@ internal sealed class TacticsQueries : ITacticsQueries
             .ThenBy(place => place.SlotNumber)
             .ToListAsync(cancellationToken);
 
+        var matchInstructions = await _dbContext.MatchInstructions
+            .Where(instruction => planIds.Contains(instruction.PlanId))
+            .OrderBy(instruction => instruction.PlanId)
+            .ThenBy(instruction => instruction.Ordinal)
+            .ToListAsync(cancellationToken);
+
         // A player is selectable when an active contract and an active registration agree on the club
         // (SQ-6, SQ-7). Both joins are required, so an inconsistent pair drops out rather than half-listing.
         var selectable = await (
@@ -139,7 +145,17 @@ internal sealed class TacticsQueries : ITacticsQueries
                     .Select(place => Describe(place.PlayerId, playersById, unavailable) is { } player
                         ? new TacticsBenchRow(place.SlotNumber, player)
                         : null)
-                    .OfType<TacticsBenchRow>()]))
+                    .OfType<TacticsBenchRow>()])
+            {
+                MatchInstructions =
+                [
+                    .. matchInstructions
+                        .Where(instruction => instruction.PlanId == plan.Id)
+                        .OrderBy(instruction => instruction.Ordinal)
+                        .Select(instruction => instruction.Definition),
+                ],
+                AssistantFatigueSubstitutions = plan.AssistantFatigueSubstitutions,
+            })
             .ToList();
 
         var selectableRows = selectable

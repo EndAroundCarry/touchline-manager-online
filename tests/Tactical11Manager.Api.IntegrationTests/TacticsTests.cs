@@ -425,6 +425,266 @@ public sealed class TacticsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_plan_keeps_its_match_instructions_in_order_through_a_save_a_revision_and_a_read()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var clubId = await OnboardAsync(client);
+        var (starters, bench) = await StartersAndBenchAsync(client, clubId);
+
+        var chase = new
+        {
+            name = "Chase the game",
+            fromMinute = 60,
+            score = "trailing",
+            scoreMargin = 1,
+            formation = "4-3-3",
+            overrides = new[] { new { playerId = starters[5], slotNumber = 9 } },
+            changes = new { mentality = "attacking", pressing = "high_press", counterAttack = false },
+            substitutions = new object[]
+            {
+                new { off = "player", offPlayerId = starters[6], on = "player", onPlayerId = bench[1] },
+                new { off = "most_tired_in_family", offFamily = "midfield", on = "best_fit_in_family", onFamily = "attack" },
+            },
+        };
+        var protect = new
+        {
+            name = "Protect a two-goal lead",
+            fromMinute = 70,
+            score = "leading",
+            scoreMargin = 2,
+            changes = new { mentalitySteps = -1, timeWasting = "on" },
+        };
+
+        var created = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/v1/tactics",
+            PlanBody("Plan B", lineup: LineupBody(starters), bench: BenchBody(bench), matchInstructions: [chase, protect]));
+
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var plan = (await created.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        plan.AssistantFatigueSubstitutions.Should().BeTrue("a plan that says nothing keeps the assistant on");
+        plan.MatchInstructions.Select(rule => rule.Name).Should().Equal("Chase the game", "Protect a two-goal lead");
+
+        var first = plan.MatchInstructions[0];
+
+        first.FromMinute.Should().Be(60);
+        first.Score.Should().Be("trailing");
+        first.Formation.Should().Be("4-3-3");
+        first.Overrides.Should().ContainSingle().Which.PlayerId.Should().Be(starters[5]);
+        first.Changes.Mentality.Should().Be("attacking");
+        first.Changes.Pressing.Should().Be("high_press");
+        first.Changes.CounterAttack.Should().BeFalse("turning the counter-attack off is a change");
+        first.Changes.Tempo.Should().BeNull("an instruction not named is not changed");
+        first.Substitutions.Select(sub => sub.Off).Should().Equal("player", "most_tired_in_family");
+        first.Substitutions[1].OnFamily.Should().Be("attack");
+        plan.MatchInstructions[1].Changes.MentalitySteps.Should().Be(-1);
+        plan.MatchInstructionWarnings.Should().BeEmpty();
+
+        // The read side agrees with what the save answered.
+        var screen = (await client.GetFromJsonAsync<TacticsResponse>("/api/v1/tactics"))!;
+
+        screen.Plans.Single(saved => saved.Id == plan.Id).MatchInstructions.Should().BeEquivalentTo(
+            plan.MatchInstructions,
+            options => options.WithStrictOrdering());
+
+        // Swapping the two moves the order; a request that sends no list keeps it, with the assistant turned off.
+        var swapped = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Plan B", lineup: LineupBody(starters), bench: BenchBody(bench), matchInstructions: [protect, chase]),
+            ifMatch: created.Headers.ETag!.Tag);
+
+        swapped.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var swappedPlan = (await swapped.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        swappedPlan.MatchInstructions.Select(rule => rule.Name).Should().Equal("Protect a two-goal lead", "Chase the game");
+        swappedPlan.Version.Should().BeGreaterThan(plan.Version);
+
+        var kept = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Plan B", lineup: LineupBody(starters), bench: BenchBody(bench), assistantFatigueSubstitutions: false),
+            ifMatch: swapped.Headers.ETag!.Tag);
+
+        kept.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var keptPlan = (await kept.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        keptPlan.MatchInstructions.Select(rule => rule.Name).Should().Equal("Protect a two-goal lead", "Chase the game");
+        keptPlan.AssistantFatigueSubstitutions.Should().BeFalse();
+
+        // One instruction deleted, then an empty list clears them all; leaving the assistant out keeps it off.
+        var oneLeft = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Plan B", lineup: LineupBody(starters), bench: BenchBody(bench), matchInstructions: [chase]),
+            ifMatch: kept.Headers.ETag!.Tag);
+
+        (await oneLeft.Content.ReadFromJsonAsync<TacticalPlanResponse>())!.MatchInstructions.Select(rule => rule.Name)
+            .Should().Equal("Chase the game");
+
+        var cleared = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Plan B", lineup: LineupBody(starters), bench: BenchBody(bench), matchInstructions: []),
+            ifMatch: oneLeft.Headers.ETag!.Tag);
+
+        var clearedPlan = (await cleared.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        clearedPlan.MatchInstructions.Should().BeEmpty();
+        clearedPlan.AssistantFatigueSubstitutions.Should().BeFalse();
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task A_stale_version_refuses_a_save_that_edits_the_match_instructions()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var rule = new { name = "Late push", fromMinute = 80, changes = new { mentalitySteps = 1 } };
+
+        var created = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Plan"));
+        var plan = (await created.Content.ReadFromJsonAsync<TacticalPlanResponse>())!;
+
+        var first = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Plan", matchInstructions: [rule]),
+            ifMatch: created.Headers.ETag!.Tag);
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var stale = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/v1/tactics/{plan.Id}",
+            PlanBody("Plan", matchInstructions: []),
+            ifMatch: created.Headers.ETag!.Tag);
+
+        stale.StatusCode.Should().Be(HttpStatusCode.PreconditionFailed, "the first save moved the version, and the instructions travel with it");
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task Match_instructions_that_break_the_rules_are_refused_with_the_instruction_they_concern()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var clubId = await OnboardAsync(client);
+        var (starters, bench) = await StartersAndBenchAsync(client, clubId);
+        var outsider = (await OutfieldIdsAsync(client, clubId)).Except(starters).Except(bench).First();
+
+        var fine = new { name = "Fine", fromMinute = 60, changes = new { mentalitySteps = 1 } };
+        var badMinute = new { name = "Too late", fromMinute = 95, changes = new { mentalitySteps = 1 } };
+        var strangerOff = new
+        {
+            name = "Swap a stranger",
+            fromMinute = 60,
+            substitutions = new[] { new { off = "player", offPlayerId = (Guid?)outsider, on = "player", onPlayerId = (Guid?)bench[1] } },
+        };
+
+        var response = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/v1/tactics",
+            PlanBody("Refused", lineup: LineupBody(starters), bench: BenchBody(bench), matchInstructions: [fine, badMinute, strangerOff]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeAsync(response)).Should().Be(SquadErrorCodes.PlanValidationFailed);
+
+        var issues = JsonDocument.Parse(await response.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("validation").GetProperty("issues").EnumerateArray()
+            .Select(issue => (Code: issue.GetProperty("code").GetString(), Ordinal: issue.GetProperty("instructionOrdinal").GetInt32()))
+            .ToList();
+
+        issues.Should().BeEquivalentTo(
+            new[] { ("INSTRUCTION_MINUTE_RANGE", 2), ("INSTRUCTION_OFF_PLAYER_NOT_IN_LINEUP", 3) });
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task An_unknown_code_or_too_many_match_instructions_are_refused()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var odd = new { name = "Odd", score = "winning-ish" };
+        var rules = Enumerable.Range(1, 11).Select(index => (object)new { name = $"Rule {index}", changes = new { mentalitySteps = 1 } });
+
+        var unknown = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Odd", matchInstructions: [odd]));
+        var tooMany = await SendAsync(client, HttpMethod.Post, "/api/v1/tactics", PlanBody("Many", matchInstructions: rules));
+
+        unknown.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        tooMany.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task More_substitutions_than_a_match_allows_are_refused()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var clubId = await OnboardAsync(client);
+        var (starters, bench) = await StartersAndBenchAsync(client, clubId);
+
+        object Rule(string name, int from) => new
+        {
+            name,
+            fromMinute = from,
+            substitutions = new[]
+            {
+                new { off = "most_tired_in_family", on = "best_fit_in_family", offFamily = "midfield", onFamily = "midfield" },
+                new { off = "most_tired_in_family", on = "best_fit_in_family", offFamily = "defence", onFamily = "defence" },
+                new { off = "most_tired_in_family", on = "best_fit_in_family", offFamily = "attack", onFamily = "attack" },
+            },
+        };
+
+        var response = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/v1/tactics",
+            PlanBody("Many changes", lineup: LineupBody(starters), bench: BenchBody(bench), matchInstructions: [Rule("First", 60), Rule("Second", 75)]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeAsync(response)).Should().Be(SquadErrorCodes.PlanValidationFailed);
+        (await IssueCodesAsync(response)).Should().Contain("INSTRUCTIONS_SUBSTITUTION_LIMIT", "the second rule takes the plan from 3 to 6");
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
     public async Task A_repeated_player_is_refused_with_issues()
     {
         using var client = CreateClient();
@@ -663,7 +923,9 @@ public sealed class TacticsTests : IAsyncLifetime
         IEnumerable<object>? lineup = null,
         string? passFocus = null,
         bool? counterAttack = null,
-        IEnumerable<object>? bench = null)
+        IEnumerable<object>? bench = null,
+        IEnumerable<object>? matchInstructions = null,
+        bool? assistantFatigueSubstitutions = null)
     {
         var body = new Dictionary<string, object?>
         {
@@ -690,6 +952,17 @@ public sealed class TacticsTests : IAsyncLifetime
         if (counterAttack is not null)
         {
             body["counterAttack"] = counterAttack;
+        }
+
+        // Left out entirely when not sent: a request without the key keeps the stored instructions and the stored setting.
+        if (matchInstructions is not null)
+        {
+            body["matchInstructions"] = matchInstructions.ToArray();
+        }
+
+        if (assistantFatigueSubstitutions is not null)
+        {
+            body["assistantFatigueSubstitutions"] = assistantFatigueSubstitutions;
         }
 
         return body;

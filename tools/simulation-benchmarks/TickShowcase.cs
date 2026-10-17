@@ -1272,7 +1272,7 @@ internal static class TickShowcase
                 ],
             };
 
-    private static (FormationPreset Formation, MatchInstructionsV1 Instructions, int? Keeper, int? Pace) Spec(string spec)
+    internal static (FormationPreset Formation, MatchInstructionsV1 Instructions, int? Keeper, int? Pace) Spec(string spec)
     {
         int? keeper = null;
         int? pace = null;

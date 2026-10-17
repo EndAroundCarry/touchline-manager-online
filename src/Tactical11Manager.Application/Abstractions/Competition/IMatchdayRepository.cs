@@ -80,6 +80,10 @@ public sealed record SnapshotPlayerRow(
 /// </param>
 /// <param name="PrimaryColour">The primary kit colour the club's manager chose, or null for the generated one.</param>
 /// <param name="SecondaryColour">The secondary kit colour the club's manager chose, or null for the generated one.</param>
+/// <param name="MatchInstructions">
+/// The default plan's match instructions in the order the manager listed them, or null when the club has no plan or the plan has none (`MAT-6`).
+/// </param>
+/// <param name="AssistantFatigueSubstitutions">Whether the plan lets the assistant make the fatigue substitutions. On for a club with no plan.</param>
 public sealed record ClubSideSource(
     Guid ClubId,
     string ClubName,
@@ -88,7 +92,9 @@ public sealed record ClubSideSource(
     IReadOnlyList<SnapshotSelectionRow> Selection,
     IReadOnlyList<SnapshotPlayerRow> Players,
     string? PrimaryColour = null,
-    string? SecondaryColour = null);
+    string? SecondaryColour = null,
+    IReadOnlyList<MatchInstructionDefinition>? MatchInstructions = null,
+    bool AssistantFatigueSubstitutions = true);
 
 /// <summary>Both clubs of one fixture, with everything a snapshot is built from.</summary>
 /// <param name="FixtureId">The fixture.</param>

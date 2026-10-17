@@ -2131,7 +2131,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_events_sequence", "sequence >= 1");
 
-                            t.HasCheckConstraint("ck_events_type", "event_type in ('kick_off', 'half_time', 'second_half_start', 'full_time', 'goal', 'penalty_awarded', 'penalty_goal', 'penalty_missed', 'shot_saved', 'shot_blocked', 'shot_off_target', 'woodwork', 'foul', 'yellow_card', 'second_yellow_card', 'red_card', 'offside', 'corner', 'injury', 'substitution', 'free_kick_won', 'free_kick_shot')");
+                            t.HasCheckConstraint("ck_events_type", "event_type in ('kick_off', 'half_time', 'second_half_start', 'full_time', 'goal', 'penalty_awarded', 'penalty_goal', 'penalty_missed', 'shot_saved', 'shot_blocked', 'shot_off_target', 'woodwork', 'foul', 'yellow_card', 'second_yellow_card', 'red_card', 'offside', 'corner', 'injury', 'substitution', 'free_kick_won', 'free_kick_shot', 'tactical_change')");
                         });
                 });
 
@@ -2457,6 +2457,185 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_fixture_team_sheets_plan_version", "tactical_plan_version > 0");
 
                             t.HasCheckConstraint("ck_fixture_team_sheets_status", "status in ('draft', 'locked')");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Squad.MatchInstruction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool?>("CounterAttack")
+                        .HasColumnType("boolean")
+                        .HasColumnName("counter_attack");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DefensiveLine")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("defensive_line");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(28)
+                        .HasColumnType("character varying(28)")
+                        .HasColumnName("event");
+
+                    b.Property<string>("EventFamily")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("event_family");
+
+                    b.Property<int?>("EventThreshold")
+                        .HasColumnType("integer")
+                        .HasColumnName("event_threshold");
+
+                    b.Property<string>("Formation")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("formation");
+
+                    b.Property<int>("FromMinute")
+                        .HasColumnType("integer")
+                        .HasColumnName("from_minute");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("Mentality")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("mentality");
+
+                    b.Property<int>("MentalitySteps")
+                        .HasColumnType("integer")
+                        .HasColumnName("mentality_steps");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
+                        .HasColumnName("name");
+
+                    b.Property<short>("Ordinal")
+                        .HasColumnType("smallint")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("OverridesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("overrides");
+
+                    b.Property<string>("PassFocus")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("pass_focus");
+
+                    b.Property<string>("Passing")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("passing");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("Pressing")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("pressing");
+
+                    b.Property<string>("Score")
+                        .IsRequired()
+                        .HasMaxLength(28)
+                        .HasColumnType("character varying(28)")
+                        .HasColumnName("score");
+
+                    b.Property<int>("ScoreMargin")
+                        .HasColumnType("integer")
+                        .HasColumnName("score_margin");
+
+                    b.Property<string>("SubstitutionsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("substitutions");
+
+                    b.Property<string>("Tackling")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("tackling");
+
+                    b.Property<string>("Tempo")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("tempo");
+
+                    b.Property<string>("TimeWasting")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("time_wasting");
+
+                    b.Property<int?>("UntilMinute")
+                        .HasColumnType("integer")
+                        .HasColumnName("until_minute");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Width")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tactical_plan_instructions_plan_ordinal");
+
+                    b.ToTable("tactical_plan_instructions", "squad", t =>
+                        {
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_defensive_line", "defensive_line is null or defensive_line in ('deep', 'normal', 'high')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_event", "event in ('none', 'own_sent_off', 'opponent_sent_off', 'own_booked', 'playing_badly', 'tired', 'opponent_mentality_at_least', 'opponent_mentality_at_most')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_event_family", "event_family is null or event_family in ('goalkeeper', 'defence', 'midfield', 'attack')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_formation", "formation is null or formation in ('4-4-2', '4-3-3', '4-2-3-1', '4-1-4-1', '3-5-2', '5-3-2', '4-4-1-1', '4-5-1', '4-3-2-1', '4-2-2-2', '3-4-3', '3-4-2-1', '5-4-1')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_mentality", "mentality is null or mentality in ('defensive', 'cautious', 'balanced', 'positive', 'attacking')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_mentality_steps", "mentality_steps between -2 and 2");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_minutes", "from_minute between 0 and 90 and (until_minute is null or (until_minute >= from_minute and until_minute <= 90))");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_name", "length(name) between 1 and 48");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_ordinal", "ordinal between 1 and 10");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_pass_focus", "pass_focus is null or pass_focus in ('balanced', 'centre', 'centre_left', 'centre_right', 'wings')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_passing", "passing is null or passing in ('short', 'mixed', 'direct')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_pressing", "pressing is null or pressing in ('low_block', 'mid_block', 'high_press')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_score", "score in ('any', 'leading', 'level', 'trailing', 'not_winning', 'not_losing')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_score_margin", "score_margin between 1 and 5");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_tackling", "tackling is null or tackling in ('stay_on_feet', 'normal', 'aggressive')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_tempo", "tempo is null or tempo in ('low', 'normal', 'high')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_time_wasting", "time_wasting is null or time_wasting in ('off', 'situational', 'on')");
+
+                            t.HasCheckConstraint("ck_tactical_plan_instructions_width", "width is null or width in ('narrow', 'normal', 'wide')");
                         });
                 });
 
@@ -3179,6 +3358,12 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<bool>("AssistantFatigueSubstitutions")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("assistant_fatigue_substitutions");
 
                     b.Property<Guid>("ClubId")
                         .HasColumnType("uuid")
@@ -4803,6 +4988,15 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.HasOne("Tactical11Manager.Domain.Squad.TacticalPlan", null)
                         .WithMany()
                         .HasForeignKey("TacticalPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Squad.MatchInstruction", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.Squad.TacticalPlan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

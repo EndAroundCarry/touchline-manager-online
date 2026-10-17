@@ -369,6 +369,9 @@ internal sealed class MatchState
     /// Where the event happened when that is not where the ball is now (`engine-v5`): a shot event is stamped
     /// where the shot was struck from, although by the time it is emitted the ball has travelled to its target.
     /// </param>
+    /// <param name="formationCode">The formation a tactical change moved to, if it changed the shape.</param>
+    /// <param name="mentality">The mentality a tactical change moved to, if it changed it.</param>
+    /// <param name="ruleOrdinal">The place of the match rule that fired, on a tactical change.</param>
     /// <returns>The event, so a caller can count it without re-reading the log.</returns>
     public EngineEventV1 Emit(
         MatchSide side,
@@ -379,7 +382,10 @@ internal sealed class MatchState
         int? qualityBasisPoints = null,
         int? absenceFixtures = null,
         MatchSubstitutionReason? substitutionReason = null,
-        SpatialPoint? at = null)
+        SpatialPoint? at = null,
+        string? formationCode = null,
+        MatchMentality? mentality = null,
+        int? ruleOrdinal = null)
     {
         var matchEvent = new EngineEventV1
         {
@@ -397,6 +403,9 @@ internal sealed class MatchState
             SubstitutionReason = substitutionReason,
             X = at?.X ?? Ball.X,
             Y = at?.Y ?? Ball.Y,
+            FormationCode = formationCode,
+            Mentality = mentality,
+            RuleOrdinal = ruleOrdinal,
         };
 
         Events.Add(matchEvent);

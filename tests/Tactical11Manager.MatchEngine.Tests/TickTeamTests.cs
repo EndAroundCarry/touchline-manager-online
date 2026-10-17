@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Tactical11Manager.MatchEngine.Configuration;
 using Tactical11Manager.MatchEngine.Model;
+using Tactical11Manager.MatchEngine.Simulation;
 using Tactical11Manager.MatchEngine.Tick;
 
 namespace Tactical11Manager.MatchEngine.Tests;
@@ -146,6 +147,93 @@ public sealed class TickTeamTests
             TickSpatialUnitsOf(away.Body[seat].X).Should().BeGreaterThanOrEqualTo(5_000);
             home.Body[seat].Speed.Should().Be(0);
         }
+    }
+
+    [Fact]
+    public void A_reshape_changes_the_positions_the_seats_ask_for_and_nothing_about_the_men_in_them()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+        var ids = team.Id.Take(11).ToArray();
+        var slotNumbers = team.SlotNumber.Take(11).ToArray();
+        var bodies = team.Body.Take(11).ToArray();
+        var before = team.Spec.Take(11).ToArray();
+        var shape = TestShapes.FourThreeThree;
+
+        var fit = ShapeFit.Fit(state.Home.Active, shape, null, Rules);
+        state.Home.Reshape(shape, fit, Rules);
+        team.Reshape();
+
+        team.Id.Take(11).Should().Equal(ids);
+        team.SlotNumber.Take(11).Should().Equal(slotNumbers, "a slot number is a man's name on the pitch and a reshape does not rename it");
+        team.Body.Take(11).Should().Equal(bodies);
+        team.Spec.Take(11).Should().NotEqual(before);
+
+        for (var seat = 0; seat < 11; seat++)
+        {
+            team.Spec[seat].Should().Be(TickAnchorSpec.From(shape.Single(slot => slot.SlotNumber == fit[team.Id[seat]])));
+        }
+    }
+
+    [Fact]
+    public void A_reshape_drops_what_was_worked_out_for_the_old_shape()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+
+        team.HasOffset[3] = true;
+        team.SupporterMask = 0b101;
+        team.RunnerMask = 0b110;
+        team.PreviousPresser = 4;
+        team.ReturnSlot = 7;
+        team.ThirdSlot = 8;
+
+        state.Home.Reshape(TestShapes.FourThreeThree, ShapeFit.Fit(state.Home.Active, TestShapes.FourThreeThree, null, Rules), Rules);
+        team.Reshape();
+
+        team.HasOffset.Should().OnlyContain(set => !set);
+        team.SupporterMask.Should().Be(0);
+        team.RunnerMask.Should().Be(0);
+        team.PreviousPresser.Should().Be(-1);
+        team.ReturnSlot.Should().Be(0);
+        team.ThirdSlot.Should().Be(0);
+    }
+
+    [Fact]
+    public void A_man_who_took_the_gloves_keeps_the_goalkeepers_spec_through_a_reshape()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+
+        state.Home.RemoveParticipant(team.Id[0], 30, Rules);
+        team.Sync(null);
+
+        var keeper = team.Id[0];
+        var shape = TestShapes.FourThreeThree;
+
+        state.Home.Reshape(shape, ShapeFit.Fit(state.Home.Active, shape, null, Rules), Rules);
+        team.Reshape();
+
+        team.Id[0].Should().Be(keeper);
+        team.IsKeeper(0).Should().BeTrue("every module assumes seat 0 is the goalkeeper");
+        Enumerable.Range(1, 9).Should().OnlyContain(seat => !team.IsKeeper(seat));
+    }
+
+    [Fact]
+    public void A_restyle_follows_the_instructions_the_runtime_holds_now()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+        var before = team.Style;
+
+        state.Home.ChangeInstructions(new MatchInstructionsV1 { Mentality = MatchMentality.Attacking, Pressing = MatchPressing.HighPress }, Rules);
+
+        team.Style.Should().Be(before, "the style is only worked out again when asked");
+
+        team.Restyle();
+
+        team.Style.Should().Be(TickTeamStyle.From(state.Home.Instructions));
+        team.Style.Should().NotBe(before);
     }
 
     private static int TickSpatialUnitsOf(int fixedUnits) => Spatial.TickSpatialUnits.ToUnits(fixedUnits);

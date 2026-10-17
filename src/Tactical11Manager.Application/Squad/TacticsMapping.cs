@@ -90,7 +90,9 @@ public static class TacticsMapping
             plan.IsDefault,
             plan.Version,
             slots,
-            bench);
+            bench,
+            plan.MatchInstructions,
+            plan.AssistantFatigueSubstitutions);
     }
 
     /// <summary>
@@ -136,20 +138,28 @@ public static class TacticsMapping
             record.Plan.IsDefault,
             record.Plan.Version,
             slots,
-            bench);
+            bench,
+            [.. record.Instructions.OrderBy(instruction => instruction.Ordinal).Select(instruction => instruction.Definition)],
+            record.Plan.AssistantFatigueSubstitutions);
     }
 
     /// <summary>Projects the validator's verdict.</summary>
     /// <param name="validation">The verdict.</param>
-    public static TacticalPlanValidationResponse ToResponse(this TacticalPlanValidation validation)
+    /// <param name="instructions">The verdict on the plan's match instructions, or null when there was none.</param>
+    public static TacticalPlanValidationResponse ToResponse(
+        this TacticalPlanValidation validation,
+        MatchInstructionValidation? instructions = null)
     {
         ArgumentNullException.ThrowIfNull(validation);
 
         return new TacticalPlanValidationResponse(
-            validation.IsValid,
+            validation.IsValid && (instructions?.IsValid ?? true),
             validation.AssignedCount,
             validation.IsComplete,
-            [.. validation.Issues.Select(issue => issue.ToResponse())]);
+            [
+                .. validation.Issues.Select(issue => issue.ToResponse()),
+                .. (instructions?.Issues ?? []).Select(issue => issue.ToResponse()),
+            ]);
     }
 
     /// <summary>Projects one validator issue.</summary>
@@ -242,7 +252,9 @@ public static class TacticsMapping
         bool isDefault,
         long version,
         List<TacticalSlotResponse> slots,
-        List<TacticalBenchSlotResponse> bench)
+        List<TacticalBenchSlotResponse> bench,
+        IReadOnlyList<MatchInstructionDefinition> matchInstructions,
+        bool assistantFatigueSubstitutions)
     {
         var assignedCount = slots.Count(slot => slot.AssignedPlayer is not null);
 
@@ -266,6 +278,9 @@ public static class TacticsMapping
             assignedCount,
             assignedCount == slots.Count,
             slots,
-            bench);
+            bench,
+            [.. matchInstructions.Select(instruction => instruction.ToModel())],
+            assistantFatigueSubstitutions,
+            [.. MatchInstructionValidator.WarningsOf(matchInstructions).Select(warning => warning.ToResponse())]);
     }
 }

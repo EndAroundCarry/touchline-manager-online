@@ -338,6 +338,178 @@ public sealed class MatchSnapshotBuilderTests
         built.Input.Seed.Should().Be(0, "the seed is derived from the built snapshot, so it cannot be part of it");
     }
 
+    [Fact]
+    public void A_plan_with_no_match_instructions_and_the_assistant_on_leaves_the_side_exactly_as_it_was()
+    {
+        var plain = Build(Home(), Away());
+        var disabled = Build(Home() with { MatchInstructions = [Rule("Off") with { IsEnabled = false, Changes = Push() }] }, Away());
+
+        plain.Input.Home.MatchPlan.Should().BeSameAs(MatchPlanV1.None);
+        disabled.Input.Home.MatchPlan.Should().BeSameAs(MatchPlanV1.None, "an instruction that is off is left out");
+        CanonicalMatchSerializer.CanonicalText(disabled.Input).Should().NotContain("plan.", "no rule means no plan lines, so the hash is what it always was");
+        CanonicalMatchSerializer.InputHash(disabled.Input).Should().Be(CanonicalMatchSerializer.InputHash(plain.Input));
+    }
+
+    [Fact]
+    public void Turning_the_assistant_off_alone_is_a_plan()
+    {
+        var built = Build(Home() with { AssistantFatigueSubstitutions = false }, Away());
+
+        built.Input.Home.MatchPlan.AssistantFatigueSubstitutions.Should().BeFalse();
+        built.Input.Home.MatchPlan.Rules.Should().BeEmpty();
+        built.Input.Home.MatchPlan.HasContent.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_match_instruction_reaches_the_engine_with_its_shape_instructions_and_substitutions()
+    {
+        var first = Build(Home(), Away());
+        var starter = first.Input.Home.Slots.Single(slot => slot.SlotNumber == 6).ParticipantId;
+        var benched = first.Input.Home.Squad.Single(participant => participant.ShirtNumber == 14).ParticipantId;
+
+        var rule = Rule("Chase the game") with
+        {
+            FromMinute = 60,
+            UntilMinute = 85,
+            Score = MatchInstructionScore.Trailing,
+            ScoreMargin = 2,
+            Formation = FormationPreset.ThreeFourThree,
+            Overrides = [new MatchInstructionOverride(starter, 11)],
+            Changes = new MatchInstructionChanges { Mentality = Mentality.Positive, MentalitySteps = 1, Pressing = Pressing.HighPress, CounterAttack = true },
+            Substitutions =
+            [
+                new MatchInstructionSubstitution(MatchInstructionOff.Player, starter, null, MatchInstructionOn.Player, benched, null),
+                new MatchInstructionSubstitution(
+                    MatchInstructionOff.MostTiredInFamily, null, PositionFamily.Midfield, MatchInstructionOn.BestFitInFamily, null, PositionFamily.Attack),
+            ],
+        };
+
+        var built = Build(Home() with { MatchInstructions = [rule] }, Away());
+
+        var plan = built.Input.Home.MatchPlan;
+        var engineRule = plan.Rules.Should().ContainSingle().Subject;
+
+        plan.AssistantFatigueSubstitutions.Should().BeTrue();
+        engineRule.Ordinal.Should().Be(1);
+        engineRule.FromMinute.Should().Be(60);
+        engineRule.UntilMinute.Should().Be(85);
+        engineRule.Score.Should().Be(MatchRuleScore.Trailing);
+        engineRule.ScoreMargin.Should().Be(2);
+        engineRule.Event.Should().Be(MatchRuleEvent.None);
+        engineRule.FormationCode.Should().Be("3-4-3");
+        engineRule.Slots.Should().HaveCount(11);
+        engineRule.Slots!.Select(slot => slot.Role).Should().Equal(
+            FormationLayouts.DefaultSlots(FormationPreset.ThreeFourThree).Select(slot => EngineVocabulary.Role(slot.Role)));
+        engineRule.Slots!.Single(slot => slot.SlotNumber == 1).Family.Should().Be(MatchPositionFamily.Goalkeeper);
+        engineRule.Overrides.Should().Equal(new MatchSlotOverrideV1(starter, 11));
+        engineRule.Instructions!.Mentality.Should().Be(MatchMentality.Positive);
+        engineRule.Instructions.MentalitySteps.Should().Be(1);
+        engineRule.Instructions.Pressing.Should().Be(MatchPressing.HighPress);
+        engineRule.Instructions.CounterAttack.Should().BeTrue();
+        engineRule.Instructions.Tempo.Should().BeNull("an instruction the rule does not name is not changed");
+        engineRule.Substitutions.Should().HaveCount(2);
+        engineRule.Substitutions[0].Off.Should().Be(MatchRuleOff.Player);
+        engineRule.Substitutions[0].OffParticipantId.Should().Be(starter);
+        engineRule.Substitutions[0].OnParticipantId.Should().Be(benched);
+        engineRule.Substitutions[1].Off.Should().Be(MatchRuleOff.MostTiredInFamily);
+        engineRule.Substitutions[1].OffFamily.Should().Be(MatchPositionFamily.Midfield);
+        engineRule.Substitutions[1].OnFamily.Should().Be(MatchPositionFamily.Attack);
+        CanonicalMatchSerializer.InputHash(built.Input).Should().NotBe(CanonicalMatchSerializer.InputHash(first.Input));
+    }
+
+    [Fact]
+    public void An_instruction_keeps_the_place_the_manager_gave_it_when_an_earlier_one_is_off()
+    {
+        var built = Build(
+            Home() with
+            {
+                MatchInstructions =
+                [
+                    Rule("Off") with { IsEnabled = false, Changes = Push() },
+                    Rule("Second") with { Changes = Push() },
+                    Rule("Third") with { Changes = Push(), FromMinute = 80 },
+                ],
+            },
+            Away());
+
+        built.Input.Home.MatchPlan.Rules.Select(rule => rule.Ordinal).Should().Equal(2, 3);
+    }
+
+    [Fact]
+    public void Placements_and_substitutions_naming_players_who_are_not_on_the_sheet_are_dropped()
+    {
+        var first = Build(Home(), Away());
+        var starter = first.Input.Home.Slots.Single(slot => slot.SlotNumber == 6).ParticipantId;
+        var stranger = Guid.Parse("99999999-9999-9999-9999-999999999999");
+
+        var rule = Rule("Mixed") with
+        {
+            Formation = FormationPreset.FourThreeThree,
+            Overrides = [new MatchInstructionOverride(stranger, 5), new MatchInstructionOverride(starter, 6)],
+            Substitutions =
+            [
+                new MatchInstructionSubstitution(MatchInstructionOff.Player, stranger, null, MatchInstructionOn.BestFitInFamily, null, PositionFamily.Attack),
+                new MatchInstructionSubstitution(MatchInstructionOff.Player, starter, null, MatchInstructionOn.Player, stranger, null),
+                new MatchInstructionSubstitution(MatchInstructionOff.Player, starter, null, MatchInstructionOn.BestFitInFamily, null, PositionFamily.Attack),
+            ],
+        };
+
+        var built = Build(Home() with { MatchInstructions = [rule] }, Away());
+
+        var engineRule = built.Input.Home.MatchPlan.Rules.Should().ContainSingle().Subject;
+
+        engineRule.Overrides.Should().Equal(new MatchSlotOverrideV1(starter, 6));
+        engineRule.Substitutions.Should().ContainSingle().Which.OffParticipantId.Should().Be(starter);
+    }
+
+    [Fact]
+    public void An_instruction_that_ends_up_changing_nothing_is_dropped()
+    {
+        var stranger = Guid.Parse("99999999-9999-9999-9999-999999999999");
+
+        var rule = Rule("Gone") with
+        {
+            Substitutions = [new MatchInstructionSubstitution(MatchInstructionOff.Player, stranger, null, MatchInstructionOn.BestFitInFamily, null, PositionFamily.Attack)],
+        };
+
+        var built = Build(Home() with { MatchInstructions = [rule] }, Away());
+
+        built.Input.Home.MatchPlan.Should().BeSameAs(MatchPlanV1.None);
+    }
+
+    [Theory]
+    [InlineData(Mentality.Defensive, MatchMentality.Defensive)]
+    [InlineData(Mentality.Balanced, MatchMentality.Balanced)]
+    [InlineData(Mentality.Attacking, MatchMentality.Attacking)]
+    public void The_opponents_mentality_arrives_as_the_engines(Mentality domain, MatchMentality engine)
+    {
+        var rule = Rule("Answer") with
+        {
+            Event = MatchInstructionEvent.OpponentMentalityAtLeast,
+            EventThreshold = (int)domain,
+            Changes = Push(),
+        };
+
+        var built = Build(Home() with { MatchInstructions = [rule] }, Away());
+
+        built.Input.Home.MatchPlan.Rules.Single().EventThreshold.Should().Be((int)engine);
+    }
+
+    [Fact]
+    public void Both_clubs_carry_their_own_plans()
+    {
+        var built = Build(
+            Home() with { MatchInstructions = [Rule("Home push") with { Changes = Push() }] },
+            Away() with { MatchInstructions = [Rule("Away dig in") with { Changes = new MatchInstructionChanges { MentalitySteps = -1 } }] });
+
+        built.Input.Home.MatchPlan.Rules.Single().Instructions!.MentalitySteps.Should().Be(1);
+        built.Input.Away.MatchPlan.Rules.Single().Instructions!.MentalitySteps.Should().Be(-1);
+    }
+
+    private static MatchInstructionDefinition Rule(string name) => new() { Name = name };
+
+    private static MatchInstructionChanges Push() => new() { MentalitySteps = 1 };
+
     private static readonly Guid HomeKeeper = Guid.Parse("11111111-1111-1111-1111-000000000001");
     private static readonly Guid HomeBackupKeeper = Guid.Parse("11111111-1111-1111-1111-000000000002");
 

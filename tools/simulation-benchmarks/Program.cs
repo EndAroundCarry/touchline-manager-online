@@ -28,6 +28,9 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tickroles N seed [cell]` reads what each kind of slot does (shots, crosses, tackles, where he stands with and without the ball), per
 // player per match, for the wide-midfielder plan. Not part of `all`.
 //
+// `tickplans N seed [scenario|all]` reads what a match looks like at the minutes a match rule would fire (the lead at 60', the legs, the live rating,
+// bookings), as the baseline for the match-instructions plan. Not part of `all`.
+//
 // `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
 // snapshots (see TickCalibration). Neither is part of `all`.
 //
@@ -205,6 +208,16 @@ if (mode is "tickroles")
     TickRoleProbe.Run(
         Math.Min(count, 600),
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var rolesSeed) ? rolesSeed : 7_000UL,
+        rules,
+        positional.Length > 3 ? positional[3] : string.Empty);
+}
+
+if (mode is "tickplans")
+{
+    // tickplans <matches a scenario> <seed> [scenario|all]   (what a match looks like at the minutes a match rule would fire; .run-logs/plans/*.tsv; TP_ONLY=a,b narrows "all")
+    TickPlanProbe.Run(
+        Math.Min(count, 600),
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var plansSeed) ? plansSeed : 7_000UL,
         rules,
         positional.Length > 3 ? positional[3] : string.Empty);
 }

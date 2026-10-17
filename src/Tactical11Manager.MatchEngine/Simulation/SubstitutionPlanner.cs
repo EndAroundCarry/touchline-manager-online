@@ -9,10 +9,10 @@ namespace Tactical11Manager.MatchEngine.Simulation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Human managers make no live changes in the MVP (`MAT-6`), so every substitution here is the engine's
-/// decision. That makes this the one place where a match is coached while it is being played, and its rules
-/// are deliberately conservative: an injury is always dealt with, and a tired player is only replaced when
-/// the bench offers somebody meaningfully fresher who can actually play the position.
+/// A manager makes no live changes (`MAT-6`): what he decides beforehand is a match plan, and <see cref="MatchPlanRunner"/> carries
+/// it out (in the tick engine). The substitutions made here are the assistant's, and its rules are deliberately conservative: an
+/// injury is always dealt with, and a tired player is only replaced when the bench offers somebody meaningfully fresher who can
+/// actually play the position.
 /// </para>
 /// <para>
 /// The planner never spends a substitution it does not have (`SQ-5`), and it considers its candidates in the
@@ -25,13 +25,28 @@ internal static class SubstitutionPlanner
     /// <summary>
     /// Considers both sides for a change at the current moment.
     /// </summary>
+    /// <remarks>
+    /// The order for each side is: injuries, which are always dealt with first; then, in the tick engine, the side's match rules
+    /// (<see cref="MatchPlanRunner"/>); then the assistant's fatigue substitution, unless the side's plan has switched it off. The
+    /// possession engine ignores match plans, so it never runs the rules and its assistant is always on.
+    /// </remarks>
     /// <param name="state">The match state.</param>
-    public static void ConsiderBothSides(MatchState state)
+    /// <param name="applyMatchPlans">Whether the sides' match plans are carried out: the tick engine's stoppages say so.</param>
+    public static void ConsiderBothSides(MatchState state, bool applyMatchPlans = false)
     {
         foreach (var which in new[] { MatchSide.Home, MatchSide.Away })
         {
             ResolveInjuries(state, which);
-            ConsiderFatigue(state, which);
+
+            if (applyMatchPlans)
+            {
+                MatchPlanRunner.Consider(state, which);
+            }
+
+            if (!applyMatchPlans || state.Input.SideOf(which).MatchPlan.AssistantFatigueSubstitutions)
+            {
+                ConsiderFatigue(state, which);
+            }
         }
     }
 
@@ -59,7 +74,7 @@ internal static class SubstitutionPlanner
             }
 
             var replacement = side.Substitutions < rules.MaxSubstitutions
-                ? BestReplacement(state, side, injured.Slot, rules)
+                ? BestReplacement(side, injured.Slot, rules)
                 : null;
 
             if (replacement is null)
@@ -103,7 +118,7 @@ internal static class SubstitutionPlanner
             return;
         }
 
-        var replacement = BestReplacement(state, side, tired.Slot, rules);
+        var replacement = BestReplacement(side, tired.Slot, rules);
 
         if (replacement is null)
         {
@@ -143,17 +158,26 @@ internal static class SubstitutionPlanner
     /// Familiarity first and freshness second, multiplied rather than weighted: a fresh player who cannot play
     /// the position is not a replacement, and the product says so without a coefficient to argue about.
     /// </remarks>
-    private static MatchParticipantV1? BestReplacement(
-        MatchState state,
+    /// <param name="side">The side whose bench is looked at.</param>
+    /// <param name="slot">The slot the substitute is to fill.</param>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="family">The family the substitute must naturally belong to, or null for any (a match rule asks for a forward).</param>
+    internal static MatchParticipantV1? BestReplacement(
         SideRuntime side,
         MatchSlotV1 slot,
-        EngineRulesV2 rules)
+        EngineRulesV2 rules,
+        MatchPositionFamily? family = null)
     {
         MatchParticipantV1? best = null;
         long bestScore = -1;
 
         foreach (var candidate in side.Bench)
         {
+            if (family is { } wanted && candidate.Position.FamilyOf() != wanted)
+            {
+                continue;
+            }
+
             var familiarity = LineupResolver.FamiliarityOf(candidate, slot, rules);
             var score = (long)familiarity * candidate.State.ConditionBasisPoints;
 
@@ -172,7 +196,18 @@ internal static class SubstitutionPlanner
         return best;
     }
 
-    private static void Substitute(
+    /// <summary>
+    /// Takes a player off and brings a substitute on in his slot, counts the change against the side's five and records it. The one
+    /// place a substitution is made, whoever decided on it: an injury, the assistant's fatigue rule, or a match rule (`Tactical`).
+    /// </summary>
+    /// <param name="state">The match state.</param>
+    /// <param name="which">The side.</param>
+    /// <param name="side">The side's runtime state.</param>
+    /// <param name="outgoing">The player coming off.</param>
+    /// <param name="replacement">The substitute, who must be on the side's bench.</param>
+    /// <param name="reason">Why the change is made.</param>
+    /// <param name="rules">The rules in force.</param>
+    internal static void Substitute(
         MatchState state,
         MatchSide which,
         SideRuntime side,

@@ -16,6 +16,10 @@ namespace Tactical11Manager.MatchEngine.Simulation;
 /// </remarks>
 internal sealed class SideRuntime
 {
+    private MatchInstructionsV1? _instructions;
+    private bool _instructionsChanged;
+    private bool _shapeChanged;
+
     /// <summary>Gets which end the side plays.</summary>
     public required MatchSide Which { get; init; }
 
@@ -162,8 +166,39 @@ internal sealed class SideRuntime
     /// <summary>Gets the club's name.</summary>
     public string ClubName => Lineup.ClubName;
 
-    /// <summary>Gets the side's instructions.</summary>
-    public MatchInstructionsV1 Instructions => Lineup.Instructions;
+    /// <summary>
+    /// Gets the side's instructions as they stand now: the ones it kicked off with until a match rule changes them
+    /// (<see cref="ChangeInstructions"/>). Everything that reads a side's instructions during the match reads this, never the lineup's.
+    /// </summary>
+    public MatchInstructionsV1 Instructions => _instructions ?? Lineup.Instructions;
+
+    /// <summary>Gets the ordinals of the match rules that have fired: a rule fires at most once a match (`match-instructions-v1`).</summary>
+    public HashSet<int> FiredRules { get; } = [];
+
+    /// <summary>
+    /// Takes the note that the instructions were changed since the last time it was taken, so the tick engine knows to work the team's
+    /// style out again.
+    /// </summary>
+    /// <returns>Whether they were changed.</returns>
+    public bool TakeInstructionsChange()
+    {
+        var changed = _instructionsChanged;
+        _instructionsChanged = false;
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Takes the note that the shape was changed since the last time it was taken, so the tick engine knows to move the team's anchors.
+    /// </summary>
+    /// <returns>Whether it was changed.</returns>
+    public bool TakeShapeChange()
+    {
+        var changed = _shapeChanged;
+        _shapeChanged = false;
+
+        return changed;
+    }
 
     /// <summary>Gets the players on the pitch who can be given the ball.</summary>
     public IReadOnlyList<ActiveSlot> Outfield =>
@@ -197,6 +232,77 @@ internal sealed class SideRuntime
                 : Instructions,
             Which == MatchSide.Home,
             rules);
+
+    /// <summary>
+    /// Swaps the side's instructions for another set from now on, which is what a match rule that changes the approach does.
+    /// </summary>
+    /// <remarks>
+    /// Condition, morale and everything else on the pitch carry on as they were; only the ratings are worked out again, because the
+    /// instructions are one of their inputs.
+    /// </remarks>
+    /// <param name="instructions">The new instructions.</param>
+    /// <param name="rules">The rules in force.</param>
+    public void ChangeInstructions(MatchInstructionsV1 instructions, EngineRulesV2 rules)
+    {
+        ArgumentNullException.ThrowIfNull(instructions);
+
+        _instructions = instructions;
+        _instructionsChanged = true;
+        RecalculateRatings(rules);
+    }
+
+    /// <summary>
+    /// Moves the players on the pitch into a new shape: each one takes the role, family and place of the slot he is assigned.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A player keeps his slot <em>number</em>. The number is his name on the pitch (the film's entity, the recorded rosters, a pass
+    /// in flight is aimed at it), so a reshape changes what the slot asks for and never what it is called. Each player's familiarity
+    /// is worked out again for his new slot, and his condition and live rating are untouched.
+    /// </para>
+    /// <para>A player the assignment does not mention keeps his slot as it was.</para>
+    /// </remarks>
+    /// <param name="newSlots">The new shape's slots, 1…11, whose <see cref="MatchSlotV1.ParticipantId"/> is not read.</param>
+    /// <param name="slotOf">The new slot number each player takes, by participant.</param>
+    /// <param name="rules">The rules in force.</param>
+    public void Reshape(IReadOnlyList<MatchSlotV1> newSlots, IReadOnlyDictionary<Guid, int> slotOf, EngineRulesV2 rules)
+    {
+        ArgumentNullException.ThrowIfNull(newSlots);
+        ArgumentNullException.ThrowIfNull(slotOf);
+
+        if (slotOf.Values.Distinct().Count() != slotOf.Count)
+        {
+            throw new ArgumentException("Two players cannot take the same slot.", nameof(slotOf));
+        }
+
+        for (var index = 0; index < Active.Count; index++)
+        {
+            var current = Active[index];
+
+            if (!slotOf.TryGetValue(current.Participant.ParticipantId, out var number))
+            {
+                continue;
+            }
+
+            var target = newSlots.FirstOrDefault(slot => slot.SlotNumber == number)
+                ?? throw new ArgumentException($"The new shape has no slot {number}.", nameof(slotOf));
+
+            var slot = target with
+            {
+                SlotNumber = current.Slot.SlotNumber,
+                ParticipantId = current.Participant.ParticipantId,
+            };
+
+            Active[index] = current with
+            {
+                Slot = slot,
+                FamiliarityBasisPoints = LineupResolver.FamiliarityOf(current.Participant, slot, rules),
+            };
+        }
+
+        _shapeChanged = true;
+        RecalculateRatings(rules);
+    }
 
     /// <summary>Replaces the player in a slot, keeping the slot's role and familiarity recalculated.</summary>
     /// <param name="slotNumber">The slot to change.</param>

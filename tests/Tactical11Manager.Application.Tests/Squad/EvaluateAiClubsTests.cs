@@ -249,6 +249,14 @@ public sealed class EvaluateAiClubsTests
         {
         }
 
+        public void AddInstruction(MatchInstruction instruction)
+        {
+        }
+
+        public void RemoveInstruction(MatchInstruction instruction)
+        {
+        }
+
         public Task<TacticalPlanRecord?> FindAsync(Guid planId, CancellationToken cancellationToken) =>
             Task.FromResult<TacticalPlanRecord?>(null);
 

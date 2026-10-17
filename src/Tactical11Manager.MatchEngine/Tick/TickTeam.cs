@@ -64,7 +64,7 @@ internal sealed class TickTeam
     public SideRuntime Runtime => _runtime;
 
     /// <summary>Gets the shape the side's instructions give its block.</summary>
-    public TickTeamStyle Style { get; }
+    public TickTeamStyle Style { get; private set; }
 
     /// <summary>Gets how many players are on the pitch.</summary>
     public int Count { get; private set; }
@@ -344,6 +344,76 @@ internal sealed class TickTeam
         }
 
         return changed;
+    }
+
+    /// <summary>
+    /// Brings the team into line with what a match rule has done to its side's runtime since the last time: the style is worked out again
+    /// when the instructions changed, and the anchors move when the shape did.
+    /// </summary>
+    /// <returns>Whether anything changed, so the caller refreshes what depends on both teams.</returns>
+    public bool AdoptPlanChanges()
+    {
+        var restyled = _runtime.TakeInstructionsChange();
+        var reshaped = _runtime.TakeShapeChange();
+
+        if (restyled)
+        {
+            Restyle();
+        }
+
+        if (reshaped)
+        {
+            Reshape();
+        }
+
+        return restyled || reshaped;
+    }
+
+    /// <summary>
+    /// Works the block's shape out again from the runtime's current instructions, after a match rule has changed them
+    /// (<see cref="SideRuntime.ChangeInstructions"/>).
+    /// </summary>
+    public void Restyle() => Style = TickTeamStyle.From(_runtime.Instructions);
+
+    /// <summary>
+    /// Brings every seat's board position into line with the slot its player now fills, after a match rule has moved the side into a
+    /// new shape (<see cref="SideRuntime.Reshape"/>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Bodies, energy, ids and slot numbers stay as they are: the players walk to their new anchors from where they stand, so nobody
+    /// is moved by the change itself. What was worked out for the old shape is dropped: the walking-about offsets, the supporters and
+    /// runners of the last tick, the return run and the third man's run.
+    /// </para>
+    /// <para>
+    /// A player who took the gloves after the goalkeeper was sent off keeps the goalkeeper's spec, whatever slot the runtime gives him.
+    /// </para>
+    /// </remarks>
+    public void Reshape()
+    {
+        for (var seat = 0; seat < Count; seat++)
+        {
+            if (ActiveOf(seat) is not { } slot)
+            {
+                continue;
+            }
+
+            var spec = TickAnchorSpec.From(slot.Slot);
+
+            if (IsKeeper(seat) && spec.Family != MatchPositionFamily.Goalkeeper)
+            {
+                continue;
+            }
+
+            Spec[seat] = spec;
+        }
+
+        Array.Clear(HasOffset);
+        SupporterMask = 0;
+        RunnerMask = 0;
+        PreviousPresser = -1;
+        ReturnSlot = 0;
+        ThirdSlot = 0;
     }
 
     /// <summary>

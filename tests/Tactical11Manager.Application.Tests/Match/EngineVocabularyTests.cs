@@ -128,6 +128,90 @@ public sealed class EngineVocabularyTests
     }
 
     [Fact]
+    public void Every_match_instruction_word_maps_to_the_engine_value_of_the_same_name()
+    {
+        foreach (var value in Enum.GetValues<MatchInstructionScore>())
+        {
+            EngineVocabulary.RuleScore(value).ToString().Should().Be(value.ToString());
+            ((int)EngineVocabulary.RuleScore(value)).Should().Be((int)value);
+        }
+
+        foreach (var value in Enum.GetValues<MatchInstructionEvent>())
+        {
+            EngineVocabulary.RuleEvent(value).ToString().Should().Be(value.ToString());
+            ((int)EngineVocabulary.RuleEvent(value)).Should().Be((int)value);
+        }
+
+        foreach (var value in Enum.GetValues<MatchInstructionOff>())
+        {
+            EngineVocabulary.RuleOff(value).ToString().Should().Be(value.ToString());
+            ((int)EngineVocabulary.RuleOff(value)).Should().Be((int)value);
+        }
+
+        foreach (var value in Enum.GetValues<MatchInstructionOn>())
+        {
+            EngineVocabulary.RuleOn(value).ToString().Should().Be(value.ToString());
+            ((int)EngineVocabulary.RuleOn(value)).Should().Be((int)value);
+        }
+
+        foreach (var value in Enum.GetValues<Mentality>())
+        {
+            EngineVocabulary.MentalityOf(value).ToString().Should().Be(value.ToString());
+            ((int)EngineVocabulary.MentalityOf(value)).Should().Be((int)value, "the opponent's mentality travels as a number");
+        }
+    }
+
+    [Fact]
+    public void A_match_instruction_carries_only_the_instructions_it_names()
+    {
+        EngineVocabulary.InstructionChanges(MatchInstructionChanges.None).Should().BeNull();
+
+        var changes = EngineVocabulary.InstructionChanges(new MatchInstructionChanges
+        {
+            Tempo = Tempo.High,
+            Tackling = TacklingStyle.StayOnFeet,
+            PassFocus = PassFocus.Wings,
+            CounterAttack = false,
+            MentalitySteps = -2,
+        })!;
+
+        changes.Tempo.Should().Be(MatchTempo.High);
+        changes.Tackling.Should().Be(MatchTacklingStyle.StayOnFeet);
+        changes.PassFocus.Should().Be(MatchPassFocus.Wings);
+        changes.CounterAttack.Should().BeFalse("turning the counter-attack off is a change");
+        changes.MentalitySteps.Should().Be(-2);
+        changes.Mentality.Should().BeNull();
+        changes.Passing.Should().BeNull();
+        changes.Width.Should().BeNull();
+        changes.Pressing.Should().BeNull();
+        changes.DefensiveLine.Should().BeNull();
+        changes.TimeWasting.Should().BeNull();
+    }
+
+    [Fact]
+    public void The_domains_shape_fit_grades_familiarity_with_the_engines_penalties()
+    {
+        // The domain may not reference the engine, so its copy of the shape fit holds the penalties as numbers of its own.
+        var rules = MatchEngine.Configuration.EngineRulesV2.Default;
+
+        FormationShapeFit.Certain.Should().Be(MatchEngine.Configuration.EngineRulesV2.Certain);
+        FormationShapeFit.UnfamiliarRoleBasisPoints.Should().Be(rules.UnfamiliarRolePenaltyBasisPoints);
+        FormationShapeFit.SecondaryPositionBasisPoints.Should().Be(rules.SecondaryPositionPenaltyBasisPoints);
+        FormationShapeFit.OutOfPositionBasisPoints.Should().Be(rules.OutOfPositionPenaltyBasisPoints);
+    }
+
+    [Fact]
+    public void The_domains_limits_are_the_engines()
+    {
+        MatchInstruction.MaxPerPlan.Should().Be(MatchPlanV1.MaxRules);
+        MatchInstruction.MaxSubstitutions.Should().Be(MatchPlanV1.MaxSubstitutionsPerRule);
+        MatchInstruction.MaxMinute.Should().Be(MatchRuleV1.MaxMinute);
+        MatchInstruction.MaxScoreMargin.Should().Be(MatchRuleV1.MaxScoreMargin);
+        MatchInstructionChanges.MaxMentalitySteps.Should().Be(MatchInstructionChangesV1.MaxMentalitySteps);
+        MatchInstruction.MatchSubstitutionLimit.Should().Be(MatchEngine.Configuration.EngineRulesV2.Default.MaxSubstitutions);
+    }
+
+    [Fact]
     public void The_neutral_instruction_set_is_the_engines_own_middle()
     {
         // A club that has saved no plan takes the field with the set that neither instructs nor inhibits, and

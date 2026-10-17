@@ -56,6 +56,7 @@ flowchart LR
         player_unavailability
         tactical_plans
         tactical_slots
+        tactical_plan_instructions
         fixture_team_sheets
         team_sheet_entries
         training_plans
@@ -119,6 +120,7 @@ flowchart LR
     players --> player_state
     clubs --> tactical_plans
     tactical_plans --> tactical_slots
+    tactical_plans --> tactical_plan_instructions
     seasons --> division_seasons
     divisions --> division_seasons
     division_seasons --> matchdays
@@ -278,6 +280,7 @@ erDiagram
     players ||--o{ player_training_days : "trains on"
     clubs ||--o{ tactical_plans : "owns"
     tactical_plans ||--|{ tactical_slots : "defines"
+    tactical_plans ||--o{ tactical_plan_instructions : "lists"
     clubs ||--o{ training_plans : "sets"
     fixtures ||--o{ fixture_team_sheets : "has"
     fixture_team_sheets ||--|{ team_sheet_entries : "contains"
@@ -388,6 +391,7 @@ erDiagram
         text tackling
         text time_wasting
         boolean counter_attack "default false"
+        boolean assistant_fatigue_substitutions "default true"
         boolean is_default
         bigint version
     }
@@ -400,6 +404,34 @@ erDiagram
         int normalized_x "0..10000"
         int normalized_y "0..10000"
         uuid assigned_player_id FK
+    }
+    tactical_plan_instructions {
+        uuid id PK
+        uuid plan_id FK
+        smallint ordinal "1..10, the order they are checked in"
+        text name "1..48 characters"
+        boolean is_enabled
+        int from_minute "0..90"
+        int until_minute "null for the rest of the match"
+        text score "any, leading, level, trailing, not_winning, not_losing"
+        int score_margin "1..5"
+        text event "none, own_sent_off, opponent_sent_off, own_booked, playing_badly, tired, opponent_mentality_at_least, opponent_mentality_at_most"
+        text event_family
+        int event_threshold
+        text formation "null keeps the shape"
+        jsonb overrides "[{playerId, slot}]"
+        text mentality "this and the next nine: null is no change"
+        int mentality_steps "-2..2"
+        text tempo
+        text passing
+        text width
+        text pass_focus
+        text pressing
+        text defensive_line
+        text tackling
+        text time_wasting
+        boolean counter_attack
+        jsonb substitutions "[{off, offPlayerId, offFamily, on, onPlayerId, onFamily}]"
     }
     fixture_team_sheets {
         uuid id PK
@@ -425,6 +457,7 @@ erDiagram
 | `version` exposed as a strong ETag and enforced as a concurrency token | `tactical_plans` | `CONC-1` (ADR-0009) |
 | `unique (plan_id, slot_number)`, `unique (plan_id, assigned_player_id)` | `tactical_slots` | No duplicate shirt slots or players |
 | `check (normalized_x between 0 and 10000)` etc. | `tactical_slots` | `TAC-9` |
+| `unique (plan_id, ordinal)`; `check` on every code, the minutes (0..90, until not before from), the margin (1..5) and the mentality steps (-2..2) | `tactical_plan_instructions` | `MAT-6`; the domain validator enforces the same, so a plan that passes it cannot fail the engine's input checks at lock time |
 | `unique (fixture_id, club_id)` | `fixture_team_sheets` | One sheet per club per fixture |
 | **Partial unique** one active scheduling record per club | `training_plans` | Latest plan wins |
 | `check (programme in (…))` on the nine programme codes; `team_focus` and `focus_family` nullable and unread until the contract migration | `player_training_focus` | `TRN-1`, `TRN-2`, `MIG-3` |

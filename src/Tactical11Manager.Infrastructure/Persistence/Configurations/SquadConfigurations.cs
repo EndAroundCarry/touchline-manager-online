@@ -535,6 +535,10 @@ internal sealed class TacticalPlanConfiguration : IEntityTypeConfiguration<Tacti
             .HasColumnName("counter_attack")
             .HasDefaultValue(false)
             .IsRequired();
+        builder.Property(plan => plan.AssistantFatigueSubstitutions)
+            .HasColumnName("assistant_fatigue_substitutions")
+            .HasDefaultValue(true)
+            .IsRequired();
         builder.Property(plan => plan.IsDefault).HasColumnName("is_default").IsRequired();
         builder.Property(plan => plan.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(plan => plan.UpdatedAt).HasColumnName("updated_at").IsRequired();
@@ -661,6 +665,181 @@ internal sealed class TacticalBenchSlotConfiguration : IEntityTypeConfiguration<
         builder.HasOne<Player>()
             .WithMany()
             .HasForeignKey(place => place.PlayerId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>squad.tactical_plan_instructions</c>: a plan's match instructions, the rules the engine carries out during a match (`MAT-6`).
+/// The conditions and the instruction changes are columns with check constraints on their codes; the placements and the substitutions are
+/// small lists that are only ever read and written with the instruction, so they are <c>jsonb</c>. A plan's list is ordered by its ordinal.
+/// </summary>
+internal sealed class MatchInstructionConfiguration : IEntityTypeConfiguration<MatchInstruction>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<MatchInstruction> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("tactical_plan_instructions", "squad", table =>
+        {
+            table.HasCheckConstraint("ck_tactical_plan_instructions_ordinal", "ordinal between 1 and 10");
+            table.HasCheckConstraint("ck_tactical_plan_instructions_name", "length(name) between 1 and 48");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_minutes",
+                "from_minute between 0 and 90 and (until_minute is null or (until_minute >= from_minute and until_minute <= 90))");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_score",
+                "score in ('any', 'leading', 'level', 'trailing', 'not_winning', 'not_losing')");
+            table.HasCheckConstraint("ck_tactical_plan_instructions_score_margin", "score_margin between 1 and 5");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_event",
+                "event in ('none', 'own_sent_off', 'opponent_sent_off', 'own_booked', 'playing_badly', 'tired', "
+                + "'opponent_mentality_at_least', 'opponent_mentality_at_most')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_event_family",
+                "event_family is null or event_family in ('goalkeeper', 'defence', 'midfield', 'attack')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_formation",
+                "formation is null or formation in ('4-4-2', '4-3-3', '4-2-3-1', '4-1-4-1', '3-5-2', '5-3-2', '4-4-1-1', '4-5-1', "
+                + "'4-3-2-1', '4-2-2-2', '3-4-3', '3-4-2-1', '5-4-1')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_mentality",
+                "mentality is null or mentality in ('defensive', 'cautious', 'balanced', 'positive', 'attacking')");
+            table.HasCheckConstraint("ck_tactical_plan_instructions_mentality_steps", "mentality_steps between -2 and 2");
+            table.HasCheckConstraint("ck_tactical_plan_instructions_tempo", "tempo is null or tempo in ('low', 'normal', 'high')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_passing",
+                "passing is null or passing in ('short', 'mixed', 'direct')");
+            table.HasCheckConstraint("ck_tactical_plan_instructions_width", "width is null or width in ('narrow', 'normal', 'wide')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_pass_focus",
+                "pass_focus is null or pass_focus in ('balanced', 'centre', 'centre_left', 'centre_right', 'wings')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_pressing",
+                "pressing is null or pressing in ('low_block', 'mid_block', 'high_press')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_defensive_line",
+                "defensive_line is null or defensive_line in ('deep', 'normal', 'high')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_tackling",
+                "tackling is null or tackling in ('stay_on_feet', 'normal', 'aggressive')");
+            table.HasCheckConstraint(
+                "ck_tactical_plan_instructions_time_wasting",
+                "time_wasting is null or time_wasting in ('off', 'situational', 'on')");
+        });
+
+        // The placements, the substitutions and the plain-value view are read out of the two jsonb columns; EF has nothing to map them to.
+        builder.Ignore(instruction => instruction.Overrides);
+        builder.Ignore(instruction => instruction.Substitutions);
+        builder.Ignore(instruction => instruction.Definition);
+
+        builder.HasKey(instruction => instruction.Id);
+        builder.Property(instruction => instruction.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(instruction => instruction.PlanId).HasColumnName("plan_id").IsRequired();
+        builder.Property(instruction => instruction.Ordinal).HasColumnName("ordinal").HasColumnType("smallint").IsRequired();
+        builder.Property(instruction => instruction.Name)
+            .HasColumnName("name")
+            .HasMaxLength(MatchInstruction.MaxNameLength)
+            .IsRequired();
+        builder.Property(instruction => instruction.IsEnabled).HasColumnName("is_enabled").IsRequired();
+        builder.Property(instruction => instruction.FromMinute).HasColumnName("from_minute").IsRequired();
+        builder.Property(instruction => instruction.UntilMinute).HasColumnName("until_minute");
+        builder.Property(instruction => instruction.Score)
+            .HasColumnName("score")
+            .HasMaxLength(MatchInstructionCodes.MaxCodeLength)
+            .HasConversion(value => value.ToCode(), code => MatchInstructionCodes.ScoreFromCode(code))
+            .IsRequired();
+        builder.Property(instruction => instruction.ScoreMargin).HasColumnName("score_margin").IsRequired();
+        builder.Property(instruction => instruction.Event)
+            .HasColumnName("event")
+            .HasMaxLength(MatchInstructionCodes.MaxCodeLength)
+            .HasConversion(value => value.ToCode(), code => MatchInstructionCodes.EventFromCode(code))
+            .IsRequired();
+        builder.Property(instruction => instruction.EventFamily)
+            .HasColumnName("event_family")
+            .HasMaxLength(PositionFamilies.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : PositionFamilies.FromCode(code));
+        builder.Property(instruction => instruction.EventThreshold).HasColumnName("event_threshold");
+        builder.Property(instruction => instruction.Formation)
+            .HasColumnName("formation")
+            .HasMaxLength(FormationPresets.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : FormationPresets.FromCode(code));
+        builder.Property(instruction => instruction.OverridesJson).HasColumnName("overrides").HasColumnType("jsonb").IsRequired();
+        builder.Property(instruction => instruction.Mentality)
+            .HasColumnName("mentality")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.MentalityFromCode(code));
+        builder.Property(instruction => instruction.MentalitySteps).HasColumnName("mentality_steps").IsRequired();
+        builder.Property(instruction => instruction.Tempo)
+            .HasColumnName("tempo")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.TempoFromCode(code));
+        builder.Property(instruction => instruction.Passing)
+            .HasColumnName("passing")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.PassingFromCode(code));
+        builder.Property(instruction => instruction.Width)
+            .HasColumnName("width")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.WidthFromCode(code));
+        builder.Property(instruction => instruction.PassFocus)
+            .HasColumnName("pass_focus")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.PassFocusFromCode(code));
+        builder.Property(instruction => instruction.Pressing)
+            .HasColumnName("pressing")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.PressingFromCode(code));
+        builder.Property(instruction => instruction.DefensiveLine)
+            .HasColumnName("defensive_line")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.LineFromCode(code));
+        builder.Property(instruction => instruction.Tackling)
+            .HasColumnName("tackling")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.TacklingFromCode(code));
+        builder.Property(instruction => instruction.TimeWasting)
+            .HasColumnName("time_wasting")
+            .HasMaxLength(TeamInstructions.MaxCodeLength)
+            .HasConversion(
+                value => value == null ? null : value.Value.ToCode(),
+                code => code == null ? null : TeamInstructions.TimeWastingFromCode(code));
+        builder.Property(instruction => instruction.CounterAttack).HasColumnName("counter_attack");
+        builder.Property(instruction => instruction.SubstitutionsJson)
+            .HasColumnName("substitutions")
+            .HasColumnType("jsonb")
+            .IsRequired();
+        builder.Property(instruction => instruction.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(instruction => instruction.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+        builder.HasIndex(instruction => new { instruction.PlanId, instruction.Ordinal })
+            .IsUnique()
+            .HasDatabaseName("ux_tactical_plan_instructions_plan_ordinal");
+
+        builder.HasOne<TacticalPlan>()
+            .WithMany()
+            .HasForeignKey(instruction => instruction.PlanId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -261,7 +261,7 @@ public static class CommentaryTokenBuilder
 
         foreach (var matchEvent in result.Events.OrderBy(matchEvent => matchEvent.Sequence))
         {
-            if (!Templates.TryGetValue(matchEvent.Type, out var template))
+            if (TemplateOf(matchEvent) is not { } template)
             {
                 continue;
             }
@@ -450,9 +450,7 @@ public static class CommentaryTokenBuilder
     /// <summary>The template a beat renders from: its own family, or the event's full-log template.</summary>
     private static Template? TemplateFor(PassageBeatV1 beat) => beat.Kind switch
     {
-        PassageBeatKind.Event => beat.Event is { } matchEvent && Templates.TryGetValue(matchEvent.Type, out var template)
-            ? template
-            : null,
+        PassageBeatKind.Event => beat.Event is { } matchEvent ? TemplateOf(matchEvent) : null,
         PassageBeatKind.Pass => BuildTemplates["pass"],
         PassageBeatKind.LongPass => BuildTemplates["long_pass"],
         PassageBeatKind.Carry => BuildTemplates["carry"],
@@ -611,6 +609,12 @@ public static class CommentaryTokenBuilder
         _ => PassageTemplates["shot"],
     };
 
+    /// <summary>The full-log template an event renders from, or null when the event is not narrated. A substitution a match rule made has its own.</summary>
+    private static Template? TemplateOf(EngineEventV1 matchEvent) =>
+        matchEvent is { Type: EngineEventType.Substitution, SubstitutionReason: MatchSubstitutionReason.Tactical }
+            ? TacticalSubstitutionTemplate
+            : Templates.GetValueOrDefault(matchEvent.Type);
+
     private static Template? OutcomeTemplate(EngineEventType type) =>
         Templates.TryGetValue(type, out var template) ? template : null;
 
@@ -663,6 +667,16 @@ public static class CommentaryTokenBuilder
         if (matchEvent.AbsenceFixtures is int absence)
         {
             facts["absenceFixtures"] = absence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        if (matchEvent.FormationCode is { Length: > 0 } formation)
+        {
+            facts["formation"] = formation;
+        }
+
+        if (matchEvent.Mentality is MatchMentality mentality)
+        {
+            facts["mentality"] = mentality.ToString().ToLowerInvariant();
         }
 
         return facts;
@@ -1226,5 +1240,23 @@ public static class CommentaryTokenBuilder
                     "A change for {club}: {second} comes on for {player}.",
                     "{club} bring on {second} in place of {player}.",
                 ]),
+            [EngineEventType.TacticalChange] = new(
+                "match.tactical_change",
+                [
+                    "{club} switch to {formation}.",
+                    "{club} change shape to {formation}.",
+                    "{club} move to a {mentality} mentality.",
+                    "{club} switch to {formation} with a {mentality} mentality.",
+                    "{club} change their tactics.",
+                ]),
         };
+
+    /// <summary>The line for a substitution a match rule made rather than an injury or the assistant's fatigue rule.</summary>
+    private static readonly Template TacticalSubstitutionTemplate = new(
+        "match.substitution.tactical",
+        [
+            "A tactical change for {club}: {second} comes on for {player}.",
+            "{club} change it up, with {second} replacing {player}.",
+            "{club} send on {second} for {player} as part of their plan.",
+        ]);
 }

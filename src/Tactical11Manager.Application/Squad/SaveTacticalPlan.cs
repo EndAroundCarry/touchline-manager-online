@@ -168,18 +168,29 @@ public sealed class SaveTacticalPlan
                 .Where(player => player.PrimaryPosition == PlayerPosition.Goalkeeper)
                 .Select(player => player.Id)]);
 
-        if (!validation.IsValid)
+        // The match instructions are held to the plan's own lineup and bench: a player to take off is one it fields, a
+        // player to bring on is one it benches. A request that sends none keeps the stored ones, which are not judged
+        // again here; the snapshot drops a named player who is no longer on the sheet (MAT-6).
+        var instructionDefinitions = BuildInstructions(request);
+        var instructionValidation = instructionDefinitions is null
+            ? null
+            : MatchInstructionValidator.Validate(
+                instructionDefinitions,
+                [.. definitions.Where(slot => slot.AssignedPlayerId is not null).Select(slot => slot.AssignedPlayerId!.Value)],
+                [.. benchDefinitions.Select(place => place.PlayerId)]);
+
+        if (!validation.IsValid || instructionValidation is { IsValid: false })
         {
             return new SaveTacticalPlanResult(
                 SaveTacticalPlanOutcome.Invalid,
                 null,
-                validation.ToResponse());
+                validation.ToResponse(instructionValidation));
         }
 
         var now = _clock.UtcNow;
         var record = existing is null
-            ? Create(request, snapshot, access.ClubId, definitions, benchDefinitions, now)
-            : Revise(existing, request, definitions, benchDefinitions, _repository, now);
+            ? Create(request, snapshot, access.ClubId, definitions, benchDefinitions, instructionDefinitions, now)
+            : Revise(existing, request, definitions, benchDefinitions, instructionDefinitions, _repository, now);
 
         var action = existing is null
             ? SquadAuditActions.TacticalPlanCreated
@@ -258,6 +269,10 @@ public sealed class SaveTacticalPlan
     private static List<TacticalBenchDefinition> BuildBench(SaveTacticalPlanRequest request) =>
         [.. (request.Bench ?? []).Select(entry => new TacticalBenchDefinition(entry.SlotNumber, entry.PlayerId))];
 
+    /// <summary>Reads the match instructions the request sends, or null when it sends none and the stored ones are kept.</summary>
+    private static List<MatchInstructionDefinition>? BuildInstructions(SaveTacticalPlanRequest request) =>
+        request.MatchInstructions is null ? null : [.. request.MatchInstructions.Select(model => model.ToDefinition())];
+
     /// <summary>Lays out a new plan and its slots.</summary>
     /// <remarks>
     /// The default is decided from the read snapshot rather than a second query: the plans that exist are
@@ -269,6 +284,7 @@ public sealed class SaveTacticalPlan
         Guid clubId,
         IReadOnlyList<TacticalSlotDefinition> definitions,
         IReadOnlyList<TacticalBenchDefinition> benchDefinitions,
+        IReadOnlyList<MatchInstructionDefinition>? instructionDefinitions,
         DateTimeOffset now)
     {
         var hasDefault = snapshot.Plans.Any(plan => plan.IsDefault);
@@ -280,7 +296,8 @@ public sealed class SaveTacticalPlan
             FormationPresets.FromCode(request.FormationPreset),
             ReadInstructions(request),
             isDefault: !hasDefault,
-            now);
+            now,
+            request.AssistantFatigueSubstitutions ?? true);
 
         _repository.AddPlan(plan);
 
@@ -317,15 +334,25 @@ public sealed class SaveTacticalPlan
             _repository.AddBenchSlot(place);
         }
 
-        return new TacticalPlanRecord(plan, slots, bench);
+        var instructions = (instructionDefinitions ?? [])
+            .Select((definition, index) => MatchInstruction.Place(Guid.CreateVersion7(), plan.Id, index + 1, definition, now))
+            .ToList();
+
+        foreach (var instruction in instructions)
+        {
+            _repository.AddInstruction(instruction);
+        }
+
+        return new TacticalPlanRecord(plan, slots, bench) { Instructions = instructions };
     }
 
-    /// <summary>Revises an existing plan in place and re-lays its slots and bench.</summary>
+    /// <summary>Revises an existing plan in place and re-lays its slots, bench and match instructions.</summary>
     private static TacticalPlanRecord Revise(
         TacticalPlanRecord existing,
         SaveTacticalPlanRequest request,
         IReadOnlyList<TacticalSlotDefinition> definitions,
         IReadOnlyList<TacticalBenchDefinition> benchDefinitions,
+        IReadOnlyList<MatchInstructionDefinition>? instructionDefinitions,
         ITacticsRepository repository,
         DateTimeOffset now)
     {
@@ -333,7 +360,8 @@ public sealed class SaveTacticalPlan
             request.Name,
             FormationPresets.FromCode(request.FormationPreset),
             ReadInstructions(request),
-            now);
+            now,
+            request.AssistantFatigueSubstitutions);
 
         var byNumber = existing.Slots.ToDictionary(slot => slot.SlotNumber);
 
@@ -352,7 +380,56 @@ public sealed class SaveTacticalPlan
             slot.Assign(definition.AssignedPlayerId, now);
         }
 
-        return existing with { Bench = ReviseBench(existing, benchDefinitions, repository, now) };
+        return existing with
+        {
+            Bench = ReviseBench(existing, benchDefinitions, repository, now),
+            Instructions = instructionDefinitions is null
+                ? existing.Instructions
+                : ReviseInstructions(existing, instructionDefinitions, repository, now),
+        };
+    }
+
+    /// <summary>
+    /// Brings the stored match instructions to the submitted list: each place in the list keeps its row while it stays filled, rows are
+    /// added for new places, and any the manager deleted are removed.
+    /// </summary>
+    /// <remarks>
+    /// Revising by place rather than deleting and re-adding keeps a save from writing a place twice in one commit, which the plan-and-
+    /// ordinal unique index would refuse. A move up or down rewrites the two rows' contents, which is the same change.
+    /// </remarks>
+    private static List<MatchInstruction> ReviseInstructions(
+        TacticalPlanRecord existing,
+        IReadOnlyList<MatchInstructionDefinition> definitions,
+        ITacticsRepository repository,
+        DateTimeOffset now)
+    {
+        var stored = existing.Instructions.ToDictionary(instruction => instruction.Ordinal);
+        var result = new List<MatchInstruction>();
+
+        foreach (var instruction in existing.Instructions.Where(instruction => instruction.Ordinal > definitions.Count))
+        {
+            repository.RemoveInstruction(instruction);
+        }
+
+        for (var index = 0; index < definitions.Count; index++)
+        {
+            var ordinal = index + 1;
+
+            if (stored.TryGetValue(ordinal, out var instruction))
+            {
+                instruction.Revise(definitions[index], now);
+                result.Add(instruction);
+
+                continue;
+            }
+
+            var added = MatchInstruction.Place(Guid.CreateVersion7(), existing.Plan.Id, ordinal, definitions[index], now);
+
+            repository.AddInstruction(added);
+            result.Add(added);
+        }
+
+        return result;
     }
 
     /// <summary>

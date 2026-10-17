@@ -200,6 +200,12 @@ public sealed class TacticalPlan
     /// <summary>Gets whether the team plays on the counter-attack.</summary>
     public bool CounterAttack { get; private set; }
 
+    /// <summary>
+    /// Gets whether the assistant makes the fatigue substitutions at the usual windows. On is how every match was played before match
+    /// instructions existed (`MAT-6`); a manager who turns it off makes the changes through the plan's match instructions only.
+    /// </summary>
+    public bool AssistantFatigueSubstitutions { get; private set; } = true;
+
     /// <summary>Gets whether this is the club's default plan (`INS-11`).</summary>
     public bool IsDefault { get; private set; }
 
@@ -220,6 +226,7 @@ public sealed class TacticalPlan
     /// <param name="instructions">The eight team instructions.</param>
     /// <param name="isDefault">Whether this is the club's default plan.</param>
     /// <param name="now">The current instant.</param>
+    /// <param name="assistantFatigueSubstitutions">Whether the assistant makes the fatigue substitutions.</param>
     public static TacticalPlan Create(
         Guid id,
         Guid clubId,
@@ -227,7 +234,8 @@ public sealed class TacticalPlan
         FormationPreset formationPreset,
         TeamInstructionSet instructions,
         bool isDefault,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool assistantFatigueSubstitutions = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(instructions);
@@ -256,6 +264,7 @@ public sealed class TacticalPlan
             Tackling = instructions.Tackling,
             TimeWasting = instructions.TimeWasting,
             CounterAttack = instructions.CounterAttack,
+            AssistantFatigueSubstitutions = assistantFatigueSubstitutions,
             IsDefault = isDefault,
             CreatedAt = now,
             UpdatedAt = now,
@@ -279,15 +288,21 @@ public sealed class TacticalPlan
     };
 
     /// <summary>Replaces the formation, instructions, and name.</summary>
+    /// <remarks>
+    /// Also the way the plan's match instructions change: they are rows of their own, but a save that edits them revises the plan, so its
+    /// version moves and the entity tag and a pinned team sheet notice.
+    /// </remarks>
     /// <param name="name">The manager-facing name.</param>
     /// <param name="formationPreset">The formation shape.</param>
     /// <param name="instructions">The eight team instructions.</param>
     /// <param name="now">The current instant.</param>
+    /// <param name="assistantFatigueSubstitutions">Whether the assistant makes the fatigue substitutions, or null to keep the setting.</param>
     public void Revise(
         string name,
         FormationPreset formationPreset,
         TeamInstructionSet instructions,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool? assistantFatigueSubstitutions = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(instructions);
@@ -304,6 +319,7 @@ public sealed class TacticalPlan
         Tackling = instructions.Tackling;
         TimeWasting = instructions.TimeWasting;
         CounterAttack = instructions.CounterAttack;
+        AssistantFatigueSubstitutions = assistantFatigueSubstitutions ?? AssistantFatigueSubstitutions;
 
         Touch(now);
     }
