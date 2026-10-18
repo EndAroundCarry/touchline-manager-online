@@ -2664,3 +2664,59 @@ Weaker side (`tickwhy 150 7000 16`, the stronger side carrying the plan): 5-4-1 
 - **The AI's default plan moves a pairing by +0.02 to +0.05 points** (nothing), and a manager's chase-and-protect plan beats it by about a fifth of a point where it fires on equal sides (+0.04, not different from zero, on a weaker side).
 
 **Known gaps.** The lab sides are uniform and 16-rated; real sides differ player by player, so a forward's skill against a defender's is not tested. Red-card cells fire in only 79 to 282 matches, so their intervals are wide. A fresh-legs effect that depends on skill loss is by construction absent here. The study shows effect sizes in this engine, not that a manager's cleverness is rewarded elsewhere.
+
+### 14.40 Why a change of shape wins little: position-shaped squads and the shape study (the shape study plan, Milestones 1-7)
+
+**Why.** The impact study (§14.39 part 2) found that no mid-match formation switch beat staying put (4-4-2 to 4-3-3 with a wings focus: -0.11 and -0.18 points against an equal side). Its lab sides were uniform: every skill 16, central midfielders in slots 6-9 and no secondary positions, so a winger and a centre back were interchangeable and no shape could suit a squad better. Real football changes shape to exploit a weakness, so this study asks whether a switch pays when every player stands in his natural place.
+
+**What the tick engine does and does not do about a player in the wrong place.** There is no out-of-position penalty in play. `LineupResolver.FamiliarityOf` (10,000 / 9,400 / 9,600 / 8,800) feeds only the legacy engine's effective skill, `ShapeFit`'s choice of who goes where and the substitution planner; tick skills come from raw attributes. A slot's **role** does change behaviour (`TickRoleProfile`), so a misplaced player costs what his role costs and nothing more. Adding a penalty is a product decision this study did not take. (One correction to the plan's premise: `TickAttackEdge` does follow the shape, since it averages the Attack-family players plus the two most advanced midfielders against the Defence-family players, from each seat's family.)
+
+**Method.** `tickshape <matches> <seed> [cells | squads | grid | matrix | h3]` (`TickShapeStudy.cs`, `TickShapeStudy.H3.cs`, `LaboratoryFixtures.Shaped.cs`); `TS_CELLS` and `TS_SHAPES` narrow it.
+- **Squads.** `LaboratoryFixtures.Shaped` builds each player's attributes as 16 plus `PlayerAttributeProfiles.BonusFor(position, attribute)` (the game's own position profiles, no jitter, one offset so the ten outfield starters average about 15.9), a uniform-16 keeper (a keeper with the profile halves the goals, 1.89 against 3.97, and shrinks every points difference; the product owner chose the uniform keeper) and a bench of a keeper plus six outfield players: what each target shape needs, then cover. Every move among the eight shapes finds a perfect placement.
+- **Cells.** `kick` (both sides start in a shape), `switch` (a rule at the first stoppage or at 60' with `natural`, `bestfit` or `mismatch` placement), `control` (the same substitutions, no shape change), `custom` (positions, roles or pass focus alone) and `oop` (a kick-off misplacement). Effects are paired (same seeds, identical until the change) and read over the matches in which the rule fired, with 95% intervals. A switch is read against its control and against the plain baseline, because a control (natural substitutes playing in the old shape) is itself handicapped by about 0.13 points.
+- **Zones.** Every match is recorded and reduced to counts of shots, crosses and passes per lane and third, and the attacker-minus-defender surplus around the ball with the shot rate in the next 10 seconds.
+- **Probe refactor.** `TickPlanStudy`'s paired engine is shared, not copied; the old study re-run is byte-identical. No engine file under `src/` changed in the study (M1-M5).
+
+**Shapes from kick-off** (eight shapes, 64 ordered pairings, 20,100 matches, seed 7000; mean home points 1.757).
+
+| Shape | Strength (points a shape adds, ±0.035) | Goals for / against | Shots for / against |
+|---|---|---|---|
+| 4-2-3-1 | +0.198 | 2.51 / 2.11 | 32.2 / 25.8 |
+| 4-1-4-1 | +0.069 | 1.97 / 1.85 | 25.6 / 22.8 |
+| 4-5-1 | +0.064 | 1.87 / 1.72 | 23.2 / 22.4 |
+| 4-4-2 | +0.052 | 2.27 / 2.16 | 26.5 / 27.0 |
+| 4-3-3 | +0.030 | 2.70 / 2.61 | 32.8 / 31.5 |
+| 5-4-1 | +0.026 | 1.83 / 1.76 | 23.7 / 22.9 |
+| 3-5-2 | -0.179 | 2.20 / 2.59 | 26.6 / 32.3 |
+| 3-4-3 | -0.259 | 2.57 / 3.12 | 32.6 / 38.5 |
+
+**H1 is not confirmed** (the plan's bar was every strength and matchup term under 0.10 points): best to worst is 0.46 points, the largest matchup is 4-3-3 over 3-4-3 +0.251, and 10 of 28 matchups are clear of zero. There is a cycle: 4-4-2 over 4-3-3 +0.150, 4-3-3 over 3-5-2 +0.106, 3-5-2 over 4-4-2 +0.147, repeated on seed 8000 (+0.144 ±0.061 a pairing). The home bonus is large and does not depend on the pairing (within ±0.18).
+
+**A switch against a 3-5-2** (600 matches, home points against the control; seed 7000, then seed 8000).
+
+| Switch | First stoppage | At 60', natural | At 60', best fit | At 60', mismatch |
+|---|---|---|---|---|
+| 4-4-2 to 4-3-3 | +0.39 ±0.14 | +0.22 ±0.11, then +0.14 ±0.11 | +0.09 ±0.10 | -0.01 ±0.11 |
+| 4-4-2 to 4-2-3-1 | +0.24 ±0.14 | +0.27 ±0.10, then +0.03 ±0.11 | +0.13 ±0.11, then +0.13 ±0.10 | +0.03 ±0.11, then -0.12 ±0.11 |
+
+Shots after a natural 60' switch: +4.1 and +4.3 (4-3-3), +3.5 and +3.4 (4-2-3-1); goals after the change +0.3 to +0.4. The points sit inside noise on one seed; the shots and goals replicate.
+
+**H2, a switch reproduces the shape.** At the first stoppage the shots, crosses and zone counts equal a kick-off in the shape (4-3-3 42.49 against 42.47 shots; 4-2-3-1 39.5 against 37.8, the one gap over a shot), and the first 5-minute bin already carries the whole shot gain, so there is no walk-in lag. `TickTeam.Reshape` rebuilds the specification, offsets, masks and runs; the profile, skills and attack quality depend only on attributes and the edge is refreshed after the reshape (`TickMatchLoop`), so no per-seat state is stale. A switch at 60' is worth a third of the kick-off gap in shots (+4.1 against 12.1 / 3).
+
+**H3, numbers in an area do not become chances.** A shape moves the surplus by under half a player (wide lanes in the middle third +0.33 for 3-5-2, -0.06 for 4-3-3) and the box is outnumbered by 1.5 to 1.85 for every shape. Within a zone each extra attacker lowers the shot rate by 0.3 to 0.8 points and moves it by 0.0 ±0.2 in the centre box (30% base); between shapes, the one with the numbers on the flank shoots least. Crosses into a flank with no opposing player are 2.5 to 6.7% of crosses, about one a match. The tables are observational.
+
+**H4, what carries a switch.** 4-4-2 to 4-2-3-1 against a 3-5-2 at 60': the whole switch +0.27 ±0.10 points and 3.5 shots; the new positions with the old roles +0.11 ±0.10 and 2.1 shots; the old positions with the new roles +0.09 ±0.11 and 0.8 shots; pass focus Wings -0.09 ±0.10, Centre 0.00. Positions carry most, roles the rest, focus none.
+
+**H5, out of position.** A deliberate mismatch erases the gain (shots +0.3 and -0.2 against +4.1 for a natural placement); the engine's own best fit leaves 3 of 10 off-natural and keeps it (+3.8 and +4.3 shots). A striker at centre back plus a centre back on the right wing from kick-off costs 5.7 to 6.0 shots, 0.6 to 0.7 goals for and 0.16 to 0.28 points a match, all in attack (goals against flat). That is role behaviour alone.
+
+**The switch matrix** (23 switches at 60' against a 4-4-2, natural placement, seed 7000, 300 matches each, read against the plain baseline). The average switch is worth -0.02 points and 9 of 23 are positive. Three are clear of zero: 4-4-2 to 4-2-3-1 +0.22 ±0.15 (net goals after +0.30), 4-4-2 to 3-4-3 -0.21 ±0.16 (-0.26), 4-2-3-1 to 5-4-1 -0.23 ±0.16 (-0.31). A switch moves a side about a third of the way to the strength of the shape it goes to (correlation 0.54, slope 0.28, over the 23): every move to 4-2-3-1 is zero or better, every move away from it is negative. The same switch depends on the opponent: 4-4-2 to 4-3-3 is +0.09 to +0.22 against a 3-5-2 and -0.09 against a 4-4-2.
+
+**Where this leaves the engine.** Shapes are decisive from kick-off (+0.40 to -0.55 goals a match from the average, against roughly 0.2 to 0.4 goals of xG in the Premier League working paper), and a switch recovers only the minutes that remain. The mechanism is positions and roles, not overloads. Levers proposed, none made: a cover term in duels, pass survival that rises with an unmarked team-mate, a cross value that depends on the far post, wing-backs that overlap and a defensive line height that does not rise with a back three (the two weakest shapes, 3-4-3 and 3-5-2, concede the most shots), and an out-of-position penalty (the product owner's decision).
+
+**Time.** 160 of the 180 minutes of simulation.
+
+**Known gaps.** One seed for the eight-shape grid and the switch matrix; 300 matches a cell leave intervals of ±0.15, so only effects of 0.2 or more are readable; the sides are 16 against 16 and perfectly suited, unlike real clubs; the switch matrix is played against a 4-4-2 only.
+
+#### The feature: placing the player who comes on (Milestone 6)
+
+A rule's placements may name a bench player the same rule brings on by name. The engine already made a rule's substitutions before it fitted the shape, so only the domain validator and the editor stopped it. `MatchInstructionValidator` now accepts that player and warns (not errors) when a placed player is out of position for the slot's role (`INSTRUCTION_OUT_OF_POSITION`, the main board's rule: a secondary position counts) or is taken off by the same rule (`INSTRUCTION_PLACED_PLAYER_LEAVES`). The editor's pitch previews the named swaps first, marks out-of-position slots, offers the incoming players in the picker and has a **Natural fit** button. The engine, `FormationShapeFit` and `shape-fit.ts` read one case table (`tests/shared/shape-fit-cases.json`, one new case). `MAT-14` is updated.

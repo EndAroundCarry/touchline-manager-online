@@ -4,6 +4,13 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Shape study plan, Milestones 1-7 - why a change of shape wins little, and placing the player who comes on
+
+- New `tickshape` probe (`TickShapeStudy.cs`, `TickShapeStudy.H3.cs`, `LaboratoryFixtures.Shaped.cs`): squads built from the game's own position profiles (16 plus `PlayerAttributeProfiles.BonusFor`, natural bench cover), every pairing of eight shapes from kick-off, 23 switches at 60', placements natural / best fit / mismatch, positions-roles-focus ablations and zone counts. It shares `TickPlanStudy`'s paired engine (the old study re-run is byte-identical). About 160 of 180 minutes of simulation. No engine file changed.
+- Findings (section 14.40, ADR-0073): shapes are decisive from kick-off (4-2-3-1 +0.20 points, 3-4-3 -0.26, a cycle 4-4-2 > 4-3-3 > 3-5-2 > 4-4-2 confirmed on a second seed); a switch reproduces the shape with no walk-in lag but recovers a third of a match (about +4 shots and +0.3 to +0.4 goals at 60', the average of 23 switches is -0.02 points); the engine's own best fit keeps the shots of a perfect placement while a mismatch erases them; positions carry the effect, roles the rest, pass focus none; extra numbers in a zone do not become chances.
+- Feature: a rule's placements may name the bench player the same rule brings on. The validator gains two warnings (`INSTRUCTION_OUT_OF_POSITION`, `INSTRUCTION_PLACED_PLAYER_LEAVES`); the editor previews the named swaps, marks out-of-position slots and has a Natural fit button. `MAT-14` updated; one shared shape-fit case.
+- Proposed, not made: an out-of-position penalty, a cover term in duels, wing-backs that overlap and a line height that does not rise with a back three.
+
 ## Match instructions plan, Milestone 7 - the impact study
 
 - New `tickplans 600 <seed> study` (`TickPlanStudy.cs`): 68 match-instruction rules played on the same seeds with and without the rule (paired, so effects are read only where the rule fired), on nine pairings of lab sides with a real bench; 10 deciding cells confirmed on a second seed. 109 of the 120 minutes of run time. Per-cell files, `cells-<seed>.tsv` and `report.md` are in `.run-logs/plans/` (not committed).

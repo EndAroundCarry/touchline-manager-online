@@ -31,6 +31,9 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tickplans N seed [scenario|all]` reads what a match looks like at the minutes a match rule would fire (the lead at 60', the legs, the live rating,
 // bookings), as the baseline for the match-instructions plan. Not part of `all`.
 //
+// `tickshape N seed [cells|squads]` plays position-shaped squads from kick-off or with a change of shape in the middle, and reads the points, the
+// zones and the bins after the change (plan snoopy-toasting-hamster). Not part of `all`.
+//
 // `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
 // snapshots (see TickCalibration). Neither is part of `all`.
 //
@@ -218,6 +221,16 @@ if (mode is "tickplans")
     TickPlanProbe.Run(
         Math.Min(count, 600),
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var plansSeed) ? plansSeed : 7_000UL,
+        rules,
+        positional.Length > 3 ? positional[3] : string.Empty);
+}
+
+if (mode is "tickshape")
+{
+    // tickshape <matches a cell> <seed> [cells|squads|grid|matrix]   (grid = every ordered pairing of TS_SHAPES from kick-off, matrix = read the grid; what a shape does from kick-off and what a change of shape does mid-match, position-shaped squads; .run-logs/plans/shape/*; TS_CELLS=a,b narrows)
+    TickShapeStudy.Run(
+        Math.Min(count, 600),
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var shapeSeed) ? shapeSeed : 7_000UL,
         rules,
         positional.Length > 3 ? positional[3] : string.Empty);
 }

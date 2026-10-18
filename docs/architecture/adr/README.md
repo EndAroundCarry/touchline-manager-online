@@ -99,3 +99,4 @@ the system is shaped the way it is.
 3. An ADR that changes a settled rule in `game-rules.md` must update that file in the same
    change set, plus the affected stage in `master-plan.md`.
 | [0072](0072-match-instructions-and-their-measured-worth.md) | Match instructions are rules the engine carries out, and what they were measured to be worth | Accepted |
+| [0073](0073-shape-matchups-and-placing-substitutes.md) | Shapes are decisive from kick-off, a switch recovers a third of that, and a rule may place the player it brings on | Accepted |

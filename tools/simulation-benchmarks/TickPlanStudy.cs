@@ -91,23 +91,39 @@ internal static class TickPlanStudy
             spent += watch.Elapsed.TotalSeconds;
             total += spent;
 
-            var line = Analyse(cell, basis, without, with, seed, matches, spent, out var text);
+            var line = Analyse(new CellLabel(cell.Id, cell.Family, basis.Key, cell.Plain, basis.Plain, cell.Live), without, with, seed, matches, spent, out var text);
 
             Console.Write(text);
             File.AppendAllText(summary, line);
             File.WriteAllText(Path.Combine(directory, $"{cell.Id}-{cell.Base}-{seed}.txt"), text);
-            File.AppendAllText(
-                Path.Combine(".run-logs", "plans", "ledger.tsv"),
-                string.Create(CultureInfo.InvariantCulture, $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}\tstudy\t{cell.Id}\t{matches}\t{seed}\t{spent:F0}\n"));
+            AppendLedger("study", cell.Id, matches, seed, spent);
         }
 
         Console.WriteLine($"  run time this call {total:F0} s over {selected.Length} cell(s)");
     }
 
-    private static Rec[] Baseline(Pairing basis, int matches, ulong seed, EngineRulesV2 rules, string directory, out double seconds)
-    {
-        var path = Path.Combine(directory, $"base-{basis.Key}-{seed}-{matches}.json");
+    private static Rec[] Baseline(Pairing basis, int matches, ulong seed, EngineRulesV2 rules, string directory, out double seconds) =>
+        Cached(
+            Path.Combine(directory, $"base-{basis.Key}-{seed}-{matches}.json"),
+            "study",
+            $"baseline-{basis.Key}",
+            matches,
+            seed,
+            () => Play(basis, null, matches, seed, rules, null),
+            out seconds);
 
+    /// <summary>
+    /// Reads a played arm from disk, or plays it and keeps it there: the baseline of a base is played once and every cell is read against it.
+    /// </summary>
+    /// <param name="path">The file the arm is kept in.</param>
+    /// <param name="kind">The study, for the ledger.</param>
+    /// <param name="id">The arm's name, for the ledger.</param>
+    /// <param name="matches">How many matches.</param>
+    /// <param name="seed">The base seed.</param>
+    /// <param name="play">Plays the arm.</param>
+    /// <param name="seconds">The time spent playing, or 0 when it was read.</param>
+    internal static Rec[] Cached(string path, string kind, string id, int matches, ulong seed, Func<Rec[]> play, out double seconds)
+    {
         if (File.Exists(path))
         {
             seconds = 0;
@@ -116,17 +132,26 @@ internal static class TickPlanStudy
         }
 
         var watch = Stopwatch.StartNew();
-        var recs = Play(basis, null, matches, seed, rules, null);
+        var recs = play();
 
         watch.Stop();
         seconds = watch.Elapsed.TotalSeconds;
         File.WriteAllText(path, JsonSerializer.Serialize(recs));
-        File.AppendAllText(
-            Path.Combine(".run-logs", "plans", "ledger.tsv"),
-            string.Create(CultureInfo.InvariantCulture, $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}\tstudy\tbaseline-{basis.Key}\t{matches}\t{seed}\t{seconds:F0}\n"));
+        AppendLedger(kind, id, matches, seed, seconds);
 
         return recs;
     }
+
+    /// <summary>Notes a run in the plans' ledger.</summary>
+    /// <param name="kind">The study.</param>
+    /// <param name="id">The cell or arm.</param>
+    /// <param name="matches">How many matches.</param>
+    /// <param name="seed">The base seed.</param>
+    /// <param name="seconds">The wall time.</param>
+    internal static void AppendLedger(string kind, string id, int matches, ulong seed, double seconds) =>
+        File.AppendAllText(
+            Path.Combine(".run-logs", "plans", "ledger.tsv"),
+            string.Create(CultureInfo.InvariantCulture, $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}\t{kind}\t{id}\t{matches}\t{seed}\t{seconds:F0}\n"));
 
     private static Rec[] Play(Pairing basis, Cell? cell, int matches, ulong seed, EngineRulesV2 rules, Rec[]? baseline)
     {
@@ -171,7 +196,7 @@ internal static class TickPlanStudy
         return recs;
     }
 
-    private static Rec Read(MatchInputV1 input, MatchResultV1 result, PlayerLiveMetricsRecorder? live)
+    internal static Rec Read(MatchInputV1 input, MatchResultV1 result, PlayerLiveMetricsRecorder? live)
     {
         var rec = new Rec
         {
@@ -225,7 +250,13 @@ internal static class TickPlanStudy
                 if (matchEvent.Type == EngineEventType.Substitution)
                 {
                     tacticalSubstitution ??= matchEvent;
+                    rec.RuleSubstitutions++;
                 }
+            }
+
+            if (matchEvent.Type is EngineEventType.Goal or EngineEventType.ShotSaved or EngineEventType.ShotBlocked or EngineEventType.ShotOffTarget or EngineEventType.Woodwork)
+            {
+                (matchEvent.Side == MatchSide.Home ? rec.HomeShotMinutes : rec.AwayShotMinutes).Add(matchEvent.Minute);
             }
 
             if (matchEvent.Side == MatchSide.Home
@@ -283,7 +314,7 @@ internal static class TickPlanStudy
         return rec;
     }
 
-    private static string Header() =>
+    internal static string Header() =>
         "cell\tfamily\tbase\tseed\tmatches\tn_fired\tfire_minute\t"
         + "pts_with\tpts_without\td_pts\tse_pts\twin_with\twin_without\tdraw_with\tdraw_without\tlose_with\tlose_without\t"
         + "d_win\tse_win\td_draw\td_lose\tse_lose\td_worse\tse_worse\td_better\tse_better\t"
@@ -292,9 +323,28 @@ internal static class TickPlanStudy
         + "sub_n\tsub_shots90\tstarter_shots90\tsub_goals90\tstarter_goals90\tsub_drib90\tstarter_drib90\tsub_pass90\tstarter_pass90\tsub_min\tstarter_min\t"
         + "off_cond\ton_cond\topp_def_cond\tspent_s\tplain\n";
 
-    private static string Analyse(Cell cell, Pairing basis, Rec[] without, Rec[] with, ulong seed, int matches, double spent, out string text)
+    /// <summary>What names a cell in a report: its place in the study, its base, and what it does.</summary>
+    /// <param name="Id">The cell's id.</param>
+    /// <param name="Family">The cell's family.</param>
+    /// <param name="BaseKey">The base the cell is played on.</param>
+    /// <param name="Plain">What the cell does, in plain words.</param>
+    /// <param name="BasisPlain">What the base is, in plain words.</param>
+    /// <param name="Live">Whether the cell reads the legs.</param>
+    /// <param name="ShowSwaps">Whether the substitute is read against the starter he replaced.</param>
+    internal readonly record struct CellLabel(string Id, string Family, string BaseKey, string Plain, string BasisPlain, bool Live, bool ShowSwaps = true);
+
+    /// <summary>Reads a cell against the arm it is paired with, over the matches in which its rule fired.</summary>
+    /// <param name="cell">The cell's label.</param>
+    /// <param name="without">The arm played without the change.</param>
+    /// <param name="with">The arm played with it.</param>
+    /// <param name="seed">The base seed.</param>
+    /// <param name="matches">How many matches.</param>
+    /// <param name="spent">The wall time, for the report.</param>
+    /// <param name="text">The report as text.</param>
+    /// <returns>The cell's row in the cells table.</returns>
+    internal static string Analyse(CellLabel cell, Rec[] without, Rec[] with, ulong seed, int matches, double spent, out string text)
     {
-        var fired = Enumerable.Range(0, matches).Where(index => with[index].FireSeq > 0).ToArray();
+        var fired = Enumerable.Range(0, matches).Where(index => with[index].FireSeq > 0 && !with[index].Excluded).ToArray();
         var n = fired.Length;
         var report = new StringBuilder();
 
@@ -370,7 +420,7 @@ internal static class TickPlanStudy
 
         string DeltaPercent((double Mean, double Se) value) => $"{(100.0 * value.Mean).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture)} ±{196.0 * value.Se:F1}";
 
-        Line($"== {cell.Id}: {cell.Plain}; on {basis.Plain}; seed {seed}, {spent:F0} s ==");
+        Line($"== {cell.Id}: {cell.Plain}; on {cell.BasisPlain}; seed {seed}, {spent:F0} s ==");
         Line($"   fired in {n} of {matches} matches, on average at minute {meanMinute:F0}");
 
         if (n > 0)
@@ -382,7 +432,7 @@ internal static class TickPlanStudy
             Line($"   shots for {Delta(shotsFor)}, against {Delta(shotsAgainst)}; crosses for {Delta(crosses)}; own yellows {Delta(yellowOwn)}; own reds {Delta(redOwn)}, opponent reds {Delta(redOpponent)}");
         }
 
-        if (swapped.Length > 0)
+        if (swapped.Length > 0 && cell.ShowSwaps)
         {
             Line($"   the substitute ({swapped.Length} swaps, {subMinutes / swapped.Length:F0} min each) against the starter over the same minutes ({starterMinutes / swapped.Length:F0} min each), per 90: shots {SubPer90(3):F2} / {StarterPer90(3):F2}, goals {SubPer90(1):F3} / {StarterPer90(1):F3}, dribbles {SubPer90(4):F2} / {StarterPer90(4):F2}, passes {SubPer90(6):F1} / {StarterPer90(6):F1}");
         }
@@ -403,7 +453,7 @@ internal static class TickPlanStudy
             '\t',
             cell.Id,
             cell.Family,
-            basis.Key,
+            cell.BaseKey,
             seed,
             matches,
             n,
@@ -677,7 +727,7 @@ internal static class TickPlanStudy
             Substitutions = subs ?? [],
         };
 
-    private static string Code(FormationPreset preset) => preset switch
+    internal static string Code(FormationPreset preset) => preset switch
     {
         FormationPreset.FourFourTwo => "4-4-2",
         FormationPreset.FourThreeThree => "4-3-3",
@@ -815,6 +865,24 @@ internal static class TickPlanStudy
         public int OnCondition { get; set; } = -1;
 
         public int OpponentDefenceCondition { get; set; } = -1;
+
+        /// <summary>
+        /// Gets or sets whether the match is left out of the effect: set on a played match by the shape study when the rule could not make all
+        /// its substitutions. Decided by the state at the change, which is the same in both arms, so leaving it out does not bias the pair.
+        /// </summary>
+        public bool Excluded { get; set; }
+
+        /// <summary>Gets or sets how many substitutions the home side's rule made.</summary>
+        public int RuleSubstitutions { get; set; }
+
+        /// <summary>Gets or sets the minutes of the home side's shots (goals, saves, blocks, misses and the woodwork).</summary>
+        public List<int> HomeShotMinutes { get; set; } = [];
+
+        /// <summary>Gets or sets the minutes of the away side's shots.</summary>
+        public List<int> AwayShotMinutes { get; set; } = [];
+
+        /// <summary>Gets or sets the match's zone counts, when the match was recorded (the shape study).</summary>
+        public int[] Zones { get; set; } = [];
 
         /// <summary>Gets or sets each home player's minutes, goals, assists, shots, dribbles attempted and completed, passes, tackles and crosses.</summary>
         public Dictionary<Guid, int[]> Lines { get; set; } = [];

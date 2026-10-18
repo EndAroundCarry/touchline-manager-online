@@ -22,7 +22,7 @@ namespace Tactical11Manager.SimulationBenchmarks;
 /// how it generated the players.
 /// </para>
 /// </remarks>
-internal static class LaboratoryFixtures
+internal static partial class LaboratoryFixtures
 {
     /// <summary>Builds two evenly matched sides.</summary>
     /// <param name="seed">The match seed.</param>
@@ -89,6 +89,9 @@ internal static class LaboratoryFixtures
         MatchInstructionsV1 home,
         MatchInstructionsV1 away,
         EngineRulesV2? rules = null) =>
+        Frame(seed, rules, Side(1, "Home", homeAbility, home), Side(2, "Away", awayAbility, away));
+
+    private static MatchInputV1 Frame(ulong seed, EngineRulesV2? rules, MatchSideV1 home, MatchSideV1 away) =>
         new()
         {
             FixtureId = Guid.Parse("018f0000-0000-7000-8000-0000000000f1"),
@@ -99,8 +102,8 @@ internal static class LaboratoryFixtures
             HomeAdvantageBasisPoints = (rules ?? EngineRulesV2.Default).HomeAdvantageBasisPoints,
             FormulaConfigurationHash = EngineConfiguration.HashOf(rules ?? EngineRulesV2.Default),
             Seed = seed,
-            Home = Side(1, "Home", homeAbility, home),
-            Away = Side(2, "Away", awayAbility, away),
+            Home = home,
+            Away = away,
         };
 
     private static MatchSideV1 Side(int clubSeed, string name, int ability, MatchInstructionsV1 instructions)
@@ -157,6 +160,15 @@ internal static class LaboratoryFixtures
         int number,
         MatchPosition position,
         int ability) =>
+        Participant(clubId, participantId, clubSeed, number, position, PlayerAttributesV1.Uniform(ability));
+
+    private static MatchParticipantV1 Participant(
+        Guid clubId,
+        Guid participantId,
+        int clubSeed,
+        int number,
+        MatchPosition position,
+        PlayerAttributesV1 attributes) =>
         new()
         {
             ParticipantId = participantId,
@@ -166,7 +178,7 @@ internal static class LaboratoryFixtures
             ShirtNumber = number,
             Position = position,
             SecondaryPositions = [],
-            Attributes = PlayerAttributesV1.Uniform(ability),
+            Attributes = attributes,
             State = PlayerMatchStateV1.Uniform(8_000),
         };
 
