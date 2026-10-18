@@ -267,7 +267,10 @@ export function withFormationChoice(
   rule: MatchInstruction,
   formation: string | null,
   lineupPlayerIds: ReadonlySet<string>,
+  benchPlayerIds: ReadonlySet<string> = new Set(),
 ): MatchInstruction {
+  const incoming = incomingPlayerIds(rule, benchPlayerIds);
+
   return {
     ...rule,
     formation,
@@ -276,9 +279,107 @@ export function withFormationChoice(
         ? []
         : rule.overrides.filter(
             (placement) =>
-              lineupPlayerIds.has(placement.playerId) && placement.slotNumber > KEEPER_SLOT,
+              (lineupPlayerIds.has(placement.playerId) || incoming.has(placement.playerId)) &&
+              placement.slotNumber > KEEPER_SLOT,
           ),
   };
+}
+
+/** The bench players the rule brings on by name: the ones a placement may name besides the starters. */
+export function incomingPlayerIds(
+  rule: MatchInstruction,
+  benchPlayerIds: ReadonlySet<string>,
+): ReadonlySet<string> {
+  return new Set(
+    rule.substitutions.flatMap((substitution) =>
+      substitution.on === 'player' &&
+      substitution.onPlayerId !== null &&
+      benchPlayerIds.has(substitution.onPlayerId)
+        ? [substitution.onPlayerId]
+        : [],
+    ),
+  );
+}
+
+/** One substitution that names both players: who comes off, and who takes his place on the pitch. */
+export interface NamedSwap {
+  readonly offPlayerId: string;
+  readonly onPlayerId: string;
+}
+
+/**
+ * The rule's substitutions that name both players, so the preview knows who stands where once they are made. A substitution that picks
+ * the player to take off by a selector (the most tired, the lowest rated) is left out: nobody knows who leaves until the match.
+ */
+export function namedSwaps(
+  rule: MatchInstruction,
+  lineupPlayerIds: ReadonlySet<string>,
+  benchPlayerIds: ReadonlySet<string>,
+): readonly NamedSwap[] {
+  return rule.substitutions.flatMap((substitution) =>
+    substitution.off === 'player' &&
+    substitution.on === 'player' &&
+    substitution.offPlayerId !== null &&
+    substitution.onPlayerId !== null &&
+    lineupPlayerIds.has(substitution.offPlayerId) &&
+    benchPlayerIds.has(substitution.onPlayerId)
+      ? [{ offPlayerId: substitution.offPlayerId, onPlayerId: substitution.onPlayerId }]
+      : [],
+  );
+}
+
+/** Whether the rule brings a substitute on by name but takes off a player chosen by a selector, so his place cannot be previewed. */
+export function hasUnplaceableIncoming(
+  rule: MatchInstruction,
+  benchPlayerIds: ReadonlySet<string>,
+): boolean {
+  return rule.substitutions.some(
+    (substitution) =>
+      substitution.on === 'player' &&
+      substitution.onPlayerId !== null &&
+      benchPlayerIds.has(substitution.onPlayerId) &&
+      substitution.off !== 'player',
+  );
+}
+
+/** The players the rule takes off by name. */
+export function leavingPlayerIds(rule: MatchInstruction): ReadonlySet<string> {
+  return new Set(
+    rule.substitutions.flatMap((substitution) =>
+      substitution.off === 'player' && substitution.offPlayerId !== null
+        ? [substitution.offPlayerId]
+        : [],
+    ),
+  );
+}
+
+/** The players the rule places in its new shape and also takes off by name: the placement is never used. */
+export function placedButLeaving(rule: MatchInstruction): readonly string[] {
+  const leaving = leavingPlayerIds(rule);
+
+  return rule.overrides.flatMap((placement) =>
+    leaving.has(placement.playerId) ? [placement.playerId] : [],
+  );
+}
+
+/**
+ * Drops the placements of players the rule no longer fields: a starter who left the lineup stays a problem for the manager to see, but
+ * a substitute the rule stopped bringing on has nothing left to place.
+ */
+export function withoutOrphanedPlacements(
+  rule: MatchInstruction,
+  lineupPlayerIds: ReadonlySet<string>,
+  benchPlayerIds: ReadonlySet<string>,
+): MatchInstruction {
+  const incoming = incomingPlayerIds(rule, benchPlayerIds);
+  const overrides = rule.overrides.filter(
+    (placement) =>
+      lineupPlayerIds.has(placement.playerId) ||
+      incoming.has(placement.playerId) ||
+      !benchPlayerIds.has(placement.playerId),
+  );
+
+  return overrides.length === rule.overrides.length ? rule : { ...rule, overrides };
 }
 
 /**
@@ -633,7 +734,7 @@ export function instructionProblems(
       substitutionProblems(substitution, current.event, lineupPlayerIds, benchPlayerIds, add);
     }
 
-    overrideProblems(current, lineupPlayerIds, add);
+    overrideProblems(current, lineupPlayerIds, benchPlayerIds, add);
 
     if (current.isEnabled) {
       substitutions += current.substitutions.length;
@@ -683,6 +784,7 @@ function substitutionProblems(
 function overrideProblems(
   current: MatchInstruction,
   lineup: ReadonlySet<string>,
+  bench: ReadonlySet<string>,
   add: (code: string, playerId?: string | null) => void,
 ): void {
   if (current.overrides.length === 0) {
@@ -695,12 +797,13 @@ function overrideProblems(
     return;
   }
 
+  const incoming = incomingPlayerIds(current, bench);
   const players = new Set<string>();
   const slots = new Set<number>();
 
   for (const placement of current.overrides) {
     if (
-      !lineup.has(placement.playerId) ||
+      !(lineup.has(placement.playerId) || incoming.has(placement.playerId)) ||
       placement.slotNumber <= KEEPER_SLOT ||
       placement.slotNumber > 11 ||
       players.has(placement.playerId) ||

@@ -37,7 +37,10 @@ public enum MatchInstructionIssueCode
     /// <summary>A substitution names a player to bring on who is not on the plan's bench.</summary>
     OnPlayerNotOnBench = 9,
 
-    /// <summary>A placement in the new shape is for a player outside the lineup, a slot outside 2…11, or a repeat, or the instruction has no new shape.</summary>
+    /// <summary>
+    /// A placement in the new shape is for a player outside the lineup who the instruction does not bring on from the bench by name, a slot
+    /// outside 2…11, or a repeat, or the instruction has no new shape.
+    /// </summary>
     OverrideInvalid = 10,
 
     /// <summary>
@@ -75,6 +78,12 @@ public enum MatchInstructionWarningCode
 {
     /// <summary>The instruction changes no shape, no team instruction, and makes no substitution.</summary>
     DoesNothing = 0,
+
+    /// <summary>A placement puts a player in a slot he is not at home in, by family or by the role's natural positions (`INS-10`).</summary>
+    OutOfPosition = 1,
+
+    /// <summary>A placement names a player the same instruction takes off by name, so the placement is never used.</summary>
+    PlacedPlayerLeaves = 2,
 }
 
 /// <summary>Stable wire codes for <see cref="MatchInstructionWarningCode"/>.</summary>
@@ -85,6 +94,8 @@ public static class MatchInstructionWarningCodes
     public static string ToCode(this MatchInstructionWarningCode code) => code switch
     {
         MatchInstructionWarningCode.DoesNothing => "INSTRUCTION_DOES_NOTHING",
+        MatchInstructionWarningCode.OutOfPosition => "INSTRUCTION_OUT_OF_POSITION",
+        MatchInstructionWarningCode.PlacedPlayerLeaves => "INSTRUCTION_PLACED_PLAYER_LEAVES",
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown match instruction warning code."),
     };
 }
@@ -98,7 +109,13 @@ public sealed record MatchInstructionIssue(MatchInstructionIssueCode Code, int? 
 /// <summary>One thing about a plan's match instructions that deserves a look but does not stop a save.</summary>
 /// <param name="Code">What it is.</param>
 /// <param name="Ordinal">The instruction's place in the list, from 1.</param>
-public sealed record MatchInstructionWarning(MatchInstructionWarningCode Code, int Ordinal);
+/// <param name="PlayerId">The player the warning concerns, when it concerns one.</param>
+public sealed record MatchInstructionWarning(MatchInstructionWarningCode Code, int Ordinal, Guid? PlayerId = null);
+
+/// <summary>Where a player plays, which is what the out-of-position warning reads.</summary>
+/// <param name="Primary">His primary position.</param>
+/// <param name="Secondary">His other positions.</param>
+public sealed record PlayerPositionFacts(PlayerPosition Primary, IReadOnlyList<PlayerPosition> Secondary);
 
 /// <summary>The verdict on a plan's match instructions.</summary>
 /// <param name="Issues">Every reason the instructions are not valid, in list order. Empty when they are.</param>
@@ -130,10 +147,12 @@ public static class MatchInstructionValidator
     /// <param name="instructions">The instructions, in the order they are checked.</param>
     /// <param name="lineupPlayerIds">The players in the plan's lineup.</param>
     /// <param name="benchPlayerIds">The players on the plan's bench.</param>
+    /// <param name="players">Where the lineup and bench play, for the out-of-position warning, or null to leave that warning out.</param>
     public static MatchInstructionValidation Validate(
         IReadOnlyList<MatchInstructionDefinition> instructions,
         IReadOnlyCollection<Guid> lineupPlayerIds,
-        IReadOnlyCollection<Guid> benchPlayerIds)
+        IReadOnlyCollection<Guid> benchPlayerIds,
+        IReadOnlyDictionary<Guid, PlayerPositionFacts>? players = null)
     {
         ArgumentNullException.ThrowIfNull(instructions);
         ArgumentNullException.ThrowIfNull(lineupPlayerIds);
@@ -169,12 +188,15 @@ public static class MatchInstructionValidator
             }
         }
 
-        return new MatchInstructionValidation(issues, WarningsOf(instructions));
+        return new MatchInstructionValidation(issues, WarningsOf(instructions, players));
     }
 
-    /// <summary>Finds what deserves a manager's attention in a plan's instructions, which needs no facts about the squad.</summary>
+    /// <summary>Finds what deserves a manager's attention in a plan's instructions.</summary>
     /// <param name="instructions">The instructions, in the order they are checked.</param>
-    public static IReadOnlyList<MatchInstructionWarning> WarningsOf(IReadOnlyList<MatchInstructionDefinition> instructions)
+    /// <param name="players">Where the players the instructions place play, or null to leave the out-of-position warning out.</param>
+    public static IReadOnlyList<MatchInstructionWarning> WarningsOf(
+        IReadOnlyList<MatchInstructionDefinition> instructions,
+        IReadOnlyDictionary<Guid, PlayerPositionFacts>? players = null)
     {
         ArgumentNullException.ThrowIfNull(instructions);
 
@@ -195,9 +217,51 @@ public static class MatchInstructionValidator
             {
                 warnings.Add(new MatchInstructionWarning(MatchInstructionWarningCode.DoesNothing, ordinal));
             }
+
+            AddPlacementWarnings(instruction, ordinal, players, warnings);
         }
 
         return warnings;
+    }
+
+    /// <summary>
+    /// The warnings about a rule's placements: a player the same rule takes off by name is placed for nothing, and a player put in a slot he
+    /// is not at home in plays out of position (`INS-10`), which is how the main board marks it too.
+    /// </summary>
+    private static void AddPlacementWarnings(
+        MatchInstructionDefinition instruction,
+        int ordinal,
+        IReadOnlyDictionary<Guid, PlayerPositionFacts>? players,
+        List<MatchInstructionWarning> warnings)
+    {
+        if (instruction.Formation is not { } formation || instruction.Overrides.Count == 0)
+        {
+            return;
+        }
+
+        var leaving = instruction.Substitutions
+            .Where(substitution => substitution.Off == MatchInstructionOff.Player && substitution.OffPlayerId is not null)
+            .Select(substitution => substitution.OffPlayerId!.Value)
+            .ToHashSet();
+        var slots = FormationLayouts.DefaultSlots(formation).ToDictionary(slot => slot.SlotNumber);
+
+        foreach (var placement in instruction.Overrides)
+        {
+            if (leaving.Contains(placement.PlayerId))
+            {
+                warnings.Add(new MatchInstructionWarning(MatchInstructionWarningCode.PlacedPlayerLeaves, ordinal, placement.PlayerId));
+
+                continue;
+            }
+
+            if (players is not null
+                && players.TryGetValue(placement.PlayerId, out var facts)
+                && slots.TryGetValue(placement.SlotNumber, out var slot)
+                && !RolePositions.IsAtHome(facts.Primary, facts.Secondary, slot.PositionFamily, slot.Role))
+            {
+                warnings.Add(new MatchInstructionWarning(MatchInstructionWarningCode.OutOfPosition, ordinal, placement.PlayerId));
+            }
+        }
     }
 
     private static void ValidateInstruction(
@@ -250,7 +314,7 @@ public static class MatchInstructionValidator
             ValidateSubstitution(substitution, instruction.Event, lineup, bench, Add);
         }
 
-        ValidateOverrides(instruction, lineup, Add);
+        ValidateOverrides(instruction, lineup, bench, Add);
     }
 
     /// <summary>
@@ -331,9 +395,14 @@ public static class MatchInstructionValidator
         }
     }
 
+    /// <summary>
+    /// A placement names a player the shape can have on the pitch: one in the lineup, or a bench player the same instruction brings on by name.
+    /// The substitutions are made before the shape is fitted, so the engine can place him.
+    /// </summary>
     private static void ValidateOverrides(
         MatchInstructionDefinition instruction,
         ISet<Guid> lineup,
+        ISet<Guid> bench,
         Action<MatchInstructionIssueCode, Guid?> add)
     {
         if (instruction.Overrides.Count == 0)
@@ -348,12 +417,16 @@ public static class MatchInstructionValidator
             return;
         }
 
+        var incoming = instruction.Substitutions
+            .Where(substitution => substitution.On == MatchInstructionOn.Player && substitution.OnPlayerId is { } id && bench.Contains(id))
+            .Select(substitution => substitution.OnPlayerId!.Value)
+            .ToHashSet();
         var players = new HashSet<Guid>();
         var slots = new HashSet<int>();
 
         foreach (var placement in instruction.Overrides)
         {
-            if (!lineup.Contains(placement.PlayerId)
+            if (!(lineup.Contains(placement.PlayerId) || incoming.Contains(placement.PlayerId))
                 || placement.SlotNumber is < TacticalSlot.FirstSlotNumber + 1 or > TacticalSlot.LastSlotNumber
                 || !players.Add(placement.PlayerId)
                 || !slots.Add(placement.SlotNumber))

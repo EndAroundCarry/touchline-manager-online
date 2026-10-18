@@ -74,7 +74,7 @@ public sealed class MatchInstructionTests
         instruction.Ordinal.Should().Be(3);
         instruction.CreatedAt.Should().Be(Now);
         instruction.Definition.Should().BeEquivalentTo(definition);
-        instruction.OverridesJson.Should().Contain(Starter.ToString("D"));
+        instruction.OverridesJson.Should().Contain(OtherStarter.ToString("D"));
         instruction.SubstitutionsJson.Should().Contain("most_tired_in_family");
     }
 
@@ -352,6 +352,66 @@ public sealed class MatchInstructionTests
     }
 
     [Fact]
+    public void A_placement_may_name_a_bench_player_the_same_instruction_brings_on_by_name()
+    {
+        var comesOn = Full() with { Overrides = [new MatchInstructionOverride(Substitute, 9)] };
+
+        Validate(comesOn).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_placement_of_a_bench_player_the_instruction_does_not_bring_on_is_refused()
+    {
+        var stays = Full() with { Substitutions = [Swap() with { OnPlayerId = null, On = MatchInstructionOn.BestFitInFamily, OnFamily = PositionFamily.Attack }], Overrides = [new MatchInstructionOverride(Substitute, 9)] };
+        var offBench = Full() with { Substitutions = [Swap() with { OnPlayerId = Stranger }], Overrides = [new MatchInstructionOverride(Stranger, 9)] };
+
+        foreach (var instruction in new[] { stays, offBench })
+        {
+            IssuesOf(instruction).Should().Contain(issue => issue.Code == MatchInstructionIssueCode.OverrideInvalid && issue.PlayerId == instruction.Overrides[0].PlayerId);
+        }
+    }
+
+    [Fact]
+    public void A_placement_of_a_player_the_same_instruction_takes_off_is_a_warning_not_an_error()
+    {
+        var leaves = Full() with { Overrides = [new MatchInstructionOverride(Starter, 9)] };
+
+        Validate(leaves).IsValid.Should().BeTrue();
+        Validate(leaves).Warnings.Should().ContainSingle()
+            .Which.Should().Be(new MatchInstructionWarning(MatchInstructionWarningCode.PlacedPlayerLeaves, 1, Starter));
+    }
+
+    [Fact]
+    public void A_placement_in_a_slot_the_player_is_not_at_home_in_is_a_warning_when_the_positions_are_known()
+    {
+        var attackSlots = FormationLayouts.DefaultSlots(FormationPreset.ThreeFourThree).Where(slot => slot.PositionFamily == PositionFamily.Attack).Select(slot => slot.SlotNumber).ToArray();
+        var placed = Full() with { Overrides = [new MatchInstructionOverride(OtherStarter, attackSlots[0]), new MatchInstructionOverride(Substitute, attackSlots[1])] };
+        var atHome = new Dictionary<Guid, PlayerPositionFacts>
+        {
+            [OtherStarter] = new(PlayerPosition.CentreBack, []),
+            [Substitute] = new(PlayerPosition.Striker, []),
+        };
+        var covered = new Dictionary<Guid, PlayerPositionFacts>
+        {
+            [OtherStarter] = new(PlayerPosition.CentreBack, [PlayerPosition.Striker]),
+            [Substitute] = new(PlayerPosition.Striker, []),
+        };
+
+        MatchInstructionValidator.WarningsOf([placed]).Should().BeEmpty("the positions are not known");
+        MatchInstructionValidator.WarningsOf([placed], atHome).Where(warning => warning.Code == MatchInstructionWarningCode.OutOfPosition)
+            .Should().ContainSingle().Which.PlayerId.Should().Be(OtherStarter);
+        MatchInstructionValidator.WarningsOf([placed], covered).Should().BeEmpty("a secondary position covers the slot");
+    }
+
+    [Fact]
+    public void An_instruction_that_is_off_warns_of_nothing()
+    {
+        var leaves = Full() with { IsEnabled = false, Overrides = [new MatchInstructionOverride(Starter, 9)] };
+
+        MatchInstructionValidator.WarningsOf([leaves]).Should().BeEmpty();
+    }
+
+    [Fact]
     public void An_issue_names_the_instruction_by_its_place_in_the_list()
     {
         var result = MatchInstructionValidator.Validate([Plain("Fine"), Plain(" "), Plain("Fine")], [Starter], [Substitute]);
@@ -423,7 +483,7 @@ public sealed class MatchInstructionTests
         EventFamily = PositionFamily.Midfield,
         EventThreshold = 6_000,
         Formation = FormationPreset.ThreeFourThree,
-        Overrides = [new MatchInstructionOverride(Starter, 9)],
+        Overrides = [new MatchInstructionOverride(OtherStarter, 9)],
         Changes = new MatchInstructionChanges
         {
             Mentality = Mentality.Positive,

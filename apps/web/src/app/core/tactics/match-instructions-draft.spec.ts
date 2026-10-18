@@ -5,7 +5,7 @@ import {
   MAX_MATCH_INSTRUCTIONS,
   blankInstruction,
 } from './match-instructions';
-import { previewShape } from './match-instructions-fit';
+import { naturalPlacements, previewShape } from './match-instructions-fit';
 import { TacticsApi } from './tactics-api';
 import {
   PlanDraft,
@@ -16,6 +16,7 @@ import {
   toRequest,
   withAssignment,
   withAssistantFatigue,
+  withBenchAssignment,
   withDuplicatedInstruction,
   withInstructionOrder,
   withMatchInstruction,
@@ -337,6 +338,7 @@ describe('previewShape', () => {
       playerId: 'p10',
       slotNumber: 3,
       isChosen: true,
+      isOutOfPosition: true,
     });
     expect(preview).toHaveLength(11);
   });
@@ -351,6 +353,163 @@ describe('previewShape', () => {
       noSecondary,
     );
 
-    expect(preview).toEqual([{ playerId: 'p1', slotNumber: 1, isChosen: false }]);
+    expect(preview).toEqual([
+      { playerId: 'p1', slotNumber: 1, isChosen: false, isOutOfPosition: false },
+    ]);
+  });
+
+  describe('with a substitute on the bench', () => {
+    const substitute: SelectablePlayer = {
+      id: 'b1',
+      fullName: 'Bench One',
+      shortName: 'B1',
+      primaryPosition: 'st',
+      positionFamily: 'attack',
+      isUnavailable: false,
+    };
+    const everyone = [...players, substitute];
+
+    function benched(): PlanDraft {
+      return withBenchAssignment(fullDraft(), 12, 'b1');
+    }
+
+    const swap = {
+      off: 'player',
+      offPlayerId: 'p10',
+      offFamily: null,
+      on: 'player',
+      onPlayerId: 'b1',
+      onFamily: null,
+    };
+
+    it('makes the named substitution first, so the substitute stands in the seat of the man he replaces', () => {
+      const preview = previewShape(
+        benched(),
+        { ...blankInstruction(), formation: '4-4-2', substitutions: [swap] },
+        [formation('4-4-2')],
+        everyone,
+        noSecondary,
+      );
+
+      expect(preview).toHaveLength(11);
+      expect(preview?.some((placement) => placement.playerId === 'p10')).toBe(false);
+      expect(preview?.find((placement) => placement.playerId === 'b1')?.slotNumber).toBe(10);
+    });
+
+    it('places the substitute where the manager says', () => {
+      const preview = previewShape(
+        benched(),
+        {
+          ...blankInstruction(),
+          formation: '4-4-2',
+          substitutions: [swap],
+          overrides: [{ playerId: 'b1', slotNumber: 11 }],
+        },
+        [formation('4-4-2')],
+        everyone,
+        noSecondary,
+      );
+
+      expect(preview?.find((placement) => placement.playerId === 'b1')).toMatchObject({
+        slotNumber: 11,
+        isChosen: true,
+        isOutOfPosition: false,
+      });
+    });
+
+    it('cannot know who leaves when the man to take off is picked by a selector, so the substitute is not on the pitch', () => {
+      const preview = previewShape(
+        benched(),
+        {
+          ...blankInstruction(),
+          formation: '4-4-2',
+          substitutions: [
+            { ...swap, off: 'most_tired_in_family', offPlayerId: null, offFamily: 'attack' },
+          ],
+        },
+        [formation('4-4-2')],
+        everyone,
+        noSecondary,
+      );
+
+      expect(preview?.some((placement) => placement.playerId === 'b1')).toBe(false);
+      expect(preview).toHaveLength(11);
+    });
+
+    it('marks a placement in a slot the player is not at home in, unless a secondary position covers it', () => {
+      const rule = {
+        ...blankInstruction(),
+        formation: '4-4-2',
+        overrides: [{ playerId: 'p10', slotNumber: 3 }],
+      };
+      const flagged = previewShape(fullDraft(), rule, [formation('4-4-2')], players, noSecondary);
+      const covered = previewShape(
+        fullDraft(),
+        rule,
+        [formation('4-4-2')],
+        players,
+        new Map([['p10', ['cb']]]),
+      );
+
+      expect(flagged?.find((placement) => placement.playerId === 'p10')?.isOutOfPosition).toBe(
+        true,
+      );
+      expect(covered?.find((placement) => placement.playerId === 'p10')?.isOutOfPosition).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('naturalPlacements', () => {
+    const rule = {
+      ...blankInstruction(),
+      formation: '4-4-2',
+      overrides: [{ playerId: 'p10', slotNumber: 3 }],
+    };
+
+    it('has nothing to place for a rule that keeps the shape', () => {
+      expect(
+        naturalPlacements(
+          fullDraft(),
+          blankInstruction(),
+          [formation('4-4-2')],
+          players,
+          noSecondary,
+        ),
+      ).toBeNull();
+    });
+
+    it('keeps the placements the manager made and puts every outfield player in a slot of his own', () => {
+      const placements = naturalPlacements(
+        fullDraft(),
+        rule,
+        [formation('4-4-2')],
+        players,
+        noSecondary,
+      );
+
+      expect(placements).toHaveLength(10);
+      expect(placements).toContainEqual({ playerId: 'p10', slotNumber: 3 });
+      expect(new Set(placements?.map((placement) => placement.slotNumber)).size).toBe(10);
+      expect(placements?.some((placement) => placement.slotNumber === 1)).toBe(false);
+    });
+
+    it('leaves no more players out of position than the usual fit does', () => {
+      const placements =
+        naturalPlacements(fullDraft(), rule, [formation('4-4-2')], players, noSecondary) ?? [];
+      const usual =
+        previewShape(fullDraft(), rule, [formation('4-4-2')], players, noSecondary) ?? [];
+      const slotFamily = new Map(
+        formation('4-4-2').slots.map((slot) => [slot.slotNumber, slot.positionFamily]),
+      );
+      const family = new Map(players.map((player) => [player.id, player.positionFamily]));
+      const outOfFamily = placements.filter(
+        (placement) => family.get(placement.playerId) !== slotFamily.get(placement.slotNumber),
+      ).length;
+
+      expect(outOfFamily).toBeLessThanOrEqual(
+        usual.filter((placement) => placement.isOutOfPosition).length,
+      );
+    });
   });
 });

@@ -133,6 +133,9 @@
               @for (message of view.problems; track message) {
                 <p class="mt-1 text-xs text-red-200" role="alert">{{ message }}</p>
               }
+              @for (message of view.warnings; track message) {
+                <p class="mt-1 text-xs text-amber-200" data-testid="rule-warning">{{ message }}</p>
+              }
             </div>
 
             <div
@@ -389,9 +392,16 @@
                   } @else if (shape(); as slots) {
                     <p class="mt-2 text-sm text-ink-2">
                       Your eleven fitted into {{ view.rule.formation }}. Select a slot to choose who
-                      stands there; the rest are fitted around your choice. A player who has been
-                      sent off or substituted is replaced in the fit on the day.
+                      stands there; the rest are fitted around your choice. A substitute this
+                      instruction brings on by name takes the place of the player he replaces. A
+                      player who has been sent off or substituted is replaced in the fit on the day.
                     </p>
+                    @if (view.hasUnplaceableIncoming) {
+                      <p class="mt-1 text-xs text-ink-2" data-testid="incoming-note">
+                        Where a substitute stands is decided in the match when the player to take
+                        off is chosen by tiredness or rating, so he cannot be placed here.
+                      </p>
+                    }
 
                     <div class="mt-3 flex justify-center">
                       <div
@@ -427,6 +437,13 @@
                               @if (slot.isChosen) {
                                 <span class="text-[9px] font-normal" aria-hidden="true">set</span>
                               }
+                              @if (slot.isOutOfPosition) {
+                                <span
+                                  class="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-amber-300 text-[10px] font-bold leading-4 text-black"
+                                  aria-hidden="true"
+                                  >!</span
+                                >
+                              }
                             } @else {
                               <span aria-hidden="true">{{ slot.slotNumber }}</span>
                               <span class="text-[9px] font-normal" aria-hidden="true">empty</span>
@@ -435,6 +452,13 @@
                         }
                       </div>
                     </div>
+
+                    @if (anyOutOfPosition()) {
+                      <p class="mt-2 text-xs text-amber-200" data-testid="misfit-legend">
+                        <span aria-hidden="true">!</span> marks a player who is not at home in his
+                        slot.
+                      </p>
+                    }
 
                     @if (selectedShapeSlot(); as picked) {
                       <div
@@ -446,7 +470,7 @@
                           Slot {{ picked.slotNumber }} is selected. Choose who stands there:
                         </p>
                         <ul class="mt-2 flex flex-wrap gap-2" role="list">
-                          @for (player of starters(); track player.id) {
+                          @for (player of placeable(); track player.id) {
                             @if (player.positionFamily !== 'goalkeeper') {
                               <li>
                                 <button
@@ -468,16 +492,26 @@
                       </div>
                     }
 
-                    @if (view.rule.overrides.length > 0) {
+                    <div class="mt-2 flex flex-wrap gap-3">
                       <button
                         type="button"
                         [class]="linkClass"
-                        data-testid="reset-placements"
-                        (click)="resetPlacements(view)"
+                        data-testid="natural-fit"
+                        (click)="placeNaturally(view)"
                       >
-                        Reset to best fit
+                        Natural fit
                       </button>
-                    }
+                      @if (view.rule.overrides.length > 0) {
+                        <button
+                          type="button"
+                          [class]="linkClass"
+                          data-testid="reset-placements"
+                          (click)="resetPlacements(view)"
+                        >
+                          Reset to best fit
+                        </button>
+                      }
+                    </div>
                   }
                 }
 

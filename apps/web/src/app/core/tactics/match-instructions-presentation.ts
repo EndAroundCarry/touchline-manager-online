@@ -316,7 +316,7 @@ export function instructionIssueMessage(
     case 'INSTRUCTION_ON_PLAYER_NOT_ON_BENCH':
       return `${player ?? 'The player to bring on'} is not on this plan's bench.`;
     case 'INSTRUCTION_OVERRIDE_INVALID':
-      return `${player ?? 'A placement'} cannot be placed there: it needs a new formation, a starter, and a free slot other than the goalkeeper's.`;
+      return `${player ?? 'A placement'} cannot be placed there: it needs a new formation, a starter or a substitute this instruction brings on, and a free slot other than the goalkeeper's.`;
     case 'INSTRUCTIONS_SUBSTITUTION_LIMIT':
       return 'Between them the instructions plan more than five substitutions, the most a club may make. Turn one off or remove a substitution.';
     case 'INSTRUCTION_DOES_NOTHING':

@@ -92,7 +92,11 @@ public static class TacticsMapping
             slots,
             bench,
             plan.MatchInstructions,
-            plan.AssistantFatigueSubstitutions);
+            plan.AssistantFatigueSubstitutions,
+            PositionsOf(
+                plan.Slots.Where(slot => slot.AssignedPlayer is not null).Select(slot => slot.AssignedPlayer!)
+                    .Concat(plan.Bench.Select(place => place.Player))
+                    .Select(player => (player.Id, player.PrimaryPosition, player.SecondaryPositions))));
     }
 
     /// <summary>
@@ -140,7 +144,8 @@ public static class TacticsMapping
             slots,
             bench,
             [.. record.Instructions.OrderBy(instruction => instruction.Ordinal).Select(instruction => instruction.Definition)],
-            record.Plan.AssistantFatigueSubstitutions);
+            record.Plan.AssistantFatigueSubstitutions,
+            PositionsOf(selectablePlayers.Values.Select(player => (player.Id, player.PrimaryPosition, player.SecondaryPositions))));
     }
 
     /// <summary>Projects the validator's verdict.</summary>
@@ -222,6 +227,11 @@ public static class TacticsMapping
         PlayerRole role) =>
         !RolePositions.IsAtHome(primary, secondary, family, role);
 
+    /// <summary>Where each player a plan fields or benches plays, which is what its placements are judged against.</summary>
+    private static Dictionary<Guid, PlayerPositionFacts> PositionsOf(
+        IEnumerable<(Guid Id, PlayerPosition Primary, IReadOnlyList<PlayerPosition> Secondary)> players) =>
+        players.DistinctBy(player => player.Id).ToDictionary(player => player.Id, player => new PlayerPositionFacts(player.Primary, player.Secondary));
+
     private static AssignedPlayerResponse? DescribeAssigned(
         Guid? playerId,
         IReadOnlyDictionary<Guid, TacticsSelectablePlayerRow> selectablePlayers)
@@ -254,7 +264,8 @@ public static class TacticsMapping
         List<TacticalSlotResponse> slots,
         List<TacticalBenchSlotResponse> bench,
         IReadOnlyList<MatchInstructionDefinition> matchInstructions,
-        bool assistantFatigueSubstitutions)
+        bool assistantFatigueSubstitutions,
+        IReadOnlyDictionary<Guid, PlayerPositionFacts> positions)
     {
         var assignedCount = slots.Count(slot => slot.AssignedPlayer is not null);
 
@@ -281,6 +292,6 @@ public static class TacticsMapping
             bench,
             [.. matchInstructions.Select(instruction => instruction.ToModel())],
             assistantFatigueSubstitutions,
-            [.. MatchInstructionValidator.WarningsOf(matchInstructions).Select(warning => warning.ToResponse())]);
+            [.. MatchInstructionValidator.WarningsOf(matchInstructions, positions).Select(warning => warning.ToResponse())]);
     }
 }

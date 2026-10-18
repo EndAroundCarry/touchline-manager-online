@@ -123,7 +123,7 @@ public static class MatchInstructionMapping
     {
         ArgumentNullException.ThrowIfNull(warning);
 
-        return new MatchInstructionWarningResponse(warning.Code.ToCode(), warning.Ordinal);
+        return new MatchInstructionWarningResponse(warning.Code.ToCode(), warning.Ordinal, warning.PlayerId);
     }
 
     /// <summary>Projects one issue in the vocabulary the plan's other issues use.</summary>

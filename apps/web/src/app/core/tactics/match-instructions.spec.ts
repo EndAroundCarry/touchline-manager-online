@@ -8,8 +8,11 @@ import {
   MAX_RULE_SUBSTITUTIONS,
   blankInstruction,
   blankSubstitution,
+  hasUnplaceableIncoming,
   inertInstructions,
   instructionProblems,
+  namedSwaps,
+  placedButLeaving,
   plannedSubstitutions,
   withAddedSubstitution,
   withEvent,
@@ -19,6 +22,7 @@ import {
   withOffSelector,
   withOnSelector,
   withPlacement,
+  withoutOrphanedPlacements,
   withoutPlacements,
 } from './match-instructions';
 import {
@@ -168,6 +172,72 @@ describe('placements in the new shape', () => {
       formation: null,
       overrides: [],
     });
+  });
+});
+
+describe('placing a substitute the instruction brings on', () => {
+  const swap = {
+    ...blankSubstitution(),
+    offPlayerId: 'p1',
+    onPlayerId: 'b1',
+  };
+  const bringsOn: MatchInstruction = {
+    ...blankInstruction(),
+    formation: '4-3-3',
+    substitutions: [swap],
+    overrides: [{ playerId: 'b1', slotNumber: 9 }],
+  };
+
+  it('accepts a placement of a bench player the same instruction brings on by name', () => {
+    expect(problemCodes([bringsOn])).toEqual([]);
+  });
+
+  it('refuses a placement of a bench player the instruction does not bring on, or of a stranger', () => {
+    expect(problemCodes([{ ...bringsOn, substitutions: [] }])).toEqual([
+      'INSTRUCTION_OVERRIDE_INVALID',
+    ]);
+    expect(problemCodes([{ ...bringsOn, overrides: [{ playerId: 'b2', slotNumber: 9 }] }])).toEqual(
+      ['INSTRUCTION_OVERRIDE_INVALID'],
+    );
+  });
+
+  it('keeps his placement when the formation changes, and drops it when the instruction stops bringing him on', () => {
+    expect(withFormationChoice(bringsOn, '3-4-3', LINEUP, BENCH).overrides).toEqual(
+      bringsOn.overrides,
+    );
+    expect(withFormationChoice(bringsOn, '3-4-3', LINEUP).overrides).toEqual([]);
+    expect(
+      withoutOrphanedPlacements({ ...bringsOn, substitutions: [] }, LINEUP, BENCH).overrides,
+    ).toEqual([]);
+    expect(withoutOrphanedPlacements(bringsOn, LINEUP, BENCH)).toBe(bringsOn);
+  });
+
+  it('leaves a placement of a player who is neither a starter nor on the bench for the problem list to show', () => {
+    const stranger = { ...bringsOn, overrides: [{ playerId: 'gone', slotNumber: 9 }] };
+
+    expect(withoutOrphanedPlacements(stranger, LINEUP, BENCH)).toBe(stranger);
+  });
+
+  it('knows which substitutions name both players, and which bring a substitute on whom nobody can place yet', () => {
+    expect(namedSwaps(bringsOn, LINEUP, BENCH)).toEqual([{ offPlayerId: 'p1', onPlayerId: 'b1' }]);
+    expect(hasUnplaceableIncoming(bringsOn, BENCH)).toBe(false);
+
+    const bySelector = {
+      ...bringsOn,
+      substitutions: [
+        { ...swap, off: 'most_tired_in_family', offPlayerId: null, offFamily: 'midfield' },
+      ],
+    };
+
+    expect(namedSwaps(bySelector, LINEUP, BENCH)).toEqual([]);
+    expect(hasUnplaceableIncoming(bySelector, BENCH)).toBe(true);
+  });
+
+  it('finds a placed player the same instruction takes off by name', () => {
+    expect(placedButLeaving(bringsOn)).toEqual([]);
+    expect(
+      placedButLeaving({ ...bringsOn, overrides: [{ playerId: 'p1', slotNumber: 9 }] }),
+    ).toEqual(['p1']);
   });
 });
 

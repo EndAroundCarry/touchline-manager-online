@@ -92,6 +92,14 @@ export function familiarityOf(player: ShapeFitPlayer, slot: ShapeFitSlot): numbe
   return OUT_OF_POSITION_BASIS_POINTS;
 }
 
+/**
+ * Whether a player is not at home in a slot: outside its family, and neither he nor one of his other positions is one the role asks
+ * for (`INS-10`). The server's out-of-position warning and the main board's marker mean the same.
+ */
+export function isOutOfPositionIn(player: ShapeFitPlayer, slot: ShapeFitSlot): boolean {
+  return familiarityOf(player, slot) === OUT_OF_POSITION_BASIS_POINTS;
+}
+
 /** What it costs to put a player in a slot: his unfamiliarity with it, weighted, plus how far it is from where he stands. */
 export function costOf(player: ShapeFitPlayer, slot: ShapeFitSlot): number {
   const unfamiliarity = CERTAIN - familiarityOf(player, slot);

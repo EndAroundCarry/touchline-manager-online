@@ -133,6 +133,7 @@ public sealed record MatchInstructionSubstitutionModel
 }
 
 /// <summary>Something about a plan's match instructions that deserves a manager's attention but does not stop a save.</summary>
-/// <param name="Code">The stable code: <c>INSTRUCTION_DOES_NOTHING</c>.</param>
+/// <param name="Code">The stable code: <c>INSTRUCTION_DOES_NOTHING</c>, <c>INSTRUCTION_OUT_OF_POSITION</c> or <c>INSTRUCTION_PLACED_PLAYER_LEAVES</c>.</param>
 /// <param name="Ordinal">The instruction's place in the list, from 1.</param>
-public sealed record MatchInstructionWarningResponse(string Code, int Ordinal);
+/// <param name="PlayerId">The player the warning concerns, when it concerns one.</param>
+public sealed record MatchInstructionWarningResponse(string Code, int Ordinal, Guid? PlayerId = null);

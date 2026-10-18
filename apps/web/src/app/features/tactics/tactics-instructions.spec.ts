@@ -565,5 +565,96 @@ describe('Tactics tabs and match instructions', () => {
 
       expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 3');
     });
+
+    it('marks a player placed in a slot he is not at home in', () => {
+      click('shape-slot-10');
+      click('place-s2');
+
+      expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('out of position');
+      expect(maybe('misfit-legend')).toBeTruthy();
+
+      click('place-s11');
+
+      expect(byId('shape-slot-10').getAttribute('aria-label')).not.toContain('out of position');
+      expect(maybe('misfit-legend')).toBeNull();
+    });
+
+    it('fits every outfield player naturally on request, keeping a placement the manager made', () => {
+      click('shape-slot-10');
+      click('place-s3');
+      click('natural-fit');
+
+      expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 3');
+
+      saveButton().click();
+
+      const overrides = (api.update.mock.calls[0][1] as SaveTacticalPlanRequest)
+        .matchInstructions?.[0].overrides;
+
+      expect(overrides).toHaveLength(10);
+      expect(overrides).toContainEqual({ playerId: 's3', slotNumber: 10 });
+    });
+
+    describe('with a substitute the rule brings on', () => {
+      beforeEach(() => {
+        click('add-substitution');
+        choose('sub-off-player', 's10');
+        choose('sub-on-player', 'b2');
+      });
+
+      it('puts the substitute in the shape in the seat of the man he replaces, and offers him for a slot', () => {
+        const pitchText = byId('shape-pitch').textContent;
+
+        expect(pitchText).toContain('FFW');
+        expect(pitchText).not.toContain('STA10');
+
+        click('shape-slot-9');
+
+        expect(maybe('place-b2')).toBeTruthy();
+        expect(maybe('place-s10')).toBeNull();
+      });
+
+      it('places him where the manager says and sends it, with no problem raised', () => {
+        click('shape-slot-9');
+        click('place-b2');
+
+        expect(byId('shape-slot-9').getAttribute('aria-label')).toContain('Fresh Forward');
+        expect(byId('shape-slot-9').getAttribute('aria-label')).toContain('placed by you');
+        expect(element.querySelector('[role="alert"]')).toBeNull();
+
+        saveButton().click();
+
+        expect(
+          (api.update.mock.calls[0][1] as SaveTacticalPlanRequest).matchInstructions?.[0].overrides,
+        ).toEqual([{ playerId: 'b2', slotNumber: 9 }]);
+      });
+
+      it('drops his placement when the rule stops bringing him on', () => {
+        click('shape-slot-9');
+        click('place-b2');
+        choose('sub-on-player', '');
+
+        expect(element.querySelector('[role="alert"]')?.textContent ?? '').not.toContain(
+          'cannot be placed',
+        );
+        expect(maybe('reset-placements')).toBeNull();
+      });
+
+      it('says where he cannot be placed when the man to take off is chosen by tiredness', () => {
+        expect(maybe('incoming-note')).toBeNull();
+
+        choose('sub-off', 'most_tired_in_family');
+
+        expect(maybe('incoming-note')).toBeTruthy();
+      });
+
+      it('warns when a player is placed whom the rule takes off', () => {
+        click('shape-slot-9');
+        click('place-s5');
+        choose('sub-off-player', 's5');
+
+        expect(byId('rule-warning').textContent).toContain('takes him off');
+      });
+    });
   });
 });

@@ -16,8 +16,12 @@ import {
   eventHasSubject,
   eventTakesFamily,
   eventTakesThreshold,
+  hasUnplaceableIncoming,
   inertInstructions,
   instructionProblems,
+  leavingPlayerIds,
+  namedSwaps,
+  placedButLeaving,
   plannedSubstitutions,
   withAddedSubstitution,
   withChange,
@@ -30,10 +34,15 @@ import {
   withOnSelector,
   withPlacement,
   withSubstitution,
+  withoutOrphanedPlacements,
   withoutPlacements,
   withoutSubstitution,
 } from '../../../core/tactics/match-instructions';
-import { ShapePlacement, previewShape } from '../../../core/tactics/match-instructions-fit';
+import {
+  ShapePlacement,
+  naturalPlacements,
+  previewShape,
+} from '../../../core/tactics/match-instructions-fit';
 import {
   EVENT_OPTIONS,
   MENTALITY_CHANGE_OPTIONS,
@@ -77,7 +86,11 @@ interface RuleView {
   readonly summary: string;
   readonly isOpen: boolean;
   readonly problems: readonly string[];
+
+  /** What deserves a look but does not stop a save: placements the rule never uses. */
+  readonly warnings: readonly string[];
   readonly isInert: boolean;
+  readonly hasUnplaceableIncoming: boolean;
 }
 
 /** A player a picker offers, with a note when the instruction names someone the plan no longer fields. */
@@ -93,6 +106,7 @@ interface ShapeSlotView {
   readonly label: string;
   readonly player: SelectablePlayer | null;
   readonly isChosen: boolean;
+  readonly isOutOfPosition: boolean;
   readonly isSelected: boolean;
   readonly isKeeper: boolean;
 }
@@ -105,7 +119,8 @@ interface ShapeSlotView {
  * listed. The tab edits the same plan draft as the Match tactics tab, through the same store, so the plan saves as one.
  *
  * A new shape is fitted automatically from the plan's starting eleven (`shape-fit.ts`, the same algorithm the server and the engine
- * run), and the manager moves a player by selecting a slot and picking who stands there, as on the main board.
+ * run), and the manager moves a player by selecting a slot and picking who stands there, as on the main board. The rule's substitutions
+ * are made first, so a substitute it brings on by name is placed like a starter, and a slot a player is not at home in is marked.
  */
 @Component({
   selector: 'app-match-instructions',
@@ -236,7 +251,12 @@ export class MatchInstructions {
       problems: this.problems()
         .filter((problem) => problem.ordinal === index + 1)
         .map((problem) => instructionIssueMessage(problem, this.names())),
+      warnings: placedButLeaving(rule).map(
+        (id) =>
+          `${this.names().get(id) ?? 'A player'} is placed, but this instruction takes him off.`,
+      ),
       isInert: inert.has(index + 1),
+      hasUnplaceableIncoming: hasUnplaceableIncoming(rule, this.benchIds()),
     }));
   });
 
@@ -249,6 +269,29 @@ export class MatchInstructions {
 
       return player === undefined ? [] : [player];
     });
+  });
+
+  /**
+   * The players the open instruction's new shape can place: its starters, and the substitutes it brings on by name in the seat of a man
+   * it also names. A man it takes off by name is left out, because he is not on the pitch to be placed.
+   */
+  protected readonly placeable = computed<readonly SelectablePlayer[]>(() => {
+    const index = this.openIndex();
+    const rule = index === null ? undefined : this.rules()[index];
+
+    if (rule === undefined) {
+      return this.starters();
+    }
+
+    const byId = new Map(this.store.selectablePlayers().map((player) => [player.id, player]));
+    const leaving = leavingPlayerIds(rule);
+    const coming = namedSwaps(rule, this.lineupIds(), this.benchIds()).flatMap((swap) => {
+      const player = byId.get(swap.onPlayerId);
+
+      return player === undefined ? [] : [player];
+    });
+
+    return [...this.starters().filter((player) => !leaving.has(player.id)), ...coming];
   });
 
   /** The formation presets a rule can move to. */
@@ -289,14 +332,20 @@ export class MatchInstructions {
       return {
         slotNumber: slot.slotNumber,
         style: pitchStyle(slot),
-        label: `Slot ${slot.slotNumber}, ${familyLabel(slot.positionFamily)}, ${roleLabel(slot.role)}: ${player?.fullName ?? 'empty'}${placement?.isChosen ? ', placed by you' : ''}`,
+        label: `Slot ${slot.slotNumber}, ${familyLabel(slot.positionFamily)}, ${roleLabel(slot.role)}: ${player?.fullName ?? 'empty'}${placement?.isChosen ? ', placed by you' : ''}${placement?.isOutOfPosition ? ', out of position' : ''}`,
         player,
         isChosen: placement?.isChosen ?? false,
+        isOutOfPosition: placement?.isOutOfPosition ?? false,
         isSelected: selected === slot.slotNumber,
         isKeeper: slot.slotNumber === KEEPER_SLOT,
       };
     });
   });
+
+  /** Whether any slot of the open instruction's new shape holds a player who is not at home in it. */
+  protected readonly anyOutOfPosition = computed(
+    () => this.shape()?.some((slot) => slot.isOutOfPosition) ?? false,
+  );
 
   /** The slot being edited on the small pitch, for the line under it. */
   protected readonly selectedShapeSlot = computed(
@@ -380,6 +429,11 @@ export class MatchInstructions {
 
   private update(index: number, rule: MatchInstruction): void {
     this.store.setMatchInstruction(index, rule);
+  }
+
+  /** Updates after a substitution changed, dropping the placement of a substitute the rule no longer brings on. */
+  private updateAfterSubstitution(index: number, rule: MatchInstruction): void {
+    this.update(index, withoutOrphanedPlacements(rule, this.lineupIds(), this.benchIds()));
   }
 
   protected setEnabled(view: RuleView, event: Event): void {
@@ -482,7 +536,12 @@ export class MatchInstructions {
     this.selectedSlot.set(0);
     this.update(
       view.index,
-      withFormationChoice(view.rule, value.length === 0 ? null : value, this.lineupIds()),
+      withFormationChoice(
+        view.rule,
+        value.length === 0 ? null : value,
+        this.lineupIds(),
+        this.benchIds(),
+      ),
     );
   }
 
@@ -538,7 +597,7 @@ export class MatchInstructions {
   }
 
   protected removeSubstitution(view: RuleView, place: number): void {
-    this.update(view.index, withoutSubstitution(view.rule, place));
+    this.updateAfterSubstitution(view.index, withoutSubstitution(view.rule, place));
   }
 
   protected setOff(view: RuleView, place: number, event: Event): void {
@@ -575,7 +634,7 @@ export class MatchInstructions {
   }
 
   protected setOn(view: RuleView, place: number, event: Event): void {
-    this.update(
+    this.updateAfterSubstitution(
       view.index,
       withSubstitution(
         view.rule,
@@ -588,7 +647,7 @@ export class MatchInstructions {
   protected setOnPlayer(view: RuleView, place: number, event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
 
-    this.update(
+    this.updateAfterSubstitution(
       view.index,
       withSubstitution(view.rule, place, {
         ...view.rule.substitutions[place],
@@ -658,6 +717,30 @@ export class MatchInstructions {
     this.update(index, withPlacement(rule, player.id, slot));
   }
 
+  /**
+   * Places every player where he is at home as far as the squad allows, keeping the placements the manager made. The result is written as
+   * placements, so each can be changed after.
+   */
+  protected placeNaturally(view: RuleView): void {
+    const draft = this.draft();
+
+    if (draft === null) {
+      return;
+    }
+
+    const placements = naturalPlacements(
+      draft,
+      view.rule,
+      this.store.formations(),
+      this.store.selectablePlayers(),
+      this.secondaryPositions(),
+    );
+
+    if (placements !== null) {
+      this.update(view.index, { ...view.rule, overrides: [...placements] });
+    }
+  }
+
   /** Gives back every placement of the open instruction, leaving the best fit. */
   protected resetPlacements(view: RuleView): void {
     this.update(view.index, withoutPlacements(view.rule));
@@ -681,6 +764,10 @@ export class MatchInstructions {
 
     if (slot.player === null) {
       return `${base} border-dashed border-white/70 bg-black/30 text-white`;
+    }
+
+    if (slot.isOutOfPosition) {
+      return `${base} border-amber-300 bg-panel text-ink`;
     }
 
     return slot.isChosen
