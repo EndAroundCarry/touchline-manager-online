@@ -45,6 +45,35 @@ public sealed class EvaluateAiClubsTests
     }
 
     [Fact]
+    public async Task A_new_default_plan_carries_the_clubs_match_instructions_in_order()
+    {
+        var clubId = ClubId(1);
+        var repository = new StubAiClubRepository(Club(clubId));
+        var (useCase, tactics, _, _) = Create(repository);
+
+        await useCase.ExecuteAsync(CancellationToken.None);
+
+        var expected = AiClubPolicy.Decide(clubId, [.. Squad(includeGoalkeepers: true).Select(row => new AiSquadPlayer(row.PlayerId, row.PrimaryPosition, row.SecondaryPositions, row.Attributes, row.ConditionBp, row.IsAvailable))]);
+
+        tactics.Instructions.Should().HaveCount(expected.MatchPlan.Instructions.Count);
+        tactics.Instructions.Should().OnlyContain(instruction => instruction.PlanId == tactics.Plans[0].Id);
+        tactics.Instructions.Select(instruction => instruction.Ordinal).Should().Equal(Enumerable.Range(1, expected.MatchPlan.Instructions.Count));
+        tactics.Instructions.Select(instruction => instruction.Name).Should().Equal(expected.MatchPlan.Instructions.Select(instruction => instruction.Name));
+        tactics.Instructions.Should().OnlyContain(instruction => instruction.IsEnabled);
+    }
+
+    [Fact]
+    public async Task A_club_that_already_has_a_default_plan_gets_no_match_instructions()
+    {
+        var repository = new StubAiClubRepository(Club(ClubId(1), hasDefaultTacticalPlan: true, hasTrainingPlan: true));
+        var (useCase, tactics, _, _) = Create(repository);
+
+        await useCase.ExecuteAsync(CancellationToken.None);
+
+        tactics.Instructions.Should().BeEmpty("the evaluation fills gaps and never overwrites a plan a manager or an earlier run wrote (WORLD-9)");
+    }
+
+    [Fact]
     public async Task A_club_that_already_has_one_plan_keeps_it_and_gets_the_other()
     {
         var tacticalOnly = ClubId(1);
@@ -122,6 +151,12 @@ public sealed class EvaluateAiClubsTests
 
             validation.IsValid.Should().BeTrue("INS-12 gives the AI no bypass");
             validation.IsComplete.Should().BeTrue();
+
+            var lineup = tactics.Slots.Where(slot => slot.PlanId == plan.Id).Select(slot => slot.AssignedPlayerId!.Value).ToList();
+            var instructions = tactics.Instructions.Where(instruction => instruction.PlanId == plan.Id).OrderBy(instruction => instruction.Ordinal).Select(instruction => instruction.Definition).ToList();
+
+            instructions.Should().NotBeEmpty();
+            MatchInstructionValidator.Validate(instructions, lineup, []).IsValid.Should().BeTrue("the match plan goes through the manager's validator too (INS-12)");
         }
     }
 
@@ -237,6 +272,8 @@ public sealed class EvaluateAiClubsTests
 
         public List<TacticalSlot> Slots { get; } = [];
 
+        public List<MatchInstruction> Instructions { get; } = [];
+
         public void AddPlan(TacticalPlan plan) => Plans.Add(plan);
 
         public void AddSlot(TacticalSlot slot) => Slots.Add(slot);
@@ -249,9 +286,7 @@ public sealed class EvaluateAiClubsTests
         {
         }
 
-        public void AddInstruction(MatchInstruction instruction)
-        {
-        }
+        public void AddInstruction(MatchInstruction instruction) => Instructions.Add(instruction);
 
         public void RemoveInstruction(MatchInstruction instruction)
         {

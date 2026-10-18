@@ -492,6 +492,12 @@ internal static class TickShowcase
                     input = input with { Home = WithCore(input.Home, defenders, DefenderCore, defenceSkill) };
                 }
 
+                // The stronger side is the AI's: TW_AI=1 gives it the match plan the AI would write for it (plan i-want-you-to-curious-globe, M6).
+                if (Environment.GetEnvironmentVariable("TW_AI") == "1")
+                {
+                    input = input with { Home = input.Home with { MatchPlan = TickAiPlan.PlanFor(seed + (ulong)index, 0, homeForm) } };
+                }
+
                 var recorder = new MatchPassageRecorder();
                 var result = MatchSimulator.Simulate(input, rules, null, recorder, TickMatchEngine.Instance);
 

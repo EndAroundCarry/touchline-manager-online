@@ -92,6 +92,11 @@ public sealed class EvaluateAiClubs
                         _tactics.AddSlot(slot);
                     }
 
+                    foreach (var instruction in plan.Instructions)
+                    {
+                        _tactics.AddInstruction(instruction);
+                    }
+
                     plans++;
                 }
                 else
@@ -145,7 +150,14 @@ public sealed class EvaluateAiClubs
             [.. club.Players.Select(player => player.PlayerId)],
             [.. club.Players.Where(player => !player.IsAvailable).Select(player => player.PlayerId)]);
 
-        if (!validation.IsValid)
+        // The match plan is held to the validator a manager's save is, against the eleven the plan fields and no bench: the policy names
+        // families, never players, so an AI club's bench is whoever the snapshot builder picks on the day.
+        var instructionValidation = MatchInstructionValidator.Validate(
+            decision.MatchPlan.Instructions,
+            [.. definitions.Where(slot => slot.AssignedPlayerId is not null).Select(slot => slot.AssignedPlayerId!.Value)],
+            []);
+
+        if (!validation.IsValid || !instructionValidation.IsValid)
         {
             record = null!;
 
@@ -174,7 +186,11 @@ public sealed class EvaluateAiClubs
                 now))
             .ToList();
 
-        record = new TacticalPlanRecord(plan, slots, []);
+        var instructions = decision.MatchPlan.Instructions
+            .Select((definition, index) => MatchInstruction.Place(Guid.CreateVersion7(), plan.Id, index + 1, definition, now))
+            .ToList();
+
+        record = new TacticalPlanRecord(plan, slots, []) { Instructions = instructions };
 
         return true;
     }

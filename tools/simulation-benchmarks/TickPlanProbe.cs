@@ -124,11 +124,11 @@ internal static class TickPlanProbe
             var report = Report(scenario, reads.Where(read => !read.Missing).ToArray(), seed, watch.Elapsed.TotalSeconds, pooled);
 
             Console.Write(report);
-            File.WriteAllText(Path.Combine(directory, $"{scenario.Name}-{seed}.txt"), report);
-            File.WriteAllText(Path.Combine(directory, $"{scenario.Name}-{seed}.tsv"), Tsv(reads.Where(read => !read.Missing).ToArray()));
+            File.WriteAllText(Path.Combine(directory, $"{scenario.Name}-{seed}{TickAiPlan.Tag}.txt"), report);
+            File.WriteAllText(Path.Combine(directory, $"{scenario.Name}-{seed}{TickAiPlan.Tag}.tsv"), Tsv(reads.Where(read => !read.Missing).ToArray()));
             File.AppendAllText(
                 Path.Combine(directory, "ledger.tsv"),
-                string.Create(CultureInfo.InvariantCulture, $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}\ttickplans\t{scenario.Name}\t{matches}\t{seed}\t{watch.Elapsed.TotalSeconds:F0}\n"));
+                string.Create(CultureInfo.InvariantCulture, $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}\ttickplans\t{scenario.Name}{TickAiPlan.Tag}\t{matches}\t{seed}\t{watch.Elapsed.TotalSeconds:F0}\n"));
         }
 
         if (selected.Length > 1)
@@ -162,7 +162,7 @@ internal static class TickPlanProbe
             Away = scenario.AwayHigh > scenario.AwayLow ? Spread(built.Away, scenario.AwayLow, scenario.AwayHigh) : built.Away,
         };
 
-        return TickCalibration.Stand(built, scenario.HomeShape, scenario.AwayShape);
+        return TickAiPlan.Apply(TickCalibration.Stand(built, scenario.HomeShape, scenario.AwayShape), seed, scenario.HomeShape, scenario.AwayShape);
     }
 
     /// <summary>Gives each player a uniform ability from the range, cycling through it so the side's average sits mid-range.</summary>
@@ -240,9 +240,19 @@ internal static class TickPlanProbe
                     read.FirstSendOffSide = side;
                 }
             }
+            else if (matchEvent.Type == EngineEventType.TacticalChange && matchEvent.RuleOrdinal is { } changed)
+            {
+                read.Fired[side] |= 1 << changed;
+            }
             else if (matchEvent.Type == EngineEventType.Substitution)
             {
                 read.Substitutions[side]++;
+
+                if (matchEvent.SubstitutionReason == MatchSubstitutionReason.Tactical && matchEvent.RuleOrdinal is { } substituted)
+                {
+                    read.Fired[side] |= 1 << substituted;
+                    read.TacticalSubstitutions[side]++;
+                }
 
                 if (matchEvent.SubstitutionReason == MatchSubstitutionReason.Fatigue)
                 {
@@ -473,7 +483,7 @@ internal static class TickPlanProbe
         var losses = n - wins - draws;
         var goals = reads.Sum(read => read.HomeGoals + read.AwayGoals);
 
-        Line($"== tickplans {scenario.Name}: {scenario.Plain}; {n} matches, seed {seed}, {seconds:F0} s ({n / Math.Max(seconds, 0.001):F1} matches/s) ==");
+        Line($"== tickplans {scenario.Name}{TickAiPlan.Tag}: {scenario.Plain}; {n} matches, seed {seed}, {seconds:F0} s ({n / Math.Max(seconds, 0.001):F1} matches/s) ==");
         Line($"  reading check: {reads.Count(read => read.Inconsistent)} of {n} matches disagree with the result's own goals, cards and sendings-off (must be 0)");
         Line($"  goals {(double)goals / n:F2} ({reads.Average(read => read.HomeGoals):F2}-{reads.Average(read => read.AwayGoals):F2}), shots {reads.Average(read => read.HomeShots + read.AwayShots):F1} ({reads.Average(read => read.HomeShots):F1}-{reads.Average(read => read.AwayShots):F1}); home W/D/L {Percent(wins, n)}/{Percent(draws, n)}/{Percent(losses, n)} %, home points {((3.0 * wins) + draws) / n:F2}");
 
@@ -515,6 +525,20 @@ internal static class TickPlanProbe
         Line($"  sendings-off: matches with one {Percent(sendOffMatches, n)} % (home player {Percent(reads.Count(read => read.SendOffs[0] > 0), n)} %, away player {Percent(reads.Count(read => read.SendOffs[1] > 0), n)} %), before 60': {Percent(reads.Count(read => read.FirstSendOffMinute is > 0 and <= SplitMinute), n)} %");
 
         var fatigueSubstitutions = reads.Sum(read => read.FatigueSubstitutions[0] + read.FatigueSubstitutions[1]);
+
+        if (TickAiPlan.Sides.Length > 0)
+        {
+            var names = AiMatchPlanPolicy.Decide(Guid.Empty, FormationPreset.FourFourTwo, TeamInstructionSet.Neutral).Instructions.Select(instruction => instruction.Name).ToArray();
+
+            Line($"  AI match plan on the {TickAiPlan.Sides} side(s), {(TickAiPlan.RealBench ? "a real club's bench" : "the lab bench (keeper and central midfielders)")}; share of matches in which each rule visibly did something (home / away), tactical substitutions a side:");
+
+            for (var rule = 0; rule < names.Length; rule++)
+            {
+                Line($"    {names[rule],-26} {Percent(reads.Count(read => (read.Fired[0] & (1 << (rule + 1))) != 0), n)} / {Percent(reads.Count(read => (read.Fired[1] & (1 << (rule + 1))) != 0), n)} %");
+            }
+
+            Line($"    tactical substitutions a match: home {reads.Average(read => read.TacticalSubstitutions[0]):F2}, away {reads.Average(read => read.TacticalSubstitutions[1]):F2}");
+        }
 
         Line($"  substitutions a side per match: home {reads.Average(read => read.Substitutions[0]):F2}, away {reads.Average(read => read.Substitutions[1]):F2}; fatigue ones {(double)fatigueSubstitutions / n / 2:F2} a side, at minute {(fatigueSubstitutions == 0 ? 0 : (double)reads.Sum(read => read.FatigueSubstitutionMinutes) / fatigueSubstitutions):F0} on average");
 
@@ -684,6 +708,11 @@ internal static class TickPlanProbe
         public int[] Substitutions { get; } = new int[2];
 
         public int[] FatigueSubstitutions { get; } = new int[2];
+
+        /// <summary>Gets the rules (by ordinal, as a bit each) that visibly did something for each side: a tactical change or a tactical substitution.</summary>
+        public int[] Fired { get; } = new int[2];
+
+        public int[] TacticalSubstitutions { get; } = new int[2];
 
         public int FatigueSubstitutionMinutes { get; set; }
 

@@ -299,10 +299,23 @@ public static class MatchSnapshotBuilder
     /// ends up changing nothing is dropped too.
     /// </para>
     /// </remarks>
-    private static MatchPlanV1 BuildPlan(ClubSideSource source, HashSet<Guid> squad)
+    private static MatchPlanV1 BuildPlan(ClubSideSource source, HashSet<Guid> squad) =>
+        PlanOf(source.MatchInstructions, source.AssistantFatigueSubstitutions, squad);
+
+    /// <summary>
+    /// Turns a list of match instructions into the engine's match plan, as a side's plan is when its snapshot is built. Public so the
+    /// laboratory can give a lab side the plan the AI would write for it and play it exactly as a fixture would.
+    /// </summary>
+    /// <param name="matchInstructions">The instructions, in the order they are checked, or null for none.</param>
+    /// <param name="assistantFatigueSubstitutions">Whether the assistant still makes the fatigue substitutions.</param>
+    /// <param name="squad">The participants this sheet fields, which a named player has to be one of.</param>
+    public static MatchPlanV1 PlanOf(
+        IReadOnlyList<MatchInstructionDefinition>? matchInstructions,
+        bool assistantFatigueSubstitutions,
+        HashSet<Guid> squad)
     {
         var rules = new List<MatchRuleV1>();
-        var instructions = source.MatchInstructions ?? [];
+        var instructions = matchInstructions ?? [];
 
         for (var index = 0; index < instructions.Count && rules.Count < MatchPlanV1.MaxRules; index++)
         {
@@ -317,9 +330,9 @@ public static class MatchSnapshotBuilder
             }
         }
 
-        return rules.Count == 0 && source.AssistantFatigueSubstitutions
+        return rules.Count == 0 && assistantFatigueSubstitutions
             ? MatchPlanV1.None
-            : new MatchPlanV1 { Rules = rules, AssistantFatigueSubstitutions = source.AssistantFatigueSubstitutions };
+            : new MatchPlanV1 { Rules = rules, AssistantFatigueSubstitutions = assistantFatigueSubstitutions };
     }
 
     private static MatchRuleV1? BuildRule(MatchInstructionDefinition instruction, int ordinal, HashSet<Guid> squad)

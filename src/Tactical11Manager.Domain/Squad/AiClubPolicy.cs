@@ -12,6 +12,13 @@ public static class AiPolicyVersions
 {
     /// <summary>The current policy label, folded into every draw the policy makes.</summary>
     public const string Version = "ai-policy-v1";
+
+    /// <summary>
+    /// The label the match plan's draws are seeded from (<see cref="AiMatchPlanPolicy"/>). It is its own label, and not a new
+    /// <see cref="Version"/>, because the version is part of every other draw's seed: bumping it would give every club a new shape and new
+    /// instructions, and the match plan moves none of them.
+    /// </summary>
+    public const string MatchPlanVersion = "ai-match-plan-v1";
 }
 
 /// <summary>
@@ -60,7 +67,11 @@ public sealed record AiClubPlan(
     FormationPreset Formation,
     TeamInstructionSet Instructions,
     IReadOnlyList<AiSlotAssignment> Slots,
-    TrainingIntensity TrainingIntensity);
+    TrainingIntensity TrainingIntensity)
+{
+    /// <summary>Gets the club's match instructions: how it reacts to the score, the clock and a sending-off (`MAT-6`).</summary>
+    public AiMatchPlan MatchPlan { get; init; } = new(AiTemperament.Balanced, []);
+}
 
 /// <summary>
 /// The deterministic policy a club nobody manages plays and trains by (`INS-12`).
@@ -138,7 +149,10 @@ public static class AiClubPolicy
                 slot.NormalizedX,
                 slot.NormalizedY,
                 lineup.TryGetValue(slot.SlotNumber, out var playerId) ? playerId : null))],
-            DefaultTrainingIntensity);
+            DefaultTrainingIntensity)
+        {
+            MatchPlan = AiMatchPlanPolicy.Decide(clubId, formation, instructions),
+        };
     }
 
     /// <summary>

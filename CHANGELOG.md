@@ -4,6 +4,13 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Match instructions plan, Milestone 6 - AI clubs carry a match plan
+
+- New `AiMatchPlanPolicy` (domain, `ai-match-plan-v1`): every AI club gets five match instructions with its new default plan - protect a two-goal lead, hold a narrow lead (a fresher player for the most tired attacker), chase the game (a fresh forward for the most tired midfielder), go all out late, settle down with ten men - and one of three temperaments (cautious, balanced, bold) that moves their minutes and steps. They name families, never players, and pass the same `MatchInstructionValidator` as a manager's save (`INS-12`).
+- It is seeded from its own label and generator, so no club's formation, instructions or eleven moved (six clubs pinned in `AiClubPolicyTests`). `AiPolicyVersions.Version` was not bumped for that reason; `MatchPlanVersion` is new.
+- `EvaluateAiClubs` writes the rules and still only fills gaps: a world seeded before this keeps rule-less AI clubs until it is reseeded. `MatchSnapshotBuilder.PlanOf` is now public so the laboratory can play the plan as a fixture does.
+- Measured with `tickplans` (`TP_AI`, `TP_BENCH=real`, `TP_AI_DROP`, `TP_AI_NOSUB`) and `tickwhy` (`TW_AI=1`): goals, the weaker-side cells and the late-goal share hold; draws rise 4-9 points and a two-goal lead from the 70th minute is held 2-5 points less often. See section 14.39 and ADR-0071.
+
 ## Match instructions plan, Milestone 5 - the match centre shows what the plan did
 
 - The Report tab tags the lines a match instruction produced: a change of shape or instructions ("Ashvale switch to 4-2-4 with an attacking mentality") carries a **Tactics** tag and a substitution a rule made carries a **Plan** tag, for both sides. The lines were already in the replay (the commentary is re-derived from the frozen snapshot, so no stored-event columns or migration were needed); the tag makes them readable at a glance.

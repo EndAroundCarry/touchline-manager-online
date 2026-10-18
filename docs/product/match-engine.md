@@ -2588,3 +2588,34 @@ The probe reads shots from open play (`open`), because the lab sides have identi
 **Tried and dropped.** Wide runs at Balanced moved nothing (the striker or the winger already takes the single run). Cross minimum X of 6,000 to 6,800 and track zones of 1,500 to 3,000 were inside the noise. A tighter, faster track (6 m, 70%) lengthened 5-4-1 default matches. The 3-4-3 with wide midfielders instead of wing-backs gave 3.5 crosses against the winger's 13 (they stand at 50 m and never reach the cross line) and cost the 3-4-3 0.35 points, so it was put back to wing-backs.
 
 **Probe.** `tickroles <matches> <seed> [442v433|442v442|343v4231]` in `tools/simulation-benchmarks/TickRoleProbe.cs` prints per role and slot family, per player per match: shots (and free kicks and open play), goals, crosses, tackles, passes, dribbles, mean own-X with and without the ball, the share of out-of-possession ticks in the own half and the distance covered.
+
+### 14.39 AI clubs carry a match plan (the match instructions plan, Milestone 6; part 2, the impact study, follows in Milestone 7)
+
+**Why.** Match instructions (`MAT-6`) let a manager's side change shape, instructions and personnel during a match. An AI club with no rules would be the one side in the league that never reacts to the score. Every AI club therefore gets a built-in, deterministic plan, written by the same code path a manager's save takes (`INS-12`).
+
+**What it is.** `AiMatchPlanPolicy` (domain) decides five rules per club from its identity, its formation and its instructions. It is seeded from its own label `ai-match-plan-v1` and draws from its own generator, one draw for the temperament, so no choice `ai-policy-v1` made (formation, eight instructions, the eleven) moved: `AiClubPolicyTests` pins six clubs' choices and they are unchanged. `AiPolicyVersions.Version` was deliberately **not** bumped, because it is part of every other draw's seed.
+
+| Rule (in the order they are checked) | Fires when | Does |
+|---|---|---|
+| Protect a two-goal lead | leading by 2 or more, from 65' / 70' / 75' (cautious / balanced / bold) | mentality 2 / 1 / 1 steps more defensive; time-wasting raised to situational only when it was off |
+| Hold a narrow lead | leading by 1 or more, from 75' / 80' / 85' | one step more defensive; the most tired attacker off, a fresh defender (cautious) or midfielder for him |
+| Chase the game | trailing by 1 or more, from 70' / 65' / 60' | 1 / 1 / 2 steps more attacking; the most tired midfielder off, a fresh forward on |
+| Go all out | trailing by 1 or more, from 88' / 85' / 82' | Attacking mentality, high press |
+| Settle down with ten men | one of its players is sent off | steps more defensive as in the first rule, and a shape with one forward fewer (4-4-2 and 3-5-2 to 4-5-1, 4-3-3 to 4-4-2, 5-3-2 to 5-4-1; single-forward shapes keep theirs) |
+
+The rules name families, never players (an AI club's bench is picked by the snapshot builder on the day), and each passes `MatchInstructionValidator`. `EvaluateAiClubs` writes them with the new default plan and counts a plan the validator refuses as skipped. It still only fills gaps: **a club that already has a default plan keeps it, so a world seeded earlier keeps rule-less AI clubs until it is reseeded** (`npm run infra:reset`, `infra:up`, `migrate`, `seed`).
+
+**Measured** (`tickplans 600 7000` with `TP_AI=both TP_BENCH=real`, both sides carrying the plan of a different club each match, against the same seeds with no plan on the same bench; paired).
+
+| Cell | Goals a match | Home W/D/L % | Home points | Lead of 2+ held from 70' | Trailing at 60': win / draw % | Goals after 75' |
+|---|---|---|---|---|---|---|
+| 4-4-2 mirror, 16 v 16 | 3.39 to 3.40 | 50.7/23.0/26.3 to 49.3/27.8/22.8 | 1.75 to 1.76 | 94.7 to 92.8 | 8.1/20.9 to 9.2/25.7 | 22.1 to 22.7 % |
+| 4-3-3 v 4-2-3-1, 16 v 16 | 4.16 to 4.24 | 33.7/20.7/45.7 to 31.8/26.0/42.2 | 1.22 to 1.22 | 95.3 to 90.5 | 9.7/21.1 to 15.1/26.4 | 20.8 to 24.0 % |
+| 16 against 18-19 | 3.52 to 3.49 | 34.5/20.2/45.3 to 27.8/28.8/43.3 | 1.24 to 1.12 | 96.4 to 91.4 | 7.3/17.1 to 8.1/31.3 | 22.6 to 25.0 % |
+| 18-19 against 16 | 3.84 to 3.83 | 70.8/16.3/12.8 to 69.5/20.3/10.2 | 2.29 to 2.29 | 98.0 to 95.5 | 9.5/18.1 to 11.6/26.3 | 21.9 to 21.9 % |
+
+Weaker side (`tickwhy 150 7000 16`, the stronger side carrying the plan): 5-4-1 default 0.87 to 0.79 points, all-out attack 0.45 to 0.35 (the stronger side's goals 1.92 to 1.90 and 4.07 to 3.99).
+
+**What held and what did not.** Goals, the weaker-side cells and the late-goal share held. Two guards did not: **draws rise 4-9 points** and **a 2-goal lead from 70' is held 2-5 points less often**. The two are one effect: a trailing side that chases at 60-70' equalises more often, and the leader's defensive levers (a step of mentality, a fresher defender) are the weak ones in this engine (the weaker-side milestones found the same). Ablations on the 4-3-3 against 4-2-3-1 cell showed where it comes from: removing "Go all out" restored most of the held lead (a one-goal lead at 70' was won 57 % of the time with the full plan, 68 % without that rule, 72 % with no plan at all), removing "Chase the game" some (65 %), removing the hold rule none. Moving "Go all out" from 75-80' to 82-88' was the minutes-only tuning step; it did not close the gap, and the choice between a weaker chase and the draws is the product owner's (recorded in the progress memory).
+
+**Probe.** `tickplans` takes `TP_AI` (`both`, `home`, `away`), `TP_BENCH=real` (a keeper, a centre back, a full back, two midfielders, a winger and a striker instead of the lab's keeper and central midfielders) and, for ablations, `TP_AI_DROP` and `TP_AI_NOSUB` (comma lists of rule places); `tickwhy` takes `TW_AI=1`. Files carry the variant in their name (`equal-442-7000-realbench-ai-both.tsv`), and the report counts how often each rule visibly did something. The plain file name is the rule-less lab baseline: a short run with no variant overwrites it.

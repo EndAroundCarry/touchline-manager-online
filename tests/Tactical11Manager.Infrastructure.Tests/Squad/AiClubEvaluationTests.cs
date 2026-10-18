@@ -53,6 +53,7 @@ public sealed class AiClubEvaluationTests : WorldTestBase
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
         var plans = await db.TacticalPlans.Where(plan => plan.IsDefault).ToListAsync();
         var slots = await db.TacticalSlots.ToListAsync();
+        var instructions = await db.MatchInstructions.ToListAsync();
         var trainingPlans = await db.TrainingPlans.ToListAsync();
 
         plans.Select(plan => plan.ClubId).Should().OnlyHaveUniqueItems("a club has one default plan (INS-11)");
@@ -85,7 +86,25 @@ public sealed class AiClubEvaluationTests : WorldTestBase
 
             validation.IsValid.Should().BeTrue("INS-12 gives the AI no bypass");
             validation.IsComplete.Should().BeTrue("a seeded squad always fields eleven (SQ-1)");
+
+            // The match plan is stored with the plan, in the order it is checked, and is judged by the manager's own validator.
+            var clubInstructions = instructions
+                .Where(instruction => instruction.PlanId == plan!.Id)
+                .OrderBy(instruction => instruction.Ordinal)
+                .ToList();
+
+            clubInstructions.Select(instruction => instruction.Ordinal).Should().Equal(Enumerable.Range(1, clubInstructions.Count));
+            clubInstructions.Should().HaveCount(5, "every AI club carries the assistant's five instructions (MAT-6)");
+
+            MatchInstructionValidator
+                .Validate(
+                    [.. clubInstructions.Select(instruction => instruction.Definition)],
+                    [.. clubSlots.Where(slot => slot.AssignedPlayerId is not null).Select(slot => slot.AssignedPlayerId!.Value)],
+                    [])
+                .IsValid.Should().BeTrue("INS-12 gives the AI no bypass here either");
         }
+
+        instructions.Select(instruction => instruction.PlanId).Distinct().Should().BeEquivalentTo(plans.Select(plan => plan.Id));
     }
 
     [Fact]
@@ -104,7 +123,7 @@ public sealed class AiClubEvaluationTests : WorldTestBase
         repeat.TrainingPlansCreated.Should().Be(0, "a club that already has a training plan keeps it");
         repeat.Skipped.Should().Be(0);
 
-        (await CountPlansAsync()).Should().Be(stored, "the second pass changes no row");
+        (await CountPlansAsync()).Should().Be(stored, "the second pass changes no row, match instructions included");
     }
 
     [Fact]
@@ -156,7 +175,7 @@ public sealed class AiClubEvaluationTests : WorldTestBase
             .ExecuteAsync(CancellationToken.None);
     }
 
-    private async Task<(int Plans, int TrainingPlans, int Slots)> CountPlansAsync()
+    private async Task<(int Plans, int TrainingPlans, int Slots, int Instructions)> CountPlansAsync()
     {
         await using var scope = Fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -164,7 +183,8 @@ public sealed class AiClubEvaluationTests : WorldTestBase
         return (
             await db.TacticalPlans.CountAsync(plan => plan.IsDefault),
             await db.TrainingPlans.CountAsync(),
-            await db.TacticalSlots.CountAsync());
+            await db.TacticalSlots.CountAsync(),
+            await db.MatchInstructions.CountAsync());
     }
 }
 

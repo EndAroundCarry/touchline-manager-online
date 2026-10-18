@@ -88,6 +88,7 @@ the system is shaped the way it is.
 | [0068](0068-tactics-in-the-tick-engine-counter-attack-low-block-and-time-wasting.md) | Tactics in the tick engine: counter-attack, low block and time-wasting | Accepted |
 | [0069](0069-commentary-narrates-every-action-at-its-start.md) | Commentary narrates every action at its start | Accepted |
 | [0070](0070-tick-engine-reads-the-slot-role.md) | The tick engine reads the slot's role, not only its family | Accepted |
+| [0071](0071-ai-clubs-carry-a-match-plan.md) | AI clubs carry a match plan | Accepted |
 
 ## Rules for changing an ADR
 

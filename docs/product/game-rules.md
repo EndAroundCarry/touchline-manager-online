@@ -240,6 +240,19 @@ is enforced by the code path rather than by intention. It fills only a missing p
 plan a manager or an earlier pass set is left exactly as it is, and a club a manager holds — active or
 merely inactive (`OCC-8`) — is never considered.
 
+The plan an AI club gets also carries five match instructions (`MAT-6`), written by a second pure policy
+(`ai-match-plan-v1`) that is seeded from its own label and draws from its own generator, so adding it moved
+no club's formation, instructions or eleven. A club has one of three temperaments — cautious, balanced or
+bold — which moves the minutes and the size of the steps. Every club protects a lead of two or more late
+(one step more defensive, time-wasting raised when it was off), holds a one-goal lead later still with a
+fresher player for its most tired attacker, chases the game when behind with one step more attacking and a
+fresh forward for its most tired midfielder, goes all out (Attacking, high press) late when still behind,
+and settles down when one of its players is sent off (one step more defensive, one forward fewer). The
+instructions name families, never players, are held to `MatchInstructionValidator`, and are ordinary rules
+a manager could write; a takeover inherits them and may edit or delete them. An existing club's plan is
+never rewritten, so a world seeded before the policy existed keeps its clubs' rule-less plans until it is
+reseeded.
+
 ---
 
 ## 10. Training and player state
@@ -635,6 +648,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `training_progression_version` | `training-v3` | TRN-9 (FIC-8) |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
+| `ai_match_plan_version` | `ai-match-plan-v1` | INS-12, MAT-6 (FIC-8) |
 | `match_statistics_schema` | `match-statistics-v6` (carries the player lines, the assists, the rating, the passes and take-ons, and the tackles, crosses, penalties, free kicks and shots faced) | JSN-1, TRN-11 |
 | `season_stats_version` | `season-stats-v3` | STA-1 (FIC-8) |
 | `match_rating_scale` | 0–10,000 basis points (displayed 0.0–10.0) | TRN-8, STA-2 |

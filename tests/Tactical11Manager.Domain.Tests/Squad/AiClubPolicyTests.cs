@@ -53,6 +53,39 @@ public sealed class AiClubPolicyTests
         counters.Should().BeInRange(70, 130, "the choice is a draw of one in four");
     }
 
+    /// <summary>
+    /// The shape, the eight instructions and the eleven six clubs were given before the match plan existed. Adding the plan must not move
+    /// any of them: it is seeded from its own label and draws from its own generator (`INS-12`).
+    /// </summary>
+    [Theory]
+    [InlineData(1, "ThreeFiveTwo|Balanced|Normal|ShortPassing|Wide|MidBlock|High|StayOnFeet|On|False|01,05,06,09,04,11,12,13,07,22,24")]
+    [InlineData(2, "ThreeFiveTwo|Defensive|High|MixedPassing|Wide|HighPress|High|StayOnFeet|Off|True|01,05,06,09,04,11,12,13,07,22,24")]
+    [InlineData(3, "FiveThreeTwo|Attacking|High|MixedPassing|Narrow|MidBlock|Normal|StayOnFeet|Situational|True|01,04,05,06,09,07,11,12,13,22,24")]
+    [InlineData(4, "FiveThreeTwo|Attacking|Normal|MixedPassing|Narrow|HighPress|High|Normal|On|True|01,04,05,06,09,07,11,12,13,22,24")]
+    [InlineData(5, "FiveThreeTwo|Attacking|Normal|MixedPassing|Normal|MidBlock|Normal|Normal|On|False|01,04,05,06,09,07,11,12,13,22,24")]
+    [InlineData(6, "FourTwoThreeOne|Positive|Low|ShortPassing|Wide|MidBlock|Deep|StayOnFeet|On|True|01,04,05,06,07,11,12,13,14,16,22")]
+    public void The_choices_made_before_the_match_plan_existed_are_unchanged(int index, string expected)
+    {
+        var plan = AiClubPolicy.Decide(ClubId(index), Squad());
+        var instructions = plan.Instructions;
+
+        var text = string.Join(
+            '|',
+            plan.Formation,
+            instructions.Mentality,
+            instructions.Tempo,
+            instructions.Passing,
+            instructions.Width,
+            instructions.Pressing,
+            instructions.DefensiveLine,
+            instructions.Tackling,
+            instructions.TimeWasting,
+            instructions.CounterAttack,
+            string.Join(',', plan.Slots.Select(slot => slot.AssignedPlayerId is { } id ? id.ToString("D")[^2..] : "-")));
+
+        text.Should().Be(expected);
+    }
+
     [Fact]
     public void The_same_club_and_squad_decide_the_same_way()
     {
