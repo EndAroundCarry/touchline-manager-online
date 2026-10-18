@@ -170,7 +170,7 @@ internal static class TickPlanSmoke
         return played;
     }
 
-    private static IReadOnlyList<MatchSlotV1> SlotsOf(FormationPreset preset) =>
+    internal static IReadOnlyList<MatchSlotV1> SlotsOf(FormationPreset preset) =>
     [
         .. FormationLayouts.DefaultSlots(preset).Select(entry => new MatchSlotV1
         {

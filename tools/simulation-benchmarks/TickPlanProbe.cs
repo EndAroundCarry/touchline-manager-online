@@ -62,6 +62,7 @@ internal static class TickPlanProbe
         new("weaker", "weaker side 16 against 18-19, 4-4-2 default both", 16, 16, 18, 19, FormationPreset.FourFourTwo, string.Empty, FormationPreset.FourFourTwo, string.Empty, true),
         new("stronger", "stronger side 18-19 against 16, 4-4-2 default both", 18, 19, 16, 16, FormationPreset.FourFourTwo, string.Empty, FormationPreset.FourFourTwo, string.Empty, true),
         new("equal-press", "equal 16 against 16, 4-4-2 both, the opponent on high press and high tempo", 16, 16, 16, 16, FormationPreset.FourFourTwo, string.Empty, FormationPreset.FourFourTwo, "press=2,tempo=2", true),
+        new("equal-442-v-352", "equal 16 against 16, 4-4-2 against 3-5-2", 16, 16, 16, 16, FormationPreset.FourFourTwo, string.Empty, FormationPreset.ThreeFiveTwo, string.Empty, false),
         new("equal-tackle", "equal 16 against 16, 4-4-2 both, aggressive tackling on both sides", 16, 16, 16, 16, FormationPreset.FourFourTwo, "tackle=2", FormationPreset.FourFourTwo, "tackle=2", false),
     ];
 
@@ -72,6 +73,13 @@ internal static class TickPlanProbe
     /// <param name="only">A scenario name (or its start), or empty or "all" for the baseline set (TP_ONLY narrows the set to a comma list of names), or "smoke" for the match-plan smoke test.</param>
     public static void Run(int matches, ulong seed, EngineRulesV2 rules, string only)
     {
+        if (only.Equals("study", StringComparison.OrdinalIgnoreCase))
+        {
+            TickPlanStudy.Run(matches, seed, rules);
+
+            return;
+        }
+
         if (only.Equals("smoke", StringComparison.OrdinalIgnoreCase))
         {
             TickPlanSmoke.Run(matches, seed, rules);

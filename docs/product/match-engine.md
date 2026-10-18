@@ -483,8 +483,10 @@ that never tires and a bench that is never used.
 
 ### 7.6 Substitutions and the bench
 
-Human managers make no live changes (`MAT-6`), so every substitution is the engine's, and it is
-deliberately conservative:
+A manager makes no live changes (`MAT-6`), so a substitution is the engine's or comes from a rule the manager wrote
+before the match (§14.39). At a stoppage the order is: injuries first, then the side's match instructions in the
+manager's order, then the fatigue changes below (skipped when the plan switches the assistant off). The fatigue
+changes are deliberately conservative:
 
 - **Injuries are always dealt with.** An injured player cannot continue; if a substitution is available
   they are replaced, and if not the side finishes a player short.
@@ -2589,7 +2591,7 @@ The probe reads shots from open play (`open`), because the lab sides have identi
 
 **Probe.** `tickroles <matches> <seed> [442v433|442v442|343v4231]` in `tools/simulation-benchmarks/TickRoleProbe.cs` prints per role and slot family, per player per match: shots (and free kicks and open play), goals, crosses, tackles, passes, dribbles, mean own-X with and without the ball, the share of out-of-possession ticks in the own half and the distance covered.
 
-### 14.39 AI clubs carry a match plan (the match instructions plan, Milestone 6; part 2, the impact study, follows in Milestone 7)
+### 14.39 Match instructions: the AI's plan and the impact study (the match instructions plan, Milestones 6 and 7)
 
 **Why.** Match instructions (`MAT-6`) let a manager's side change shape, instructions and personnel during a match. An AI club with no rules would be the one side in the league that never reacts to the score. Every AI club therefore gets a built-in, deterministic plan, written by the same code path a manager's save takes (`INS-12`).
 
@@ -2619,3 +2621,46 @@ Weaker side (`tickwhy 150 7000 16`, the stronger side carrying the plan): 5-4-1 
 **What held and what did not.** Goals, the weaker-side cells and the late-goal share held. Two guards did not: **draws rise 4-9 points** and **a 2-goal lead from 70' is held 2-5 points less often**. The two are one effect: a trailing side that chases at 60-70' equalises more often, and the leader's defensive levers (a step of mentality, a fresher defender) are the weak ones in this engine (the weaker-side milestones found the same). Ablations on the 4-3-3 against 4-2-3-1 cell showed where it comes from: removing "Go all out" restored most of the held lead (a one-goal lead at 70' was won 57 % of the time with the full plan, 68 % without that rule, 72 % with no plan at all), removing "Chase the game" some (65 %), removing the hold rule none. Moving "Go all out" from 75-80' to 82-88' was the minutes-only tuning step; it did not close the gap, and the choice between a weaker chase and the draws is the product owner's (recorded in the progress memory).
 
 **Probe.** `tickplans` takes `TP_AI` (`both`, `home`, `away`), `TP_BENCH=real` (a keeper, a centre back, a full back, two midfielders, a winger and a striker instead of the lab's keeper and central midfielders) and, for ablations, `TP_AI_DROP` and `TP_AI_NOSUB` (comma lists of rule places); `tickwhy` takes `TW_AI=1`. Files carry the variant in their name (`equal-442-7000-realbench-ai-both.tsv`), and the report counts how often each rule visibly did something. The plain file name is the rule-less lab baseline: a short run with no variant overwrites it.
+
+#### Part 2: the impact study (Milestone 7)
+
+**Method.** `tickplans 600 <seed> study` (`TickPlanStudy.cs`, `TP_BENCH=real`, `TP_CELLS` narrows the cells) plays every cell on the same seeds with and without the rule on the home side. The engine is deterministic and the plan runner draws nothing, so the two matches are identical until the rule fires and every difference after that is the rule's. Effects are read only over the matches in which the rule fired, as a paired difference with its standard error (the tables give 95% intervals); because the matches match up to the change, a difference in a match total is the difference after the change. A baseline is played once per pairing and kept; a cell does not replay matches where its trigger cannot occur (decided from the baseline's own goals and cards; a 60-match check gave identical figures). Nine pairings, all on a real club's bench of seven: equal 16 against 16 in 4-4-2, in 4-3-3 against 4-2-3-1, 4-4-2 against 3-5-2, with aggressive tackling on both sides, with the opponent on high press and high tempo; a stronger side (18-19 against 16); a weaker side (16 against 18-19); and equal and weaker sides with the AI's default plan on the opponent. 68 cells at seed 7000, then the 10 cells that decided something at seed 8000. Run time: 87 min for the first pass, 16 min for the confirmations, 6.5 min of smoke runs while building the probe, about 109 of the 120 minutes.
+
+**What the rule is worth** (home points a match in the matches where it fired; the interval is 95%; "again" is the second seed).
+
+| Family | Rule | Pairing | Fired | Points | Second seed |
+|---|---|---|---|---|---|
+| Chase | 4-3-3, Attacking, high press from 60' when behind | equal 4-4-2 | 212 | +0.18 ±0.18 (wins 8 to 13%) | +0.25 ±0.18 (8 to 16%) |
+| Chase | the same, with two fresh forwards for tired midfielders | equal 4-4-2 | 212 | +0.28 ±0.18 | +0.19 ±0.18 |
+| Chase | 4-3-3, Attacking, high press from 60' when behind | 4-3-3 against 4-2-3-1 | 342 | +0.20 ±0.12 | |
+| Chase | 4-3-3, Attacking, high press from 60' when behind | weaker side | 328 | +0.08 ±0.11 | |
+| Chase | Attacking only | equal / weaker | 212 / 328 | +0.19 ±0.16 / 0.00 ±0.10 | |
+| Chase | all-out (3-4-3, Attacking, high press, high tempo, high line) from 85' | equal / weaker | 177 / 291 | +0.11 ±0.11 / +0.07 ±0.07 | |
+| Protect | Defensive, low block, deep line from 70' leading by 2+ | equal 4-4-2 | 198 | -0.06 ±0.08 (lead lost in 12 more matches in a hundred) | -0.04 ±0.06 (15 more) |
+| Protect | 5-4-1 Cautious from 70' leading by 2+ | equal 4-4-2 | 198 | +0.05 ±0.05 | +0.01 ±0.05 |
+| Protect | one step more defensive | equal / 4-3-3 against 4-2-3-1 / stronger | 198 / 141 / 326 | 0.00 / +0.09 / +0.02, each within its interval | |
+| Fresh legs | a fresh striker for the most tired forward at 60' (opponent pressing high) | opponent pressing | 576 | +0.04 ±0.10 | |
+| Fresh legs | the same at 70' / at 30' (control) | opponent pressing | 571 / 590 | 0.00 ±0.10 / +0.03 ±0.13 | |
+| Fresh legs | a fresh pace-18 winger for the most tired midfielder at 60' | pressing / equal | 595 / 600 | -0.01 ±0.11 / +0.09 ±0.11 | |
+| Shape | 4-4-2 to 4-3-3 and wings focus at 60' | equal / against 3-5-2 | 600 | -0.11 ±0.11 / +0.01 ±0.10 | -0.18 ±0.10 (equal) |
+| Shape | the same at the first stoppage, against 3-5-2 | against 3-5-2 | 600 | -0.27 ±0.15 | -0.12 ±0.15 |
+| Shape | 4-2-3-1 and centre focus at 60' | equal / against 3-5-2 | 600 | +0.06 ±0.11 / +0.06 ±0.10 | |
+| Shape | 3-4-3 at 60' | equal / against 3-5-2 | 600 | -0.07 ±0.11 / 0.00 ±0.11 | |
+| Bookings | a booked defender off for a fresh one / stay on feet after a booking | aggressive tackling | 486 / 489 | -0.15 ±0.13 / -0.07 ±0.12 (staying on feet: 1.2 fewer yellows and 0.3 fewer reds a match) | |
+| Red cards | own red: 4-5-1 Cautious / keep the shape, Defensive | equal | 96 | +0.21 ±0.27 / -0.07 ±0.30 | -0.10 ±0.29 / -0.22 ±0.29 |
+| Red cards | opponent red: 4-3-3 and high press | equal | 112 | +0.38 ±0.30 | -0.03 ±0.28 |
+| Playing badly | lowest rated forward off at 60' / a midfielder rated under 5.7 off | equal / weaker | 600 / 222-261 | +0.05 ±0.11 to 0.00 ±0.16 | |
+| AI plans | both sides carry the AI's default plan, against neither | equal / 4-3-3 against 4-2-3-1 | 536 / 557 | +0.05 ±0.11 / +0.02 ±0.10 | |
+| AI plans | a human plan (chase from 60', 5-4-1 Cautious from 70' leading by 2) against the AI's default plan | equal | 406 | +0.18 ±0.10 | +0.24 ±0.10 |
+
+**Readings.**
+- **Chasing is the one rule that pays**: about +0.2 points where it fires on equal sides, confirmed on the second seed, at the price of conceding more (+0.26 goals against after the change, +0.4 goals for). A weaker side chasing a stronger one gains nothing the study can see. Two fresh forwards add no reliable extra (+0.10 on one seed, -0.06 on the other); going all-out at 85' is inside the noise.
+- **A lead of two goals at 70' needs no help**: it is held 95-99% of the time with no rule, so there are at most three points in a hundred to win, and the rules that give ground lose it. Defensive with a low block and a deep line cost 3 shots and lose the lead in 12-15 more matches in a hundred on both seeds. 5-4-1 Cautious is harmless, one step more defensive does nothing.
+- **Fresh legs are worth nothing the study can measure.** A fresh striker came on at 80% condition for a starter at 77%, against defenders at 59% (55% at 70'), the widest gap the engine produces, and shot 11.6 times per 90 against the starter's 11.2 over the same minutes, with 1.05 goals per 90 against 0.89 (not different). In the tick engine tiredness costs speed and acceleration only (`TickPlayerPhysics.TiredSpeedFloorBasisPoints`, floor 60%). Whether tiredness should also lower technical and mental skills, as `EffectiveSkill` does for the legacy engine, is a product decision the study leaves open; it would move every match in the league and needs its own balance pass.
+- **No formation beat staying put.** 4-4-2 to 4-3-3 with a wings focus cost 0.11 and 0.18 points against an equal side on the two seeds and nothing against a 3-5-2 whose flanks it targets; changing at the first stoppage was worse than at 60'. 4-2-3-1 with a centre focus adds 1.4 to 2.2 shots a match and no points.
+- **Cards fall without points following.** Staying on feet after a booking removes 1.2 yellows and 0.3 reds a match, and gains no points.
+- **Red cards**: after your own red, keeping the shape and going Defensive was the weakest answer on both seeds (never positive); re-shaping to 4-5-1 Cautious was neutral. The opponent's red paid on one seed and not the other.
+- **A rule on a player's live rating does nothing** (as expected: the rating moves only on goals, shots on target, saves, tackles and cards).
+- **The AI's default plan moves a pairing by +0.02 to +0.05 points** (nothing), and a manager's chase-and-protect plan beats it by about a fifth of a point where it fires on equal sides (+0.04, not different from zero, on a weaker side).
+
+**Known gaps.** The lab sides are uniform and 16-rated; real sides differ player by player, so a forward's skill against a defender's is not tested. Red-card cells fire in only 79 to 282 matches, so their intervals are wide. A fresh-legs effect that depends on skill loss is by construction absent here. The study shows effect sizes in this engine, not that a manager's cleverness is rewarded elsewhere.

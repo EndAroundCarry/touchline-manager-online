@@ -4,6 +4,12 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Match instructions plan, Milestone 7 - the impact study
+
+- New `tickplans 600 <seed> study` (`TickPlanStudy.cs`): 68 match-instruction rules played on the same seeds with and without the rule (paired, so effects are read only where the rule fired), on nine pairings of lab sides with a real bench; 10 deciding cells confirmed on a second seed. 109 of the 120 minutes of run time. Per-cell files, `cells-<seed>.tsv` and `report.md` are in `.run-logs/plans/` (not committed).
+- Findings (section 14.39 part 2): chasing from 60' with 4-3-3, Attacking and a high press is worth about +0.2 points where it fires on equal sides (confirmed); a two-goal lead needs no help and a Defensive low block loses it more often; **a fresh forward against tired defenders is worth +0.04 +-0.10 points** (the engine's tiredness only costs speed), which is the decision for the product owner; no formation switch beat staying put; staying on feet after a booking cuts 1.2 yellows and 0.3 reds a match without points; the AI's default plan moves nothing and a human chase-and-protect plan beats it by about 0.2 points.
+- `MAT-6` rewritten (managers' rules, no live clicks), `MAT-13` and `MAT-14` added, the in-match line in `mvp-traceability.md` reworded, ADR-0072. No engine code changed: both golden hashes are as they were.
+
 ## Match instructions plan, Milestone 6 - AI clubs carry a match plan
 
 - New `AiMatchPlanPolicy` (domain, `ai-match-plan-v1`): every AI club gets five match instructions with its new default plan - protect a two-goal lead, hold a narrow lead (a fresher player for the most tired attacker), chase the game (a fresh forward for the most tired midfielder), go all out late, settle down with ten men - and one of three temperaments (cautious, balanced, bold) that moves their minutes and steps. They name families, never players, and pass the same `MatchInstructionValidator` as a manager's save (`INS-12`).

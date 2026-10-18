@@ -98,3 +98,4 @@ the system is shaped the way it is.
    history is an ADR-level change and must be reviewed before implementation.
 3. An ADR that changes a settled rule in `game-rules.md` must update that file in the same
    change set, plus the affected stage in `master-plan.md`.
+| [0072](0072-match-instructions-and-their-measured-worth.md) | Match instructions are rules the engine carries out, and what they were measured to be worth | Accepted |

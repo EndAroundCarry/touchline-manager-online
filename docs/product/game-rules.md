@@ -504,13 +504,15 @@ version. The value and band constants are in §18.
 | MAT-3 | Simulation covers 90 regulation minutes plus deterministic stoppage time, modelled as a sequence of possessions. Each half has its own clock and its own stoppage: the first half runs 1'…45' and the second 46'…90', and the second half is never started or ended by the first half's added time. |
 | MAT-4 | Goals are produced by resolved chances, never by an independent per-minute roll. |
 | MAT-5 | The final score equals the goal events. Statistics reconcile exactly with events. |
-| MAT-6 | Human managers make no live in-match changes in the MVP; substitutions are chosen deterministically by the engine from the selected bench. |
+| MAT-6 | A manager makes no live in-match changes. A tactical plan may carry up to 10 match instructions: each is a rule written before the match (a minute, a score, an event such as a sending-off, a booking, a tired or badly playing player) with changes it makes when its conditions hold (a new formation, instruction changes, up to 3 substitutions). The engine carries them out; the engine's own fatigue substitutions still run unless the plan switches them off. |
 | MAT-7 | A division matchday publishes atomically: either all nine fixtures or none. |
 | MAT-8 | Commentary and highlights consume events and cannot change the outcome. |
 | MAT-9 | Match input and output hashes are stored; re-running the same snapshot, seed, and engine version reproduces the same output hash. |
 | MAT-10 | A void/replay requires an operator reason and uses the original snapshot and seed unless a documented engine defect requires a versioned remediation. |
 | MAT-11 | Hidden attributes, the raw seed, internal valuations, and engine diagnostics never appear in player-facing responses. |
 | MAT-12 | A dead ball belongs to the side the rules name, and is taken from where the rules put it: the conceding side kicks off after a goal (home the first half, away the second); the defending side restarts from its own goal area after a save, a miss off target, or a missed penalty; the fouled side takes the free kick for a foul with no shot; the defending side takes the free kick for an offside. A restart is consumed by the very next possession and never survives it; a loose ball (a block, a rebound, a cleared corner, a turnover) is contested. |
+| MAT-13 | A match instruction is checked at every stoppage and at half-time, in the manager's order, fires at most once a match, and uses no random number. Injuries are dealt with before rules, and the 5-substitution limit (`SQ-5`) and the one-appearance rule still hold: a substitution whose player has left the pitch, is not on the sheet or would exceed the limit is skipped. |
+| MAT-14 | A new formation set by a rule is a best fit of the players on the pitch (a deterministic assignment that keeps the goalkeeper in goal, places the manager's own overrides first, and drops the slot whose loss costs least when a player is short). Humans and AI clubs write rules through the same validator (`INS-12`). |
 
 Detailed engine formulas (unit ratings, possession and chance resolution, the continuous passage, bounded
 tactical modifiers, and all versioned constants) live in `docs/product/match-engine.md`, which covers

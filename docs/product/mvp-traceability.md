@@ -123,7 +123,7 @@ enforced rather than remembered.
 | Cups, continental competitions, national teams, friendlies | Not in the domain model; a new competition type requires an ADR |
 | Staff hiring and attributes | No tables; squad module has no staff aggregate |
 | Youth academy and intake | Not in the domain model; Stage 17 |
-| In-match tactical changes, WebSockets, synchronous PvP | No socket transport; team sheets lock before kickoff (`CAL-3`, `MAT-6`) |
+| Live in-match clicks, WebSockets, synchronous PvP | No socket transport; team sheets lock before kickoff (`CAL-3`). Changes during a match are match instructions written beforehand (`MAT-6`, `MAT-13`) |
 | Private negotiations, agents, loans, swaps, clauses, installments, windows | `TRF-13`; only the auction path exists |
 | Fog-of-war attributes, scouted network | `SCT-1`, `SCT-2`; attributes are exact and public |
 | Facilities beyond the stadium, sponsorship negotiation, merchandising, taxes, currencies, debt | `FIN-14`; one currency. The stadium itself is in scope: `STAD-1`…`STAD-6` |
