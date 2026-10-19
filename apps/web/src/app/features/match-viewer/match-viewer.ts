@@ -543,16 +543,6 @@ export class MatchViewer implements OnDestroy {
       this.renderer = new CanvasMatchRenderer(canvas.nativeElement, film, {
         kits,
         reducedMotion,
-        onHover: (hover) => {
-          const playerId =
-            hover === null ? null : (this.lineupPlayer(hover.participantId)?.playerId ?? null);
-
-          if (hover === null || playerId === null) {
-            this.playerCards.hide();
-          } else {
-            this.playerCards.show(playerId, hover);
-          }
-        },
       });
       this.renderFrame();
     });
