@@ -32,9 +32,4 @@ export class PlayerSkillsCard {
   protected skillClass(value: number | null): string {
     return value === null ? 'text-muted' : attributeBand(value).className;
   }
-
-  /** How a multiplier reads beside an attribute; nothing for the neutral ×1. */
-  protected multiplierLabel(weight: number): string {
-    return weight === 1 ? '' : `×${weight}`;
-  }
 }
