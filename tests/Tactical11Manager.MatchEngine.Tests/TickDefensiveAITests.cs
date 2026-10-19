@@ -125,6 +125,40 @@ public sealed class TickDefensiveAITests
         Roles(wingers.Assign(), TickDefensiveRole.Screen).Should().BeEmpty();
     }
 
+    [Fact]
+    public void A_winger_beside_wing_backs_tracks_the_flank_man_and_screens_lanes_but_a_four_three_three_winger_does_not()
+    {
+        var attackers = TrackingScene();
+
+        attackers[5] = new SpatialPoint(4_200, 1_000);
+
+        // The control: the same winger in a back four (full-backs, no wing-backs) tracks nobody.
+        var four = new Scene(isHome: true, MatchPressing.MidBlock, 5_500, 3_500, attackers, carrier: 9).WithRole(5, MatchRole.Winger);
+
+        four.Assign()[5].Role.Should().NotBe(TickDefensiveRole.Tracker);
+
+        var three = new Scene(isHome: true, MatchPressing.MidBlock, 5_500, 3_500, attackers, carrier: 9)
+            .WithRole(5, MatchRole.Winger)
+            .WithRole(1, MatchRole.WingBack)
+            .WithRole(4, MatchRole.WingBack);
+
+        three.Assign()[5].Role.Should().Be(TickDefensiveRole.Tracker);
+
+        var controlLanes = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
+        var withWingBacks = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
+
+        foreach (var seat in new[] { 5, 6, 7, 8, 9, 10 })
+        {
+            controlLanes.WithRole(seat, MatchRole.Winger);
+            withWingBacks.WithRole(seat, MatchRole.Winger);
+        }
+
+        withWingBacks.WithRole(1, MatchRole.WingBack);
+
+        Roles(controlLanes.Assign(), TickDefensiveRole.Screen).Should().BeEmpty();
+        Roles(withWingBacks.Assign(), TickDefensiveRole.Screen).Should().NotBeEmpty();
+    }
+
     [Theory]
     [InlineData(MatchPressing.LowBlock)]
     [InlineData(MatchPressing.MidBlock)]

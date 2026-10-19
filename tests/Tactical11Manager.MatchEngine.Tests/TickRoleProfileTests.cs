@@ -56,8 +56,34 @@ public sealed class TickRoleProfileTests
     {
         foreach (var role in Enum.GetValues<MatchRole>())
         {
-            TickRoleProfile.Tracks(role).Should().Be(role == MatchRole.WideMidfielder, role.ToString());
-            TickRoleProfile.Screens(role).Should().Be(role != MatchRole.Winger, role.ToString());
+            TickRoleProfile.Tracks(role, wingBacks: false).Should().Be(role == MatchRole.WideMidfielder, role.ToString());
+            TickRoleProfile.Screens(role, wingBacks: false).Should().Be(role != MatchRole.Winger, role.ToString());
         }
+    }
+
+    [Fact]
+    public void A_winger_beside_wing_backs_screens_and_tracks_like_a_wide_midfielder_and_nobody_else_changes()
+    {
+        foreach (var role in Enum.GetValues<MatchRole>())
+        {
+            TickRoleProfile.Tracks(role, wingBacks: true).Should().Be(role is MatchRole.WideMidfielder or MatchRole.Winger, role.ToString());
+            TickRoleProfile.Screens(role, wingBacks: true).Should().BeTrue(role.ToString());
+        }
+    }
+
+    [Fact]
+    public void A_side_has_wing_backs_when_any_of_its_slots_asks_for_the_role()
+    {
+        TickAnchorSpec[] backThree =
+        [
+            new(1_000, 3_500, MatchPositionFamily.Goalkeeper),
+            new(4_200, 900, MatchPositionFamily.Defence, MatchRole.WingBack),
+            new(2_000, 3_500, MatchPositionFamily.Defence),
+            new(7_500, 2_600, MatchPositionFamily.Attack, MatchRole.Winger),
+        ];
+
+        TickRoleProfile.HasWingBacks(backThree).Should().BeTrue();
+        TickRoleProfile.HasWingBacks(backThree.AsSpan(2)).Should().BeFalse("a back four's full-backs are not wing-backs, and a winger is not one");
+        TickRoleProfile.HasWingBacks([]).Should().BeFalse();
     }
 }

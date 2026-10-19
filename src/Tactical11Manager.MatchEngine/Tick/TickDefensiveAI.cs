@@ -593,10 +593,11 @@ internal static class TickDefensiveAI
     {
         var zone = (long)TickSpatialUnits.ToFixed(TickRoleProfile.TrackZone) * TickSpatialUnits.ToFixed(TickRoleProfile.TrackZone);
         var goalX = situation.IsHome ? 0 : SpatialPitch.PitchLength;
+        var wingBacks = TickRoleProfile.HasWingBacks(situation.Specs);
 
         for (var defender = 0; defender < situation.Defenders.Length; defender++)
         {
-            if (busy[defender] || !TickRoleProfile.Tracks(situation.Specs[defender].Role))
+            if (busy[defender] || !TickRoleProfile.Tracks(situation.Specs[defender].Role, wingBacks))
             {
                 continue;
             }
@@ -661,6 +662,7 @@ internal static class TickDefensiveAI
         var range = (long)TickSpatialUnits.ToFixed(ScreenerRange) * TickSpatialUnits.ToFixed(ScreenerRange);
 
         var screens = MaximumScreens + (PacksTheBox(situation) ? LowBlockExtraScreens : 0);
+        var wingBacks = TickRoleProfile.HasWingBacks(situation.Specs);
 
         for (var screen = 0; screen < screens; screen++)
         {
@@ -708,7 +710,7 @@ internal static class TickDefensiveAI
 
                 if (busy[defender]
                     || (family != MatchPositionFamily.Midfield && family != MatchPositionFamily.Attack)
-                    || !TickRoleProfile.Screens(situation.Specs[defender].Role))
+                    || !TickRoleProfile.Screens(situation.Specs[defender].Role, wingBacks))
                 {
                     continue;
                 }

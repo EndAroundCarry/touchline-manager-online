@@ -65,11 +65,32 @@ internal static class TickRoleProfile
     public static bool RunsWide(MatchRole role, MatchMentality mentality, bool holding) =>
         role == MatchRole.WideMidfielder && mentality != MatchMentality.Defensive && !holding;
 
-    /// <summary>Tells whether a man of a role may be sent to screen a passing lane: the winger stays high.</summary>
-    /// <param name="role">The man's role.</param>
-    public static bool Screens(MatchRole role) => role != MatchRole.Winger;
+    /// <summary>Tells whether a side's anchors include a wing-back: the formation is a back three or back five that plays its width through them.</summary>
+    /// <param name="specs">The side's anchors, one per player.</param>
+    public static bool HasWingBacks(ReadOnlySpan<TickAnchorSpec> specs)
+    {
+        foreach (var spec in specs)
+        {
+            if (spec.Role == MatchRole.WingBack)
+            {
+                return true;
+            }
+        }
 
-    /// <summary>Tells whether a man of a role tracks the opposing man on his flank when his side defends.</summary>
+        return false;
+    }
+
+    /// <summary>
+    /// Tells whether a man of a role may be sent to screen a passing lane: the winger stays high, unless wing-backs play beside him
+    /// (`back-threes`, Milestone 2): then he is a wide forward of a 3-4-3 and the side defends as a five-four-one with him in the four.
+    /// </summary>
     /// <param name="role">The man's role.</param>
-    public static bool Tracks(MatchRole role) => role == MatchRole.WideMidfielder;
+    /// <param name="wingBacks">Whether his side plays wing-backs.</param>
+    public static bool Screens(MatchRole role, bool wingBacks) => role != MatchRole.Winger || wingBacks;
+
+    /// <summary>Tells whether a man of a role tracks the opposing man on his flank when his side defends: a wide midfielder, or a winger beside wing-backs.</summary>
+    /// <param name="role">The man's role.</param>
+    /// <param name="wingBacks">Whether his side plays wing-backs.</param>
+    public static bool Tracks(MatchRole role, bool wingBacks) =>
+        role == MatchRole.WideMidfielder || (role == MatchRole.Winger && wingBacks);
 }

@@ -4,6 +4,11 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Back threes plan, Milestone 2 - the 3-4-3's wide forwards help defend
+
+- Engine: in a side that plays wing-backs, a winger now screens passing lanes and tracks the opposing flank man like a wide midfielder (`TickRoleProfile.HasWingBacks`, `Screens`, `Tracks`), so a 3-4-3 defends as a 5-4-1 with its wide forwards in the four instead of a 5-2-3. Wingers in back-four formations are untouched, so matches between back-four shapes are bit-identical. `engine-v12` is not bumped and the tick golden hash did not move.
+- Measured (300 matches a cell, seed 7000, against the six other shapes): the 3-4-3's strength -0.34 to -0.29 points a match, shots conceded 38.6 to 37.1; the 3-5-2 is unchanged (it has no winger). Giving the winger the midfield's out-of-possession depth as well (tried) added nothing and was dropped. The target of -0.10 is not yet met.
+
 ## Tired skills plan, Milestones 0-5 - a tired player plays worse
 
 - Feature: in the tick engine a player's skills fall with his live condition: nothing at 100%, 2% of the sheet value at 90%, 4% at 80%, 7% at 70%, 10% at 60%, 14% at 50%, 20% at 40% and below (a first, steeper curve of 20% at 60% and a 30% floor was measured and softened); mental skills half as much; pace and acceleration none. A substitute comes on fresh. `TickSkillTiredness` holds the curve, `TickTeam.RefreshSkills` applies it at each minute, stoppage, interval and full time. The legacy engine's rule is unchanged.
