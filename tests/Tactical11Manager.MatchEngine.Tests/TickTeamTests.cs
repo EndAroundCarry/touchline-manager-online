@@ -113,6 +113,130 @@ public sealed class TickTeamTests
     }
 
     [Fact]
+    public void A_tired_seat_plays_worse_after_a_refresh_and_a_fresh_one_does_not_change()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+        var tired = 3;
+        var fresh = 4;
+        var freshBefore = team.Skills[fresh];
+
+        team.Skills[tired].Tackling.Should().Be(freshBefore.Tackling, "uniform sides: the seats start alike");
+
+        // Half the tank gone costs 130% of that in condition: well under 90%, so the drop is real.
+        team.Body[tired].Energy -= TickPlayerPhysics.EnergyFull / 2;
+        team.RefreshSkills();
+
+        var live = team.LiveConditionOf(tired);
+        var drop = TickSkillTiredness.FullDropBasisPoints(live);
+
+        live.Should().BeLessThan(team.ConditionOf(tired));
+        drop.Should().BePositive();
+        team.Skills[tired].Condition.Should().Be(live);
+        team.Skills[tired].Tackling.Should().BeLessThan(freshBefore.Tackling);
+        team.Skills[tired].Decisions.Should().BeLessThan(freshBefore.Decisions);
+        team.Skills[tired].Decisions.Should().BeGreaterThan(team.Skills[tired].Tackling, "a mental skill loses half as much");
+        team.Skills[tired].Pace.Should().Be(freshBefore.Pace);
+        team.Skills[fresh].Should().Be(freshBefore);
+    }
+
+    [Fact]
+    public void The_skills_follow_the_same_condition_the_runtime_is_told()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+        var seat = 5;
+
+        team.Body[seat].Energy -= TickPlayerPhysics.EnergyFull / 3;
+        team.PushCondition();
+        team.RefreshSkills();
+
+        team.Skills[seat].Condition.Should().Be(team.ActiveOf(seat)!.Condition.ConditionBasisPoints);
+    }
+
+    [Fact]
+    public void A_substitute_comes_on_with_the_skills_his_own_condition_gives()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+        var substitute = state.Home.Bench[0];
+        var seat = 6;
+
+        team.Body[seat].Energy -= TickPlayerPhysics.EnergyFull / 2;
+        team.RefreshSkills();
+        state.Home.ReplaceOccupant(team.SlotNumber[seat], substitute, 60, Rules);
+        team.Sync(null);
+
+        team.Id[seat].Should().Be(substitute.ParticipantId);
+        team.Skills[seat].Condition.Should().Be(team.ConditionOf(seat));
+        team.Skills[seat].Natural.Should().BeSameAs(substitute.Attributes);
+        team.LiveConditionOf(seat).Should().Be(team.ConditionOf(seat), "he has not run yet");
+    }
+
+    [Fact]
+    public void A_sent_off_mans_tired_skills_leave_with_him_and_the_others_keep_theirs()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+        var stays = 6;
+
+        team.Body[stays].Energy -= TickPlayerPhysics.EnergyFull / 2;
+        team.RefreshSkills();
+
+        var tired = team.Skills[stays];
+        var id = team.Id[stays];
+
+        state.Home.RemoveParticipant(team.Id[4], 30, Rules).Should().BeTrue();
+        team.Sync(null);
+
+        team.SeatOf(id).Should().Be(stays - 1);
+        team.Skills[stays - 1].Should().Be(tired);
+        team.Skills[stays - 1].Condition.Should().Be(team.LiveConditionOf(stays - 1));
+    }
+
+    [Fact]
+    public void A_man_who_takes_the_gloves_keeps_his_tired_skills_and_his_raw_ones_stay_paired()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+
+        for (var seat = 1; seat < team.Count; seat++)
+        {
+            team.Body[seat].Energy -= TickPlayerPhysics.EnergyFull / 2;
+        }
+
+        team.RefreshSkills();
+        state.Home.RemoveParticipant(team.Id[0], 30, Rules).Should().BeTrue();
+        team.Sync(null);
+
+        var keeper = team.Skills[0];
+
+        keeper.Natural.Should().NotBeNull();
+        keeper.Condition.Should().Be(team.LiveConditionOf(0));
+        keeper.Uncurved().Tackling.Should().BeLessThan(keeper.Natural!.ValueOf(MatchAttributeName.Tackling) * TickPlayerSkills.Scale, "the raw set is tired too");
+    }
+
+    [Fact]
+    public void The_raw_skills_a_free_kick_is_taken_on_are_tired_too()
+    {
+        var state = TickTestMatchState.Create();
+        var team = new TickTeam(state.Home);
+        var seat = 7;
+        var sheet = team.Skills[seat].Natural!.ValueOf(MatchAttributeName.SetPieces) * TickPlayerSkills.Scale;
+
+        var startDrop = TickSkillTiredness.FullDropBasisPoints(team.ConditionOf(seat));
+
+        team.Skills[seat].Uncurved().SetPieces.Should().Be(((sheet * (10_000 - startDrop)) + 5_000) / 10_000, "a man who starts below full carries his drop from kick-off");
+
+        team.Body[seat].Energy -= TickPlayerPhysics.EnergyFull / 2;
+        team.RefreshSkills();
+
+        var drop = TickSkillTiredness.FullDropBasisPoints(team.LiveConditionOf(seat));
+
+        team.Skills[seat].Uncurved().SetPieces.Should().Be(((sheet * (10_000 - drop)) + 5_000) / 10_000);
+    }
+
+    [Fact]
     public void The_interval_gives_back_energy_up_to_what_the_player_started_with()
     {
         var state = TickTestMatchState.Create();

@@ -433,15 +433,40 @@ internal sealed class TickTeam
                     continue;
                 }
 
-                var spent = (int)((long)(_startEnergy[seat] - Body[seat].Energy) * 10_000 / TickPlayerPhysics.EnergyFull);
-                var condition = Math.Clamp(_startCondition[seat] - (spent * ConditionPerEnergyPercent / 100), 0, 10_000);
-
                 _runtime.Active[index] = slot with
                 {
-                    Condition = slot.Condition.WithConditionDelta(condition - slot.Condition.ConditionBasisPoints),
+                    Condition = slot.Condition.WithConditionDelta(LiveConditionOf(seat) - slot.Condition.ConditionBasisPoints),
                 };
 
                 break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets a seat's live condition in basis points: the condition he started his spell with, less <see cref="ConditionPerEnergyPercent"/>
+    /// of the share of the tank he has used. It is what <see cref="PushCondition"/> writes back, so the match centre and the skills
+    /// (<see cref="RefreshSkills"/>) follow the same number.
+    /// </summary>
+    /// <param name="seat">The seat.</param>
+    public int LiveConditionOf(int seat)
+    {
+        var spent = (int)((long)(_startEnergy[seat] - Body[seat].Energy) * 10_000 / TickPlayerPhysics.EnergyFull);
+
+        return Math.Clamp(_startCondition[seat] - (spent * ConditionPerEnergyPercent / 100), 0, 10_000);
+    }
+
+    /// <summary>
+    /// Works every seat's skills out again from his live condition (<see cref="TickSkillTiredness"/>). The match calls it once a minute, at
+    /// a stoppage and at the interval, not every tick, so a dead-ball layout does not shift under its taker. It allocates nothing.
+    /// </summary>
+    public void RefreshSkills()
+    {
+        for (var seat = 0; seat < Count; seat++)
+        {
+            if (Skills[seat].Natural is { } attributes)
+            {
+                Skills[seat] = TickPlayerSkills.Tired(attributes, LiveConditionOf(seat));
             }
         }
     }
@@ -470,7 +495,7 @@ internal sealed class TickTeam
         Id[seat] = slot.Participant.ParticipantId;
         SlotNumber[seat] = slot.Slot.SlotNumber;
         Spec[seat] = TickAnchorSpec.From(slot.Slot);
-        Skills[seat] = TickPlayerSkills.Rated(attributes);
+        Skills[seat] = TickPlayerSkills.Tired(attributes, condition);
         Profile[seat] = TickPlayerProfile.From(attributes, slot.Slot.Family == MatchPositionFamily.Goalkeeper);
         AttackQuality[seat] = TickAttackEdge.AttackQuality(attributes);
         DefenceQuality[seat] = TickAttackEdge.DefenceQuality(attributes);

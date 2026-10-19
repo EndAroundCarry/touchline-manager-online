@@ -87,6 +87,12 @@ public sealed class TickEngineTests
     private static MatchInputV1 Restand(MatchInputV1 input, (MatchPositionFamily Family, MatchRole Role, int X, int Y)[] home, (MatchPositionFamily Family, MatchRole Role, int X, int Y)[] away) =>
         input with { Home = Restand(input.Home, home), Away = Restand(input.Away, away) };
 
+    private static MatchInputV1 FreshLegs(MatchInputV1 input) =>
+        input with { Home = FreshLegs(input.Home), Away = FreshLegs(input.Away) };
+
+    private static MatchSideV1 FreshLegs(MatchSideV1 side) =>
+        side with { Squad = [.. side.Squad.Select(player => player with { State = PlayerMatchStateV1.Uniform(10_000) })] };
+
     private static MatchSideV1 Restand(MatchSideV1 side, (MatchPositionFamily Family, MatchRole Role, int X, int Y)[] board) =>
         side with
         {
@@ -161,7 +167,7 @@ public sealed class TickEngineTests
         var result = MatchSimulator.Simulate(Current(20_260_925));
 
         result.InputHash.Should().Be(GoldenInputHash);
-        result.OutputHash.Should().Be(GoldenOutputHash, "a change to the tick engine's behaviour is an engine-version change (ADR-0004); re-pinned at tired-skills M2, when the kick error, offside carelessness, interception, dribble, support and back-line sums stopped truncating to whole points (was 208bcc1897c76e1f; earlier, wide-midfielders M3: 881fefd371d6b429)");
+        result.OutputHash.Should().Be(GoldenOutputHash, "a change to the tick engine's behaviour is an engine-version change (ADR-0004); re-pinned at tired-skills M3, when skills began to fall with live condition (was b8baf8a8afafca3b; at M2, when the kick error, offside carelessness, interception, dribble, support and back-line sums stopped truncating to whole points: 208bcc1897c76e1f; earlier, wide-midfielders M3: 881fefd371d6b429)");
     }
 
     [Fact]
@@ -247,6 +253,10 @@ public sealed class TickEngineTests
         // `weaker-side-v1` Milestone 5, the yardstick's S1 in miniature: a side of 17 at home in the default 4-4-2 against a side of 16 that sits
         // in a low block and counters. 300 matches, so the standard error of the points is about 0.06; the bounds are wide enough for the
         // scatter and tight enough to catch a bonus that has vanished (the weaker side never scores or draws) or grown into a superpower.
+        // The floor was 0.60 until tired skills M3: a drop that is a share of the sheet value takes more off the better side, so the 17s
+        // lose to the 16s a little more often (58% against 60%+ before); it is reported at M4, not tuned away.
+        // Both sides start at full condition, as the benchmark's laboratory does (tired skills M0): the factory's 80% legs would take a
+        // flat 8% off every skill from the first minute, which no real snapshot has.
         const int Matches = 300;
         var counter = new MatchInstructionsV1
         {
@@ -260,7 +270,7 @@ public sealed class TickEngineTests
 
         Parallel.For(0, Matches, index =>
         {
-            var input = Restand(TestMatchFactory.Build(5_000UL + (ulong)index, 17, 16, new MatchInstructionsV1(), counter), FourFourTwo, FourFourTwo) with
+            var input = FreshLegs(Restand(TestMatchFactory.Build(5_000UL + (ulong)index, 17, 16, new MatchInstructionsV1(), counter), FourFourTwo, FourFourTwo)) with
             {
                 EngineVersion = EngineVersions.EngineLabel,
                 RuleSetVersion = EngineVersions.RuleSetLabel,
@@ -276,7 +286,7 @@ public sealed class TickEngineTests
         var draws = results.Count(result => result.Home == result.Away) / (double)Matches;
         var weakerPoints = (3 * weakerWins) + draws;
 
-        strongerWins.Should().BeGreaterThanOrEqualTo(0.60, $"the better side mostly wins (stronger {strongerWins:P0}, draws {draws:P0}, weaker {weakerWins:P0}, weaker points {weakerPoints:F2})");
+        strongerWins.Should().BeGreaterThanOrEqualTo(0.55, $"the better side mostly wins (stronger {strongerWins:P0}, draws {draws:P0}, weaker {weakerWins:P0}, weaker points {weakerPoints:F2})");
         weakerWins.Should().BeLessThanOrEqualTo(0.20, "a counter-attacking side is no superpower");
         draws.Should().BeGreaterThanOrEqualTo(0.08, "a side that defends deep earns draws");
         weakerPoints.Should().BeInRange(0.25, 0.80, "a side that defends deep and counters earns something, so the bonus has not gone, and it is no superpower either");
@@ -364,5 +374,5 @@ public sealed class TickEngineTests
 
     private const string GoldenInputHash = "624b1cc3bd04834400ba8f7cfa37c2205c8f560830a0d458edeaadd520c0716f";
 
-    private const string GoldenOutputHash = "b8baf8a8afafca3befc73fef8d076b7fa10923baf38b37cbb39722dd58c5efa5";
+    private const string GoldenOutputHash = "fe32cadaa9506d48727ea399d7eb958bae03f1deca9632c33dc97ecc1b2ff168";
 }

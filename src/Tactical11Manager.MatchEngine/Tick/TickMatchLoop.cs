@@ -294,12 +294,16 @@ internal sealed partial class TickMatchLoop
         _state.CaptureLiveMetrics();
     }
 
-    /// <summary>Writes the legs the bodies have into the runtime's condition, and adds a minute's fatigue and sharpness.</summary>
+    /// <summary>
+    /// Writes the legs the bodies have into the runtime's condition, and lets the skills follow them: a tired player passes, shoots and
+    /// tackles worse (<see cref="TickSkillTiredness"/>). Called a minute at a time, at a stoppage and at the interval, never every tick.
+    /// </summary>
     private void PushConditions()
     {
         foreach (var team in _teams)
         {
             team.PushCondition();
+            team.RefreshSkills();
         }
     }
 

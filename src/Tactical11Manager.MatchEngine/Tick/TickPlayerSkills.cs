@@ -94,8 +94,17 @@ internal readonly record struct TickPlayerSkills
     /// <summary>Gets the attributes these skills were curved from, or null when they were not curved (<see cref="Uncurved"/>).</summary>
     public PlayerAttributesV1? Natural { get; init; }
 
+    /// <summary>Gets how far below <see cref="FreshCondition"/> the condition these skills were worked out at lies, in basis points (a struct cannot default a field to full).</summary>
+    public int ConditionShortfall { get; init; }
+
+    /// <summary>Gets the live condition these skills were worked out at, in basis points: 10,000 for a fresh player (<see cref="Tired"/>).</summary>
+    public int Condition => FreshCondition - ConditionShortfall;
+
     /// <summary>How many hundredths make one attribute point: the unit every value here is held in, as in <see cref="Ratings.EffectiveSkill"/>.</summary>
     public const int Scale = 100;
+
+    /// <summary>A fresh player's condition, in basis points.</summary>
+    public const int FreshCondition = 10_000;
 
     /// <summary>The pitch's average attribute, which the engine's skill curve is centred on.</summary>
     public const int CurveCentre = 13;
@@ -107,27 +116,31 @@ internal readonly record struct TickPlayerSkills
     /// </summary>
     public const int CurvePercent = 38;
 
-    /// <summary>Builds the skills a player brings to a match: his attributes pulled towards the average by the skill curve.</summary>
+    /// <summary>Builds the skills a player brings to a match, fresh: his attributes pulled towards the average by the skill curve.</summary>
     /// <param name="attributes">The player's attributes.</param>
-    public static TickPlayerSkills Rated(PlayerAttributesV1 attributes)
+    public static TickPlayerSkills Rated(PlayerAttributesV1 attributes) => Tired(attributes, FreshCondition);
+
+    /// <summary>
+    /// Builds a player's skills as the skill curve and his condition leave them: the share of each sheet value that tiredness takes
+    /// (<see cref="TickSkillTiredness"/>) comes off, and the curve scales that loss like every other difference from the average.
+    /// </summary>
+    /// <remarks>
+    /// Allocation-free, so the match can rebuild a seat's skills every minute. A fresh player's values are exactly the curved whole points.
+    /// </remarks>
+    /// <param name="attributes">The player's attributes.</param>
+    /// <param name="conditionBasisPoints">His live condition, 0..10,000.</param>
+    public static TickPlayerSkills Tired(PlayerAttributesV1 attributes, int conditionBasisPoints)
     {
         ArgumentNullException.ThrowIfNull(attributes);
 
-        var values = new int[MatchAttributeNames.Count];
-
-        for (var index = 0; index < values.Length; index++)
-        {
-            values[index] = CurveCentre + (((attributes.Values[index]) - CurveCentre) * CurvePercent / 100);
-        }
-
-        return From(PlayerAttributesV1.From(values)) with { Natural = attributes };
+        return Build(attributes, conditionBasisPoints, curved: true);
     }
 
     /// <summary>
-    /// Gets the player's attributes as he has them, before the skill curve: what a dead ball, where one man faces another with
-    /// time to spare, is decided on. Skills not built by <see cref="Rated"/> have no curve to undo and are returned as they are.
+    /// Gets the player's attributes as he has them, before the skill curve, and as tired as he is: what a dead ball, where one man faces
+    /// another with time to spare, is decided on. Skills not built by <see cref="Rated"/> have no curve to undo and are returned as they are.
     /// </summary>
-    public TickPlayerSkills Uncurved() => Natural is null ? this : From(Natural);
+    public TickPlayerSkills Uncurved() => Natural is null ? this : Build(Natural, Condition, curved: false);
 
     /// <summary>Builds a player's skills from his frozen attributes, in hundredths of a point.</summary>
     /// <param name="attributes">The player's attributes.</param>
@@ -135,35 +148,60 @@ internal readonly record struct TickPlayerSkills
     {
         ArgumentNullException.ThrowIfNull(attributes);
 
+        return Build(attributes, FreshCondition, curved: false) with { Natural = null };
+    }
+
+    private static TickPlayerSkills Build(PlayerAttributesV1 attributes, int conditionBasisPoints, bool curved)
+    {
+        var condition = Math.Clamp(conditionBasisPoints, 0, FreshCondition);
+        var full = TickSkillTiredness.FullDropBasisPoints(condition);
+        var mental = TickSkillTiredness.MentalDropBasisPoints(full);
+
         return new TickPlayerSkills
         {
-            Tackling = Hundredths(attributes, MatchAttributeName.Tackling),
-            Strength = Hundredths(attributes, MatchAttributeName.Strength),
-            Aggression = Hundredths(attributes, MatchAttributeName.Aggression),
-            Marking = Hundredths(attributes, MatchAttributeName.Marking),
-            Positioning = Hundredths(attributes, MatchAttributeName.Positioning),
-            Anticipation = Hundredths(attributes, MatchAttributeName.Anticipation),
-            Decisions = Hundredths(attributes, MatchAttributeName.Decisions),
-            Dribbling = Hundredths(attributes, MatchAttributeName.Dribbling),
-            Agility = Hundredths(attributes, MatchAttributeName.Agility),
-            Composure = Hundredths(attributes, MatchAttributeName.Composure),
-            Pace = Hundredths(attributes, MatchAttributeName.Pace),
-            Acceleration = Hundredths(attributes, MatchAttributeName.Acceleration),
-            WorkRate = Hundredths(attributes, MatchAttributeName.WorkRate),
-            Finishing = Hundredths(attributes, MatchAttributeName.Finishing),
-            Passing = Hundredths(attributes, MatchAttributeName.Passing),
-            Crossing = Hundredths(attributes, MatchAttributeName.Crossing),
-            Technique = Hundredths(attributes, MatchAttributeName.Technique),
-            Vision = Hundredths(attributes, MatchAttributeName.Vision),
-            Reflexes = Hundredths(attributes, MatchAttributeName.Reflexes),
-            Handling = Hundredths(attributes, MatchAttributeName.Handling),
-            OneOnOnes = Hundredths(attributes, MatchAttributeName.OneOnOnes),
-            AerialAbility = Hundredths(attributes, MatchAttributeName.AerialAbility),
-            JumpingReach = Hundredths(attributes, MatchAttributeName.JumpingReach),
-            Heading = Hundredths(attributes, MatchAttributeName.Heading),
-            SetPieces = Hundredths(attributes, MatchAttributeName.SetPieces),
+            Tackling = Value(attributes, MatchAttributeName.Tackling, full, curved),
+            Strength = Value(attributes, MatchAttributeName.Strength, full, curved),
+            Aggression = Value(attributes, MatchAttributeName.Aggression, mental, curved),
+            Marking = Value(attributes, MatchAttributeName.Marking, full, curved),
+            Positioning = Value(attributes, MatchAttributeName.Positioning, mental, curved),
+            Anticipation = Value(attributes, MatchAttributeName.Anticipation, mental, curved),
+            Decisions = Value(attributes, MatchAttributeName.Decisions, mental, curved),
+            Dribbling = Value(attributes, MatchAttributeName.Dribbling, full, curved),
+            Agility = Value(attributes, MatchAttributeName.Agility, full, curved),
+            Composure = Value(attributes, MatchAttributeName.Composure, mental, curved),
+            Pace = Value(attributes, MatchAttributeName.Pace, 0, curved),
+            Acceleration = Value(attributes, MatchAttributeName.Acceleration, 0, curved),
+            WorkRate = Value(attributes, MatchAttributeName.WorkRate, mental, curved),
+            Finishing = Value(attributes, MatchAttributeName.Finishing, full, curved),
+            Passing = Value(attributes, MatchAttributeName.Passing, full, curved),
+            Crossing = Value(attributes, MatchAttributeName.Crossing, full, curved),
+            Technique = Value(attributes, MatchAttributeName.Technique, full, curved),
+            Vision = Value(attributes, MatchAttributeName.Vision, mental, curved),
+            Reflexes = Value(attributes, MatchAttributeName.Reflexes, full, curved),
+            Handling = Value(attributes, MatchAttributeName.Handling, full, curved),
+            OneOnOnes = Value(attributes, MatchAttributeName.OneOnOnes, full, curved),
+            AerialAbility = Value(attributes, MatchAttributeName.AerialAbility, full, curved),
+            JumpingReach = Value(attributes, MatchAttributeName.JumpingReach, full, curved),
+            Heading = Value(attributes, MatchAttributeName.Heading, full, curved),
+            SetPieces = Value(attributes, MatchAttributeName.SetPieces, full, curved),
+            Natural = attributes,
+            ConditionShortfall = FreshCondition - condition,
         };
     }
 
-    private static int Hundredths(PlayerAttributesV1 attributes, MatchAttributeName name) => attributes.ValueOf(name) * Scale;
+    /// <summary>One attribute in hundredths: the sheet value less its drop, curved or not.</summary>
+    private static int Value(PlayerAttributesV1 attributes, MatchAttributeName name, int dropBasisPoints, bool curved)
+    {
+        var sheet = attributes.ValueOf(name);
+
+        if (!curved)
+        {
+            return ((sheet * (TickSkillTiredness.BasisPoints - dropBasisPoints)) + (TickSkillTiredness.BasisPoints / 200)) / (TickSkillTiredness.BasisPoints / Scale);
+        }
+
+        var fresh = (CurveCentre + ((sheet - CurveCentre) * CurvePercent / 100)) * Scale;
+        var lost = ((sheet * dropBasisPoints * CurvePercent) + (TickSkillTiredness.BasisPoints / 2)) / TickSkillTiredness.BasisPoints;
+
+        return fresh - lost;
+    }
 }

@@ -40,10 +40,11 @@ internal static class TickPlay
 
     /// <summary>
     /// Builds a snapshot on the tactics board's own shape, so the film is not laid on its side. The default seed is 20,260,935 since
-    /// wide-midfielders M3: the one before it drew 0-0 once the wide midfielders began to track, and the goal tests need goals.
+    /// wide-midfielders M3: the one before it drew 0-0 once the wide midfielders began to track, and the goal tests need goals. Seed
+    /// 20,260,939 since tired skills M3, when 20,260,935 drew 0-0 again (the sides now start at 80% and tire, so every match changed).
     /// </summary>
     /// <param name="seed">The match seed.</param>
-    public static MatchInputV1 Fixture(ulong seed = 20_260_935) => TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed));
+    public static MatchInputV1 Fixture(ulong seed = 20_260_939) => TestMatchFactory.OnTheBoard(TestMatchFactory.Even(seed));
 
     /// <summary>Builds a snapshot, and the rules it is frozen against, in which most fouls draw a red card.</summary>
     /// <param name="rules">The rules.</param>
