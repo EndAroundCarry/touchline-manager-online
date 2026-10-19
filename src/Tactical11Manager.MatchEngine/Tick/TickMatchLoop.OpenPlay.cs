@@ -971,7 +971,7 @@ internal sealed partial class TickMatchLoop
             return ThroughBallHoldTicks;
         }
 
-        var firstTime = skills.Technique >= OneTouchTechnique
+        var firstTime = skills.Technique >= OneTouchTechnique * TickPlayerSkills.Scale
             && (decision.Action == TickCarrierAction.Shoot || decision.EffectivePressure >= OneTouchPressure);
 
         if (firstTime)
@@ -1312,7 +1312,7 @@ internal sealed partial class TickMatchLoop
         }
 
         // A man in touch of the carrier goes in for the ball on some ticks and not others: the draw is always taken.
-        var commit = Math.Clamp(ChallengeCommitBase + (ChallengeCommitPerAggression * opponents.Skills[challenger].Aggression), 0, BasisPointsCertain);
+        var commit = Math.Clamp(ChallengeCommitBase + (ChallengeCommitPerAggression * opponents.Skills[challenger].Aggression / TickPlayerSkills.Scale), 0, BasisPointsCertain);
 
         if (_random.NextBasisPoints() >= commit)
         {
@@ -1878,7 +1878,7 @@ internal sealed partial class TickMatchLoop
         var passerTeam = _teams[_passer.Side];
         var passerSeat = passerTeam.SeatOfSlot(_passer.Slot);
         var passer = passerSeat >= 0 ? passerTeam.Skills[passerSeat] : skills;
-        var difference = ((skills.Anticipation + skills.Positioning) - (passer.Passing + passer.Vision)) / 2;
+        var difference = ((skills.Anticipation + skills.Positioning) - (passer.Passing + passer.Vision)) / 2 / TickPlayerSkills.Scale;
         var factor = Math.Clamp(100 + (InterceptSkillPerPoint * difference), 50, 160);
         var chance = Math.Clamp((InterceptMaximum * factor / 100) + HomeEdgeBasisPoints(_teams[1 - _passer.Side].IsHome), 500, 9_000);
 
@@ -1968,7 +1968,7 @@ internal sealed partial class TickMatchLoop
     {
         var team = _teams[side];
         var skills = team.Skills[seat];
-        var chance = Math.Clamp(BlockBaseBasisPoints + (BlockPerPositioning * skills.Positioning), 3_000, 8_500);
+        var chance = Math.Clamp(BlockBaseBasisPoints + (BlockPerPositioning * skills.Positioning / TickPlayerSkills.Scale), 3_000, 8_500);
         var roll = _random.NextBasisPoints();
         var swing = _random.NextRange(-BlockSpreadAngle, BlockSpreadAngle);
 

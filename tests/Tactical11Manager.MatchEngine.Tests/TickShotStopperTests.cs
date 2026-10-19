@@ -115,7 +115,7 @@ public sealed class TickShotStopperTests
 
         foreach (var (reflexes, reactsAtTick) in new[] { (20, 1), (10, 2), (1, 3) })
         {
-            var skills = Skills(10) with { Reflexes = reflexes };
+            var skills = Skills(10) with { Reflexes = reflexes * TickPlayerSkills.Scale };
 
             for (var tick = 0; tick < reactsAtTick; tick++)
             {
@@ -155,9 +155,9 @@ public sealed class TickShotStopperTests
         var keeper = Keeper();
         var forecast = new TickShotForecast(true, TickBallBoundary.GoalHomeEnd, 6, 5, 3_700, 0, ShotSpeed);
         var average = TickShotStopper.Assess(keeper, Skills(10), forecast);
-        var agile = TickShotStopper.Assess(keeper, Skills(10) with { Agility = 20 }, forecast);
-        var safe = TickShotStopper.Assess(keeper, Skills(10) with { Handling = 20 }, forecast);
-        var tall = TickShotStopper.Assess(keeper, Skills(10) with { JumpingReach = 20, AerialAbility = 20 }, forecast);
+        var agile = TickShotStopper.Assess(keeper, Skills(10) with { Agility = 20 * TickPlayerSkills.Scale }, forecast);
+        var safe = TickShotStopper.Assess(keeper, Skills(10) with { Handling = 20 * TickPlayerSkills.Scale }, forecast);
+        var tall = TickShotStopper.Assess(keeper, Skills(10) with { JumpingReach = 20 * TickPlayerSkills.Scale, AerialAbility = 20 * TickPlayerSkills.Scale }, forecast);
 
         average.Needed.Should().Be(200);
         average.ParryReach.Should().Be(170);
@@ -267,7 +267,7 @@ public sealed class TickShotStopperTests
     [Fact]
     public void An_elite_goalkeeper_saves_the_close_shot_an_ordinary_one_cannot()
     {
-        var elite = Skills(10) with { Reflexes = 20, Agility = 20, Pace = 20, Acceleration = 20, Handling = 20 };
+        var elite = Skills(10) with { Reflexes = 20 * TickPlayerSkills.Scale, Agility = 20 * TickPlayerSkills.Scale, Pace = 20 * TickPlayerSkills.Scale, Acceleration = 20 * TickPlayerSkills.Scale, Handling = 20 * TickPlayerSkills.Scale };
 
         Seeds().Select(seed => Play(1_100, 3_850, elite, seed))
             .Count(outcome => outcome != TickSaveOutcome.Beaten)
@@ -278,7 +278,7 @@ public sealed class TickShotStopperTests
     public void A_shot_down_the_middle_is_never_scored_and_a_safer_pair_of_hands_holds_it_more_often()
     {
         int Held(int handling) => Seeds()
-            .Select(seed => Play(2_200, 3_500, Skills(10) with { Handling = handling }, seed))
+            .Select(seed => Play(2_200, 3_500, Skills(10) with { Handling = handling * TickPlayerSkills.Scale }, seed))
             .Count(outcome => outcome == TickSaveOutcome.Caught);
 
         Seeds().Select(seed => Play(2_200, 3_500, Skills(10), seed))
@@ -484,9 +484,9 @@ public sealed class TickShotStopperTests
     {
         var values = new int[MatchAttributeNames.Count];
 
-        values[(int)MatchAttributeName.Pace] = skills.Pace;
-        values[(int)MatchAttributeName.Acceleration] = skills.Acceleration;
-        values[(int)MatchAttributeName.Agility] = skills.Agility;
+        values[(int)MatchAttributeName.Pace] = skills.Pace / TickPlayerSkills.Scale;
+        values[(int)MatchAttributeName.Acceleration] = skills.Acceleration / TickPlayerSkills.Scale;
+        values[(int)MatchAttributeName.Agility] = skills.Agility / TickPlayerSkills.Scale;
         values[(int)MatchAttributeName.Stamina] = 10;
         values[(int)MatchAttributeName.WorkRate] = 10;
 

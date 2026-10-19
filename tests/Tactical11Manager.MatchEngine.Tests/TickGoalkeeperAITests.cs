@@ -135,7 +135,7 @@ public sealed class TickGoalkeeperAITests
     [Fact]
     public void A_lone_attacker_inside_his_range_makes_him_charge_out_to_where_the_ball_will_be()
     {
-        var skills = Skills(10) with { OneOnOnes = 15 };
+        var skills = Skills(10) with { OneOnOnes = 15 * TickPlayerSkills.Scale };
         var order = new Scene(true, new SpatialPoint(1_200, 3_200)) { Skills = skills }.Decide();
 
         order.Mode.Should().Be(TickKeeperMode.Rush);
@@ -153,7 +153,7 @@ public sealed class TickGoalkeeperAITests
         ball.PlaceAt(1_500, 3_500);
         ball.Kick(-TickSpatialUnits.SpeedToFixedPerTick(600), 0, 0);
 
-        var skills = Skills(10) with { OneOnOnes = 20 };
+        var skills = Skills(10) with { OneOnOnes = 20 * TickPlayerSkills.Scale };
         var order = new Scene(true, new SpatialPoint(1_500, 3_500)) { Skills = skills, Ball = ball }.Decide();
 
         order.Mode.Should().Be(TickKeeperMode.Rush);
@@ -167,7 +167,7 @@ public sealed class TickGoalkeeperAITests
     [Fact]
     public void A_teammate_between_the_ball_and_the_goal_keeps_him_on_his_line_but_one_behind_the_ball_does_not()
     {
-        var skills = Skills(10) with { OneOnOnes = 20 };
+        var skills = Skills(10) with { OneOnOnes = 20 * TickPlayerSkills.Scale };
         var ball = new SpatialPoint(1_400, 3_500);
 
         new Scene(true, ball) { Skills = skills, Teammates = Move(FarTeam, (2, 700, 3_600)) }.Decide().Mode
@@ -303,7 +303,7 @@ public sealed class TickGoalkeeperAITests
         TickGoalkeeperAI.ClaimChanceBasisPoints(even, even).Should().Be(5_000);
         TickGoalkeeperAI.ClaimChanceBasisPoints(elite, poor).Should().Be(8_500);
         TickGoalkeeperAI.ClaimChanceBasisPoints(poor, elite).Should().Be(1_500);
-        TickGoalkeeperAI.ClaimChanceBasisPoints(even with { OneOnOnes = 16 }, even).Should().BeGreaterThan(5_000);
+        TickGoalkeeperAI.ClaimChanceBasisPoints(even with { OneOnOnes = 16 * TickPlayerSkills.Scale }, even).Should().BeGreaterThan(5_000);
     }
 
     [Theory]

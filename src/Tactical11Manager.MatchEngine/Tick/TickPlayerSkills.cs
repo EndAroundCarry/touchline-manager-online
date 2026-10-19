@@ -6,7 +6,9 @@ namespace Tactical11Manager.MatchEngine.Tick;
 /// The attributes the tick engine's decision code reads, taken once per player per match (`tick-engine-v1`).
 /// </summary>
 /// <remarks>
-/// Every value is on the canonical 1..20 scale. Milestone 3 needs the defensive and duelling attributes, Milestone 4
+/// Every value is in hundredths of an attribute point on the canonical 1..20 scale (<see cref="Scale"/>), so that a drop of a few percent
+/// is not lost to whole-point arithmetic. A fresh player's values are whole points times <see cref="Scale"/>, and every reader divides the
+/// scale out where it needs a point count. Milestone 3 needs the defensive and duelling attributes, Milestone 4
 /// the off-the-ball ones (Pace, Acceleration, WorkRate) and Milestone 5 the ones the ball carrier decides with
 /// (Finishing, Passing, Crossing, Technique, Vision) and Milestone 6 the goalkeeper's (Reflexes, Handling, OneOnOnes,
 /// AerialAbility, JumpingReach) and Milestone 7 the set-piece ones (Heading, SetPieces). Kept apart from <see cref="TickPlayerProfile"/>, which
@@ -92,6 +94,9 @@ internal readonly record struct TickPlayerSkills
     /// <summary>Gets the attributes these skills were curved from, or null when they were not curved (<see cref="Uncurved"/>).</summary>
     public PlayerAttributesV1? Natural { get; init; }
 
+    /// <summary>How many hundredths make one attribute point: the unit every value here is held in, as in <see cref="Ratings.EffectiveSkill"/>.</summary>
+    public const int Scale = 100;
+
     /// <summary>The pitch's average attribute, which the engine's skill curve is centred on.</summary>
     public const int CurveCentre = 13;
 
@@ -124,7 +129,7 @@ internal readonly record struct TickPlayerSkills
     /// </summary>
     public TickPlayerSkills Uncurved() => Natural is null ? this : From(Natural);
 
-    /// <summary>Builds a player's skills from his frozen attributes.</summary>
+    /// <summary>Builds a player's skills from his frozen attributes, in hundredths of a point.</summary>
     /// <param name="attributes">The player's attributes.</param>
     public static TickPlayerSkills From(PlayerAttributesV1 attributes)
     {
@@ -132,31 +137,33 @@ internal readonly record struct TickPlayerSkills
 
         return new TickPlayerSkills
         {
-            Tackling = attributes.ValueOf(MatchAttributeName.Tackling),
-            Strength = attributes.ValueOf(MatchAttributeName.Strength),
-            Aggression = attributes.ValueOf(MatchAttributeName.Aggression),
-            Marking = attributes.ValueOf(MatchAttributeName.Marking),
-            Positioning = attributes.ValueOf(MatchAttributeName.Positioning),
-            Anticipation = attributes.ValueOf(MatchAttributeName.Anticipation),
-            Decisions = attributes.ValueOf(MatchAttributeName.Decisions),
-            Dribbling = attributes.ValueOf(MatchAttributeName.Dribbling),
-            Agility = attributes.ValueOf(MatchAttributeName.Agility),
-            Composure = attributes.ValueOf(MatchAttributeName.Composure),
-            Pace = attributes.ValueOf(MatchAttributeName.Pace),
-            Acceleration = attributes.ValueOf(MatchAttributeName.Acceleration),
-            WorkRate = attributes.ValueOf(MatchAttributeName.WorkRate),
-            Finishing = attributes.ValueOf(MatchAttributeName.Finishing),
-            Passing = attributes.ValueOf(MatchAttributeName.Passing),
-            Crossing = attributes.ValueOf(MatchAttributeName.Crossing),
-            Technique = attributes.ValueOf(MatchAttributeName.Technique),
-            Vision = attributes.ValueOf(MatchAttributeName.Vision),
-            Reflexes = attributes.ValueOf(MatchAttributeName.Reflexes),
-            Handling = attributes.ValueOf(MatchAttributeName.Handling),
-            OneOnOnes = attributes.ValueOf(MatchAttributeName.OneOnOnes),
-            AerialAbility = attributes.ValueOf(MatchAttributeName.AerialAbility),
-            JumpingReach = attributes.ValueOf(MatchAttributeName.JumpingReach),
-            Heading = attributes.ValueOf(MatchAttributeName.Heading),
-            SetPieces = attributes.ValueOf(MatchAttributeName.SetPieces),
+            Tackling = Hundredths(attributes, MatchAttributeName.Tackling),
+            Strength = Hundredths(attributes, MatchAttributeName.Strength),
+            Aggression = Hundredths(attributes, MatchAttributeName.Aggression),
+            Marking = Hundredths(attributes, MatchAttributeName.Marking),
+            Positioning = Hundredths(attributes, MatchAttributeName.Positioning),
+            Anticipation = Hundredths(attributes, MatchAttributeName.Anticipation),
+            Decisions = Hundredths(attributes, MatchAttributeName.Decisions),
+            Dribbling = Hundredths(attributes, MatchAttributeName.Dribbling),
+            Agility = Hundredths(attributes, MatchAttributeName.Agility),
+            Composure = Hundredths(attributes, MatchAttributeName.Composure),
+            Pace = Hundredths(attributes, MatchAttributeName.Pace),
+            Acceleration = Hundredths(attributes, MatchAttributeName.Acceleration),
+            WorkRate = Hundredths(attributes, MatchAttributeName.WorkRate),
+            Finishing = Hundredths(attributes, MatchAttributeName.Finishing),
+            Passing = Hundredths(attributes, MatchAttributeName.Passing),
+            Crossing = Hundredths(attributes, MatchAttributeName.Crossing),
+            Technique = Hundredths(attributes, MatchAttributeName.Technique),
+            Vision = Hundredths(attributes, MatchAttributeName.Vision),
+            Reflexes = Hundredths(attributes, MatchAttributeName.Reflexes),
+            Handling = Hundredths(attributes, MatchAttributeName.Handling),
+            OneOnOnes = Hundredths(attributes, MatchAttributeName.OneOnOnes),
+            AerialAbility = Hundredths(attributes, MatchAttributeName.AerialAbility),
+            JumpingReach = Hundredths(attributes, MatchAttributeName.JumpingReach),
+            Heading = Hundredths(attributes, MatchAttributeName.Heading),
+            SetPieces = Hundredths(attributes, MatchAttributeName.SetPieces),
         };
     }
+
+    private static int Hundredths(PlayerAttributesV1 attributes, MatchAttributeName name) => attributes.ValueOf(name) * Scale;
 }

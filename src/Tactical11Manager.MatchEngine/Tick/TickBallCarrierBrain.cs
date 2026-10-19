@@ -546,11 +546,11 @@ internal static class TickBallCarrierBrain
     public static int DecisionInterval(in TickPlayerSkills skills, MatchTempo tempo, bool breaking = false)
     {
         var sharpness = skills.Decisions + skills.Anticipation
-            + (tempo == MatchTempo.High ? 4 : 0)
-            - (tempo == MatchTempo.Low ? 4 : 0)
-            + (breaking ? BreakSharpness : 0);
+            + (tempo == MatchTempo.High ? 4 * TickPlayerSkills.Scale : 0)
+            - (tempo == MatchTempo.Low ? 4 * TickPlayerSkills.Scale : 0)
+            + (breaking ? BreakSharpness * TickPlayerSkills.Scale : 0);
 
-        return sharpness >= QuickDecisionSum ? 1 : 2;
+        return sharpness >= QuickDecisionSum * TickPlayerSkills.Scale ? 1 : 2;
     }
 
     /// <summary>Measures the raw pressure on the carrier from the defenders around him, in basis points (0 to 10,000).</summary>
@@ -623,21 +623,21 @@ internal static class TickBallCarrierBrain
 
     /// <summary>Scales a raw pressure by the carrier's composure: 140% − 4% × Composure, so 60% at 20 and 136% at 1.</summary>
     /// <param name="pressure">The raw pressure, in basis points.</param>
-    /// <param name="composure">The carrier's Composure.</param>
+    /// <param name="composure">The carrier's Composure, in hundredths of a point.</param>
     public static int EffectivePressure(int pressure, int composure) =>
-        pressure * (14_000 - (400 * composure)) / BasisPoints;
+        pressure * (14_000 - (400 * composure / TickPlayerSkills.Scale)) / BasisPoints;
 
     /// <summary>
     /// Gets the error angle of a kick, in binary angle units: <c>BaseError × max(25%, 100 − (5 × skill + Technique) / 2) × (1 +
     /// pressure)</c>. The kick leaves anywhere within this angle either side of its aim.
     /// </summary>
-    /// <param name="skill">The attribute the kick is made with: Passing, Finishing or Crossing.</param>
-    /// <param name="technique">The kicker's Technique.</param>
+    /// <param name="skill">The attribute the kick is made with: Passing, Finishing or Crossing, in hundredths of a point.</param>
+    /// <param name="technique">The kicker's Technique, in hundredths of a point.</param>
     /// <param name="baseError">The error of an average player with no pressure on him at the weakest skill.</param>
     /// <param name="effectivePressure">The pressure on him after his composure, in basis points.</param>
     public static int ErrorAngle(int skill, int technique, int baseError, int effectivePressure)
     {
-        var percent = Math.Max(MinimumErrorPercent, ErrorSkillCeiling - (((ErrorSkillWeight * skill) + technique) / 2));
+        var percent = Math.Max(MinimumErrorPercent, ErrorSkillCeiling - (((ErrorSkillWeight * skill) + technique) / 2 / TickPlayerSkills.Scale));
         var error = baseError * percent * (BasisPoints + Math.Max(0, effectivePressure)) / (100 * BasisPoints);
 
         return Math.Max(1, error);
@@ -702,7 +702,7 @@ internal static class TickBallCarrierBrain
         var cosine = (int)(dx * BasisPoints / Math.Max(1, distance));
         var angle = cosine * cosine / BasisPoints;
         var block = BlockerFactors[Math.Min(blockers, BlockerFactors.Length - 1)];
-        var finish = 6_000 + (4_000 * ((2 * skills.Finishing) + skills.Technique) / 3 / 10);
+        var finish = 6_000 + (4_000 * ((2 * skills.Finishing) + skills.Technique) / 3 / 10 / TickPlayerSkills.Scale);
 
         return (int)((long)shape * angle / BasisPoints * block / BasisPoints * finish / BasisPoints * MaximumGoalChance / BasisPoints);
     }
@@ -724,7 +724,7 @@ internal static class TickBallCarrierBrain
     /// </summary>
     /// <param name="skills">The carrier's skills.</param>
     public static int OffsideCarelessPercent(in TickPlayerSkills skills) =>
-        Math.Clamp(OffsideCarelessBase + (OffsideCarelessPerPoint * (OffsideReadingSum - skills.Decisions - skills.Anticipation)), 0, OffsideCarelessMaximum);
+        Math.Clamp(OffsideCarelessBase + (OffsideCarelessPerPoint * ((OffsideReadingSum * TickPlayerSkills.Scale) - skills.Decisions - skills.Anticipation) / TickPlayerSkills.Scale), 0, OffsideCarelessMaximum);
 
     /// <summary>Tells whether the carrier sees a receiver as offside: he was, and the carrier is not one of the times he misses it.</summary>
     private static bool SeesOffside(in TickCarrierSituation situation, int careless, int receiver)
@@ -841,7 +841,7 @@ internal static class TickBallCarrierBrain
     private static void ScorePasses(in TickCarrierSituation situation, in View view, ref Best best, ref PassScan scan)
     {
         var carrierSkills = situation.Skills[situation.CarrierIndex];
-        var vision = VisionBase + (VisionStep * carrierSkills.Vision);
+        var vision = VisionBase + (VisionStep * carrierSkills.Vision / TickPlayerSkills.Scale);
         var careless = OffsideCarelessPercent(carrierSkills);
         var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.EdgeFactorPercent);
         var loss = LossOfBall(view);
@@ -868,7 +868,7 @@ internal static class TickBallCarrierBrain
             }
 
             var run = situation.Orders.Length > index ? situation.Orders[index].Role : TickAttackingRole.Holding;
-            var through = run == TickAttackingRole.Runner && carrierSkills.Vision >= ThroughBallMinimumVision;
+            var through = run == TickAttackingRole.Runner && carrierSkills.Vision >= ThroughBallMinimumVision * TickPlayerSkills.Scale;
             var combination = run is TickAttackingRole.Return or TickAttackingRole.ThirdMan;
 
             if (SeesOffside(situation, careless, index))
@@ -1134,7 +1134,7 @@ internal static class TickBallCarrierBrain
         }
 
         var skills = situation.Skills[situation.CarrierIndex];
-        var mean = ((2 * skills.Dribbling) + skills.Pace + skills.Acceleration) / 4;
+        var mean = ((2 * skills.Dribbling) + skills.Pace + skills.Acceleration) / 4 / TickPlayerSkills.Scale;
         var success = Math.Clamp(5_500 + (250 * mean), 2_000, 9_800) * (BasisPoints - (view.Effective * 45 / 100)) / BasisPoints;
         var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.EdgeFactorPercent);
         var loss = LossOfBall(view);
@@ -1189,7 +1189,7 @@ internal static class TickBallCarrierBrain
             return;
         }
 
-        var worth = 1_000 + (80 * (skills.Composure + skills.Strength)) - (100 * situation.ShieldTicks);
+        var worth = 1_000 + (80 * (skills.Composure + skills.Strength) / TickPlayerSkills.Scale) - (100 * situation.ShieldTicks);
         var utility = worth * Math.Max(0, 11_000 - view.Effective) / BasisPoints;
 
         if (utility <= 0)
@@ -1220,7 +1220,7 @@ internal static class TickBallCarrierBrain
         // A goalkeeper with no pass he trusts clears whatever the pressure on him.
         var stuck = best.Utility == int.MinValue && situation.Specs[situation.CarrierIndex].Family == MatchPositionFamily.Goalkeeper;
 
-        if (!stuck && view.Pressure < PanicBase + (PanicStep * skills.Composure))
+        if (!stuck && view.Pressure < PanicBase + (PanicStep * skills.Composure / TickPlayerSkills.Scale))
         {
             return;
         }

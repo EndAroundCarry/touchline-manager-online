@@ -684,12 +684,12 @@ public sealed class TickSetPiecesTests
         var weak = TickPlayerSkills.Rated(PlayerAttributesV1.Uniform(6));
         var strong = TickPlayerSkills.Rated(PlayerAttributesV1.Uniform(20));
 
-        weak.SetPieces.Should().BeGreaterThan(6, "the curve pulls a weak player towards the average");
-        strong.SetPieces.Should().BeLessThan(20);
-        weak.Uncurved().SetPieces.Should().Be(6);
-        strong.Uncurved().SetPieces.Should().Be(20);
+        weak.SetPieces.Should().BeGreaterThan(6 * TickPlayerSkills.Scale, "the curve pulls a weak player towards the average");
+        strong.SetPieces.Should().BeLessThan(20 * TickPlayerSkills.Scale);
+        weak.Uncurved().SetPieces.Should().Be(6 * TickPlayerSkills.Scale);
+        strong.Uncurved().SetPieces.Should().Be(20 * TickPlayerSkills.Scale);
         TickSetPieces.Craft(strong.Uncurved()).Should().BeGreaterThan(TickSetPieces.Craft(weak.Uncurved()) * 2);
-        Skill(12).Uncurved().SetPieces.Should().Be(12, "skills that were never curved are left as they are");
+        Skill(12).Uncurved().SetPieces.Should().Be(12 * TickPlayerSkills.Scale, "skills that were never curved are left as they are");
     }
 
     [Fact]

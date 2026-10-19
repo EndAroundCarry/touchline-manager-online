@@ -566,7 +566,7 @@ internal static class TickDefensiveAI
             }
 
             var man = situation.Attackers[bestAttacker];
-            var standOff = LooseMarkingStandOff - (MarkingStandOffStep * situation.Skills[bestDefender].Marking);
+            var standOff = LooseMarkingStandOff - (MarkingStandOffStep * situation.Skills[bestDefender].Marking / TickPlayerSkills.Scale);
 
             picked++;
             busy[bestDefender] = true;
@@ -728,7 +728,7 @@ internal static class TickDefensiveAI
             }
 
             // Positioning decides how much of the lane point he takes, the rest being the shape position he came from.
-            var commitment = 5_000 + (250 * situation.Skills[screener].Positioning);
+            var commitment = 5_000 + (250 * situation.Skills[screener].Positioning / TickPlayerSkills.Scale);
             var anchor = situation.Anchors[screener];
 
             busy[screener] = true;
@@ -772,7 +772,7 @@ internal static class TickDefensiveAI
         }
 
         var line = (int)(anchorSum / members);
-        var decisions = (int)(decisionsSum / members);
+        var decisions = (int)(decisionsSum / members / TickPlayerSkills.Scale);
         var nearest = NearestOutfieldDistanceSquared(situation);
         var closed = (long)TickSpatialUnits.ToFixed(ClosedDownDistance) * TickSpatialUnits.ToFixed(ClosedDownDistance);
         var free = (long)TickSpatialUnits.ToFixed(FreeCarrierDistance) * TickSpatialUnits.ToFixed(FreeCarrierDistance);

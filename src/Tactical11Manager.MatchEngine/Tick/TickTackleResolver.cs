@@ -114,7 +114,7 @@ internal static class TickTackleResolver
 
         var tackle = ((DefenderTacklingWeight * defender.Tackling)
             + (DefenderStrengthWeight * defender.Strength)
-            + (DefenderAggressionWeight * defender.Aggression)) * EffectiveSkill.Scale;
+            + (DefenderAggressionWeight * defender.Aggression));
 
         tackle += style switch
         {
@@ -125,7 +125,7 @@ internal static class TickTackleResolver
 
         var dribble = ((CarrierDribblingWeight * carrier.Dribbling)
             + (CarrierAgilityWeight * carrier.Agility)
-            + (CarrierComposureWeight * carrier.Composure)) * EffectiveSkill.Scale;
+            + (CarrierComposureWeight * carrier.Composure));
 
         var swing = Probability.Swing(
             tackle - dribble,
@@ -151,8 +151,8 @@ internal static class TickTackleResolver
         };
 
         var skillMultiplier = DisciplineSimulator.FoulSkillMultiplier(
-            defender.Aggression * EffectiveSkill.Scale,
-            defender.Tackling * EffectiveSkill.Scale,
+            defender.Aggression,
+            defender.Tackling,
             rules);
 
         return Probability.Band(

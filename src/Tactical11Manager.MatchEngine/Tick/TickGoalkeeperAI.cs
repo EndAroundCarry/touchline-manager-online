@@ -206,7 +206,7 @@ internal static class TickGoalkeeperAI
     /// <summary>Gets how far from the goal's middle the ball may be for the goalkeeper to charge out, in pitch units.</summary>
     /// <param name="skills">The goalkeeper's skills.</param>
     public static int RushRange(in TickPlayerSkills skills) =>
-        RushBaseRange + (RushPerOneOnOnes * skills.OneOnOnes) + (RushPerDecisions * skills.Decisions);
+        RushBaseRange + (((RushPerOneOnOnes * skills.OneOnOnes) + (RushPerDecisions * skills.Decisions)) / TickPlayerSkills.Scale);
 
     /// <summary>
     /// Gets how far off his line the goalkeeper stands with the ball a distance from the middle of his goal, in pitch units.
@@ -216,7 +216,7 @@ internal static class TickGoalkeeperAI
     public static int ArcDepth(in TickPlayerSkills skills, int ballDistance)
     {
         var closeness = Math.Clamp((ArcRange - ballDistance) * BasisPoints / (ArcRange - NearRange), 0, BasisPoints);
-        var deepest = BaseDepth + (DepthPerPositioning * skills.Positioning);
+        var deepest = BaseDepth + (DepthPerPositioning * skills.Positioning / TickPlayerSkills.Scale);
 
         return MinimumDepth + ((deepest - MinimumDepth) * closeness / BasisPoints);
     }
@@ -269,8 +269,8 @@ internal static class TickGoalkeeperAI
     /// <param name="attacker">The attacker's skills.</param>
     public static int ClaimChanceBasisPoints(in TickPlayerSkills keeper, in TickPlayerSkills attacker)
     {
-        var save = ((5 * keeper.OneOnOnes) + (3 * keeper.Agility) + (2 * keeper.Decisions)) * 100;
-        var beat = ((4 * attacker.Dribbling) + (4 * attacker.Composure) + (2 * attacker.Pace)) * 100;
+        var save = (5 * keeper.OneOnOnes) + (3 * keeper.Agility) + (2 * keeper.Decisions);
+        var beat = (4 * attacker.Dribbling) + (4 * attacker.Composure) + (2 * attacker.Pace);
 
         return Probability.Band(
             BaseClaimBasisPoints + Probability.Swing(save - beat, ClaimSwingBasisPoints, ClaimReference),
@@ -281,7 +281,7 @@ internal static class TickGoalkeeperAI
     /// <summary>Gets the chance, in basis points, that a smother which fails is a foul.</summary>
     /// <param name="keeper">The goalkeeper's skills.</param>
     public static int FoulChanceBasisPoints(in TickPlayerSkills keeper) =>
-        BaseFoulBasisPoints + (FoulPerAggression * keeper.Aggression);
+        BaseFoulBasisPoints + (FoulPerAggression * keeper.Aggression / TickPlayerSkills.Scale);
 
     /// <summary>Settles a smother from one draw.</summary>
     /// <param name="keeper">The goalkeeper's skills.</param>

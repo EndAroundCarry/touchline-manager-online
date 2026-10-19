@@ -562,7 +562,7 @@ internal static class TickOffBallSupport
 
             var workRate = situation.Skills[index].WorkRate;
 
-            situation.OffsetPaces[index] = Math.Min(SpacePaceCeiling, SpacePaceFloor + (SpacePaceStep * workRate));
+            situation.OffsetPaces[index] = Math.Min(SpacePaceCeiling, SpacePaceFloor + (SpacePaceStep * workRate / TickPlayerSkills.Scale));
         }
     }
 
@@ -737,7 +737,7 @@ internal static class TickOffBallSupport
         orders[best] = new TickAttackingOrder(
             TickAttackingRole.Overlap,
             Mirror(x, y, situation.IsHome),
-            Math.Min(BasisPoints, OverlapPaceBasisPoints + (OverlapPaceStep * situation.Skills[best].WorkRate)));
+            Math.Min(BasisPoints, OverlapPaceBasisPoints + (OverlapPaceStep * situation.Skills[best].WorkRate / TickPlayerSkills.Scale)));
     }
 
     private static void AssignSupport(in TickAttackingSituation situation, in Frame frame, Span<TickAttackingOrder> orders, Span<bool> busy)
@@ -805,7 +805,7 @@ internal static class TickOffBallSupport
             busy[bestPlayer] = true;
 
             var skills = situation.Skills[bestPlayer];
-            var commitment = SupportCommitmentBasisPoints + (SupportCommitmentStep * ((skills.Positioning + skills.Anticipation) / 2));
+            var commitment = SupportCommitmentBasisPoints + (SupportCommitmentStep * ((skills.Positioning + skills.Anticipation) / 2 / TickPlayerSkills.Scale));
             var anchor = situation.Anchors[bestPlayer];
             var ideal = Mirror(slots[bestSlot].X, slots[bestSlot].Y, situation.IsHome);
 
@@ -814,7 +814,7 @@ internal static class TickOffBallSupport
                 new SpatialPoint(
                     anchor.X + ((ideal.X - anchor.X) * Math.Min(BasisPoints, commitment) / BasisPoints),
                     anchor.Y + ((ideal.Y - anchor.Y) * Math.Min(BasisPoints, commitment) / BasisPoints)),
-                Math.Min(BasisPoints, SupportPaceBasisPoints + (SupportPaceStep * skills.WorkRate)));
+                Math.Min(BasisPoints, SupportPaceBasisPoints + (SupportPaceStep * skills.WorkRate / TickPlayerSkills.Scale)));
         }
     }
 
@@ -1018,8 +1018,8 @@ internal static class TickOffBallSupport
 
                 var skills = situation.Skills[index];
                 var score = skills.Pace + skills.Acceleration + skills.Positioning + skills.Anticipation
-                    + (previous ? RunnerStickiness : 0)
-                    + (spec.Family == MatchPositionFamily.Attack ? StrikerPreference : 0);
+                    + (previous ? RunnerStickiness * TickPlayerSkills.Scale : 0)
+                    + (spec.Family == MatchPositionFamily.Attack ? StrikerPreference * TickPlayerSkills.Scale : 0);
 
                 if (score > bestScore)
                 {

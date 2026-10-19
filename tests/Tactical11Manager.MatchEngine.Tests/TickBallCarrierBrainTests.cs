@@ -148,22 +148,22 @@ public sealed class TickBallCarrierBrainTests
     [Fact]
     public void Composure_scales_the_pressure_a_player_feels()
     {
-        TickBallCarrierBrain.EffectivePressure(10_000, 20).Should().Be(6_000);
-        TickBallCarrierBrain.EffectivePressure(10_000, 10).Should().Be(10_000);
-        TickBallCarrierBrain.EffectivePressure(10_000, 1).Should().Be(13_600);
+        TickBallCarrierBrain.EffectivePressure(10_000, 20 * TickPlayerSkills.Scale).Should().Be(6_000);
+        TickBallCarrierBrain.EffectivePressure(10_000, 10 * TickPlayerSkills.Scale).Should().Be(10_000);
+        TickBallCarrierBrain.EffectivePressure(10_000, 1 * TickPlayerSkills.Scale).Should().Be(13_600);
     }
 
     [Fact]
     public void The_error_angle_shrinks_with_skill_grows_with_pressure_and_never_reaches_zero()
     {
-        TickBallCarrierBrain.ErrorAngle(20, 20, TickBallCarrierBrain.PassBaseError, 0)
+        TickBallCarrierBrain.ErrorAngle(20 * TickPlayerSkills.Scale, 20 * TickPlayerSkills.Scale, TickBallCarrierBrain.PassBaseError, 0)
             .Should().BeGreaterThan(0, "the plan's formula gives a perfect player no error; the floor keeps him human");
-        TickBallCarrierBrain.ErrorAngle(20, 20, TickBallCarrierBrain.PassBaseError, 0)
-            .Should().BeLessThan(TickBallCarrierBrain.ErrorAngle(10, 10, TickBallCarrierBrain.PassBaseError, 0))
-            .And.BeLessThan(TickBallCarrierBrain.ErrorAngle(1, 1, TickBallCarrierBrain.PassBaseError, 0));
-        TickBallCarrierBrain.ErrorAngle(10, 10, TickBallCarrierBrain.PassBaseError, 10_000)
-            .Should().BeGreaterThan(TickBallCarrierBrain.ErrorAngle(10, 10, TickBallCarrierBrain.PassBaseError, 0));
-        TickBallCarrierBrain.ErrorAngle(10, 10, TickBallCarrierBrain.PassBaseError, 0)
+        TickBallCarrierBrain.ErrorAngle(20 * TickPlayerSkills.Scale, 20 * TickPlayerSkills.Scale, TickBallCarrierBrain.PassBaseError, 0)
+            .Should().BeLessThan(TickBallCarrierBrain.ErrorAngle(10 * TickPlayerSkills.Scale, 10 * TickPlayerSkills.Scale, TickBallCarrierBrain.PassBaseError, 0))
+            .And.BeLessThan(TickBallCarrierBrain.ErrorAngle(1 * TickPlayerSkills.Scale, 1 * TickPlayerSkills.Scale, TickBallCarrierBrain.PassBaseError, 0));
+        TickBallCarrierBrain.ErrorAngle(10 * TickPlayerSkills.Scale, 10 * TickPlayerSkills.Scale, TickBallCarrierBrain.PassBaseError, 10_000)
+            .Should().BeGreaterThan(TickBallCarrierBrain.ErrorAngle(10 * TickPlayerSkills.Scale, 10 * TickPlayerSkills.Scale, TickBallCarrierBrain.PassBaseError, 0));
+        TickBallCarrierBrain.ErrorAngle(10 * TickPlayerSkills.Scale, 10 * TickPlayerSkills.Scale, TickBallCarrierBrain.PassBaseError, 0)
             .Should().Be(21, "30 units at 70% of the error: (5 × 10 + 10) / 2 = 30 points off 100");
     }
 
@@ -208,8 +208,8 @@ public sealed class TickBallCarrierBrainTests
     [Fact]
     public void More_cover_gives_a_shot_a_wider_error_angle()
     {
-        var open = TickBallCarrierBrain.ErrorAngle(14, 14, TickBallCarrierBrain.ShotBaseError, 2_000);
-        var covered = TickBallCarrierBrain.ErrorAngle(14, 14, TickBallCarrierBrain.ShotBaseError, 2_000 + (TickBallCarrierBrain.ShotCoverMaximum * TickBallCarrierBrain.ShotCoverPressure));
+        var open = TickBallCarrierBrain.ErrorAngle(14 * TickPlayerSkills.Scale, 14 * TickPlayerSkills.Scale, TickBallCarrierBrain.ShotBaseError, 2_000);
+        var covered = TickBallCarrierBrain.ErrorAngle(14 * TickPlayerSkills.Scale, 14 * TickPlayerSkills.Scale, TickBallCarrierBrain.ShotBaseError, 2_000 + (TickBallCarrierBrain.ShotCoverMaximum * TickBallCarrierBrain.ShotCoverPressure));
 
         covered.Should().BeGreaterThan(open, "bodies in the corridor add pressure to the strike");
     }
@@ -388,7 +388,7 @@ public sealed class TickBallCarrierBrainTests
         var defenders = Move(DeepBlock, (9, 3_150, 3_500));
         var scene = new Scene(true, 6, attackers, defenders)
             .WithVision(6, 1)
-            .WithSkill(6, skills => skills with { Passing = 16, Technique = 14 })
+            .WithSkill(6, skills => skills with { Passing = 16 * TickPlayerSkills.Scale, Technique = 14 * TickPlayerSkills.Scale })
             .DefenderMoving(9, TickTrigonometry.HalfTurn, 700);
         var decision = scene.Decide();
 
@@ -444,7 +444,7 @@ public sealed class TickBallCarrierBrainTests
         var defenders = Move(DeepBlock, (9, 6_250, 3_500));
         var scene = new Scene(true, 6, attackers, defenders)
             .WithVision(6, 1)
-            .WithSkill(6, skills => skills with { Composure = 20, Strength = 20 });
+            .WithSkill(6, skills => skills with { Composure = 20 * TickPlayerSkills.Scale, Strength = 20 * TickPlayerSkills.Scale });
         var decision = scene.Decide();
 
         decision.Action.Should().Be(TickCarrierAction.Shield);
@@ -453,7 +453,7 @@ public sealed class TickBallCarrierBrainTests
 
         var worn = new Scene(true, 6, attackers, defenders) { ShieldTicks = 40 }
             .WithVision(6, 1)
-            .WithSkill(6, skills => skills with { Composure = 20, Strength = 20 })
+            .WithSkill(6, skills => skills with { Composure = 20 * TickPlayerSkills.Scale, Strength = 20 * TickPlayerSkills.Scale })
             .Decide();
 
         worn.Action.Should().NotBe(TickCarrierAction.Shield, "he cannot hold the ball for ever");
@@ -465,8 +465,8 @@ public sealed class TickBallCarrierBrainTests
         var attackers = Move(OwnHalf, (6, 3_000, 3_500), (0, 8_000, 500), (1, 8_000, 900), (2, 8_000, 1_500), (3, 8_000, 2_000), (4, 8_000, 2_500), (5, 8_000, 5_000), (7, 8_000, 5_500), (8, 8_000, 6_100), (9, 8_000, 6_500), (10, 8_000, 6_900));
         var defenders = Move(DeepBlock, (9, 3_150, 3_500), (6, 3_200, 3_200), (7, 3_200, 3_800));
 
-        var rattled = new Scene(true, 6, attackers, defenders).WithVision(6, 1).WithSkill(6, skills => skills with { Composure = 1 }).Decide();
-        var composed = new Scene(true, 6, attackers, defenders).WithVision(6, 1).WithSkill(6, skills => skills with { Composure = 20 }).Decide();
+        var rattled = new Scene(true, 6, attackers, defenders).WithVision(6, 1).WithSkill(6, skills => skills with { Composure = 1 * TickPlayerSkills.Scale }).Decide();
+        var composed = new Scene(true, 6, attackers, defenders).WithVision(6, 1).WithSkill(6, skills => skills with { Composure = 20 * TickPlayerSkills.Scale }).Decide();
 
         rattled.Action.Should().Be(TickCarrierAction.Clear);
         rattled.Target.X.Should().BeGreaterThan(3_000, "upfield");
@@ -509,7 +509,7 @@ public sealed class TickBallCarrierBrainTests
         var aware = scene.Decide();
         var careless = new Scene(true, 6, attackers, defenders)
             .WithVision(6, 12)
-            .WithSkill(6, skills => skills with { Decisions = 4, Anticipation = 4 })
+            .WithSkill(6, skills => skills with { Decisions = 4 * TickPlayerSkills.Scale, Anticipation = 4 * TickPlayerSkills.Scale })
             .Decide();
 
         aware.Receiver.Should().NotBe(9);
@@ -526,7 +526,7 @@ public sealed class TickBallCarrierBrainTests
 
         int Receiver(MatchPassFocus focus) =>
             new Scene(true, 6, attackers, DeepBlock) { Focus = focus }
-                .WithSkill(6, skills => skills with { Passing = 20, Technique = 20 })
+                .WithSkill(6, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale })
                 .WithVision(6, 20)
                 .Decide()
                 .Receiver;
@@ -542,7 +542,7 @@ public sealed class TickBallCarrierBrainTests
 
         TickCarrierDecision Play(MatchPassingStyle style) =>
             new Scene(true, 6, attackers, DeepBlock) { Passing = style }
-                .WithSkill(6, skills => skills with { Passing = 20, Technique = 20 })
+                .WithSkill(6, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale })
                 .WithVision(6, 20)
                 .Decide();
 
@@ -665,7 +665,7 @@ public sealed class TickBallCarrierBrainTests
                     attackers,
                     Move(DeepBlock, (6, 5_600, 900), (7, 5_600, 1_500), (8, 6_200, 1_200), (9, fourthX, 1_200), (10, 5_200, markerY)))
                 .WithVision(6, 20)
-                .WithSkill(6, skills => skills with { Passing = 20, Technique = 20 })
+                .WithSkill(6, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale })
                 .Decide();
 
         // The fourth defender stands just inside 20 m of the carrier, then just outside it.
@@ -814,7 +814,7 @@ public sealed class TickBallCarrierBrainTests
                 ball.PlaceAt(9_200, 3_500);
 
                 var decision = new Scene(true, 9, Move(OwnHalf, (9, 9_200, 3_500)), DeepBlock)
-                    .WithSkill(9, skills => skills with { Finishing = skill, Technique = skill })
+                    .WithSkill(9, skills => skills with { Finishing = skill * TickPlayerSkills.Scale, Technique = skill * TickPlayerSkills.Scale })
                     .Decide();
 
                 decision.Action.Should().Be(TickCarrierAction.Shoot);
@@ -918,7 +918,7 @@ public sealed class TickBallCarrierBrainTests
             new Scene(true, 10, attackers, opposition) { Orders = orders }
                 .Moving(6, 0, 600)
                 .WithVision(10, 1)
-                .WithSkill(10, skills => skills with { Passing = 20, Technique = 20, Composure = 20 })
+                .WithSkill(10, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale, Composure = 20 * TickPlayerSkills.Scale })
                 .Decide();
 
         var plain = Decide([], defenders);
@@ -933,7 +933,7 @@ public sealed class TickBallCarrierBrainTests
         TickCarrierDecision Boundary(int markerGap) =>
             new Scene(true, 10, attackers, Move(defenders, (8, 7_000 + markerGap, 3_400))) { Orders = returnRun }
                 .WithVision(10, 1)
-                .WithSkill(10, skills => skills with { Passing = 20, Technique = 20, Composure = 20 })
+                .WithSkill(10, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale, Composure = 20 * TickPlayerSkills.Scale })
                 .Decide();
 
         var free = Boundary(TickBallCarrierBrain.FreeRunnerReach + 5);
@@ -956,7 +956,7 @@ public sealed class TickBallCarrierBrainTests
             new Scene(true, 10, attackers, opposition) { Orders = orders }
                 .Moving(7, 0, 600)
                 .WithVision(10, 1)
-                .WithSkill(10, skills => skills with { Passing = 20, Technique = 20, Composure = 20 })
+                .WithSkill(10, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale, Composure = 20 * TickPlayerSkills.Scale })
                 .Decide();
 
         var plain = Decide([], defenders);
@@ -982,7 +982,7 @@ public sealed class TickBallCarrierBrainTests
         TickCarrierDecision Decide(int finishing) =>
             new Scene(true, 9, attackers, defenders)
                 .WithVision(9, 5)
-                .WithSkill(10, skills => skills with { Finishing = finishing, Technique = finishing })
+                .WithSkill(10, skills => skills with { Finishing = finishing * TickPlayerSkills.Scale, Technique = finishing * TickPlayerSkills.Scale })
                 .Decide();
 
         var skilled = Decide(20);
@@ -1098,7 +1098,7 @@ public sealed class TickBallCarrierBrainTests
 
         public int Carrier { get; }
 
-        public Scene WithVision(int index, int vision) => WithSkill(index, skills => skills with { Vision = vision });
+        public Scene WithVision(int index, int vision) => WithSkill(index, skills => skills with { Vision = vision * TickPlayerSkills.Scale });
 
         public Scene WithSkill(int index, Func<TickPlayerSkills, TickPlayerSkills> change)
         {

@@ -340,7 +340,7 @@ internal static class TickSetPieces
         return Math.Clamp(size, 2, 5);
     }
 
-    /// <summary>Gets a header's rank for a corner: <c>2 × Heading + JumpingReach</c>.</summary>
+    /// <summary>Gets a header's rank for a corner: <c>2 × Heading + JumpingReach</c>, in hundredths of a point.</summary>
     /// <param name="skills">The player's skills.</param>
     public static int HeaderRank(in TickPlayerSkills skills) => (2 * skills.Heading) + skills.JumpingReach;
 
@@ -357,7 +357,7 @@ internal static class TickSetPieces
             _ => attacking ? 1 : 3,
         };
 
-        return (HeaderRank(skills) * 4) + job;
+        return (HeaderRank(skills) * 4) + (job * TickPlayerSkills.Scale);
     }
 
     /// <summary>
@@ -583,7 +583,7 @@ internal static class TickSetPieces
     /// <param name="skills">The taker's skills.</param>
     public static int Craft(in TickPlayerSkills skills)
     {
-        var linear = Math.Clamp(((2 * skills.SetPieces) + skills.Technique) * 10_000 / (3 * CraftCeiling), 0, 10_000);
+        var linear = Math.Clamp(((2 * skills.SetPieces) + skills.Technique) * 10_000 / (3 * CraftCeiling * TickPlayerSkills.Scale), 0, 10_000);
 
         // Mostly eased: most of what a taker can do with a dead ball he has by the middle of the scale, and the last points are the specialist's.
         return (linear + (3 * (linear * ((2 * 10_000) - linear) / 10_000))) / 4;
@@ -1264,7 +1264,7 @@ internal static class TickSetPieces
                 continue;
             }
 
-            var rank = HeaderRank(view.OwnSkills[index]) + (family == MatchPositionFamily.Attack ? 1_000 : 0);
+            var rank = HeaderRank(view.OwnSkills[index]) + (family == MatchPositionFamily.Attack ? 1_000 * TickPlayerSkills.Scale : 0);
 
             if (rank > best)
             {
@@ -1365,7 +1365,7 @@ internal static class TickSetPieces
                 }
             }
 
-            var key = (crowd * 1_000) - HeaderRank(view.OwnSkills[index]);
+            var key = (crowd * 1_000 * TickPlayerSkills.Scale) - HeaderRank(view.OwnSkills[index]);
 
             if (key < best)
             {

@@ -300,7 +300,7 @@ public sealed class TickDefensiveAITests
         {
             var scene = new Scene(isHome: true, MatchPressing.MidBlock, 1_800, 700, WingerAtTheByline, carrier: 5);
 
-            scene.Skills[2] = scene.Skills[2] with { Marking = marking };
+            scene.Skills[2] = scene.Skills[2] with { Marking = marking * TickPlayerSkills.Scale };
 
             var order = scene.Assign()[2];
             var man = scene.Attackers[order.Opponent];
@@ -430,9 +430,9 @@ public sealed class TickDefensiveAITests
 
         var scene = new Scene(isHome: true, MatchPressing.LowBlock, 5_000, 3_500, attackers, carrier: 5);
 
-        scene.Skills[5] = scene.Skills[5] with { Positioning = 20 };
-        scene.Skills[6] = scene.Skills[6] with { Positioning = 1 };
-        scene.Skills[7] = scene.Skills[7] with { Positioning = 20 };
+        scene.Skills[5] = scene.Skills[5] with { Positioning = 20 * TickPlayerSkills.Scale };
+        scene.Skills[6] = scene.Skills[6] with { Positioning = 1 * TickPlayerSkills.Scale };
+        scene.Skills[7] = scene.Skills[7] with { Positioning = 20 * TickPlayerSkills.Scale };
 
         var orders = scene.Assign();
         var screens = Roles(orders, TickDefensiveRole.Screen).ToArray();
@@ -459,7 +459,7 @@ public sealed class TickDefensiveAITests
 
             laneDistance.Should().BeLessThan(anchorDistance, "he moves into the lane");
 
-            if (scene.Skills[index].Positioning == 20)
+            if (scene.Skills[index].Positioning == 20 * TickPlayerSkills.Scale)
             {
                 laneDistance.Should().BeLessThan(40, "full commitment puts him on the lane");
             }
@@ -471,8 +471,8 @@ public sealed class TickDefensiveAITests
 
         foreach (var index in screens)
         {
-            sharp.Skills[index] = sharp.Skills[index] with { Positioning = 20 };
-            sloppy.Skills[index] = sloppy.Skills[index] with { Positioning = 1 };
+            sharp.Skills[index] = sharp.Skills[index] with { Positioning = 20 * TickPlayerSkills.Scale };
+            sloppy.Skills[index] = sloppy.Skills[index] with { Positioning = 1 * TickPlayerSkills.Scale };
         }
 
         var sharpOrders = sharp.Assign();

@@ -179,7 +179,7 @@ internal static class TickShotStopper
     /// <summary>Gets how long the goalkeeper takes to react to a shot, in milliseconds.</summary>
     /// <param name="skills">The goalkeeper's skills.</param>
     public static int ReactionMilliseconds(in TickPlayerSkills skills) =>
-        ReactionBaseMilliseconds - (ReactionPerReflexes * skills.Reflexes);
+        ReactionBaseMilliseconds - (ReactionPerReflexes * skills.Reflexes / TickPlayerSkills.Scale);
 
     /// <summary>
     /// Plays the ball forward on a scratch ball and reports where it ends and when it passes the goalkeeper.
@@ -282,13 +282,13 @@ internal static class TickShotStopper
     public static TickSaveAssessment Assess(in TickPlayerState keeper, in TickPlayerSkills skills, in TickShotForecast forecast, int placement = 0)
     {
         var needed = Math.Abs(forecast.PlaneY - TickSpatialUnits.ToUnits(keeper.Y)) + placement;
-        var parry = BodyReach + DiveBase + (DivePerAgility * (skills.Agility + skills.Reflexes) / 2);
-        var share = CatchShareBase + (CatchSharePerHandlingTenths * skills.Handling / 10);
-        var height = HeightBase + ((skills.JumpingReach + skills.AerialAbility) * 2 / 5);
+        var parry = BodyReach + DiveBase + (DivePerAgility * (skills.Agility + skills.Reflexes) / 2 / TickPlayerSkills.Scale);
+        var share = CatchShareBase + (CatchSharePerHandlingTenths * skills.Handling / 10 / TickPlayerSkills.Scale);
+        var height = HeightBase + ((skills.JumpingReach + skills.AerialAbility) * 2 / 5 / TickPlayerSkills.Scale);
 
         var speed = (int)((long)forecast.PlaneSpeed * 1_000 / FixedPerMetreDivisor);
         var hold = Math.Clamp(
-            HoldBase + (HoldPerHandling * skills.Handling) - (Math.Max(0, speed - EasySpeedCentimetresPerSecond) * HoldSpeedPenaltyPerCentimetre),
+            HoldBase + (HoldPerHandling * skills.Handling / TickPlayerSkills.Scale) -(Math.Max(0, speed - EasySpeedCentimetresPerSecond) * HoldSpeedPenaltyPerCentimetre),
             MinimumHold,
             MaximumHold);
         var tip = Math.Clamp(TipBase + (TipStretch * needed / Math.Max(1, parry)), 0, MaximumTip);

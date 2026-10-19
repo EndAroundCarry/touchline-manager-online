@@ -213,7 +213,7 @@ public sealed class TickOffBallSupportTests
         var sharp = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, skill: 20);
         var sloppy = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo, skill: 20);
 
-        sloppy.Skills[5] = sloppy.Skills[5] with { Positioning = 1, Anticipation = 1 };
+        sloppy.Skills[5] = sloppy.Skills[5] with { Positioning = 1 * TickPlayerSkills.Scale, Anticipation = 1 * TickPlayerSkills.Scale };
 
         var corner = sharp.Assign()[5].Target;
         var anchor = sharp.Anchors[5];
@@ -228,8 +228,8 @@ public sealed class TickOffBallSupportTests
     {
         var scene = new Scene(isHome: true, 6, CentralMidfielderHasTheBall, CompactFourFourTwo);
 
-        scene.Skills[5] = scene.Skills[5] with { WorkRate = 1 };
-        scene.Skills[7] = scene.Skills[7] with { WorkRate = 20 };
+        scene.Skills[5] = scene.Skills[5] with { WorkRate = 1 * TickPlayerSkills.Scale };
+        scene.Skills[7] = scene.Skills[7] with { WorkRate = 20 * TickPlayerSkills.Scale };
 
         var orders = scene.Assign();
 
