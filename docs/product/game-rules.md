@@ -246,7 +246,7 @@ no club's formation, instructions or eleven. A club has one of three temperament
 bold — which moves the minutes and the size of the steps. Every club protects a lead of two or more late
 (one step more defensive, time-wasting raised when it was off), holds a one-goal lead later still with a
 fresher player for its most tired attacker, chases the game when behind with one step more attacking and a
-fresh forward for its most tired midfielder, goes all out (Attacking, high press) late when still behind,
+fresh forward for its most tired midfielder, goes all out (All-out attack, high press) late when still behind,
 and settles down when one of its players is sent off (one step more defensive, one forward fewer). The
 instructions name families, never players, are held to `MatchInstructionValidator`, and are ordinary rules
 a manager could write; a takeover inherits them and may edit or delete them. An existing club's plan is

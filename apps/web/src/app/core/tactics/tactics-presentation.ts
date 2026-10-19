@@ -51,8 +51,8 @@ export const INSTRUCTION_FIELDS: readonly InstructionField[] = [
       { value: 'defensive', label: 'Defensive' },
       { value: 'cautious', label: 'Cautious' },
       { value: 'balanced', label: 'Balanced' },
-      { value: 'positive', label: 'Positive' },
-      { value: 'attacking', label: 'Attacking' },
+      { value: 'positive', label: 'Attacking' },
+      { value: 'attacking', label: 'All-out attack' },
     ],
   },
   {

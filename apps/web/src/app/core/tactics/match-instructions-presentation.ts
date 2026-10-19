@@ -164,9 +164,9 @@ function eventText(rule: MatchInstruction): string | null {
     case EVENT_CODES.tired:
       return `a player's condition drops below ${conditionLabel(rule.eventThreshold ?? 0)}`;
     case EVENT_CODES.opponentMentalityAtLeast:
-      return `the opponent's mentality is ${mentalityLabel(rule.eventThreshold)} or more attacking`;
+      return `the opponent's mentality is at least ${mentalityLabel(rule.eventThreshold)}`;
     case EVENT_CODES.opponentMentalityAtMost:
-      return `the opponent's mentality is ${mentalityLabel(rule.eventThreshold)} or more defensive`;
+      return `the opponent's mentality is at most ${mentalityLabel(rule.eventThreshold)}`;
     default:
       return null;
   }

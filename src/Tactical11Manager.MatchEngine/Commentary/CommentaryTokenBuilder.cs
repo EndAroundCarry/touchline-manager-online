@@ -696,7 +696,7 @@ public static class CommentaryTokenBuilder
 
     /// <summary>
     /// Says what a tactical change did, as a clause that follows the club name: the new shape, the new mentality, then every other instruction it
-    /// changed (<c>switch to 4-2-4, take on an attacking mentality and press high up the pitch</c>).
+    /// changed (<c>switch to 4-2-4, go all out in attack and press high up the pitch</c>).
     /// </summary>
     private static string DescribeTacticalChange(EngineEventV1 matchEvent)
     {
@@ -714,8 +714,8 @@ public static class CommentaryTokenBuilder
                 MatchMentality.Defensive => "take on a defensive mentality",
                 MatchMentality.Cautious => "take on a cautious mentality",
                 MatchMentality.Balanced => "take on a balanced mentality",
-                MatchMentality.Positive => "take on a positive mentality",
-                _ => "take on an attacking mentality",
+                MatchMentality.Positive => "take on an attacking mentality",
+                _ => "go all out in attack",
             });
         }
 

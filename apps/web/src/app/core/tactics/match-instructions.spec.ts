@@ -406,7 +406,7 @@ describe('instructionSummary', () => {
     };
 
     expect(instructionSummary(rule, new Map([['b1', 'Okafor']]))).toBe(
-      "From 60', if losing by 1 or more → 4-2-4, Attacking, high press, Okafor on for the most tired midfielder",
+      "From 60', if losing by 1 or more → 4-2-4, All-out attack, high press, Okafor on for the most tired midfielder",
     );
   });
 
@@ -434,7 +434,7 @@ describe('instructionSummary', () => {
       "Until 75', if a player's condition drops below 60% → changes nothing",
     );
     expect(summary({ event: EVENT_CODES.opponentMentalityAtLeast, eventThreshold: 3 })).toBe(
-      "If the opponent's mentality is Positive or more attacking → changes nothing",
+      "If the opponent's mentality is at least Attacking → changes nothing",
     );
     expect(summary({ score: 'not_losing', event: EVENT_CODES.none })).toBe(
       'If not losing → changes nothing',

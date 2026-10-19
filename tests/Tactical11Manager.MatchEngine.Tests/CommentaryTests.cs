@@ -252,7 +252,7 @@ public sealed class CommentaryTests
             var tokens = CommentaryTokenBuilder.Build(input, result with { Events = [.. result.Events, .. shifted] });
             var texts = shifted.Select(matchEvent => tokens.Single(token => token.EventSequence == matchEvent.Sequence).Text).ToList();
 
-            texts[0].Should().Contain("switch to 4-2-4, take on an attacking mentality, raise the tempo, press high up the pitch and look to hit on the counter");
+            texts[0].Should().Contain("switch to 4-2-4, go all out in attack, raise the tempo, press high up the pitch and look to hit on the counter");
             texts[1].Should().Contain("drop into a low block").And.NotContain("switch to");
             texts[2].Should().Contain("change their tactics");
             texts.Should().OnlyContain(text => text.Contains(input.Home.ClubName) && !text.Contains('{') && !text.Contains("a team-mate"));

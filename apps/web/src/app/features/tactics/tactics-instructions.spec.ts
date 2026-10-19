@@ -383,7 +383,7 @@ describe('Tactics tabs and match instructions', () => {
       choose('rule-mentality', 'set:attacking');
 
       expect(summary(1)).toBe(
-        "From 70', if level → 4-3-3, Attacking, high press, a fresh forward on for the most tired midfielder",
+        "From 70', if level → 4-3-3, All-out attack, high press, a fresh forward on for the most tired midfielder",
       );
     });
 
