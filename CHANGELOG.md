@@ -4,6 +4,14 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Tired skills plan, Milestones 0-5 - a tired player plays worse
+
+- Feature: in the tick engine a player's skills fall with his live condition: nothing at 100%, 2% of the sheet value at 90%, 20% at 60%, 30% at 40% and below; mental skills half as much; pace and acceleration none. A substitute comes on fresh. `TickSkillTiredness` holds the curve, `TickTeam.RefreshSkills` applies it at each minute, stoppage, interval and full time. The legacy engine's rule is unchanged.
+- Engine: `TickPlayerSkills` now holds hundredths of an attribute point, and kick error, the dribble choice, the interception factor, offside carelessness, support commitment and the back-line step-up are fixed-point. `engine-v12` is not bumped; the tick golden hash is re-pinned (`fe32cada...`), the legacy and rules hashes are as they were.
+- The laboratory fixtures now start every player at 100% condition (were 80%) and the baselines were re-taken. New `tickcond` probe (`TickConditionProbe.cs`): condition bands, skill drop and late-game passing by setup.
+- Measured (section 14.41, ADR-0074, `MAT-15`): `tick 500` goals 3.04 to 3.01; late-game pass completion stays 83-84%; fresh legs lean positive (+0.08 to +0.19 points, not proven). The all-out attack against a counter (weaker-side cell S6b) moves from 53/15/32 to 41/19/40, outside its guard, and was accepted as the intended effect. The weaker-side miniature's stronger-side floor is 0.55 (was 0.60).
+- Proposed, not made: a lighter drain, a gentler curve between 80% and 60%, re-tuning the weaker-side levers for S6b.
+
 ## Player portraits
 
 - Feature: every player has a drawn portrait on their profile, under their name, with the State measures beneath it and the tabs (the skills grid on Attributes) to its right. The profile fits a 1280 by 768 window or larger without a page scroll (the squad's `fit` convention); below that, and on phones, the portrait and State sit above the tabs. The face is generated from the player's id (skin tone, face shape, hair style and colour, eyes, beard), so a player keeps the same face for life; age bends it (a softer jaw and lighter beard for teenagers, lines, a receding hairline and grey from the late twenties) without drawing a different person. The shirt is the club's main colour, with the second colour on the collar and the club's own crest on the chest.

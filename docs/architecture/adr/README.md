@@ -100,3 +100,4 @@ the system is shaped the way it is.
    change set, plus the affected stage in `master-plan.md`.
 | [0072](0072-match-instructions-and-their-measured-worth.md) | Match instructions are rules the engine carries out, and what they were measured to be worth | Accepted |
 | [0073](0073-shape-matchups-and-placing-substitutes.md) | Shapes are decisive from kick-off, a switch recovers a third of that, and a rule may place the player it brings on | Accepted |
+| [0074](0074-tick-engine-skills-fall-with-live-condition.md) | In the tick engine a player's skills fall with his live condition | Accepted |

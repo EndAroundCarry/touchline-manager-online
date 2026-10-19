@@ -227,6 +227,8 @@ duel (§7.9). Position fit, tiredness, and the state multiplier scale each skill
 figure below at zero condition — and physical skills fall furthest, then technical, then mental. Goalkeepers
 (and the goalkeeping skills) are exempt.
 
+This is the legacy engine's rule (`engine-v11`, stored matches only). The tick engine lowers skills by a different curve, by live condition and off the sheet value, in §14.41.
+
 | Family | Drop at zero condition | At the 60% condition a match typically ends on |
 |---|---|---|
 | Physical | `TiredPhysicalDropBasisPoints` = 4_000 | −16% |
@@ -1391,6 +1393,7 @@ for version 12; changing one moves the golden hash in `TickEngineTests`.
 | Constant | Value | Meaning |
 |---|---|---|
 | `TickPlayerSkills.CurvePercent` | 38 | A player's attribute counts 38% of its distance from 13 (60 before the ball flowed, §14.12). |
+| `TickSkillTiredness` breakpoints | (10,000, 0) (9,000, 200) (6,000, 2,000) (4,000, 3,000) bp | Share of the sheet value a skill loses by live condition, linear between, flat 3,000 below 40%; Mental takes half, Pace and Acceleration none (§14.41). |
 | `TickBallCarrierBrain.ShotMinimumChance` | 1,850 bp | Below this heuristic chance a carrier does not shoot. |
 | `TickBallCarrierBrain.ShotBaseError` | 200 | Base error angle of an open-play shot (a set piece: `SetPieceShotBaseError` 50). |
 | `TickBallCarrierBrain.ErrorSkillWeight`, `MinimumErrorPercent` | 5, 25% | A kick's error is `Base × max(25%, 100 − (5 × skill + Technique) / 2)`. |
@@ -2296,6 +2299,8 @@ The floor is the lever that matters, and it is also a global one: a lower floor 
 - `tick 500`: goals 3.85 (3.82 before; above the 2.6-2.9 band before this milestone), shots 39.3, on target 34.2%, pass completion 84.1%. `tickmotion 200 1` film health unchanged. `ticksnap 205` was not run (needs the DB export); nothing in the stored squads sets a different instruction mix than the one `tick 500` plays.
 - Test changes: the board-formation test's upper goal band 3.8 to 4.3 (the true mean is 3.85; 72 matches scatter by 0.3); the replay test allows a slot to be missing for a player sent off (the fixed film match now has a red card); the spent-player pace floor in the physics test 60% to 40%.
 
+*Later:* tiredness also lowers skills now, not only speed (§14.41).
+
 ### 14.30 Time-wasting in the tick engine (the weaker-side plan, Milestone 4)
 
 **Why.** `TimeWasting` (Off, Situational, On) was read only by the possession engine's ratings and the film's counter logic, so a tick match ignored it. A side that was ahead could not run down the clock.
@@ -2720,3 +2725,54 @@ Shots after a natural 60' switch: +4.1 and +4.3 (4-3-3), +3.5 and +3.4 (4-2-3-1)
 #### The feature: placing the player who comes on (Milestone 6)
 
 A rule's placements may name a bench player the same rule brings on by name. The engine already made a rule's substitutions before it fitted the shape, so only the domain validator and the editor stopped it. `MatchInstructionValidator` now accepts that player and warns (not errors) when a placed player is out of position for the slot's role (`INSTRUCTION_OUT_OF_POSITION`, the main board's rule: a secondary position counts) or is taken off by the same rule (`INSTRUCTION_PLACED_PLAYER_LEAVES`). The editor's pitch previews the named swaps first, marks out-of-position slots, offers the incoming players in the picker and has a **Natural fit** button. The engine, `FormationShapeFit` and `shape-fit.ts` read one case table (`tests/shared/shape-fit-cases.json`, one new case). `MAT-14` is updated.
+
+### 14.41 Tired skills: a player plays worse as his condition falls (the tired skills plan, Milestones 0-5)
+
+**Why.** The impact study (§14.39 part 2) found fresh legs worth nothing the study could measure, because in the tick engine tiredness only slowed the body (§14.29: speed and acceleration down to a 60% floor) while passing, shooting, tackling, decisions and keeping stayed at 100%. The legacy engine lowered skills with tiredness (§6.3). The product owner asked for the same in the tick engine: about nothing while fresh (2% at 90% condition), steeper after that (20% at 60%), and a floor of 30% for a very tired player.
+
+**The curve.** The drop is a share of the **sheet value**, the 1-20 attribute the manager sees, so a 15 at a 20% drop plays like a 12. It is linear between breakpoints (`TickSkillTiredness`, basis points of the sheet value):
+
+| Condition | 100% | 95% | 90% | 85% | 80% | 75% | 70% | 65% | 60% | 50% | 40% and below |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Technical, physical and goalkeeping skills | 0% | 1% | 2% | 5% | 8% | 11% | 14% | 17% | 20% | 25% | 30% |
+| Mental skills (half) | 0% | 0.5% | 1% | 2.5% | 4% | 5.5% | 7% | 8.5% | 10% | 12.5% | 15% |
+
+The table is the four breakpoints (10,000, 0) (9,000, 200) (6,000, 2,000) (4,000, 3,000) with a flat line below 4,000. Families come from `MatchAttributeNames.FamilyOf`: Mental takes half; **Pace and Acceleration are left alone** because the body already slows with tiredness; goalkeeping skills take the full drop (keepers rarely go under 90%, so it is small).
+
+**How it reaches play.** Tick skills are curved (`TickPlayerSkills.CurvePercent` 38, §14.12), so the drop is taken off the sheet value and then passes through the curve: `effective = fresh curved x 100 - sheet x 100 x drop / 10,000 x 38 / 100`, in hundredths, rounded. A fresh player is bit-for-bit what he was. The readers of raw sheet values (`Uncurved()`, for free kicks and the keeper facing them) get `sheet x (10,000 - drop) / 10,000`. A sheet-13 player at 75% condition loses about 0.6 of a curved point; at 37% about 1.5.
+
+**What had to change first** (Milestones 1 and 2). Skills were whole numbers on a 7-step curve and many formulas truncated further, so a 2-5% drop would have vanished or jumped a whole point. `TickPlayerSkills` now holds hundredths of an attribute point (golden hash unchanged by that step). Then the places where a fraction of a point disappeared became fixed-point products (kick error and accuracy, the dribble-choice mean, the interception factor, offside carelessness in basis points, support commitment, the back-line step-up mean); this moved the hash and, against the M0 baseline, nothing else (`tick 500` goals 3.04 to 3.14, `tickbalance` quick within noise). The cliffs stay cliffs, compared in hundredths: the decision-interval threshold, first-time Technique, the through-ball Vision floor, keeper reaction ticks and every ranking (set-piece takers, header ranks, runner pick, keeper promotion). A tired player may cross one.
+
+**When it is refreshed.** `TickTeam.LiveConditionOf(seat)` is the match centre's own formula (`start condition - spent x 130%`), and `RefreshSkills()` rewrites the seat's skills from it without allocating. `TickMatchLoop.PushConditions` calls both at the end of every minute, at every stoppage, after the interval's rest and at full time. A minute cadence keeps a set-piece layout (re-run on every tick of a dead-ball hold) from jittering. A substitute comes on fresh; a starter who kicks off under 100% carries his drop from the first minute. `TickPlayerSkills` carries the sheet attributes (`Natural`) and the condition, so a substitution or promotion needs no second array and the fresh and tired sets cannot get out of step.
+
+**Deliberately left alone.** The physics profile (speed and acceleration already tire, §14.29); `TickAttackEdge` quality (a structural forwards-against-defenders measure set at kick-off and on changes, §14.37); the legacy engine's `EffectiveSkill` (stored `engine-v11` matches replay with the old rule); the drain itself (see below). No version was bumped: `engine-v12` and the rules hashes are as they were; the tick golden hash is re-pinned (M2 `b8baf8a8...`, M3 `fe32cada...`).
+
+**The laboratory now starts at 100% condition.** Every laboratory player used to start at 80% (`PlayerMatchStateV1.Uniform(8_000)`), which with this rule would take about 11% off every skill from the first minute. The fixtures and the bench now start at 100% and the baselines were re-taken (M0: `tick 500` goals 3.04, shots 38.9, on target 31.1%, completion 83.0%; `tickbalance` and the weaker-side cells moved within noise). The unit-test factory (`TestMatchFactory`) still starts everyone at 80% because the legacy engine shares it, so a tick unit-test match carries an 8% drop from the first minute; the weaker-side miniature in `TickEngineTests` uses 100% legs.
+
+**How tired the players actually get** (M0 census, 200 matches a setup, outfield, 100% start, the drain unchanged). Share of player-minutes under 60% condition, and the mean skill drop at 85':
+
+| Setup | Under 60% | Starters who ever dip under 60% / 40% | Mean condition at 85' | Drop at 85' (mental half) |
+|---|---|---|---|---|
+| 4-4-2 default | 0% | 0% / 0% | 87% | 4.5% |
+| High press | 3.4% | 48% / 0% | 78% | 9.8% |
+| High tempo | 0.9% | 20% / 0% | 82% | 7.3% |
+| Positive | 0% | 0.1% / 0% | 85% | 5.6% |
+| Attacking | 0.3% | 10% / 0% | 84% | 6.3% |
+| Positive with high press, high tempo and high line | 31% | 98% / 50% | 61% | 19.1% |
+| Attacking with the same | 38% | 98% / 86% | 57% | 21.0% |
+
+Real stored worlds start lower than the laboratory (outfield starters average 98.9%, 5.3% of minutes under 60% as played with the AI's instructions). The drain was **not** changed: the product owner left it as it was after the M0 census and the weaker-side caps (§14.29, §14.31) were tuned on it.
+
+**Measured effect** (M4; 200-500 matches, against the M2 code, which has the same 100% legs and no curve).
+- **Whole-league figures hold.** `tick 500`: goals 3.04 to 3.01, shots 38.9 to 38.2, on target 31.1% to 30.0%, completion 83.0% to 82.8%, yellow cards 2.42 to 2.19. The S1 matrix (17-20 against 15-18, 12 cells) stronger side wins 79.7% to 78.3%.
+- **Late-game passing does not fall.** Pass completion is 83-84% in every 15-minute window for every setup, including the two stacked ones at a 19-21% drop (Attacking stacked 84.5% to 84.1% late). On-target share is noise (27-35%). A drop of this size is about one curved point, and the opponent tires too.
+- **Fresh legs: a positive lean, not proof.** A fresh striker for the most tired forward at 60' or 70' against a high-pressing side: +0.15 and +0.18 points (were -0.09 and -0.13 before the curve); the same on equal 4-4-2 sides +0.08; a fresh winger +0.19 and -0.02. The control (a change at 30', where nothing should show) read +0.25, and every figure carries about ±0.25. The substitute plays well: 0.98 goals per 90 against the starter's 0.52 over the same minutes in the 60' case.
+- **Pressing and attacking sides pay more late on.** In the 16 v 16 matrix a counter-attacking side beats an attacking side 73% (was 61%) and a Positive side 71% (was 65%).
+
+**One weaker-side guard moves, by design.** The all-out attacking side (17-20, Positive with press, tempo and line) against a 15-18 counter-attacking side (`tickbalance` S6b, breakers quicker by 3), 500 matches, seed 91000: **53/15/32 before the curve, 41/19/40 with it**. The guard (§14.31) asks the stronger side to win at least 60% and the weaker at most about 25%. That cell was already below its guard before the curve (53/15/32 here against 68/15/16 documented at the end of the weaker-side plan, so something earlier in this branch moved it), and tiredness costs it another 12 points because it is the setup that spends its legs. S6b with default instructions, 54/19/27 to 59/19/22, is inside noise. S3 (17-20 against the 6-skill side) is untouched: 99/1/0 in each cell, inside its 2% guard. The weaker-side miniature in `TickEngineTests` (17 v 16, deep and counter, 300 matches) gives the stronger side 58% and the weaker side 0.80 points with the curve, so its stronger-side floor went from 0.60 to 0.55. **The product owner accepted this** (2026-10-19): an all-out attack that tires is the feature working, and the cell is documented here as moved by design rather than re-tuned.
+
+**Not done, offered.** Lightening the drain so that only the stacked setups go under 60%; a gentler curve between 80% and 60%; re-tuning the weaker-side levers for S6b. None is needed to ship the rule.
+
+**Method.** `tickcond <matches> <seed> [snap <file>]` (`TickConditionProbe.cs`, output in `.run-logs/cond/`): condition bands, the skill drop each would give, and passes and shots by 15-minute window, per setup and for goalkeepers; `TC_ONLY`, `TC_STARTS`. The guard re-runs used `tickbalance 150 90000 S3 S6` and, for S6b, `TB_HOME=DEF,POS TB_AWAY=COUNTER tickbalance 500 91000 S6b`, once on the code before the curve (a detached worktree) and once after.
+
+**Tests.** `TickSkillTirednessTests` (every breakpoint, mental half, Pace and Acceleration zero, monotone, integer-only, exactly 11% and 5.5% at 75%, curve scaling) and six in `TickTeamTests` (a tired seat lower and a fresh seat unchanged, a substitute fresh, `Remove` and `Promote` keeping the pair, `Uncurved()` returning tired sheet values). The legacy and rules golden hashes are unchanged.
