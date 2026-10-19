@@ -4,6 +4,11 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Player portraits
+
+- Feature: every player has a drawn portrait on their profile, under their name, with the State measures beneath it and the tabs (the skills grid on Attributes) to its right. The profile fits a 1280 by 768 window or larger without a page scroll (the squad's `fit` convention); below that, and on phones, the portrait and State sit above the tabs. The face is generated from the player's id (skin tone, face shape, hair style and colour, eyes, beard), so a player keeps the same face for life; age bends it (a softer jaw and lighter beard for teenagers, lines, a receding hairline and grey from the late twenties) without drawing a different person. The shirt is the club's main colour, with the second colour on the collar and the club's own crest on the chest.
+- `shared/ui/player-portrait/`: `portrait-designs.ts` builds the drawing as a tree of SVG elements and `PlayerPortrait` creates them with the renderer, so no markup is parsed; colours are checked as `#rrggbb` before they reach an attribute.
+
 ## Shape study plan, Milestones 1-7 - why a change of shape wins little, and placing the player who comes on
 
 - New `tickshape` probe (`TickShapeStudy.cs`, `TickShapeStudy.H3.cs`, `LaboratoryFixtures.Shaped.cs`): squads built from the game's own position profiles (16 plus `PlayerAttributeProfiles.BonusFor`, natural bench cover), every pairing of eight shapes from kick-off, 23 switches at 60', placements natural / best fit / mismatch, positions-roles-focus ablations and zone counts. It shares `TickPlanStudy`'s paired engine (the old study re-run is byte-identical). About 160 of 180 minutes of simulation. No engine file changed.

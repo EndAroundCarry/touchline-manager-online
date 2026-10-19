@@ -6,7 +6,7 @@
     <a routerLink="/squad" [class]="secondaryButtonClass">Back to the squad</a>
   </div>
 } @else if (player(); as profile) {
-  <section [class]="activeTab() === 'statistics' ? '' : 'max-w-4xl'">
+  <section [class]="activeTab() === 'statistics' ? '' : 'max-w-6xl'">
     <p class="text-sm">
       <a routerLink="/squad" [class]="linkClass">Back to the squad</a>
     </p>
@@ -32,367 +32,395 @@
       </ul>
     }
 
-    <h2 class="mt-8 text-lg font-semibold text-ink">State</h2>
-    <p class="mt-1 text-sm text-ink-2">
-      Condition and fatigue move with match minutes; morale reacts to playing time, results, and
-      contracts (TRN-11, TRN-13).
-    </p>
+    <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+      <div class="flex gap-4 lg:w-40 lg:shrink-0 lg:flex-col min-[1400px]:w-48">
+        <app-player-portrait
+          class="aspect-[5/6] w-32 shrink-0 rounded border border-line sm:w-40 lg:w-full"
+          data-testid="player-portrait"
+          [playerId]="profile.id"
+          [age]="profile.age"
+          [primary]="kit().primary"
+          [secondary]="kit().secondary"
+          [crestShape]="kit().crestShape"
+          [crestPattern]="kit().crestPattern"
+          [label]="'Portrait of ' + profile.fullName"
+        />
 
-    <dl class="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      @for (measure of stateMeasures(); track measure.label) {
-        <div class="rounded border border-line bg-panel p-3">
-          <dt class="text-sm font-medium text-muted">{{ measure.label }}</dt>
-          <dd class="mt-1 flex items-baseline gap-2">
-            <span class="text-xl font-semibold" [class]="measure.band.className">
-              {{ measure.value }}
-            </span>
-            <span class="text-xs font-medium" [class]="measure.band.className">
-              {{ measure.band.label }}
-              @if (!measure.higherIsBetter) {
-                &nbsp;is good
-              }
-            </span>
-          </dd>
-        </div>
-      }
-    </dl>
-
-    <div class="mt-8" role="tablist" aria-label="Player details" data-testid="player-tabs">
-      <div class="flex gap-1 overflow-x-auto border-b border-line">
-        @for (tab of tabs; track tab.key; let index = $index) {
-          <button
-            type="button"
-            role="tab"
-            class="min-h-11 shrink-0 border-b-2 px-2 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            [class.border-accent]="activeTab() === tab.key"
-            [class.text-ink]="activeTab() === tab.key"
-            [class.border-transparent]="activeTab() !== tab.key"
-            [class.text-ink-2]="activeTab() !== tab.key"
-            [id]="'player-tab-' + tab.key"
-            [attr.aria-selected]="activeTab() === tab.key"
-            [attr.aria-controls]="'player-panel-' + tab.key"
-            [attr.tabindex]="activeTab() === tab.key ? 0 : -1"
-            (click)="selectTab(tab.key)"
-            (keydown)="onTabKeydown($event, index)"
-          >
-            {{ tab.label }}
-          </button>
-        }
-      </div>
-    </div>
-
-    @switch (activeTab()) {
-      @case ('attributes') {
-        <div
-          id="player-panel-attributes"
-          role="tabpanel"
-          aria-labelledby="player-tab-attributes"
-          tabindex="0"
-          class="pt-4"
-        >
-          <h2 class="text-lg font-semibold text-ink">Attributes</h2>
-          <p class="mt-1 text-sm text-ink-2">
-            Shown on a 1&ndash;20 scale in four columns, one per family, side by side. Colour is
-            never the only signal (TRN-4):
-            <span class="font-medium text-red-300">Low 1&ndash;6</span>,
-            <span class="font-medium text-amber-300">Average 7&ndash;13</span>,
-            <span class="font-medium text-emerald-200">Strong 14&ndash;20</span>. A figure in
-            brackets, such as <span class="font-medium text-ink">19 (0.85)</span>, is how far the
-            skill is towards its next point; a minus sign means it is slipping towards a loss.
+        <section class="min-w-0 flex-1" aria-labelledby="player-state-heading">
+          <h2 id="player-state-heading" class="text-lg font-semibold text-ink">State</h2>
+          <p class="mt-1 text-xs text-ink-2">
+            Condition and fatigue move with match minutes; morale reacts to playing time, results,
+            and contracts (TRN-11, TRN-13).
           </p>
 
-          <div
-            class="mt-3 grid grid-cols-4 gap-x-2 rounded border border-line bg-panel p-2 sm:gap-x-6 sm:p-4"
-            data-testid="attribute-rows"
-          >
-            @for (family of attributeFamilies(); track family.key) {
-              <section class="min-w-0" [attr.aria-label]="family.label + ' attributes'">
-                <h3
-                  class="truncate border-b border-line-strong pb-0.5 text-[0.5625rem] font-bold uppercase tracking-tight text-ink sm:pb-1 sm:text-sm sm:tracking-wide"
-                >
-                  {{ family.label }}
-                </h3>
-                <div class="mt-0.5 sm:mt-1">
-                  @for (row of family.rows; track row.label) {
-                    <app-attribute-value
-                      [label]="row.label"
-                      [value]="row.value"
-                      [progress]="row.progress"
-                    />
-                  }
-                </div>
-              </section>
+          <dl class="mt-2 grid gap-1.5">
+            @for (measure of stateMeasures(); track measure.label) {
+              <div
+                class="flex items-baseline justify-between gap-2 rounded border border-line bg-panel px-2 py-1.5"
+              >
+                <dt class="text-sm font-medium text-muted">{{ measure.label }}</dt>
+                <dd class="flex items-baseline gap-1.5">
+                  <span class="text-base font-semibold" [class]="measure.band.className">
+                    {{ measure.value }}
+                  </span>
+                  <span class="text-xs font-medium" [class]="measure.band.className">
+                    {{ measure.band.label }}
+                    @if (!measure.higherIsBetter) {
+                      &nbsp;is good
+                    }
+                  </span>
+                </dd>
+              </div>
+            }
+          </dl>
+        </section>
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <div role="tablist" aria-label="Player details" data-testid="player-tabs">
+          <div class="flex gap-1 overflow-x-auto border-b border-line">
+            @for (tab of tabs; track tab.key; let index = $index) {
+              <button
+                type="button"
+                role="tab"
+                class="min-h-11 shrink-0 border-b-2 px-2 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent fit:min-h-9 fit:py-1"
+                [class.border-accent]="activeTab() === tab.key"
+                [class.text-ink]="activeTab() === tab.key"
+                [class.border-transparent]="activeTab() !== tab.key"
+                [class.text-ink-2]="activeTab() !== tab.key"
+                [id]="'player-tab-' + tab.key"
+                [attr.aria-selected]="activeTab() === tab.key"
+                [attr.aria-controls]="'player-panel-' + tab.key"
+                [attr.tabindex]="activeTab() === tab.key ? 0 : -1"
+                (click)="selectTab(tab.key)"
+                (keydown)="onTabKeydown($event, index)"
+              >
+                {{ tab.label }}
+              </button>
             }
           </div>
         </div>
-      }
 
-      @case ('training') {
-        <div
-          id="player-panel-training"
-          role="tabpanel"
-          aria-labelledby="player-tab-training"
-          tabindex="0"
-          class="pt-4"
-        >
-          <app-player-training [playerId]="profile.id" />
-        </div>
-      }
-
-      @case ('statistics') {
-        <div
-          id="player-panel-statistics"
-          role="tabpanel"
-          aria-labelledby="player-tab-statistics"
-          tabindex="0"
-          class="pt-4"
-        >
-          <h2 class="text-lg font-semibold text-ink">Statistics</h2>
-
-          @if (resultsHeldBack()) {
-            <div class="mt-3 rounded border border-line bg-panel">
-              <app-result-hidden subject="A player's statistics" />
-            </div>
-          } @else {
-            <h3 class="mt-4 text-base font-semibold text-ink">Season by season</h3>
-            <p class="mt-1 text-sm text-ink-2">
-              One row per season, most recent first, with the career total underneath.
-            </p>
-
+        @switch (activeTab()) {
+          @case ('attributes') {
             <div
-              class="mt-3 overflow-x-auto rounded border border-line bg-panel"
-              role="group"
-              aria-label="Season statistics"
-              data-testid="season-stats"
+              id="player-panel-attributes"
+              role="tabpanel"
+              aria-labelledby="player-tab-attributes"
+              tabindex="0"
+              class="pt-4 fit:pt-3"
             >
-              <table class="w-full min-w-max border-collapse whitespace-nowrap text-xs xl:text-sm">
-                <caption class="sr-only">
-                  Season-by-season statistics, most recent first, with the career total.
-                </caption>
-                <thead>
-                  <tr class="border-b border-line text-ink-2">
-                    <th scope="col" class="px-2 py-2 text-left font-medium">Season</th>
-                    <th scope="col" class="px-2 py-2 text-left font-medium">Club</th>
-                    @for (column of statColumns(); track column.label) {
-                      <th scope="col" [class]="statCellClass + ' font-medium'">
-                        <abbr [title]="column.title">{{ column.label }}</abbr>
-                      </th>
-                    }
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of seasonTableRows(); track row.key) {
-                    <tr class="border-b border-line-soft">
-                      <th scope="row" class="px-2 py-2 text-left font-medium">
-                        {{ row.season }}
-                      </th>
-                      <td class="px-2 py-2 text-left">{{ row.club }}</td>
-                      @for (cell of row.cells; track $index) {
-                        <td [class]="statCellClass + ' tabular-nums'">
-                          {{ cell }}
-                        </td>
-                      }
-                    </tr>
-                  } @empty {
-                    <tr>
-                      <td
-                        [attr.colspan]="statColumns().length + 2"
-                        class="whitespace-normal px-3 py-3 text-ink-2"
-                      >
-                        This player has not taken the pitch yet, so there are no season statistics.
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-                @if (careerRow(); as career) {
-                  <tfoot>
-                    <tr class="border-t border-line-strong bg-ground font-semibold">
-                      <th scope="row" class="px-2 py-2 text-left" colspan="2">
-                        Career ({{ seasonsPlayed() }})
-                      </th>
-                      @for (cell of career; track $index) {
-                        <td [class]="statCellClass + ' tabular-nums'">
-                          {{ cell }}
-                        </td>
-                      }
-                    </tr>
-                  </tfoot>
-                }
-              </table>
-            </div>
-
-            <h3 class="mt-8 text-base font-semibold text-ink">Match by match</h3>
-
-            <label class="mt-2 block max-w-sm" for="statistics-season">
-              <span class="text-sm font-medium text-ink-2">Season</span>
-            </label>
-            <select
-              id="statistics-season"
-              [class]="selectClass + ' max-w-sm'"
-              [value]="selectedSeason()"
-              (change)="selectSeason($any($event.target).value)"
-            >
-              @for (option of seasonOptions(); track option.value) {
-                <option [value]="option.value" [selected]="option.value === selectedSeason()">
-                  {{ option.label }}
-                </option>
-              }
-            </select>
-
-            @if (matchesLoading()) {
-              <p class="mt-3 text-sm text-ink-2" role="status">Loading the match statistics…</p>
-            } @else if (matchesError(); as message) {
-              <p [class]="formErrorClass" role="alert">{{ message }}</p>
-            } @else {
-              <p class="mt-3 text-sm text-ink-2">
-                One row per match played, from the stored results the season totals are summed from.
-                Passes, crosses, tackles, take-ons and set pieces are shown as completed out of
-                attempted{{ isKeeper() ? ', saves out of the shots on target faced' : '' }}.
+              <h2 class="text-lg font-semibold text-ink">Attributes</h2>
+              <p class="mt-1 text-sm text-ink-2">
+                Shown on a 1&ndash;20 scale in four columns, one per family, side by side. Colour is
+                never the only signal (TRN-4):
+                <span class="font-medium text-red-300">Low 1&ndash;6</span>,
+                <span class="font-medium text-amber-300">Average 7&ndash;13</span>,
+                <span class="font-medium text-emerald-200">Strong 14&ndash;20</span>. A figure in
+                brackets, such as <span class="font-medium text-ink">19 (0.85)</span>, is how far
+                the skill is towards its next point; a minus sign means it is slipping towards a
+                loss.
               </p>
 
               <div
-                class="mt-3 overflow-x-auto rounded border border-line bg-panel"
-                role="group"
-                aria-label="Match statistics"
-                data-testid="match-stats"
+                class="mt-3 grid grid-cols-4 gap-x-2 rounded border border-line bg-panel p-2 sm:gap-x-3 sm:p-3"
+                data-testid="attribute-rows"
               >
-                <table
-                  class="w-full min-w-max border-collapse whitespace-nowrap text-xs xl:text-sm"
-                >
-                  <caption class="sr-only">
-                    Match-by-match statistics, most recent first.
-                  </caption>
-                  <thead>
-                    <tr class="border-b border-line text-ink-2">
-                      <th scope="col" class="px-2 py-2 text-left font-medium">Rd</th>
-                      <th scope="col" class="px-2 py-2 text-left font-medium">Match</th>
-                      <th scope="col" class="px-2 py-2 text-left font-medium">Result</th>
-                      @for (column of matchColumns(); track column.label) {
-                        <th scope="col" [class]="statCellClass + ' font-medium'">
-                          <abbr [title]="column.title">{{ column.label }}</abbr>
-                        </th>
+                @for (family of attributeFamilies(); track family.key) {
+                  <section class="min-w-0" [attr.aria-label]="family.label + ' attributes'">
+                    <h3
+                      class="truncate border-b border-line-strong pb-0.5 text-[0.5625rem] font-bold uppercase tracking-tight text-ink sm:pb-1 sm:text-sm sm:tracking-wide"
+                    >
+                      {{ family.label }}
+                    </h3>
+                    <div class="mt-0.5 sm:mt-1">
+                      @for (row of family.rows; track row.label) {
+                        <app-attribute-value
+                          [label]="row.label"
+                          [value]="row.value"
+                          [progress]="row.progress"
+                        />
                       }
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (row of matchRows(); track row.match.fixtureId) {
-                      <tr class="border-b border-line-soft last:border-b-0">
-                        <td class="px-2 py-2 tabular-nums">{{ row.match.round }}</td>
-                        <td class="px-2 py-2">
-                          {{ row.match.home ? 'vs' : 'at' }} {{ row.match.opponentName }}
-                        </td>
-                        <td class="px-2 py-2 tabular-nums">
-                          {{ row.match.goalsFor }}&ndash;{{ row.match.goalsAgainst }}
-                        </td>
-                        @for (cell of row.cells; track $index) {
-                          <td [class]="statCellClass + ' tabular-nums'">
-                            {{ cell }}
-                          </td>
+                    </div>
+                  </section>
+                }
+              </div>
+            </div>
+          }
+
+          @case ('training') {
+            <div
+              id="player-panel-training"
+              role="tabpanel"
+              aria-labelledby="player-tab-training"
+              tabindex="0"
+              class="pt-4"
+            >
+              <app-player-training [playerId]="profile.id" />
+            </div>
+          }
+
+          @case ('statistics') {
+            <div
+              id="player-panel-statistics"
+              role="tabpanel"
+              aria-labelledby="player-tab-statistics"
+              tabindex="0"
+              class="pt-4"
+            >
+              <h2 class="text-lg font-semibold text-ink">Statistics</h2>
+
+              @if (resultsHeldBack()) {
+                <div class="mt-3 rounded border border-line bg-panel">
+                  <app-result-hidden subject="A player's statistics" />
+                </div>
+              } @else {
+                <h3 class="mt-4 text-base font-semibold text-ink">Season by season</h3>
+                <p class="mt-1 text-sm text-ink-2">
+                  One row per season, most recent first, with the career total underneath.
+                </p>
+
+                <div
+                  class="mt-3 overflow-x-auto rounded border border-line bg-panel"
+                  role="group"
+                  aria-label="Season statistics"
+                  data-testid="season-stats"
+                >
+                  <table
+                    class="w-full min-w-max border-collapse whitespace-nowrap text-xs xl:text-sm"
+                  >
+                    <caption class="sr-only">
+                      Season-by-season statistics, most recent first, with the career total.
+                    </caption>
+                    <thead>
+                      <tr class="border-b border-line text-ink-2">
+                        <th scope="col" class="px-2 py-2 text-left font-medium">Season</th>
+                        <th scope="col" class="px-2 py-2 text-left font-medium">Club</th>
+                        @for (column of statColumns(); track column.label) {
+                          <th scope="col" [class]="statCellClass + ' font-medium'">
+                            <abbr [title]="column.title">{{ column.label }}</abbr>
+                          </th>
                         }
                       </tr>
-                    } @empty {
-                      <tr>
-                        <td
-                          [attr.colspan]="matchColumns().length + 3"
-                          class="whitespace-normal px-3 py-3 text-ink-2"
-                        >
-                          This player has no matches for that season: they have not taken the pitch
-                          in it.
-                        </td>
-                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of seasonTableRows(); track row.key) {
+                        <tr class="border-b border-line-soft">
+                          <th scope="row" class="px-2 py-2 text-left font-medium">
+                            {{ row.season }}
+                          </th>
+                          <td class="px-2 py-2 text-left">{{ row.club }}</td>
+                          @for (cell of row.cells; track $index) {
+                            <td [class]="statCellClass + ' tabular-nums'">
+                              {{ cell }}
+                            </td>
+                          }
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td
+                            [attr.colspan]="statColumns().length + 2"
+                            class="whitespace-normal px-3 py-3 text-ink-2"
+                          >
+                            This player has not taken the pitch yet, so there are no season
+                            statistics.
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                    @if (careerRow(); as career) {
+                      <tfoot>
+                        <tr class="border-t border-line-strong bg-ground font-semibold">
+                          <th scope="row" class="px-2 py-2 text-left" colspan="2">
+                            Career ({{ seasonsPlayed() }})
+                          </th>
+                          @for (cell of career; track $index) {
+                            <td [class]="statCellClass + ' tabular-nums'">
+                              {{ cell }}
+                            </td>
+                          }
+                        </tr>
+                      </tfoot>
                     }
-                  </tbody>
-                </table>
-              </div>
-            }
-          }
-        </div>
-      }
+                  </table>
+                </div>
 
-      @case ('contract') {
-        <div
-          id="player-panel-contract"
-          role="tabpanel"
-          aria-labelledby="player-tab-contract"
-          tabindex="0"
-          class="grid gap-6 pt-4 sm:grid-cols-2"
-        >
-          <section class="rounded border border-line bg-panel p-4">
-            <h2 class="text-lg font-semibold text-ink">Contract</h2>
-            @if (profile.contract; as contract) {
-              <dl class="mt-2 space-y-1 text-sm">
-                <div class="flex justify-between gap-4">
-                  <dt class="text-muted">Seasons</dt>
-                  <dd>{{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                  <dt class="text-muted">Expires</dt>
-                  <dd>End of season {{ contract.endSeasonNumber }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                  <dt class="text-muted">Seasons remaining</dt>
-                  <dd>{{ contract.seasonsRemaining }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                  <dt class="text-muted">Squad status</dt>
-                  <dd>{{ squadStatus(contract.squadStatus) }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                  <dt class="text-muted">Salary</dt>
-                  <dd>{{ funds(contract.weeklyWageMinor) }} a week</dd>
-                </div>
-              </dl>
-              <p class="mt-2 text-xs text-muted">
-                When a contract runs out the Board renews it automatically at the rollover, so you
-                never lose a player to an expiring deal (CON-11). Contract years advance at season
-                rollover, never on an anniversary (CON-8).
-              </p>
+                <h3 class="mt-8 text-base font-semibold text-ink">Match by match</h3>
 
-              <div class="mt-4 border-t border-line pt-4">
-                <h3 class="text-sm font-medium text-ink-2">Negotiate a new contract</h3>
-                <div class="mt-2">
-                  <button
-                    type="button"
-                    [class]="secondaryButtonClass"
-                    disabled
-                    aria-describedby="negotiation-note"
+                <label class="mt-2 block max-w-sm" for="statistics-season">
+                  <span class="text-sm font-medium text-ink-2">Season</span>
+                </label>
+                <select
+                  id="statistics-season"
+                  [class]="selectClass + ' max-w-sm'"
+                  [value]="selectedSeason()"
+                  (change)="selectSeason($any($event.target).value)"
+                >
+                  @for (option of seasonOptions(); track option.value) {
+                    <option [value]="option.value" [selected]="option.value === selectedSeason()">
+                      {{ option.label }}
+                    </option>
+                  }
+                </select>
+
+                @if (matchesLoading()) {
+                  <p class="mt-3 text-sm text-ink-2" role="status">Loading the match statistics…</p>
+                } @else if (matchesError(); as message) {
+                  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+                } @else {
+                  <p class="mt-3 text-sm text-ink-2">
+                    One row per match played, from the stored results the season totals are summed
+                    from. Passes, crosses, tackles, take-ons and set pieces are shown as completed
+                    out of attempted{{
+                      isKeeper() ? ', saves out of the shots on target faced' : ''
+                    }}.
+                  </p>
+
+                  <div
+                    class="mt-3 overflow-x-auto rounded border border-line bg-panel"
+                    role="group"
+                    aria-label="Match statistics"
+                    data-testid="match-stats"
                   >
-                    Start negotiation
-                  </button>
-                </div>
-                <p id="negotiation-note" class="mt-2 text-sm text-ink-2" role="status">
-                  Contract negotiation is coming soon.
-                </p>
-              </div>
-            } @else {
-              <p class="mt-2 text-sm text-ink-2">This player holds no active contract.</p>
-            }
-          </section>
+                    <table
+                      class="w-full min-w-max border-collapse whitespace-nowrap text-xs xl:text-sm"
+                    >
+                      <caption class="sr-only">
+                        Match-by-match statistics, most recent first.
+                      </caption>
+                      <thead>
+                        <tr class="border-b border-line text-ink-2">
+                          <th scope="col" class="px-2 py-2 text-left font-medium">Rd</th>
+                          <th scope="col" class="px-2 py-2 text-left font-medium">Match</th>
+                          <th scope="col" class="px-2 py-2 text-left font-medium">Result</th>
+                          @for (column of matchColumns(); track column.label) {
+                            <th scope="col" [class]="statCellClass + ' font-medium'">
+                              <abbr [title]="column.title">{{ column.label }}</abbr>
+                            </th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of matchRows(); track row.match.fixtureId) {
+                          <tr class="border-b border-line-soft last:border-b-0">
+                            <td class="px-2 py-2 tabular-nums">{{ row.match.round }}</td>
+                            <td class="px-2 py-2">
+                              {{ row.match.home ? 'vs' : 'at' }} {{ row.match.opponentName }}
+                            </td>
+                            <td class="px-2 py-2 tabular-nums">
+                              {{ row.match.goalsFor }}&ndash;{{ row.match.goalsAgainst }}
+                            </td>
+                            @for (cell of row.cells; track $index) {
+                              <td [class]="statCellClass + ' tabular-nums'">
+                                {{ cell }}
+                              </td>
+                            }
+                          </tr>
+                        } @empty {
+                          <tr>
+                            <td
+                              [attr.colspan]="matchColumns().length + 3"
+                              class="whitespace-normal px-3 py-3 text-ink-2"
+                            >
+                              This player has no matches for that season: they have not taken the
+                              pitch in it.
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              }
+            </div>
+          }
 
-          <section class="rounded border border-line bg-panel p-4">
-            <h2 class="text-lg font-semibold text-ink">Registration</h2>
-            @if (profile.registration; as registration) {
-              <dl class="mt-2 space-y-1 text-sm">
-                <div class="flex justify-between gap-4">
-                  <dt class="text-muted">Status</dt>
-                  <dd>{{ registration.status }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                  <dt class="text-muted">Eligible from round</dt>
-                  <dd>{{ registration.effectiveFixtureBoundaryRound }}</dd>
-                </div>
-              </dl>
-              <p class="mt-2 text-xs text-muted">
-                A registration follows a fixture boundary, so a player signed after a snapshot locks
-                plays in later fixtures only (SQ-7).
-              </p>
-            } @else {
-              <p class="mt-2 text-sm text-ink-2">This player holds no active registration.</p>
-            }
-          </section>
-        </div>
-      }
-    }
+          @case ('contract') {
+            <div
+              id="player-panel-contract"
+              role="tabpanel"
+              aria-labelledby="player-tab-contract"
+              tabindex="0"
+              class="grid gap-6 pt-4 sm:grid-cols-2"
+            >
+              <section class="rounded border border-line bg-panel p-4">
+                <h2 class="text-lg font-semibold text-ink">Contract</h2>
+                @if (profile.contract; as contract) {
+                  <dl class="mt-2 space-y-1 text-sm">
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-muted">Seasons</dt>
+                      <dd>{{ contract.startSeasonNumber }}&ndash;{{ contract.endSeasonNumber }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-muted">Expires</dt>
+                      <dd>End of season {{ contract.endSeasonNumber }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-muted">Seasons remaining</dt>
+                      <dd>{{ contract.seasonsRemaining }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-muted">Squad status</dt>
+                      <dd>{{ squadStatus(contract.squadStatus) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-muted">Salary</dt>
+                      <dd>{{ funds(contract.weeklyWageMinor) }} a week</dd>
+                    </div>
+                  </dl>
+                  <p class="mt-2 text-xs text-muted">
+                    When a contract runs out the Board renews it automatically at the rollover, so
+                    you never lose a player to an expiring deal (CON-11). Contract years advance at
+                    season rollover, never on an anniversary (CON-8).
+                  </p>
+
+                  <div class="mt-4 border-t border-line pt-4">
+                    <h3 class="text-sm font-medium text-ink-2">Negotiate a new contract</h3>
+                    <div class="mt-2">
+                      <button
+                        type="button"
+                        [class]="secondaryButtonClass"
+                        disabled
+                        aria-describedby="negotiation-note"
+                      >
+                        Start negotiation
+                      </button>
+                    </div>
+                    <p id="negotiation-note" class="mt-2 text-sm text-ink-2" role="status">
+                      Contract negotiation is coming soon.
+                    </p>
+                  </div>
+                } @else {
+                  <p class="mt-2 text-sm text-ink-2">This player holds no active contract.</p>
+                }
+              </section>
+
+              <section class="rounded border border-line bg-panel p-4">
+                <h2 class="text-lg font-semibold text-ink">Registration</h2>
+                @if (profile.registration; as registration) {
+                  <dl class="mt-2 space-y-1 text-sm">
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-muted">Status</dt>
+                      <dd>{{ registration.status }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-muted">Eligible from round</dt>
+                      <dd>{{ registration.effectiveFixtureBoundaryRound }}</dd>
+                    </div>
+                  </dl>
+                  <p class="mt-2 text-xs text-muted">
+                    A registration follows a fixture boundary, so a player signed after a snapshot
+                    locks plays in later fixtures only (SQ-7).
+                  </p>
+                } @else {
+                  <p class="mt-2 text-sm text-ink-2">This player holds no active registration.</p>
+                }
+              </section>
+            </div>
+          }
+        }
+      </div>
+    </div>
   </section>
 } @else {
   <p class="text-sm text-ink-2" role="status">Loading the player…</p>

@@ -6,6 +6,7 @@ import { Player, PlayerMatchStat, PlayerSeasonStats } from '../../core/squad/squ
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { MyFixtures } from '../../core/competition/competition.models';
 import { SquadStore } from '../../core/squad/squad-store';
+import { OnboardingStore } from '../../core/world/onboarding-store';
 import { PlayerTrainingStore } from '../../core/training/player-training-store';
 import { PlayerProfile } from './player';
 
@@ -224,6 +225,20 @@ describe('PlayerProfile', () => {
         { provide: SquadStore, useValue: store },
         { provide: PlayerTrainingStore, useValue: trainingStore },
         {
+          provide: OnboardingStore,
+          useValue: {
+            state: signal({
+              tenure: {
+                clubId: 'club-1',
+                primaryColour: '#b11f2a',
+                secondaryColour: '#f3efe6',
+                crestShape: 'round',
+                crestPattern: 'stripes',
+              },
+            }),
+          },
+        },
+        {
           provide: CompetitionStore,
           useValue: {
             fixtures: mine,
@@ -277,6 +292,41 @@ describe('PlayerProfile', () => {
       '(−0.40)',
     );
     expect(passing.querySelector('[data-testid="attribute-progress"]')).toBeNull();
+  });
+
+  it('shows the player’s portrait under their name, with the skills to the right of it, in the club’s shirt', () => {
+    const portrait = root.querySelector<HTMLElement>('[data-testid="player-portrait"]');
+    const attributes = root.querySelector<HTMLElement>('[data-testid="attribute-rows"]');
+    const name = root.querySelector('h1');
+
+    expect(portrait).not.toBeNull();
+    expect(attributes).not.toBeNull();
+    expect(
+      name!.compareDocumentPosition(portrait!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // The portrait's column and the tabs' column are the two halves of one row, portrait first.
+    const row = portrait!.parentElement!.parentElement!;
+    const tabs = root.querySelector('[data-testid="player-tabs"]')!;
+
+    expect(row.children).toHaveLength(2);
+    expect(row.children[0].contains(portrait)).toBe(true);
+    expect(row.children[1].contains(tabs)).toBe(true);
+    expect(row.children[1].contains(attributes)).toBe(true);
+    expect(portrait?.getAttribute('role')).toBe('img');
+    expect(portrait?.getAttribute('aria-label')).toBe(`Portrait of ${player.fullName}`);
+    expect(portrait?.querySelector('svg')).not.toBeNull();
+    expect(portrait?.querySelector('path[fill="#b11f2a"]')).not.toBeNull();
+    expect(portrait?.querySelector('path[stroke="#f3efe6"]')).not.toBeNull();
+  });
+
+  it('keeps the state measures under the portrait, in the same column', () => {
+    const portrait = root.querySelector<HTMLElement>('[data-testid="player-portrait"]')!;
+    const state = root.querySelector<HTMLElement>('#player-state-heading')!;
+
+    expect(portrait.parentElement!.contains(state)).toBe(true);
+    expect(state.textContent).toContain('State');
+    expect(portrait.parentElement!.querySelectorAll('dt')).toHaveLength(4);
   });
 
   it('lays the attributes out as four columns side by side', () => {

@@ -18,8 +18,11 @@ import {
   stateRows,
 } from '../../core/squad/squad-presentation';
 import { SquadStore } from '../../core/squad/squad-store';
+import { OnboardingStore } from '../../core/world/onboarding-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
+import { PlayerPortrait } from '../../shared/ui/player-portrait/player-portrait';
+import { FALLBACK_KIT, PortraitKit } from '../../shared/ui/player-portrait/portrait-designs';
 import { PlayerTraining } from './player-training/player-training';
 import {
   FORM_ERROR,
@@ -51,7 +54,7 @@ const CURRENT_SEASON = 'current';
  */
 @Component({
   selector: 'app-player',
-  imports: [RouterLink, AttributeValue, PlayerTraining, ResultHidden],
+  imports: [RouterLink, AttributeValue, PlayerPortrait, PlayerTraining, ResultHidden],
   templateUrl: './player.html',
 })
 export class PlayerProfile implements OnInit {
@@ -60,6 +63,7 @@ export class PlayerProfile implements OnInit {
 
   private readonly store = inject(SquadStore);
   private readonly gate = inject(ResultGate);
+  private readonly onboarding = inject(OnboardingStore);
 
   protected readonly player = this.store.player;
 
@@ -76,6 +80,27 @@ export class PlayerProfile implements OnInit {
     const player = this.player();
 
     return player === null ? [] : attributeGroups(player.attributes, player.attributeProgress);
+  });
+
+  /**
+   * The shirt the portrait wears: the club's two colours and crest. The profile only opens for the manager's own
+   * players, so that is the club the manager holds; anything else wears a plain fallback kit.
+   */
+  protected readonly kit = computed<PortraitKit>(() => {
+    const tenure = this.onboarding.state()?.tenure;
+    const player = this.player();
+
+    return tenure === undefined ||
+      tenure === null ||
+      player === null ||
+      tenure.clubId !== player.clubId
+      ? FALLBACK_KIT
+      : {
+          primary: tenure.primaryColour,
+          secondary: tenure.secondaryColour,
+          crestShape: tenure.crestShape,
+          crestPattern: tenure.crestPattern,
+        };
   });
 
   /** The four state measures with their bands resolved. */
