@@ -263,7 +263,7 @@ public sealed record MatchPlanV1
     public const int MaxRules = 10;
 
     /// <summary>The most substitutions one rule may make.</summary>
-    public const int MaxSubstitutionsPerRule = 3;
+    public const int MaxSubstitutionsPerRule = 5;
 
     /// <summary>Gets a plan with no rules and the assistant on.</summary>
     public static MatchPlanV1 None { get; } = new();

@@ -245,11 +245,11 @@ public sealed class MatchInstructionTests
             .ContainSingle(issue => issue.Code == MatchInstructionIssueCode.MentalitySteps);
 
     [Fact]
-    public void An_instruction_makes_at_most_three_substitutions()
+    public void An_instruction_makes_at_most_five_substitutions()
     {
-        var four = Enumerable.Repeat(Swap(), 4).ToList();
+        var six = Enumerable.Repeat(Swap(), 6).ToList();
 
-        IssuesOf(Plain("Changes") with { Substitutions = four }).Should()
+        IssuesOf(Plain("Changes") with { Substitutions = six }).Should()
             .ContainSingle(issue => issue.Code == MatchInstructionIssueCode.TooManySubstitutions);
     }
 

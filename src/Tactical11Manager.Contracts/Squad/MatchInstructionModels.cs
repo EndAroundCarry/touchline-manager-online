@@ -57,7 +57,7 @@ public sealed record MatchInstructionModel
     /// <summary>Gets the team instructions the instruction changes.</summary>
     public MatchInstructionChangesModel Changes { get; init; } = new();
 
-    /// <summary>Gets the substitutions the instruction makes, at most 3.</summary>
+    /// <summary>Gets the substitutions the instruction makes, at most 5.</summary>
     public IReadOnlyList<MatchInstructionSubstitutionModel> Substitutions { get; init; } = [];
 }
 

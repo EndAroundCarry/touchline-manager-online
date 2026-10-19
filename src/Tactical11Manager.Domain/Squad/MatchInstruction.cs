@@ -149,7 +149,7 @@ public sealed class MatchInstruction
     public const int MaxPerPlan = 10;
 
     /// <summary>The most substitutions one instruction may make.</summary>
-    public const int MaxSubstitutions = 3;
+    public const int MaxSubstitutions = 5;
 
     /// <summary>The substitutions a club may make in a match (`SQ-5`): more across a plan's instructions may be skipped.</summary>
     public const int MatchSubstitutionLimit = 5;

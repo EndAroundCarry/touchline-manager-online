@@ -58,14 +58,14 @@ public sealed class MatchPlanInputTests
     }
 
     [Fact]
-    public void Four_substitutions_in_one_rule_are_refused()
+    public void Six_substitutions_in_one_rule_are_refused()
     {
         MatchRuleSubstitutionV1 Swap(int slot, int bench) =>
             new() { Off = MatchRuleOff.Player, OffParticipantId = Starter(slot), On = MatchRuleOn.Player, OnParticipantId = Bench(bench) };
 
-        var act = WithRule(new MatchRuleV1 { Ordinal = 1, Substitutions = [Swap(2, 2), Swap(3, 3), Swap(4, 4), Swap(5, 5)] }).Validate;
+        var act = WithRule(new MatchRuleV1 { Ordinal = 1, Substitutions = [Swap(2, 2), Swap(3, 3), Swap(4, 4), Swap(5, 5), Swap(6, 6), Swap(7, 7)] }).Validate;
 
-        act.Should().Throw<InvalidMatchInputException>().WithMessage("*4 substitutions*");
+        act.Should().Throw<InvalidMatchInputException>().WithMessage("*6 substitutions*");
     }
 
     [Fact]

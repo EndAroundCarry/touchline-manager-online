@@ -94,7 +94,7 @@ export interface MatchInstruction {
   readonly overrides: readonly MatchInstructionOverride[];
   readonly changes: MatchInstructionChanges;
 
-  /** At most 3. */
+  /** At most 5. */
   readonly substitutions: readonly MatchInstructionSubstitution[];
 }
 

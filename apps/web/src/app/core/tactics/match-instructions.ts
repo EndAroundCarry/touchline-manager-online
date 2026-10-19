@@ -1,5 +1,5 @@
 /**
- * Match instructions as pure data: the limits, the blank rule, the edits one rule takes, the templates a manager starts from, and the
+ * Match instructions as pure data: the limits, the blank rule, the edits one rule takes, and the
  * checks that mirror the server's validator (`MAT-6`, `INS-12`).
  *
  * A match instruction is a rule the engine carries out during a match when its conditions hold: when (minute, score, an event) then
@@ -22,7 +22,7 @@ import type {
 export const MAX_MATCH_INSTRUCTIONS = 10;
 
 /** The most substitutions one match instruction makes. */
-export const MAX_RULE_SUBSTITUTIONS = 3;
+export const MAX_RULE_SUBSTITUTIONS = 5;
 
 /** The most substitutions a club may make in a match (`SQ-5`): the enabled instructions may not plan more between them. */
 export const MATCH_SUBSTITUTION_LIMIT = 5;
@@ -447,190 +447,6 @@ export function plannedSubstitutions(rules: readonly MatchInstruction[]): number
     .filter((rule) => rule.isEnabled)
     .reduce((total, rule) => total + rule.substitutions.length, 0);
 }
-
-/** What a template needs to know about the plan it is added to. */
-export interface TemplateContext {
-  /** The formation the plan starts in. */
-  readonly planFormation: string;
-
-  /** Every formation preset code the manager can switch to. */
-  readonly formations: readonly string[];
-}
-
-/** A rule the manager can start from, instead of a blank one. */
-export interface InstructionTemplate {
-  readonly key: string;
-  readonly label: string;
-
-  /** One line saying what the rule does, shown beside the choice. */
-  readonly description: string;
-  readonly build: (context: TemplateContext) => MatchInstruction;
-}
-
-/** Builds a rule from the blank one, so a template names only what it sets. */
-function rule(name: string, set: Partial<MatchInstruction>): MatchInstruction {
-  return { ...blankInstruction(name), ...set };
-}
-
-function steps(mentalitySteps: number): MatchInstructionChanges {
-  return { ...noChanges(), mentalitySteps };
-}
-
-/** The formation a "planned change" moves to: a 4-3-3 when the plan is not in one already, otherwise the first other preset. */
-function plannedFormation(context: TemplateContext): string | null {
-  if (context.planFormation !== '4-3-3' && context.formations.includes('4-3-3')) {
-    return '4-3-3';
-  }
-
-  return context.formations.find((code) => code !== context.planFormation) ?? null;
-}
-
-/** The templates the "Add instruction" menu offers, in the order it lists them. The last is the blank rule. */
-export const INSTRUCTION_TEMPLATES: readonly InstructionTemplate[] = [
-  {
-    key: 'protect-lead',
-    label: 'Protect a 2-goal lead',
-    description:
-      "From 70', leading by 2 or more: one step more defensive and time wasting when it suits.",
-    build: () =>
-      rule('Protect a 2-goal lead', {
-        fromMinute: 70,
-        score: 'leading',
-        scoreMargin: 2,
-        changes: { ...steps(-1), timeWasting: 'situational' },
-      }),
-  },
-  {
-    key: 'hold-lead',
-    label: 'Hold a 1-goal lead late',
-    description:
-      "From 80', leading: one step more defensive and a fresh defender for the most tired forward.",
-    build: () =>
-      rule('Hold a 1-goal lead late', {
-        fromMinute: 80,
-        score: 'leading',
-        scoreMargin: 1,
-        changes: steps(-1),
-        substitutions: [
-          {
-            off: 'most_tired_in_family',
-            offPlayerId: null,
-            offFamily: 'attack',
-            on: 'best_fit_in_family',
-            onPlayerId: null,
-            onFamily: 'defence',
-          },
-        ],
-      }),
-  },
-  {
-    key: 'chase',
-    label: "Chase the game from 60'",
-    description:
-      "From 60', losing: one step more attacking and a fresh forward for the most tired midfielder.",
-    build: () =>
-      rule("Chase the game from 60'", {
-        fromMinute: 60,
-        score: 'trailing',
-        scoreMargin: 1,
-        changes: steps(1),
-        substitutions: [
-          {
-            off: 'most_tired_in_family',
-            offPlayerId: null,
-            offFamily: 'midfield',
-            on: 'best_fit_in_family',
-            onPlayerId: null,
-            onFamily: 'attack',
-          },
-        ],
-      }),
-  },
-  {
-    key: 'all-out',
-    label: "All-out attack from 85'",
-    description: "From 85', not winning: Attacking, high press, high tempo.",
-    build: () =>
-      rule("All-out attack from 85'", {
-        fromMinute: 85,
-        score: 'not_winning',
-        changes: { ...noChanges(), mentality: 'attacking', pressing: 'high_press', tempo: 'high' },
-      }),
-  },
-  {
-    key: 'ten-men',
-    label: 'Down to ten men',
-    description:
-      'When one of your players is sent off: one step more defensive. The shape drops a forward.',
-    build: () => rule('Down to ten men', { event: EVENT_CODES.ownSentOff, changes: steps(-1) }),
-  },
-  {
-    key: 'opponent-ten',
-    label: 'Opponent down to ten',
-    description: 'When an opponent is sent off: one step more attacking and wider.',
-    build: () =>
-      rule('Opponent down to ten', {
-        event: EVENT_CODES.opponentSentOff,
-        changes: { ...steps(1), width: 'wide' },
-      }),
-  },
-  {
-    key: 'booked-defender',
-    label: 'Booked defender off',
-    description: "After 45', when a defender is booked: a fresh defender takes his place.",
-    build: () =>
-      rule('Booked defender off', {
-        fromMinute: 45,
-        event: EVENT_CODES.ownBooked,
-        eventFamily: 'defence',
-        substitutions: [
-          {
-            off: 'subject',
-            offPlayerId: null,
-            offFamily: null,
-            on: 'best_fit_in_family',
-            onPlayerId: null,
-            onFamily: 'defence',
-          },
-        ],
-      }),
-  },
-  {
-    key: 'off-day',
-    label: 'Off-day player off',
-    description:
-      "After 55', when a player's rating drops low: a fresh player of his kind comes on.",
-    build: () =>
-      rule('Off-day player off', {
-        fromMinute: 55,
-        event: EVENT_CODES.playingBadly,
-        eventThreshold: DEFAULT_BAD_RATING,
-        substitutions: [
-          {
-            off: 'subject',
-            offPlayerId: null,
-            offFamily: null,
-            on: 'best_fit_in_family',
-            onPlayerId: null,
-            onFamily: 'midfield',
-          },
-        ],
-      }),
-  },
-  {
-    key: 'planned-change',
-    label: 'Planned change at a minute',
-    description: 'At a set minute, whatever the score: a new shape, to surprise the opponent.',
-    build: (context) =>
-      rule('Planned change', { fromMinute: 60, formation: plannedFormation(context) }),
-  },
-  {
-    key: 'blank',
-    label: 'Blank instruction',
-    description: 'Start from nothing and set every part yourself.',
-    build: () => blankInstruction(),
-  },
-];
 
 /** One thing wrong with a match instruction, in the server's vocabulary so one set of words serves both. */
 export interface InstructionProblem {

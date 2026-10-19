@@ -1,9 +1,7 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import {
   EVENT_CODES,
-  INSTRUCTION_TEMPLATES,
   InstructionProblem,
-  InstructionTemplate,
   KEEPER_SLOT,
   MATCH_SUBSTITUTION_LIMIT,
   MAX_INSTRUCTION_NAME_LENGTH,
@@ -13,6 +11,7 @@ import {
   MAX_SCORE_MARGIN,
   MENTALITY_CODES,
   ChangeKey,
+  blankInstruction,
   eventHasSubject,
   eventTakesFamily,
   eventTakesThreshold,
@@ -140,13 +139,9 @@ export class MatchInstructions {
   /** The place of the instruction whose editor is open, or null. */
   protected readonly openIndex = signal<number | null>(null);
 
-  /** Whether the template menu is open. */
-  protected readonly menuOpen = signal(false);
-
   /** The slot of the open instruction's new shape that is selected, or 0. */
   protected readonly selectedSlot = signal(0);
 
-  protected readonly templates = INSTRUCTION_TEMPLATES;
   protected readonly scoreOptions = SCORE_OPTIONS;
   protected readonly eventOptions = EVENT_OPTIONS;
   protected readonly eventFamilies = eventFamilyOptions();
@@ -352,22 +347,15 @@ export class MatchInstructions {
     () => this.shape()?.find((slot) => slot.isSelected) ?? null,
   );
 
-  /** Adds an instruction built from a template, opens its editor, and closes the menu. */
-  protected addFrom(template: InstructionTemplate): void {
+  /** Adds a blank instruction and opens its editor. */
+  protected add(): void {
     if (this.isFull()) {
       return;
     }
 
     const index = this.rules().length;
 
-    this.store.setMatchInstruction(
-      index,
-      template.build({
-        planFormation: this.draft()?.formationPreset ?? '',
-        formations: this.formationCodes(),
-      }),
-    );
-    this.menuOpen.set(false);
+    this.store.setMatchInstruction(index, blankInstruction());
     this.open(index);
   }
 

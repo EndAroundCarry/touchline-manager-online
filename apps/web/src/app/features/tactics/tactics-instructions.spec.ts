@@ -20,7 +20,7 @@ import { Tactics as TacticsPage } from './tactics';
  * The tactics screen's two tabs and the Match instructions editor.
  *
  * The rules the instructions follow are pinned in `match-instructions.spec.ts` and `match-instructions-draft.spec.ts`; what only a
- * rendered page shows is that the tabs work by mouse and keyboard, that an instruction can be added from a template, edited, ordered
+ * rendered page shows is that the tabs work by mouse and keyboard, that an instruction can be added, edited, ordered
  * and removed, that a new shape is drawn and a player can be placed in it, and that all of it reaches the request a save sends.
  */
 
@@ -214,10 +214,34 @@ describe('Tactics tabs and match instructions', () => {
     ) as HTMLButtonElement;
   }
 
-  async function openInstructionsAndAdd(templateKey: string): Promise<void> {
+  async function openInstructionsAndAdd(): Promise<void> {
     click('tab-instructions');
     click('add-instruction');
-    click(`template-${templateKey}`);
+  }
+
+  /** Sets the open, blank rule to: from 60', losing, one step more attacking, a forward on for the most tired midfielder. */
+  function fillChase(): void {
+    type('rule-from', '60');
+    choose('rule-score', 'trailing');
+    choose('rule-mentality', 'steps:1');
+    click('add-substitution');
+    choose('sub-off', 'most_tired_in_family');
+    choose('sub-off-family', 'midfield');
+    choose('sub-on', 'best_fit_in_family');
+    choose('sub-on-family', 'attack');
+  }
+
+  /** Sets the open, blank rule to: when one of the side is sent off, one step more defensive. */
+  function fillTenMen(): void {
+    type('rule-name', 'Down to ten men');
+    choose('rule-event', 'own_sent_off');
+    choose('rule-mentality', 'steps:-1');
+  }
+
+  /** Sets the open, blank rule to: from 60', whatever the score, move to a 4-3-3. */
+  function fillPlannedChange(): void {
+    type('rule-from', '60');
+    choose('rule-formation', '4-3-3');
   }
 
   describe('the tabs', () => {
@@ -325,8 +349,18 @@ describe('Tactics tabs and match instructions', () => {
       expect(saveButton().disabled).toBe(true);
     });
 
-    it('adds a rule from a template, summarises it in words and offers to save it', async () => {
-      await openInstructionsAndAdd('chase');
+    it('adds a blank rule straight away, with no list of templates to pick from', async () => {
+      await openInstructionsAndAdd();
+
+      expect(maybe('template-menu')).toBeNull();
+      expect(byId('instruction-count').textContent).toContain('1 of 10');
+      expect(byId('toggle-1').textContent).toContain('New instruction');
+      expect(byId('editor-1')).toBeTruthy();
+    });
+
+    it('summarises a rule in words and offers to save it', async () => {
+      await openInstructionsAndAdd();
+      fillChase();
 
       expect(summary(1)).toBe(
         "From 60', if losing by 1 or more → one step more attacking, a fresh forward on for the most tired midfielder",
@@ -339,7 +373,8 @@ describe('Tactics tabs and match instructions', () => {
     });
 
     it('edits a rule in place and the summary follows', async () => {
-      await openInstructionsAndAdd('chase');
+      await openInstructionsAndAdd();
+      fillChase();
 
       type('rule-from', '70');
       choose('rule-score', 'level');
@@ -353,7 +388,7 @@ describe('Tactics tabs and match instructions', () => {
     });
 
     it('clears the family and threshold when the kind of event changes', async () => {
-      await openInstructionsAndAdd('blank');
+      await openInstructionsAndAdd();
 
       choose('rule-event', 'playing_badly');
       choose('rule-event-family', 'attack');
@@ -368,7 +403,7 @@ describe('Tactics tabs and match instructions', () => {
     });
 
     it('names a substitute in the summary and flags a substitution still missing a player', async () => {
-      await openInstructionsAndAdd('blank');
+      await openInstructionsAndAdd();
       click('add-substitution');
 
       expect(element.textContent).toContain('A substitution is missing a player');
@@ -381,9 +416,10 @@ describe('Tactics tabs and match instructions', () => {
     });
 
     it('orders, duplicates and deletes rules', async () => {
-      await openInstructionsAndAdd('chase');
+      await openInstructionsAndAdd();
+      fillChase();
       click('add-instruction');
-      click('template-ten-men');
+      fillTenMen();
       click('up-2');
 
       expect(summary(1)).toContain('sent off');
@@ -406,7 +442,8 @@ describe('Tactics tabs and match instructions', () => {
     });
 
     it('turns a rule off without losing it', async () => {
-      await openInstructionsAndAdd('chase');
+      await openInstructionsAndAdd();
+      fillChase();
 
       byId<HTMLInputElement>('enabled-1').click();
       fixture.detectChanges();
@@ -420,7 +457,6 @@ describe('Tactics tabs and match instructions', () => {
 
       for (let count = 0; count < MAX_MATCH_INSTRUCTIONS; count++) {
         click('add-instruction');
-        click('template-blank');
       }
 
       expect(byId('instruction-count').textContent).toContain('10 of 10');
@@ -432,7 +468,7 @@ describe('Tactics tabs and match instructions', () => {
 
       for (let count = 0; count < 3; count++) {
         click('add-instruction');
-        click('template-chase');
+        fillChase();
       }
 
       expect(byId('substitution-count').textContent).toContain('3 of 5');
@@ -469,7 +505,8 @@ describe('Tactics tabs and match instructions', () => {
     });
 
     it('saves the rules with the plan', async () => {
-      await openInstructionsAndAdd('ten-men');
+      await openInstructionsAndAdd();
+      fillTenMen();
 
       saveButton().click();
       fixture.detectChanges();
@@ -489,7 +526,8 @@ describe('Tactics tabs and match instructions', () => {
   describe('a new shape', () => {
     beforeEach(async () => {
       await create();
-      await openInstructionsAndAdd('planned-change');
+      await openInstructionsAndAdd();
+      fillPlannedChange();
     });
 
     it('draws the eleven in the new formation, each in the slot the fit gave them', () => {

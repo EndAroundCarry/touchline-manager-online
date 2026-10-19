@@ -37,39 +37,14 @@
       type="button"
       [class]="secondaryButtonClass"
       data-testid="add-instruction"
-      aria-controls="instruction-templates"
-      [attr.aria-expanded]="menuOpen()"
       [disabled]="isFull()"
-      (click)="menuOpen.set(!menuOpen())"
+      (click)="add()"
     >
       Add instruction
     </button>
     <span class="ml-3 text-sm text-ink-2" data-testid="instruction-count"
       >{{ rules().length }} of {{ maxRules }}</span
     >
-
-    @if (menuOpen()) {
-      <ul
-        id="instruction-templates"
-        class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
-        role="list"
-        data-testid="template-menu"
-      >
-        @for (template of templates; track template.key) {
-          <li>
-            <button
-              type="button"
-              class="block h-full w-full rounded border border-line-strong bg-panel p-3 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              [attr.data-testid]="'template-' + template.key"
-              (click)="addFrom(template)"
-            >
-              <span class="block text-sm font-semibold text-ink">{{ template.label }}</span>
-              <span class="mt-0.5 block text-xs text-ink-2">{{ template.description }}</span>
-            </button>
-          </li>
-        }
-      </ul>
-    }
   </div>
 
   @for (message of listProblems(); track message) {

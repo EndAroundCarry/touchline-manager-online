@@ -2,7 +2,6 @@ import {
   DEFAULT_BAD_RATING,
   DEFAULT_TIRED_CONDITION,
   EVENT_CODES,
-  INSTRUCTION_TEMPLATES,
   MATCH_SUBSTITUTION_LIMIT,
   MAX_MATCH_INSTRUCTIONS,
   MAX_RULE_SUBSTITUTIONS,
@@ -134,7 +133,7 @@ describe('substitution selectors', () => {
     expect(backToNames).toMatchObject({ offFamily: null, onFamily: null });
   });
 
-  it('adds at most three substitutions to a rule', () => {
+  it('adds at most five substitutions to a rule', () => {
     let rule = blankInstruction();
 
     for (let count = 0; count < MAX_RULE_SUBSTITUTIONS + 2; count++) {
@@ -357,40 +356,25 @@ describe('instructionProblems', () => {
   });
 });
 
-describe('templates', () => {
-  const context = { planFormation: '4-4-2', formations: ['4-4-2', '4-3-3', '3-5-2'] };
+describe('a new instruction', () => {
+  it('is the blank rule: valid, with a name, and doing nothing yet', () => {
+    const rule = blankInstruction();
 
-  it('offers a blank rule last', () => {
-    expect(INSTRUCTION_TEMPLATES.at(-1)?.key).toBe('blank');
-    expect(new Set(INSTRUCTION_TEMPLATES.map((template) => template.key)).size).toBe(
-      INSTRUCTION_TEMPLATES.length,
-    );
+    expect(instructionProblems([rule], LINEUP, BENCH)).toEqual([]);
+    expect(rule.name.length).toBeGreaterThan(0);
+    expect(inertInstructions([rule])).toEqual([1]);
   });
 
-  it('builds a rule the server would accept from each template, every one but the blank doing something', () => {
-    for (const template of INSTRUCTION_TEMPLATES) {
-      const rule = template.build(context);
+  it('reads a protect-the-lead rule as the manager would say it', () => {
+    const rule: MatchInstruction = {
+      ...blankInstruction('Protect a 2-goal lead'),
+      fromMinute: 70,
+      score: 'leading',
+      scoreMargin: 2,
+      changes: { ...blankInstruction().changes, mentalitySteps: -1, timeWasting: 'situational' },
+    };
 
-      expect(instructionProblems([rule], LINEUP, BENCH), template.key).toEqual([]);
-      expect(rule.name.length, template.key).toBeGreaterThan(0);
-
-      if (template.key !== 'blank') {
-        expect(inertInstructions([rule]), template.key).toEqual([]);
-      }
-    }
-  });
-
-  it('moves a planned change to a 4-3-3, or to another preset when the plan is in one already', () => {
-    const planned = INSTRUCTION_TEMPLATES.find((template) => template.key === 'planned-change');
-
-    expect(planned?.build(context).formation).toBe('4-3-3');
-    expect(planned?.build({ ...context, planFormation: '4-3-3' }).formation).toBe('4-4-2');
-  });
-
-  it('reads "protect a 2-goal lead" as the manager would say it', () => {
-    const protect = INSTRUCTION_TEMPLATES.find((template) => template.key === 'protect-lead');
-
-    expect(instructionSummary(protect?.build(context) ?? blankInstruction(), NO_NAMES)).toBe(
+    expect(instructionSummary(rule, NO_NAMES)).toBe(
       "From 70', if leading by 2 or more → one step more defensive, time wasting situational",
     );
   });
