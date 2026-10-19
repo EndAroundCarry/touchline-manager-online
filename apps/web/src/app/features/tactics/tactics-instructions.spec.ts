@@ -530,6 +530,60 @@ describe('Tactics tabs and match instructions', () => {
       fillPlannedChange();
     });
 
+    /** The slot whose dot holds the named player. */
+    function slotOf(name: string): number {
+      const dot = [...byId('shape-pitch').querySelectorAll('button')].find((button) =>
+        button.getAttribute('aria-label')?.includes(name),
+      );
+
+      expect(dot, `a dot for ${name}`).toBeTruthy();
+
+      return Number(dot?.getAttribute('data-testid')?.replace('shape-slot-', ''));
+    }
+
+    /** Swaps two dots the way a keyboard does: select one, then the other. */
+    function swap(first: number, second: number): void {
+      click(`shape-slot-${first}`);
+      click(`shape-slot-${second}`);
+    }
+
+    /** Gives the small pitch a size, since the test page has no layout: 300 by 400 pixels. */
+    function sizePitch(): void {
+      byId('shape-pitch').getBoundingClientRect = () =>
+        ({ left: 0, top: 0, width: 300, height: 400, right: 300, bottom: 400 }) as DOMRect;
+    }
+
+    /** Fires a pointer event at a dot. */
+    function pointer(slot: number, type: string, point: { x: number; y: number }): void {
+      byId(`shape-slot-${slot}`).dispatchEvent(
+        new MouseEvent(type, { bubbles: true, clientX: point.x, clientY: point.y }),
+      );
+      fixture.detectChanges();
+    }
+
+    /** Where a dot's centre is on the 300 by 400 pitch. */
+    function centre(slot: number): { x: number; y: number } {
+      const style = byId(`shape-slot-${slot}`).style;
+
+      return {
+        x: (Number.parseFloat(style.left) / 100) * 300,
+        y: 400 - (Number.parseFloat(style.bottom) / 100) * 400,
+      };
+    }
+
+    /** Drags one dot onto another with the pointer, or to a point of its own. */
+    function drag(from: number, to: number, ending: { x: number; y: number } | null = null): void {
+      sizePitch();
+
+      const start = centre(from);
+      const end = ending ?? centre(to);
+
+      pointer(from, 'pointerdown', start);
+      pointer(from, 'pointermove', { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 });
+      pointer(from, 'pointermove', end);
+      pointer(from, 'pointerup', end);
+    }
+
     it('draws the eleven in the new formation, each in the slot the fit gave them', () => {
       expect(byId<HTMLSelectElement>('rule-formation').value).toBe('4-3-3');
 
@@ -544,52 +598,103 @@ describe('Tactics tabs and match instructions', () => {
       expect(byId<HTMLButtonElement>('shape-slot-1').disabled).toBe(true);
     });
 
-    it('places a player in the slot the manager picks, marks it, and resets to the best fit', () => {
+    it('lists no player names under the pitch, because the dots are the way to move players', () => {
+      click('shape-slot-10');
+
+      expect(element.querySelectorAll('[data-testid^="place-"]')).toHaveLength(0);
+      expect(element.textContent).not.toContain('Choose who stands there');
+    });
+
+    it('always says a player can be substituted out of position with the Add substitution button', () => {
+      expect(byId('out-of-position-note').textContent).toContain('Add substitution');
+
+      swap(10, 3);
+
+      expect(byId('out-of-position-note').textContent).toContain('Add substitution');
+    });
+
+    it('swaps two players when a dot is selected and then another, marks the placement, and resets to the best fit', () => {
       click('shape-slot-10');
 
       expect(byId('shape-slot-10').getAttribute('aria-pressed')).toBe('true');
       expect(element.textContent).toContain('Slot 10 is selected');
 
-      click('place-s3');
+      click('shape-slot-3');
 
       expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 3');
       expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('placed by you');
+      expect(byId('shape-slot-3').getAttribute('aria-label')).toContain('Starter 10');
+      expect(byId('shape-slot-10').getAttribute('aria-pressed')).toBe('false');
       expect(byId('toggle-1').closest('li')?.textContent).toContain('4-3-3');
 
       click('reset-placements');
 
       expect(maybe('reset-placements')).toBeNull();
       expect(byId('shape-slot-10').getAttribute('aria-label')).not.toContain('placed by you');
+      expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 10');
     });
 
-    it('never offers the goalkeeper for a slot, nor lets the goalkeeper slot be picked', () => {
+    it('swaps two players when one dot is dragged onto another', () => {
+      drag(10, 3);
+
+      expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 3');
+      expect(byId('shape-slot-3').getAttribute('aria-label')).toContain('Starter 10');
+      expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('placed by you');
+      expect(byId('shape-slot-10').getAttribute('aria-pressed')).toBe('false');
+      expect(byId('shape-slot-10').style.left).not.toContain('calc');
+    });
+
+    it('moves the dot with the pointer while it is held, and puts it back when the drag is cancelled', () => {
+      sizePitch();
+      pointer(10, 'pointerdown', { x: 100, y: 100 });
+      pointer(10, 'pointermove', { x: 140, y: 130 });
+
+      expect(byId('shape-slot-10').style.left).toContain('+ 40px');
+      expect(byId('shape-slot-10').style.bottom).toContain('- 30px');
+
+      pointer(10, 'pointercancel', { x: 140, y: 130 });
+
+      expect(byId('shape-slot-10').style.left).not.toContain('calc');
+    });
+
+    it('puts a dot back, and changes nothing, when it is let go away from every other dot', () => {
+      drag(10, 3, { x: 1, y: 1 });
+
+      expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 10');
+      expect(maybe('reset-placements')).toBeNull();
+    });
+
+    it('does not select a dot that was only dragged, nor move the goalkeeper', () => {
+      drag(10, 1);
+
+      expect(byId('shape-slot-10').getAttribute('aria-pressed')).toBe('false');
+      expect(byId('shape-slot-1').getAttribute('aria-label')).toContain('Starter 1');
+      expect(maybe('reset-placements')).toBeNull();
+    });
+
+    it('never lets the goalkeeper slot be picked', () => {
       click('shape-slot-10');
-
-      expect(maybe('place-s1')).toBeNull();
-      expect(maybe('place-s2')).toBeTruthy();
-
       click('shape-slot-1');
 
       expect(byId('shape-slot-10').getAttribute('aria-pressed')).toBe('true');
     });
 
-    it('sends the placement with the rule', () => {
-      click('shape-slot-10');
-      click('place-s3');
+    it('sends the placements with the rule', () => {
+      swap(10, 3);
 
       saveButton().click();
 
       const request = api.update.mock.calls[0][1] as SaveTacticalPlanRequest;
+      const overrides = request.matchInstructions?.[0].overrides;
 
       expect(request.matchInstructions?.[0].formation).toBe('4-3-3');
-      expect(request.matchInstructions?.[0].overrides).toEqual([
-        { playerId: 's3', slotNumber: 10 },
-      ]);
+      expect(overrides).toHaveLength(2);
+      expect(overrides).toContainEqual({ playerId: 's3', slotNumber: 10 });
+      expect(overrides).toContainEqual({ playerId: 's10', slotNumber: 3 });
     });
 
     it('drops the shape and its placements when the rule goes back to keeping the shape', () => {
-      click('shape-slot-10');
-      click('place-s3');
+      swap(10, 3);
       choose('rule-formation', '');
 
       expect(maybe('shape-pitch')).toBeNull();
@@ -597,29 +702,26 @@ describe('Tactics tabs and match instructions', () => {
     });
 
     it('keeps a placement when the rule moves to another formation that still has the slot', () => {
-      click('shape-slot-10');
-      click('place-s3');
+      swap(10, 3);
       choose('rule-formation', '4-4-2');
 
       expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 3');
     });
 
     it('marks a player placed in a slot he is not at home in', () => {
-      click('shape-slot-10');
-      click('place-s2');
+      swap(10, 2);
 
       expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('out of position');
       expect(maybe('misfit-legend')).toBeTruthy();
 
-      click('place-s11');
+      swap(10, 2);
 
       expect(byId('shape-slot-10').getAttribute('aria-label')).not.toContain('out of position');
       expect(maybe('misfit-legend')).toBeNull();
     });
 
     it('fits every outfield player naturally on request, keeping a placement the manager made', () => {
-      click('shape-slot-10');
-      click('place-s3');
+      swap(10, 3);
       click('natural-fit');
 
       expect(byId('shape-slot-10').getAttribute('aria-label')).toContain('Starter 3');
@@ -640,21 +742,15 @@ describe('Tactics tabs and match instructions', () => {
         choose('sub-on-player', 'b2');
       });
 
-      it('puts the substitute in the shape in the seat of the man he replaces, and offers him for a slot', () => {
+      it('puts the substitute in the shape in the seat of the man he replaces', () => {
         const pitchText = byId('shape-pitch').textContent;
 
         expect(pitchText).toContain('FFW');
         expect(pitchText).not.toContain('STA10');
-
-        click('shape-slot-9');
-
-        expect(maybe('place-b2')).toBeTruthy();
-        expect(maybe('place-s10')).toBeNull();
       });
 
       it('places him where the manager says and sends it, with no problem raised', () => {
-        click('shape-slot-9');
-        click('place-b2');
+        swap(9, slotOf('Fresh Forward'));
 
         expect(byId('shape-slot-9').getAttribute('aria-label')).toContain('Fresh Forward');
         expect(byId('shape-slot-9').getAttribute('aria-label')).toContain('placed by you');
@@ -664,18 +760,17 @@ describe('Tactics tabs and match instructions', () => {
 
         expect(
           (api.update.mock.calls[0][1] as SaveTacticalPlanRequest).matchInstructions?.[0].overrides,
-        ).toEqual([{ playerId: 'b2', slotNumber: 9 }]);
+        ).toContainEqual({ playerId: 'b2', slotNumber: 9 });
       });
 
       it('drops his placement when the rule stops bringing him on', () => {
-        click('shape-slot-9');
-        click('place-b2');
+        swap(9, slotOf('Fresh Forward'));
         choose('sub-on-player', '');
 
         expect(element.querySelector('[role="alert"]')?.textContent ?? '').not.toContain(
           'cannot be placed',
         );
-        expect(maybe('reset-placements')).toBeNull();
+        expect(byId('shape-pitch').textContent).not.toContain('FFW');
       });
 
       it('says where he cannot be placed when the man to take off is chosen by tiredness', () => {
@@ -687,8 +782,7 @@ describe('Tactics tabs and match instructions', () => {
       });
 
       it('warns when a player is placed whom the rule takes off', () => {
-        click('shape-slot-9');
-        click('place-s5');
+        swap(9, 5);
         choose('sub-off-player', 's5');
 
         expect(byId('rule-warning').textContent).toContain('takes him off');

@@ -18,8 +18,6 @@ import {
   hasUnplaceableIncoming,
   inertInstructions,
   instructionProblems,
-  leavingPlayerIds,
-  namedSwaps,
   placedButLeaving,
   plannedSubstitutions,
   withAddedSubstitution,
@@ -110,6 +108,25 @@ interface ShapeSlotView {
   readonly isKeeper: boolean;
 }
 
+/** A dot being dragged across the small pitch. */
+interface ShapeDrag {
+  readonly slotNumber: number;
+  readonly dx: number;
+  readonly dy: number;
+
+  /** Whether the pointer has moved far enough to count as a drag rather than a click. */
+  readonly isActive: boolean;
+
+  /** The slot the dot would swap places with if let go now, or 0. */
+  readonly overSlot: number;
+}
+
+/** How far the pointer must move, in pixels, before a press on a dot becomes a drag. */
+const DRAG_THRESHOLD = 6;
+
+/** How close, in pixels, a dot must be let go to another dot's centre to swap with it. */
+const DROP_RADIUS = 30;
+
 /**
  * The Match instructions tab of the tactics screen (`MAT-6`).
  *
@@ -118,7 +135,7 @@ interface ShapeSlotView {
  * listed. The tab edits the same plan draft as the Match tactics tab, through the same store, so the plan saves as one.
  *
  * A new shape is fitted automatically from the plan's starting eleven (`shape-fit.ts`, the same algorithm the server and the engine
- * run), and the manager moves a player by selecting a slot and picking who stands there, as on the main board. The rule's substitutions
+ * run), and the manager moves a player by dragging his dot onto another (the two swap places), or by selecting one dot and then another. The rule's substitutions
  * are made first, so a substitute it brings on by name is placed like a starter, and a slot a player is not at home in is marked.
  */
 @Component({
@@ -141,6 +158,15 @@ export class MatchInstructions {
 
   /** The slot of the open instruction's new shape that is selected, or 0. */
   protected readonly selectedSlot = signal(0);
+
+  /** The dot being dragged on the small pitch: its slot, how far it has moved in pixels, and the slot it would swap with. */
+  protected readonly drag = signal<ShapeDrag | null>(null);
+
+  /** Where the pointer went down, for measuring how far a drag has gone. */
+  private dragOrigin: { readonly x: number; readonly y: number } | null = null;
+
+  /** Whether the click that follows a drag must be ignored, so letting go of a dot does not also select it. */
+  private dragEndedOnDot = false;
 
   protected readonly scoreOptions = SCORE_OPTIONS;
   protected readonly eventOptions = EVENT_OPTIONS;
@@ -264,29 +290,6 @@ export class MatchInstructions {
 
       return player === undefined ? [] : [player];
     });
-  });
-
-  /**
-   * The players the open instruction's new shape can place: its starters, and the substitutes it brings on by name in the seat of a man
-   * it also names. A man it takes off by name is left out, because he is not on the pitch to be placed.
-   */
-  protected readonly placeable = computed<readonly SelectablePlayer[]>(() => {
-    const index = this.openIndex();
-    const rule = index === null ? undefined : this.rules()[index];
-
-    if (rule === undefined) {
-      return this.starters();
-    }
-
-    const byId = new Map(this.store.selectablePlayers().map((player) => [player.id, player]));
-    const leaving = leavingPlayerIds(rule);
-    const coming = namedSwaps(rule, this.lineupIds(), this.benchIds()).flatMap((swap) => {
-      const player = byId.get(swap.onPlayerId);
-
-      return player === undefined ? [] : [player];
-    });
-
-    return [...this.starters().filter((player) => !leaving.has(player.id)), ...coming];
   });
 
   /** The formation presets a rule can move to. */
@@ -683,26 +686,167 @@ export class MatchInstructions {
     return withStale(choices, substitution.onPlayerId, this.names(), 'not on the bench');
   }
 
-  /** Selects a slot of the new shape, or clears the selection when it is the selected one. The goalkeeper's slot is fixed. */
+  /**
+   * Selects a slot of the new shape, or clears the selection when it is the selected one. With one slot already selected, choosing another
+   * swaps the two players, which is the keyboard's way of doing what a drag does. The goalkeeper's slot is fixed.
+   */
   protected selectShapeSlot(slotNumber: number): void {
+    if (this.dragEndedOnDot) {
+      this.dragEndedOnDot = false;
+
+      return;
+    }
+
     if (slotNumber === KEEPER_SLOT) {
       return;
     }
 
-    this.selectedSlot.update((current) => (current === slotNumber ? 0 : slotNumber));
-  }
+    const current = this.selectedSlot();
 
-  /** Puts a starter in the selected slot of the open instruction's new shape. */
-  protected placeInSelected(player: SelectablePlayer): void {
-    const index = this.openIndex();
-    const slot = this.selectedSlot();
-    const rule = index === null ? undefined : this.rules()[index];
+    if (current === 0 || current === slotNumber) {
+      this.selectedSlot.set(current === slotNumber ? 0 : slotNumber);
 
-    if (index === null || rule === undefined || slot === 0) {
       return;
     }
 
-    this.update(index, withPlacement(rule, player.id, slot));
+    this.swapSlots(current, slotNumber);
+    this.selectedSlot.set(0);
+  }
+
+  /** Stands the player of one slot of the open instruction's new shape in another, and the other's player in his. */
+  protected swapSlots(from: number, to: number): void {
+    const index = this.openIndex();
+    const rule = index === null ? undefined : this.rules()[index];
+    const slots = this.shape();
+    const mover = slots?.find((slot) => slot.slotNumber === from)?.player;
+    const other = slots?.find((slot) => slot.slotNumber === to)?.player;
+
+    if (
+      index === null ||
+      rule === undefined ||
+      mover === null ||
+      mover === undefined ||
+      from === to ||
+      from === KEEPER_SLOT ||
+      to === KEEPER_SLOT
+    ) {
+      return;
+    }
+
+    const moved = withPlacement(rule, mover.id, to);
+
+    this.update(
+      index,
+      other === null || other === undefined ? moved : withPlacement(moved, other.id, from),
+    );
+  }
+
+  /** Starts a press on a dot. It becomes a drag once the pointer has moved a little; until then it is a click. */
+  protected startDrag(slot: ShapeSlotView, event: PointerEvent): void {
+    this.dragEndedOnDot = false;
+
+    if (slot.isKeeper || slot.player === null || event.button > 0) {
+      return;
+    }
+
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+    this.dragOrigin = { x: event.clientX, y: event.clientY };
+    this.drag.set({ slotNumber: slot.slotNumber, dx: 0, dy: 0, isActive: false, overSlot: 0 });
+  }
+
+  /** Follows the pointer while a dot is held, and lights the dot it would swap with. */
+  protected moveDrag(event: PointerEvent): void {
+    const current = this.drag();
+    const origin = this.dragOrigin;
+
+    if (current === null || origin === null) {
+      return;
+    }
+
+    const dx = event.clientX - origin.x;
+    const dy = event.clientY - origin.y;
+
+    if (!current.isActive && Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+      return;
+    }
+
+    this.drag.set({ ...current, dx, dy, isActive: true, overSlot: this.slotUnder(event) });
+  }
+
+  /** Lets go of a dot: over the dot it was lit on the two swap places, anywhere else the dot goes back. */
+  protected endDrag(): void {
+    const current = this.drag();
+    const target = current?.isActive ? current.overSlot : 0;
+
+    this.drag.set(null);
+    this.dragOrigin = null;
+
+    if (current === null || !current.isActive) {
+      return;
+    }
+
+    this.dragEndedOnDot = true;
+
+    if (target !== 0) {
+      this.swapSlots(current.slotNumber, target);
+      this.selectedSlot.set(0);
+    }
+  }
+
+  /** Gives up a drag the browser took over, such as a touch that became a scroll. */
+  protected cancelDrag(): void {
+    this.drag.set(null);
+    this.dragOrigin = null;
+  }
+
+  /** The slot whose dot is nearest the pointer, within reach, other than the one held and the goalkeeper's; 0 when none. */
+  private slotUnder(event: PointerEvent): number {
+    const held = this.drag()?.slotNumber ?? 0;
+    const pitch = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
+
+    if (pitch === undefined || pitch.width === 0 || pitch.height === 0) {
+      return 0;
+    }
+
+    const x = event.clientX - pitch.left;
+    const y = event.clientY - pitch.top;
+    let best = 0;
+    let bestDistance = DROP_RADIUS;
+
+    for (const slot of this.shape() ?? []) {
+      if (slot.slotNumber === held || slot.isKeeper) {
+        continue;
+      }
+
+      const centreX = (Number.parseFloat(slot.style['left']) / 100) * pitch.width;
+      const centreY = pitch.height - (Number.parseFloat(slot.style['bottom']) / 100) * pitch.height;
+      const distance = Math.hypot(x - centreX, y - centreY);
+
+      if (distance < bestDistance) {
+        best = slot.slotNumber;
+        bestDistance = distance;
+      }
+    }
+
+    return best;
+  }
+
+  /** The left edge of a dot, moved by the drag when it is the one held. */
+  protected slotLeft(slot: ShapeSlotView): string {
+    const held = this.drag();
+
+    return held?.isActive && held.slotNumber === slot.slotNumber
+      ? `calc(${slot.style['left']} + ${held.dx}px)`
+      : slot.style['left'];
+  }
+
+  /** The bottom edge of a dot, moved by the drag when it is the one held. */
+  protected slotBottom(slot: ShapeSlotView): string {
+    const held = this.drag();
+
+    return held?.isActive && held.slotNumber === slot.slotNumber
+      ? `calc(${slot.style['bottom']} - ${held.dy}px)`
+      : slot.style['bottom'];
   }
 
   /**
@@ -734,17 +878,21 @@ export class MatchInstructions {
     this.update(view.index, withoutPlacements(view.rule));
   }
 
-  /** What picking a starter does to the selected slot, as the button's accessible name. */
-  protected placeLabel(player: SelectablePlayer): string {
-    return `Stand ${player.fullName} in slot ${this.selectedSlot()}`;
-  }
-
   /** The classes of a slot marker on the small pitch. */
   protected shapeSlotClasses(slot: ShapeSlotView): string {
     const base =
       'absolute -translate-x-1/2 translate-y-1/2 flex h-11 w-11 flex-col items-center justify-center rounded-full border-2 ' +
       'text-center text-[10px] font-semibold leading-tight shadow focus-visible:outline focus-visible:outline-2 ' +
-      'focus-visible:outline-offset-2 focus-visible:outline-accent';
+      'focus-visible:outline-offset-2 focus-visible:outline-accent touch-none';
+    const held = this.drag();
+
+    if (held?.isActive && held.slotNumber === slot.slotNumber) {
+      return `${base} z-20 cursor-grabbing border-accent bg-panel text-ink opacity-90 shadow-lg ring-2 ring-accent`;
+    }
+
+    if (held?.isActive && held.overSlot === slot.slotNumber) {
+      return `${base} border-accent bg-panel text-ink ring-2 ring-accent`;
+    }
 
     if (slot.isSelected) {
       return `${base} border-accent bg-panel text-ink ring-2 ring-accent`;

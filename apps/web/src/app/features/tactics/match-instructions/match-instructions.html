@@ -366,10 +366,11 @@
                     </p>
                   } @else if (shape(); as slots) {
                     <p class="mt-2 text-sm text-ink-2">
-                      Your eleven fitted into {{ view.rule.formation }}. Select a slot to choose who
-                      stands there; the rest are fitted around your choice. A substitute this
-                      instruction brings on by name takes the place of the player he replaces. A
-                      player who has been sent off or substituted is replaced in the fit on the day.
+                      Your eleven fitted into {{ view.rule.formation }}. Drag a player's dot onto
+                      another to swap their places, or select one dot and then the other; the rest
+                      are fitted around your choice. A substitute this instruction brings on by name
+                      takes the place of the player he replaces. A player who has been sent off or
+                      substituted is replaced in the fit on the day.
                     </p>
                     @if (view.hasUnplaceableIncoming) {
                       <p class="mt-1 text-xs text-ink-2" data-testid="incoming-note">
@@ -397,13 +398,17 @@
                           <button
                             type="button"
                             [class]="shapeSlotClasses(slot)"
-                            [style.left]="slot.style['left']"
-                            [style.bottom]="slot.style['bottom']"
+                            [style.left]="slotLeft(slot)"
+                            [style.bottom]="slotBottom(slot)"
                             [disabled]="slot.isKeeper"
                             [attr.aria-pressed]="slot.isSelected"
                             [attr.aria-label]="slot.label"
                             [attr.data-testid]="'shape-slot-' + slot.slotNumber"
                             (click)="selectShapeSlot(slot.slotNumber)"
+                            (pointerdown)="startDrag(slot, $event)"
+                            (pointermove)="moveDrag($event)"
+                            (pointerup)="endDrag()"
+                            (pointercancel)="cancelDrag()"
                           >
                             @if (slot.player; as player) {
                               <span class="max-w-full truncate px-0.5" aria-hidden="true">{{
@@ -436,35 +441,10 @@
                     }
 
                     @if (selectedShapeSlot(); as picked) {
-                      <div
-                        class="mt-3"
-                        role="group"
-                        [attr.aria-label]="'Who stands in slot ' + picked.slotNumber"
-                      >
-                        <p class="text-sm text-ink-2" role="status">
-                          Slot {{ picked.slotNumber }} is selected. Choose who stands there:
-                        </p>
-                        <ul class="mt-2 flex flex-wrap gap-2" role="list">
-                          @for (player of placeable(); track player.id) {
-                            @if (player.positionFamily !== 'goalkeeper') {
-                              <li>
-                                <button
-                                  type="button"
-                                  [class]="secondaryButtonClass"
-                                  class="!px-3 !text-xs"
-                                  [class.border-accent]="picked.player?.id === player.id"
-                                  [attr.aria-pressed]="picked.player?.id === player.id"
-                                  [attr.aria-label]="placeLabel(player)"
-                                  [attr.data-testid]="'place-' + player.id"
-                                  (click)="placeInSelected(player)"
-                                >
-                                  {{ player.fullName }}
-                                </button>
-                              </li>
-                            }
-                          }
-                        </ul>
-                      </div>
+                      <p class="mt-2 text-sm text-ink-2" role="status">
+                        Slot {{ picked.slotNumber }} is selected. Select another dot to swap the two
+                        players.
+                      </p>
                     }
 
                     <div class="mt-2 flex flex-wrap gap-3">
@@ -488,6 +468,12 @@
                       }
                     </div>
                   }
+
+                  <p class="mt-3 text-xs text-ink-2" data-testid="out-of-position-note">
+                    A player can be substituted into a position he does not usually play: use the
+                    Add substitution button below to bring on any substitute for any player,
+                    wherever the new shape needs him.
+                  </p>
                 }
 
                 <h4 class="mt-4 text-sm font-medium text-ink-2">Team instructions</h4>
