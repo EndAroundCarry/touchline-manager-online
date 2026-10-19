@@ -210,7 +210,7 @@ if (mode is "tickmatrix")
 
 if (mode is "tickroles")
 {
-    // tickroles <matches a cell> <seed> [442v433|442v442|343v4231]   (what each kind of slot does, per player per match; .run-logs/roles-*.tsv)
+    // tickroles <matches a cell> <seed> [442v433|442v442|343v4231|352v442|352v433]   (what each kind of slot does, per player per match; .run-logs/roles-*.tsv)
     TickRoleProbe.Run(
         Math.Min(count, 600),
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var rolesSeed) ? rolesSeed : 7_000UL,

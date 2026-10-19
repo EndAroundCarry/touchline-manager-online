@@ -42,13 +42,15 @@ internal static class TickRoleProbe
         ("442v433", FormationPreset.FourFourTwo, "4-4-2", FormationPreset.FourThreeThree, "4-3-3"),
         ("442v442", FormationPreset.FourFourTwo, "4-4-2", FormationPreset.FourFourTwo, "4-4-2"),
         ("343v4231", FormationPreset.ThreeFourThree, "3-4-3", FormationPreset.FourTwoThreeOne, "4-2-3-1"),
+        ("352v442", FormationPreset.ThreeFiveTwo, "3-5-2", FormationPreset.FourFourTwo, "4-4-2"),
+        ("352v433", FormationPreset.ThreeFiveTwo, "3-5-2", FormationPreset.FourThreeThree, "4-3-3"),
     ];
 
     /// <summary>Runs the probe.</summary>
     /// <param name="matches">How many matches a cell.</param>
     /// <param name="seed">The base seed.</param>
     /// <param name="rules">The rules in force.</param>
-    /// <param name="only">The cell to play (442v433, 442v442, 343v4231), or empty for all three.</param>
+    /// <param name="only">The cell to play (442v433, 442v442, 343v4231, 352v442, 352v433), or empty for all five.</param>
     public static void Run(int matches, ulong seed, EngineRulesV2 rules, string only)
     {
         Directory.CreateDirectory(".run-logs");
