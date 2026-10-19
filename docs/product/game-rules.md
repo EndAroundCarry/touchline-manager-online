@@ -202,7 +202,7 @@ season it opens are distinct rows, so a finished season's membership, results, a
 
 AI clubs keep choosing from `TAC-1`…`TAC-6`; the later presets are for human managers.
 
-The wide slots of `TAC-1` 4-4-2, `TAC-4` 4-1-4-1, `TAC-11` 4-4-1-1 and `TAC-12` 4-5-1, and the outer midfield slots of `TAC-17` 5-4-1, ask for the **wide midfielder** role (positions RM and LM). `TAC-5` 3-5-2, `TAC-15` 3-4-3 and `TAC-16` 3-4-2-1 keep their wing-backs, and `TAC-2` 4-3-3 and `TAC-3` 4-2-3-1 keep their wingers. A winger, a full-back or a wing-back in a wide-midfielder slot, and a left or right midfielder in a wing-back slot, are at home (no out-of-position warning).
+The wide slots of `TAC-1` 4-4-2, `TAC-4` 4-1-4-1, `TAC-11` 4-4-1-1 and `TAC-12` 4-5-1, and the outer midfield slots of `TAC-17` 5-4-1, ask for the **wide midfielder** role (positions RM and LM). `TAC-5` 3-5-2, `TAC-15` 3-4-3 and `TAC-16` 3-4-2-1 keep their wing-backs, and `TAC-2` 4-3-3 and `TAC-3` 4-2-3-1 keep their wingers. Out of possession, a side with wing-backs (`TAC-5`, `TAC-6` 5-3-2, `TAC-15`, `TAC-16`, `TAC-17`) slides across when the ball is on a flank in its middle third: the wing-back on the ball's side goes out to the opponent's widest man and the one on the far side tucks in toward the middle. In a 3-4-3 the wide forwards also help defend: they screen passing lanes and track the opposing flank man, so the shape defends as a 5-4-1. A winger, a full-back or a wing-back in a wide-midfielder slot, and a left or right midfielder in a wing-back slot, are at home (no out-of-position warning).
 
 | Ref | Rule |
 |---|---|

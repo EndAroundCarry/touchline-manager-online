@@ -262,6 +262,9 @@ internal static class TickDefensiveAI
     /// <summary>How far in from the ball the second presser of a trap stands, in pitch units (3 m).</summary>
     public const int TrapInset = 300;
 
+    /// <summary>How far the far wing-back tucks in toward the middle while the ball is on the other flank, in pitch units (15 m): the back three slides across and becomes a back four with a wing-back stepping out (`back-threes`, Milestone 4).</summary>
+    public const int WingBackTuckIn = 1_500;
+
     private const int HysteresisPercent = 85;
 
     /// <summary>The ticks between one defender stepping to cover a man and the next (1 s).</summary>
@@ -336,6 +339,7 @@ internal static class TickDefensiveAI
         }
 
         AssignTrackers(situation, orders, busy, dealtWith);
+        AssignWingBackStepOut(situation, orders, busy, dealtWith);
         AssignScreens(situation, orders, busy, dealtWith);
         AssignLine(situation, orders);
         AssignAdjustments(situation, orders);
@@ -744,6 +748,102 @@ internal static class TickDefensiveAI
         }
     }
 
+    /// <summary>
+    /// Tells whether the ball is on a flank in the defender's middle third (`back-threes`, Milestone 4), and which: 1 is the high-Y side.
+    /// </summary>
+    private static bool BallOnFlank(in TickDefensiveSituation situation, out int side)
+    {
+        var ownBallX = Own(situation.BallX, situation.IsHome);
+        var off = situation.BallY - SpatialPitch.GoalYCenter;
+
+        side = off >= 0 ? 1 : -1;
+
+        return ownBallX >= DefensiveThird && ownBallX <= MidBlockLimit && Math.Abs(off) >= TickOffBallSupport.WideThreshold;
+    }
+
+    /// <summary>
+    /// The ball-side wing-back of a back three or five steps out to the opponent's widest man on that flank (`back-threes`, Milestone 4), at a
+    /// marker's stand-off.
+    /// </summary>
+    private static void AssignWingBackStepOut(
+        in TickDefensiveSituation situation,
+        Span<TickDefensiveOrder> orders,
+        Span<bool> busy,
+        Span<bool> claimed)
+    {
+        if (!BallOnFlank(situation, out var side))
+        {
+            return;
+        }
+
+        var zone = (long)TickSpatialUnits.ToFixed(TickRoleProfile.TrackZone) * TickSpatialUnits.ToFixed(TickRoleProfile.TrackZone);
+        var goalX = situation.IsHome ? 0 : SpatialPitch.PitchLength;
+
+        for (var defender = 0; defender < situation.Defenders.Length; defender++)
+        {
+            if (busy[defender]
+                || situation.Specs[defender].Role != MatchRole.WingBack
+                || (situation.Anchors[defender].Y >= SpatialPitch.GoalYCenter ? 1 : -1) != side)
+            {
+                continue;
+            }
+
+            var man = -1;
+            var manWidth = 0;
+
+            for (var attacker = 1; attacker < situation.Attackers.Length; attacker++)
+            {
+                if (claimed[attacker] || attacker == situation.CarrierIndex)
+                {
+                    continue;
+                }
+
+                var width = (TickSpatialUnits.ToUnits(situation.Attackers[attacker].Y) - SpatialPitch.GoalYCenter) * side;
+
+                if (width < TickOffBallSupport.WideThreshold
+                    || width <= manWidth
+                    || Own(TickSpatialUnits.ToUnits(situation.Attackers[attacker].X), situation.IsHome) > MidBlockLimit
+                    || DistanceSquared(situation.Defenders[defender], situation.Attackers[attacker]) > zone)
+                {
+                    continue;
+                }
+
+                manWidth = width;
+                man = attacker;
+            }
+
+            if (man < 0)
+            {
+                continue;
+            }
+
+            var standOff = LooseMarkingStandOff - (MarkingStandOffStep * situation.Skills[defender].Marking / TickPlayerSkills.Scale);
+
+            busy[defender] = true;
+            claimed[man] = true;
+            orders[defender] = new TickDefensiveOrder(
+                TickDefensiveRole.Tracker,
+                RunThrough(situation.Attackers[man], goalX, SpatialPitch.GoalYCenter, standOff, fromPlayer: true),
+                MarkerPaceBasisPoints,
+                man);
+        }
+    }
+
+    /// <summary>Gets where a wing-back on the line stands across the pitch: the far one tucks in toward the middle while the ball is on the other flank.</summary>
+    private static int LineY(in TickDefensiveSituation situation, int index)
+    {
+        var y = situation.Anchors[index].Y;
+
+        if (situation.Specs[index].Role != MatchRole.WingBack || !BallOnFlank(situation, out var side))
+        {
+            return y;
+        }
+
+        var mine = y >= SpatialPitch.GoalYCenter ? 1 : -1;
+
+        return mine == side ? y : y - (mine * Math.Min(WingBackTuckIn, Math.Abs(y - SpatialPitch.GoalYCenter)));
+    }
+
     private static void AssignLine(in TickDefensiveSituation situation, Span<TickDefensiveOrder> orders)
     {
         var members = 0;
@@ -798,7 +898,7 @@ internal static class TickDefensiveAI
             {
                 orders[index] = new TickDefensiveOrder(
                     TickDefensiveRole.Line,
-                    new SpatialPoint(lineX, situation.Anchors[index].Y),
+                    new SpatialPoint(lineX, LineY(situation, index)),
                     0,
                     -1);
             }

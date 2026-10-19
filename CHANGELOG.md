@@ -4,6 +4,17 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Back threes plan, Milestone 5 - verification and docs
+
+- Full eight-shape grid (64 pairings, 300 matches each, seed 7000): strengths 4-2-3-1 +0.17, 4-1-4-1 +0.05, 4-4-2 +0.02, 4-5-1 +0.02, 5-4-1 +0.01, 4-3-3 -0.01, 3-5-2 -0.13, 3-4-3 -0.13 (were -0.18 and -0.26); 4-3-3 takes 0.14 from 3-5-2 and 0.23 from 3-4-3. `tick 500` goals 2.90, completion 82.9%. The -0.10 target is not met.
+- Docs: match-engine section 14.42 (what was tried, the rules, the grid, what is offered) with a row in 14.4 and a note in 14.38; `game-rules.md` formation notes; ADR-0075.
+
+## Back threes plan, Milestone 4 - the near wing-back steps out, the far one tucks in
+
+- Engine: with the ball on a flank (at least 18 m off the middle) in the defender's middle third, the ball-side wing-back of a back three or five goes out to the opponent's widest free man on that flank, within 25 m, at a marker's stand-off and pace (`TickDefensiveAI.AssignWingBackStepOut`, a `Tracker` order), and the far wing-back tucks in 15 m toward the middle on the line (`WingBackTuckIn`, `LineY`), so the back three slides across into a back four with a wing-back pressing. Both keep to the shared line height. Keyed to the `WingBack` role: matches between back-four shapes are bit-identical and the tick golden hash did not move; `engine-v12` is not bumped.
+- Measured (300 matches a cell, seed 7000, against the six other shapes): the 3-5-2's strength -0.23 to -0.14 points a match (shots conceded 32.4 to 31.9), the 3-4-3's -0.29 to -0.21 (37.1 to 36.1); the gain is goals scored, not fewer shots against. The weaker side's 5-4-1 default reads 0.92 (was 0.98); the all-out attack is unchanged. The target of -0.10 is not yet met for either shape.
+- Tried before and not kept: the line set by the centre-backs alone (M1), a wing-back flank run and a lower cross line (M3).
+
 ## Back threes plan, Milestone 2 - the 3-4-3's wide forwards help defend
 
 - Engine: in a side that plays wing-backs, a winger now screens passing lanes and tracks the opposing flank man like a wide midfielder (`TickRoleProfile.HasWingBacks`, `Screens`, `Tracks`), so a 3-4-3 defends as a 5-4-1 with its wide forwards in the four instead of a 5-2-3. Wingers in back-four formations are untouched, so matches between back-four shapes are bit-identical. `engine-v12` is not bumped and the tick golden hash did not move.

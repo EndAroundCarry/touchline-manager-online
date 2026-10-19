@@ -1394,6 +1394,7 @@ for version 12; changing one moves the golden hash in `TickEngineTests`.
 |---|---|---|
 | `TickPlayerSkills.CurvePercent` | 38 | A player's attribute counts 38% of its distance from 13 (60 before the ball flowed, §14.12). |
 | `TickSkillTiredness` breakpoints | (10,000, 0) (9,000, 200) (8,000, 400) (7,000, 700) (6,000, 1,000) (5,000, 1,400) (4,000, 2,000) bp | Share of the sheet value a skill loses by live condition, linear between, flat 2,000 below 40%; Mental takes half, Pace and Acceleration none (§14.41). |
+| `TickDefensiveAI.WingBackTuckIn` | 1,500 (15 m) | How far the far wing-back of a back three or five stands nearer the middle while the ball is on the other flank in the defender's middle third; the near one steps out to the widest man within `TrackZone`, at a marker's stand-off and 80% pace (§14.42). |
 | `TickBallCarrierBrain.ShotMinimumChance` | 1,850 bp | Below this heuristic chance a carrier does not shoot. |
 | `TickBallCarrierBrain.ShotBaseError` | 200 | Base error angle of an open-play shot (a set piece: `SetPieceShotBaseError` 50). |
 | `TickBallCarrierBrain.ErrorSkillWeight`, `MinimumErrorPercent` | 5, 25% | A kick's error is `Base × max(25%, 100 − (5 × skill + Technique) / 2)`. |
@@ -2562,7 +2563,7 @@ With the attackers 19 and the stronger side's defenders 14 (edge +5, the ceiling
 **Without the ball** (`TickDefensiveAI`):
 
 - **Tracking** (`AssignTrackers`, new `TickDefensiveRole.Tracker`, after the back-line markers and before the screens). A wide midfielder takes the most advanced unclaimed opponent who is at least `WideThreshold` off the middle on his anchor side, in his own half and within `TrackZone` = 25 m, and stands `TrackStandOff` = 15 m goal-side of him at `TrackPaceBasisPoints` = 50% of top speed. A closer, faster shadow (6 m, 70%) made 5-4-1 default matches 0.6 goals longer, so the shadow is loose.
-- **Winger stays high.** A winger is never sent to screen a passing lane (`Screens`). The out-of-possession depth drop is the Midfield family's 60% for the wide midfielder and the Attack family's for the winger, unchanged.
+- **Winger stays high.** A winger is never sent to screen a passing lane (`Screens`), unless wing-backs play beside him (a 3-4-3): then he screens lanes and tracks the flank man like a wide midfielder (§14.42). The out-of-possession depth drop is the Midfield family's 60% for the wide midfielder and the Attack family's for the winger, unchanged.
 - **Attack edge** (§14.37) is unchanged: wide midfielders count only when they are among the side's two most advanced midfielders.
 
 **Measured** (`tickroles`, 300 matches a cell, seed 7000; per player per match; the baseline is the pre-feature code, where the 4-4-2 wide men are wingers):
@@ -2778,3 +2779,55 @@ Real stored worlds start lower than the laboratory (outfield starters average 98
 **Method.** `tickcond <matches> <seed> [snap <file>]` (`TickConditionProbe.cs`, output in `.run-logs/cond/`): condition bands, the skill drop each would give, and passes and shots by 15-minute window, per setup and for goalkeepers; `TC_ONLY`, `TC_STARTS`. The guard re-runs used `tickbalance 150 90000 S3 S6` and, for S6b, `TB_HOME=DEF,POS TB_AWAY=COUNTER tickbalance 500 91000 S6b`, once on the code before the curve (a detached worktree) and once after; `tickcond <matches> <seed> s6b` and `s6bsubs` (`TickConditionProbe.cs`) report how tired each side of S6b is and what its substitutions are worth.
 
 **Tests.** `TickSkillTirednessTests` (every breakpoint, mental half, Pace and Acceleration zero, monotone, integer-only, exactly 5.5% and 2.75% at 75%, curve scaling) and six in `TickTeamTests` (a tired seat lower and a fresh seat unchanged, a substitute fresh, `Remove` and `Promote` keeping the pair, `Uncurved()` returning tired sheet values). The legacy and rules golden hashes are unchanged.
+
+### 14.42 Back threes: the wing-backs slide across (the back threes plan, Milestones 0-5)
+
+**Why.** The formation research check (§14.40) found the 3-4-3 and the 3-5-2 the two weakest of eight shapes in the tick engine (-0.26 and -0.18 points a match against an average shape, the others between -0.03 and +0.20) and the two that concede most (38.5 and 32.3 shots a match against 22-27). Real back threes win titles, so four habits were suspected of being missing: the centre-backs set the line and the wing-backs drop into it; the wide forwards of a 3-4-3 screen midfield and the side defends as a 5-4-1; the wing-backs are the width, one at a time; the near wing-back presses while the far one tucks in. The plan's aim was to **join the pack**: each back-three shape at -0.10 or better and about 28 shots conceded a match, with neither above +0.15. The invariant throughout: a match between two back-four shapes is bit-identical, because every change keys off the `WingBack` role.
+
+**What was tried** (seed 7000; the edge is a shape's points minus its opponents' over its 12 pairings against the six other shapes, halved):
+
+| Milestone | Change | 3-5-2 edge | 3-4-3 edge | Verdict |
+|---|---|---|---|---|
+| M0 | the baseline at the head after the tired-skills plan (300 matches) | -0.233 | -0.344 | the figures to beat |
+| M1 | the line set by the centre-backs alone (150 matches) | -0.238 | -0.433 | **worse, dropped.** The wing-backs stand *ahead* of the centre-backs (X 42 m in a 3-5-2 and 3-4-3, 26 m in a 5-3-2 and 5-4-1), so leaving them out makes the line deeper, not higher; the plan's "the line is 9 m too high" was backwards. The 5-4-1 default fell from 0.98 to 0.73 weaker-side points on 150 matches |
+| M2 | a winger beside wing-backs screens lanes and tracks the flank man (`TickRoleProfile.HasWingBacks`, `Screens`, `Tracks`) | unchanged (no winger) | -0.292 | **shipped.** A third step, the midfield's out-of-possession depth for the winger, added nothing and was dropped |
+| M3 | a wing-back flank run to the overlap point, and a 68 m cross line (150 matches) | -0.214 (line alone) to -0.293 (both) | -0.274 to -0.234 | **dropped.** The run's target is the carrier plus 10 m and the carrier is mostly at 45-60 m, so the wing-back ends at about 60 m, short of any cross line; shots conceded rose and wing-back crosses went from 1.15 to 1.26 a match, not the 4 aimed at |
+| M4 | the near wing-back steps out, the far one tucks in | -0.137 | -0.205 | **shipped** |
+
+**The rules in force.**
+- **Winger beside wing-backs** (M2). `HasWingBacks(specs)` is read from the side's anchors each tick, so a mid-match shape change is followed. In such a side a winger is sent to screen lanes (`Screens(role, wingBacks)`) and tracks the most advanced opponent on his flank like a wide midfielder (`Tracks`: `TrackZone` 25 m, `TrackStandOff` 15 m, `TrackPaceBasisPoints` 50%), so a 3-4-3 defends as a 5-4-1 with its wide forwards in the four instead of a 5-2-3. A 4-3-3 winger plays as before.
+- **Step out and tuck in** (M4, `TickDefensiveAI.AssignWingBackStepOut` and `LineY`). While the ball is on a flank (at least `WideThreshold` 18 m off the middle) in the defender's middle third (35 to 70 m from his own goal line), the **ball-side wing-back**, if he is not pressing or marking, goes to the opponent's widest unclaimed man on that flank who is not the carrier, in his own 70 m and within `TrackZone`, and stands at a marker's distance (5.7 m at Marking 1, 2.7 m at Marking 20) at the marker's 80% pace, as a `Tracker` order. The **far wing-back** keeps the line's height but stands `WingBackTuckIn` = 15 m nearer the middle (never past it). A ball down the middle, in the defensive third or in the attacking two-thirds changes nothing. Back fours (full-backs, not wing-backs) are untouched. Every back five (5-3-2, 5-4-1) is covered by the same rule.
+
+**Measured** (300 matches a cell, seed 7000, against the six other shapes, both home and away):
+
+| | 3-5-2 M0 | 3-5-2 now | 3-4-3 M0 | 3-4-3 M2 | 3-4-3 now |
+|---|---|---|---|---|---|
+| Points a match | 1.174 | 1.270 | 1.073 | 1.127 | 1.213 |
+| Edge | -0.233 | **-0.137** | -0.344 | -0.292 | **-0.205** |
+| Goals for / against | 2.02 / 2.46 | 2.16 / 2.41 | 2.19 / 2.97 | 2.27 / 2.89 | 2.38 / 2.79 |
+| Shots for / against | 25.4 / 32.4 | 26.6 / 31.9 | 29.3 / 38.6 | 30.4 / 37.1 | 31.7 / 36.1 |
+| Crosses for | 17.3 | 18.2 | 32.3 | 32.3 | 33.9 |
+
+The gain is goals scored (and a few more shots for), not fewer shots conceded: the shots against barely move. The wing-backs' own play (`tickroles`, 3-5-2 against a 4-4-2): crosses 1.15 to 0.48 a match (0.96 to 0.43 against a 4-3-3), tackles 7.2 to 8.2, own-half share without the ball 94.5% to 93.2%, distance from his own goal with the ball 41.5 m to 42.0 m. A 3-4-3 winger's tackles went from 2.6 to 3.2 with M2.
+
+**The full grid** (M5: all 64 ordered pairings of eight shapes, 300 matches each, 19,200 matches, seed 7000). Strength is the points a shape adds as the stronger of two sides against the average shape (zero-sum, +-0.035):
+
+| Shape | 4-2-3-1 | 4-1-4-1 | 4-4-2 | 4-5-1 | 5-4-1 | 4-3-3 | 3-5-2 | 3-4-3 |
+|---|---|---|---|---|---|---|---|---|
+| Strength | +0.169 | +0.054 | +0.022 | +0.019 | +0.012 | -0.011 | **-0.132** | **-0.132** |
+| Goals for / against | 2.42 / 2.09 | 1.89 / 1.79 | 2.20 / 2.18 | 1.77 / 1.74 | 1.72 / 1.70 | 2.60 / 2.61 | 2.22 / 2.45 | 2.65 / 2.91 |
+| Shots for / against | 32.4 / 26.6 | 25.7 / 23.7 | 26.8 / 28.1 | 23.0 / 23.5 | 23.9 / 23.2 | 33.3 / 32.7 | 27.7 / 32.6 | 35.2 / 37.6 |
+
+Before the plan the 3-4-3 read -0.26 and the 3-5-2 -0.18 in the shape study's grid (§14.40), so the two back threes moved to -0.13 each: still the two weakest, but no longer far from the pack. The shape cycle survives: 4-4-2 takes 0.10 from 4-3-3, 4-3-3 takes 0.14 from 3-5-2 and **0.23 from 3-4-3**, and 3-5-2 takes 0.12 from 4-4-2; 3-4-3 takes 0.21 from 3-5-2. Neither back three is above +0.15 and the 4-2-3-1 stays under +0.20. The target (-0.10 and about 28 shots conceded) is **not met**: -0.13 on the grid (-0.14 and -0.21 against the six, the 3-4-3 carrying its two heavy matchups), 32.6 and 37.6 shots conceded.
+
+**Guards.** Matches between back-four shapes are bit-identical to the baseline (4-4-2 v 4-3-3 and 4-2-3-1 v 4-4-2, 60 matches); the tick golden hash did not move. The weaker side's 5-4-1 default (16 against 18-19, 150 matches, `tickwhy`) reads 0.92 points, from 0.98 (the guard is 0.10); the all-out attack is unchanged at 0.32 with 4.17 goals for the stronger side (guard 4.5). `tick 500`: goals 2.90 (2.89 at the baseline; band 2.60-2.90), shots on target 29.8%, completion 82.9%, yellow cards 2.32, home win and draw 49.6/24.6 (48.6/23.6 at the baseline; band 42-48 / 22-26), with the same shots and cards misses as the tool's older bands. The Calibration and Distribution tests pass.
+
+**Not done, offered.**
+- The step-out and the tuck-in were screened together at one distance (15 m); neither was tried alone or at a second distance, so which carries the gain is not known.
+- A wing-back run aimed at a fixed X in the attacking third (not the carrier plus 10 m) was not tried; M3's version could not reach a cross line.
+- Raising, not lowering, the back five's line (M1 showed the line follows the wing-backs' height) was not tried.
+- Shots conceded, still 32 and 36 a match, are the larger part of the gap; the goals the back threes score are now near the pack's.
+
+**Method.** `tickshape <matches> <seed> <cells>` with `TS_SHAPES=442,433,4231,352,541,343,451,4141` and `matrix` (`TickShapeStudy.cs`, unchanged); `tickroles 300 7000 352v442|352v433|343v4231` (the 3-5-2 cells added to `TickRoleProbe.cs`); `tickwhy 150 7000 16` with `TW_ONLY=DEF541,ATT`. Screens were 150 matches a cell, confirmations 300; the temporary knobs were environment variables in a `TickDiag` class, baked and deleted. Runs went in an isolated directory with the committed shape-study output untouched. Screening variants in parallel made each three times slower, so they ran one after another. The grid's 26 back-three cells came from the M4 confirmation (same code); the other 38 were played in M5.
+
+**Tests.** `TickRoleProfileTests` (a winger screens and tracks only beside wing-backs; `HasWingBacks`), `TickDefensiveAITests` (a 3-4-3 winger takes a track and a 4-3-3 winger does not; the near wing-back steps out to the widest man and the far one tucks in 15 m; a ball in the defensive third or down the middle changes nothing; a back four is untouched). No version was bumped: `engine-v12` and the rules hashes are as they were, and the tick golden hash did not move.

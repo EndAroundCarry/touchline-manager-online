@@ -159,6 +159,43 @@ public sealed class TickDefensiveAITests
         Roles(withWingBacks.Assign(), TickDefensiveRole.Screen).Should().NotBeEmpty();
     }
 
+    [Fact]
+    public void With_the_ball_on_a_flank_the_near_wing_back_steps_out_to_the_widest_man_and_the_far_one_tucks_in()
+    {
+        var scene = BackFiveScene(ballY: 800);
+        var orders = scene.Assign();
+
+        orders[1].Role.Should().Be(TickDefensiveRole.Tracker, "the wing-back on the ball's flank goes out to the widest man");
+        orders[1].Opponent.Should().Be(6, "the widest free attacker on that flank");
+        orders[1].Target.X.Should().BeLessThan(scene.Attackers[6].X / TickSpatialUnits.FixedScale, "goal-side of his man, whose goal is at X = 0");
+        orders[4].Role.Should().Be(TickDefensiveRole.Line);
+        orders[4].Target.Y.Should().Be(scene.Anchors[4].Y - TickDefensiveAI.WingBackTuckIn, "the far wing-back slides in toward the middle");
+        orders[2].Target.Y.Should().Be(scene.Anchors[2].Y, "the centre-backs stay where they are");
+    }
+
+    [Theory]
+    [InlineData(800, 1_500, "the ball is in the defensive third: the back line marks")]
+    [InlineData(3_500, 5_000, "the ball is down the middle: nobody steps out or tucks in")]
+    public void The_wing_backs_hold_the_line_when_the_ball_is_not_on_a_flank_in_the_middle_third(int ballY, int ballX, string reason)
+    {
+        var scene = BackFiveScene(ballY, ballX);
+        var orders = scene.Assign();
+
+        orders[1].Opponent.Should().NotBe(6, reason);
+        orders[4].Target.Y.Should().Be(orders[4].Role == TickDefensiveRole.Line ? scene.Anchors[4].Y : orders[4].Target.Y, reason);
+    }
+
+    [Fact]
+    public void A_back_four_does_not_step_out_or_tuck_in_with_the_ball_on_a_flank()
+    {
+        var scene = BackFiveScene(ballY: 800).WithRole(1, MatchRole.FullBack).WithRole(4, MatchRole.FullBack);
+        var orders = scene.Assign();
+
+        orders[1].Role.Should().NotBe(TickDefensiveRole.Tracker);
+        orders[4].Role.Should().Be(TickDefensiveRole.Line);
+        orders[4].Target.Y.Should().Be(scene.Anchors[4].Y);
+    }
+
     [Theory]
     [InlineData(MatchPressing.LowBlock)]
     [InlineData(MatchPressing.MidBlock)]
@@ -846,6 +883,21 @@ public sealed class TickDefensiveAITests
         attackers[10] = new SpatialPoint(8_300, 4_200);
 
         return attackers;
+    }
+
+    /// <summary>The 4-4-2 scene as a back five: wing-backs in seats 1 and 4, plain midfielders, and the ball at 50 m down one flank with a free wide man near it.</summary>
+    private static Scene BackFiveScene(int ballY, int ballX = 5_000)
+    {
+        var attackers = TrackingScene();
+
+        attackers[9] = new SpatialPoint(ballX, ballY);
+        attackers[6] = new SpatialPoint(3_800, 1_500);
+
+        return new Scene(isHome: true, MatchPressing.MidBlock, ballX, ballY, attackers, carrier: 9)
+            .WithRole(1, MatchRole.WingBack)
+            .WithRole(4, MatchRole.WingBack)
+            .WithRole(5, TickAnchorSpec.PlainRoleOf(MatchPositionFamily.Midfield))
+            .WithRole(8, TickAnchorSpec.PlainRoleOf(MatchPositionFamily.Midfield));
     }
 
     private static IEnumerable<int> Roles(TickDefensiveOrder[] orders, TickDefensiveRole role) =>
