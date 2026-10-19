@@ -3,12 +3,12 @@ using Tactical11Manager.MatchEngine.Model;
 namespace Tactical11Manager.MatchEngine.Tick;
 
 /// <summary>
-/// How far a player's skills fall as his condition does (`tick-engine-v1`, tired skills): none while fresh, a fifth of the sheet value at
-/// 60%, and a floor of 30% for a spent player.
+/// How far a player's skills fall as his condition does (`tick-engine-v1`, tired skills): none while fresh, a tenth of the sheet value at
+/// 60%, and a floor of 20% for a spent player.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The drop is a share of the <em>sheet</em> value, the 1..20 attribute the manager sees, so a 15 at a 20% drop plays like a 12. It
+/// The drop is a share of the <em>sheet</em> value, the 1..20 attribute the manager sees, so a 15 at a 10% drop plays like a 13.5. It
 /// is then passed through the engine's skill curve like any other attribute change (<see cref="TickPlayerSkills.Tired"/>). Taking the
 /// share off the already curved value would be far harsher: a curved 13 would drop below what a sheet-1 player has.
 /// </para>
@@ -31,8 +31,11 @@ internal static class TickSkillTiredness
     [
         (10_000, 0),
         (9_000, 200),
-        (6_000, 2_000),
-        (4_000, 3_000),
+        (8_000, 400),
+        (7_000, 700),
+        (6_000, 1_000),
+        (5_000, 1_400),
+        (4_000, 2_000),
     ];
 
     /// <summary>Gets the share of the sheet value a technical, physical or goalkeeping skill loses at a condition, in basis points.</summary>

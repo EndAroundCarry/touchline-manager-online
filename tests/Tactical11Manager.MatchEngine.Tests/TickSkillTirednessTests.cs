@@ -11,16 +11,16 @@ public sealed class TickSkillTirednessTests
     [InlineData(10_000, 0)]
     [InlineData(9_500, 100)]
     [InlineData(9_000, 200)]
-    [InlineData(8_500, 500)]
-    [InlineData(8_000, 800)]
-    [InlineData(7_500, 1_100)]
-    [InlineData(7_000, 1_400)]
-    [InlineData(6_500, 1_700)]
-    [InlineData(6_000, 2_000)]
-    [InlineData(5_000, 2_500)]
-    [InlineData(4_000, 3_000)]
-    [InlineData(2_000, 3_000)]
-    [InlineData(0, 3_000)]
+    [InlineData(8_500, 300)]
+    [InlineData(8_000, 400)]
+    [InlineData(7_500, 550)]
+    [InlineData(7_000, 700)]
+    [InlineData(6_500, 850)]
+    [InlineData(6_000, 1_000)]
+    [InlineData(5_000, 1_400)]
+    [InlineData(4_000, 2_000)]
+    [InlineData(2_000, 2_000)]
+    [InlineData(0, 2_000)]
     public void The_full_drop_follows_the_breakpoints(int condition, int drop)
     {
         TickSkillTiredness.FullDropBasisPoints(condition).Should().Be(drop);
@@ -61,20 +61,20 @@ public sealed class TickSkillTirednessTests
             var drop = TickSkillTiredness.FullDropBasisPoints(condition);
 
             drop.Should().BeGreaterThanOrEqualTo(previous, $"at {condition}");
-            drop.Should().BeInRange(0, 3_000);
+            drop.Should().BeInRange(0, 2_000);
 
             previous = drop;
         }
     }
 
     [Fact]
-    public void A_player_held_at_75_percent_loses_11_percent_of_a_technical_sheet_value_and_5_and_a_half_of_a_mental_one()
+    public void A_player_held_at_75_percent_loses_5_and_a_half_percent_of_a_technical_sheet_value_and_2_and_three_quarters_of_a_mental_one()
     {
         var tired = TickPlayerSkills.Tired(PlayerAttributesV1.Uniform(20), 7_500);
         var raw = tired.Uncurved();
 
-        raw.Tackling.Should().Be(1_780, "20 less 11% is 17.8 sheet points");
-        raw.Decisions.Should().Be(1_890, "20 less 5.5% is 18.9 sheet points");
+        raw.Tackling.Should().Be(1_890, "20 less 5.5% is 18.9 sheet points");
+        raw.Decisions.Should().Be(1_945, "20 less 2.75% is 19.45 sheet points");
         raw.Pace.Should().Be(2_000);
         raw.Acceleration.Should().Be(2_000);
     }
@@ -86,8 +86,8 @@ public sealed class TickSkillTirednessTests
         var tired = TickPlayerSkills.Tired(PlayerAttributesV1.Uniform(20), 7_500);
 
         fresh.Tackling.Should().Be(1_500, "a sheet 20 plays as a 15");
-        tired.Tackling.Should().Be(1_500 - 84, "2.2 sheet points of loss, 38% of it, is 0.84 of a curved point");
-        tired.Decisions.Should().Be(1_500 - 42);
+        tired.Tackling.Should().Be(1_500 - 42, "1.1 sheet points of loss, 38% of it, is 0.42 of a curved point");
+        tired.Decisions.Should().Be(1_500 - 21);
         tired.Pace.Should().Be(1_500);
         fresh.Condition.Should().Be(10_000);
         tired.Condition.Should().Be(7_500);

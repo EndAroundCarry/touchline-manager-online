@@ -18,8 +18,8 @@ namespace Tactical11Manager.SimulationBenchmarks;
 /// <remarks>
 /// <para>
 /// The census is read from the live metrics the match centre draws (one end-of-minute condition a player on the pitch), so a figure here
-/// is the figure a manager sees. The drop columns apply the curve the plan chose (0% at 100% condition, 2% at 90%, 20% at 60%, 30% at 40%
-/// and below, a straight line between those points; mental skills take half) to that condition. Nothing in the engine reads the curve yet:
+/// is the figure a manager sees. The drop columns apply the curve (0% at 100% condition, 2% at 90%, 10% at 60%, 20% at 40%
+/// and below, a straight line between the breakpoints; mental skills take half) to that condition. Nothing in the engine reads the curve yet:
 /// the probe carries its own copy so the plan can see how often it would bite before it is built.
 /// </para>
 /// <para>
@@ -271,14 +271,27 @@ internal static class TickConditionProbe
 
     /// <summary>The drop the plan's curve gives a technical, physical or goalkeeping skill at a condition, in basis points of the sheet value.</summary>
     /// <param name="condition">The condition, 0-10,000.</param>
-    private static int Drop(int condition) => condition switch
+    private static int Drop(int condition)
     {
-        >= 10_000 => 0,
-        >= 9_000 => (10_000 - condition) / 5,
-        >= 6_000 => 200 + ((9_000 - condition) * 6 / 10),
-        >= 4_000 => 2_000 + ((6_000 - condition) / 2),
-        _ => 3_000,
-    };
+        // The breakpoints of TickSkillTiredness (internal to the engine): condition and drop, linear between, flat below the last.
+        int[] conditions = [10_000, 9_000, 8_000, 7_000, 6_000, 5_000, 4_000];
+        int[] drops = [0, 200, 400, 700, 1_000, 1_400, 2_000];
+
+        if (condition >= conditions[0])
+        {
+            return drops[0];
+        }
+
+        for (var index = 1; index < conditions.Length; index++)
+        {
+            if (condition >= conditions[index])
+            {
+                return drops[index - 1] + ((conditions[index - 1] - condition) * (drops[index] - drops[index - 1]) / (conditions[index - 1] - conditions[index]));
+            }
+        }
+
+        return drops[^1];
+    }
 
     private static int BandOf(int condition)
     {
