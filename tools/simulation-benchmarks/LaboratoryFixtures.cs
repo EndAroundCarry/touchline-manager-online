@@ -179,7 +179,9 @@ internal static partial class LaboratoryFixtures
             Position = position,
             SecondaryPositions = [],
             Attributes = attributes,
-            State = PlayerMatchStateV1.Uniform(8_000),
+            // A fresh squad: stored worlds kick off at about 99% (tired-skills plan, M0). Until 2026-10-18 this was 8_000, so every
+            // number calibrated before then was played on 80% legs; .run-logs/cond/ holds the old baselines.
+            State = PlayerMatchStateV1.Uniform(10_000),
         };
 
     private static Guid Identity(int value) => Guid.Parse($"018f0000-0000-7000-8000-{value:D12}");

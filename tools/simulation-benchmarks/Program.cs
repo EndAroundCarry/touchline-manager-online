@@ -31,6 +31,9 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tickplans N seed [scenario|all]` reads what a match looks like at the minutes a match rule would fire (the lead at 60', the legs, the live rating,
 // bookings), as the baseline for the match-instructions plan. Not part of `all`.
 //
+// `tickcond N seed [snap file]` reads how tired the tick engine's players are (bands of condition by setup and minute, the skill drop a
+// tiredness curve would give) and the late-game passes and shots, as the baseline for the tired-skills plan. Not part of `all`.
+//
 // `tickshape N seed [cells|squads]` plays position-shaped squads from kick-off or with a change of shape in the middle, and reads the points, the
 // zones and the bins after the change (plan snoopy-toasting-hamster). Not part of `all`.
 //
@@ -223,6 +226,17 @@ if (mode is "tickplans")
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var plansSeed) ? plansSeed : 7_000UL,
         rules,
         positional.Length > 3 ? positional[3] : string.Empty);
+}
+
+if (mode is "tickcond")
+{
+    // tickcond <matches a setup> <seed> [snap <file>]   (how tired the players are by band, by setup and by minute, and the late-game passes and shots; .run-logs/cond/*; TC_ONLY=a,b narrows the setups, TC_STARTS=8000,10000 the starting conditions, default 10000)
+    TickConditionProbe.Run(
+        Math.Min(count, 600),
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var condSeed) ? condSeed : 7_000UL,
+        rules,
+        positional.Length > 3 ? positional[3] : string.Empty,
+        positional.Length > 4 ? positional[4] : string.Empty);
 }
 
 if (mode is "tickshape")
