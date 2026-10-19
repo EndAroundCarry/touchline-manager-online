@@ -502,20 +502,28 @@ public sealed class TickBallCarrierBrainTests
     [Fact]
     public void A_reader_of_the_game_does_not_play_to_a_man_in_an_offside_position_and_a_careless_one_does()
     {
-        var attackers = Move(OwnHalf, (6, 6_000, 3_500), (9, 8_600, 3_350), (5, 500, 6_900), (7, 500, 6_800), (8, 500, 6_700), (10, 500, 6_600));
-        var defenders = HighLine;
+        // Whether a careless carrier misses a given offside man is a fixed function of where the two stand, so the man is tried at several spots.
+        var spots = new[] { 8_500, 8_540, 8_580, 8_620, 8_660, 8_700, 8_740, 8_780, 8_820, 8_860 };
+        var aware = 0;
+        var careless = 0;
 
-        var scene = new Scene(true, 6, attackers, defenders).WithVision(6, 12);
-        var aware = scene.Decide();
-        var careless = new Scene(true, 6, attackers, defenders)
-            .WithVision(6, 12)
-            .WithSkill(6, skills => skills with { Decisions = 4 * TickPlayerSkills.Scale, Anticipation = 4 * TickPlayerSkills.Scale })
-            .Decide();
+        foreach (var spot in spots)
+        {
+            var attackers = Move(OwnHalf, (6, 6_000, 3_500), (9, spot, 3_350), (5, 500, 6_900), (7, 500, 6_800), (8, 500, 6_700), (10, 500, 6_600));
+            var scene = new Scene(true, 6, attackers, HighLine).WithVision(6, 12);
 
-        aware.Receiver.Should().NotBe(9);
-        careless.Receiver.Should().Be(9);
-        scene.IsOffside(9).Should().BeTrue();
-        scene.IsOffside(5).Should().BeFalse("he is behind the ball");
+            scene.IsOffside(9).Should().BeTrue();
+            scene.IsOffside(5).Should().BeFalse("he is behind the ball");
+            aware += scene.Decide().Receiver == 9 ? 1 : 0;
+            careless += new Scene(true, 6, attackers, HighLine)
+                .WithVision(6, 12)
+                .WithSkill(6, skills => skills with { Decisions = 4 * TickPlayerSkills.Scale, Anticipation = 4 * TickPlayerSkills.Scale })
+                .Decide().Receiver == 9 ? 1 : 0;
+        }
+
+        careless.Should().BeGreaterThan(aware, "a careless carrier misses the offside line far more often than a reader of the game");
+        careless.Should().BeGreaterThanOrEqualTo(3);
+        aware.Should().BeLessThanOrEqualTo(2);
     }
 
     [Fact]
@@ -665,7 +673,7 @@ public sealed class TickBallCarrierBrainTests
                     attackers,
                     Move(DeepBlock, (6, 5_600, 900), (7, 5_600, 1_500), (8, 6_200, 1_200), (9, fourthX, 1_200), (10, 5_200, markerY)))
                 .WithVision(6, 20)
-                .WithSkill(6, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale })
+                .WithSkill(6, skills => skills with { Passing = 20 * TickPlayerSkills.Scale, Technique = 20 * TickPlayerSkills.Scale, Composure = 20 * TickPlayerSkills.Scale, Dribbling = 1 * TickPlayerSkills.Scale, Pace = 1 * TickPlayerSkills.Scale, Acceleration = 1 * TickPlayerSkills.Scale })
                 .Decide();
 
         // The fourth defender stands just inside 20 m of the carrier, then just outside it.

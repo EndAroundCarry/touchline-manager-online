@@ -161,7 +161,7 @@ public sealed class TickEngineTests
         var result = MatchSimulator.Simulate(Current(20_260_925));
 
         result.InputHash.Should().Be(GoldenInputHash);
-        result.OutputHash.Should().Be(GoldenOutputHash, "a change to the tick engine's behaviour is an engine-version change (ADR-0004); re-pinned at wide-midfielders M3, when the wide midfielder began to track, cross and shoot as his role does (was 881fefd371d6b429, at M2: 27735a84e0fc2e08)");
+        result.OutputHash.Should().Be(GoldenOutputHash, "a change to the tick engine's behaviour is an engine-version change (ADR-0004); re-pinned at tired-skills M2, when the kick error, offside carelessness, interception, dribble, support and back-line sums stopped truncating to whole points (was 208bcc1897c76e1f; earlier, wide-midfielders M3: 881fefd371d6b429)");
     }
 
     [Fact]
@@ -364,5 +364,5 @@ public sealed class TickEngineTests
 
     private const string GoldenInputHash = "624b1cc3bd04834400ba8f7cfa37c2205c8f560830a0d458edeaadd520c0716f";
 
-    private const string GoldenOutputHash = "208bcc1897c76e1f86ed993da3f52c056e28edba1462d2a1db7f7b906e61903f";
+    private const string GoldenOutputHash = "b8baf8a8afafca3befc73fef8d076b7fa10923baf38b37cbb39722dd58c5efa5";
 }

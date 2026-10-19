@@ -772,14 +772,14 @@ internal static class TickDefensiveAI
         }
 
         var line = (int)(anchorSum / members);
-        var decisions = (int)(decisionsSum / members / TickPlayerSkills.Scale);
+        var decisions = (int)(decisionsSum / members);
         var nearest = NearestOutfieldDistanceSquared(situation);
         var closed = (long)TickSpatialUnits.ToFixed(ClosedDownDistance) * TickSpatialUnits.ToFixed(ClosedDownDistance);
         var free = (long)TickSpatialUnits.ToFixed(FreeCarrierDistance) * TickSpatialUnits.ToFixed(FreeCarrierDistance);
 
         if (nearest <= closed)
         {
-            line += LineStepUp * decisions / 20;
+            line += LineStepUp * decisions / (20 * TickPlayerSkills.Scale);
         }
         else if (nearest > free && Own(situation.BallX, situation.IsHome) <= LineDropBallLimit)
         {

@@ -508,8 +508,8 @@ internal static class TickSetPieces
         // A free kick is struck at leisure: the man's own craft counts, not the curve the game's pace is kept by.
         var natural = skills.Uncurved();
 
-        var error = TickBallCarrierBrain.ErrorAngle(natural.SetPieces, natural.Technique, TickBallCarrierBrain.SetPieceShotBaseError, decision.EffectivePressure);
-        error = Math.Max(1, error * FreeKickErrorPercent / 100);
+        var errorHundredths = TickBallCarrierBrain.ErrorAngleHundredths(natural.SetPieces, natural.Technique, TickBallCarrierBrain.SetPieceShotBaseError, decision.EffectivePressure);
+        var error = Math.Max(1, errorHundredths * FreeKickErrorPercent / 100 / TickPlayerSkills.Scale);
 
         var spread = Math.Max(1, error * FreeKickHeightErrorPercent / 100);
 

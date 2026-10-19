@@ -1878,9 +1878,9 @@ internal sealed partial class TickMatchLoop
         var passerTeam = _teams[_passer.Side];
         var passerSeat = passerTeam.SeatOfSlot(_passer.Slot);
         var passer = passerSeat >= 0 ? passerTeam.Skills[passerSeat] : skills;
-        var difference = ((skills.Anticipation + skills.Positioning) - (passer.Passing + passer.Vision)) / 2 / TickPlayerSkills.Scale;
-        var factor = Math.Clamp(100 + (InterceptSkillPerPoint * difference), 50, 160);
-        var chance = Math.Clamp((InterceptMaximum * factor / 100) + HomeEdgeBasisPoints(_teams[1 - _passer.Side].IsHome), 500, 9_000);
+        var difference = ((skills.Anticipation + skills.Positioning) - (passer.Passing + passer.Vision)) / 2;
+        var factor = Math.Clamp(BasisPointsCertain + (InterceptSkillPerPoint * difference), 5_000, 16_000);
+        var chance = Math.Clamp((InterceptMaximum * factor / BasisPointsCertain) + HomeEdgeBasisPoints(_teams[1 - _passer.Side].IsHome), 500, 9_000);
 
         return _random.NextBasisPoints() < chance;
     }

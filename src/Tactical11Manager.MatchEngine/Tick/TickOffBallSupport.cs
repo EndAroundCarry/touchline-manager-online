@@ -805,7 +805,7 @@ internal static class TickOffBallSupport
             busy[bestPlayer] = true;
 
             var skills = situation.Skills[bestPlayer];
-            var commitment = SupportCommitmentBasisPoints + (SupportCommitmentStep * ((skills.Positioning + skills.Anticipation) / 2 / TickPlayerSkills.Scale));
+            var commitment = SupportCommitmentBasisPoints + (SupportCommitmentStep * ((skills.Positioning + skills.Anticipation) / 2) / TickPlayerSkills.Scale);
             var anchor = situation.Anchors[bestPlayer];
             var ideal = Mirror(slots[bestSlot].X, slots[bestSlot].Y, situation.IsHome);
 

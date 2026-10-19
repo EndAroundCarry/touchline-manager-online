@@ -635,12 +635,24 @@ internal static class TickBallCarrierBrain
     /// <param name="technique">The kicker's Technique, in hundredths of a point.</param>
     /// <param name="baseError">The error of an average player with no pressure on him at the weakest skill.</param>
     /// <param name="effectivePressure">The pressure on him after his composure, in basis points.</param>
-    public static int ErrorAngle(int skill, int technique, int baseError, int effectivePressure)
-    {
-        var percent = Math.Max(MinimumErrorPercent, ErrorSkillCeiling - (((ErrorSkillWeight * skill) + technique) / 2 / TickPlayerSkills.Scale));
-        var error = baseError * percent * (BasisPoints + Math.Max(0, effectivePressure)) / (100 * BasisPoints);
+    public static int ErrorAngle(int skill, int technique, int baseError, int effectivePressure) =>
+        ErrorAngleHundredths(skill, technique, baseError, effectivePressure) / TickPlayerSkills.Scale;
 
-        return Math.Max(1, error);
+    /// <summary>
+    /// Gets the same error angle as <see cref="ErrorAngle"/> in hundredths of a binary angle unit, rounded down once at the end, so that the few
+    /// percent a tired kicker loses is not lost to whole units (a pass has an error of only about 20 of them). The skill percent is held in
+    /// hundredths of a percent, which is what hundredths of an attribute point come to.
+    /// </summary>
+    /// <param name="skill">The attribute the kick is made with, in hundredths of a point.</param>
+    /// <param name="technique">The kicker's Technique, in hundredths of a point.</param>
+    /// <param name="baseError">The error of an average player with no pressure on him at the weakest skill.</param>
+    /// <param name="effectivePressure">The pressure on him after his composure, in basis points.</param>
+    public static int ErrorAngleHundredths(int skill, int technique, int baseError, int effectivePressure)
+    {
+        var percent = Math.Max(MinimumErrorPercent * TickPlayerSkills.Scale, (ErrorSkillCeiling * TickPlayerSkills.Scale) - (((ErrorSkillWeight * skill) + technique) / 2));
+        var error = (long)baseError * percent * (BasisPoints + Math.Max(0, effectivePressure)) / (100L * BasisPoints);
+
+        return (int)Math.Max(TickPlayerSkills.Scale, error);
     }
 
     /// <summary>
@@ -718,13 +730,16 @@ internal static class TickBallCarrierBrain
             !situation.IsHome);
 
     /// <summary>
-    /// Gets the share, in percent, of offside receivers a carrier fails to notice: <c>12 + 4 × (26 − Decisions − Anticipation)</c>, between 0
-    /// and 60. Which of them he fails to notice is a fixed function of where the two men stand (no draw), so a careless player now and then plays
+    /// Gets the share, in basis points, of offside receivers a carrier fails to notice: <c>12% + 4% × (26 − Decisions − Anticipation)</c>, between 0
+    /// and 60%. Which of them he fails to notice is a fixed function of where the two men stand (no draw), so a careless player now and then plays
     /// the ball to a man who is offside.
     /// </summary>
     /// <param name="skills">The carrier's skills.</param>
-    public static int OffsideCarelessPercent(in TickPlayerSkills skills) =>
-        Math.Clamp(OffsideCarelessBase + (OffsideCarelessPerPoint * ((OffsideReadingSum * TickPlayerSkills.Scale) - skills.Decisions - skills.Anticipation) / TickPlayerSkills.Scale), 0, OffsideCarelessMaximum);
+    public static int OffsideCarelessBasisPoints(in TickPlayerSkills skills) =>
+        Math.Clamp(
+            (OffsideCarelessBase * 100) + (OffsideCarelessPerPoint * ((OffsideReadingSum * TickPlayerSkills.Scale) - skills.Decisions - skills.Anticipation)),
+            0,
+            OffsideCarelessMaximum * 100);
 
     /// <summary>Tells whether the carrier sees a receiver as offside: he was, and the carrier is not one of the times he misses it.</summary>
     private static bool SeesOffside(in TickCarrierSituation situation, int careless, int receiver)
@@ -737,7 +752,7 @@ internal static class TickBallCarrierBrain
         // A function of the positions only: the same moment of play always gives the same answer.
         var spot = (uint)(situation.Attackers[receiver].X >> 6) * 2_654_435_761u ^ (uint)(situation.Attackers[situation.CarrierIndex].Y >> 6) * 40_503u;
 
-        return spot % 100 >= careless;
+        return spot % BasisPoints >= careless;
     }
 
     /// <summary>Chooses what the carrier does with the ball this decision.</summary>
@@ -790,13 +805,15 @@ internal static class TickBallCarrierBrain
 
         var error = decision.Action switch
         {
-            TickCarrierAction.Shoot => ErrorAngle(skills.Finishing, skills.Technique, shotBaseError, decision.EffectivePressure),
-            TickCarrierAction.Cross => ErrorAngle(skills.Crossing, skills.Technique, CrossBaseError, decision.EffectivePressure),
-            TickCarrierAction.Clear => ErrorAngle(skills.Passing, skills.Technique, ClearBaseError, decision.EffectivePressure),
-            _ => ErrorAngle(skills.Passing, skills.Technique, PassBaseError, decision.EffectivePressure),
+            TickCarrierAction.Shoot => ErrorAngleHundredths(skills.Finishing, skills.Technique, shotBaseError, decision.EffectivePressure),
+            TickCarrierAction.Cross => ErrorAngleHundredths(skills.Crossing, skills.Technique, CrossBaseError, decision.EffectivePressure),
+            TickCarrierAction.Clear => ErrorAngleHundredths(skills.Passing, skills.Technique, ClearBaseError, decision.EffectivePressure),
+            _ => ErrorAngleHundredths(skills.Passing, skills.Technique, PassBaseError, decision.EffectivePressure),
         };
 
-        var turn = random.NextRange(-error, error);
+        // The draw is made in hundredths of a unit and rounded to the nearest unit, symmetrically about the aim.
+        var drawn = random.NextRange(-error, error);
+        var turn = Math.Sign(drawn) * ((Math.Abs(drawn) + (TickPlayerSkills.Scale / 2)) / TickPlayerSkills.Scale);
         var fromX = ball.UnitX;
         var fromY = ball.UnitY;
         long dx = decision.Target.X - fromX;
@@ -842,7 +859,7 @@ internal static class TickBallCarrierBrain
     {
         var carrierSkills = situation.Skills[situation.CarrierIndex];
         var vision = VisionBase + (VisionStep * carrierSkills.Vision / TickPlayerSkills.Scale);
-        var careless = OffsideCarelessPercent(carrierSkills);
+        var careless = OffsideCarelessBasisPoints(carrierSkills);
         var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.EdgeFactorPercent);
         var loss = LossOfBall(view);
         var crowded = Congestion(situation, view) >= SwitchCongestion;
@@ -1002,7 +1019,7 @@ internal static class TickBallCarrierBrain
         }
 
         var carrierSkills = situation.Skills[situation.CarrierIndex];
-        var careless = OffsideCarelessPercent(carrierSkills);
+        var careless = OffsideCarelessBasisPoints(carrierSkills);
         var areaX = SpatialPitch.PitchLength - SpatialPitch.PenaltyBoxWidth;
         var receiver = -1;
         var targetX = CrossFallbackX;
@@ -1134,8 +1151,8 @@ internal static class TickBallCarrierBrain
         }
 
         var skills = situation.Skills[situation.CarrierIndex];
-        var mean = ((2 * skills.Dribbling) + skills.Pace + skills.Acceleration) / 4 / TickPlayerSkills.Scale;
-        var success = Math.Clamp(5_500 + (250 * mean), 2_000, 9_800) * (BasisPoints - (view.Effective * 45 / 100)) / BasisPoints;
+        var mean = ((2 * skills.Dribbling) + skills.Pace + skills.Acceleration) / 4;
+        var success = Math.Clamp(5_500 + (250 * mean / TickPlayerSkills.Scale), 2_000, 9_800) * (BasisPoints - (view.Effective * 45 / 100)) / BasisPoints;
         var progressPercent = ProgressPercent(situation.Mentality, situation.Tempo, situation.BreakProgress, situation.EdgeFactorPercent);
         var loss = LossOfBall(view);
         var toGoal = TickTrigonometry.AngleOf(SpatialPitch.PitchLength - view.X, SpatialPitch.GoalYCenter - view.Y);
@@ -1496,16 +1513,25 @@ internal static class TickBallCarrierBrain
     /// </summary>
     private static int Accuracy(int skill, int technique, int baseError, int length, bool lofted, int effective, int catchWidth = CatchWidth)
     {
-        var error = ErrorAngle(skill, technique, baseError, effective);
+        var error = ErrorAngleHundredths(skill, technique, baseError, effective);
 
         if (lofted)
         {
             error = error * 3 / 2;
         }
 
-        var spread = (long)length * TickTrigonometry.Sin(error) / TickTrigonometry.Scale;
+        var spread = (long)length * SineOfHundredths(error) / TickTrigonometry.Scale;
 
         return spread <= catchWidth ? BasisPoints : (int)Math.Max(1_500, (long)catchWidth * BasisPoints / spread);
+    }
+
+    /// <summary>Gets the sine of an angle given in hundredths of a binary angle unit, interpolated between the whole units of the table.</summary>
+    private static int SineOfHundredths(int angle)
+    {
+        var whole = angle / TickPlayerSkills.Scale;
+        var low = TickTrigonometry.Sin(whole);
+
+        return low + ((TickTrigonometry.Sin(whole + 1) - low) * (angle % TickPlayerSkills.Scale) / TickPlayerSkills.Scale);
     }
 
     private static int CrowdAround(in TickCarrierSituation situation, int x, int y)
