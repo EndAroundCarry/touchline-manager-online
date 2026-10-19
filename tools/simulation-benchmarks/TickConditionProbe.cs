@@ -58,7 +58,7 @@ internal static class TickConditionProbe
     /// <param name="matches">How many matches a setup.</param>
     /// <param name="seed">The base seed.</param>
     /// <param name="rules">The rules in force.</param>
-    /// <param name="mode">Empty for the setups (TC_ONLY=a,b narrows them), or "snap" to census the stored snapshots.</param>
+    /// <param name="mode">Empty for the setups (TC_ONLY=a,b narrows them), "s6b" for the weaker-side guard cell S6b, "s6bsubs" for what substitutions are worth to its attackers, or "snap" to census the stored snapshots.</param>
     /// <param name="path">The snapshot export for "snap".</param>
     public static void Run(int matches, ulong seed, EngineRulesV2 rules, string mode, string path)
     {
@@ -72,6 +72,44 @@ internal static class TickConditionProbe
         if (mode.Equals("snap", StringComparison.OrdinalIgnoreCase))
         {
             text.Append(Snapshots(path, matches, rules));
+        }
+        else if (mode.Equals("s6bsubs", StringComparison.OrdinalIgnoreCase))
+        {
+            text.Append(SubstitutionStudy(matches, seed, rules));
+        }
+        else if (mode.Equals("s6b", StringComparison.OrdinalIgnoreCase))
+        {
+            // The weaker-side guard cell S6b of tickbalance: a 17-20 side (keeper 17, pace 16) at home to a 15-18 counter-attacking side
+            // (keeper 15, pace 19), played with the all-out attacking setup and with the default.
+            string[] counter = ["form=12,ment=1,press=0,line=0,pass=2,counter=1"];
+
+            foreach (var (name, plain, homeSetup) in new[] { ("s6b-all-out", "17-20 all-out (Positive, high press, high tempo, high line)", "ment=3,press=2,line=2,tempo=2"), ("s6b-default", "17-20 default 4-4-2", string.Empty) })
+            {
+                var tallies = new Tally[matches];
+                var homeSpec = $"gk=17,pace=16{(homeSetup.Length == 0 ? string.Empty : "," + homeSetup)}";
+                var awaySpec = $"gk=15,pace=19,{counter[0]}";
+
+                Parallel.For(0, matches, new ParallelOptions { MaxDegreeOfParallelism = 10 }, index =>
+                {
+                    var (homeForm, homeInstructions, homeKeeper, homePace) = TickShowcase.Spec(homeSpec);
+                    var (awayForm, awayInstructions, awayKeeper, awayPace) = TickShowcase.Spec(awaySpec);
+                    var (homeLow, homeHigh) = TickShowcase.Range("17-20");
+                    var (awayLow, awayHigh) = TickShowcase.Range("15-18");
+                    var built = LaboratoryFixtures.Build(seed + (ulong)index, homeLow, awayLow, homeInstructions, awayInstructions, rules);
+                    var input = TickCalibration.Stand(
+                        built with
+                        {
+                            Home = TickShowcase.Paced(TickShowcase.Keeper(TickShowcase.Spread(built.Home, homeLow, homeHigh), homeKeeper), homePace),
+                            Away = TickShowcase.Paced(TickShowcase.Keeper(TickShowcase.Spread(built.Away, awayLow, awayHigh), awayKeeper), awayPace),
+                        },
+                        homeForm,
+                        awayForm);
+
+                    tallies[index] = Play(input, rules);
+                });
+
+                text.Append(Report($"{plain} at home to the 15-18 counter-attacking side, 100% start", name, Tally.Sum(tallies), ["home 17-20", "away 15-18 counter"]));
+            }
         }
         else
         {
@@ -107,6 +145,103 @@ internal static class TickConditionProbe
             Path.Combine(directory, "ledger.tsv"),
             string.Create(CultureInfo.InvariantCulture, $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}\ttickcond\t{(mode.Length == 0 ? "setups" : mode)}\t{matches}\t{seed}\t{watch.Elapsed.TotalSeconds:F0}\n"));
         Console.WriteLine($"  run time this call {watch.Elapsed.TotalSeconds:F0} s; every call is appended to {Path.Combine(directory, "ledger.tsv")}");
+    }
+
+    /// <summary>
+    /// What substitutions are worth to the all-out attacking side of S6b: no substitutions, the assistant's usual fatigue rule, and five
+    /// substitutions that each take off the most tired player, at the five windows (46', 58', 68', 78', 84').
+    /// </summary>
+    /// <remarks>
+    /// The counter-attacking side makes no substitutions in the first two arms, so only the home side's choice differs; in the reference arm
+    /// both assistants are on (that is how S6b is played in tickbalance). "Five for the most tired" relaxes the assistant's two thresholds (replace
+    /// the most tired player whatever his condition, whatever the gain) for that run only; the bench is the laboratory's (a keeper and central
+    /// midfielders of the side's own ability).
+    /// </remarks>
+    private static string SubstitutionStudy(int matches, ulong seed, EngineRulesV2 rules)
+    {
+        var text = new StringBuilder();
+        var everyWindow = rules with { ConditionSubstitutionThresholdBasisPoints = 10_000, MinimumConditionAdvantageBasisPoints = 0 };
+        var arms = new (string Name, string Plain, EngineRulesV2 Rules, bool HomeAssistant, bool AwayAssistant)[]
+        {
+            ("assistant", "the assistant's usual fatigue substitutions on both sides (as tickbalance plays S6b)", rules, true, true),
+            ("none", "no substitutions by the attackers (the counter side makes none either)", rules, false, false),
+            ("five-tired", "five substitutions by the attackers, each for the most tired player on the pitch (the counter side makes none)", everyWindow, true, false),
+        };
+
+        text.Append(CultureInfo.InvariantCulture, $"== tickcond s6bsubs: the 17-20 all-out attacking side (Positive, high press, high tempo, high line) at home to the 15-18 counter-attacking side, {matches} matches an arm, 100% start ==\n");
+
+        foreach (var (name, plain, armRules, homeAssistant, awayAssistant) in arms)
+        {
+            var homeWins = 0;
+            var draws = 0;
+            var awayWins = 0;
+            var goals = new long[2];
+            var substitutions = new long[2];
+            var substitutionMinutes = 0L;
+            var conditionSum = new double[2];
+            var gate = new object();
+
+            Parallel.For(0, matches, new ParallelOptions { MaxDegreeOfParallelism = 10 }, index =>
+            {
+                var (homeForm, homeInstructions, homeKeeper, homePace) = TickShowcase.Spec("gk=17,pace=16,ment=3,press=2,line=2,tempo=2");
+                var (awayForm, awayInstructions, awayKeeper, awayPace) = TickShowcase.Spec("gk=15,pace=19,form=12,ment=1,press=0,line=0,pass=2,counter=1");
+                var (homeLow, homeHigh) = TickShowcase.Range("17-20");
+                var (awayLow, awayHigh) = TickShowcase.Range("15-18");
+                var built = LaboratoryFixtures.Build(seed + (ulong)index, homeLow, awayLow, homeInstructions, awayInstructions, armRules);
+                var home = TickShowcase.Paced(TickShowcase.Keeper(TickShowcase.Spread(built.Home, homeLow, homeHigh), homeKeeper), homePace);
+                var away = TickShowcase.Paced(TickShowcase.Keeper(TickShowcase.Spread(built.Away, awayLow, awayHigh), awayKeeper), awayPace);
+                var input = TickCalibration.Stand(
+                    built with
+                    {
+                        Home = home with { MatchPlan = new MatchPlanV1 { AssistantFatigueSubstitutions = homeAssistant } },
+                        Away = away with { MatchPlan = new MatchPlanV1 { AssistantFatigueSubstitutions = awayAssistant } },
+                    },
+                    homeForm,
+                    awayForm);
+                var live = new PlayerLiveMetricsRecorder();
+                var result = MatchSimulator.Simulate(input, armRules, live, null, TickMatchEngine.Instance);
+                var squads = new[] { input.Home.Squad.Select(player => player.ParticipantId).ToHashSet(), input.Away.Squad.Select(player => player.ParticipantId).ToHashSet() };
+                var onPitch = new double[2];
+
+                for (var side = 0; side < 2; side++)
+                {
+                    var late = live.Metrics.Where(metric => metric.Minute == 85 && squads[side].Contains(metric.ParticipantId)).ToArray();
+
+                    onPitch[side] = late.Length == 0 ? 0 : late.Average(metric => metric.ConditionBasisPoints);
+                }
+
+                lock (gate)
+                {
+                    homeWins += result.HomeGoals > result.AwayGoals ? 1 : 0;
+                    draws += result.HomeGoals == result.AwayGoals ? 1 : 0;
+                    awayWins += result.HomeGoals < result.AwayGoals ? 1 : 0;
+                    goals[0] += result.HomeGoals;
+                    goals[1] += result.AwayGoals;
+                    conditionSum[0] += onPitch[0];
+                    conditionSum[1] += onPitch[1];
+
+                    foreach (var matchEvent in result.Events.Where(e => e.Type == EngineEventType.Substitution))
+                    {
+                        substitutions[(int)matchEvent.Side]++;
+
+                        if (matchEvent.Side == MatchSide.Home)
+                        {
+                            substitutionMinutes += matchEvent.Minute;
+                        }
+                    }
+                }
+            });
+
+            var points = ((3.0 * homeWins) + draws) / matches;
+
+            text.Append(CultureInfo.InvariantCulture, $"  {name,-10} {plain}\n");
+            text.Append(CultureInfo.InvariantCulture, $"             attackers win/draw/lose {100.0 * homeWins / matches,3:F0}/{100.0 * draws / matches,3:F0}/{100.0 * awayWins / matches,3:F0} %   points {points:F2} (counter side {((3.0 * awayWins) + draws) / matches:F2})   goals {goals[0] / (double)matches:F2}-{goals[1] / (double)matches:F2}\n");
+            text.Append(CultureInfo.InvariantCulture, $"             substitutions a match: attackers {substitutions[0] / (double)matches:F2} (at minute {(substitutions[0] == 0 ? 0 : substitutionMinutes / (double)substitutions[0]):F0} on average), counter side {substitutions[1] / (double)matches:F2}; mean condition of the players on the pitch at 85': attackers {conditionSum[0] / matches / 100.0:F1}%, counter side {conditionSum[1] / matches / 100.0:F1}%\n");
+        }
+
+        text.Append('\n');
+
+        return text.ToString();
     }
 
     private static MatchInputV1 Build(string spec, int start, ulong seed, EngineRulesV2 rules)

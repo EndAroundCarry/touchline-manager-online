@@ -1250,7 +1250,7 @@ internal static class TickShowcase
         }
     }
 
-    private static MatchSideV1 Keeper(MatchSideV1 side, int? ability) =>
+    internal static MatchSideV1 Keeper(MatchSideV1 side, int? ability) =>
         ability is null
             ? side
             : side with
@@ -1259,7 +1259,7 @@ internal static class TickShowcase
             };
 
     /// <summary>Sets Pace and Acceleration of every outfield player to a value and leaves his other attributes as they are.</summary>
-    private static MatchSideV1 Paced(MatchSideV1 side, int? pace) =>
+    internal static MatchSideV1 Paced(MatchSideV1 side, int? pace) =>
         pace is null
             ? side
             : side with
@@ -1365,7 +1365,7 @@ internal static class TickShowcase
     private static double Mean(int players, int low, int high) =>
         Enumerable.Range(0, players).Average(index => low + ((index * 5) % (high - low + 1)));
 
-    private static (int Low, int High) Range(string text)
+    internal static (int Low, int High) Range(string text)
     {
         var parts = text.Split('-');
         var low = int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
@@ -1374,7 +1374,7 @@ internal static class TickShowcase
     }
 
     /// <summary>Gives each player a uniform ability from the range, cycling through it so the side's average sits mid-range.</summary>
-    private static MatchSideV1 Spread(MatchSideV1 side, int low, int high) =>
+    internal static MatchSideV1 Spread(MatchSideV1 side, int low, int high) =>
         side with
         {
             Squad =
