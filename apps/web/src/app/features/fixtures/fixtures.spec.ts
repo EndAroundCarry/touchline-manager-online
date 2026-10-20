@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { ClubFixture, MyFixtures } from '../../core/competition/competition.models';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { ResultRevealStore } from '../../core/match/result-reveal-store';
+import { OnboardingStore } from '../../core/world/onboarding-store';
 import { Fixtures } from './fixtures';
 
 /**
@@ -60,12 +61,39 @@ describe('Fixtures', () => {
   let component: ComponentFixture<Fixtures>;
   let mine: ReturnType<typeof signal<MyFixtures | null>>;
 
+  /** Renders the screen with the Results tab open, which is where the played matches are. */
   async function render(fixtures: readonly ClubFixture[]): Promise<HTMLElement> {
+    const root = await renderOnUpcoming(fixtures);
+
+    tab(root, 'Results')!.click();
+    await component.whenStable();
+
+    return root;
+  }
+
+  async function renderOnUpcoming(fixtures: readonly ClubFixture[]): Promise<HTMLElement> {
     mine.set(list(fixtures));
     component = TestBed.createComponent(Fixtures);
     await component.whenStable();
 
     return component.nativeElement as HTMLElement;
+  }
+
+  function tab(root: HTMLElement, text: string): HTMLButtonElement | undefined {
+    return [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((candidate) =>
+      candidate.textContent?.trim().startsWith(text),
+    );
+  }
+
+  function scheduled(id: string, round: number, opponent: string): ClubFixture {
+    return {
+      ...played(id, round, opponent, 0, 0),
+      status: 'scheduled',
+      homeScore: null,
+      awayScore: null,
+      matchId: null,
+      outcome: null,
+    };
   }
 
   function button(root: HTMLElement, text: string): HTMLButtonElement | undefined {
@@ -82,6 +110,7 @@ describe('Fixtures', () => {
       imports: [Fixtures],
       providers: [
         provideRouter([]),
+        { provide: OnboardingStore, useValue: { state: signal(null) } },
         {
           provide: CompetitionStore,
           useValue: {
@@ -127,11 +156,12 @@ describe('Fixtures', () => {
       played('b', 2, 'Northfield', 0, 2),
     ]);
 
+    // The latest round is listed first, so the first button is Northfield's.
     button(root, 'Show result')!.click();
     await component.whenStable();
 
-    expect(root.textContent).toContain('3–0');
-    expect(root.textContent).not.toContain('0–2');
+    expect(root.textContent).toContain('0–2');
+    expect(root.textContent).not.toContain('3–0');
     expect(button(root, 'Show result'), 'the other match still waits').toBeDefined();
   });
 
@@ -162,5 +192,36 @@ describe('Fixtures', () => {
     const root = await render([played('a', 1, 'Vale Athletic', 3, 0)]);
 
     expect(button(root, 'Show all results')).toBeUndefined();
+  });
+
+  it('opens on the upcoming fixtures, with the results one tab away and counted', async () => {
+    const root = await renderOnUpcoming([
+      played('a', 1, 'Vale Athletic', 3, 0),
+      scheduled('b', 2, 'Northfield'),
+    ]);
+
+    expect(tab(root, 'Upcoming')!.getAttribute('aria-selected')).toBe('true');
+    expect(tab(root, 'Results')!.textContent).toContain('1');
+    expect(root.textContent).toContain('Northfield');
+    expect(root.textContent).not.toContain('Vale Athletic');
+  });
+
+  it('lists the latest result first', async () => {
+    const root = await render([
+      played('a', 1, 'Vale Athletic', 3, 0),
+      played('b', 2, 'Northfield', 0, 2),
+    ]);
+    const text = root.querySelector('[role="tabpanel"]')!.textContent!;
+
+    expect(text.indexOf('Northfield')).toBeLessThan(text.indexOf('Vale Athletic'));
+  });
+
+  it('moves between the tabs with the arrow keys', async () => {
+    const root = await renderOnUpcoming([played('a', 1, 'Vale Athletic', 3, 0)]);
+
+    tab(root, 'Upcoming')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await component.whenStable();
+
+    expect(tab(root, 'Results')!.getAttribute('aria-selected')).toBe('true');
   });
 });

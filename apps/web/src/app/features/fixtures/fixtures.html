@@ -4,126 +4,262 @@
   <p [class]="formErrorClass" role="alert">{{ message }}</p>
 } @else if (fixtures(); as season) {
   <section aria-labelledby="fixtures-heading">
-    <h1 id="fixtures-heading" [class]="pageHeadingClass">{{ season.clubName }}</h1>
-    <p class="mt-1 text-sm text-ink-2">
-      {{ season.divisionName }} · tier {{ season.tierNumber }} · {{ season.seasonLabel }}
-    </p>
+    <header class="flex items-center gap-4">
+      @if (tenure(); as kit) {
+        <app-club-crest
+          class="h-14 shrink-0"
+          [shape]="kit.crestShape"
+          [pattern]="kit.crestPattern"
+          [primary]="kit.primaryColour"
+          [secondary]="kit.secondaryColour"
+        />
+      }
+      <div>
+        <h1 id="fixtures-heading" [class]="pageHeadingClass">{{ season.clubName }}</h1>
+        <p class="mt-1 text-sm text-ink-2">
+          {{ season.divisionName }} · tier {{ season.tierNumber }} · {{ season.seasonLabel }}
+        </p>
+      </div>
+    </header>
 
-    @if (nextFixture(); as next) {
-      <div class="mt-6 rounded border border-line-strong bg-panel p-4">
-        <h2 class="text-sm font-medium text-muted">Next fixture</h2>
-        <p class="mt-1 text-lg font-semibold">
-          {{ venue(next) }} v
-          <a [routerLink]="['/clubs', next.opponentClubId]" [class]="nameLinkClass">{{
-            next.opponentName
-          }}</a>
-        </p>
-        <p class="text-sm text-ink-2">
-          {{ round(next.roundNumber) }} · {{ kickoff(next.kickoffAt) }}
-        </p>
-        <p class="mt-1 text-sm font-medium text-ink" role="status">
-          {{ countdown(next.lockAt) }} — deadline {{ deadline(next.lockAt) }}
-        </p>
-        <div class="mt-4">
-          <a
-            routerLink="/tactics"
-            [class]="primaryButtonClass"
-            [attr.aria-label]="'Prepare your side for ' + next.opponentName"
+    <div class="mt-6" role="tablist" aria-label="Fixture sections" data-testid="fixtures-tabs">
+      <div class="flex gap-1 overflow-x-auto border-b border-line">
+        @for (tab of tabs(); track tab.key; let index = $index) {
+          <button
+            type="button"
+            role="tab"
+            class="inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            [class.border-accent]="activeTab() === tab.key"
+            [class.text-ink]="activeTab() === tab.key"
+            [class.border-transparent]="activeTab() !== tab.key"
+            [class.text-ink-2]="activeTab() !== tab.key"
+            [id]="'fixtures-tab-' + tab.key"
+            [attr.aria-selected]="activeTab() === tab.key"
+            [attr.aria-controls]="'fixtures-panel-' + tab.key"
+            [attr.tabindex]="activeTab() === tab.key ? 0 : -1"
+            (click)="selectTab(tab.key)"
+            (keydown)="onTabKeydown($event, index)"
           >
-            Prepare your side
-          </a>
-        </div>
+            {{ tab.label }}
+            <span
+              class="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold tabular-nums text-ink-2"
+              >{{ tab.count }}</span
+            >
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (activeTab() === 'upcoming') {
+      <div id="fixtures-panel-upcoming" role="tabpanel" aria-labelledby="fixtures-tab-upcoming">
+        @if (nextFixture(); as next) {
+          <div
+            class="mt-6 overflow-hidden rounded-lg border border-line-strong bg-panel"
+            data-testid="next-fixture"
+          >
+            <div class="border-b border-line bg-raised px-4 py-2 sm:px-6">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-muted">
+                Next fixture · {{ round(next.roundNumber) }}
+              </h2>
+            </div>
+
+            <div class="grid items-center gap-6 p-4 sm:px-6 sm:py-6 md:grid-cols-[1fr_auto]">
+              <div class="flex items-center justify-center gap-4 sm:gap-8 md:justify-start">
+                @let ours = next.venue === 'home';
+                <div class="flex w-24 flex-col items-center gap-2 text-center sm:w-32">
+                  @if (tenure(); as kit) {
+                    <app-club-crest
+                      class="h-14 sm:h-16"
+                      [shape]="kit.crestShape"
+                      [pattern]="kit.crestPattern"
+                      [primary]="kit.primaryColour"
+                      [secondary]="kit.secondaryColour"
+                    />
+                  }
+                  <span class="text-sm font-semibold">{{ season.clubName }}</span>
+                </div>
+                <div class="flex flex-col items-center gap-1">
+                  <span class="font-display text-2xl font-semibold text-muted">v</span>
+                  <span
+                    class="rounded-full border border-line-strong px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-ink-2"
+                    >{{ ours ? 'Home' : 'Away' }}</span
+                  >
+                </div>
+                <div class="flex w-24 flex-col items-center gap-2 text-center sm:w-32">
+                  <app-club-crest
+                    class="h-14 sm:h-16"
+                    data-testid="opponent-crest"
+                    [shape]="next.opponentCrestShape"
+                    [pattern]="next.opponentCrestPattern"
+                    [primary]="next.opponentPrimaryColour"
+                    [secondary]="next.opponentSecondaryColour"
+                  />
+                  <a
+                    [routerLink]="['/clubs', next.opponentClubId]"
+                    [class]="nameLinkClass"
+                    class="text-sm font-semibold"
+                    >{{ next.opponentName }}</a
+                  >
+                </div>
+              </div>
+
+              <div class="text-center md:text-right">
+                <p class="text-sm text-ink-2">{{ kickoff(next.kickoffAt) }}</p>
+                <p class="mt-1 text-sm font-medium text-ink" role="status">
+                  {{ countdown(next.lockAt) }} — deadline {{ deadline(next.lockAt) }}
+                </p>
+                <div class="mt-4">
+                  <a
+                    routerLink="/tactics"
+                    [class]="primaryButtonClass"
+                    [attr.aria-label]="'Prepare your side for ' + next.opponentName"
+                  >
+                    Prepare your side
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        } @else {
+          <p [class]="statusMessageClass" role="status">
+            Your season has no fixtures left to play.
+          </p>
+        }
+
+        @if (afterNext().length > 0) {
+          <h2 class="mt-8 text-lg font-semibold">Still to play</h2>
+          <ul
+            class="mt-2 divide-y divide-line overflow-hidden rounded-lg border border-line bg-panel"
+          >
+            @for (fixture of afterNext(); track fixture.id) {
+              <li class="flex flex-wrap items-center gap-x-4 gap-y-1 p-3">
+                <span
+                  class="w-16 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted"
+                  >{{ round(fixture.roundNumber) }}</span
+                >
+                <app-club-crest
+                  class="h-9 shrink-0"
+                  [shape]="fixture.opponentCrestShape"
+                  [pattern]="fixture.opponentCrestPattern"
+                  [primary]="fixture.opponentPrimaryColour"
+                  [secondary]="fixture.opponentSecondaryColour"
+                />
+                <div class="min-w-0 flex-1 basis-40">
+                  <span
+                    aria-hidden="true"
+                    class="mr-2 text-xs font-semibold uppercase text-muted"
+                    >{{ venue(fixture) === 'Home' ? 'H' : 'A' }}</span
+                  >
+                  <span class="sr-only">{{ venue(fixture) }} v</span>
+                  <a
+                    [routerLink]="['/clubs', fixture.opponentClubId]"
+                    [class]="nameLinkClass"
+                    class="font-medium"
+                    >{{ fixture.opponentName }}</a
+                  >
+                </div>
+                <div class="text-sm text-ink-2">
+                  {{ kickoff(fixture.kickoffAt) }}
+                  <span class="ml-2 text-muted">{{ status(fixture.status) }}</span>
+                </div>
+                @if (canPrepare(fixture)) {
+                  <a
+                    routerLink="/tactics"
+                    [class]="linkClass"
+                    [attr.aria-label]="'Prepare your side for ' + fixture.opponentName"
+                  >
+                    Prepare
+                  </a>
+                }
+              </li>
+            }
+          </ul>
+        } @else if (nextFixture() !== null) {
+          <p class="mt-6 text-sm text-ink-2">That is the last fixture of the season.</p>
+        }
       </div>
     } @else {
-      <p [class]="statusMessageClass" role="status">Your season has no fixtures left to play.</p>
-    }
-
-    <h2 class="mt-8 text-lg font-semibold">Still to play</h2>
-    @if (upcoming().length === 0) {
-      <p class="mt-2 text-sm text-ink-2">Nothing left in the calendar.</p>
-    } @else {
-      <ul class="mt-2 divide-y divide-line rounded border border-line bg-panel">
-        @for (fixture of upcoming(); track fixture.id) {
-          <li class="flex flex-wrap items-center justify-between gap-2 p-3">
-            <div>
-              <span class="font-medium"
-                >{{ venue(fixture) }} v
-                <a [routerLink]="['/clubs', fixture.opponentClubId]" [class]="nameLinkClass">{{
-                  fixture.opponentName
-                }}</a></span
-              >
-              <span class="ml-2 text-sm text-ink-2">{{ round(fixture.roundNumber) }}</span>
-            </div>
-            <div class="text-sm text-ink-2">
-              {{ kickoff(fixture.kickoffAt) }}
-              <span class="ml-2 text-muted">{{ status(fixture.status) }}</span>
-            </div>
-            @if (canPrepare(fixture)) {
-              <a
-                routerLink="/tactics"
-                [class]="linkClass"
-                [attr.aria-label]="'Prepare your side for ' + fixture.opponentName"
-              >
-                Prepare
-              </a>
-            }
-          </li>
-        }
-      </ul>
-    }
-
-    <div class="mt-8 flex flex-wrap items-center justify-between gap-2">
-      <h2 class="text-lg font-semibold">Results</h2>
-      @if (hiddenCount() > 1) {
-        <button type="button" [class]="secondaryButtonClass" (click)="showAll()">
-          Show all results
-        </button>
-      }
-    </div>
-    @if (results().length === 0) {
-      <p class="mt-2 text-sm text-ink-2">No matches have been played yet.</p>
-    } @else {
-      <ul class="mt-2 divide-y divide-line rounded border border-line bg-panel">
-        @for (fixture of results(); track fixture.id) {
-          <li class="flex flex-wrap items-center justify-between gap-2 p-3">
-            <div>
-              <span class="font-medium"
-                >{{ venue(fixture) }} v
-                <a [routerLink]="['/clubs', fixture.opponentClubId]" [class]="nameLinkClass">{{
-                  fixture.opponentName
-                }}</a></span
-              >
-              <span class="ml-2 text-sm text-ink-2">{{ round(fixture.roundNumber) }}</span>
-            </div>
-            <div class="text-sm text-ink-2">
-              @if (hidden(fixture)) {
-                <button
-                  type="button"
-                  [class]="linkClass"
-                  [attr.aria-label]="'Show the result of the match against ' + fixture.opponentName"
-                  (click)="show(fixture)"
+      <div id="fixtures-panel-results" role="tabpanel" aria-labelledby="fixtures-tab-results">
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-lg font-semibold">Latest first</h2>
+          @if (hiddenCount() > 1) {
+            <button type="button" [class]="secondaryButtonClass" (click)="showAll()">
+              Show all results
+            </button>
+          }
+        </div>
+        @if (results().length === 0) {
+          <p class="mt-2 text-sm text-ink-2">No matches have been played yet.</p>
+        } @else {
+          <ul
+            class="mt-2 divide-y divide-line overflow-hidden rounded-lg border border-line bg-panel"
+          >
+            @for (fixture of results(); track fixture.id) {
+              <li class="flex flex-wrap items-center gap-x-4 gap-y-1 p-3">
+                <span
+                  class="w-16 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted"
+                  >{{ round(fixture.roundNumber) }}</span
                 >
-                  Show result
-                </button>
-              } @else {
-                <span class="font-semibold">{{ score(fixture) }}</span>
-                <span class="ml-2">{{ outcome(fixture) }}</span>
-              }
-            </div>
-            @if (fixture.matchId; as matchId) {
-              <a
-                routerLink="/matches/{{ matchId }}"
-                [class]="linkClass"
-                [attr.aria-label]="
-                  'Watch the highlights of the match against ' + fixture.opponentName
-                "
-              >
-                Watch
-              </a>
+                <app-club-crest
+                  class="h-9 shrink-0"
+                  [shape]="fixture.opponentCrestShape"
+                  [pattern]="fixture.opponentCrestPattern"
+                  [primary]="fixture.opponentPrimaryColour"
+                  [secondary]="fixture.opponentSecondaryColour"
+                />
+                <div class="min-w-0 flex-1 basis-40">
+                  <span
+                    aria-hidden="true"
+                    class="mr-2 text-xs font-semibold uppercase text-muted"
+                    >{{ venue(fixture) === 'Home' ? 'H' : 'A' }}</span
+                  >
+                  <span class="sr-only">{{ venue(fixture) }} v</span>
+                  <a
+                    [routerLink]="['/clubs', fixture.opponentClubId]"
+                    [class]="nameLinkClass"
+                    class="font-medium"
+                    >{{ fixture.opponentName }}</a
+                  >
+                </div>
+                <div class="flex items-center gap-2 text-sm">
+                  @if (hidden(fixture)) {
+                    <button
+                      type="button"
+                      [class]="linkClass"
+                      [attr.aria-label]="
+                        'Show the result of the match against ' + fixture.opponentName
+                      "
+                      (click)="show(fixture)"
+                    >
+                      Show result
+                    </button>
+                  } @else {
+                    <span class="font-display text-lg font-semibold tabular-nums">{{
+                      score(fixture)
+                    }}</span>
+                    <span
+                      class="rounded-full border px-2 py-0.5 text-xs font-semibold"
+                      [class]="outcomeClass(fixture)"
+                      >{{ outcome(fixture) }}</span
+                    >
+                  }
+                </div>
+                @if (fixture.matchId; as matchId) {
+                  <a
+                    routerLink="/matches/{{ matchId }}"
+                    [class]="linkClass"
+                    [attr.aria-label]="
+                      'Watch the highlights of the match against ' + fixture.opponentName
+                    "
+                  >
+                    Watch
+                  </a>
+                }
+              </li>
             }
-          </li>
+          </ul>
         }
-      </ul>
+      </div>
     }
   </section>
 }
