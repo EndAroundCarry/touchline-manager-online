@@ -16,10 +16,10 @@ namespace Tactical11Manager.Application.Finance;
 /// which is what lets the caller commit them with the table it just rebuilt.
 /// </para>
 /// <para>
-/// The gate is drawn against the rank the round produced, not the rank going in, because that is the table
-/// the fixture has just changed — a club that won its way up the division the same evening draws the bigger
-/// crowd for the match it played. The correlation key is the fixture, so a retried publication collides
-/// with the first entry rather than drawing the gate twice (`FIN-17`).
+/// The gate is drawn by the fans going into the round, not the fans coming out of it, because the crowd came
+/// before the result moved them: the caller applies the result to the fans only after this has run. The
+/// correlation key is the fixture, so a retried publication collides with the first entry rather than
+/// drawing the gate twice (`FIN-17`).
 /// </para>
 /// </remarks>
 public sealed class MatchdayFinances
@@ -42,19 +42,16 @@ public sealed class MatchdayFinances
     /// <summary>Posts one gate receipt per published fixture's host club.</summary>
     /// <param name="matchdayId">The round being published, which names the division to price.</param>
     /// <param name="published">The fixtures the round published.</param>
-    /// <param name="positions">Every club's position after the round, which is the form the gate draws on.</param>
     /// <param name="now">The current instant, taken from the caller's clock (`TIME-2`).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>How many gate receipts were posted.</returns>
     public async Task<int> PostGateReceiptsAsync(
         Guid matchdayId,
         IReadOnlyList<Fixture> published,
-        IReadOnlyList<ClubPositionFact> positions,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(published);
-        ArgumentNullException.ThrowIfNull(positions);
 
         if (published.Count == 0)
         {
@@ -63,8 +60,6 @@ public sealed class MatchdayFinances
 
         var basis = (await _queries.GetMatchdayRevenueBasisAsync(matchdayId, cancellationToken))
             .ToDictionary(row => row.ClubId);
-
-        var ranks = positions.ToDictionary(position => position.ClubId, position => position.Position);
 
         var accounts = (await _accounts.LoadAsync(
                 [.. published.Select(fixture => fixture.HomeClubId).Distinct()],
@@ -89,13 +84,11 @@ public sealed class MatchdayFinances
                     $"Club {clubId:D} has no account, so its gate cannot be posted (FIN-11).");
             }
 
-            if (!ranks.TryGetValue(clubId, out var formRank))
-            {
-                throw new InvalidOperationException(
-                    $"Club {clubId:D} has no position in the rebuilt table, so its gate has no form (FIN-3).");
-            }
-
-            var amount = StadiumRuleSet.GateRevenueMinorFor(revenue.Seats, revenue.TierNumber, formRank);
+            var amount = StadiumRuleSet.GateRevenueMinorFor(
+                revenue.Seats,
+                revenue.TierNumber,
+                revenue.Fans,
+                revenue.MoodBp);
 
             if (amount <= 0)
             {

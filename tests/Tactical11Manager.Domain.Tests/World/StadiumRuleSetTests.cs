@@ -74,20 +74,75 @@ public sealed class StadiumRuleSetTests
     }
 
     [Fact]
-    public void Demand_falls_with_the_tier_and_rises_with_league_position()
+    public void The_mood_factor_runs_in_a_straight_line_from_four_fifths_to_six_fifths_through_calm()
     {
-        StadiumRuleSet.MatchdayDemandFor(2, formRank: 9).Should().BeLessThan(StadiumRuleSet.MatchdayDemandFor(1, 9));
-        StadiumRuleSet.MatchdayDemandFor(5, 9).Should().BeLessThan(StadiumRuleSet.MatchdayDemandFor(4, 9));
-        StadiumRuleSet.MatchdayDemandFor(1, formRank: 1).Should().BeGreaterThan(StadiumRuleSet.MatchdayDemandFor(1, 18));
-        StadiumRuleSet.MatchdayDemandFor(1, formRank: 9).Should().Be(StadiumRuleSet.MatchdayDemandTier1);
-        StadiumRuleSet.MatchdayDemandFor(40, formRank: 9).Should().BeGreaterThanOrEqualTo(0);
+        StadiumRuleSet.MoodFactorBpFor(0).Should().Be(8_000, "furious fans stay away");
+        StadiumRuleSet.MoodFactorBpFor(FanRuleSet.CalmMoodBp).Should().Be(10_000, "calm fans are the neutral crowd");
+        StadiumRuleSet.MoodFactorBpFor(FanRuleSet.MoodMaxBp).Should().Be(12_000, "euphoric fans pack the ground");
+        StadiumRuleSet.MoodFactorBpFor(7_500).Should().Be(11_000);
     }
 
     [Fact]
-    public void A_top_tier_crowd_is_bigger_than_the_opening_ground_but_a_deep_tier_crowd_is_not()
+    public void A_mood_outside_the_scale_is_a_programming_error()
     {
-        StadiumRuleSet.MatchdayDemandFor(1, 9).Should().BeGreaterThan(Opening.Total);
-        StadiumRuleSet.MatchdayDemandFor(6, 9).Should().BeLessThan(Opening.Total);
+        var below = () => StadiumRuleSet.MoodFactorBpFor(-1);
+        var above = () => StadiumRuleSet.MoodFactorBpFor(FanRuleSet.MoodMaxBp + 1);
+
+        below.Should().Throw<ArgumentOutOfRangeException>();
+        above.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Opening_fans_with_a_calm_mood_draw_3000_2250_and_1688_in_tiers_one_two_and_three()
+    {
+        // FAN-1 / STAD-5: three in ten of the tier's opening fans want to come, and a calm mood changes nothing.
+        StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp).Should().Be(3_000);
+        StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(2), FanRuleSet.CalmMoodBp).Should().Be(2_250);
+        StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(3), FanRuleSet.CalmMoodBp).Should().Be(1_688);
+    }
+
+    [Fact]
+    public void Demand_falls_with_the_tier_and_rises_with_the_fans_and_their_mood()
+    {
+        for (var tier = 1; tier < 6; tier++)
+        {
+            StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(tier + 1), FanRuleSet.CalmMoodBp)
+                .Should().BeLessThan(StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(tier), FanRuleSet.CalmMoodBp));
+        }
+
+        StadiumRuleSet.MatchdayDemandFor(20_000, FanRuleSet.CalmMoodBp)
+            .Should().BeGreaterThan(StadiumRuleSet.MatchdayDemandFor(10_000, FanRuleSet.CalmMoodBp));
+        StadiumRuleSet.MatchdayDemandFor(10_000, FanRuleSet.MoodMaxBp)
+            .Should().BeGreaterThan(StadiumRuleSet.MatchdayDemandFor(10_000, 0));
+        StadiumRuleSet.MatchdayDemandFor(10_000, FanRuleSet.MoodMaxBp).Should().Be(3_600);
+        StadiumRuleSet.MatchdayDemandFor(10_000, 0).Should().Be(2_400);
+        StadiumRuleSet.MatchdayDemandFor(0, FanRuleSet.CalmMoodBp).Should().Be(0);
+    }
+
+    [Fact]
+    public void A_club_at_the_tier_one_floor_and_furious_draws_nine_hundred_and_sixty()
+    {
+        StadiumRuleSet.MatchdayDemandFor(FanRuleSet.FloorFansFor(1), 0).Should().Be(960);
+    }
+
+    [Fact]
+    public void The_opening_ground_sells_two_thousand_eight_hundred_and_ninety_of_the_three_thousand_who_want_to_come()
+    {
+        var demand = StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp);
+
+        // The 100 VIP places are oversubscribed from day one (210 want one), and no other kind is full.
+        StadiumStands.All.Sum(stand => StadiumRuleSet.SoldFor(stand, Opening.Of(stand), demand)).Should().Be(2_890);
+        StadiumRuleSet.SoldFor(StadiumStand.Vip, Opening.Vip, demand).Should().Be(Opening.Vip);
+    }
+
+    [Fact]
+    public void A_top_tier_ground_fills_only_when_the_fans_have_grown_into_it()
+    {
+        var opening = StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp);
+        var grown = StadiumRuleSet.MatchdayDemandFor(FanRuleSet.StartFansFor(1) * 3, FanRuleSet.CalmMoodBp);
+
+        opening.Should().BeLessThan(Opening.Total, "a new club cannot fill even its opening ground");
+        grown.Should().BeGreaterThan(Opening.Total, "a club that has tripled its fans has a crowd waiting for a bigger stadium");
     }
 
     [Fact]
@@ -100,33 +155,55 @@ public sealed class StadiumRuleSetTests
     }
 
     [Fact]
-    public void An_opening_tier_one_ground_sells_out_and_takes_the_full_house_at_the_gate()
+    public void An_opening_tier_one_club_takes_the_gate_of_the_places_its_fans_fill()
     {
-        var gate = StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 1, formRank: 9);
+        var gate = StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 1, FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp);
 
-        gate.Should().Be(StadiumRuleSet.FullHouseMinorFor(Opening, 1));
-        gate.Should().Be((3_000 * 800L) + (1_000 * 1_500L) + (900 * 2_500L) + (100 * 9_000L));
+        // 1,350 on the terrace, 600 in the seats, 840 under cover and all 100 VIP places.
+        gate.Should().Be((1_350 * 800L) + (600 * 1_500L) + (840 * 2_500L) + (100 * 9_000L));
+        gate.Should().BeLessThan(StadiumRuleSet.FullHouseMinorFor(Opening, 1), "the opening crowd does not fill the ground");
     }
 
     [Fact]
-    public void Extra_places_nobody_turns_up_for_earn_nothing()
+    public void A_crowd_that_outgrows_the_ground_takes_the_full_house()
     {
-        // A tier-6 crowd is far smaller than a 50,000 ground, so building to the top adds no income.
+        StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 1, fans: 100_000, FanRuleSet.CalmMoodBp)
+            .Should().Be(StadiumRuleSet.FullHouseMinorFor(Opening, 1));
+    }
+
+    [Fact]
+    public void Extra_places_the_fans_do_not_fill_earn_nothing()
+    {
+        // A tier-6 club's opening fans are fewer than even the opening ground holds, so building adds no income;
+        // a tier-1 club's opening crowd already wants more VIP places than it has, so one more kind of place pays.
         var bigGround = new StadiumSeats(30_000, 8_000, 9_000, 3_000);
-        var small = StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 6, formRank: 9);
-        var large = StadiumRuleSet.GateRevenueMinorFor(bigGround, tier: 6, formRank: 9);
+        var deepFans = FanRuleSet.StartFansFor(6);
 
-        large.Should().BeGreaterThan(small, "the places the crowd does fill still pay");
-        large.Should().BeLessThan(StadiumRuleSet.FullHouseMinorFor(bigGround, 6) / 4, "most of a huge ground sits empty");
+        StadiumRuleSet.GateRevenueMinorFor(bigGround, tier: 6, deepFans, FanRuleSet.CalmMoodBp)
+            .Should().Be(StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 6, deepFans, FanRuleSet.CalmMoodBp));
+
+        var topFans = FanRuleSet.StartFansFor(1);
+        var moreVip = new StadiumSeats(3_000, 1_000, 900, 300);
+
+        StadiumRuleSet.GateRevenueMinorFor(moreVip, tier: 1, topFans, FanRuleSet.CalmMoodBp)
+            .Should().BeGreaterThan(StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 1, topFans, FanRuleSet.CalmMoodBp));
+        StadiumRuleSet.GateRevenueMinorFor(bigGround, tier: 1, topFans, FanRuleSet.CalmMoodBp)
+            .Should().BeLessThan(StadiumRuleSet.FullHouseMinorFor(bigGround, 1) / 4, "most of a huge ground sits empty");
     }
 
     [Fact]
-    public void A_better_league_position_never_lowers_the_gate()
+    public void More_fans_and_a_better_mood_never_lower_the_gate()
     {
-        for (var rank = 1; rank < WorldRuleSet.ClubsPerDivision; rank++)
+        for (var mood = 0; mood < FanRuleSet.MoodMaxBp; mood += 500)
         {
-            StadiumRuleSet.GateRevenueMinorFor(Opening, 4, rank)
-                .Should().BeGreaterThanOrEqualTo(StadiumRuleSet.GateRevenueMinorFor(Opening, 4, rank + 1));
+            StadiumRuleSet.GateRevenueMinorFor(Opening, 4, 5_000, mood + 500)
+                .Should().BeGreaterThanOrEqualTo(StadiumRuleSet.GateRevenueMinorFor(Opening, 4, 5_000, mood));
+        }
+
+        for (var fans = 1_000; fans < 40_000; fans += 1_000)
+        {
+            StadiumRuleSet.GateRevenueMinorFor(Opening, 4, fans + 1_000, FanRuleSet.CalmMoodBp)
+                .Should().BeGreaterThanOrEqualTo(StadiumRuleSet.GateRevenueMinorFor(Opening, 4, fans, FanRuleSet.CalmMoodBp));
         }
     }
 
@@ -135,8 +212,8 @@ public sealed class StadiumRuleSetTests
     {
         for (var tier = 1; tier < 6; tier++)
         {
-            StadiumRuleSet.GateRevenueMinorFor(Opening, tier + 1, 9)
-                .Should().BeLessThan(StadiumRuleSet.GateRevenueMinorFor(Opening, tier, 9));
+            StadiumRuleSet.GateRevenueMinorFor(Opening, tier + 1, FanRuleSet.StartFansFor(tier + 1), FanRuleSet.CalmMoodBp)
+                .Should().BeLessThan(StadiumRuleSet.GateRevenueMinorFor(Opening, tier, FanRuleSet.StartFansFor(tier), FanRuleSet.CalmMoodBp));
         }
     }
 
@@ -144,13 +221,14 @@ public sealed class StadiumRuleSetTests
     public void A_season_of_home_gates_is_in_proportion_to_the_weekly_sponsorship_it_sits_beside()
     {
         // A guard on the calibration: a ground must be a real income without dwarfing the club's other money.
-        // 17 home matches at the opening ground against 34 weekly sponsorship credits.
+        // 17 home matches at the opening ground against 34 weekly sponsorship credits. A new club opens with a
+        // small crowd (a third of what the old gate assumed), so the lower bound is an eighth, not a quarter.
         for (var tier = 1; tier <= 6; tier++)
         {
-            var season = 17 * StadiumRuleSet.GateRevenueMinorFor(Opening, tier, 9);
+            var season = 17 * StadiumRuleSet.GateRevenueMinorFor(Opening, tier, FanRuleSet.StartFansFor(tier), FanRuleSet.CalmMoodBp);
             var sponsorship = 34 * WorldRuleSet.WeeklySponsorshipMinorForTier(tier);
 
-            season.Should().BeGreaterThan(sponsorship / 4, $"tier {tier}'s gate is a real income");
+            season.Should().BeGreaterThan(sponsorship / 8, $"tier {tier}'s gate is a real income");
             season.Should().BeLessThan(sponsorship * 4, $"tier {tier}'s gate does not drown the rest of the economy");
         }
     }

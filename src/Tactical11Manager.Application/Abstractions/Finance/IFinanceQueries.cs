@@ -4,17 +4,20 @@ using Tactical11Manager.Domain.World;
 namespace Tactical11Manager.Application.Abstractions.Finance;
 
 /// <summary>
-/// One club's basis for gate revenue: the places in its ground and the tier it plays in (`FIN-3`, `STAD-5`).
+/// One club's basis for gate revenue: the places in its ground, the tier it plays in, and its fans (`FIN-3`, `STAD-5`).
 /// </summary>
 /// <remarks>
-/// The ground says how many people the club can seat and the tier says how many want to come and what they
-/// pay, so the two are read together: a second read that must agree with the first is a second read that can
-/// disagree.
+/// The ground says how many people the club can seat, the fans and their mood say how many want to come, and
+/// the tier says what they pay, so the three are read together: a second read that must agree with the first
+/// is a second read that can disagree. The fans are read as they stand going into the round, because the
+/// crowd came before the result moved them.
 /// </remarks>
 /// <param name="ClubId">The club.</param>
 /// <param name="Seats">The places in the club's ground.</param>
 /// <param name="TierNumber">The tier the club plays in, 1 and up.</param>
-public sealed record ClubRevenueBasis(Guid ClubId, StadiumSeats Seats, int TierNumber);
+/// <param name="Fans">The club's fans. A club with no fan base yet reads as the tier's opening fans.</param>
+/// <param name="MoodBp">The fans' mood, 0 to 10,000. A club with no fan base yet reads as calm.</param>
+public sealed record ClubRevenueBasis(Guid ClubId, StadiumSeats Seats, int TierNumber, int Fans, int MoodBp);
 
 /// <summary>
 /// One club's obligations for a week's finance run: the tier it plays in and what its squad costs (`FIN-7`).

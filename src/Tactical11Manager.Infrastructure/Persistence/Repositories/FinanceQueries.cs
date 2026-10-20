@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Domain.Finance;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.World;
 
@@ -41,6 +42,8 @@ internal sealed class FinanceQueries : IFinanceQueries
             join stadium in _dbContext.ClubStadiums on entry.ClubId equals stadium.ClubId
             join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
             join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join fanBase in _dbContext.ClubFanBases on entry.ClubId equals fanBase.ClubId into fanBases
+            from fanBase in fanBases.DefaultIfEmpty()
             where entry.DivisionSeasonId == divisionSeasonId.Value
             select new
             {
@@ -50,15 +53,27 @@ internal sealed class FinanceQueries : IFinanceQueries
                 stadium.CoveredSeats,
                 stadium.VipSeats,
                 division.TierNumber,
+                Fans = (int?)fanBase.Fans,
+                MoodBp = (int?)fanBase.MoodBp,
             })
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
 
+        // A club whose fan base has not been opened yet (the safety net in the fan keeper covers the same case when
+        // the result is applied) is priced as a new club of its tier: the opening fans, calm.
         return
         [
-            .. rows.Select(row => new ClubRevenueBasis(
-                row.ClubId,
-                new StadiumSeats(row.StandingSeats, row.SeatingSeats, row.CoveredSeats, row.VipSeats),
-                row.TierNumber)),
+            .. rows.Select(row =>
+            {
+                var opening = FanRuleSet.OpeningFor(row.TierNumber);
+
+                return new ClubRevenueBasis(
+                    row.ClubId,
+                    new StadiumSeats(row.StandingSeats, row.SeatingSeats, row.CoveredSeats, row.VipSeats),
+                    row.TierNumber,
+                    row.Fans ?? opening.Fans,
+                    row.MoodBp ?? opening.MoodBp);
+            }),
         ];
     }
 

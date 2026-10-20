@@ -101,15 +101,11 @@ public static class StadiumRuleSet
         return (capacity + SeatsPerLevel - 1) / SeatsPerLevel;
     }
 
-    /// <summary>The most people who would come to a tier-1 club's home match at its mid-table form (`STAD-5`).</summary>
-    /// <remarks>
-    /// Larger than the opening ground's 5,000, so a tier-1 club has a crowd waiting for a bigger stadium, and
-    /// a lower division's own demand falls away below it.
-    /// </remarks>
-    public const int MatchdayDemandTier1 = 9_000;
+    /// <summary>The attendance factor at the lowest mood, furious fans, in basis points (`STAD-5`).</summary>
+    public const int MoodFactorFloorBp = 8_000;
 
-    /// <summary>The fraction of one tier's demand that the tier below it draws, in basis points (`STAD-5`).</summary>
-    private const int DemandRetainedPerTierBp = 7_500;
+    /// <summary>The attendance factor at the highest mood, euphoric fans, in basis points (`STAD-5`).</summary>
+    public const int MoodFactorCeilingBp = 12_000;
 
     /// <summary>The share of a matchday's demand that wants a given kind of place, in basis points (`STAD-5`).</summary>
     /// <param name="stand">The kind of place.</param>
@@ -123,25 +119,31 @@ public static class StadiumRuleSet
         _ => throw new ArgumentOutOfRangeException(nameof(stand), stand, "Unknown stadium stand."),
     };
 
-    /// <summary>The people who would come to a home match, before the ground limits them (`STAD-5`).</summary>
-    /// <param name="tier">The tier the club plays in, starting at 1.</param>
-    /// <param name="formRank">The club's league position, 1 (top) to 18 (bottom).</param>
-    /// <remarks>
-    /// Demand falls by a quarter per tier and rises and falls with league position the same way the old
-    /// gate did (`FIN-3`), so a club on a winning run draws a bigger crowd for the match it just played.
-    /// </remarks>
-    public static int MatchdayDemandFor(int tier, int formRank)
+    /// <summary>The attendance factor a fan mood applies to a matchday's demand, in basis points (`STAD-5`).</summary>
+    /// <param name="moodBp">The fans' mood, 0 (furious) to 10,000 (euphoric).</param>
+    /// <returns>A factor rising in a straight line from 8,000 at mood 0 through 10,000 at calm to 12,000 at mood 100.</returns>
+    public static int MoodFactorBpFor(int moodBp)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(tier, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(moodBp);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(moodBp, FanRuleSet.MoodMaxBp);
 
-        long demand = MatchdayDemandTier1;
+        return MoodFactorFloorBp
+            + (int)((long)moodBp * (MoodFactorCeilingBp - MoodFactorFloorBp) / FanRuleSet.MoodMaxBp);
+    }
 
-        for (var step = 1; step < tier; step++)
-        {
-            demand = demand * DemandRetainedPerTierBp / 10_000;
-        }
+    /// <summary>The people who would come to a home match, before the ground limits them (`STAD-5`).</summary>
+    /// <param name="fans">The club's fans going into the match.</param>
+    /// <param name="moodBp">The fans' mood going into the match, 0 to 10,000.</param>
+    /// <remarks>
+    /// Three in ten fans want to come (`FAN-1`), and a happy crowd is up to a fifth bigger and an unhappy one
+    /// up to a fifth smaller. The tier sets the fans a club opens with, not the crowd directly, so a lower
+    /// division's crowd is smaller because its fans are fewer.
+    /// </remarks>
+    public static int MatchdayDemandFor(int fans, int moodBp)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(fans);
 
-        return (int)(demand * WorldRuleSet.GateRevenueFormFactorBpFor(formRank) / 10_000);
+        return (int)((long)FanRuleSet.WantToComeFor(fans) * MoodFactorBpFor(moodBp) / 10_000);
     }
 
     /// <summary>How many places of a kind a home match sells (`STAD-5`).</summary>
@@ -161,11 +163,12 @@ public static class StadiumRuleSet
 
     /// <summary>The gate a home fixture yields, in minor units (`FIN-3`, `STAD-5`).</summary>
     /// <param name="seats">The ground's places.</param>
-    /// <param name="tier">The tier the club plays in, starting at 1.</param>
-    /// <param name="formRank">The club's league position, 1–18.</param>
-    public static long GateRevenueMinorFor(StadiumSeats seats, int tier, int formRank)
+    /// <param name="tier">The tier the club plays in, starting at 1, which sets the ticket prices.</param>
+    /// <param name="fans">The club's fans going into the match.</param>
+    /// <param name="moodBp">The fans' mood going into the match, 0 to 10,000.</param>
+    public static long GateRevenueMinorFor(StadiumSeats seats, int tier, int fans, int moodBp)
     {
-        var demand = MatchdayDemandFor(tier, formRank);
+        var demand = MatchdayDemandFor(fans, moodBp);
         long gate = 0;
 
         foreach (var stand in StadiumStands.All)

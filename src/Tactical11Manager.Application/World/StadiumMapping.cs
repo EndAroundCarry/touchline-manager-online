@@ -12,14 +12,11 @@ namespace Tactical11Manager.Application.World;
 /// <remarks>
 /// The prices, the build costs and the expected crowd are derived here from the club's tier rather than
 /// stored on the ground, because they are rule-set values and the rule set is where a balancing change is
-/// made (`RULE-1`). The crowd is quoted at mid-table form so the figure is steady from one match to the next;
-/// the gate a fixture actually draws moves with the league position it is priced against (`FIN-3`).
+/// made (`RULE-1`). The crowd is quoted from the club's fans and their mood as they stand now, which is the
+/// crowd the next home match draws if nothing moves them before it (`FIN-3`, `STAD-5`).
 /// </remarks>
 public static class StadiumMapping
 {
-    /// <summary>The league position a quoted crowd and gate assume: the middle of an 18-club table.</summary>
-    private const int QuotedFormRank = 9;
-
     /// <summary>Projects a ground for the stadium page.</summary>
     /// <param name="stadium">The ground.</param>
     /// <param name="context">The club's tier and money.</param>
@@ -33,7 +30,7 @@ public static class StadiumMapping
         ArgumentNullException.ThrowIfNull(context);
 
         var tier = context.TierNumber;
-        var demand = StadiumRuleSet.MatchdayDemandFor(tier, QuotedFormRank);
+        var demand = StadiumRuleSet.MatchdayDemandFor(context.Fans, context.MoodBp);
         var capacity = stadium.Capacity;
 
         var stands = StadiumStands.All
@@ -61,7 +58,7 @@ public static class StadiumMapping
             stands,
             demand,
             StadiumRuleSet.FullHouseMinorFor(stadium.Seats, tier),
-            StadiumRuleSet.GateRevenueMinorFor(stadium.Seats, tier, QuotedFormRank),
+            StadiumRuleSet.GateRevenueMinorFor(stadium.Seats, tier, context.Fans, context.MoodBp),
             context.CashMinor - context.ReservedMinor,
             stadium.Version,
             serverTime);

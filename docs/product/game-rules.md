@@ -349,7 +349,7 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 
 | Ref | Source | Basis |
 |---|---|---|
-| FIN-3 | Home-match gate revenue | the club's stadium (places and ticket prices), tier, and form |
+| FIN-3 | Home-match gate revenue | the club's stadium (places and ticket prices), tier, and its fans and their mood |
 | FIN-4 | Weekly sponsorship credit | fixed baseline per tier |
 | FIN-5 | Promotion award and final-position award | tier and final rank |
 | FIN-6 | Transfer income | completed auction proceeds |
@@ -396,9 +396,11 @@ calibrates the baselines; the shapes below are fixed from this version on.
 
 - **Gate revenue (`FIN-3`)** is what the club's own stadium takes in at a home match (§13.5): for each kind of
   place, the lesser of the places the club has and the crowd that wants them, times that place's ticket price,
-  summed. The crowd is the tier's demand times an attendance factor of 8000–12000 basis points that rises with
-  league position and clamps at both ends. It is posted for the host club of every published fixture, inside the
-  publication transaction, priced against the table that round produced.
+  summed. The crowd is the club's fans times 30% (the share who want to come, `STAD-5`) times an attendance
+  factor of 8000–12000 basis points that rises in a straight line with the fans' mood (8000 at mood 0, 10000 at calm
+  50, 12000 at 100). It is posted for the host club of every published fixture, inside the publication
+  transaction, drawn by the fans and mood going into the round: the result moves the fans only after the gate is
+  posted, because the crowd came before the match.
 - **Weekly sponsorship (`FIN-4`)** is a fixed tier-1 credit halved per tier below the first.
 - **Weekly player wages (`FIN-7`)** are the sum of the club's active contracts' weekly wages, charged after the
   Sunday matchday.
@@ -423,10 +425,10 @@ its size, its level, the picture a manager sees — is read from those counts.
 | STAD-2 | Every club opens with **5,000 places**: 3,000 standing, 1,000 seating, 900 covered seating and 100 VIP, whatever its tier. |
 | STAD-3 | A ticket costs, at a tier-1 club, **8.00** standing, **15.00** seating, **25.00** covered seating and **90.00** VIP. Prices halve per tier below the first, like every other baseline (`WORLD-4`). |
 | STAD-4 | A manager may add as many places as they like, of any kind, up to the top level. A place costs, at a tier-1 club, **300.00** standing, **600.00** seating, **1,000.00** covered seating and **4,000.00** VIP, halved per tier. The club pays from its available cash (`FIN-10`) through one ledger entry (`stadium_construction`), and the order is refused if the club cannot pay or the ground has no room. The ground's version is the entity tag the order carries, so a retried or doubled order is refused rather than paid for twice (`CONC-1`, `FIN-17`). |
-| STAD-5 | A home match sells, for each kind of place, the lesser of the places the club has and the crowd that wants them. A tier-1 club draws 9,000 at mid-table, **a quarter fewer per tier below**, scaled by the league-position factor of `FIN-3`; the crowd splits across the kinds 45% standing, 20% seating, 28% covered and 7% VIP. Places nobody turns up for earn nothing. |
+| STAD-5 | A home match sells, for each kind of place, the lesser of the places the club has and the crowd that wants them. The crowd is **30% of the club's fans** (a new tier-1 club has 10,000 fans and draws 3,000; tier 2 draws 2,250 and tier 3 1,688, a quarter fewer per tier) times the mood factor of `FIN-3`, so it grows and shrinks with the fans; the crowd splits across the kinds 45% standing, 20% seating, 28% covered and 7% VIP. Places nobody turns up for earn nothing. |
 | STAD-6 | Places are only ever added. A club's ground cannot shrink, and a place is paid for once. |
 
-A mid-table tier-1 club's opening ground sells out and takes 70,500.00 a home match. A place that sells out pays for
+A new tier-1 club's opening crowd of 3,000 sells 2,890 of the 5,000 places (1,350 standing, 600 seating, 840 covered, all 100 VIP) and takes 49,800.00 a home match; the full house is 70,500.00, which a club reaches when its fans have grown. A place that sells out pays for
 itself in roughly two and a half seasons (17 home matches); one that does not sell pays nothing, so a manager builds
 toward the crowd and not toward the cap. The values are balancing values in `StadiumRuleSet`, to be calibrated with
 the rest of the economy.
@@ -726,13 +728,12 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `tier_scaling_factor` | 2^(tier − 1) | WORLD-4 (balancing) |
 | `opening_cash_minor_tier1` | 50,000,000 minor units | FIN-1 (balancing) |
 | `opening_reputation_tier1` | 70 / 100 | WORLD-3 (balancing) |
-| `gate_revenue_form_factor_bp` | 8,000–12,000, pivoting on ninth place | FIN-3 (balancing) |
-| `gate_revenue_form_factor_step_bp` | 300 per place | FIN-3 (balancing) |
+| `stadium_mood_factor_bp` | 8,000 at mood 0 to 12,000 at mood 100, straight line, 10,000 at calm | FIN-3 (balancing) |
 | `stadium_seats_per_level` / `stadium_max_level` | 5,000 / 10 (50,000 places) | STAD-1 |
 | `stadium_opening_places` | 3,000 / 1,000 / 900 / 100 | STAD-2 |
 | `stadium_ticket_price_minor_tier1` | 800 / 1,500 / 2,500 / 9,000 minor units | STAD-3 (balancing) |
 | `stadium_build_cost_minor_tier1` | 30,000 / 60,000 / 100,000 / 400,000 minor units per place | STAD-4 (balancing) |
-| `stadium_matchday_demand_tier1` | 9,000, retaining 7,500 bp per tier below | STAD-5 (balancing) |
+| `stadium_matchday_demand` | the club's fans × `fan_want_to_come_share_bp` (3,000), × the mood factor | STAD-5 (balancing) |
 | `stadium_demand_share_bp` | 4,500 / 2,000 / 2,800 / 700 | STAD-5 (balancing) |
 | `weekly_sponsorship_minor_tier1` | 3,000,000 minor units | FIN-4 (balancing) |
 | `weekly_operating_cost_minor_tier1` | 1,000,000 minor units | FIN-9 (balancing) |

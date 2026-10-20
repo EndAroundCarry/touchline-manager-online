@@ -6,6 +6,7 @@ using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Application.Competition;
 using Tactical11Manager.Application.Match;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Match;
 using Tactical11Manager.Domain.Rules;
@@ -516,15 +517,25 @@ public sealed class MatchdayWorkflowTests
             where divisionSeason.Id == divisionSeasonId
             select division.TierNumber)
             .SingleAsync();
-        var ranks = await readDb.Standings
-            .Where(standing => standing.DivisionSeasonId == divisionSeasonId)
-            .ToDictionaryAsync(standing => standing.ClubId, standing => standing.Rank);
 
-        // The gate is the club's own ground filled by the crowd the position the round produced draws (FIN-3).
+        // The fans going into the round: the publication moved them after the gate was drawn, so the events it
+        // wrote hold the numbers the crowd came with (FAN-5, FIN-3).
+        var fansBefore = await readDb.ClubFanEvents
+            .Where(fanEvent => fanEvent.Kind == FanEventKind.Match
+                && fanEvent.FixtureId != null
+                && fixtureIds.Contains(fanEvent.FixtureId.Value)
+                && homeClubIds.Contains(fanEvent.ClubId))
+            .ToDictionaryAsync(fanEvent => fanEvent.ClubId, fanEvent => new { fanEvent.FansBefore, fanEvent.MoodBeforeBp });
+
+        fansBefore.Should().HaveCount(homeClubIds.Count, "every host's fans heard the result");
+
+        // The gate is the club's own ground filled by the crowd its fans and their mood drew (FIN-3, STAD-5).
         foreach (var gate in gates)
         {
+            var before = fansBefore[gate.ClubId];
+
             gate.CashDeltaMinor.Should().Be(
-                StadiumRuleSet.GateRevenueMinorFor(grounds[gate.ClubId].Seats, tier, ranks[gate.ClubId]));
+                StadiumRuleSet.GateRevenueMinorFor(grounds[gate.ClubId].Seats, tier, before.FansBefore, before.MoodBeforeBp));
         }
 
         // The account is the running total of the ledger, so the gate sits inside the balance it produced

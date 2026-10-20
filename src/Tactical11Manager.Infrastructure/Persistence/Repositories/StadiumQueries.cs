@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Application.Abstractions.World;
+using Tactical11Manager.Domain.Rules;
 
 namespace Tactical11Manager.Infrastructure.Persistence.Repositories;
 
@@ -51,10 +52,20 @@ internal sealed class StadiumQueries : IStadiumQueries
             .Select(candidate => new { candidate.PrimaryColour, candidate.SecondaryColour })
             .FirstOrDefaultAsync(cancellationToken);
 
+        var fanBase = await _dbContext.ClubFanBases
+            .Where(candidate => candidate.ClubId == clubId)
+            .Select(candidate => new { candidate.Fans, candidate.MoodBp })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // A club whose fans have not been opened yet is quoted as a new club of its tier.
+        var opening = FanRuleSet.OpeningFor(tier ?? 1);
+
         return new ClubStadiumContext(
             tier ?? 1,
             account.CashMinor,
             account.ReservedMinor,
+            fanBase?.Fans ?? opening.Fans,
+            fanBase?.MoodBp ?? opening.MoodBp,
             colours?.PrimaryColour,
             colours?.SecondaryColour);
     }

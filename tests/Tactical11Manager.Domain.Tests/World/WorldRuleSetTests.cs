@@ -146,26 +146,6 @@ public sealed class WorldRuleSetTests
     }
 
     [Fact]
-    public void The_gate_factor_is_bounded_and_pivots_on_ninth_place()
-    {
-        // FIN-3: form moves the gate, but only within a fifth either side of a neutral gate.
-        WorldRuleSet.GateRevenueFormFactorBpFor(1).Should().Be(12_000, "the top of the table clamps at the ceiling");
-        WorldRuleSet.GateRevenueFormFactorBpFor(9).Should().Be(10_000, "ninth place is the neutral gate");
-        WorldRuleSet.GateRevenueFormFactorBpFor(18).Should().Be(8_000, "the bottom of the table clamps at the floor");
-
-    }
-
-    [Fact]
-    public void A_position_outside_the_division_is_a_programming_error_for_the_gate()
-    {
-        var below = () => WorldRuleSet.GateRevenueFormFactorBpFor(0);
-        var above = () => WorldRuleSet.GateRevenueFormFactorBpFor(WorldRuleSet.ClubsPerDivision + 1);
-
-        below.Should().Throw<ArgumentOutOfRangeException>();
-        above.Should().Throw<ArgumentOutOfRangeException>();
-    }
-
-    [Fact]
     public void The_weekly_run_values_scale_with_tier_and_the_award_decays_with_position()
     {
         WorldRuleSet.WeeklyFinanceUtc.Should().Be(new TimeOnly(23, 0), "CON-2 charges wages after Sunday");

@@ -4,12 +4,16 @@ namespace Tactical11Manager.Application.Abstractions.World;
 /// <param name="TierNumber">The tier the club plays in this season, which scales prices and build costs.</param>
 /// <param name="CashMinor">The club's cash, in minor units.</param>
 /// <param name="ReservedMinor">The part of it already committed to open bids, in minor units.</param>
+/// <param name="Fans">The club's fans, which set the crowd the ground is quoted against (`STAD-5`).</param>
+/// <param name="MoodBp">The fans' mood, 0 to 10,000.</param>
 /// <param name="PrimaryColour">The primary kit colour the club's manager chose, or null for the generated one.</param>
 /// <param name="SecondaryColour">The secondary kit colour the club's manager chose, or null for the generated one.</param>
 public sealed record ClubStadiumContext(
     int TierNumber,
     long CashMinor,
     long ReservedMinor,
+    int Fans,
+    int MoodBp,
     string? PrimaryColour = null,
     string? SecondaryColour = null);
 

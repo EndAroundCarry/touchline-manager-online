@@ -6,7 +6,7 @@ namespace Tactical11Manager.Contracts.World;
 /// <param name="TicketPriceMinor">What one ticket costs, in minor units, at the club's tier.</param>
 /// <param name="BuildCostMinor">What one more place of this kind costs to build, in minor units.</param>
 /// <param name="ExpectedSold">
-/// How many of these places a home match sells at mid-table form: the lesser of the places and the crowd that
+/// How many of these places the next home match sells given the club's fans and their mood now: the lesser of the places and the crowd that
 /// wants them (`STAD-5`). When it is below <paramref name="Seats"/>, more of this kind would sit empty.
 /// </param>
 public sealed record StadiumStandResponse(
@@ -29,9 +29,9 @@ public sealed record StadiumStandResponse(
 /// <param name="PrimaryColour">The club's colour, which the seats are drawn in.</param>
 /// <param name="SecondaryColour">The club's second colour, for the trim.</param>
 /// <param name="Stands">The four kinds of place, in the order a manager reads them.</param>
-/// <param name="ExpectedDemand">The people who would come to a mid-table home match, before the ground limits them.</param>
+/// <param name="ExpectedDemand">The people who would come to the next home match given the club's fans and their mood now, before the ground limits them.</param>
 /// <param name="FullHouseMinor">What a sell-out would take at the gate, in minor units.</param>
-/// <param name="ExpectedGateMinor">What a mid-table home match takes at the gate, in minor units.</param>
+/// <param name="ExpectedGateMinor">What the next home match would take at the gate, in minor units.</param>
 /// <param name="AvailableMinor">What the club can spend on building, after reservations (`FIN-10`).</param>
 /// <param name="Version">The ground's version, which is the strong entity tag a build order is made against.</param>
 /// <param name="ServerTime">The server's current instant.</param>

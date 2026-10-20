@@ -34,7 +34,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v13";
+    public const string Version = "world-rules-v14";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -149,24 +149,6 @@ public static class WorldRuleSet
     /// (ADR-0003).
     /// </remarks>
     public static readonly TimeOnly WeeklyFinanceUtc = new(23, 0);
-
-    /// <summary>How much one place in the table moves the gate factor, in basis points (`FIN-3`).</summary>
-    /// <remarks>Above and below the middle place the factor rises and falls, and both ends clamp.</remarks>
-    private const int GateRevenueFormFactorStepPerRankBp = 300;
-
-    /// <summary>
-    /// The attendance factor a league position applies to a matchday's demand, in basis points (`FIN-3`,
-    /// <see cref="StadiumRuleSet.MatchdayDemandFor"/>).
-    /// </summary>
-    /// <param name="formRank">The club's league position, 1 (top) to 18 (bottom).</param>
-    /// <returns>A factor bounded between 8,000 and 12,000 basis points, pivoting on ninth place.</returns>
-    public static int GateRevenueFormFactorBpFor(int formRank)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(formRank, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(formRank, ClubsPerDivision);
-
-        return Math.Clamp(10_000 + ((9 - formRank) * GateRevenueFormFactorStepPerRankBp), 8_000, 12_000);
-    }
 
     /// <summary>The weekly sponsorship credit for a tier-1 club, in minor units. A balancing value (`FIN-4`).</summary>
     public const long WeeklySponsorshipMinorTier1 = 3_000_000;
