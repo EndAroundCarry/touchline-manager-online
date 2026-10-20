@@ -8,6 +8,7 @@ using Tactical11Manager.Application.Auth.Validation;
 using Tactical11Manager.Application.Calendar;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Application.Competition;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Jobs;
 using Tactical11Manager.Application.Market;
@@ -53,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
         services.AddScoped<IJobHandler, RebuildDivisionProjectionsJobHandler>();
         services.AddScoped<IJobHandler, WeeklyFinanceRunJobHandler>();
+        services.AddScoped<IJobHandler, WeeklyFanReviewJobHandler>();
         services.AddScoped<IJobHandler, RunFreeAgentBatchJobHandler>();
         services.AddScoped<IJobHandler, ResolveAuctionJobHandler>();
         services.AddScoped<IJobHandler, EvaluateAiMarketJobHandler>();
@@ -72,6 +74,7 @@ public static class DependencyInjection
         AddMatchUseCases(services);
         AddCommsUseCases(services);
         AddFinanceUseCases(services);
+        AddFanUseCases(services);
         AddMarketUseCases(services);
         AddCalendarUseCases(services);
 
@@ -175,6 +178,26 @@ public static class DependencyInjection
 
         // Operator finance repair (master plan §10.8, FIN-12, F-46, ADR-0045).
         services.AddScoped<PostCompensatingEntry>();
+    }
+
+    /// <summary>
+    /// Registers the fan module's collaborators, review and trigger (master plan Stage 17; `FAN-1`…`FAN-10`).
+    /// </summary>
+    /// <remarks>
+    /// The collaborators are registered with the use cases because the matchday, rollover and takeover workflows compose them the way they
+    /// compose <see cref="MatchdayFinances"/>, and each commits inside the transaction of the workflow that calls it.
+    /// </remarks>
+    private static void AddFanUseCases(IServiceCollection services)
+    {
+        // The fans: every collaborator the matchday, rollover and takeover workflows compose, the weekly review
+        // the worker runs, and the diagnostics trigger (FAN-1..FAN-10).
+        services.AddScoped<FanBaseKeeper>();
+        services.AddScoped<MatchdayFans>();
+        services.AddScoped<FreezeFanExpectations>();
+        services.AddScoped<RunWeeklyFanReview>();
+        services.AddScoped<SettleSeasonFans>();
+        services.AddScoped<FanBaseTakeover>();
+        services.AddScoped<TriggerFanReview>();
     }
 
     /// <summary>

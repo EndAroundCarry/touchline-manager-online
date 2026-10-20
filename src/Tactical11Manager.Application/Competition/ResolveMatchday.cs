@@ -4,6 +4,7 @@ using Tactical11Manager.Application.Abstractions.Jobs;
 using Tactical11Manager.Application.Abstractions.Match;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Jobs;
 using Tactical11Manager.Application.Match;
 using Tactical11Manager.Domain.Competition;
@@ -59,6 +60,7 @@ public sealed class ResolveMatchday
     private readonly IMatchdayRepository _matchdays;
     private readonly IMatchRepository _matches;
     private readonly MatchSnapshotFactory _snapshots;
+    private readonly FreezeFanExpectations _fanExpectations;
     private readonly IAdvisoryLock _locks;
     private readonly IJobQueue _jobs;
     private readonly IUnitOfWork _unitOfWork;
@@ -69,6 +71,7 @@ public sealed class ResolveMatchday
         IMatchdayRepository matchdays,
         IMatchRepository matches,
         MatchSnapshotFactory snapshots,
+        FreezeFanExpectations fanExpectations,
         IAdvisoryLock locks,
         IJobQueue jobs,
         IUnitOfWork unitOfWork,
@@ -77,6 +80,7 @@ public sealed class ResolveMatchday
         _matchdays = matchdays;
         _matches = matches;
         _snapshots = snapshots;
+        _fanExpectations = fanExpectations;
         _locks = locks;
         _jobs = jobs;
         _unitOfWork = unitOfWork;
@@ -110,7 +114,7 @@ public sealed class ResolveMatchday
 
         foreach (var fixture in workload.Fixtures.Where(NeedsSimulation))
         {
-            pending.Add((fixture, await EnsureSnapshotAsync(matchdayId, fixture, cancellationToken)));
+            pending.Add((fixture, await EnsureSnapshotAsync(matchdayId, workload.Matchday.DivisionSeasonId, fixture, cancellationToken)));
         }
 
         var simulated = await SimulateRoundAsync(pending, jobId, cancellationToken);
@@ -172,6 +176,7 @@ public sealed class ResolveMatchday
     /// </remarks>
     private async Task<InputSnapshot> EnsureSnapshotAsync(
         Guid matchdayId,
+        Guid divisionSeasonId,
         Fixture fixture,
         CancellationToken cancellationToken)
     {
@@ -186,6 +191,12 @@ public sealed class ResolveMatchday
         await _locks.AcquireAsync(AdvisoryLockKey.Matchday(matchdayId), cancellationToken);
 
         var snapshot = await _snapshots.FreezeAsync(sides, cancellationToken);
+
+        if (snapshot.Built)
+        {
+            // The lock never ran for this fixture, so what its fans expect is frozen here, with the sides (FAN-4).
+            await _fanExpectations.FreezeAsync(divisionSeasonId, [sides], _clock.UtcNow, cancellationToken);
+        }
 
         if (fixture.Status == FixtureStatus.Scheduled)
         {

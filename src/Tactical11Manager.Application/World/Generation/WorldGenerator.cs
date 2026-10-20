@@ -1,6 +1,7 @@
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Application.Abstractions.World;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
@@ -78,6 +79,7 @@ public sealed class WorldGenerator
     private readonly ISquadRepository _squad;
     private readonly IClubAccountRepository _accounts;
     private readonly ILedgerRepository _ledger;
+    private readonly FanBaseKeeper _fans;
     private readonly DivisionScheduleGenerator _schedules;
 
     /// <summary>Initializes the generator.</summary>
@@ -88,6 +90,7 @@ public sealed class WorldGenerator
         ISquadRepository squad,
         IClubAccountRepository accounts,
         ILedgerRepository ledger,
+        FanBaseKeeper fans,
         DivisionScheduleGenerator schedules)
     {
         _world = world;
@@ -96,6 +99,7 @@ public sealed class WorldGenerator
         _squad = squad;
         _accounts = accounts;
         _ledger = ledger;
+        _fans = fans;
         _schedules = schedules;
     }
 
@@ -173,6 +177,9 @@ public sealed class WorldGenerator
             // Every club opens with the same ground, whatever its tier: the divisions differ in how many
             // people come to fill it and what they pay, not in the bricks (STAD-2).
             _stadiums.Add(ClubStadium.Open(Guid.CreateVersion7(), clubId, now));
+
+            // And the same fans, whatever its tier but for the scale: the tier's opening numbers (FAN-1).
+            _fans.Open(clubId, tier, season.Id, now);
 
             _world.AddClubSeasonEntry(ClubSeasonEntry.Enter(
                 Guid.CreateVersion7(),

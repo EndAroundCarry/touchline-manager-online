@@ -302,6 +302,7 @@ if (diagnostics.EnableMatchdayTrigger)
     moduleGroups["ops"].MapMatchdayTrigger();
     moduleGroups["ops"].MapAuctionTrigger();
     moduleGroups["ops"].MapFreeAgentTrigger();
+    moduleGroups["ops"].MapFanReviewTrigger();
 }
 
 if (diagnostics.EnableProvisioningTrigger)

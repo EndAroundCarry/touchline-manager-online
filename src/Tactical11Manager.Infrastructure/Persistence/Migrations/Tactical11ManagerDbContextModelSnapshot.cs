@@ -1375,6 +1375,226 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.Fans.ClubFanBase", b =>
+                {
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Fans")
+                        .HasColumnType("integer")
+                        .HasColumnName("fans");
+
+                    b.Property<int?>("LastWeekGap")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_week_gap");
+
+                    b.Property<int>("MoodBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("mood_bp");
+
+                    b.Property<string>("RuleSetVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("rule_set_version");
+
+                    b.Property<int?>("SeasonTargetRank")
+                        .HasColumnType("integer")
+                        .HasColumnName("season_target_rank");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("ClubId");
+
+                    b.ToTable("club_fan_bases", "fans", t =>
+                        {
+                            t.HasCheckConstraint("ck_club_fan_bases_fans", "fans >= 1");
+
+                            t.HasCheckConstraint("ck_club_fan_bases_mood", "mood_bp between 0 and 10000");
+
+                            t.HasCheckConstraint("ck_club_fan_bases_rule_set", "length(rule_set_version) > 0");
+
+                            t.HasCheckConstraint("ck_club_fan_bases_target", "season_target_rank is null or season_target_rank >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Fans.ClubFanEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<int?>("ExpectedPointsCentis")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_points_c");
+
+                    b.Property<int>("FansAfter")
+                        .HasColumnType("integer")
+                        .HasColumnName("fans_after");
+
+                    b.Property<int>("FansBefore")
+                        .HasColumnType("integer")
+                        .HasColumnName("fans_before");
+
+                    b.Property<Guid?>("FixtureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<int?>("Gap")
+                        .HasColumnType("integer")
+                        .HasColumnName("gap");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("MoodAfterBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("mood_after_bp");
+
+                    b.Property<int>("MoodBeforeBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("mood_before_bp");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<int?>("PointsWon")
+                        .HasColumnType("integer")
+                        .HasColumnName("points_won");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<Guid?>("TenureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenure_id");
+
+                    b.Property<DateOnly?>("WeekOf")
+                        .HasColumnType("date")
+                        .HasColumnName("week_of");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FixtureId");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("TenureId");
+
+                    b.HasIndex("ClubId", "FixtureId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_club_fan_events_match")
+                        .HasFilter("kind = 'match'");
+
+                    b.HasIndex("ClubId", "OccurredAt")
+                        .HasDatabaseName("ix_club_fan_events_club_time");
+
+                    b.HasIndex("ClubId", "WeekOf")
+                        .IsUnique()
+                        .HasDatabaseName("ux_club_fan_events_weekly")
+                        .HasFilter("kind = 'weekly'");
+
+                    b.ToTable("club_fan_events", "fans", t =>
+                        {
+                            t.HasCheckConstraint("ck_club_fan_events_expected_points", "expected_points_c is null or expected_points_c between 0 and 300");
+
+                            t.HasCheckConstraint("ck_club_fan_events_fans", "fans_before >= 1 and fans_after >= 1");
+
+                            t.HasCheckConstraint("ck_club_fan_events_kind", "kind in ('opening', 'match', 'weekly', 'season_reset', 'promotion', 'relegation', 'takeover')");
+
+                            t.HasCheckConstraint("ck_club_fan_events_match_shape", "kind <> 'match' or (fixture_id is not null and expected_points_c is not null and points_won is not null)");
+
+                            t.HasCheckConstraint("ck_club_fan_events_mood", "mood_before_bp between 0 and 10000 and mood_after_bp between 0 and 10000");
+
+                            t.HasCheckConstraint("ck_club_fan_events_points_won", "points_won is null or points_won in (0, 1, 3)");
+
+                            t.HasCheckConstraint("ck_club_fan_events_takeover_shape", "kind <> 'takeover' or tenure_id is not null");
+
+                            t.HasCheckConstraint("ck_club_fan_events_weekly_shape", "kind <> 'weekly' or week_of is not null");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Fans.FixtureFanExpectation", b =>
+                {
+                    b.Property<Guid>("FixtureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DrawBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("draw_bp");
+
+                    b.Property<int>("ExpectedPointsCentis")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_points_c");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("label_code");
+
+                    b.Property<int>("LossBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("loss_bp");
+
+                    b.Property<int>("PredictedGoalsAgainst")
+                        .HasColumnType("integer")
+                        .HasColumnName("predicted_goals_against");
+
+                    b.Property<int>("PredictedGoalsFor")
+                        .HasColumnType("integer")
+                        .HasColumnName("predicted_goals_for");
+
+                    b.Property<int>("WinBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("win_bp");
+
+                    b.HasKey("FixtureId", "ClubId");
+
+                    b.HasIndex("ClubId");
+
+                    b.ToTable("fixture_fan_expectations", "fans", t =>
+                        {
+                            t.HasCheckConstraint("ck_fixture_fan_expectations_chances", "win_bp >= 0 and draw_bp >= 0 and loss_bp >= 0 and win_bp + draw_bp + loss_bp = 10000");
+
+                            t.HasCheckConstraint("ck_fixture_fan_expectations_label", "label_code in ('damage_limitation', 'tough_game', 'a_point_would_do', 'could_go_either_way', 'should_win', 'expect_a_win', 'should_hammer_them')");
+
+                            t.HasCheckConstraint("ck_fixture_fan_expectations_points", "expected_points_c between 0 and 300");
+
+                            t.HasCheckConstraint("ck_fixture_fan_expectations_score", "predicted_goals_for >= 0 and predicted_goals_against >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.Finance.ClubAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4864,6 +5084,55 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("DivisionSeasonId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Fans.ClubFanBase", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Fans.ClubFanEvent", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Fixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Season", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.ClubTenure", null)
+                        .WithMany()
+                        .HasForeignKey("TenureId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Fans.FixtureFanExpectation", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Fixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

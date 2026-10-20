@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Domain.Auth;
 using Tactical11Manager.Domain.Comms;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Match;
@@ -212,6 +213,15 @@ public sealed class Tactical11ManagerDbContext : DbContext
 
     /// <summary>Gets the squad module's team-sheet entries.</summary>
     public DbSet<TeamSheetEntry> TeamSheetEntries => Set<TeamSheetEntry>();
+
+    /// <summary>Gets the fans module's per-club fan bases.</summary>
+    public DbSet<ClubFanBase> ClubFanBases => Set<ClubFanBase>();
+
+    /// <summary>Gets the fans module's append-only fan history.</summary>
+    public DbSet<ClubFanEvent> ClubFanEvents => Set<ClubFanEvent>();
+
+    /// <summary>Gets the fans module's expectations frozen at the lock.</summary>
+    public DbSet<FixtureFanExpectation> FixtureFanExpectations => Set<FixtureFanExpectation>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

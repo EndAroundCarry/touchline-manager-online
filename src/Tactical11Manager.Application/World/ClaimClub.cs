@@ -5,6 +5,7 @@ using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Comms;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Contracts.World;
 using Tactical11Manager.Domain.Auth;
 using Tactical11Manager.Domain.Comms;
@@ -98,6 +99,7 @@ public sealed class ClaimClub
     private readonly IAdvisoryLock _locks;
     private readonly CapacityEvaluator _capacity;
     private readonly IInboxRepository _inbox;
+    private readonly FanBaseTakeover _fans;
     private readonly IAuditWriter _audit;
     private readonly IOperationalMetrics _metrics;
     private readonly ISecureTokenService _secureTokens;
@@ -116,6 +118,7 @@ public sealed class ClaimClub
         IAdvisoryLock locks,
         CapacityEvaluator capacity,
         IInboxRepository inbox,
+        FanBaseTakeover fans,
         IAuditWriter audit,
         IOperationalMetrics metrics,
         ISecureTokenService secureTokens,
@@ -132,6 +135,7 @@ public sealed class ClaimClub
         _locks = locks;
         _capacity = capacity;
         _inbox = inbox;
+        _fans = fans;
         _audit = audit;
         _metrics = metrics;
         _secureTokens = secureTokens;
@@ -212,6 +216,7 @@ public sealed class ClaimClub
             userId,
             manager,
             club,
+            placement,
             world.CurrentSeasonNumber,
             idempotencyKey,
             cancellationToken);
@@ -229,6 +234,7 @@ public sealed class ClaimClub
         Guid userId,
         Manager manager,
         Club club,
+        ClubDashboardSnapshot placement,
         int seasonNumber,
         string idempotencyKey,
         CancellationToken cancellationToken)
@@ -293,6 +299,16 @@ public sealed class ClaimClub
 
         _tenures.Add(tenure);
         manager.ClearTakeoverCooldown(now);
+
+        // A new manager starts with the tier's default fans however the club was doing, and the fans' target is
+        // worked out again from the squad as it is today. In this transaction, so a retried claim cannot reset twice (FAN-9).
+        await _fans.ResetAsync(
+            club.Id,
+            placement.Division.TierNumber,
+            placement.Season.Id,
+            tenure.Id,
+            now,
+            cancellationToken);
 
         // The welcome is the first thing a new manager reads, written in the takeover's own transaction so an
         // inbox with a club always has it (COM-1).

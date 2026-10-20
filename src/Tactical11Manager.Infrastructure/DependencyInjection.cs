@@ -8,6 +8,7 @@ using Tactical11Manager.Application.Abstractions.Auth;
 using Tactical11Manager.Application.Abstractions.Calendar;
 using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Application.Abstractions.Competition;
+using Tactical11Manager.Application.Abstractions.Fans;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Jobs;
 using Tactical11Manager.Application.Abstractions.Market;
@@ -19,6 +20,7 @@ using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Infrastructure.Comms;
 using Tactical11Manager.Infrastructure.Competition;
 using Tactical11Manager.Infrastructure.Email;
+using Tactical11Manager.Infrastructure.Fans;
 using Tactical11Manager.Infrastructure.Finance;
 using Tactical11Manager.Infrastructure.Jobs;
 using Tactical11Manager.Infrastructure.Market;
@@ -69,6 +71,7 @@ public static class DependencyInjection
         AddAiClubInfrastructure(services, configuration);
         AddMatchdayInfrastructure(services, configuration);
         AddFinanceInfrastructure(services, configuration);
+        AddFanInfrastructure(services, configuration);
         AddMarketInfrastructure(services, configuration);
         AddOpsInfrastructure(services);
 
@@ -165,6 +168,26 @@ public static class DependencyInjection
 
         // What the calendar may promise about the coming weekly settlement is what the scheduler will do.
         services.AddSingleton<IWeeklyFinanceRunSettings, WeeklyFinanceRunSettings>();
+    }
+
+    /// <summary>
+    /// Registers the fans module's persistence and the weekly review's configuration (`FAN-8`, `FAN-10`).
+    /// </summary>
+    /// <remarks>
+    /// The options are bound here rather than in <see cref="AddJobQueueWorker"/> so a misconfigured interval fails at startup in every
+    /// host, and the scheduler is registered there because the API must never judge a club's fans.
+    /// </remarks>
+    private static void AddFanInfrastructure(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IFanRepository, FanRepository>();
+        services.AddScoped<IFanQueries, FanQueries>();
+
+        services
+            .AddOptions<FanOptions>()
+            .Bind(configuration.GetSection(FanOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "Fans:CheckIntervalSeconds must be between 30 and 86400.");
     }
 
     /// <summary>
@@ -545,6 +568,10 @@ public static class DependencyInjection
         // what lists a surplus player and bids for a better one through the same writers a manager's command
         // uses (TRF-12, ADR-0025).
         AddMaterializer<AiMarketScheduler>(services);
+
+        // And the same for the fans: this service places the week's review row, and the row is what judges every
+        // club's fans against the place they hoped for (FAN-8).
+        AddMaterializer<WeeklyFanReviewScheduler>(services);
 
         // And the same for the free-agent pool: this service places the week's batch row, and the row is what
         // generates the players and lists them on Monday at the auction window (FA-5).

@@ -3,6 +3,7 @@ using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Application.Comms;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Match;
 using Tactical11Manager.Domain.Competition;
@@ -76,6 +77,7 @@ public sealed class PublishMatchday
     private readonly IPlayerStateRepository _playerStates;
     private readonly MatchdayNotifications _notifications;
     private readonly MatchdayFinances _finances;
+    private readonly MatchdayFans _fans;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
 
@@ -86,6 +88,7 @@ public sealed class PublishMatchday
         IPlayerStateRepository playerStates,
         MatchdayNotifications notifications,
         MatchdayFinances finances,
+        MatchdayFans fans,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
@@ -94,6 +97,7 @@ public sealed class PublishMatchday
         _playerStates = playerStates;
         _notifications = notifications;
         _finances = finances;
+        _fans = fans;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -149,6 +153,15 @@ public sealed class PublishMatchday
             workload.Matchday.Id,
             published,
             positions,
+            now,
+            cancellationToken);
+
+        // The fans hear the result in the same transaction. The gate above was drawn by the fans going in, so
+        // the crowd came before the result moved them (FAN-5, FIN-3).
+        await _fans.ApplyAsync(
+            workload.SeasonId,
+            workload.DivisionId,
+            published,
             now,
             cancellationToken);
 

@@ -127,6 +127,9 @@ public static partial class FanRuleSet
     /// <summary>How much of its distance from calm the mood keeps over a season's end, in basis points: half, as in Hattrick (`FAN-8`).</summary>
     public const int SeasonEndKeepBp = 5_000;
 
+    /// <summary>The time of day, UTC, the weekly review runs on a Sunday: half an hour after the weekly finance run, so both follow the Sunday round (`FAN-8`).</summary>
+    public static readonly TimeOnly WeeklyReviewUtc = new(23, 30);
+
     private const int Hundredths = 100;
 
     /// <summary>The fans a club in the given tier starts with (`FAN-1`).</summary>

@@ -12,6 +12,7 @@ using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Auth;
 using Tactical11Manager.Domain.Comms;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -326,6 +327,130 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             (await db.InboxMessages.CountAsync(message => message.TemplateKey == InboxTemplates.SeasonMovement))
                 .Should()
                 .Be(1, "the movement was not announced twice");
+        }
+    }
+
+    [Fact]
+    public async Task Rolling_over_gives_every_clubs_fans_their_verdict_and_moves_them_with_the_club()
+    {
+        Guid seasonId;
+        Guid tierOneDivisionId;
+        Guid tierTwoDivisionId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+            var countryId = await db.Countries.OrderBy(country => country.SortOrder).Select(country => country.Id).FirstAsync();
+
+            seasonId = await db.Seasons.Where(candidate => candidate.WorldId == _fixture.WorldId).Select(candidate => candidate.Id).SingleAsync();
+            tierOneDivisionId = await db.Divisions
+                .Where(division => division.CountryId == countryId && division.TierNumber == 1)
+                .Select(division => division.Id)
+                .SingleAsync();
+            tierTwoDivisionId = await db.Divisions
+                .Where(division => division.CountryId == countryId && division.TierNumber == 2)
+                .Select(division => division.Id)
+                .SingleAsync();
+        }
+
+        await PublishSeasonAsync(seasonId);
+
+        // Each of the two tiers' clubs gets fans and a target of its own, so the verdict is a different number for almost every club.
+        var finalRank = new Dictionary<Guid, int>();
+        var tierOf = new Dictionary<Guid, int>();
+        var before = new Dictionary<Guid, FanBaseState>();
+        var targetOf = new Dictionary<Guid, int>();
+        List<Guid> tierOneOrder;
+        List<Guid> tierTwoOrder;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+            tierOneOrder = await RankedClubsAsync(scope, tierOneDivisionId, seasonId);
+            tierTwoOrder = await RankedClubsAsync(scope, tierTwoDivisionId, seasonId);
+
+            foreach (var (order, tier) in new[] { (tierOneOrder, 1), (tierTwoOrder, 2) })
+            {
+                for (var index = 0; index < order.Count; index++)
+                {
+                    finalRank[order[index]] = index + 1;
+                    tierOf[order[index]] = tier;
+                }
+            }
+
+            var position = 0;
+            var bases = await db.ClubFanBases.Where(fanBase => finalRank.Keys.Contains(fanBase.ClubId)).ToListAsync();
+
+            foreach (var fanBase in bases.OrderBy(candidate => candidate.ClubId))
+            {
+                position++;
+
+                var state = new FanBaseState(
+                    FanRuleSet.StartFansFor(tierOf[fanBase.ClubId]) + (position * 1_000),
+                    2_000 + ((position * 700) % 7_000),
+                    LastWeekGap: position % 5);
+
+                targetOf[fanBase.ClubId] = ((position * 5) % 18) + 1;
+                fanBase.Apply(state, _fixture.Clock.UtcNow);
+                fanBase.SetTarget(targetOf[fanBase.ClubId], _fixture.Clock.UtcNow);
+                before[fanBase.ClubId] = state;
+            }
+
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+
+        SeasonRolloverResult result;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            result = await scope.ServiceProvider.GetRequiredService<RunSeasonRollover>().ExecuteAsync(seasonId, CancellationToken.None);
+        }
+
+        result.Outcome.Should().Be(SeasonRolloverOutcome.Completed);
+
+        var promoted = tierTwoOrder.Take(3).ToHashSet();
+        var relegated = tierOneOrder.TakeLast(3).ToHashSet();
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+            var after = await db.ClubFanBases.AsNoTracking().Where(fanBase => finalRank.Keys.Contains(fanBase.ClubId)).ToDictionaryAsync(fanBase => fanBase.ClubId);
+            var resets = await db.ClubFanEvents.AsNoTracking()
+                .Where(fanEvent => fanEvent.Kind == FanEventKind.SeasonReset)
+                .ToDictionaryAsync(fanEvent => fanEvent.ClubId);
+
+            resets.Should().HaveCount(await db.Clubs.CountAsync(), "every club's fans in the world are closed for the season exactly once");
+
+            foreach (var (clubId, rank) in finalRank)
+            {
+                var tier = tierOf[clubId];
+                var gap = rank - targetOf[clubId];
+                var closed = FanRuleSet.AfterSeason(before[clubId], tier, gap);
+                var expected = promoted.Contains(clubId) ? FanRuleSet.OnTierChange(closed, 2, 1)
+                    : relegated.Contains(clubId) ? FanRuleSet.OnTierChange(closed, 1, 2)
+                    : closed;
+
+                after[clubId].Fans.Should().Be(expected.Fans, $"club {clubId:N} finished {rank} of tier {tier} against a target of {targetOf[clubId]}");
+                after[clubId].MoodBp.Should().Be(expected.MoodBp);
+                after[clubId].LastWeekGap.Should().BeNull("the new season is judged afresh");
+                after[clubId].SeasonTargetRank.Should().BeInRange(1, 18, "the fans pick the place they hope for from the squads");
+
+                resets[clubId].SeasonId.Should().Be(seasonId);
+                resets[clubId].Gap.Should().Be(gap);
+                resets[clubId].FansAfter.Should().Be(closed.Fans);
+                resets[clubId].MoodAfterBp.Should().Be(closed.MoodBp);
+            }
+
+            var moves = await db.ClubFanEvents.AsNoTracking()
+                .Where(fanEvent => fanEvent.Kind == FanEventKind.Promotion || fanEvent.Kind == FanEventKind.Relegation)
+                .ToListAsync();
+
+            moves.Where(fanEvent => fanEvent.Kind == FanEventKind.Promotion).Select(fanEvent => fanEvent.ClubId)
+                .Should().BeEquivalentTo(promoted, "the top three of the lower tier climb");
+            moves.Where(fanEvent => fanEvent.Kind == FanEventKind.Relegation).Select(fanEvent => fanEvent.ClubId)
+                .Should().BeEquivalentTo(relegated, "the bottom three of the upper tier fall");
+            moves.Should().OnlyContain(fanEvent => fanEvent.SeasonId == result.NextSeasonId!.Value);
         }
     }
 

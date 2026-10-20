@@ -1,5 +1,6 @@
 using Tactical11Manager.Api.Http;
 using Tactical11Manager.Application.Competition;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Jobs;
 using Tactical11Manager.Application.Market;
 using Tactical11Manager.Application.Ops;
@@ -104,6 +105,28 @@ internal static class OpsEndpoints
                 + "exactly as it would on Monday; this only does what the worker-only scheduler normally "
                 + "does, and a repeated call is a no-op.")
             .Produces<FreeAgentBatchTriggerResponse>(StatusCodes.Status202Accepted);
+
+        return group;
+    }
+
+    /// <summary>Maps the fans' non-production weekly review trigger onto the ops module group.</summary>
+    /// <remarks>
+    /// It enqueues the coming Sunday's real review job, due now, so a journey can watch the fans react to a round without waiting for the
+    /// weekend. The worker still reviews exactly as it would on the calendar (ADR-0016 pattern). Mapped only when the diagnostics flag is on.
+    /// </remarks>
+    public static RouteGroupBuilder MapFanReviewTrigger(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapPost("/diagnostics/fan-review", PlayFanReviewAsync)
+            .WithName("PlayFanReviewProbe")
+            .WithSummary("Enqueues the week's fan review job, due now, so the fans' weekly verdict can be watched.")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker reviews every club exactly as it would on "
+                + "Sunday night; this only does what the worker-only scheduler normally does, and a repeated call "
+                + "for the same week is a no-op.")
+            .Produces<FanReviewTriggerResponse>(StatusCodes.Status202Accepted);
 
         return group;
     }
@@ -420,6 +443,17 @@ internal static class OpsEndpoints
             statusCode: StatusCodes.Status202Accepted);
     }
 
+    private static async Task<IResult> PlayFanReviewAsync(
+        TriggerFanReview trigger,
+        CancellationToken cancellationToken)
+    {
+        var result = await trigger.ExecuteAsync(cancellationToken);
+
+        return Results.Json(
+            new FanReviewTriggerResponse(result.WeekOf, result.ReviewKey, result.Enqueued),
+            statusCode: StatusCodes.Status202Accepted);
+    }
+
     private static async Task<IResult> PlayMatchdayAsync(
         PlayMatchdayRequest request,
         TriggerMatchday trigger,
@@ -503,6 +537,12 @@ internal sealed record AuctionTriggerResponse(Guid ListingId, string ResolveKey,
 /// <param name="BatchKey">The business key of the enqueued batch job.</param>
 /// <param name="Enqueued"><see langword="true"/> when the batch job row was newly inserted.</param>
 internal sealed record FreeAgentBatchTriggerResponse(DateOnly WeekStart, string BatchKey, bool Enqueued);
+
+/// <summary>Response of the weekly fan review trigger.</summary>
+/// <param name="WeekOf">The Sunday the triggered review is for.</param>
+/// <param name="ReviewKey">The business key of the enqueued review job.</param>
+/// <param name="Enqueued"><see langword="true"/> when the review job row was newly inserted.</param>
+internal sealed record FanReviewTriggerResponse(DateOnly WeekOf, string ReviewKey, bool Enqueued);
 
 /// <summary>The body of the provisioning trigger.</summary>
 /// <param name="CountryId">The country whose pyramid grows.</param>

@@ -8,6 +8,7 @@ using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Comms;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Application.World.Generation;
@@ -82,6 +83,7 @@ public sealed partial class RunSeasonRollover
     private readonly DivisionScheduleGenerator _schedules;
     private readonly SeasonRolloverPlanLoader _plans;
     private readonly SettleSeasonFinances _finances;
+    private readonly SettleSeasonFans _fans;
     private readonly SettleSquadContinuity _continuity;
     private readonly IInboxRepository _inbox;
     private readonly IAdvisoryLock _locks;
@@ -101,6 +103,7 @@ public sealed partial class RunSeasonRollover
         DivisionScheduleGenerator schedules,
         SeasonRolloverPlanLoader plans,
         SettleSeasonFinances finances,
+        SettleSeasonFans fans,
         SettleSquadContinuity continuity,
         IInboxRepository inbox,
         IAdvisoryLock locks,
@@ -118,6 +121,7 @@ public sealed partial class RunSeasonRollover
         _schedules = schedules;
         _plans = plans;
         _finances = finances;
+        _fans = fans;
         _continuity = continuity;
         _inbox = inbox;
         _locks = locks;
@@ -377,6 +381,9 @@ public sealed partial class RunSeasonRollover
 
         await _finances.SettleAsync(world.Id, season, settlement, now, cancellationToken);
 
+        // The fans give their last verdict and move halfway back to calm, in the phase that closes the table (FAN-8).
+        await _fans.CloseSeasonAsync(season.Id, settlement, now, cancellationToken);
+
         rollover.Finalize(now);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -514,6 +521,10 @@ public sealed partial class RunSeasonRollover
                 }
 
                 _schedules.Generate(nextDivisionSeason, ordered, nextSeason, now, bootstrapCutoff: null);
+
+                // The fans of a club that changed tier jump with it, and every club's fans pick the place they
+                // hope for from the squads as they now stand (FAN-7, FAN-8).
+                await _fans.OpenSeasonAsync(nextSeason.Id, ordered, moved, tier.TierNumber, now, cancellationToken);
 
                 // Only where the clubs are actually placed, so a redelivery that finds the entries present
                 // skips both the placement and the message (at-least-once).

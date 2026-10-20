@@ -3,6 +3,7 @@ using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Comms;
+using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Match;
 using Tactical11Manager.Domain.Competition;
 
@@ -55,6 +56,7 @@ public sealed class LockMatchday
     private readonly IMatchdayRepository _matchdays;
     private readonly MatchSnapshotFactory _snapshots;
     private readonly MatchdayNotifications _notifications;
+    private readonly FreezeFanExpectations _fanExpectations;
     private readonly IAdvisoryLock _locks;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
@@ -64,6 +66,7 @@ public sealed class LockMatchday
         IMatchdayRepository matchdays,
         MatchSnapshotFactory snapshots,
         MatchdayNotifications notifications,
+        FreezeFanExpectations fanExpectations,
         IAdvisoryLock locks,
         IUnitOfWork unitOfWork,
         IClock clock)
@@ -71,6 +74,7 @@ public sealed class LockMatchday
         _matchdays = matchdays;
         _snapshots = snapshots;
         _notifications = notifications;
+        _fanExpectations = fanExpectations;
         _locks = locks;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -102,6 +106,7 @@ public sealed class LockMatchday
         await _locks.AcquireAsync(AdvisoryLockKey.Matchday(matchdayId), cancellationToken);
 
         var repairedSides = new List<RepairedSideFact>();
+        var lockedSides = new List<FixtureSidesSnapshot>();
 
         foreach (var fixture in workload.Fixtures.Where(fixture => fixture.Status == FixtureStatus.Scheduled))
         {
@@ -113,6 +118,8 @@ public sealed class LockMatchday
             }
 
             var snapshot = await _snapshots.FreezeAsync(sides, cancellationToken);
+
+            lockedSides.Add(sides);
 
             if (snapshot.Built)
             {
@@ -143,6 +150,14 @@ public sealed class LockMatchday
 
             fixture.Lock(now);
         }
+
+        // What each side's fans expect from the match is frozen with the sides, so the result is judged against
+        // what they held at the lock and not against the squads as they stand when it is published (FAN-4).
+        await _fanExpectations.FreezeAsync(
+            workload.Matchday.DivisionSeasonId,
+            lockedSides,
+            now,
+            cancellationToken);
 
         await _notifications.NotifyRepairedSidesAsync(
             workload.Matchday.RoundNumber,
