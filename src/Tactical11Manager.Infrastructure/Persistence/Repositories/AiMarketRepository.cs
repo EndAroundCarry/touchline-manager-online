@@ -180,7 +180,7 @@ internal sealed class AiMarketRepository : IAiMarketRepository
 
             listings.Add(new AiMarketListingRow(
                 row.Listing.Id,
-                row.Listing.SellerClubId,
+                row.Listing.SellerClubId!.Value,
                 leadingClubId,
                 row.Player.Id,
                 PlayerPositions.FamilyOf(row.Player.PrimaryPosition),

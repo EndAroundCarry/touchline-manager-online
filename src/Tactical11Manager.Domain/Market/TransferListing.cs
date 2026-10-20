@@ -109,8 +109,14 @@ public sealed class TransferListing
     /// <summary>Gets the listed player.</summary>
     public Guid PlayerId { get; private set; }
 
-    /// <summary>Gets the club selling the player.</summary>
-    public Guid SellerClubId { get; private set; }
+    /// <summary>Gets the club selling the player, or null for a free agent, who has no seller (`FA-5`).</summary>
+    public Guid? SellerClubId { get; private set; }
+
+    /// <summary>
+    /// Gets the weekly free-agent batch the listing belongs to, or null for a club's listing. Exactly one of
+    /// this and <see cref="SellerClubId"/> is set (`FA-5`).
+    /// </summary>
+    public Guid? FreeAgentBatchId { get; private set; }
 
     /// <summary>Gets the minimum fee the seller will accept, in minor units (`TRF-1`).</summary>
     public long MinimumFeeMinor { get; private set; }
@@ -145,6 +151,9 @@ public sealed class TransferListing
     /// <summary>Gets whether the listing is still accepting bids. A player has at most one of these (`TRF-14`).</summary>
     public bool IsOpen => Status == ListingStatus.Open;
 
+    /// <summary>Gets whether the listing offers a free agent, sold with no seller and no proceeds (`FA-5`).</summary>
+    public bool IsFreeAgent => FreeAgentBatchId is not null;
+
     /// <summary>Opens a listing for an eligible player (`TRF-1`, `TRF-2`).</summary>
     /// <param name="id">A server-generated identity.</param>
     /// <param name="playerId">The listed player.</param>
@@ -168,24 +177,7 @@ public sealed class TransferListing
         string? idempotencyKey,
         DateTimeOffset now)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minimumFeeMinor);
-        ArgumentOutOfRangeException.ThrowIfNegative(generatedBuyerWageMinor);
-
-        if (generatedContractSeasons is < Rules.WorldRuleSet.ContractMinSeasons or > Rules.WorldRuleSet.ContractMaxSeasons)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(generatedContractSeasons),
-                generatedContractSeasons,
-                $"A contract is between {Rules.WorldRuleSet.ContractMinSeasons} and {Rules.WorldRuleSet.ContractMaxSeasons} game seasons (CON-1).");
-        }
-
-        if (endsAt <= opensAt)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(endsAt),
-                endsAt,
-                "A listing resolves after it opens (TRF-2).");
-        }
+        EnsureTerms(minimumFeeMinor, generatedBuyerWageMinor, generatedContractSeasons, opensAt, endsAt);
 
         return new TransferListing
         {
@@ -205,6 +197,51 @@ public sealed class TransferListing
         };
     }
 
+    /// <summary>Opens a listing for a free agent in a weekly batch (`FA-5`).</summary>
+    /// <remarks>
+    /// There is no seller: the listing belongs to the batch, the fee leaves the game when it is paid, and the
+    /// player is signed from free agency when it resolves.
+    /// </remarks>
+    /// <param name="id">A server-generated identity.</param>
+    /// <param name="playerId">The listed free agent.</param>
+    /// <param name="freeAgentBatchId">The weekly batch the listing belongs to.</param>
+    /// <param name="minimumFeeMinor">The minimum fee, which must be positive.</param>
+    /// <param name="generatedBuyerWageMinor">The weekly wage the signing club will pay, in minor units.</param>
+    /// <param name="generatedContractSeasons">The contract length, 1–3 game seasons (`CON-1`).</param>
+    /// <param name="opensAt">When the listing opens.</param>
+    /// <param name="endsAt">When the listing resolves, which must be after it opens.</param>
+    /// <param name="now">The current instant.</param>
+    public static TransferListing OpenFreeAgent(
+        Guid id,
+        Guid playerId,
+        Guid freeAgentBatchId,
+        long minimumFeeMinor,
+        long generatedBuyerWageMinor,
+        int generatedContractSeasons,
+        DateTimeOffset opensAt,
+        DateTimeOffset endsAt,
+        DateTimeOffset now)
+    {
+        EnsureTerms(minimumFeeMinor, generatedBuyerWageMinor, generatedContractSeasons, opensAt, endsAt);
+
+        return new TransferListing
+        {
+            Id = id,
+            PlayerId = playerId,
+            FreeAgentBatchId = freeAgentBatchId,
+            MinimumFeeMinor = minimumFeeMinor,
+            GeneratedBuyerWageMinor = generatedBuyerWageMinor,
+            GeneratedContractSeasons = generatedContractSeasons,
+            OpensAt = opensAt,
+            EndsAt = endsAt,
+            Status = ListingStatus.Open,
+            IdempotencyKey = null,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = 1,
+        };
+    }
+
     /// <summary>Marks the listing resolved with a winner (`TRF-10`).</summary>
     /// <param name="now">The current instant.</param>
     public void MarkSold(DateTimeOffset now) => Transition(ListingStatus.Sold, now);
@@ -216,6 +253,33 @@ public sealed class TransferListing
     /// <summary>Withdraws the listing, releasing every reservation (`TRF-15`).</summary>
     /// <param name="now">The current instant.</param>
     public void Cancel(DateTimeOffset now) => Transition(ListingStatus.Cancelled, now);
+
+    private static void EnsureTerms(
+        long minimumFeeMinor,
+        long generatedBuyerWageMinor,
+        int generatedContractSeasons,
+        DateTimeOffset opensAt,
+        DateTimeOffset endsAt)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minimumFeeMinor);
+        ArgumentOutOfRangeException.ThrowIfNegative(generatedBuyerWageMinor);
+
+        if (generatedContractSeasons is < Rules.WorldRuleSet.ContractMinSeasons or > Rules.WorldRuleSet.ContractMaxSeasons)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(generatedContractSeasons),
+                generatedContractSeasons,
+                $"A contract is between {Rules.WorldRuleSet.ContractMinSeasons} and {Rules.WorldRuleSet.ContractMaxSeasons} game seasons (CON-1).");
+        }
+
+        if (endsAt <= opensAt)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(endsAt),
+                endsAt,
+                "A listing resolves after it opens (TRF-2).");
+        }
+    }
 
     private void Transition(ListingStatus status, DateTimeOffset now)
     {

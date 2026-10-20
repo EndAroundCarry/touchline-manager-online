@@ -296,15 +296,29 @@ public static class PlayerGenerator
                 now));
     }
 
-    private static SquadDraft Draft(
+    /// <summary>
+    /// Draws one player. With no <paramref name="over"/> the draws are exactly the squad generator's, in the
+    /// same order, so a squad's golden digest cannot move; a free agent passes an override instead.
+    /// </summary>
+    internal static SquadDraft Draft(
         SquadGenerationRequest request,
         PlayerNamePool pool,
         Pcg32 rng,
         PlayerPosition position,
-        int nameOrdinal)
+        int nameOrdinal,
+        DraftOverride? over = null)
     {
-        var ageSpan = WorldRuleSet.PlayerMaximumAge - WorldRuleSet.PlayerMinimumAge + 1;
-        var age = WorldRuleSet.PlayerMinimumAge + ((rng.NextInt(ageSpan) + rng.NextInt(ageSpan)) / 2);
+        int age;
+
+        if (over is null)
+        {
+            var ageSpan = WorldRuleSet.PlayerMaximumAge - WorldRuleSet.PlayerMinimumAge + 1;
+            age = WorldRuleSet.PlayerMinimumAge + ((rng.NextInt(ageSpan) + rng.NextInt(ageSpan)) / 2);
+        }
+        else
+        {
+            age = over.Age;
+        }
 
         var birthDayOfYear = 1 + rng.NextInt(366);
 
@@ -321,8 +335,19 @@ public static class PlayerGenerator
 
         // The ceiling is drawn first and the skills follow from it (`TRN-18`), so a young player starts
         // below a potential that is already fixed rather than having it derived from his skills.
-        var potential = GeneratedPotential.Draw(request.Tier, rng);
-        var baseAbility = potential + PlayerAttributeProfiles.AgeAbilityAdjustment(age);
+        int potential;
+        int baseAbility;
+
+        if (over is null)
+        {
+            potential = GeneratedPotential.Draw(request.Tier, rng);
+            baseAbility = potential + PlayerAttributeProfiles.AgeAbilityAdjustment(age);
+        }
+        else
+        {
+            potential = over.Potential;
+            baseAbility = over.TargetAbility;
+        }
 
         var values = new int[AttributeNames.Count];
 
@@ -335,6 +360,11 @@ public static class PlayerGenerator
                     - PlayerAttributeProfiles.AttributeJitter,
                 WorldRuleSet.AttributeMin,
                 WorldRuleSet.AttributeMax);
+        }
+
+        if (over is not null)
+        {
+            ShiftToAbility(values, over.TargetAbility);
         }
 
         var attributes = PlayerAttributeSet.FromValues(values);
@@ -371,6 +401,31 @@ public static class PlayerGenerator
             mean,
             contractSeasons,
             PlayerExperience.StartingFor(age));
+    }
+
+    /// <summary>
+    /// Moves every attribute by the same amount until the rounded mean is the target, so a position's bonuses
+    /// shape the player without moving the ability he shows. Clamping at the scale's ends can leave a
+    /// remainder, so it repeats; at the abilities a free agent has it settles in a step or two.
+    /// </summary>
+    private static void ShiftToAbility(int[] values, int target)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var mean = (int)Math.Round(values.Average(), MidpointRounding.AwayFromZero);
+
+            if (mean == target)
+            {
+                return;
+            }
+
+            var delta = target - mean;
+
+            for (var index = 0; index < values.Length; index++)
+            {
+                values[index] = Math.Clamp(values[index] + delta, WorldRuleSet.AttributeMin, WorldRuleSet.AttributeMax);
+            }
+        }
     }
 
     private static List<PlayerPosition> SecondaryPositionsFor(
@@ -431,7 +486,7 @@ public static class PlayerGenerator
     /// Ranks the squad by mean ability and bands it, so squad status reflects where a player sits rather
     /// than the order the generator happened to draw them in.
     /// </summary>
-    private static SquadStatus[] SquadStatuses(IReadOnlyList<SquadDraft> drafts)
+    private static SquadStatus[] SquadStatuses(List<SquadDraft> drafts)
     {
         var order = drafts
             .Select((draft, index) => (Index: index, draft.Mean))
@@ -455,10 +510,17 @@ public static class PlayerGenerator
         return statuses;
     }
 
-    private sealed record SquadDraft(
+    /// <summary>One drawn player, before his rows exist.</summary>
+    internal sealed record SquadDraft(
         PlayerIdentity Identity,
         PlayerAttributeSet Attributes,
         int Mean,
         int ContractSeasons,
         int ExperienceBp);
+
+    /// <summary>
+    /// The values a free agent fixes instead of drawing them the way a squad member does: his age, his
+    /// hidden potential, and the ability he shows (the rounded mean of his attributes).
+    /// </summary>
+    internal sealed record DraftOverride(int Age, int Potential, int TargetAbility);
 }

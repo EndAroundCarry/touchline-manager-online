@@ -111,6 +111,93 @@ public sealed class TransferMarketTests
     }
 
     [Fact]
+    public void A_free_agent_listing_belongs_to_a_batch_and_has_no_seller()
+    {
+        var batchId = Guid.CreateVersion7();
+        var listing = TransferListing.OpenFreeAgent(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            batchId,
+            minimumFeeMinor: 250_000,
+            generatedBuyerWageMinor: 20_000,
+            generatedContractSeasons: 2,
+            opensAt: Now,
+            endsAt: Now.AddDays(7),
+            now: Now);
+
+        listing.IsFreeAgent.Should().BeTrue();
+        listing.SellerClubId.Should().BeNull();
+        listing.FreeAgentBatchId.Should().Be(batchId);
+        listing.IsOpen.Should().BeTrue();
+        listing.IdempotencyKey.Should().BeNull();
+
+        Listing().IsFreeAgent.Should().BeFalse();
+        Listing().FreeAgentBatchId.Should().BeNull();
+
+        listing.Expire(Now.AddDays(7));
+        listing.Status.Should().Be(ListingStatus.Expired, "a free-agent listing follows the same lifecycle");
+    }
+
+    [Fact]
+    public void A_free_agent_listing_keeps_the_same_term_checks_as_any_listing()
+    {
+        var noFee = () => TransferListing.OpenFreeAgent(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            minimumFeeMinor: 0, generatedBuyerWageMinor: 1, generatedContractSeasons: 1,
+            opensAt: Now, endsAt: Now.AddDays(7), now: Now);
+        noFee.Should().Throw<ArgumentOutOfRangeException>();
+
+        var backwards = () => TransferListing.OpenFreeAgent(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            minimumFeeMinor: 1, generatedBuyerWageMinor: 1, generatedContractSeasons: 1,
+            opensAt: Now, endsAt: Now, now: Now);
+        backwards.Should().Throw<ArgumentOutOfRangeException>();
+
+        var tooLong = () => TransferListing.OpenFreeAgent(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            minimumFeeMinor: 1, generatedBuyerWageMinor: 1,
+            generatedContractSeasons: WorldRuleSet.ContractMaxSeasons + 1,
+            opensAt: Now, endsAt: Now.AddDays(7), now: Now);
+        tooLong.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void An_outcome_records_a_free_agent_signing_with_no_seller_and_no_old_contract()
+    {
+        var signing = TransferOutcome.Record(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            sellerClubId: null, Guid.CreateVersion7(), feeMinor: 300_000, oldContractId: null,
+            Guid.CreateVersion7(), "transfer:test", Now);
+
+        signing.IsFreeAgentSigning.Should().BeTrue();
+        signing.SellerClubId.Should().BeNull();
+        signing.OldContractId.Should().BeNull();
+
+        var sale = TransferOutcome.Record(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), Guid.CreateVersion7(), feeMinor: 300_000, Guid.CreateVersion7(),
+            Guid.CreateVersion7(), "transfer:test", Now);
+
+        sale.IsFreeAgentSigning.Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_outcome_has_both_a_seller_and_a_closed_contract_or_neither()
+    {
+        var sellerOnly = () => TransferOutcome.Record(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), Guid.CreateVersion7(), feeMinor: 1, oldContractId: null,
+            Guid.CreateVersion7(), "transfer:test", Now);
+        sellerOnly.Should().Throw<ArgumentException>();
+
+        var contractOnly = () => TransferOutcome.Record(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            sellerClubId: null, Guid.CreateVersion7(), feeMinor: 1, Guid.CreateVersion7(),
+            Guid.CreateVersion7(), "transfer:test", Now);
+        contractOnly.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void A_shortlist_note_is_bounded()
     {
         var longNote = new string('x', WorldRuleSet.ShortlistNotesMaxLength + 1);

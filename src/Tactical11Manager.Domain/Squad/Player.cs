@@ -209,6 +209,21 @@ public sealed class Player
         Touch(now);
     }
 
+    /// <summary>Signs a free agent to a club, so he is an active player again (`FA-5`).</summary>
+    /// <param name="now">The current instant.</param>
+    /// <exception cref="InvalidOperationException">When the player is not a free agent.</exception>
+    public void SignFromFreeAgency(DateTimeOffset now)
+    {
+        if (Status != PlayerStatus.FreeAgent)
+        {
+            throw new InvalidOperationException($"A player who is '{Status}' cannot be signed from free agency.");
+        }
+
+        Status = PlayerStatus.Active;
+
+        Touch(now);
+    }
+
     /// <summary>Removes the person's identity on a data-subject request, retaining the record.</summary>
     /// <param name="now">The current instant.</param>
     public void Anonymize(DateTimeOffset now)

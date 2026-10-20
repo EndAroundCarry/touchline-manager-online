@@ -34,7 +34,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v12";
+    public const string Version = "world-rules-v13";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -745,4 +745,92 @@ public static class WorldRuleSet
     /// balancing value, tuned from the market-health measurements this milestone requires.
     /// </remarks>
     public const int AiMarketBidBudgetFractionBp = 5_000;
+
+    /// <summary>
+    /// The size of a weekly free-agent batch, as a share of the players under active contract, in basis
+    /// points (`FA-1`). A balancing value.
+    /// </summary>
+    public const int FreeAgentShareBp = 1_000;
+
+    /// <summary>The share of a generated batch that plays in a position family, in basis points (`FA-2`).</summary>
+    /// <remarks>The four shares sum to 10,000: 15% goalkeepers, 28% defenders, 29% midfielders, 28% attackers.</remarks>
+    /// <param name="family">The position family.</param>
+    public static int FreeAgentFamilyShareBp(PositionFamily family) => family switch
+    {
+        PositionFamily.Goalkeeper => 1_500,
+        PositionFamily.Defence => 2_800,
+        PositionFamily.Midfield => 2_900,
+        PositionFamily.Attack => 2_800,
+        _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown position family."),
+    };
+
+    /// <summary>The lowest displayed ability a generated free agent shows, on the 1–20 scale (`FA-3`).</summary>
+    public const int FreeAgentAbilityMin = 6;
+
+    /// <summary>The highest displayed ability a generated free agent shows, on the 1–20 scale (`FA-3`).</summary>
+    public const int FreeAgentAbilityMax = 10;
+
+    /// <summary>The youngest age of a normal generated free agent (`FA-3`).</summary>
+    public const int FreeAgentAgeMin = 20;
+
+    /// <summary>The oldest age of a normal generated free agent (`FA-3`).</summary>
+    public const int FreeAgentAgeMax = 32;
+
+    /// <summary>The highest hidden potential a normal generated free agent can have (`FA-3`).</summary>
+    public const int FreeAgentPotentialCap = 11;
+
+    /// <summary>The most points of headroom over his ability a young normal free agent can have (`FA-3`).</summary>
+    public const int FreeAgentHeadroomMax = 2;
+
+    /// <summary>The oldest age that still has headroom; older free agents have a ceiling at their ability (`FA-3`).</summary>
+    public const int FreeAgentHeadroomAgeMax = 23;
+
+    /// <summary>The share of generated free agents who are hidden gems, in per-mille (`FA-4`). A balancing value.</summary>
+    public const int FreeAgentGemPermille = 10;
+
+    /// <summary>The oldest age of a hidden gem; the youngest is <see cref="PlayerMinimumAge"/> (`FA-4`).</summary>
+    public const int FreeAgentGemAgeMax = 21;
+
+    /// <summary>The lowest hidden potential of a gem (`FA-4`).</summary>
+    public const int FreeAgentGemPotentialMin = 13;
+
+    /// <summary>The highest hidden potential of a gem (`FA-4`).</summary>
+    public const int FreeAgentGemPotentialMax = 16;
+
+    /// <summary>
+    /// A free agent's minimum fee as a share of his valuation, in basis points (`FA-6`). A balancing value.
+    /// </summary>
+    /// <remarks>Never below <see cref="MinimumBidIncrementMinor"/>, so the fee is always a real price.</remarks>
+    public const int FreeAgentMinimumFeeBp = 2_500;
+
+    /// <summary>The weekday a new free-agent batch opens, at <see cref="AuctionResolutionUtc"/> (`FA-5`).</summary>
+    public const DayOfWeek FreeAgentWeekStartDay = DayOfWeek.Monday;
+
+    /// <summary>
+    /// The length of the contract a free agent signs, in game seasons, from his age alone (`FA-7`).
+    /// </summary>
+    /// <remarks>
+    /// Age only, so the length never points at a hidden gem: 3 seasons at 21 or under, 2 from 22 to 29, 1 from 30.
+    /// </remarks>
+    /// <param name="age">The player's age in game years.</param>
+    public static int FreeAgentContractSeasonsFor(int age)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(age);
+
+        return age switch
+        {
+            <= 21 => 3,
+            <= 29 => 2,
+            _ => 1,
+        };
+    }
+
+    /// <summary>The oldest age at which a signed free agent joins as a prospect rather than rotation (`FA-7`).</summary>
+    public const int FreeAgentProspectAgeMax = 21;
+
+    /// <summary>
+    /// The share of the wages left on a contract that a club pays to release a player now, in basis points
+    /// (`CON-12`). A balancing value.
+    /// </summary>
+    public const int ReleasePayoutBp = 5_000;
 }

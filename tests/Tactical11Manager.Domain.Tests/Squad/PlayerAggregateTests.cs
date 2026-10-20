@@ -27,6 +27,34 @@ public sealed class PlayerAggregateTests
     }
 
     [Fact]
+    public void A_free_agent_signs_for_a_club_and_is_active_again()
+    {
+        var player = GeneratedPlayer();
+
+        player.ReleaseToFreeAgency(Now);
+        player.Status.Should().Be(PlayerStatus.FreeAgent);
+
+        var later = Now.AddDays(3);
+
+        player.SignFromFreeAgency(later);
+
+        player.Status.Should().Be(PlayerStatus.Active);
+        player.UpdatedAt.Should().Be(later);
+        player.Version.Should().Be(3);
+    }
+
+    [Fact]
+    public void Only_a_free_agent_can_be_signed_from_free_agency()
+    {
+        var active = () => GeneratedPlayer().SignFromFreeAgency(Now);
+        active.Should().Throw<InvalidOperationException>();
+
+        var retired = GeneratedPlayer();
+        retired.Retire(Now);
+        FluentActions.Invoking(() => retired.SignFromFreeAgency(Now)).Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void Secondary_positions_are_stored_in_a_stable_order()
     {
         var player = Player.Generate(

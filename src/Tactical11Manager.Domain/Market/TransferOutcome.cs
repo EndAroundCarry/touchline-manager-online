@@ -53,8 +53,8 @@ public sealed class TransferOutcome
     /// <summary>Gets the player who moved.</summary>
     public Guid PlayerId { get; private set; }
 
-    /// <summary>Gets the club that sold.</summary>
-    public Guid SellerClubId { get; private set; }
+    /// <summary>Gets the club that sold, or null when a free agent was signed, who has no seller (`FA-5`).</summary>
+    public Guid? SellerClubId { get; private set; }
 
     /// <summary>Gets the club that bought.</summary>
     public Guid BuyerClubId { get; private set; }
@@ -62,8 +62,11 @@ public sealed class TransferOutcome
     /// <summary>Gets the settled fee, in minor units (`FIN-6`, `FIN-8`).</summary>
     public long FeeMinor { get; private set; }
 
-    /// <summary>Gets the seller contract that was closed.</summary>
-    public Guid OldContractId { get; private set; }
+    /// <summary>Gets the seller contract that was closed, or null when a free agent was signed.</summary>
+    public Guid? OldContractId { get; private set; }
+
+    /// <summary>Gets whether the player was signed from free agency rather than bought from a club (`FA-5`).</summary>
+    public bool IsFreeAgentSigning => SellerClubId is null;
 
     /// <summary>Gets the buyer contract that was created.</summary>
     public Guid NewContractId { get; private set; }
@@ -82,10 +85,10 @@ public sealed class TransferOutcome
     /// <param name="listingId">The listing that resolved.</param>
     /// <param name="winningBidId">The winning bid.</param>
     /// <param name="playerId">The player who moved.</param>
-    /// <param name="sellerClubId">The selling club.</param>
+    /// <param name="sellerClubId">The selling club, or null for a free agent.</param>
     /// <param name="buyerClubId">The buying club.</param>
     /// <param name="feeMinor">The settled fee, which must be positive.</param>
-    /// <param name="oldContractId">The closed seller contract.</param>
+    /// <param name="oldContractId">The closed seller contract, or null for a free agent.</param>
     /// <param name="newContractId">The created buyer contract.</param>
     /// <param name="correlationId">The resolution's correlation key.</param>
     /// <param name="now">The current instant.</param>
@@ -94,16 +97,23 @@ public sealed class TransferOutcome
         Guid listingId,
         Guid winningBidId,
         Guid playerId,
-        Guid sellerClubId,
+        Guid? sellerClubId,
         Guid buyerClubId,
         long feeMinor,
-        Guid oldContractId,
+        Guid? oldContractId,
         Guid newContractId,
         string correlationId,
         DateTimeOffset now)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(feeMinor);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        if (sellerClubId is null != oldContractId is null)
+        {
+            throw new ArgumentException(
+                "A transfer has both a seller and a closed contract, or neither: a free agent has no seller.",
+                nameof(oldContractId));
+        }
 
         return new TransferOutcome
         {

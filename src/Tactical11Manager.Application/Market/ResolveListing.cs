@@ -148,7 +148,9 @@ public sealed class ResolveListing
         TransferBid leading,
         CancellationToken cancellationToken)
     {
-        if (leading.BidderClubId == listing.SellerClubId)
+        var sellerClubId = SellerOf(listing);
+
+        if (leading.BidderClubId == sellerClubId)
         {
             return TransferOutcomeReasons.PlayerIneligible;
         }
@@ -156,13 +158,13 @@ public sealed class ResolveListing
         var eligibility = await _roster.GetListingEligibilityAsync(listing.PlayerId, cancellationToken);
 
         if (eligibility is null
-            || eligibility.ClubId != listing.SellerClubId
+            || eligibility.ClubId != sellerClubId
             || !eligibility.HasActiveRegistration)
         {
             return TransferOutcomeReasons.PlayerIneligible;
         }
 
-        var seller = await _roster.GetCompositionAsync(listing.SellerClubId, cancellationToken);
+        var seller = await _roster.GetCompositionAsync(sellerClubId, cancellationToken);
         var buyer = await _roster.GetCompositionAsync(leading.BidderClubId, cancellationToken);
 
         if (seller is null || buyer is null)
@@ -202,8 +204,9 @@ public sealed class ResolveListing
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        var sellerClubId = SellerOf(listing);
         var buyerAccount = await _accounts.FindByClubAsync(leading.BidderClubId, cancellationToken);
-        var sellerAccount = await _accounts.FindByClubAsync(listing.SellerClubId, cancellationToken);
+        var sellerAccount = await _accounts.FindByClubAsync(sellerClubId, cancellationToken);
         var sellerContract = await _squad.FindActiveContractAsync(listing.PlayerId, cancellationToken);
         var sellerRegistration = await _squad.FindActiveRegistrationAsync(listing.PlayerId, cancellationToken);
 
@@ -222,7 +225,7 @@ public sealed class ResolveListing
             LedgerPostings.TransferPayment(Guid.CreateVersion7(), leading.BidderClubId, listing.Id, fee),
             now));
         _ledger.Add(sellerAccount.Post(
-            LedgerPostings.TransferProceeds(Guid.CreateVersion7(), listing.SellerClubId, listing.Id, fee),
+            LedgerPostings.TransferProceeds(Guid.CreateVersion7(), sellerClubId, listing.Id, fee),
             now));
 
         var renewal = await _squadQueries.GetRenewalContextAsync(sellerContract.Id, cancellationToken);
@@ -283,12 +286,21 @@ public sealed class ResolveListing
         await _notifications.NotifyTransferAsync(
             (await _world.FindWorldAsync(cancellationToken))?.Id,
             leading.BidderClubId,
-            listing.SellerClubId,
+            sellerClubId,
             listing.PlayerId,
             fee,
             now,
             cancellationToken);
     }
+
+    /// <summary>
+    /// The selling club of a club listing. A free-agent listing has none and settles on its own path, which is
+    /// not built yet, so reaching it here is a defect rather than a case to handle.
+    /// </summary>
+    private static Guid SellerOf(TransferListing listing) =>
+        listing.SellerClubId
+        ?? throw new InvalidOperationException(
+            $"Listing {listing.Id} is a free-agent listing and has no seller club to settle against.");
 
     private void AuditResolution(TransferListing listing, string reason, DateTimeOffset now)
     {
