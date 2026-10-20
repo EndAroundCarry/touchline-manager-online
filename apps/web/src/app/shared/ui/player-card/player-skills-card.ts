@@ -1,7 +1,9 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, input } from '@angular/core';
 import { SkillGroup } from '../../../core/squad/position-ratings';
+import { PlayerExperience } from '../../../core/squad/squad.models';
 import { attributeBand } from '../../../core/squad/squad-presentation';
+import { ExperienceLevel } from '../experience-level/experience-level';
 
 /**
  * A player's skills as the hover card draws them: the name, where they play, and all twenty-eight skills in
@@ -12,7 +14,7 @@ import { attributeBand } from '../../../core/squad/squad-presentation';
  */
 @Component({
   selector: 'app-player-skills-card',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, ExperienceLevel],
   templateUrl: './player-skills-card.html',
 })
 export class PlayerSkillsCard {
@@ -27,6 +29,9 @@ export class PlayerSkillsCard {
 
   /** The skills, grouped by family. */
   readonly groups = input.required<readonly SkillGroup[]>();
+
+  /** The player's experience, shown under the header; the tactics board has none to show and leaves it out. */
+  readonly experience = input<PlayerExperience | null>(null);
 
   /** The tint for an attribute or an average, on the 1–20 scale. */
   protected skillClass(value: number | null): string {

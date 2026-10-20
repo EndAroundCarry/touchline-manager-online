@@ -12,14 +12,21 @@
     </p>
 
     <h1 [class]="pageHeadingClass">{{ profile.fullName }}</h1>
-    <p class="mt-1 text-sm text-ink-2">
-      {{ position(profile.primaryPosition) }}
-      @if (profile.secondaryPositions.length > 0) {
-        · also {{ profile.secondaryPositions.length }} other position(s)
-      }
-      · {{ profile.age }} years · {{ foot(profile.preferredFoot) }} foot · {{ profile.heightCm }} cm
-      · {{ profile.weightKg }} kg · {{ profile.nationalityCode }}
-    </p>
+    <div class="mt-1 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
+      <p class="text-sm text-ink-2">
+        {{ position(profile.primaryPosition) }}
+        @if (profile.secondaryPositions.length > 0) {
+          · also {{ profile.secondaryPositions.length }} other position(s)
+        }
+        · {{ profile.age }} years · {{ foot(profile.preferredFoot) }} foot ·
+        {{ profile.heightCm }} cm · {{ profile.weightKg }} kg · {{ profile.nationalityCode }}
+      </p>
+      <app-experience-level
+        data-testid="player-experience"
+        [compact]="true"
+        [experience]="profile.experience"
+      />
+    </div>
 
     @if (profile.availability.length > 0) {
       <ul class="mt-4 space-y-1" role="list">

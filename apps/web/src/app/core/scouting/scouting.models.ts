@@ -1,4 +1,4 @@
-import { PlayerAttributes } from '../squad/squad.models';
+import { PlayerAttributes, PlayerExperience } from '../squad/squad.models';
 
 /**
  * The scouting module's transport mirror (master plan §10.6; `SCT-1`, `SCT-3`).
@@ -24,6 +24,7 @@ export interface PlayerSearchResult {
   readonly divisionName: string | null;
   readonly isListed: boolean;
   readonly attributes: PlayerAttributes;
+  readonly experience: PlayerExperience;
 }
 
 /** One page of scouting results. */

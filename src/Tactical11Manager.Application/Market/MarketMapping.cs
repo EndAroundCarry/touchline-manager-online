@@ -39,7 +39,8 @@ public static class MarketMapping
             row.DivisionId,
             row.DivisionName,
             row.IsListed,
-            row.Attributes.ToResponse());
+            row.Attributes.ToResponse(),
+            SquadMapping.ToExperienceResponse(row.ExperienceBp));
     }
 
     /// <summary>Projects a scouting page (`SCT-1`).</summary>

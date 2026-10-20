@@ -84,6 +84,25 @@ public static class SquadMapping
             ToUserFacingState(state.MatchSharpnessBp));
     }
 
+    /// <summary>
+    /// Projects stored experience to what a screen shows: the points, the level, and the bonus the level gives.
+    /// </summary>
+    /// <remarks>Shared by the player profile and the scouting card, so the rule is applied in one place.</remarks>
+    /// <param name="experienceBp">The stored experience in basis points of the maximum.</param>
+    public static PlayerExperienceResponse ToExperienceResponse(int experienceBp)
+    {
+        var level = PlayerExperience.LevelOf(experienceBp);
+
+        return new PlayerExperienceResponse(
+            Math.Round(Math.Clamp(experienceBp, 0, PlayerExperience.MaximumBasisPoints) / 100m, 1),
+            level,
+            PlayerExperience.MaximumLevel,
+            PlayerExperience.SkillBonusBasisPointsOf(experienceBp) / 100,
+            level >= PlayerExperience.MaximumLevel
+                ? null
+                : (level + 1) * PlayerExperience.LevelStepBasisPoints / 100m);
+    }
+
     /// <summary>Projects an unavailability record.</summary>
     /// <param name="availability">The stored record.</param>
     public static PlayerAvailabilityResponse ToResponse(this SquadAvailabilityRow availability)
@@ -368,6 +387,7 @@ public static class SquadMapping
             player.Attributes.ToResponse(),
             player.State.AttributeProgress.ToProgressResponse(),
             player.State.ToResponse(),
+            ToExperienceResponse(player.State.ExperienceBp),
             player.Contract?.ToSummary(player.SeasonNumber),
             player.Registration?.ToResponse(),
             [.. player.Availability.Select(record => record.ToResponse())],

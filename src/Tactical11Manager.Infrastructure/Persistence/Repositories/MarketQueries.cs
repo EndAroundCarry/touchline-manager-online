@@ -120,7 +120,8 @@ internal sealed class MarketQueries : IMarketQueries
                 row.Candidate.DivisionId,
                 row.Candidate.DivisionName,
                 season.GameYear,
-                listed.Contains(row.Candidate.Player.Id)))
+                listed.Contains(row.Candidate.Player.Id),
+                row.Candidate.ExperienceBp))
             .ToList();
 
         var nextCursor = hasMore && page.Count > 0
@@ -167,7 +168,8 @@ internal sealed class MarketQueries : IMarketQueries
             candidate.DivisionId,
             candidate.DivisionName,
             season.GameYear,
-            listed.Contains(playerId));
+            listed.Contains(playerId),
+            candidate.ExperienceBp);
     }
 
     /// <inheritdoc />
@@ -535,6 +537,7 @@ internal sealed class MarketQueries : IMarketQueries
     private IQueryable<Candidate> CandidatesOf(CurrentSeason season) =>
         from player in _dbContext.Players
         join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
+        join state in _dbContext.PlayerStates on player.Id equals state.PlayerId
         join contract in _dbContext.PlayerContracts on player.Id equals contract.PlayerId
         join club in _dbContext.Clubs on contract.ClubId equals club.Id
         join entry in _dbContext.ClubSeasonEntries on club.Id equals entry.ClubId
@@ -546,6 +549,7 @@ internal sealed class MarketQueries : IMarketQueries
         {
             Player = player,
             Attributes = attributes,
+            ExperienceBp = state.ExperienceBp,
             ClubId = club.Id,
             ClubName = club.Name,
             TierNumber = division.TierNumber,
@@ -559,6 +563,8 @@ internal sealed class MarketQueries : IMarketQueries
         public Player Player { get; init; } = null!;
 
         public PlayerAttributes Attributes { get; init; } = null!;
+
+        public int ExperienceBp { get; init; }
 
         public Guid ClubId { get; init; }
 

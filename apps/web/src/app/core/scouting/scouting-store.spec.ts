@@ -29,6 +29,7 @@ function player(id: string): PlayerSearchResult {
     divisionId: 'division-1',
     divisionName: 'Top Flight',
     isListed: false,
+    experience: { points: 47.5, level: 2, maxLevel: 5, skillBonusPercent: 2, nextLevelPoints: 60 },
     attributes: {
       technical: {
         finishing: 12,

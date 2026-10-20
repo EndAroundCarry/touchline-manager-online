@@ -71,6 +71,9 @@ public sealed class MarketTests : IAsyncLifetime
         card!.PlayerId.Should().Be(listed.PlayerId);
         card.FullName.Should().Be(listed.FullName);
         card.Attributes.Should().BeEquivalentTo(listed.Attributes, "the card is the search's own row (SCT-1)");
+        card.Experience.Should().NotBeNull("experience is public, like age");
+        card.Experience.Should().BeEquivalentTo(listed.Experience);
+        card.Experience.MaxLevel.Should().Be(5);
 
         var unknown = await client.GetAsync($"/api/v1/scouting/players/{Guid.CreateVersion7()}");
 

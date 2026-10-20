@@ -183,6 +183,15 @@ public sealed class SquadTests : IAsyncLifetime
         player.State.Condition.Should().BeInRange(0, 100);
         player.State.MatchSharpness.Should().BeInRange(0, 100);
 
+        // A seeded player starts with the age rule's experience, at most half the maximum, and the response
+        // carries the level and the bonus so the screen never repeats the rule.
+        player.Experience.Should().NotBeNull();
+        player.Experience.Points.Should().BeInRange(0, 50);
+        player.Experience.MaxLevel.Should().Be(5);
+        player.Experience.Level.Should().Be((int)(player.Experience.Points / 20));
+        player.Experience.SkillBonusPercent.Should().Be(player.Experience.Level);
+        player.Experience.NextLevelPoints.Should().Be((player.Experience.Level + 1) * 20);
+
         // The hidden values are class C2: absent from the payload that crossed the wire, not merely
         // unmapped by a DTO (data-classification.md §2.1).
         var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

@@ -69,6 +69,20 @@ export interface PlayerState {
   readonly matchSharpness: number;
 }
 
+/**
+ * A player's experience as the server reports it: the points (0–100), the level, and the per cent the level adds
+ * to the skills played with in a match. The thresholds live on the server; this only shows what it sends.
+ */
+export interface PlayerExperience {
+  readonly points: number;
+  readonly level: number;
+  readonly maxLevel: number;
+  readonly skillBonusPercent: number;
+
+  /** The points at which the next level is reached, or null at the highest level. */
+  readonly nextLevelPoints: number | null;
+}
+
 /** An open injury or suspension, measured in the fixtures it costs (`TRN-12`). */
 export interface PlayerAvailability {
   readonly id: string;
@@ -246,6 +260,7 @@ export interface Player {
    */
   readonly attributeProgress: Readonly<Record<string, number>>;
   readonly state: PlayerState;
+  readonly experience: PlayerExperience;
   readonly contract: PlayerContractSummary | null;
   readonly registration: PlayerRegistrationSummary | null;
   readonly availability: readonly PlayerAvailability[];

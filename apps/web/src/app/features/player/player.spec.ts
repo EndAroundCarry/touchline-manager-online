@@ -143,6 +143,7 @@ const player: Player = {
   },
   attributeProgress: { finishing: 0.85, stamina: -0.4 },
   state: { condition: 90, fatigue: 10, morale: 70, matchSharpness: 80 },
+  experience: { points: 47.5, level: 2, maxLevel: 5, skillBonusPercent: 2, nextLevelPoints: 60 },
   contract: {
     id: 'contract-1',
     startSeasonNumber: 2,
@@ -327,6 +328,18 @@ describe('PlayerProfile', () => {
     expect(portrait.parentElement!.contains(state)).toBe(true);
     expect(state.textContent).toContain('State');
     expect(portrait.parentElement!.querySelectorAll('dt')).toHaveLength(4);
+  });
+
+  it('shows the experience beside the player’s details, with the level and what it adds in matches', () => {
+    const box = root.querySelector<HTMLElement>('[data-testid="player-experience"]')!;
+
+    expect(box.querySelector('[data-testid="experience-headline"]')?.textContent).toContain(
+      'Level 2 · 47.5 / 100',
+    );
+    expect(box.querySelector('[data-testid="experience-bonus"]')?.textContent).toContain(
+      '+2% skills in matches',
+    );
+    expect(box.querySelectorAll('[data-testid="experience-pips"] > span')).toHaveLength(5);
   });
 
   it('lays the attributes out as four columns side by side', () => {

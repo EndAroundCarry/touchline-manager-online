@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { SkillGroup, skillGroups } from '../../../core/squad/position-ratings';
 import { positionLabel } from '../../../core/squad/squad-presentation';
+import { PlayerExperience } from '../../../core/squad/squad.models';
 import { PlayerSearchResult } from '../../../core/scouting/scouting.models';
 import { ScoutingApi } from '../../../core/scouting/scouting-api';
 import { CardAnchor, placeCard } from './player-card-placement';
@@ -18,6 +19,7 @@ export interface PlayerCardView {
   readonly subtitle: string;
   readonly basisLabel: string;
   readonly groups: readonly SkillGroup[];
+  readonly experience: PlayerExperience;
   readonly left: number;
   readonly top: number;
 }
@@ -91,6 +93,7 @@ export class PlayerCardService {
           : `${position} · age ${player.age} · ${player.clubName}`,
       basisLabel: position,
       groups: skillGroups(player.attributes, player.primaryPosition),
+      experience: player.experience,
       left: placement.left,
       top: placement.top,
     });

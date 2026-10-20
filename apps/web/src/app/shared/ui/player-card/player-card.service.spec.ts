@@ -55,6 +55,7 @@ function player(id: string, name: string): PlayerSearchResult {
     divisionName: 'Division',
     isListed: false,
     attributes: attributes(12),
+    experience: { points: 47.5, level: 2, maxLevel: 5, skillBonusPercent: 2, nextLevelPoints: 60 },
   };
 }
 
@@ -113,6 +114,13 @@ describe('PlayerCardService', () => {
     expect(card?.name).toBe('Alan Alder');
     expect(card?.subtitle).toContain('age 24');
     expect(card?.subtitle).toContain('Ashford');
+    expect(card?.experience).toEqual({
+      points: 47.5,
+      level: 2,
+      maxLevel: 5,
+      skillBonusPercent: 2,
+      nextLevelPoints: 60,
+    });
     expect(card?.groups.map((group) => group.key)).toEqual([
       'technical',
       'mental',

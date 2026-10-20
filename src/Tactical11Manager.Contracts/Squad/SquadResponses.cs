@@ -176,6 +176,7 @@ public sealed record PlayerRegistrationResponse(
 /// (`TRN-10`).
 /// </param>
 /// <param name="State">Condition, fatigue, morale, and sharpness.</param>
+/// <param name="Experience">Experience points, level, and the skill bonus the level gives in matches.</param>
 /// <param name="Contract">The active contract, or null if the player has none.</param>
 /// <param name="Registration">The active registration, or null if the player has none.</param>
 /// <param name="Availability">Every open injury and suspension, if any.</param>
@@ -205,6 +206,7 @@ public sealed record PlayerResponse(
     PlayerAttributesResponse Attributes,
     IReadOnlyDictionary<string, decimal> AttributeProgress,
     PlayerStateResponse State,
+    PlayerExperienceResponse Experience,
     PlayerContractSummaryResponse? Contract,
     PlayerRegistrationResponse? Registration,
     IReadOnlyList<PlayerAvailabilityResponse> Availability,

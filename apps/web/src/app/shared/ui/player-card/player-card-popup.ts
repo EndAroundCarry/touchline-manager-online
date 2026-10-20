@@ -24,6 +24,7 @@ import { PlayerSkillsCard } from './player-skills-card';
           [subtitle]="card.subtitle"
           [basisLabel]="card.basisLabel"
           [groups]="card.groups"
+          [experience]="card.experience"
         />
       </div>
     }

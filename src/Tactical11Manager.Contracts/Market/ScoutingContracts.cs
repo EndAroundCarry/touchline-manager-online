@@ -29,6 +29,7 @@ public sealed record ShortlistRequest(string? Notes);
 /// <param name="DivisionName">The division's name, or null.</param>
 /// <param name="IsListed">Whether the player currently has an open listing (`TRF-14`).</param>
 /// <param name="Attributes">The player's exact public attributes (`SCT-1`).</param>
+/// <param name="Experience">The player's experience, which is public like age.</param>
 public sealed record PlayerSearchResultResponse(
     Guid PlayerId,
     string FullName,
@@ -44,7 +45,8 @@ public sealed record PlayerSearchResultResponse(
     Guid? DivisionId,
     string? DivisionName,
     bool IsListed,
-    PlayerAttributesResponse Attributes);
+    PlayerAttributesResponse Attributes,
+    PlayerExperienceResponse Experience);
 
 /// <summary>One page of scouting results (`SCT-1`).</summary>
 /// <param name="Players">The players on this page.</param>

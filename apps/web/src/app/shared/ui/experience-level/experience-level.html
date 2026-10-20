@@ -1,0 +1,31 @@
+<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5" aria-hidden="true">
+  <span class="flex gap-0.5" data-testid="experience-pips">
+    @for (filled of pips(); track $index) {
+      <span
+        class="h-2.5 w-2.5 rounded-full border"
+        [class.border-accent]="filled"
+        [class.bg-accent]="filled"
+        [class.border-line-strong]="!filled"
+      ></span>
+    }
+  </span>
+  <span class="text-xs font-medium text-ink" data-testid="experience-headline">{{
+    headline()
+  }}</span>
+  @if (compact() && bonus()) {
+    <span class="text-xs text-ink-2" data-testid="experience-bonus">{{ bonus() }}</span>
+  }
+</div>
+@if (!compact()) {
+  <p class="mt-0.5 text-xs text-ink-2" aria-hidden="true">
+    @if (bonus()) {
+      <span data-testid="experience-bonus">{{ bonus() }}</span>
+    } @else {
+      <span>No bonus yet</span>
+    }
+    @if (nextStep()) {
+      · <span data-testid="experience-next">{{ nextStep() }}</span>
+    }
+  </p>
+}
+<span class="sr-only" data-testid="experience-spoken">{{ spoken() }}</span>

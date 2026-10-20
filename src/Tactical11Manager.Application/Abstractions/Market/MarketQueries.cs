@@ -62,6 +62,7 @@ public sealed record PlayerSearchFilter(
 /// <param name="DivisionName">The division's name, or null.</param>
 /// <param name="GameYear">The game year the age is read against (`TIME-3`).</param>
 /// <param name="IsListed">Whether the player currently has an open listing (`TRF-14`).</param>
+/// <param name="ExperienceBp">The player's experience in basis points of the maximum.</param>
 public sealed record PlayerSearchRow(
     Guid PlayerId,
     string FullName,
@@ -78,7 +79,8 @@ public sealed record PlayerSearchRow(
     Guid? DivisionId,
     string? DivisionName,
     int GameYear,
-    bool IsListed);
+    bool IsListed,
+    int ExperienceBp);
 
 /// <summary>One page of scouting results (`SCT-1`).</summary>
 /// <param name="Players">The players on this page.</param>

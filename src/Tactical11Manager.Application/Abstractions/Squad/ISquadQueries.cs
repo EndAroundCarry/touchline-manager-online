@@ -11,12 +11,14 @@ namespace Tactical11Manager.Application.Abstractions.Squad;
 /// Each attribute's progress towards its next point in millionths of a point (`TRN-10`), read only where a
 /// screen shows it; null elsewhere.
 /// </param>
+/// <param name="ExperienceBp">Experience in basis points of the maximum, read only where a screen shows it.</param>
 public sealed record SquadStateRow(
     int ConditionBp,
     int FatigueBp,
     int MoraleBp,
     int MatchSharpnessBp,
-    IReadOnlyList<int>? AttributeProgress = null);
+    IReadOnlyList<int>? AttributeProgress = null,
+    int ExperienceBp = 0);
 
 /// <summary>A player's active contract, as the squad and contract screens read it.</summary>
 /// <param name="Id">The contract identity.</param>

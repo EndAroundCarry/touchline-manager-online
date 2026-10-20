@@ -21,6 +21,7 @@ import { SquadStore } from '../../core/squad/squad-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
+import { ExperienceLevel } from '../../shared/ui/experience-level/experience-level';
 import { PlayerPortrait } from '../../shared/ui/player-portrait/player-portrait';
 import { FALLBACK_KIT, PortraitKit } from '../../shared/ui/player-portrait/portrait-designs';
 import { PlayerTraining } from './player-training/player-training';
@@ -54,7 +55,14 @@ const CURRENT_SEASON = 'current';
  */
 @Component({
   selector: 'app-player',
-  imports: [RouterLink, AttributeValue, PlayerPortrait, PlayerTraining, ResultHidden],
+  imports: [
+    RouterLink,
+    AttributeValue,
+    ExperienceLevel,
+    PlayerPortrait,
+    PlayerTraining,
+    ResultHidden,
+  ],
   templateUrl: './player.html',
 })
 export class PlayerProfile implements OnInit {

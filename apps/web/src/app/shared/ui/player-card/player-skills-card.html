@@ -2,6 +2,9 @@
   <p class="text-sm font-semibold text-ink">{{ name() }}</p>
   <p class="text-muted">{{ subtitle() }}</p>
 </div>
+@if (experience(); as level) {
+  <app-experience-level class="mt-1" [compact]="true" [experience]="level" />
+}
 <p class="mt-0.5 text-ink-2">
   Averages weighted for {{ basisLabel() }}. Bold skills count most there.
 </p>
