@@ -3,8 +3,9 @@ using Tactical11Manager.Domain.Fans;
 namespace Tactical11Manager.Domain.Rules;
 
 /// <summary>
-/// The fan rules: how the fans size a match up before it is played, and (in later milestones) how a result moves their number and their
-/// mood (game rules §14, `FAN-*`).
+/// The fan rules: how the fans size a match up before it is played, and how a result, a week, a season, a change of division or a new
+/// manager moves their number and their mood (game rules §14, `FAN-*`). This file holds the expectation; the other half is in
+/// <c>FanRuleSet.FanBase.cs</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,7 +19,7 @@ namespace Tactical11Manager.Domain.Rules;
 /// chances in floating point because it only picks between a handful of scorelines and is stored the moment it is made.
 /// </para>
 /// </remarks>
-public static class FanRuleSet
+public static partial class FanRuleSet
 {
     /// <summary>The version of the fan rules, stored with every fan row so a number can be traced to the rules that made it.</summary>
     public const string Version = "fan-rules-v1";
@@ -130,6 +131,16 @@ public static class FanRuleSet
             label);
 
         return new FanExpectation(points, winBp, drawBp, againstBp, label, goalsFor, goalsAgainst);
+    }
+
+    /// <summary>The goals each side is expected to score, by the strength gap between the home and the away side (`FAN-4`).</summary>
+    /// <param name="homeGapCentis">The home side's strength minus the away side's, in hundredths of an attribute point.</param>
+    /// <returns>The home side's and the away side's expected goals, in hundredths.</returns>
+    public static (int HomeGoalsCentis, int AwayGoalsCentis) ExpectedGoalsForGap(int homeGapCentis)
+    {
+        var (_, _, homeGoalsCentis, awayGoalsCentis) = CurveAt(homeGapCentis);
+
+        return (homeGoalsCentis, awayGoalsCentis);
     }
 
     /// <summary>The label the fans give an expected number of points (`FAN-4`).</summary>
