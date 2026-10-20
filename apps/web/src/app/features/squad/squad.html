@@ -202,10 +202,18 @@
                     {{ fatigueWord(player.state.fatigue) }}
                   </span>
                 </td>
-                <td>{{ player.ratings.goalkeeping | number: '1.1-1' }}</td>
-                <td>{{ player.ratings.technical | number: '1.1-1' }}</td>
-                <td>{{ player.ratings.mental | number: '1.1-1' }}</td>
-                <td>{{ player.ratings.physical | number: '1.1-1' }}</td>
+                <td [class]="skillClass(player.ratings.goalkeeping)">
+                  {{ player.ratings.goalkeeping | number: '1.1-1' }}
+                </td>
+                <td [class]="skillClass(player.ratings.technical)">
+                  {{ player.ratings.technical | number: '1.1-1' }}
+                </td>
+                <td [class]="skillClass(player.ratings.mental)">
+                  {{ player.ratings.mental | number: '1.1-1' }}
+                </td>
+                <td [class]="skillClass(player.ratings.physical)">
+                  {{ player.ratings.physical | number: '1.1-1' }}
+                </td>
                 <td>
                   @if (player.contract; as contract) {
                     <span class="block fit:inline">to season {{ contract.endSeasonNumber }}</span>

@@ -6,6 +6,7 @@ import { ApiError } from '../../core/api/api-error';
 import {
   POSITION_FAMILY_OPTIONS,
   SquadFilter,
+  attributeBand,
   availabilityLabel,
   filterSquad,
   positionAbbreviation,
@@ -233,6 +234,11 @@ export class Squad {
   /** The band word for a state value where higher is better. */
   protected conditionWord(value: number): string {
     return stateBand(value, true).label;
+  }
+
+  /** The tint for a skill average, on the 1–20 scale, the same as the tactics table. */
+  protected skillClass(value: number): string {
+    return attributeBand(value).className;
   }
 
   /** The tint for a state value where lower is better, which is fatigue. */
