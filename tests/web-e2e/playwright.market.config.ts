@@ -16,8 +16,9 @@ import { marketConnectionString } from './support/market-database';
  *
  * The worker's own schedulers are switched off: the AI market would otherwise bid against the managers the
  * journey is driving, and the auction scheduler would pre-create the resolution row with its real deadline,
- * turning the trigger's due-now enqueue into a no-op. Both are the same reasoning the matchday stack applies
- * to its own scheduler.
+ * turning the trigger's due-now enqueue into a no-op. The free-agent scheduler is off for the same reason: the
+ * journey that needs the pool asks for this week's batch itself. This is the reasoning the matchday stack
+ * applies to its own scheduler.
  *
  * The ports are shared with the other configs on purpose: the suites never run at the same time, and sharing
  * them keeps the dev-server proxy and CORS settings valid. `reuseExistingServer: false` means a stray
@@ -94,6 +95,9 @@ export default defineConfig({
         Auctions__EnableAuctions: 'false',
         // And the AI market must not bid against the managers this journey is driving.
         AiMarket__EnableEvaluation: 'false',
+        // The free-agent batch is opened by the journey's own trigger, so the pool is not already listed (or
+        // listed late, on the worker's first pass) when the journey looks for it.
+        FreeAgents__EnableBatches: 'false',
         Worker__PollIntervalSeconds: '1',
         Worker__MaxIdlePollIntervalSeconds: '1',
       },

@@ -4,8 +4,10 @@ import { createVerifiedManager } from '../support/auth-flows';
 import { confirmKitColours } from '../support/kit-colours';
 import {
   apiAccessToken,
+  openFreeAgentBatch,
   playAuction,
   readMyActivity,
+  waitForFreeAgentListings,
   waitForMyListing,
   waitForTransfer,
 } from '../support/market';
@@ -26,11 +28,7 @@ import {
 const fee = 1_000_000;
 
 /** Onboards a manager into a club the way the onboarding journey does, and returns their access token. */
-async function onboard(
-  page: Page,
-  request: APIRequestContext,
-  account: TestAccount,
-): Promise<string> {
+async function onboard(page: Page, request: APIRequestContext, account: TestAccount): Promise<string> {
   await createVerifiedManager(page, request, account);
 
   await page.goto('/onboarding/manager');
@@ -49,9 +47,7 @@ async function onboard(
 
 /** Locates the row of the open-listings table for a player. */
 function listingRow(page: Page, playerName: string) {
-  const openListings = page
-    .locator('table')
-    .filter({ has: page.getByRole('columnheader', { name: 'Leading' }) });
+  const openListings = page.locator('table').filter({ has: page.getByRole('columnheader', { name: 'Leading' }) });
 
   return openListings.locator('tbody tr', { hasText: playerName });
 }
@@ -68,10 +64,7 @@ function section(page: Page, heading: string) {
 }
 
 test.describe('the transfer market', () => {
-  test('a manager lists a player, two rivals bid, and the auction settles', async ({
-    browser,
-    request,
-  }) => {
+  test('a manager lists a player, two rivals bid, and the auction settles', async ({ browser, request }) => {
     const sellerAccount = createAccount();
     const firstRivalAccount = createAccount();
     const secondRivalAccount = createAccount();
@@ -182,5 +175,63 @@ test.describe('the transfer market', () => {
     await sellerContext.close();
     await firstRivalContext.close();
     await secondRivalContext.close();
+  });
+
+  test('a manager bids on a free agent and signs him', async ({ browser, request }) => {
+    const account = createAccount();
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const token = await onboard(page, request, account);
+
+    // The weekly pool opens through the real batch job (FA-1, FA-2); the journey only asks for it now.
+    await openFreeAgentBatch(request);
+
+    const pool = await waitForFreeAgentListings(request, token);
+    const target = pool[0];
+
+    expect(target.kind).toBe('free_agent');
+    expect(target.sellerClubId).toBeNull();
+
+    // The Free agents tab lists him with his terms, and the clubs' tab does not (FA-5).
+    await page.goto('/transfers');
+    await page.getByRole('tab', { name: 'Free agents' }).click();
+
+    const row = page.getByTestId('free-agents-table').locator('tbody tr', { hasText: target.playerName });
+
+    await expect(row).toBeVisible();
+
+    // He is bid for through his own row, at the server's minimum (FA-6).
+    await row.locator('input[name="amount"]').fill(String(target.minimumAcceptableBidMinor));
+    await row.getByRole('button', { name: 'Bid' }).click();
+
+    await expect(section(page, 'Your bids').getByText('leading')).toBeVisible();
+
+    const bid = (await readMyActivity(request, token)).myBids[0];
+
+    expect(bid.status).toBe('leading');
+    expect(bid.amountMinor).toBe(target.minimumAcceptableBidMinor);
+
+    // Resolve the listing now, rather than at next Monday's close, and watch the signing settle (FA-7).
+    await playAuction(request, target.listingId);
+
+    const transfer = await waitForTransfer(request, token, target.listingId);
+
+    expect(transfer.playerName).toBe(target.playerName);
+    expect(transfer.sellerClubName).toBeNull();
+    expect(transfer.feeMinor).toBe(target.minimumAcceptableBidMinor);
+
+    // The public history says where he came from, without a club to link to (FA-5).
+    await page.reload();
+
+    const history = section(page, 'Recent transfers');
+    const signed = history.locator('tbody tr', { hasText: target.playerName });
+
+    await expect(signed).toBeVisible();
+    await expect(signed.locator('td').nth(1)).toHaveText('Free agent');
+    await expect(signed.locator('td').nth(2)).toHaveText(transfer.buyerClubName);
+
+    await expect(section(page, 'Your bids').getByText('won')).toBeVisible();
+
+    await context.close();
   });
 });

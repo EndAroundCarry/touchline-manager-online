@@ -804,4 +804,48 @@ describe('PlayerProfile', () => {
       expect(opponent?.getAttribute('href')).toBe('/clubs/club-2');
     });
   });
+
+  describe('a free agent', () => {
+    const freeAgent: Player = {
+      ...player,
+      clubId: null,
+      club: null,
+      isOwnClub: false,
+      state: null,
+      contract: null,
+      registration: null,
+      availability: [],
+      attributeProgress: {},
+    };
+
+    beforeEach(async () => {
+      playerState.set(freeAgent);
+      await fixture.whenStable();
+    });
+
+    it('says free agent where the club would be, with no club link or crest', () => {
+      const club = root.querySelector<HTMLElement>('[data-testid="player-club"]')!;
+
+      expect(club.textContent?.trim()).toBe('Free agent');
+      expect(club.querySelector('a')).toBeNull();
+      expect(club.querySelector('app-club-crest')).toBeNull();
+    });
+
+    it('goes back to the transfers page rather than to a club or the squad', () => {
+      const links = Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).map((a) => [
+        a.textContent?.trim(),
+        a.getAttribute('href'),
+      ]);
+
+      expect(links).toContainEqual(['Back to transfers', '/transfers']);
+      expect(links.some(([, href]) => href === '/squad')).toBe(false);
+    });
+
+    it('offers the public tabs and dresses the portrait in the neutral shirt', () => {
+      const tabs = Array.from(root.querySelectorAll<HTMLElement>('[role="tab"]'));
+
+      expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(['Attributes', 'Statistics']);
+      expect(root.querySelector('[data-testid="player-portrait"] path[fill="#b11f2a"]')).toBeNull();
+    });
+  });
 });

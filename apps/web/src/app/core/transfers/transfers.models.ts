@@ -5,6 +5,9 @@
  * them and the server does every piece of arithmetic that matters (`INT-1`).
  */
 
+/** Who sells a listed player (`FA-5`). */
+export type ListingKind = 'club' | 'free_agent';
+
 /** One transfer listing as the market reads it (`TRF-4`, `CON-5`, `TRF-5`). */
 export interface TransferListing {
   readonly listingId: string;
@@ -13,8 +16,16 @@ export interface TransferListing {
   readonly playerShortName: string;
   readonly primaryPosition: string;
   readonly age: number;
-  readonly sellerClubId: string;
-  readonly sellerClubName: string;
+
+  /** The displayed ability, the mean of the attributes a scouting card shows (1-20). */
+  readonly ability: number;
+
+  /** Who sells the player: a `club`, or the weekly `free_agent` pool (`FA-5`). */
+  readonly kind: ListingKind;
+
+  /** The selling club, or null for a free agent. */
+  readonly sellerClubId: string | null;
+  readonly sellerClubName: string | null;
   readonly minimumFeeMinor: number;
   readonly generatedBuyerWageMinor: number;
   readonly generatedContractSeasons: number;
@@ -57,8 +68,10 @@ export interface TransferHistoryEntry {
   readonly listingId: string;
   readonly playerId: string;
   readonly playerName: string;
-  readonly sellerClubId: string;
-  readonly sellerClubName: string;
+
+  /** The selling club, or null when the player was a free agent. */
+  readonly sellerClubId: string | null;
+  readonly sellerClubName: string | null;
   readonly buyerClubId: string;
   readonly buyerClubName: string;
   readonly feeMinor: number;

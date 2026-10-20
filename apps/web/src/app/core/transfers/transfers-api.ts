@@ -2,11 +2,21 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
+  ListingKind,
   MyMarketActivity,
   TransferHistoryPage,
   TransferListing,
   TransferListingsPage,
 } from './transfers.models';
+
+/** What a listings read is narrowed to. */
+export interface ListingsFilter {
+  /** Club listings or the free-agent pool. */
+  readonly kind?: ListingKind;
+
+  /** A position family (`goalkeeper`, `defence`, `midfield`, `attack`), or empty for any. */
+  readonly family?: string;
+}
 
 /**
  * The transfers module's HTTP surface (master plan §10.6; `TRF-1`, `TRF-4`, `INT-6`).
@@ -19,9 +29,30 @@ import {
 export class TransfersApi {
   private readonly api = inject(ApiClient);
 
-  /** Browses open listings. */
-  getListings(cursor: string | null): Observable<TransferListingsPage> {
-    const query = cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`;
+  /**
+   * Browses open listings. The transfer list asks for `club` and the free-agent tab for `free_agent`: with no
+   * kind the server answers with both, which no screen wants (`FA-5`).
+   */
+  getListings(
+    cursor: string | null,
+    filter: ListingsFilter = {},
+  ): Observable<TransferListingsPage> {
+    const params = new URLSearchParams();
+
+    if (filter.kind !== undefined) {
+      params.set('kind', filter.kind);
+    }
+
+    if (filter.family !== undefined && filter.family.length > 0) {
+      params.set('family', filter.family);
+    }
+
+    if (cursor !== null) {
+      params.set('cursor', cursor);
+    }
+
+    const text = params.toString();
+    const query = text.length === 0 ? '' : `?${text}`;
 
     return this.api.get<TransferListingsPage>(`/transfers/listings${query}`);
   }

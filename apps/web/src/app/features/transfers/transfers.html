@@ -63,68 +63,186 @@
   <section class="mt-8">
     <h2 class="text-lg font-semibold">Open listings</h2>
 
-    @if (loading()) {
-      <p class="mt-2 text-sm text-ink-2" role="status">Loading the market…</p>
-    } @else if (listings().length === 0) {
-      <p class="mt-2 text-sm text-ink-2" role="status">No players are listed right now.</p>
-    } @else {
-      <div
-        class="mt-2 hidden overflow-x-auto md:block"
-        data-testid="listings-table"
-        tabindex="0"
-        role="group"
-        aria-label="Transfer listings"
-      >
-        <table class="min-w-full divide-y divide-line text-sm">
-          <caption class="sr-only">
-            Open transfer listings
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Player</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Seller</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Minimum</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Leading</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Bids</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Closes</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Your bid</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-line-soft">
-            @for (listing of listings(); track listing.listingId) {
-              <tr>
-                <td class="px-3 py-2 text-ink">
-                  <a
-                    [routerLink]="['/players', listing.playerId]"
-                    [appPlayerCard]="listing.playerId"
-                    [class]="nameLinkClass"
-                    >{{ listing.playerName }}</a
-                  >
-                </td>
-                <td class="px-3 py-2 text-ink-2">
-                  <a [routerLink]="['/clubs', listing.sellerClubId]" [class]="nameLinkClass">{{
-                    listing.sellerClubName
-                  }}</a>
-                </td>
-                <td class="px-3 py-2 text-right text-ink-2">
-                  {{ funds(listing.minimumFeeMinor) }}
-                </td>
-                <td class="px-3 py-2 text-right font-medium text-ink">
-                  @if (listing.leadingAmountMinor; as leading) {
-                    {{ funds(leading) }}
-                  } @else {
-                    No bids
+    <div role="tablist" aria-label="Open listings" data-testid="transfer-tabs" class="mt-2">
+      <div class="flex gap-1 overflow-x-auto border-b border-line">
+        @for (tab of tabs; track tab.key; let index = $index) {
+          <button
+            type="button"
+            role="tab"
+            class="min-h-11 shrink-0 border-b-2 px-3 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            [class.border-accent]="activeTab() === tab.key"
+            [class.text-ink]="activeTab() === tab.key"
+            [class.border-transparent]="activeTab() !== tab.key"
+            [class.text-ink-2]="activeTab() !== tab.key"
+            [id]="'transfers-tab-' + tab.key"
+            [attr.aria-selected]="activeTab() === tab.key"
+            [attr.aria-controls]="'transfers-panel-' + tab.key"
+            [attr.tabindex]="activeTab() === tab.key ? 0 : -1"
+            (click)="selectTab(tab.key)"
+            (keydown)="onTabKeydown($event, index)"
+          >
+            {{ tab.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    @switch (activeTab()) {
+      @case ('club') {
+        <div
+          id="transfers-panel-club"
+          role="tabpanel"
+          aria-labelledby="transfers-tab-club"
+          tabindex="0"
+        >
+          @if (loading()) {
+            <p class="mt-2 text-sm text-ink-2" role="status">Loading the market…</p>
+          } @else if (listings().length === 0) {
+            <p class="mt-2 text-sm text-ink-2" role="status">No players are listed right now.</p>
+          } @else {
+            <div
+              class="mt-2 hidden overflow-x-auto md:block"
+              data-testid="listings-table"
+              tabindex="0"
+              role="group"
+              aria-label="Transfer listings"
+            >
+              <table class="min-w-full divide-y divide-line text-sm">
+                <caption class="sr-only">
+                  Open transfer listings
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Player</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Seller</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Minimum</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Leading</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Bids</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Closes</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Your bid</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-line-soft">
+                  @for (listing of listings(); track listing.listingId) {
+                    <tr>
+                      <td class="px-3 py-2 text-ink">
+                        <a
+                          [routerLink]="['/players', listing.playerId]"
+                          [appPlayerCard]="listing.playerId"
+                          [class]="nameLinkClass"
+                          >{{ listing.playerName }}</a
+                        >
+                      </td>
+                      <td class="px-3 py-2 text-ink-2">
+                        @if (listing.sellerClubId; as sellerId) {
+                          <a [routerLink]="['/clubs', sellerId]" [class]="nameLinkClass">{{
+                            listing.sellerClubName
+                          }}</a>
+                        } @else {
+                          Free agent
+                        }
+                      </td>
+                      <td class="px-3 py-2 text-right text-ink-2">
+                        {{ funds(listing.minimumFeeMinor) }}
+                      </td>
+                      <td class="px-3 py-2 text-right font-medium text-ink">
+                        @if (listing.leadingAmountMinor; as leading) {
+                          {{ funds(leading) }}
+                        } @else {
+                          No bids
+                        }
+                      </td>
+                      <td class="px-3 py-2 text-right text-ink-2">{{ listing.bidderCount }}</td>
+                      <td class="px-3 py-2 text-ink-2">{{ instant(listing.endsAt) }}</td>
+                      <td class="px-3 py-2">
+                        <form
+                          class="flex items-center gap-2"
+                          (submit)="onBid($event, listing.listingId)"
+                        >
+                          <label class="sr-only" [attr.for]="'bid-' + listing.listingId"
+                            >Bid amount</label
+                          >
+                          <input
+                            [id]="'bid-' + listing.listingId"
+                            name="amount"
+                            type="number"
+                            min="1"
+                            [value]="listing.minimumAcceptableBidMinor"
+                            [class]="textInputClass"
+                          />
+                          <button
+                            type="submit"
+                            [class]="secondaryButtonClass"
+                            [disabled]="!canMutate()"
+                          >
+                            Bid
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
                   }
-                </td>
-                <td class="px-3 py-2 text-right text-ink-2">{{ listing.bidderCount }}</td>
-                <td class="px-3 py-2 text-ink-2">{{ instant(listing.endsAt) }}</td>
-                <td class="px-3 py-2">
-                  <form class="flex items-center gap-2" (submit)="onBid($event, listing.listingId)">
-                    <label class="sr-only" [attr.for]="'bid-' + listing.listingId"
+                </tbody>
+              </table>
+            </div>
+
+            <!--
+        The same listings as cards below `md`. The bid control is in the seventh column of the
+        table, so on a phone it lives behind a sideways scroll; here it sits under the player
+        (`F-44`).
+      -->
+            <ul class="mt-2 flex flex-col gap-3 md:hidden" data-testid="listings-cards">
+              @for (listing of listings(); track listing.listingId) {
+                <li class="rounded border border-line bg-panel p-3">
+                  <h3 class="text-sm font-semibold text-ink">
+                    <a
+                      [routerLink]="['/players', listing.playerId]"
+                      [appPlayerCard]="listing.playerId"
+                      [class]="nameLinkClass"
+                      >{{ listing.playerName }}</a
+                    >
+                  </h3>
+                  <p class="text-sm text-ink-2">
+                    @if (listing.sellerClubId; as sellerId) {
+                      <a [routerLink]="['/clubs', sellerId]" [class]="nameLinkClass">{{
+                        listing.sellerClubName
+                      }}</a>
+                    } @else {
+                      Free agent
+                    }
+                  </p>
+                  <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Minimum</dt>
+                      <dd class="text-ink">{{ funds(listing.minimumFeeMinor) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Leading</dt>
+                      <dd class="text-ink">
+                        @if (listing.leadingAmountMinor; as leading) {
+                          {{ funds(leading) }}
+                        } @else {
+                          No bids
+                        }
+                      </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Bids</dt>
+                      <dd class="text-ink">{{ listing.bidderCount }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Closes</dt>
+                      <dd class="text-ink">{{ instant(listing.endsAt) }}</dd>
+                    </div>
+                  </dl>
+                  <form
+                    class="mt-2 flex items-center gap-2"
+                    (submit)="onBid($event, listing.listingId)"
+                  >
+                    <label class="sr-only" [attr.for]="'bid-mobile-' + listing.listingId"
                       >Bid amount</label
                     >
                     <input
-                      [id]="'bid-' + listing.listingId"
+                      [id]="'bid-mobile-' + listing.listingId"
                       name="amount"
                       type="number"
                       min="1"
@@ -135,92 +253,224 @@
                       Bid
                     </button>
                   </form>
-                </td>
-              </tr>
+                </li>
+              }
+            </ul>
+
+            @if (hasMore()) {
+              <div class="mt-4">
+                <button
+                  type="button"
+                  [class]="secondaryButtonClass"
+                  [disabled]="loadingMore()"
+                  (click)="loadMore()"
+                >
+                  {{ loadingMore() ? 'Loading…' : 'Load more listings' }}
+                </button>
+              </div>
             }
-          </tbody>
-        </table>
-      </div>
+          }
+        </div>
+      }
 
-      <!--
-        The same listings as cards below `md`. The bid control is in the seventh column of the
-        table, so on a phone it lives behind a sideways scroll; here it sits under the player
-        (`F-44`).
-      -->
-      <ul class="mt-2 flex flex-col gap-3 md:hidden" data-testid="listings-cards">
-        @for (listing of listings(); track listing.listingId) {
-          <li class="rounded border border-line bg-panel p-3">
-            <h3 class="text-sm font-semibold text-ink">
-              <a
-                [routerLink]="['/players', listing.playerId]"
-                [appPlayerCard]="listing.playerId"
-                [class]="nameLinkClass"
-                >{{ listing.playerName }}</a
-              >
-            </h3>
-            <p class="text-sm text-ink-2">
-              <a [routerLink]="['/clubs', listing.sellerClubId]" [class]="nameLinkClass">{{
-                listing.sellerClubName
-              }}</a>
+      @case ('free-agents') {
+        <div
+          id="transfers-panel-free-agents"
+          role="tabpanel"
+          aria-labelledby="transfers-tab-free-agents"
+          tabindex="0"
+        >
+          <p class="mt-3 text-sm text-ink-2">
+            Players with no club, sold through the same timed auction. A new batch opens every
+            Monday at 12:00 UTC and closes the Monday after; a player with a bid is signed, the rest
+            leave. The fee goes out of the game, and the wage is fixed before you bid. Only managers
+            may bid.
+          </p>
+
+          <div class="mt-3 max-w-xs">
+            <label class="block text-sm font-medium text-ink-2" for="free-agent-family"
+              >Position</label
+            >
+            <select id="free-agent-family" [class]="selectClass" (change)="onFamilyChange($event)">
+              @for (option of familyOptions; track option.value) {
+                <option [value]="option.value" [selected]="option.value === freeAgentFamily()">
+                  {{ option.label }}
+                </option>
+              }
+            </select>
+          </div>
+
+          @if (freeAgentsLoading()) {
+            <p class="mt-3 text-sm text-ink-2" role="status">Loading the free agents…</p>
+          } @else if (freeAgents().length === 0) {
+            <p class="mt-3 text-sm text-ink-2" role="status">
+              No free agents are listed right now. The next batch opens on Monday at 12:00 UTC.
             </p>
-            <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-              <div class="flex justify-between gap-2">
-                <dt class="text-muted">Minimum</dt>
-                <dd class="text-ink">{{ funds(listing.minimumFeeMinor) }}</dd>
-              </div>
-              <div class="flex justify-between gap-2">
-                <dt class="text-muted">Leading</dt>
-                <dd class="text-ink">
-                  @if (listing.leadingAmountMinor; as leading) {
-                    {{ funds(leading) }}
-                  } @else {
-                    No bids
+          } @else {
+            <div
+              class="mt-3 hidden overflow-x-auto md:block"
+              data-testid="free-agents-table"
+              tabindex="0"
+              role="group"
+              aria-label="Free agents"
+            >
+              <table class="min-w-full divide-y divide-line text-sm">
+                <caption class="sr-only">
+                  Free agents open to bids
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Player</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Position</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Age</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Ability</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">
+                      Weekly wage
+                    </th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Minimum</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Leading</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Bids</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Closes</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Your bid</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-line-soft">
+                  @for (listing of freeAgents(); track listing.listingId) {
+                    <tr>
+                      <td class="px-3 py-2 text-ink">
+                        <a
+                          [routerLink]="['/players', listing.playerId]"
+                          [appPlayerCard]="listing.playerId"
+                          [class]="nameLinkClass"
+                          >{{ listing.playerName }}</a
+                        >
+                      </td>
+                      <td class="px-3 py-2 text-ink-2">{{ position(listing.primaryPosition) }}</td>
+                      <td class="px-3 py-2 text-right text-ink-2">{{ listing.age }}</td>
+                      <td class="px-3 py-2 text-right text-ink-2">{{ listing.ability }}</td>
+                      <td class="px-3 py-2 text-right text-ink-2">
+                        {{ funds(listing.generatedBuyerWageMinor) }}
+                        <span class="block text-xs text-muted">{{
+                          seasons(listing.generatedContractSeasons)
+                        }}</span>
+                      </td>
+                      <td class="px-3 py-2 text-right text-ink-2">
+                        {{ funds(listing.minimumFeeMinor) }}
+                      </td>
+                      <td class="px-3 py-2 text-right font-medium text-ink">
+                        @if (listing.leadingAmountMinor; as leading) {
+                          {{ funds(leading) }}
+                        } @else {
+                          No bids
+                        }
+                      </td>
+                      <td class="px-3 py-2 text-right text-ink-2">{{ listing.bidderCount }}</td>
+                      <td class="px-3 py-2 text-ink-2">{{ instant(listing.endsAt) }}</td>
+                      <td class="px-3 py-2">
+                        <ng-container
+                          *ngTemplateOutlet="
+                            bidForm;
+                            context: { $implicit: listing, prefix: 'bid-' }
+                          "
+                        />
+                      </td>
+                    </tr>
                   }
-                </dd>
-              </div>
-              <div class="flex justify-between gap-2">
-                <dt class="text-muted">Bids</dt>
-                <dd class="text-ink">{{ listing.bidderCount }}</dd>
-              </div>
-              <div class="flex justify-between gap-2">
-                <dt class="text-muted">Closes</dt>
-                <dd class="text-ink">{{ instant(listing.endsAt) }}</dd>
-              </div>
-            </dl>
-            <form class="mt-2 flex items-center gap-2" (submit)="onBid($event, listing.listingId)">
-              <label class="sr-only" [attr.for]="'bid-mobile-' + listing.listingId"
-                >Bid amount</label
-              >
-              <input
-                [id]="'bid-mobile-' + listing.listingId"
-                name="amount"
-                type="number"
-                min="1"
-                [value]="listing.minimumAcceptableBidMinor"
-                [class]="textInputClass"
-              />
-              <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">
-                Bid
-              </button>
-            </form>
-          </li>
-        }
-      </ul>
+                </tbody>
+              </table>
+            </div>
 
-      @if (hasMore()) {
-        <div class="mt-4">
-          <button
-            type="button"
-            [class]="secondaryButtonClass"
-            [disabled]="loadingMore()"
-            (click)="loadMore()"
-          >
-            {{ loadingMore() ? 'Loading…' : 'Load more listings' }}
-          </button>
+            <ul class="mt-3 flex flex-col gap-3 md:hidden" data-testid="free-agents-cards">
+              @for (listing of freeAgents(); track listing.listingId) {
+                <li class="rounded border border-line bg-panel p-3">
+                  <h3 class="text-sm font-semibold text-ink">
+                    <a
+                      [routerLink]="['/players', listing.playerId]"
+                      [appPlayerCard]="listing.playerId"
+                      [class]="nameLinkClass"
+                      >{{ listing.playerName }}</a
+                    >
+                  </h3>
+                  <p class="text-sm text-ink-2">
+                    {{ position(listing.primaryPosition) }} &middot; {{ listing.age }} years
+                    &middot; ability {{ listing.ability }}
+                  </p>
+                  <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Weekly wage</dt>
+                      <dd class="text-ink">{{ funds(listing.generatedBuyerWageMinor) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Contract</dt>
+                      <dd class="text-ink">{{ seasons(listing.generatedContractSeasons) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Minimum</dt>
+                      <dd class="text-ink">{{ funds(listing.minimumFeeMinor) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Leading</dt>
+                      <dd class="text-ink">
+                        @if (listing.leadingAmountMinor; as leading) {
+                          {{ funds(leading) }}
+                        } @else {
+                          No bids
+                        }
+                      </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Bids</dt>
+                      <dd class="text-ink">{{ listing.bidderCount }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-muted">Closes</dt>
+                      <dd class="text-ink">{{ instant(listing.endsAt) }}</dd>
+                    </div>
+                  </dl>
+                  <div class="mt-2">
+                    <ng-container
+                      *ngTemplateOutlet="
+                        bidForm;
+                        context: { $implicit: listing, prefix: 'bid-mobile-' }
+                      "
+                    />
+                  </div>
+                </li>
+              }
+            </ul>
+
+            @if (hasMoreFreeAgents()) {
+              <div class="mt-4">
+                <button
+                  type="button"
+                  [class]="secondaryButtonClass"
+                  [disabled]="freeAgentsLoadingMore()"
+                  (click)="loadMoreFreeAgents()"
+                >
+                  {{ freeAgentsLoadingMore() ? 'Loading…' : 'Load more free agents' }}
+                </button>
+              </div>
+            }
+          }
         </div>
       }
     }
   </section>
+
+  <ng-template #bidForm let-listing let-prefix="prefix">
+    <form class="flex items-center gap-2" (submit)="onBid($event, listing.listingId)">
+      <label class="sr-only" [attr.for]="prefix + listing.listingId">Bid amount</label>
+      <input
+        [id]="prefix + listing.listingId"
+        name="amount"
+        type="number"
+        min="1"
+        [value]="listing.minimumAcceptableBidMinor"
+        [class]="textInputClass"
+      />
+      <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">Bid</button>
+    </form>
+  </ng-template>
 
   <div class="mt-8 grid gap-6 lg:grid-cols-2">
     <section class="rounded border border-line bg-panel p-4">
@@ -322,9 +572,13 @@
                   >
                 </td>
                 <td class="px-3 py-2 text-ink-2">
-                  <a [routerLink]="['/clubs', entry.sellerClubId]" [class]="nameLinkClass">{{
-                    entry.sellerClubName
-                  }}</a>
+                  @if (entry.sellerClubId; as sellerId) {
+                    <a [routerLink]="['/clubs', sellerId]" [class]="nameLinkClass">{{
+                      entry.sellerClubName
+                    }}</a>
+                  } @else {
+                    Free agent
+                  }
                 </td>
                 <td class="px-3 py-2 text-ink-2">
                   <a [routerLink]="['/clubs', entry.buyerClubId]" [class]="nameLinkClass">{{

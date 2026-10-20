@@ -16,6 +16,8 @@ export interface MarketListingRead {
   readonly listingId: string;
   readonly playerId: string;
   readonly playerName: string;
+  readonly kind: string;
+  readonly sellerClubId: string | null;
   readonly status: string;
   readonly minimumFeeMinor: number;
   readonly leadingAmountMinor: number | null;
@@ -41,7 +43,7 @@ export interface MyMarketActivityRead {
 export interface TransferHistoryEntryRead {
   readonly listingId: string;
   readonly playerName: string;
-  readonly sellerClubName: string;
+  readonly sellerClubName: string | null;
   readonly buyerClubName: string;
   readonly feeMinor: number;
 }
@@ -52,11 +54,7 @@ export interface TransferHistoryRead {
 }
 
 /** Signs in through the API so the journey can act as the harness. */
-export async function apiAccessToken(
-  request: APIRequestContext,
-  email: string,
-  password: string,
-): Promise<string> {
+export async function apiAccessToken(request: APIRequestContext, email: string, password: string): Promise<string> {
   const response = await request.post(`${apiBaseUrl}/api/v1/auth/login`, {
     data: { email, password },
   });
@@ -67,10 +65,7 @@ export async function apiAccessToken(
 }
 
 /** Reads the club's own listings and bids. */
-export async function readMyActivity(
-  request: APIRequestContext,
-  token: string,
-): Promise<MyMarketActivityRead> {
+export async function readMyActivity(request: APIRequestContext, token: string): Promise<MyMarketActivityRead> {
   const response = await request.get(`${apiBaseUrl}/api/v1/transfers/mine`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -81,10 +76,7 @@ export async function readMyActivity(
 }
 
 /** Reads the public history of completed transfers. */
-export async function readTransferHistory(
-  request: APIRequestContext,
-  token: string,
-): Promise<TransferHistoryRead> {
+export async function readTransferHistory(request: APIRequestContext, token: string): Promise<TransferHistoryRead> {
   const response = await request.get(`${apiBaseUrl}/api/v1/transfers/history`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -151,4 +143,43 @@ export async function waitForTransfer(
   }
 
   throw new Error(`Listing ${listingId} did not transfer within ${timeoutMs}ms.`);
+}
+
+/**
+ * Asks the non-production trigger to open this week's free-agent batch now.
+ *
+ * It enqueues the worker's real batch job, due now, exactly as the Monday scheduler would; a repeated call is a
+ * no-op. Like the auction trigger it is reached without a bearer token, because configuration gates it.
+ */
+export async function openFreeAgentBatch(request: APIRequestContext): Promise<void> {
+  const response = await request.post(`${apiBaseUrl}/api/v1/ops/diagnostics/free-agents`);
+
+  expect(response.status(), 'the free-agent trigger should accept the request').toBe(202);
+}
+
+/** Waits for the free-agent pool to hold listings, which the worker writes when it runs the batch. */
+export async function waitForFreeAgentListings(
+  request: APIRequestContext,
+  token: string,
+  timeoutMs = 60_000,
+): Promise<readonly MarketListingRead[]> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const response = await request.get(`${apiBaseUrl}/api/v1/transfers/listings?kind=free_agent`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.ok()).toBe(true);
+
+    const listings = ((await response.json()) as { listings: MarketListingRead[] }).listings;
+
+    if (listings.length > 0) {
+      return listings;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`No free-agent listings appeared within ${timeoutMs}ms.`);
 }

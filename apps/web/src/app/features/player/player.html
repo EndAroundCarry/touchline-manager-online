@@ -10,25 +10,27 @@
     <p class="text-sm">
       @if (isOwn()) {
         <a routerLink="/squad" [class]="linkClass">Back to the squad</a>
+      } @else if (profile.club; as club) {
+        <a [routerLink]="['/clubs', club.id]" [class]="linkClass">Back to {{ club.name }}</a>
       } @else {
-        <a [routerLink]="['/clubs', profile.club.id]" [class]="linkClass"
-          >Back to {{ profile.club.name }}</a
-        >
+        <a routerLink="/transfers" [class]="linkClass">Back to transfers</a>
       }
     </p>
 
     <h1 [class]="pageHeadingClass">{{ profile.fullName }}</h1>
     <p class="mt-1 flex items-center gap-2 text-sm text-ink-2" data-testid="player-club">
-      <app-club-crest
-        class="h-6 shrink-0"
-        [shape]="profile.club.crestShape"
-        [pattern]="profile.club.crestPattern"
-        [primary]="profile.club.primaryColour"
-        [secondary]="profile.club.secondaryColour"
-      />
-      <a [routerLink]="['/clubs', profile.club.id]" [class]="nameLinkClass">{{
-        profile.club.name
-      }}</a>
+      @if (profile.club; as club) {
+        <app-club-crest
+          class="h-6 shrink-0"
+          [shape]="club.crestShape"
+          [pattern]="club.crestPattern"
+          [primary]="club.primaryColour"
+          [secondary]="club.secondaryColour"
+        />
+        <a [routerLink]="['/clubs', club.id]" [class]="nameLinkClass">{{ club.name }}</a>
+      } @else {
+        <span data-testid="player-free-agent">Free agent</span>
+      }
     </p>
     <div class="mt-1 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
       <p class="text-sm text-ink-2">

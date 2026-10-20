@@ -101,11 +101,11 @@ export class PlayerProfile implements OnInit {
     return player === null ? [] : attributeGroups(player.attributes, player.attributeProgress);
   });
 
-  /** The shirt the portrait wears: the colours and crest of the club the player belongs to. */
+  /** The shirt the portrait wears: the colours and crest of the club the player belongs to; a free agent wears the neutral one. */
   protected readonly kit = computed<PortraitKit>(() => {
     const club = this.player()?.club;
 
-    return club === undefined
+    return club === undefined || club === null
       ? FALLBACK_KIT
       : {
           primary: club.primaryColour,

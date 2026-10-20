@@ -292,8 +292,10 @@ export interface PlayerClub {
  */
 export interface Player {
   readonly id: string;
-  readonly clubId: string;
-  readonly club: PlayerClub;
+
+  /** The club the player is contracted to, or null for a free agent (`FA-5`). */
+  readonly clubId: string | null;
+  readonly club: PlayerClub | null;
 
   /** Whether the caller manages the player's club. */
   readonly isOwnClub: boolean;
