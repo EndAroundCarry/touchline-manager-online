@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
+using Tactical11Manager.Domain.Market;
+using Tactical11Manager.Domain.Ops;
 
 namespace Tactical11Manager.Application.Jobs;
 
@@ -17,6 +19,28 @@ public static class AuctionJobTypes
 {
     /// <summary>Resolves a listing at its window, settling the winning bid (`TRF-9`, `TRF-10`).</summary>
     public const string Resolve = "market.resolve-auction";
+
+    /// <summary>
+    /// Attempts a free agent's resolution job is allowed before it is dead-lettered (`FA-5`).
+    /// </summary>
+    /// <remarks>
+    /// A signing cannot settle while the season rolls over, so the job retries until the next season is
+    /// active. The retry delay is capped at 30 minutes and jittered down to 15, so 700 attempts last at least
+    /// 7 days, the whole rollover window (`RolloverDays`), however long the rollover takes. A dead-lettered job
+    /// is never enqueued again (its business key is taken), which would leave the listing open for good.
+    /// </remarks>
+    public const int FreeAgentMaxAttempts = 700;
+
+    /// <summary>Gets how many attempts a listing's resolution job is allowed.</summary>
+    /// <param name="listing">The listing the job resolves.</param>
+    public static int MaxAttemptsFor(TransferListing listing)
+    {
+        ArgumentNullException.ThrowIfNull(listing);
+
+        return listing.IsFreeAgent
+            ? FreeAgentMaxAttempts
+            : JobRetryPolicy.DefaultMaxAttempts;
+    }
 
     /// <summary>Gets the business key of a listing's resolution job.</summary>
     /// <param name="listingId">The listing.</param>

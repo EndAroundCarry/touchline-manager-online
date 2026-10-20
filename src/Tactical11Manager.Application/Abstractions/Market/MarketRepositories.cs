@@ -147,6 +147,13 @@ public sealed record ListingEligibilityContext(
 /// <param name="GoalkeeperCount">How many of them are goalkeepers.</param>
 public sealed record RosterComposition(Guid ClubId, int RegisteredCount, int GoalkeeperCount);
 
+/// <summary>The season a signing starts in (`FA-5`).</summary>
+/// <param name="SeasonId">The season's identity, which a new registration takes.</param>
+/// <param name="SequenceNumber">The season's sequence number, which a new contract starts at.</param>
+/// <param name="GameYear">The season's game year, which fixes each player's age (`TIME-3`).</param>
+/// <param name="IsRollover">Whether the season is closing, when no contract may start (`CON-8`).</param>
+public sealed record CurrentSeasonFacts(Guid SeasonId, int SequenceNumber, int GameYear, bool IsRollover);
+
 /// <summary>The squad facts the market reads, in one query each (`MOD-3`).</summary>
 public interface IRosterQueries
 {
@@ -161,4 +168,8 @@ public interface IRosterQueries
     /// <param name="clubId">The club.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<RosterComposition?> GetCompositionAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>Reads the season being played, or null when no world or season exists (`FA-5`).</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<CurrentSeasonFacts?> GetCurrentSeasonAsync(CancellationToken cancellationToken);
 }

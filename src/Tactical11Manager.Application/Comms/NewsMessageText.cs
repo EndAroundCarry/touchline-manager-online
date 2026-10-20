@@ -41,6 +41,8 @@ public static class NewsMessageText
                 NewsTemplates.Read<NewsTemplates.DivisionParameters>(parametersJson)),
             NewsTemplates.TransferCompleted => Transfer(
                 NewsTemplates.Read<NewsTemplates.TransferParameters>(parametersJson)),
+            NewsTemplates.FreeAgentSigned => FreeAgent(
+                NewsTemplates.Read<NewsTemplates.FreeAgentParameters>(parametersJson)),
             NewsTemplates.ResultPublished => Round(
                 NewsTemplates.Read<NewsTemplates.ResultParameters>(parametersJson)),
             NewsTemplates.AnnouncementPublished => Announcement(
@@ -59,6 +61,12 @@ public static class NewsMessageText
         new(
             $"{parameters.PlayerName} moves",
             $"{parameters.BuyerClubName} has signed {parameters.PlayerName} from {parameters.SellerClubName} "
+            + $"for {Money(parameters.FeeMinor)}.");
+
+    private static NewsText FreeAgent(NewsTemplates.FreeAgentParameters parameters) =>
+        new(
+            $"{parameters.PlayerName} signs",
+            $"{parameters.BuyerClubName} has signed {parameters.PlayerName} as a free agent "
             + $"for {Money(parameters.FeeMinor)}.");
 
     private static NewsText Round(NewsTemplates.ResultParameters parameters)

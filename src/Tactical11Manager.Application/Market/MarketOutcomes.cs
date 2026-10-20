@@ -56,6 +56,12 @@ public enum MarketOutcome
 
     /// <summary>The cursor did not decode (master plan §10).</summary>
     InvalidCursor = 14,
+
+    /// <summary>The bidder's squad already holds the maximum, so a free agent has no place (`FA-5`).</summary>
+    SquadFull = 15,
+
+    /// <summary>The listing is a free agent's, and only human managers may bid on those (`FA-5`).</summary>
+    HumanManagersOnly = 16,
 }
 
 /// <summary>A scouting search's result (`SCT-1`).</summary>

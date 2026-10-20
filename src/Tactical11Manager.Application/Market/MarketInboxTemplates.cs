@@ -24,7 +24,17 @@ public static class MarketInboxTemplates
     /// <summary>The club's listed player was sold (`TRF-10`).</summary>
     public const string PlayerSold = "inbox.market.player_sold";
 
+    /// <summary>The club's bid won a free agent and he signed (`FA-5`).</summary>
+    public const string FreeAgentSigned = "inbox.market.free_agent_signed";
+
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+
+    /// <summary>Builds the message a bidder receives when he signs a free agent.</summary>
+    /// <param name="playerName">The player signed.</param>
+    /// <param name="feeMinor">The settled fee, in minor units.</param>
+    /// <param name="playerId">The player, which the message links to.</param>
+    public static InboxDraft FreeAgentSignedMessage(string playerName, long feeMinor, Guid playerId) =>
+        Write(FreeAgentSigned, new FreeAgentSignedParameters(playerName, feeMinor), playerId);
 
     /// <summary>Builds the message an outbid club receives.</summary>
     /// <param name="playerName">The player bid for.</param>
@@ -59,6 +69,8 @@ public static class MarketInboxTemplates
     internal sealed record BidWonParameters(string PlayerName, long FeeMinor, string SellerClubName);
 
     internal sealed record PlayerSoldParameters(string PlayerName, long FeeMinor, string BuyerClubName);
+
+    internal sealed record FreeAgentSignedParameters(string PlayerName, long FeeMinor);
 
     private static InboxDraft Write<TParameters>(string templateKey, TParameters parameters, Guid relatedEntityId) =>
         new(

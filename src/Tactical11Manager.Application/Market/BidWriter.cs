@@ -5,6 +5,7 @@ using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Domain.Market;
+using Tactical11Manager.Domain.Rules;
 
 namespace Tactical11Manager.Application.Market;
 
@@ -59,6 +60,7 @@ public sealed class BidWriter : IBidWriter
 {
     private readonly IListingRepository _listings;
     private readonly IBidRepository _bids;
+    private readonly IRosterQueries _roster;
     private readonly IClubAccountRepository _accounts;
     private readonly ILedgerRepository _ledger;
     private readonly IAuditWriter _audit;
@@ -70,6 +72,7 @@ public sealed class BidWriter : IBidWriter
     public BidWriter(
         IListingRepository listings,
         IBidRepository bids,
+        IRosterQueries roster,
         IClubAccountRepository accounts,
         ILedgerRepository ledger,
         IAuditWriter audit,
@@ -79,6 +82,7 @@ public sealed class BidWriter : IBidWriter
     {
         _listings = listings;
         _bids = bids;
+        _roster = roster;
         _accounts = accounts;
         _ledger = ledger;
         _audit = audit;
@@ -119,6 +123,23 @@ public sealed class BidWriter : IBidWriter
         if (listing.SellerClubId == clubId)
         {
             return Refused(MarketOutcome.CannotBidOnOwnPlayer);
+        }
+
+        if (listing.IsFreeAgent)
+        {
+            // The AI reads hidden potential, so it would find every gem; only people may sign free agents.
+            if (actor.ActorType != AuditActorTypes.User)
+            {
+                return Refused(MarketOutcome.HumanManagersOnly);
+            }
+
+            // Refused up front, so a bid that wins is not later lost to a full squad (FA-5).
+            var squad = await _roster.GetCompositionAsync(clubId, cancellationToken);
+
+            if (squad is not null && squad.RegisteredCount >= WorldRuleSet.SquadMaximumRegistered)
+            {
+                return Refused(MarketOutcome.SquadFull);
+            }
         }
 
         // Serialise the bids on this listing, so "who leads now" is decided under the lock rather than read

@@ -529,6 +529,18 @@ internal static class MarketEndpoints
             "Insufficient funds.",
             "The club does not hold that much cash after its existing reservations (FIN-10)."),
 
+        MarketOutcome.SquadFull => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            MarketErrorCodes.SquadFull,
+            "Your squad is full.",
+            "A squad holds at most 27 players, so there is no place for a free agent (FA-5)."),
+
+        MarketOutcome.HumanManagersOnly => ProblemResults.Code(
+            StatusCodes.Status403Forbidden,
+            MarketErrorCodes.FreeAgentsHumanOnly,
+            "Free agents are for managers.",
+            "Only human managers may bid on a free agent (FA-5)."),
+
         MarketOutcome.IdempotencyKeyReused => ProblemResults.Code(
             StatusCodes.Status409Conflict,
             MarketErrorCodes.IdempotencyKeyReused,

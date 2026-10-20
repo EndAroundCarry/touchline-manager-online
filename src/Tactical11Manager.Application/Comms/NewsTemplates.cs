@@ -34,6 +34,9 @@ public static class NewsTemplates
     /// <summary>A transfer completed (`TRF-10`).</summary>
     public const string TransferCompleted = "news.transfer.completed";
 
+    /// <summary>A club signed a free agent (`FA-5`).</summary>
+    public const string FreeAgentSigned = "news.transfer.free_agent";
+
     /// <summary>A division's round was published (`MAT-7`).</summary>
     public const string ResultPublished = "news.result.published";
 
@@ -75,6 +78,18 @@ public static class NewsTemplates
             NewsCategory.Transfer,
             TransferCompleted,
             new TransferParameters(playerName, feeMinor, buyerClubName, sellerClubName),
+            countryId: null,
+            divisionId: null);
+
+    /// <summary>Builds the item a signed free agent produces.</summary>
+    /// <param name="playerName">The player who signed.</param>
+    /// <param name="feeMinor">The fee, in minor units.</param>
+    /// <param name="buyerClubName">The signing club.</param>
+    public static NewsDraft FreeAgent(string playerName, long feeMinor, string buyerClubName) =>
+        Write(
+            NewsCategory.Transfer,
+            FreeAgentSigned,
+            new FreeAgentParameters(playerName, feeMinor, buyerClubName),
             countryId: null,
             divisionId: null);
 
@@ -150,6 +165,8 @@ public static class NewsTemplates
         long FeeMinor,
         string BuyerClubName,
         string SellerClubName);
+
+    internal sealed record FreeAgentParameters(string PlayerName, long FeeMinor, string BuyerClubName);
 
     internal sealed record ResultParameters(
         int RoundNumber,

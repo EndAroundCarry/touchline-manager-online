@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Application.Abstractions.Market;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -139,5 +140,27 @@ internal sealed class RosterQueries : IRosterQueries
             .CountAsync(cancellationToken);
 
         return new RosterComposition(clubId, registered, goalkeepers);
+    }
+
+    /// <inheritdoc />
+    public async Task<CurrentSeasonFacts?> GetCurrentSeasonAsync(CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var status = await _dbContext.Seasons
+            .Where(candidate => candidate.Id == season.SeasonId)
+            .Select(candidate => candidate.Status)
+            .SingleAsync(cancellationToken);
+
+        return new CurrentSeasonFacts(
+            season.SeasonId,
+            season.SequenceNumber,
+            season.GameYear,
+            status == SeasonStatus.Rollover);
     }
 }

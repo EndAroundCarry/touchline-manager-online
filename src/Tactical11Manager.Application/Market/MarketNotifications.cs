@@ -115,6 +115,53 @@ public sealed class MarketNotifications
         }
     }
 
+    /// <summary>Tells the buyer, and the news feed, that a free agent signed (`FA-5`).</summary>
+    /// <param name="worldId">The world, which scopes the news.</param>
+    /// <param name="buyerClubId">The signing club.</param>
+    /// <param name="playerId">The player who signed.</param>
+    /// <param name="feeMinor">The settled fee, in minor units.</param>
+    /// <param name="now">The current instant.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task NotifyFreeAgentSignedAsync(
+        Guid? worldId,
+        Guid buyerClubId,
+        Guid playerId,
+        long feeMinor,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var targets = (await _inbox.FindClubTargetsAsync([buyerClubId], cancellationToken))
+            .ToDictionary(target => target.ClubId);
+        var names = await _inbox.FindPlayerNamesAsync([playerId], cancellationToken);
+        var playerName = names.TryGetValue(playerId, out var name) ? name : "a player";
+        var buyerName = targets.TryGetValue(buyerClubId, out var buyerTarget) ? buyerTarget.Name : "a club";
+
+        if (Target(targets, buyerClubId) is { } buyer)
+        {
+            _inbox.Add(Message(
+                buyer,
+                MarketInboxTemplates.FreeAgentSignedMessage(playerName, feeMinor, playerId),
+                now));
+        }
+
+        if (worldId is { } world)
+        {
+            var draft = NewsTemplates.FreeAgent(playerName, feeMinor, buyerName);
+
+            _news.Add(NewsItem.Publish(
+                Guid.CreateVersion7(),
+                world,
+                draft.CountryId,
+                draft.DivisionId,
+                draft.Category,
+                draft.TemplateKey,
+                draft.ParametersJson,
+                publishedAt: now,
+                expiresAt: null,
+                now));
+        }
+    }
+
     private static Guid? Target(Dictionary<Guid, ClubInboxTarget> targets, Guid clubId) =>
         targets.TryGetValue(clubId, out var target) && target.ManagerId is { } manager && manager != Guid.Empty
             ? manager

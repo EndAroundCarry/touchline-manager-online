@@ -66,6 +66,11 @@ public static class FreeAgentTerms
             minimumFee,
             wage.WeeklyWageMinor,
             seasons,
-            age <= WorldRuleSet.FreeAgentProspectAgeMax ? SquadStatus.Prospect : SquadStatus.Rotation);
+            SquadStatusFor(age));
     }
+
+    /// <summary>The standing a free agent of this age joins a squad with (`FA-7`).</summary>
+    /// <param name="age">His age in game years.</param>
+    public static SquadStatus SquadStatusFor(int age) =>
+        age <= WorldRuleSet.FreeAgentProspectAgeMax ? SquadStatus.Prospect : SquadStatus.Rotation;
 }

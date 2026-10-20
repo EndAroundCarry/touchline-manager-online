@@ -59,6 +59,7 @@ public sealed class TriggerAuctions
                 BusinessKey = key,
                 DueAt = _clock.UtcNow,
                 PayloadJson = AuctionJobPayload.For(listing.Id),
+                MaxAttempts = AuctionJobTypes.MaxAttemptsFor(listing),
             },
             cancellationToken);
 

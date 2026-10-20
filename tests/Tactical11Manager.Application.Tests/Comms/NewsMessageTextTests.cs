@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Application.Comms;
+using Tactical11Manager.Application.Market;
 
 namespace Tactical11Manager.Application.Tests.Comms;
 
@@ -34,6 +35,27 @@ public sealed class NewsMessageTextTests
 
         text.Title.Should().Be("Ion Popescu moves");
         text.Body.Should().Contain("Vale Athletic").And.Contain("Northfield").And.Contain("12,500,000");
+    }
+
+    [Fact]
+    public void A_signed_free_agent_names_the_club_and_the_fee_but_no_seller()
+    {
+        var draft = NewsTemplates.FreeAgent("Ion Popescu", 250_000, "Vale Athletic");
+
+        var text = NewsMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Title.Should().Be("Ion Popescu signs");
+        text.Body.Should().Contain("Vale Athletic").And.Contain("free agent").And.Contain("250,000");
+    }
+
+    [Fact]
+    public void A_free_agent_signing_message_renders_for_the_buyer()
+    {
+        var draft = MarketInboxTemplates.FreeAgentSignedMessage("Ion Popescu", 250_000, Guid.CreateVersion7());
+
+        var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Body.Should().Contain("Ion Popescu").And.Contain("free agent").And.Contain("250,000");
     }
 
     [Fact]

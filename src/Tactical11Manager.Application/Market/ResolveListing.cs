@@ -111,12 +111,32 @@ public sealed class ResolveListing
             return;
         }
 
-        var reason = await RejectAsync(listing, leading, cancellationToken);
+        // A free agent signs into the season being played, so the window where no season is playing waits
+        // for the next one. Checked before anything is staged, so the throw leaves nothing behind (FA-5).
+        var signingSeason = listing.IsFreeAgent ? await RequireSigningSeasonAsync(listing, cancellationToken) : null;
+
+        var reason = signingSeason is null
+            ? await RejectAsync(listing, leading, cancellationToken)
+            : await RejectFreeAgentAsync(leading, listing.PlayerId, cancellationToken);
 
         if (reason is not null)
         {
             leading.Invalidate(now);
             listing.Expire(now);
+
+            // The failed leader still holds a reservation, and nothing else will ever release it (FIN-10).
+            var bidderAccount = await _accounts.FindByClubAsync(leading.BidderClubId, cancellationToken);
+
+            if (bidderAccount is not null)
+            {
+                _ledger.Add(bidderAccount.Post(
+                    LedgerPostings.ReservationRelease(
+                        Guid.CreateVersion7(),
+                        leading.BidderClubId,
+                        leading.Id,
+                        leading.AmountMinor),
+                    now));
+            }
 
             _audit.Record(new AuditEntry(
                 MarketAuditActions.BidInvalidated,
@@ -136,7 +156,14 @@ public sealed class ResolveListing
             return;
         }
 
-        await SettleAsync(listing, leading, now, cancellationToken);
+        if (signingSeason is null)
+        {
+            await SettleAsync(listing, leading, now, cancellationToken);
+        }
+        else
+        {
+            await SettleFreeAgentAsync(listing, leading, signingSeason, now, cancellationToken);
+        }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -294,8 +321,151 @@ public sealed class ResolveListing
     }
 
     /// <summary>
-    /// The selling club of a club listing. A free-agent listing has none and settles on its own path, which is
-    /// not built yet, so reaching it here is a defect rather than a case to handle.
+    /// The season a free agent signs into. While the season is closing no contract may start, so the
+    /// resolution throws and the job queue retries it after the next season is active (`CON-8`, `FA-5`).
+    /// </summary>
+    private async Task<CurrentSeasonFacts> RequireSigningSeasonAsync(
+        TransferListing listing,
+        CancellationToken cancellationToken)
+    {
+        var season = await _roster.GetCurrentSeasonAsync(cancellationToken);
+
+        if (season is null || season.IsRollover)
+        {
+            throw new InvalidOperationException(
+                $"Listing {listing.Id} cannot sign a free agent while the season rolls over; it is retried "
+                + "once the next season is active (FA-5).");
+        }
+
+        return season;
+    }
+
+    /// <summary>
+    /// Revalidates a free agent's leading bid: he is still unsigned, the buyer has a place for him and the
+    /// cash (`FA-5`). There is no seller to check.
+    /// </summary>
+    private async Task<string?> RejectFreeAgentAsync(
+        TransferBid leading,
+        Guid playerId,
+        CancellationToken cancellationToken)
+    {
+        var players = await _squad.LoadPlayersAsync([playerId], cancellationToken);
+
+        if (players.Count != 1
+            || players[0].Status != PlayerStatus.FreeAgent
+            || await _squad.FindActiveContractAsync(playerId, cancellationToken) is not null)
+        {
+            return TransferOutcomeReasons.PlayerIneligible;
+        }
+
+        var buyer = await _roster.GetCompositionAsync(leading.BidderClubId, cancellationToken);
+
+        if (buyer is null)
+        {
+            return TransferOutcomeReasons.PlayerIneligible;
+        }
+
+        if (buyer.RegisteredCount + 1 > WorldRuleSet.SquadMaximumRegistered)
+        {
+            return TransferOutcomeReasons.BuyerAboveMaximum;
+        }
+
+        var account = await _accounts.FindByClubAsync(leading.BidderClubId, cancellationToken);
+
+        return account is null || account.CashMinor < leading.AmountMinor
+            ? TransferOutcomeReasons.FundsUnavailable
+            : null;
+    }
+
+    /// <summary>
+    /// Settles a free agent's winning bid: the buyer pays and nobody is credited, because the fee leaves the
+    /// game, and the player gets a contract and a registration (`FA-5`).
+    /// </summary>
+    private async Task SettleFreeAgentAsync(
+        TransferListing listing,
+        TransferBid leading,
+        CurrentSeasonFacts season,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var buyerAccount = await _accounts.FindByClubAsync(leading.BidderClubId, cancellationToken);
+        var player = (await _squad.LoadPlayersAsync([listing.PlayerId], cancellationToken)).SingleOrDefault();
+
+        // Rechecked after RejectFreeAgentAsync, so a missing row here is a defect, not a refusal.
+        if (buyerAccount is null || player is null)
+        {
+            throw new InvalidOperationException(
+                "A free-agent listing that passed revalidation lost its account or player before settlement (FA-5).");
+        }
+
+        var fee = leading.AmountMinor;
+
+        _ledger.Add(buyerAccount.Post(
+            LedgerPostings.TransferPayment(Guid.CreateVersion7(), leading.BidderClubId, listing.Id, fee),
+            now));
+
+        var age = season.GameYear - player.BirthGameYear;
+        var squadStatus = FreeAgentTerms.SquadStatusFor(age);
+
+        player.SignFromFreeAgency(now);
+
+        var newContract = PlayerContract.Sign(
+            Guid.CreateVersion7(),
+            listing.PlayerId,
+            leading.BidderClubId,
+            season.SequenceNumber,
+            season.SequenceNumber + listing.GeneratedContractSeasons - 1,
+            listing.GeneratedBuyerWageMinor,
+            squadStatus,
+            now);
+
+        _squad.AddPlayerContract(newContract);
+        _squad.AddPlayerRegistration(PlayerRegistration.Register(
+            Guid.CreateVersion7(),
+            listing.PlayerId,
+            leading.BidderClubId,
+            season.SeasonId,
+            effectiveFixtureBoundaryRound: 0,
+            now));
+
+        _outcomes.Add(TransferOutcome.Record(
+            Guid.CreateVersion7(),
+            listing.Id,
+            leading.Id,
+            listing.PlayerId,
+            sellerClubId: null,
+            leading.BidderClubId,
+            fee,
+            oldContractId: null,
+            newContract.Id,
+            LedgerPostings.TransferCorrelationId(listing.Id),
+            now));
+
+        leading.Win(now);
+        listing.MarkSold(now);
+
+        _audit.Record(new AuditEntry(
+            MarketAuditActions.ListingSold,
+            AuditActorTypes.Service,
+            ActorUserId: null,
+            AuditTargetTypes.TransferOutcome,
+            listing.Id,
+            LedgerPostings.TransferCorrelationId(listing.Id),
+            IpHash: null,
+            Reason: null));
+
+        await _notifications.NotifyFreeAgentSignedAsync(
+            (await _world.FindWorldAsync(cancellationToken))?.Id,
+            leading.BidderClubId,
+            listing.PlayerId,
+            fee,
+            now,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// The selling club of a club listing. A free-agent listing has none and settles on its own path, so
+    /// reaching it here is a defect rather than a case to handle.
     /// </summary>
     private static Guid SellerOf(TransferListing listing) =>
         listing.SellerClubId

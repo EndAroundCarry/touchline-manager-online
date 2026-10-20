@@ -30,6 +30,12 @@ public static class MarketErrorCodes
     /// <summary>The club does not hold the cash after existing reservations (`FIN-10`).</summary>
     public const string InsufficientFunds = "INSUFFICIENT_FUNDS";
 
+    /// <summary>The bidder's squad is full, so a free agent has no place (`FA-5`).</summary>
+    public const string SquadFull = "SQUAD_FULL";
+
+    /// <summary>Only human managers may bid on a free agent (`FA-5`).</summary>
+    public const string FreeAgentsHumanOnly = "FREE_AGENTS_HUMAN_ONLY";
+
     /// <summary>The player does not exist, or is not visible.</summary>
     public const string PlayerNotFound = "PLAYER_NOT_FOUND";
 

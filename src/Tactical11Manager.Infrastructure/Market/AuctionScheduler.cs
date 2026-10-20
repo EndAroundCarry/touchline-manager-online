@@ -110,6 +110,7 @@ internal sealed partial class AuctionScheduler : BackgroundService, IJobMaterial
                         BusinessKey = AuctionJobTypes.ResolveKey(listing.Id),
                         DueAt = listing.EndsAt,
                         PayloadJson = AuctionJobPayload.For(listing.Id),
+                        MaxAttempts = AuctionJobTypes.MaxAttemptsFor(listing),
                     },
                     cancellationToken))
             {

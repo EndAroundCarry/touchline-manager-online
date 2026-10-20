@@ -73,9 +73,16 @@ public static class InboxMessageText
                 MarketInboxTemplates.Read<MarketInboxTemplates.BidWonParameters>(parametersJson)),
             MarketInboxTemplates.PlayerSold => PlayerSold(
                 MarketInboxTemplates.Read<MarketInboxTemplates.PlayerSoldParameters>(parametersJson)),
+            MarketInboxTemplates.FreeAgentSigned => FreeAgentSigned(
+                MarketInboxTemplates.Read<MarketInboxTemplates.FreeAgentSignedParameters>(parametersJson)),
             _ => throw new InvalidOperationException($"'{templateKey}' is not an inbox template this build renders."),
         };
     }
+
+    private static InboxText FreeAgentSigned(MarketInboxTemplates.FreeAgentSignedParameters parameters) =>
+        new(
+            "Free agent signed",
+            $"You signed {parameters.PlayerName} as a free agent for {Money(parameters.FeeMinor)}.");
 
     private static InboxText Outbid(MarketInboxTemplates.OutbidParameters parameters) =>
         new(
