@@ -332,7 +332,7 @@ describe('calendarEvents', () => {
     const events = calendarEvents(FIXTURES, [], [], now);
 
     expect(events.filter((e) => e.kind === 'deadline')).toHaveLength(1);
-    expect(events.find((e) => e.kind === 'match')?.link).toEqual(['/fixtures', 'f2', 'prepare']);
+    expect(events.find((e) => e.kind === 'match')?.link).toEqual(['/tactics']);
   });
 
   it('is bounded, and is empty with nothing to show', () => {

@@ -24,7 +24,7 @@ describe('inbox presentation', () => {
     expect(messageLink('result', 'match-1')).toBe('/matches/match-1');
     expect(messageLink('injury', 'player-1')).toBe('/players/player-1');
     expect(messageLink('discipline', 'player-2')).toBe('/players/player-2');
-    expect(messageLink('squad', 'fixture-1')).toBe('/fixtures/fixture-1/prepare');
+    expect(messageLink('squad', 'fixture-1')).toBe('/tactics');
   });
 
   it('links nowhere when the message names no entity or a category with no destination', () => {

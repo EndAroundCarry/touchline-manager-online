@@ -185,7 +185,7 @@ export function calendarEvents(
       kind: 'match',
       title: opponent,
       detail: roundLabel(fixture.roundNumber),
-      link: ['/fixtures', fixture.id, 'prepare'],
+      link: ['/tactics'],
     });
 
     if (fixture.id === fixtures?.nextFixtureId) {
@@ -194,7 +194,7 @@ export function calendarEvents(
         kind: 'deadline',
         title: 'Team sheet locks',
         detail: opponent,
-        link: ['/fixtures', fixture.id, 'prepare'],
+        link: ['/tactics'],
       });
     }
   }

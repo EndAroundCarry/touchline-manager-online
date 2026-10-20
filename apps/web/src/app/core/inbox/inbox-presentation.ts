@@ -45,7 +45,7 @@ export function messageLink(category: string, relatedEntityId: string | null): s
       return `/players/${relatedEntityId}`;
 
     case 'squad':
-      return `/fixtures/${relatedEntityId}/prepare`;
+      return '/tactics';
 
     default:
       return null;

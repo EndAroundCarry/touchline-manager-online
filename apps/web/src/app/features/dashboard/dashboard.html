@@ -170,7 +170,7 @@
                 </p>
                 <div class="mt-auto flex justify-center pt-3">
                   <a
-                    routerLink="/fixtures/{{ next.id }}/prepare"
+                    routerLink="/tactics"
                     [class]="primaryButtonClass"
                     [attr.aria-label]="'Prepare your side for ' + next.opponentName"
                   >
@@ -522,9 +522,7 @@
             @if (nextFixture(); as next) {
               <li>
                 4.
-                <a routerLink="/fixtures/{{ next.id }}/prepare" [class]="linkClass">
-                  Prepare your next team sheet
-                </a>
+                <a routerLink="/tactics" [class]="linkClass"> Prepare your next team sheet </a>
               </li>
             }
           </ol>

@@ -254,11 +254,9 @@ export const routes: Routes = [
         title: 'Help — Tactical11 Manager',
       },
       {
-        // A detail route for one fixture, where a manager prepares a side (`SQ-4`).
+        // The old prepare screen is gone; links saved or sent before then land on the tactics screen.
         path: 'fixtures/:fixtureId/prepare',
-        loadComponent: () => import('./features/prepare/prepare').then((m) => m.Prepare),
-        canActivate: [requireAuthentication, requireVerifiedEmail],
-        title: 'Prepare — Tactical11 Manager',
+        redirectTo: 'tactics',
       },
       {
         // A detail route rather than a navigation destination: a match is reached from its fixture, not
