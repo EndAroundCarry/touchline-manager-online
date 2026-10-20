@@ -102,4 +102,5 @@ the system is shaped the way it is.
 | [0073](0073-shape-matchups-and-placing-substitutes.md) | Shapes are decisive from kick-off, a switch recovers a third of that, and a rule may place the player it brings on | Accepted |
 | [0074](0074-tick-engine-skills-fall-with-live-condition.md) | In the tick engine a player's skills fall with his live condition | Accepted |
 | [0075](0075-back-threes-slide-across.md) | A back three or five slides across: the near wing-back steps out and the far one tucks in | Accepted |
+| [0076](0076-experience-is-frozen-into-the-snapshot-as-a-skill-bonus.md) | Experience is frozen into the snapshot as a skill bonus, after the curve and uncapped, hashed only when above zero | Accepted |
 | [0076](0076-potential-drawn-before-skills.md) | Potential is drawn before skills, with a tail of talents and gems | Accepted |

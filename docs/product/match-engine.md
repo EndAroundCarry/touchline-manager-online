@@ -1394,6 +1394,7 @@ for version 12; changing one moves the golden hash in `TickEngineTests`.
 |---|---|---|
 | `TickPlayerSkills.CurvePercent` | 38 | A player's attribute counts 38% of its distance from 13 (60 before the ball flowed, §14.12). |
 | `TickSkillTiredness` breakpoints | (10,000, 0) (9,000, 200) (8,000, 400) (7,000, 700) (6,000, 1,000) (5,000, 1,400) (4,000, 2,000) bp | Share of the sheet value a skill loses by live condition, linear between, flat 2,000 below 40%; Mental takes half, Pace and Acceleration none (§14.41). |
+| `PlayerMatchStateV1.ExperienceBonusBasisPoints` | 0–500 bp | A player's experience bonus (1% a level, §14.43), applied to every skill except Pace and Acceleration after the curve and tiredness, never capped at 20; hashed only when above 0. |
 | `TickDefensiveAI.WingBackTuckIn` | 1,500 (15 m) | How far the far wing-back of a back three or five stands nearer the middle while the ball is on the other flank in the defender's middle third; the near one steps out to the widest man within `TrackZone`, at a marker's stand-off and 80% pace (§14.42). |
 | `TickBallCarrierBrain.ShotMinimumChance` | 1,850 bp | Below this heuristic chance a carrier does not shoot. |
 | `TickBallCarrierBrain.ShotBaseError` | 200 | Base error angle of an open-play shot (a set piece: `SetPieceShotBaseError` 50). |
@@ -2831,3 +2832,35 @@ Before the plan the 3-4-3 read -0.26 and the 3-5-2 -0.18 in the shape study's gr
 **Method.** `tickshape <matches> <seed> <cells>` with `TS_SHAPES=442,433,4231,352,541,343,451,4141` and `matrix` (`TickShapeStudy.cs`, unchanged); `tickroles 300 7000 352v442|352v433|343v4231` (the 3-5-2 cells added to `TickRoleProbe.cs`); `tickwhy 150 7000 16` with `TW_ONLY=DEF541,ATT`. Screens were 150 matches a cell, confirmations 300; the temporary knobs were environment variables in a `TickDiag` class, baked and deleted. Runs went in an isolated directory with the committed shape-study output untouched. Screening variants in parallel made each three times slower, so they ran one after another. The grid's 26 back-three cells came from the M4 confirmation (same code); the other 38 were played in M5.
 
 **Tests.** `TickRoleProfileTests` (a winger screens and tracks only beside wing-backs; `HasWingBacks`), `TickDefensiveAITests` (a 3-4-3 winger takes a track and a 4-3-3 winger does not; the near wing-back steps out to the widest man and the far one tucks in 15 m; a ball in the defensive third or down the middle changes nothing; a back four is untouched). No version was bumped: `engine-v12` and the rules hashes are as they were, and the tick golden hash did not move.
+
+### 14.43 Experience: a bonus on the played skills (the player experience plan, Milestones 1-4)
+
+**Why.** A player gets more effective with matches played. Experience is 0 to 100 points, half a point for every match of 15 minutes or more, in five even levels (20, 40, 60, 80, 100 points); level *n* adds *n*% to the skills the engine plays with. The rules are `EXP-1` to `EXP-6` in `game-rules.md` section 10, the decision is ADR-0076.
+
+**How it reaches play.** The snapshot builder freezes the bonus, not the experience, on each player's match state (`PlayerMatchStateV1.ExperienceBonusBasisPoints`, 0 to 500, validated; an old document without it reads as 0). `TickPlayerSkills.Tired(attributes, condition, bonus)` multiplies each skill by `(10,000 + bonus) / 10,000`, rounded, **after** the skill curve (section 14.12) and the tiredness drop (section 14.41); the zero branch returns the value untouched. The bonus survives `RefreshSkills` and `Uncurved()`.
+
+| Question | Answer |
+|---|---|
+| Which skills? | All the played skills; **not Pace and Acceleration**, the way tiredness exempts them. |
+| Which readers? | `TickPlayerProfile` (the physics), `TickAttackEdge` and `EffectiveSkill` read the sheet and are untouched, as is the legacy engine. |
+| A cap at 20? | **None.** A sheet 20 at +5% is 2,100 hundredths on the raw path (dead balls: free kicks, the keeper facing one) and 1,575 on the curved path (15.75, where the sheet 20 curves to 15.00). The formulas keep their own result clamps (`TickShotStopper` hold and tip, `Craft`, the minimum kick error); the reaction time at Reflexes 21 is still 40 ms. |
+| The hash? | `{side}.experienceBonus` is written only when above 0, so a match of players without a level keeps its hash; `EngineLabel` and `RuleSetLabel` did not change. |
+
+**Guards.** The tick golden hash, the determinism and receiver-choice goldens did not move. `tick 500` (seed 9000) at bonus 0 gives the same event digest as the commit before the plan (680b2f5), `91cb3c94fc41bf8a`, 36,930 events: goals 2.90, shots 38.5, completion 82.9%, home win / draw 44.4% / 24.4%. A sheet-20 keeper and free-kick taker at bonus 500 play a full match with every probability in range.
+
+**Measured** (uniform 15 against 15 in the laboratory, `tickexp`, seed 9000, **500 matches a cell**: 250 with the bonus side at home and 250 away, because the laboratory's home side takes 1.64 points to 1.09. Figures are the bonus side's, the two halves averaged):
+
+| Bonus on every player of one side | Wins / draws / losses | Points a match | Goals for / against | Shots for / against |
+|---|---|---|---|---|
+| None | 37 / 25 / 37 % | 1.37 | 1.23 / 1.23 | 16.8 / 16.8 |
+| Level 2, +2% (200 bp) | 39.5 / 27 / 33.5 % | 1.45 (+0.09) | 1.37 / 1.26 | 18.2 / 16.7 |
+| Level 5, +5% (500 bp) | 44.5 / 24 / 31.5 % | 1.58 (+0.21) | 1.56 / 1.24 | 20.1 / 16.2 |
+| For scale: a whole sheet point (16 against 15, 250 + 250) | 56.5 / 20 / 23.5 % | 1.90 (+0.53) | | |
+
+In plain words: a team of level-5 players takes about 0.2 points a match more than the same team without experience, a win rate of 45% against 37%; level 2 is +0.09, within the noise (about 0.08 on the difference at this size). The full bonus is about 40% of a sheet point on every skill. That is less than the plan's estimate: on played skills alone 5% of a curved 15 (13.8) is 0.69 of a played point against 0.38 for a sheet point, so the bonus was expected to be worth more. The likely reason is that a sheet point also lifts Pace, Acceleration, stamina and the attack edge, which the bonus leaves out; this was not isolated. Nothing was tuned.
+
+**Not done, offered.** A bigger step per level, or the bonus on Pace and Acceleration; experience in valuation, wages or training (none reads it); a mixed side (a few level-5 players in a squad of level 0 to 2) was not measured, and a real squad's spread of levels will make the effect smaller than the all-level-5 figure.
+
+**Method.** `tickexp <label> 15 15 250 9000` with `TICK_HOME_EXP_BP` or `TICK_AWAY_EXP_BP` set to 0, 200 or 500 (every player of that side; also read by `tickmatrix`); `tick 500 9000` for the digest, compared against a worktree at 680b2f5. About 25 s per 250 matches, 3.5 minutes for the table.
+
+**Tests.** `TickExperienceTests` (bonus 0 is the unchanged struct; 500 gives `round(x x 1.05)` per field fresh, tired, curved and `Uncurved()`; a sheet 20 gives 2,100 and 1,575; Pace and Acceleration unchanged; the bonus survives `RefreshSkills`; a full match with a sheet-20 keeper and free-kick taker), `MatchDocumentTests` (the hash is unchanged at 0 and changes at 100; -1 and 501 are rejected), `MatchSnapshotBuilderTests` (3,999 bp maps to 100, 4,000 to 200).

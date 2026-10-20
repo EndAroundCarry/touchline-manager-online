@@ -81,7 +81,11 @@ internal static class TickCalibration
                         rules);
 
                     input = Stand(input, home, away);
-                    input = input with { Home = WithAttributes(input.Home, "TICK_HOME_ATTR"), Away = WithAttributes(input.Away, "TICK_AWAY_ATTR") };
+                    input = input with
+                    {
+                        Home = TickShowcase.Experienced(WithAttributes(input.Home, "TICK_HOME_ATTR"), "TICK_HOME_EXP_BP"),
+                        Away = TickShowcase.Experienced(WithAttributes(input.Away, "TICK_AWAY_ATTR"), "TICK_AWAY_EXP_BP"),
+                    };
                     lines[index] = Play(input, rules);
                 });
 

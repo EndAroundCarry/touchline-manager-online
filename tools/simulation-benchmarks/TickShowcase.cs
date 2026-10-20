@@ -294,7 +294,11 @@ internal static class TickShowcase
         {
             var built = LaboratoryFixtures.Build(seed + (ulong)index, homeLow, awayLow, homeInstructions, awayInstructions, rules);
             var input = TickCalibration.Stand(
-                built with { Home = Paced(Keeper(Spread(built.Home, homeLow, homeHigh), homeKeeper), homePace), Away = Paced(Keeper(Spread(built.Away, awayLow, awayHigh), awayKeeper), awayPace) },
+                built with
+                {
+                    Home = Experienced(Paced(Keeper(Spread(built.Home, homeLow, homeHigh), homeKeeper), homePace), "TICK_HOME_EXP_BP"),
+                    Away = Experienced(Paced(Keeper(Spread(built.Away, awayLow, awayHigh), awayKeeper), awayPace), "TICK_AWAY_EXP_BP"),
+                },
                 homeForm,
                 awayForm);
             var recorder = new MatchPassageRecorder();
@@ -1248,6 +1252,19 @@ internal static class TickShowcase
             lastSide = side;
             interrupted = false;
         }
+    }
+
+    internal static MatchSideV1 Experienced(MatchSideV1 side, string variable)
+    {
+        if (!int.TryParse(Environment.GetEnvironmentVariable(variable), CultureInfo.InvariantCulture, out var basisPoints) || basisPoints == 0)
+        {
+            return side;
+        }
+
+        return side with
+        {
+            Squad = [.. side.Squad.Select(participant => participant with { State = participant.State with { ExperienceBonusBasisPoints = basisPoints } })],
+        };
     }
 
     internal static MatchSideV1 Keeper(MatchSideV1 side, int? ability) =>

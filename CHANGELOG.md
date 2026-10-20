@@ -4,6 +4,14 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Player experience plan - five levels, up to +5% on the played skills
+
+- Experience is 0 to 100 points per player (basis points, `PlayerState.ExperienceBp`): half a point for every match of 15 minutes or more, earned at matchday publication with the match load; five levels at 20, 40, 60, 80 and 100 points; level n is +n% on the skills the tick engine plays with. Players start by age (0 at 17-18, 4 points a year, 50 at 30+), generated and backfilled by migration.
+- Engine: the bonus (not the experience) is frozen into the snapshot, applied after the skill curve and tiredness, to every skill except Pace and Acceleration, with no cap at 20. Hashed only when above 0: golden hashes unchanged, `tick 500` digest identical to the commit before the plan.
+- Web and API: the player page, the player popup and the scouting card show the pips, the points, the level and "+n% skills in matches"; the sheet attributes stay 1-20.
+- Measured (uniform 15 against 15, 500 matches a cell, halves at home and away): +5% is worth +0.21 points a match (45% wins against 37%), +2% +0.09 (within noise), a whole sheet point +0.53. Nothing tuned; the full bonus is smaller than the plan's estimate.
+- Docs: `game-rules.md` `EXP-1` to `EXP-6` and the constants in section 18; match-engine sections 14.4 and 14.43; ADR-0076. `tickexp` and `tickmatrix` read `TICK_HOME_EXP_BP` / `TICK_AWAY_EXP_BP`.
+
 ## Potential plan - potential is drawn before skills, with talents and gems
 
 - Generator: a player's hidden potential is drawn first, as the tier's mean ability plus an offset, and his skills are derived from it and his age (24 - age below 24, none to 29, age - 29 above) instead of the other way round. The offset is normal 80% (two four-faced dice less four, -4 to +2), talent 15% (+3 to +5), gem 5% (+6 to +7), so a tier has a tail of ceilings where it had a narrow band. One ceiling for every skill, so training is unchanged. `player-gen-v3`, rule set `world-rules-v12`, `player-attr-v2` unchanged; rule `TRN-18`, ADR-0076. `GeneratedPotential` holds the draw; `PlayerSpread`, `DevelopmentAge` and `PotentialUpsideForAge` are gone. Existing worlds get the new potentials by reseeding.
