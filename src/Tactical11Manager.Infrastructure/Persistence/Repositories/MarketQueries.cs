@@ -147,7 +147,7 @@ internal sealed class MarketQueries : IMarketQueries
 
         if (candidate is null)
         {
-            return null;
+            return await GetFreeAgentAsync(playerId, season, cancellationToken);
         }
 
         var listed = await ListedPlayerIdsAsync([playerId], cancellationToken);
@@ -170,6 +170,67 @@ internal sealed class MarketQueries : IMarketQueries
             season.GameYear,
             listed.Contains(playerId),
             candidate.ExperienceBp);
+    }
+
+    /// <summary>
+    /// Reads a free agent as a scouting card does: the same public attributes with no club (`FA-5`).
+    /// </summary>
+    /// <remarks>
+    /// A free agent from the weekly pool, or a released player waiting for the next batch. The row carries
+    /// nothing a club player's does not: the hidden potential is never read here.
+    /// </remarks>
+    private async Task<PlayerSearchRow?> GetFreeAgentAsync(
+        Guid playerId,
+        CurrentSeason season,
+        CancellationToken cancellationToken)
+    {
+        var row = await (
+            from player in _dbContext.Players
+            join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
+            join state in _dbContext.PlayerStates on player.Id equals state.PlayerId
+            where player.Id == playerId && player.Status == PlayerStatus.FreeAgent
+            select new
+            {
+                Player = player,
+                Attributes = attributes,
+                state.ExperienceBp,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (row is null)
+        {
+            return null;
+        }
+
+        var hasContract = await _dbContext.PlayerContracts.AnyAsync(
+            contract => contract.PlayerId == playerId && contract.Status == ContractStatus.Active,
+            cancellationToken);
+
+        if (hasContract)
+        {
+            return null;
+        }
+
+        var listed = await ListedPlayerIdsAsync([playerId], cancellationToken);
+
+        return new PlayerSearchRow(
+            row.Player.Id,
+            row.Player.FullName,
+            row.Player.ShortName,
+            row.Player.NationalityCode,
+            row.Player.BirthGameYear,
+            row.Player.PrimaryPosition,
+            row.Player.SecondaryPositions,
+            row.Player.PreferredFoot,
+            row.Attributes.ToSet(),
+            ClubId: null,
+            ClubName: null,
+            TierNumber: null,
+            DivisionId: null,
+            DivisionName: null,
+            season.GameYear,
+            listed.Contains(playerId),
+            row.ExperienceBp);
     }
 
     /// <inheritdoc />
@@ -250,8 +311,16 @@ internal sealed class MarketQueries : IMarketQueries
             {
                 ListingId = listing.Id,
                 listing.SellerClubId,
+                listing.FreeAgentBatchId,
                 player.PrimaryPosition,
             };
+
+        if (filter.Kind is { } kind)
+        {
+            query = kind == ListingKind.FreeAgent
+                ? query.Where(row => row.FreeAgentBatchId != null)
+                : query.Where(row => row.FreeAgentBatchId == null);
+        }
 
         if (filter.SellerClubId is { } sellerClubId)
         {
@@ -329,7 +398,8 @@ internal sealed class MarketQueries : IMarketQueries
         var query =
             from outcome in _dbContext.TransferOutcomes
             join player in _dbContext.Players on outcome.PlayerId equals player.Id
-            join seller in _dbContext.Clubs on outcome.SellerClubId equals seller.Id
+            join seller in _dbContext.Clubs on outcome.SellerClubId equals (Guid?)seller.Id into sellers
+            from seller in sellers.DefaultIfEmpty()
             join buyer in _dbContext.Clubs on outcome.BuyerClubId equals buyer.Id
             select new
             {
@@ -362,7 +432,7 @@ internal sealed class MarketQueries : IMarketQueries
                 row.ListingId,
                 row.PlayerId,
                 row.PlayerName,
-                row.SellerClubId!.Value,
+                row.SellerClubId,
                 row.SellerClubName,
                 row.BuyerClubId,
                 row.BuyerClubName,
@@ -398,12 +468,15 @@ internal sealed class MarketQueries : IMarketQueries
         var baseRows = await (
             from listing in _dbContext.TransferListings
             join player in _dbContext.Players on listing.PlayerId equals player.Id
-            join club in _dbContext.Clubs on listing.SellerClubId equals club.Id
+            join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
+            join club in _dbContext.Clubs on listing.SellerClubId equals (Guid?)club.Id into sellers
+            from club in sellers.DefaultIfEmpty()
             where listingIds.Contains(listing.Id)
             select new
             {
                 Listing = listing,
                 Player = player,
+                Attributes = attributes,
                 SellerClubName = club.Name,
             })
             .ToListAsync(cancellationToken);
@@ -443,7 +516,8 @@ internal sealed class MarketQueries : IMarketQueries
                     row.Player.ShortName,
                     row.Player.PrimaryPosition,
                     row.Player.BirthGameYear,
-                    row.Listing.SellerClubId!.Value,
+                    MeanAbility(row.Attributes),
+                    row.Listing.SellerClubId,
                     row.SellerClubName,
                     row.Listing.MinimumFeeMinor,
                     row.Listing.GeneratedBuyerWageMinor,

@@ -115,12 +115,14 @@ public sealed record ShortlistSnapshot(IReadOnlyList<ShortlistRow> Entries, int 
 /// <param name="Status">The listing status to show, or null for open only.</param>
 /// <param name="SellerClubId">The seller to restrict to, or null for every seller.</param>
 /// <param name="Family">The listed player's position family, or null for any.</param>
+/// <param name="Kind">Whether to show a club's listings or the free agents', or null for both (`FA-5`).</param>
 /// <param name="CursorListingId">The decoded cursor listing identity, or null for the first page.</param>
 /// <param name="PageSize">The bounded page size.</param>
 public sealed record ListingBrowseFilter(
     ListingStatus? Status,
     Guid? SellerClubId,
     PositionFamily? Family,
+    ListingKind? Kind,
     Guid? CursorListingId,
     int PageSize);
 
@@ -131,8 +133,9 @@ public sealed record ListingBrowseFilter(
 /// <param name="PlayerShortName">The player's abbreviation.</param>
 /// <param name="PrimaryPosition">The player's position.</param>
 /// <param name="BirthGameYear">The game year the player was born in.</param>
-/// <param name="SellerClubId">The selling club.</param>
-/// <param name="SellerClubName">The selling club's name.</param>
+/// <param name="Ability">The player's displayed ability, the mean of the attributes a scouting card shows.</param>
+/// <param name="SellerClubId">The selling club, or null for a free agent (`FA-5`).</param>
+/// <param name="SellerClubName">The selling club's name, or null for a free agent.</param>
 /// <param name="MinimumFeeMinor">The seller's minimum fee, in minor units.</param>
 /// <param name="GeneratedBuyerWageMinor">The weekly wage the buyer will sign, in minor units.</param>
 /// <param name="GeneratedContractSeasons">The buyer's contract length, in game seasons.</param>
@@ -151,8 +154,9 @@ public sealed record ListingRow(
     string PlayerShortName,
     PlayerPosition PrimaryPosition,
     int BirthGameYear,
-    Guid SellerClubId,
-    string SellerClubName,
+    int Ability,
+    Guid? SellerClubId,
+    string? SellerClubName,
     long MinimumFeeMinor,
     long GeneratedBuyerWageMinor,
     int GeneratedContractSeasons,
@@ -198,8 +202,8 @@ public sealed record MyMarketActivity(
 /// <param name="ListingId">The listing that resolved.</param>
 /// <param name="PlayerId">The player who moved.</param>
 /// <param name="PlayerName">The player's full name.</param>
-/// <param name="SellerClubId">The selling club.</param>
-/// <param name="SellerClubName">The selling club's name.</param>
+/// <param name="SellerClubId">The selling club, or null for a free agent (`FA-5`).</param>
+/// <param name="SellerClubName">The selling club's name, or null for a free agent.</param>
 /// <param name="BuyerClubId">The buying club.</param>
 /// <param name="BuyerClubName">The buying club's name.</param>
 /// <param name="FeeMinor">The settled fee, in minor units.</param>
@@ -208,8 +212,8 @@ public sealed record TransferHistoryRow(
     Guid ListingId,
     Guid PlayerId,
     string PlayerName,
-    Guid SellerClubId,
-    string SellerClubName,
+    Guid? SellerClubId,
+    string? SellerClubName,
     Guid BuyerClubId,
     string BuyerClubName,
     long FeeMinor,
@@ -235,7 +239,10 @@ public interface IMarketQueries
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<PlayerSearchPage> SearchPlayersAsync(PlayerSearchFilter filter, CancellationToken cancellationToken);
 
-    /// <summary>Reads one player as a scouting result reads them, or null when they hold no active contract.</summary>
+    /// <summary>
+    /// Reads one player as a scouting result reads them, or null when they hold no active contract and are not a
+    /// free agent (`FA-5`).
+    /// </summary>
     /// <param name="playerId">The player.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<PlayerSearchRow?> GetPlayerAsync(Guid playerId, CancellationToken cancellationToken);

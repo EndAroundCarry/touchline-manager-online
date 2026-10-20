@@ -1,8 +1,10 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Tactical11Manager.Application.Abstractions.Market;
 using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
+using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Application.Market;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Market;
@@ -238,6 +240,125 @@ public sealed class FreeAgentSettlementTests : IAsyncLifetime, IDisposable
 
         (await afterDb.TransferListings.SingleAsync(listing => listing.Id == target.ListingId)).Status
             .Should().Be(ListingStatus.Sold);
+    }
+
+    [Fact]
+    public async Task A_free_agents_listing_and_card_read_with_no_club()
+    {
+        var target = await ArrangeAsync();
+
+        await using var scope = _fixture.CreateScope();
+        var market = scope.ServiceProvider.GetRequiredService<IMarketQueries>();
+        var squad = scope.ServiceProvider.GetRequiredService<ISquadQueries>();
+
+        var listing = await market.GetListingAsync(target.ListingId, viewerClubId: null, CancellationToken.None);
+
+        listing.Should().NotBeNull();
+        listing!.SellerClubId.Should().BeNull();
+        listing.SellerClubName.Should().BeNull();
+        listing.Ability.Should().BeInRange(WorldRuleSet.FreeAgentAbilityMin, WorldRuleSet.FreeAgentAbilityMax);
+
+        var card = await market.GetPlayerAsync(target.PlayerId, CancellationToken.None);
+
+        card.Should().NotBeNull("a free agent has a scouting card like any player (FA-5)");
+        card!.ClubId.Should().BeNull();
+        card.ClubName.Should().BeNull();
+        card.TierNumber.Should().BeNull();
+        card.IsListed.Should().BeTrue();
+
+        var profile = await squad.GetPlayerAsync(target.PlayerId, CancellationToken.None);
+
+        profile.Should().NotBeNull();
+        profile!.ClubId.Should().BeNull();
+        profile.Club.Should().BeNull();
+        profile.Contract.Should().BeNull();
+        profile.Status.Should().Be(PlayerStatus.FreeAgent);
+    }
+
+    [Fact]
+    public async Task The_kind_filter_separates_free_agents_from_a_clubs_own_listings()
+    {
+        await using var scope = _fixture.CreateScope();
+        var market = scope.ServiceProvider.GetRequiredService<IMarketQueries>();
+
+        var freeAgents = await market.ListListingsAsync(
+            new ListingBrowseFilter(null, null, null, ListingKind.FreeAgent, null, 50),
+            viewerClubId: null,
+            CancellationToken.None);
+
+        freeAgents.Listings.Should().HaveCount(50);
+        freeAgents.Listings.Should().OnlyContain(row => row.SellerClubId == null);
+        freeAgents.NextCursor.Should().NotBeNull("a batch is about 260 listings, so there is a second page");
+
+        var clubs = await market.ListListingsAsync(
+            new ListingBrowseFilter(null, null, null, ListingKind.Club, null, 50),
+            viewerClubId: null,
+            CancellationToken.None);
+
+        clubs.Listings.Should().BeEmpty("no club has listed a player in this world");
+
+        var goalkeepers = await market.ListListingsAsync(
+            new ListingBrowseFilter(null, null, PositionFamily.Goalkeeper, ListingKind.FreeAgent, null, 50),
+            viewerClubId: null,
+            CancellationToken.None);
+
+        goalkeepers.Listings.Should().NotBeEmpty();
+        goalkeepers.Listings.Should().OnlyContain(row => row.PrimaryPosition == PlayerPosition.Goalkeeper);
+    }
+
+    [Fact]
+    public async Task A_signed_free_agent_shows_in_the_history_with_no_seller_and_reads_with_his_new_club()
+    {
+        var target = await ArrangeAsync();
+
+        (await BidAsync(target.ListingId, target.BuyerClubId, target.MinimumFeeMinor)).Outcome
+            .Should().Be(MarketOutcome.Found);
+
+        await ResolveAsync(target.ListingId);
+
+        await using var scope = _fixture.CreateScope();
+        var market = scope.ServiceProvider.GetRequiredService<IMarketQueries>();
+
+        var history = await market.GetHistoryAsync(cursorId: null, pageSize: 10, CancellationToken.None);
+
+        var row = history.Transfers.Should().ContainSingle(entry => entry.ListingId == target.ListingId).Subject;
+
+        row.PlayerId.Should().Be(target.PlayerId);
+        row.SellerClubId.Should().BeNull("a free agent has no seller");
+        row.SellerClubName.Should().BeNull();
+        row.BuyerClubId.Should().Be(target.BuyerClubId);
+        row.FeeMinor.Should().Be(target.MinimumFeeMinor);
+
+        var card = await market.GetPlayerAsync(target.PlayerId, CancellationToken.None);
+
+        card.Should().NotBeNull();
+        card!.ClubId.Should().Be(target.BuyerClubId, "once signed he is a club's player like any other");
+
+        var listing = await market.GetListingAsync(target.ListingId, viewerClubId: null, CancellationToken.None);
+
+        listing!.SellerClubId.Should().BeNull("the sold listing still reads, with no seller");
+    }
+
+    [Fact]
+    public async Task A_player_with_no_contract_who_is_not_a_free_agent_is_not_readable()
+    {
+        var target = await ArrangeAsync();
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+            await db.Database.ExecuteSqlRawAsync(
+                "update squad.players set status = 'retired' where id = {0}",
+                target.PlayerId);
+        }
+
+        await using var read = _fixture.CreateScope();
+        var market = read.ServiceProvider.GetRequiredService<IMarketQueries>();
+        var squad = read.ServiceProvider.GetRequiredService<ISquadQueries>();
+
+        (await market.GetPlayerAsync(target.PlayerId, CancellationToken.None)).Should().BeNull();
+        (await squad.GetPlayerAsync(target.PlayerId, CancellationToken.None)).Should().BeNull();
     }
 
     private async Task<Target> ArrangeAsync()

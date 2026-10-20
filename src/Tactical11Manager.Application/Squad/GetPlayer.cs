@@ -25,6 +25,10 @@ public sealed record GetPlayerResult(SquadReadOutcome Outcome, PlayerResponse? P
 /// the biography and the statistics. The state, contract, registration and injuries are left out of that
 /// response rather than hidden by the client.
 /// </para>
+/// <para>
+/// A free agent has no club to authorize against (`FA-5`), so any manager holding a club reads the public
+/// half, exactly as they read a rival's player.
+/// </para>
 /// </remarks>
 public sealed class GetPlayer
 {
@@ -57,6 +61,14 @@ public sealed class GetPlayer
         }
 
         var access = await _access.ExecuteAsync(userId, player.ClubId, cancellationToken);
+
+        if (player.ClubId is null)
+        {
+            // With no club to match, a granted access is the caller's own club: the public view all the same.
+            return access.Outcome == ClubAccessOutcome.Granted
+                ? new GetPlayerResult(SquadReadOutcome.Found, player.ToResponse(isOwnClub: false, _clock.UtcNow))
+                : new GetPlayerResult(access.Outcome.ToReadOutcome(), null);
+        }
 
         return access.Outcome switch
         {

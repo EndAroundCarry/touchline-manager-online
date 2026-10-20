@@ -16,6 +16,54 @@ public enum ListingStatus
     Expired = 3,
 }
 
+/// <summary>Who a listing is sold by (`FA-5`).</summary>
+public enum ListingKind
+{
+    /// <summary>A club's own player, sold by that club.</summary>
+    Club = 0,
+
+    /// <summary>A free agent from the weekly pool, sold with no seller.</summary>
+    FreeAgent = 1,
+}
+
+/// <summary>Stable codes for <see cref="ListingKind"/>.</summary>
+public static class ListingKinds
+{
+    /// <summary>The code for <see cref="ListingKind.Club"/>.</summary>
+    public const string ClubCode = "club";
+
+    /// <summary>The code for <see cref="ListingKind.FreeAgent"/>.</summary>
+    public const string FreeAgentCode = "free_agent";
+
+    /// <summary>Converts a kind to its stable code.</summary>
+    /// <param name="kind">The listing kind.</param>
+    public static string ToCode(this ListingKind kind) => kind switch
+    {
+        ListingKind.Club => ClubCode,
+        ListingKind.FreeAgent => FreeAgentCode,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown listing kind."),
+    };
+
+    /// <summary>Tries to parse a stable code, so a filter can reject an unknown value rather than throw.</summary>
+    /// <param name="code">The stable code.</param>
+    /// <param name="kind">The parsed kind, when the code is known.</param>
+    public static bool TryFromCode(string code, out ListingKind kind)
+    {
+        switch (code)
+        {
+            case ClubCode:
+                kind = ListingKind.Club;
+                return true;
+            case FreeAgentCode:
+                kind = ListingKind.FreeAgent;
+                return true;
+            default:
+                kind = ListingKind.Club;
+                return false;
+        }
+    }
+}
+
 /// <summary>Stable codes and storage representation for <see cref="ListingStatus"/>.</summary>
 public static class ListingStatuses
 {

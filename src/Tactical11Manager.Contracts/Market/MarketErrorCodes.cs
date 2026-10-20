@@ -42,6 +42,9 @@ public static class MarketErrorCodes
     /// <summary>The shortlist has no entry for that player (`SCT-3`).</summary>
     public const string ShortlistEntryNotFound = "SHORTLIST_ENTRY_NOT_FOUND";
 
+    /// <summary>The listing kind filter is not one this build knows (`FA-5`).</summary>
+    public const string InvalidListingKind = "INVALID_LISTING_KIND";
+
     /// <summary>The cursor did not decode.</summary>
     public const string InvalidCursor = "INVALID_CURSOR";
 

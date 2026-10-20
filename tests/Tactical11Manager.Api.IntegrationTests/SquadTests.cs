@@ -182,7 +182,7 @@ public sealed class SquadTests : IAsyncLifetime
         // TRN-8).
         AttributeValues(player.Attributes).Should().OnlyContain(value => value >= 1 && value <= 20, "TRN-4");
         player.IsOwnClub.Should().BeTrue();
-        player.Club.Id.Should().Be(clubId);
+        player.Club!.Id.Should().Be(clubId);
         player.State.Should().NotBeNull();
         player.State!.Condition.Should().BeInRange(0, 100);
         player.State.MatchSharpness.Should().BeInRange(0, 100);
@@ -229,7 +229,7 @@ public sealed class SquadTests : IAsyncLifetime
         player.ClubId.Should().Be(otherClubId);
         player.ClubId.Should().NotBe(ownClubId);
         player.IsOwnClub.Should().BeFalse();
-        player.Club.Id.Should().Be(otherClubId);
+        player.Club!.Id.Should().Be(otherClubId);
         player.Club.Name.Should().NotBeNullOrWhiteSpace();
         player.Attributes.Technical.Should().NotBeNull("attributes are public (SCT-1)");
 

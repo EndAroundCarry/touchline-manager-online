@@ -202,15 +202,19 @@ internal sealed class SquadQueries : ISquadQueries
             return null;
         }
 
-        // The active contract is joined rather than left-joined: a player with no contract is not in
-        // anybody's squad (`SQ-6`), and there is no club to authorize a read against.
+        // The active contract is left-joined: a player with no contract is in nobody's squad (`SQ-6`), so
+        // there is no club to authorize a read against, and only a free agent is then readable (`FA-5`).
+        // The public half of the profile is all anyone gets for such a player.
         var row = await (
             from player in _dbContext.Players
             join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
             join state in _dbContext.PlayerStates on player.Id equals state.PlayerId
-            join contract in _dbContext.PlayerContracts on player.Id equals contract.PlayerId
-            join club in _dbContext.Clubs on contract.ClubId equals club.Id
-            where player.Id == playerId && contract.Status == ContractStatus.Active
+            join contract in _dbContext.PlayerContracts.Where(candidate => candidate.Status == ContractStatus.Active)
+                on player.Id equals contract.PlayerId into contracts
+            from contract in contracts.DefaultIfEmpty()
+            join club in _dbContext.Clubs on contract.ClubId equals (Guid?)club.Id into clubs
+            from club in clubs.DefaultIfEmpty()
+            where player.Id == playerId
             select new
             {
                 Player = player,
@@ -221,10 +225,12 @@ internal sealed class SquadQueries : ISquadQueries
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (row is null)
+        if (row is null || (row.Contract is null && row.Player.Status != PlayerStatus.FreeAgent))
         {
             return null;
         }
+
+        var clubId = row.Contract?.ClubId;
 
         var registration = await _dbContext.PlayerRegistrations
             .Where(candidate => candidate.PlayerId == playerId
@@ -247,7 +253,8 @@ internal sealed class SquadQueries : ISquadQueries
             from stat in _dbContext.PlayerSeasonStats
             join divisionSeason in _dbContext.DivisionSeasons on stat.DivisionSeasonId equals divisionSeason.Id
             where stat.PlayerId == playerId
-                && stat.ClubId == row.Contract.ClubId
+                && clubId != null
+                && stat.ClubId == clubId
                 && divisionSeason.SeasonId == season.SeasonId
             select new SquadSeasonStatRow(
                 stat.Appearances,
@@ -354,8 +361,8 @@ internal sealed class SquadQueries : ISquadQueries
 
         return new PlayerSnapshot(
             row.Player.Id,
-            row.Contract.ClubId,
-            ToSummary(row.Club),
+            clubId,
+            row.Club is null ? null : ToSummary(row.Club),
             row.Player.FullName,
             row.Player.ShortName,
             row.Player.NationalityCode,
@@ -375,13 +382,15 @@ internal sealed class SquadQueries : ISquadQueries
                 row.State.MatchSharpnessBp,
                 row.State.AttributeProgress,
                 row.State.ExperienceBp),
-            new SquadContractRow(
-                row.Contract.Id,
-                row.Contract.StartSeasonNumber,
-                row.Contract.EndSeasonNumber,
-                row.Contract.WeeklyWageMinor,
-                row.Contract.SquadStatus,
-                row.Contract.Status),
+            row.Contract is null
+                ? null
+                : new SquadContractRow(
+                    row.Contract.Id,
+                    row.Contract.StartSeasonNumber,
+                    row.Contract.EndSeasonNumber,
+                    row.Contract.WeeklyWageMinor,
+                    row.Contract.SquadStatus,
+                    row.Contract.Status),
             registration,
             availability.GetValueOrDefault(playerId, []),
             seasonStat,

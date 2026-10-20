@@ -157,8 +157,8 @@ public sealed record PlayerRegistrationResponse(
 /// (master plan §11.1).
 /// </summary>
 /// <param name="Id">The player identity.</param>
-/// <param name="ClubId">The club the player is registered to.</param>
-/// <param name="Club">The club's name and kit, so the profile can name it, link to it, and dress the portrait in its shirt.</param>
+/// <param name="ClubId">The club the player is registered to, or null for a free agent (`FA-5`).</param>
+/// <param name="Club">The club's name and kit, so the profile can name it, link to it, and dress the portrait in its shirt; null for a free agent.</param>
 /// <param name="IsOwnClub">
 /// Whether the caller manages the player's club. When false the profile is the public view: the attributes,
 /// the statistics and the biography, with the state, contract, registration, availability and attribute
@@ -197,8 +197,8 @@ public sealed record PlayerRegistrationResponse(
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record PlayerResponse(
     Guid Id,
-    Guid ClubId,
-    PlayerClubResponse Club,
+    Guid? ClubId,
+    PlayerClubResponse? Club,
     bool IsOwnClub,
     string FullName,
     string ShortName,

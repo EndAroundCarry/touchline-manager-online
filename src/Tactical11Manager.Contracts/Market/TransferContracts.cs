@@ -24,8 +24,10 @@ public sealed record PlaceBidRequest(long AmountMinor);
 /// <param name="PlayerShortName">The player's abbreviation.</param>
 /// <param name="PrimaryPosition">The player's position.</param>
 /// <param name="Age">The player's age in game years.</param>
-/// <param name="SellerClubId">The selling club.</param>
-/// <param name="SellerClubName">The selling club's name.</param>
+/// <param name="Ability">The player's displayed ability, the mean of the attributes a scouting card shows.</param>
+/// <param name="Kind">Who sells the player: <c>club</c>, or <c>free_agent</c> from the weekly pool (`FA-5`).</param>
+/// <param name="SellerClubId">The selling club, or null for a free agent.</param>
+/// <param name="SellerClubName">The selling club's name, or null for a free agent.</param>
 /// <param name="MinimumFeeMinor">The seller's minimum fee, in minor units.</param>
 /// <param name="GeneratedBuyerWageMinor">The weekly wage the buyer will sign, in minor units.</param>
 /// <param name="GeneratedContractSeasons">The buyer's contract length, in game seasons.</param>
@@ -44,8 +46,10 @@ public sealed record TransferListingResponse(
     string PlayerShortName,
     string PrimaryPosition,
     int Age,
-    Guid SellerClubId,
-    string SellerClubName,
+    int Ability,
+    string Kind,
+    Guid? SellerClubId,
+    string? SellerClubName,
     long MinimumFeeMinor,
     long GeneratedBuyerWageMinor,
     int GeneratedContractSeasons,
@@ -95,8 +99,8 @@ public sealed record MyMarketActivityResponse(
 /// <param name="ListingId">The listing that resolved.</param>
 /// <param name="PlayerId">The player who moved.</param>
 /// <param name="PlayerName">The player's full name.</param>
-/// <param name="SellerClubId">The selling club.</param>
-/// <param name="SellerClubName">The selling club's name.</param>
+/// <param name="SellerClubId">The selling club, or null when the player was a free agent.</param>
+/// <param name="SellerClubName">The selling club's name, or null when the player was a free agent.</param>
 /// <param name="BuyerClubId">The buying club.</param>
 /// <param name="BuyerClubName">The buying club's name.</param>
 /// <param name="FeeMinor">The settled fee, in minor units.</param>
@@ -105,8 +109,8 @@ public sealed record TransferHistoryEntryResponse(
     Guid ListingId,
     Guid PlayerId,
     string PlayerName,
-    Guid SellerClubId,
-    string SellerClubName,
+    Guid? SellerClubId,
+    string? SellerClubName,
     Guid BuyerClubId,
     string BuyerClubName,
     long FeeMinor,

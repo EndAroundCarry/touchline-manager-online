@@ -384,7 +384,7 @@ public static class SquadMapping
         return new PlayerResponse(
             player.Id,
             player.ClubId,
-            player.Club.ToClubResponse(),
+            player.Club?.ToClubResponse(),
             isOwnClub,
             player.FullName,
             player.ShortName,

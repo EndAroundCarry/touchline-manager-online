@@ -273,12 +273,22 @@ internal static class MarketEndpoints
         string? status = null,
         Guid? sellerClubId = null,
         PositionFamily? family = null,
+        string? kind = null,
         string? cursor = null,
         int? pageSize = null)
     {
         if (!TryGetUserId(httpContext, out var userId))
         {
             return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        if (!TryParseKind(kind, out var listingKind))
+        {
+            return ProblemResults.Code(
+                StatusCodes.Status400BadRequest,
+                MarketErrorCodes.InvalidListingKind,
+                "Unknown listing kind.",
+                "The listing kind must be club or free_agent.");
         }
 
         if (!TryParseStatus(status, out var listingStatus))
@@ -294,6 +304,7 @@ internal static class MarketEndpoints
             listingStatus,
             sellerClubId,
             family,
+            listingKind,
             CursorListingId: null,
             pageSize ?? ListListings.DefaultPageSize);
 
@@ -582,6 +593,25 @@ internal static class MarketEndpoints
         }
 
         listingStatus = parsed;
+
+        return true;
+    }
+
+    private static bool TryParseKind(string? kind, out ListingKind? listingKind)
+    {
+        listingKind = null;
+
+        if (string.IsNullOrWhiteSpace(kind))
+        {
+            return true;
+        }
+
+        if (!ListingKinds.TryFromCode(kind, out var parsed))
+        {
+            return false;
+        }
+
+        listingKind = parsed;
 
         return true;
     }

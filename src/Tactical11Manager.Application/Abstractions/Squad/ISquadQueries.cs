@@ -349,8 +349,11 @@ public sealed record ContractsSnapshot(
 
 /// <summary>Everything the player profile reads (master plan §10.3, §11.1).</summary>
 /// <param name="Id">The player identity.</param>
-/// <param name="ClubId">The club the player is registered to, which is what the ownership check is made against.</param>
-/// <param name="Club">The club's name and kit.</param>
+/// <param name="ClubId">
+/// The club the player is registered to, which is what the ownership check is made against, or null for a
+/// free agent (`FA-5`).
+/// </param>
+/// <param name="Club">The club's name and kit, or null for a free agent.</param>
 /// <param name="FullName">The generated full name.</param>
 /// <param name="ShortName">The abbreviation.</param>
 /// <param name="NationalityCode">The nationality country code.</param>
@@ -373,8 +376,8 @@ public sealed record ContractsSnapshot(
 /// <param name="GameYear">The season's game year, which is what fixes the player's age.</param>
 public sealed record PlayerSnapshot(
     Guid Id,
-    Guid ClubId,
-    ClubSummaryRow Club,
+    Guid? ClubId,
+    ClubSummaryRow? Club,
     string FullName,
     string ShortName,
     string NationalityCode,

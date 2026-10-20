@@ -95,6 +95,8 @@ public static class MarketMapping
             row.PlayerShortName,
             row.PrimaryPosition.ToCode(),
             SquadMapping.AgeIn(row.BirthGameYear, row.GameYear),
+            row.Ability,
+            (row.SellerClubId is null ? ListingKind.FreeAgent : ListingKind.Club).ToCode(),
             row.SellerClubId,
             row.SellerClubName,
             row.MinimumFeeMinor,
