@@ -127,6 +127,9 @@ public static class FixtureMapping
             row.Saves,
             row.YellowCards,
             row.RedCards,
+            row.TacklesWon,
+            row.PassesCompleted,
+            row.CrossesCompleted,
             // Converted here and nowhere else, so the basis points the row is stored in never reach a client
             // (TRN-8), and rounded to the tenth of a point a rating is read in.
             row.AverageRatingBasisPoints is null

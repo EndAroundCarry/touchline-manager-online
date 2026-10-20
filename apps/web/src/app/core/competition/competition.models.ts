@@ -111,6 +111,9 @@ export interface DivisionPlayerStat {
   readonly saves: number;
   readonly yellowCards: number;
   readonly redCards: number;
+  readonly tacklesWon: number;
+  readonly passesCompleted: number;
+  readonly crossesCompleted: number;
 
   /** The average match rating on a 0.0–10.0 scale, or null before the player is rated (`TRN-8`). */
   readonly averageRating: number | null;

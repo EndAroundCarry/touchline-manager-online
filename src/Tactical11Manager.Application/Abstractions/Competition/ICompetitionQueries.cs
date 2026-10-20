@@ -241,6 +241,9 @@ public sealed record DivisionTableSnapshot(
 /// <param name="Saves">Saves made.</param>
 /// <param name="YellowCards">Bookings accumulated.</param>
 /// <param name="RedCards">Sendings-off accumulated.</param>
+/// <param name="TacklesWon">Challenges for the ball won.</param>
+/// <param name="PassesCompleted">Passes that found a teammate.</param>
+/// <param name="CrossesCompleted">Open-play crosses that found a teammate.</param>
 /// <param name="AverageRatingBasisPoints">The average match rating, or null before the player is rated.</param>
 public sealed record DivisionPlayerStatRow(
     Guid PlayerId,
@@ -258,6 +261,9 @@ public sealed record DivisionPlayerStatRow(
     int Saves,
     int YellowCards,
     int RedCards,
+    int TacklesWon,
+    int PassesCompleted,
+    int CrossesCompleted,
     int? AverageRatingBasisPoints);
 
 /// <summary>A division's player statistics for the season in progress (master plan §10.5).</summary>

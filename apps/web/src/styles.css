@@ -292,21 +292,30 @@
    * shell's own wrappers are named here; the screen lays out its own insides (`fit:` utilities).
    */
   @media (min-width: 80rem) and (min-height: 48rem) {
-    app-shell > div:has(:is(app-tactics, app-squad)) {
+    app-shell > div:has(:is(app-tactics, app-squad, app-competition-table)) {
       height: 100dvh;
     }
 
-    app-shell > div:has(:is(app-tactics, app-squad)) > div:has(> #main-content) {
+    app-shell
+      > div:has(:is(app-tactics, app-squad, app-competition-table))
+      > div:has(> #main-content) {
       min-height: 0;
     }
 
-    app-shell > div:has(:is(app-tactics, app-squad)) nav[aria-label='Main'] {
+    app-shell > div:has(:is(app-tactics, app-squad, app-competition-table)) nav[aria-label='Main'] {
       max-height: 100% !important;
     }
 
-    #main-content:has(> :is(app-tactics, app-squad)) {
+    #main-content:has(> :is(app-tactics, app-squad, app-competition-table)) {
       display: flex;
       flex-direction: column;
+      min-height: 0;
+    }
+
+    /* The division table takes the height that is left, so its rows share it instead of overflowing it. */
+    #main-content > app-competition-table {
+      display: block;
+      flex: 1 1 0;
       min-height: 0;
     }
   }

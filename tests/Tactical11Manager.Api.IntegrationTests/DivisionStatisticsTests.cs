@@ -50,12 +50,18 @@ public sealed class DivisionStatisticsTests
             row.Appearances.Should().BeGreaterThanOrEqualTo(1);
             row.Starts.Should().BeLessThanOrEqualTo(row.Appearances);
             row.ShotsOnTarget.Should().BeLessThanOrEqualTo(row.Shots);
+            row.TacklesWon.Should().BeGreaterThanOrEqualTo(0);
+            row.PassesCompleted.Should().BeGreaterThanOrEqualTo(0);
+            row.CrossesCompleted.Should().BeGreaterThanOrEqualTo(0);
 
             if (row.AverageRating is decimal rating)
             {
                 rating.Should().BeInRange(0.0m, 10.0m, "TRN-8: the rating arrives on its display scale");
             }
         }
+
+        // The leaderboards beside the table read these two, so a played round must have produced some of each.
+        statistics.Rows.Should().Contain(row => row.PassesCompleted > 0, "a played match completes passes");
 
         // Every goal a side scored is attributed to exactly one player, so the division's player goals and
         // the goals its published fixtures record are the same number (MAT-5, applied to the projection).

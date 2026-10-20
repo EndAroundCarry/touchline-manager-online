@@ -161,6 +161,9 @@ internal sealed class CompetitionQueries : ICompetitionQueries
                 stat.Saves,
                 stat.YellowCards,
                 stat.RedCards,
+                stat.TacklesWon,
+                stat.PassesCompleted,
+                stat.CrossesCompleted,
                 stat.RatedAppearances == 0
                     ? null
                     : (int?)(stat.RatingBasisPointsTotal / stat.RatedAppearances)))

@@ -6,6 +6,8 @@
  * when a new one appears.
  */
 
+import type { DivisionPlayerStat } from './competition.models';
+
 const FIXTURE_STATUS_LABELS: Record<string, string> = {
   scheduled: 'Scheduled',
   locked: 'Locked',
@@ -177,6 +179,39 @@ export function lockCountdown(lockAt: string, now: Date): string {
   }
 
   return hours > 0 ? `Locks in ${hours}h ${minutes}m` : `Locks in ${minutes}m`;
+}
+
+/** One line of a division leaderboard. */
+export interface LeaderboardEntry {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly clubName: string;
+  readonly clubShortName: string;
+  readonly value: number;
+}
+
+/**
+ * The top of one statistic across a division's players, best first.
+ *
+ * Only a player who has earned some of the statistic is listed (a "top scorer" with no goals would be a lie), and
+ * players on the same value keep the server's order (goals, then assists, then name), so two reads never disagree.
+ */
+export function leaderboard(
+  rows: readonly DivisionPlayerStat[],
+  value: (row: DivisionPlayerStat) => number,
+  limit: number,
+): readonly LeaderboardEntry[] {
+  return rows
+    .map((row) => ({
+      playerId: row.playerId,
+      playerName: row.playerName,
+      clubName: row.clubName,
+      clubShortName: row.clubShortName,
+      value: value(row),
+    }))
+    .filter((entry) => entry.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit);
 }
 
 /** Whether a fixture is still ahead of publication, which is what "next fixture" means. */

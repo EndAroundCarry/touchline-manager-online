@@ -16,6 +16,9 @@ namespace Tactical11Manager.Contracts.Competition;
 /// <param name="Saves">Saves made.</param>
 /// <param name="YellowCards">Bookings accumulated.</param>
 /// <param name="RedCards">Sendings-off accumulated.</param>
+/// <param name="TacklesWon">Challenges for the ball won.</param>
+/// <param name="PassesCompleted">Passes that found a teammate.</param>
+/// <param name="CrossesCompleted">Open-play crosses that found a teammate.</param>
 /// <param name="AverageRating">
 /// The average match rating on a 0.0–10.0 scale, or null before the player has been rated. Converted from
 /// the stored basis points in one place (`TRN-8`), so no storage unit reaches a client.
@@ -36,6 +39,9 @@ public sealed record DivisionPlayerStatRowResponse(
     int Saves,
     int YellowCards,
     int RedCards,
+    int TacklesWon,
+    int PassesCompleted,
+    int CrossesCompleted,
     decimal? AverageRating);
 
 /// <summary>A division's player statistics for the season in progress (master plan §10.5).</summary>

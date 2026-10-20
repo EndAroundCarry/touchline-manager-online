@@ -3,6 +3,7 @@ import {
   fixtureStatusLabel,
   goalDifferenceLabel,
   isUpcoming,
+  leaderboard,
   lockCountdown,
   movementLabel,
   outcomeLabel,
@@ -166,5 +167,48 @@ describe('movementLabel', () => {
 
   it('falls back to the raw code for a movement it does not know', () => {
     expect(movementLabel('expelled')).toBe('expelled');
+  });
+});
+
+describe('leaderboard', () => {
+  const player = (name: string, goals: number, tacklesWon = 0) => ({
+    playerId: name,
+    playerName: name,
+    clubId: 'c',
+    clubName: 'Club',
+    clubShortName: 'CLB',
+    appearances: 1,
+    starts: 1,
+    minutesPlayed: 90,
+    goals,
+    assists: 0,
+    shots: 0,
+    shotsOnTarget: 0,
+    saves: 0,
+    yellowCards: 0,
+    redCards: 0,
+    tacklesWon,
+    passesCompleted: 0,
+    crossesCompleted: 0,
+    averageRating: null,
+  });
+
+  it('lists the best first, keeps the server order on a tie, and cuts at the limit', () => {
+    const rows = [player('Ana', 2), player('Bea', 4), player('Cy', 2), player('Di', 1)];
+
+    expect(leaderboard(rows, (row) => row.goals, 3).map((entry) => entry.playerName)).toEqual([
+      'Bea',
+      'Ana',
+      'Cy',
+    ]);
+  });
+
+  it('leaves out a player who has none of the statistic', () => {
+    const rows = [player('Ana', 0, 3), player('Bea', 2, 0)];
+
+    expect(leaderboard(rows, (row) => row.tacklesWon, 5)).toEqual([
+      expect.objectContaining({ playerName: 'Ana', value: 3 }),
+    ]);
+    expect(leaderboard([], (row) => row.goals, 5)).toEqual([]);
   });
 });

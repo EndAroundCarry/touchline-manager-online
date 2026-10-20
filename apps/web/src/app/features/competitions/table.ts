@@ -1,11 +1,18 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, untracked } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { goalDifferenceLabel } from '../../core/competition/competition-presentation';
+import { goalDifferenceLabel, leaderboard } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { ResultGate } from '../../core/match/result-gate';
 import { formatInstant } from '../../core/world/presentation';
 import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/control-styles';
+import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
+
+/**
+ * How many players each leaderboard lists. Eight is what fits beside the table on a full-HD window without a
+ * scrollbar; the template shows only the first three until the window is wide enough for two columns of boards.
+ */
+const LEADERBOARD_SIZE = 8;
 
 /**
  * The division table screen (master plan §11.1, §10.5).
@@ -21,7 +28,7 @@ import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
  */
 @Component({
   selector: 'app-competition-table',
-  imports: [RouterLink, ResultHidden],
+  imports: [RouterLink, ResultHidden, PlayerCardTrigger],
   templateUrl: './table.html',
 })
 export class CompetitionTable {
@@ -47,6 +54,51 @@ export class CompetitionTable {
       : `${table.divisionName} table for ${table.seasonLabel}, best first.`;
   });
 
+  /** The division's player statistics, once they have been read for the division on screen. */
+  private readonly statistics = computed(() => {
+    const statistics = this.store.divisionStatistics();
+
+    return statistics !== null && statistics.divisionId === this.table()?.divisionId
+      ? statistics
+      : null;
+  });
+
+  /**
+   * The leaderboards beside the table: the top eight of five statistics, each left out until somebody has
+   * earned some of it. They are an extra, so a failed or slow read shows no boards rather than an error.
+   */
+  protected readonly boards = computed(() => {
+    const rows = this.statistics()?.rows ?? [];
+
+    return [
+      {
+        title: 'Top scorers',
+        unit: 'Goals',
+        entries: leaderboard(rows, (r) => r.goals, LEADERBOARD_SIZE),
+      },
+      {
+        title: 'Most assists',
+        unit: 'Assists',
+        entries: leaderboard(rows, (r) => r.assists, LEADERBOARD_SIZE),
+      },
+      {
+        title: 'Most tackles won',
+        unit: 'Tackles won',
+        entries: leaderboard(rows, (r) => r.tacklesWon, LEADERBOARD_SIZE),
+      },
+      {
+        title: 'Most passes completed',
+        unit: 'Passes completed',
+        entries: leaderboard(rows, (r) => r.passesCompleted, LEADERBOARD_SIZE),
+      },
+      {
+        title: 'Most crosses completed',
+        unit: 'Crosses completed',
+        entries: leaderboard(rows, (r) => r.crossesCompleted, LEADERBOARD_SIZE),
+      },
+    ].filter((board) => board.entries.length > 0);
+  });
+
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
@@ -61,6 +113,18 @@ export class CompetitionTable {
     } else {
       this.store.loadMyDivisionTable();
     }
+
+    // The own-division read does not name the division until the table is back, so the leaderboards are read
+    // from the table's own division. A held-back division has them held back too: they count the same goals.
+    const tableDivisionId = computed(() => this.table()?.divisionId ?? null);
+
+    effect(() => {
+      const id = tableDivisionId();
+
+      if (id !== null && !this.gate.holdsBack(id)) {
+        untracked(() => this.store.loadDivisionStatistics(id));
+      }
+    });
   }
 
   /**

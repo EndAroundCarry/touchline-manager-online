@@ -358,6 +358,9 @@ function stat(name: string, over: Partial<DivisionPlayerStat>): DivisionPlayerSt
     saves: 0,
     yellowCards: 0,
     redCards: 0,
+    tacklesWon: 0,
+    passesCompleted: 0,
+    crossesCompleted: 0,
     averageRating: null,
     ...over,
   };

@@ -104,6 +104,9 @@ describe('The division aggregates', () => {
       saves: 0,
       yellowCards: 0,
       redCards: 0,
+      tacklesWon: 0,
+      passesCompleted: 0,
+      crossesCompleted: 0,
       averageRating: 8.1,
     };
   }
