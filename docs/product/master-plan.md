@@ -792,8 +792,8 @@ Use columns rather than JSONB because scouting filters and match formulas depend
 
 #### `market.transfer_listings`
 
-- Player, seller club, minimum fee, generated buyer wage/contract terms, opens/ends timestamps, status, version, resolution job ID.
-- Checks positive fee, end after minimum exposure, active seller contract.
+- Player, seller club (null for a free agent) or free-agent batch (null for a club listing), minimum fee, generated buyer wage/contract terms, opens/ends timestamps, status, version, resolution job ID.
+- Checks positive fee, end after minimum exposure, active seller contract, exactly one of seller club and free-agent batch.
 - Partial unique active listing per player.
 
 #### `market.transfer_bids`
@@ -804,8 +804,13 @@ Use columns rather than JSONB because scouting filters and match formulas depend
 
 #### `market.transfer_outcomes`
 
-- Listing, winning bid/player/seller/buyer, fee, old/new contract IDs, resolved timestamp, outcome reason, correlation ID.
+- Listing, winning bid/player/seller/buyer, fee, old/new contract IDs, resolved timestamp, outcome reason, correlation ID. Seller and old contract are null together when a free agent was signed.
 - Unique listing.
+
+#### `market.free_agent_batches`
+
+- World, week start (the Monday), opens/ends timestamps, contracted/generated/released/gem counts, generator version.
+- Unique world and week, so the weekly job is idempotent. The gem count is server-only.
 
 #### `market.ai_market_decisions`
 
@@ -894,6 +899,7 @@ Implement `PostgresJobQueue` in `Tactical11Manager.Infrastructure/Jobs`:
 - `ResolveDivisionMatchday`: at kickoff; produces staged fixtures.
 - `PublishDivisionMatchday`: publishes only after all fixtures are staged and validated.
 - `ResolveTransferAuction`: at fixed auction windows.
+- `OpenFreeAgentBatch` (`market.free-agent-batch:{monday}`): Monday 12:00 UTC, the auction window; generates the week's free agents (a tenth of the players under contract), picks up the players released since the last batch, and lists them with no seller until the next Monday (`FA-1`…`FA-8`, ADR-0077).
 - `DailyPlayerProgression`: training/state/injury recovery.
 - `WeeklyFinanceRun`: wages, sponsorship, operating costs.
 - `EvaluateAiClubs`: lineups, tactics, training, renewals, listings, bids.

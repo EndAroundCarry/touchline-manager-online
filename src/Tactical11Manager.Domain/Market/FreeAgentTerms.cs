@@ -20,9 +20,14 @@ public sealed record FreeAgentOffer(
 /// </summary>
 /// <remarks>
 /// <para>
-/// Hidden potential is never an input. The valuation and the wage are both priced with potential set equal to
-/// ability, so a hidden gem costs and earns exactly what a normal player of the same ability and age does, and
-/// the price cannot give him away.
+/// A generated free agent's hidden potential is never an input. The valuation and the wage are both priced with
+/// potential set equal to ability, so a hidden gem costs and earns exactly what a normal player of the same
+/// ability and age does, and the price cannot give him away.
+/// </para>
+/// <para>
+/// A released player is a different case: he is a former club player, listed like any club's player, so his fee is
+/// his full valuation with his real potential, as a club listing's asking price is (`FA-6`). His wage is still
+/// priced on ability alone.
 /// </para>
 /// <para>
 /// The tier is the reference tier, the lowest active tier of the player's country, because a free agent has no
@@ -36,18 +41,31 @@ public static class FreeAgentTerms
     /// <param name="ability">The ability he shows, on the 1–20 scale.</param>
     /// <param name="age">His age in game years.</param>
     /// <param name="referenceTier">The reference tier, which is 1 or more.</param>
-    public static FreeAgentOffer Calculate(int ability, int age, int referenceTier)
+    public static FreeAgentOffer Calculate(int ability, int age, int referenceTier) =>
+        Calculate(ability, ability, age, referenceTier, WorldRuleSet.FreeAgentMinimumFeeBp);
+
+    /// <summary>Calculates the terms a released player is listed on: his full valuation, with his real potential.</summary>
+    /// <param name="ability">The ability he shows, on the 1–20 scale.</param>
+    /// <param name="potential">His hidden potential, on the 1–20 scale. It prices his fee and nothing else.</param>
+    /// <param name="age">His age in game years.</param>
+    /// <param name="referenceTier">The reference tier, which is 1 or more.</param>
+    public static FreeAgentOffer CalculateReleased(int ability, int potential, int age, int referenceTier) =>
+        Calculate(ability, potential, age, referenceTier, WorldRuleSet.FreeAgentReleasedFeeBp);
+
+    private static FreeAgentOffer Calculate(int ability, int potential, int age, int referenceTier, int feeBp)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(ability, WorldRuleSet.AttributeMin);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(ability, WorldRuleSet.AttributeMax);
+        ArgumentOutOfRangeException.ThrowIfLessThan(potential, WorldRuleSet.AttributeMin);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(potential, WorldRuleSet.AttributeMax);
         ArgumentOutOfRangeException.ThrowIfNegative(age);
         ArgumentOutOfRangeException.ThrowIfLessThan(referenceTier, 1);
 
-        var valuation = PlayerValuation.Estimate(new PlayerValuationInput(ability, ability, age, referenceTier));
+        var valuation = PlayerValuation.Estimate(new PlayerValuationInput(ability, potential, age, referenceTier));
 
         var minimumFee = Math.Max(
             WorldRuleSet.MinimumBidIncrementMinor,
-            valuation * WorldRuleSet.FreeAgentMinimumFeeBp / 10_000);
+            valuation * feeBp / 10_000);
 
         var seasons = WorldRuleSet.FreeAgentContractSeasonsFor(age);
 

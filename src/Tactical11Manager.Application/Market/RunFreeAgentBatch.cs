@@ -40,8 +40,9 @@ public sealed record RunFreeAgentBatchResult(
 /// cleanup job is needed: a player with a bid is signed there, one without drops off the page.
 /// </para>
 /// <para>
-/// Price and wage come from <see cref="FreeAgentTerms"/> with potential set equal to ability, so nothing
-/// visible or priced reveals a hidden gem (`FA-6`).
+/// A generated player's price and wage come from <see cref="FreeAgentTerms"/> with potential set equal to
+/// ability, so nothing visible or priced reveals a hidden gem (`FA-6`). A released player's fee is his full
+/// valuation with his real potential, as a club listing's is.
 /// </para>
 /// </remarks>
 public sealed class RunFreeAgentBatch
@@ -156,9 +157,10 @@ public sealed class RunFreeAgentBatch
             OpenListing(
                 batch,
                 agent.Player.Id,
-                agent.Ability,
-                facts.GameYear - agent.Player.BirthGameYear,
-                ReferenceTier(tierByCountry, agent.Player.NationalityCode),
+                FreeAgentTerms.Calculate(
+                    agent.Ability,
+                    facts.GameYear - agent.Player.BirthGameYear,
+                    ReferenceTier(tierByCountry, agent.Player.NationalityCode)),
                 now);
         }
 
@@ -167,9 +169,11 @@ public sealed class RunFreeAgentBatch
             OpenListing(
                 batch,
                 row.PlayerId,
-                row.Ability,
-                row.Age,
-                ReferenceTier(tierByCountry, row.NationalityCode),
+                FreeAgentTerms.CalculateReleased(
+                    row.Ability,
+                    row.Potential,
+                    row.Age,
+                    ReferenceTier(tierByCountry, row.NationalityCode)),
                 now);
         }
 
@@ -204,13 +208,9 @@ public sealed class RunFreeAgentBatch
     private void OpenListing(
         FreeAgentBatch batch,
         Guid playerId,
-        int ability,
-        int age,
-        int referenceTier,
+        FreeAgentOffer offer,
         DateTimeOffset now)
     {
-        var offer = FreeAgentTerms.Calculate(ability, age, referenceTier);
-
         _listings.Add(TransferListing.OpenFreeAgent(
             Guid.CreateVersion7(),
             playerId,

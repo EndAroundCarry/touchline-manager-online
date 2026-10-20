@@ -40,7 +40,7 @@ replacement path is what keeps the club legal afterwards.
 > manager loses a player to expiry. Release to free agency applies only to the surplus of clubs nobody manages.
 
 **3. A club nobody manages renews by a pure, versioned policy.**
-`AiContractPolicy` (`ai-contract-v1`) is a deterministic function of a squad's shape: it renews the best
+`AiContractPolicy` (`ai-contract-v1`; `v2` from ADR-0077, which raises the target from 21 to 23) is a deterministic function of a squad's shape: it renews the best
 expiring players up to `AiContractTargetSquadSize`, then extends renewals only as far as legality requires
 (the minimum registered squad and the goalkeeper minimum, `SQ-2`), and releases the rest. "Nobody manages"
 means no tenure, **or** an inactive tenure — the AI already fills an inactive manager's gaps (`OCC-2`), and

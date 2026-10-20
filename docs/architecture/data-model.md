@@ -90,6 +90,7 @@ flowchart LR
         transfer_bids
         transfer_outcomes
         ai_market_decisions
+        free_agent_batches
     end
     subgraph finance[finance]
         club_accounts
@@ -137,6 +138,7 @@ flowchart LR
     players --> transfer_listings
     transfer_listings --> transfer_bids
     transfer_listings --> transfer_outcomes
+    free_agent_batches --> transfer_listings
 ```
 
 ---
@@ -490,6 +492,7 @@ erDiagram
     players ||--o{ transfer_listings : "listed"
     transfer_listings ||--o{ transfer_bids : "receives"
     transfer_listings ||--o| transfer_outcomes : "resolves"
+    free_agent_batches ||--o{ transfer_listings : "opens"
     clubs ||--|| club_accounts : "banked"
     club_accounts ||--o{ ledger_entries : "records"
     clubs ||--o{ club_season_finances : "summarised"
@@ -627,7 +630,8 @@ erDiagram
     transfer_listings {
         uuid id PK
         uuid player_id FK
-        uuid seller_club_id FK
+        uuid seller_club_id FK "null for a free agent"
+        uuid free_agent_batch_id FK "null for a club listing"
         bigint minimum_fee_minor
         bigint generated_buyer_wage_minor
         int generated_contract_seasons
@@ -636,6 +640,19 @@ erDiagram
         text status
         uuid resolution_job_id FK
         bigint version
+    }
+    free_agent_batches {
+        uuid id PK
+        uuid world_id FK
+        date week_start UK "the Monday, unique per world"
+        timestamptz opens_at
+        timestamptz ends_at
+        int contracted_count
+        int generated_count
+        int released_count
+        int gem_count "server-only"
+        text generator_version
+        timestamptz created_at
     }
     transfer_bids {
         uuid id PK
@@ -712,6 +729,8 @@ erDiagram
 | `unique (source_event_id)` where one highlight per event | `highlights` | Determinism |
 | `check (minimum_fee_minor > 0)`, `check (ends_at > opens_at + minimum exposure)` | `transfer_listings` | `TRF-1`, `TRF-2` |
 | **Partial unique** one active listing per player | `transfer_listings` | `TRF-14` |
+| `check (seller_club_id is not null and free_agent_batch_id is null or seller_club_id is null and free_agent_batch_id is not null)` (`ck_transfer_listings_seller_or_batch`) | `transfer_listings` | A listing is a club's or a free-agent batch's, never both and never neither (`FA-3`) |
+| `unique (world_id, week_start)`, `check (ends_at > opens_at)`, `check (gem_count <= generated_count)` | `free_agent_batches` | One pool per world per Monday, so a retried job lists nothing twice (`FA-1`) |
 | **Partial unique** one active bid per listing per club | `transfer_bids` | `TRF-6` |
 | Index `(listing_id, status, amount_minor, bid_sequence)` | `transfer_bids` | `TRF-8` ordering |
 | `unique (listing_id)` | `transfer_outcomes` | Resolution happens once |
@@ -727,6 +746,14 @@ erDiagram
 > `listing:{id}:resolve` already identifies it durably, and a column naming it would be a second
 > statement of the same fact (ADR-0003, ADR-0024). `shortlists` is owned by the `market` module, per §7.
 
+> **Free agents milestone.** `market.free_agent_batches` records each week's pool (the Monday, the window, the
+> contracted count the tenth was taken of, the generated and released counts, and the hidden gem count, which no
+> response carries). `transfer_listings.seller_club_id` is now nullable and gains `free_agent_batch_id`, with the
+> one-of check above; `transfer_outcomes.seller_club_id` and `old_contract_id` are nullable together (a free agent
+> has neither a seller nor a contract to close). The ledger gains the `release_payout` category and the `contract`
+> source, and the rule set advances to `world-rules-v13` (`FA-1`…`FA-8`, `CON-12`, ADR-0077). Migrations
+> `FreeAgents` and `ReleasePayout`; no data is backfilled.
+>
 > **Stage 12 status (rollover).** `competition.season_rollovers` is the checkpoint row for the season
 > rollover state machine (ADR-0031): one row per closing season, guarded by a world-scoped advisory lock,
 > advanced `started → frozen → finalized → squads → moved → completed`. `club_season_entries.final_rank`,

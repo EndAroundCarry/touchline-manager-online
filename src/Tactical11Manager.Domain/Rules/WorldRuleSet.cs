@@ -726,9 +726,11 @@ public static class WorldRuleSet
     /// <remarks>
     /// The same target the AI market trims toward, so an unmanaged club neither grows past what the market
     /// would sell nor falls toward the minimum: it renews its best players up to this size and lets the
-    /// surplus go to free agency, keeping a legal squad without hoarding.
+    /// surplus go to free agency, keeping a legal squad without hoarding. It was 21 while the market's was 23,
+    /// which took a generated squad of 24 down to 21 at its first rollover and, with the AI barred from the
+    /// free-agent pool, left it there; the two targets are now one number (`CON-9`).
     /// </remarks>
-    public const int AiContractTargetSquadSize = 21;
+    public const int AiContractTargetSquadSize = 23;
 
     /// <summary>The most players an AI club lists in one evaluation, so a pass cannot flood the market (`TRF-12`).</summary>
     public const int AiMarketMaxListingsPerClub = 3;
@@ -802,6 +804,15 @@ public static class WorldRuleSet
     /// </summary>
     /// <remarks>Never below <see cref="MinimumBidIncrementMinor"/>, so the fee is always a real price.</remarks>
     public const int FreeAgentMinimumFeeBp = 2_500;
+
+    /// <summary>
+    /// A released player's minimum fee as a share of his valuation, in basis points (`FA-6`). A balancing value.
+    /// </summary>
+    /// <remarks>
+    /// Full value, with his real potential, like a club listing's asking price: a released player is a former
+    /// club player, not cheap depth. Never below <see cref="MinimumBidIncrementMinor"/>.
+    /// </remarks>
+    public const int FreeAgentReleasedFeeBp = 10_000;
 
     /// <summary>The weekday a new free-agent batch opens, at <see cref="AuctionResolutionUtc"/> (`FA-5`).</summary>
     public const DayOfWeek FreeAgentWeekStartDay = DayOfWeek.Monday;

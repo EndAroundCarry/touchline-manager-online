@@ -132,7 +132,7 @@ internal sealed class FreeAgentQueries : IFreeAgentQueries
                 && !_dbContext.TransferListings.Any(listing => listing.PlayerId == player.Id
                     && listing.CreatedAt >= contract.ClosedAt)
             orderby player.Id
-            select new { player.Id, player.BirthGameYear, player.NationalityCode, Attributes = attributes })
+            select new { player.Id, player.BirthGameYear, player.NationalityCode, player.Potential, Attributes = attributes })
             .ToListAsync(cancellationToken);
 
         if (rows.Count == 0)
@@ -147,6 +147,7 @@ internal sealed class FreeAgentQueries : IFreeAgentQueries
             .Select(row => new ReleasedFreeAgentRow(
                 row.Id,
                 Ability(row.Attributes),
+                row.Potential,
                 gameYear - row.BirthGameYear,
                 row.NationalityCode))];
     }

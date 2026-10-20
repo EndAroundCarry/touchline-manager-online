@@ -91,10 +91,43 @@ public sealed class FreeAgentTermsTests
     }
 
     [Fact]
+    public void A_released_player_costs_his_full_value_with_his_real_potential()
+    {
+        foreach (var ability in new[] { 4, 10, 16 })
+        {
+            foreach (var age in new[] { 19, 25, 33 })
+            {
+                var potential = Math.Min(WorldRuleSet.AttributeMax, ability + 2);
+                var valuation = PlayerValuation.Estimate(new PlayerValuationInput(ability, potential, age, 1));
+                var released = FreeAgentTerms.CalculateReleased(ability, potential, age, referenceTier: 1);
+                var generated = FreeAgentTerms.Calculate(ability, age, referenceTier: 1);
+
+                released.MinimumFeeMinor.Should().Be(
+                    Math.Max(WorldRuleSet.MinimumBidIncrementMinor, valuation),
+                    $"ability {ability}, age {age}");
+                released.MinimumFeeMinor.Should().BeGreaterThanOrEqualTo(generated.MinimumFeeMinor);
+                released.WeeklyWageMinor.Should().Be(generated.WeeklyWageMinor, "the wage is priced on ability alone");
+                released.ContractSeasons.Should().Be(generated.ContractSeasons);
+                released.SquadStatus.Should().Be(generated.SquadStatus);
+            }
+        }
+    }
+
+    [Fact]
+    public void A_released_player_with_a_higher_ceiling_costs_more()
+    {
+        var low = FreeAgentTerms.CalculateReleased(10, 10, 20, 1);
+        var high = FreeAgentTerms.CalculateReleased(10, 16, 20, 1);
+
+        high.MinimumFeeMinor.Should().BeGreaterThan(low.MinimumFeeMinor);
+    }
+
+    [Fact]
     public void Terms_off_the_scale_are_refused()
     {
         FluentActions.Invoking(() => FreeAgentTerms.Calculate(0, 25, 1)).Should().Throw<ArgumentOutOfRangeException>();
         FluentActions.Invoking(() => FreeAgentTerms.Calculate(21, 25, 1)).Should().Throw<ArgumentOutOfRangeException>();
         FluentActions.Invoking(() => FreeAgentTerms.Calculate(8, 25, 0)).Should().Throw<ArgumentOutOfRangeException>();
+        FluentActions.Invoking(() => FreeAgentTerms.CalculateReleased(8, 21, 25, 1)).Should().Throw<ArgumentOutOfRangeException>();
     }
 }

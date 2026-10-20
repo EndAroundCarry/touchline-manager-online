@@ -10,6 +10,14 @@ namespace Tactical11Manager.Domain.Tests.Squad;
 public sealed class AiContractPolicyTests
 {
     [Fact]
+    public void The_rollover_target_is_the_one_the_ai_market_trims_toward()
+    {
+        WorldRuleSet.AiContractTargetSquadSize.Should().Be(
+            WorldRuleSet.AiMarketTargetSquadSize,
+            "a squad of 24 must not lose three players at rollover only for the AI to be barred from refilling it (CON-9)");
+    }
+
+    [Fact]
     public void The_best_expiring_players_are_renewed_first()
     {
         var best = Player(ability: 19);
@@ -55,7 +63,10 @@ public sealed class AiContractPolicyTests
     {
         var expiring = new[] { Player(20), Player(19), Player(18), Player(17) };
 
-        var decisions = AiContractPolicy.Decide(stableCount: 22, stableGoalkeepers: 3, expiring);
+        var decisions = AiContractPolicy.Decide(
+            stableCount: WorldRuleSet.AiContractTargetSquadSize,
+            stableGoalkeepers: 3,
+            expiring);
 
         decisions.Should().OnlyContain(decision => !decision.Renew);
     }
@@ -81,8 +92,9 @@ public sealed class AiContractPolicyTests
     {
         var players = new[] { Player(18), Player(14), Player(16), Player(12) };
 
-        var forward = AiContractPolicy.Decide(stableCount: 18, stableGoalkeepers: 2, players);
-        var reversed = AiContractPolicy.Decide(stableCount: 18, stableGoalkeepers: 2, [.. players.Reverse()]);
+        var stable = WorldRuleSet.AiContractTargetSquadSize - 3;
+        var forward = AiContractPolicy.Decide(stable, stableGoalkeepers: 2, players);
+        var reversed = AiContractPolicy.Decide(stable, stableGoalkeepers: 2, [.. players.Reverse()]);
 
         reversed.Should().BeEquivalentTo(forward);
     }

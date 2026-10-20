@@ -11,7 +11,7 @@ namespace Tactical11Manager.Domain.Squad;
 public static class AiContractPolicyVersions
 {
     /// <summary>The current policy label.</summary>
-    public const string Version = "ai-contract-v1";
+    public const string Version = "ai-contract-v2";
 }
 
 /// <summary>One expiring player as the AI contract policy weighs them (`CON-6`).</summary>

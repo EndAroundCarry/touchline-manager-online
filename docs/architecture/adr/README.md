@@ -104,3 +104,4 @@ the system is shaped the way it is.
 | [0075](0075-back-threes-slide-across.md) | A back three or five slides across: the near wing-back steps out and the far one tucks in | Accepted |
 | [0076](0076-experience-is-frozen-into-the-snapshot-as-a-skill-bonus.md) | Experience is frozen into the snapshot as a skill bonus, after the curve and uncapped, hashed only when above zero | Accepted |
 | [0076](0076-potential-drawn-before-skills.md) | Potential is drawn before skills, with a tail of talents and gems | Accepted |
+| [0077](0077-free-agents-weekly-generated-pool.md) | Free agents are a weekly generated pool sold through the timed auction | Accepted |

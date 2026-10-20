@@ -325,10 +325,11 @@ neither the ordering nor the counts are stored a second time.
 | CON-4 | The manager accepts or declines the quote. Free-form negotiation is post-MVP. | — |
 | CON-5 | A transfer closes the seller's contract and creates the buyer's contract, which was displayed before the bid was placed. | — |
 | CON-6 | Expired players become free agents at rollover unless renewed. | — |
-| CON-7 | Free-agent signing beyond emergency replacements is post-MVP, unless it proves necessary to keep the transfer market healthy. If enabled it uses the same timed-auction mechanism with a zero seller fee and an explicit signing wage. | — |
+| CON-7 | **Built** (`FA-1`…`FA-8`, §14.5): free agents are signed through the same timed-auction mechanism with no seller, so no seller fee, and an explicit signing wage frozen on the listing. | — |
 | CON-8 | Contract years advance at **season rollover**, never on the real-world anniversary. | — |
-| CON-9 | At rollover, a club nobody manages (no tenure, or an inactive one) renews its best expiring players up to the AI target and releases the rest; a present manager's expiring contracts are renewed by the board (`CON-11`). | — |
+| CON-9 | At rollover, a club nobody manages (no tenure, or an inactive one) renews its best expiring players up to the AI target (**23**, the AI market's own target, so a generated squad of 24 loses at most one player) and releases the rest; a present manager's expiring contracts are renewed by the board (`CON-11`). | — |
 | CON-11 | The board automatically renews every expiring contract of a club with a present manager at rollover, for a two-season deal on the deterministic renewal quote, so no manager loses a player to an expiring contract. Expiry to free agency remains for the surplus of clubs nobody manages (`CON-9`). | — |
+| CON-12 | A manager may **release** a player of their own club now, from the player's Contract tab. It costs **half the weekly wages left on the contract**, paid at once (rounded up to whole weeks: the rest of this season plus whole seasons after it). The contract closes as `released`, the registration ends, and the player joins the next Monday's free-agent batch (`FA-5`). Refused while the player has an open listing, when it would leave fewer than **18** players or fewer than **2** goalkeepers, during rollover, or when the club's available cash (cash less reservations) cannot cover the payout. A match snapshot that is already locked keeps him (`SQ-7`). | `release_payout_bp` 5,000 |
 | CON-10 | **Announce-then-play retirement**: from **32** a player may announce that the coming season is their last; the chance rises each season and is gated by ability and fitness, with a forced announcement age and a forced retirement age capping it. An announced player plays one final season. | — |
 
 The retirement rule's numbers are a hidden mechanic: a manager knows an announcement is possible from the
@@ -500,7 +501,28 @@ version. The value and band constants are in §18.
 | INT-5 | Listing and bid commands are rate-limited per manager and per club. |
 | INT-6 | Completed market history is public enough for transparency. |
 
----
+### 14.5 Free agents
+
+A weekly pool of players with no club, sold through the timed auction (`CON-7`, ADR-0077). They are squad depth
+for a new or weak team, plus a small chance of a hidden gem to train into a star.
+
+| Ref | Rule | Value |
+|---|---|---|
+| FA-1 | Every **Monday at 12:00 UTC** (the daily auction window) a batch of generated free agents opens: `round(10% × the players under active contract)` when the batch runs, split across the countries in proportion to each country's contracted players, with that country's nationality and name pool. A batch is unique per world and Monday and its players are a pure function of the world seed and the week, so a retried or late job reproduces the same people and never lists a week twice. A worker that was down runs the batch late, unless the week has already closed. | `free_agent_share_bp` 1,000 |
+| FA-2 | Positions are spread **15% goalkeepers, 28% defenders, 29% midfielders, 28% attackers** (exact sums per country by largest remainder), cycling the positions inside a family so a batch has full-backs and wingers as well as centre-backs and strikers. | `free_agent_family_share_bp` 1,500 / 2,800 / 2,900 / 2,800 |
+| FA-3 | A generated free agent is **age 20 to 32** (most often the middle) and shows a **1–20 ability of 6 to 10** (most often 8), guaranteed by shifting all 28 attributes together. His hidden potential is his ability plus 0 to 2 at age 23 or under and none after, **never above 11**. | `free_agent_ability_min/max` 6 / 10; age 20–32; potential cap 11 |
+| FA-4 | **1%** of the generated players are **hidden gems**: age **17 to 21**, a shown ability of 6 to 10 like any other free agent, and a hidden potential of **13 to 16**. Nothing in any response marks one, and nothing visible or priced reads his potential (`FA-8`). A gem grows only where daily training progression is on. | `free_agent_gem_permille` 10; gem age ≤ 21; potential 13–16 |
+| FA-5 | A listing from the pool has **no seller** (it belongs to the batch). It closes at the **next Monday 12:00**, seven days after it opened, when the auction scheduler resolves it: **a leading bid signs the player** (even one placed on the last day), and **a listing with no bid expires** and the player leaves the page. Only **human managers** may bid, and the AI market neither lists nor bids on them. A bid is refused up front when the bidder's squad already holds **27** players (`SQUAD_FULL`); at the close the buyer's squad must still be at **26 or fewer** and the cash still there, else the listing expires. The fee is paid by the buyer and **leaves the game**; no club receives it. The contract starts in the current season, and if the season is in rollover when the listing resolves, the resolution is retried (700 attempts) until the next season is active. **Released players join on top of the 10%**: every player an AI club released at rollover (`CON-9`) or a manager released (`CON-12`) since the previous batch, with his real ability and age, listed once, at the price in `FA-6`. | window Monday 12:00 → Monday 12:00; squad cap 27 / 26 |
+| FA-6 | Price is the valuation at the **lowest active tier** of the player's country. A **generated** free agent is valued on his **ability with potential set equal to ability**, and his minimum fee is the larger of the minimum bid increment and **25%** of that. A **released** player is a former club player and is valued **in full, with his real potential**, as a club listing's asking price is: his minimum fee is the larger of the minimum bid increment and **100%** of it. The **weekly wage** is the renewal quote on ability alone for both, frozen on the listing and shown before the bid (`CON-5`). | `free_agent_minimum_fee_bp` 2,500; `free_agent_released_fee_bp` 10,000 |
+| FA-7 | The contract is **3 seasons at age 21 or under, 2 at 22 to 29, 1 at 30 or over**, and the player joins as a **prospect** at 21 or under, otherwise as **rotation**. Both depend on age alone, so neither points at a gem. | — |
+| FA-8 | A free agent's ability, age and position are public, like any player's. His potential, whether he is a gem, and the batch's gem count are class C2 and never reach a response; a released player's potential moves his fee, as a club listing's does, and is never shown. The scouting card and the public profile read any `FreeAgent` player with no contract, with no club, including a player released since the last batch who has no listing yet. | — |
+
+**Measured** (one scratch world, 108 clubs, 2,592 players; nothing else tuned):
+
+- The first batch listed 259 players, a tenth of 2,592, all showing ability 6 to 10 (mean 8.1) at ages 20 to 32, from 14% goalkeepers, 28% defenders, 30% midfielders and 28% attackers, 43 or 44 in each of the six countries. Minimum fees run 2,500 to 6,143 (median 3,084, about 0.5% of a top club's opening cash) and wages 93 to 311 a week (median 182); 227 of the 259 are on a 2-season deal.
+- The first measurement, with the rollover target at 21 and released players at 25%, gave a released pool larger and stronger than the generated one: 318 released (ability 4 to 16, mean 9.0, 64 with potential 13 or more) against 227 generated, at fees of 2,500 to 13,789. Two changes followed (ADR-0077): the target went to 23 and a released player is priced in full.
+- After one rollover now (nobody managed a club, so every club released what it could not keep under `CON-9`), 108 contracts expired, one a club. The next batch listed 248 generated players (a tenth of the 2,484 under contract) **and** those 108 released: the weakest expiring player of each club (ability 4 to 11, mean 7.5, mostly aged 18 to 24; 13 with potential 13 or more). Their fees run 5,477 to 31,853 (median 16,074, about 3% of a top club's opening cash) and wages 47 to 344.
+- Gems: 0 of 259 in the first batch and 3 of 248 in the second (ages 17, 18 and 18, ability 7 to 8, potential 13 to 14); a unit test asserts 1% +/- 0.3% over 10,000 drawn players.
 
 ## 15. Match rules
 
@@ -651,7 +673,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `outbox_dispatch_bucket` | 1 minute | COM-9, `MOD-4` |
 | `generator_version` | `world-gen-v3` (the bootstrap: clubs, squads, and fixtures) | FIC-8, PYR-14 |
 | `club_generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
-| `player_generator_version` | `player-gen-v1` | FIC-8, PYR-14 |
+| `player_generator_version` | `player-gen-v3` | FIC-8, PYR-14 |
 | `schedule_generator_version` | `schedule-gen-v1` | CAL-8, PYR-14 |
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
@@ -684,6 +706,21 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `experience_skill_bonus_per_level_bp` | 100 (1% of the skill) | EXP-4 |
 | `experience_start_age` / `_per_year_bp` / `_cap_bp` | 18 / 400 / 5,000 | EXP-5 |
 | `experience_version` | `experience-v1` | EXP-1…EXP-6 |
+| `free_agent_generator_version` | `free-agent-gen-v1` | FA-1…FA-4 (FIC-8) |
+| `free_agent_share_bp` | 1,000 (a tenth of the players under contract) | FA-1 (balancing) |
+| `free_agent_family_share_bp` | 1,500 goalkeepers / 2,800 defenders / 2,900 midfielders / 2,800 attackers | FA-2 (balancing) |
+| `free_agent_ability_min` / `free_agent_ability_max` | 6 / 10 | FA-3 (balancing) |
+| `free_agent_age_min` / `free_agent_age_max` | 20 / 32 | FA-3 (balancing) |
+| `free_agent_potential_cap` | 11 (headroom 0–2 at age 23 or under) | FA-3 (balancing) |
+| `free_agent_gem_permille` | 10 | FA-4 (balancing) |
+| `free_agent_gem_age_max` / `free_agent_gem_potential_min` / `free_agent_gem_potential_max` | 21 / 13 / 16 | FA-4 (balancing) |
+| `free_agent_week_start` | Monday 12:00 UTC (listings close the next Monday 12:00) | FA-5 |
+| `free_agent_resolution_max_attempts` | 700 (club listings 8) | FA-5 |
+| `free_agent_minimum_fee_bp` | 2,500 of the valuation, never below the minimum bid increment | FA-6 (balancing) |
+| `free_agent_released_fee_bp` | 10,000 of the valuation with real potential, never below the minimum bid increment | FA-6 (balancing) |
+| `free_agent_contract_seasons` | 3 (age ≤ 21) / 2 (22–29) / 1 (30+) | FA-7 |
+| `free_agent_prospect_age_max` | 21 | FA-7 |
+| `release_payout_bp` | 5,000 of the wages left on the contract | CON-12 (balancing) |
 | `potential_band_offsets` | normal −4..+2 (two four-faced dice less 4) / talent +3..+5 / gem +6..+7, from the tier mean | TRN-18 (balancing) |
 | `weekly_wage_minor_per_ability_squared` | 300 minor units | CON-2 (balancing) |
 | `tier_scaling_factor` | 2^(tier − 1) | WORLD-4 (balancing) |
@@ -711,12 +748,12 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `player_valuation_age_factor_bp` | 13,000 (≤21) → 6,000 (32+) | TRF-12 (balancing) |
 | `player_valuation_potential_factor_bp` | 9,000 + 150 × potential (9,150–12,000) | TRF-12 (balancing) |
 | `ai_market_policy_version` | `ai-market-v1` | TRF-12 (FIC-8) |
-| `ai_market_target_squad_size` | 21 | TRF-12 (balancing) |
+| `ai_market_target_squad_size` | 23 | TRF-12 (balancing) |
 | `ai_market_max_listings_per_club` | 3 per pass | TRF-12 (balancing) |
 | `ai_market_max_bids_per_club` | 3 per pass | TRF-12 (balancing) |
 | `ai_market_bid_budget_fraction_bp` | 5,000 (half of available cash) | TRF-12 (balancing) |
-| `ai_contract_policy_version` | `ai-contract-v1` | CON-9 (FIC-8) |
-| `ai_contract_target_squad_size` | 21 | CON-9 (balancing) |
+| `ai_contract_policy_version` | `ai-contract-v2` | CON-9 (FIC-8) |
+| `ai_contract_target_squad_size` | 23 | CON-9 (balancing) |
 | `retirement_policy_version` | `retirement-v1` | CON-10 (FIC-8) |
 | `retirement_announcement_start_age` | 32 | CON-10 (balancing) |
 | `retirement_announcement_base_chance_per_mille` | 300 | CON-10 (balancing) |
