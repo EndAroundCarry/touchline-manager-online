@@ -75,6 +75,15 @@ public sealed record PlayerMatchStateV1
     /// <summary>Gets match sharpness.</summary>
     public required int SharpnessBasisPoints { get; init; }
 
+    /// <summary>
+    /// Gets the experience bonus to the skills the tick engine plays with, in basis points of the skill (0..500), frozen from the player's
+    /// experience level when the snapshot is built. The engine never sees the experience or its levels, only this number.
+    /// </summary>
+    public int ExperienceBonusBasisPoints { get; init; }
+
+    /// <summary>The largest experience bonus a state may carry, in basis points: level 5 is +5%.</summary>
+    public const int MaxExperienceBonusBasisPoints = 500;
+
     /// <summary>Creates a state whose four values are all the same.</summary>
     /// <param name="basisPoints">The value for all four.</param>
     public static PlayerMatchStateV1 Uniform(int basisPoints) => new()
@@ -409,6 +418,12 @@ public sealed record MatchInputV1
             {
                 throw new InvalidMatchInputException(
                     $"{label} carries participant {participant.ParticipantId} from another club.");
+            }
+
+            if (participant.State.ExperienceBonusBasisPoints is < 0 or > PlayerMatchStateV1.MaxExperienceBonusBasisPoints)
+            {
+                throw new InvalidMatchInputException(
+                    $"{label}'s participant {participant.ParticipantId} has an experience bonus of {participant.State.ExperienceBonusBasisPoints}, outside 0..{PlayerMatchStateV1.MaxExperienceBonusBasisPoints}.");
             }
         }
 

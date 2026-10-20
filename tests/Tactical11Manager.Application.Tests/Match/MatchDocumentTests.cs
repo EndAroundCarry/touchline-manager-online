@@ -47,6 +47,37 @@ public sealed class MatchDocumentTests
     }
 
     [Fact]
+    public void An_experience_bonus_round_trips_and_a_document_without_one_reads_as_none()
+    {
+        var input = Snapshot(seed: 5UL);
+        var boosted = input with
+        {
+            Home = input.Home with { Squad = [.. input.Home.Squad.Select((player, index) => index == 0 ? player with { State = player.State with { ExperienceBonusBasisPoints = 300 } } : player)] },
+        };
+
+        var content = MatchSnapshotDocument.Read(MatchSnapshotDocument.Write(boosted, []));
+
+        content.Input.Home.Squad[0].State.ExperienceBonusBasisPoints.Should().Be(300);
+        CanonicalMatchSerializer.InputHash(content.Input).Should().Be(CanonicalMatchSerializer.InputHash(boosted));
+
+        // A document stored before experience existed has no such field.
+        var old = JsonNode.Parse(MatchSnapshotDocument.Write(input, []))!;
+
+        foreach (var side in new[] { "home", "away" })
+        {
+            foreach (var player in old["input"]![side]!["squad"]!.AsArray())
+            {
+                player!["state"]!.AsObject().Remove("experienceBonusBasisPoints");
+            }
+        }
+
+        var read = MatchSnapshotDocument.Read(old.ToJsonString());
+
+        read.Input.Home.Squad.Should().OnlyContain(player => player.State.ExperienceBonusBasisPoints == 0);
+        CanonicalMatchSerializer.InputHash(read.Input).Should().Be(CanonicalMatchSerializer.InputHash(input));
+    }
+
+    [Fact]
     public void A_snapshot_document_of_another_schema_is_refused()
     {
         var json = MatchSnapshotDocument.Write(Snapshot(seed: 1UL), []);

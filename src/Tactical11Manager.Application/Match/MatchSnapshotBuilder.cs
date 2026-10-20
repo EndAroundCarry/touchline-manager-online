@@ -688,6 +688,7 @@ public static class MatchSnapshotBuilder
             FatigueBasisPoints = player.FatigueBp,
             MoraleBasisPoints = player.MoraleBp,
             SharpnessBasisPoints = player.MatchSharpnessBp,
+            ExperienceBonusBasisPoints = PlayerExperience.SkillBonusBasisPointsOf(player.ExperienceBp),
         },
     };
 

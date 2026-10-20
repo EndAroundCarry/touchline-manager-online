@@ -46,6 +46,26 @@ public sealed class MatchSnapshotBuilderTests
                 .Select(slot => EngineVocabulary.Role(slot.Role)));
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1_999, 0)]
+    [InlineData(2_000, 100)]
+    [InlineData(3_999, 100)]
+    [InlineData(4_000, 200)]
+    [InlineData(10_000, 500)]
+    public void A_snapshot_freezes_the_level_a_players_experience_has_reached_as_a_skill_bonus(int experienceBp, int bonus)
+    {
+        var home = Home();
+        var experienced = home.Players[0].PlayerId;
+
+        var built = Build(
+            home with { Players = [.. home.Players.Select(player => player.PlayerId == experienced ? player with { ExperienceBp = experienceBp } : player)] },
+            Away());
+
+        built.Input.Home.Squad.Single(player => player.PlayerId == experienced).State.ExperienceBonusBasisPoints.Should().Be(bonus);
+        built.Input.Home.Squad.Where(player => player.PlayerId != experienced).Should().OnlyContain(player => player.State.ExperienceBonusBasisPoints == 0);
+    }
+
     [Fact]
     public void A_snapshot_freezes_the_colours_a_manager_chose_and_leaves_the_rest_to_the_palette()
     {

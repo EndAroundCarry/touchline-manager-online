@@ -48,6 +48,7 @@ public sealed record SnapshotSelectionRow(int SlotNumber, Guid PlayerId, PlayerR
 /// <param name="MoraleBp">Morale in basis points.</param>
 /// <param name="MatchSharpnessBp">Match sharpness in basis points.</param>
 /// <param name="IsAvailable">Whether the player has no open injury or suspension (`TRN-12`, `DIS-5`).</param>
+/// <param name="ExperienceBp">Experience in basis points of the maximum, which the snapshot turns into a skill bonus.</param>
 public sealed record SnapshotPlayerRow(
     Guid PlayerId,
     string FullName,
@@ -59,7 +60,8 @@ public sealed record SnapshotPlayerRow(
     int FatigueBp,
     int MoraleBp,
     int MatchSharpnessBp,
-    bool IsAvailable);
+    bool IsAvailable,
+    int ExperienceBp = 0);
 
 /// <summary>Everything one club's side is built from.</summary>
 /// <param name="ClubId">The club.</param>

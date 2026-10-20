@@ -152,6 +152,12 @@ public static class CanonicalMatchSerializer
             lines.Add(Field($"{prefix}.fatigue", participant.State.FatigueBasisPoints));
             lines.Add(Field($"{prefix}.morale", participant.State.MoraleBasisPoints));
             lines.Add(Field($"{prefix}.sharpness", participant.State.SharpnessBasisPoints));
+
+            // Written only when there is a bonus, so every snapshot made before experience existed, and every player with no level, keeps its hash.
+            if (participant.State.ExperienceBonusBasisPoints > 0)
+            {
+                lines.Add(Field($"{prefix}.experienceBonus", participant.State.ExperienceBonusBasisPoints));
+            }
         }
 
         foreach (var slot in side.Slots.OrderBy(slot => slot.SlotNumber))

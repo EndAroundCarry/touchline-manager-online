@@ -466,7 +466,7 @@ internal sealed class TickTeam
         {
             if (Skills[seat].Natural is { } attributes)
             {
-                Skills[seat] = TickPlayerSkills.Tired(attributes, LiveConditionOf(seat));
+                Skills[seat] = TickPlayerSkills.Tired(attributes, LiveConditionOf(seat), Skills[seat].ExperienceBonusBasisPoints);
             }
         }
     }
@@ -495,7 +495,7 @@ internal sealed class TickTeam
         Id[seat] = slot.Participant.ParticipantId;
         SlotNumber[seat] = slot.Slot.SlotNumber;
         Spec[seat] = TickAnchorSpec.From(slot.Slot);
-        Skills[seat] = TickPlayerSkills.Tired(attributes, condition);
+        Skills[seat] = TickPlayerSkills.Tired(attributes, condition, slot.Participant.State.ExperienceBonusBasisPoints);
         Profile[seat] = TickPlayerProfile.From(attributes, slot.Slot.Family == MatchPositionFamily.Goalkeeper);
         AttackQuality[seat] = TickAttackEdge.AttackQuality(attributes);
         DefenceQuality[seat] = TickAttackEdge.DefenceQuality(attributes);

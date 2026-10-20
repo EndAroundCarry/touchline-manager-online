@@ -118,6 +118,11 @@ public static class EngineVersions
     /// They are read off decisions the loop already makes and draw nothing, so no scoreline or event moves: only the
     /// lines, the canonical serialization and the output hash do.
     /// </para>
+    /// <para>
+    /// A player's experience bonus (`PlayerMatchStateV1.ExperienceBonusBasisPoints`, 0..500) is a percentage of the skills the tick engine
+    /// plays with, worked out after the skill curve and never capped at the top of the scale. It is hashed only when it is above zero, so every
+    /// snapshot made without one keeps its hash and plays bit-identically, and neither label changed for it.
+    /// </para>
     /// </remarks>
     public const string EngineLabel = "engine-v12";
 
