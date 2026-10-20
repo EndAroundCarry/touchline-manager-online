@@ -141,7 +141,11 @@ internal sealed class AiMarketRepository : IAiMarketRepository
             from listing in _dbContext.TransferListings
             join player in _dbContext.Players on listing.PlayerId equals player.Id
             join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
-            where listing.Status == ListingStatus.Open && listing.OpensAt < before
+            where listing.Status == ListingStatus.Open
+                && listing.OpensAt < before
+
+                // The AI never sees a free agent: it reads hidden potential and would find every gem (FA-5).
+                && listing.FreeAgentBatchId == null
             orderby listing.Id
             select new { Listing = listing, Player = player, Attributes = attributes })
             .ToListAsync(cancellationToken);

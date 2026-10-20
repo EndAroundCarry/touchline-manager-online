@@ -185,6 +185,9 @@ public static class AuditTargetTypes
     /// <summary>A transfer listing (`TRF-1`, `TRF-15`).</summary>
     public const string TransferListing = "transfer_listing";
 
+    /// <summary>A weekly free-agent batch (`FA-5`).</summary>
+    public const string FreeAgentBatch = "free_agent_batch";
+
     /// <summary>A transfer bid (`TRF-4`, `TRF-7`).</summary>
     public const string TransferBid = "transfer_bid";
 

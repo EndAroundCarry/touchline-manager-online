@@ -121,6 +121,8 @@ public static class DependencyInjection
         services.AddScoped<IRosterQueries, RosterQueries>();
         services.AddScoped<IAiMarketRepository, AiMarketRepository>();
         services.AddScoped<IAiMarketDecisionRepository, AiMarketDecisionRepository>();
+        services.AddScoped<IFreeAgentBatchRepository, FreeAgentBatchRepository>();
+        services.AddScoped<IFreeAgentQueries, FreeAgentQueries>();
 
         services
             .AddOptions<MarketOptions>()
@@ -135,6 +137,13 @@ public static class DependencyInjection
             .Validate(
                 options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
                 "AiMarket:CheckIntervalSeconds must be between 30 and 86400.");
+
+        services
+            .AddOptions<FreeAgentOptions>()
+            .Bind(configuration.GetSection(FreeAgentOptions.SectionName))
+            .Validate(
+                options => options.CheckIntervalSeconds is >= 30 and <= 86_400,
+                "FreeAgents:CheckIntervalSeconds must be between 30 and 86400.");
     }
 
     /// <summary>
@@ -536,6 +545,10 @@ public static class DependencyInjection
         // what lists a surplus player and bids for a better one through the same writers a manager's command
         // uses (TRF-12, ADR-0025).
         AddMaterializer<AiMarketScheduler>(services);
+
+        // And the same for the free-agent pool: this service places the week's batch row, and the row is what
+        // generates the players and lists them on Monday at the auction window (FA-5).
+        AddMaterializer<FreeAgentScheduler>(services);
 
         // And the same for the pyramid: this service places a provisioning row for every pending tier request,
         // and the row is what generates, backfills, and activates the next tier (PYR-4).

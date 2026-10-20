@@ -72,12 +72,19 @@ internal sealed class TransferListingConfiguration : IEntityTypeConfiguration<Tr
                 "ck_transfer_listings_seasons",
                 "generated_contract_seasons between 1 and 3");
             table.HasCheckConstraint("ck_transfer_listings_window", "ends_at > opens_at");
+
+            // A listing is a club's or a free-agent batch's, never both and never neither (FA-5).
+            table.HasCheckConstraint(
+                "ck_transfer_listings_seller_or_batch",
+                "(seller_club_id is not null and free_agent_batch_id is null) "
+                + "or (seller_club_id is null and free_agent_batch_id is not null)");
         });
 
         builder.HasKey(listing => listing.Id);
         builder.Property(listing => listing.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(listing => listing.PlayerId).HasColumnName("player_id").IsRequired();
-        builder.Property(listing => listing.SellerClubId).HasColumnName("seller_club_id").IsRequired();
+        builder.Property(listing => listing.SellerClubId).HasColumnName("seller_club_id");
+        builder.Property(listing => listing.FreeAgentBatchId).HasColumnName("free_agent_batch_id");
         builder.Property(listing => listing.MinimumFeeMinor).HasColumnName("minimum_fee_minor").IsRequired();
         builder.Property(listing => listing.GeneratedBuyerWageMinor)
             .HasColumnName("generated_buyer_wage_minor")
@@ -121,6 +128,14 @@ internal sealed class TransferListingConfiguration : IEntityTypeConfiguration<Tr
             .WithMany()
             .HasForeignKey(listing => listing.SellerClubId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<FreeAgentBatch>()
+            .WithMany()
+            .HasForeignKey(listing => listing.FreeAgentBatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(listing => listing.FreeAgentBatchId)
+            .HasFilter("free_agent_batch_id is not null")
+            .HasDatabaseName("ix_transfer_listings_free_agent_batch_id");
     }
 }
 
@@ -205,7 +220,10 @@ internal sealed class TransferOutcomeConfiguration : IEntityTypeConfiguration<Tr
             table.HasCheckConstraint("ck_transfer_outcomes_fee", "fee_minor > 0");
             table.HasCheckConstraint(
                 "ck_transfer_outcomes_distinct_clubs",
-                "seller_club_id <> buyer_club_id");
+                "seller_club_id is null or seller_club_id <> buyer_club_id");
+            table.HasCheckConstraint(
+                "ck_transfer_outcomes_seller_and_old_contract",
+                "(seller_club_id is null) = (old_contract_id is null)");
         });
 
         builder.HasKey(outcome => outcome.Id);
@@ -213,10 +231,10 @@ internal sealed class TransferOutcomeConfiguration : IEntityTypeConfiguration<Tr
         builder.Property(outcome => outcome.ListingId).HasColumnName("listing_id").IsRequired();
         builder.Property(outcome => outcome.WinningBidId).HasColumnName("winning_bid_id").IsRequired();
         builder.Property(outcome => outcome.PlayerId).HasColumnName("player_id").IsRequired();
-        builder.Property(outcome => outcome.SellerClubId).HasColumnName("seller_club_id").IsRequired();
+        builder.Property(outcome => outcome.SellerClubId).HasColumnName("seller_club_id");
         builder.Property(outcome => outcome.BuyerClubId).HasColumnName("buyer_club_id").IsRequired();
         builder.Property(outcome => outcome.FeeMinor).HasColumnName("fee_minor").IsRequired();
-        builder.Property(outcome => outcome.OldContractId).HasColumnName("old_contract_id").IsRequired();
+        builder.Property(outcome => outcome.OldContractId).HasColumnName("old_contract_id");
         builder.Property(outcome => outcome.NewContractId).HasColumnName("new_contract_id").IsRequired();
         builder.Property(outcome => outcome.OutcomeReason)
             .HasColumnName("outcome_reason")
@@ -325,6 +343,56 @@ internal sealed class AiMarketDecisionConfiguration : IEntityTypeConfiguration<A
         builder.HasOne<TransferBid>()
             .WithMany()
             .HasForeignKey(decision => decision.BidId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>market.free_agent_batches</c>, the record that a week's free-agent pool was opened (`FA-5`).
+/// </summary>
+/// <remarks>
+/// The unique week per world is what makes the weekly job idempotent: a second run for the same Monday
+/// collides here rather than listing the week twice.
+/// </remarks>
+internal sealed class FreeAgentBatchConfiguration : IEntityTypeConfiguration<FreeAgentBatch>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<FreeAgentBatch> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("free_agent_batches", "market", table =>
+        {
+            table.HasCheckConstraint("ck_free_agent_batches_window", "ends_at > opens_at");
+            table.HasCheckConstraint(
+                "ck_free_agent_batches_counts",
+                "contracted_count >= 0 and generated_count >= 0 and released_count >= 0 "
+                + "and gem_count >= 0 and gem_count <= generated_count");
+        });
+
+        builder.HasKey(batch => batch.Id);
+        builder.Property(batch => batch.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(batch => batch.WorldId).HasColumnName("world_id").IsRequired();
+        builder.Property(batch => batch.WeekStart).HasColumnName("week_start").IsRequired();
+        builder.Property(batch => batch.OpensAt).HasColumnName("opens_at").IsRequired();
+        builder.Property(batch => batch.EndsAt).HasColumnName("ends_at").IsRequired();
+        builder.Property(batch => batch.ContractedCount).HasColumnName("contracted_count").IsRequired();
+        builder.Property(batch => batch.GeneratedCount).HasColumnName("generated_count").IsRequired();
+        builder.Property(batch => batch.ReleasedCount).HasColumnName("released_count").IsRequired();
+        builder.Property(batch => batch.GemCount).HasColumnName("gem_count").IsRequired();
+        builder.Property(batch => batch.GeneratorVersion)
+            .HasColumnName("generator_version")
+            .HasMaxLength(32)
+            .IsRequired();
+        builder.Property(batch => batch.CreatedAt).HasColumnName("created_at").IsRequired();
+
+        builder.HasIndex(batch => new { batch.WorldId, batch.WeekStart })
+            .IsUnique()
+            .HasDatabaseName("ux_free_agent_batches_world_week");
+
+        builder.HasOne<GameWorld>()
+            .WithMany()
+            .HasForeignKey(batch => batch.WorldId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

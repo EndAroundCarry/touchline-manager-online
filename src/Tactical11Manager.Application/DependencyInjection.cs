@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
         services.AddScoped<IJobHandler, RebuildDivisionProjectionsJobHandler>();
         services.AddScoped<IJobHandler, WeeklyFinanceRunJobHandler>();
+        services.AddScoped<IJobHandler, RunFreeAgentBatchJobHandler>();
         services.AddScoped<IJobHandler, ResolveAuctionJobHandler>();
         services.AddScoped<IJobHandler, EvaluateAiMarketJobHandler>();
         services.AddScoped<IJobHandler, ProvisionDivisionJobHandler>();
@@ -146,6 +147,10 @@ public static class DependencyInjection
 
         // Reachable only from the non-production diagnostics trigger (§17.12).
         services.AddScoped<TriggerAuctions>();
+        services.AddScoped<TriggerFreeAgentBatch>();
+
+        // The weekly free-agent pool: a worker-only writer of players and listings (FA-1..FA-6).
+        services.AddScoped<RunFreeAgentBatch>();
 
         services.AddScoped<IValidator<CreateListingRequest>, CreateListingRequestValidator>();
         services.AddScoped<IValidator<PlaceBidRequest>, PlaceBidRequestValidator>();

@@ -30,4 +30,7 @@ public static class MarketAuditActions
 
     /// <summary>A bid was skipped at resolution because it failed a revalidated invariant (`TRF-11`).</summary>
     public const string BidInvalidated = "market.bid.invalidated";
+
+    /// <summary>A weekly free-agent batch was opened (`FA-5`).</summary>
+    public const string FreeAgentBatchOpened = "market.free-agent-batch.opened";
 }

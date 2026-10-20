@@ -156,6 +156,9 @@ public sealed class Tactical11ManagerDbContext : DbContext
     /// <summary>Gets the market module's transfer listings.</summary>
     public DbSet<TransferListing> TransferListings => Set<TransferListing>();
 
+    /// <summary>Gets the market module's weekly free-agent batches (`FA-5`).</summary>
+    public DbSet<FreeAgentBatch> FreeAgentBatches => Set<FreeAgentBatch>();
+
     /// <summary>Gets the market module's transfer bids.</summary>
     public DbSet<TransferBid> TransferBids => Set<TransferBid>();
 

@@ -52,6 +52,7 @@ public sealed class AiMarketSchedulerTests : IAsyncLifetime
             ["Training:EnableDailyProgression"] = "false",
             ["AiClubs:EnableEvaluation"] = "false",
             ["Finance:EnableWeeklyRun"] = "false",
+            ["FreeAgents:EnableBatches"] = "false",
             ["Auctions:EnableAuctions"] = "false",
             ["Provisioning:EnableProvisioning"] = "false",
             ["Inactivity:EnableEvaluation"] = "false",

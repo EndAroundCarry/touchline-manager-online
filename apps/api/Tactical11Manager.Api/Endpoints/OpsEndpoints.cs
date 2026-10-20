@@ -85,6 +85,29 @@ internal static class OpsEndpoints
         return group;
     }
 
+    /// <summary>Maps the free-agent pool's non-production batch trigger onto the ops module group.</summary>
+    /// <remarks>
+    /// It enqueues the current week's real batch job, due now, so a journey can watch the weekly pool open
+    /// without waiting for Monday. The worker still generates and lists exactly as it would on the calendar
+    /// (ADR-0016 pattern). Mapped only when the diagnostics flag is on.
+    /// </remarks>
+    public static RouteGroupBuilder MapFreeAgentTrigger(this RouteGroupBuilder group)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        group
+            .MapPost("/diagnostics/free-agents", PlayFreeAgentBatchAsync)
+            .WithName("PlayFreeAgentBatchProbe")
+            .WithSummary("Enqueues this week's free-agent batch job, due now, so the pool can be watched opening.")
+            .WithDescription(
+                "Development and staging diagnostics only. The worker generates the players and lists them "
+                + "exactly as it would on Monday; this only does what the worker-only scheduler normally "
+                + "does, and a repeated call is a no-op.")
+            .Produces<FreeAgentBatchTriggerResponse>(StatusCodes.Status202Accepted);
+
+        return group;
+    }
+
     /// <summary>Maps the Stage 11 provisioning trigger onto the ops module group.</summary>
     /// <remarks>
     /// It exists so a journey can grow the pyramid without filling a tier by hand. It creates the request and
@@ -386,6 +409,17 @@ internal static class OpsEndpoints
             statusCode: StatusCodes.Status202Accepted);
     }
 
+    private static async Task<IResult> PlayFreeAgentBatchAsync(
+        TriggerFreeAgentBatch trigger,
+        CancellationToken cancellationToken)
+    {
+        var result = await trigger.ExecuteAsync(cancellationToken);
+
+        return Results.Json(
+            new FreeAgentBatchTriggerResponse(result.WeekStart, result.BatchKey, result.Enqueued),
+            statusCode: StatusCodes.Status202Accepted);
+    }
+
     private static async Task<IResult> PlayMatchdayAsync(
         PlayMatchdayRequest request,
         TriggerMatchday trigger,
@@ -463,6 +497,12 @@ internal sealed record PlayAuctionRequest(Guid ListingId);
 /// <param name="ResolveKey">The business key of the enqueued resolution job.</param>
 /// <param name="Enqueued"><see langword="true"/> when the resolution row was newly inserted.</param>
 internal sealed record AuctionTriggerResponse(Guid ListingId, string ResolveKey, bool Enqueued);
+
+/// <summary>Response of the free-agent batch trigger.</summary>
+/// <param name="WeekStart">The Monday the triggered batch is for.</param>
+/// <param name="BatchKey">The business key of the enqueued batch job.</param>
+/// <param name="Enqueued"><see langword="true"/> when the batch job row was newly inserted.</param>
+internal sealed record FreeAgentBatchTriggerResponse(DateOnly WeekStart, string BatchKey, bool Enqueued);
 
 /// <summary>The body of the provisioning trigger.</summary>
 /// <param name="CountryId">The country whose pyramid grows.</param>

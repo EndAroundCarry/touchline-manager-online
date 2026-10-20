@@ -1698,6 +1698,68 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.Market.FreeAgentBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ContractedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("contracted_count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<int>("GemCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("gem_count");
+
+                    b.Property<int>("GeneratedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("generated_count");
+
+                    b.Property<string>("GeneratorVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("generator_version");
+
+                    b.Property<DateTimeOffset>("OpensAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opens_at");
+
+                    b.Property<int>("ReleasedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("released_count");
+
+                    b.Property<DateOnly>("WeekStart")
+                        .HasColumnType("date")
+                        .HasColumnName("week_start");
+
+                    b.Property<Guid>("WorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("world_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorldId", "WeekStart")
+                        .IsUnique()
+                        .HasDatabaseName("ux_free_agent_batches_world_week");
+
+                    b.ToTable("free_agent_batches", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_free_agent_batches_counts", "contracted_count >= 0 and generated_count >= 0 and released_count >= 0 and gem_count >= 0 and gem_count <= generated_count");
+
+                            t.HasCheckConstraint("ck_free_agent_batches_window", "ends_at > opens_at");
+                        });
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.Market.ShortlistEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1841,6 +1903,10 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ends_at");
 
+                    b.Property<Guid?>("FreeAgentBatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("free_agent_batch_id");
+
                     b.Property<long>("GeneratedBuyerWageMinor")
                         .HasColumnType("bigint")
                         .HasColumnName("generated_buyer_wage_minor");
@@ -1866,7 +1932,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("player_id");
 
-                    b.Property<Guid>("SellerClubId")
+                    b.Property<Guid?>("SellerClubId")
                         .HasColumnType("uuid")
                         .HasColumnName("seller_club_id");
 
@@ -1885,6 +1951,10 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnName("version");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FreeAgentBatchId")
+                        .HasDatabaseName("ix_transfer_listings_free_agent_batch_id")
+                        .HasFilter("free_agent_batch_id is not null");
 
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
@@ -1908,6 +1978,8 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_transfer_listings_minimum_fee", "minimum_fee_minor > 0");
 
                             t.HasCheckConstraint("ck_transfer_listings_seasons", "generated_contract_seasons between 1 and 3");
+
+                            t.HasCheckConstraint("ck_transfer_listings_seller_or_batch", "(seller_club_id is not null and free_agent_batch_id is null) or (seller_club_id is null and free_agent_batch_id is not null)");
 
                             t.HasCheckConstraint("ck_transfer_listings_window", "ends_at > opens_at");
                         });
@@ -1941,7 +2013,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("new_contract_id");
 
-                    b.Property<Guid>("OldContractId")
+                    b.Property<Guid?>("OldContractId")
                         .HasColumnType("uuid")
                         .HasColumnName("old_contract_id");
 
@@ -1959,7 +2031,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");
 
-                    b.Property<Guid>("SellerClubId")
+                    b.Property<Guid?>("SellerClubId")
                         .HasColumnType("uuid")
                         .HasColumnName("seller_club_id");
 
@@ -1982,9 +2054,11 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("transfer_outcomes", "market", t =>
                         {
-                            t.HasCheckConstraint("ck_transfer_outcomes_distinct_clubs", "seller_club_id <> buyer_club_id");
+                            t.HasCheckConstraint("ck_transfer_outcomes_distinct_clubs", "seller_club_id is null or seller_club_id <> buyer_club_id");
 
                             t.HasCheckConstraint("ck_transfer_outcomes_fee", "fee_minor > 0");
+
+                            t.HasCheckConstraint("ck_transfer_outcomes_seller_and_old_contract", "(seller_club_id is null) = (old_contract_id is null)");
                         });
                 });
 
@@ -4865,6 +4939,15 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.Market.FreeAgentBatch", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.GameWorld", null)
+                        .WithMany()
+                        .HasForeignKey("WorldId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.Market.ShortlistEntry", b =>
                 {
                     b.HasOne("Tactical11Manager.Domain.World.Manager", null)
@@ -4897,6 +4980,11 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Tactical11Manager.Domain.Market.TransferListing", b =>
                 {
+                    b.HasOne("Tactical11Manager.Domain.Market.FreeAgentBatch", null)
+                        .WithMany()
+                        .HasForeignKey("FreeAgentBatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Tactical11Manager.Domain.Squad.Player", null)
                         .WithMany()
                         .HasForeignKey("PlayerId")
@@ -4906,8 +4994,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.HasOne("Tactical11Manager.Domain.World.Club", null)
                         .WithMany()
                         .HasForeignKey("SellerClubId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Tactical11Manager.Domain.Market.TransferOutcome", b =>
@@ -4927,8 +5014,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.HasOne("Tactical11Manager.Domain.World.Club", null)
                         .WithMany()
                         .HasForeignKey("SellerClubId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Tactical11Manager.Domain.Match.InputSnapshot", b =>

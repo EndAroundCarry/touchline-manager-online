@@ -84,6 +84,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
             ["Training:EnableDailyProgression"] = "false",
             ["AiClubs:EnableEvaluation"] = "false",
             ["Finance:EnableWeeklyRun"] = "false",
+            ["FreeAgents:EnableBatches"] = "false",
             ["Auctions:EnableAuctions"] = "false",
             ["AiMarket:EnableEvaluation"] = "false",
             ["Provisioning:EnableProvisioning"] = "false",

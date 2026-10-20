@@ -61,6 +61,7 @@ public sealed class SeasonRolloverWorkerTests : IAsyncLifetime
             ["AiClubs:EnableEvaluation"] = "false",
             ["Auctions:EnableAuctions"] = "false",
             ["AiMarket:EnableEvaluation"] = "false",
+            ["FreeAgents:EnableBatches"] = "false",
             ["Provisioning:EnableProvisioning"] = "false",
             ["Inactivity:EnableEvaluation"] = "false",
             ["Reminders:EnableReminders"] = "false",
