@@ -51,6 +51,9 @@ public static class InboxTemplates
     /// <summary>A player announced that the coming season is their last (`CON-6`).</summary>
     public const string RetirementAnnounced = "inbox.squad.retirement_announced";
 
+    /// <summary>The manager released a player and paid out his contract (`CON-12`).</summary>
+    public const string PlayerReleased = "inbox.squad.player_released";
+
     /// <summary>A club was promoted or relegated at rollover (`PR-1`).</summary>
     public const string SeasonMovement = "inbox.season.movement";
 
@@ -154,6 +157,17 @@ public static class InboxTemplates
             InboxCategory.Squad,
             RetirementAnnounced,
             new RetirementParameters(playerName),
+            playerId);
+
+    /// <summary>Builds the message a released player produces (`CON-12`).</summary>
+    /// <param name="playerName">The player released.</param>
+    /// <param name="payoutMinor">What the club paid to release him, in minor units.</param>
+    /// <param name="playerId">The player, which the message links to.</param>
+    public static InboxDraft Released(string playerName, long payoutMinor, Guid playerId) =>
+        Write(
+            InboxCategory.Squad,
+            PlayerReleased,
+            new ReleasedParameters(playerName, payoutMinor),
             playerId);
 
     /// <summary>Builds the message a club's promotion or relegation produces (`PR-1`).</summary>
@@ -262,6 +276,8 @@ public static class InboxTemplates
     internal sealed record InjuryParameters(string PlayerName, int Fixtures, string Severity);
 
     internal sealed record RetirementParameters(string PlayerName);
+
+    internal sealed record ReleasedParameters(string PlayerName, long PayoutMinor);
 
     internal sealed record MovementParameters(
         string ClubName,

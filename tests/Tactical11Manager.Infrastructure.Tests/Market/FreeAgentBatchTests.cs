@@ -107,10 +107,12 @@ public sealed class FreeAgentBatchTests : IAsyncLifetime, IDisposable
         (await CountAsync(db => db.FreeAgentBatches.CountAsync())).Should().Be(1);
     }
 
-    [Fact]
-    public async Task A_released_player_is_listed_once_on_top_of_the_tenth()
+    [Theory]
+    [InlineData(PlayerContractCloseReasons.Expired)]
+    [InlineData(PlayerContractCloseReasons.Released)]
+    public async Task A_released_player_is_listed_once_on_top_of_the_tenth(string closeReason)
     {
-        var releasedId = await ReleaseOnePlayerAsync();
+        var releasedId = await ReleaseOnePlayerAsync(closeReason);
         var contracted = await ContractedCountAsync();
 
         var result = await RunAsync(ThisWeek);
@@ -229,8 +231,11 @@ public sealed class FreeAgentBatchTests : IAsyncLifetime, IDisposable
         return await count(scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>());
     }
 
-    /// <summary>Lets one player's contract run out, as the rollover does for a player a club will not renew.</summary>
-    private async Task<Guid> ReleaseOnePlayerAsync()
+    /// <summary>
+    /// Lets one player's contract end, as the rollover does for a player a club will not renew (expired) or a
+    /// manager does by releasing him (released).
+    /// </summary>
+    private async Task<Guid> ReleaseOnePlayerAsync(string closeReason)
     {
         await using var scope = _fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -244,7 +249,7 @@ public sealed class FreeAgentBatchTests : IAsyncLifetime, IDisposable
             .FirstAsync(candidate => candidate.PlayerId == contract.PlayerId && candidate.Status == RegistrationStatus.Active);
         var player = await db.Players.FirstAsync(candidate => candidate.Id == contract.PlayerId);
 
-        contract.Close(PlayerContractCloseReasons.Expired, now);
+        contract.Close(closeReason, now);
         registration.End(now);
         player.ReleaseToFreeAgency(now);
 

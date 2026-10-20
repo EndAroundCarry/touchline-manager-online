@@ -50,6 +50,9 @@ public enum LedgerCategory
 
     /// <summary>Places a club paid to add to its stadium (`STAD-4`).</summary>
     StadiumConstruction = 12,
+
+    /// <summary>Half the wages left, paid by a club to release a player now (`CON-12`).</summary>
+    ReleasePayout = 13,
 }
 
 /// <summary>Stable codes and parsing for <see cref="LedgerCategory"/>.</summary>
@@ -78,6 +81,7 @@ public static class LedgerCategories
         LedgerCategory.EmergencyGrant => "emergency_grant",
         LedgerCategory.Compensation => "compensation",
         LedgerCategory.StadiumConstruction => "stadium_construction",
+        LedgerCategory.ReleasePayout => "release_payout",
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown ledger category."),
     };
 
@@ -98,6 +102,7 @@ public static class LedgerCategories
         "emergency_grant" => LedgerCategory.EmergencyGrant,
         "compensation" => LedgerCategory.Compensation,
         "stadium_construction" => LedgerCategory.StadiumConstruction,
+        "release_payout" => LedgerCategory.ReleasePayout,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown ledger category code."),
     };
 }

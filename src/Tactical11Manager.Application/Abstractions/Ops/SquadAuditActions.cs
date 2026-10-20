@@ -37,6 +37,9 @@ public static class SquadAuditActions
     /// <summary>A player was re-signed, closing the old contract and opening a new one (`CON-3`, `CON-4`).</summary>
     public const string ContractRenewed = "squad.contract.renewed";
 
+    /// <summary>A manager released a player now, paying half the wages left (`CON-12`).</summary>
+    public const string ContractReleased = "squad.contract.released";
+
     /// <summary>
     /// An emergency replacement was created because a club fell below the minimum squad (`SQ-8`).
     /// </summary>

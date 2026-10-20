@@ -1,8 +1,14 @@
 import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
-import { Player, PlayerMatchStat, PlayerSeasonStats } from '../../core/squad/squad.models';
+import { of, throwError } from 'rxjs';
+import { ApiError } from '../../core/api/api-error';
+import {
+  Player,
+  PlayerMatchStat,
+  PlayerSeasonStats,
+  ReleaseQuote,
+} from '../../core/squad/squad.models';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { MyFixtures } from '../../core/competition/competition.models';
 import { SquadStore } from '../../core/squad/squad-store';
@@ -182,6 +188,19 @@ const player: Player = {
   serverTime: '2026-09-28T00:00:00Z',
 };
 
+const releaseQuote: ReleaseQuote = {
+  contractId: 'contract-1',
+  playerId: 'player-1',
+  remainingWeeks: 20,
+  payoutMinor: 12_000_000,
+  weeklyWageMinor: 1_200_000,
+  availableMinor: 50_000_000,
+  joinsPoolAt: '2026-10-26T12:00:00Z',
+  blockedReason: null,
+  contractVersion: 4,
+  serverTime: '2026-10-20T09:00:00Z',
+};
+
 /** A manager's season in which nothing has been played, so there is no result to keep back. */
 const NOTHING_PLAYED: MyFixtures = {
   clubId: 'club-1',
@@ -202,6 +221,9 @@ describe('PlayerProfile', () => {
   let root: HTMLElement;
   let mine: WritableSignal<MyFixtures | null>;
   let playerState: WritableSignal<Player>;
+  let releaseQuoteState: WritableSignal<ReleaseQuote | null>;
+  let quoteRelease: ReturnType<typeof vi.fn>;
+  let releasePlayer: ReturnType<typeof vi.fn>;
   let trainingStore: {
     history: WritableSignal<null>;
     loading: WritableSignal<boolean>;
@@ -214,12 +236,36 @@ describe('PlayerProfile', () => {
     mine = signal<MyFixtures | null>(NOTHING_PLAYED);
 
     playerState = signal(player);
+    releaseQuoteState = signal<ReleaseQuote | null>(null);
+
+    quoteRelease = vi.fn(() => {
+      releaseQuoteState.set(releaseQuote);
+
+      return of(releaseQuote);
+    });
+    releasePlayer = vi.fn(() => {
+      releaseQuoteState.set(null);
+
+      return of({
+        contractId: 'contract-1',
+        playerId: 'player-1',
+        payoutMinor: 12_000_000,
+        remainingWeeks: 20,
+        weeklyWageSavedMinor: 1_200_000,
+        joinsPoolAt: '2026-10-26T12:00:00Z',
+        serverTime: '2026-10-20T09:00:00Z',
+      });
+    });
 
     const store = {
       player: playerState,
       playerMatches: signal(matches),
       loadPlayer: () => of(player),
       loadPlayerMatches: () => of(matches),
+      releaseQuote: releaseQuoteState.asReadonly(),
+      quoteRelease,
+      releasePlayer,
+      clearReleaseQuote: () => releaseQuoteState.set(null),
     };
 
     trainingStore = {
@@ -357,6 +403,128 @@ describe('PlayerProfile', () => {
 
     expect(grid.classList.contains('grid-cols-4')).toBe(true);
     expect(grid.querySelectorAll(':scope > section')).toHaveLength(4);
+  });
+
+  describe('releasing a player', () => {
+    function button(text: string): HTMLButtonElement | undefined {
+      return Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find((candidate) =>
+        candidate.textContent?.includes(text),
+      );
+    }
+
+    async function ask(): Promise<void> {
+      await openTab('Contract');
+      button('Release player')!.click();
+      await fixture.whenStable();
+    }
+
+    it('offers the release below the negotiation, and asks nothing until the manager does', async () => {
+      await openTab('Contract');
+
+      const section = root.querySelector('[data-testid="release-section"]')!;
+      const negotiation = root.querySelector('#negotiation-note')!;
+
+      expect(
+        negotiation.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(section.textContent).toContain('half the wages left');
+      expect(button('Release player')).toBeDefined();
+      expect(quoteRelease).not.toHaveBeenCalled();
+    });
+
+    it('shows the payout, the wage saved and when the player joins the pool before anything is paid', async () => {
+      await ask();
+
+      const group = root.querySelector(
+        '[role="group"][aria-labelledby="release-confirm-heading"]',
+      )!;
+
+      expect(quoteRelease).toHaveBeenCalledWith('contract-1');
+      expect(group.textContent).toContain(`Release ${player.fullName}?`);
+      expect(group.textContent).toContain('20 weeks of wages');
+      expect(group.textContent).toContain('Payout, paid now');
+      expect(group.textContent).toContain('Weekly wage saved');
+      expect(group.textContent).toContain('Joins the free-agent pool');
+      expect(releasePlayer).not.toHaveBeenCalled();
+    });
+
+    it('releases under the quoted version and says where the player goes', async () => {
+      await ask();
+
+      button('Confirm release')!.click();
+      await fixture.whenStable();
+
+      expect(releasePlayer).toHaveBeenCalledWith('contract-1', 4);
+
+      const message = root.querySelector('[data-testid="release-section"] [role="status"]')!;
+
+      expect(message.textContent).toContain(`${player.fullName} was released`);
+      expect(message.textContent).toContain('free-agent pool');
+      expect(root.querySelector('[data-testid="release-section"] a[href="/squad"]')).not.toBeNull();
+      expect(button('Release player')).toBeUndefined();
+    });
+
+    it('lets the manager keep the player', async () => {
+      await ask();
+
+      button('Keep player')!.click();
+      await fixture.whenStable();
+
+      expect(releasePlayer).not.toHaveBeenCalled();
+      expect(releaseQuoteState()).toBeNull();
+      expect(button('Release player')).toBeDefined();
+      expect(
+        root.querySelector('[role="group"][aria-labelledby="release-confirm-heading"]'),
+      ).toBeNull();
+    });
+
+    it('says why a release is refused and keeps the confirm button off', async () => {
+      quoteRelease.mockImplementation(() => {
+        const blocked = { ...releaseQuote, blockedReason: 'RELEASE_PLAYER_LISTED' };
+
+        releaseQuoteState.set(blocked);
+
+        return of(blocked);
+      });
+
+      await ask();
+
+      const alert = root.querySelector('[role="group"] [role="alert"]')!;
+
+      expect(alert.textContent).toContain('listed for transfer');
+      expect(button('Confirm release')!.disabled).toBe(true);
+
+      button('Confirm release')!.click();
+      await fixture.whenStable();
+
+      expect(releasePlayer).not.toHaveBeenCalled();
+    });
+
+    it('shows the server’s refusal and asks for a fresh quote next time when the contract has changed', async () => {
+      releasePlayer.mockImplementation(() =>
+        throwError(
+          () =>
+            new ApiError(
+              412,
+              'PRECONDITION_FAILED',
+              'Reload the contract and try again.',
+              null,
+              new Map(),
+            ),
+        ),
+      );
+
+      await ask();
+
+      button('Confirm release')!.click();
+      await fixture.whenStable();
+
+      expect(
+        root.querySelector('[data-testid="release-section"] [role="alert"]')?.textContent,
+      ).toContain('Reload the contract and try again.');
+      expect(releaseQuoteState()).toBeNull();
+      expect(button('Release player')).toBeDefined();
+    });
   });
 
   it('hands the Training tab to the training component, which reads the player’s history', async () => {

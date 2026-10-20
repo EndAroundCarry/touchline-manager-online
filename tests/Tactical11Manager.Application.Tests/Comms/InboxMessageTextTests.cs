@@ -146,6 +146,20 @@ public sealed class InboxMessageTextTests
     }
 
     [Fact]
+    public void A_released_player_names_the_payout_and_the_pool()
+    {
+        var draft = InboxTemplates.Released("Corin Alderwick", 1_234_500, Guid.CreateVersion7());
+
+        draft.TemplateKey.Should().Be(InboxTemplates.PlayerReleased);
+
+        var text = InboxMessageText.Render(draft.TemplateKey, draft.ParametersJson);
+
+        text.Title.Should().Be("Corin Alderwick was released");
+        text.Body.Should().Be(
+            "Corin Alderwick was released for 1,234,500 and joins the free-agent pool at the next weekly batch.");
+    }
+
+    [Fact]
     public void A_season_movement_names_the_destination_and_the_direction()
     {
         var promoted = InboxTemplates.Movement(

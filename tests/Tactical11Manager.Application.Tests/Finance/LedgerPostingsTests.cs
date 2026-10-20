@@ -234,6 +234,47 @@ public sealed class LedgerPostingsTests
     }
 
     [Fact]
+    public void A_release_payout_debits_the_cash_and_keys_on_the_contract_it_closed()
+    {
+        var contractId = Guid.CreateVersion7();
+
+        var posting = LedgerPostings.ReleasePayout(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), contractId, remainingWeeks: 30, amountMinor: 450_000);
+
+        posting.Category.Should().Be(LedgerCategory.ReleasePayout);
+        posting.SourceType.Should().Be(LedgerSourceType.Contract);
+        posting.SourceId.Should().Be(contractId);
+        posting.CashDeltaMinor.Should().Be(-450_000, "a release is a spend");
+        posting.ReservedDeltaMinor.Should().Be(0);
+        posting.CorrelationId.Should().Be(
+            $"release:{contractId:D}",
+            "a contract closes once, so a retried release collides with its first entry (FIN-17)");
+        LedgerEntryText.Render(posting.DescriptionTemplate, posting.DescriptionParametersJson)
+            .Should().Be("Player release payout");
+    }
+
+    [Fact]
+    public void A_release_that_costs_nothing_is_refused_by_the_posting()
+    {
+        var free = () => LedgerPostings.ReleasePayout(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 10, 0);
+
+        free.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void The_release_category_and_source_round_trip_through_their_stable_codes()
+    {
+        LedgerCategory.ReleasePayout.ToCode().Should().Be("release_payout");
+        LedgerCategories.FromCode("release_payout").Should().Be(LedgerCategory.ReleasePayout);
+        LedgerSourceType.Contract.ToCode().Should().Be("contract");
+        LedgerSourceTypes.FromCode("contract").Should().Be(LedgerSourceType.Contract);
+
+        LedgerSourceTypes.All.Select(source => source.ToCode().Length).Max()
+            .Should().BeLessThanOrEqualTo(LedgerSourceTypes.MaxCodeLength, "the column holds every code");
+    }
+
+    [Fact]
     public void The_new_category_and_source_round_trip_through_their_stable_codes()
     {
         LedgerCategory.StadiumConstruction.ToCode().Should().Be("stadium_construction");

@@ -368,6 +368,39 @@ export interface ContractRenewal {
   readonly serverTime: string;
 }
 
+/** What releasing a player now costs, and whether the club may (`CON-12`). */
+export interface ReleaseQuote {
+  readonly contractId: string;
+  readonly playerId: string;
+  readonly remainingWeeks: number;
+  readonly payoutMinor: number;
+  readonly weeklyWageMinor: number;
+
+  /** The club's cash less what its bids have reserved. */
+  readonly availableMinor: number;
+
+  /** When the player joins the free-agent pool: the next weekly batch. */
+  readonly joinsPoolAt: string;
+
+  /** The stable code of the rule that refuses the release now, or null when it is allowed. */
+  readonly blockedReason: string | null;
+
+  /** The contract's version at the moment it was quoted, sent back as `If-Match` when releasing. */
+  readonly contractVersion: number;
+  readonly serverTime: string;
+}
+
+/** A player a manager has just released (`CON-12`). */
+export interface PlayerRelease {
+  readonly contractId: string;
+  readonly playerId: string;
+  readonly payoutMinor: number;
+  readonly remainingWeeks: number;
+  readonly weeklyWageSavedMinor: number;
+  readonly joinsPoolAt: string;
+  readonly serverTime: string;
+}
+
 /** A club's contract list. */
 export interface ContractList {
   readonly clubId: string;

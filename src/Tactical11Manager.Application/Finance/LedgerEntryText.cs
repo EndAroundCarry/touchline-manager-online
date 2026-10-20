@@ -54,6 +54,7 @@ public static class LedgerEntryText
             LedgerPostings.TransferPaymentTemplate => "Transfer fee paid",
             LedgerPostings.TransferProceedsTemplate => "Transfer fee received",
             LedgerPostings.StadiumConstructionTemplate => StadiumWorks(parameters),
+            LedgerPostings.ReleasePayoutTemplate => "Player release payout",
             _ => throw new InvalidOperationException(
                 $"'{templateKey}' is not a ledger template this build renders."),
         };

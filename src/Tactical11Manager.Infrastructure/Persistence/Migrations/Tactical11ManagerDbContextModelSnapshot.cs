@@ -1610,7 +1610,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_ledger_entries_balances", "resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor");
 
-                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction')");
+                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout')");
 
                             t.HasCheckConstraint("ck_ledger_entries_correlation_id", "length(correlation_id) > 0");
 
@@ -1622,7 +1622,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_ledger_entries_sequence", "sequence >= 1");
 
-                            t.HasCheckConstraint("ck_ledger_entries_source_type", "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', 'safety_job', 'admin_repair', 'stadium')");
+                            t.HasCheckConstraint("ck_ledger_entries_source_type", "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', 'safety_job', 'admin_repair', 'stadium', 'contract')");
                         });
                 });
 

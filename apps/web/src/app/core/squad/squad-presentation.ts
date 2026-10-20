@@ -188,6 +188,23 @@ export function squadStatusLabel(code: string): string {
   return SQUAD_STATUS_LABELS[code] ?? code;
 }
 
+const RELEASE_BLOCKED_LABELS: Record<string, string> = {
+  RELEASE_PLAYER_LISTED: 'This player is listed for transfer. Withdraw the listing first.',
+  RELEASE_SQUAD_TOO_SMALL: 'A club needs at least 18 players, so this player cannot be released.',
+  RELEASE_GOALKEEPERS_TOO_FEW:
+    'A club needs at least two goalkeepers, so this player cannot be released.',
+  RELEASE_SEASON_ROLLOVER: 'Contracts cannot change while the season rolls over. Try again soon.',
+  RELEASE_INSUFFICIENT_FUNDS: 'Your available cash cannot cover the payout.',
+};
+
+/**
+ * Says why a release is refused, from the server's stable code (`CON-12`). An unknown code still reads as a
+ * refusal rather than as nothing.
+ */
+export function releaseBlockedLabel(code: string): string {
+  return RELEASE_BLOCKED_LABELS[code] ?? 'This player cannot be released right now.';
+}
+
 /** Names a preferred foot. */
 export function footLabel(code: string): string {
   return FOOT_LABELS[code] ?? code;

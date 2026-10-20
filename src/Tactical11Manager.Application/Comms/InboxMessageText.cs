@@ -55,6 +55,8 @@ public static class InboxMessageText
                 InboxTemplates.Read<InboxTemplates.InjuryParameters>(parametersJson)),
             InboxTemplates.RetirementAnnounced => Retirement(
                 InboxTemplates.Read<InboxTemplates.RetirementParameters>(parametersJson)),
+            InboxTemplates.PlayerReleased => Released(
+                InboxTemplates.Read<InboxTemplates.ReleasedParameters>(parametersJson)),
             InboxTemplates.SeasonMovement => Movement(
                 InboxTemplates.Read<InboxTemplates.MovementParameters>(parametersJson)),
             InboxTemplates.TeamSheetRepaired => RepairedSide(
@@ -161,6 +163,12 @@ public static class InboxMessageText
         new(
             $"{parameters.PlayerName} will retire",
             $"{parameters.PlayerName} has announced that this will be their final season.");
+
+    private static InboxText Released(InboxTemplates.ReleasedParameters parameters) =>
+        new(
+            $"{parameters.PlayerName} was released",
+            $"{parameters.PlayerName} was released for {Money(parameters.PayoutMinor)} and joins the "
+            + "free-agent pool at the next weekly batch.");
 
     private static InboxText Movement(InboxTemplates.MovementParameters parameters) =>
         new(

@@ -433,6 +433,39 @@ public sealed record ContractRenewalContext(
     int RemainingSeasons);
 
 /// <summary>
+/// What releasing a player is decided from, gathered server-side (`CON-12`).
+/// </summary>
+/// <param name="ContractId">The contract being closed.</param>
+/// <param name="PlayerId">The contracted player.</param>
+/// <param name="ClubId">The club the contract binds the player to, which ownership is checked against.</param>
+/// <param name="ContractVersion">The contract's optimistic-concurrency version.</param>
+/// <param name="WeeklyWageMinor">The wage on the contract, per week, in minor units.</param>
+/// <param name="EndSeasonNumber">The last season the contract covers.</param>
+/// <param name="CurrentSeasonNumber">The season being played.</param>
+/// <param name="CurrentSeasonEndsAt">When the current season, rollover included, ends.</param>
+/// <param name="WeeksPerSeason">A season's length in whole weeks, read from the calendar.</param>
+/// <param name="IsRollover">Whether the season is closing, when no contract may change (`CON-8`).</param>
+/// <param name="PrimaryPosition">The player's position.</param>
+/// <param name="RegisteredCount">How many players the club has under contract.</param>
+/// <param name="GoalkeeperCount">How many of them are goalkeepers.</param>
+/// <param name="IsListed">Whether the player has an open transfer listing (`TRF-14`).</param>
+public sealed record ReleaseContext(
+    Guid ContractId,
+    Guid PlayerId,
+    Guid ClubId,
+    long ContractVersion,
+    long WeeklyWageMinor,
+    int EndSeasonNumber,
+    int CurrentSeasonNumber,
+    DateTimeOffset CurrentSeasonEndsAt,
+    int WeeksPerSeason,
+    bool IsRollover,
+    PlayerPosition PrimaryPosition,
+    int RegisteredCount,
+    int GoalkeeperCount,
+    bool IsListed);
+
+/// <summary>
 /// The read side of the squad module.
 /// </summary>
 /// <remarks>
@@ -486,6 +519,16 @@ public interface ISquadQueries
     /// <param name="contractId">The contract to quote.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<ContractRenewalContext?> GetRenewalContextAsync(
+        Guid contractId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the facts a release is decided from, or null when the contract is unknown or no longer active
+    /// (`CON-12`).
+    /// </summary>
+    /// <param name="contractId">The contract to release.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<ReleaseContext?> GetReleaseContextAsync(
         Guid contractId,
         CancellationToken cancellationToken);
 }

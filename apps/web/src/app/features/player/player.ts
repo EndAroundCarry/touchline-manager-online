@@ -11,12 +11,14 @@ import {
   matchCells,
   matchColumnsFor,
   positionLabel,
+  releaseBlockedLabel,
   statCells,
   statColumnsFor,
   seasonsPlayedLabel,
   squadStatusLabel,
   stateRows,
 } from '../../core/squad/squad-presentation';
+import { PlayerRelease } from '../../core/squad/squad.models';
 import { SquadStore } from '../../core/squad/squad-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
@@ -26,12 +28,14 @@ import { PlayerPortrait } from '../../shared/ui/player-portrait/player-portrait'
 import { FALLBACK_KIT, PortraitKit } from '../../shared/ui/player-portrait/portrait-designs';
 import { PlayerTraining } from './player-training/player-training';
 import {
+  DESTRUCTIVE_BUTTON,
   FORM_ERROR,
   LINK,
   NAME_LINK,
   PAGE_HEADING,
   SECONDARY_BUTTON,
   SELECT_INPUT,
+  STATUS_MESSAGE,
 } from '../../shared/forms/control-styles';
 import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
@@ -40,6 +44,9 @@ export type PlayerTab = 'attributes' | 'training' | 'statistics' | 'contract';
 
 /** The tabs another club's player shows. */
 const PUBLIC_TABS: readonly PlayerTab[] = ['attributes', 'statistics'];
+
+/** Where the release flow on the Contract tab has got to (`CON-12`). */
+export type ReleaseStep = 'idle' | 'quoting' | 'confirming' | 'releasing' | 'released';
 
 /** The statistics drop-down's value for the season in progress. */
 const CURRENT_SEASON = 'current';
@@ -227,8 +234,22 @@ export class PlayerProfile implements OnInit {
       .map((match) => ({ match, cells: matchCells(match, this.matchColumns()) }));
   });
 
+  protected readonly releaseStep = signal<ReleaseStep>('idle');
+  protected readonly releaseError = signal<string | null>(null);
+  protected readonly released = signal<PlayerRelease | null>(null);
+  protected readonly releaseQuote = this.store.releaseQuote;
+
+  /** Why the release is refused right now, in words, or null when it is allowed. */
+  protected readonly releaseBlocked = computed(() => {
+    const code = this.releaseQuote()?.blockedReason;
+
+    return code === null || code === undefined ? null : releaseBlockedLabel(code);
+  });
+
   protected readonly pageHeadingClass = PAGE_HEADING;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
+  protected readonly destructiveButtonClass = DESTRUCTIVE_BUTTON;
+  protected readonly statusMessageClass = STATUS_MESSAGE;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly selectClass = SELECT_INPUT;
   protected readonly linkClass = LINK;
@@ -329,6 +350,57 @@ export class PlayerProfile implements OnInit {
     event.preventDefault();
     this.selectTab(tabs[target].key);
     (document.getElementById(`player-tab-${tabs[target].key}`) as HTMLElement | null)?.focus();
+  }
+
+  /** Asks what releasing the player costs, and opens the confirmation (`CON-12`). */
+  protected startRelease(): void {
+    const contract = this.player()?.contract;
+
+    if (contract === null || contract === undefined) {
+      return;
+    }
+
+    this.releaseError.set(null);
+    this.releaseStep.set('quoting');
+
+    this.store.quoteRelease(contract.id).subscribe({
+      next: () => this.releaseStep.set('confirming'),
+      error: (error: unknown) => this.failRelease(error, 'The cost could not be worked out.'),
+    });
+  }
+
+  /** Releases the player on the quoted terms. The quoted version makes a stale confirmation fail rather than pay. */
+  protected confirmRelease(): void {
+    const quote = this.releaseQuote();
+
+    if (quote === null || quote.blockedReason !== null || this.releaseStep() !== 'confirming') {
+      return;
+    }
+
+    this.releaseError.set(null);
+    this.releaseStep.set('releasing');
+
+    this.store.releasePlayer(quote.contractId, quote.contractVersion).subscribe({
+      next: (release) => {
+        this.released.set(release);
+        this.releaseStep.set('released');
+      },
+      error: (error: unknown) => this.failRelease(error, 'The player could not be released.'),
+    });
+  }
+
+  /** Closes the confirmation without releasing anyone. */
+  protected cancelRelease(): void {
+    this.store.clearReleaseQuote();
+    this.releaseError.set(null);
+    this.releaseStep.set('idle');
+  }
+
+  private failRelease(error: unknown, fallback: string): void {
+    // The quote may be stale or refused now; a fresh one is asked for when the manager tries again.
+    this.store.clearReleaseQuote();
+    this.releaseStep.set('idle');
+    this.releaseError.set(error instanceof ApiError ? error.detail : fallback);
   }
 
   /** Chooses the season whose statistics are shown. */

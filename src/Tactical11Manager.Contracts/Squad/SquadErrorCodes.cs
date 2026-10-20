@@ -32,4 +32,19 @@ public static class SquadErrorCodes
 
     /// <summary>The requested contract length is not one to three game seasons (`CON-1`).</summary>
     public const string InvalidContractTerm = "INVALID_CONTRACT_TERM";
+
+    /// <summary>The player has an open transfer listing; it must be withdrawn first (`CON-12`).</summary>
+    public const string ReleasePlayerListed = "RELEASE_PLAYER_LISTED";
+
+    /// <summary>The release would leave the club below the minimum squad (`CON-12`, `SQ-2`).</summary>
+    public const string ReleaseSquadTooSmall = "RELEASE_SQUAD_TOO_SMALL";
+
+    /// <summary>The release would leave the club with fewer than two goalkeepers (`CON-12`, `SQ-2`).</summary>
+    public const string ReleaseGoalkeepersTooFew = "RELEASE_GOALKEEPERS_TOO_FEW";
+
+    /// <summary>No contract may change while the season is closing (`CON-8`, `CON-12`).</summary>
+    public const string ReleaseSeasonRollover = "RELEASE_SEASON_ROLLOVER";
+
+    /// <summary>The club's available cash cannot cover the payout (`CON-12`, `FIN-10`).</summary>
+    public const string ReleaseInsufficientFunds = "RELEASE_INSUFFICIENT_FUNDS";
 }

@@ -10,6 +10,7 @@ import {
   positionAbbreviation,
   positionLabel,
   progressReadOut,
+  releaseBlockedLabel,
   progressText,
   KEEPER_MATCH_COLUMNS,
   KEEPER_STAT_COLUMNS,
@@ -151,6 +152,15 @@ describe('squad presentation', () => {
       expect(squadStatusLabel('key_player')).toBe('Key player');
       expect(squadStatusLabel('unknown')).toBe('unknown');
       expect(footLabel('both')).toBe('Either');
+    });
+
+    it('says in words why a release is refused, and never leaves a refusal blank (CON-12)', () => {
+      expect(releaseBlockedLabel('RELEASE_PLAYER_LISTED')).toContain('listed for transfer');
+      expect(releaseBlockedLabel('RELEASE_SQUAD_TOO_SMALL')).toContain('18 players');
+      expect(releaseBlockedLabel('RELEASE_GOALKEEPERS_TOO_FEW')).toContain('two goalkeepers');
+      expect(releaseBlockedLabel('RELEASE_SEASON_ROLLOVER')).toContain('rolls over');
+      expect(releaseBlockedLabel('RELEASE_INSUFFICIENT_FUNDS')).toContain('available cash');
+      expect(releaseBlockedLabel('SOMETHING_NEW')).toContain('cannot be released');
     });
 
     it('describes an absence in fixtures, with the right plural (TRN-12)', () => {

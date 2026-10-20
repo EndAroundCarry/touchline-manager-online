@@ -7,6 +7,8 @@ import {
   ContractRenewal,
   Player,
   PlayerMatches,
+  PlayerRelease,
+  ReleaseQuote,
   RenewalQuote,
   Squad,
 } from './squad.models';
@@ -66,6 +68,25 @@ export class SquadApi {
     return this.api.post<ContractRenewal, { seasons: number }>(
       `/contracts/${contractId}/renew`,
       { seasons },
+      { etag: `"${version}"` },
+    );
+  }
+
+  /** Asks the server what releasing a player now costs, and whether the club may (`CON-12`). */
+  releaseQuote(contractId: string): Observable<ReleaseQuote> {
+    return this.api.get<ReleaseQuote>(`/contracts/${contractId}/release-quote`);
+  }
+
+  /**
+   * Releases a player (`CON-12`).
+   *
+   * The quote's contract version is sent as `If-Match`, so a release agreed against a stale read is refused
+   * with `412`, and a repeated one finds the contract already closed.
+   */
+  release(contractId: string, version: number): Observable<PlayerRelease> {
+    return this.api.post<PlayerRelease, Record<string, never>>(
+      `/contracts/${contractId}/release`,
+      {},
       { etag: `"${version}"` },
     );
   }

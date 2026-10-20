@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.World;
@@ -672,6 +673,87 @@ internal sealed class SquadQueries : ISquadQueries
             placement.TierNumber,
             season.SequenceNumber,
             Math.Max(0, contract.EndSeasonNumber - season.SequenceNumber));
+    }
+
+    /// <inheritdoc />
+    public async Task<ReleaseContext?> GetReleaseContextAsync(
+        Guid contractId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var window = await _dbContext.Seasons
+            .Where(candidate => candidate.Id == season.SeasonId)
+            .Select(candidate => new
+            {
+                candidate.Status,
+                candidate.StartsAt,
+                candidate.EndsAt,
+                candidate.RolloverEndsAt,
+            })
+            .SingleAsync(cancellationToken);
+
+        var row = await (
+            from contract in _dbContext.PlayerContracts
+            join player in _dbContext.Players on contract.PlayerId equals player.Id
+            where contract.Id == contractId && contract.Status == ContractStatus.Active
+            select new
+            {
+                contract.Id,
+                contract.PlayerId,
+                contract.ClubId,
+                contract.Version,
+                contract.WeeklyWageMinor,
+                contract.EndSeasonNumber,
+                player.PrimaryPosition,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (row is null)
+        {
+            return null;
+        }
+
+        var registered = await _dbContext.PlayerContracts
+            .CountAsync(
+                contract => contract.ClubId == row.ClubId && contract.Status == ContractStatus.Active,
+                cancellationToken);
+
+        var goalkeepers = await (
+            from contract in _dbContext.PlayerContracts
+            join player in _dbContext.Players on contract.PlayerId equals player.Id
+            where contract.ClubId == row.ClubId
+                && contract.Status == ContractStatus.Active
+                && player.PrimaryPosition == PlayerPosition.Goalkeeper
+            select contract.Id)
+            .CountAsync(cancellationToken);
+
+        var isListed = await _dbContext.TransferListings
+            .AnyAsync(
+                listing => listing.PlayerId == row.PlayerId && listing.Status == ListingStatus.Open,
+                cancellationToken);
+
+        return new ReleaseContext(
+            row.Id,
+            row.PlayerId,
+            row.ClubId,
+            row.Version,
+            row.WeeklyWageMinor,
+            row.EndSeasonNumber,
+            season.SequenceNumber,
+            window.RolloverEndsAt,
+            ReleaseCost.WeeksPerSeason(
+                new SeasonWindow(window.StartsAt, window.EndsAt, window.RolloverEndsAt, [])),
+            window.Status == SeasonStatus.Rollover,
+            row.PrimaryPosition,
+            registered,
+            goalkeepers,
+            isListed);
     }
 
     /// <summary>Reads every open injury and suspension for the given players, keyed by player.</summary>

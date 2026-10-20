@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { SquadApi } from './squad-api';
 import { SquadStore } from './squad-store';
-import { ContractList, Player, PlayerMatches, Squad } from './squad.models';
+import { ContractList, Player, PlayerMatches, ReleaseQuote, Squad } from './squad.models';
 
 /**
  * The squad store's guarantees.
@@ -28,6 +28,19 @@ const quote = {
   serverTime: '2026-09-28T00:00:00Z',
 };
 
+const releaseQuote: ReleaseQuote = {
+  contractId: 'contract-1',
+  playerId: 'player-1',
+  remainingWeeks: 20,
+  payoutMinor: 12_000_000,
+  weeklyWageMinor: 1_200_000,
+  availableMinor: 50_000_000,
+  joinsPoolAt: '2026-10-26T12:00:00Z',
+  blockedReason: null,
+  contractVersion: 4,
+  serverTime: '2026-10-20T09:00:00Z',
+};
+
 const renewedPlayer = {
   id: 'player-1',
   fullName: 'Alaric Alderwick',
@@ -42,6 +55,8 @@ function createSquadApiStub() {
     contracts: vi.fn(),
     renewalQuote: vi.fn(),
     renew: vi.fn(),
+    releaseQuote: vi.fn(),
+    release: vi.fn(),
   };
 }
 
@@ -135,6 +150,57 @@ describe('SquadStore', () => {
     expect(api.renew).toHaveBeenCalledWith('contract-1', 3, quote.contractVersion);
     expect(store.player()).toBe(renewedPlayer);
     expect(store.renewalQuote()).toBeNull();
+  });
+
+  it('publishes the release quote it read, and forgets it on demand', async () => {
+    api.releaseQuote.mockReturnValue(of(releaseQuote));
+
+    await firstValueFrom(store.quoteRelease('contract-1'));
+
+    expect(api.releaseQuote).toHaveBeenCalledWith('contract-1');
+    expect(store.releaseQuote()).toBe(releaseQuote);
+
+    store.clearReleaseQuote();
+
+    expect(store.releaseQuote()).toBeNull();
+  });
+
+  it('releases under the quoted version and does not read a profile that has become a free agent', async () => {
+    const release = {
+      contractId: 'contract-1',
+      playerId: 'player-1',
+      payoutMinor: 12_000_000,
+      remainingWeeks: 20,
+      weeklyWageSavedMinor: 1_200_000,
+      joinsPoolAt: '2026-10-26T12:00:00Z',
+      serverTime: '2026-10-20T09:00:00Z',
+    };
+
+    api.releaseQuote.mockReturnValue(of(releaseQuote));
+    api.release.mockReturnValue(of(release));
+
+    await firstValueFrom(store.quoteRelease('contract-1'));
+
+    const released = await firstValueFrom(
+      store.releasePlayer('contract-1', releaseQuote.contractVersion),
+    );
+
+    // The quote's version is the If-Match the command carries, so a stale quote is refused (CONC-1).
+    expect(api.release).toHaveBeenCalledWith('contract-1', releaseQuote.contractVersion);
+    expect(released).toBe(release);
+    expect(store.releaseQuote()).toBeNull();
+    expect(api.player).not.toHaveBeenCalled();
+  });
+
+  it('keeps nothing of a refused release', async () => {
+    api.releaseQuote.mockReturnValue(of(releaseQuote));
+    api.release.mockReturnValue(throwError(() => new Error('PRECONDITION_FAILED')));
+
+    await firstValueFrom(store.quoteRelease('contract-1'));
+
+    await expect(firstValueFrom(store.releasePlayer('contract-1', 4))).rejects.toThrow(
+      'PRECONDITION_FAILED',
+    );
   });
 
   it('forgets everything on clear, so one manager never sees the previous squad', async () => {

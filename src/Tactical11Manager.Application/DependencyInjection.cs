@@ -359,6 +359,8 @@ public static class DependencyInjection
         services.AddScoped<SaveFixtureTeamSheet>();
         services.AddScoped<RequestRenewalQuote>();
         services.AddScoped<RenewContract>();
+        services.AddScoped<RequestReleaseQuote>();
+        services.AddScoped<ReleasePlayer>();
 
         services.AddScoped<IValidator<SaveTacticalPlanRequest>, SaveTacticalPlanRequestValidator>();
         services.AddScoped<IValidator<SaveTrainingRequest>, SaveTrainingRequestValidator>();

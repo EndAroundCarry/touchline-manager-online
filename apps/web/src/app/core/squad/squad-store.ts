@@ -1,7 +1,15 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, switchMap, tap } from 'rxjs';
 import { SquadApi } from './squad-api';
-import { ContractList, Player, PlayerMatches, RenewalQuote, Squad } from './squad.models';
+import {
+  ContractList,
+  Player,
+  PlayerMatches,
+  PlayerRelease,
+  ReleaseQuote,
+  RenewalQuote,
+  Squad,
+} from './squad.models';
 
 /**
  * The squad module's view state.
@@ -21,6 +29,7 @@ export class SquadStore {
   private readonly playerMatchesSignal = signal<PlayerMatches | null>(null);
   private readonly contractsSignal = signal<ContractList | null>(null);
   private readonly renewalQuoteSignal = signal<RenewalQuote | null>(null);
+  private readonly releaseQuoteSignal = signal<ReleaseQuote | null>(null);
 
   /** The squad last read. */
   readonly squad = this.squadSignal.asReadonly();
@@ -36,6 +45,9 @@ export class SquadStore {
 
   /** The renewal quote last requested for the open profile, or null. */
   readonly renewalQuote = this.renewalQuoteSignal.asReadonly();
+
+  /** The release quote last requested for the open profile, or null. */
+  readonly releaseQuote = this.releaseQuoteSignal.asReadonly();
 
   /** Reads a club's squad. */
   loadSquad(clubId: string): Observable<Squad> {
@@ -85,6 +97,26 @@ export class SquadStore {
     );
   }
 
+  /** Requests what releasing a player now would cost, and whether the club may (`CON-12`). */
+  quoteRelease(contractId: string): Observable<ReleaseQuote> {
+    return this.api
+      .releaseQuote(contractId)
+      .pipe(tap((quote) => this.releaseQuoteSignal.set(quote)));
+  }
+
+  /**
+   * Releases a player (`CON-12`). The profile is not re-read: the player is a free agent now, and the screen
+   * shows the server's answer instead.
+   */
+  releasePlayer(contractId: string, version: number): Observable<PlayerRelease> {
+    return this.api.release(contractId, version).pipe(tap(() => this.releaseQuoteSignal.set(null)));
+  }
+
+  /** Forgets the last release quote, so a cancelled confirmation does not leave a stale price on screen. */
+  clearReleaseQuote(): void {
+    this.releaseQuoteSignal.set(null);
+  }
+
   /** Forgets the last renewal quote, so a change of term does not leave a stale wage on screen. */
   clearRenewalQuote(): void {
     this.renewalQuoteSignal.set(null);
@@ -97,5 +129,6 @@ export class SquadStore {
     this.playerMatchesSignal.set(null);
     this.contractsSignal.set(null);
     this.renewalQuoteSignal.set(null);
+    this.releaseQuoteSignal.set(null);
   }
 }

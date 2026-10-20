@@ -88,6 +88,23 @@ internal static class SquadEndpoints
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesProblem(StatusCodes.Status428PreconditionRequired);
 
+        group.MapGet("/contracts/{contractId:guid}/release-quote", RequestReleaseQuoteAsync)
+            .WithName("RequestReleaseQuote")
+            .WithSummary("Returns what releasing a player now costs, and whether the club may (CON-12).")
+            .Produces<ReleaseQuoteResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/contracts/{contractId:guid}/release", ReleasePlayerAsync)
+            .WithName("ReleasePlayer")
+            .WithSummary("Releases a player, paying half the wages left. Requires If-Match with the contract's current version (CON-12).")
+            .Produces<ReleasePlayerResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
         return endpoints;
     }
 
@@ -252,6 +269,116 @@ internal static class SquadEndpoints
 
         return Results.Ok(result.Contract);
     }
+
+    private static async Task<IResult> RequestReleaseQuoteAsync(
+        HttpContext httpContext,
+        Guid contractId,
+        RequestReleaseQuote useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await useCase.ExecuteAsync(userId, contractId, cancellationToken);
+
+        return result.Outcome == ContractReleaseOutcome.Quoted
+            ? Results.Ok(result.Quote)
+            : ReleaseRefusal(result.Outcome);
+    }
+
+    private static async Task<IResult> ReleasePlayerAsync(
+        HttpContext httpContext,
+        Guid contractId,
+        ReleasePlayer useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var expectedVersion = EntityTagHeader.ParseIfMatch(httpContext.Request.Headers.IfMatch.ToString());
+
+        var result = await useCase.ExecuteAsync(userId, contractId, expectedVersion, cancellationToken);
+
+        return result.Outcome == ContractReleaseOutcome.Released
+            ? Results.Ok(result.Release)
+            : ReleaseRefusal(result.Outcome);
+    }
+
+    /// <summary>Turns a release refusal into a status and a stable code.</summary>
+    private static IResult ReleaseRefusal(ContractReleaseOutcome outcome) => outcome switch
+    {
+        ContractReleaseOutcome.ContractNotFound => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            SquadErrorCodes.ContractNotFound,
+            "No such contract.",
+            "That contract does not exist for your club."),
+
+        ContractReleaseOutcome.PreconditionRequired => RenewalPreconditionRequired(),
+
+        ContractReleaseOutcome.PreconditionFailed => ProblemResults.Code(
+            StatusCodes.Status412PreconditionFailed,
+            ApiErrorCodes.PreconditionFailed,
+            "The contract changed.",
+            "Reload the contract and ask for the release quote again."),
+
+        ContractReleaseOutcome.PlayerListed => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            SquadErrorCodes.ReleasePlayerListed,
+            "The player is listed for transfer.",
+            "Withdraw the transfer listing before releasing the player."),
+
+        ContractReleaseOutcome.SquadTooSmall => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            SquadErrorCodes.ReleaseSquadTooSmall,
+            "The squad would be too small.",
+            "A club needs at least 18 players, so this player cannot be released."),
+
+        ContractReleaseOutcome.GoalkeepersTooFew => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            SquadErrorCodes.ReleaseGoalkeepersTooFew,
+            "The club would be short of goalkeepers.",
+            "A club needs at least two goalkeepers, so this player cannot be released."),
+
+        ContractReleaseOutcome.SeasonRollover => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            SquadErrorCodes.ReleaseSeasonRollover,
+            "The season is closing.",
+            "Contracts cannot change while the season rolls over. Try again once the new season starts."),
+
+        ContractReleaseOutcome.InsufficientFunds => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            SquadErrorCodes.ReleaseInsufficientFunds,
+            "Not enough available cash.",
+            "The club cannot cover the release payout after what it has committed to bids."),
+
+        ContractReleaseOutcome.NoClub => ProblemResults.Code(
+            StatusCodes.Status403Forbidden,
+            SquadErrorCodes.NoClub,
+            "No club.",
+            "You do not manage a club yet, so there is no contract to release."),
+
+        ContractReleaseOutcome.NoManagerProfile => ProblemResults.Code(
+            StatusCodes.Status403Forbidden,
+            WorldErrorCodes.ManagerProfileRequired,
+            "No manager profile.",
+            "Create your manager profile before managing a club."),
+
+        ContractReleaseOutcome.WorldNotSeeded => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            WorldErrorCodes.WorldNotSeeded,
+            "No world yet.",
+            "The world has not been created."),
+
+        _ => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            WorldErrorCodes.ClubNotFound,
+            "No such club.",
+            "That club does not exist in this world."),
+    };
 
     /// <summary>Turns a renewal refusal into a status and a stable code.</summary>
     private static IResult RenewalRefusal(ContractRenewalOutcome outcome) => outcome switch

@@ -64,6 +64,9 @@ public static class LedgerPostings
     /// <summary>The template that describes a club paying for new places in its stadium (`STAD-4`).</summary>
     public const string StadiumConstructionTemplate = "finance.stadium_construction";
 
+    /// <summary>The template that describes a club paying to release a player (`CON-12`).</summary>
+    public const string ReleasePayoutTemplate = "finance.release_payout";
+
     /// <summary>
     /// Builds the posting that funds a newly generated club's account.
     /// </summary>
@@ -427,6 +430,37 @@ public static class LedgerPostings
             $"stadium:{stadiumId:D}:v{stadiumVersion}",
             StadiumConstructionTemplate,
             Parameters(("amountMinor", amountMinor), ("stand", (long)stand), ("count", count)));
+    }
+
+    /// <summary>Builds the posting a released player's payout makes (`CON-12`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club paying.</param>
+    /// <param name="contractId">The contract that was closed, which the key and the source name.</param>
+    /// <param name="remainingWeeks">The weeks of wages the payout is half of.</param>
+    /// <param name="amountMinor">The payout, in minor units, as a positive amount to be debited.</param>
+    /// <remarks>
+    /// The correlation key is the contract, because a contract closes once: a retried release that was already
+    /// paid for collides with its first entry instead of charging the club twice (`FIN-17`).
+    /// </remarks>
+    public static LedgerPosting ReleasePayout(
+        Guid entryId,
+        Guid clubId,
+        Guid contractId,
+        int remainingWeeks,
+        long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.ReleasePayout,
+            CashDeltaMinor: -amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Contract,
+            SourceId: contractId,
+            $"release:{contractId:D}",
+            ReleasePayoutTemplate,
+            Parameters(("amountMinor", amountMinor), ("weeks", remainingWeeks)));
     }
 
     /// <summary>The correlation key of a bid's reservation (`FIN-17`, `TRF-7`).</summary>
