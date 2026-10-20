@@ -37,6 +37,9 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tickshape N seed [cells|squads]` plays position-shaped squads from kick-off or with a change of shape in the middle, and reads the points, the
 // zones and the bins after the change (plan snoopy-toasting-hamster). Not part of `all`.
 //
+// `tickfans N seed [curve|real|pool|league]` fits how a strength gap becomes win, draw and loss on the tick engine and checks the fans' expectation
+// against played matches (plan partitioned-feather). Not part of `all`.
+//
 // `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
 // snapshots (see TickCalibration). Neither is part of `all`.
 //
@@ -247,6 +250,17 @@ if (mode is "tickshape")
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var shapeSeed) ? shapeSeed : 7_000UL,
         rules,
         positional.Length > 3 ? positional[3] : string.Empty);
+}
+
+if (mode is "tickfans")
+{
+    // tickfans <matches a cell> <seed> [curve|real|pool|league] [snapshots.tsv]   (how a strength gap becomes win, draw and loss, and whether the fans' expectation is right on average; .run-logs/fans/*; TF_BASE, TF_GAPS narrow the curve)
+    TickFansProbe.Run(
+        Math.Min(count, 600),
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var fansSeed) ? fansSeed : 7_000UL,
+        rules,
+        positional.Length > 3 ? positional[3] : string.Empty,
+        positional.Length > 4 ? positional[4] : string.Empty);
 }
 
 if (mode is "tickfk")

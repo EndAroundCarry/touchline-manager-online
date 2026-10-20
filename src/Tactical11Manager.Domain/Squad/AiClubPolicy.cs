@@ -163,9 +163,12 @@ public static class AiClubPolicy
     /// Returns an empty mapping when the squad cannot field a legal eleven — no available goalkeeper, or
     /// too few available outfielders. An empty lineup is a valid plan (`TAC-10`): the shape and the
     /// instructions are still the AI's, and the snapshot builder decides the eleven at the lock, which is
-    /// the same repair a half-empty sheet gets.
+    /// the same repair a half-empty sheet gets. Public because the fans size a side up by the eleven this ordering would field
+    /// (<see cref="Fans.TeamStrength"/>).
     /// </remarks>
-    private static Dictionary<int, Guid> ChooseLineup(
+    /// <param name="layout">The eleven slots of the shape.</param>
+    /// <param name="squad">Every player the club may pick; unavailable players are filtered out.</param>
+    public static Dictionary<int, Guid> ChooseLineup(
         IReadOnlyList<FormationSlot> layout,
         IReadOnlyList<AiSquadPlayer> squad)
     {
