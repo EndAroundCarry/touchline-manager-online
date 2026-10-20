@@ -4,6 +4,11 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Potential plan - potential is drawn before skills, with talents and gems
+
+- Generator: a player's hidden potential is drawn first, as the tier's mean ability plus an offset, and his skills are derived from it and his age (24 - age below 24, none to 29, age - 29 above) instead of the other way round. The offset is normal 80% (two four-faced dice less four, -4 to +2), talent 15% (+3 to +5), gem 5% (+6 to +7), so a tier has a tail of ceilings where it had a narrow band. One ceiling for every skill, so training is unchanged. `player-gen-v3`, rule set `world-rules-v12`, `player-attr-v2` unchanged; rule `TRN-18`, ADR-0076. `GeneratedPotential` holds the draw; `PlayerSpread`, `DevelopmentAge` and `PotentialUpsideForAge` are gone. Existing worlds get the new potentials by reseeding.
+- Measured (100 clubs a tier): mean ability per tier and age band within 0.28 of before; tier 1 mean potential 13.87 to 13.14; valuation -1.5%, renewal wage -0.9% overall; by age valuation 17-20 -5%, 21-23 -9%, 24-29 unchanged, 30+ +15%. Not retuned.
+
 ## Back threes plan, Milestone 5 - verification and docs
 
 - Full eight-shape grid (64 pairings, 300 matches each, seed 7000): strengths 4-2-3-1 +0.17, 4-1-4-1 +0.05, 4-4-2 +0.02, 4-5-1 +0.02, 5-4-1 +0.01, 4-3-3 -0.01, 3-5-2 -0.13, 3-4-3 -0.13 (were -0.18 and -0.26); 4-3-3 takes 0.14 from 3-5-2 and 0.23 from 3-4-3. `tick 500` goals 2.90, completion 82.9%. The -0.10 target is not met.

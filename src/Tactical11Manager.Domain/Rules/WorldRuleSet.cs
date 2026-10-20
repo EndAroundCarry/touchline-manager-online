@@ -34,7 +34,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v11";
+    public const string Version = "world-rules-v12";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -525,6 +525,34 @@ public static class WorldRuleSet
     /// squad reads as a coherent group rather than as noise.
     /// </remarks>
     public const int GeneratedAbilityMeanTier1 = 13;
+
+    /// <summary>The share of generated players who are gems, in percent (`TRN-18`). A balancing value.</summary>
+    public const int GeneratedPotentialGemPercent = 5;
+
+    /// <summary>The share of generated players who are talents, in percent (`TRN-18`). A balancing value.</summary>
+    public const int GeneratedPotentialTalentPercent = 15;
+
+    /// <summary>
+    /// The lowest a normal player's potential sits from his tier's mean ability. The normal offset is
+    /// two dice of <see cref="GeneratedPotentialNormalDieFaces"/> faces added together, less this
+    /// (`TRN-18`). A balancing value.
+    /// </summary>
+    public const int GeneratedPotentialNormalFloor = -4;
+
+    /// <summary>The faces on each of the two dice that make a normal player's potential offset (`TRN-18`).</summary>
+    public const int GeneratedPotentialNormalDieFaces = 4;
+
+    /// <summary>The lowest offset of a talent's potential from his tier's mean ability (`TRN-18`).</summary>
+    public const int GeneratedPotentialTalentOffsetMin = 3;
+
+    /// <summary>The number of offsets a talent can draw, counting up from the minimum (`TRN-18`).</summary>
+    public const int GeneratedPotentialTalentOffsetCount = 3;
+
+    /// <summary>The lowest offset of a gem's potential from his tier's mean ability (`TRN-18`).</summary>
+    public const int GeneratedPotentialGemOffsetMin = 6;
+
+    /// <summary>The number of offsets a gem can draw, counting up from the minimum (`TRN-18`).</summary>
+    public const int GeneratedPotentialGemOffsetCount = 2;
 
     /// <summary>How far a squad's mean ability falls per tier below the first, in attribute points.</summary>
     /// <remarks>

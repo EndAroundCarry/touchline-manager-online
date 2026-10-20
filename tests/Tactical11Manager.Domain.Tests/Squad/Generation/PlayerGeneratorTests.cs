@@ -232,6 +232,49 @@ public sealed class PlayerGeneratorTests
     }
 
     [Fact]
+    public void A_players_skills_are_derived_from_his_potential_and_age()
+    {
+        // Tier 3 keeps the mean well inside 1-20, so the per-skill clamp does not bend the comparison.
+        var checkedPlayers = 0;
+
+        for (var clubOrdinal = 0; clubOrdinal < 40; clubOrdinal++)
+        {
+            foreach (var member in Generate(seed: "potential-first", clubOrdinal: clubOrdinal, tier: 3))
+            {
+                var age = member.Player.AgeIn(2026);
+                var baseAbility = member.Player.Potential + PlayerAttributeProfiles.AgeAbilityAdjustment(age);
+
+                var expected = AttributeNames.All.Average(name => Math.Clamp(
+                    baseAbility + PlayerAttributeProfiles.BonusFor(member.Player.PrimaryPosition, name),
+                    WorldRuleSet.AttributeMin,
+                    WorldRuleSet.AttributeMax));
+
+                var actual = member.Attributes.ToSet().Values.Average();
+
+                // The per-skill jitter averages out over all the skills, so the mean sits close to the ceiling
+                // less the years left to develop (TRN-18).
+                actual.Should().BeApproximately(expected, 1.0, $"{member.Player.FullName}, age {age}");
+                checkedPlayers++;
+            }
+        }
+
+        checkedPlayers.Should().Be(40 * WorldRuleSet.GeneratorSquadTarget);
+    }
+
+    [Fact]
+    public void A_young_player_starts_below_a_ceiling_that_is_already_set()
+    {
+        var young = Enumerable.Range(0, 40)
+            .SelectMany(clubOrdinal => Generate(seed: "potential-first", clubOrdinal: clubOrdinal, tier: 1))
+            .Where(member => member.Player.AgeIn(2026) <= 20)
+            .ToList();
+
+        young.Should().NotBeEmpty();
+        young.Average(member => member.Player.Potential - member.Attributes.ToSet().Values.Average())
+            .Should().BeGreaterThan(4.0, "a 17 to 20 year old is 4 to 7 points below his ceiling (TRN-18)");
+    }
+
+    [Fact]
     public void The_generator_versions_are_named_for_the_run_to_record()
     {
         PlayerGenerator.Version.Should().NotBeNullOrWhiteSpace("FIC-8");
@@ -254,7 +297,10 @@ public sealed class PlayerGeneratorTests
         squad.Take(3).Select(member => member.Player.FullName)
             .Should().Equal("Alaric Alderwick", "Bramwell Brambleby", "Corin Cawthorne");
 
-        GoldenDigest(squad).Should().Be("941aab8c455dbc46");
+        GoldenDigest(squad).Should().Be(
+            "64306e99164964bf",
+            "player-gen-v3 draws potential before the skills and derives the skills from it (TRN-18); "
+            + "the old digest was 941aab8c455dbc46");
     }
 
     private static string GoldenDigest(IReadOnlyList<GeneratedSquadMember> squad) =>

@@ -33,14 +33,8 @@ public static class PlayerAttributeProfiles
     /// <summary>The most a single attribute moves from the position's base, from its own random draw.</summary>
     public const int AttributeJitter = 2;
 
-    /// <summary>The most a player's whole set moves from the squad mean, from their own random draw.</summary>
-    public const int PlayerSpread = 3;
-
     /// <summary>The age a player's ability adjustment stops penalising and starts declining from.</summary>
     public const int PeakAge = 27;
-
-    /// <summary>The age below which a player still has development headroom.</summary>
-    public const int DevelopmentAge = 25;
 
     private static readonly Dictionary<PlayerPosition, IReadOnlyDictionary<AttributeName, int>> Table =
         new Dictionary<PlayerPosition, IReadOnlyDictionary<AttributeName, int>>
@@ -244,7 +238,7 @@ public static class PlayerAttributeProfiles
             : throw new ArgumentOutOfRangeException(nameof(position), position, "Unknown position.");
 
     /// <summary>
-    /// Gets how far a player's ability sits from their profile's mean at the given age.
+    /// Gets how far a player's ability sits from his potential at the given age (`TRN-18`).
     /// </summary>
     /// <remarks>
     /// Players inside <see cref="PeakAge"/>'s window are unadjusted; younger players are discounted
@@ -258,11 +252,6 @@ public static class PlayerAttributeProfiles
         > 29 => -(age - 29),
         _ => 0,
     };
-
-    /// <summary>Gets how much development headroom a player of the given age still has.</summary>
-    /// <param name="age">The player's age in game years.</param>
-    public static int PotentialUpsideForAge(int age) =>
-        age < DevelopmentAge ? DevelopmentAge - age : 0;
 
     /// <summary>Gets whether a player is old enough to be treated as a senior squad member.</summary>
     /// <param name="age">The player's age in game years.</param>

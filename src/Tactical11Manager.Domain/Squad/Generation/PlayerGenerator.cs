@@ -80,7 +80,7 @@ public static class PlayerGenerator
     /// and version must reproduce the same squads; the same seed and a different version must not be
     /// expected to.
     /// </remarks>
-    public const string Version = "player-gen-v2";
+    public const string Version = "player-gen-v3";
 
     /// <summary>
     /// The positional composition of a generated squad, ordered goalkeeper outwards. Its length is the
@@ -319,11 +319,10 @@ public static class PlayerGenerator
         var heightCm = physique.MinHeightCm + rng.NextInt(physique.MaxHeightCm - physique.MinHeightCm + 1);
         var weightKg = physique.MinWeightKg + rng.NextInt(physique.MaxWeightKg - physique.MinWeightKg + 1);
 
-        var spread = rng.NextInt((2 * PlayerAttributeProfiles.PlayerSpread) + 1)
-            - PlayerAttributeProfiles.PlayerSpread;
-        var baseAbility = WorldRuleSet.GeneratedAbilityMeanForTier(request.Tier)
-            + PlayerAttributeProfiles.AgeAbilityAdjustment(age)
-            + spread;
+        // The ceiling is drawn first and the skills follow from it (`TRN-18`), so a young player starts
+        // below a potential that is already fixed rather than having it derived from his skills.
+        var potential = GeneratedPotential.Draw(request.Tier, rng);
+        var baseAbility = potential + PlayerAttributeProfiles.AgeAbilityAdjustment(age);
 
         var values = new int[AttributeNames.Count];
 
@@ -343,10 +342,6 @@ public static class PlayerGenerator
 
         var secondaryPositions = SecondaryPositionsFor(Adjacent[position], position, rng);
 
-        var potential = Math.Clamp(
-            mean + PlayerAttributeProfiles.PotentialUpsideForAge(age) + rng.NextInt(3),
-            WorldRuleSet.AttributeMin,
-            WorldRuleSet.AttributeMax);
         var reputation = Math.Clamp(
             mean + rng.NextInt(5) - 2,
             WorldRuleSet.AttributeMin,

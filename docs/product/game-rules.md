@@ -262,7 +262,7 @@ reseeded.
 | TRN-1 | A player trains one **programme**: a weighted list of attributes (3 core, 2 important, 1 supporting). The programmes are `goalkeeper`, `defender`, `wingback`, `midfielder`, `winger`, `forward`, `mental`, `physical`, `recovery`, and `widemid` (the wide midfielder's). The catalogue is served by the API, never repeated by a client. `recovery` trains no attributes and recovers extra fatigue. | 10 programmes |
 | TRN-2 | Programmes are per player only; there is no club-wide programme. A player trains the programme that matches their primary position (gk → goalkeeper; cb → defender; rb, lb → wingback; dm, cm, am → midfielder; rm, lm → widemid; rw, lw → winger; st → forward) unless the manager sets an override, and clearing it returns them to that default. Intensity (light, normal, intense) is the one club-wide training setting. | — |
 | TRN-3 | Daily progression job runs | **02:00 UTC** |
-| TRN-4 | Attribute scale | **1–20** displayed; neither development nor decline can push a displayed attribute outside 1–20, and development never lifts one above the player's hidden potential |
+| TRN-4 | Attribute scale | **1–20** displayed; neither development nor decline can push a displayed attribute outside 1–20, and development never lifts one above the player's hidden potential (how potential is drawn: TRN-18) |
 | TRN-5 | Condition | **0–10,000** basis points |
 | TRN-6 | Fatigue | **0–10,000** basis points |
 | TRN-7 | Morale | **0–10,000** basis points |
@@ -276,6 +276,7 @@ reseeded.
 | TRN-15 | **Hidden aptitude.** Each player has a training aptitude of 55%–145% (triangular around 100%) derived purely from their identity and never stored. It scales development, so two players of equal potential reach it at different speeds. | 550–1450 permille |
 | TRN-16 | **Decline.** Each attribute declines from its own start age by a yearly slope that grows each year past it: pace and acceleration from 28, agility from 29, stamina and jumping from 30, strength from 31, some technical skills from 29 and the rest from 32, work rate from 31, goalkeeper reflexes from 32 and the other goalkeeping skills from 34. Other mental attributes do not decline. An attribute the player's programme trains declines at half the rate. Decline comes off the same per-attribute progress as growth, so a skill that is trained and ageing nets the two; a point is lost when the progress reaches minus one, and an attribute never falls below 1. | 86 progression days a season |
 | TRN-17 | **History.** Every progression day records, per player, the programme and intensity in force, the development and decline earned, the whole points gained and lost, and which attributes moved. A manager reads it for their own players only. | kept in full |
+| TRN-18 | **Potential.** A generated player's hidden potential is drawn first, as `clamp(tier mean + offset, 1, 20)`, and his skills are derived from it: `potential + age adjustment`, where the adjustment is 24 − age below 24, zero from 24 to 29, and age − 29 above 29. So a 17-year-old starts 7 under his ceiling, a 24 to 29-year-old is at it, and an older player's potential is his peak, with his current skills showing the decline. Position bonuses and per-skill jitter are unchanged. There is one ceiling for every skill (TRN-4). The offset is a band: **normal** 80%, two four-faced dice less four (−4 to +2, most often −1); **talent** 15%, +3 to +5; **gem** 5%, +6 to +7. The bands do not overlap, and the mean offset is about +0.1, so a tier's squad strength is kept. Existing worlds get the new potentials by reseeding. | 80% / 15% / 5% (balancing) |
 
 Match load is a pure, versioned rule (`match-load-v1`) over the frozen facts of a result — each player's
 minutes, their stamina, their side's instructions, and the scoreline — and it is applied by the matchday
@@ -671,6 +672,8 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `player_age_range` | 17–34 game years | SQ-1 (balancing) |
 | `ability_mean_tier1` | 13 / 20 | TRN-4 (balancing) |
 | `ability_drop_per_tier` | 2 | TRN-4 (balancing) |
+| `potential_band_shares` | normal 80% / talent 15% / gem 5% | TRN-18 (balancing) |
+| `potential_band_offsets` | normal −4..+2 (two four-faced dice less 4) / talent +3..+5 / gem +6..+7, from the tier mean | TRN-18 (balancing) |
 | `weekly_wage_minor_per_ability_squared` | 300 minor units | CON-2 (balancing) |
 | `tier_scaling_factor` | 2^(tier − 1) | WORLD-4 (balancing) |
 | `opening_cash_minor_tier1` | 50,000,000 minor units | FIN-1 (balancing) |
