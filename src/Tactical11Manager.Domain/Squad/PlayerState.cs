@@ -54,6 +54,11 @@ public sealed class PlayerState
     /// </summary>
     public IReadOnlyList<int> AttributeProgress => Training.AttributeProgress.Parse(AttributeProgressJson);
 
+    /// <summary>
+    /// Gets experience, 0–10,000: earned a match at a time and never lost (see <see cref="PlayerExperience"/>).
+    /// </summary>
+    public int ExperienceBp { get; private set; }
+
     /// <summary>Gets the last day the progression job ran for this player, if it has run.</summary>
     public DateOnly? LastProgressionDate { get; private set; }
 
@@ -62,20 +67,27 @@ public sealed class PlayerState
 
     /// <summary>
     /// Opens a player's state at the start of a world: fully rested, unloaded, and neutral, with no
-    /// development carried yet.
+    /// development carried yet, and the experience his age gives him.
     /// </summary>
     /// <param name="playerId">The owning player.</param>
-    public static PlayerState Open(Guid playerId) => new()
+    /// <param name="experienceBp">The opening experience in basis points, from <see cref="PlayerExperience.StartingFor"/>.</param>
+    public static PlayerState Open(Guid playerId, int experienceBp = 0)
     {
-        PlayerId = playerId,
-        ConditionBp = WorldRuleSet.StateBasisPointsMax,
-        FatigueBp = WorldRuleSet.StateBasisPointsMin,
-        MoraleBp = NeutralBasisPoints,
-        MatchSharpnessBp = NeutralBasisPoints,
-        AttributeProgressJson = Training.AttributeProgress.EmptyJson,
-        LastProgressionDate = null,
-        Version = 1,
-    };
+        EnsureExperience(experienceBp, nameof(experienceBp));
+
+        return new PlayerState
+        {
+            PlayerId = playerId,
+            ConditionBp = WorldRuleSet.StateBasisPointsMax,
+            FatigueBp = WorldRuleSet.StateBasisPointsMin,
+            MoraleBp = NeutralBasisPoints,
+            MatchSharpnessBp = NeutralBasisPoints,
+            AttributeProgressJson = Training.AttributeProgress.EmptyJson,
+            ExperienceBp = experienceBp,
+            LastProgressionDate = null,
+            Version = 1,
+        };
+    }
 
     /// <summary>Creates a state row with explicit values. Used where a fixture has already been played.</summary>
     /// <param name="playerId">The owning player.</param>
@@ -85,6 +97,7 @@ public sealed class PlayerState
     /// <param name="matchSharpnessBp">Match sharpness in basis points.</param>
     /// <param name="lastProgressionDate">The last progression day, if any.</param>
     /// <param name="attributeProgress">Each attribute's progress towards its next point, or none (`TRN-10`).</param>
+    /// <param name="experienceBp">Experience in basis points.</param>
     public static PlayerState Create(
         Guid playerId,
         int conditionBp,
@@ -92,12 +105,14 @@ public sealed class PlayerState
         int moraleBp,
         int matchSharpnessBp,
         DateOnly? lastProgressionDate,
-        IReadOnlyList<int>? attributeProgress = null)
+        IReadOnlyList<int>? attributeProgress = null,
+        int experienceBp = 0)
     {
         EnsureBasisPoints(conditionBp, nameof(conditionBp));
         EnsureBasisPoints(fatigueBp, nameof(fatigueBp));
         EnsureBasisPoints(moraleBp, nameof(moraleBp));
         EnsureBasisPoints(matchSharpnessBp, nameof(matchSharpnessBp));
+        EnsureExperience(experienceBp, nameof(experienceBp));
 
         if (attributeProgress is not null)
         {
@@ -114,6 +129,7 @@ public sealed class PlayerState
             AttributeProgressJson = attributeProgress is null
                 ? Training.AttributeProgress.EmptyJson
                 : Training.AttributeProgress.Serialize(attributeProgress),
+            ExperienceBp = experienceBp,
             LastProgressionDate = lastProgressionDate,
             Version = 1,
         };
@@ -180,6 +196,34 @@ public sealed class PlayerState
         FatigueBp = Clamp(FatigueBp + fatigueDeltaBp);
         MoraleBp = Clamp(MoraleBp + moraleDeltaBp);
         Version++;
+    }
+
+    /// <summary>
+    /// Adds the experience a played match earned, up to the maximum.
+    /// </summary>
+    /// <remarks>
+    /// Additive like <see cref="ApplyMatchLoad"/>: the amount is decided by the pure <see cref="PlayerExperience"/>
+    /// rule and the value it is added to is the player's own current one. Experience is never lost, so a negative
+    /// amount is refused.
+    /// </remarks>
+    /// <param name="basisPoints">The experience earned, zero or more.</param>
+    public void GainExperience(int basisPoints)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(basisPoints);
+
+        ExperienceBp = Math.Min(ExperienceBp + basisPoints, PlayerExperience.MaximumBasisPoints);
+        Version++;
+    }
+
+    private static void EnsureExperience(int value, string parameterName)
+    {
+        if (value is < 0 or > PlayerExperience.MaximumBasisPoints)
+        {
+            throw new ArgumentOutOfRangeException(
+                parameterName,
+                value,
+                $"Experience is between 0 and {PlayerExperience.MaximumBasisPoints} basis points.");
+        }
     }
 
     private static int Clamp(int value) =>

@@ -424,13 +424,16 @@ public sealed class PublishMatchday
             return;
         }
 
-        var loads = MatchLoadCalculator.Calculate(
-            rows.Select(row => new MatchLoadInput(
+        var inputs = rows
+            .Select(row => new MatchLoadInput(
                 row.FixtureId,
                 row.HomeGoals,
                 row.AwayGoals,
                 MatchSnapshotDocument.Read(row.SnapshotJson).Input,
-                MatchStatisticsDocument.Read(row.StatisticsJson).PlayerLines)));
+                MatchStatisticsDocument.Read(row.StatisticsJson).PlayerLines))
+            .ToList();
+
+        var loads = MatchLoadCalculator.Calculate(inputs);
 
         var states = (await _playerStates.LoadAsync(
                 [.. loads.Select(load => load.PlayerId).Distinct()],
@@ -445,6 +448,18 @@ public sealed class PublishMatchday
                 load.ConditionDeltaBp,
                 load.FatigueDeltaBp,
                 load.MoraleDeltaBp);
+        }
+
+        // Experience is earned from the same stored lines, in the same transaction, so a round that has
+        // already been published (and returns AlreadyPublished) can never earn it twice.
+        foreach (var line in inputs.SelectMany(input => input.PlayerLines))
+        {
+            var earned = PlayerExperience.EarnedFor(line.MinutesPlayed);
+
+            if (earned > 0)
+            {
+                states[line.ParticipantId].GainExperience(earned);
+            }
         }
     }
 

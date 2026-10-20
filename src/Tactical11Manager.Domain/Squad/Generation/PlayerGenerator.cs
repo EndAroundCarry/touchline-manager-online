@@ -171,7 +171,7 @@ public static class PlayerGenerator
             squad.Add(new GeneratedSquadMember(
                 Player.Generate(playerId, request.WorldId, draft.Identity, request.Now),
                 PlayerAttributes.Create(playerId, draft.Attributes),
-                PlayerState.Open(playerId),
+                PlayerState.Open(playerId, draft.ExperienceBp),
                 PlayerContract.Sign(
                     Guid.CreateVersion7(),
                     playerId,
@@ -277,7 +277,7 @@ public static class PlayerGenerator
         return new GeneratedSquadMember(
             Player.Generate(playerId, worldId, draft.Identity, now),
             PlayerAttributes.Create(playerId, draft.Attributes),
-            PlayerState.Open(playerId),
+            PlayerState.Open(playerId, draft.ExperienceBp),
             PlayerContract.Sign(
                 Guid.CreateVersion7(),
                 playerId,
@@ -369,7 +369,8 @@ public static class PlayerGenerator
                 reputation),
             attributes,
             mean,
-            contractSeasons);
+            contractSeasons,
+            PlayerExperience.StartingFor(age));
     }
 
     private static List<PlayerPosition> SecondaryPositionsFor(
@@ -458,5 +459,6 @@ public static class PlayerGenerator
         PlayerIdentity Identity,
         PlayerAttributeSet Attributes,
         int Mean,
-        int ContractSeasons);
+        int ContractSeasons,
+        int ExperienceBp);
 }

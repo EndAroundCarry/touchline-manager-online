@@ -3075,6 +3075,12 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("development_remainder");
 
+                    b.Property<int>("ExperienceBp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("experience_bp");
+
                     b.Property<int>("FatigueBp")
                         .HasColumnType("integer")
                         .HasColumnName("fatigue_bp");
@@ -3104,6 +3110,8 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_player_state_decline_remainder", "decline_remainder >= 0");
 
                             t.HasCheckConstraint("ck_player_state_development_remainder", "development_remainder >= 0");
+
+                            t.HasCheckConstraint("ck_player_state_experience_range", "experience_bp between 0 and 10000");
                         });
                 });
 

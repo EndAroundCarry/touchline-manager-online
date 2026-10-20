@@ -191,6 +191,9 @@ internal sealed class PlayerStateConfiguration : IEntityTypeConfiguration<Player
                 "condition_bp between 0 and 10000 and fatigue_bp between 0 and 10000 "
                 + "and morale_bp between 0 and 10000 and match_sharpness_bp between 0 and 10000");
             table.HasCheckConstraint(
+                "ck_player_state_experience_range",
+                "experience_bp between 0 and 10000");
+            table.HasCheckConstraint(
                 "ck_player_state_development_remainder",
                 "development_remainder >= 0");
             table.HasCheckConstraint(
@@ -221,6 +224,10 @@ internal sealed class PlayerStateConfiguration : IEntityTypeConfiguration<Player
             .HasColumnName("attribute_progress")
             .HasColumnType("jsonb")
             .HasDefaultValueSql("'[]'::jsonb")
+            .IsRequired();
+        builder.Property(state => state.ExperienceBp)
+            .HasColumnName("experience_bp")
+            .HasDefaultValue(0)
             .IsRequired();
         builder.Property(state => state.LastProgressionDate).HasColumnName("last_progression_date");
         builder.Property(state => state.Version).HasColumnName("version").IsRequired();

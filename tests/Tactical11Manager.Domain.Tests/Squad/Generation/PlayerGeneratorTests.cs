@@ -282,6 +282,53 @@ public sealed class PlayerGeneratorTests
         PlayerNamePools.Version.Should().NotBeNullOrWhiteSpace("FIC-8");
     }
 
+    [Fact]
+    public void A_generated_player_starts_with_the_experience_his_age_gives_him()
+    {
+        const int gameYear = 2026;
+
+        var players = Enumerable.Range(0, 12)
+            .SelectMany(clubOrdinal => Generate(seed: "experience", clubOrdinal: clubOrdinal, gameYear: gameYear))
+            .ToList();
+
+        using var scope = new AssertionScope();
+
+        foreach (var member in players)
+        {
+            var age = member.Player.AgeIn(gameYear);
+
+            member.State.ExperienceBp.Should().Be(PlayerExperience.StartingFor(age), $"age {age}");
+            member.State.ExperienceBp.Should().BeLessThanOrEqualTo(PlayerExperience.StartingCapBasisPoints);
+        }
+
+        players.Where(member => member.Player.AgeIn(gameYear) <= 18)
+            .Should().OnlyContain(member => member.State.ExperienceBp == 0, "17 and 18 year olds start with none");
+        players.Select(member => member.State.ExperienceBp).Distinct().Should().HaveCountGreaterThan(5);
+    }
+
+    [Fact]
+    public void An_emergency_replacement_starts_with_the_experience_his_age_gives_him()
+    {
+        for (var ordinal = 0; ordinal < 20; ordinal++)
+        {
+            var member = PlayerGenerator.GenerateEmergencyReplacement(
+                Seed,
+                "england",
+                "ENG",
+                Guid.CreateVersion7(),
+                Guid.CreateVersion7(),
+                tier: 1,
+                Guid.CreateVersion7(),
+                seasonNumber: 1,
+                gameYear: 2026,
+                PlayerPosition.CentreBack,
+                ordinal,
+                Now);
+
+            member.State.ExperienceBp.Should().Be(PlayerExperience.StartingFor(member.Player.AgeIn(2026)));
+        }
+    }
+
     /// <summary>
     /// Pins one club's squad exactly, so an unintended change to a pool, a profile, or the draw order fails
     /// here rather than silently rewriting every world. A deliberate change is made by re-pinning, which is

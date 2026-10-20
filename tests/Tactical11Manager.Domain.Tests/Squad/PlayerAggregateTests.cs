@@ -176,6 +176,52 @@ public sealed class PlayerAggregateTests
     }
 
     [Fact]
+    public void A_state_row_opens_with_the_experience_it_is_given()
+    {
+        PlayerState.Open(Guid.CreateVersion7()).ExperienceBp.Should().Be(0);
+        PlayerState.Open(Guid.CreateVersion7(), 2_800).ExperienceBp.Should().Be(2_800);
+        PlayerState.Create(Guid.CreateVersion7(), 0, 0, 0, 0, null, null, 1_200).ExperienceBp.Should().Be(1_200);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(10_001)]
+    public void A_state_row_refuses_experience_off_its_scale(int experienceBp)
+    {
+        var open = () => PlayerState.Open(Guid.CreateVersion7(), experienceBp);
+        var create = () => PlayerState.Create(Guid.CreateVersion7(), 0, 0, 0, 0, null, null, experienceBp);
+
+        open.Should().Throw<ArgumentOutOfRangeException>();
+        create.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Gaining_experience_adds_to_it_stops_at_the_maximum_and_is_a_new_version()
+    {
+        var state = PlayerState.Open(Guid.CreateVersion7(), 9_980);
+
+        state.GainExperience(PlayerExperience.PerMatchBasisPoints);
+
+        state.ExperienceBp.Should().Be(PlayerExperience.MaximumBasisPoints, "the gain stops at the top of the scale");
+        state.Version.Should().Be(2);
+
+        state.GainExperience(PlayerExperience.PerMatchBasisPoints);
+
+        state.ExperienceBp.Should().Be(PlayerExperience.MaximumBasisPoints, "a full player stays full");
+    }
+
+    [Fact]
+    public void Experience_is_never_taken_away()
+    {
+        var state = PlayerState.Open(Guid.CreateVersion7(), 1_000);
+
+        var act = () => state.GainExperience(-50);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+        state.ExperienceBp.Should().Be(1_000);
+    }
+
+    [Fact]
     public void A_match_load_moves_condition_fatigue_and_morale_by_its_deltas()
     {
         var state = PlayerState.Create(Guid.CreateVersion7(), 9_000, 200, 5_000, 5_000, null);

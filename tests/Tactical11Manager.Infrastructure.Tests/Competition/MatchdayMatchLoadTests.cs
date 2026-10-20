@@ -5,6 +5,7 @@ using Tactical11Manager.Application.Competition;
 using Tactical11Manager.Application.Match;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Match;
+using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Infrastructure.Persistence;
 using Tactical11Manager.MatchEngine.Model;
 
@@ -124,6 +125,125 @@ public sealed class MatchdayMatchLoadTests
 
         afterSecond.Should().BeEquivalentTo(afterFirst, "a republished round must not load a player twice");
     }
+
+    [Fact]
+    public async Task Publishing_a_round_earns_experience_for_fifteen_minutes_and_nothing_below()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var round = await ClaimRoundAsync(scope);
+
+        await LockAndResolveAsync(scope, round);
+
+        var fixture = await FirstStagedFixtureAsync(db, round);
+        var content = await LoadLinesAsync(db, fixture.Id);
+        var playerIds = content.Select(line => line.ParticipantId).ToList();
+
+        var qualifying = content.Where(line => line.MinutesPlayed >= PlayerExperience.MinimumMinutes).ToList();
+        var brief = content.Where(line => line.MinutesPlayed is > 0 and < PlayerExperience.MinimumMinutes).ToList();
+        var unused = content.Where(line => line.MinutesPlayed == 0).ToList();
+
+        qualifying.Should().HaveCountGreaterThan(2, "a starter plays most of the match");
+        unused.Should().NotBeEmpty("a bench of seven cannot all be used by five substitutions");
+
+        // One player a half-point short of the maximum and one already at it: a match adds no more than the
+        // scale holds.
+        var nearlyFull = qualifying[0].ParticipantId;
+        var full = qualifying[1].ParticipantId;
+
+        // Publication runs in its own scope, as it does in production: a context that already tracks the
+        // players from the lock would write its stale copy over this change.
+        await using var publishScope = Fixture.CreateScope();
+        var publishDb = publishScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        await publishDb.PlayerStates.Where(state => state.PlayerId == nearlyFull)
+            .ExecuteUpdateAsync(set => set.SetProperty(state => state.ExperienceBp, PlayerExperience.MaximumBasisPoints - 20));
+        await publishDb.PlayerStates.Where(state => state.PlayerId == full)
+            .ExecuteUpdateAsync(set => set.SetProperty(state => state.ExperienceBp, PlayerExperience.MaximumBasisPoints));
+
+        var before = await SnapshotExperienceAsync(publishDb, playerIds);
+
+        var published = await publishScope.ServiceProvider.GetRequiredService<PublishMatchday>()
+            .ExecuteAsync(round, CancellationToken.None);
+
+        published.Outcome.Should().Be(PublishMatchdayOutcome.Published);
+
+        await using var readScope = Fixture.CreateScope();
+        var after = await SnapshotExperienceAsync(
+            readScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>(),
+            playerIds);
+
+        foreach (var line in content)
+        {
+            var expected = Math.Min(
+                before[line.ParticipantId] + PlayerExperience.EarnedFor(line.MinutesPlayed),
+                PlayerExperience.MaximumBasisPoints);
+
+            after[line.ParticipantId].Should().Be(
+                expected,
+                $"{line.MinutesPlayed} minutes earn {PlayerExperience.EarnedFor(line.MinutesPlayed)} basis points");
+        }
+
+        foreach (var line in qualifying.Where(line => line.ParticipantId != nearlyFull && line.ParticipantId != full))
+        {
+            after[line.ParticipantId].Should().Be(
+                before[line.ParticipantId] + PlayerExperience.PerMatchBasisPoints,
+                "a player on the pitch for fifteen minutes or more gains half a point");
+        }
+
+        foreach (var line in brief.Concat(unused))
+        {
+            after[line.ParticipantId].Should().Be(
+                before[line.ParticipantId],
+                "under fifteen minutes earns nothing, and an unused substitute earns nothing");
+        }
+
+        after[nearlyFull].Should().Be(PlayerExperience.MaximumBasisPoints, "the gain stops at the maximum");
+        after[full].Should().Be(PlayerExperience.MaximumBasisPoints, "a full player stays full");
+    }
+
+    [Fact]
+    public async Task Publishing_the_same_round_twice_earns_experience_once()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var round = await ClaimRoundAsync(scope);
+
+        await LockAndResolveAsync(scope, round);
+
+        var fixture = await FirstStagedFixtureAsync(db, round);
+        var playerIds = (await LoadLinesAsync(db, fixture.Id))
+            .Select(line => line.ParticipantId)
+            .ToList();
+
+        var publish = scope.ServiceProvider.GetRequiredService<PublishMatchday>();
+
+        await publish.ExecuteAsync(round, CancellationToken.None);
+
+        await using var betweenScope = Fixture.CreateScope();
+        var afterFirst = await SnapshotExperienceAsync(
+            betweenScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>(),
+            playerIds);
+
+        (await publish.ExecuteAsync(round, CancellationToken.None)).Outcome
+            .Should().Be(PublishMatchdayOutcome.AlreadyPublished);
+
+        await using var finalScope = Fixture.CreateScope();
+        var afterSecond = await SnapshotExperienceAsync(
+            finalScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>(),
+            playerIds);
+
+        afterSecond.Should().BeEquivalentTo(afterFirst, "a republished round must not earn experience twice");
+    }
+
+    /// <summary>Reads the players' experience as primitives, so a later mutation of a tracked row cannot rewrite it.</summary>
+    private static async Task<Dictionary<Guid, int>> SnapshotExperienceAsync(
+        Tactical11ManagerDbContext db,
+        IReadOnlyCollection<Guid> playerIds) =>
+        await db.PlayerStates
+            .AsNoTracking()
+            .Where(state => playerIds.Contains(state.PlayerId))
+            .ToDictionaryAsync(state => state.PlayerId, state => state.ExperienceBp);
 
     /// <summary>Asserts a player's morale moved the way their side's result implies, allowing for clamping.</summary>
     private static void AssertMoraleMovesWithTheResult(
