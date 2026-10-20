@@ -9,6 +9,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
 import { FadeEdge, fadeAlpha, fadeEdgesFor } from '../../core/match/film-fade';
 import { bannerPalette } from '../../core/match/commentary-banner';
@@ -65,6 +66,7 @@ import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigg
 import { PlayerCardService } from '../../shared/ui/player-card/player-card.service';
 import { CanvasMatchRenderer } from './renderer/canvas-match-renderer';
 import { RenderLoop } from './renderer/render-loop';
+import { NAME_LINK } from '../../shared/forms/control-styles';
 
 /** The match center's sections, in the order a manager reads them. */
 const TABS = [
@@ -134,7 +136,7 @@ interface ReplayMarker {
 @Component({
   selector: 'app-match-viewer',
   templateUrl: './match-viewer.html',
-  imports: [ClubCrest, PlayerCardTrigger],
+  imports: [RouterLink, ClubCrest, PlayerCardTrigger],
   // The viewer is drawn on dark ground in either theme, so it keeps the dark tokens (`.theme-dark`, styles.css).
   host: { class: 'theme-dark block' },
 })
@@ -169,6 +171,7 @@ export class MatchViewer implements OnDestroy {
    * for it. Until then the screen keeps the score, the scorers, the goal markers and the post-match panels
    * back, so the match is a game to watch rather than a result to be told.
    */
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly revealed = computed(() => this.reveals.isRevealed(this.matchId));
 
   protected readonly match = this.store.match;

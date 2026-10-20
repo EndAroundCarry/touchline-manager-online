@@ -274,6 +274,14 @@ export const routes: Routes = [
         canActivate: [requireAuthentication, requireVerifiedEmail],
         title: 'Player — Tactical11 Manager',
       },
+      {
+        // Any club's public page: its squad and its season, for studying a rival. A detail route like the
+        // player's, reached from a club's name wherever one is shown.
+        path: 'clubs/:id',
+        loadComponent: () => import('./features/club/club').then((m) => m.ClubPage),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Club — Tactical11 Manager',
+      },
     ],
   },
 

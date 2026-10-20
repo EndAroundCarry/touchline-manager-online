@@ -3,6 +3,7 @@ using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
+using Tactical11Manager.Domain.World;
 using MatchEventType = Tactical11Manager.Domain.Match.MatchEventType;
 
 namespace Tactical11Manager.Infrastructure.Persistence.Repositories;
@@ -106,6 +107,91 @@ internal sealed class SquadQueries : ISquadQueries
     }
 
     /// <inheritdoc />
+    public async Task<ClubOverviewSnapshot?> GetClubOverviewAsync(
+        Guid clubId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return null;
+        }
+
+        var club = await (
+            from candidate in _dbContext.Clubs
+            join country in _dbContext.Countries on candidate.CountryId equals country.Id
+            where candidate.Id == clubId
+            select new { Club = candidate, Country = country })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (club is null)
+        {
+            return null;
+        }
+
+        var division = await (
+            from entry in _dbContext.ClubSeasonEntries
+            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            join candidate in _dbContext.Divisions on divisionSeason.DivisionId equals candidate.Id
+            where entry.ClubId == clubId && divisionSeason.SeasonId == season.SeasonId
+            select new { candidate.Id, candidate.DisplayName, candidate.TierNumber })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var rows = await (
+            from contract in _dbContext.PlayerContracts
+            join player in _dbContext.Players on contract.PlayerId equals player.Id
+            join state in _dbContext.PlayerStates on player.Id equals state.PlayerId
+            join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
+            where contract.ClubId == clubId && contract.Status == ContractStatus.Active
+            orderby player.FullName
+            select new { Player = player, State = state, Attributes = attributes })
+            .Take(WorldRuleSet.SquadMaximumRegistered)
+            .ToListAsync(cancellationToken);
+
+        var players = rows
+            .Select(row => new ClubOverviewPlayerRow(
+                row.Player.Id,
+                row.Player.FullName,
+                row.Player.ShortName,
+                row.Player.NationalityCode,
+                row.Player.BirthGameYear,
+                row.Player.PreferredFoot,
+                row.Player.PrimaryPosition,
+                row.Player.SecondaryPositions,
+                row.State.ExperienceBp,
+                row.Attributes.ToSet()))
+            // Goalkeepers first and then by position, as the private squad is ordered.
+            .OrderBy(player => (int)player.PrimaryPosition)
+            .ThenBy(player => player.FullName, StringComparer.Ordinal)
+            .ToList();
+
+        return new ClubOverviewSnapshot(
+            ToSummary(club.Club),
+            club.Club.City,
+            club.Club.Region,
+            club.Country.Code,
+            club.Club.FoundingGameYear,
+            division?.Id,
+            division?.DisplayName,
+            division?.TierNumber,
+            season.SequenceNumber,
+            season.GameYear,
+            players);
+    }
+
+    private static ClubSummaryRow ToSummary(Club club) =>
+        new(
+            club.Id,
+            club.Name,
+            club.ShortName,
+            club.BadgeSeed,
+            club.PrimaryColour,
+            club.SecondaryColour,
+            club.CrestShape,
+            club.CrestPattern);
+
+    /// <inheritdoc />
     public async Task<PlayerSnapshot?> GetPlayerAsync(Guid playerId, CancellationToken cancellationToken)
     {
         var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
@@ -122,6 +208,7 @@ internal sealed class SquadQueries : ISquadQueries
             join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
             join state in _dbContext.PlayerStates on player.Id equals state.PlayerId
             join contract in _dbContext.PlayerContracts on player.Id equals contract.PlayerId
+            join club in _dbContext.Clubs on contract.ClubId equals club.Id
             where player.Id == playerId && contract.Status == ContractStatus.Active
             select new
             {
@@ -129,6 +216,7 @@ internal sealed class SquadQueries : ISquadQueries
                 Attributes = attributes,
                 State = state,
                 Contract = contract,
+                Club = club,
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -266,6 +354,7 @@ internal sealed class SquadQueries : ISquadQueries
         return new PlayerSnapshot(
             row.Player.Id,
             row.Contract.ClubId,
+            ToSummary(row.Club),
             row.Player.FullName,
             row.Player.ShortName,
             row.Player.NationalityCode,

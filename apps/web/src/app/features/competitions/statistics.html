@@ -74,10 +74,17 @@
             @for (row of competition.rows; track row.playerId + row.clubId) {
               <tr class="border-b border-line-soft last:border-b-0">
                 <th scope="row" class="px-3 py-2 text-left font-medium">
-                  <span [appPlayerCard]="row.playerId">{{ row.playerName }}</span>
+                  <a
+                    [routerLink]="['/players', row.playerId]"
+                    [appPlayerCard]="row.playerId"
+                    [class]="nameLinkClass"
+                    >{{ row.playerName }}</a
+                  >
                 </th>
                 <td class="px-3 py-2 text-left">
-                  <abbr [title]="row.clubName">{{ row.clubShortName }}</abbr>
+                  <a [routerLink]="['/clubs', row.clubId]" [class]="nameLinkClass"
+                    ><abbr [title]="row.clubName">{{ row.clubShortName }}</abbr></a
+                  >
                 </td>
                 <td class="px-3 py-2 text-right tabular-nums">{{ row.appearances }}</td>
                 <td class="px-3 py-2 text-right tabular-nums">{{ row.starts }}</td>

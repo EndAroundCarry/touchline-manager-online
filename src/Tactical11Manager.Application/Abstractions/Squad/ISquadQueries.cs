@@ -225,6 +225,73 @@ public sealed record SquadPlayerRow(
     IReadOnlyList<SquadAvailabilityRow> Availability,
     PlayerAttributeSet Attributes);
 
+/// <summary>A club as stored: its name and the kit its players wear, before the generated defaults are applied.</summary>
+/// <param name="Id">The club identity.</param>
+/// <param name="Name">The generated club name.</param>
+/// <param name="ShortName">The abbreviation.</param>
+/// <param name="BadgeSeed">The seed the generated crest and kit are derived from.</param>
+/// <param name="PrimaryColour">The primary kit colour the manager chose, or null for the generated one.</param>
+/// <param name="SecondaryColour">The secondary kit colour the manager chose, or null for the generated one.</param>
+/// <param name="CrestShape">The crest shape the manager chose, or null for the generated one.</param>
+/// <param name="CrestPattern">The crest pattern the manager chose, or null for the generated one.</param>
+public sealed record ClubSummaryRow(
+    Guid Id,
+    string Name,
+    string ShortName,
+    string BadgeSeed,
+    string? PrimaryColour,
+    string? SecondaryColour,
+    string? CrestShape,
+    string? CrestPattern);
+
+/// <summary>One player on another club's public squad: the public half of <see cref="SquadPlayerRow"/>.</summary>
+/// <param name="Id">The player identity.</param>
+/// <param name="FullName">The generated full name.</param>
+/// <param name="ShortName">The abbreviation.</param>
+/// <param name="NationalityCode">The nationality country code.</param>
+/// <param name="BirthGameYear">The game year the player was born in.</param>
+/// <param name="PreferredFoot">The foot the player favours.</param>
+/// <param name="PrimaryPosition">The player's position.</param>
+/// <param name="SecondaryPositions">The other positions the player covers.</param>
+/// <param name="ExperienceBp">Experience in basis points of the maximum.</param>
+/// <param name="Attributes">The player's displayed attributes.</param>
+public sealed record ClubOverviewPlayerRow(
+    Guid Id,
+    string FullName,
+    string ShortName,
+    string NationalityCode,
+    int BirthGameYear,
+    PreferredFoot PreferredFoot,
+    PlayerPosition PrimaryPosition,
+    IReadOnlyList<PlayerPosition> SecondaryPositions,
+    int ExperienceBp,
+    PlayerAttributeSet Attributes);
+
+/// <summary>Everything a club's public page reads.</summary>
+/// <param name="Club">The club's name and kit.</param>
+/// <param name="City">The generated home city.</param>
+/// <param name="Region">The generated region.</param>
+/// <param name="CountryCode">The club's country code.</param>
+/// <param name="FoundingGameYear">The game year the club was founded.</param>
+/// <param name="DivisionId">The division the club plays in this season, or null when it has none.</param>
+/// <param name="DivisionName">The division's name.</param>
+/// <param name="TierNumber">The division's tier number.</param>
+/// <param name="SeasonNumber">The season the squad is read against.</param>
+/// <param name="GameYear">The season's game year, which is what fixes each player's age.</param>
+/// <param name="Players">The players, goalkeepers first.</param>
+public sealed record ClubOverviewSnapshot(
+    ClubSummaryRow Club,
+    string City,
+    string Region,
+    string CountryCode,
+    int FoundingGameYear,
+    Guid? DivisionId,
+    string? DivisionName,
+    int? TierNumber,
+    int SeasonNumber,
+    int GameYear,
+    IReadOnlyList<ClubOverviewPlayerRow> Players);
+
 /// <summary>Everything the squad screen reads (master plan §10.3).</summary>
 /// <param name="ClubId">The club.</param>
 /// <param name="ClubName">The generated club name.</param>
@@ -283,6 +350,7 @@ public sealed record ContractsSnapshot(
 /// <summary>Everything the player profile reads (master plan §10.3, §11.1).</summary>
 /// <param name="Id">The player identity.</param>
 /// <param name="ClubId">The club the player is registered to, which is what the ownership check is made against.</param>
+/// <param name="Club">The club's name and kit.</param>
 /// <param name="FullName">The generated full name.</param>
 /// <param name="ShortName">The abbreviation.</param>
 /// <param name="NationalityCode">The nationality country code.</param>
@@ -306,6 +374,7 @@ public sealed record ContractsSnapshot(
 public sealed record PlayerSnapshot(
     Guid Id,
     Guid ClubId,
+    ClubSummaryRow Club,
     string FullName,
     string ShortName,
     string NationalityCode,
@@ -384,6 +453,11 @@ public interface ISquadQueries
     /// <param name="clubId">The club to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<SquadSnapshot?> GetSquadAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>Reads a club's public page: its details and its players' public attributes, or null if the club is unknown.</summary>
+    /// <param name="clubId">The club to read.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<ClubOverviewSnapshot?> GetClubOverviewAsync(Guid clubId, CancellationToken cancellationToken);
 
     /// <summary>Reads one player's profile, or returns null if the player is unknown.</summary>
     /// <param name="playerId">The player to read.</param>

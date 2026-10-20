@@ -97,6 +97,16 @@ const matches = {
 const player: Player = {
   id: 'player-1',
   clubId: 'club-1',
+  club: {
+    id: 'club-1',
+    name: 'Ashvale United',
+    shortName: 'ASH',
+    primaryColour: '#b11f2a',
+    secondaryColour: '#f3efe6',
+    crestShape: 'round',
+    crestPattern: 'stripes',
+  },
+  isOwnClub: true,
   fullName: 'Alaric Alderwick',
   shortName: 'A. Alderwick',
   nationalityCode: 'ENG',
@@ -561,5 +571,69 @@ describe('PlayerProfile', () => {
     expect(panel.textContent).toContain('a week');
     expect(button.disabled).toBe(true);
     expect(panel.textContent).toContain('coming soon');
+  });
+  describe('another club’s player', () => {
+    const rival: Player = {
+      ...player,
+      clubId: 'club-9',
+      club: {
+        id: 'club-9',
+        name: 'Vale Rovers',
+        shortName: 'VAL',
+        primaryColour: '#1f4e79',
+        secondaryColour: '#d6e4f0',
+        crestShape: 'shield',
+        crestPattern: 'bands',
+      },
+      isOwnClub: false,
+      state: null,
+      contract: null,
+      registration: null,
+      availability: [],
+      attributeProgress: {},
+    };
+
+    beforeEach(async () => {
+      playerState.set(rival);
+      await fixture.whenStable();
+    });
+
+    it('offers only the attributes and the statistics, never the training or the contract', () => {
+      const tabs = Array.from(root.querySelectorAll<HTMLElement>('[role="tab"]'));
+
+      expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(['Attributes', 'Statistics']);
+      expect(root.querySelector('app-player-training')).toBeNull();
+    });
+
+    it('keeps the club’s state out of the page and dresses the portrait in the player’s own club’s shirt', () => {
+      const portrait = root.querySelector<HTMLElement>('[data-testid="player-portrait"]')!;
+
+      expect(root.querySelector('#player-state-heading')).toBeNull();
+      expect(portrait.querySelector('path[fill="#1f4e79"]')).not.toBeNull();
+      expect(portrait.querySelector('path[fill="#b11f2a"]')).toBeNull();
+    });
+
+    it('names the club with a link to its page, and goes back there rather than to the squad', () => {
+      const links = Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).map((a) => [
+        a.textContent?.trim(),
+        a.getAttribute('href'),
+      ]);
+
+      expect(links).toContainEqual(['Back to Vale Rovers', '/clubs/club-9']);
+      expect(links).toContainEqual(['Vale Rovers', '/clubs/club-9']);
+      expect(links.some(([, href]) => href === '/squad')).toBe(false);
+    });
+
+    it('still shows the statistics, with the opponent of each match linked to its page', async () => {
+      await openTab('Statistics');
+
+      expect(root.querySelector('[data-testid="season-stats"]')).not.toBeNull();
+
+      const opponent = Array.from(
+        root.querySelectorAll<HTMLAnchorElement>('[data-testid="match-stats"] a'),
+      ).find((a) => a.textContent?.trim() === 'Vale Rovers');
+
+      expect(opponent?.getAttribute('href')).toBe('/clubs/club-2');
+    });
   });
 });

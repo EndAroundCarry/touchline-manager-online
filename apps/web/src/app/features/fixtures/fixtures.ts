@@ -16,6 +16,7 @@ import { formatDeadline, formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
   LINK_ACTION,
+  NAME_LINK,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -71,6 +72,7 @@ export class Fixtures implements OnDestroy {
   );
 
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;

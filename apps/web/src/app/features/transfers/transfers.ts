@@ -1,10 +1,12 @@
 import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { SquadStore } from '../../core/squad/squad-store';
 import { TransfersStore } from '../../core/transfers/transfers-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
+  NAME_LINK,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -21,7 +23,7 @@ import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigg
  */
 @Component({
   selector: 'app-transfers',
-  imports: [PlayerCardTrigger],
+  imports: [RouterLink, PlayerCardTrigger],
   templateUrl: './transfers.html',
 })
 export class Transfers {
@@ -45,6 +47,7 @@ export class Transfers {
   protected readonly canMutate = this.maintenance.canMutate;
 
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly textInputClass = TEXT_INPUT;

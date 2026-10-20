@@ -44,6 +44,14 @@ export const DESTRUCTIVE_BUTTON = `${TOUCH_TARGET} inline-flex items-center just
 export const LINK = 'font-medium text-accent underline underline-offset-2 hover:text-accent-strong';
 
 /**
+ * The name of a player or a club, wherever one is listed: it takes the colour of the text around it and a faint dotted
+ * underline, and turns into the link it is when the pointer or the keyboard reaches it. Plain {@link LINK} would turn
+ * a dense table blue and solidly underlined.
+ */
+export const NAME_LINK =
+  'rounded-sm underline decoration-dotted decoration-ink-2/50 underline-offset-2 hover:text-accent-strong hover:decoration-solid focus:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+
+/**
  * A link used as a row or card action rather than inside prose, so it needs the same touch target as
  * a button. {@link LINK} stays bare for links within a sentence.
  */

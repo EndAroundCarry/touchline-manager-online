@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import {
+  ClubOverview,
   ContractList,
   ContractRenewal,
   Player,
@@ -27,7 +28,12 @@ export class SquadApi {
     return this.api.get<Squad>(`/clubs/${clubId}/squad`);
   }
 
-  /** Reads one player's profile. */
+  /** Reads any club's public page: its details and its players' public attributes. */
+  club(clubId: string): Observable<ClubOverview> {
+    return this.api.get<ClubOverview>(`/clubs/${clubId}`);
+  }
+
+  /** Reads one player's profile: the whole of it for the caller's own player, the public half for any other. */
   player(playerId: string): Observable<Player> {
     return this.api.get<Player>(`/players/${playerId}`);
   }

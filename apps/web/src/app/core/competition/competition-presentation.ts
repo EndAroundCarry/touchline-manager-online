@@ -185,6 +185,7 @@ export function lockCountdown(lockAt: string, now: Date): string {
 export interface LeaderboardEntry {
   readonly playerId: string;
   readonly playerName: string;
+  readonly clubId: string;
   readonly clubName: string;
   readonly clubShortName: string;
   readonly value: number;
@@ -205,6 +206,7 @@ export function leaderboard(
     .map((row) => ({
       playerId: row.playerId,
       playerName: row.playerName,
+      clubId: row.clubId,
       clubName: row.clubName,
       clubShortName: row.clubShortName,
       value: value(row),

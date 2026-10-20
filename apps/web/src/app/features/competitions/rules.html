@@ -78,7 +78,9 @@
               @for (club of divisionRules.clubs; track club.clubId) {
                 <tr class="border-b border-line-soft last:border-b-0">
                   <th scope="row" class="px-3 py-2 text-left font-medium">
-                    <abbr [title]="club.clubName">{{ club.clubShortName }}</abbr>
+                    <a [routerLink]="['/clubs', club.clubId]" [class]="nameLinkClass"
+                      ><abbr [title]="club.clubName">{{ club.clubShortName }}</abbr></a
+                    >
                   </th>
                   <td class="break-all px-3 py-2 text-left font-mono text-xs">
                     {{ club.drawKey }}

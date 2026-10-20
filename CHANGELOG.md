@@ -4,6 +4,13 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Club and player pages for every club
+
+- Every player name in the web app is a link to that player's profile, and every club name a link to a new club page (`/clubs/:id`): the squad (exact attributes averaged for each player's position, experience, never condition or contracts) and the season's results and fixtures read from that club's side, each played match with a Watch link and each opponent a link in turn.
+- A player of another club opens the public profile: the Attributes and Statistics tabs, the club with a link to its page, and the portrait in that club's shirt. The state, contract, registration, injuries, attribute progress and the Training tab stay with the owning manager and are absent from the response, not just hidden. Match-by-match statistics are public like the division's.
+- A result of the manager's own that they have not seen yet stays behind the result gate on a rival's page.
+- API: `GET /clubs/{id}` and `GET /clubs/{id}/fixtures` (public); `GET /players/{id}` and `/matches` no longer refuse another club's player (`PlayerResponse` gains `club` and `isOwnClub`, `state` is null on another club's player). The player and club name links are not on the tactics pitch, where a click selects the player.
+
 ## Player experience plan - five levels, up to +5% on the played skills
 
 - Experience is 0 to 100 points per player (basis points, `PlayerState.ExperienceBp`): half a point for every match of 15 minutes or more, earned at matchday publication with the match load; five levels at 20, 40, 60, 80 and 100 points; level n is +n% on the skills the tick engine plays with. Players start by age (0 at 17-18, 4 points a year, 50 at 30+), generated and backfilled by migration.

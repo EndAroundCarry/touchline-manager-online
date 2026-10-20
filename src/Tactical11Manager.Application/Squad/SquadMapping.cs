@@ -4,6 +4,8 @@ using Tactical11Manager.Contracts.Squad;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Training;
+using Tactical11Manager.Domain.World;
+using Tactical11Manager.MatchEngine.Highlights;
 
 namespace Tactical11Manager.Application.Squad;
 
@@ -364,15 +366,26 @@ public static class SquadMapping
     }
 
     /// <summary>Projects one player's profile.</summary>
+    /// <remarks>
+    /// The caller's own player gets everything. Any other club's player gets the public half: the attributes,
+    /// the biography and the statistics, without the state, the contract, the registration, the open
+    /// injuries and suspensions, or the progress towards the next point, which are the owning club's.
+    /// </remarks>
     /// <param name="player">The stored profile.</param>
+    /// <param name="isOwnClub">Whether the caller manages the player's club.</param>
     /// <param name="serverTime">When the response was produced.</param>
-    public static PlayerResponse ToResponse(this PlayerSnapshot player, DateTimeOffset serverTime)
+    public static PlayerResponse ToResponse(
+        this PlayerSnapshot player,
+        bool isOwnClub,
+        DateTimeOffset serverTime)
     {
         ArgumentNullException.ThrowIfNull(player);
 
         return new PlayerResponse(
             player.Id,
             player.ClubId,
+            player.Club.ToClubResponse(),
+            isOwnClub,
             player.FullName,
             player.ShortName,
             player.NationalityCode,
@@ -385,14 +398,76 @@ public static class SquadMapping
             [.. player.SecondaryPositions.Select(position => position.ToCode())],
             player.Status.ToCode(),
             player.Attributes.ToResponse(),
-            player.State.AttributeProgress.ToProgressResponse(),
-            player.State.ToResponse(),
+            isOwnClub ? player.State.AttributeProgress.ToProgressResponse() : new Dictionary<string, decimal>(),
+            isOwnClub ? player.State.ToResponse() : null,
             ToExperienceResponse(player.State.ExperienceBp),
-            player.Contract?.ToSummary(player.SeasonNumber),
-            player.Registration?.ToResponse(),
-            [.. player.Availability.Select(record => record.ToResponse())],
+            isOwnClub ? player.Contract?.ToSummary(player.SeasonNumber) : null,
+            isOwnClub ? player.Registration?.ToResponse() : null,
+            isOwnClub ? [.. player.Availability.Select(record => record.ToResponse())] : [],
             player.SeasonStat?.ToResponse(),
             player.Career?.ToResponse(),
+            serverTime);
+    }
+
+    /// <summary>Projects a club's name and kit, resolving the generated defaults a manager has not replaced.</summary>
+    /// <param name="club">The stored club.</param>
+    public static PlayerClubResponse ToClubResponse(this ClubSummaryRow club)
+    {
+        ArgumentNullException.ThrowIfNull(club);
+
+        var colours = ClubPalette.Resolve(club.Id, club.PrimaryColour, club.SecondaryColour);
+
+        return new PlayerClubResponse(
+            club.Id,
+            club.Name,
+            club.ShortName,
+            colours.Primary,
+            colours.Secondary,
+            CrestDesigns.ResolveShape(club.BadgeSeed, club.CrestShape),
+            CrestDesigns.ResolvePattern(club.BadgeSeed, club.CrestPattern));
+    }
+
+    /// <summary>Projects a club's public page.</summary>
+    /// <param name="overview">The stored page.</param>
+    /// <param name="isOwnClub">Whether the caller manages the club.</param>
+    /// <param name="serverTime">When the response was produced.</param>
+    public static ClubOverviewResponse ToResponse(
+        this ClubOverviewSnapshot overview,
+        bool isOwnClub,
+        DateTimeOffset serverTime)
+    {
+        ArgumentNullException.ThrowIfNull(overview);
+
+        var club = overview.Club.ToClubResponse();
+
+        return new ClubOverviewResponse(
+            club.Id,
+            club.Name,
+            club.ShortName,
+            overview.City,
+            overview.Region,
+            overview.CountryCode,
+            overview.FoundingGameYear,
+            club.PrimaryColour,
+            club.SecondaryColour,
+            club.CrestShape,
+            club.CrestPattern,
+            overview.DivisionId,
+            overview.DivisionName,
+            overview.TierNumber,
+            isOwnClub,
+            overview.SeasonNumber,
+            [.. overview.Players.Select(player => new ClubPlayerResponse(
+                player.Id,
+                player.FullName,
+                player.ShortName,
+                player.NationalityCode,
+                AgeIn(player.BirthGameYear, overview.GameYear),
+                player.PreferredFoot.ToCode(),
+                player.PrimaryPosition.ToCode(),
+                [.. player.SecondaryPositions.Select(position => position.ToCode())],
+                player.Attributes.ToResponse(),
+                ToExperienceResponse(player.ExperienceBp)))],
             serverTime);
     }
 

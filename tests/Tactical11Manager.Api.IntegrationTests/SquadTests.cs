@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tactical11Manager.Application.World;
+using Tactical11Manager.Contracts.Competition;
 using Tactical11Manager.Contracts.Squad;
 using Tactical11Manager.Contracts.World;
 using Tactical11Manager.Domain.Rules;
@@ -180,7 +181,10 @@ public sealed class SquadTests : IAsyncLifetime
         // Every attribute is on the displayed scale, and the state values are the converted ones (TRN-4,
         // TRN-8).
         AttributeValues(player.Attributes).Should().OnlyContain(value => value >= 1 && value <= 20, "TRN-4");
-        player.State.Condition.Should().BeInRange(0, 100);
+        player.IsOwnClub.Should().BeTrue();
+        player.Club.Id.Should().Be(clubId);
+        player.State.Should().NotBeNull();
+        player.State!.Condition.Should().BeInRange(0, 100);
         player.State.MatchSharpness.Should().BeInRange(0, 100);
 
         // A seeded player starts with the age rule's experience, at most half the maximum, and the response
@@ -203,22 +207,84 @@ public sealed class SquadTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Another_club_s_player_is_refused_by_name()
+    public async Task Another_club_s_player_is_read_without_the_club_s_private_state()
     {
         using var client = CreateClient();
         var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
 
         client.WithBearer(manager.AccessToken);
 
-        await OnboardAsync(client);
+        var ownClubId = await OnboardAsync(client);
 
         var (_, otherClubId) = await FirstAvailableClubAsync(client);
         var otherPlayerId = await FirstPlayerOfClubAsync(otherClubId);
 
         var response = await client.GetAsync($"/api/v1/players/{otherPlayerId}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await CodeAsync(response)).Should().Be(SquadErrorCodes.ClubNotManaged, "§15.4: the other-club case");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var player = (await response.Content.ReadFromJsonAsync<PlayerResponse>())!;
+
+        player.Id.Should().Be(otherPlayerId);
+        player.ClubId.Should().Be(otherClubId);
+        player.ClubId.Should().NotBe(ownClubId);
+        player.IsOwnClub.Should().BeFalse();
+        player.Club.Id.Should().Be(otherClubId);
+        player.Club.Name.Should().NotBeNullOrWhiteSpace();
+        player.Attributes.Technical.Should().NotBeNull("attributes are public (SCT-1)");
+
+        // What the owning club keeps to itself is absent, not merely hidden by the screen.
+        player.State.Should().BeNull();
+        player.Contract.Should().BeNull();
+        player.Registration.Should().BeNull();
+        player.Availability.Should().BeEmpty();
+        player.AttributeProgress.Should().BeEmpty();
+
+        var matches = await client.GetAsync($"/api/v1/players/{otherPlayerId}/matches");
+
+        matches.StatusCode.Should().Be(HttpStatusCode.OK, "match statistics are public, like the division's");
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task Another_club_s_page_lists_its_public_squad()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        var ownClubId = await OnboardAsync(client);
+        var (_, otherClubId) = await FirstAvailableClubAsync(client);
+
+        var own = (await client.GetFromJsonAsync<ClubOverviewResponse>($"/api/v1/clubs/{ownClubId}"))!;
+        var other = (await client.GetFromJsonAsync<ClubOverviewResponse>($"/api/v1/clubs/{otherClubId}"))!;
+
+        own.IsOwnClub.Should().BeTrue();
+        other.IsOwnClub.Should().BeFalse();
+        other.ClubId.Should().Be(otherClubId);
+        other.Name.Should().NotBeNullOrWhiteSpace();
+        other.PrimaryColour.Should().MatchRegex("^#[0-9a-f]{6}$");
+        other.DivisionId.Should().NotBeNull();
+        other.Players.Should().HaveCount(WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+        other.Players.Select(player => player.Id).Should().OnlyHaveUniqueItems();
+        other.Players[0].PrimaryPosition.Should().Be(PlayerPositions.GoalkeeperCode);
+
+        // Only the public half crosses the wire: nothing about condition, morale or the contract.
+        var raw = await client.GetStringAsync($"/api/v1/clubs/{otherClubId}");
+
+        PropertyNames(JsonDocument.Parse(raw).RootElement)
+            .Should().NotContain(["state", "contract", "weeklyWageMinor", "morale", "potential", "reputation"]);
+
+        var fixtures = (await client.GetFromJsonAsync<MyFixturesResponse>($"/api/v1/clubs/{otherClubId}/fixtures"))!;
+
+        fixtures.ClubId.Should().Be(otherClubId);
+        fixtures.Fixtures.Should().NotBeEmpty();
+
+        var unknown = await client.GetAsync($"/api/v1/clubs/{Guid.CreateVersion7()}");
+
+        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         await client.PostAsync("/api/v1/club-tenure/resign", content: null);
     }

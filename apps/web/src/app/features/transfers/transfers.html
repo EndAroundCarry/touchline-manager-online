@@ -94,9 +94,18 @@
             @for (listing of listings(); track listing.listingId) {
               <tr>
                 <td class="px-3 py-2 text-ink">
-                  <span [appPlayerCard]="listing.playerId">{{ listing.playerName }}</span>
+                  <a
+                    [routerLink]="['/players', listing.playerId]"
+                    [appPlayerCard]="listing.playerId"
+                    [class]="nameLinkClass"
+                    >{{ listing.playerName }}</a
+                  >
                 </td>
-                <td class="px-3 py-2 text-ink-2">{{ listing.sellerClubName }}</td>
+                <td class="px-3 py-2 text-ink-2">
+                  <a [routerLink]="['/clubs', listing.sellerClubId]" [class]="nameLinkClass">{{
+                    listing.sellerClubName
+                  }}</a>
+                </td>
                 <td class="px-3 py-2 text-right text-ink-2">
                   {{ funds(listing.minimumFeeMinor) }}
                 </td>
@@ -142,9 +151,18 @@
         @for (listing of listings(); track listing.listingId) {
           <li class="rounded border border-line bg-panel p-3">
             <h3 class="text-sm font-semibold text-ink">
-              <span [appPlayerCard]="listing.playerId">{{ listing.playerName }}</span>
+              <a
+                [routerLink]="['/players', listing.playerId]"
+                [appPlayerCard]="listing.playerId"
+                [class]="nameLinkClass"
+                >{{ listing.playerName }}</a
+              >
             </h3>
-            <p class="text-sm text-ink-2">{{ listing.sellerClubName }}</p>
+            <p class="text-sm text-ink-2">
+              <a [routerLink]="['/clubs', listing.sellerClubId]" [class]="nameLinkClass">{{
+                listing.sellerClubName
+              }}</a>
+            </p>
             <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
               <div class="flex justify-between gap-2">
                 <dt class="text-muted">Minimum</dt>
@@ -216,7 +234,12 @@
             <li class="flex items-center justify-between gap-3">
               <div>
                 <p class="text-sm font-medium text-ink">
-                  <span [appPlayerCard]="listing.playerId">{{ listing.playerName }}</span>
+                  <a
+                    [routerLink]="['/players', listing.playerId]"
+                    [appPlayerCard]="listing.playerId"
+                    [class]="nameLinkClass"
+                    >{{ listing.playerName }}</a
+                  >
                 </p>
                 <p class="text-sm text-ink-2">
                   {{ listing.status }} &middot; minimum
@@ -249,7 +272,12 @@
           @for (bid of myBids(); track bid.listingId) {
             <li>
               <p class="text-sm font-medium text-ink">
-                <span [appPlayerCard]="bid.playerId">{{ bid.playerName }}</span>
+                <a
+                  [routerLink]="['/players', bid.playerId]"
+                  [appPlayerCard]="bid.playerId"
+                  [class]="nameLinkClass"
+                  >{{ bid.playerName }}</a
+                >
               </p>
               <p class="text-sm text-ink-2">
                 {{ funds(bid.amountMinor) }} &middot; {{ bid.status }} &middot; closes
@@ -286,10 +314,23 @@
             @for (entry of history(); track entry.listingId) {
               <tr>
                 <td class="px-3 py-2 text-ink">
-                  <span [appPlayerCard]="entry.playerId">{{ entry.playerName }}</span>
+                  <a
+                    [routerLink]="['/players', entry.playerId]"
+                    [appPlayerCard]="entry.playerId"
+                    [class]="nameLinkClass"
+                    >{{ entry.playerName }}</a
+                  >
                 </td>
-                <td class="px-3 py-2 text-ink-2">{{ entry.sellerClubName }}</td>
-                <td class="px-3 py-2 text-ink-2">{{ entry.buyerClubName }}</td>
+                <td class="px-3 py-2 text-ink-2">
+                  <a [routerLink]="['/clubs', entry.sellerClubId]" [class]="nameLinkClass">{{
+                    entry.sellerClubName
+                  }}</a>
+                </td>
+                <td class="px-3 py-2 text-ink-2">
+                  <a [routerLink]="['/clubs', entry.buyerClubId]" [class]="nameLinkClass">{{
+                    entry.buyerClubName
+                  }}</a>
+                </td>
                 <td class="px-3 py-2 text-right font-medium text-ink">
                   {{ funds(entry.feeMinor) }}
                 </td>

@@ -34,9 +34,12 @@
         <div class="flex items-center justify-center gap-6">
           <div class="flex min-w-[140px] items-center justify-end gap-2">
             <div class="flex flex-col items-end">
-              <span class="text-lg font-bold tracking-wide text-slate-100">{{
-                result.home.name
-              }}</span>
+              <a
+                [routerLink]="['/clubs', result.home.clubId]"
+                [class]="nameLinkClass"
+                class="text-lg font-bold tracking-wide text-slate-100"
+                >{{ result.home.name }}</a
+              >
               <span class="text-xs text-slate-400">{{ result.home.shortName }}</span>
             </div>
             <!-- The club's crest, in the two colours the pitch draws it in; a swatch until the lineup loads. -->
@@ -121,9 +124,12 @@
               </span>
             }
             <div class="flex flex-col items-start">
-              <span class="text-lg font-bold tracking-wide text-slate-100">{{
-                result.away.name
-              }}</span>
+              <a
+                [routerLink]="['/clubs', result.away.clubId]"
+                [class]="nameLinkClass"
+                class="text-lg font-bold tracking-wide text-slate-100"
+                >{{ result.away.name }}</a
+              >
               <span class="text-xs text-slate-400">{{ result.away.shortName }}</span>
             </div>
           </div>
@@ -343,7 +349,12 @@
                                 >
                               </td>
                               <td class="truncate px-1 py-1 font-medium text-slate-200">
-                                <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
+                                <a
+                                  [routerLink]="['/players', player.playerId]"
+                                  [appPlayerCard]="player.playerId"
+                                  [class]="nameLinkClass"
+                                  >{{ player.name }}</a
+                                >
                                 @if (yellowShown(player)) {
                                   <span class="ml-1 text-yellow-400" aria-label="Yellow card"
                                     >Y</span
@@ -404,10 +415,12 @@
                               <span class="w-4 text-right tabular-nums text-slate-400">{{
                                 player.shirtNumber
                               }}</span>
-                              <span
+                              <a
                                 class="truncate font-medium"
+                                [routerLink]="['/players', player.playerId]"
                                 [appPlayerCard]="player.playerId"
-                                >{{ player.name }}</span
+                                [class]="nameLinkClass"
+                                >{{ player.name }}</a
                               >
                               @if (subbedInShown(player)) {
                                 <span class="ml-auto text-[9px] text-emerald-600"
@@ -620,7 +633,12 @@
                                     >Y</span
                                   >
                                 }
-                                <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
+                                <a
+                                  [routerLink]="['/players', player.playerId]"
+                                  [appPlayerCard]="player.playerId"
+                                  [class]="nameLinkClass"
+                                  >{{ player.name }}</a
+                                >
                               </td>
                               <td class="px-1 py-1">
                                 <span
@@ -647,10 +665,12 @@
                               <span class="w-4 text-left tabular-nums text-slate-400">{{
                                 player.shirtNumber
                               }}</span>
-                              <span
+                              <a
                                 class="truncate font-medium"
+                                [routerLink]="['/players', player.playerId]"
                                 [appPlayerCard]="player.playerId"
-                                >{{ player.name }}</span
+                                [class]="nameLinkClass"
+                                >{{ player.name }}</a
                               >
                               @if (subbedInShown(player)) {
                                 <span class="mr-auto text-[9px] text-emerald-600"
@@ -972,7 +992,12 @@
                             {{ player.shirtNumber }}
                           </td>
                           <td class="py-1.5 font-medium text-slate-200">
-                            <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
+                            <a
+                              [routerLink]="['/players', player.playerId]"
+                              [appPlayerCard]="player.playerId"
+                              [class]="nameLinkClass"
+                              >{{ player.name }}</a
+                            >
                             @if (!player.isStarter && player.subbedInMinute !== null) {
                               <span class="text-[9px] text-emerald-600" data-testid="sub-on"
                                 >{{ player.subbedInMinute }}'&#8593;</span
@@ -1080,7 +1105,12 @@
                               {{ player.shirtNumber }}
                             </td>
                             <td class="py-1.5 font-medium text-slate-200">
-                              <span [appPlayerCard]="player.playerId">{{ player.name }}</span>
+                              <a
+                                [routerLink]="['/players', player.playerId]"
+                                [appPlayerCard]="player.playerId"
+                                [class]="nameLinkClass"
+                                >{{ player.name }}</a
+                              >
                               @if (!player.isStarter && player.subbedInMinute !== null) {
                                 <span class="text-[9px] text-emerald-600" data-testid="sub-on"
                                   >{{ player.subbedInMinute }}'&#8593;</span

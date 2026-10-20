@@ -1195,6 +1195,8 @@ POST   /api/v1/contracts/{contractId}/renew
 
 Squad response is bounded to 25 players; client-side table sorting is acceptable. Global player search is server-side.
 
+`GET /clubs/{clubId}` is any club's public page (details, kit, division and its players' exact attributes, never condition or contracts), and `GET /clubs/{clubId}/fixtures` is any club's season read from its own side (section 10.5). `GET /players/{playerId}` and `/matches` answer for a player of any club: the owning manager reads the whole profile, every other manager reads the public half (attributes, biography, statistics) with the state, contract, registration, injuries and attribute progress left out of the response. The web names every club and player as a link to these pages.
+
 ### 10.4 Tactics, team sheets, training
 
 ```text

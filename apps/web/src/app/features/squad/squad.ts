@@ -23,6 +23,7 @@ import {
   CHECKBOX_ROW,
   FORM_ERROR,
   LINK_ACTION,
+  NAME_LINK,
   PAGE_HEADING,
   SECONDARY_BUTTON,
   TEXT_INPUT,
@@ -97,6 +98,7 @@ export class Squad {
   );
 
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly linkClass = LINK_ACTION;

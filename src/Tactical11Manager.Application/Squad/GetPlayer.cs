@@ -20,9 +20,10 @@ public sealed record GetPlayerResult(SquadReadOutcome Outcome, PlayerResponse? P
 /// data (`data-classification.md` §1).
 /// </para>
 /// <para>
-/// Attribute values are exact and public (`SCT-1`), but condition and contract terms are club state, so
-/// the profile as a whole is still the owning manager's read. The public, unattached player profile is
-/// Stage 10's scouting surface.
+/// Attribute values are exact and public (`SCT-1`), but condition and contract terms are club state. So the
+/// owning manager reads the whole profile, and every other manager reads the public half: the attributes,
+/// the biography and the statistics. The state, contract, registration and injuries are left out of that
+/// response rather than hidden by the client.
 /// </para>
 /// </remarks>
 public sealed class GetPlayer
@@ -57,8 +58,15 @@ public sealed class GetPlayer
 
         var access = await _access.ExecuteAsync(userId, player.ClubId, cancellationToken);
 
-        return access.Outcome == ClubAccessOutcome.Granted
-            ? new GetPlayerResult(SquadReadOutcome.Found, player.ToResponse(_clock.UtcNow))
-            : new GetPlayerResult(access.Outcome.ToReadOutcome(), null);
+        return access.Outcome switch
+        {
+            ClubAccessOutcome.Granted => new GetPlayerResult(
+                SquadReadOutcome.Found,
+                player.ToResponse(isOwnClub: true, _clock.UtcNow)),
+            ClubAccessOutcome.ClubNotManaged => new GetPlayerResult(
+                SquadReadOutcome.Found,
+                player.ToResponse(isOwnClub: false, _clock.UtcNow)),
+            _ => new GetPlayerResult(access.Outcome.ToReadOutcome(), null),
+        };
     }
 }

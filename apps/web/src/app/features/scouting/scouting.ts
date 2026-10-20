@@ -1,10 +1,12 @@
 import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ScoutingStore, PLAYER_SORTS } from '../../core/scouting/scouting-store';
 import { PlayerSearchResult, PlayerSort } from '../../core/scouting/scouting.models';
 import { PlayerAttributes } from '../../core/squad/squad.models';
 import { formatInstant } from '../../core/world/presentation';
 import {
   FORM_ERROR,
+  NAME_LINK,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -23,7 +25,7 @@ const POSITION_FAMILIES = ['Goalkeeper', 'Defence', 'Midfield', 'Attack'] as con
  */
 @Component({
   selector: 'app-scouting',
-  imports: [PlayerCardTrigger],
+  imports: [RouterLink, PlayerCardTrigger],
   templateUrl: './scouting.html',
 })
 export class Scouting {
@@ -40,6 +42,7 @@ export class Scouting {
   protected readonly families = POSITION_FAMILIES;
 
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly textInputClass = TEXT_INPUT;

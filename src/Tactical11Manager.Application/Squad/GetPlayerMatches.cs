@@ -13,8 +13,9 @@ public sealed record GetPlayerMatchesResult(SquadReadOutcome Outcome, PlayerMatc
 /// Reads a player's match-by-match statistics (master plan §11.1; `STA-2`).
 /// </summary>
 /// <remarks>
-/// Authorized exactly like the profile: the player's own club is the one the caller must manage. The rows come
-/// from the stored results the season statistics are summed from, so they add up to the season line.
+/// Open to any manager who holds a club, like the division's statistics it adds up to: another club's player has
+/// public results. The rows come from the stored results the season statistics are summed from, so they add up to
+/// the season line.
 /// </remarks>
 public sealed class GetPlayerMatches
 {
@@ -48,7 +49,7 @@ public sealed class GetPlayerMatches
 
         var access = await _access.ExecuteAsync(userId, player.ClubId, cancellationToken);
 
-        if (access.Outcome != ClubAccessOutcome.Granted)
+        if (access.Outcome is not (ClubAccessOutcome.Granted or ClubAccessOutcome.ClubNotManaged))
         {
             return new GetPlayerMatchesResult(access.Outcome.ToReadOutcome(), null);
         }

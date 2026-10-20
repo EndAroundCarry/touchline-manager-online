@@ -18,9 +18,9 @@ import {
   stateRows,
 } from '../../core/squad/squad-presentation';
 import { SquadStore } from '../../core/squad/squad-store';
-import { OnboardingStore } from '../../core/world/onboarding-store';
 import { formatFunds, formatInstant } from '../../core/world/presentation';
 import { AttributeValue } from '../../shared/ui/attribute-value/attribute-value';
+import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
 import { ExperienceLevel } from '../../shared/ui/experience-level/experience-level';
 import { PlayerPortrait } from '../../shared/ui/player-portrait/player-portrait';
 import { FALLBACK_KIT, PortraitKit } from '../../shared/ui/player-portrait/portrait-designs';
@@ -28,6 +28,7 @@ import { PlayerTraining } from './player-training/player-training';
 import {
   FORM_ERROR,
   LINK,
+  NAME_LINK,
   PAGE_HEADING,
   SECONDARY_BUTTON,
   SELECT_INPUT,
@@ -36,6 +37,9 @@ import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 
 /** The profile's tabs. */
 export type PlayerTab = 'attributes' | 'training' | 'statistics' | 'contract';
+
+/** The tabs another club's player shows. */
+const PUBLIC_TABS: readonly PlayerTab[] = ['attributes', 'statistics'];
 
 /** The statistics drop-down's value for the season in progress. */
 const CURRENT_SEASON = 'current';
@@ -58,6 +62,7 @@ const CURRENT_SEASON = 'current';
   imports: [
     RouterLink,
     AttributeValue,
+    ClubCrest,
     ExperienceLevel,
     PlayerPortrait,
     PlayerTraining,
@@ -71,7 +76,6 @@ export class PlayerProfile implements OnInit {
 
   private readonly store = inject(SquadStore);
   private readonly gate = inject(ResultGate);
-  private readonly onboarding = inject(OnboardingStore);
 
   protected readonly player = this.store.player;
 
@@ -90,32 +94,31 @@ export class PlayerProfile implements OnInit {
     return player === null ? [] : attributeGroups(player.attributes, player.attributeProgress);
   });
 
-  /**
-   * The shirt the portrait wears: the club's two colours and crest. The profile only opens for the manager's own
-   * players, so that is the club the manager holds; anything else wears a plain fallback kit.
-   */
+  /** The shirt the portrait wears: the colours and crest of the club the player belongs to. */
   protected readonly kit = computed<PortraitKit>(() => {
-    const tenure = this.onboarding.state()?.tenure;
-    const player = this.player();
+    const club = this.player()?.club;
 
-    return tenure === undefined ||
-      tenure === null ||
-      player === null ||
-      tenure.clubId !== player.clubId
+    return club === undefined
       ? FALLBACK_KIT
       : {
-          primary: tenure.primaryColour,
-          secondary: tenure.secondaryColour,
-          crestShape: tenure.crestShape,
-          crestPattern: tenure.crestPattern,
+          primary: club.primaryColour,
+          secondary: club.secondaryColour,
+          crestShape: club.crestShape,
+          crestPattern: club.crestPattern,
         };
   });
 
+  /**
+   * Whether the player is the manager's own. Another club's player shows the public half only: the attributes and
+   * the statistics, never the state, the contract or the training, which are that club's to see.
+   */
+  protected readonly isOwn = computed(() => this.player()?.isOwnClub ?? false);
+
   /** The four state measures with their bands resolved. */
   protected readonly stateMeasures = computed(() => {
-    const player = this.player();
+    const state = this.player()?.state;
 
-    return player === null ? [] : stateRows(player.state);
+    return state === null || state === undefined ? [] : stateRows(state);
   });
 
   /** Whether the player is a goalkeeper, whose statistics are the saves he made rather than the tackles and shots. */
@@ -137,6 +140,7 @@ export class PlayerProfile implements OnInit {
     this.careerSeasons().map((season) => ({
       key: `${season.seasonNumber}-${season.clubId}`,
       season: season.seasonLabel,
+      clubId: season.clubId,
       club: season.clubName,
       cells: statCells(season.stats, this.statColumns()),
     })),
@@ -161,13 +165,18 @@ export class PlayerProfile implements OnInit {
     return career === null || career === undefined ? '' : seasonsPlayedLabel(career.seasonsPlayed);
   });
 
-  /** The tabs, in the order they are shown. Attributes is the default (F-17). */
-  protected readonly tabs: readonly { readonly key: PlayerTab; readonly label: string }[] = [
+  /** Every tab, in the order they are shown. Attributes is the default (F-17). */
+  private readonly allTabs: readonly { readonly key: PlayerTab; readonly label: string }[] = [
     { key: 'attributes', label: 'Attributes' },
     { key: 'training', label: 'Training' },
     { key: 'statistics', label: 'Statistics' },
     { key: 'contract', label: 'Contract' },
   ];
+
+  /** The tabs this viewer may open: all four on their own player, the attributes and the statistics on any other. */
+  protected readonly tabs = computed(() =>
+    this.isOwn() ? this.allTabs : this.allTabs.filter((tab) => PUBLIC_TABS.includes(tab.key)),
+  );
 
   /** The tab currently open. */
   protected readonly activeTab = signal<PlayerTab>('attributes');
@@ -223,6 +232,7 @@ export class PlayerProfile implements OnInit {
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly selectClass = SELECT_INPUT;
   protected readonly linkClass = LINK;
+  protected readonly nameLinkClass = NAME_LINK;
 
   /** Reads the profile for the player the route names. */
   ngOnInit(): void {
@@ -299,12 +309,13 @@ export class PlayerProfile implements OnInit {
 
   /** Moves between tabs with the arrow keys, Home and End, as the tabs pattern expects. */
   protected onTabKeydown(event: KeyboardEvent, index: number): void {
-    const last = this.tabs.length - 1;
+    const tabs = this.tabs();
+    const last = tabs.length - 1;
     const target =
       event.key === 'ArrowRight'
-        ? (index + 1) % this.tabs.length
+        ? (index + 1) % tabs.length
         : event.key === 'ArrowLeft'
-          ? (index + last) % this.tabs.length
+          ? (index + last) % tabs.length
           : event.key === 'Home'
             ? 0
             : event.key === 'End'
@@ -316,8 +327,8 @@ export class PlayerProfile implements OnInit {
     }
 
     event.preventDefault();
-    this.selectTab(this.tabs[target].key);
-    (document.getElementById(`player-tab-${this.tabs[target].key}`) as HTMLElement | null)?.focus();
+    this.selectTab(tabs[target].key);
+    (document.getElementById(`player-tab-${tabs[target].key}`) as HTMLElement | null)?.focus();
   }
 
   /** Chooses the season whose statistics are shown. */

@@ -32,6 +32,11 @@ export class CompetitionApi {
     return this.api.get<MyFixtures>('/fixtures/mine');
   }
 
+  /** Reads any club's fixtures for the season in progress, played and still to play. */
+  clubFixtures(clubId: string): Observable<MyFixtures> {
+    return this.api.get<MyFixtures>(`/clubs/${clubId}/fixtures`);
+  }
+
   /** Reads one fixture in full. */
   fixture(fixtureId: string): Observable<FixtureDetail> {
     return this.api.get<FixtureDetail>(`/fixtures/${fixtureId}`);

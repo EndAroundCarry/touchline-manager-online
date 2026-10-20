@@ -3,7 +3,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { suspensionRemainingLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { formatInstant } from '../../core/world/presentation';
-import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/control-styles';
+import {
+  FORM_ERROR,
+  NAME_LINK,
+  PAGE_HEADING,
+  STATUS_MESSAGE,
+} from '../../shared/forms/control-styles';
 import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /**
@@ -41,6 +46,7 @@ export class CompetitionDiscipline {
   });
 
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
 

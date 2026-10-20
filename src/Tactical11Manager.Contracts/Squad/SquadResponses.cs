@@ -158,6 +158,12 @@ public sealed record PlayerRegistrationResponse(
 /// </summary>
 /// <param name="Id">The player identity.</param>
 /// <param name="ClubId">The club the player is registered to.</param>
+/// <param name="Club">The club's name and kit, so the profile can name it, link to it, and dress the portrait in its shirt.</param>
+/// <param name="IsOwnClub">
+/// Whether the caller manages the player's club. When false the profile is the public view: the attributes,
+/// the statistics and the biography, with the state, contract, registration, availability and attribute
+/// progress left out, because those are the owning club's.
+/// </param>
 /// <param name="FullName">The generated full name.</param>
 /// <param name="ShortName">The abbreviation shown in lineups.</param>
 /// <param name="NationalityCode">The nationality country code.</param>
@@ -175,11 +181,11 @@ public sealed record PlayerRegistrationResponse(
 /// positive is progress towards a gain, negative towards a loss. Attributes with no progress are left out
 /// (`TRN-10`).
 /// </param>
-/// <param name="State">Condition, fatigue, morale, and sharpness.</param>
+/// <param name="State">Condition, fatigue, morale, and sharpness, or null on another club's player.</param>
 /// <param name="Experience">Experience points, level, and the skill bonus the level gives in matches.</param>
-/// <param name="Contract">The active contract, or null if the player has none.</param>
-/// <param name="Registration">The active registration, or null if the player has none.</param>
-/// <param name="Availability">Every open injury and suspension, if any.</param>
+/// <param name="Contract">The active contract, or null if the player has none or the caller does not manage the club.</param>
+/// <param name="Registration">The active registration, or null if the player has none or the caller does not manage the club.</param>
+/// <param name="Availability">Every open injury and suspension, if any; empty on another club's player.</param>
 /// <param name="SeasonStats">
 /// The player's own season statistics for the club they play for, or null before they have appeared
 /// (`STA-2`). Read from the publication's projection, so it agrees with the division leaderboard.
@@ -192,6 +198,8 @@ public sealed record PlayerRegistrationResponse(
 public sealed record PlayerResponse(
     Guid Id,
     Guid ClubId,
+    PlayerClubResponse Club,
+    bool IsOwnClub,
     string FullName,
     string ShortName,
     string NationalityCode,
@@ -205,7 +213,7 @@ public sealed record PlayerResponse(
     string Status,
     PlayerAttributesResponse Attributes,
     IReadOnlyDictionary<string, decimal> AttributeProgress,
-    PlayerStateResponse State,
+    PlayerStateResponse? State,
     PlayerExperienceResponse Experience,
     PlayerContractSummaryResponse? Contract,
     PlayerRegistrationResponse? Registration,
@@ -213,6 +221,23 @@ public sealed record PlayerResponse(
     PlayerSeasonStatsResponse? SeasonStats,
     PlayerCareerStatsResponse? CareerStats,
     DateTimeOffset ServerTime);
+
+/// <summary>A club as another screen names it: its identity, its name, and the kit its players wear.</summary>
+/// <param name="Id">The club identity.</param>
+/// <param name="Name">The generated club name.</param>
+/// <param name="ShortName">The abbreviation.</param>
+/// <param name="PrimaryColour">The main kit colour as <c>#rrggbb</c>: the one chosen, or the generated one.</param>
+/// <param name="SecondaryColour">The second kit colour as <c>#rrggbb</c>.</param>
+/// <param name="CrestShape">The code of the crest shape.</param>
+/// <param name="CrestPattern">The code of the stripes on the crest.</param>
+public sealed record PlayerClubResponse(
+    Guid Id,
+    string Name,
+    string ShortName,
+    string PrimaryColour,
+    string SecondaryColour,
+    string CrestShape,
+    string CrestPattern);
 
 /// <summary>
 /// A player's own season statistics for the season in progress (`STA-2`, master plan §11.1).

@@ -157,12 +157,20 @@
                       [primary]="next.opponentPrimaryColour"
                       [secondary]="next.opponentSecondaryColour"
                     />
-                    <span class="text-xs leading-tight text-ink-2">{{ next.opponentName }}</span>
+                    <a
+                      [routerLink]="['/clubs', next.opponentClubId]"
+                      [class]="nameLinkClass"
+                      class="text-xs leading-tight text-ink-2"
+                      >{{ next.opponentName }}</a
+                    >
                   </div>
                 </div>
 
                 <p class="mt-2 text-center font-display text-xl font-semibold">
-                  {{ venue(next.venue) }} v {{ next.opponentName }}
+                  {{ venue(next.venue) }} v
+                  <a [routerLink]="['/clubs', next.opponentClubId]" [class]="nameLinkClass">{{
+                    next.opponentName
+                  }}</a>
                 </p>
                 <p class="text-center text-sm text-ink-2">{{ instant(next.kickoffAt) }}</p>
                 <p class="mt-1 text-center text-sm font-medium" role="status">
@@ -435,9 +443,13 @@
                 <ul>
                   @for (bid of shownBids(); track bid.listingId) {
                     <li class="flex justify-between gap-2">
-                      <span class="truncate" [appPlayerCard]="bid.playerId">{{
-                        bid.playerName
-                      }}</span>
+                      <a
+                        class="truncate"
+                        [routerLink]="['/players', bid.playerId]"
+                        [appPlayerCard]="bid.playerId"
+                        [class]="nameLinkClass"
+                        >{{ bid.playerName }}</a
+                      >
                       <span class="shrink-0 text-muted">{{ funds(bid.amountMinor) }}</span>
                     </li>
                   }

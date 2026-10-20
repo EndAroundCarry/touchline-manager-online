@@ -3,7 +3,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { tieBreakerLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { formatInstant } from '../../core/world/presentation';
-import { FORM_ERROR, PAGE_HEADING, STATUS_MESSAGE } from '../../shared/forms/control-styles';
+import {
+  FORM_ERROR,
+  NAME_LINK,
+  PAGE_HEADING,
+  STATUS_MESSAGE,
+} from '../../shared/forms/control-styles';
 
 /**
  * The competition rules screen (master plan §10.5, `TBL-1`…`TBL-11`).
@@ -31,6 +36,7 @@ export class CompetitionRules {
   protected readonly loadError = this.store.rulesError;
 
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
 

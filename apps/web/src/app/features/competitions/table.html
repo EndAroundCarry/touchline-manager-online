@@ -103,7 +103,12 @@
                     {{ row.rank }}
                   </td>
                   <th scope="row" class="px-2 py-[3px] fit:py-0 text-left font-medium">
-                    <span [class.font-semibold]="isManaged(row.clubId)">{{ row.clubName }}</span>
+                    <a
+                      [routerLink]="['/clubs', row.clubId]"
+                      [class]="nameLinkClass"
+                      [class.font-semibold]="isManaged(row.clubId)"
+                      >{{ row.clubName }}</a
+                    >
                     @if (isManaged(row.clubId)) {
                       <span class="ml-1.5 text-xs font-normal text-ink-2">(your club)</span>
                     }
@@ -173,15 +178,22 @@
                           </td>
                           <th scope="row" class="px-2 py-[2px] text-left font-medium">
                             <span class="flex items-baseline gap-1">
-                              <span class="truncate" [appPlayerCard]="entry.playerId">{{
-                                entry.playerName
-                              }}</span>
-                              <abbr
-                                [title]="entry.clubName"
-                                class="hidden shrink-0 font-normal text-muted no-underline @[17rem]:inline"
+                              <a
+                                class="truncate"
+                                [routerLink]="['/players', entry.playerId]"
+                                [appPlayerCard]="entry.playerId"
+                                [class]="nameLinkClass"
+                                >{{ entry.playerName }}</a
                               >
-                                {{ entry.clubShortName }}
-                              </abbr>
+                              <a
+                                [routerLink]="['/clubs', entry.clubId]"
+                                [class]="nameLinkClass"
+                                class="hidden shrink-0 font-normal text-muted @[17rem]:inline"
+                              >
+                                <abbr [title]="entry.clubName" class="no-underline">{{
+                                  entry.clubShortName
+                                }}</abbr>
+                              </a>
                             </span>
                           </th>
                           <td class="w-12 py-[2px] pl-1 pr-3 text-right font-semibold tabular-nums">

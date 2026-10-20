@@ -43,9 +43,15 @@ internal static class SquadEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/clubs/{clubId:guid}", GetClubOverviewAsync)
+            .WithName("GetClubOverview")
+            .WithSummary("Reads any club's public page: its details and its players' public attributes.")
+            .Produces<ClubOverviewResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/players/{playerId:guid}", GetPlayerAsync)
             .WithName("GetPlayer")
-            .WithSummary("Reads one player's profile, including the displayed attribute grid.")
+            .WithSummary("Reads one player's profile: the whole of it for your own player, the public half for any other.")
             .Produces<PlayerResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -100,6 +106,24 @@ internal static class SquadEndpoints
 
         return result.Outcome == SquadReadOutcome.Found
             ? Results.Ok(result.Squad)
+            : Refusal(result.Outcome);
+    }
+
+    private static async Task<IResult> GetClubOverviewAsync(
+        HttpContext httpContext,
+        Guid clubId,
+        GetClubOverview query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, clubId, cancellationToken);
+
+        return result.Outcome == SquadReadOutcome.Found
+            ? Results.Ok(result.Club)
             : Refusal(result.Outcome);
     }
 

@@ -123,12 +123,25 @@
               @for (player of results(); track player.playerId) {
                 <tr>
                   <td class="px-3 py-2 text-ink">
-                    <span [appPlayerCard]="player.playerId">{{ player.fullName }}</span>
+                    <a
+                      [routerLink]="['/players', player.playerId]"
+                      [appPlayerCard]="player.playerId"
+                      [class]="nameLinkClass"
+                      >{{ player.fullName }}</a
+                    >
                     <span class="text-muted">({{ player.shortName }})</span>
                   </td>
                   <td class="px-3 py-2 text-ink-2">{{ player.primaryPosition }}</td>
                   <td class="px-3 py-2 text-right text-ink-2">{{ player.age }}</td>
-                  <td class="px-3 py-2 text-ink-2">{{ player.clubName ?? 'Unattached' }}</td>
+                  <td class="px-3 py-2 text-ink-2">
+                    @if (player.clubId; as clubId) {
+                      <a [routerLink]="['/clubs', clubId]" [class]="nameLinkClass">{{
+                        player.clubName
+                      }}</a>
+                    } @else {
+                      Unattached
+                    }
+                  </td>
                   <td class="px-3 py-2 text-right font-medium text-ink">
                     {{ abilityOf(player) }}
                   </td>
@@ -169,14 +182,25 @@
             <li class="rounded border border-line bg-panel p-3">
               <div class="flex flex-wrap items-baseline justify-between gap-x-2">
                 <h3 class="text-sm font-semibold text-ink">
-                  <span [appPlayerCard]="player.playerId">{{ player.fullName }}</span>
+                  <a
+                    [routerLink]="['/players', player.playerId]"
+                    [appPlayerCard]="player.playerId"
+                    [class]="nameLinkClass"
+                    >{{ player.fullName }}</a
+                  >
                   <span class="font-normal text-muted">({{ player.shortName }})</span>
                 </h3>
                 <span class="text-xs text-muted">Ability {{ abilityOf(player) }}</span>
               </div>
               <p class="mt-1 text-sm text-ink-2">
                 {{ player.primaryPosition }} · age {{ player.age }} ·
-                {{ player.clubName ?? 'Unattached' }}
+                @if (player.clubId; as clubId) {
+                  <a [routerLink]="['/clubs', clubId]" [class]="nameLinkClass">{{
+                    player.clubName
+                  }}</a>
+                } @else {
+                  Unattached
+                }
               </p>
               <p class="mt-1 text-sm text-ink-2">
                 {{ player.isListed ? 'Listed for transfer' : 'Not listed' }}
@@ -230,7 +254,12 @@
             <li class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-sm font-medium text-ink">
-                  <span [appPlayerCard]="entry.playerId">{{ entry.playerName }}</span>
+                  <a
+                    [routerLink]="['/players', entry.playerId]"
+                    [appPlayerCard]="entry.playerId"
+                    [class]="nameLinkClass"
+                    >{{ entry.playerName }}</a
+                  >
                 </p>
                 <p class="text-sm text-ink-2">
                   {{ entry.primaryPosition }} &middot; age {{ entry.age }}

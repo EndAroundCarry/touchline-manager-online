@@ -121,6 +121,44 @@ export interface SquadPlayer {
   readonly attributes: PlayerAttributes;
 }
 
+/** One player on a club's public page: who they are and how good they are. */
+export interface ClubPlayer {
+  readonly id: string;
+  readonly fullName: string;
+  readonly shortName: string;
+  readonly nationalityCode: string;
+  readonly age: number;
+  readonly preferredFoot: string;
+  readonly primaryPosition: string;
+  readonly secondaryPositions: readonly string[];
+  readonly attributes: PlayerAttributes;
+  readonly experience: PlayerExperience;
+}
+
+/** Any club's public page: its details and its players' public attributes. */
+export interface ClubOverview {
+  readonly clubId: string;
+  readonly name: string;
+  readonly shortName: string;
+  readonly city: string;
+  readonly region: string;
+  readonly countryCode: string;
+  readonly foundingGameYear: number;
+  readonly primaryColour: string;
+  readonly secondaryColour: string;
+  readonly crestShape: string;
+  readonly crestPattern: string;
+  readonly divisionId: string | null;
+  readonly divisionName: string | null;
+  readonly tierNumber: number | null;
+
+  /** Whether the caller manages this club. */
+  readonly isOwnClub: boolean;
+  readonly seasonNumber: number;
+  readonly players: readonly ClubPlayer[];
+  readonly serverTime: string;
+}
+
 /** The squad's size and legality, so the screen can warn without recomputing (`SQ-2`, `SQ-9`). */
 export interface SquadSummary {
   readonly playerCount: number;
@@ -237,10 +275,28 @@ export interface PlayerCareerStats {
   readonly seasons: readonly PlayerCareerSeason[];
 }
 
-/** A player's full profile: the attribute grid plus the state and contract around it. */
+/** A club as another screen names it: its identity, its name and the kit its players wear. */
+export interface PlayerClub {
+  readonly id: string;
+  readonly name: string;
+  readonly shortName: string;
+  readonly primaryColour: string;
+  readonly secondaryColour: string;
+  readonly crestShape: string;
+  readonly crestPattern: string;
+}
+
+/**
+ * A player's profile: the attribute grid and the statistics, plus the state and contract around them when the
+ * player is the caller's own. Another club's player carries the public half only (`isOwnClub` false).
+ */
 export interface Player {
   readonly id: string;
   readonly clubId: string;
+  readonly club: PlayerClub;
+
+  /** Whether the caller manages the player's club. */
+  readonly isOwnClub: boolean;
   readonly fullName: string;
   readonly shortName: string;
   readonly nationalityCode: string;
@@ -259,7 +315,8 @@ export interface Player {
    * positive towards a gain, negative towards a loss. An attribute with no progress is left out (`TRN-10`).
    */
   readonly attributeProgress: Readonly<Record<string, number>>;
-  readonly state: PlayerState;
+  /** Condition, fatigue, morale and sharpness; null on another club's player. */
+  readonly state: PlayerState | null;
   readonly experience: PlayerExperience;
   readonly contract: PlayerContractSummary | null;
   readonly registration: PlayerRegistrationSummary | null;

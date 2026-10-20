@@ -338,6 +338,7 @@ public static class DependencyInjection
         services.AddScoped<GetSquad>();
         services.AddScoped<GetPlayer>();
         services.AddScoped<GetPlayerMatches>();
+        services.AddScoped<GetClubOverview>();
         services.AddScoped<ListContracts>();
         services.AddScoped<GetTactics>();
         services.AddScoped<SaveTacticalPlan>();
@@ -380,6 +381,7 @@ public static class DependencyInjection
     {
         services.AddScoped<ListDivisionFixtures>();
         services.AddScoped<GetMyFixtures>();
+        services.AddScoped<GetClubFixtures>();
         services.AddScoped<GetFixture>();
         services.AddScoped<GetDivisionTable>();
         services.AddScoped<GetDivisionStatistics>();

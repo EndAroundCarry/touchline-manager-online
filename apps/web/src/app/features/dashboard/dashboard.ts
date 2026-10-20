@@ -26,6 +26,7 @@ import {
   DESTRUCTIVE_BUTTON,
   FORM_ERROR,
   LINK,
+  NAME_LINK,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -194,6 +195,7 @@ export class Dashboard {
   );
 
   protected readonly pageHeadingClass = PAGE_HEADING;
+  protected readonly nameLinkClass = NAME_LINK;
   protected readonly primaryButtonClass = PRIMARY_BUTTON;
   protected readonly secondaryButtonClass = SECONDARY_BUTTON;
   protected readonly destructiveButtonClass = DESTRUCTIVE_BUTTON;
