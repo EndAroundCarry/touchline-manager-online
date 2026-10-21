@@ -71,4 +71,11 @@ internal static class RateLimitPolicies
     /// Partitioned by manager, like <see cref="MarketListing"/>.
     /// </summary>
     public const string MarketBid = "market-bid";
+
+    /// <summary>
+    /// Applied to the commands that send a direct message — starting a conversation and replying — so one
+    /// manager cannot flood another (`COM-14`). Both share one allowance per manager, which is what "starts
+    /// and replies together" means.
+    /// </summary>
+    public const string DirectMessage = "direct-message";
 }

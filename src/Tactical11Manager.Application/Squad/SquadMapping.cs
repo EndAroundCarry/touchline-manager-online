@@ -430,10 +430,12 @@ public static class SquadMapping
     /// <summary>Projects a club's public page.</summary>
     /// <param name="overview">The stored page.</param>
     /// <param name="isOwnClub">Whether the caller manages the club.</param>
+    /// <param name="managerName">The display name of the club's manager, or null when the game runs it.</param>
     /// <param name="serverTime">When the response was produced.</param>
     public static ClubOverviewResponse ToResponse(
         this ClubOverviewSnapshot overview,
         bool isOwnClub,
+        string? managerName,
         DateTimeOffset serverTime)
     {
         ArgumentNullException.ThrowIfNull(overview);
@@ -456,6 +458,7 @@ public static class SquadMapping
             overview.DivisionName,
             overview.TierNumber,
             isOwnClub,
+            managerName,
             overview.SeasonNumber,
             [.. overview.Players.Select(player => new ClubPlayerResponse(
                 player.Id,

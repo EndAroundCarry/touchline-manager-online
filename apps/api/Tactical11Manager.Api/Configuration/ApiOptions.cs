@@ -134,4 +134,13 @@ public sealed class RateLimitingOptions
 
     /// <summary>Gets or sets the length of the market rate-limit window in seconds.</summary>
     public int MarketWindowSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Gets or sets the direct messages one manager may send per window, starts and replies together
+    /// (`COM-14`, `dm_sends_per_hour`).
+    /// </summary>
+    public int DirectMessagePermitLimit { get; set; } = 30;
+
+    /// <summary>Gets or sets the length of the direct-message rate-limit window in seconds.</summary>
+    public int DirectMessageWindowSeconds { get; set; } = 3600;
 }

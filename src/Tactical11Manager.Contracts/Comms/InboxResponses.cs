@@ -65,8 +65,12 @@ public sealed record InboxResponse(
 /// (master plan §13, `F-51`).
 /// </param>
 /// <param name="ReadOnlyMessage">The operator's stated reason while read-only, otherwise null.</param>
+/// <param name="UnreadDirectMessageCount">
+/// How many direct messages from other managers are unread (`COM-16`), kept apart from the game's own.
+/// </param>
 public sealed record SyncResponse(
     DateTimeOffset ServerTime,
     int UnreadInboxCount,
     bool ReadOnly,
-    string? ReadOnlyMessage);
+    string? ReadOnlyMessage,
+    int UnreadDirectMessageCount = 0);

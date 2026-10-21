@@ -220,6 +220,15 @@ public static class DependencyInjection
         services.AddScoped<MarkInboxMessagesRead>();
         services.AddScoped<GetSync>();
 
+        // Direct messages between managers (`COM-10` to `COM-16`).
+        services.AddScoped<StartConversation>();
+        services.AddScoped<ReplyToConversation>();
+        services.AddScoped<GetConversations>();
+        services.AddScoped<GetConversation>();
+        services.AddScoped<MarkConversationRead>();
+        services.AddScoped<BlockManager>();
+        services.AddScoped<UnblockManager>();
+
         // The news feed (COM-1): the writer the provisioning, market, and matchday workflows compose, and the
         // read the client's screen uses.
         services.AddScoped<PostNews>();

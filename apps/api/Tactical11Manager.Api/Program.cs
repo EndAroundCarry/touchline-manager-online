@@ -148,6 +148,19 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(
         RateLimitPolicies.MarketBid,
         httpContext => MarketLimit(httpContext, rateLimits, rateLimits.MarketBidPermitLimit));
+
+    // A message is limited per manager over an hour, not per minute, so the window is its own (`COM-14`).
+    options.AddPolicy(
+        RateLimitPolicies.DirectMessage,
+        httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: AuthenticatedPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimits.DirectMessagePermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimits.DirectMessageWindowSeconds),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
 });
 
 // ---------------------------------------------------------------------------------------------

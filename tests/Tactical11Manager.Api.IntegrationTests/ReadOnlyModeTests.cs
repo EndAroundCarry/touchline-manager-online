@@ -92,6 +92,42 @@ public sealed class ReadOnlyModeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Direct_message_commands_are_refused_while_read_only_but_reading_them_still_works()
+    {
+        using var operatorClient = _fixture.Factory.CreateClient();
+        var op = await MfaScenario.CreateOperatorAsync(_fixture, operatorClient);
+        operatorClient.WithBearer(op.AccessToken);
+
+        (await SetFlagAsync(operatorClient, MfaScenario.Code(op.Secret), enabled: true, Reason))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var managerClient = _fixture.Factory.CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, managerClient);
+        managerClient.WithBearer(manager.AccessToken);
+
+        var id = Guid.CreateVersion7();
+
+        var start = await managerClient.PostAsJsonAsync(
+            "/api/v1/conversations",
+            new StartConversationRequest(id, "Hello", "Hello"));
+        var reply = await managerClient.PostAsJsonAsync(
+            $"/api/v1/conversations/{id}/messages",
+            new SendDirectMessageRequest("Hello"));
+        var read = await managerClient.PostAsync($"/api/v1/conversations/{id}/read", content: null);
+        var block = await managerClient.PutAsync($"/api/v1/blocked-managers/{id}", content: null);
+
+        foreach (var response in new[] { start, reply, read, block })
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, "COM-10 commands join the read-only gate (F-51)");
+            (await MfaScenario.ErrorCodeAsync(response)).Should().Be(ApiErrorCodes.ReadOnlyMode);
+        }
+
+        // Reading the list is not a command; this account has no profile, so it is refused by name, not gated.
+        (await managerClient.GetAsync("/api/v1/conversations")).StatusCode
+            .Should().NotBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
     public async Task An_anonymous_command_is_refused_by_authentication_first()
     {
         using var client = _fixture.Factory.CreateClient();

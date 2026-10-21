@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Tactical11Manager.Api.Auth;
 using Tactical11Manager.Api.Endpoints;
 using Tactical11Manager.Api.Http;
@@ -21,6 +22,11 @@ namespace Tactical11Manager.Api.Comms;
 /// <para>
 /// The recipient is resolved from the account and never named by the request, so a manager can only read and
 /// mark their own messages (`INT-1`, §10.9).
+/// </para>
+/// <para>
+/// Direct messages between managers sit beside the inbox at <c>/conversations</c> and <c>/blocked-managers</c>
+/// (`COM-10` to `COM-16`). Nothing is pushed: a new message reaches the other side through the unread count on
+/// <c>/sync</c>. The two commands that send are limited per manager (`COM-14`).
 /// </para>
 /// </remarks>
 internal static class CommsEndpoints
@@ -59,6 +65,65 @@ internal static class CommsEndpoints
             .WithName("GetSync")
             .WithSummary("Reads the unread inbox count the shell polls.")
             .Produces<SyncResponse>(StatusCodes.Status200OK);
+
+        group.MapGet("/conversations", GetConversationsAsync)
+            .WithName("GetConversations")
+            .WithSummary("Reads a page of the manager's direct-message conversations (`COM-10`).")
+            .Produces<ConversationListResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPost("/conversations", StartConversationAsync)
+            .WithName("StartConversation")
+            .RequireAuthorization(AuthorizationPolicies.VerifiedManager)
+            .RequireRateLimiting(RateLimitPolicies.DirectMessage)
+            .WithSummary("Starts a conversation with the manager who runs a club (`COM-11`).")
+            .Produces<SentDirectMessageResponse>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        group.MapGet("/conversations/{conversationId:guid}", GetConversationAsync)
+            .WithName("GetConversation")
+            .WithSummary("Reads a page of one conversation's messages (`COM-10`).")
+            .Produces<ConversationResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/conversations/{conversationId:guid}/messages", ReplyToConversationAsync)
+            .WithName("ReplyToConversation")
+            .RequireAuthorization(AuthorizationPolicies.VerifiedManager)
+            .RequireRateLimiting(RateLimitPolicies.DirectMessage)
+            .WithSummary("Replies in a conversation (`COM-12`).")
+            .Produces<SentDirectMessageResponse>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        group.MapPost("/conversations/{conversationId:guid}/read", MarkConversationReadAsync)
+            .WithName("MarkConversationRead")
+            .WithSummary("Marks the messages addressed to the manager in a conversation read (`COM-16`).")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPut("/blocked-managers/{managerId:guid}", BlockManagerAsync)
+            .WithName("BlockManager")
+            .WithSummary("Blocks a manager, so neither can write to the other (`COM-15`).")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/blocked-managers/{managerId:guid}", UnblockManagerAsync)
+            .WithName("UnblockManager")
+            .WithSummary("Lifts the manager's own block on another manager (`COM-15`).")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         group.MapGet("/news", GetNewsAsync)
             .WithName("GetNews")
@@ -147,6 +212,137 @@ internal static class CommsEndpoints
         var result = await query.ExecuteAsync(userId, cancellationToken);
 
         return Results.Ok(result.Sync);
+    }
+
+    private static async Task<IResult> GetConversationsAsync(
+        HttpContext httpContext,
+        string? cursor,
+        GetConversations query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, cursor, cancellationToken);
+
+        return result.Outcome == DirectMessageOutcome.Ok
+            ? Results.Ok(result.Conversations)
+            : DirectMessageRefusal(result.Outcome);
+    }
+
+    private static async Task<IResult> StartConversationAsync(
+        HttpContext httpContext,
+        StartConversationRequest request,
+        StartConversation command,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await command.ExecuteAsync(
+            userId,
+            request.ClubId,
+            request.Subject,
+            request.Body,
+            cancellationToken);
+
+        return result.Outcome == DirectMessageOutcome.Ok
+            ? Results.Created(
+                $"{ModuleEndpointGroups.VersionPrefix}/conversations/{result.Sent!.ConversationId}",
+                result.Sent)
+            : DirectMessageRefusal(result.Outcome);
+    }
+
+    private static async Task<IResult> GetConversationAsync(
+        HttpContext httpContext,
+        Guid conversationId,
+        string? cursor,
+        GetConversation query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, conversationId, cursor, cancellationToken);
+
+        return result.Outcome == DirectMessageOutcome.Ok
+            ? Results.Ok(result.Conversation)
+            : DirectMessageRefusal(result.Outcome);
+    }
+
+    private static async Task<IResult> ReplyToConversationAsync(
+        HttpContext httpContext,
+        Guid conversationId,
+        SendDirectMessageRequest request,
+        ReplyToConversation command,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await command.ExecuteAsync(userId, conversationId, request.Body, cancellationToken);
+
+        return result.Outcome == DirectMessageOutcome.Ok
+            ? Results.Created(
+                $"{ModuleEndpointGroups.VersionPrefix}/conversations/{result.Sent!.ConversationId}",
+                result.Sent)
+            : DirectMessageRefusal(result.Outcome);
+    }
+
+    private static async Task<IResult> MarkConversationReadAsync(
+        HttpContext httpContext,
+        Guid conversationId,
+        MarkConversationRead command,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var outcome = await command.ExecuteAsync(userId, conversationId, cancellationToken);
+
+        return outcome == DirectMessageOutcome.Ok ? Results.NoContent() : DirectMessageRefusal(outcome);
+    }
+
+    private static async Task<IResult> BlockManagerAsync(
+        HttpContext httpContext,
+        Guid managerId,
+        BlockManager command,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var outcome = await command.ExecuteAsync(userId, managerId, cancellationToken);
+
+        return outcome == DirectMessageOutcome.Ok ? Results.NoContent() : DirectMessageRefusal(outcome);
+    }
+
+    private static async Task<IResult> UnblockManagerAsync(
+        HttpContext httpContext,
+        Guid managerId,
+        UnblockManager command,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var outcome = await command.ExecuteAsync(userId, managerId, cancellationToken);
+
+        return outcome == DirectMessageOutcome.Ok ? Results.NoContent() : DirectMessageRefusal(outcome);
     }
 
     private static async Task<IResult> GetNewsAsync(
@@ -240,6 +436,76 @@ internal static class CommsEndpoints
         ApiErrorCodes.PreconditionRequired,
         "A version is required.",
         "Send the preferences' current entity tag in If-Match so a concurrent change is not overwritten.");
+
+    /// <summary>Turns a direct-message refusal into a status and a stable code.</summary>
+    private static IResult DirectMessageRefusal(DirectMessageOutcome outcome) => outcome switch
+    {
+        DirectMessageOutcome.InvalidCursor => ProblemResults.Code(
+            StatusCodes.Status400BadRequest,
+            CommsErrorCodes.InvalidCursor,
+            "Invalid cursor.",
+            "The page cursor is not one this server produced."),
+
+        DirectMessageOutcome.InvalidText => ProblemResults.Code(
+            StatusCodes.Status400BadRequest,
+            CommsErrorCodes.InvalidMessageText,
+            "Invalid message.",
+            "A subject is 1 to 80 characters and a message is 1 to 1,000 characters, once trimmed."),
+
+        DirectMessageOutcome.NoManagerProfile => ProblemResults.Code(
+            StatusCodes.Status403Forbidden,
+            WorldErrorCodes.ManagerProfileRequired,
+            "No manager profile.",
+            "Create your manager profile before writing to other managers."),
+
+        DirectMessageOutcome.ClubNotFound => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            WorldErrorCodes.ClubNotFound,
+            "No such club.",
+            "That club does not exist."),
+
+        DirectMessageOutcome.ConversationNotFound => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            CommsErrorCodes.ConversationNotFound,
+            "No such conversation.",
+            "That conversation does not exist among yours."),
+
+        DirectMessageOutcome.ManagerNotFound => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            CommsErrorCodes.ManagerNotFound,
+            "No such manager.",
+            "That manager does not exist."),
+
+        DirectMessageOutcome.SenderHasNoClub => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            CommsErrorCodes.SenderHasNoClub,
+            "You hold no club.",
+            "Take over a club before you start a conversation with another manager."),
+
+        DirectMessageOutcome.ClubHasNoManager => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            CommsErrorCodes.ClubHasNoManager,
+            "Nobody to write to.",
+            "The game runs this club, so there is no manager to message."),
+
+        DirectMessageOutcome.OwnClub => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            CommsErrorCodes.CannotMessageOwnClub,
+            "That is your own club.",
+            "You cannot start a conversation with yourself."),
+
+        DirectMessageOutcome.RecipientUnavailable => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            CommsErrorCodes.RecipientUnavailable,
+            "Manager unavailable.",
+            "This manager's account is closing, so they cannot receive messages."),
+
+        _ => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            CommsErrorCodes.ManagerBlocked,
+            "Messages not accepted.",
+            "This manager is not accepting your messages, or you have blocked them."),
+    };
 
     /// <summary>Turns a comms refusal into a status and a stable code.</summary>
     private static IResult Refusal(CommsOutcome outcome) => outcome switch

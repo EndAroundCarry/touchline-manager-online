@@ -23,6 +23,10 @@ namespace Tactical11Manager.Contracts.Squad;
 /// <param name="DivisionName">The division's generated name.</param>
 /// <param name="TierNumber">The division's tier number.</param>
 /// <param name="IsOwnClub">Whether the caller manages this club, so the screen can point to the private squad.</param>
+/// <param name="ManagerName">
+/// The display name of the manager who runs the club, which other signed-in managers may see (`COM-11`), or null
+/// when the game's own manager runs it. It carries no manager identity: a conversation is started from the club.
+/// </param>
 /// <param name="SeasonNumber">The season the squad is read against.</param>
 /// <param name="Players">The players, goalkeepers first.</param>
 /// <param name="ServerTime">The instant the response was produced.</param>
@@ -42,6 +46,7 @@ public sealed record ClubOverviewResponse(
     string? DivisionName,
     int? TierNumber,
     bool IsOwnClub,
+    string? ManagerName,
     int SeasonNumber,
     IReadOnlyList<ClubPlayerResponse> Players,
     DateTimeOffset ServerTime);

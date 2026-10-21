@@ -1,5 +1,6 @@
 using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Squad;
+using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Contracts.Squad;
 
 namespace Tactical11Manager.Application.Squad;
@@ -16,19 +17,26 @@ public sealed record GetClubOverviewResult(SquadReadOutcome Outcome, ClubOvervie
 /// Public game data like the fixture calendar and the scouting search (`SCT-1`), so it is not gated on holding
 /// the club: a manager studies a rival before they play it. The caller's own tenure is read only to tell the
 /// screen whether this is their club, and a caller without a club simply is not the owner of this one.
-/// What a club keeps to itself (condition, morale, contracts, wages) is not in the response at all.
+/// What a club keeps to itself (condition, morale, contracts, wages) is not in the response at all. The manager's
+/// display name is there, because a conversation starts from this page (`COM-11`); their identity is not.
 /// </remarks>
 public sealed class GetClubOverview
 {
     private readonly ResolveOwnedClub _access;
     private readonly ISquadQueries _queries;
+    private readonly IClubManagerLookup _managers;
     private readonly IClock _clock;
 
     /// <summary>Initializes the use case.</summary>
-    public GetClubOverview(ResolveOwnedClub access, ISquadQueries queries, IClock clock)
+    public GetClubOverview(
+        ResolveOwnedClub access,
+        ISquadQueries queries,
+        IClubManagerLookup managers,
+        IClock clock)
     {
         _access = access;
         _queries = queries;
+        _managers = managers;
         _clock = clock;
     }
 
@@ -51,8 +59,10 @@ public sealed class GetClubOverview
         var own = await _access.ExecuteAsync(userId, clubId: null, cancellationToken);
         var isOwnClub = own.Outcome == ClubAccessOutcome.Granted && own.ClubId == clubId;
 
+        var manager = await _managers.FindByClubAsync(clubId, cancellationToken);
+
         return new GetClubOverviewResult(
             SquadReadOutcome.Found,
-            overview.ToResponse(isOwnClub, _clock.UtcNow));
+            overview.ToResponse(isOwnClub, manager?.DisplayName, _clock.UtcNow));
     }
 }

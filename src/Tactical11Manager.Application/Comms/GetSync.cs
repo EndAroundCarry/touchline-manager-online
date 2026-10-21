@@ -22,6 +22,7 @@ public sealed record GetSyncResult(SyncResponse Sync);
 public sealed class GetSync
 {
     private readonly IInboxQueries _queries;
+    private readonly IDirectMessageQueries _directMessages;
     private readonly IManagerRepository _managers;
     private readonly IReadOnlyMode _readOnlyMode;
     private readonly IClock _clock;
@@ -29,11 +30,13 @@ public sealed class GetSync
     /// <summary>Initializes the query.</summary>
     public GetSync(
         IInboxQueries queries,
+        IDirectMessageQueries directMessages,
         IManagerRepository managers,
         IReadOnlyMode readOnlyMode,
         IClock clock)
     {
         _queries = queries;
+        _directMessages = directMessages;
         _managers = managers;
         _readOnlyMode = readOnlyMode;
         _clock = clock;
@@ -50,6 +53,12 @@ public sealed class GetSync
             ? 0
             : await _queries.CountUnreadAsync(manager.Id, cancellationToken);
 
+        // Direct messages from other managers are counted apart from the game's own (`COM-16`), and the poll
+        // asks the same way: no profile, no messages.
+        var unreadDirect = manager is null
+            ? 0
+            : await _directMessages.CountUnreadAsync(manager.Id, cancellationToken);
+
         // Read-only mode travels on the same poll so the shell can disable commands between requests
         // (`F-51`); the server gate remains the backstop for a client that has not caught up.
         var readOnly = await _readOnlyMode.GetStateAsync(cancellationToken);
@@ -58,6 +67,7 @@ public sealed class GetSync
             _clock.UtcNow,
             unread,
             readOnly.Enabled,
-            readOnly.Message));
+            readOnly.Message,
+            unreadDirect));
     }
 }
