@@ -117,6 +117,7 @@ test.describe('@a11y the manager screens meet WCAG 2.2 AA', () => {
       '/transfers',
       '/finances',
       '/inbox',
+      '/inbox/managers',
       '/news',
       '/history',
       '/settings',
@@ -205,6 +206,7 @@ test.describe('@a11y the light theme meets WCAG 2.2 AA', () => {
       '/fixtures',
       '/finances',
       '/inbox',
+      '/inbox/managers',
       '/settings',
     ]) {
       await page.goto(route);

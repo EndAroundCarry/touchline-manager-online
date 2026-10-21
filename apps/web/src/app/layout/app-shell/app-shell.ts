@@ -18,6 +18,7 @@ import { lockCountdown, venueLabel } from '../../core/competition/competition-pr
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { GameClockStore } from '../../core/devtools/game-clock-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
+import { ConversationsStore } from '../../core/messages/conversations-store';
 import { MatchStore } from '../../core/match/match-store';
 import { NewsStore } from '../../core/news/news-store';
 import { NotificationPreferencesStore } from '../../core/notifications/notification-preferences-store';
@@ -68,6 +69,7 @@ export class AppShell implements OnDestroy {
   private readonly calendar = inject(CalendarStore);
   private readonly fans = inject(FanStore);
   private readonly inbox = inject(InboxStore);
+  private readonly conversations = inject(ConversationsStore);
   private readonly news = inject(NewsStore);
   private readonly notifications = inject(NotificationPreferencesStore);
   private readonly sessions = inject(SessionsStore);
@@ -231,8 +233,8 @@ export class AppShell implements OnDestroy {
   /** The signed-in manager's name, or null. */
   protected readonly displayName = this.session.displayName;
 
-  /** How many inbox messages are unread, for the navigation badge (`F-41`). */
-  protected readonly unreadInboxCount = this.sync.unreadInboxCount;
+  /** How many inbox messages and direct messages are unread together, for the navigation badge (`F-41`, `COM-16`). */
+  protected readonly unreadInboxCount = this.sync.unreadTotalCount;
 
   /**
    * Whether the mobile navigation panel is open.
@@ -298,6 +300,7 @@ export class AppShell implements OnDestroy {
       this.calendar.clear();
       this.fans.clear();
       this.inbox.clear();
+      this.conversations.clear();
       this.news.clear();
       this.notifications.clear();
       this.sessions.clear();

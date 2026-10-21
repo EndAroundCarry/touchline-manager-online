@@ -40,6 +40,8 @@ export interface InboxPage {
 export interface SyncSummary {
   readonly serverTime: string;
   readonly unreadInboxCount: number;
+  /** Direct messages from other managers that are addressed to the caller and unread (`COM-16`). */
+  readonly unreadDirectMessageCount: number;
   readonly readOnly: boolean;
   readonly readOnlyMessage: string | null;
 }

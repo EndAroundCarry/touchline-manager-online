@@ -8,6 +8,7 @@ import {
   RESULT_REVEAL_STORAGE_KEY,
   ResultRevealStore,
 } from '../../core/match/result-reveal-store';
+import { SyncStore } from '../../core/sync/sync-store';
 import { Inbox } from './inbox';
 
 /**
@@ -48,6 +49,10 @@ describe('Inbox', () => {
       imports: [Inbox],
       providers: [
         provideRouter([]),
+        {
+          provide: SyncStore,
+          useValue: { unreadInboxCount: signal(1), unreadDirectMessageCount: signal(0) },
+        },
         {
           provide: InboxStore,
           useValue: {

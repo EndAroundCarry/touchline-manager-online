@@ -22,6 +22,13 @@
           <dd class="mt-0.5 break-all text-sm text-ink">{{ profile.email }}</dd>
         </div>
         <div>
+          <dt class="text-sm font-medium text-muted">Manager name</dt>
+          <dd class="mt-0.5 text-sm text-ink">{{ profile.displayName }}</dd>
+          <dd class="mt-0.5 text-xs text-muted">
+            Other managers see this name on your club page and in messages.
+          </dd>
+        </div>
+        <div>
           <dt class="text-sm font-medium text-muted">Status</dt>
           <dd class="mt-0.5 text-sm text-ink">
             {{ profile.emailVerified ? 'Active' : 'Awaiting email confirmation' }}

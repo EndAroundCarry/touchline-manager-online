@@ -1,0 +1,77 @@
+@if (loading() && conversations().length === 0) {
+  <p class="text-sm text-ink-2" role="status">Loading your conversations…</p>
+} @else {
+  <section class="max-w-4xl">
+    <h1 [class]="pageHeadingClass">Inbox</h1>
+    <app-inbox-tabs />
+
+    <p class="mt-4 text-sm text-ink-2">
+      Messages between you and other managers. To write to one, open their club's page and choose
+      "Send a message".
+    </p>
+
+    @if (error(); as message) {
+      <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    }
+
+    @if (conversations().length === 0 && error() === null) {
+      <p class="mt-6 text-sm text-ink-2" role="status">
+        No conversations yet. Open a club's page from a division table to write to its manager.
+      </p>
+    } @else {
+      <ul class="mt-6 flex flex-col gap-3" data-testid="conversation-list">
+        @for (conversation of conversations(); track conversation.id) {
+          <li
+            class="rounded border px-3 py-3"
+            [class]="
+              conversation.unreadCount > 0 ? 'border-slate-400 bg-ground' : 'border-line bg-panel'
+            "
+          >
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 class="text-sm font-semibold text-ink">
+                <a [routerLink]="['/inbox/managers', conversation.id]" [class]="nameLinkClass">{{
+                  conversation.subject
+                }}</a>
+              </h2>
+              @if (conversation.unreadCount > 0) {
+                <span class="text-xs font-semibold text-ink">
+                  {{ conversation.unreadCount }} unread
+                </span>
+              }
+              <time class="ml-auto text-xs text-muted" [attr.datetime]="conversation.lastMessageAt">
+                {{ time(conversation.lastMessageAt) }}
+              </time>
+            </div>
+
+            <p class="mt-1 text-xs text-muted">
+              With {{ conversation.otherManager.displayName }}
+              @if (conversation.otherManager.clubName; as clubName) {
+                · {{ clubName }}
+              }
+              @if (conversation.blockedByMe) {
+                · you have blocked this manager
+              }
+            </p>
+
+            @if (conversation.lastMessagePreview; as preview) {
+              <p class="mt-1 truncate text-sm text-ink-2">{{ preview }}</p>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    @if (hasMore()) {
+      <div class="mt-4">
+        <button
+          type="button"
+          [class]="secondaryButtonClass"
+          [disabled]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ loadingMore() ? 'Loading…' : 'Load older conversations' }}
+        </button>
+      </div>
+    }
+  </section>
+}

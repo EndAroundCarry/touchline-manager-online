@@ -65,7 +65,12 @@ function player(id: string, name: string, position: string): ClubPlayer {
   };
 }
 
-function club(id: string, name: string, isOwnClub = false): ClubOverview {
+function club(
+  id: string,
+  name: string,
+  isOwnClub = false,
+  managerName: string | null = 'Sam Rivera',
+): ClubOverview {
   return {
     clubId: id,
     name,
@@ -82,6 +87,7 @@ function club(id: string, name: string, isOwnClub = false): ClubOverview {
     divisionName: 'English Tier 1',
     tierNumber: 1,
     isOwnClub,
+    managerName,
     seasonNumber: 1,
     players: [player('p-gk', 'Gil Keeper', 'gk'), player('p-st', 'Stan Striker', 'st')],
     serverTime: '2026-10-20T00:00:00Z',
@@ -203,6 +209,42 @@ describe('ClubPage', () => {
     expect(root.querySelector('[data-testid="club-crest"] rect')?.getAttribute('fill')).toBe(
       '#1f4e79',
     );
+  });
+
+  it('names the manager and offers to write to them', async () => {
+    await open();
+
+    expect(root.querySelector('[data-testid="club-manager"]')?.textContent).toContain(
+      'Manager: Sam Rivera',
+    );
+
+    const link = Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).find(
+      (a) => a.textContent?.trim() === 'Send a message',
+    );
+
+    expect(link?.getAttribute('href')).toBe('/inbox/managers/new?club=club-1');
+  });
+
+  it('says AI manager and offers no message link for a club the game runs (COM-11)', async () => {
+    squadApi.club.mockReturnValue(of(club('club-1', 'Ashvale United', false, null)));
+
+    await open();
+
+    expect(root.querySelector('[data-testid="club-manager"]')?.textContent?.trim()).toBe(
+      'AI manager',
+    );
+    expect(root.textContent).not.toContain('Send a message');
+  });
+
+  it('offers no message link on the manager’s own club (COM-11)', async () => {
+    squadApi.club.mockReturnValue(of(club('club-1', 'Ashvale United', true)));
+
+    await open();
+
+    expect(root.querySelector('[data-testid="club-manager"]')?.textContent).toContain(
+      'Manager: Sam Rivera',
+    );
+    expect(root.textContent).not.toContain('Send a message');
   });
 
   it('opens on the squad, goalkeeper first, each player a link to their profile', async () => {

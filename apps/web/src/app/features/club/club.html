@@ -21,6 +21,22 @@
           {{ profile.city }}, {{ profile.region }} · {{ profile.countryCode }} · founded
           {{ profile.foundingGameYear }}
         </p>
+        <p class="mt-1 text-sm text-ink-2" data-testid="club-manager">
+          @if (profile.managerName; as managerName) {
+            Manager: {{ managerName }}
+            @if (!profile.isOwnClub) {
+              ·
+              <a
+                routerLink="/inbox/managers/new"
+                [queryParams]="{ club: profile.clubId }"
+                [class]="linkClass"
+                >Send a message</a
+              >
+            }
+          } @else {
+            AI manager
+          }
+        </p>
         @if (profile.divisionId; as divisionId) {
           <p class="mt-1 text-sm text-ink-2">
             <a [routerLink]="['/competitions', divisionId, 'table']" [class]="linkClass">{{

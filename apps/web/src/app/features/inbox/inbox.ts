@@ -18,6 +18,7 @@ import {
   SECONDARY_BUTTON,
   STATUS_MESSAGE,
 } from '../../shared/forms/control-styles';
+import { InboxTabs } from './inbox-tabs';
 
 /**
  * The inbox screen (master plan §11.1, F-41).
@@ -36,7 +37,7 @@ import {
  */
 @Component({
   selector: 'app-inbox',
-  imports: [RouterLink],
+  imports: [RouterLink, InboxTabs],
   templateUrl: './inbox.html',
 })
 export class Inbox {

@@ -9,7 +9,7 @@ import { SyncApi } from './sync-api';
  * The shell's synchronization poll (master plan §11.2, ADR-0007).
  *
  * It repeats one lightweight read while the tab is visible and the browser is online, and exposes the unread
- * inbox count the navigation badge shows. The poll is suspended rather than queued in a hidden or offline
+ * inbox and direct-message counts the navigation badge and the inbox tabs show. The poll is suspended rather than queued in a hidden or offline
  * tab: freshness is worth a request a minute, not a burst of them when a laptop wakes up. It also reads
  * again the moment the tab becomes visible or the connection returns, so a manager who comes back to a
  * backgrounded tab does not stare at a minute-old badge.
@@ -26,12 +26,19 @@ export class SyncStore implements OnDestroy {
   private readonly session = inject(SessionStore);
 
   private readonly unreadSignal = signal(0);
+  private readonly unreadDirectSignal = signal(0);
   private readonly lastRefreshedSignal = signal<number | null>(null);
   private readonly refreshFailedSignal = signal(false);
   private timer: ReturnType<typeof setInterval> | null = null;
 
   /** How many inbox messages are unread, for the navigation badge. */
   readonly unreadInboxCount = this.unreadSignal.asReadonly();
+
+  /** How many direct messages from other managers are unread, for the Managers tab (`COM-16`). */
+  readonly unreadDirectMessageCount = this.unreadDirectSignal.asReadonly();
+
+  /** Both unread counts added together, for the Inbox badge in the navigation. */
+  readonly unreadTotalCount = computed(() => this.unreadSignal() + this.unreadDirectSignal());
 
   /** When the last successful poll landed, in epoch milliseconds, or null before the first. */
   readonly lastRefreshedAt = this.lastRefreshedSignal.asReadonly();
@@ -73,6 +80,7 @@ export class SyncStore implements OnDestroy {
   /** Drops the count and freshness, so a signed-out device keeps none of the previous manager's state. */
   clear(): void {
     this.unreadSignal.set(0);
+    this.unreadDirectSignal.set(0);
     this.lastRefreshedSignal.set(null);
     this.refreshFailedSignal.set(false);
     this.maintenance.clear();
@@ -97,6 +105,7 @@ export class SyncStore implements OnDestroy {
     this.api.summary().subscribe({
       next: (summary) => {
         this.unreadSignal.set(summary.unreadInboxCount);
+        this.unreadDirectSignal.set(summary.unreadDirectMessageCount);
         this.maintenance.set(summary.readOnly, summary.readOnlyMessage);
         this.lastRefreshedSignal.set(Date.now());
         this.refreshFailedSignal.set(false);

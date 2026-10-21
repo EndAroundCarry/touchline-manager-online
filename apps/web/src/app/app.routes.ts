@@ -240,10 +240,35 @@ export const routes: Routes = [
         title: 'Calendar — Tactical11 Manager',
       },
       {
+        // Two sections under one address: what the game told the manager, and what other managers wrote
+        // (`COM-10`). `managers/new` precedes the thread so "new" is never read as a conversation identity.
         path: 'inbox',
-        loadComponent: () => import('./features/inbox/inbox').then((m) => m.Inbox),
         canActivate: [requireAuthentication, requireVerifiedEmail],
-        title: 'Inbox — Tactical11 Manager',
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./features/inbox/inbox').then((m) => m.Inbox),
+            title: 'Inbox — Tactical11 Manager',
+          },
+          {
+            path: 'managers',
+            loadComponent: () =>
+              import('./features/inbox/managers/conversation-list').then((m) => m.ConversationList),
+            title: 'Messages from managers — Tactical11 Manager',
+          },
+          {
+            path: 'managers/new',
+            loadComponent: () =>
+              import('./features/inbox/managers/compose').then((m) => m.ComposeMessage),
+            title: 'New message — Tactical11 Manager',
+          },
+          {
+            path: 'managers/:conversationId',
+            loadComponent: () =>
+              import('./features/inbox/managers/thread').then((m) => m.ConversationThread),
+            title: 'Conversation — Tactical11 Manager',
+          },
+        ],
       },
       {
         // The public division news feed (`COM-1`), beside the inbox it shares its message shape with.

@@ -26,6 +26,7 @@ describe('SyncStore', () => {
         of({
           serverTime: '2026-10-06T19:00:00Z',
           unreadInboxCount: 3,
+          unreadDirectMessageCount: 0,
           readOnly: false,
           readOnlyMessage: null,
         }),
@@ -155,6 +156,7 @@ describe('SyncStore', () => {
       of({
         serverTime: '2026-10-06T19:00:00Z',
         unreadInboxCount: 1,
+        unreadDirectMessageCount: 0,
         readOnly: false,
         readOnlyMessage: null,
       }),
@@ -165,6 +167,30 @@ describe('SyncStore', () => {
     expect(store.isStale()).toBe(false);
 
     store.stop();
+  });
+
+  it('adds the direct-message count to the inbox count for the navigation badge (COM-16)', () => {
+    const store = create();
+
+    api.summary.mockReturnValue(
+      of({
+        serverTime: '2026-10-06T19:00:00Z',
+        unreadInboxCount: 3,
+        unreadDirectMessageCount: 2,
+        readOnly: false,
+        readOnlyMessage: null,
+      }),
+    );
+
+    store.refresh();
+
+    expect(store.unreadInboxCount()).toBe(3);
+    expect(store.unreadDirectMessageCount()).toBe(2);
+    expect(store.unreadTotalCount()).toBe(5);
+
+    store.clear();
+
+    expect(store.unreadTotalCount()).toBe(0);
   });
 
   it('is stale while the browser is offline, before any poll has failed', () => {
@@ -184,6 +210,7 @@ describe('SyncStore', () => {
       of({
         serverTime: '2026-10-06T19:00:00Z',
         unreadInboxCount: 3,
+        unreadDirectMessageCount: 0,
         readOnly: true,
         readOnlyMessage: 'Read-only while we repair the ledger.',
       }),

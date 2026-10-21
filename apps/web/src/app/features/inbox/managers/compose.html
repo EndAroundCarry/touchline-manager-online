@@ -1,0 +1,66 @@
+<section class="max-w-2xl">
+  <h1 [class]="pageHeadingClass">New message</h1>
+
+  @if (loading()) {
+    <p class="mt-4 text-sm text-ink-2" role="status">Loading the club…</p>
+  } @else if (problem(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    <div class="mt-4 flex gap-3">
+      @if (club(); as profile) {
+        <a [routerLink]="['/clubs', profile.clubId]" [class]="secondaryButtonClass">
+          Back to {{ profile.name }}
+        </a>
+      }
+      <a routerLink="/inbox/managers" [class]="secondaryButtonClass">Back to messages</a>
+    </div>
+  } @else if (club(); as profile) {
+    <p class="mt-1 text-sm text-ink-2" data-testid="compose-recipient">
+      To {{ profile.managerName }}, manager of
+      <a [routerLink]="['/clubs', profile.clubId]" [class]="linkClass">{{ profile.name }}</a>
+    </p>
+
+    @if (sendError(); as message) {
+      <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    }
+
+    <form class="mt-6 space-y-4" [formGroup]="form" (ngSubmit)="send()" novalidate>
+      <div>
+        <label class="block text-sm font-medium text-ink" for="subject">Subject</label>
+        <input
+          id="subject"
+          type="text"
+          formControlName="subject"
+          autocomplete="off"
+          [attr.maxlength]="subjectMax"
+          [class]="textInputClass"
+          aria-describedby="subject-count"
+        />
+        <p id="subject-count" class="mt-1 text-xs text-muted">
+          {{ subjectLength() }} of {{ subjectMax }} characters
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-ink" for="body">Message</label>
+        <textarea
+          id="body"
+          formControlName="body"
+          rows="8"
+          [attr.maxlength]="bodyMax"
+          [class]="textInputClass"
+          aria-describedby="body-count"
+        ></textarea>
+        <p id="body-count" class="mt-1 text-xs text-muted">
+          {{ bodyLength() }} of {{ bodyMax }} characters. Plain text only.
+        </p>
+      </div>
+
+      <div class="flex flex-wrap gap-3">
+        <button type="submit" [class]="primaryButtonClass" [disabled]="!canSend() || sending()">
+          {{ sending() ? 'Sending…' : 'Send message' }}
+        </button>
+        <a [routerLink]="['/clubs', profile.clubId]" [class]="secondaryButtonClass">Cancel</a>
+      </div>
+    </form>
+  }
+</section>

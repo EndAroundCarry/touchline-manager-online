@@ -154,6 +154,9 @@ export interface ClubOverview {
 
   /** Whether the caller manages this club. */
   readonly isOwnClub: boolean;
+
+  /** The display name of the manager who runs the club, or null when the club is run by the game's AI (`COM-11`). */
+  readonly managerName: string | null;
   readonly seasonNumber: number;
   readonly players: readonly ClubPlayer[];
   readonly serverTime: string;
