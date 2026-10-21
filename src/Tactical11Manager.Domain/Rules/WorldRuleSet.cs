@@ -27,6 +27,8 @@ namespace Tactical11Manager.Domain.Rules;
 /// retirement rule's start age, growth, forced caps, and ability and fitness gate (`CON-6`, `CON-8`).
 /// The wide-midfielder milestone grew the generated squad from twenty-two to twenty-four (one left and one
 /// right midfielder) and the registration ceiling from twenty-five to twenty-seven (`SQ-1`, `SQ-3`).
+/// The structures milestone added the snack bar and the merchandise shop, whose levels, takings, bonuses and
+/// upkeep live in <see cref="StructureRuleSet"/> (`STRC-*`).
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -34,7 +36,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v14";
+    public const string Version = "world-rules-v15";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;

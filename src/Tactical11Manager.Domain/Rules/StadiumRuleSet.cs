@@ -161,6 +161,27 @@ public static class StadiumRuleSet
         return Math.Min(seats, wanted);
     }
 
+    /// <summary>How many people come to a home match: every place sold, across the four stands (`STAD-5`).</summary>
+    /// <param name="seats">The ground's places.</param>
+    /// <param name="fans">The club's fans going into the match.</param>
+    /// <param name="moodBp">The fans' mood going into the match, 0 to 10,000.</param>
+    /// <remarks>
+    /// The crowd is never stored: it is this sum, which is also what the gate is priced from. The snack bar
+    /// earns for each of these spectators (`STRC-4`).
+    /// </remarks>
+    public static int AttendanceFor(StadiumSeats seats, int fans, int moodBp)
+    {
+        var demand = MatchdayDemandFor(fans, moodBp);
+        var crowd = 0;
+
+        foreach (var stand in StadiumStands.All)
+        {
+            crowd += SoldFor(stand, seats.Of(stand), demand);
+        }
+
+        return crowd;
+    }
+
     /// <summary>The gate a home fixture yields, in minor units (`FIN-3`, `STAD-5`).</summary>
     /// <param name="seats">The ground's places.</param>
     /// <param name="tier">The tier the club plays in, starting at 1, which sets the ticket prices.</param>

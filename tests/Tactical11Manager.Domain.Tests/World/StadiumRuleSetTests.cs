@@ -232,4 +232,30 @@ public sealed class StadiumRuleSetTests
             season.Should().BeLessThan(sponsorship * 4, $"tier {tier}'s gate does not drown the rest of the economy");
         }
     }
+
+    [Fact]
+    public void Attendance_is_every_place_sold_and_a_tier_one_opening_ground_seats_2890()
+    {
+        // 3,000 want to come: 1,350 standing, 600 seated, 840 covered, 210 VIP; the ground has 100 VIP places.
+        StadiumRuleSet.AttendanceFor(Opening, FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp).Should().Be(2_890);
+    }
+
+    [Fact]
+    public void Attendance_agrees_with_the_gate_it_prices()
+    {
+        foreach (var moodBp in new[] { 0, 2_500, FanRuleSet.CalmMoodBp, 7_500, FanRuleSet.MoodMaxBp })
+        {
+            var demand = StadiumRuleSet.MatchdayDemandFor(20_000, moodBp);
+            var expected = StadiumStands.All.Sum(stand => StadiumRuleSet.SoldFor(stand, Opening.Of(stand), demand));
+
+            StadiumRuleSet.AttendanceFor(Opening, 20_000, moodBp).Should().Be(expected);
+        }
+    }
+
+    [Fact]
+    public void Attendance_never_passes_the_ground_and_is_empty_without_fans()
+    {
+        StadiumRuleSet.AttendanceFor(Opening, 1_000_000, FanRuleSet.MoodMaxBp).Should().Be(Opening.Total);
+        StadiumRuleSet.AttendanceFor(Opening, 0, FanRuleSet.CalmMoodBp).Should().Be(0);
+    }
 }
