@@ -89,7 +89,7 @@ Do not put these on the public MVP critical path:
 - Live in-match tactical changes, WebSockets, synchronous PvP, or a client-side match simulation.
 - Private transfer negotiations, player agents, loans, swaps, clauses, installment payments, or transfer windows.
 - Fog-of-war attribute estimates or a staffed scouting network; MVP scouting is database search plus shortlists.
-- Facilities beyond the stadium, sponsorship negotiation, merchandising, taxes, currencies, or debt.
+- Facilities beyond the stadium and the two structures (the snack bar and the merchandise shop, [ADR-0080](../architecture/adr/0080-club-structures-snack-bar-and-merchandise-shop.md)), sponsorship negotiation, taxes, currencies, or debt.
 - Public chat, forums, manager associations, or user-generated public content. (Private messages between two managers are in scope: [ADR-0079](../architecture/adr/0079-direct-messages-between-managers.md), `COM-10`…`COM-16`.)
 - Native Android/iOS packages; Capacitor follows the PWA release.
 - Offline mutations. Deadline-sensitive writes must never be silently queued.
@@ -264,6 +264,7 @@ Use integer minor units (`bigint`) and a single canonical in-game display curren
 Income:
 
 - Home-match gate revenue from the club's own stadium (its places and their ticket prices), the tier, and form (`STAD-*`, ADR-0062).
+- Snack bar takings at a home match (spectators times a spend for the level, lifted by up to 30% by the result and the expectation) and weekly merchandise takings (fans times a spend for the level, lifted by the fans' mood) (`STRC-4`…`STRC-7`, ADR-0080).
 - Weekly sponsorship credit.
 - Promotion and final-position awards.
 - Transfer income.
@@ -273,12 +274,13 @@ Expenses:
 - Weekly player wages.
 - Transfer fees.
 - A small fixed weekly operating cost.
+- Weekly upkeep of the snack bar and the merchandise shop (`STRC-8`).
 
 Rules:
 
 - Clubs cannot place bids that exceed available cash after existing reservations.
 - Cash and reserved funds update transactionally with an append-only ledger.
-- No loans, debt, overdrafts, owner injections, or real-money purchases in the MVP. The one cash purchase besides players is new places in the club's stadium (`STAD-4`).
+- No loans, debt, overdrafts, owner injections, or real-money purchases in the MVP. The cash purchases besides players are new places in the club's stadium (`STAD-4`) and upgrades of the snack bar and the merchandise shop (`STRC-3`).
 - AI clubs obey the same affordability constraints.
 - A safety job detects clubs unable to field a legal squad or pay the next wage run and applies a logged emergency grant only when required to preserve competition integrity. This must emit an operations alert and be tuned out through balancing.
 
@@ -1958,7 +1960,8 @@ Add in separate feature flags and migrations:
 
 - Staff roles, recruitment, contracts, and effects.
 - Youth academy, annual intake, development squads, and homegrown rules.
-- Facilities beyond the stadium (training ground, academy buildings, upkeep costs, naming rights).
+- Facilities beyond the stadium (training ground, academy buildings, naming rights).
+- **Structures (delivered, ADR-0080):** every club has a snack bar and a merchandise shop, each of ten levels, opening at level 1 for free. A human manager upgrades them with cash and a build time of 1 to 7 days; computer-run clubs stay at level 1. The snack bar earns per spectator at a home match with up to +30% for the result and the underdog (`STRC-4`, `STRC-5`); the shop earns per fan each week with up to +25% for the fans' mood (`STRC-6`, `STRC-7`); each building costs a weekly upkeep (`STRC-8`). The values are provisional until the finance rework (`STRC-9`).
 - Richer morale, promises, player personalities, captaincy, and team cohesion.
 - **Fan base (delivered, ADR-0078):** every club has a fan count that grows after good results and shrinks after bad ones, between a floor and a soft cap per tier, and a mood that the fans judge against what they expected from each match and against the place they hoped the club would finish. The crowd and the gate are drawn from them (`FAN-1`…`FAN-10`, `FIN-3`, `STAD-5`). Still ahead: season objectives (the fans' own predicted finish stands in for them), ticket pricing against mood, a home "twelfth man" effect, messages from the fans, and fan groups.
 - More formations, roles, set-piece plans, and conditional substitution instructions.

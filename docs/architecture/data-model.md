@@ -42,6 +42,8 @@ flowchart LR
         countries
         clubs
         club_stadiums
+        club_structures
+        club_structure_takings
         managers
         club_tenures
         division_provisioning_requests
@@ -175,6 +177,8 @@ erDiagram
     countries ||--o{ division_provisioning_requests : "requests"
     clubs ||--o{ club_tenures : "controlled by"
     clubs ||--|| club_stadiums : "plays in"
+    clubs ||--|{ club_structures : "owns two"
+    clubs ||--o{ club_structure_takings : "history"
 
     users {
         uuid id PK
@@ -223,6 +227,30 @@ erDiagram
         int covered_seats
         int vip_seats
         bigint version
+    }
+    club_structures {
+        uuid id PK
+        uuid club_id FK
+        text kind
+        int level
+        int upgrade_target_level
+        timestamptz upgrade_due_at
+        bigint version
+    }
+    club_structure_takings {
+        uuid id PK
+        uuid club_id FK
+        text kind
+        text row_kind
+        uuid fixture_id FK
+        date week_of
+        int level
+        int customers
+        bigint base_minor
+        int bonus_bp
+        text bonus_reason
+        bigint amount_minor
+        uuid ledger_entry_id FK
     }
     countries {
         uuid id PK
@@ -747,6 +775,8 @@ erDiagram
 | `unique (listing_id)` | `transfer_outcomes` | Resolution happens once |
 | `check` the action is a known code and names exactly one of the listing or the bid; `check (length(inputs_hash) = 64)`; index `(club_id, evaluated_at)` | `ai_market_decisions` | `TRF-12`: a decision always states what it produced and what it read |
 | `unique (club_id)`, `check (every stand >= 0)`, `check (standing + seating + covered + vip between 1 and 50000)` | `club_stadiums` | One ground per club, never empty and never past the top level (`STAD-1`) |
+| `unique (club_id, kind)`, `check (kind in ('snack_bar', 'merchandise'))`, `check (level between 1 and 10)`, `check (a pending upgrade names level + 1 and a finish time, or neither)` | `club_structures` | Two buildings per club, in range, and at most one upgrade under way (`STRC-1`, `STRC-3`) |
+| Partial unique `(club_id, fixture_id)` where `row_kind = 'match_sale'`, partial unique `(club_id, kind, row_kind, week_of)` otherwise, `check (row_kind in ('match_sale', 'week_sale', 'upkeep'))`, `check (the amount's sign and shape fit the row kind)`; `ledger_entry_id` is a foreign key to the ledger | `club_structure_takings` | A retried publication or weekly run writes a sale or a charge once (`STRC-4`, `STRC-6`, `STRC-8`, `FIN-17`) |
 | `check (cash_minor >= 0 and reserved_minor >= 0)` | `club_accounts` | `FIN-13` |
 | `unique (club_id, sequence)`, `unique (correlation_id, category)`, `check (resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor)` | `ledger_entries` | `FIN-11`, `FIN-13`, `FIN-17` |
 | `unique (club_id, season_id)` | `club_season_finances` | One finance summary per club per season (`FIN-19`) |
@@ -782,6 +812,15 @@ erDiagram
 > stored. It replaces `world.clubs.stadium_baseline`, which the migration drops after giving every existing club the
 > opening 5,000-place ground; gate revenue now reads the ground, not a baseline (ADR-0062, `STAD-5`). The ledger gains
 > the `stadium_construction` category and the `stadium` source, and the rule set advances to `world-rules-v10`.
+>
+> **Structures milestone.** `world.club_structures` holds each club's two buildings (`snack_bar`, `merchandise`): the level, and
+> while work is under way the target level and the instant it finishes, with the `version` an upgrade order is made against.
+> `world.club_structure_takings` is the append-only history the Structures page reads: a `match_sale` for each home match (snack bar),
+> a `week_sale` for each week (shop) and an `upkeep` row for each building each week, each with the ledger entry it came from.
+> The ledger gains the categories `snack_bar`, `merchandise`, `structure_upkeep` and `structure_upgrade` and the `structure` source; the
+> season-line category check is extended to every category, including `stadium_construction` and `release_payout`, which it had missed.
+> The rule set advances to `world-rules-v15` (`STRC-1`…`STRC-9`, ADR-0080). Migration `ClubStructures`, which also gives every existing club
+> both buildings at level 1.
 >
 > **Stage 12 status (season history).** No schema change: the closed entries are read back as a club's
 > season history and next-season placement (`PR-4`, `PR-6`), and the retained `player_season_stats` rows are

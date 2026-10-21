@@ -353,6 +353,8 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 | FIN-4 | Weekly sponsorship credit | fixed baseline per tier |
 | FIN-5 | Promotion award and final-position award | tier and final rank |
 | FIN-6 | Transfer income | completed auction proceeds |
+| STRC-4 | Snack bar takings at a home match | the crowd, the snack bar's level, and the result judged against what the fans expected (§13.7) |
+| STRC-6 | Merchandise takings, weekly | the club's fans, the shop's level, and the fans' mood (§13.7) |
 
 ### 13.2 Expenses
 
@@ -361,6 +363,7 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 | FIN-7 | Weekly player wages |
 | FIN-8 | Transfer fees |
 | FIN-9 | A small fixed weekly operating cost |
+| STRC-8 | The weekly upkeep of the snack bar and the merchandise shop, one charge for both (§13.7) |
 
 ### 13.3 Rules
 
@@ -370,7 +373,7 @@ Money is stored as `bigint` minor units of one canonical in-game display currenc
 | FIN-11 | Cash and reserved funds update transactionally together with an append-only ledger entry. |
 | FIN-12 | The ledger is append-only. Corrections use compensating entries; balances are never edited directly. |
 | FIN-13 | Cash and reserved balances are never negative. Enforced by database check constraints. |
-| FIN-14 | No loans, debt, overdrafts, owner injections, or real-money purchases exist in the MVP. The one thing a club buys with its cash besides players is new places in its stadium (`STAD-4`). |
+| FIN-14 | No loans, debt, overdrafts, owner injections, or real-money purchases exist in the MVP. A club buys with its cash players, new places in its stadium (`STAD-4`), and upgrades of its snack bar and merchandise shop (`STRC-3`). |
 | FIN-15 | AI clubs obey identical affordability constraints. They never receive hidden discounts or unlimited money. |
 | FIN-16 | A safety job detects clubs that cannot field a legal squad or pay the next wage run and applies a **logged emergency grant** only when required to preserve competition integrity. It emits an operations alert and is tuned out through balancing. |
 | FIN-17 | Every financial operation is idempotent under retry and carries a correlation key. |
@@ -405,6 +408,12 @@ calibrates the baselines; the shapes below are fixed from this version on.
 - **Weekly player wages (`FIN-7`)** are the sum of the club's active contracts' weekly wages, charged after the
   Sunday matchday.
 - **The weekly operating cost (`FIN-9`)** is a small fixed tier-1 cost halved per tier below the first.
+- **Snack bar takings (`STRC-4`)** are the spectators of a home match (the places sold, `STAD-5`) times the snack bar's
+  spend for its level, lifted by a result bonus of up to 30% (§13.7). They are posted for the host club of every
+  published fixture, in the publication transaction, right after the gate, under the same correlation key.
+- **Merchandise takings (`STRC-6`)** are the club's fans times the shop's spend for its level, lifted by a mood
+  bonus of up to 25%, and **structure upkeep (`STRC-8`)** is one charge for both buildings. Both are posted in the
+  weekly finance run, beside sponsorship, wages and the operating cost.
 - **The promotion and position award (`FIN-5`)** is a tier-1 champion's award decayed linearly by final
   position and halved per tier, settled at rollover.
 - **The emergency grant (`FIN-16`)** is not a formula: it is the exact shortfall the safety step computes when a
@@ -461,6 +470,33 @@ The fans' reaction is a result in disguise, which is why it follows the result g
 - **A change of division at rollover:** a promoted club's fans rise 10% (24,893 → 27,382 for the three promoted from tier 2) and a relegated one's fall 10% (12,448 → 11,204 from tier 1); the halfway reset brings a mood of 3 to 25, 13 to 29, and 84 to 68.
 - **The gate against the old formula** (a full house for everybody, because the old crowd of 9,000 always filled the 5,000-place opening ground): in season 1 the new gate is **0.84** of the old one in tier 1 (0.96 for the best three, 0.69 for the worst three), 0.75 in tier 2 and 0.68 in tier 3; in season 2 it is 0.98, 0.93 and 0.86; in season 3 it is 1.00, 0.98 and 0.97. A tier-1 club takes about 1.01 million (minor units ÷ 100) a season in season 1 against 1.20 million at a full house.
 - **The opening ground is outgrown inside the first two seasons.** Demand passes the 5,000 places at 84% of the best tier-1 clubs' home matches in season 1 and 100% in season 2; by season 3 even the bottom three of tier 1 sell out at every home match (demand 23,001 for the best three, 11,146 for the worst three, against 5,000 places). From then on the gate no longer tells a good club from a bad one: money only follows the fans once the manager builds (`STAD-4`). This is the open question of the plan, and the rules leave it as it is.
+
+### 13.7 Structures
+
+Every club has two more buildings besides its stadium: a **snack bar** and a **merchandise shop**. Each has ten levels. A manager upgrades them with cash and waits for the builders; the buildings earn from the crowd and from the fans, and cost a little each week to keep. The values are provisional and live in `StructureRuleSet` so the planned finance rework can retune them in one place. ADR-0080.
+
+| Ref | Rule |
+|---|---|
+| STRC-1 | Every club has a snack bar and a merchandise shop. Each opens at **level 1, free**, and goes up to **level 10**. |
+| STRC-2 | Only a human manager can order an upgrade. A computer-run club stays at the level it has (level 1). |
+| STRC-3 | An upgrade is **paid in full when ordered**, from available cash (`FIN-10`), in one ledger entry (`structure_upgrade`). It takes **1 day** to reach level 2 or 3, **2** for 4 or 5, **3** for 6, **4** for 7, **5** for 8, **6** for 9 and **7** for 10. One upgrade per building at a time; the building keeps trading at its old level until the work is finished, when an inbox message says so. There is no cancelling. The order carries the building's version, so a retried or doubled order is refused rather than paid for twice (`CONC-1`, `FIN-17`). |
+| STRC-4 | **Snack bar takings** for a home match = spectators × the spend for the level × (1 + the result bonus). The spectators are the places the match sold (`STAD-5`). The spend per spectator is **1.00** at level 1 and rises by **0.25** a level to **3.25** at level 10, in every tier. They are booked with the gate when the round is published, under the same correlation key. |
+| STRC-5 | **The result bonus** is judged against the home side's frozen expectation (`FAN-4`), with the fans' own thresholds (underdog: under 1.00 expected points; favourite: 1.60 or more). A **win as the underdog +30%**, a **win in an even game +15%**, a **win as the favourite +5%**, a **draw as the underdog +10%**. Any other result earns nothing. The cap is 30%. Where no expectation was frozen, the figure for two evenly matched sides with one at home (1.64 expected points, so a favourite) stands in, as it does for the fans. |
+| STRC-6 | **Merchandise takings** for a week = the club's fans × the spend for the level × (1 + the mood bonus). The spend per fan per week is **0.30** at level 1 and rises by **0.10** a level to **1.20** at level 10, in every tier. They are booked in the weekly finance run, right after sponsorship. |
+| STRC-7 | **The mood bonus** is read from the fans' mood word at the week's close (`FAN-2`): Furious 0%, Angry 0%, Unhappy +2%, Calm +5%, Content +10%, Delighted +18%, Euphoric +25%. The weekly finance run (Sunday 23:00) comes before the fan review (23:30), so the mood is the one the week ended on. |
+| STRC-8 | **Upkeep.** Each building costs a weekly upkeep for its level, at a tier-1 club **300.00** at level 1, then 450.00, 600.00, 800.00, 1,000.00, 1,250.00, 1,500.00, 1,800.00, 2,150.00 and **2,500.00** at level 10. Both are booked as **one** entry in the weekly finance run (`structure_upkeep`), after the operating cost, and they count toward the shortfall check that triggers an emergency grant (`FIN-16`). A week with no home match therefore shows a small loss on the snack bar. |
+| STRC-9 | **Money scales by tier like every other baseline** (`WORLD-4`): upkeep and the cost of an upgrade are halved per tier below the first. The spend per spectator and per fan is **not** scaled: a lower division earns less because its crowds and fans are smaller. These values are provisional until the finance rework. |
+
+The cost of an upgrade at a tier-1 club, by the level it reaches: **25,000.00** for level 2, then 35,000.00, 50,000.00, 70,000.00, 95,000.00, 130,000.00, 175,000.00, 235,000.00 and **315,000.00** for level 10, halved per tier. Each building's history (a sale for each home match, a sale for each week, and each week's upkeep) is kept as append-only rows, which the Structures page reads as the last eight weeks, the last eight home matches and the season's totals.
+
+**Measured** (M6: a probe with no match simulated, one season of 34 matchdays with 17 home matches and 11⅓ weekly runs, both buildings at one level, fans Calm, and a typical home season for the snack bar: 5 wins in an even game, 2 as the underdog, 2 as the favourite, 1 underdog draw, which lifts the base by about 9%):
+
+- **A tier-1 club at its opening numbers** (10,000 fans, 5,000 places, a crowd of 2,890, a gate of 846,600 a season) earns from the two buildings a profit, after upkeep, of **82,510** at level 1 (9.7% of the gate), **167,852** at level 5 (19.8%) and **260,364** at level 10 (30.8%). Bringing both from level 1 to 5 costs 360,000 and to 10 costs 2,260,000.
+- **A big tier-1 club** (40,000 fans, 20,000 places, a crowd of 11,560, a gate of 3,386,400) earns **350,438** at level 1 (10.3%), **739,409** at level 5 (21.8%) and **1,211,457** at level 10 (35.8%).
+- **A tier-4 club at its opening numbers** (4,219 fans, a crowd of 1,264, a gate of 53,322) earns **37,659** at level 1 (70.6% of its gate), **79,205** at level 5 and **129,367** at level 10 (2.4 times its gate).
+- **Weeks for one step to pay for itself**, snack bar / shop: level 1 to 2 takes 24 / 28 weeks at a tier-1 opening club, 6 / 6 at a big one and 6 / 7 at a tier-4 club; level 4 to 5 takes 71 / 82, 16 / 18 and 18 / 21; level 9 to 10 takes 378 / 450, 72 / 82 and 83 / 99. The top levels are for big crowds and many fans, as designed.
+- **Every step adds weekly profit** at the opening crowd of every tier tested.
+- **A lower division gains much more from the buildings than a higher one**, because the spend per customer is the same in every tier while upkeep and upgrade costs halve per tier. This is left open for the finance rework (ADR-0080).
 
 ---
 
@@ -781,6 +817,14 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `stadium_build_cost_minor_tier1` | 30,000 / 60,000 / 100,000 / 400,000 minor units per place | STAD-4 (balancing) |
 | `stadium_matchday_demand` | the club's fans × `fan_want_to_come_share_bp` (3,000), × the mood factor | STAD-5 (balancing) |
 | `stadium_demand_share_bp` | 4,500 / 2,000 / 2,800 / 700 | STAD-5 (balancing) |
+| `structure_max_level` / `structure_opening_level` | 10 / 1 | STRC-1 |
+| `structure_snack_spend_minor` | 100, 125, 150, 175, 200, 225, 250, 275, 300, 325 minor units per spectator, levels 1 to 10, every tier | STRC-4 (balancing) |
+| `structure_merch_spend_minor` | 30, 40, 50, 60, 70, 80, 90, 100, 110, 120 minor units per fan per week, levels 1 to 10, every tier | STRC-6 (balancing) |
+| `structure_result_bonus_bp` | 3,000 underdog win / 1,500 even-game win / 500 favourite win / 1,000 underdog draw; cap 3,000 | STRC-5 (balancing) |
+| `structure_mood_bonus_bp` | 0 / 0 / 200 / 500 / 1,000 / 1,800 / 2,500, Furious to Euphoric | STRC-7 (balancing) |
+| `structure_upkeep_minor_tier1` | 30,000, 45,000, 60,000, 80,000, 100,000, 125,000, 150,000, 180,000, 215,000, 250,000 per building per week, levels 1 to 10 | STRC-8 (balancing) |
+| `structure_upgrade_cost_minor_tier1` | 2,500,000, 3,500,000, 5,000,000, 7,000,000, 9,500,000, 13,000,000, 17,500,000, 23,500,000, 31,500,000, for levels 2 to 10 | STRC-3 (balancing) |
+| `structure_build_days` | 1, 1, 2, 2, 3, 4, 5, 6, 7, for levels 2 to 10 | STRC-3 (balancing) |
 | `fan_rule_version` | `fan-rules-v1` | FAN-4 (FIC-8) |
 | `fan_opening_fans_tier1` / `fan_tier_retained` | 10,000 fans / ¾ for each tier below the first | FAN-1 (balancing) |
 | `fan_want_to_come_share_bp` | 3,000 (30% of the fans want to come to a home match) | FAN-1, STAD-5 (balancing) |

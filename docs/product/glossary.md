@@ -94,6 +94,8 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 | **Ledger** | The append-only record of every money movement, from which cash and reserved balances are exactly reconstructible. Corrections are compensating entries (`FIN-12`, `FIN-18`). |
 | **Gate revenue** | Home-match income: what the club's stadium sells at a home match, from its places, their ticket prices, the crowd the tier and form draw (`FIN-3`, `STAD-5`). |
 | **Stadium** | A club's ground: a count of standing, seating, covered and VIP places, from which its level (1–10, one per 5,000 places) and its picture are read (`STAD-1`). |
+| **Snack bar** | A club's building that earns a set amount for every spectator at a home match, lifted by up to 30% by the result; ten levels, level 1 free (`STRC-4`, `STRC-5`). |
+| **Merchandise shop** | A club's building that earns a set amount for every fan each week, lifted by up to 25% by the fans' mood; ten levels, level 1 free (`STRC-6`, `STRC-7`). |
 | **Emergency grant** | A logged, alerted integrity payment made only when a club cannot field a legal squad or pay the next wage run (`FIN-16`). |
 
 ## Platform and operations

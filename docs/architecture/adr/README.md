@@ -107,3 +107,4 @@ the system is shaped the way it is.
 | [0077](0077-free-agents-weekly-generated-pool.md) | Free agents are a weekly generated pool sold through the timed auction | Accepted |
 | [0078](0078-fan-base-satisfaction-and-the-crowd.md) | Every club has a fan count and a mood that results move, and the crowd and the gate are drawn from them | Accepted |
 | [0079](0079-direct-messages-between-managers.md) | Managers write to each other in subject threads, with a length cap, a rate limit and a block switch | Accepted |
+| [0080](0080-club-structures-snack-bar-and-merchandise-shop.md) | Every club has a snack bar and a merchandise shop with ten levels, timed upgrades and weekly upkeep; takings follow the crowd, the result and the fans' mood | Accepted |
