@@ -132,6 +132,18 @@ public sealed class AiMarketPolicyTests
     }
 
     [Fact]
+    public void A_club_with_no_player_in_a_family_can_bid_on_a_listing_in_it()
+    {
+        // Retirements and expiries can leave a club with no attacker at all; the bid must still be made, not throw.
+        var squad = Squad(Composition(goalkeepers: 3, defenders: 7, midfielders: 9, attackers: 0));
+        var listing = AttackListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 1_000_000);
+
+        var plan = AiMarketPolicy.Decide(Club(ClubId(1), squad), [listing]);
+
+        plan.Bids.Should().ContainSingle().Which.ListingId.Should().Be(listing.ListingId);
+    }
+
+    [Fact]
     public void The_club_never_bids_on_its_own_player_or_its_own_leading_bid()
     {
         var clubId = ClubId(1);

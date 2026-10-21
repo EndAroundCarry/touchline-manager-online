@@ -261,7 +261,7 @@ public static class AiMarketPolicy
             decisions.Add(new AiBidDecision(listing.ListingId, amount));
 
             spendable -= amount;
-            familyCounts[listing.Family] = familyCounts[listing.Family] + 1;
+            familyCounts[listing.Family] = familyCounts.GetValueOrDefault(listing.Family) + 1;
             squadCount++;
         }
 
