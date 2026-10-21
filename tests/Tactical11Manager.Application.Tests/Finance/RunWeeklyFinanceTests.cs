@@ -4,9 +4,12 @@ using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
+using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Finance;
+using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Application.Tests.Finance;
 
@@ -27,7 +30,7 @@ public sealed class RunWeeklyFinanceTests
     public async Task Every_club_is_credited_its_sponsorship_and_charged_its_wages_and_costs()
     {
         var clubId = Guid.CreateVersion7();
-        var queries = new StubFinanceQueries(new ClubWeeklyObligations(clubId, 1, WeeklyWageMinor: 1_200_000, ContractedPlayers: 22));
+        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: 1_200_000, players: 22));
         var accounts = new RecordingAccountRepository(FundedAccount(clubId, 50_000_000));
         var ledger = new RecordingLedgerRepository();
         var audit = new RecordingAuditWriter();
@@ -36,17 +39,18 @@ public sealed class RunWeeklyFinanceTests
 
         result.Clubs.Should().Be(1);
         result.Skipped.Should().Be(0);
-        result.Posted.Should().Be(3, "sponsorship, wages, and the operating cost");
+        result.Posted.Should().Be(4, "sponsorship, wages, the operating cost, and the buildings' upkeep");
         result.Grants.Should().Be(0, "a funded club needs no grant");
 
         ledger.Entries.Select(entry => entry.Category).Should().BeEquivalentTo(
-            [LedgerCategory.Sponsorship, LedgerCategory.Wages, LedgerCategory.OperatingCost]);
+            [LedgerCategory.Sponsorship, LedgerCategory.Wages, LedgerCategory.OperatingCost, LedgerCategory.StructureUpkeep]);
 
         var account = accounts.All.Single();
         var expected = 50_000_000
             + WorldRuleSet.WeeklySponsorshipMinorForTier(1)
             - 1_200_000
-            - WorldRuleSet.WeeklyOperatingCostMinorForTier(1);
+            - WorldRuleSet.WeeklyOperatingCostMinorForTier(1)
+            - 2 * StructureRuleSet.UpkeepMinorFor(1, 1);
 
         account.CashMinor.Should().Be(expected);
         account.ReservedMinor.Should().Be(0);
@@ -62,7 +66,7 @@ public sealed class RunWeeklyFinanceTests
     public async Task A_club_that_cannot_pay_is_granted_the_exact_shortfall_and_the_grant_is_audited()
     {
         var clubId = Guid.CreateVersion7();
-        var queries = new StubFinanceQueries(new ClubWeeklyObligations(clubId, 1, WeeklyWageMinor: 10_000_000, ContractedPlayers: 22));
+        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: 10_000_000, players: 22));
         var accounts = new RecordingAccountRepository(FundedAccount(clubId, 1_000_000));
         var ledger = new RecordingLedgerRepository();
         var audit = new RecordingAuditWriter();
@@ -70,7 +74,9 @@ public sealed class RunWeeklyFinanceTests
         var result = await Create(queries, accounts, ledger, audit).ExecuteAsync(Week, CancellationToken.None);
 
         result.Grants.Should().Be(1);
-        result.GrantedMinor.Should().Be(7_000_000, "the week cost 11,000,000 and the club could commit 4,000,000");
+        result.GrantedMinor.Should().Be(
+            7_000_000 + 2 * StructureRuleSet.UpkeepMinorFor(1, 1),
+            "the week cost the wages, the operating cost and both buildings' upkeep, and the club could commit 4,000,000");
 
         var grant = ledger.Entries
             .Should()
@@ -78,7 +84,7 @@ public sealed class RunWeeklyFinanceTests
             .Which;
 
         grant.SourceType.Should().Be(LedgerSourceType.SafetyJob);
-        grant.CashDeltaMinor.Should().Be(7_000_000);
+        grant.CashDeltaMinor.Should().Be(7_000_000 + 2 * StructureRuleSet.UpkeepMinorFor(1, 1));
 
         var account = accounts.All.Single();
         account.CashMinor.Should().Be(0, "the grant covers the week exactly, never more");
@@ -91,7 +97,7 @@ public sealed class RunWeeklyFinanceTests
     public async Task A_week_already_settled_is_skipped_rather_than_charged_again()
     {
         var clubId = Guid.CreateVersion7();
-        var queries = new StubFinanceQueries(new ClubWeeklyObligations(clubId, 1, WeeklyWageMinor: 1_000_000, ContractedPlayers: 22));
+        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: 1_000_000, players: 22));
         var accounts = new RecordingAccountRepository(FundedAccount(clubId, 50_000_000));
         var ledger = new RecordingLedgerRepository();
 
@@ -110,8 +116,8 @@ public sealed class RunWeeklyFinanceTests
     public async Task The_run_commits_once_for_the_whole_world()
     {
         var queries = new StubFinanceQueries(
-            new ClubWeeklyObligations(Guid.CreateVersion7(), 1, 1_000_000, 22),
-            new ClubWeeklyObligations(Guid.CreateVersion7(), 2, 500_000, 20));
+            Obligations(Guid.CreateVersion7(), 1, wage: 1_000_000, players: 22),
+            Obligations(Guid.CreateVersion7(), 2, wage: 500_000, players: 20));
 
         var accounts = new RecordingAccountRepository(
             FundedAccount(queries.Clubs[0].ClubId, 50_000_000),
@@ -138,16 +144,153 @@ public sealed class RunWeeklyFinanceTests
         unitOfWork.Saves.Should().Be(0);
     }
 
+    [Fact]
+    public async Task The_merchandise_shop_credits_the_fans_times_the_spend_lifted_by_their_mood()
+    {
+        var clubId = Guid.CreateVersion7();
+        var queries = new StubFinanceQueries(
+            Obligations(clubId, 1, wage: 0, players: 0, fans: 10_000, moodBp: 5_000, merchandiseLevel: 3));
+
+        var accounts = new RecordingAccountRepository(FundedAccount(clubId, 50_000_000));
+        var ledger = new RecordingLedgerRepository();
+        var structures = new RecordingStructureRepository();
+
+        await Create(queries, accounts, ledger, new RecordingAuditWriter(), structures: structures)
+            .ExecuteAsync(Week, CancellationToken.None);
+
+        var expected = StructureRuleSet.MerchTakingsMinorFor(3, 10_000, FanMoods.WordFor(5_000));
+
+        expected.Should().BeGreaterThan(10_000 * StructureRuleSet.MerchSpendMinor(3), "calm fans lift the takings");
+
+        var entry = ledger.Entries.Should().ContainSingle(item => item.Category == LedgerCategory.Merchandise).Which;
+
+        entry.CashDeltaMinor.Should().Be(expected);
+        entry.CorrelationId.Should().Be($"weekly-run:{Week:yyyy-MM-dd}:{clubId:D}");
+
+        var row = structures.Takings.Should().ContainSingle(item => item.RowKind == StructureTakingsKind.WeekSale).Which;
+
+        row.Kind.Should().Be(StructureKind.Merchandise);
+        row.Level.Should().Be(3);
+        row.Customers.Should().Be(10_000);
+        row.AmountMinor.Should().Be(expected);
+        row.WeekOf.Should().Be(Week);
+        row.LedgerEntryId.Should().Be(entry.Id);
+    }
+
+    [Fact]
+    public async Task One_combined_upkeep_entry_is_booked_and_each_building_gets_its_own_takings_row()
+    {
+        var clubId = Guid.CreateVersion7();
+        var queries = new StubFinanceQueries(
+            Obligations(clubId, 2, wage: 0, players: 0, snackBarLevel: 4, merchandiseLevel: 2));
+
+        var accounts = new RecordingAccountRepository(FundedAccount(clubId, 50_000_000));
+        var ledger = new RecordingLedgerRepository();
+        var structures = new RecordingStructureRepository();
+
+        await Create(queries, accounts, ledger, new RecordingAuditWriter(), structures: structures)
+            .ExecuteAsync(Week, CancellationToken.None);
+
+        var snack = StructureRuleSet.UpkeepMinorFor(4, 2);
+        var merch = StructureRuleSet.UpkeepMinorFor(2, 2);
+
+        var entry = ledger.Entries.Should().ContainSingle(item => item.Category == LedgerCategory.StructureUpkeep).Which;
+
+        entry.CashDeltaMinor.Should().Be(-(snack + merch));
+
+        var rows = structures.Takings.Where(item => item.RowKind == StructureTakingsKind.Upkeep).ToList();
+
+        rows.Should().HaveCount(2);
+        rows.Single(item => item.Kind == StructureKind.SnackBar).AmountMinor.Should().Be(-snack);
+        rows.Single(item => item.Kind == StructureKind.Merchandise).AmountMinor.Should().Be(-merch);
+        rows.Should().OnlyContain(item => item.LedgerEntryId == entry.Id && item.WeekOf == Week);
+    }
+
+    [Fact]
+    public async Task A_club_with_no_fans_sells_no_merchandise_and_writes_no_empty_entry()
+    {
+        var clubId = Guid.CreateVersion7();
+        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: 0, players: 0, fans: 0));
+        var ledger = new RecordingLedgerRepository();
+        var structures = new RecordingStructureRepository();
+
+        await Create(
+                queries,
+                new RecordingAccountRepository(FundedAccount(clubId, 50_000_000)),
+                ledger,
+                new RecordingAuditWriter(),
+                structures: structures)
+            .ExecuteAsync(Week, CancellationToken.None);
+
+        ledger.Entries.Should().NotContain(item => item.Category == LedgerCategory.Merchandise);
+        structures.Takings.Should().NotContain(item => item.RowKind == StructureTakingsKind.WeekSale);
+    }
+
+    [Fact]
+    public async Task The_upkeep_counts_toward_the_shortfall_that_triggers_the_emergency_grant()
+    {
+        var clubId = Guid.CreateVersion7();
+        var upkeep = 2 * StructureRuleSet.UpkeepMinorFor(1, 1);
+
+        // The wages are set so the sponsorship alone covers the week before the upkeep, and the club holds one
+        // unit of cash: a grant can only be the upkeep tipping the week over.
+        var wage = WorldRuleSet.WeeklySponsorshipMinorForTier(1) - WorldRuleSet.WeeklyOperatingCostMinorForTier(1);
+        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: wage, players: 22));
+        var accounts = new RecordingAccountRepository(FundedAccount(clubId, 1));
+        var ledger = new RecordingLedgerRepository();
+
+        var result = await Create(queries, accounts, ledger, new RecordingAuditWriter())
+            .ExecuteAsync(Week, CancellationToken.None);
+
+        result.Grants.Should().Be(1, "the buildings' upkeep is owed like the wages");
+        result.GrantedMinor.Should().Be(upkeep - 1, "the grant is exactly what the upkeep needs beyond the cash in hand");
+        accounts.All.Single().CashMinor.Should().Be(0, "the grant covers the week exactly, never more");
+    }
+
+    [Fact]
+    public async Task A_settled_week_writes_no_takings_rows()
+    {
+        var clubId = Guid.CreateVersion7();
+        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: 0, players: 0, fans: 10_000, moodBp: 5_000));
+        var ledger = new RecordingLedgerRepository();
+        var structures = new RecordingStructureRepository();
+
+        ledger.Existing.Add($"weekly-run:{Week:yyyy-MM-dd}:{clubId:D}");
+
+        await Create(
+                queries,
+                new RecordingAccountRepository(FundedAccount(clubId, 50_000_000)),
+                ledger,
+                new RecordingAuditWriter(),
+                structures: structures)
+            .ExecuteAsync(Week, CancellationToken.None);
+
+        structures.Takings.Should().BeEmpty("a retried week must not write its history twice (FIN-17)");
+    }
+
+    private static ClubWeeklyObligations Obligations(
+        Guid clubId,
+        int tier,
+        long wage,
+        int players,
+        int fans = 0,
+        int moodBp = 5_000,
+        int snackBarLevel = 1,
+        int merchandiseLevel = 1) =>
+        new(clubId, tier, wage, players, fans, moodBp, snackBarLevel, merchandiseLevel);
+
     private static RunWeeklyFinance Create(
         StubFinanceQueries queries,
         RecordingAccountRepository accounts,
         RecordingLedgerRepository ledger,
         RecordingAuditWriter audit,
-        RecordingUnitOfWork? unitOfWork = null) =>
+        RecordingUnitOfWork? unitOfWork = null,
+        RecordingStructureRepository? structures = null) =>
         new(
             queries,
             accounts,
             ledger,
+            structures ?? new RecordingStructureRepository(),
             audit,
             unitOfWork ?? new RecordingUnitOfWork(),
             new FixedClock(),
@@ -238,6 +381,26 @@ public sealed class RunWeeklyFinanceTests
             DateTimeOffset instant,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyDictionary<Guid, long>>(new Dictionary<Guid, long>());
+    }
+
+    private sealed class RecordingStructureRepository : IStructureRepository
+    {
+        public List<ClubStructureTakings> Takings { get; } = [];
+
+        public void Add(ClubStructure building)
+        {
+        }
+
+        public void AddTakings(ClubStructureTakings takings) => Takings.Add(takings);
+
+        public Task<ClubStructure?> FindAsync(Guid buildingId, CancellationToken cancellationToken) =>
+            Task.FromResult<ClubStructure?>(null);
+
+        public Task<ClubStructure?> FindByClubAsync(Guid clubId, StructureKind kind, CancellationToken cancellationToken) =>
+            Task.FromResult<ClubStructure?>(null);
+
+        public Task<IReadOnlyList<ClubStructure>> ListByClubAsync(Guid clubId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ClubStructure>>([]);
     }
 
     private sealed class RecordingAuditWriter : IAuditWriter

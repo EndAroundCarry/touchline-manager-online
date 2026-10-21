@@ -147,9 +147,9 @@ public sealed class PublishMatchday
 
         var positions = await RebuildTableAsync(workload.Matchday.DivisionSeasonId, now, cancellationToken);
 
-        // The gate is drawn by the fans going into the round, and staged in this transaction so the result and
-        // the money it earned become public together (FIN-3, §7.4.7).
-        await _finances.PostGateReceiptsAsync(
+        // The gate and the snack bar are drawn by the fans going into the round, and staged in this transaction
+        // so the result and the money it earned become public together (FIN-3, STRC-4, §7.4.7).
+        await _finances.PostMatchdayTakingsAsync(
             workload.Matchday.Id,
             published,
             now,

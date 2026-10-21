@@ -2,6 +2,9 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tactical11Manager.Application.Finance;
+using Tactical11Manager.Domain.Finance;
+using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 using Tactical11Manager.Infrastructure.Persistence;
 using Tactical11Manager.Infrastructure.Tests.Competition;
 
@@ -73,6 +76,44 @@ public sealed class WeeklyFinanceRunTests
                 account => new { account.CashMinor, account.ReservedMinor, account.LastLedgerSequence });
 
         balancesAfterSecond.Should().BeEquivalentTo(balancesAfterFirst, "a retried week moves no money");
+    }
+
+    [Fact]
+    public async Task Settling_a_week_books_every_clubs_merchandise_and_upkeep_once_at_level_one()
+    {
+        var week = new DateOnly(2026, 10, 4);
+
+        await using var scope = Fixture.CreateScope();
+        var run = scope.ServiceProvider.GetRequiredService<RunWeeklyFinance>();
+
+        var first = await run.ExecuteAsync(week, CancellationToken.None);
+        var second = await run.ExecuteAsync(week, CancellationToken.None);
+
+        second.Skipped.Should().Be(first.Clubs, "the week is already settled");
+
+        await using var readScope = Fixture.CreateScope();
+        var readDb = readScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var weekly = await readDb.LedgerEntries
+            .Where(entry => entry.CorrelationId.StartsWith(WeekPrefix(week)))
+            .ToListAsync();
+
+        weekly.Count(entry => entry.Category == LedgerCategory.Merchandise).Should().Be(first.Clubs, "every club has fans (STRC-6)");
+        weekly.Count(entry => entry.Category == LedgerCategory.StructureUpkeep).Should().Be(first.Clubs, "one combined entry per club (STRC-8)");
+        weekly.Where(entry => entry.Category == LedgerCategory.Merchandise).Should().OnlyContain(entry => entry.CashDeltaMinor > 0);
+        weekly.Where(entry => entry.Category == LedgerCategory.StructureUpkeep).Should().OnlyContain(entry => entry.CashDeltaMinor < 0);
+
+        var rows = await readDb.ClubStructureTakings.Where(row => row.WeekOf == week).ToListAsync();
+
+        rows.Count(row => row.RowKind == StructureTakingsKind.WeekSale).Should().Be(first.Clubs);
+        rows.Count(row => row.RowKind == StructureTakingsKind.Upkeep).Should().Be(first.Clubs * 2, "one row per building");
+        rows.Should().OnlyContain(row => row.Level == StructureRuleSet.OpeningLevel, "a new world opens both buildings at level 1");
+
+        // Each club's two upkeep rows add up to the one ledger entry that charged them.
+        foreach (var upkeep in weekly.Where(entry => entry.Category == LedgerCategory.StructureUpkeep))
+        {
+            rows.Where(row => row.LedgerEntryId == upkeep.Id).Sum(row => row.AmountMinor).Should().Be(upkeep.CashDeltaMinor);
+        }
     }
 
     private static string WeekPrefix(DateOnly week) => $"weekly-run:{week:yyyy-MM-dd}:";

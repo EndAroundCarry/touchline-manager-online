@@ -68,7 +68,8 @@ public sealed class FinanceCalendarSource : ICalendarEventSource
         var first = lines[0];
         var net = lines.Sum(line => line.CashDeltaMinor);
         var isWeekly = lines.Any(line => line.Category is
-            LedgerCategory.Sponsorship or LedgerCategory.Wages or LedgerCategory.OperatingCost);
+            LedgerCategory.Sponsorship or LedgerCategory.Wages or LedgerCategory.OperatingCost
+                or LedgerCategory.Merchandise or LedgerCategory.StructureUpkeep);
 
         var title = isWeekly
             ? WeeklyTitle

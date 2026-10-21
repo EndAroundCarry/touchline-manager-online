@@ -44,6 +44,9 @@ internal sealed class FinanceQueries : IFinanceQueries
             join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
             join fanBase in _dbContext.ClubFanBases on entry.ClubId equals fanBase.ClubId into fanBases
             from fanBase in fanBases.DefaultIfEmpty()
+            join snackBar in _dbContext.ClubStructures.Where(building => building.Kind == StructureKind.SnackBar)
+                on entry.ClubId equals snackBar.ClubId into snackBars
+            from snackBar in snackBars.DefaultIfEmpty()
             where entry.DivisionSeasonId == divisionSeasonId.Value
             select new
             {
@@ -55,6 +58,7 @@ internal sealed class FinanceQueries : IFinanceQueries
                 division.TierNumber,
                 Fans = (int?)fanBase.Fans,
                 MoodBp = (int?)fanBase.MoodBp,
+                SnackBarLevel = (int?)snackBar.Level,
             })
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -72,7 +76,8 @@ internal sealed class FinanceQueries : IFinanceQueries
                     new StadiumSeats(row.StandingSeats, row.SeatingSeats, row.CoveredSeats, row.VipSeats),
                     row.TierNumber,
                     row.Fans ?? opening.Fans,
-                    row.MoodBp ?? opening.MoodBp);
+                    row.MoodBp ?? opening.MoodBp,
+                    row.SnackBarLevel ?? StructureRuleSet.OpeningLevel);
             }),
         ];
     }
@@ -124,15 +129,42 @@ internal sealed class FinanceQueries : IFinanceQueries
 
         var wageByClub = wages.ToDictionary(row => row.ClubId);
 
+        // The merchandise shop sells to the fans as they stand at the close of the week, and the fan review
+        // follows the finance run, so this is the week's closing mood (STRC-6). A club whose fan base has not
+        // been opened yet sells to a new club's opening fans, calm, as the gate does.
+        var fanBases = await _dbContext.ClubFanBases
+            .AsNoTracking()
+            .Select(fanBase => new { fanBase.ClubId, fanBase.Fans, fanBase.MoodBp })
+            .ToListAsync(cancellationToken);
+
+        var fansByClub = fanBases.ToDictionary(row => row.ClubId);
+
+        var buildings = await _dbContext.ClubStructures
+            .AsNoTracking()
+            .Select(building => new { building.ClubId, building.Kind, building.Level })
+            .ToListAsync(cancellationToken);
+
+        var levelByBuilding = buildings.ToDictionary(row => (row.ClubId, row.Kind), row => row.Level);
+
         return
         [
             .. tiers
                 .OrderBy(row => row.ClubId)
-                .Select(row => new ClubWeeklyObligations(
-                    row.ClubId,
-                    row.TierNumber,
-                    wageByClub.TryGetValue(row.ClubId, out var wage) ? wage.Total : 0,
-                    wageByClub.TryGetValue(row.ClubId, out var counted) ? counted.Count : 0)),
+                .Select(row =>
+                {
+                    var opening = FanRuleSet.OpeningFor(row.TierNumber);
+                    var hasFans = fansByClub.TryGetValue(row.ClubId, out var fanBase);
+
+                    return new ClubWeeklyObligations(
+                        row.ClubId,
+                        row.TierNumber,
+                        wageByClub.TryGetValue(row.ClubId, out var wage) ? wage.Total : 0,
+                        wageByClub.TryGetValue(row.ClubId, out var counted) ? counted.Count : 0,
+                        hasFans ? fanBase!.Fans : opening.Fans,
+                        hasFans ? fanBase!.MoodBp : opening.MoodBp,
+                        levelByBuilding.GetValueOrDefault((row.ClubId, StructureKind.SnackBar), StructureRuleSet.OpeningLevel),
+                        levelByBuilding.GetValueOrDefault((row.ClubId, StructureKind.Merchandise), StructureRuleSet.OpeningLevel));
+                }),
         ];
     }
 

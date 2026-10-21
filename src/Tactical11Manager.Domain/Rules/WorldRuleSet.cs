@@ -152,6 +152,23 @@ public static class WorldRuleSet
     /// </remarks>
     public static readonly TimeOnly WeeklyFinanceUtc = new(23, 0);
 
+    /// <summary>The date of the weekly finance boundary that settles an instant: the first Sunday 23:00 UTC at or after it (`CON-2`).</summary>
+    /// <param name="instant">The instant, such as a fixture's kickoff.</param>
+    /// <remarks>
+    /// The weekly run keys its postings by this date, so a home match's snack bar takings and the same week's
+    /// upkeep line up in the structure history (`STRC-4`, `STRC-8`).
+    /// </remarks>
+    public static DateOnly WeeklyFinanceDateFor(DateTimeOffset instant)
+    {
+        var utc = instant.UtcDateTime;
+        var daysToSunday = ((int)DayOfWeek.Sunday - (int)utc.DayOfWeek + 7) % 7;
+        var date = DateOnly.FromDateTime(utc).AddDays(daysToSunday);
+
+        return daysToSunday == 0 && TimeOnly.FromDateTime(utc) >= WeeklyFinanceUtc
+            ? date.AddDays(7)
+            : date;
+    }
+
     /// <summary>The weekly sponsorship credit for a tier-1 club, in minor units. A balancing value (`FIN-4`).</summary>
     public const long WeeklySponsorshipMinorTier1 = 3_000_000;
 

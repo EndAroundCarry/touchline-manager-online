@@ -1,4 +1,5 @@
 using Tactical11Manager.Domain.Finance;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Application.Abstractions.Finance;
@@ -17,7 +18,14 @@ namespace Tactical11Manager.Application.Abstractions.Finance;
 /// <param name="TierNumber">The tier the club plays in, 1 and up.</param>
 /// <param name="Fans">The club's fans. A club with no fan base yet reads as the tier's opening fans.</param>
 /// <param name="MoodBp">The fans' mood, 0 to 10,000. A club with no fan base yet reads as calm.</param>
-public sealed record ClubRevenueBasis(Guid ClubId, StadiumSeats Seats, int TierNumber, int Fans, int MoodBp);
+/// <param name="SnackBarLevel">The snack bar's level, which prices each spectator's spend (`STRC-4`). A club with no snack bar yet reads as level 1.</param>
+public sealed record ClubRevenueBasis(
+    Guid ClubId,
+    StadiumSeats Seats,
+    int TierNumber,
+    int Fans,
+    int MoodBp,
+    int SnackBarLevel = StructureRuleSet.OpeningLevel);
 
 /// <summary>
 /// One club's obligations for a week's finance run: the tier it plays in and what its squad costs (`FIN-7`).
@@ -26,11 +34,19 @@ public sealed record ClubRevenueBasis(Guid ClubId, StadiumSeats Seats, int TierN
 /// <param name="TierNumber">The tier the club plays in, which scales the sponsorship and the operating cost.</param>
 /// <param name="WeeklyWageMinor">The club's active contracts' total weekly wage, in minor units.</param>
 /// <param name="ContractedPlayers">How many active contracts that total covers.</param>
+/// <param name="Fans">The club's fans at the week's close, which the merchandise shop sells to (`STRC-6`). A club with no fan base yet reads as the tier's opening fans.</param>
+/// <param name="MoodBp">The fans' mood, 0 to 10,000, which lifts the merchandise takings (`STRC-7`). A club with no fan base yet reads as calm.</param>
+/// <param name="SnackBarLevel">The snack bar's level, which sets its upkeep (`STRC-8`).</param>
+/// <param name="MerchandiseLevel">The merchandise shop's level, which sets its spend and its upkeep (`STRC-6`, `STRC-8`).</param>
 public sealed record ClubWeeklyObligations(
     Guid ClubId,
     int TierNumber,
     long WeeklyWageMinor,
-    int ContractedPlayers);
+    int ContractedPlayers,
+    int Fans,
+    int MoodBp,
+    int SnackBarLevel,
+    int MerchandiseLevel);
 
 /// <summary>One ledger category's net cash movement over a season.</summary>
 /// <param name="Category">The category.</param>

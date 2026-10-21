@@ -1,12 +1,16 @@
+using Tactical11Manager.Application.Abstractions.Fans;
 using Tactical11Manager.Application.Abstractions.Finance;
+using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Application.Finance;
 
 /// <summary>
-/// Posts a published round's gate revenue (`FIN-3`, master plan §7.4.7).
+/// Posts a published round's gate revenue and snack bar takings (`FIN-3`, `STRC-4`, master plan §7.4.7).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,31 +25,44 @@ namespace Tactical11Manager.Application.Finance;
 /// correlation key is the fixture, so a retried publication collides with the first entry rather than
 /// drawing the gate twice (`FIN-17`).
 /// </para>
+/// <para>
+/// The snack bar sells to the same crowd the gate was drawn for, and the result lifts what it takes: a win the
+/// fans did not expect lifts it most. The result is judged against the expectation frozen when the team sheets
+/// locked, exactly as the fans judge it, so the fans and the snack bar agree on who was the underdog
+/// (`STRC-5`). Its takings share the fixture's correlation key and are told apart from the gate by their
+/// category.
+/// </para>
 /// </remarks>
 public sealed class MatchdayFinances
 {
     private readonly IFinanceQueries _queries;
     private readonly IClubAccountRepository _accounts;
     private readonly ILedgerRepository _ledger;
+    private readonly IFanRepository _fans;
+    private readonly IStructureRepository _structures;
 
     /// <summary>Initializes the collaborator.</summary>
     public MatchdayFinances(
         IFinanceQueries queries,
         IClubAccountRepository accounts,
-        ILedgerRepository ledger)
+        ILedgerRepository ledger,
+        IFanRepository fans,
+        IStructureRepository structures)
     {
         _queries = queries;
         _accounts = accounts;
         _ledger = ledger;
+        _fans = fans;
+        _structures = structures;
     }
 
-    /// <summary>Posts one gate receipt per published fixture's host club.</summary>
+    /// <summary>Posts one gate receipt and one snack bar sale per published fixture's host club.</summary>
     /// <param name="matchdayId">The round being published, which names the division to price.</param>
     /// <param name="published">The fixtures the round published.</param>
     /// <param name="now">The current instant, taken from the caller's clock (`TIME-2`).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>How many gate receipts were posted.</returns>
-    public async Task<int> PostGateReceiptsAsync(
+    public async Task<int> PostMatchdayTakingsAsync(
         Guid matchdayId,
         IReadOnlyList<Fixture> published,
         DateTimeOffset now,
@@ -65,6 +82,11 @@ public sealed class MatchdayFinances
                 [.. published.Select(fixture => fixture.HomeClubId).Distinct()],
                 cancellationToken))
             .ToDictionary(account => account.ClubId);
+
+        var expected = (await _fans.LoadExpectationsAsync(
+                [.. published.Select(fixture => fixture.Id)],
+                cancellationToken))
+            .ToDictionary(expectation => (expectation.FixtureId, expectation.ClubId));
 
         var posted = 0;
 
@@ -100,8 +122,66 @@ public sealed class MatchdayFinances
                 now));
 
             posted++;
+
+            // A fixture locked before the fan module existed has no frozen expectation, and is judged as an
+            // even game at the ground it was played on, the same fallback the fans use (STRC-5).
+            var expectedPoints = expected.TryGetValue((fixture.Id, clubId), out var frozen)
+                ? frozen.ExpectedPointsCentis
+                : FanRuleSet.ExpectationForGap(0, atHome: true).ExpectedPointsCentis;
+
+            PostSnackBar(fixture, revenue, account, expectedPoints, now);
         }
 
         return posted;
+    }
+
+    private void PostSnackBar(
+        Fixture fixture,
+        ClubRevenueBasis revenue,
+        ClubAccount account,
+        int expectedPointsCentis,
+        DateTimeOffset now)
+    {
+        var spectators = StadiumRuleSet.AttendanceFor(revenue.Seats, revenue.Fans, revenue.MoodBp);
+        var bonus = StructureRuleSet.ResultBonusFor(
+            fixture.HomeScore!.Value,
+            fixture.AwayScore!.Value,
+            expectedPointsCentis);
+
+        var baseMinor = StructureRuleSet.SnackBaseMinorFor(revenue.SnackBarLevel, spectators);
+        var amount = StructureRuleSet.WithBonus(baseMinor, bonus.Bp);
+
+        // A ledger entry is never empty, so a crowd of nobody sells nothing and writes nothing.
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        var entryId = Guid.CreateVersion7();
+
+        _ledger.Add(account.Post(
+            LedgerPostings.SnackBarTakings(
+                entryId,
+                revenue.ClubId,
+                fixture.Id,
+                revenue.SnackBarLevel,
+                spectators,
+                bonus.Bp,
+                amount),
+            now));
+
+        _structures.AddTakings(ClubStructureTakings.MatchSale(
+            Guid.CreateVersion7(),
+            revenue.ClubId,
+            fixture.Id,
+            WorldRuleSet.WeeklyFinanceDateFor(fixture.KickoffAt),
+            revenue.SnackBarLevel,
+            spectators,
+            baseMinor,
+            bonus.Bp,
+            bonus.Reason,
+            amount,
+            entryId,
+            now));
     }
 }

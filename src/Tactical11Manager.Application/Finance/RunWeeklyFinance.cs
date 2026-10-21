@@ -3,7 +3,10 @@ using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
+using Tactical11Manager.Application.Abstractions.World;
+using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Application.Finance;
 
@@ -21,8 +24,8 @@ public sealed record RunWeeklyFinanceResult(
     long GrantedMinor);
 
 /// <summary>
-/// Settles one week's sponsorship, wages, and operating cost for every club, granting emergency funds where
-/// a club cannot pay (`CON-2`, `FIN-4`, `FIN-7`, `FIN-9`, `FIN-16`).
+/// Settles one week's sponsorship, merchandise, wages, operating cost, and structure upkeep for every club,
+/// granting emergency funds where a club cannot pay (`CON-2`, `FIN-4`, `FIN-7`, `FIN-9`, `FIN-16`, `STRC-6`, `STRC-8`).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -47,6 +50,7 @@ public sealed partial class RunWeeklyFinance
     private readonly IFinanceQueries _queries;
     private readonly IClubAccountRepository _accounts;
     private readonly ILedgerRepository _ledger;
+    private readonly IStructureRepository _structures;
     private readonly IAuditWriter _audit;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
@@ -57,6 +61,7 @@ public sealed partial class RunWeeklyFinance
         IFinanceQueries queries,
         IClubAccountRepository accounts,
         ILedgerRepository ledger,
+        IStructureRepository structures,
         IAuditWriter audit,
         IUnitOfWork unitOfWork,
         IClock clock,
@@ -65,6 +70,7 @@ public sealed partial class RunWeeklyFinance
         _queries = queries;
         _accounts = accounts;
         _ledger = ledger;
+        _structures = structures;
         _audit = audit;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -138,8 +144,50 @@ public sealed partial class RunWeeklyFinance
                 posted++;
             }
 
+            // The shop sells all week to the fans as they close it, and its credit is in the account before the
+            // guard reads it, like the sponsorship (STRC-6, STRC-7).
+            var moodBonus = StructureRuleSet.MoodBonusFor(FanMoods.WordFor(club.MoodBp));
+            var merchBase = StructureRuleSet.MerchBaseMinorFor(club.MerchandiseLevel, club.Fans);
+            var merchandise = StructureRuleSet.WithBonus(merchBase, moodBonus.Bp);
+
+            if (merchandise > 0)
+            {
+                var entryId = Guid.CreateVersion7();
+
+                _ledger.Add(account.Post(
+                    LedgerPostings.MerchandiseTakings(
+                        entryId,
+                        club.ClubId,
+                        weekOf,
+                        club.MerchandiseLevel,
+                        club.Fans,
+                        moodBonus.Bp,
+                        merchandise),
+                    now));
+
+                _structures.AddTakings(ClubStructureTakings.WeekSale(
+                    Guid.CreateVersion7(),
+                    club.ClubId,
+                    weekOf,
+                    club.MerchandiseLevel,
+                    club.Fans,
+                    merchBase,
+                    moodBonus.Bp,
+                    moodBonus.Reason,
+                    merchandise,
+                    entryId,
+                    now));
+
+                posted++;
+            }
+
             var operating = WorldRuleSet.WeeklyOperatingCostMinorForTier(club.TierNumber);
-            var outgoings = club.WeeklyWageMinor + operating;
+            var snackUpkeep = StructureRuleSet.UpkeepMinorFor(club.SnackBarLevel, club.TierNumber);
+            var merchUpkeep = StructureRuleSet.UpkeepMinorFor(club.MerchandiseLevel, club.TierNumber);
+            var upkeep = snackUpkeep + merchUpkeep;
+
+            // The upkeep is owed whatever the shop earned, so it counts toward the shortfall like the wages (STRC-8).
+            var outgoings = club.WeeklyWageMinor + operating + upkeep;
 
             // The week's credit is in the account before the guard reads it, because it is the week's income.
             var shortfall = ClubSolvencyGuard.Shortfall(account.AvailableMinor, outgoings);
@@ -192,6 +240,28 @@ public sealed partial class RunWeeklyFinance
 
                 posted++;
             }
+
+            // One entry for both buildings, because the ledger allows one entry per category per week; the
+            // per-building split is in the takings rows (STRC-8).
+            var upkeepEntryId = Guid.CreateVersion7();
+
+            _ledger.Add(account.Post(
+                LedgerPostings.StructureUpkeep(
+                    upkeepEntryId,
+                    club.ClubId,
+                    weekOf,
+                    club.SnackBarLevel,
+                    club.MerchandiseLevel,
+                    upkeep),
+                now));
+
+            _structures.AddTakings(ClubStructureTakings.Upkeep(
+                Guid.CreateVersion7(), club.ClubId, StructureKind.SnackBar, weekOf, club.SnackBarLevel, snackUpkeep, upkeepEntryId, now));
+
+            _structures.AddTakings(ClubStructureTakings.Upkeep(
+                Guid.CreateVersion7(), club.ClubId, StructureKind.Merchandise, weekOf, club.MerchandiseLevel, merchUpkeep, upkeepEntryId, now));
+
+            posted++;
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

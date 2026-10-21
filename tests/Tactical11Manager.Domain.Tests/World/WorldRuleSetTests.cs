@@ -145,6 +145,21 @@ public sealed class WorldRuleSetTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    [Theory]
+    [InlineData(2026, 10, 16, 12, 2026, 10, 18)] // Friday: the coming Sunday.
+    [InlineData(2026, 10, 17, 19, 2026, 10, 18)] // Saturday evening.
+    [InlineData(2026, 10, 18, 0, 2026, 10, 18)] // Sunday morning: that Sunday's own run.
+    [InlineData(2026, 10, 18, 22, 2026, 10, 18)] // Sunday before the 23:00 boundary.
+    [InlineData(2026, 10, 18, 23, 2026, 10, 25)] // Sunday at the boundary: the run has already taken that week.
+    [InlineData(2026, 10, 19, 1, 2026, 10, 25)] // Monday: the next Sunday.
+    public void A_weekly_finance_date_is_the_sunday_boundary_that_settles_the_instant(
+        int year, int month, int day, int hour, int weekYear, int weekMonth, int weekDay)
+    {
+        var instant = new DateTimeOffset(year, month, day, hour, 0, 0, TimeSpan.Zero);
+
+        WorldRuleSet.WeeklyFinanceDateFor(instant).Should().Be(new DateOnly(weekYear, weekMonth, weekDay));
+    }
+
     [Fact]
     public void The_weekly_run_values_scale_with_tier_and_the_award_decays_with_position()
     {

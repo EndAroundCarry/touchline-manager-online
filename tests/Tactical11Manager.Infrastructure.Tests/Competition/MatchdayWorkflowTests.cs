@@ -11,6 +11,7 @@ using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Match;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
+using Tactical11Manager.Domain.World;
 using Tactical11Manager.Infrastructure.Persistence;
 using Tactical11Manager.MatchEngine;
 using Tactical11Manager.MatchEngine.Configuration;
@@ -550,6 +551,83 @@ public sealed class MatchdayWorkflowTests
             entries.Sum(entry => entry.CashDeltaMinor).Should().Be(account.CashMinor);
             entries.Sum(entry => entry.ReservedDeltaMinor).Should().Be(account.ReservedMinor);
         }
+    }
+
+    [Fact]
+    public async Task Publishing_a_round_posts_the_snack_bar_takings_of_every_host_and_a_republication_adds_none()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var matchdayId = await ClaimRoundAsync(scope);
+
+        await scope.ServiceProvider.GetRequiredService<LockMatchday>().ExecuteAsync(matchdayId, CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<ResolveMatchday>()
+            .ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
+
+        var publish = scope.ServiceProvider.GetRequiredService<PublishMatchday>();
+
+        (await publish.ExecuteAsync(matchdayId, CancellationToken.None)).Outcome.Should().Be(PublishMatchdayOutcome.Published);
+
+        var fixtures = await FixturesOfAsync(db, matchdayId);
+        var fixtureIds = fixtures.Select(fixture => fixture.Id).ToList();
+
+        await using var readScope = Fixture.CreateScope();
+        var readDb = readScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var sales = await readDb.LedgerEntries
+            .Where(entry => entry.Category == LedgerCategory.SnackBar
+                && entry.SourceId != null
+                && fixtureIds.Contains(entry.SourceId.Value))
+            .ToListAsync();
+
+        sales.Should().HaveCount(9, "every home fixture of a round has a crowd (STRC-4)");
+        sales.Select(sale => sale.SourceId).Should().OnlyHaveUniqueItems();
+        sales.Should().OnlyContain(sale => sale.CashDeltaMinor > 0 && sale.SourceType == LedgerSourceType.Matchday);
+
+        var rows = await readDb.ClubStructureTakings
+            .Where(row => row.RowKind == StructureTakingsKind.MatchSale
+                && row.FixtureId != null
+                && fixtureIds.Contains(row.FixtureId.Value))
+            .ToListAsync();
+
+        rows.Should().HaveCount(9);
+        rows.Should().OnlyContain(row => row.Kind == StructureKind.SnackBar && row.Level == StructureRuleSet.OpeningLevel);
+
+        // Each row books exactly what its ledger entry moved, and the amount is the crowd's spend lifted by the
+        // result judged against what the host's fans expected (STRC-4, STRC-5).
+        var expectations = await readDb.FixtureFanExpectations
+            .Where(expectation => fixtureIds.Contains(expectation.FixtureId))
+            .ToDictionaryAsync(expectation => (expectation.FixtureId, expectation.ClubId));
+
+        foreach (var row in rows)
+        {
+            var fixture = fixtures.Single(candidate => candidate.Id == row.FixtureId);
+            var entry = sales.Single(sale => sale.SourceId == fixture.Id);
+            var expected = expectations.TryGetValue((fixture.Id, fixture.HomeClubId), out var frozen)
+                ? frozen.ExpectedPointsCentis
+                : FanRuleSet.ExpectationForGap(0, atHome: true).ExpectedPointsCentis;
+            var bonus = StructureRuleSet.ResultBonusFor(fixture.HomeScore!.Value, fixture.AwayScore!.Value, expected);
+
+            row.LedgerEntryId.Should().Be(entry.Id);
+            row.ClubId.Should().Be(fixture.HomeClubId);
+            row.AmountMinor.Should().Be(entry.CashDeltaMinor);
+            row.BonusBp.Should().Be(bonus.Bp);
+            row.AmountMinor.Should().Be(StructureRuleSet.WithBonus(row.BaseMinor, bonus.Bp));
+            row.BaseMinor.Should().Be(StructureRuleSet.SnackBaseMinorFor(row.Level, row.Customers));
+        }
+
+        // A republication returns before it posts, so the round's takings cannot be drawn twice (FIN-17).
+        (await publish.ExecuteAsync(matchdayId, CancellationToken.None)).Outcome.Should().Be(PublishMatchdayOutcome.AlreadyPublished);
+
+        await using var againScope = Fixture.CreateScope();
+        var againDb = againScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        (await againDb.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.SnackBar
+            && entry.SourceId != null
+            && fixtureIds.Contains(entry.SourceId.Value))).Should().Be(9);
+
+        (await againDb.ClubStructureTakings.CountAsync(row => row.FixtureId != null
+            && fixtureIds.Contains(row.FixtureId.Value))).Should().Be(9);
     }
 
     /// <summary>
