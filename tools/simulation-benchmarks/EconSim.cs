@@ -42,9 +42,8 @@ internal sealed partial class EconSim
     private int _replacementOrdinal;
     private int _listingOrdinal;
 
-    public EconSim(IEconRules rules, ulong seed, int seasons, int youthPerClub = 0, int trainingPercent = 100, int backgroundPercent = 0)
+    public EconSim(IEconRules rules, ulong seed, int seasons, int youthPerClub = 0, int trainingPercent = 100)
     {
-        BackgroundPercent = backgroundPercent;
         Rules = rules;
         YouthPerClub = youthPerClub;
         TrainingPercent = trainingPercent;
@@ -104,9 +103,6 @@ internal sealed partial class EconSim
 
     /// <summary>How fast players develop, as a percentage of today's (100). A what-if: it scales the aptitude the daily progression reads, so decline is untouched.</summary>
     public int TrainingPercent { get; }
-
-    /// <summary>A what-if: the share of a day's development budget that goes, in all, to the attributes the player's programme does not train (0 is the game today).</summary>
-    public int BackgroundPercent { get; }
 
     public int Season { get; private set; }
 
@@ -262,7 +258,7 @@ internal sealed partial class EconSim
             {
                 foreach (var player in club.Squad)
                 {
-                    EconTraining.Day(player, player.AgeIn(GameYear), date, TrainingPercent, BackgroundPercent);
+                    EconTraining.Day(player, player.AgeIn(GameYear), date, TrainingPercent);
                 }
             }
         }

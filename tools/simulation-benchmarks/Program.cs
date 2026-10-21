@@ -268,17 +268,22 @@ if (mode is "tickfans")
 
 if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") == "1")
 {
-    // ECON_PROBE=1 econ <youths> : follows a cohort of generated 17-18-year-olds through daily training for ten years (ECON_TRAIN scales development speed)
+    // ECON_PROBE=1 econ <youths> : follows a cohort of generated 17-18-year-olds through daily training for ten years, then veterans and the drift of adults (ECON_TRAIN scales development speed; ECON_PROBE_POT=18-20 narrows the youths to a potential range)
+    var probePotential = Environment.GetEnvironmentVariable("ECON_PROBE_POT")?.Split('-');
+    var probeLow = probePotential is { Length: 2 } && int.TryParse(probePotential[0], CultureInfo.InvariantCulture, out var probePotentialLow) ? Math.Clamp(probePotentialLow, 1, 20) : 0;
+    var probeHigh = probeLow > 0 && int.TryParse(probePotential![1], CultureInfo.InvariantCulture, out var probePotentialHigh) ? Math.Clamp(probePotentialHigh, probeLow, 20) : 0;
+
     EconTrainingProbe.Run(
         Math.Clamp(positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var probeYouths) ? probeYouths : 120, 10, 2_000),
         10,
         int.TryParse(Environment.GetEnvironmentVariable("ECON_TRAIN"), CultureInfo.InvariantCulture, out var probeTrain) ? Math.Clamp(probeTrain, 25, 1000) : 100,
-        int.TryParse(Environment.GetEnvironmentVariable("ECON_BACKGROUND"), CultureInfo.InvariantCulture, out var probeBackground) ? Math.Clamp(probeBackground, 0, 300) : 0);
+        probeHigh > 0 ? probeLow : 0,
+        probeHigh);
 }
 
 if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") != "1")
 {
-    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of 18 clubs, weekly steps, today's rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per club, default 0; ECON_TRAIN scales development speed in percent, default 100; ECON_BACKGROUND gives untrained attributes a share of the daily budget, default 0)
+    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of 18 clubs, weekly steps, today's rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per club, default 0; ECON_TRAIN scales development speed in percent, default 100)
     EconReport.Run(
         Math.Clamp(positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var econSeeds) ? econSeeds : 3, 1, 10),
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var econSeed) ? econSeed : 5_000UL,
@@ -286,8 +291,7 @@ if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") != "1")
         Environment.GetEnvironmentVariable("ECON_OUT") is { Length: > 0 } econOut ? econOut : Path.Combine(".run-logs", "econ"),
         new TodayEconRules(),
         int.TryParse(Environment.GetEnvironmentVariable("ECON_INTAKE"), CultureInfo.InvariantCulture, out var econIntake) ? Math.Clamp(econIntake, 0, 8) : 0,
-        int.TryParse(Environment.GetEnvironmentVariable("ECON_TRAIN"), CultureInfo.InvariantCulture, out var econTrain) ? Math.Clamp(econTrain, 25, 1000) : 100,
-        int.TryParse(Environment.GetEnvironmentVariable("ECON_BACKGROUND"), CultureInfo.InvariantCulture, out var econBackground) ? Math.Clamp(econBackground, 0, 300) : 0);
+        int.TryParse(Environment.GetEnvironmentVariable("ECON_TRAIN"), CultureInfo.InvariantCulture, out var econTrain) ? Math.Clamp(econTrain, 25, 1000) : 100);
 }
 
 if (mode is "tickfk")

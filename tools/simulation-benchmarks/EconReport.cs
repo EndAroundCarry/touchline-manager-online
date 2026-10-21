@@ -28,7 +28,7 @@ internal static class EconReport
 
     private sealed record Result(ulong Seed, EconSim Sim, double Seconds);
 
-    public static void Run(int seeds, ulong firstSeed, int seasons, string outDir, IEconRules rules, int youthPerClub = 0, int trainingPercent = 100, int backgroundPercent = 0)
+    public static void Run(int seeds, ulong firstSeed, int seasons, string outDir, IEconRules rules, int youthPerClub = 0, int trainingPercent = 100)
     {
         Directory.CreateDirectory(outDir);
 
@@ -39,7 +39,7 @@ internal static class EconReport
         {
             var seed = firstSeed + (ulong)index;
             var watch = Stopwatch.StartNew();
-            var sim = new EconSim(rules, seed, seasons, youthPerClub, trainingPercent, backgroundPercent);
+            var sim = new EconSim(rules, seed, seasons, youthPerClub, trainingPercent);
 
             sim.Run();
             results.Add(new Result(seed, sim, watch.Elapsed.TotalSeconds));
@@ -49,7 +49,7 @@ internal static class EconReport
         WriteClubsCsv(Path.Combine(outDir, "econ-clubs.csv"), results);
         WriteTiersCsv(Path.Combine(outDir, "econ-tiers.csv"), results, seasons);
 
-        var markdown = Markdown(rules, results, seasons, total.Elapsed.TotalSeconds, youthPerClub, trainingPercent, backgroundPercent);
+        var markdown = Markdown(rules, results, seasons, total.Elapsed.TotalSeconds, youthPerClub, trainingPercent);
 
         File.WriteAllText(Path.Combine(outDir, "econ-report.md"), markdown, new UTF8Encoding(false));
         Console.WriteLine(string.Create(Inv, $"econ: {seeds} seeds x {seasons} seasons in {total.Elapsed.TotalSeconds:0.0}s -> {Path.GetFullPath(outDir)}"));
@@ -105,7 +105,7 @@ internal static class EconReport
 
     // ---- the report -------------------------------------------------------------------------------------------------------------------
 
-    private static string Markdown(IEconRules rules, List<Result> results, int seasons, double seconds, int youthPerClub, int trainingPercent, int backgroundPercent)
+    private static string Markdown(IEconRules rules, List<Result> results, int seasons, double seconds, int youthPerClub, int trainingPercent)
     {
         var rows = results.SelectMany(result => result.Sim.Rows).ToList();
         var text = new StringBuilder();
@@ -114,7 +114,7 @@ internal static class EconReport
         text.AppendLine();
         text.AppendLine(string.Create(
             Inv,
-            $"{results.Count} seed(s) ({string.Join(", ", results.Select(result => result.Seed))}), {seasons} seasons, one country of {EconSim.Tiers} tiers of {EconSim.ClubsPerTier} clubs, {seconds:0} s in all. Amounts are what a manager reads (minor units divided by 100); a season is {EconSim.Weeks} settlements. Youth intake: {(youthPerClub == 0 ? "none (the game today)" : $"{youthPerClub} players of 17-18 per club at each rollover")}. Player development speed: {trainingPercent}% of today's; background growth of untrained attributes: {backgroundPercent}% of the daily budget."));
+            $"{results.Count} seed(s) ({string.Join(", ", results.Select(result => result.Seed))}), {seasons} seasons, one country of {EconSim.Tiers} tiers of {EconSim.ClubsPerTier} clubs, {seconds:0} s in all. Amounts are what a manager reads (minor units divided by 100); a season is {EconSim.Weeks} settlements. Youth intake: {(youthPerClub == 0 ? "none (the game today)" : $"{youthPerClub} players of 17-18 per club at each rollover")}. Player development speed: {trainingPercent}% of the rules'."));
         text.AppendLine();
 
         var unbalanced = rows.Count(row => !row.Reconciled);
