@@ -7,13 +7,14 @@ using Xunit.Abstractions;
 namespace Tactical11Manager.Domain.Tests.Squad;
 
 /// <summary>
-/// The deterministic daily progression, `training-v3` (`TRN-1`, `TRN-4`, `TRN-9`, `TRN-10`, `TRN-14`…`TRN-16`).
+/// The deterministic daily progression, `training-v4` (`TRN-1`, `TRN-4`, `TRN-9`, `TRN-10`, `TRN-14`…`TRN-16`).
 /// </summary>
 /// <remarks>
 /// The calculator is a pure function, so these tests need neither a clock nor a database. What they pin is
-/// the contract the worker depends on: the same input reproduces the same day, development is bounded and
-/// split over the programme's attributes by weight, ageing and aptitude shape the pace, and each attribute
-/// carries its own partial progress rather than losing it.
+/// the contract the worker depends on: the same input reproduces the same day, every attribute a player
+/// develops grows, the programme takes the bigger share, development stops at the limit his potential and
+/// position set, ageing and aptitude shape the pace, and each attribute carries its own partial progress
+/// rather than losing it.
 /// </remarks>
 public sealed class DailyProgressionTests
 {
@@ -25,9 +26,9 @@ public sealed class DailyProgressionTests
     public DailyProgressionTests(ITestOutputHelper output) => _output = output;
 
     [Fact]
-    public void The_version_is_training_v3()
+    public void The_version_is_training_v4()
     {
-        DailyProgression.Version.Should().Be("training-v3");
+        DailyProgression.Version.Should().Be("training-v4");
     }
 
     [Fact]
@@ -83,20 +84,76 @@ public sealed class DailyProgressionTests
     }
 
     [Fact]
-    public void A_programme_develops_its_own_attributes_and_leaves_the_others_alone()
+    public void A_programme_is_a_focus_so_its_attributes_grow_faster_than_the_rest()
     {
-        var start = Input(programme: TrainingProgramme.Forward);
-        var end = Simulate(start, days: 400).Attributes;
-        var trained = TrainingProgrammes.Of(TrainingProgramme.Forward);
+        var start = Input(programme: TrainingProgramme.Forward, age: 17, values: Enumerable.Repeat(8, AttributeNames.Count).ToArray());
+        var end = Simulate(start, days: 2 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false).Attributes;
+        var forward = TrainingProgrammes.Of(TrainingProgramme.Forward);
+        var others = DevelopmentLimit.DevelopingAttributes(PlayerPosition.Striker).Where(name => forward.WeightOf(name) == 0).ToList();
 
-        foreach (var name in AttributeNames.All.Where(name => trained.WeightOf(name) == 0))
+        double Gain(IEnumerable<AttributeName> names) => names.Average(name => end.ValueOf(name) - start.Attributes.ValueOf(name));
+
+        Gain(forward.Attributes.Select(entry => entry.Attribute)).Should().BeGreaterThan(
+            Gain(others),
+            "the programme takes the bigger share of the day (TRN-1, TRN-10)");
+        others.Should().Contain(name => end.ValueOf(name) > 8, "the rest of the player develops too");
+    }
+
+    [Fact]
+    public void Every_developing_attribute_of_a_youth_grows_within_two_seasons()
+    {
+        var start = Input(age: 17, potential: 20, values: Enumerable.Repeat(6, AttributeNames.Count).ToArray());
+        var end = Simulate(start, days: 2 * TrainingAgeCurve.TrainingDaysPerSeason).Attributes;
+
+        foreach (var name in DevelopmentLimit.DevelopingAttributes(PlayerPosition.Striker))
         {
-            end.ValueOf(name).Should().Be(start.Attributes.ValueOf(name), $"{name} is not in the forward programme");
+            end.ValueOf(name).Should().BeGreaterThan(6, $"{name} is developed whatever the programme (TRN-10)");
         }
+    }
 
-        trained.Attributes.Should().Contain(
-            entry => end.ValueOf(entry.Attribute) > start.Attributes.ValueOf(entry.Attribute),
-            "the programme develops its attributes (TRN-1)");
+    [Fact]
+    public void An_outfielders_goalkeeping_attributes_never_grow()
+    {
+        var start = Input(age: 17, values: Enumerable.Repeat(6, AttributeNames.Count).ToArray());
+        var end = Simulate(start, days: 6 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false).Attributes;
+
+        foreach (var name in AttributeNames.All.Where(name => AttributeNames.FamilyOf(name) == AttributeFamily.Goalkeeping))
+        {
+            end.ValueOf(name).Should().Be(6, $"{name} is a goalkeeper's skill (TRN-4)");
+        }
+    }
+
+    [Fact]
+    public void A_goalkeeper_develops_all_twenty_eight_attributes()
+    {
+        var start = Input(
+            age: 17,
+            position: PlayerPosition.Goalkeeper,
+            programme: TrainingProgramme.Goalkeeper,
+            values: Enumerable.Repeat(6, AttributeNames.Count).ToArray());
+        var end = Simulate(start, days: 3 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false).Attributes;
+
+        DevelopmentLimit.DevelopingAttributes(PlayerPosition.Goalkeeper).Should().HaveCount(AttributeNames.Count);
+
+        foreach (var name in AttributeNames.All)
+        {
+            end.ValueOf(name).Should().BeGreaterThan(6, $"a keeper's {name} feeds distribution and reading the game (TRN-4)");
+        }
+    }
+
+    [Fact]
+    public void A_narrower_programme_grows_its_attributes_faster()
+    {
+        var values = Enumerable.Repeat(6, AttributeNames.Count).ToArray();
+        var narrow = Simulate(Input(age: 17, programme: TrainingProgramme.Physical, values: values), 2 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false);
+        var wide = Simulate(Input(age: 17, programme: TrainingProgramme.Forward, values: values), 2 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false);
+
+        double Gain(DailyProgressionInput end, TrainingProgramme programme) => TrainingProgrammes.Of(programme).Attributes
+            .Average(entry => end.Attributes.ValueOf(entry.Attribute) - 6);
+
+        Gain(narrow, TrainingProgramme.Physical).Should().BeGreaterThan(
+            Gain(wide, TrainingProgramme.Forward),
+            "the same budget is concentrated on fewer skills (TRN-10)");
     }
 
     [Fact]
@@ -229,29 +286,75 @@ public sealed class DailyProgressionTests
     }
 
     [Fact]
-    public void An_attribute_never_grows_past_the_players_potential()
+    public void No_attribute_passes_its_limit_and_the_sum_never_passes_the_cap_through_development()
     {
-        var start = Input(
-            values: [.. Enumerable.Repeat(11, AttributeNames.Count)],
-            potential: 12,
-            age: 17);
-        var end = Simulate(start, days: 6 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false).Attributes;
+        var position = PlayerPosition.Striker;
+        var potential = 15;
+        var limits = DevelopmentLimit.Limits(position, potential);
+        var cap = DevelopmentLimit.CapSum(position, potential);
+        var state = Input(
+            potential: potential,
+            age: 17,
+            values: [.. AttributeNames.All.Select(name => Math.Max(1, DevelopmentLimit.FormulaValue(position, potential, name) - 7))]);
 
-        end.Values.Should().OnlyContain(value => value <= 12, "the hidden potential is the ceiling (TRN-9)");
-        TrainingProgrammes.Of(TrainingProgramme.Forward).Attributes.Should().OnlyContain(
-            entry => end.ValueOf(entry.Attribute) == 12,
-            "a young trained player reaches a close ceiling");
+        for (var day = 0; day < 9 * TrainingAgeCurve.TrainingDaysPerSeason; day++)
+        {
+            var outcome = DailyProgression.Advance(state with
+            {
+                Day = Day.AddDays(day),
+                Age = 17 + (day / TrainingAgeCurve.TrainingDaysPerSeason),
+            });
+
+            foreach (var name in DevelopmentLimit.DevelopingAttributes(position))
+            {
+                outcome.Attributes.ValueOf(name).Should().BeLessThanOrEqualTo(limits[(int)name], $"{name}'s own limit, day {day} (TRN-4)");
+            }
+
+            DevelopmentLimit.DevelopingAttributes(position).Sum(name => outcome.Attributes.ValueOf(name))
+                .Should().BeLessThanOrEqualTo(cap, $"the overall limit, day {day} (TRN-4)");
+
+            state = Carry(state, outcome);
+        }
     }
 
     [Fact]
-    public void A_player_already_at_their_potential_cannot_grow_past_it()
+    public void A_player_at_his_cap_takes_no_development_and_holds_no_progress()
     {
-        var start = Input(values: [.. Enumerable.Repeat(18, AttributeNames.Count)], potential: 18);
+        var start = Input(
+            values: [.. AttributeNames.All.Select(name => DevelopmentLimit.FormulaValue(PlayerPosition.Striker, 15, name))],
+            potential: 15,
+            progress: Progress(500_000));
         var outcome = DailyProgression.Advance(start);
 
         outcome.DevelopmentMilli.Should().Be(0);
-        Simulate(start, days: 200, ageStep: false).Attributes.Values
-            .Should().OnlyContain(value => value <= 18, "the hidden potential is the ceiling (TRN-9)");
+        outcome.Attributes.Should().Be(start.Attributes);
+        outcome.AttributeProgress[(int)AttributeName.Finishing].Should().Be(0, "progress towards a point he cannot gain is dropped");
+    }
+
+    [Fact]
+    public void An_attribute_may_pass_its_formula_value_by_the_headroom_while_the_player_is_under_his_cap()
+    {
+        var position = PlayerPosition.Striker;
+        const int potential = 10;
+        var formula = DevelopmentLimit.FormulaValue(position, potential, AttributeName.Finishing);
+        var values = AttributeNames.All.Select(name => DevelopmentLimit.FormulaValue(position, potential, name) - 3).ToArray();
+
+        values[(int)AttributeName.Finishing] = formula;
+        formula.Should().BeLessThan(WorldRuleSet.AttributeMax, "the headroom is not clamped away");
+
+        var end = Simulate(Input(values: values, potential: potential, age: 17), 4 * TrainingAgeCurve.TrainingDaysPerSeason, ageStep: false).Attributes;
+
+        end.Finishing.Should().Be(formula + DevelopmentLimit.CeilingHeadroom, "a programme may tilt a player by the headroom, no more");
+    }
+
+    [Fact]
+    public void A_potential_twenty_youth_reaches_twenty_in_his_key_attributes()
+    {
+        var start = Input(age: 17, potential: 20, values: Enumerable.Repeat(8, AttributeNames.Count).ToArray());
+        var end = Simulate(start, days: 9 * TrainingAgeCurve.TrainingDaysPerSeason).Attributes;
+
+        end.Finishing.Should().Be(20);
+        end.Composure.Should().Be(20);
     }
 
     [Fact]
@@ -346,25 +449,37 @@ public sealed class DailyProgressionTests
     }
 
     [Fact]
-    public void The_days_development_is_split_across_the_programme_by_weight()
+    public void The_days_development_is_split_by_weight_across_the_programme_and_equally_across_the_rest()
     {
         var outcome = DailyProgression.Advance(Input(programme: TrainingProgramme.Forward));
         var forward = TrainingProgrammes.Of(TrainingProgramme.Forward);
         var budget = outcome.ProgressChanges.Sum(change => change.DeltaMicro);
+        var focusBudget = (double)budget * DailyProgression.ProgrammeSharePermille / 1_000;
+        var rest = DevelopmentLimit.DevelopingAttributes(PlayerPosition.Striker).Where(name => forward.WeightOf(name) == 0).ToList();
         var totalWeight = forward.Attributes.Sum(entry => entry.Weight);
 
         outcome.ProgressChanges.Select(change => change.Attribute).Should().BeEquivalentTo(
-            forward.Attributes.Select(entry => entry.Attribute),
-            "only the programme's attributes earn a share");
+            DevelopmentLimit.DevelopingAttributes(PlayerPosition.Striker),
+            "every developing attribute earns a share, and nothing else does");
 
-        foreach (var change in outcome.ProgressChanges)
+        foreach (var entry in forward.Attributes)
         {
-            var expected = (double)budget * forward.WeightOf(change.Attribute) / totalWeight;
+            var expected = focusBudget * entry.Weight / totalWeight;
 
-            change.DeltaMicro.Should().BeInRange(
+            outcome.ProgressChanges.Single(change => change.Attribute == entry.Attribute).DeltaMicro.Should().BeInRange(
                 (int)Math.Floor(expected),
                 (int)Math.Ceiling(expected) + 1,
-                $"{change.Attribute} takes its weight's share of the day (TRN-10)");
+                $"{entry.Attribute} takes its weight's share of the programme's part of the day (TRN-10)");
+        }
+
+        foreach (var name in rest)
+        {
+            var expected = (budget - focusBudget) / rest.Count;
+
+            outcome.ProgressChanges.Single(change => change.Attribute == name).DeltaMicro.Should().BeInRange(
+                (int)Math.Floor(expected),
+                (int)Math.Ceiling(expected) + 1,
+                $"{name} takes an equal part of the rest (TRN-10)");
         }
 
         budget.Should().BeInRange(
@@ -414,15 +529,16 @@ public sealed class DailyProgressionTests
     }
 
     [Fact]
-    public void An_attribute_at_its_potential_takes_no_share_and_its_share_moves_to_the_others()
+    public void An_attribute_at_its_limit_takes_no_share_and_its_share_moves_to_the_others()
     {
+        var limit = DevelopmentLimit.LimitOf(PlayerPosition.Striker, 15, AttributeName.Finishing);
         var values = new int[AttributeNames.Count];
 
-        Array.Fill(values, 10);
-        values[(int)AttributeName.Finishing] = 12;
+        Array.Fill(values, 8);
+        values[(int)AttributeName.Finishing] = limit;
 
-        var capped = DailyProgression.Advance(Input(values: values, potential: 12, progress: Progress(500_000)));
-        var open = DailyProgression.Advance(Input(values: [.. Enumerable.Repeat(10, AttributeNames.Count)], potential: 12));
+        var capped = DailyProgression.Advance(Input(values: values, potential: 15, progress: Progress(500_000)));
+        var open = DailyProgression.Advance(Input(values: [.. Enumerable.Repeat(8, AttributeNames.Count)], potential: 15));
 
         capped.ProgressChanges.Select(change => change.Attribute).Should().NotContain(AttributeName.Finishing);
         capped.AttributeProgress[(int)AttributeName.Finishing].Should().Be(0, "progress towards a point it cannot gain is dropped");
@@ -432,6 +548,60 @@ public sealed class DailyProgressionTests
             "the budget does not shrink; the capped attribute's share moves to the others");
         capped.ProgressChanges.Single(change => change.Attribute == AttributeName.Composure).DeltaMicro.Should().BeGreaterThan(
             open.ProgressChanges.Single(change => change.Attribute == AttributeName.Composure).DeltaMicro);
+    }
+
+    [Fact]
+    public void No_budget_is_lost_while_the_programmes_attributes_are_all_at_their_limit()
+    {
+        var forward = TrainingProgrammes.Of(TrainingProgramme.Forward);
+        var values = new int[AttributeNames.Count];
+
+        Array.Fill(values, 8);
+
+        foreach (var entry in forward.Attributes)
+        {
+            values[(int)entry.Attribute] = DevelopmentLimit.LimitOf(PlayerPosition.Striker, 15, entry.Attribute);
+        }
+
+        var focused = DailyProgression.Advance(Input(values: values, potential: 15));
+        var open = DailyProgression.Advance(Input(values: [.. Enumerable.Repeat(8, AttributeNames.Count)], potential: 15));
+
+        focused.DevelopmentMilli.Should().Be(open.DevelopmentMilli, "the whole budget goes to the rest of the player");
+        focused.ProgressChanges.Select(change => change.Attribute).Should().NotContain(forward.Attributes.Select(entry => entry.Attribute));
+    }
+
+    [Fact]
+    public void Every_day_spends_the_whole_budget_until_the_player_is_complete()
+    {
+        var position = PlayerPosition.Striker;
+        var cap = DevelopmentLimit.CapSum(position, 15);
+        var state = Input(
+            potential: 15,
+            age: 17,
+            values: [.. AttributeNames.All.Select(name => Math.Max(1, DevelopmentLimit.FormulaValue(position, 15, name) - 7))]);
+        var developing = DevelopmentLimit.DevelopingAttributes(position);
+        var daysWithBudget = 0;
+
+        for (var day = 0; day < 9 * TrainingAgeCurve.TrainingDaysPerSeason; day++)
+        {
+            var age = 17 + (day / TrainingAgeCurve.TrainingDaysPerSeason);
+            var complete = developing.Sum(name => state.Attributes.ValueOf(name)) >= cap;
+            var outcome = DailyProgression.Advance(state with { Day = Day.AddDays(day), Age = age });
+
+            if (!complete && age <= 25)
+            {
+                outcome.DevelopmentMilli.Should().BeGreaterThan(0, $"nothing is lost before the cap, day {day} (TRN-10)");
+                daysWithBudget++;
+            }
+            else if (complete)
+            {
+                outcome.DevelopmentMilli.Should().Be(0, $"a complete player develops no more, day {day}");
+            }
+
+            state = Carry(state, outcome);
+        }
+
+        daysWithBudget.Should().BeGreaterThan(TrainingAgeCurve.TrainingDaysPerSeason, "the youth spent several seasons developing");
     }
 
     [Fact]
@@ -466,37 +636,75 @@ public sealed class DailyProgressionTests
         Pace(trained).Should().BeGreaterThan(Pace(idle), "training adds a share and halves the decline");
     }
 
-    [Fact]
-    public void Calibration_an_average_young_player_closes_most_of_the_gap_to_potential_by_twenty_four()
+    [Theory]
+    [MemberData(nameof(Positions))]
+    public void Calibration_an_average_young_player_is_at_his_limit_at_about_twenty_four(PlayerPosition position)
     {
-        var average = Calibrate(aptitude: TrainingAptitude.Neutral);
-        var slow = Calibrate(aptitude: TrainingAptitude.MinPermille);
-        var quick = Calibrate(aptitude: TrainingAptitude.MaxPermille);
+        var average = Calibrate(position, TrainingAptitude.Neutral);
+        var slow = Calibrate(position, TrainingAptitude.MinPermille);
+        var quick = Calibrate(position, TrainingAptitude.MaxPermille);
 
-        _output.WriteLine($"gap to potential at 24 (trained attributes, mean): slow {slow:F2}, average {average:F2}, quick {quick:F2}");
+        _output.WriteLine(
+            $"{position}: shortfall of the developing attributes' average from the limit at 19/21/22/24 (slow / average / quick): "
+            + $"{Describe(slow)} / {Describe(average)} / {Describe(quick)}");
 
-        average.Should().BeLessThanOrEqualTo(1.0, "an average learner is within a point of potential by about 24");
-        slow.Should().BeGreaterThan(average + 1.5, "a low-aptitude learner is clearly slower");
-        quick.Should().BeLessThan(0.5, "a quick learner gets there early");
+        average[At(24)].Should().BeLessThanOrEqualTo(0.3, "an average learner is within 0.3 of his limit by 24");
+        average[At(21)].Should().BeGreaterThan(0.3, "but not before 21");
+        slow[At(24)].Should().BeGreaterThan(average[At(24)], "a low-aptitude learner is clearly slower");
+        slow[At(24)].Should().BeGreaterThan(0.3, "and falls short by 24");
+        quick[At(22)].Should().BeLessThanOrEqualTo(0.3, "a quick learner is there by 22");
+        quick[At(21)].Should().BeLessThan(average[At(21)], "a quick learner is ahead of an average one");
     }
+
+    public static IEnumerable<object[]> Positions() => Enum.GetValues<PlayerPosition>().Select(position => new object[] { position });
+
+    private static string Describe(double[] shortfalls) =>
+        string.Join("/", new[] { 19, 21, 22, 24 }.Select(age => shortfalls[At(age)].ToString("F2", System.Globalization.CultureInfo.InvariantCulture)));
 
     /// <summary>
-    /// Runs a 17-year-old who starts seven points under a potential of 18, through seven seasons of normal
-    /// training, and returns how far the trained attributes still are from potential.
+    /// Runs a 17-year-old, who starts at the generator's youth level for a potential of 15 (seven points under
+    /// the adult formula), through seven seasons of normal training. Returns the shortfall of the developing
+    /// attributes' average from the limit at the start of each season, ages 17 to 24 (read with <see cref="At"/>).
     /// </summary>
-    private static double Calibrate(int aptitude)
+    private static double[] Calibrate(PlayerPosition position, int aptitude)
     {
-        var start = Input(
-            values: [.. Enumerable.Repeat(11, AttributeNames.Count)],
-            potential: 18,
+        const int potential = 15;
+        var programme = TrainingProgrammes.DefaultFor(position);
+        var developing = DevelopmentLimit.DevelopingAttributes(position);
+        var cap = DevelopmentLimit.CapSum(position, potential);
+        var state = Input(
+            values: [.. AttributeNames.All.Select(name => Math.Max(
+                WorldRuleSet.AttributeMin,
+                DevelopmentLimit.FormulaValue(position, potential, name) - 7))],
+            potential: potential,
             age: 17,
             aptitude: aptitude,
-            programme: TrainingProgramme.Forward);
+            programme: programme,
+            position: position);
 
-        var end = Simulate(start, days: 7 * TrainingAgeCurve.TrainingDaysPerSeason).Attributes;
+        double Shortfall() => (cap - developing.Sum(name => state.Attributes.ValueOf(name))) / (double)developing.Count;
 
-        return TrainingProgrammes.Of(TrainingProgramme.Forward).Attributes.Average(entry => 18 - end.ValueOf(entry.Attribute));
+        var result = new double[8];
+
+        for (var season = 0; season < 8; season++)
+        {
+            result[season] = Shortfall();
+
+            for (var day = 0; season < 7 && day < TrainingAgeCurve.TrainingDaysPerSeason; day++)
+            {
+                state = Carry(state, DailyProgression.Advance(state with
+                {
+                    Day = Day.AddDays((season * TrainingAgeCurve.TrainingDaysPerSeason) + day),
+                    Age = 17 + season,
+                }));
+            }
+        }
+
+        return result;
     }
+
+    /// <summary>The age a calibration shortfall is read at, from the 17-year-old start.</summary>
+    private static int At(int age) => age - 17;
 
     /// <summary>Runs the calculator for a number of days, carrying each day's output into the next.</summary>
     private static DailyProgressionInput Simulate(DailyProgressionInput start, int days, bool ageStep = true)
@@ -533,6 +741,7 @@ public sealed class DailyProgressionTests
         int potential = 20,
         int age = 18,
         int aptitude = TrainingAptitude.Neutral,
+        PlayerPosition position = PlayerPosition.Striker,
         TrainingProgramme programme = TrainingProgramme.Forward,
         TrainingIntensity intensity = TrainingIntensity.Normal,
         int condition = 8_000,
@@ -544,7 +753,8 @@ public sealed class DailyProgressionTests
         new(
             PlayerId,
             age,
-            PlayerAttributeSet.FromValues(values ?? [.. Enumerable.Repeat(10, AttributeNames.Count)]),
+            position,
+            PlayerAttributeSet.FromValues(values ??[.. Enumerable.Repeat(10, AttributeNames.Count)]),
             potential,
             aptitude,
             programme,

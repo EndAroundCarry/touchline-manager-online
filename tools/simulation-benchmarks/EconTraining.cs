@@ -13,6 +13,7 @@ internal static class EconTraining
         var outcome = DailyProgression.Advance(new DailyProgressionInput(
             player.Guid,
             age,
+            player.Position,
             player.AttrSet,
             player.Potential,
             player.Aptitude * trainingPercent / 100,

@@ -14,6 +14,10 @@ namespace Tactical11Manager.Domain.Squad.Training;
 /// </remarks>
 /// <param name="PlayerId">The player's identity, which seeds the day's draw (`TRN-9`).</param>
 /// <param name="Age">The player's age in game years, which is the development curve.</param>
+/// <param name="Position">
+/// The player's primary position, which never changes: it says which attributes he develops and, with the
+/// potential, how far (see <see cref="DevelopmentLimit"/>).
+/// </param>
 /// <param name="Attributes">The player's current attributes.</param>
 /// <param name="Potential">The hidden development ceiling, on the displayed scale (`TRN-9`).</param>
 /// <param name="AptitudePermille">The hidden training aptitude, from <see cref="TrainingAptitude.For"/> (`TRN-15`).</param>
@@ -30,6 +34,7 @@ namespace Tactical11Manager.Domain.Squad.Training;
 public sealed record DailyProgressionInput(
     Guid PlayerId,
     int Age,
+    PlayerPosition Position,
     PlayerAttributeSet Attributes,
     int Potential,
     int AptitudePermille,
@@ -86,11 +91,14 @@ public sealed record DailyProgressionOutcome(
 /// <para>
 /// <b>Development.</b> The day's budget, in millionths of an attribute point, is a base rate scaled by the
 /// player's age curve, hidden aptitude, the club's intensity, and a fatigue penalty. It does not depend on how
-/// many attributes the programme covers, so a narrow programme concentrates the same gain on fewer skills. The
-/// budget is split across the programme's attributes by their weights (3 core, 2 important, 1 supporting), and
-/// each attribute keeps its own progress towards its next point, so a core skill climbs faster than a
-/// supporting one and a manager can see how close each is. An attribute at the player's potential takes no
-/// share, and its share moves to the others (`TRN-4`, `TRN-10`).
+/// many attributes the programme covers. The programme is a focus, not a fence: <see cref="ProgrammeSharePermille"/>
+/// of the budget goes to the programme's attributes by their weights (3 core, 2 important, 1 supporting) and the
+/// rest is shared equally by every other attribute the player develops, so a narrow programme concentrates the
+/// gain without leaving the rest of the player behind. Each attribute keeps its own progress towards its next
+/// point, so a manager can see how close each is. An attribute at its limit takes no share, and its share moves
+/// to the others; development stops only when the player is complete, that is when the sum of his developing
+/// attributes reaches the sum the generator would give his potential and position (`TRN-4`, `TRN-10`, see
+/// <see cref="DevelopmentLimit"/>).
 /// </para>
 /// <para>
 /// <b>Decline.</b> Each attribute ages from its own start age (see <see cref="TrainingAgeCurve"/>). The
@@ -116,13 +124,19 @@ public sealed record DailyProgressionOutcome(
 public static class DailyProgression
 {
     /// <summary>The progression version, bumped whenever a coefficient or the draw order changes.</summary>
-    public const string Version = "training-v3";
+    public const string Version = "training-v4";
 
     /// <summary>How many thousandths of an attribute point make one displayed point (`TRN-10`).</summary>
     public const int DevelopmentBasis = 1_000;
 
     /// <summary>The development budget of a peak-age, neutral-aptitude player on normal intensity, per day.</summary>
-    public const int BaseDailyMilli = 140;
+    public const int BaseDailyMilli = 400;
+
+    /// <summary>
+    /// How much of the day's budget goes to the programme's attributes while the player has others left to
+    /// develop, in permille (`TRN-10`).
+    /// </summary>
+    public const int ProgrammeSharePermille = 600;
 
     /// <summary>The fatigue below which development is not penalised, in basis points.</summary>
     public const int FatiguePenaltyStartBp = 6_000;
@@ -170,11 +184,14 @@ public static class DailyProgression
         var values = input.Attributes.Values.ToArray();
         var movement = new int[AttributeNames.Count];
 
-        var developmentMicro = Develop(input, definition, jitter, values, movement);
+        var limits = DevelopmentLimit.Limits(input.Position, input.Potential);
+        var cap = DevelopmentLimit.CapSum(input.Position, input.Potential);
+
+        var developmentMicro = Develop(input, definition, jitter, values, limits, cap, movement);
         var declineMicro = Age(input, definition, values, movement);
 
         var progress = input.AttributeProgress.ToArray();
-        var deltas = Settle(input, values, progress, movement);
+        var deltas = Settle(values, progress, movement, limits, cap);
 
         var changes = new List<AttributeChange>();
         var progressChanges = new List<AttributeProgressChange>();
@@ -237,51 +254,91 @@ public static class DailyProgression
     private static int ToMilli(int micro) => (micro + (Permille / 2)) / Permille;
 
     /// <summary>
-    /// Splits the day's development across the programme's attributes by weight (`TRN-4`, `TRN-10`), adding
-    /// each share to <paramref name="movement"/>, and returns what was spent in millionths of a point.
+    /// Splits the day's development between the programme's attributes (by weight) and the player's other
+    /// developing attributes (equally), adding each share to <paramref name="movement"/>, and returns what was
+    /// spent in millionths of a point (`TRN-4`, `TRN-10`).
     /// </summary>
+    /// <remarks>
+    /// An attribute at its limit takes no share, and while the player's sum is at the cap nothing is spent. When
+    /// one of the two groups has nothing left to develop, the other takes the whole budget, so nothing is lost
+    /// until the player is complete.
+    /// </remarks>
     private static int Develop(
         DailyProgressionInput input,
         TrainingProgrammeDefinition definition,
         int jitter,
         int[] values,
+        int[] limits,
+        int cap,
         int[] movement)
     {
-        if (definition.Attributes.Count == 0)
+        if (definition.Attributes.Count == 0 || SumOfDeveloping(values, limits) >= cap)
         {
             return 0;
         }
 
-        var capacity = Math.Min(WorldRuleSet.AttributeMax, input.Potential);
-        var eligible = definition.Attributes
-            .Where(entry => values[(int)entry.Attribute] < capacity)
+        var focus = definition.Attributes
+            .Where(entry => values[(int)entry.Attribute] < limits[(int)entry.Attribute])
+            .ToList();
+        var rest = AttributeNames.All
+            .Where(name => definition.WeightOf(name) == 0 && values[(int)name] < limits[(int)name])
             .ToList();
 
-        if (eligible.Count == 0)
+        if (focus.Count == 0 && rest.Count == 0)
         {
             return 0;
         }
 
         var budget = BudgetMicro(input.Age, input.AptitudePermille, input.Intensity, input.FatigueBp, jitter);
-        var totalWeight = eligible.Sum(entry => entry.Weight);
+        var focusBudget = rest.Count == 0
+            ? budget
+            : focus.Count == 0 ? 0 : (int)((long)budget * ProgrammeSharePermille / Permille);
+        var restBudget = budget - focusBudget;
+        var totalWeight = focus.Sum(entry => entry.Weight);
         var spent = 0;
 
-        foreach (var entry in eligible)
+        foreach (var entry in focus)
         {
-            var share = (int)((long)budget * entry.Weight / totalWeight);
+            var share = (int)((long)focusBudget * entry.Weight / totalWeight);
 
             movement[(int)entry.Attribute] += share;
             spent += share;
         }
 
-        // The integer split leaves less than one micro-point per attribute. It goes to the heaviest attributes
-        // first, so the whole budget is spent and the split is the same on every replay.
+        foreach (var name in rest)
+        {
+            var share = restBudget / rest.Count;
+
+            movement[(int)name] += share;
+            spent += share;
+        }
+
+        // The integer split leaves less than one micro-point per attribute. It goes to the programme's heaviest
+        // attributes first, then the others in canonical order, so the whole budget is spent and the split is
+        // the same on every replay.
+        var order = focus.Select(entry => entry.Attribute).Concat(rest).ToList();
+
         for (var slot = 0; spent < budget; slot++, spent++)
         {
-            movement[(int)eligible[slot % eligible.Count].Attribute]++;
+            movement[(int)order[slot % order.Count]]++;
         }
 
         return budget;
+    }
+
+    private static int SumOfDeveloping(int[] values, int[] limits)
+    {
+        var sum = 0;
+
+        for (var index = 0; index < values.Length; index++)
+        {
+            if (limits[index] > 0)
+            {
+                sum += values[index];
+            }
+        }
+
+        return sum;
     }
 
     /// <summary>
@@ -321,24 +378,31 @@ public static class DailyProgression
     /// Adds the day's movement to each attribute's progress and turns every whole point into a change of the
     /// displayed value (`TRN-4`, `TRN-10`). Returns the whole-point change of each attribute.
     /// </summary>
-    private static int[] Settle(DailyProgressionInput input, int[] values, int[] progress, int[] movement)
+    /// <remarks>
+    /// A point is gained only while the attribute is under its own limit and the sum of the developing
+    /// attributes stays at or under the cap, in canonical order so a replay settles the same way.
+    /// </remarks>
+    private static int[] Settle(int[] values, int[] progress, int[] movement, int[] limits, int cap)
     {
-        var capacity = Math.Min(WorldRuleSet.AttributeMax, input.Potential);
         var deltas = new int[AttributeNames.Count];
+        var sum = SumOfDeveloping(values, limits);
 
         for (var index = 0; index < progress.Length; index++)
         {
+            var developing = limits[index] > 0;
+
             progress[index] += movement[index];
 
-            while (progress[index] >= AttributeProgress.Basis && values[index] < capacity)
+            while (progress[index] >= AttributeProgress.Basis && values[index] < limits[index] && sum < cap)
             {
                 values[index]++;
+                sum++;
                 deltas[index]++;
                 progress[index] -= AttributeProgress.Basis;
             }
 
-            // An attribute at its ceiling holds no progress towards a point it cannot gain.
-            if (progress[index] > 0 && values[index] >= capacity)
+            // An attribute at its limit, or a player at his cap, holds no progress towards a point he cannot gain.
+            if (progress[index] > 0 && (values[index] >= limits[index] || sum >= cap))
             {
                 progress[index] = 0;
             }
@@ -348,6 +412,11 @@ public static class DailyProgression
                 values[index]--;
                 deltas[index]--;
                 progress[index] += AttributeProgress.Basis;
+
+                if (developing)
+                {
+                    sum--;
+                }
             }
 
             if (progress[index] < 0 && values[index] <= WorldRuleSet.AttributeMin)
@@ -372,6 +441,11 @@ public static class DailyProgression
                 nameof(input),
                 input.Potential,
                 $"A potential is between {WorldRuleSet.AttributeMin} and {WorldRuleSet.AttributeMax} (TRN-4).");
+        }
+
+        if (!Enum.IsDefined(input.Position))
+        {
+            throw new ArgumentOutOfRangeException(nameof(input), input.Position, "A position is a known position (TRN-4).");
         }
 
         if (input.AptitudePermille <= 0)

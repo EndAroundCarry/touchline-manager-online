@@ -63,6 +63,7 @@ public sealed class RunDailyProgression
                 var outcome = DailyProgression.Advance(new DailyProgressionInput(
                     member.Player.Id,
                     member.Player.AgeIn(roster.GameYear),
+                    member.Player.PrimaryPosition,
                     member.Attributes.ToSet(),
                     member.Potential,
                     TrainingAptitude.For(member.Player.Id),
