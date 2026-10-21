@@ -275,6 +275,131 @@ public sealed class LedgerPostingsTests
     }
 
     [Fact]
+    public void Snack_bar_takings_credit_the_host_and_share_the_gates_key_under_their_own_category()
+    {
+        var clubId = Guid.CreateVersion7();
+        var fixtureId = Guid.CreateVersion7();
+
+        var gate = LedgerPostings.GateReceipt(Guid.CreateVersion7(), clubId, fixtureId, 4_000);
+        var snacks = LedgerPostings.SnackBarTakings(
+            Guid.CreateVersion7(), clubId, fixtureId, level: 3, spectators: 2_890, bonusBp: 3_000, amountMinor: 5_000);
+
+        snacks.Category.Should().Be(LedgerCategory.SnackBar);
+        snacks.SourceType.Should().Be(LedgerSourceType.Matchday);
+        snacks.SourceId.Should().Be(fixtureId);
+        snacks.CashDeltaMinor.Should().Be(5_000);
+        snacks.ReservedDeltaMinor.Should().Be(0);
+        snacks.CorrelationId.Should().Be(gate.CorrelationId, "one publication, one key, so a retry collides with both (FIN-17)");
+        LedgerEntryText.Render(snacks.DescriptionTemplate, snacks.DescriptionParametersJson)
+            .Should().Be("Snack bar takings");
+
+        using var document = JsonDocument.Parse(snacks.DescriptionParametersJson);
+
+        document.RootElement.GetProperty("spectators").GetInt64().Should().Be(2_890);
+        document.RootElement.GetProperty("bonusBp").GetInt64().Should().Be(3_000);
+        document.RootElement.GetProperty("level").GetInt64().Should().Be(3);
+    }
+
+    [Fact]
+    public void Merchandise_takings_and_structure_upkeep_share_the_weeks_key_under_their_own_categories()
+    {
+        var clubId = Guid.CreateVersion7();
+        var weekOf = new DateOnly(2026, 10, 18);
+
+        var sponsorship = LedgerPostings.WeeklySponsorship(Guid.CreateVersion7(), clubId, weekOf, 1, 30_000);
+        var merchandise = LedgerPostings.MerchandiseTakings(
+            Guid.CreateVersion7(), clubId, weekOf, level: 2, fans: 10_000, bonusBp: 500, amountMinor: 4_200);
+        var upkeep = LedgerPostings.StructureUpkeep(
+            Guid.CreateVersion7(), clubId, weekOf, snackBarLevel: 1, merchandiseLevel: 2, amountMinor: 750);
+
+        merchandise.Category.Should().Be(LedgerCategory.Merchandise);
+        merchandise.SourceType.Should().Be(LedgerSourceType.WeeklyRun);
+        merchandise.CashDeltaMinor.Should().Be(4_200);
+        upkeep.Category.Should().Be(LedgerCategory.StructureUpkeep);
+        upkeep.SourceType.Should().Be(LedgerSourceType.WeeklyRun);
+        upkeep.CashDeltaMinor.Should().Be(-750, "upkeep is a cost");
+
+        merchandise.CorrelationId.Should().Be(sponsorship.CorrelationId);
+        upkeep.CorrelationId.Should().Be(sponsorship.CorrelationId, "a retried week skips the club by this key (FIN-17)");
+        LedgerEntryText.Render(merchandise.DescriptionTemplate, merchandise.DescriptionParametersJson)
+            .Should().Be("Merchandise takings");
+        LedgerEntryText.Render(upkeep.DescriptionTemplate, upkeep.DescriptionParametersJson)
+            .Should().Be("Weekly structure upkeep");
+    }
+
+    [Theory]
+    [InlineData(StructureKind.SnackBar, 4, "Snack bar upgraded to level 4")]
+    [InlineData(StructureKind.Merchandise, 10, "Merchandise shop upgraded to level 10")]
+    public void A_structure_upgrade_debits_the_cash_and_keys_on_the_building_at_the_version_it_produced(
+        StructureKind kind,
+        int targetLevel,
+        string expectedText)
+    {
+        var clubId = Guid.CreateVersion7();
+        var structureId = Guid.CreateVersion7();
+
+        var posting = LedgerPostings.StructureUpgrade(
+            Guid.CreateVersion7(), clubId, structureId, structureVersion: 5, kind, targetLevel, 70_000);
+
+        posting.Category.Should().Be(LedgerCategory.StructureUpgrade);
+        posting.SourceType.Should().Be(LedgerSourceType.Structure);
+        posting.SourceId.Should().Be(structureId);
+        posting.CashDeltaMinor.Should().Be(-70_000, "an upgrade is a spend");
+        posting.ReservedDeltaMinor.Should().Be(0);
+        posting.CorrelationId.Should().Be(
+            $"structure:{structureId:D}:v5",
+            "a retried order collides with its first entry, the next upgrade does not (FIN-17)");
+        LedgerEntryText.Render(posting.DescriptionTemplate, posting.DescriptionParametersJson)
+            .Should().Be(expectedText);
+    }
+
+    [Fact]
+    public void A_structure_posting_that_moves_nothing_is_refused()
+    {
+        var clubId = Guid.CreateVersion7();
+        var weekOf = new DateOnly(2026, 10, 18);
+
+        var postings = new Action[]
+        {
+            () => LedgerPostings.SnackBarTakings(Guid.CreateVersion7(), clubId, Guid.CreateVersion7(), 1, 100, 0, 0),
+            () => LedgerPostings.MerchandiseTakings(Guid.CreateVersion7(), clubId, weekOf, 1, 100, 0, 0),
+            () => LedgerPostings.StructureUpkeep(Guid.CreateVersion7(), clubId, weekOf, 1, 1, 0),
+            () => LedgerPostings.StructureUpgrade(
+                Guid.CreateVersion7(), clubId, Guid.CreateVersion7(), 2, StructureKind.SnackBar, 2, 0),
+        };
+
+        foreach (var post in postings)
+        {
+            post.Should().Throw<ArgumentOutOfRangeException>();
+        }
+    }
+
+    [Fact]
+    public void The_structure_categories_and_source_round_trip_through_their_stable_codes()
+    {
+        (LedgerCategory Category, string Code)[] categories =
+        [
+            (LedgerCategory.SnackBar, "snack_bar"),
+            (LedgerCategory.Merchandise, "merchandise"),
+            (LedgerCategory.StructureUpkeep, "structure_upkeep"),
+            (LedgerCategory.StructureUpgrade, "structure_upgrade"),
+        ];
+
+        foreach (var (category, code) in categories)
+        {
+            category.ToCode().Should().Be(code);
+            LedgerCategories.FromCode(code).Should().Be(category);
+        }
+
+        LedgerSourceType.Structure.ToCode().Should().Be("structure");
+        LedgerSourceTypes.FromCode("structure").Should().Be(LedgerSourceType.Structure);
+        LedgerCategories.All.Select(category => category.ToCode().Length).Max()
+            .Should().BeLessThanOrEqualTo(LedgerCategories.MaxCodeLength);
+        LedgerSourceTypes.All.Select(source => source.ToCode().Length).Max()
+            .Should().BeLessThanOrEqualTo(LedgerSourceTypes.MaxCodeLength);
+    }
+
+    [Fact]
     public void The_new_category_and_source_round_trip_through_their_stable_codes()
     {
         LedgerCategory.StadiumConstruction.ToCode().Should().Be("stadium_construction");

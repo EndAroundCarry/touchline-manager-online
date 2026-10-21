@@ -37,6 +37,9 @@ public enum LedgerSourceType
 
     /// <summary>A manager released a player and paid out the wages left on his contract (`CON-12`).</summary>
     Contract = 8,
+
+    /// <summary>A manager's upgrade of the snack bar or the merchandise shop was paid for (`STRC-3`).</summary>
+    Structure = 9,
 }
 
 /// <summary>Stable codes and parsing for <see cref="LedgerSourceType"/>.</summary>
@@ -61,6 +64,7 @@ public static class LedgerSourceTypes
         LedgerSourceType.AdminRepair => "admin_repair",
         LedgerSourceType.Stadium => "stadium",
         LedgerSourceType.Contract => "contract",
+        LedgerSourceType.Structure => "structure",
         _ => throw new ArgumentOutOfRangeException(nameof(sourceType), sourceType, "Unknown ledger source."),
     };
 
@@ -77,6 +81,7 @@ public static class LedgerSourceTypes
         "admin_repair" => LedgerSourceType.AdminRepair,
         "stadium" => LedgerSourceType.Stadium,
         "contract" => LedgerSourceType.Contract,
+        "structure" => LedgerSourceType.Structure,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown ledger source code."),
     };
 }

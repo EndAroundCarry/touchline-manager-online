@@ -93,6 +93,31 @@ public sealed class WorldSeedingTests : WorldTestBase
     }
 
     [Fact]
+    public async Task Every_club_opens_with_a_snack_bar_and_a_merchandise_shop_at_level_one()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var clubIds = await db.Clubs
+            .Where(club => club.WorldId == Fixture.WorldId)
+            .Select(club => club.Id)
+            .ToListAsync();
+
+        var buildings = await db.ClubStructures
+            .Where(building => clubIds.Contains(building.ClubId))
+            .ToListAsync();
+
+        buildings.Should().HaveCount(216, "two buildings for each of 108 clubs (STRC-1)");
+        buildings.Should().OnlyContain(building => building.Level == 1 && !building.IsBuilding);
+
+        foreach (var kind in StructureKinds.All)
+        {
+            buildings.Where(building => building.Kind == kind).Select(building => building.ClubId)
+                .Should().BeEquivalentTo(clubIds, $"every club has a {kind.ToCode()}");
+        }
+    }
+
+    [Fact]
     public async Task Every_club_was_generated_from_the_world_seed()
     {
         // The reproducibility contract (FIC-7, PYR-14): the seeder must not have invented names of its own,

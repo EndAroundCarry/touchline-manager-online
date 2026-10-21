@@ -78,6 +78,12 @@ public sealed class Tactical11ManagerDbContext : DbContext
     /// <summary>Gets the club stadiums (`STAD-1`).</summary>
     public DbSet<ClubStadium> ClubStadiums => Set<ClubStadium>();
 
+    /// <summary>Gets the club snack bars and merchandise shops (`STRC-1`).</summary>
+    public DbSet<ClubStructure> ClubStructures => Set<ClubStructure>();
+
+    /// <summary>Gets the append-only sales and upkeep history of the club structures (`STRC-4`, `STRC-6`, `STRC-8`).</summary>
+    public DbSet<ClubStructureTakings> ClubStructureTakings => Set<ClubStructureTakings>();
+
     /// <summary>Gets the world module's club tenures, the whole of the ownership model.</summary>
     public DbSet<ClubTenure> ClubTenures => Set<ClubTenure>();
 

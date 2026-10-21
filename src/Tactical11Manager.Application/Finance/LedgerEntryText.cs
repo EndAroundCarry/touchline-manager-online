@@ -55,6 +55,10 @@ public static class LedgerEntryText
             LedgerPostings.TransferProceedsTemplate => "Transfer fee received",
             LedgerPostings.StadiumConstructionTemplate => StadiumWorks(parameters),
             LedgerPostings.ReleasePayoutTemplate => "Player release payout",
+            LedgerPostings.SnackBarTakingsTemplate => "Snack bar takings",
+            LedgerPostings.MerchandiseTakingsTemplate => "Merchandise takings",
+            LedgerPostings.StructureUpkeepTemplate => "Weekly structure upkeep",
+            LedgerPostings.StructureUpgradeTemplate => StructureWorks(parameters),
             _ => throw new InvalidOperationException(
                 $"'{templateKey}' is not a ledger template this build renders."),
         };
@@ -77,6 +81,20 @@ public static class LedgerEntryText
         return string.Create(
             CultureInfo.InvariantCulture,
             $"Stadium works: {count:N0} {place}{(count == 1 ? string.Empty : "s")}");
+    }
+
+    private static string StructureWorks(Dictionary<string, long> parameters)
+    {
+        var name = (StructureKind)Number(parameters, "kind") switch
+        {
+            StructureKind.SnackBar => "Snack bar",
+            StructureKind.Merchandise => "Merchandise shop",
+            _ => "Building",
+        };
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{name} upgraded to level {Number(parameters, "level")}");
     }
 
     private static long Number(Dictionary<string, long> parameters, string key) =>

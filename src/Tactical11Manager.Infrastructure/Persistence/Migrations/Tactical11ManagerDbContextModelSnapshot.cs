@@ -1874,7 +1874,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("club_season_finance_lines", "finance", t =>
                         {
-                            t.HasCheckConstraint("ck_club_season_finance_lines_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation')");
+                            t.HasCheckConstraint("ck_club_season_finance_lines_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade')");
                         });
                 });
 
@@ -1969,7 +1969,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_ledger_entries_balances", "resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor");
 
-                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout')");
+                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade')");
 
                             t.HasCheckConstraint("ck_ledger_entries_correlation_id", "length(correlation_id) > 0");
 
@@ -1981,7 +1981,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_ledger_entries_sequence", "sequence >= 1");
 
-                            t.HasCheckConstraint("ck_ledger_entries_source_type", "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', 'safety_job', 'admin_repair', 'stadium', 'contract')");
+                            t.HasCheckConstraint("ck_ledger_entries_source_type", "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', 'safety_job', 'admin_repair', 'stadium', 'contract', 'structure')");
                         });
                 });
 
@@ -4297,6 +4297,164 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.World.ClubStructure", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("UpgradeDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("upgrade_due_at");
+
+                    b.Property<int?>("UpgradeTargetLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("upgrade_target_level");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClubId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_club_structures_club_id_kind");
+
+                    b.ToTable("club_structures", "world", t =>
+                        {
+                            t.HasCheckConstraint("ck_club_structures_kind", "kind in ('snack_bar', 'merchandise')");
+
+                            t.HasCheckConstraint("ck_club_structures_level", "level between 1 and 10");
+
+                            t.HasCheckConstraint("ck_club_structures_upgrade", "(upgrade_target_level is null and upgrade_due_at is null) or (upgrade_target_level = level + 1 and upgrade_due_at is not null)");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.World.ClubStructureTakings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<long>("BaseMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("base_minor");
+
+                    b.Property<int>("BonusBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("bonus_bp");
+
+                    b.Property<string>("BonusReason")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("bonus_reason");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Customers")
+                        .HasColumnType("integer")
+                        .HasColumnName("customers");
+
+                    b.Property<Guid?>("FixtureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("LedgerEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ledger_entry_id");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
+
+                    b.Property<string>("RowKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("row_kind");
+
+                    b.Property<DateOnly>("WeekOf")
+                        .HasColumnType("date")
+                        .HasColumnName("week_of");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FixtureId");
+
+                    b.HasIndex("LedgerEntryId");
+
+                    b.HasIndex("ClubId", "FixtureId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_club_structure_takings_match_sale")
+                        .HasFilter("row_kind = 'match_sale'");
+
+                    b.HasIndex("ClubId", "Kind", "WeekOf")
+                        .HasDatabaseName("ix_club_structure_takings_club_kind_week");
+
+                    b.HasIndex("ClubId", "Kind", "RowKind", "WeekOf")
+                        .IsUnique()
+                        .HasDatabaseName("ux_club_structure_takings_weekly")
+                        .HasFilter("row_kind <> 'match_sale'");
+
+                    b.ToTable("club_structure_takings", "world", t =>
+                        {
+                            t.HasCheckConstraint("ck_club_structure_takings_amounts", "customers >= 0 and base_minor >= 0 and bonus_bp >= 0");
+
+                            t.HasCheckConstraint("ck_club_structure_takings_kind", "kind in ('snack_bar', 'merchandise')");
+
+                            t.HasCheckConstraint("ck_club_structure_takings_level", "level between 1 and 10");
+
+                            t.HasCheckConstraint("ck_club_structure_takings_match_sale_shape", "row_kind <> 'match_sale' or (kind = 'snack_bar' and fixture_id is not null and amount_minor >= 0)");
+
+                            t.HasCheckConstraint("ck_club_structure_takings_row_kind", "row_kind in ('match_sale', 'week_sale', 'upkeep')");
+
+                            t.HasCheckConstraint("ck_club_structure_takings_upkeep_shape", "row_kind <> 'upkeep' or (fixture_id is null and amount_minor <= 0)");
+
+                            t.HasCheckConstraint("ck_club_structure_takings_week_sale_shape", "row_kind <> 'week_sale' or (kind = 'merchandise' and fixture_id is null and amount_minor >= 0)");
+                        });
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.World.ClubTenure", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5749,6 +5907,35 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.HasOne("Tactical11Manager.Domain.World.Club", null)
                         .WithMany()
                         .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.World.ClubStructure", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.World.ClubStructureTakings", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Fixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Tactical11Manager.Domain.Finance.LedgerEntry", null)
+                        .WithMany()
+                        .HasForeignKey("LedgerEntryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

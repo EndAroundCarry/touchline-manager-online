@@ -486,6 +486,205 @@ public sealed class WorldPersistenceTests
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
+    [Fact]
+    public async Task A_club_cannot_hold_two_buildings_of_one_kind()
+    {
+        // STRC-1: one snack bar and one shop. The unique index is what makes it a database fact.
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var now = _fixture.Clock.UtcNow;
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+
+        db.ClubStructures.Add(ClubStructure.Open(Guid.CreateVersion7(), clubId, StructureKind.SnackBar, now));
+        await db.SaveChangesAsync();
+
+        db.ClubStructures.Add(ClubStructure.Open(Guid.CreateVersion7(), clubId, StructureKind.SnackBar, now));
+
+        var act = async () => await db.SaveChangesAsync();
+        var exception = await act.Should().ThrowAsync<DbUpdateException>();
+
+        ConstraintOf(exception).Should().Be("ux_club_structures_club_id_kind");
+    }
+
+    [Fact]
+    public async Task A_building_above_the_top_level_is_refused_by_the_database()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+        var building = ClubStructure.Open(Guid.CreateVersion7(), clubId, StructureKind.Merchandise, _fixture.Clock.UtcNow);
+        db.ClubStructures.Add(building);
+        await db.SaveChangesAsync();
+
+        var act = () => db.Database.ExecuteSqlRawAsync(
+            "update world.club_structures set level = 11 where id = {0}",
+            building.Id);
+
+        var exception = await act.Should().ThrowAsync<PostgresException>();
+
+        exception.Which.ConstraintName.Should().Be("ck_club_structures_level");
+    }
+
+    [Fact]
+    public async Task An_upgrade_that_skips_a_level_or_has_no_due_time_is_refused_by_the_database()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+        var building = ClubStructure.Open(Guid.CreateVersion7(), clubId, StructureKind.SnackBar, _fixture.Clock.UtcNow);
+        db.ClubStructures.Add(building);
+        await db.SaveChangesAsync();
+
+        var skipped = () => db.Database.ExecuteSqlRawAsync(
+            "update world.club_structures set upgrade_target_level = 3, upgrade_due_at = now() where id = {0}",
+            building.Id);
+        var undated = () => db.Database.ExecuteSqlRawAsync(
+            "update world.club_structures set upgrade_target_level = 2 where id = {0}",
+            building.Id);
+
+        (await skipped.Should().ThrowAsync<PostgresException>()).Which.ConstraintName
+            .Should().Be("ck_club_structures_upgrade");
+        (await undated.Should().ThrowAsync<PostgresException>()).Which.ConstraintName
+            .Should().Be("ck_club_structures_upgrade");
+    }
+
+    [Fact]
+    public async Task Two_orders_made_against_one_version_of_a_building_cannot_both_win()
+    {
+        // CONC-1: the version is the concurrency token, so the second order is refused rather than paid for.
+        await using var first = _fixture.CreateScope();
+        await using var second = _fixture.CreateScope();
+        var firstDb = first.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var secondDb = second.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var now = _fixture.Clock.UtcNow;
+
+        var (_, clubId) = await ArrangeClubAsync(first);
+        var building = ClubStructure.Open(Guid.CreateVersion7(), clubId, StructureKind.SnackBar, now);
+        firstDb.ClubStructures.Add(building);
+        await firstDb.SaveChangesAsync();
+
+        var mine = await firstDb.ClubStructures.SingleAsync(candidate => candidate.Id == building.Id);
+        var theirs = await secondDb.ClubStructures.SingleAsync(candidate => candidate.Id == building.Id);
+
+        mine.StartUpgrade(now.AddDays(1), now);
+        theirs.StartUpgrade(now.AddDays(1), now);
+
+        await firstDb.SaveChangesAsync();
+
+        var act = async () => await secondDb.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
+    }
+
+    [Fact]
+    public async Task A_building_keeps_its_upgrade_state_and_history_rows_round_trip()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var now = _fixture.Clock.UtcNow;
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+        var entryId = await OpenAccountAsync(db, clubId);
+        var weekOf = new DateOnly(2026, 10, 18);
+
+        var building = ClubStructure.Open(Guid.CreateVersion7(), clubId, StructureKind.Merchandise, now);
+        building.StartUpgrade(now.AddDays(2), now);
+        db.ClubStructures.Add(building);
+        db.ClubStructureTakings.Add(ClubStructureTakings.WeekSale(
+            Guid.CreateVersion7(), clubId, weekOf, level: 1, fans: 10_000, baseMinor: 300_000,
+            bonusBp: 500, bonusReason: "calm", amountMinor: 315_000, entryId, now));
+        db.ClubStructureTakings.Add(ClubStructureTakings.Upkeep(
+            Guid.CreateVersion7(), clubId, StructureKind.Merchandise, weekOf, level: 1, upkeepMinor: 30_000, entryId, now));
+        await db.SaveChangesAsync();
+
+        await using var readScope = _fixture.CreateScope();
+        var readDb = readScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var stored = await readDb.ClubStructures.AsNoTracking().SingleAsync(candidate => candidate.Id == building.Id);
+        stored.Kind.Should().Be(StructureKind.Merchandise);
+        stored.Level.Should().Be(1);
+        stored.UpgradeTargetLevel.Should().Be(2);
+        stored.UpgradeDueAt.Should().BeCloseTo(now.AddDays(2), TimeSpan.FromMilliseconds(1));
+
+        var rows = await readDb.ClubStructureTakings.AsNoTracking()
+            .Where(row => row.ClubId == clubId)
+            .OrderByDescending(row => row.AmountMinor)
+            .ToListAsync();
+
+        rows.Should().HaveCount(2);
+        rows[0].RowKind.Should().Be(StructureTakingsKind.WeekSale);
+        rows[0].WeekOf.Should().Be(weekOf);
+        rows[0].AmountMinor.Should().Be(315_000);
+        rows[0].BonusReason.Should().Be("calm");
+        rows[1].RowKind.Should().Be(StructureTakingsKind.Upkeep);
+        rows[1].AmountMinor.Should().Be(-30_000, "upkeep is stored as the money it moved");
+    }
+
+    [Fact]
+    public async Task A_buildings_week_cannot_be_booked_twice()
+    {
+        // A retried weekly run collides with its own first rows instead of booking the week again.
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var now = _fixture.Clock.UtcNow;
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+        var entryId = await OpenAccountAsync(db, clubId);
+        var weekOf = new DateOnly(2026, 10, 18);
+
+        db.ClubStructureTakings.Add(ClubStructureTakings.Upkeep(
+            Guid.CreateVersion7(), clubId, StructureKind.SnackBar, weekOf, 1, 30_000, entryId, now));
+        await db.SaveChangesAsync();
+
+        db.ClubStructureTakings.Add(ClubStructureTakings.Upkeep(
+            Guid.CreateVersion7(), clubId, StructureKind.SnackBar, weekOf, 1, 30_000, entryId, now));
+
+        var act = async () => await db.SaveChangesAsync();
+        var exception = await act.Should().ThrowAsync<DbUpdateException>();
+
+        ConstraintOf(exception).Should().Be("ux_club_structure_takings_weekly");
+    }
+
+    [Fact]
+    public async Task A_match_sale_must_name_a_fixture_and_be_the_snack_bars()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+        var entryId = await OpenAccountAsync(db, clubId);
+
+        var act = () => db.Database.ExecuteSqlRawAsync(
+            "insert into world.club_structure_takings "
+            + "(id, club_id, kind, row_kind, fixture_id, week_of, level, customers, base_minor, bonus_bp, bonus_reason, "
+            + "amount_minor, ledger_entry_id, created_at) "
+            + "values ({0}, {1}, 'snack_bar', 'match_sale', null, '2026-10-18', 1, 100, 100, 0, 'none', 100, {2}, now())",
+            Guid.CreateVersion7(),
+            clubId,
+            entryId);
+
+        var exception = await act.Should().ThrowAsync<PostgresException>();
+
+        exception.Which.ConstraintName.Should().Be("ck_club_structure_takings_match_sale_shape");
+    }
+
+    /// <summary>Opens the club's account with a ledger entry, returning the entry's identity.</summary>
+    private async Task<Guid> OpenAccountAsync(Tactical11ManagerDbContext db, Guid clubId)
+    {
+        var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, _fixture.Clock.UtcNow);
+        var entryId = Guid.CreateVersion7();
+        db.ClubAccounts.Add(account);
+        db.LedgerEntries.Add(account.Post(
+            LedgerPostings.OpeningBalance(entryId, clubId, 1_000_000),
+            _fixture.Clock.UtcNow));
+        await db.SaveChangesAsync();
+
+        return entryId;
+    }
+
     /// <summary>Reads the constraint name out of a failed write.</summary>
     private static string? ConstraintOf(FluentAssertions.Specialized.ExceptionAssertions<DbUpdateException> exception) =>
         (exception.Which.InnerException as PostgresException)?.ConstraintName;

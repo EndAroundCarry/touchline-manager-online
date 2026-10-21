@@ -76,6 +76,7 @@ public sealed class WorldGenerator
     private readonly IWorldRepository _world;
     private readonly IClubRepository _clubs;
     private readonly IStadiumRepository _stadiums;
+    private readonly IStructureRepository _structures;
     private readonly ISquadRepository _squad;
     private readonly IClubAccountRepository _accounts;
     private readonly ILedgerRepository _ledger;
@@ -87,6 +88,7 @@ public sealed class WorldGenerator
         IWorldRepository world,
         IClubRepository clubs,
         IStadiumRepository stadiums,
+        IStructureRepository structures,
         ISquadRepository squad,
         IClubAccountRepository accounts,
         ILedgerRepository ledger,
@@ -96,6 +98,7 @@ public sealed class WorldGenerator
         _world = world;
         _clubs = clubs;
         _stadiums = stadiums;
+        _structures = structures;
         _squad = squad;
         _accounts = accounts;
         _ledger = ledger;
@@ -177,6 +180,13 @@ public sealed class WorldGenerator
             // Every club opens with the same ground, whatever its tier: the divisions differ in how many
             // people come to fill it and what they pay, not in the bricks (STAD-2).
             _stadiums.Add(ClubStadium.Open(Guid.CreateVersion7(), clubId, now));
+
+            // Beside the ground, a snack bar and a merchandise shop, both at level 1 and free, whatever the
+            // tier (STRC-1).
+            foreach (var kind in StructureKinds.All)
+            {
+                _structures.Add(ClubStructure.Open(Guid.CreateVersion7(), clubId, kind, now));
+            }
 
             // And the same fans, whatever its tier but for the scale: the tier's opening numbers (FAN-1).
             _fans.Open(clubId, tier, season.Id, now);

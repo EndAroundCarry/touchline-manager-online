@@ -79,11 +79,11 @@ internal sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<Ledger
                 "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', "
                 + "'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', "
                 + "'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', "
-                + "'release_payout')");
+                + "'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade')");
             table.HasCheckConstraint(
                 "ck_ledger_entries_source_type",
                 "source_type in ('world_seed', 'matchday', 'weekly_run', 'season_rollover', 'transfer', "
-                + "'safety_job', 'admin_repair', 'stadium', 'contract')");
+                + "'safety_job', 'admin_repair', 'stadium', 'contract', 'structure')");
             table.HasCheckConstraint(
                 "ck_ledger_entries_balances",
                 "resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 "
@@ -228,7 +228,8 @@ internal sealed class ClubSeasonFinanceLineConfiguration : IEntityTypeConfigurat
             "ck_club_season_finance_lines_category",
             "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', "
             + "'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', "
-            + "'reservation_release', 'emergency_grant', 'compensation')"));
+            + "'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', "
+            + "'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade')"));
 
         builder.HasKey(line => line.Id);
         builder.Property(line => line.Id).HasColumnName("id").ValueGeneratedNever();

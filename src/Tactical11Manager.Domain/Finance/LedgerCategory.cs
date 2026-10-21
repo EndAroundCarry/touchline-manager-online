@@ -53,6 +53,18 @@ public enum LedgerCategory
 
     /// <summary>Half the wages left, paid by a club to release a player now (`CON-12`).</summary>
     ReleasePayout = 13,
+
+    /// <summary>The snack bar's takings for one home match (`STRC-4`).</summary>
+    SnackBar = 14,
+
+    /// <summary>The merchandise shop's takings for one week (`STRC-6`).</summary>
+    Merchandise = 15,
+
+    /// <summary>The combined weekly upkeep of a club's snack bar and merchandise shop (`STRC-8`).</summary>
+    StructureUpkeep = 16,
+
+    /// <summary>A club paid for a building's upgrade (`STRC-3`).</summary>
+    StructureUpgrade = 17,
 }
 
 /// <summary>Stable codes and parsing for <see cref="LedgerCategory"/>.</summary>
@@ -82,6 +94,10 @@ public static class LedgerCategories
         LedgerCategory.Compensation => "compensation",
         LedgerCategory.StadiumConstruction => "stadium_construction",
         LedgerCategory.ReleasePayout => "release_payout",
+        LedgerCategory.SnackBar => "snack_bar",
+        LedgerCategory.Merchandise => "merchandise",
+        LedgerCategory.StructureUpkeep => "structure_upkeep",
+        LedgerCategory.StructureUpgrade => "structure_upgrade",
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown ledger category."),
     };
 
@@ -103,6 +119,10 @@ public static class LedgerCategories
         "compensation" => LedgerCategory.Compensation,
         "stadium_construction" => LedgerCategory.StadiumConstruction,
         "release_payout" => LedgerCategory.ReleasePayout,
+        "snack_bar" => LedgerCategory.SnackBar,
+        "merchandise" => LedgerCategory.Merchandise,
+        "structure_upkeep" => LedgerCategory.StructureUpkeep,
+        "structure_upgrade" => LedgerCategory.StructureUpgrade,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown ledger category code."),
     };
 }

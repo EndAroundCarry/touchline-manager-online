@@ -165,6 +165,38 @@ internal sealed class StadiumRepository : IStadiumRepository
         _dbContext.ClubStadiums.SingleOrDefaultAsync(stadium => stadium.ClubId == clubId, cancellationToken);
 }
 
+/// <summary>Club-structure persistence (`STRC-1`).</summary>
+internal sealed class StructureRepository : IStructureRepository
+{
+    private readonly Tactical11ManagerDbContext _dbContext;
+
+    /// <summary>Initializes the repository.</summary>
+    public StructureRepository(Tactical11ManagerDbContext dbContext) => _dbContext = dbContext;
+
+    /// <inheritdoc />
+    public void Add(ClubStructure building) => _dbContext.ClubStructures.Add(building);
+
+    /// <inheritdoc />
+    public void AddTakings(ClubStructureTakings takings) => _dbContext.ClubStructureTakings.Add(takings);
+
+    /// <inheritdoc />
+    public Task<ClubStructure?> FindAsync(Guid buildingId, CancellationToken cancellationToken) =>
+        _dbContext.ClubStructures.SingleOrDefaultAsync(structure => structure.Id == buildingId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ClubStructure?> FindByClubAsync(Guid clubId, StructureKind kind, CancellationToken cancellationToken) =>
+        _dbContext.ClubStructures.SingleOrDefaultAsync(
+            structure => structure.ClubId == clubId && structure.Kind == kind,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubStructure>> ListByClubAsync(Guid clubId, CancellationToken cancellationToken) =>
+        await _dbContext.ClubStructures
+            .Where(structure => structure.ClubId == clubId)
+            .OrderBy(structure => structure.Kind)
+            .ToListAsync(cancellationToken);
+}
+
 /// <summary>Manager-profile persistence.</summary>
 internal sealed class ManagerRepository : IManagerRepository
 {

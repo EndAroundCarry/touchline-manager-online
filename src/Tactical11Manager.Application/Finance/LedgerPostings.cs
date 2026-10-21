@@ -67,6 +67,18 @@ public static class LedgerPostings
     /// <summary>The template that describes a club paying to release a player (`CON-12`).</summary>
     public const string ReleasePayoutTemplate = "finance.release_payout";
 
+    /// <summary>The template that describes the snack bar's takings for a home match (`STRC-4`).</summary>
+    public const string SnackBarTakingsTemplate = "finance.snack_bar";
+
+    /// <summary>The template that describes the merchandise shop's takings for a week (`STRC-6`).</summary>
+    public const string MerchandiseTakingsTemplate = "finance.merchandise";
+
+    /// <summary>The template that describes a week's upkeep for both buildings (`STRC-8`).</summary>
+    public const string StructureUpkeepTemplate = "finance.structure_upkeep";
+
+    /// <summary>The template that describes a club paying for a building's upgrade (`STRC-3`).</summary>
+    public const string StructureUpgradeTemplate = "finance.structure_upgrade";
+
     /// <summary>
     /// Builds the posting that funds a newly generated club's account.
     /// </summary>
@@ -461,6 +473,143 @@ public static class LedgerPostings
             $"release:{contractId:D}",
             ReleasePayoutTemplate,
             Parameters(("amountMinor", amountMinor), ("weeks", remainingWeeks)));
+    }
+
+    /// <summary>Builds the posting the snack bar's takings for one home match make (`STRC-4`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The host club.</param>
+    /// <param name="fixtureId">The fixture played.</param>
+    /// <param name="level">The snack bar's level.</param>
+    /// <param name="spectators">The crowd the takings are for.</param>
+    /// <param name="bonusBp">The result bonus, in basis points.</param>
+    /// <param name="amountMinor">The takings, in minor units.</param>
+    /// <remarks>
+    /// The correlation key is the fixture, the same as the gate's: the two entries differ by category, so a
+    /// retried publication collides with both instead of selling the crowd its snacks twice (`FIN-17`).
+    /// </remarks>
+    public static LedgerPosting SnackBarTakings(
+        Guid entryId,
+        Guid clubId,
+        Guid fixtureId,
+        int level,
+        int spectators,
+        int bonusBp,
+        long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.SnackBar,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Matchday,
+            SourceId: fixtureId,
+            $"matchday:{fixtureId:D}",
+            SnackBarTakingsTemplate,
+            Parameters(
+                ("amountMinor", amountMinor), ("level", level), ("spectators", spectators), ("bonusBp", bonusBp)));
+    }
+
+    /// <summary>Builds the posting the merchandise shop's takings for one week make (`STRC-6`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club credited.</param>
+    /// <param name="weekOf">The week's boundary date.</param>
+    /// <param name="level">The shop's level.</param>
+    /// <param name="fans">The fans the takings are for.</param>
+    /// <param name="bonusBp">The mood bonus, in basis points.</param>
+    /// <param name="amountMinor">The takings, in minor units.</param>
+    public static LedgerPosting MerchandiseTakings(
+        Guid entryId,
+        Guid clubId,
+        DateOnly weekOf,
+        int level,
+        int fans,
+        int bonusBp,
+        long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.Merchandise,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.WeeklyRun,
+            SourceId: clubId,
+            WeeklyCorrelationId(weekOf, clubId),
+            MerchandiseTakingsTemplate,
+            Parameters(("amountMinor", amountMinor), ("level", level), ("fans", fans), ("bonusBp", bonusBp)));
+    }
+
+    /// <summary>Builds the posting a week's upkeep for both buildings makes (`STRC-8`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club charged.</param>
+    /// <param name="weekOf">The week's boundary date.</param>
+    /// <param name="snackBarLevel">The snack bar's level.</param>
+    /// <param name="merchandiseLevel">The merchandise shop's level.</param>
+    /// <param name="amountMinor">The combined upkeep, in minor units, as a positive amount to be debited.</param>
+    /// <remarks>
+    /// One entry for both buildings, because the ledger allows one entry per category per correlation key; the
+    /// per-building split is in the takings rows (`STRC-8`).
+    /// </remarks>
+    public static LedgerPosting StructureUpkeep(
+        Guid entryId,
+        Guid clubId,
+        DateOnly weekOf,
+        int snackBarLevel,
+        int merchandiseLevel,
+        long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.StructureUpkeep,
+            CashDeltaMinor: -amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.WeeklyRun,
+            SourceId: clubId,
+            WeeklyCorrelationId(weekOf, clubId),
+            StructureUpkeepTemplate,
+            Parameters(
+                ("amountMinor", amountMinor), ("snackBarLevel", snackBarLevel), ("merchandiseLevel", merchandiseLevel)));
+    }
+
+    /// <summary>Builds the posting a building's upgrade makes (`STRC-3`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club paying.</param>
+    /// <param name="structureId">The building, which the entry's source names.</param>
+    /// <param name="structureVersion">The building's version once the upgrade was started.</param>
+    /// <param name="kind">Which building.</param>
+    /// <param name="targetLevel">The level the work will reach.</param>
+    /// <param name="amountMinor">The price, in minor units, as a positive amount to be debited.</param>
+    /// <remarks>
+    /// The correlation key is the building at the version the order produced, because each order moves the
+    /// version on by one: a retried order collides with its first entry instead of charging the club twice,
+    /// while the next upgrade is a different version and a different key (`FIN-17`).
+    /// </remarks>
+    public static LedgerPosting StructureUpgrade(
+        Guid entryId,
+        Guid clubId,
+        Guid structureId,
+        long structureVersion,
+        StructureKind kind,
+        int targetLevel,
+        long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.StructureUpgrade,
+            CashDeltaMinor: -amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Structure,
+            SourceId: structureId,
+            $"structure:{structureId:D}:v{structureVersion}",
+            StructureUpgradeTemplate,
+            Parameters(("amountMinor", amountMinor), ("kind", (long)kind), ("level", targetLevel)));
     }
 
     /// <summary>The correlation key of a bid's reservation (`FIN-17`, `TRF-7`).</summary>
