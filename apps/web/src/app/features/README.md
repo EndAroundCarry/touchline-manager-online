@@ -19,6 +19,7 @@ lands, and its route is added to `app.routes.ts` at the same time, so no unreach
 | `scouting/` | `/scouting` | 10 |
 | `transfers/` | `/transfers` | 10 |
 | `finances/` | `/finances` | 9 |
+| `fan-base/` | `/fans` — the club's fan count and satisfaction, what the fans expect from the next match, the last matches against that, and two charts; the expectation chip also sits on the Office and fixtures screens | Fan base milestone (plan partitioned-feather) |
 | `calendar/` | `/calendar` — a month grid of what happens on each day, drawn from one server list of events by kind | Calendar milestone |
 | `stadium/` | `/stadium` — the club's ground drawn in three dimensions with a key of its kinds of place, its pictures by level, and building places | Stadium milestone (ADR-0062, ADR-0065) |
 | `inbox/` | `/inbox` | 11 |

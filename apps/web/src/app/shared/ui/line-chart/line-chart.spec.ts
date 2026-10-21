@@ -17,6 +17,7 @@ interface RecordedChart {
     type: string;
     data: { labels: string[]; datasets: Record<string, unknown>[] };
     options: {
+      scales: { y: { min?: number; max?: number } };
       plugins: {
         legend: { display: boolean };
         tooltip: {
@@ -159,6 +160,37 @@ describe('LineChart', () => {
 
     // The legend is HTML, so the canvas one is off.
     expect(options.plugins.legend.display).toBe(false);
+  });
+
+  it('draws a series at the point radius it asks for, 3 by default, 0 for a bare line', async () => {
+    fixture.componentRef.setInput('series', [
+      series[0],
+      { ...series[1], pointRadius: 0 },
+      { ...series[1], label: 'Marker', pointRadius: 8 },
+    ]);
+    await loaded();
+
+    const { datasets } = charts()[0].config.data;
+
+    expect(datasets[0]).toMatchObject({ pointRadius: 3, pointHoverRadius: 5 });
+    expect(datasets[1]).toMatchObject({ pointRadius: 0, pointHoverRadius: 0 });
+    expect(datasets[2]).toMatchObject({ pointRadius: 8, pointHoverRadius: 8 });
+  });
+
+  it('leaves the y axis to the chart unless a bound is given', async () => {
+    await loaded();
+
+    expect(charts()[0].config.options.scales.y.min).toBeUndefined();
+    expect(charts()[0].config.options.scales.y.max).toBeUndefined();
+
+    fixture.componentRef.setInput('yMin', 0);
+    fixture.componentRef.setInput('yMax', 100);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const options = charts()[0] as unknown as { options: RecordedChart['config']['options'] };
+
+    expect(options.options.scales.y).toMatchObject({ min: 0, max: 100 });
   });
 
   it('puts the day’s attribute changes under its value in the tooltip', async () => {

@@ -173,6 +173,15 @@
                   }}</a>
                 </p>
                 <p class="text-center text-sm text-ink-2">{{ instant(next.kickoffAt) }}</p>
+                @if (fanExpectation(); as fans) {
+                  <div class="mt-2 flex justify-center">
+                    <app-fan-expectation-chip
+                      class="items-center text-center"
+                      [expectation]="fans.expectation"
+                      [frozen]="fans.frozen"
+                    />
+                  </div>
+                }
                 <p class="mt-1 text-center text-sm font-medium" role="status">
                   {{ countdown(next.lockAt) }} — deadline {{ deadline(next.lockAt) }}
                 </p>

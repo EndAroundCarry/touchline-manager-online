@@ -106,6 +106,7 @@ test.describe('@a11y the manager screens meet WCAG 2.2 AA', () => {
 
     const routes = [
       '/dashboard',
+      '/fans',
       '/squad',
       profileHref!,
       '/tactics',

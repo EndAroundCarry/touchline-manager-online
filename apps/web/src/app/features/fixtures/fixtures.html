@@ -105,6 +105,15 @@
 
               <div class="text-center md:text-right">
                 <p class="text-sm text-ink-2">{{ kickoff(next.kickoffAt) }}</p>
+                @if (fanExpectation(); as fans) {
+                  <div class="mt-2 flex justify-center md:justify-end">
+                    <app-fan-expectation-chip
+                      class="items-center md:items-end"
+                      [expectation]="fans.expectation"
+                      [frozen]="fans.frozen"
+                    />
+                  </div>
+                }
                 <p class="mt-1 text-sm font-medium text-ink" role="status">
                   {{ countdown(next.lockAt) }} — deadline {{ deadline(next.lockAt) }}
                 </p>

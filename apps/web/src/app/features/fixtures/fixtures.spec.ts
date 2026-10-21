@@ -3,6 +3,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ClubFixture, MyFixtures } from '../../core/competition/competition.models';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { FanNextFixture } from '../../core/fans/fan.models';
+import { FanStore } from '../../core/fans/fan-store';
+import { clubFixture, expectation } from '../../core/fans/fan-test-data';
 import { ResultRevealStore } from '../../core/match/result-reveal-store';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { Fixtures } from './fixtures';
@@ -60,6 +63,7 @@ describe('Fixtures', () => {
 
   let component: ComponentFixture<Fixtures>;
   let mine: ReturnType<typeof signal<MyFixtures | null>>;
+  let fanNext: ReturnType<typeof signal<FanNextFixture | null>>;
 
   /** Renders the screen with the Results tab open, which is where the played matches are. */
   async function render(fixtures: readonly ClubFixture[]): Promise<HTMLElement> {
@@ -105,12 +109,14 @@ describe('Fixtures', () => {
   beforeEach(async () => {
     localStorage.clear();
     mine = signal<MyFixtures | null>(null);
+    fanNext = signal<FanNextFixture | null>(null);
 
     await TestBed.configureTestingModule({
       imports: [Fixtures],
       providers: [
         provideRouter([]),
         { provide: OnboardingStore, useValue: { state: signal(null) } },
+        { provide: FanStore, useValue: { nextFixture: fanNext, load: vi.fn() } },
         {
           provide: CompetitionStore,
           useValue: {
@@ -192,6 +198,45 @@ describe('Fixtures', () => {
     const root = await render([played('a', 1, 'Vale Athletic', 3, 0)]);
 
     expect(button(root, 'Show all results')).toBeUndefined();
+  });
+
+  describe('what the fans expect from the next fixture', () => {
+    async function renderWithNext(): Promise<HTMLElement> {
+      mine.set({ ...list([scheduled('b', 2, 'Northfield')]), nextFixtureId: 'b' });
+      component = TestBed.createComponent(Fixtures);
+      await component.whenStable();
+
+      return component.nativeElement as HTMLElement;
+    }
+
+    it('shows the label, the chances and the predicted score in the next fixture card', async () => {
+      fanNext.set({
+        fixture: clubFixture({ id: 'b' }),
+        expectation: expectation(),
+        frozen: false,
+      });
+
+      const root = await renderWithNext();
+      const card = root.querySelector('[data-testid="next-fixture"]')!;
+
+      expect(card.textContent).toContain('Should win');
+      expect(card.textContent).toContain('58% win, 24% draw, 18% loss');
+      expect(card.textContent).toContain('can still change');
+    });
+
+    it('shows nothing before the fans are read, or for a different fixture', async () => {
+      const root = await renderWithNext();
+      expect(root.querySelector('app-fan-expectation-chip')).toBeNull();
+
+      fanNext.set({
+        fixture: clubFixture({ id: 'not-the-next-one' }),
+        expectation: expectation(),
+        frozen: true,
+      });
+      await component.whenStable();
+
+      expect(root.querySelector('app-fan-expectation-chip')).toBeNull();
+    });
   });
 
   it('opens on the upcoming fixtures, with the results one tab away and counted', async () => {

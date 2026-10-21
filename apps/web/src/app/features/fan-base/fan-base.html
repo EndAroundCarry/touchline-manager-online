@@ -1,0 +1,375 @@
+@if (loading() && fans() === null) {
+  <p class="text-sm text-ink-2" role="status">Loading your fans…</p>
+} @else if (error(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  <div class="mt-4 flex flex-wrap gap-3">
+    <button type="button" [class]="secondaryButtonClass" (click)="retry()">Try again</button>
+    <a routerLink="/dashboard" [class]="secondaryButtonClass">Back to the office</a>
+  </div>
+} @else if (fans(); as base) {
+  <section class="max-w-6xl">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h1 [class]="pageHeadingClass">Fan base</h1>
+        <p class="mt-1 max-w-3xl text-sm text-ink-2">
+          Fans join after wins, leave after defeats the club was expected to avoid, and judge every
+          match against what they expected from it. Their mood sets how many of them come to a home
+          match, and how many come sets the gate.
+        </p>
+      </div>
+
+      <div
+        class="inline-flex"
+        role="group"
+        aria-label="How much history to show"
+        data-testid="fan-scope"
+      >
+        @for (option of scopes; track option.key; let first = $first; let last = $last) {
+          <button
+            type="button"
+            class="min-h-11 border px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            [class]="
+              (first ? 'rounded-l' : '-ml-px') +
+              (last ? ' rounded-r' : '') +
+              (scope() === option.key
+                ? ' border-accent bg-accent text-on-accent'
+                : ' border-line-strong bg-panel text-ink')
+            "
+            [attr.aria-pressed]="scope() === option.key"
+            (click)="selectScope(option.key)"
+          >
+            {{ option.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (!settled()) {
+      <p class="mt-6 text-sm text-ink-2" role="status">Checking your results…</p>
+    } @else {
+      @if (heldBack()) {
+        <div class="mt-6 rounded border border-line bg-panel" data-testid="fan-held-back">
+          <app-result-hidden subject="The fans’ reaction" />
+        </div>
+      }
+
+      <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="fan-summary">
+        <div class="rounded border border-line bg-panel p-4">
+          <dt class="text-sm font-medium text-muted">Fans</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" data-testid="fan-count">
+            {{ group(fanCount() ?? base.fans) }}
+          </dd>
+          <dd class="text-sm text-ink-2">
+            Tier {{ base.tierNumber }}: never fewer than {{ group(base.floorFans) }}, new fans slow
+            down towards {{ group(base.softCapFans) }}
+          </dd>
+        </div>
+
+        <div class="rounded border border-line bg-panel p-4">
+          <dt class="text-sm font-medium text-muted">Satisfaction</dt>
+          <dd class="mt-1 text-xl font-semibold" data-testid="fan-mood">
+            {{ moodPhrase() }}
+            <span class="text-base font-normal text-ink-2 tabular-nums"
+              >{{ satisfaction()?.toFixed(0) }} / 100</span
+            >
+          </dd>
+          <dd class="text-sm text-ink-2">
+            @if (targetLabel(); as target) {
+              The fans expect a {{ target }} place finish
+              @if (lastGapLabel(); as gap) {
+                · {{ gap }}
+              }
+            } @else {
+              The fans set their target for the season at the first review
+            }
+          </dd>
+        </div>
+
+        <div class="rounded border border-line bg-panel p-4">
+          <dt class="text-sm font-medium text-muted">Next home crowd</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" data-testid="fan-crowd">
+            @if (heldBack()) {
+              <span class="text-base font-normal text-ink-2">Held back</span>
+            } @else {
+              {{ group(base.homeDemand) }}
+            }
+          </dd>
+          <dd class="text-sm text-ink-2">People who want to come, before the ground limits it</dd>
+        </div>
+
+        <div class="rounded border border-line bg-panel p-4">
+          <dt class="text-sm font-medium text-muted">This season</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" data-testid="fan-season-change">
+            @if (heldBack()) {
+              <span class="text-base font-normal text-ink-2">Held back</span>
+            } @else {
+              {{ signed(base.seasonFansChange) }} fans
+            }
+          </dd>
+          <dd class="text-sm text-ink-2">
+            Since the season began, or since you took over if that was later
+          </dd>
+        </div>
+      </dl>
+
+      <section
+        class="mt-6 rounded border border-line bg-panel p-4"
+        aria-labelledby="fan-next"
+        data-testid="fan-next"
+      >
+        <h2 id="fan-next" class="text-sm font-medium text-muted">Next match</h2>
+
+        @if (base.nextFixture; as next) {
+          <div class="mt-3 flex flex-wrap items-center gap-x-8 gap-y-4">
+            <div class="flex items-center gap-4">
+              <div class="flex w-24 flex-col items-center gap-1 text-center">
+                @if (tenure(); as kit) {
+                  <app-club-crest
+                    class="h-12"
+                    [shape]="kit.crestShape"
+                    [pattern]="kit.crestPattern"
+                    [primary]="kit.primaryColour"
+                    [secondary]="kit.secondaryColour"
+                  />
+                }
+                <span class="text-xs leading-tight text-ink-2">{{ base.clubName }}</span>
+              </div>
+              <span class="font-display text-xl font-bold text-muted" aria-hidden="true">
+                {{ next.fixture.venue === 'home' ? 'v' : '@' }}
+              </span>
+              <div class="flex w-24 flex-col items-center gap-1 text-center">
+                <app-club-crest
+                  class="h-12"
+                  [shape]="next.fixture.opponentCrestShape"
+                  [pattern]="next.fixture.opponentCrestPattern"
+                  [primary]="next.fixture.opponentPrimaryColour"
+                  [secondary]="next.fixture.opponentSecondaryColour"
+                />
+                <a
+                  [routerLink]="['/clubs', next.fixture.opponentClubId]"
+                  [class]="nameLinkClass"
+                  class="text-xs leading-tight"
+                  >{{ next.fixture.opponentName }}</a
+                >
+              </div>
+            </div>
+
+            <div>
+              <p class="text-sm text-ink-2">
+                {{ round(next.fixture) }} · {{ venue(next.fixture) }} ·
+                {{ instant(next.fixture.kickoffAt) }}
+              </p>
+              <app-fan-expectation-chip
+                class="mt-1"
+                [expectation]="next.expectation"
+                [frozen]="next.frozen"
+              />
+              <p class="mt-1 text-xs text-muted">
+                @if (next.frozen) {
+                  Fixed when the team sheets locked: the result is judged against this.
+                } @else {
+                  Worked out from both squads and the table now. It is fixed when the team sheets
+                  lock.
+                }
+              </p>
+            </div>
+          </div>
+        } @else {
+          <p class="mt-2 text-sm text-ink-2" role="status">
+            Your season has no fixtures left to play.
+          </p>
+        }
+      </section>
+
+      <div class="mt-6 grid gap-4 xl:grid-cols-2">
+        <section
+          class="min-w-0 rounded border border-line bg-panel p-4"
+          aria-labelledby="fan-satisfaction"
+          data-testid="fan-satisfaction-chart"
+        >
+          <h2 id="fan-satisfaction" class="text-base font-semibold">Fan satisfaction</h2>
+          <p class="mt-1 text-sm text-ink-2">
+            One point for every match and weekly review this season. Between
+            {{ calmFrom }} and {{ calmTo }} the fans are calm.
+          </p>
+          <div class="mt-3">
+            <app-line-chart
+              [labels]="satisfactionPlot().labels"
+              [series]="satisfactionPlot().series"
+              [ariaLabel]="satisfactionLabel()"
+              yTitle="Satisfaction (0–100)"
+              [yMin]="0"
+              [yMax]="100"
+            />
+          </div>
+          <p class="mt-2 text-xs text-ink-2">
+            @for (band of moodBands; track band.code; let last = $last) {
+              {{ band.phrase }} {{ band.from }}{{ last ? '+' : '' }}{{ last ? '' : ' · ' }}
+            }
+          </p>
+        </section>
+
+        <section
+          class="min-w-0 rounded border border-line bg-panel p-4"
+          aria-labelledby="fan-size"
+          data-testid="fan-count-chart"
+        >
+          <h2 id="fan-size" class="text-base font-semibold">Fan base size</h2>
+          <p class="mt-1 text-sm text-ink-2">
+            @if (scope() === 'club') {
+              Every season of the club. The floor and the soft cap are those of the tier it plays in
+              now.
+            } @else {
+              Since you took over. The floor and the soft cap are those of the tier the club plays
+              in.
+            }
+          </p>
+          <div class="mt-3">
+            @if (fanCountPlot(); as plot) {
+              <app-line-chart
+                [labels]="plot.labels"
+                [series]="plot.series"
+                [ariaLabel]="fanCountLabel()"
+                yTitle="Fans"
+              />
+            }
+          </div>
+          @if (!capDrawn()) {
+            <p class="mt-2 text-xs text-ink-2">
+              The soft cap, {{ group(base.softCapFans) }} fans, joins the chart once the club is a
+              third of the way there.
+            </p>
+          }
+        </section>
+      </div>
+
+      <section class="mt-6" aria-labelledby="fan-recent">
+        <h2 id="fan-recent" class="text-base font-semibold">Recent matches</h2>
+        <p class="mt-1 text-sm text-ink-2">
+          What the fans expected when the team sheets locked, what happened, and how they reacted.
+        </p>
+
+        @if (base.recentMatches.length === 0) {
+          <p class="mt-2 text-sm text-ink-2" role="status" data-testid="fan-no-matches">
+            No match has been played this season yet.
+          </p>
+        } @else {
+          <div
+            class="mt-2 overflow-x-auto rounded border border-line bg-panel"
+            tabindex="0"
+            role="group"
+            aria-label="Recent matches"
+          >
+            <table class="min-w-full border-collapse text-sm" data-testid="fan-recent-matches">
+              <caption class="sr-only">
+                The club’s last published matches, newest first: what the fans expected, the result,
+                and the change in satisfaction and in fans.
+              </caption>
+              <thead>
+                <tr class="border-b border-line text-ink-2">
+                  <th scope="col" class="px-3 py-2 text-left font-medium">Match</th>
+                  <th scope="col" class="px-3 py-2 text-left font-medium">Fans expected</th>
+                  <th scope="col" class="px-3 py-2 text-left font-medium">Result</th>
+                  <th scope="col" class="px-3 py-2 text-right font-medium">Satisfaction</th>
+                  <th scope="col" class="px-3 py-2 text-right font-medium">Fans</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (match of base.recentMatches; track match.fixture.id) {
+                  <tr class="border-b border-line-soft last:border-b-0">
+                    <th scope="row" class="px-3 py-2 text-left font-medium">
+                      <span class="block text-xs font-normal text-muted">
+                        {{ round(match.fixture) }} · {{ venue(match.fixture) }}
+                      </span>
+                      <a
+                        [routerLink]="['/clubs', match.fixture.opponentClubId]"
+                        [class]="nameLinkClass"
+                        >{{ match.fixture.opponentName }}</a
+                      >
+                    </th>
+                    <td class="px-3 py-2">
+                      @if (match.expectation; as expectation) {
+                        <span class="font-medium">{{ expectation.labelPhrase }}</span>
+                        <span class="block text-xs text-ink-2">
+                          {{ chances(match) }} · predicted {{ predicted(match) }}
+                        </span>
+                      } @else {
+                        <span class="text-muted">Not recorded</span>
+                      }
+                    </td>
+                    @if (hidden(match)) {
+                      <td class="px-3 py-2 text-muted" colspan="3">
+                        Held back until you have seen the result
+                      </td>
+                    } @else {
+                      <td class="px-3 py-2">
+                        <span class="tabular-nums">{{ score(match.fixture) }}</span>
+                        <span
+                          class="ml-2 rounded-full border px-2 py-0.5 text-xs font-semibold"
+                          [class]="outcomeClass(match.fixture)"
+                          >{{ outcome(match.fixture) }}</span
+                        >
+                      </td>
+                      <td class="px-3 py-2 text-right tabular-nums">
+                        {{ moodDelta(match) || '—' }}
+                      </td>
+                      <td class="px-3 py-2 text-right tabular-nums">
+                        {{ fansDelta(match) || '—' }}
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <details class="mt-6 rounded border border-line bg-panel px-3">
+        <summary class="flex min-h-11 cursor-pointer items-center text-sm font-medium text-ink">
+          Data table of the plotted points
+        </summary>
+        <div
+          class="max-h-96 overflow-auto pb-3"
+          tabindex="0"
+          role="group"
+          aria-label="Plotted points"
+        >
+          <table class="min-w-full border-collapse text-sm" data-testid="fan-points">
+            <caption class="sr-only">
+              Every point on the two charts, oldest first: the date, what happened, the satisfaction
+              and the fans after it.
+            </caption>
+            <thead>
+              <tr class="border-b border-line text-ink-2">
+                <th scope="col" class="px-3 py-2 text-left font-medium">Date</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Season</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium">What happened</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Satisfaction</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Fans</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (event of events(); track event.id) {
+                <tr class="border-b border-line-soft last:border-b-0">
+                  <th scope="row" class="px-3 py-2 text-left font-medium">
+                    {{ date(event.occurredAt) }}
+                  </th>
+                  <td class="px-3 py-2 text-right tabular-nums">{{ event.seasonNumber }}</td>
+                  <td class="px-3 py-2">
+                    <span class="font-medium">{{ kind(event) }}</span>
+                    <span class="block text-xs text-ink-2">{{ note(event) }}</span>
+                  </td>
+                  <td class="px-3 py-2 text-right tabular-nums">
+                    {{ points(event) }} · {{ word(event) }}
+                  </td>
+                  <td class="px-3 py-2 text-right tabular-nums">{{ group(event.fansAfter) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </details>
+    }
+  </section>
+}

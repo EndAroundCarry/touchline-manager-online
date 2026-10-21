@@ -1,0 +1,17 @@
+<span
+  class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-sm font-semibold"
+  [class]="toneClass()"
+  data-testid="fan-expectation-label"
+>
+  <i class="pi pi-users text-xs" aria-hidden="true"></i>
+  <span class="sr-only">The fans expect: </span>{{ expectation().labelPhrase }}
+</span>
+
+@if (detail()) {
+  <span class="text-xs text-ink-2" data-testid="fan-expectation-detail">
+    Fans: {{ chances() }} · predicted {{ score() }}
+    @if (frozen() === false) {
+      <span class="text-muted">· can still change</span>
+    }
+  </span>
+}

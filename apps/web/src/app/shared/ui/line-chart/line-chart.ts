@@ -31,6 +31,9 @@ export interface LineChartSeries {
 
   /** An optional note per label, shown under that day's value in the tooltip. */
   readonly notes?: readonly (string | null)[];
+
+  /** The point radius in pixels. Defaults to 3; 0 draws a bare line, a larger one makes a marker. */
+  readonly pointRadius?: number;
 }
 
 /** The chart ink: the screen's own tokens, read from the page so the chart follows the theme (ADR-0059). */
@@ -86,6 +89,12 @@ export class LineChart {
   /** The y-axis title. */
   readonly yTitle = input('Points');
 
+  /** The lowest value on the y axis, or null to let the chart choose. */
+  readonly yMin = input<number | null>(null);
+
+  /** The highest value on the y axis, or null to let the chart choose. */
+  readonly yMax = input<number | null>(null);
+
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly destroyRef = inject(DestroyRef);
   private readonly theme = inject(ThemeStore);
@@ -111,8 +120,8 @@ export class LineChart {
       borderWidth: 2,
       borderDash: [...line.dash],
       pointStyle: line.pointStyle as ChartDataset<'line'>['pointStyle'],
-      pointRadius: 3,
-      pointHoverRadius: 5,
+      pointRadius: line.pointRadius ?? 3,
+      pointHoverRadius: line.pointRadius === 0 ? 0 : Math.max(5, line.pointRadius ?? 0),
       pointHitRadius: 12,
       pointBackgroundColor: line.color,
       pointBorderColor: this.ink().pointBorder,
@@ -144,8 +153,11 @@ export class LineChart {
 
       const ink = this.ink();
 
+      // Built before the chart exists too, so the effect depends on every input the options read.
+      const options = this.options(ink);
+
       if (this.chart !== null) {
-        this.chart.options = this.options(ink);
+        this.chart.options = options;
         this.chart.data.labels = data.labels;
         this.chart.data.datasets = data.datasets;
         this.chart.update();
@@ -201,6 +213,8 @@ export class LineChart {
           ticks: { color: ink.tick, maxTicksLimit: 8, autoSkip: true },
         },
         y: {
+          min: this.yMin() ?? undefined,
+          max: this.yMax() ?? undefined,
           title: { display: true, text: this.yTitle(), color: ink.tick },
           grid: {
             color: (context) => (context.tick.value === 0 ? ink.zeroLine : ink.grid),

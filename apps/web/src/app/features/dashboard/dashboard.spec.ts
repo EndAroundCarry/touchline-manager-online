@@ -4,6 +4,9 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { ClubFixture, MyFixtures } from '../../core/competition/competition.models';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { FanNextFixture } from '../../core/fans/fan.models';
+import { FanStore } from '../../core/fans/fan-store';
+import { clubFixture, expectation } from '../../core/fans/fan-test-data';
 import { FinanceStore } from '../../core/finance/finance-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
 import { ResultRevealStore } from '../../core/match/result-reveal-store';
@@ -142,10 +145,14 @@ const FIXTURES: MyFixtures = {
 describe('Dashboard', () => {
   let fixture: ComponentFixture<Dashboard>;
   let fixtures: WritableSignal<MyFixtures | null>;
+  let fanNext: WritableSignal<FanNextFixture | null>;
+  let fanLoad: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     localStorage.clear();
     fixtures = signal<MyFixtures | null>(FIXTURES);
+    fanNext = signal<FanNextFixture | null>(null);
+    fanLoad = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [Dashboard],
@@ -195,6 +202,7 @@ describe('Dashboard', () => {
           },
         },
         { provide: FinanceStore, useValue: { summary: signal(null), loadSummary: vi.fn() } },
+        { provide: FanStore, useValue: { nextFixture: fanNext, load: fanLoad } },
       ],
     }).compileComponents();
 
@@ -256,6 +264,43 @@ describe('Dashboard', () => {
 
     expect(element.textContent).toContain('Barrow Town');
     expect(element.textContent).toContain('Calendar');
+  });
+
+  describe('what the fans expect from the next match', () => {
+    it('reads the fans when the office opens', async () => {
+      await render();
+
+      expect(fanLoad).toHaveBeenCalled();
+    });
+
+    it('shows the label, the chances and the predicted score beside the next match', async () => {
+      fanNext.set({
+        fixture: clubFixture({ id: NEXT_FIXTURE.id }),
+        expectation: expectation(),
+        frozen: true,
+      });
+
+      const element = await render();
+      const chip = element.querySelector('app-fan-expectation-chip');
+
+      expect(chip?.textContent).toContain('Should win');
+      expect(chip?.textContent).toContain('58% win, 24% draw, 18% loss');
+    });
+
+    it('shows nothing before the fans are read, or for a match that is no longer the next one', async () => {
+      const element = await render();
+      expect(element.querySelector('app-fan-expectation-chip')).toBeNull();
+
+      fanNext.set({
+        fixture: clubFixture({ id: 'some-other-fixture' }),
+        expectation: expectation(),
+        frozen: true,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(element.querySelector('app-fan-expectation-chip')).toBeNull();
+    });
   });
 
   it("draws the next opponent's crest, not a text badge", async () => {

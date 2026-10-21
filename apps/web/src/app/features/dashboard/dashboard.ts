@@ -8,6 +8,8 @@ import {
   venueLabel,
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { FanExpectation } from '../../core/fans/fan.models';
+import { FanStore } from '../../core/fans/fan-store';
 import { ResultGate } from '../../core/match/result-gate';
 import { FinanceStore } from '../../core/finance/finance-store';
 import { InboxStore } from '../../core/inbox/inbox-store';
@@ -41,6 +43,7 @@ import {
   tableWindow,
 } from './dashboard-presentation';
 import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
+import { FanExpectationChip } from '../../shared/ui/fan-expectation-chip/fan-expectation-chip';
 import { ResultHidden } from '../../shared/ui/result-hidden/result-hidden';
 import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
@@ -75,7 +78,7 @@ const MARKET_ROWS = 2;
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [ClubCrest, RouterLink, ResultHidden, PlayerCardTrigger],
+  imports: [ClubCrest, RouterLink, ResultHidden, PlayerCardTrigger, FanExpectationChip],
   templateUrl: './dashboard.html',
 })
 export class Dashboard {
@@ -83,6 +86,7 @@ export class Dashboard {
   private readonly competition = inject(CompetitionStore);
   private readonly gate = inject(ResultGate);
   private readonly finance = inject(FinanceStore);
+  private readonly fanStore = inject(FanStore);
   private readonly squadStore = inject(SquadStore);
   private readonly transfers = inject(TransfersStore);
   private readonly inbox = inject(InboxStore);
@@ -118,6 +122,24 @@ export class Dashboard {
     }
 
     return list.fixtures.find((fixture) => fixture.id === list.nextFixtureId) ?? null;
+  });
+
+  /**
+   * What the fans expect from the next match, or null while it is unread or belongs to a match that is no longer next.
+   *
+   * The fans' read and the fixture list are separate reads, so the expectation is shown only when both name the same
+   * fixture: a chip for the wrong match would be worse than none.
+   */
+  protected readonly fanExpectation = computed<{
+    readonly expectation: FanExpectation;
+    readonly frozen: boolean;
+  } | null>(() => {
+    const next = this.nextFixture();
+    const expected = this.fanStore.nextFixture();
+
+    return next !== null && expected !== null && expected.fixture.id === next.id
+      ? { expectation: expected.expectation, frozen: expected.frozen }
+      : null;
   });
 
   /** The finance summary, for the club widget's funds and the warnings. */
@@ -231,6 +253,7 @@ export class Dashboard {
             // the screen.
             this.competition.loadFixtures();
             this.finance.loadSummary();
+            this.fanStore.load();
 
             // The widgets' own reads. They are independent of one another, and of the club that has just loaded,
             // so none of them waits for another.

@@ -11,10 +11,13 @@ import {
   venueLabel,
 } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
+import { FanExpectation } from '../../core/fans/fan.models';
+import { FanStore } from '../../core/fans/fan-store';
 import { ResultGate } from '../../core/match/result-gate';
 import { OnboardingStore } from '../../core/world/onboarding-store';
 import { formatDeadline, formatInstant } from '../../core/world/presentation';
 import { ClubCrest } from '../../shared/ui/club-crest/club-crest';
+import { FanExpectationChip } from '../../shared/ui/fan-expectation-chip/fan-expectation-chip';
 import {
   FORM_ERROR,
   LINK_ACTION,
@@ -41,13 +44,14 @@ export type FixturesTab = 'upcoming' | 'results';
  */
 @Component({
   selector: 'app-fixtures',
-  imports: [RouterLink, ClubCrest],
+  imports: [RouterLink, ClubCrest, FanExpectationChip],
   templateUrl: './fixtures.html',
 })
 export class Fixtures implements OnDestroy {
   private readonly store = inject(CompetitionStore);
   private readonly gate = inject(ResultGate);
   private readonly onboarding = inject(OnboardingStore);
+  private readonly fanStore = inject(FanStore);
   private readonly timer: ReturnType<typeof setInterval>;
 
   /** The clock the countdown is measured against, advanced on an interval. */
@@ -61,6 +65,22 @@ export class Fixtures implements OnDestroy {
   protected readonly nextFixture = computed<ClubFixture | null>(() =>
     this.nextFrom(this.fixtures()),
   );
+
+  /**
+   * What the fans expect from the next fixture, or null while it is unread or belongs to a match that is no longer
+   * next: the fans' read and the fixture list are separate reads, and a chip for the wrong match would be worse than none.
+   */
+  protected readonly fanExpectation = computed<{
+    readonly expectation: FanExpectation;
+    readonly frozen: boolean;
+  } | null>(() => {
+    const next = this.nextFixture();
+    const expected = this.fanStore.nextFixture();
+
+    return next !== null && expected !== null && expected.fixture.id === next.id
+      ? { expectation: expected.expectation, frozen: expected.frozen }
+      : null;
+  });
 
   /** The club the manager holds, which carries the colours and crest it wears. */
   protected readonly tenure = computed(() => this.onboarding.state()?.tenure ?? null);
@@ -110,6 +130,7 @@ export class Fixtures implements OnDestroy {
 
   constructor() {
     this.store.loadFixtures();
+    this.fanStore.load();
 
     this.timer = setInterval(() => this.nowSignal.set(new Date()), 30_000);
   }
