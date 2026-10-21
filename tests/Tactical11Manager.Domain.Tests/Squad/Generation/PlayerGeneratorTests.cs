@@ -369,6 +369,8 @@ public sealed class PlayerGeneratorTests
         youths.Should().OnlyContain(member => member.Contract.EndSeasonNumber == 2 + WorldRuleSet.ContractMaxSeasons - 1);
         youths.Average(member => member.Attributes.ToSet().Values.Average())
             .Should().BeLessThan(youths.Average(member => (double)member.Player.Potential), "a 17 or 18-year-old starts below his ceiling (TRN-18)");
+        youths.Average(member => (double)member.Player.Potential)
+            .Should().BeApproximately(WorldRuleSet.YouthPotentialMeanForTier(1), 1.0, "a youth's potential is drawn around the youth mean (TRN-18)");
         Youth(7).Player.FullName.Should().Be(Youth(7).Player.FullName, "the same club and ordinal reproduce the same player (FIC-7)");
         Youth(7).Attributes.ToSet().Should().Be(Youth(7).Attributes.ToSet());
     }

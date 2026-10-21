@@ -534,6 +534,20 @@ public static class WorldRuleSet
     public const int GeneratedPotentialTalentPercent = 15;
 
     /// <summary>
+    /// The mean potential of a youth-intake player at a tier-1 club, on the 1–20 scale (`TRN-18`). A balancing
+    /// value.
+    /// </summary>
+    /// <remarks>
+    /// Its own constant, equal to <see cref="GeneratedAbilityMeanTier1"/> today, so reseeding the starting
+    /// world at a lower mean never lowers the talent that later intakes can reach. The bands around it are the
+    /// generated players' own (<see cref="GeneratedPotentialGemPercent"/> and the offsets below).
+    /// </remarks>
+    public const int YouthPotentialMeanTier1 = 13;
+
+    /// <summary>How far a youth intake's mean potential falls per tier below the first (`TRN-18`).</summary>
+    public const int YouthPotentialDropPerTier = 2;
+
+    /// <summary>
     /// The lowest a normal player's potential sits from his tier's mean ability. The normal offset is
     /// two dice of <see cref="GeneratedPotentialNormalDieFaces"/> faces added together, less this
     /// (`TRN-18`). A balancing value.
@@ -603,6 +617,21 @@ public static class WorldRuleSet
 
         return Math.Clamp(
             GeneratedAbilityMeanTier1 - (GeneratedAbilityDropPerTier * (tier - 1)),
+            AttributeMin,
+            AttributeMax);
+    }
+
+    /// <summary>The mean potential of a youth-intake player at a club in the given tier (`TRN-18`).</summary>
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static int YouthPotentialMeanForTier(int tier)
+    {
+        if (tier < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tier), tier, "A division tier starts at 1 (WORLD-4).");
+        }
+
+        return Math.Clamp(
+            YouthPotentialMeanTier1 - (YouthPotentialDropPerTier * (tier - 1)),
             AttributeMin,
             AttributeMax);
     }

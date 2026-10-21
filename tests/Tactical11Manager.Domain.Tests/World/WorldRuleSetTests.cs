@@ -85,6 +85,23 @@ public sealed class WorldRuleSetTests
     }
 
     [Fact]
+    public void Youth_potential_falls_with_depth_on_its_own_scale()
+    {
+        WorldRuleSet.YouthPotentialMeanForTier(1).Should().Be(WorldRuleSet.YouthPotentialMeanTier1);
+        WorldRuleSet.YouthPotentialMeanForTier(2).Should()
+            .Be(WorldRuleSet.YouthPotentialMeanTier1 - WorldRuleSet.YouthPotentialDropPerTier);
+        WorldRuleSet.YouthPotentialMeanForTier(20).Should().Be(WorldRuleSet.AttributeMin);
+    }
+
+    [Fact]
+    public void A_tier_below_one_is_a_programming_error_for_youth_potential_too()
+    {
+        var act = () => WorldRuleSet.YouthPotentialMeanForTier(0);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
     public void Matchdays_fall_on_tuesday_thursday_and_sunday()
     {
         WorldRuleSet.KickoffWeekdays.Should().Equal(

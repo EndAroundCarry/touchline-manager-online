@@ -351,7 +351,7 @@ public static class PlayerGenerator
 
         var nameOrdinal = (int)(DeterministicDigest.SeedOf(seed, countryCode, "youth-name", clubId.ToString("D"), ordinalText) % 1_000_000);
         var age = WorldRuleSet.PlayerMinimumAge + rng.NextInt(2);
-        var potential = GeneratedPotential.Draw(tier, rng);
+        var potential = GeneratedPotential.DrawYouth(tier, rng);
         var ability = Math.Clamp(
             potential + PlayerAttributeProfiles.AgeAbilityAdjustment(age),
             WorldRuleSet.AttributeMin,

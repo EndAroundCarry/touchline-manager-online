@@ -38,13 +38,24 @@ public static class GeneratedPotential
     {
         ArgumentNullException.ThrowIfNull(rng);
 
-        var offset = OffsetFor(rng);
-
-        return Math.Clamp(
-            WorldRuleSet.GeneratedAbilityMeanForTier(tier) + offset,
-            WorldRuleSet.AttributeMin,
-            WorldRuleSet.AttributeMax);
+        return Around(WorldRuleSet.GeneratedAbilityMeanForTier(tier), rng);
     }
+
+    /// <summary>
+    /// Draws a youth-intake player's potential, on the 1–20 scale. The same bands as <see cref="Draw"/>, around
+    /// the youth mean for the tier, which moves on its own so reseeding the starting world cannot cap a gem.
+    /// </summary>
+    /// <param name="tier">The tier the club plays in, which fixes the mean the offset is taken from.</param>
+    /// <param name="rng">The generator's random stream. One draw for the band and one or two for the offset.</param>
+    public static int DrawYouth(int tier, Pcg32 rng)
+    {
+        ArgumentNullException.ThrowIfNull(rng);
+
+        return Around(WorldRuleSet.YouthPotentialMeanForTier(tier), rng);
+    }
+
+    private static int Around(int mean, Pcg32 rng) =>
+        Math.Clamp(mean + OffsetFor(rng), WorldRuleSet.AttributeMin, WorldRuleSet.AttributeMax);
 
     private static int OffsetFor(Pcg32 rng)
     {

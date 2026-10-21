@@ -76,6 +76,47 @@ public sealed class GeneratedPotentialTests
         }
     }
 
+    [Fact]
+    public void A_youth_draws_the_same_bands_around_the_youth_mean()
+    {
+        var offsets = YouthPotentials(tier: 1)
+            .Select(potential => potential - WorldRuleSet.YouthPotentialMeanForTier(1))
+            .ToList();
+
+        Share(offsets, offset => offset >= 6).Should().BeApproximately(5.0, 1.5, "gems are 5% (TRN-18)");
+        Share(offsets, offset => offset is >= 3 and <= 5).Should().BeApproximately(15.0, 2.5, "talents are 15% (TRN-18)");
+        Share(offsets, offset => offset <= 2).Should().BeApproximately(80.0, 3.0, "the rest are normal (TRN-18)");
+        offsets.Min().Should().Be(-4);
+        offsets.Max().Should().Be(7);
+    }
+
+    [Fact]
+    public void A_tier_one_youth_gem_can_reach_the_top_of_the_scale()
+    {
+        YouthPotentials(tier: 1).Max().Should().Be(WorldRuleSet.AttributeMax);
+    }
+
+    [Fact]
+    public void A_youth_intakes_mean_falls_by_the_youth_drop_per_tier_and_stays_on_the_scale()
+    {
+        (YouthPotentials(1).Average() - YouthPotentials(2).Average())
+            .Should().Be(WorldRuleSet.YouthPotentialDropPerTier);
+
+        for (var tier = 1; tier <= 10; tier++)
+        {
+            YouthPotentials(tier).Should().OnlyContain(
+                potential => potential >= WorldRuleSet.AttributeMin && potential <= WorldRuleSet.AttributeMax,
+                $"tier {tier}");
+        }
+    }
+
+    private static List<int> YouthPotentials(int tier)
+    {
+        var rng = new Pcg32(DeterministicDigest.SeedOf("youth-potential-draw"));
+
+        return [.. Enumerable.Range(0, Draws).Select(_ => GeneratedPotential.DrawYouth(tier, rng))];
+    }
+
     private static List<int> Potentials(int tier)
     {
         var rng = new Pcg32(DeterministicDigest.SeedOf("potential-draw"));
