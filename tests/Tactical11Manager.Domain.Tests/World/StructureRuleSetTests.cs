@@ -52,15 +52,15 @@ public sealed class StructureRuleSetTests
     }
 
     [Theory]
-    [InlineData(2, 2_500_000, 1)]
-    [InlineData(3, 3_500_000, 1)]
-    [InlineData(4, 5_000_000, 2)]
-    [InlineData(5, 7_000_000, 2)]
-    [InlineData(6, 9_500_000, 3)]
-    [InlineData(7, 13_000_000, 4)]
-    [InlineData(8, 17_500_000, 5)]
-    [InlineData(9, 23_500_000, 6)]
-    [InlineData(10, 31_500_000, 7)]
+    [InlineData(2, 200_000, 1)]
+    [InlineData(3, 230_000, 1)]
+    [InlineData(4, 250_000, 2)]
+    [InlineData(5, 290_000, 2)]
+    [InlineData(6, 300_000, 3)]
+    [InlineData(7, 340_000, 4)]
+    [InlineData(8, 350_000, 5)]
+    [InlineData(9, 360_000, 6)]
+    [InlineData(10, 380_000, 7)]
     public void The_cost_and_build_time_of_each_upgrade_match_the_table(int target, long costMinor, int days)
     {
         StructureRuleSet.UpgradeCostMinorTier1(target).Should().Be(costMinor);
@@ -99,7 +99,7 @@ public sealed class StructureRuleSetTests
     {
         StructureRuleSet.UpkeepMinorFor(4, 1).Should().Be(80_000);
         StructureRuleSet.UpkeepMinorFor(4, 2).Should().Be(40_000);
-        StructureRuleSet.UpgradeCostMinorFor(6, 4).Should().Be(9_500_000 / 8);
+        StructureRuleSet.UpgradeCostMinorFor(6, 4).Should().Be(300_000 / 8);
 
         for (var level = 1; level <= StructureRuleSet.MaxLevel; level++)
         {
@@ -246,20 +246,22 @@ public sealed class StructureRuleSetTests
     }
 
     [Fact]
-    public void The_first_upgrade_of_either_building_repays_in_about_two_and_a_half_seasons_at_tier_one()
+    public void An_upgrade_repays_in_about_two_weeks_at_the_first_step_and_five_at_the_last_at_tier_one()
     {
         var fans = FanRuleSet.StartFansFor(1);
         var crowd = StadiumRuleSet.AttendanceFor(OpeningGround, fans, FanRuleSet.CalmMoodBp);
 
-        var snackGain = SnackWeeklyProfitMinor(2, 1, crowd) - SnackWeeklyProfitMinor(1, 1, crowd);
-        var merchGain = MerchWeeklyProfitMinor(2, 1, fans) - MerchWeeklyProfitMinor(1, 1, fans);
-        var cost = StructureRuleSet.UpgradeCostMinorFor(2, 1);
+        double Weeks(int target, long gain) => (double)StructureRuleSet.UpgradeCostMinorFor(target, 1) / gain;
 
-        var snackWeeks = (double)cost / snackGain;
-        var merchWeeks = (double)cost / merchGain;
+        var snackFirst = Weeks(2, SnackWeeklyProfitMinor(2, 1, crowd) - SnackWeeklyProfitMinor(1, 1, crowd));
+        var merchFirst = Weeks(2, MerchWeeklyProfitMinor(2, 1, fans) - MerchWeeklyProfitMinor(1, 1, fans));
+        var snackLast = Weeks(10, SnackWeeklyProfitMinor(10, 1, crowd) - SnackWeeklyProfitMinor(9, 1, crowd));
+        var merchLast = Weeks(10, MerchWeeklyProfitMinor(10, 1, fans) - MerchWeeklyProfitMinor(9, 1, fans));
 
-        snackWeeks.Should().BeInRange(25, 33, "the plan quotes 27 to 31 weeks");
-        merchWeeks.Should().BeInRange(25, 33, "the plan quotes 27 to 31 weeks");
+        snackFirst.Should().BeInRange(1.5, 3, "about two weeks");
+        merchFirst.Should().BeInRange(1.5, 3, "about two weeks");
+        snackLast.Should().BeInRange(4, 6.5, "about five weeks");
+        merchLast.Should().BeInRange(4, 6.5, "about five weeks");
     }
 
     // Tiers 5 and and deeper are not asserted: money halves per tier while a club's fans fall by a quarter, so by

@@ -49,14 +49,14 @@ A short probe, with no match simulated: one season of 34 matchdays (17 home matc
 | Club | Level | Snack bar | Shop | Upkeep (both) | Profit | Gate | Profit as share of the gate | Cost of both from level 1 |
 |---|---|---|---|---|---|---|---|---|
 | Tier 1 opening (10,000 fans, 5,000 places, crowd 2,890) | 1 | 53,610 | 35,700 | 6,800 | 82,510 | 846,600 | 9.7% | free |
-| | 5 | 107,219 | 83,300 | 22,667 | 167,852 | | 19.8% | 360,000 |
-| | 10 | 174,231 | 142,800 | 56,667 | 260,364 | | 30.8% | 2,260,000 |
+| | 5 | 107,219 | 83,300 | 22,667 | 167,852 | | 19.8% | 19,400 |
+| | 10 | 174,231 | 142,800 | 56,667 | 260,364 | | 30.8% | 54,000 |
 | Tier 1 big (40,000 fans, 20,000 places, crowd 11,560) | 1 | 214,438 | 142,800 | 6,800 | 350,438 | 3,386,400 | 10.3% | free |
-| | 5 | 428,876 | 333,200 | 22,667 | 739,409 | | 21.8% | 360,000 |
-| | 10 | 696,924 | 571,200 | 56,667 | 1,211,457 | | 35.8% | 2,260,000 |
+| | 5 | 428,876 | 333,200 | 22,667 | 739,409 | | 21.8% | 19,400 |
+| | 10 | 696,924 | 571,200 | 56,667 | 1,211,457 | | 35.8% | 54,000 |
 | Tier 4 opening (4,219 fans, 5,000 places, crowd 1,264) | 1 | 23,447 | 15,062 | 850 | 37,659 | 53,322 | 70.6% | free |
-| | 5 | 46,894 | 35,144 | 2,833 | 79,205 | | 148.5% | 45,000 |
-| | 10 | 76,203 | 60,247 | 7,083 | 129,367 | | 242.6% | 282,500 |
+| | 5 | 46,894 | 35,144 | 2,833 | 79,205 | | 148.5% | 2,425 |
+| | 10 | 76,203 | 60,247 | 7,083 | 129,367 | | 242.6% | 6,750 |
 
 For scale, a tier-1 club's sponsorship over the same season is 340,000 and its operating cost 113,333; a tier-4 club's sponsorship is 42,500 and its operating cost 14,167.
 
@@ -64,14 +64,14 @@ For scale, a tier-1 club's sponsorship over the same season is 340,000 and its o
 
 | Step | Tier 1 opening | Tier 1 big | Tier 4 opening |
 |---|---|---|---|
-| Level 1 to 2 | 24.2 / 27.8 | 5.5 / 6.2 | 6.3 / 7.4 |
-| Level 4 to 5 | 71.2 / 82.4 | 15.5 / 17.5 | 17.8 / 20.9 |
-| Level 9 to 10 | 378 / 450 | 71.9 / 81.8 | 83.2 / 98.6 |
+| Level 1 to 2 | 1.9 / 2.2 | 0.4 / 0.5 | 0.5 / 0.6 |
+| Level 4 to 5 | 3.0 / 3.4 | 0.6 / 0.7 | 0.7 / 0.9 |
+| Level 9 to 10 | 4.6 / 5.4 | 0.9 / 1.0 | 1.0 / 1.2 |
 
 What this says:
 
-- **A tier-1 club at its opening numbers** earns about a tenth of its gate from the two buildings at level 1 and about 31% of it at level 10. The first step pays back in 24 to 28 weeks, about two and a quarter seasons, close to the stadium place it was set against (`STAD-4`). The top levels do not pay for a small club (378 weeks): they are for clubs with a big crowd and many fans, as designed.
-- **A big tier-1 club** pays every step back several times faster. The first step takes 6 weeks and the last 72 to 82, which is the whole reason the top levels exist.
+- **A tier-1 club at its opening numbers** earns about a tenth of its gate from the two buildings at level 1 and about 31% of it at level 10. The first step pays back in about two weeks and the last in about five. That was set on purpose on 2026-10-21: the buildings are there to help a club grow, not to hold it back, so an upgrade costs 2,000 for level 2 rising to 3,800 for level 10, and bringing both buildings from level 1 to 10 costs 54,000, about a tenth of a new club's opening cash. The build time (1 to 7 days), not the price, is what paces a manager. The first version of the table (25,000 rising to 315,000, a payback of 24 to 28 weeks at the first step and 378 to 450 at the last) was rejected as too slow.
+- **A big tier-1 club** pays every step back within a week: the first step takes half a week and the last one week.
 - **Every step is positive at every opening crowd**, in every tier tested (this is also a Domain test): upkeep never outgrows what the next level takes in.
 
 ## Alternatives considered
@@ -85,7 +85,7 @@ What this says:
 
 ## Consequences
 
-- **A lower division gains far more from the buildings than a higher one.** With the same spend per customer in every tier and costs divided by 2^(tier − 1) while crowds and fans shrink only to ¾ per tier, a tier-4 club's buildings earn 71% of its gate at level 1 (tier 1: 10%), and its first upgrade pays back in 6 to 7 weeks (tier 1: 24 to 28). At level 10 a tier-4 club earns 2.4 times its gate from the buildings. The AI clubs at level 1 get the same relative lift, so a lower-division AI club's income rises by about 70% of its gate with this change, and no season was simulated to see what that does to the leagues' cash. The planned finance rework should settle it. The options when it does: scale the spend per customer by tier, scale the cost of an upgrade by the club's fans instead of the tier, or accept it as a reward for managing a small club.
+- **A lower division gains far more from the buildings than a higher one.** With the same spend per customer in every tier and costs divided by 2^(tier − 1) while crowds and fans shrink only to ¾ per tier, a tier-4 club's buildings earn 71% of its gate at level 1 (tier 1: 10%), and its first upgrade pays back in half a week (tier 1: two weeks). At level 10 a tier-4 club earns 2.4 times its gate from the buildings. The AI clubs at level 1 get the same relative lift, so a lower-division AI club's income rises by about 70% of its gate with this change, and no season was simulated to see what that does to the leagues' cash. The planned finance rework should settle it. The options when it does: scale the spend per customer by tier, scale the cost of an upgrade by the club's fans instead of the tier, or accept it as a reward for managing a small club.
 - **The week without a home match shows a small loss on the snack bar** (upkeep with no takings). The page shows the week as it is.
 - **Upgrade cost and upkeep are provisional (`STRC-9`).** They are tables in `StructureRuleSet` so the rework changes values and not code.
 - **The shortfall check counts the upkeep.** At tier 1 the upkeep alone cannot trigger a grant (sponsorship of 30,000 a week against at most 5,000 of upkeep on top of the 10,000 operating cost); a club that has already used all its cash on wages can.

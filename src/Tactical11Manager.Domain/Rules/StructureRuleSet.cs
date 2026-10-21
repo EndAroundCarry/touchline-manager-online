@@ -72,7 +72,7 @@ public static class StructureRuleSet
     private static readonly long[] UpkeepTier1 = [30_000, 45_000, 60_000, 80_000, 100_000, 125_000, 150_000, 180_000, 215_000, 250_000];
 
     // Index 0 is level 1, which opens free; a cost belongs to the level it buys.
-    private static readonly long[] UpgradeCostTier1 = [0, 2_500_000, 3_500_000, 5_000_000, 7_000_000, 9_500_000, 13_000_000, 17_500_000, 23_500_000, 31_500_000];
+    private static readonly long[] UpgradeCostTier1 = [0, 200_000, 230_000, 250_000, 290_000, 300_000, 340_000, 350_000, 360_000, 380_000];
 
     private static readonly int[] BuildDays = [0, 1, 1, 2, 2, 3, 4, 5, 6, 7];
 
@@ -91,9 +91,9 @@ public static class StructureRuleSet
     /// <summary>What an upgrade costs at a tier-1 club, in minor units, by the level it reaches (`STRC-3`).</summary>
     /// <param name="targetLevel">The level the work reaches, 2–10.</param>
     /// <remarks>
-    /// Set so the first upgrade of either building pays for itself in about 27 to 31 weeks, roughly two and a
-    /// half seasons: the same payback as a stadium place (<see cref="StadiumRuleSet.BuildCostMinorTier1"/>).
-    /// The top levels only pay off quickly with a big crowd or many fans, which is deliberate.
+    /// Set so an upgrade helps a club grow and does not hold it back: at a tier-1 club with its opening crowd
+    /// and fans, the first upgrade of either building pays for itself in about two weeks and the last in about
+    /// five, counting the upkeep each step adds. A bigger club pays back faster still.
     /// </remarks>
     public static long UpgradeCostMinorTier1(int targetLevel) => UpgradeCostTier1[UpgradeIndexOf(targetLevel)];
 
