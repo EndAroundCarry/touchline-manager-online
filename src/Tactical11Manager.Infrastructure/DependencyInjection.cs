@@ -307,6 +307,8 @@ public static class DependencyInjection
     {
         services.AddScoped<IInboxRepository, InboxRepository>();
         services.AddScoped<IInboxQueries, InboxQueries>();
+        services.AddScoped<IDirectMessageRepository, DirectMessageRepository>();
+        services.AddScoped<IDirectMessageQueries, DirectMessageQueries>();
         services.AddScoped<INewsRepository, NewsRepository>();
         services.AddScoped<INotificationPreferencesRepository, NotificationPreferencesRepository>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();

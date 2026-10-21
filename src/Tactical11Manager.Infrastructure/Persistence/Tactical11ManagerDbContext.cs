@@ -145,6 +145,15 @@ public sealed class Tactical11ManagerDbContext : DbContext
     /// <summary>Gets the comms module's inbox messages.</summary>
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
+    /// <summary>Gets the comms module's direct-message conversations between managers.</summary>
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    /// <summary>Gets the comms module's direct messages.</summary>
+    public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
+
+    /// <summary>Gets the comms module's manager-to-manager blocks.</summary>
+    public DbSet<ManagerBlock> ManagerBlocks => Set<ManagerBlock>();
+
     /// <summary>Gets the comms module's public news feed items.</summary>
     public DbSet<NewsItem> NewsItems => Set<NewsItem>();
 

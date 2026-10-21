@@ -368,6 +368,120 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.ToTable("user_roles", "auth");
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.Comms.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("LastMessageAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_message_at");
+
+                    b.Property<Guid>("RecipientManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_manager_id");
+
+                    b.Property<Guid>("StartedByManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("started_by_manager_id");
+
+                    b.Property<Guid>("StartedFromClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("started_from_club_id");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedFromClubId");
+
+                    b.HasIndex("RecipientManagerId", "LastMessageAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_conversations_recipient_manager_id_last_message_at_id");
+
+                    b.HasIndex("StartedByManagerId", "LastMessageAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_conversations_started_by_manager_id_last_message_at_id");
+
+                    b.ToTable("conversations", "comms", t =>
+                        {
+                            t.HasCheckConstraint("ck_conversations_participants", "started_by_manager_id <> recipient_manager_id");
+
+                            t.HasCheckConstraint("ck_conversations_subject", "length(subject) between 1 and 80");
+
+                            t.HasCheckConstraint("ck_conversations_version", "version >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Comms.DirectMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("RecipientManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_manager_id");
+
+                    b.Property<Guid>("SenderManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sender_manager_id");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientManagerId")
+                        .HasDatabaseName("ix_direct_messages_recipient_manager_id_unread")
+                        .HasFilter("read_at is null");
+
+                    b.HasIndex("SenderManagerId");
+
+                    b.HasIndex("ConversationId", "SentAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_direct_messages_conversation_id_sent_at_id");
+
+                    b.ToTable("direct_messages", "comms", t =>
+                        {
+                            t.HasCheckConstraint("ck_direct_messages_body", "length(body) between 1 and 1000");
+
+                            t.HasCheckConstraint("ck_direct_messages_participants", "sender_manager_id <> recipient_manager_id");
+                        });
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.Comms.InboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -431,6 +545,31 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_inbox_messages_template_key", "length(template_key) > 0");
 
                             t.HasCheckConstraint("ck_inbox_messages_version", "version >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Comms.ManagerBlock", b =>
+                {
+                    b.Property<Guid>("BlockerManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocker_manager_id");
+
+                    b.Property<Guid>("BlockedManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocked_manager_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("BlockerManagerId", "BlockedManagerId");
+
+                    b.HasIndex("BlockedManagerId")
+                        .HasDatabaseName("ix_manager_blocks_blocked_manager_id");
+
+                    b.ToTable("manager_blocks", "comms", t =>
+                        {
+                            t.HasCheckConstraint("ck_manager_blocks_distinct", "blocker_manager_id <> blocked_manager_id");
                         });
                 });
 
@@ -4889,11 +5028,68 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.Comms.Conversation", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Manager", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.Manager", null)
+                        .WithMany()
+                        .HasForeignKey("StartedByManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("StartedFromClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Comms.DirectMessage", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.Comms.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.Manager", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.Manager", null)
+                        .WithMany()
+                        .HasForeignKey("SenderManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.Comms.InboxMessage", b =>
                 {
                     b.HasOne("Tactical11Manager.Domain.World.Manager", null)
                         .WithMany()
                         .HasForeignKey("RecipientManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Comms.ManagerBlock", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Manager", null)
+                        .WithMany()
+                        .HasForeignKey("BlockedManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.Manager", null)
+                        .WithMany()
+                        .HasForeignKey("BlockerManagerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
