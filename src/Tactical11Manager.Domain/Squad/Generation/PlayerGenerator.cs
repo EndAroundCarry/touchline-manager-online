@@ -297,6 +297,92 @@ public static class PlayerGenerator
     }
 
     /// <summary>
+    /// Generates one young player for a club's yearly intake: 17 or 18 years old, a ceiling drawn like any generated player's (`TRN-18`), and
+    /// skills that start below it by the usual age adjustment. Deterministic from the seed, the club and the ordinal.
+    /// </summary>
+    /// <param name="seed">The world seed.</param>
+    /// <param name="namePoolKey">The name pool key of the club's country.</param>
+    /// <param name="countryCode">The club's country.</param>
+    /// <param name="worldId">The world.</param>
+    /// <param name="clubId">The club taking him in.</param>
+    /// <param name="tier">The tier the club plays in, which sets the ceiling's mean.</param>
+    /// <param name="seasonId">The season he joins for.</param>
+    /// <param name="seasonNumber">The season number he joins for.</param>
+    /// <param name="gameYear">The game year he joins in, which fixes his age.</param>
+    /// <param name="position">The position he is generated for.</param>
+    /// <param name="ordinal">The ordinal of this player within the world's rollover, unique per club and season.</param>
+    /// <param name="now">The current instant.</param>
+    public static GeneratedSquadMember GenerateYouth(
+        string seed,
+        string namePoolKey,
+        string countryCode,
+        Guid worldId,
+        Guid clubId,
+        int tier,
+        Guid seasonId,
+        int seasonNumber,
+        int gameYear,
+        PlayerPosition position,
+        int ordinal,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(seed);
+        ArgumentException.ThrowIfNullOrWhiteSpace(countryCode);
+        ArgumentOutOfRangeException.ThrowIfNegative(ordinal);
+        ArgumentOutOfRangeException.ThrowIfLessThan(tier, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(seasonNumber, 1);
+
+        var request = new SquadGenerationRequest(
+            seed,
+            namePoolKey,
+            countryCode,
+            worldId,
+            clubId,
+            ordinal,
+            tier,
+            seasonId,
+            seasonNumber,
+            gameYear,
+            now);
+
+        var pool = PlayerNamePools.For(namePoolKey);
+        var ordinalText = ordinal.ToString(CultureInfo.InvariantCulture);
+        var rng = new Pcg32(DeterministicDigest.SeedOf(seed, countryCode, "youth", clubId.ToString("D"), ordinalText));
+
+        var nameOrdinal = (int)(DeterministicDigest.SeedOf(seed, countryCode, "youth-name", clubId.ToString("D"), ordinalText) % 1_000_000);
+        var age = WorldRuleSet.PlayerMinimumAge + rng.NextInt(2);
+        var potential = GeneratedPotential.Draw(tier, rng);
+        var ability = Math.Clamp(
+            potential + PlayerAttributeProfiles.AgeAbilityAdjustment(age),
+            WorldRuleSet.AttributeMin,
+            WorldRuleSet.AttributeMax);
+
+        var draft = Draft(request, pool, rng, position, nameOrdinal, new DraftOverride(age, potential, ability));
+        var playerId = Guid.CreateVersion7();
+
+        return new GeneratedSquadMember(
+            Player.Generate(playerId, worldId, draft.Identity, now),
+            PlayerAttributes.Create(playerId, draft.Attributes),
+            PlayerState.Open(playerId, draft.ExperienceBp),
+            PlayerContract.Sign(
+                Guid.CreateVersion7(),
+                playerId,
+                clubId,
+                seasonNumber,
+                seasonNumber + WorldRuleSet.ContractMaxSeasons - 1,
+                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean, tier),
+                SquadStatus.Prospect,
+                now),
+            PlayerRegistration.Register(
+                Guid.CreateVersion7(),
+                playerId,
+                clubId,
+                seasonId,
+                effectiveFixtureBoundaryRound: 0,
+                now));
+    }
+
+    /// <summary>
     /// Draws one player. With no <paramref name="over"/> the draws are exactly the squad generator's, in the
     /// same order, so a squad's golden digest cannot move; a free agent passes an override instead.
     /// </summary>

@@ -40,6 +40,9 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tickfans N seed [curve|real|pool|league]` fits how a strength gap becomes win, draw and loss on the tick engine and checks the fans' expectation
 // against played matches (plan partitioned-feather). Not part of `all`.
 //
+// `econ seeds seed [seasons]` runs the economy sandbox (plan toasty-scott): one country of 4 tiers of 18 clubs through ten seasons on the game's own
+// pure rule code, scripted managers beside the AI clubs, and writes the season tables, the target checks and the report. Not part of `all`.
+//
 // `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
 // snapshots (see TickCalibration). Neither is part of `all`.
 //
@@ -261,6 +264,30 @@ if (mode is "tickfans")
         rules,
         positional.Length > 3 ? positional[3] : string.Empty,
         positional.Length > 4 ? positional[4] : string.Empty);
+}
+
+if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") == "1")
+{
+    // ECON_PROBE=1 econ <youths> : follows a cohort of generated 17-18-year-olds through daily training for ten years (ECON_TRAIN scales development speed)
+    EconTrainingProbe.Run(
+        Math.Clamp(positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var probeYouths) ? probeYouths : 120, 10, 2_000),
+        10,
+        int.TryParse(Environment.GetEnvironmentVariable("ECON_TRAIN"), CultureInfo.InvariantCulture, out var probeTrain) ? Math.Clamp(probeTrain, 25, 1000) : 100,
+        int.TryParse(Environment.GetEnvironmentVariable("ECON_BACKGROUND"), CultureInfo.InvariantCulture, out var probeBackground) ? Math.Clamp(probeBackground, 0, 300) : 0);
+}
+
+if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") != "1")
+{
+    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of 18 clubs, weekly steps, today's rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per club, default 0; ECON_TRAIN scales development speed in percent, default 100; ECON_BACKGROUND gives untrained attributes a share of the daily budget, default 0)
+    EconReport.Run(
+        Math.Clamp(positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var econSeeds) ? econSeeds : 3, 1, 10),
+        positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var econSeed) ? econSeed : 5_000UL,
+        positional.Length > 3 && int.TryParse(positional[3], CultureInfo.InvariantCulture, out var econSeasons) ? Math.Clamp(econSeasons, 1, 12) : 10,
+        Environment.GetEnvironmentVariable("ECON_OUT") is { Length: > 0 } econOut ? econOut : Path.Combine(".run-logs", "econ"),
+        new TodayEconRules(),
+        int.TryParse(Environment.GetEnvironmentVariable("ECON_INTAKE"), CultureInfo.InvariantCulture, out var econIntake) ? Math.Clamp(econIntake, 0, 8) : 0,
+        int.TryParse(Environment.GetEnvironmentVariable("ECON_TRAIN"), CultureInfo.InvariantCulture, out var econTrain) ? Math.Clamp(econTrain, 25, 1000) : 100,
+        int.TryParse(Environment.GetEnvironmentVariable("ECON_BACKGROUND"), CultureInfo.InvariantCulture, out var econBackground) ? Math.Clamp(econBackground, 0, 300) : 0);
 }
 
 if (mode is "tickfk")

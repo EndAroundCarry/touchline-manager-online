@@ -350,6 +350,29 @@ public sealed class PlayerGeneratorTests
             + "the old digest was 941aab8c455dbc46");
     }
 
+    [Fact]
+    public void A_youth_intake_player_is_17_or_18_with_skills_under_his_ceiling_and_is_reproducible()
+    {
+        var clubId = Guid.CreateVersion7();
+
+        GeneratedSquadMember Youth(int ordinal) => PlayerGenerator.GenerateYouth(
+            Seed, "england", "ENG", Guid.CreateVersion7(), clubId, tier: 1, Guid.CreateVersion7(), seasonNumber: 2, gameYear: 2027,
+            PlayerPosition.CentralMidfielder, ordinal, Now);
+
+        var youths = Enumerable.Range(0, 60).Select(Youth).ToList();
+
+        using var scope = new AssertionScope();
+
+        youths.Should().OnlyContain(member => member.Player.AgeIn(2027) >= 17 && member.Player.AgeIn(2027) <= 18);
+        youths.Should().OnlyContain(member => member.Attributes.ToSet().IsWithinScale);
+        youths.Should().OnlyContain(member => member.Contract.SquadStatus == SquadStatus.Prospect);
+        youths.Should().OnlyContain(member => member.Contract.EndSeasonNumber == 2 + WorldRuleSet.ContractMaxSeasons - 1);
+        youths.Average(member => member.Attributes.ToSet().Values.Average())
+            .Should().BeLessThan(youths.Average(member => (double)member.Player.Potential), "a 17 or 18-year-old starts below his ceiling (TRN-18)");
+        Youth(7).Player.FullName.Should().Be(Youth(7).Player.FullName, "the same club and ordinal reproduce the same player (FIC-7)");
+        Youth(7).Attributes.ToSet().Should().Be(Youth(7).Attributes.ToSet());
+    }
+
     private static string GoldenDigest(IReadOnlyList<GeneratedSquadMember> squad) =>
         DeterministicDigest.Of(
         [
