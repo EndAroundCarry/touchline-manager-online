@@ -105,3 +105,4 @@ the system is shaped the way it is.
 | [0076](0076-experience-is-frozen-into-the-snapshot-as-a-skill-bonus.md) | Experience is frozen into the snapshot as a skill bonus, after the curve and uncapped, hashed only when above zero | Accepted |
 | [0076](0076-potential-drawn-before-skills.md) | Potential is drawn before skills, with a tail of talents and gems | Accepted |
 | [0077](0077-free-agents-weekly-generated-pool.md) | Free agents are a weekly generated pool sold through the timed auction | Accepted |
+| [0078](0078-fan-base-satisfaction-and-the-crowd.md) | Every club has a fan count and a mood that results move, and the crowd and the gate are drawn from them | Accepted |

@@ -17,6 +17,7 @@
 | **match** | `match` | Input snapshots, matches, lineups, events, highlights, simulation attempts | 5, 6, 7 |
 | **market** | `market` | Shortlists, transfer listings, bids, outcomes, AI market decisions | 10 |
 | **finance** | `finance` | Club accounts, append-only ledger, season finance summaries | 9 |
+| **fans** | `fans` | Each club's fan count and mood, the append-only history of what moved them, and what the fans expected from each fixture when the team sheets locked | 17 |
 | **comms** | `comms` | Inbox messages, news items, email dispatch intent | 6, 8, 11 |
 | **ops** | `ops` | Jobs, outbox, idempotency records, audit log, feature flags, repair actions, the read-only operational funnels and their counters, the operator game-health read, the console's job, matchday, and audit reads, and the local telemetry stack's dashboards and SLO alert rules | 1, 6, 13, 14 |
 
@@ -96,6 +97,9 @@ flowchart TD
 | match → competition | write via use case | Publication marks fixtures published and updates standings |
 | market → squad | write via use case | Resolution moves registration and rewrites contracts |
 | market → finance | write via use case | Reservations, payment, seller credit |
+| competition → fans | write via use case | The lock freezes what each side's fans expect; publication moves both clubs' fans after the gate is posted; rollover gives the last verdict and the tier jump |
+| world → fans | write via use case | A takeover resets the club's fans to its tier's opening numbers (`FAN-9`) |
+| finance → fans | read | The gate is drawn by the fans and mood going into the match (`FIN-3`) |
 | comms ← all | consumed events | Inbox/news from publication, transfers, discipline, deadlines |
 | ops ← all | infrastructure | Jobs, outbox dispatch, idempotency, audit |
 
@@ -135,3 +139,4 @@ flowchart TD
 | 13 | web (all features), ops | Feature-complete PWA — *delivered: account sessions, export, and preferences (ADR-0036), PWA hardening and the offline boundary (ADR-0037), responsive layouts and the breakpoint suite (`F-44`, ADR-0038), the accessibility baseline and axe gate (`F-52`, ADR-0039), guided help and the first-steps surface (`F-53`, ADR-0040), and the privacy-safe operational funnels (`F-54`, ADR-0041)* |
 | 14 | ops, security, auth, web | Hardened live operations — *delivered so far: role administration and the access-admin tool, TOTP multi-factor authentication with the two-step login, the gated admin surface, the operator read console over jobs, matchdays, and the audit trail, the operator recovery commands — job retry and cancel (with the terminal `cancelled` status) and matchday resume, the administrative repairs and broadcasts (`F-46`, `F-47`, ADR-0045), the load, supply-chain, and point-in-time restore drills (`F-49`, ADR-0046), the read-only incident mode that blocks manager writes while reads stay live (`F-51`, ADR-0047), and the local telemetry stack — the dashboards and the availability and latency SLO alerts, over the instruments that exist (`F-48`, ADR-0048) — with the on-call runbook (`F-46`, `F-47`, ADR-0042, ADR-0043, ADR-0044, ADR-0045, ADR-0046, ADR-0047, ADR-0048)* |
 | 15–16 | web, ops | Closed beta, public MVP — *delivered so far (Stage 15): the non-production stepped clock and its test toolbar (`TIME-6`, `TIME-7`, ADR-0049), and the player-facing rules, privacy, terms, status, and support pages, with the public service status behind the product's first anonymous read (`GET /api/v1/status`, `F-55`, ADR-0050)* |
+| 17 (fan base) | fans, competition, finance, world, web | Fan count and mood per club, the expectation before each match, the weekly review against the fans' hoped-for place, and the crowd and gate drawn from them — *delivered: `FAN-1`–`FAN-10`, the Fan Base page and the expectation chip (ADR-0078)* |

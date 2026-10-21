@@ -97,6 +97,11 @@ flowchart LR
         ledger_entries
         club_season_finances
     end
+    subgraph fans[fans]
+        club_fan_bases
+        club_fan_events
+        fixture_fan_expectations
+    end
     subgraph comms[comms]
         inbox_messages
         news_items
@@ -139,6 +144,9 @@ flowchart LR
     transfer_listings --> transfer_bids
     transfer_listings --> transfer_outcomes
     free_agent_batches --> transfer_listings
+    clubs --> club_fan_bases
+    clubs --> club_fan_events
+    fixtures --> fixture_fan_expectations
 ```
 
 ---
@@ -971,6 +979,67 @@ erDiagram
 > to migrate and `match.highlights` is no longer written (`MAT-8`, ADR-0052). No column, index, or
 > constraint is touched. A database seeded under `engine-v3` was archived (`touchline_engine_v3_backup`) and
 > reseeded, because a version-4 match cannot re-simulate a version-3 result (ADR-0051).
+
+### 3.5 Fans
+
+One fan count and one mood per club, the append-only history behind them, and what the fans expected from each fixture when the team sheets locked (`FAN-1`…`FAN-10`, ADR-0078). The module reads `world.clubs`, `competition.fixtures` and the squads, and owns these three tables only.
+
+```mermaid
+erDiagram
+    clubs ||--|| club_fan_bases : "has"
+    clubs ||--o{ club_fan_events : "history"
+    fixtures ||--o{ fixture_fan_expectations : "frozen at lock"
+    club_fan_bases {
+        uuid club_id PK
+        int fans "floor to soft cap, at least 1"
+        int mood_bp "0..10000, 5000 is Calm"
+        int season_target_rank "null until set"
+        int last_week_gap "null after a reset"
+        text rule_set_version "fan-rules-v1"
+        timestamptz created_at
+        timestamptz updated_at
+        bigint version "concurrency token"
+    }
+    club_fan_events {
+        uuid id PK
+        uuid club_id FK
+        uuid season_id FK
+        timestamptz occurred_at
+        text kind "opening|match|weekly|season_reset|promotion|relegation|takeover"
+        uuid tenure_id "set on a takeover"
+        uuid fixture_id "set on a match"
+        date week_of "set on a weekly review"
+        int fans_before
+        int fans_after
+        int mood_before_bp
+        int mood_after_bp
+        int expected_points_c "hundredths, match only"
+        int points_won "match only: 0, 1 or 3"
+        int gap "weekly and season_reset"
+    }
+    fixture_fan_expectations {
+        uuid fixture_id PK
+        uuid club_id PK
+        int expected_points_c "0..300"
+        int win_bp
+        int draw_bp
+        int loss_bp
+        text label_code
+        int predicted_goals_for
+        int predicted_goals_against
+        timestamptz created_at
+    }
+```
+
+| Constraint or index | Table | Purpose |
+|---|---|---|
+| `club_id` is the key, `check (fans >= 1)`, `check (mood_bp between 0 and 10000)`, `check (season_target_rank is null or season_target_rank >= 1)`, `check (length(rule_set_version) > 0)` | `club_fan_bases` | One row per club, a count that is never nought and a mood on the scale (`FAN-1`, `FAN-2`) |
+| `check (kind in (...))`, `check (fans_before >= 1 and fans_after >= 1)`, mood bounds, `points_won in (0, 1, 3)`, and a shape check per kind (a match names its fixture, expected points and points won; a takeover its tenure; a weekly review its week) | `club_fan_events` | A row always says what produced it (`FAN-10`) |
+| `unique (club_id, fixture_id)` where `kind = 'match'`, `unique (club_id, week_of)` where `kind = 'weekly'` | `club_fan_events` | A match and a week move a club's fans once, so a retried publish or review adds nothing (`FAN-5`, `FAN-8`) |
+| Index `(club_id, occurred_at)` | `club_fan_events` | The charts read a club's history in order |
+| `unique (fixture_id, club_id)` (the key), `check (expected_points_c between 0 and 300)`, `check (win_bp + draw_bp + loss_bp = 10000)`, a known `label_code`, non-negative predicted goals | `fixture_fan_expectations` | One complete expectation per side per fixture, written once at the lock (`FAN-4`) |
+
+> **Fan base milestone.** The `FanBase` migration creates the `fans` schema and backfills a base row and an `opening` event for every existing club at its tier's opening numbers (a recursive query for the ¾-per-tier scaling); a club created afterwards is opened by the world generator. The gate now reads `club_fan_bases` (`FIN-3`, `STAD-5`), the rule set advances to `world-rules-v14`, and the weekly review is a job (`fans.weekly-review:{date}`) on the existing queue. Nothing else is touched.
 
 ---
 

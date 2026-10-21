@@ -4,7 +4,7 @@ namespace Tactical11Manager.Domain.Rules;
 
 /// <summary>
 /// The fan rules: how the fans size a match up before it is played, and how a result, a week, a season, a change of division or a new
-/// manager moves their number and their mood (game rules §14, `FAN-*`). This file holds the expectation; the other half is in
+/// manager moves their number and their mood (game rules §13.6, `FAN-*`). This file holds the expectation; the other half is in
 /// <c>FanRuleSet.FanBase.cs</c>.
 /// </summary>
 /// <remarks>

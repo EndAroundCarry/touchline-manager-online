@@ -1,0 +1,47 @@
+# ADR-0078: Fan base, fan satisfaction and the crowd
+
+- **Status:** Accepted
+- **Date:** 2026-10-21
+- **Stage:** Fan base plan (`i-want-to-add-partitioned-feather.md`), Milestones 0-7; master plan Stage 17
+- **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0004](0004-deterministic-match-engine.md), [ADR-0031](0031-season-rollover-state-machine.md), game-rules `FAN-1`…`FAN-10`, `FIN-3`, `STAD-1`…`STAD-6`
+
+## Context
+
+Nothing in the game reacted to how a club was doing. `Club.Reputation` was set from the tier at seeding and never moved, and the home crowd was `9,000 × 0.75^(tier − 1)` times a factor of the league position, so a club that won everything drew the same people next season as one that lost everything, and the first stadium (5,000 places) was full from the first match whatever the club was. There was no number a manager could grow, no answer to "what do the fans expect from this match", and no reason to build a stadium.
+
+## Decision
+
+**1. One fan count and one mood per club, AI clubs too (`FAN-1`, `FAN-2`).** A tier-1 club opens with 10,000 fans, 30% of whom (3,000 people) want to come to a home match; each tier below keeps three quarters of the one above. There is no spread between clubs in a tier. The count has a floor (40% of the opening fans) and a soft cap (55,000 people who want to come in tier 1, a little above the biggest stadium), both scaled by tier. Mood is 0-100, shown as a word from Furious to Euphoric. Every club has them because an opponent's strength and mood feed the expectation, and the crowd needs fans for every home side. The cost is one row update per club per match, inside the publication transaction that already rewrites the table.
+
+**2. The fans judge a result against what they expected (`FAN-3`, `FAN-4`, `FAN-5`).** Before each match the fans size both teams up (the squad's best eleven plus this season's form, whose weight is `games ÷ (games + 10)`) and turn the gap, with home advantage, into win, draw and defeat chances and expected points through a curve fitted to the tick engine. The player sees a label, the three percentages and a predicted score. The expectation is **frozen when the team sheets lock**, so the result is judged against what the fans held at kick-off. After the match the mood moves by the surprise (points won minus points expected), with a response that grows slower than the surprise (a power of ¾) and is 1.5 times as strong for a bad surprise; the count grows by a fixed number of people per win that depends on how much the fans expected it (600 as the underdog, 450 in an even game, 325 as the favourite) and falls after a defeat they did not take for granted (300 as the favourite, 250 in an even game), each with a small random amount drawn from the fixture and the club so a replay is identical.
+
+**3. Growth comes from the games, not from a percentage or from the mood.** An earlier design moved the count by a percentage set by the mood. The user rejected it: fans come after wins. A season's growth is the sum of what the club earned game by game, and nothing in the code says "6,000 a season". The sandbox (M0) fixed the six amounts in `FAN-5`; M2 retuned them against the engine's real result curve, because a real club's form follows its quality, which the sandbox's stand-in did not.
+
+**4. Fans drive the crowd and the gate (`FIN-3`, `STAD-5`).** Demand is `fans × 30% × a mood factor` (8,000 basis points at mood 0, 10,000 at Calm, 12,000 at 100), replacing `9,000 × 0.75^(tier − 1) × a league-position factor`. The mood takes the place of the league position, since it already carries form and results. The gate is drawn by the fans going into the match, before the result moves them. `WorldRuleSet.GateRevenueFormFactorBpFor` is removed and the rule set advances to `world-rules-v14` (money is an ADR-level change). A club that grows its fans needs a bigger ground to earn from them, which gives the stadium a purpose.
+
+**5. A weekly review against the place the fans hoped for (`FAN-8`).** Every Sunday at 23:30 UTC, after the weekly finance run, the fans compare each club's projected place with a target place and move the mood by the gap and by whether it is closing. Until season objectives exist the target is the club's rank by squad strength in its division when the season began; a small port, `ISeasonTargetSource`'s place in the design, lets objectives replace it without touching the fan code. At season end the fans give a last verdict, and the mood moves halfway back to Calm.
+
+**6. A change of division and a first season (`FAN-6`, `FAN-7`).** Promotion adds 10% of the fans for each tier climbed and relegation takes 10% for each tier fallen, never below the new tier's floor; a club above its new cap sheds a quarter of the excess each season end. A club's very first season adds a boost of 5% of the count for each step the tier is above the third (about +7% in tier 1, +3.5% in tier 2, nothing below) so that the tiers separate from the start.
+
+**7. A new manager gets a clean slate (`FAN-9`).** When a human manager takes a club over, in the claim's own transaction, its fans go to the tier's opening numbers, the mood to Calm, and the target is worked out again from the squad as it stands. A retried claim cannot reset twice and a resignation resets nothing. The history before the takeover is kept, and the Fan Base page starts its charts at the takeover, with a switch for the whole club history.
+
+**8. The history is append-only (`FAN-10`).** Every change is a row in `fans.club_fan_events` written together with the new numbers by one keeper class. A match and a week each exist once per club (partial unique indexes), so a retried publication or review changes nothing. The expectation frozen at the lock is `fans.fixture_fan_expectations`.
+
+**9. The page follows the result gate.** The fans' reaction to a match is a result in disguise, so the Fan Base page holds it back until the manager has seen the result. The expectation before a match is a prediction, so it is not held back.
+
+## Alternatives considered
+
+- **Growth as a percentage of the fan base, set by the mood** (the first design): rejected in the sandbox, because it makes the biggest clubs grow the most in people and gives a bad run no direct cost.
+- **A starting crowd equal to the old 9,000:** rejected. A new manager would outgrow nothing and the stadium would never matter; the opening crowd is 3,000.
+- **Fans falling because of a low mood alone:** dropped. Mood moves the crowd by ±20% and drives the weekly review; the count moves only on results, tier changes and the cap.
+- **Mood as a function of league position, as the crowd was:** rejected, because a position says nothing about whether a club is doing better or worse than its fans expect, which is the whole point.
+- **Hidden-skill spread between clubs of a tier at the start:** rejected by the user; every club of a tier opens the same and results pull them apart.
+
+## Consequences
+
+- **The opening ground is outgrown inside the first two seasons** (M4 and M7, real publication of whole seasons). Demand first passes the 5,000 places at the 6th to 9th home match of season 1 for the better clubs; by season 2 the top nine clubs of tier 1 sell out at every home match and the 10th to 15th at nine in ten of them, and by season 3 so does the bottom three (demand 23,001 for the best three, 11,146 for the worst three, against 5,000 places). The gate is then the same full house for good and bad clubs alike, and money follows the fans only through stadium building. The plan hoped for "some seasons"; the rules leave it as it is and the measurement is the evidence for a later decision on the opening ground or on the amounts of `FAN-5`.
+- **Measured against the sandbox targets** (M7: 54 AI clubs, three tiers, three seasons, two rollovers): tier-1 growth in people who want to come is +8,830 for a top-three finish, +5,095 for 4th to 9th, +2,779 for 10th to 15th and +734 for the bottom three in season 1, against targets of +6,085 / +3,782 / +1,956 for finishing about 3rd / 9th / 15th; a mid-table club grows by 55-60% of a top-three club. The average surprise is within ±0.05 points a match, and the end-of-season mood averages 42 to 53 in every tier, so the expectation and the neutral offset hold. The mood is wide (the best three clubs end a season near 82, the worst near 3).
+- **The gate against the old formula** (full house for all, because the old crowd filled the opening ground): 0.84 in tier 1, 0.75 in tier 2 and 0.68 in tier 3 in season 1, 0.98 / 0.93 / 0.86 in season 2 and 1.00 / 0.98 / 0.97 in season 3. The worst clubs lose most in season 1 (0.69 for the bottom three of tier 1) and recover by season 3 because their fans have grown too.
+- A tier-1 club that keeps winning needs the biggest ground (50,000 places) after about eight seasons, a club that only meets expectations after about thirteen (M2, 300 simulated runs each, counted against the 47,500 people who want to come that fill it).
+- `Club.Reputation` is unchanged and unused by the fans; a later reputation rule can read the fan count.
+- **Open, offered and not done:** season objectives (the target place is the fans' own prediction until then); ticket prices that react to mood; a home "twelfth man" effect (needs engine calibration); messages from the fans when the mood word changes (a new inbox category and a migration); fan groups in the manner of Football Manager; derbies; fans reacting to star signings and sales.

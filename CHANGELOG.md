@@ -4,6 +4,12 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Fan base plan - fans, mood and the crowd (milestone 7: measurement and docs)
+
+- Every club has a fan count (floor and soft cap by tier) and a mood. Fans join after wins and leave after defeats by what they expected from the match, the mood is judged against that expectation and against the place the fans hoped the club would finish (weekly review, Sundays 23:30 UTC), promotion adds 10% and relegation takes 10%, a new manager gets the tier's opening numbers, and the home crowd and gate are drawn from the fans and mood (`world-rules-v14`, `fan-rules-v1`). The Fan Base page shows both charts and the expectation chip is on the Office and Fixtures pages.
+- Measured on a scratch world (54 AI clubs, three tiers, three seasons, two rollovers): tier-1 growth in people who want to come +8,830 / +5,095 / +2,779 / +734 for finishing 1st-3rd / 4th-9th / 10th-15th / 16th-18th in season 1; average surprise within 0.05 points a match; end-of-season mood averaging 42-53. The gate is 0.84 (tier 1), 0.75 and 0.68 of the old formula in season 1, and 1.00, 0.98 and 0.97 in season 3. The 5,000-place opening ground is outgrown inside two seasons, after which the gate no longer separates good clubs from bad ones until the manager builds (open decision).
+- Docs: `game-rules.md` section 13.6 (`FAN-1` to `FAN-10`, with `FIN-3`, `STAD-5` and the constants in section 18), `data-model.md` section 3.5, `modules.md`, master plan 7.2 and Stage 17, ADR-0078.
+
 ## Manager name fixed at sign-up
 
 - The manager name is the account name chosen at sign-up and can no longer be changed. Removed: the Manager name form on the Settings page, `PATCH /api/v1/me` (with its `If-Match` handling, the `UpdateProfile` use case, `User.ChangeDisplayName`, the `auth.profile.updated` audit action, the `ACCOUNT_NOT_VERIFIED` error code, and the web `updateDisplayName` call plus the profile entity-tag bookkeeping it needed). The sign-up form says the name is permanent. No schema change: the name lives in the one `DisplayName` column on the account, which sign-up still fills, and no second manager-name field existed to drop.
