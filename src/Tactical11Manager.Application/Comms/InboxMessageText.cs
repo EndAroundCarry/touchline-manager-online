@@ -1,8 +1,10 @@
 using System.Globalization;
 using Tactical11Manager.Application.Market;
 using Tactical11Manager.Application.Match;
+using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
+using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Application.Comms;
 
@@ -77,8 +79,21 @@ public static class InboxMessageText
                 MarketInboxTemplates.Read<MarketInboxTemplates.PlayerSoldParameters>(parametersJson)),
             MarketInboxTemplates.FreeAgentSigned => FreeAgentSigned(
                 MarketInboxTemplates.Read<MarketInboxTemplates.FreeAgentSignedParameters>(parametersJson)),
+            StructureInboxTemplates.UpgradeCompleted => StructureUpgraded(
+                StructureInboxTemplates.Read(parametersJson)),
             _ => throw new InvalidOperationException($"'{templateKey}' is not an inbox template this build renders."),
         };
+    }
+
+    private static InboxText StructureUpgraded(StructureInboxTemplates.UpgradeCompletedParameters parameters)
+    {
+        var building = StructureKinds.TryFromCode(parameters.Kind, out var kind) && kind == StructureKind.Merchandise
+            ? "merchandise shop"
+            : "snack bar";
+
+        return new InboxText(
+            $"Your {building} is now level {parameters.Level}",
+            $"The upgrade is finished: the {building} now trades at level {parameters.Level}.");
     }
 
     private static InboxText FreeAgentSigned(MarketInboxTemplates.FreeAgentSignedParameters parameters) =>

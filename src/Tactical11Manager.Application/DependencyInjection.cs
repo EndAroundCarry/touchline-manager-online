@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, DispatchOutboxJobHandler>();
         services.AddScoped<IJobHandler, RunSeasonRolloverJobHandler>();
         services.AddScoped<IJobHandler, AdvanceGameClockJobHandler>();
+        services.AddScoped<IJobHandler, CompleteStructureUpgradeJobHandler>();
         services.AddScoped<JobHandlerRegistry>();
         services.AddScoped<EnqueueNoOpJob>();
 
@@ -351,6 +352,13 @@ public static class DependencyInjection
         // The club's stadium: a read and the one command that grows it (`STAD-1`…`STAD-6`).
         services.AddScoped<GetStadium>();
         services.AddScoped<BuildStadiumSeats>();
+
+        // The club's snack bar and merchandise shop: a read, the paid upgrade, and the job that finishes it
+        // when its build time is up (`STRC-1`…`STRC-9`).
+        services.AddScoped<StructuresComposer>();
+        services.AddScoped<GetStructures>();
+        services.AddScoped<UpgradeStructure>();
+        services.AddScoped<CompleteStructureUpgrade>();
 
         // Reachable only from the non-production diagnostics triggers (§17.12).
         services.AddScoped<TriggerProvisioning>();

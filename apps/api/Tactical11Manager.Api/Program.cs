@@ -303,6 +303,7 @@ app.MapFinanceEndpoints();
 app.MapCalendarEndpoints();
 app.MapFanEndpoints();
 app.MapStadiumEndpoints();
+app.MapStructureEndpoints();
 app.MapMarketEndpoints();
 
 var diagnostics = app.Services.GetRequiredService<IOptions<DiagnosticsOptions>>().Value;

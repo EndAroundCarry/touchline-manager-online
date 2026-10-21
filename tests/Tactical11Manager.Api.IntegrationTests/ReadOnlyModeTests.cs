@@ -128,6 +128,30 @@ public sealed class ReadOnlyModeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_structure_upgrade_is_refused_while_read_only_but_the_buildings_can_still_be_read()
+    {
+        using var operatorClient = _fixture.Factory.CreateClient();
+        var op = await MfaScenario.CreateOperatorAsync(_fixture, operatorClient);
+        operatorClient.WithBearer(op.AccessToken);
+
+        (await SetFlagAsync(operatorClient, MfaScenario.Code(op.Secret), enabled: true, Reason))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var managerClient = _fixture.Factory.CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, managerClient);
+        managerClient.WithBearer(manager.AccessToken);
+
+        var upgrade = await managerClient.PostAsync("/api/v1/structures/snack_bar/upgrade", content: null);
+
+        upgrade.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, "an upgrade spends the club's cash (STRC-3, F-51)");
+        (await MfaScenario.ErrorCodeAsync(upgrade)).Should().Be(ApiErrorCodes.ReadOnlyMode);
+
+        // Reading is not a command; this account has no profile, so it is refused by name, not gated.
+        (await managerClient.GetAsync("/api/v1/structures")).StatusCode
+            .Should().NotBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
     public async Task An_anonymous_command_is_refused_by_authentication_first()
     {
         using var client = _fixture.Factory.CreateClient();

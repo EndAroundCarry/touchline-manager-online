@@ -16,6 +16,9 @@ public static class WorldAuditActions
     /// <summary>A manager paid for new places in the club's stadium (`STAD-4`).</summary>
     public const string StadiumSeatsBuilt = "world.club_stadium.seats_built";
 
+    /// <summary>A manager paid for an upgrade of the snack bar or the merchandise shop (`STRC-3`).</summary>
+    public const string StructureUpgradeStarted = "world.club_structure.upgrade_started";
+
     /// <summary>A manager profile was created.</summary>
     public const string ManagerProfileCreated = "world.manager_profile.created";
 

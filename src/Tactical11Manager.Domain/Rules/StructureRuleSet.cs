@@ -207,6 +207,26 @@ public static class StructureRuleSet
     public static long MerchTakingsMinorFor(int level, int fans, FanMoodWord mood) =>
         WithBonus(MerchBaseMinorFor(level, fans), MoodBonusBpFor(mood));
 
+    /// <summary>
+    /// What the snack bar would take in a week at a level, before any result bonus, in minor units: a quote for
+    /// the page, not a booking (`STRC-4`).
+    /// </summary>
+    /// <param name="level">The snack bar's level.</param>
+    /// <param name="spectators">The crowd the next home match draws.</param>
+    /// <remarks>
+    /// Matchdays fall three times a week and a club hosts half of them, so it hosts 1.5 matches a week on
+    /// average.
+    /// </remarks>
+    public static long SnackWeeklyEstimateMinorFor(int level, int spectators) =>
+        SnackBaseMinorFor(level, spectators) * 3 / 2;
+
+    /// <summary>What the shop would take in a week at a level, in minor units: a quote for the page, not a booking (`STRC-6`).</summary>
+    /// <param name="level">The shop's level.</param>
+    /// <param name="fans">The club's fans.</param>
+    /// <param name="mood">The fans' mood word now.</param>
+    public static long MerchWeeklyEstimateMinorFor(int level, int fans, FanMoodWord mood) =>
+        MerchTakingsMinorFor(level, fans, mood);
+
     private static int IndexOf(int level)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(level, OpeningLevel);

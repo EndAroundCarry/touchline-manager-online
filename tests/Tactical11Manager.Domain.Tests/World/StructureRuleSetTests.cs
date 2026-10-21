@@ -298,6 +298,17 @@ public sealed class StructureRuleSetTests
         StructureRuleSet.SnackBaseMinorFor(1, lowerCrowd).Should().BeLessThan(StructureRuleSet.SnackBaseMinorFor(1, topCrowd));
     }
 
+    [Theory]
+    [MemberData(nameof(Levels))]
+    public void The_pages_weekly_quotes_are_the_plans_one_and_a_half_home_matches_and_the_shops_week(int level)
+    {
+        // The page quotes the next level with the same arithmetic the scale check above uses.
+        StructureRuleSet.SnackWeeklyEstimateMinorFor(level, 2_890)
+            .Should().Be(SnackWeeklyTakingsMinor(level, 2_890));
+        StructureRuleSet.MerchWeeklyEstimateMinorFor(level, 10_000, FanMoodWord.Content)
+            .Should().Be(StructureRuleSet.MerchTakingsMinorFor(level, 10_000, FanMoodWord.Content));
+    }
+
     private static long SnackWeeklyTakingsMinor(int level, int crowd) =>
         StructureRuleSet.SnackBaseMinorFor(level, crowd) * HomeMatchesPerSeason * MatchdaysPerWeek / MatchdaysPerSeason;
 

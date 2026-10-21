@@ -164,6 +164,9 @@ public static class AuditTargetTypes
     /// <summary>A club's stadium (`STAD-4`).</summary>
     public const string ClubStadium = "club_stadium";
 
+    /// <summary>A club's snack bar or merchandise shop (`STRC-3`).</summary>
+    public const string ClubStructure = "club_structure";
+
     /// <summary>A tactical plan (`INS-11`).</summary>
     public const string TacticalPlan = "tactical_plan";
 

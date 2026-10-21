@@ -461,6 +461,7 @@ public static class DependencyInjection
         services.AddScoped<IStadiumRepository, StadiumRepository>();
         services.AddScoped<IStadiumQueries, StadiumQueries>();
         services.AddScoped<IStructureRepository, StructureRepository>();
+        services.AddScoped<IStructureQueries, StructureQueries>();
         services.AddScoped<IManagerRepository, ManagerRepository>();
         services.AddScoped<IClubTenureRepository, ClubTenureRepository>();
         services.AddScoped<IClubManagerLookup, ClubManagerLookup>();
