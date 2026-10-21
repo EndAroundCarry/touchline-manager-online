@@ -18,7 +18,7 @@
 | FIC-6 | Generated names must not accidentally reproduce a real person's full name. Where a collision is detected, the generator deterministically picks the next candidate for that seed. |
 | FIC-7 | Generated content is reproducible: the same generation seed and generator version produce the same logical world (`PYR-14`). |
 | FIC-8 | Name pools, badge seeds, and generator versions are versioned artifacts, reviewed like code, with the legal review noted in the change. |
-| FIC-9 | Any user-supplied text field is length-limited and sanitized. Public user-generated content is out of scope for the MVP — there is no chat, no forum, no custom club names, and no uploads. |
+| FIC-9 | Any user-supplied text field is length-limited and sanitized. Public user-generated content is out of scope for the MVP — there is no forum, no public chat, no custom club names, and no uploads. The one exception is a private message between two managers (`COM-10`…`COM-16`, ADR-0079): plain text, length-capped, rate-limited, blockable, and never shown to anyone else. |
 | FIC-10 | If a real-identity complaint arrives, the response is: the affected name pool entry is blocklisted, the generator version is bumped, and **existing** generated names are left in place unless the complaint specifically requires a rename. Renames are audited because they touch history. |
 
 ### 1.1 What is explicitly not in the product (MVP)

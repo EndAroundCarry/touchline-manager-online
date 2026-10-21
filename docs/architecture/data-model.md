@@ -105,6 +105,9 @@ flowchart LR
     subgraph comms[comms]
         inbox_messages
         news_items
+        conversations
+        direct_messages
+        manager_blocks
     end
     subgraph ops[ops]
         jobs
@@ -791,6 +794,10 @@ erDiagram
 ```mermaid
 erDiagram
     managers ||--o{ inbox_messages : "receives"
+    managers ||--o{ conversations : "starts or receives"
+    conversations ||--|{ direct_messages : "holds"
+    managers ||--o{ direct_messages : "sends or receives"
+    managers ||--o{ manager_blocks : "blocks"
     managers ||--o| notification_preferences : "sets"
     jobs ||--o{ simulation_attempts : "drives"
 
@@ -816,6 +823,31 @@ erDiagram
         jsonb parameters
         timestamptz published_at
         timestamptz expires_at
+    }
+    conversations {
+        uuid id PK
+        text subject
+        uuid started_by_manager_id FK
+        uuid recipient_manager_id FK
+        uuid started_from_club_id FK
+        timestamptz created_at
+        timestamptz last_message_at
+        timestamptz updated_at
+        bigint version
+    }
+    direct_messages {
+        uuid id PK
+        uuid conversation_id FK
+        uuid sender_manager_id FK
+        uuid recipient_manager_id FK
+        text body
+        timestamptz sent_at
+        timestamptz read_at
+    }
+    manager_blocks {
+        uuid blocker_manager_id PK
+        uuid blocked_manager_id PK
+        timestamptz created_at
     }
     notification_preferences {
         uuid id PK
@@ -918,6 +950,12 @@ erDiagram
 | `check (status in ('pending','published','dead_letter'))`, `check (attempt_count >= 0 and max_attempts >= 1)` | `outbox_messages` | An outbox row is in a known state with a real attempt budget (`MOD-4`) |
 | Index `(division_id, published_at desc)` and `(country_id, published_at desc)` | `news_items` | The feed's two scopes, newest first (`COM-1`) |
 | `check (expires_at is null or expires_at > published_at)` | `news_items` | A news item cannot expire before it is published |
+| `check (started_by_manager_id <> recipient_manager_id)`, `check (version >= 1)` | `conversations` | A conversation is between two different managers (`COM-10`) |
+| Index `(started_by_manager_id, last_message_at desc, id desc)` and `(recipient_manager_id, last_message_at desc, id desc)` | `conversations` | Each side's list, newest first |
+| `check (sender_manager_id <> recipient_manager_id)`; foreign keys to the conversation and both managers are `Restrict` | `direct_messages` | A message is never to oneself, and history is never cascaded away |
+| Index `(conversation_id, sent_at desc, id desc)` | `direct_messages` | A thread's keyset page, newest first |
+| Partial index `recipient_manager_id where read_at is null` | `direct_messages` | The direct unread count in `/sync` (`COM-16`) |
+| `primary key (blocker_manager_id, blocked_manager_id)`, `check (blocker_manager_id <> blocked_manager_id)`, index `blocked_manager_id` | `manager_blocks` | One block per pair and direction; the reverse lookup answers "has this manager blocked me" (`COM-15`) |
 | `unique (manager_id)` | `notification_preferences` | One preferences row per manager (`COM-8`) |
 | `unique (user_id, operation, idempotency_key)` | `idempotency_records` | Reject key reuse with a different request hash |
 | `check (category in (...))`, `check (length(template_key) > 0)` | `inbox_messages` | A stored shelf and template are codes, not ordinals |

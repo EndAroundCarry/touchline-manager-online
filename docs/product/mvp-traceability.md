@@ -127,7 +127,7 @@ enforced rather than remembered.
 | Private negotiations, agents, loans, swaps, clauses, installments, windows | `TRF-13`; only the auction path exists |
 | Fog-of-war attributes, scouted network | `SCT-1`, `SCT-2`; attributes are exact and public |
 | Facilities beyond the stadium, sponsorship negotiation, merchandising, taxes, currencies, debt | `FIN-14`; one currency. The stadium itself is in scope: `STAD-1`…`STAD-6` |
-| Social chat, forums, PMs, associations, UGC | No such endpoints; `FIC-9` |
+| Public chat, forums, associations, public UGC | No such endpoints; `FIC-9`. Private messages between two managers are built: `COM-10`…`COM-16`, ADR-0079 |
 | Native Android/iOS packages | ADR-0007: Capacitor follows the PWA (Stage 20) |
 | Offline mutations | ADR-0007: mutations disabled offline, no queue |
 | Native AOT as a release gate | ADR-0004 note; no AOT gate exists in CI |

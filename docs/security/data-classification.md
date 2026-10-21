@@ -12,7 +12,7 @@
 | **C0 — Public game data** | Intended to be seen by any visitor or manager | Competition names, tables, results, fixture lists, public player profiles and attributes, completed transfer history |
 | **C1 — Internal game data** | Correctness-critical, not user-private, but not meant for arbitrary exposure | Standings projections, discipline records, engine configuration hashes, job metadata, audit references |
 | **C2 — Restricted game data** | Must never be exposed to any manager; operator/support only | Hidden potential, internal valuations, collusion risk flags, raw match snapshots, RNG seed material, simulation diagnostics, AI policy internals |
-| **C3 — Personal data** | Identifies or can locate a natural person | Email, display name, password hash, consent records, session records, IP hashes, user-agent hash, support correspondence |
+| **C3 — Personal data** | Identifies or can locate a natural person | Email, display name, password hash, consent records, session records, IP hashes, user-agent hash, support correspondence, the text of direct messages between managers |
 | **C4 — Secrets and credentials** | Compromise enables access or forgery | Refresh and email token hashes, password hashes, signing keys, TOTP secrets and recovery codes, world seed secret, provider API keys, database credentials |
 
 ---
@@ -24,8 +24,17 @@
 | **C0** | Plain, backed up | Public or authenticated read | Full values allowed | Permanent (competition history) |
 | **C1** | Plain, backed up | Only where the viewer is authorized (for example own club, own division) | Values allowed with identifiers; no cross-tenant leakage | Season-linked; permanent for history |
 | **C2** | Plain tables/columns with restricted access, or `server_only` columns never mapped to DTOs | **Never** in a manager-facing response | Counts and durations only, never values | Engine/rule artifacts retained while their matches are replayable |
-| **C3** | Plain where functionally necessary; hashed where the hash suffices | Own data only; never another manager's | **Redacted by default**; identifiers/hashes only when operationally required | See §3 |
+| **C3** | Plain where functionally necessary; hashed where the hash suffices | Own data only; never another manager's, with two exceptions (§2.3) | **Redacted by default**; identifiers/hashes only when operationally required | See §3 |
 | **C4** | Hashed where a hash suffices (tokens, passwords); encrypted where reversible (seed material, TOTP secrets) | **Never** | **Never**; tokens and secrets are on the log redaction list | See §3 |
+
+### 2.3 What other managers see of C3
+
+Two items of C3 are shown to other signed-in managers on purpose (ADR-0079, `COM-10`…`COM-16`):
+
+- **The display name** is shown on a club's page as "Manager: {name}" and in conversations. It is chosen at sign-up and cannot be changed, and the sign-up form and Settings say so. The response carries the name and never the manager's identifier, email, or account state.
+- **A direct message** (subject and body) is visible to its two participants and to no one else. A conversation a caller is not part of answers 404, never 403. Bodies are plain text, drawn as text and never as markup, and are retained like inbox messages.
+
+A closed account's name in old conversations, and the export of a manager's conversations, belong to the privacy-workflow stage: until it runs, the stored name still shows and `GET /me/export` does not include conversations.
 
 ### 2.1 Restricted-column convention
 

@@ -627,6 +627,13 @@ What the game tells a manager, and how (master plan §6.9, §10.7, F-41).
 | COM-7 | A deadline reminder is sent **once per round**, to every club a human holds in it, when the round's team-sheet lock falls within `reminder_lead_hours` of now. A round that has already locked or published is never reminded. |
 | COM-8 | Notification preferences are per manager and govern **email only**. Every switch defaults on, and a manager who has never set one has no row and is treated as all-on. An email is written to the outbox only when the matching preference is on; the inbox message is never suppressed. |
 | COM-9 | An email leaves the game asynchronously: the workflow records the intention in `ops.outbox_messages` inside the transaction that produced the event, and the worker's dispatcher sends it later, at least once (`MOD-4`). A transport fault is rescheduled; an unknown message kind, an unreadable payload, or an exhausted attempt budget is dead-lettered and alerted. Auth transactional email is the one exception and stays on the request path. |
+| COM-10 | A conversation is between exactly two managers. It has a subject and an ordered list of plain-text messages. It is addressed to managers, not clubs, so it outlives either side's tenure (like `COM-1`). |
+| COM-11 | A conversation is started from a club page. The recipient is the manager who holds that club's open tenure at that moment. The sender must hold a club themselves. An AI-run club, your own club, and a manager whose account is closing cannot be messaged. |
+| COM-12 | Either participant can reply at any time, with or without a club. A reply to a manager whose account is closing is refused. |
+| COM-13 | A subject is 1–`dm_subject_max_chars` and a body 1–`dm_body_max_chars` characters after trimming. Control characters other than a line break are removed. Text is stored as written and always rendered as text, never as markup. |
+| COM-14 | A manager may send at most `dm_sends_per_hour` messages (starts and replies together). Over that, the send is refused with 429. |
+| COM-15 | A manager can block another manager and later unblock them. While a block exists in either direction, neither can start a conversation with the other or reply to them. The sender is told plainly that the manager is not accepting their messages. Existing messages stay readable. |
+| COM-16 | A direct message is unread until its recipient opens the conversation. Opening it marks every message addressed to them in it read. Messages are never edited or deleted by a manager. |
 
 The events that produce an inbox message are the ones the matchday, market, occupancy, and
 reminder workflows decide: a club's result, its changed league position, a player's suspension,
@@ -635,6 +642,11 @@ warning, a return-to-AI notice, a welcome, a deadline reminder, and a club's pro
 relegation at rollover. The news feed carries the
 division-provisioned, transfer-completed, and result-published events. A message that is written
 but never shown is not built early.
+
+Direct messages (`COM-10`…`COM-16`) are the other kind of message: written by a manager, kept apart from
+the game's own in a second Inbox tab, and delivered by the same 60-second `/sync` poll. Nothing is pushed.
+The club page names the manager who runs it, or "AI manager", and offers "Send a message" on a human-run
+club that is not your own ([ADR-0079](../architecture/adr/0079-direct-messages-between-managers.md)).
 
 ---
 
@@ -702,6 +714,11 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `reminder_lead_hours` | 24 | COM-7 |
 | `notification_preferences_default` | all on: deadline reminders, inactivity warnings, market messages, news digest | COM-8 |
 | `outbox_dispatch_bucket` | 1 minute | COM-9, `MOD-4` |
+| `dm_subject_max_chars` | 80 | COM-13 |
+| `dm_body_max_chars` | 1,000 | COM-13 |
+| `dm_sends_per_hour` | 30 | COM-14 |
+| `dm_conversation_page_size` | 25 conversations | COM-10 |
+| `dm_thread_page_size` | 50 messages | COM-10 |
 | `generator_version` | `world-gen-v3` (the bootstrap: clubs, squads, and fixtures) | FIC-8, PYR-14 |
 | `club_generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
 | `player_generator_version` | `player-gen-v3` | FIC-8, PYR-14 |

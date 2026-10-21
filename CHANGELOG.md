@@ -4,6 +4,15 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Messages plan - managers write to each other
+
+- A club's page shows "Manager: {name}", or "AI manager" when no human runs it, and a "Send a message" link on a human-run club that is not yours. A conversation is a thread with a subject between two managers, started from a club page and open to any human manager in the world. Either side replies inside the thread, with or without a club. Nothing is pushed: a new message arrives through the 60-second `/sync` poll, and the shell badge counts the game inbox and direct messages together.
+- The Inbox page has two tabs, Game messages (as before) and Managers (list, compose, thread). Plain text only, shown as text and never as markup; subject 1-80 and body 1-1,000 characters; 30 sends an hour per manager (429 over that); a manager can block and unblock another, which stops starts and replies in both directions and leaves the old messages readable. A thread you are not part of answers 404. There is no report queue.
+- API: `GET`/`POST /conversations`, `GET /conversations/{id}`, `POST /conversations/{id}/messages`, `POST /conversations/{id}/read`, `PUT`/`DELETE /blocked-managers/{managerId}`; `ClubOverviewResponse.managerName`; `SyncResponse.unreadDirectMessageCount`. Schema: `comms.conversations`, `comms.direct_messages`, `comms.manager_blocks` (migration `DirectMessages`). Config: `RateLimiting:DirectMessagePermitLimit` and `DirectMessageWindowSeconds`.
+- Reverses part of three written rules on purpose: private messages leave the master-plan non-goals (public chat and forums stay out), `FIC-9` allows a private message between two managers, and the display name (C3) is shown to other signed-in managers.
+- Open: anonymizing a closed account's name in old conversations and exporting conversations (privacy-workflow stage), an email for a new message, a report queue, muting or archiving a thread, a manager profile page.
+- Docs: `game-rules.md` `COM-10` to `COM-16` and the constants in section 18, `data-model.md` section 3.4, `data-classification.md` section 2.3, threat model `D-9` and `I-13`, `mvp-traceability.md`, `modules.md`, ADR-0079.
+
 ## Fan base plan - fans, mood and the crowd (milestone 7: measurement and docs)
 
 - Every club has a fan count (floor and soft cap by tier) and a mood. Fans join after wins and leave after defeats by what they expected from the match, the mood is judged against that expectation and against the place the fans hoped the club would finish (weekly review, Sundays 23:30 UTC), promotion adds 10% and relegation takes 10%, a new manager gets the tier's opening numbers, and the home crowd and gate are drawn from the fans and mood (`world-rules-v14`, `fan-rules-v1`). The Fan Base page shows both charts and the expectation chip is on the Office and Fixtures pages.

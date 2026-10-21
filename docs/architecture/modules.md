@@ -18,7 +18,7 @@
 | **market** | `market` | Shortlists, transfer listings, bids, outcomes, AI market decisions | 10 |
 | **finance** | `finance` | Club accounts, append-only ledger, season finance summaries | 9 |
 | **fans** | `fans` | Each club's fan count and mood, the append-only history of what moved them, and what the fans expected from each fixture when the team sheets locked | 17 |
-| **comms** | `comms` | Inbox messages, news items, email dispatch intent | 6, 8, 11 |
+| **comms** | `comms` | Inbox messages, news items, email dispatch intent, direct messages between managers (conversations, messages, blocks) | 6, 8, 11, Messages plan |
 | **ops** | `ops` | Jobs, outbox, idempotency records, audit log, feature flags, repair actions, the read-only operational funnels and their counters, the operator game-health read, the console's job, matchday, and audit reads, and the local telemetry stack's dashboards and SLO alert rules | 1, 6, 13, 14 |
 
 Logical model detail is in [`data-model.md`](data-model.md) and master plan §6.
@@ -101,6 +101,7 @@ flowchart TD
 | world → fans | write via use case | A takeover resets the club's fans to its tier's opening numbers (`FAN-9`) |
 | finance → fans | read | The gate is drawn by the fans and mood going into the match (`FIN-3`) |
 | comms ← all | consumed events | Inbox/news from publication, transfers, discipline, deadlines |
+| world → comms | read | A club's manager name and whether the account is closing, through the `IClubManagerLookup` port; direct messages never write `world.*` or `auth.*` (ADR-0079) |
 | ops ← all | infrastructure | Jobs, outbox dispatch, idempotency, audit |
 
 ---
