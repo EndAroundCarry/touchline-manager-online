@@ -161,6 +161,13 @@ export const routes: Routes = [
         title: 'Stadium — Tactical11 Manager',
       },
       {
+        path: 'structures',
+        loadComponent: () =>
+          import('./features/structures/structures').then((m) => m.StructuresScreen),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Structures — Tactical11 Manager',
+      },
+      {
         path: 'fans',
         loadComponent: () => import('./features/fan-base/fan-base').then((m) => m.FanBasePage),
         canActivate: [requireAuthentication, requireVerifiedEmail],

@@ -24,6 +24,7 @@ import { NewsStore } from '../../core/news/news-store';
 import { NotificationPreferencesStore } from '../../core/notifications/notification-preferences-store';
 import { SessionsStore } from '../../core/sessions/sessions-store';
 import { SquadStore } from '../../core/squad/squad-store';
+import { StructuresStore } from '../../core/structures/structures-store';
 import { SyncStore } from '../../core/sync/sync-store';
 import { ThemeStore } from '../../core/theme/theme-store';
 import { TacticsStore } from '../../core/tactics/tactics-store';
@@ -68,6 +69,7 @@ export class AppShell implements OnDestroy {
   private readonly competition = inject(CompetitionStore);
   private readonly calendar = inject(CalendarStore);
   private readonly fans = inject(FanStore);
+  private readonly structures = inject(StructuresStore);
   private readonly inbox = inject(InboxStore);
   private readonly conversations = inject(ConversationsStore);
   private readonly news = inject(NewsStore);
@@ -299,6 +301,7 @@ export class AppShell implements OnDestroy {
       this.competition.clear();
       this.calendar.clear();
       this.fans.clear();
+      this.structures.clear();
       this.inbox.clear();
       this.conversations.clear();
       this.news.clear();

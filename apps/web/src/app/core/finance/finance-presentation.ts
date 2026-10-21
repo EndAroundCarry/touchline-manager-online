@@ -22,6 +22,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   compensation: 'Compensating entries',
   stadium_construction: 'Stadium construction',
   release_payout: 'Release payouts',
+  snack_bar: 'Snack bar',
+  merchandise: 'Merchandise',
+  structure_upkeep: 'Structure upkeep',
+  structure_upgrade: 'Structure upgrades',
 };
 
 /** One labelled total for display. */

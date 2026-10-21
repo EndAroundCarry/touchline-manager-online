@@ -76,6 +76,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     available: true,
     group: 'Facilities',
   },
+  {
+    path: '/structures',
+    label: 'Structures',
+    icon: 'pi pi-shop',
+    available: true,
+    group: 'Facilities',
+  },
   { path: '/inbox', label: 'Inbox', icon: 'pi pi-inbox', available: true, group: 'Messages' },
   { path: '/news', label: 'News', icon: 'pi pi-megaphone', available: true, group: 'Messages' },
   { path: '/settings', label: 'Settings', icon: 'pi pi-cog', available: true, group: 'Game' },
