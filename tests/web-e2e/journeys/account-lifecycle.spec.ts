@@ -34,20 +34,6 @@ test.describe('the account lifecycle', () => {
     await expect(page).toHaveURL(/\/login\?returnUrl=%2Fsettings/);
   });
 
-  test('an unconfirmed account may sign in but may not change its manager name', async ({ page }) => {
-    const account = createAccount();
-
-    await register(page, account);
-    await signIn(page, account);
-
-    // The restriction is explained rather than merely enforced with a dead control.
-    await expect(
-      page.getByText(/Confirm your email address before you can change your manager name/),
-    ).toBeVisible();
-    await expect(page.getByLabel('Manager name', { exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Save manager name' })).toBeDisabled();
-  });
-
   test('a manager can close their account and cannot sign in afterwards', async ({ page, request }) => {
     const account = createAccount();
 

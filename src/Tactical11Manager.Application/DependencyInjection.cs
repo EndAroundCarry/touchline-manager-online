@@ -268,7 +268,6 @@ public static class DependencyInjection
         services.AddScoped<ForgotPassword>();
         services.AddScoped<ResetPassword>();
         services.AddScoped<GetProfile>();
-        services.AddScoped<UpdateProfile>();
         services.AddScoped<DeleteAccount>();
         services.AddScoped<ListSessions>();
         services.AddScoped<RevokeSession>();
@@ -295,7 +294,6 @@ public static class DependencyInjection
         services.AddScoped<IValidator<ResendVerificationRequest>, ResendVerificationRequestValidator>();
         services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
-        services.AddScoped<IValidator<UpdateProfileRequest>, UpdateProfileRequestValidator>();
         services.AddScoped<IValidator<DeleteAccountRequest>, DeleteAccountRequestValidator>();
         services.AddScoped<IValidator<MfaConfirmRequest>, MfaConfirmRequestValidator>();
         services.AddScoped<IValidator<MfaLoginRequest>, MfaLoginRequestValidator>();

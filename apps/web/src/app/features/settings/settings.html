@@ -28,58 +28,6 @@
           </dd>
         </div>
       </dl>
-
-      @if (!isVerified()) {
-        <p
-          class="mt-4 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
-          role="status"
-        >
-          Confirm your email address before you can change your manager name.
-          <a routerLink="/verify-email" [class]="linkClass">Send a new link</a>.
-        </p>
-      }
-
-      @if (nameSaved()) {
-        <p [class]="statusMessageClass" role="status">Your manager name has been saved.</p>
-      }
-
-      @if (nameConflict()) {
-        <p [class]="formErrorClass" role="alert">
-          Your profile changed on another device while this form was open. The current values are
-          shown above — check the name and save again.
-        </p>
-      }
-
-      @if (nameError(); as message) {
-        <p [class]="formErrorClass" role="alert">{{ message }}</p>
-      }
-
-      <form class="mt-6 space-y-4" [formGroup]="nameForm" (ngSubmit)="saveDisplayName()" novalidate>
-        <div>
-          <label class="block text-sm font-medium text-ink" for="displayName">Manager name</label>
-          <p class="text-xs text-muted">Shown to other managers. 3 to 32 characters.</p>
-          <input
-            id="displayName"
-            type="text"
-            formControlName="displayName"
-            autocomplete="nickname"
-            [class]="textInputClass"
-            [attr.aria-invalid]="displayNameError() !== null"
-            [attr.aria-describedby]="displayNameError() !== null ? displayNameErrorId : null"
-          />
-          @if (displayNameError(); as message) {
-            <p [id]="displayNameErrorId" [class]="fieldErrorClass">{{ message }}</p>
-          }
-        </div>
-
-        <button
-          type="submit"
-          [class]="primaryButtonClass"
-          [disabled]="nameSubmitting() || !isVerified() || !canMutate()"
-        >
-          {{ nameSubmitting() ? 'Saving…' : 'Save manager name' }}
-        </button>
-      </form>
     </div>
 
     <div class="mt-6 rounded border border-line bg-panel p-6">

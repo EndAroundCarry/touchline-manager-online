@@ -3,22 +3,14 @@ import {
   EMPTY,
   Observable,
   catchError,
-  defer,
   finalize,
   firstValueFrom,
   map,
   shareReplay,
   tap,
-  throwError,
 } from 'rxjs';
 import { AuthApi } from './auth-api';
-import {
-  AuthSession,
-  LoginPayload,
-  ProfileUpdated,
-  RequestAccepted,
-  UserProfile,
-} from './auth.models';
+import { AuthSession, LoginPayload, RequestAccepted, UserProfile } from './auth.models';
 
 /** What the client currently knows about the session. */
 export type SessionStatus = 'unknown' | 'authenticated' | 'anonymous';
@@ -38,7 +30,6 @@ export class SessionStore {
   private readonly accessTokenSignal = signal<string | null>(null);
   private readonly userSignal = signal<UserProfile | null>(null);
   private readonly statusSignal = signal<SessionStatus>('unknown');
-  private readonly profileEtagSignal = signal<string | null>(null);
   private refreshInFlight: Observable<AuthSession> | null = null;
 
   /** The signed-in account, or null. */
@@ -133,40 +124,9 @@ export class SessionStore {
     );
   }
 
-  /** Reads the profile and records the entity tag for the next conditional write. */
+  /** Reads the profile and adopts it as the signed-in account. */
   loadProfile(): Observable<UserProfile> {
-    return this.authApi.profile().pipe(
-      tap((snapshot) => {
-        this.userSignal.set(snapshot.profile);
-        this.profileEtagSignal.set(snapshot.etag);
-      }),
-      map((snapshot) => snapshot.profile),
-    );
-  }
-
-  /**
-   * Changes the display name, using the remembered entity tag as the precondition.
-   *
-   * The version check happens inside `defer` so that calling this before the profile has been loaded
-   * produces a failed observable the caller can handle, rather than throwing past their error handling.
-   */
-  updateDisplayName(displayName: string): Observable<ProfileUpdated> {
-    return defer(() => {
-      const etag = this.profileEtagSignal();
-
-      if (etag === null) {
-        return throwError(
-          () => new Error('The profile has not been loaded, so there is no version to send.'),
-        );
-      }
-
-      return this.authApi.updateDisplayName(displayName, etag).pipe(
-        tap((updated) => {
-          this.userSignal.set(updated.user);
-          this.profileEtagSignal.set(quoteVersion(updated.version));
-        }),
-      );
-    });
+    return this.authApi.profile().pipe(tap((profile) => this.userSignal.set(profile)));
   }
 
   /** Closes the account and clears the local session. */
@@ -178,7 +138,6 @@ export class SessionStore {
   forget(): void {
     this.accessTokenSignal.set(null);
     this.userSignal.set(null);
-    this.profileEtagSignal.set(null);
     this.statusSignal.set('anonymous');
   }
 
@@ -187,9 +146,4 @@ export class SessionStore {
     this.userSignal.set(session.user);
     this.statusSignal.set('authenticated');
   }
-}
-
-/** Formats a version as the strong entity tag the server uses. */
-export function quoteVersion(version: number): string {
-  return `"${version}"`;
 }

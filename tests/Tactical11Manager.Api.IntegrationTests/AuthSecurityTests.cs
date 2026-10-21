@@ -53,38 +53,6 @@ public sealed class AuthSecurityTests
     }
 
     [Fact]
-    public async Task An_unverified_account_cannot_change_its_display_name()
-    {
-        _fixture.Email.Clear();
-
-        using var client = CreateClient();
-        var email = $"unverified-{Guid.NewGuid():N}@example.com";
-        await AuthScenario.RegisterAsync(client, email, $"Mgr{Guid.NewGuid():N}"[..13]);
-
-        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new
-        {
-            email,
-            password = AuthScenario.Password,
-        });
-
-        var session = await login.Content.ReadFromJsonAsync<AuthSessionResponse>();
-        client.WithBearer(session!.AccessToken);
-
-        var me = await client.GetAsync("/api/v1/me");
-
-        using var patch = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/me")
-        {
-            Content = JsonContent.Create(new { displayName = $"Mgr{Guid.NewGuid():N}"[..13] }),
-        };
-        patch.Headers.TryAddWithoutValidation("If-Match", me.Headers.ETag!.Tag);
-
-        var response = await client.SendAsync(patch);
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await ReadProblemCodeAsync(response)).Should().Be(AuthErrorCodes.AccountNotVerified);
-    }
-
-    [Fact]
     public async Task A_suspended_account_cannot_sign_in_and_its_live_token_stops_working()
     {
         using var client = CreateClient();
@@ -111,54 +79,24 @@ public sealed class AuthSecurityTests
     }
 
     [Fact]
-    public async Task A_profile_write_must_be_conditional()
+    public async Task The_display_name_chosen_at_sign_up_cannot_be_changed_afterwards()
     {
         using var client = CreateClient();
         var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
         client.WithBearer(manager.AccessToken);
+
+        var me = await client.GetAsync("/api/v1/me");
+        var before = (await me.Content.ReadFromJsonAsync<UserProfileResponse>())!.DisplayName;
 
         var response = await client.PatchAsJsonAsync("/api/v1/me", new
         {
             displayName = $"Mgr{Guid.NewGuid():N}"[..13],
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.PreconditionRequired);
-        (await ReadProblemCodeAsync(response)).Should().Be(ApiErrorCodes.PreconditionRequired);
-    }
+        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
 
-    [Fact]
-    public async Task A_stale_profile_version_is_rejected_without_overwriting_the_change()
-    {
-        using var client = CreateClient();
-        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
-        client.WithBearer(manager.AccessToken);
-
-        using var patch = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/me")
-        {
-            Content = JsonContent.Create(new { displayName = $"Mgr{Guid.NewGuid():N}"[..13] }),
-        };
-        patch.Headers.TryAddWithoutValidation("If-Match", "\"999999\"");
-
-        var response = await client.SendAsync(patch);
-
-        response.StatusCode.Should().Be(HttpStatusCode.PreconditionFailed);
-        (await ReadProblemCodeAsync(response)).Should().Be(ApiErrorCodes.PreconditionFailed);
-    }
-
-    [Fact]
-    public async Task A_weak_entity_tag_is_not_accepted_as_a_precondition()
-    {
-        using var client = CreateClient();
-        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
-        client.WithBearer(manager.AccessToken);
-
-        using var patch = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/me")
-        {
-            Content = JsonContent.Create(new { displayName = $"Mgr{Guid.NewGuid():N}"[..13] }),
-        };
-        patch.Headers.TryAddWithoutValidation("If-Match", "W/\"1\"");
-
-        (await client.SendAsync(patch)).StatusCode.Should().Be(HttpStatusCode.PreconditionRequired);
+        var after = await (await client.GetAsync("/api/v1/me")).Content.ReadFromJsonAsync<UserProfileResponse>();
+        after!.DisplayName.Should().Be(before);
     }
 
     [Fact]

@@ -90,29 +90,6 @@ public sealed class UserAggregateTests
     }
 
     [Fact]
-    public void A_verified_account_may_change_its_display_name_and_the_normalized_form_follows()
-    {
-        var user = Register();
-        user.MarkEmailVerified(Now);
-
-        user.ChangeDisplayName("  New Name ", Now.AddMinutes(1));
-
-        user.DisplayName.Should().Be("New Name");
-        user.NormalizedDisplayName.Should().Be("NEW NAME");
-    }
-
-    [Fact]
-    public void An_unverified_account_may_not_change_its_display_name()
-    {
-        // Verification is required before a display-name change (ADR-0002).
-        var user = Register();
-
-        var act = () => user.ChangeDisplayName("New Name", Now);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
     public void Failed_logins_accumulate_and_lock_the_account_at_the_threshold()
     {
         var user = Register();

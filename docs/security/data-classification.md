@@ -126,7 +126,7 @@ error category. Structured logs carry these as fields, not as interpolated prose
 | Export | Returns account, consents, manager profile, tenure history, active sessions, and the current club's ledger (the own transactional history, capped) as one JSON document at `GET /me/export`, sent `no-store` and carrying no secret or hidden value (ADR-0036). A club's earlier ledgers and its matches are world records, not the departing manager's personal data, and are not included |
 | Deletion | Closes tenure → revokes sessions → cooling period → anonymizes identity; competition records retained anonymized |
 | Consent | Terms and privacy versions are recorded per acceptance with a timestamp |
-| Correction | Display name and timezone are user-editable; game data is not user-editable |
+| Correction | Timezone and locale are user-editable; the display name is fixed at sign-up and game data is not user-editable |
 
 ---
 

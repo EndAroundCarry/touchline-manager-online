@@ -900,6 +900,7 @@ Implement `PostgresJobQueue` in `Tactical11Manager.Infrastructure/Jobs`:
 - `PublishDivisionMatchday`: publishes only after all fixtures are staged and validated.
 - `ResolveTransferAuction`: at fixed auction windows.
 - `OpenFreeAgentBatch` (`market.free-agent-batch:{monday}`): Monday 12:00 UTC, the auction window; generates the week's free agents (a tenth of the players under contract), picks up the players released since the last batch, and lists them with no seller until the next Monday (`FA-1`…`FA-8`, ADR-0077).
+- `WeeklyFanReview` (`fans.weekly-review:{sunday}`): Sunday 23:30 UTC, after the weekly finance run; judges every club's fans against the place they hoped it would finish, once a week per club (`FAN-8`, ADR-0078).
 - `DailyPlayerProgression`: training/state/injury recovery.
 - `WeeklyFinanceRun`: wages, sponsorship, operating costs.
 - `EvaluateAiClubs`: lineups, tactics, training, renewals, listings, bids.
@@ -1167,7 +1168,6 @@ POST   /api/v1/auth/logout-all
 POST   /api/v1/auth/forgot-password
 POST   /api/v1/auth/reset-password
 GET    /api/v1/me
-PATCH  /api/v1/me
 DELETE /api/v1/me
 ```
 
@@ -1960,6 +1960,7 @@ Add in separate feature flags and migrations:
 - Youth academy, annual intake, development squads, and homegrown rules.
 - Facilities beyond the stadium (training ground, academy buildings, upkeep costs, naming rights).
 - Richer morale, promises, player personalities, captaincy, and team cohesion.
+- **Fan base (delivered, ADR-0078):** every club has a fan count that grows after good results and shrinks after bad ones, between a floor and a soft cap per tier, and a mood that the fans judge against what they expected from each match and against the place they hoped the club would finish. The crowd and the gate are drawn from them (`FAN-1`…`FAN-10`, `FIN-3`, `STAD-5`). Still ahead: season objectives (the fans' own predicted finish stands in for them), ticket pricing against mood, a home "twelfth man" effect, messages from the fans, and fan groups.
 - More formations, roles, set-piece plans, and conditional substitution instructions.
 - Scout assignments and uncertain attribute reports.
 

@@ -4,6 +4,10 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Manager name fixed at sign-up
+
+- The manager name is the account name chosen at sign-up and can no longer be changed. Removed: the Manager name form on the Settings page, `PATCH /api/v1/me` (with its `If-Match` handling, the `UpdateProfile` use case, `User.ChangeDisplayName`, the `auth.profile.updated` audit action, the `ACCOUNT_NOT_VERIFIED` error code, and the web `updateDisplayName` call plus the profile entity-tag bookkeeping it needed). The sign-up form says the name is permanent. No schema change: the name lives in the one `DisplayName` column on the account, which sign-up still fills, and no second manager-name field existed to drop.
+
 ## Free agents plan - a weekly pool on the transfer page, and releasing a player
 
 - Every Monday at 12:00 UTC a batch opens: a tenth of the players under contract, generated as depth (shown ability 6 to 10, ages 20 to 32, spread 15% goalkeepers, 28% defenders, 29% midfielders, 28% attackers), plus every player an AI club or a manager released since the last batch. They are sold through the existing timed auction with no seller; the listing closes the next Monday at 12:00, a leading bid signs the player even on the last day, and a listing with no bid expires. Human managers only; the AI market never sees them. The fee leaves the game. Price is 25% of the valuation of his ability (potential set equal to ability), never below the bid increment; wage frozen on the listing; contract 3, 2 or 1 seasons by age.

@@ -22,9 +22,6 @@ public static class AuthErrorCodes
     /// <summary>The account is suspended and may not authenticate.</summary>
     public const string AccountSuspended = "ACCOUNT_SUSPENDED";
 
-    /// <summary>The action requires a verified email address.</summary>
-    public const string AccountNotVerified = "ACCOUNT_NOT_VERIFIED";
-
     /// <summary>The email token is unknown, expired, or already used.</summary>
     public const string InvalidToken = "INVALID_TOKEN";
 

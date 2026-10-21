@@ -8,7 +8,7 @@ namespace Tactical11Manager.Domain.Auth;
 /// <remarks>
 /// <para>
 /// The invariants that matter competitively live here rather than in an endpoint: an account cannot
-/// be verified from a suspended state, a display name cannot change before verification, and every
+/// be verified from a suspended state, the display name chosen at sign-up never changes, and every
 /// event that must invalidate existing sessions bumps the security stamp (ADR-0002).
 /// </para>
 /// <para>
@@ -218,25 +218,6 @@ public sealed class User
         }
 
         Status = EmailVerifiedAt.HasValue ? UserStatus.Active : UserStatus.Pending;
-
-        Touch(now);
-    }
-
-    /// <summary>Changes the display name. Requires a verified account (ADR-0002).</summary>
-    /// <param name="displayName">The new display name.</param>
-    /// <param name="now">The current instant.</param>
-    public void ChangeDisplayName(string displayName, DateTimeOffset now)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
-
-        if (!UserStatusRules.CanWrite(Status))
-        {
-            throw new InvalidOperationException(
-                "A display name can only be changed by a verified account (ADR-0002).");
-        }
-
-        DisplayName = displayName.Trim();
-        NormalizedDisplayName = NormalizeDisplayName(displayName);
 
         Touch(now);
     }

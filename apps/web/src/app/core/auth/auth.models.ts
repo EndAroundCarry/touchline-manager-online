@@ -43,18 +43,6 @@ export interface RequestAccepted {
   readonly serverTime: string;
 }
 
-/** The result of a profile change, including the new concurrency version. */
-export interface ProfileUpdated {
-  readonly user: UserProfile;
-  readonly version: number;
-}
-
-/** A profile read together with the entity tag the next conditional write must carry. */
-export interface ProfileSnapshot {
-  readonly profile: UserProfile;
-  readonly etag: string | null;
-}
-
 /**
  * The account's own data as one document (`F-07`, master plan §12.4).
  *

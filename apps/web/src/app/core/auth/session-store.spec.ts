@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { AuthApi } from './auth-api';
 import { AuthSession, UserProfile } from './auth.models';
-import { SessionStore, quoteVersion } from './session-store';
+import { SessionStore } from './session-store';
 
 /**
  * The session store is the single source of truth for "is this client signed in", so these tests pin
@@ -44,7 +44,6 @@ function createAuthApiStub() {
     forgotPassword: vi.fn(),
     resetPassword: vi.fn(),
     profile: vi.fn(),
-    updateDisplayName: vi.fn(),
     deleteAccount: vi.fn(),
   };
 }
@@ -157,41 +156,12 @@ describe('SessionStore', () => {
     expect(store.isAuthenticated()).toBe(false);
   });
 
-  it('carries the entity tag from a profile read into the next conditional write', async () => {
-    api.profile.mockReturnValue(of({ profile, etag: '"3"' }));
+  it('adopts a profile read as the signed-in account', async () => {
+    api.profile.mockReturnValue(of(profile));
 
     await firstValueFrom(store.loadProfile());
 
-    const renamed = { ...profile, displayName: 'Manager Two' };
-    api.updateDisplayName.mockReturnValue(of({ user: renamed, version: 4 }));
-
-    const updated = await firstValueFrom(store.updateDisplayName('Manager Two'));
-
-    expect(api.updateDisplayName).toHaveBeenCalledWith('Manager Two', '"3"');
-    expect(updated.version).toBe(4);
-    expect(store.displayName()).toBe('Manager Two');
-  });
-
-  it('uses the version returned by a write as the precondition for the following one', async () => {
-    api.profile.mockReturnValue(of({ profile, etag: '"3"' }));
-    await firstValueFrom(store.loadProfile());
-
-    api.updateDisplayName.mockReturnValue(of({ user: profile, version: 4 }));
-    await firstValueFrom(store.updateDisplayName('Manager Two'));
-
-    api.updateDisplayName.mockReturnValue(of({ user: profile, version: 5 }));
-    await firstValueFrom(store.updateDisplayName('Manager Three'));
-
-    expect(api.updateDisplayName).toHaveBeenLastCalledWith('Manager Three', quoteVersion(4));
-  });
-
-  it('refuses to write a profile change before the profile has been read', async () => {
-    // There is no version to send, so the write must fail loudly rather than be sent unconditionally.
-    api.updateDisplayName.mockReturnValue(of({ user: profile, version: 2 }));
-
-    await expect(firstValueFrom(store.updateDisplayName('Manager Two'))).rejects.toThrow();
-
-    expect(api.updateDisplayName).not.toHaveBeenCalled();
+    expect(store.displayName()).toBe('Manager One');
   });
 
   it('closes the account and drops the local session', async () => {
@@ -218,11 +188,5 @@ describe('SessionStore', () => {
     expect(store.user()).toBeNull();
     expect(store.accessToken()).toBeNull();
     expect(store.displayName()).toBeNull();
-  });
-});
-
-describe('quoteVersion', () => {
-  it('formats a version as the strong entity tag the server uses', () => {
-    expect(quoteVersion(7)).toBe('"7"');
   });
 });

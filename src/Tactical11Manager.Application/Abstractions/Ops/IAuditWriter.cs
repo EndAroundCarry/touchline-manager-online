@@ -78,9 +78,6 @@ public static class AuthAuditActions
     /// <summary>A password was reset.</summary>
     public const string PasswordReset = "auth.password.reset";
 
-    /// <summary>The display name changed.</summary>
-    public const string ProfileUpdated = "auth.profile.updated";
-
     /// <summary>Account deletion was requested.</summary>
     public const string DeletionRequested = "auth.account.deletion_requested";
 }

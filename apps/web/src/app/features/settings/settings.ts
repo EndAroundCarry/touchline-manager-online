@@ -6,7 +6,7 @@ import {
   ValidationErrors,
   Validators,
 } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { ApiError } from '../../core/api/api-error';
 import { AuthApi } from '../../core/auth/auth-api';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
@@ -27,7 +27,6 @@ import {
   DESTRUCTIVE_BUTTON,
   FIELD_ERROR,
   FORM_ERROR,
-  LINK,
   PAGE_HEADING,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -35,7 +34,7 @@ import {
   STATUS_MESSAGE,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
-import { controlError, errorId } from '../../shared/forms/form-support';
+import { errorId } from '../../shared/forms/form-support';
 import {
   DEFAULT_CREST_PATTERN,
   DEFAULT_CREST_SHAPE,
@@ -99,13 +98,13 @@ function withCurrent(options: readonly string[], current: string | null): readon
 /**
  * Account settings.
  *
- * Covers the profile, the manager name under an optimistic concurrency check, formatting preferences
- * (locale and time zone, `CAL-4`), notification switches, the session list (`F-07`), the account-data
- * export (master plan §12.4), and closing the account.
+ * Covers formatting preferences (locale and time zone, `CAL-4`), notification switches, the session list
+ * (`F-07`), the account-data export (master plan §12.4), and closing the account. The manager name is the
+ * account name chosen at sign-up and is not editable here.
  */
 @Component({
   selector: 'app-settings',
-  imports: [CrestPicker, KitColourPicker, ReactiveFormsModule, RouterLink],
+  imports: [CrestPicker, KitColourPicker, ReactiveFormsModule],
   templateUrl: './settings.html',
 })
 export class Settings {
@@ -120,31 +119,11 @@ export class Settings {
   /** The signed-in account. */
   protected readonly user = this.store.user;
 
-  /** Whether the address is confirmed. */
-  protected readonly isVerified = this.store.isVerified;
-
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
 
   /** Whether a write is allowed; every account change is refused offline or read-only (Â§11.4). */
   protected readonly canMutate = this.maintenance.canMutate;
-
-  protected readonly nameForm = inject(FormBuilder).nonNullable.group({
-    displayName: [
-      '',
-      [
-        Validators.required,
-        Validators.minLength(3),
-        Validators.maxLength(32),
-        Validators.pattern("^[A-Za-z0-9][A-Za-z0-9 _'-]*$"),
-      ],
-    ],
-  });
-
-  protected readonly nameSubmitting = signal(false);
-  protected readonly nameSaved = signal(false);
-  protected readonly nameError = signal<string | null>(null);
-  protected readonly nameConflict = signal(false);
 
   /** The manager profile, which carries the formatting preferences. */
   protected readonly manager = computed(() => this.onboarding.state()?.manager ?? null);
@@ -227,7 +206,6 @@ export class Settings {
   protected readonly formErrorClass = FORM_ERROR;
   protected readonly fieldErrorClass = FIELD_ERROR;
   protected readonly statusMessageClass = STATUS_MESSAGE;
-  protected readonly linkClass = LINK;
   protected readonly checkboxClass = CHECKBOX_INPUT;
   protected readonly checkboxRowClass = CHECKBOX_ROW;
 
@@ -247,9 +225,6 @@ export class Settings {
     emailMarketMessages: true,
     emailNewsDigest: true,
   });
-
-  /** The element id the display-name error will carry. */
-  protected readonly displayNameErrorId = errorId('displayName');
 
   /** The element id the delete-password error will carry. */
   protected readonly deletePasswordErrorId = errorId('deletePassword');
@@ -471,9 +446,7 @@ export class Settings {
     this.loadError.set(null);
 
     this.store.loadProfile().subscribe({
-      next: (profile) => {
-        this.nameForm.patchValue({ displayName: profile.displayName });
-        this.applyVerificationToNameForm(profile.emailVerified);
+      next: () => {
         this.loading.set(false);
       },
       error: (error: unknown) => {
@@ -482,73 +455,6 @@ export class Settings {
           error instanceof ApiError ? error.detail : 'Your profile could not be loaded.',
         );
       },
-    });
-  }
-
-  /**
-   * Enables the manager name only for a confirmed address.
-   *
-   * The control's own disabled state is used rather than a `disabled` binding on the input. With a
-   * reactive form the control owns that property — `FormControlName` re-applies it on every change —
-   * so an attribute binding is silently ignored and the field stays editable while the screen claims
-   * otherwise.
-   */
-  private applyVerificationToNameForm(verified: boolean): void {
-    const control = this.nameForm.controls.displayName;
-
-    if (verified) {
-      control.enable({ emitEvent: false });
-    } else {
-      control.disable({ emitEvent: false });
-    }
-  }
-
-  /** Resolves the message under the display-name field. */
-  protected displayNameError(): string | null {
-    return controlError(this.nameForm.get('displayName'), new Map(), 'DisplayName');
-  }
-
-  /** Saves the display name. */
-  protected saveDisplayName(): void {
-    if (this.nameSubmitting()) {
-      return;
-    }
-
-    this.nameSaved.set(false);
-    this.nameError.set(null);
-    this.nameConflict.set(false);
-
-    if (this.nameForm.invalid) {
-      this.nameForm.markAllAsTouched();
-
-      return;
-    }
-
-    this.nameSubmitting.set(true);
-
-    this.store.updateDisplayName(this.nameForm.getRawValue().displayName).subscribe({
-      next: () => this.nameSaved.set(true),
-      error: (error: unknown) => {
-        this.nameSubmitting.set(false);
-
-        if (error instanceof ApiError) {
-          if (error.isPreconditionFailed) {
-            // Somebody changed the profile underneath this screen. Show the new state and let the
-            // manager decide, rather than overwriting the other change.
-            this.nameConflict.set(true);
-            this.reload();
-
-            return;
-          }
-
-          this.nameError.set(error.detail);
-
-          return;
-        }
-
-        this.nameError.set('The change could not be saved. Try again.');
-      },
-      complete: () => this.nameSubmitting.set(false),
     });
   }
 

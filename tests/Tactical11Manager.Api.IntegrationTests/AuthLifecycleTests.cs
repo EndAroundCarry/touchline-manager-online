@@ -19,7 +19,7 @@ public sealed class AuthLifecycleTests
     public AuthLifecycleTests(ApiFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task A_manager_can_register_verify_sign_in_edit_refresh_and_sign_out()
+    public async Task A_manager_can_register_verify_sign_in_refresh_and_sign_out()
     {
         using var client = CreateClient();
         var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
@@ -36,22 +36,6 @@ public sealed class AuthLifecycleTests
         profile.EmailVerified.Should().BeTrue();
         profile.Status.Should().Be("active");
         profile.Roles.Should().Contain("player");
-
-        // A conditional write succeeds and returns the next version.
-        var renamed = $"Mgr{Guid.NewGuid():N}"[..13];
-
-        using var patch = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/me")
-        {
-            Content = JsonContent.Create(new { displayName = renamed }),
-        };
-        patch.Headers.TryAddWithoutValidation("If-Match", me.Headers.ETag!.Tag);
-
-        var patched = await client.SendAsync(patch);
-        patched.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var updated = await patched.Content.ReadFromJsonAsync<ProfileUpdatedResponse>();
-        updated!.User.DisplayName.Should().Be(renamed);
-        updated.Version.Should().BeGreaterThan(1);
 
         // Refreshing rotates the cookie rather than reusing the token.
         using var refresh = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh")

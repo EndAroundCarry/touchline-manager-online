@@ -46,8 +46,3 @@ public sealed record RegistrationAcceptedResponse(Guid UserId, string Email, boo
 /// <param name="Message">A neutral, non-enumerating message.</param>
 /// <param name="ServerTime">The server's current instant.</param>
 public sealed record RequestAcceptedResponse(string Message, DateTimeOffset ServerTime);
-
-/// <summary>The result of a profile change, including its new concurrency version.</summary>
-/// <param name="User">The updated account.</param>
-/// <param name="Version">The new version, to be used as an ETag on the next conditional write.</param>
-public sealed record ProfileUpdatedResponse(UserProfileResponse User, long Version);

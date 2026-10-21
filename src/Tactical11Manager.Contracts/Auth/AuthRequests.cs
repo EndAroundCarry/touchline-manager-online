@@ -63,13 +63,6 @@ public sealed record ResetPasswordRequest
     public required string NewPassword { get; init; }
 }
 
-/// <summary>Request to change the public display name. Requires a verified account.</summary>
-public sealed record UpdateProfileRequest
-{
-    /// <summary>Gets the new display name.</summary>
-    public required string DisplayName { get; init; }
-}
-
 /// <summary>Request to delete the account. Requires the current password as confirmation.</summary>
 public sealed record DeleteAccountRequest
 {

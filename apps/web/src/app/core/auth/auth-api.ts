@@ -1,14 +1,11 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable } from 'rxjs';
 import { ApiClient } from '../api/api-client';
-import { ApiHeaders } from '../api/api-headers';
 import { authEndpointContext } from './auth-context';
 import {
   AccountExport,
   AuthSession,
   LoginPayload,
-  ProfileSnapshot,
-  ProfileUpdated,
   RegisterPayload,
   RegistrationAccepted,
   RequestAccepted,
@@ -103,26 +100,9 @@ export class AuthApi {
     });
   }
 
-  /** Reads the profile together with the entity tag for the next conditional write. */
-  profile(): Observable<ProfileSnapshot> {
-    return this.api.getWithResponse<UserProfile>('/me').pipe(
-      map((response) => {
-        if (response.body === null) {
-          throw new Error('The profile response was empty.');
-        }
-
-        return { profile: response.body, etag: response.headers.get(ApiHeaders.entityTag) };
-      }),
-    );
-  }
-
-  /** Changes the display name under an optimistic concurrency check. */
-  updateDisplayName(displayName: string, etag: string): Observable<ProfileUpdated> {
-    return this.api.patch<ProfileUpdated, { displayName: string }>(
-      '/me',
-      { displayName },
-      { etag },
-    );
+  /** Reads the signed-in account's profile. */
+  profile(): Observable<UserProfile> {
+    return this.api.get<UserProfile>('/me');
   }
 
   /** Closes the account, confirming with the current password. */

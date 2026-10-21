@@ -182,16 +182,6 @@ internal static class AuthEndpoints
             .Produces<UserProfileResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
-        group.MapPatch(string.Empty, UpdateMeAsync)
-            .WithName("UpdateMe")
-            .WithSummary("Changes the display name. Requires a verified account and If-Match.")
-            .Produces<ProfileUpdatedResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status409Conflict)
-            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
-            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
-
         group.MapGet("/export", ExportAccountAsync)
             .WithName("ExportAccountData")
             .WithSummary("Returns the account's own data as one machine-readable document (`F-07`, §12.4).")
@@ -790,71 +780,6 @@ internal static class AuthEndpoints
         httpContext.Response.Headers.CacheControl = "no-store";
 
         return Results.Ok(export);
-    }
-
-    private static async Task<IResult> UpdateMeAsync(
-        HttpContext httpContext,
-        UpdateProfileRequest request,
-        IValidator<UpdateProfileRequest> validator,
-        UpdateProfile useCase,
-        CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(httpContext, out var userId))
-        {
-            return ProblemResults.Unauthenticated("Sign in to continue.");
-        }
-
-        var expectedVersion = EntityTagHeader.ParseIfMatch(httpContext.Request.Headers.IfMatch.ToString());
-
-        if (expectedVersion is null)
-        {
-            return ProblemResults.Code(
-                StatusCodes.Status428PreconditionRequired,
-                ApiErrorCodes.PreconditionRequired,
-                "A version is required.",
-                "Send the current entity tag in If-Match so a concurrent change is not overwritten.");
-        }
-
-        var invalid = await RequestValidation.ValidateAsync(validator, request, cancellationToken);
-
-        if (invalid is not null)
-        {
-            return invalid;
-        }
-
-        var result = await useCase.ExecuteAsync(userId, expectedVersion.Value, request, cancellationToken);
-
-        switch (result.Outcome)
-        {
-            case UpdateProfileOutcome.Updated:
-                httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Profile!.Version);
-
-                return Results.Ok(new ProfileUpdatedResponse(result.Profile.Profile, result.Profile.Version));
-
-            case UpdateProfileOutcome.DisplayNameTaken:
-                return ProblemResults.Code(
-                    StatusCodes.Status409Conflict,
-                    AuthErrorCodes.DisplayNameTaken,
-                    "Display name taken.",
-                    "That display name is already in use.");
-
-            case UpdateProfileOutcome.PreconditionFailed:
-                return ProblemResults.Code(
-                    StatusCodes.Status412PreconditionFailed,
-                    ApiErrorCodes.PreconditionFailed,
-                    "The account changed.",
-                    "Reload the profile and reapply the change.");
-
-            case UpdateProfileOutcome.NotVerified:
-                return ProblemResults.Code(
-                    StatusCodes.Status403Forbidden,
-                    AuthErrorCodes.AccountNotVerified,
-                    "Email not confirmed.",
-                    "Confirm your email address before changing your display name.");
-
-            default:
-                return ProblemResults.Unauthenticated("Your session is no longer valid.");
-        }
     }
 
     private static async Task<IResult> DeleteMeAsync(

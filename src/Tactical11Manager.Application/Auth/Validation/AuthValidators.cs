@@ -126,13 +126,6 @@ public sealed class ResetPasswordRequestValidator : AbstractValidator<ResetPassw
     }
 }
 
-/// <summary>Validates <see cref="UpdateProfileRequest"/>.</summary>
-public sealed class UpdateProfileRequestValidator : AbstractValidator<UpdateProfileRequest>
-{
-    /// <summary>Initializes the validator.</summary>
-    public UpdateProfileRequestValidator() => RuleFor(request => request.DisplayName).DisplayNameRules();
-}
-
 /// <summary>Validates <see cref="DeleteAccountRequest"/>.</summary>
 public sealed class DeleteAccountRequestValidator : AbstractValidator<DeleteAccountRequest>
 {
