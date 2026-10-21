@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Application.Abstractions.Fans;
 using Tactical11Manager.Domain.Fans;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 
 namespace Tactical11Manager.Infrastructure.Persistence.Repositories;
@@ -165,6 +166,107 @@ internal sealed class FanQueries : IFanQueries
             .Select(group => group.Key)
             .ToListAsync(cancellationToken))
             .ToHashSet();
+
+    /// <inheritdoc />
+    public async Task<FanClubRow?> GetClubAsync(Guid clubId, CancellationToken cancellationToken)
+    {
+        var club = await _dbContext.Clubs
+            .AsNoTracking()
+            .Where(candidate => candidate.Id == clubId)
+            .Select(candidate => new { candidate.Name })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (club is null)
+        {
+            return null;
+        }
+
+        var season = await (
+            from world in _dbContext.GameWorlds
+            join candidate in _dbContext.Seasons on world.Id equals candidate.WorldId
+            where candidate.SequenceNumber == world.CurrentSeasonNumber
+            orderby world.CreatedAt
+            select new { candidate.Id, candidate.SequenceNumber })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        int? tier = season is null
+            ? null
+            : await (
+                from entry in _dbContext.ClubSeasonEntries
+                join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+                join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+                where entry.SeasonId == season.Id && entry.ClubId == clubId
+                select (int?)division.TierNumber)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        var fanBase = await _dbContext.ClubFanBases
+            .AsNoTracking()
+            .Where(candidate => candidate.ClubId == clubId)
+            .Select(candidate => new
+            {
+                candidate.Fans,
+                candidate.MoodBp,
+                candidate.SeasonTargetRank,
+                candidate.LastWeekGap,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // A club whose fans have not been opened yet reads as a new club of its tier, as the stadium page quotes it.
+        var opening = FanRuleSet.OpeningFor(tier ?? 1);
+
+        return new FanClubRow(
+            clubId,
+            club.Name,
+            tier ?? 1,
+            fanBase?.Fans ?? opening.Fans,
+            fanBase?.MoodBp ?? opening.MoodBp,
+            fanBase?.SeasonTargetRank,
+            fanBase?.LastWeekGap,
+            season?.Id,
+            season?.SequenceNumber ?? 0);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<FanEventRow>> ListEventsAsync(Guid clubId, CancellationToken cancellationToken) =>
+        await (
+            from fanEvent in _dbContext.ClubFanEvents.AsNoTracking()
+            join season in _dbContext.Seasons on fanEvent.SeasonId equals season.Id
+            where fanEvent.ClubId == clubId
+            orderby fanEvent.OccurredAt, fanEvent.Id
+            select new FanEventRow(
+                fanEvent.Id,
+                fanEvent.Kind,
+                fanEvent.OccurredAt,
+                fanEvent.SeasonId,
+                season.SequenceNumber,
+                fanEvent.FixtureId,
+                fanEvent.FansBefore,
+                fanEvent.FansAfter,
+                fanEvent.MoodBeforeBp,
+                fanEvent.MoodAfterBp,
+                fanEvent.ExpectedPointsCentis,
+                fanEvent.PointsWon,
+                fanEvent.Gap))
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, FanExpectation>> GetFrozenExpectationsAsync(
+        Guid clubId,
+        IReadOnlyCollection<Guid> fixtureIds,
+        CancellationToken cancellationToken)
+    {
+        if (fixtureIds.Count == 0)
+        {
+            return new Dictionary<Guid, FanExpectation>();
+        }
+
+        var rows = await _dbContext.FixtureFanExpectations
+            .AsNoTracking()
+            .Where(expectation => expectation.ClubId == clubId && fixtureIds.Contains(expectation.FixtureId))
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(row => row.FixtureId, row => row.Expectation);
+    }
 
     private async Task<Guid?> CurrentSeasonIdAsync(CancellationToken cancellationToken) =>
         await (

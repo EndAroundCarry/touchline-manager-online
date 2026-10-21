@@ -19,6 +19,56 @@ public sealed record FanSeasonClubRow(
     int Points,
     int Rank);
 
+/// <summary>A club's fans as the Fan Base page reads them.</summary>
+/// <param name="ClubId">The club.</param>
+/// <param name="Name">The club's name.</param>
+/// <param name="TierNumber">The tier it plays in this season, or 1 when it has no entry in the season.</param>
+/// <param name="Fans">The fans it has. A club whose fans were never opened reads as a new club of its tier.</param>
+/// <param name="MoodBp">How satisfied they are, in basis points.</param>
+/// <param name="SeasonTargetRank">The place the fans expect this season, or null before it is set.</param>
+/// <param name="LastWeekGap">The gap at the last weekly review, or null before the first.</param>
+/// <param name="CurrentSeasonId">The world's current season, or null before a world exists.</param>
+/// <param name="CurrentSeasonNumber">The current season's sequence number, from 1, or 0 when there is none.</param>
+public sealed record FanClubRow(
+    Guid ClubId,
+    string Name,
+    int TierNumber,
+    int Fans,
+    int MoodBp,
+    int? SeasonTargetRank,
+    int? LastWeekGap,
+    Guid? CurrentSeasonId,
+    int CurrentSeasonNumber);
+
+/// <summary>One entry of a club's fan history, with the season it belongs to named by number.</summary>
+/// <param name="Id">The event identity.</param>
+/// <param name="Kind">What moved the fans.</param>
+/// <param name="OccurredAt">When it happened.</param>
+/// <param name="SeasonId">The season.</param>
+/// <param name="SeasonNumber">The season's sequence number, from 1.</param>
+/// <param name="FixtureId">The match, on a match event.</param>
+/// <param name="FansBefore">The fans before the change.</param>
+/// <param name="FansAfter">The fans after the change.</param>
+/// <param name="MoodBeforeBp">The mood before the change.</param>
+/// <param name="MoodAfterBp">The mood after the change.</param>
+/// <param name="ExpectedPointsCentis">The points expected, on a match event.</param>
+/// <param name="PointsWon">The points taken, on a match event.</param>
+/// <param name="Gap">The gap to the target, on a review or a season reset.</param>
+public sealed record FanEventRow(
+    Guid Id,
+    FanEventKind Kind,
+    DateTimeOffset OccurredAt,
+    Guid SeasonId,
+    int SeasonNumber,
+    Guid? FixtureId,
+    int FansBefore,
+    int FansAfter,
+    int MoodBeforeBp,
+    int MoodAfterBp,
+    int? ExpectedPointsCentis,
+    int? PointsWon,
+    int? Gap);
+
 /// <summary>
 /// The reads the fan module is built from: where each club stands, how strong its squad is, and how its season has gone (`FAN-3`, `FAN-8`).
 /// </summary>
@@ -58,5 +108,26 @@ public interface IFanQueries
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<IReadOnlySet<Guid>> GetFirstSeasonClubIdsAsync(
         IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>Reads a club's fans for the Fan Base page and the public summary (`FAN-1`, `FAN-8`).</summary>
+    /// <param name="clubId">The club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The club's fans, or null when no such club exists.</returns>
+    Task<FanClubRow?> GetClubAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>Lists a club's whole fan history, oldest first (`FAN-10`).</summary>
+    /// <param name="clubId">The club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<FanEventRow>> ListEventsAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>Reads what a club's fans expected from some fixtures when the team sheets locked (`FAN-4`).</summary>
+    /// <param name="clubId">The club whose fans held the expectation.</param>
+    /// <param name="fixtureIds">The fixtures.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The expectations that were frozen, by fixture. A fixture locked before fans existed has none.</returns>
+    Task<IReadOnlyDictionary<Guid, FanExpectation>> GetFrozenExpectationsAsync(
+        Guid clubId,
+        IReadOnlyCollection<Guid> fixtureIds,
         CancellationToken cancellationToken);
 }

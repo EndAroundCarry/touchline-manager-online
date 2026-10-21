@@ -11,6 +11,7 @@ using Tactical11Manager.Api.Comms;
 using Tactical11Manager.Api.Competition;
 using Tactical11Manager.Api.Configuration;
 using Tactical11Manager.Api.Endpoints;
+using Tactical11Manager.Api.Fans;
 using Tactical11Manager.Api.Finance;
 using Tactical11Manager.Api.Health;
 using Tactical11Manager.Api.Http;
@@ -287,6 +288,7 @@ app.MapMatchEndpoints();
 app.MapCommsEndpoints();
 app.MapFinanceEndpoints();
 app.MapCalendarEndpoints();
+app.MapFanEndpoints();
 app.MapStadiumEndpoints();
 app.MapMarketEndpoints();
 

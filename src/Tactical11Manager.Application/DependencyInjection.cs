@@ -198,6 +198,10 @@ public static class DependencyInjection
         services.AddScoped<SettleSeasonFans>();
         services.AddScoped<FanBaseTakeover>();
         services.AddScoped<TriggerFanReview>();
+
+        // The reads: the manager's Fan Base page and what anyone can see of a club's fans.
+        services.AddScoped<GetFanBase>();
+        services.AddScoped<GetClubFanSummary>();
     }
 
     /// <summary>
