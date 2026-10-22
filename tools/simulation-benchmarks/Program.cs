@@ -40,7 +40,7 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tickfans N seed [curve|real|pool|league]` fits how a strength gap becomes win, draw and loss on the tick engine and checks the fans' expectation
 // against played matches (plan partitioned-feather). Not part of `all`.
 //
-// `econ seeds seed [seasons]` runs the economy sandbox (plan toasty-scott): one country of 4 tiers of 18 clubs through ten seasons on the game's own
+// `econ seeds seed [seasons]` runs the economy sandbox (plan toasty-scott): one country of 4 tiers of the game's division size through ten seasons on the game's own
 // pure rule code, scripted managers beside the AI clubs, and writes the season tables, the target checks and the report. Not part of `all`.
 //
 // `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
@@ -283,7 +283,7 @@ if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") == "1")
 
 if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") != "1")
 {
-    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of 18 clubs, matchday steps, the v17 economy rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per computer club, default 2; ECON_TRAIN scales development speed in percent, default 100)
+    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of the game's division size, matchday steps and the weekly run of the season cycle, the economy rules of the world rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per computer club, default 2; ECON_TRAIN scales development speed in percent, default 100)
     EconReport.Run(
         Math.Clamp(positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var econSeeds) ? econSeeds : 3, 1, 10),
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var econSeed) ? econSeed : 5_000UL,

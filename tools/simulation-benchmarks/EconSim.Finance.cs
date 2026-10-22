@@ -35,7 +35,7 @@ internal sealed partial class EconSim
     {
         var books = club.Books;
         var limit = EconomyRuleSet.OverdraftLimitMinorFor(club.Forecast);
-        var now = ((Season - 1) * Weeks) + Week + 1;
+        var now = ((Season - 1) * Matchdays) + Step + 1;
         var step = ClubFinancialState.Next(club.FinState, club.FinSince, now, club.Cash, limit);
 
         books.EnteredRed += step.Transition == FinancialTransition.EnteredRed ? 1 : 0;

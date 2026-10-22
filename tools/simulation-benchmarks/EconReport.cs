@@ -108,7 +108,7 @@ internal static class EconReport
         text.AppendLine();
         text.AppendLine(string.Create(
             Inv,
-            $"{results.Count} seed(s) ({string.Join(", ", results.Select(result => result.Seed))}), {seasons} seasons, one country of {EconSim.Tiers} tiers of {EconSim.ClubsPerTier} clubs, {seconds:0} s in all. Amounts are what a manager reads (minor units divided by 100); a season is {EconSim.Weeks} settlements, one on each matchday. Youth intake: {(youthPerClub == 0 ? "none" : $"{youthPerClub} players of 17-18 per computer club at each rollover")}. Player development speed: {trainingPercent}% of the rules'."));
+            $"{results.Count} seed(s) ({string.Join(", ", results.Select(result => result.Seed))}), {seasons} seasons, one country of {EconSim.Tiers} tiers of {EconSim.ClubsPerTier} clubs, {seconds:0} s in all. Amounts are what a manager reads (minor units divided by 100); a season is {EconSim.Matchdays} matchdays and {EconSim.RunsPerSeason} weekly runs. Youth intake: {(youthPerClub == 0 ? "none" : $"{youthPerClub} players of 17-18 per computer club at each rollover")}. Player development speed: {trainingPercent}% of the rules'."));
         text.AppendLine();
 
         var unbalanced = rows.Count(row => !row.Reconciled);
@@ -181,14 +181,14 @@ internal static class EconReport
         text.AppendLine();
         text.AppendLine("A fresh club of each tier: its season income at the opening fans and ground, the league and sponsor money, the prize for a mid-table place, and its opening cash.");
         text.AppendLine();
-        text.AppendLine("| Tier | Forecast income | League TV | Steady sponsor | Champion | 9th place | 18th place | Opening cash | Operating cost |");
+        text.AppendLine("| Tier | Forecast income | League TV | Steady sponsor | Champion | {EconSim.ClubsPerTier / 2}th place | {EconSim.ClubsPerTier}th place | Opening cash | Operating cost |");
         text.AppendLine("|---|---|---|---|---|---|---|---|---|");
 
         for (var tier = 1; tier <= 5; tier++)
         {
             text.AppendLine(string.Create(
                 Inv,
-                $"| {tier} | {Money(EconomyRuleSet.FreshClubForecastMinor(tier))} | {Money(EconomyRuleSet.LeagueTvSeasonMinorFor(tier))} | {Money(EconomyRuleSet.SponsorBaseSeasonMinorFor(tier))} | {Money(EconRules.Prize(tier, 1))} | {Money(EconRules.Prize(tier, 9))} | {Money(EconRules.Prize(tier, 18))} | {Money(EconRules.OpeningCash(tier))} | {Money(EconomyRuleSet.OperatingCostSeasonMinorFor(tier))} |"));
+                $"| {tier} | {Money(EconomyRuleSet.FreshClubForecastMinor(tier))} | {Money(EconomyRuleSet.LeagueTvSeasonMinorFor(tier))} | {Money(EconomyRuleSet.SponsorBaseSeasonMinorFor(tier))} | {Money(EconRules.Prize(tier, 1))} | {Money(EconRules.Prize(tier, EconSim.ClubsPerTier / 2))} | {Money(EconRules.Prize(tier, EconSim.ClubsPerTier))} | {Money(EconRules.OpeningCash(tier))} | {Money(EconomyRuleSet.OperatingCostSeasonMinorFor(tier))} |"));
         }
 
         text.AppendLine();
@@ -435,7 +435,7 @@ internal static class EconReport
 
         foreach (var result in results)
         {
-            foreach (var row in result.Sim.Rows.Where(row => row.Season < seasons && row.Tier < EconSim.Tiers && row.Rank > EconSim.ClubsPerTier - 3))
+            foreach (var row in result.Sim.Rows.Where(row => row.Season < seasons && row.Tier < EconSim.Tiers && row.Rank > EconSim.ClubsPerTier - WorldRuleSet.RelegatedPerTier))
             {
                 var next = result.Sim.Rows.FirstOrDefault(other => other.Season == row.Season + 1 && other.ClubIdx == row.ClubIdx);
 
@@ -606,10 +606,10 @@ internal static class EconReport
         text.AppendLine("- Real code, called as it is: the fans (count, mood, weekly review, the win/draw/loss curve), the stadium and structure rules, the economy rules (values, wages, league money, prize table, sponsor, objective, standing, budget, debt states), the player valuation, the renewal quote, daily training, retirements, the AI contract, market and finance policies, the squad, free-agent and emergency-replacement generators, promotion and relegation.");
         text.AppendLine("- Replaced: the match engine (a result is drawn from the fans' own curve of strength gap, then goals that fit it), the database, and the auction (the highest bid wins; a listing is open for at least one of three market rounds a matchday, about the game's 48 hours).");
         text.AppendLine("- Money moves once a matchday: league money, the sponsor's fixed part, wages, a third of a weekly run's shop takings, and a 34th of the season's operating cost and upkeep. Prize money, the sponsor's bonus and the standing step come at the end of the season; the parachute at the start of the next.");
-        text.AppendLine("- No injuries, suspensions, condition or morale from matches; every player is available every week; appearances for the renewal quote come from the rank in the squad (starter 30, bench 12, other 2).");
+        text.AppendLine("- No injuries, suspensions, condition or morale from matches; every player is available every week; appearances for the renewal quote come from the rank in the squad (a starter 30, the bench 12, the rest 2 of 34 matchdays, scaled to the season).");
         text.AppendLine("- Free agents: a weekly batch is generated and only the scripted managers bid on it, as in the game (FA-5). Released and expired players join the next batch at their value.");
         text.AppendLine("- The two spenders buy their stars straight from a computer club at 105% of his value (not a game rule), and are handed the fee if they cannot pay it (booked as a gift): it tests what the wages do to a club, not whether it can find the cash for a star. The trader knows every hidden ceiling (a perfect scout).");
-        text.AppendLine("- A club in the red bids on nothing and builds nothing; in administration the board lists the highest earners at 80% of their value, and a player nobody buys is released with his agent paying the club 30% of his value; a scripted manager still in administration a whole season (34 matchdays) later is dismissed and the club plays on as a computer club. A computer club in administration just keeps selling.");
+        text.AppendLine("- A club in the red bids on nothing and builds nothing; in administration the board lists the highest earners at 80% of their value, and a player nobody buys is released with his agent paying the club 30% of his value; a scripted manager still in administration a whole season later is dismissed and the club plays on as a computer club. A computer club in administration just keeps selling.");
         text.AppendLine("- The clean start is the plan's section 8, played by the sandbox at the start of season 4 on the tier-1 computer club with the most cash.");
         text.AppendLine("- Rankings and shares use the pooled club-seasons of all seeds.");
     }

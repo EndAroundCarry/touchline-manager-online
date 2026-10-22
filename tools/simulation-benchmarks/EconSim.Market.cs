@@ -31,7 +31,7 @@ internal sealed partial class EconSim
                     buyer.Cash -= listing.Leading.Value;
                     buyer.Books.FeesPaid += listing.Leading.Value;
                     Sign(buyer, listing, listing.Leading.Value);
-                    Transfers.Add(new TransferRecord(Season, Week, listing.Player.Ability, listing.Player.AgeIn(GameYear), listing.Player.Potential, listing.Leading.Value, 0, buyer.Tier, Pool: true, EconRules.Value(listing.Player.AbilityTenths, listing.Player.AgeIn(GameYear))));
+                    Transfers.Add(new TransferRecord(Season, WeekOfSeason, listing.Player.Ability, listing.Player.AgeIn(GameYear), listing.Player.Potential, listing.Leading.Value, 0, buyer.Tier, Pool: true, EconRules.Value(listing.Player.AbilityTenths, listing.Player.AgeIn(GameYear))));
                 }
             }
         }
@@ -39,7 +39,7 @@ internal sealed partial class EconSim
 
     private void OpenPool()
     {
-        var week = TrainingBase.AddDays(((Season - 1) * 238) + (Week * 7));
+        var week = TrainingBase.AddDays(((Season - 1) * 7 * WorldRuleSet.SeasonCycleWeeks) + (WeekOfSeason * 7));
         var contracted = Clubs.Sum(club => club.Squad.Count);
         var request = new FreeAgentBatchRequest(
             _seedText,
@@ -150,7 +150,7 @@ internal sealed partial class EconSim
             }
 
             seller.Squad.Remove(player);
-            Transfers.Add(new TransferRecord(Season, Week, player.Ability, player.AgeIn(GameYear), player.Potential, fee, seller.Tier, buyer.Tier, Pool: false, EconRules.Value(player.AbilityTenths, player.AgeIn(GameYear))));
+            Transfers.Add(new TransferRecord(Season, WeekOfSeason, player.Ability, player.AgeIn(GameYear), player.Potential, fee, seller.Tier, buyer.Tier, Pool: false, EconRules.Value(player.AbilityTenths, player.AgeIn(GameYear))));
             Sign(buyer, listing, fee);
         }
     }
@@ -368,7 +368,7 @@ internal sealed partial class EconSim
         buyer.Books.FeesPaid += bestFee;
         from.Books.FeesReceived += bestFee;
         from.Squad.Remove(best);
-        Transfers.Add(new TransferRecord(Season, Week, best.Ability, best.AgeIn(GameYear), best.Potential, bestFee, from.Tier, buyer.Tier, Pool: false, EconRules.Value(best.AbilityTenths, best.AgeIn(GameYear))));
+        Transfers.Add(new TransferRecord(Season, WeekOfSeason, best.Ability, best.AgeIn(GameYear), best.Potential, bestFee, from.Tier, buyer.Tier, Pool: false, EconRules.Value(best.AbilityTenths, best.AgeIn(GameYear))));
 
         best.Club = buyer;
         best.Wage = wage;

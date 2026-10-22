@@ -72,7 +72,7 @@ internal static class Growth
             }
         }
 
-        UpgradeBuildings(sim, club, reserve, repaysWithinSettlements: EconSim.Weeks / 2);
+        UpgradeBuildings(sim, club, reserve, repaysWithinSettlements: EconSim.Matchdays / 2);
     }
 
     /// <summary>What a place costs on average when they are built in the proportions the crowd asks for.</summary>
@@ -86,11 +86,11 @@ internal static class Growth
 
         if (club.SnackLevel < StructureRuleSet.MaxLevel)
         {
-            var gain = ((EconRules.SnackTakings(club.SnackLevel + 1, spectators, 0, club.Tier) - EconRules.SnackTakings(club.SnackLevel, spectators, 0, club.Tier)) * (EconSim.Weeks / 2))
-                - ((EconRules.Upkeep(club.SnackLevel + 1, club.Tier) - EconRules.Upkeep(club.SnackLevel, club.Tier)) * EconSim.Weeks);
+            var gain = ((EconRules.SnackTakings(club.SnackLevel + 1, spectators, 0, club.Tier) - EconRules.SnackTakings(club.SnackLevel, spectators, 0, club.Tier)) * (EconSim.Matchdays / 2))
+                - ((EconRules.Upkeep(club.SnackLevel + 1, club.Tier) - EconRules.Upkeep(club.SnackLevel, club.Tier)) * EconSim.RunsPerSeason);
             var cost = EconRules.UpgradeCost(club.SnackLevel + 1, club.Tier);
 
-            if (gain > 0 && cost <= gain * repaysWithinSettlements / EconSim.Weeks && club.Available - cost >= reserve)
+            if (gain > 0 && cost <= gain * repaysWithinSettlements / EconSim.Matchdays && club.Available - cost >= reserve)
             {
                 EconSim.UpgradeStructure(club, snackBar: true);
             }
@@ -98,11 +98,11 @@ internal static class Growth
 
         if (club.MerchLevel < StructureRuleSet.MaxLevel)
         {
-            var gain = ((EconRules.MerchTakings(club.MerchLevel + 1, club.Fans.Fans, word, club.Tier) - EconRules.MerchTakings(club.MerchLevel, club.Fans.Fans, word, club.Tier)) * EconSim.Weeks)
-                - ((EconRules.Upkeep(club.MerchLevel + 1, club.Tier) - EconRules.Upkeep(club.MerchLevel, club.Tier)) * EconSim.Weeks);
+            var gain = ((EconRules.MerchTakings(club.MerchLevel + 1, club.Fans.Fans, word, club.Tier) - EconRules.MerchTakings(club.MerchLevel, club.Fans.Fans, word, club.Tier)) * EconSim.RunsPerSeason)
+                - ((EconRules.Upkeep(club.MerchLevel + 1, club.Tier) - EconRules.Upkeep(club.MerchLevel, club.Tier)) * EconSim.RunsPerSeason);
             var cost = EconRules.UpgradeCost(club.MerchLevel + 1, club.Tier);
 
-            if (gain > 0 && cost <= gain * repaysWithinSettlements / EconSim.Weeks && club.Available - cost >= reserve)
+            if (gain > 0 && cost <= gain * repaysWithinSettlements / EconSim.Matchdays && club.Available - cost >= reserve)
             {
                 EconSim.UpgradeStructure(club, snackBar: false);
             }

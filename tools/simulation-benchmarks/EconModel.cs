@@ -38,7 +38,7 @@ internal sealed class SimPlayer
 
     public SimClub? Club { get; set; }
 
-    /// <summary>The wage for the season, paid in 34 equal parts.</summary>
+    /// <summary>The wage for the season, paid in an equal part on each matchday.</summary>
     public long Wage { get; set; }
 
     public int ContractEnd { get; set; }
@@ -175,7 +175,7 @@ internal sealed class SimClub
 
     public int SponsorStanding { get; set; }
 
-    /// <summary>The season income forecast the wage budget and the overdraft limit are set from: made at signing, refreshed after matchday 17.</summary>
+    /// <summary>The season income forecast the wage budget and the overdraft limit are set from: made at signing, refreshed at the half way of the season.</summary>
     public long Forecast { get; set; }
 
     public FinancialStateKind FinState { get; set; }

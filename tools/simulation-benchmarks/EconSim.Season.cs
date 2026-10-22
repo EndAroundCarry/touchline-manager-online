@@ -29,17 +29,19 @@ internal sealed partial class EconSim
     private void PickManagers()
     {
         // The scripted managers take the median club of their tier, so each starts as a typical club and not a favourite or a strugger.
-        Take(1, 9, new PrudentBuilder("Prudent builder"));
+        const int median = ClubsPerTier / 2;
+
+        Take(1, median, new PrudentBuilder("Prudent builder"));
 
         // Four dominant tier-1 clubs: the sandbox stands in for managers who build great squads, with a lead in strength the results are drawn from.
         Take(1, 3, new Dynasty());
         Take(1, 5, new Dynasty());
         Take(1, 7, new Dynasty());
-        Take(1, 12, new Dynasty());
-        Take(2, 9, new Trader());
-        Take(2, 10, new OverAmbitious());
-        Take(3, 9, new BigSpender("Tier-3 big spender", stars: 3));
-        Take(4, 9, new BigSpender("Tier-4 spender", stars: 1));
+        Take(1, median + 3, new Dynasty());
+        Take(2, median, new Trader());
+        Take(2, median + 1, new OverAmbitious());
+        Take(3, median, new BigSpender("Tier-3 big spender", stars: 3));
+        Take(4, median, new BigSpender("Tier-4 spender", stars: 1));
 
         void Take(int tier, int rank, EconManager manager)
         {

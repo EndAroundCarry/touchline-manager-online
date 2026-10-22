@@ -11,20 +11,33 @@ using Tactical11Manager.Domain.World.Generation;
 
 namespace Tactical11Manager.SimulationBenchmarks;
 
-// The economy sandbox (plan toasty-scott, Milestones 0 and 1): one country of four tiers of 18 clubs, ten seasons, in matchday steps.
+// The economy sandbox (plan toasty-scott, Milestones 0 and 1): one country of four tiers of clubs (WorldRuleSet.ClubsPerDivision), ten seasons, in matchday steps.
 //
 // It calls the game's own pure rule code (fans, stadium, structures, valuation, renewal quote, daily training, retirement, the AI contract, market and
 // finance policies, the sponsor, standing and debt rules, the generators, promotion and relegation) and replaces only what is not pure: the match engine
 // is replaced by the fans' own win/draw/loss curve (FanRuleSet, fitted to 1,800 tick-engine matches), the database by the classes in EconModel.cs, and
 // the auction by a highest-bid-wins round. The money formulas go through EconRules.
 //
-// One simulated week = one matchday. A matchday has three market rounds (a listing is open for at least one round, about the game's 48-hour minimum),
-// then the match, then the settlement of every club's money (league money, sponsor, wages, the shop, costs) and the fans' review.
+// One simulated step = one matchday, and the season is the game's own cycle (plan luminous-cosmos): WorldRuleSet.MatchdaysPerSeason matchday steps, three to
+// a week, and then the rollover week as one more step without a match. A step has three market rounds (a listing is open for at least one round, about
+// the game's 48-hour minimum), then the match, then the matchday's money (league money, sponsor, wages). The weekly run is the Sunday after every third
+// matchday and once more in the rollover week, WorldRuleSet.SeasonCycleWeeks times a season: the shop, the operating cost, the upkeep, the free-agent
+// batch and the fans' review.
 internal sealed partial class EconSim
 {
     public const int Tiers = 4;
-    public const int ClubsPerTier = 18;
-    public const int Weeks = 34;
+    public const int ClubsPerTier = WorldRuleSet.ClubsPerDivision;
+    public const int Matchdays = WorldRuleSet.MatchdaysPerSeason;
+
+    /// <summary>The weekly finance runs, free-agent batches and fan reviews of a season: one a week of the cycle, the last in the rollover week.</summary>
+    public const int RunsPerSeason = WorldRuleSet.SeasonCycleWeeks;
+
+    /// <summary>The matchdays between two weekly runs.</summary>
+    public const int MatchdaysPerRun = EconomyRuleSet.MatchdaysPerWeeklyRun;
+
+    /// <summary>The steps of a season: its matchdays, then the rollover week.</summary>
+    public const int Steps = Matchdays + 1;
+
     public const int Rounds = 3;
     public const int GameYearBase = 2030;
     public const int ReferenceTier = Tiers;
@@ -45,6 +58,11 @@ internal sealed partial class EconSim
 
     public EconSim(ulong seed, int seasons, int youthPerClub = EconSim.DefaultYouthPerAiClub, int trainingPercent = 100)
     {
+        if (Matchdays != (RunsPerSeason - 1) * MatchdaysPerRun)
+        {
+            throw new InvalidOperationException($"{Matchdays} matchdays do not fill {RunsPerSeason - 1} weeks of {MatchdaysPerRun}: the sandbox's weekly cadence needs a season cycle that does.");
+        }
+
         YouthPerClub = youthPerClub;
         TrainingPercent = trainingPercent;
         Seed = seed;
@@ -145,13 +163,26 @@ internal sealed partial class EconSim
 
     public int Season { get; private set; }
 
-    public int Week { get; private set; }
+    /// <summary>The step of the season, from 0: matchday Step + 1, and the last step is the rollover week.</summary>
+    public int Step { get; private set; }
+
+    /// <summary>The week of the season, from 0, as the weekly run counts it.</summary>
+    public int WeekOfSeason => Step / MatchdaysPerRun;
+
+    /// <summary>The step has a match.</summary>
+    private bool HasMatchday => Step < Matchdays;
+
+    /// <summary>The step opens a week: the free-agent batch is drawn.</summary>
+    private bool OpensWeek => Step % MatchdaysPerRun == 0;
+
+    /// <summary>The step ends with the Sunday weekly run: after every third matchday, and in the rollover week.</summary>
+    private bool RunsWeekly => !HasMatchday || (Step + 1) % MatchdaysPerRun == 0;
 
     public int RoundInWeek { get; private set; }
 
     public int GameYear => GameYearBase + Season - 1;
 
-    public int Round => ((((Season - 1) * Weeks) + Week) * Rounds) + RoundInWeek;
+    public int Round => ((((Season - 1) * Steps) + Step) * Rounds) + RoundInWeek;
 
     public List<SimClub> Clubs { get; } = [];
 
@@ -186,7 +217,7 @@ internal sealed partial class EconSim
     }
 
     public void Note(SimClub club, string text) =>
-        Log.Add(string.Create(CultureInfo.InvariantCulture, $"s{Season:00} w{Week + 1:00} {club.Name}: {text}"));
+        Log.Add(string.Create(CultureInfo.InvariantCulture, $"s{Season:00} w{WeekOfSeason + 1:00} {club.Name}: {text}"));
 
     public IEnumerable<SimClub> Tier(int tier) => Clubs.Where(club => club.Tier == tier);
 
@@ -196,16 +227,16 @@ internal sealed partial class EconSim
         {
             StartSeason();
 
-            for (Week = 0; Week < Weeks; Week++)
+            for (Step = 0; Step < Steps; Step++)
             {
-                RunWeek();
+                RunStep();
             }
 
             EndSeason();
         }
 
         Season = Seasons;
-        Week = Weeks - 1;
+        Step = Steps - 1;
     }
 
     // ---- the season -------------------------------------------------------------------------------------------------------------------
@@ -268,43 +299,59 @@ internal sealed partial class EconSim
         }
     }
 
-    private void RunWeek()
+    private void RunStep()
     {
         for (RoundInWeek = 0; RoundInWeek < Rounds; RoundInWeek++)
         {
             if (RoundInWeek == 0)
             {
-                TrainWeek();
-                ResolvePool();
-                OpenPool();
+                TrainStep();
+
+                if (OpensWeek)
+                {
+                    ResolvePool();
+                    OpenPool();
+                }
             }
 
             ResolveListings();
 
             foreach (var club in Clubs.Where(club => club.Managed))
             {
-                club.Manager!.Act(this, club, Week, RoundInWeek);
+                club.Manager!.Act(this, club, Step, RoundInWeek);
             }
 
             AiMarketRound();
         }
 
         RoundInWeek = Rounds - 1;
-        ComputeStrengths();
-        PlayMatchday();
+
+        if (HasMatchday)
+        {
+            ComputeStrengths();
+            PlayMatchday();
+        }
 
         foreach (var club in Clubs)
         {
-            SettleMatchday(club);
+            SettleStep(club);
         }
 
-        FanReview();
+        if (RunsWeekly)
+        {
+            FanReview();
+        }
+
+        if (!HasMatchday)
+        {
+            return;
+        }
 
         foreach (var club in Clubs)
         {
             if (club.Managed)
             {
-                club.Manager!.OnWeekEnd(this, club, Week);
+                club.Manager!.OnWeekEnd(this, club, Step);
             }
             else
             {
@@ -315,10 +362,11 @@ internal sealed partial class EconSim
 
     // ---- training ---------------------------------------------------------------------------------------------------------------------
 
-    private void TrainWeek()
+    private void TrainStep()
     {
-        var from = TrainingAgeCurve.TrainingDaysPerSeason * Week / Weeks;
-        var to = TrainingAgeCurve.TrainingDaysPerSeason * (Week + 1) / Weeks;
+        // The season's training days are spread over its matchdays; the rollover week has none left.
+        var from = HasMatchday ? TrainingAgeCurve.TrainingDaysPerSeason * Step / Matchdays : 0;
+        var to = HasMatchday ? TrainingAgeCurve.TrainingDaysPerSeason * (Step + 1) / Matchdays : 0;
 
         for (var day = from; day < to; day++)
         {
@@ -358,7 +406,7 @@ internal sealed partial class EconSim
                 (arr[i], arr[j]) = (arr[j], arr[i]);
             }
 
-            var weeks = new List<(SimClub, SimClub)>[Weeks];
+            var weeks = new List<(SimClub, SimClub)>[Matchdays];
             var half = arr.Count / 2;
 
             for (var round = 0; round < arr.Count - 1; round++)
@@ -393,7 +441,7 @@ internal sealed partial class EconSim
     {
         for (var tier = 1; tier <= Tiers; tier++)
         {
-            foreach (var (home, away) in _fixtures[tier][Week])
+            foreach (var (home, away) in _fixtures[tier][Step])
             {
                 Play(home, away);
             }
@@ -435,7 +483,7 @@ internal sealed partial class EconSim
             home.RecentFill.Dequeue();
         }
 
-        var fixtureId = MakeGuid(3, Season, (Week * 1000) + home.Idx);
+        var fixtureId = MakeGuid(3, Season, (Step * 1000) + home.Idx);
 
         home.Fans = FanRuleSet.AfterMatch(home.Fans, home.Tier, expectedHome, goalsHome, goalsAway, fixtureId, home.Guid, home.FirstSeason);
         away.Fans = FanRuleSet.AfterMatch(away.Fans, away.Tier, expectedAway, goalsAway, goalsHome, fixtureId, away.Guid, away.FirstSeason);
@@ -462,7 +510,7 @@ internal sealed partial class EconSim
             _seedText,
             "match",
             Season.ToString(CultureInfo.InvariantCulture),
-            Week.ToString(CultureInfo.InvariantCulture),
+            Step.ToString(CultureInfo.InvariantCulture),
             home.Idx.ToString(CultureInfo.InvariantCulture)));
 
         var trueGap = home.Strength - away.Strength;
@@ -501,42 +549,60 @@ internal sealed partial class EconSim
         return count - 1;
     }
 
-    // ---- the Sunday finance run and the fans' review -----------------------------------------------------------------------------------
+    // ---- the matchday's money, the Sunday finance run and the fans' review ----------------------------------------------------------
 
-    /// <summary>One matchday's settlement of a club's money: league money, the sponsor's fixed part, wages, the shop and the costs (plan section 2).</summary>
-    private void SettleMatchday(SimClub club)
+    /// <summary>
+    /// One step's settlement of a club's money (plan section 2). A matchday pays the league money, the sponsor's fixed part and the wages, each a
+    /// matchday's part of the season. The weekly run, the Sunday after every third matchday and the one in the rollover week, pays the shop, the
+    /// operating cost and the upkeep, each a run's part of the season.
+    /// </summary>
+    private void SettleStep(SimClub club)
     {
         var books = club.Books;
-        var tv = EconRules.TvPerMatchday(club.Tier);
-        var sponsor = club.HasSponsor ? EconomyRuleSet.PerMatchday(club.SponsorFixedSeason) : 0;
-        var merch = EconRules.MerchTakings(club.MerchLevel, club.Fans.Fans, FanMoods.WordFor(club.Fans.MoodBp), club.Tier);
 
-        club.Cash += tv + sponsor + merch;
-        books.Tv += tv;
-        books.Sponsor += sponsor;
-        books.Merch += merch;
-
-        var wages = club.WageBill / Weeks;
-        var operating = EconRules.OperatingPerMatchday(club.Tier);
-        var upkeep = EconRules.Upkeep(club.SnackLevel, club.Tier) + EconRules.Upkeep(club.MerchLevel, club.Tier) + EconRules.GroundUpkeepPerMatchday(club.Seats, club.Tier);
-
-        // Only the recurring costs may take a club below zero (plan section 6); the state machine reads the result.
-        club.Cash -= wages + operating + upkeep;
-        books.Wages += wages;
-        books.Operating += operating;
-        books.Upkeep += upkeep;
-
-        foreach (var player in club.Squad.Where(player => player.BoughtFee > 0))
+        if (HasMatchday)
         {
-            player.WagesSinceBought += player.Wage / Weeks;
+            var tv = EconRules.TvPerMatchday(club.Tier);
+            var sponsor = club.HasSponsor ? EconomyRuleSet.PerMatchday(club.SponsorFixedSeason) : 0;
+            var wages = club.WageBill / Matchdays;
+
+            club.Cash += tv + sponsor;
+            books.Tv += tv;
+            books.Sponsor += sponsor;
+            club.Cash -= wages;
+            books.Wages += wages;
+
+            foreach (var player in club.Squad.Where(player => player.BoughtFee > 0))
+            {
+                player.WagesSinceBought += player.Wage / Matchdays;
+            }
         }
 
-        if (Week == (Weeks / 2) - 1)
+        if (RunsWeekly)
         {
-            club.Forecast = ForecastSeasonIncome(club);
+            var merch = EconRules.MerchTakings(club.MerchLevel, club.Fans.Fans, FanMoods.WordFor(club.Fans.MoodBp), club.Tier);
+            var operating = EconRules.OperatingPerRun(club.Tier);
+            var upkeep = EconRules.Upkeep(club.SnackLevel, club.Tier) + EconRules.Upkeep(club.MerchLevel, club.Tier) + EconRules.GroundUpkeepPerRun(club.Seats, club.Tier);
+
+            club.Cash += merch;
+            books.Merch += merch;
+
+            // Only the recurring costs may take a club below zero (plan section 6); the state machine reads the result.
+            club.Cash -= operating + upkeep;
+            books.Operating += operating;
+            books.Upkeep += upkeep;
         }
 
-        ReadFinancialState(club);
+        if (HasMatchday)
+        {
+            if (Step == (Matchdays / 2) - 1)
+            {
+                club.Forecast = ForecastSeasonIncome(club);
+            }
+
+            ReadFinancialState(club);
+        }
+
         club.ShadowMin = Math.Min(club.ShadowMin, club.ShadowCash);
     }
 
@@ -554,7 +620,7 @@ internal sealed partial class EconSim
 
             foreach (var club in clubs)
             {
-                club.Fans = FanRuleSet.AfterWeek(club.Fans, places[club] - club.TargetRank, club.Played, Weeks);
+                club.Fans = FanRuleSet.AfterWeek(club.Fans, places[club] - club.TargetRank, club.Played, Matchdays);
             }
         }
     }
@@ -567,7 +633,7 @@ internal sealed partial class EconSim
 
     // ---- what a club can expect -------------------------------------------------------------------------------------------------------
 
-    /// <summary>A season's income on the club's present fans and ground: the league and sponsor money, the gate and snack bar of 17 home matches and the shop (plan section 5).</summary>
+    /// <summary>A season's income on the club's present fans and ground: the league and sponsor money, the gate and snack bar of the home matches and the shop (plan section 5).</summary>
     public static long ForecastSeasonIncome(SimClub club) => EconomyRuleSet.SeasonIncomeForecastMinor(
         club.Tier,
         club.HasSponsor ? club.SponsorFixedSeason : 0,
@@ -612,5 +678,9 @@ internal sealed partial class EconSim
         };
     }
 
-    public static int AppearancesFor(int rank) => rank < 11 ? 30 : rank < 18 ? 12 : 2;
+    /// <summary>The matchdays the first sandbox counted appearances in (a season of 18 clubs).</summary>
+    private const int ReferenceMatchdays = 34;
+
+    /// <summary>The appearances of the squad's rank-th best player: 30, 12 and 2 of 34 for a starter, the bench and the rest, kept as shares of the season.</summary>
+    public static int AppearancesFor(int rank) => ((Matchdays * (rank < 11 ? 30 : rank < 18 ? 12 : 2)) + (ReferenceMatchdays / 2)) / ReferenceMatchdays;
 }

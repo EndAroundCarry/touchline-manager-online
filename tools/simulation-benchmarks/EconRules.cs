@@ -7,9 +7,11 @@ using Tactical11Manager.Domain.World;
 namespace Tactical11Manager.SimulationBenchmarks;
 
 // The economy sandbox (plan toasty-scott, Milestone 1). Every money formula the sandbox needs goes through this one class, which reads the game's own
-// rules (EconomyRuleSet, StadiumRuleSet, StructureRuleSet, PlayerValuation, ContractRenewalQuote, FreeAgentTerms). All amounts are minor units. A season
-// is 34 settlements, one on each matchday: league money, the sponsor's fixed part and wages are paid in 34 equal parts, and the weekly run's items
-// (the shop, building upkeep) are paid a third of a weekly run on each matchday.
+// rules (EconomyRuleSet, StadiumRuleSet, StructureRuleSet, PlayerValuation, ContractRenewalQuote, FreeAgentTerms). All amounts are minor units. League
+// money, the sponsor's fixed part and wages are paid in one equal part on each matchday, and the weekly run's items (the shop, the operating cost and
+// the upkeep) once a week of the season cycle (EconSim.RunsPerSeason), a run's equal part of the season. The domain splits a season into runs by
+// its own 3 matchdays a run (EconomyRuleSet.PerWeeklyRun), which is 10 runs of a cycle that has 11: until the economy milestone of plan luminous-cosmos
+// corrects it, the sandbox splits by the real count so that the season's money is the season figure.
 //
 // The first version of the sandbox (Milestone 0) ran the rules of world-rules-v16 behind an interface; its baseline report is kept outside the repo. Those
 // rules were replaced by the v17 rules, so only the v17 rules run here.
@@ -48,20 +50,23 @@ internal static class EconRules
 
     public static long SnackTakings(int level, int spectators, int bonusBp, int tier) => StructureRuleSet.SnackTakingsMinorFor(level, spectators, bonusBp, tier);
 
-    /// <summary>The shop's takings for one matchday: a third of a weekly run's.</summary>
+    /// <summary>The shop's takings for one weekly run.</summary>
     public static long MerchTakings(int level, int fans, Tactical11Manager.Domain.Fans.FanMoodWord mood, int tier) =>
-        StructureRuleSet.MerchTakingsMinorFor(level, fans, mood, tier) / EconomyRuleSet.MatchdaysPerWeeklyRun;
+        StructureRuleSet.MerchTakingsMinorFor(level, fans, mood, tier);
 
-    /// <summary>A building's upkeep for one matchday.</summary>
-    public static long Upkeep(int level, int tier) => EconomyRuleSet.PerMatchday(StructureRuleSet.UpkeepSeasonMinorFor(level, tier));
+    /// <summary>A season's amount for one weekly run: an equal part of the cycle's runs.</summary>
+    public static long PerRun(long seasonMinor) => seasonMinor / EconSim.RunsPerSeason;
+
+    /// <summary>A building's upkeep for one weekly run.</summary>
+    public static long Upkeep(int level, int tier) => PerRun(StructureRuleSet.UpkeepSeasonMinorFor(level, tier));
 
     public static long UpgradeCost(int targetLevel, int tier) => StructureRuleSet.UpgradeCostMinorFor(targetLevel, tier);
 
     public static long TvPerMatchday(int tier) => EconomyRuleSet.PerMatchday(EconomyRuleSet.LeagueTvSeasonMinorFor(tier));
 
-    public static long OperatingPerMatchday(int tier) => EconomyRuleSet.PerMatchday(EconomyRuleSet.OperatingCostSeasonMinorFor(tier));
+    public static long OperatingPerRun(int tier) => PerRun(EconomyRuleSet.OperatingCostSeasonMinorFor(tier));
 
-    public static long GroundUpkeepPerMatchday(StadiumSeats seats, int tier) => EconomyRuleSet.PerMatchday(StadiumRuleSet.GroundUpkeepSeasonMinorFor(seats, tier));
+    public static long GroundUpkeepPerRun(StadiumSeats seats, int tier) => PerRun(StadiumRuleSet.GroundUpkeepSeasonMinorFor(seats, tier));
 
     public static long Prize(int tier, int rank) => EconomyRuleSet.PrizeMinorFor(tier, rank);
 }
