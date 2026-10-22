@@ -45,6 +45,10 @@ public static class LedgerEntryText
             LedgerPostings.OperatingCostTemplate => "Weekly operating cost",
             LedgerPostings.LeagueTvTemplate => "League television money",
             LedgerPostings.SponsorMatchdayTemplate => "Sponsor payment",
+            LedgerPostings.SponsorBackPayTemplate =>
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Sponsor payment for the {Number(parameters, "matchdays")} matchday(s) already played"),
             LedgerPostings.MatchdayWagesTemplate =>
                 string.Create(CultureInfo.InvariantCulture, $"Matchday player wages ({Number(parameters, "playerCount")} players)"),
             LedgerPostings.SponsorBonusTemplate =>

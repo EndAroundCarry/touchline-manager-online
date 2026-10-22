@@ -77,6 +77,15 @@ public static class AiMatchPlanPolicy
     /// <summary>Bold: protects from the 75th minute, chases from the 60th, and steps two places towards attack.</summary>
     private static readonly Profile BoldProfile = new(75, 85, 60, 82, 1, 2, PositionFamily.Midfield);
 
+    /// <summary>The temperament a club plays by: the first draw of its match plan, so every module that reads it agrees.</summary>
+    /// <param name="clubId">The club, which is the seed's identity.</param>
+    public static AiTemperament TemperamentOf(Guid clubId)
+    {
+        var draws = new Pcg32(DeterministicDigest.SeedOf(AiPolicyVersions.MatchPlanVersion, clubId.ToString("D")));
+
+        return Enum.GetValues<AiTemperament>()[draws.NextInt(Enum.GetValues<AiTemperament>().Length)];
+    }
+
     /// <summary>Decides a club's match instructions.</summary>
     /// <param name="clubId">The club, which is the seed's identity.</param>
     /// <param name="formation">The shape the club starts from, which decides how it settles down when a player is sent off.</param>
@@ -85,8 +94,7 @@ public static class AiMatchPlanPolicy
     {
         ArgumentNullException.ThrowIfNull(instructions);
 
-        var draws = new Pcg32(DeterministicDigest.SeedOf(AiPolicyVersions.MatchPlanVersion, clubId.ToString("D")));
-        var temperament = Enum.GetValues<AiTemperament>()[draws.NextInt(Enum.GetValues<AiTemperament>().Length)];
+        var temperament = TemperamentOf(clubId);
 
         var profile = temperament switch
         {

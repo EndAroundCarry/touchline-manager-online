@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Domain.Comms;
+using Tactical11Manager.Domain.Finance;
 
 namespace Tactical11Manager.Application.Finance;
 
@@ -37,6 +38,21 @@ public static class FinanceInboxTemplates
 
     /// <summary>The manager was dismissed after the club stayed in administration (`DEBT-5`).</summary>
     public const string ManagerDismissed = "inbox.finance.manager_dismissed";
+
+    /// <summary>The season's sponsors made their offers and the manager has until the deadline to choose (`SPN-4`).</summary>
+    public const string SponsorOffersReady = "inbox.finance.sponsor_offers_ready";
+
+    /// <summary>The deadline passed and the board signed a deal for the club (`SPN-4`).</summary>
+    public const string SponsorSignedByBoard = "inbox.finance.sponsor_signed_by_board";
+
+    /// <summary>The season ended and the club met its objective (`OBJ-4`).</summary>
+    public const string ObjectiveMet = "inbox.finance.objective_met";
+
+    /// <summary>The season ended and the club finished three or more places better than its objective (`OBJ-4`).</summary>
+    public const string ObjectiveExceeded = "inbox.finance.objective_exceeded";
+
+    /// <summary>The season ended and the club missed its objective (`OBJ-4`).</summary>
+    public const string ObjectiveMissed = "inbox.finance.objective_missed";
 
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
@@ -89,6 +105,37 @@ public static class FinanceInboxTemplates
     public static InboxDraft ManagerDismissedMessage(string clubName, int matchdays) =>
         Write(ManagerDismissed, new DismissedParameters(clubName, matchdays), relatedEntityId: null);
 
+    /// <summary>Builds the message the sponsors' offers produce.</summary>
+    /// <param name="deadline">When the board signs for the club if the manager has not.</param>
+    /// <param name="realisticObjective">The code of the objective the board thinks fits the squad.</param>
+    public static InboxDraft SponsorOffersReadyMessage(DateTimeOffset deadline, string realisticObjective) =>
+        Write(SponsorOffersReady, new OffersReadyParameters(deadline, realisticObjective), relatedEntityId: null);
+
+    /// <summary>Builds the message the board's signing produces.</summary>
+    /// <param name="sponsorName">The sponsor.</param>
+    /// <param name="offer">The code of the offer signed.</param>
+    /// <param name="objective">The code of the objective chosen.</param>
+    /// <param name="fixedSeasonMinor">What the deal pays over the season whatever happens.</param>
+    public static InboxDraft SponsorSignedByBoardMessage(string sponsorName, string offer, string objective, long fixedSeasonMinor) =>
+        Write(SponsorSignedByBoard, new SignedParameters(sponsorName, offer, objective, fixedSeasonMinor), relatedEntityId: null);
+
+    /// <summary>Builds the message a settled objective produces.</summary>
+    /// <param name="outcome">How the season turned out.</param>
+    /// <param name="objective">The code of the objective the club chose.</param>
+    /// <param name="targetPlace">The place it asked for.</param>
+    /// <param name="finalPlace">The place the club finished in.</param>
+    /// <param name="bonusMinor">The bonus the sponsor paid.</param>
+    public static InboxDraft ObjectiveSettledMessage(ObjectiveOutcome outcome, string objective, int targetPlace, int finalPlace, long bonusMinor) =>
+        Write(
+            outcome switch
+            {
+                ObjectiveOutcome.Exceeded => ObjectiveExceeded,
+                ObjectiveOutcome.Met => ObjectiveMet,
+                _ => ObjectiveMissed,
+            },
+            new ObjectiveParameters(objective, targetPlace, finalPlace, bonusMinor),
+            relatedEntityId: null);
+
     /// <summary>Reads a stored parameter document back.</summary>
     internal static TParameters Read<TParameters>(string parametersJson) =>
         JsonSerializer.Deserialize<TParameters>(parametersJson, Options)
@@ -107,6 +154,12 @@ public static class FinanceInboxTemplates
     internal sealed record BidWithdrawnParameters(string PlayerName, long AmountMinor);
 
     internal sealed record DismissedParameters(string ClubName, int Matchdays);
+
+    internal sealed record OffersReadyParameters(DateTimeOffset Deadline, string RealisticObjective);
+
+    internal sealed record SignedParameters(string SponsorName, string Offer, string Objective, long FixedSeasonMinor);
+
+    internal sealed record ObjectiveParameters(string Objective, int TargetPlace, int FinalPlace, long BonusMinor);
 
     private static InboxDraft Write<TParameters>(string templateKey, TParameters parameters, Guid? relatedEntityId) =>
         new(

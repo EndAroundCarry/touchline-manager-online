@@ -153,6 +153,123 @@ public sealed class FinanceTests : IAsyncLifetime
         (await CodeAsync(ledger)).Should().Be(SquadErrorCodes.NoClub);
     }
 
+    [Fact]
+    public async Task A_manager_reads_the_sponsor_offers_of_the_club_they_took_over()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var response = await client.GetAsync("/api/v1/finances/sponsor");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var sponsor = await response.Content.ReadFromJsonAsync<SponsorResponse>();
+
+        sponsor.Should().NotBeNull();
+        sponsor!.Offers.Select(offer => offer.Kind).Should().Equal("steady", "balanced", "performance");
+        sponsor.Offers.Should().OnlyContain(offer => offer.FixedSeasonMinor > 0 && offer.Objectives.Count == 6);
+        sponsor.Offers.Select(offer => offer.SponsorName).Distinct().Should().HaveCount(3);
+        sponsor.Offers.All(offer => offer.Objectives[0].BonusMetMinor >= offer.Objectives[5].BonusMetMinor).Should().BeTrue(
+            "a harder objective pays more (OBJ-2)");
+
+        // The club is the world's first free one, which another test in this collection may already have signed for as a manager.
+        sponsor.Deal.Should().NotBeNull("the computer signed it before any manager arrived");
+        sponsor.Deal!.SignedBy.Should().BeOneOf("ai", "manager");
+        sponsor.Version.Should().BeGreaterThanOrEqualTo(1);
+        sponsor.Deadline.Should().BeAfter(sponsor.ServerTime.AddDays(-400));
+        response.Headers.ETag!.Tag.Should().Be($"\"{sponsor.Version}\"");
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task A_new_manager_signs_another_offer_once_and_the_version_guards_the_request()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await OnboardAsync(client);
+
+        var body = new SignSponsorRequest("performance", "top_three");
+
+        (await SignAsync(client, body, ifMatch: null)).StatusCode.Should().Be(HttpStatusCode.PreconditionRequired);
+
+        var stale = await SignAsync(client, body, "\"9\"");
+
+        stale.StatusCode.Should().Be(HttpStatusCode.PreconditionFailed);
+
+        var unknownOffer = await SignAsync(client, new SignSponsorRequest("generous", "top_three"), "\"1\"");
+
+        unknownOffer.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeAsync(unknownOffer)).Should().Be(SponsorErrorCodes.UnknownOffer);
+
+        var unknownObjective = await SignAsync(client, new SignSponsorRequest("steady", "world_cup"), "\"1\"");
+
+        unknownObjective.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeAsync(unknownObjective)).Should().Be(SponsorErrorCodes.UnknownObjective);
+
+        var signed = await SignAsync(client, body, "\"1\"");
+
+        signed.StatusCode.Should().Be(HttpStatusCode.OK);
+        signed.Headers.ETag!.Tag.Should().Be("\"2\"");
+
+        var sponsor = await signed.Content.ReadFromJsonAsync<SponsorResponse>();
+
+        sponsor!.Deal!.Kind.Should().Be("performance");
+        sponsor.Deal.Objective.Should().Be("top_three");
+        sponsor.Deal.SignedBy.Should().Be("manager");
+        sponsor.CanSign.Should().BeFalse("this manager has signed; the deal is the deal");
+
+        var again = await SignAsync(client, new SignSponsorRequest("steady", "stay_up"), "\"2\"");
+
+        again.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeAsync(again)).Should().Be(SponsorErrorCodes.AlreadySigned);
+
+        await client.PostAsync("/api/v1/club-tenure/resign", content: null);
+    }
+
+    [Fact]
+    public async Task A_manager_with_no_club_cannot_read_or_sign_a_sponsor()
+    {
+        using var client = CreateClient();
+        var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);
+
+        client.WithBearer(manager.AccessToken);
+
+        await client.PostAsJsonAsync(
+            "/api/v1/manager-profile",
+            new { locale = "en-GB", timeZone = "Europe/London" });
+
+        var read = await client.GetAsync("/api/v1/finances/sponsor");
+        var sign = await SignAsync(client, new SignSponsorRequest("steady", "stay_up"), "\"0\"");
+
+        read.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await CodeAsync(read)).Should().Be(SquadErrorCodes.NoClub);
+        sign.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await CodeAsync(sign)).Should().Be(SquadErrorCodes.NoClub);
+    }
+
+    private static Task<HttpResponseMessage> SignAsync(HttpClient client, SignSponsorRequest body, string? ifMatch)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/finances/sponsor")
+        {
+            Content = JsonContent.Create(body),
+        };
+
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        return client.SendAsync(request);
+    }
+
     private HttpClient CreateClient() => _fixture.Factory.CreateClient(new WebApplicationFactoryClientOptions
     {
         HandleCookies = false,

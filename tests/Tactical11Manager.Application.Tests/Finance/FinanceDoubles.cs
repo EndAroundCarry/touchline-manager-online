@@ -295,8 +295,14 @@ internal static class FinanceDoubles
         }
     }
 
-    public sealed class RecordingSponsorRepository(params ClubSponsorDeal[] deals) : ISponsorRepository
+    public sealed class RecordingSponsorRepository : ISponsorRepository
     {
+        public RecordingSponsorRepository(params ClubSponsorDeal[] deals) => Deals.AddRange(deals);
+
+        public List<ClubSponsorDeal> Deals { get; } = [];
+
+        public List<ClubSponsorOffer> Offers { get; } = [];
+
         public List<ClubStandingEvent> Steps { get; } = [];
 
         public Task<IReadOnlyList<ClubSponsorDeal>> LoadDealsAsync(
@@ -304,7 +310,18 @@ internal static class FinanceDoubles
             IReadOnlyCollection<Guid> clubIds,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ClubSponsorDeal>>(
-                [.. deals.Where(deal => deal.SeasonId == seasonId && clubIds.Contains(deal.ClubId))]);
+                [.. Deals.Where(deal => deal.SeasonId == seasonId && clubIds.Contains(deal.ClubId))]);
+
+        public Task<ClubSponsorDeal?> FindDealAsync(Guid clubId, Guid seasonId, CancellationToken cancellationToken) =>
+            Task.FromResult(Deals.FirstOrDefault(deal => deal.ClubId == clubId && deal.SeasonId == seasonId));
+
+        public Task<IReadOnlyList<ClubSponsorOffer>> ListOffersAsync(Guid clubId, Guid seasonId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ClubSponsorOffer>>(
+                [.. Offers.Where(offer => offer.ClubId == clubId && offer.SeasonId == seasonId).OrderBy(offer => offer.Kind)]);
+
+        public void AddOffers(IEnumerable<ClubSponsorOffer> offers) => Offers.AddRange(offers);
+
+        public void AddDeal(ClubSponsorDeal deal) => Deals.Add(deal);
 
         public void AddStandingEvent(ClubStandingEvent standingEvent) => Steps.Add(standingEvent);
     }

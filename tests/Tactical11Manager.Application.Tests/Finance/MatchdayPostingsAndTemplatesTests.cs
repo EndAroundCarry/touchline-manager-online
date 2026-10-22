@@ -74,6 +74,7 @@ public sealed class MatchdayPostingsAndTemplatesTests
     [InlineData("parachute")]
     [InlineData("ground_upkeep")]
     [InlineData("release_fee")]
+    [InlineData("sponsor_back_pay")]
     public void Every_new_ledger_template_renders_without_the_amount(string name)
     {
         var template = $"finance.{name}";
@@ -97,6 +98,40 @@ public sealed class MatchdayPostingsAndTemplatesTests
             .Should().Contain("D. Back").And.Contain("wages");
         Render(FinanceInboxTemplates.ManagerDismissedMessage("Northgate United", 34)).Title
             .Should().Be("You were dismissed by Northgate United");
+    }
+
+    [Fact]
+    public void The_sponsor_back_pay_is_a_sponsor_credit_keyed_by_the_deal()
+    {
+        var dealId = Guid.CreateVersion7();
+        var posting = LedgerPostings.SponsorBackPay(Guid.CreateVersion7(), Guid.CreateVersion7(), dealId, 3, 90_000);
+
+        posting.Category.Should().Be(LedgerCategory.SponsorMatchday);
+        posting.CashDeltaMinor.Should().Be(90_000);
+        posting.CorrelationId.Should().Be($"sponsor-signing:{dealId:N}");
+        LedgerEntryText.Render(posting.DescriptionTemplate, posting.DescriptionParametersJson)
+            .Should().Contain("3 matchday").And.NotContain("90000");
+    }
+
+    [Fact]
+    public void The_sponsor_messages_render_in_plain_words()
+    {
+        var deadline = new DateTimeOffset(2026, 10, 14, 17, 30, 0, TimeSpan.Zero);
+
+        var offers = Render(FinanceInboxTemplates.SponsorOffersReadyMessage(deadline, "top_six"));
+        offers.Title.Should().Be("Your sponsors have made their offers");
+        offers.Body.Should().Contain("14 October 2026 17:30 UTC").And.Contain("finish in the top six");
+
+        var board = Render(FinanceInboxTemplates.SponsorSignedByBoardMessage("Northgate Energy", "balanced", "top_half", 3_000_000));
+        board.Title.Should().Be("The board signed your sponsor");
+        board.Body.Should().Contain("Northgate Energy").And.Contain("balanced").And.Contain("3,000,000").And.Contain("finish in the top half");
+
+        Render(FinanceInboxTemplates.ObjectiveSettledMessage(ObjectiveOutcome.Exceeded, "top_three", 3, 1, 2_000_000)).Body
+            .Should().Contain("1st").And.Contain("2,000,000");
+        Render(FinanceInboxTemplates.ObjectiveSettledMessage(ObjectiveOutcome.Met, "top_three", 3, 3, 1_000_000)).Title
+            .Should().Be("The season's objective was met");
+        Render(FinanceInboxTemplates.ObjectiveSettledMessage(ObjectiveOutcome.Missed, "win_league", 1, 4, 0)).Body
+            .Should().Contain("4th").And.Contain("no bonus");
     }
 
     [Fact]

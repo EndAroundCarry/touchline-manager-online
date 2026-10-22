@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IJobHandler, PublishMatchdayJobHandler>();
         services.AddScoped<IJobHandler, RebuildDivisionProjectionsJobHandler>();
         services.AddScoped<IJobHandler, WeeklyFinanceRunJobHandler>();
+        services.AddScoped<IJobHandler, SignSponsorDealsJobHandler>();
         services.AddScoped<IJobHandler, WeeklyFanReviewJobHandler>();
         services.AddScoped<IJobHandler, RunFreeAgentBatchJobHandler>();
         services.AddScoped<IJobHandler, ResolveAuctionJobHandler>();
@@ -115,6 +116,7 @@ public static class DependencyInjection
 
         services.AddScoped<ICalendarEventSource, MatchCalendarSource>();
         services.AddScoped<ICalendarEventSource, FinanceCalendarSource>();
+        services.AddScoped<ICalendarEventSource, SponsorCalendarSource>();
         services.AddScoped<ICalendarEventSource, InjuryCalendarSource>();
     }
 
@@ -176,6 +178,12 @@ public static class DependencyInjection
         services.AddScoped<MatchdayFinances>();
         services.AddScoped<RunWeeklyFinance>();
         services.AddScoped<SettleSeasonFinances>();
+        services.AddScoped<SponsorSeasonOpener>();
+        services.AddScoped<SponsorSigning>();
+        services.AddScoped<SponsorComposer>();
+        services.AddScoped<GetSponsorOffers>();
+        services.AddScoped<SignSponsorDeal>();
+        services.AddScoped<SignDueSponsorDeals>();
         services.AddScoped<GetFinanceSummary>();
         services.AddScoped<GetFinanceLedger>();
 

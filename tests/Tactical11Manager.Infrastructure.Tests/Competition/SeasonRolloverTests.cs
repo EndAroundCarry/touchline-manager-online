@@ -13,6 +13,7 @@ using Tactical11Manager.Domain.Auth;
 using Tactical11Manager.Domain.Comms;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Fans;
+using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -315,6 +316,27 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             steps.Where(step => step.FinalPlace == 1)
                 .Should()
                 .OnlyContain(step => step.AfterCentis > step.BeforeCentis, "a champion gains standing");
+
+            // The closing season's sponsor deals are settled against the final table, and the next season's sponsors have made their
+            // offers; a computer club has already signed, and a club a manager holds waits for the manager's choice (SPN-1, SPN-4, OBJ-4).
+            (await db.SponsorDeals.CountAsync(deal => deal.SeasonId == seasonId && deal.Outcome != null))
+                .Should()
+                .Be(126, "every closing club's objective was settled");
+
+            var nextSeasonId = await db.Seasons
+                .Where(candidate => candidate.WorldId == _fixture.WorldId && candidate.SequenceNumber == 2)
+                .Select(candidate => candidate.Id)
+                .SingleAsync();
+
+            var managedClubs = await db.ClubTenures.CountAsync(tenure => tenure.EndedAt == null);
+
+            (await db.SponsorOffers.CountAsync(offer => offer.SeasonId == nextSeasonId)).Should().Be(126 * 3);
+            (await db.SponsorDeals.CountAsync(deal => deal.SeasonId == nextSeasonId && deal.SignedBy == SponsorSigner.Ai))
+                .Should()
+                .Be(126 - managedClubs, "a computer club signs at once");
+            (await db.InboxMessages.CountAsync(message => message.TemplateKey == FinanceInboxTemplates.SponsorOffersReady))
+                .Should()
+                .Be(managedClubs, "each manager is told what is on offer");
 
             // The clubs are unmanaged, so the AI renewed their expiring contracts (CON-6).
             (await db.PlayerContracts.CountAsync(contract =>

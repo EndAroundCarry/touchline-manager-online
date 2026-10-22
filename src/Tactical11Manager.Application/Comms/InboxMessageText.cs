@@ -98,6 +98,14 @@ public static class InboxMessageText
                 FinanceInboxTemplates.Read<FinanceInboxTemplates.BidWithdrawnParameters>(parametersJson)),
             FinanceInboxTemplates.ManagerDismissed => Dismissed(
                 FinanceInboxTemplates.Read<FinanceInboxTemplates.DismissedParameters>(parametersJson)),
+            FinanceInboxTemplates.SponsorOffersReady => OffersReady(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.OffersReadyParameters>(parametersJson)),
+            FinanceInboxTemplates.SponsorSignedByBoard => SignedByBoard(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.SignedParameters>(parametersJson)),
+            FinanceInboxTemplates.ObjectiveMet or FinanceInboxTemplates.ObjectiveExceeded or FinanceInboxTemplates.ObjectiveMissed =>
+                ObjectiveSettled(
+                    templateKey,
+                    FinanceInboxTemplates.Read<FinanceInboxTemplates.ObjectiveParameters>(parametersJson)),
             _ => throw new InvalidOperationException($"'{templateKey}' is not an inbox template this build renders."),
         };
     }
@@ -147,6 +155,47 @@ public static class InboxMessageText
             $"You were dismissed by {parameters.ClubName}",
             $"{parameters.ClubName} stayed in administration for {Matchdays(parameters.Matchdays)}, so the board dismissed you. "
             + "The club is AI-controlled again, and you may take over another club after a short wait.");
+
+    private static InboxText OffersReady(FinanceInboxTemplates.OffersReadyParameters parameters) =>
+        new(
+            "Your sponsors have made their offers",
+            "Three sponsors want to put their name on the club this season. Choose one and an objective on the sponsor page before "
+            + $"{parameters.Deadline.UtcDateTime.ToString("d MMMM yyyy HH:mm", CultureInfo.InvariantCulture)} UTC. "
+            + $"If you do not, the board signs the balanced offer and aims to {ObjectiveWords(parameters.RealisticObjective)}.");
+
+    private static InboxText SignedByBoard(FinanceInboxTemplates.SignedParameters parameters) =>
+        new(
+            "The board signed your sponsor",
+            $"You did not choose a sponsor in time, so the board signed {parameters.SponsorName}'s {parameters.Offer} offer, worth "
+            + $"{Money(parameters.FixedSeasonMinor)} over the season, and set the objective to {ObjectiveWords(parameters.Objective)}.");
+
+    private static InboxText ObjectiveSettled(string templateKey, FinanceInboxTemplates.ObjectiveParameters parameters)
+    {
+        var goal = $"{ObjectiveWords(parameters.Objective)} (place {parameters.TargetPlace})";
+
+        return templateKey switch
+        {
+            FinanceInboxTemplates.ObjectiveExceeded => new InboxText(
+                "The season's objective was exceeded",
+                $"The board asked you to {goal} and you finished {Ordinal(parameters.FinalPlace)}. The sponsor paid a bonus of {Money(parameters.BonusMinor)}."),
+            FinanceInboxTemplates.ObjectiveMet => new InboxText(
+                "The season's objective was met",
+                $"The board asked you to {goal} and you finished {Ordinal(parameters.FinalPlace)}. The sponsor paid a bonus of {Money(parameters.BonusMinor)}."),
+            _ => new InboxText(
+                "The season's objective was missed",
+                $"The board asked you to {goal} but you finished {Ordinal(parameters.FinalPlace)}, so the sponsor paid no bonus."),
+        };
+    }
+
+    private static string ObjectiveWords(string code) => code switch
+    {
+        "win_league" => "win the league",
+        "top_three" => "finish in the top three",
+        "top_six" => "finish in the top six",
+        "top_half" => "finish in the top half",
+        "twelfth" => "finish 12th or better",
+        _ => "stay up",
+    };
 
     private static string Matchdays(int count) => count == 1 ? "1 matchday" : $"{count} matchdays";
 

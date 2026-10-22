@@ -85,6 +85,9 @@ public static class LedgerPostings
     /// <summary>The template that describes a matchday's share of the sponsor's fixed payment (`SPN-3`).</summary>
     public const string SponsorMatchdayTemplate = "finance.sponsor_matchday";
 
+    /// <summary>The template that describes the sponsor's payment for the matchdays played before a deal was signed (`SPN-3`).</summary>
+    public const string SponsorBackPayTemplate = "finance.sponsor_back_pay";
+
     /// <summary>The template that describes a matchday's player wages (`FIN-7`).</summary>
     public const string MatchdayWagesTemplate = "finance.matchday_wages";
 
@@ -678,6 +681,32 @@ public static class LedgerPostings
             MatchdayMoneyCorrelationId(matchdayId, clubId),
             SponsorMatchdayTemplate,
             Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>Builds the posting that pays the sponsor's fixed part for the matchdays already played when a deal is signed (`SPN-3`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club credited.</param>
+    /// <param name="dealId">The deal, which the key and the source name.</param>
+    /// <param name="matchdays">How many matchdays the payment covers.</param>
+    /// <param name="amountMinor">The credit, in minor units.</param>
+    /// <remarks>
+    /// The matchdays it pays for are matchdays, so the source is the matchday workflow, named by the deal that is paying them. The key is the
+    /// deal, so a retried signing collides with its first payment (`FIN-17`).
+    /// </remarks>
+    public static LedgerPosting SponsorBackPay(Guid entryId, Guid clubId, Guid dealId, int matchdays, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.SponsorMatchday,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Matchday,
+            SourceId: dealId,
+            $"sponsor-signing:{dealId:N}",
+            SponsorBackPayTemplate,
+            Parameters(("amountMinor", amountMinor), ("matchdays", matchdays)));
     }
 
     /// <summary>Builds the posting a matchday's player wages make (`FIN-7`).</summary>

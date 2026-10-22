@@ -672,6 +672,13 @@ public sealed class MatchdayWorkflowTests
             .ToListAsync();
 
         clubIds.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
+        var sponsor = await readDb.LedgerEntries
+            .Where(entry => entry.Category == LedgerCategory.SponsorMatchday && entry.SourceId == matchdayId)
+            .ToListAsync();
+
+        sponsor.Select(entry => entry.ClubId).Should().BeEquivalentTo(
+            clubIds,
+            "every club signed its sponsor when the world was seeded, so each is paid its fixed part (SPN-3)");
         television.Select(entry => entry.ClubId).Should().BeEquivalentTo(clubIds, "every club of the division is paid, home or away (FIN-4)");
         wages.Select(entry => entry.ClubId).Should().BeEquivalentTo(clubIds, "every club of the division pays its wages (FIN-7)");
         television.Should().OnlyContain(entry => entry.CashDeltaMinor > 0 && entry.SourceType == LedgerSourceType.Matchday);

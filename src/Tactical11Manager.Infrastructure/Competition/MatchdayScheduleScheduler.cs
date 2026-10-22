@@ -7,6 +7,7 @@ using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Jobs;
 using Tactical11Manager.Application.Jobs;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Infrastructure.Persistence;
 using Tactical11Manager.Infrastructure.Persistence.Repositories;
 
@@ -130,6 +131,8 @@ internal sealed partial class MatchdayScheduleScheduler : BackgroundService, IJo
             select new
             {
                 matchday.Id,
+                matchday.DivisionSeasonId,
+                matchday.RoundNumber,
                 matchday.LockAt,
                 matchday.KickoffAt,
                 matchday.PublicationStatus,
@@ -157,6 +160,20 @@ internal sealed partial class MatchdayScheduleScheduler : BackgroundService, IJo
                     DueAt(round.KickoffAt, now),
                     round.Id,
                     cancellationToken) ? 1 : 0;
+
+                // The sponsor deadline is the fourth round's lock: the board signs for the managers who have not (SPN-4).
+                if (round.RoundNumber == SponsorDeadline.Round)
+                {
+                    inserted += await queue.EnqueueAsync(
+                        new JobEnqueueRequest
+                        {
+                            JobType = SponsorJobTypes.SignDeals,
+                            BusinessKey = SponsorJobTypes.SignDealsKey(round.DivisionSeasonId),
+                            DueAt = DueAt(round.LockAt, now),
+                            PayloadJson = SponsorJobTypes.PayloadFor(round.DivisionSeasonId),
+                        },
+                        cancellationToken) ? 1 : 0;
+                }
 
                 continue;
             }

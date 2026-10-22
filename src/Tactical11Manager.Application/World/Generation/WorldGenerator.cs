@@ -4,8 +4,10 @@ using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Generation;
 using Tactical11Manager.Domain.World;
 using Tactical11Manager.Domain.World.Generation;
@@ -81,6 +83,7 @@ public sealed class WorldGenerator
     private readonly IClubAccountRepository _accounts;
     private readonly ILedgerRepository _ledger;
     private readonly FanBaseKeeper _fans;
+    private readonly SponsorSeasonOpener _sponsors;
     private readonly DivisionScheduleGenerator _schedules;
 
     /// <summary>Initializes the generator.</summary>
@@ -93,6 +96,7 @@ public sealed class WorldGenerator
         IClubAccountRepository accounts,
         ILedgerRepository ledger,
         FanBaseKeeper fans,
+        SponsorSeasonOpener sponsors,
         DivisionScheduleGenerator schedules)
     {
         _world = world;
@@ -103,6 +107,7 @@ public sealed class WorldGenerator
         _accounts = accounts;
         _ledger = ledger;
         _fans = fans;
+        _sponsors = sponsors;
         _schedules = schedules;
     }
 
@@ -163,19 +168,22 @@ public sealed class WorldGenerator
         var clubIds = new List<Guid>(identities.Count);
         var players = 0;
         var accounts = 0;
+        var openings = new List<(Guid ClubId, int Fans, int Standing, int Strength)>(identities.Count);
 
         foreach (var identity in identities)
         {
             var clubId = Guid.CreateVersion7();
 
-            _clubs.Add(Club.Generate(
+            var club = Club.Generate(
                 clubId,
                 country.WorldId,
                 country.Id,
                 identity,
                 tier,
                 season.GameYear,
-                now));
+                now);
+
+            _clubs.Add(club);
 
             // Every club opens with the same ground, whatever its tier: the divisions differ in how many
             // people come to fill it and what they pay, not in the bricks (STAD-2).
@@ -213,7 +221,7 @@ public sealed class WorldGenerator
 
             // The ordinal is the club's position within its country, tier-adjusted, matching the ordinal its
             // identity was generated with, so a provisioned tier's squads are distinct from tier 1's.
-            players += AddSquad(
+            var (squadSize, strength) = AddSquad(
                 seed,
                 country,
                 clubId,
@@ -222,11 +230,26 @@ public sealed class WorldGenerator
                 season,
                 now);
 
+            players += squadSize;
+            openings.Add((clubId, FanRuleSet.OpeningFor(tier).Fans, club.Reputation, strength));
+
             clubIds.Add(clubId);
             accounts++;
         }
 
         _schedules.Generate(divisionSeason, clubIds, season, now, request.BootstrapCutoff);
+
+        // Every club of a new world is the computer's until a manager takes it over, so each signs its season's sponsor now; the manager who
+        // claims it may think again for a few matchdays (SPN-6).
+        var ranks = FanBaseKeeper.RankByStrength(openings.ToDictionary(opening => opening.ClubId, opening => opening.Strength));
+
+        _sponsors.Open(
+            country.WorldId,
+            season.Id,
+            season.SequenceNumber,
+            tier,
+            [.. openings.Select(opening => new SponsorClubInput(opening.ClubId, opening.Fans, opening.Standing, ranks[opening.ClubId], IsHuman: false))],
+            now);
 
         return new GeneratedTier(
             division.Id,
@@ -237,8 +260,8 @@ public sealed class WorldGenerator
             accounts);
     }
 
-    /// <summary>Generates and stages one club's squad (`SQ-1`).</summary>
-    private int AddSquad(
+    /// <summary>Generates and stages one club's squad (`SQ-1`), and reads how strong it is for the sponsor's realistic objective.</summary>
+    private (int Size, int Strength) AddSquad(
         string seed,
         Country country,
         Guid clubId,
@@ -273,6 +296,17 @@ public sealed class WorldGenerator
             _squad.AddPlayerRegistration(member.Registration);
         }
 
-        return squad.Count;
+        var strength = TeamStrength.OfSquad(
+        [
+            .. squad.Select(member => new AiSquadPlayer(
+                member.Player.Id,
+                member.Player.PrimaryPosition,
+                member.Player.SecondaryPositions,
+                member.Attributes.ToSet().Values,
+                member.State.ConditionBp,
+                IsAvailable: true)),
+        ]);
+
+        return (squad.Count, strength);
     }
 }

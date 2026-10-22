@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
+using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.World;
+using Tactical11Manager.Domain.Comms;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
@@ -49,6 +51,7 @@ public sealed partial class SettleSeasonFinances
     private readonly IClubSeasonFinanceRepository _summaries;
     private readonly ISponsorRepository _sponsors;
     private readonly IClubRepository _clubs;
+    private readonly IInboxRepository _inbox;
     private readonly ILogger<SettleSeasonFinances> _logger;
 
     /// <summary>Initializes the settlement.</summary>
@@ -58,6 +61,7 @@ public sealed partial class SettleSeasonFinances
         IClubSeasonFinanceRepository summaries,
         ISponsorRepository sponsors,
         IClubRepository clubs,
+        IInboxRepository inbox,
         ILogger<SettleSeasonFinances> logger)
     {
         _accounts = accounts;
@@ -65,6 +69,7 @@ public sealed partial class SettleSeasonFinances
         _summaries = summaries;
         _sponsors = sponsors;
         _clubs = clubs;
+        _inbox = inbox;
         _logger = logger;
     }
 
@@ -103,6 +108,7 @@ public sealed partial class SettleSeasonFinances
         var bonuses = 0;
         var parachutes = 0;
         var steps = 0;
+        var settledDeals = new List<ClubSponsorDeal>();
 
         foreach (var club in clubs.OrderBy(club => club.ClubId))
         {
@@ -132,6 +138,7 @@ public sealed partial class SettleSeasonFinances
                 var bonus = deal.Settle(club.FinalRank, now);
 
                 outcome = deal.Outcome;
+                settledDeals.Add(deal);
 
                 if (bonus > 0)
                 {
@@ -186,6 +193,8 @@ public sealed partial class SettleSeasonFinances
             }
         }
 
+        await TellManagersAsync(settledDeals, now, cancellationToken);
+
         // The season's window: from the first kickoff to the end of its rollover. Movements inside it are the
         // season's income and expenses; the money just posted is after it and stays in the ledger only.
         var windowStart = season.StartsAt;
@@ -233,6 +242,49 @@ public sealed partial class SettleSeasonFinances
         LogSettled(worldId, season.Id, awarded, bonuses, parachutes, steps, summaries);
 
         return new SeasonSettlementResult(awarded, summaries, bonuses, parachutes, steps);
+    }
+
+    /// <summary>Tells each manager how the season ended against the objective they were set (`OBJ-4`).</summary>
+    private async Task TellManagersAsync(
+        List<ClubSponsorDeal> deals,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (deals.Count == 0)
+        {
+            return;
+        }
+
+        var targets = (await _inbox.FindClubTargetsAsync([.. deals.Select(deal => deal.ClubId)], cancellationToken))
+            .ToDictionary(target => target.ClubId);
+
+        foreach (var deal in deals)
+        {
+            if (!targets.TryGetValue(deal.ClubId, out var target)
+                || target.ManagerId is not { } managerId
+                || managerId == Guid.Empty
+                || deal.Outcome is not { } outcome
+                || deal.FinalPlace is not { } finalPlace)
+            {
+                continue;
+            }
+
+            var draft = FinanceInboxTemplates.ObjectiveSettledMessage(
+                outcome,
+                deal.Objective.ToCode(),
+                deal.TargetPlace,
+                finalPlace,
+                deal.BonusPaidMinor ?? 0);
+
+            _inbox.Add(InboxMessage.Record(
+                Guid.CreateVersion7(),
+                managerId,
+                draft.Category,
+                draft.TemplateKey,
+                draft.ParametersJson,
+                draft.RelatedEntityId,
+                now));
+        }
     }
 
     [LoggerMessage(

@@ -174,6 +174,10 @@ public sealed class EconomyPersistenceTests
         var club = await db.Clubs.OrderBy(candidate => candidate.Id).FirstAsync();
         var season = await db.Seasons.OrderBy(candidate => candidate.SequenceNumber).FirstAsync();
         await using var transaction = await db.Database.BeginTransactionAsync();
+
+        // A seeded world already holds the club's offers and its computer deal; the test writes its own in their place, inside the transaction.
+        await db.SponsorDeals.Where(candidate => candidate.ClubId == club.Id).ExecuteDeleteAsync();
+        await db.SponsorOffers.Where(candidate => candidate.ClubId == club.Id).ExecuteDeleteAsync();
         var now = _fixture.Clock.UtcNow;
 
         var offers = SponsorOffers.For(_fixture.WorldId, season.SequenceNumber, club.Id, tier: 1, fans: 20_000, standing: club.Reputation)
@@ -228,6 +232,10 @@ public sealed class EconomyPersistenceTests
         var club = await db.Clubs.OrderBy(candidate => candidate.Id).FirstAsync();
         var season = await db.Seasons.OrderBy(candidate => candidate.SequenceNumber).FirstAsync();
         await using var transaction = await db.Database.BeginTransactionAsync();
+
+        // A seeded world already holds the club's offers and its computer deal; the test writes its own in their place, inside the transaction.
+        await db.SponsorDeals.Where(candidate => candidate.ClubId == club.Id).ExecuteDeleteAsync();
+        await db.SponsorOffers.Where(candidate => candidate.ClubId == club.Id).ExecuteDeleteAsync();
         var now = _fixture.Clock.UtcNow;
 
         var offer = ClubSponsorOffer.Record(

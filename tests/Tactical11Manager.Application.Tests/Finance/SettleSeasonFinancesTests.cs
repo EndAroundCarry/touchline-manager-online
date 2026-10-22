@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Domain.Competition;
@@ -157,6 +158,59 @@ public sealed class SettleSeasonFinancesTests
         }
     }
 
+    [Theory]
+    [InlineData(4, FinanceInboxTemplates.ObjectiveMet)]
+    [InlineData(1, FinanceInboxTemplates.ObjectiveExceeded)]
+    [InlineData(12, FinanceInboxTemplates.ObjectiveMissed)]
+    public async Task The_manager_is_told_how_the_season_ended_against_the_objective(int finalPlace, string template)
+    {
+        var clubId = Guid.CreateVersion7();
+        var managerId = Guid.CreateVersion7();
+        var inbox = new RecordingInboxRepository();
+
+        inbox.Targets.Add(new ClubInboxTarget(clubId, managerId, "Test FC"));
+
+        await Create(
+                new RecordingAccountRepository(Funded(clubId, 1)),
+                new RecordingLedgerRepository(),
+                new RecordingSummaryRepository(),
+                new RecordingSponsorRepository(Deal(clubId, SeasonObjective.TopSix)),
+                inbox)
+            .SettleAsync(
+                WorldId,
+                ClosingSeason(),
+                [new SeasonSettlementClub(clubId, 1, finalPlace, 1)],
+                SettledAt,
+                CancellationToken.None);
+
+        var message = inbox.Messages.Should().ContainSingle().Which;
+
+        message.TemplateKey.Should().Be(template);
+        message.RecipientManagerId.Should().Be(managerId);
+    }
+
+    [Fact]
+    public async Task A_computer_club_is_told_nothing_about_its_objective()
+    {
+        var clubId = Guid.CreateVersion7();
+        var inbox = new RecordingInboxRepository();
+
+        await Create(
+                new RecordingAccountRepository(Funded(clubId, 1)),
+                new RecordingLedgerRepository(),
+                new RecordingSummaryRepository(),
+                new RecordingSponsorRepository(Deal(clubId, SeasonObjective.TopSix)),
+                inbox)
+            .SettleAsync(
+                WorldId,
+                ClosingSeason(),
+                [new SeasonSettlementClub(clubId, 1, 3, 1)],
+                SettledAt,
+                CancellationToken.None);
+
+        inbox.Messages.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task A_clubs_standing_moves_by_its_finish_and_the_step_is_recorded()
     {
@@ -170,6 +224,7 @@ public sealed class SettleSeasonFinancesTests
                 new RecordingLedgerRepository(),
                 new RecordingSummaryRepository(),
                 sponsors,
+                inbox: null,
                 club)
             .SettleAsync(
                 WorldId,
@@ -227,6 +282,7 @@ public sealed class SettleSeasonFinancesTests
         RecordingLedgerRepository ledger,
         RecordingSummaryRepository summaries,
         RecordingSponsorRepository? sponsors = null,
+        RecordingInboxRepository? inbox = null,
         params Club[] clubs) =>
         new(
             accounts,
@@ -234,6 +290,7 @@ public sealed class SettleSeasonFinancesTests
             summaries,
             sponsors ?? new RecordingSponsorRepository(),
             new StubClubRepository(clubs),
+            inbox ?? new RecordingInboxRepository(),
             NullLogger<SettleSeasonFinances>.Instance);
 
     private static Club NewClub(Guid clubId, int tier) =>

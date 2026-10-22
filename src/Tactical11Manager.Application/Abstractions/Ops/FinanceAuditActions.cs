@@ -25,6 +25,12 @@ public static class FinanceAuditActions
     /// <summary>A club's manager was dismissed after the club stayed in administration (`DEBT-5`).</summary>
     public const string ManagerDismissed = "finance.administration.manager_dismissed";
 
+    /// <summary>A club signed its sponsor deal for the season (`SPN-2`).</summary>
+    public const string SponsorSigned = "finance.sponsor.signed";
+
+    /// <summary>A manager took another sponsor offer or objective in the days after taking a club over (`SPN-6`).</summary>
+    public const string SponsorChanged = "finance.sponsor.changed";
+
     /// <summary>A leading bid was withdrawn so the club could pay its wages (`FIN-10`).</summary>
     public const string BidWithdrawn = "finance.bid.withdrawn";
 

@@ -72,6 +72,20 @@ public static class SponsorOffers
         ];
     }
 
+    /// <summary>What one objective pays under an offer a club was made, worked out from the figures the offer was made from.</summary>
+    /// <param name="offer">The offer.</param>
+    /// <param name="objective">The objective.</param>
+    public static ObjectiveBonusQuote QuoteFor(ClubSponsorOffer offer, SeasonObjective objective)
+    {
+        ArgumentNullException.ThrowIfNull(offer);
+
+        return new ObjectiveBonusQuote(
+            objective,
+            EconomyRuleSet.TargetPlaceFor(objective),
+            EconomyRuleSet.SponsorBonusMinorFor(offer.Kind, objective, ObjectiveOutcome.Met, offer.Tier, offer.Fans, offer.StandingPoints),
+            EconomyRuleSet.SponsorBonusMinorFor(offer.Kind, objective, ObjectiveOutcome.Exceeded, offer.Tier, offer.Fans, offer.StandingPoints));
+    }
+
     /// <summary>What every objective would pay under an offer, hardest first: the figures a manager picks an objective by.</summary>
     /// <param name="kind">The offer.</param>
     /// <param name="tier">The tier the club plays in.</param>

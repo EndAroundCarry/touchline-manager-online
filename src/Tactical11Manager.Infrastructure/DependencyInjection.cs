@@ -473,6 +473,7 @@ public static class DependencyInjection
         services.AddScoped<ICalendarQueries, CalendarQueries>();
         services.AddScoped<IClubSeasonFinanceRepository, ClubSeasonFinanceRepository>();
         services.AddScoped<ISponsorRepository, SponsorRepository>();
+        services.AddScoped<ISponsorQueries, SponsorQueries>();
         services.AddScoped<IOnboardingQueries, OnboardingQueries>();
         services.AddScoped<IAdvisoryLock, PostgresAdvisoryLock>();
 

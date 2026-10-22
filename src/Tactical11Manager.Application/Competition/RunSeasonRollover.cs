@@ -84,6 +84,7 @@ public sealed partial class RunSeasonRollover
     private readonly SeasonRolloverPlanLoader _plans;
     private readonly SettleSeasonFinances _finances;
     private readonly SettleSeasonFans _fans;
+    private readonly SponsorSeasonOpener _sponsors;
     private readonly SettleSquadContinuity _continuity;
     private readonly IInboxRepository _inbox;
     private readonly IAdvisoryLock _locks;
@@ -104,6 +105,7 @@ public sealed partial class RunSeasonRollover
         SeasonRolloverPlanLoader plans,
         SettleSeasonFinances finances,
         SettleSeasonFans fans,
+        SponsorSeasonOpener sponsors,
         SettleSquadContinuity continuity,
         IInboxRepository inbox,
         IAdvisoryLock locks,
@@ -122,6 +124,7 @@ public sealed partial class RunSeasonRollover
         _plans = plans;
         _finances = finances;
         _fans = fans;
+        _sponsors = sponsors;
         _continuity = continuity;
         _inbox = inbox;
         _locks = locks;
@@ -537,6 +540,10 @@ public sealed partial class RunSeasonRollover
                 // The fans of a club that changed tier jump with it, and every club's fans pick the place they
                 // hope for from the squads as they now stand (FAN-7, FAN-8).
                 await _fans.OpenSeasonAsync(nextSeason.Id, ordered, moved, tier.TierNumber, now, cancellationToken);
+
+                // The sponsors make their offers for the fans the clubs now have. A computer club signs at once; a manager has until the end
+                // of the season's first week (SPN-1, SPN-4).
+                await _sponsors.OpenSeasonAsync(nextSeason, tier.TierNumber, ordered, openClubIds, now, cancellationToken);
 
                 // Only where the clubs are actually placed, so a redelivery that finds the entries present
                 // skips both the placement and the message (at-least-once).

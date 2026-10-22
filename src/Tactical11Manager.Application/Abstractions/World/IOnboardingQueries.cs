@@ -48,6 +48,15 @@ public readonly record struct AdvisoryLockKey(string Scope, Guid Target)
     public static AdvisoryLockKey Listing(Guid listingId) => new("listing", listingId);
 
     /// <summary>
+    /// A club-scoped lock for signing the season's sponsor deal.
+    /// </summary>
+    /// <remarks>
+    /// A club signs one deal a season, and the manager's click, a retry of it and the board's deadline job can all arrive together. Serialising
+    /// them means the second reads the first's deal and is refused as stale, instead of racing it to the unique index.
+    /// </remarks>
+    public static AdvisoryLockKey ClubSponsor(Guid clubId) => new("club-sponsor", clubId);
+
+    /// <summary>
     /// A world-scoped lock, used by the season rollover.
     /// </summary>
     /// <remarks>

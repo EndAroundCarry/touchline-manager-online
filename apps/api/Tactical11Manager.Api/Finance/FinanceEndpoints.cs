@@ -4,6 +4,9 @@ using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Contracts.Auth;
 using Tactical11Manager.Contracts.Finance;
+using Tactical11Manager.Contracts.Http;
+using Tactical11Manager.Contracts.Squad;
+using Tactical11Manager.Contracts.World;
 
 namespace Tactical11Manager.Api.Finance;
 
@@ -43,8 +46,131 @@ internal static class FinanceEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/finances/sponsor", GetSponsorAsync)
+            .WithName("GetSponsor")
+            .WithSummary("Reads the club's sponsor offers, the deal it signed, the realistic objective and the deadline.")
+            .Produces<SponsorResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/finances/sponsor", SignSponsorAsync)
+            .WithName("SignSponsor")
+            .WithSummary("Signs the season's sponsor deal: an offer and an objective. Requires If-Match, the deal's version (0 before a deal).")
+            .Produces<SponsorResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
         return endpoints;
     }
+
+    private static async Task<IResult> GetSponsorAsync(
+        HttpContext httpContext,
+        GetSponsorOffers query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var result = await query.ExecuteAsync(userId, cancellationToken);
+
+        if (result.Outcome != SquadReadOutcome.Found)
+        {
+            return SquadEndpoints.Refusal(result.Outcome);
+        }
+
+        httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Sponsor!.Version);
+
+        return Results.Ok(result.Sponsor);
+    }
+
+    private static async Task<IResult> SignSponsorAsync(
+        HttpContext httpContext,
+        SignSponsorRequest request,
+        SignSponsorDeal useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId))
+        {
+            return ProblemResults.Unauthenticated("Sign in to continue.");
+        }
+
+        var expectedVersion = EntityTagHeader.ParseIfMatch(httpContext.Request.Headers.IfMatch.ToString());
+
+        var result = await useCase.ExecuteAsync(userId, request, expectedVersion, cancellationToken);
+
+        if (result.Outcome != SignSponsorDealOutcome.Agreed)
+        {
+            return Refusal(result.Outcome);
+        }
+
+        httpContext.Response.Headers.ETag = EntityTagHeader.ForVersion(result.Sponsor!.Version);
+
+        return Results.Ok(result.Sponsor);
+    }
+
+    /// <summary>Turns a refused signing into a status and a stable code.</summary>
+    private static IResult Refusal(SignSponsorDealOutcome outcome) => outcome switch
+    {
+        SignSponsorDealOutcome.PreconditionRequired => ProblemResults.Code(
+            StatusCodes.Status428PreconditionRequired,
+            ApiErrorCodes.PreconditionRequired,
+            "A version is required.",
+            "Send the deal's current entity tag in If-Match (0 when the club has not signed) so a retry does not sign twice."),
+
+        SignSponsorDealOutcome.PreconditionFailed => ProblemResults.Code(
+            StatusCodes.Status412PreconditionFailed,
+            ApiErrorCodes.PreconditionFailed,
+            "That changed.",
+            "The deal changed since you read it. Reload the offers and choose again."),
+
+        SignSponsorDealOutcome.UnknownOffer => ProblemResults.Code(
+            StatusCodes.Status400BadRequest,
+            SponsorErrorCodes.UnknownOffer,
+            "No such offer.",
+            "Choose steady, balanced or performance."),
+
+        SignSponsorDealOutcome.UnknownObjective => ProblemResults.Code(
+            StatusCodes.Status400BadRequest,
+            SponsorErrorCodes.UnknownObjective,
+            "No such objective.",
+            "Choose win_league, top_three, top_six, top_half, twelfth or stay_up."),
+
+        SignSponsorDealOutcome.AlreadySigned => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            SponsorErrorCodes.AlreadySigned,
+            "Already signed.",
+            "The club has signed its sponsor for the season. A new manager may change the deal in the first matchdays after taking the club over (SPN-6)."),
+
+        SignSponsorDealOutcome.NoClub => ProblemResults.Code(
+            StatusCodes.Status403Forbidden,
+            SquadErrorCodes.NoClub,
+            "No club.",
+            "You do not manage a club yet, so there is no sponsor to sign."),
+
+        SignSponsorDealOutcome.NoManagerProfile => ProblemResults.Code(
+            StatusCodes.Status403Forbidden,
+            WorldErrorCodes.ManagerProfileRequired,
+            "No manager profile.",
+            "Create your manager profile before managing a club."),
+
+        SignSponsorDealOutcome.WorldNotSeeded => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            WorldErrorCodes.WorldNotSeeded,
+            "No world yet.",
+            "The world has not been created."),
+
+        _ => ProblemResults.Code(
+            StatusCodes.Status404NotFound,
+            SponsorErrorCodes.NoOffers,
+            "No sponsor offers.",
+            "The club has been made no offers for this season."),
+    };
 
     private static async Task<IResult> GetSummaryAsync(
         HttpContext httpContext,

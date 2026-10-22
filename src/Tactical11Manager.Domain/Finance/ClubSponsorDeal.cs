@@ -143,6 +143,51 @@ public sealed class ClubSponsorDeal
         Touch(now);
     }
 
+    /// <summary>Takes another offer and objective, before the season is settled: a new manager's second thoughts.</summary>
+    /// <param name="offer">The offer now taken, one of the club's own for the season.</param>
+    /// <param name="objective">The objective now chosen.</param>
+    /// <param name="bonusMetMinor">The bonus for meeting it under the new offer.</param>
+    /// <param name="bonusExceededMinor">The bonus for exceeding it.</param>
+    /// <param name="signedBy">Who chose it.</param>
+    /// <param name="now">The current instant.</param>
+    /// <remarks>
+    /// The matchdays already paid stay paid at the figure they were paid at; the new fixed part runs from the next matchday. The deal is signed
+    /// again at that instant, which is what tells a deal the present manager made from one he inherited.
+    /// </remarks>
+    public void Replace(
+        ClubSponsorOffer offer,
+        SeasonObjective objective,
+        long bonusMetMinor,
+        long bonusExceededMinor,
+        SponsorSigner signedBy,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(offer);
+        ArgumentOutOfRangeException.ThrowIfNegative(bonusMetMinor);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bonusExceededMinor, bonusMetMinor);
+
+        if (IsSettled)
+        {
+            throw new InvalidOperationException("A settled season's deal cannot change (OBJ-1).");
+        }
+
+        if (offer.ClubId != ClubId || offer.SeasonId != SeasonId)
+        {
+            throw new InvalidOperationException("A deal can only take an offer made to the same club for the same season (SPN-1).");
+        }
+
+        OfferId = offer.Id;
+        Kind = offer.Kind;
+        FixedMatchdayMinor = EconomyRuleSet.PerMatchday(offer.FixedSeasonMinor);
+        Objective = objective;
+        TargetPlace = EconomyRuleSet.TargetPlaceFor(objective);
+        BonusMetMinor = bonusMetMinor;
+        BonusExceededMinor = bonusExceededMinor;
+        SignedBy = signedBy;
+        SignedAt = now;
+        Touch(now);
+    }
+
     /// <summary>Settles the season against the objective, once.</summary>
     /// <param name="finalPlace">The place the club finished in.</param>
     /// <param name="now">The current instant.</param>

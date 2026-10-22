@@ -168,6 +168,12 @@ public sealed class MatchdayWorkerTests : IAsyncLifetime
             "competition.publish-matchday",
         ]);
         jobs.Should().OnlyContain(job => job.Status == "completed");
+
+        // The scheduler also ensures the sponsor deadline, the fourth round's lock, once for the division (SPN-4).
+        (await db.Jobs.CountAsync(job => job.JobType == "finance.sign-sponsor-deals"
+                && job.BusinessKey == $"sponsor-deadline:{matchday.DivisionSeasonId:D}"))
+            .Should()
+            .Be(1, "one deadline job a division, whatever the number of passes");
     }
 
     /// <summary>Waits for every job of one round to be completed.</summary>

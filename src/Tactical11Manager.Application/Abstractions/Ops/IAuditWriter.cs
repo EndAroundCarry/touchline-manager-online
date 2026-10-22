@@ -167,6 +167,9 @@ public static class AuditTargetTypes
     /// <summary>A club's snack bar or merchandise shop (`STRC-3`).</summary>
     public const string ClubStructure = "club_structure";
 
+    /// <summary>A club's sponsor deal for a season.</summary>
+    public const string SponsorDeal = "sponsor_deal";
+
     /// <summary>A tactical plan (`INS-11`).</summary>
     public const string TacticalPlan = "tactical_plan";
 

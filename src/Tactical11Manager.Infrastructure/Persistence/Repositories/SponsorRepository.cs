@@ -25,5 +25,24 @@ internal sealed class SponsorRepository : ISponsorRepository
             .ToListAsync(cancellationToken);
 
     /// <inheritdoc />
+    public Task<ClubSponsorDeal?> FindDealAsync(Guid clubId, Guid seasonId, CancellationToken cancellationToken) =>
+        _dbContext.SponsorDeals.FirstOrDefaultAsync(deal => deal.ClubId == clubId && deal.SeasonId == seasonId, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubSponsorOffer>> ListOffersAsync(Guid clubId, Guid seasonId, CancellationToken cancellationToken) =>
+        (await _dbContext.SponsorOffers
+            .AsNoTracking()
+            .Where(offer => offer.ClubId == clubId && offer.SeasonId == seasonId)
+            .ToListAsync(cancellationToken))
+        .OrderBy(offer => offer.Kind)
+        .ToList();
+
+    /// <inheritdoc />
+    public void AddOffers(IEnumerable<ClubSponsorOffer> offers) => _dbContext.SponsorOffers.AddRange(offers);
+
+    /// <inheritdoc />
+    public void AddDeal(ClubSponsorDeal deal) => _dbContext.SponsorDeals.Add(deal);
+
+    /// <inheritdoc />
     public void AddStandingEvent(ClubStandingEvent standingEvent) => _dbContext.ClubStandingEvents.Add(standingEvent);
 }

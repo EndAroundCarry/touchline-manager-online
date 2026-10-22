@@ -101,11 +101,14 @@ public sealed class MatchdayFinances
             return new FinancialStatesResult(0, 0, 0, 0);
         }
 
-        var basis = (await _queries.GetClubFinanceBasisAsync(clubIds, cancellationToken))
-            .ToDictionary(row => row.ClubId);
-
+        // The accounts are loaded before the sponsor deals are read. A club that signs while the round publishes changes its account, so
+        // whichever of the two commits second finds the account changed under it and is retried: the matchday is paid by this publication or
+        // by the signing's back pay, never by neither and never by both (SPN-3).
         var accounts = (await _accounts.LoadAsync(clubIds, cancellationToken))
             .ToDictionary(account => account.ClubId);
+
+        var basis = (await _queries.GetClubFinanceBasisAsync(clubIds, cancellationToken))
+            .ToDictionary(row => row.ClubId);
 
         foreach (var clubId in clubIds)
         {
