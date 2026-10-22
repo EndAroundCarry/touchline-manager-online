@@ -10,70 +10,279 @@
     <h1 [class]="pageHeadingClass">Finances</h1>
     <p class="mt-1 text-sm text-ink-2">
       Every movement of your club's money is a ledger entry. The balances are the running total of
-      the entries below, so nothing here is an estimate.
+      the entries below; the forecast is the club's income at its present fans and ground, before
+      any prize or bonus.
     </p>
+
+    @if (banner(); as notice) {
+      <section
+        class="mt-6 rounded border px-4 py-3"
+        [class]="toneClass(notice.tone)"
+        role="alert"
+        data-testid="state-banner"
+      >
+        <h2 class="text-sm font-semibold">{{ notice.title }}</h2>
+        <p class="mt-1 text-sm">{{ notice.body }}</p>
+      </section>
+    }
 
     <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <div class="rounded border border-line bg-panel p-4">
         <dt class="text-sm font-medium text-muted">Cash</dt>
-        <dd class="mt-1 text-xl font-semibold">{{ funds(finances.cashMinor) }}</dd>
+        <dd class="mt-1 text-xl font-semibold" data-testid="cash">
+          <app-money [minor]="finances.cashMinor" />
+        </dd>
+        @if (finances.outlook; as outlook) {
+          @if (outlook.state !== 'healthy') {
+            <dd class="text-sm text-ink-2">
+              Overdraft limit <app-money [minor]="outlook.overdraftLimitMinor" />
+            </dd>
+          }
+        }
       </div>
 
       <div class="rounded border border-line bg-panel p-4">
         <dt class="text-sm font-medium text-muted">Reserved for bids</dt>
-        <dd class="mt-1 text-xl font-semibold">{{ funds(finances.reservedMinor) }}</dd>
+        <dd class="mt-1 text-xl font-semibold"><app-money [minor]="finances.reservedMinor" /></dd>
       </div>
 
       <div class="rounded border border-line bg-panel p-4">
         <dt class="text-sm font-medium text-muted">Available</dt>
-        <dd class="mt-1 text-xl font-semibold">{{ funds(finances.availableMinor) }}</dd>
+        <dd class="mt-1 text-xl font-semibold"><app-money [minor]="finances.availableMinor" /></dd>
         <dd class="text-sm text-ink-2">After existing reservations</dd>
       </div>
 
       <div class="rounded border border-line bg-panel p-4">
-        <dt class="text-sm font-medium text-muted">Weekly wages</dt>
-        <dd class="mt-1 text-xl font-semibold">{{ funds(finances.weeklyWageMinor) }}</dd>
-        <dd class="text-sm text-ink-2">{{ finances.contractedPlayers }} players under contract</dd>
+        <dt class="text-sm font-medium text-muted">Season income forecast</dt>
+        @if (finances.outlook; as outlook) {
+          <dd class="mt-1 text-xl font-semibold" data-testid="forecast">
+            <app-money [minor]="outlook.forecastMinor" />
+          </dd>
+          <dd class="text-sm text-ink-2">
+            {{ outlook.matchdaysPlayed }} of {{ outlook.matchdaysInSeason }} matchdays played
+          </dd>
+        } @else {
+          <dd class="mt-1 text-sm text-ink-2">Available once the season starts</dd>
+        }
       </div>
     </dl>
 
-    <section class="mt-6 rounded border border-line bg-panel p-4">
-      <h2 class="text-sm font-medium text-muted">Every week</h2>
-      <dl class="mt-2 grid gap-3 sm:grid-cols-3">
-        <div>
-          <dt class="text-sm text-ink-2">Sponsorship (tier {{ finances.tierNumber }})</dt>
-          <dd class="text-lg font-semibold">+{{ funds(finances.weeklySponsorshipMinor) }}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-ink-2">Wages</dt>
-          <dd class="text-lg font-semibold">&minus;{{ funds(finances.weeklyWageMinor) }}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-ink-2">Operating cost</dt>
-          <dd class="text-lg font-semibold">
-            &minus;{{ funds(finances.weeklyOperatingCostMinor) }}
-          </dd>
-        </div>
-      </dl>
+    @if (finances.outlook; as outlook) {
+      <div class="mt-6 grid gap-4 lg:grid-cols-2">
+        <section class="rounded border border-line bg-panel p-4" aria-labelledby="wage-budget">
+          <h2 id="wage-budget" class="text-sm font-medium text-muted">Wages against the budget</h2>
+
+          @if (gauge(); as bar) {
+            <p class="mt-2 text-lg font-semibold" data-testid="wage-summary">
+              <app-money [minor]="outlook.seasonWageMinor" />
+              <span class="text-sm font-normal text-ink-2">
+                of a <app-money [minor]="outlook.wageBudgetMinor" /> budget
+              </span>
+            </p>
+
+            <div
+              class="relative mt-3 h-3 rounded bg-raised"
+              role="img"
+              [attr.aria-label]="
+                'Wages are ' + bar.sharePercent + '% of the forecast income. ' + bar.caption
+              "
+              data-testid="wage-gauge"
+            >
+              <div
+                class="h-3 rounded"
+                [class]="
+                  bar.tone === 'bad'
+                    ? 'bg-red-400'
+                    : bar.tone === 'warn'
+                      ? 'bg-amber-400'
+                      : 'bg-emerald-400'
+                "
+                [style.width.%]="bar.fillPercent"
+              ></div>
+              <div
+                class="absolute -top-1 h-5 w-0.5 bg-ink"
+                [style.left.%]="bar.budgetPercent"
+                title="The wage budget"
+              ></div>
+            </div>
+
+            <p class="mt-2 text-sm" [class]="bar.tone === 'good' ? 'text-ink-2' : 'text-amber-200'">
+              {{ bar.caption }}: {{ bar.sharePercent }}% of the forecast income. The budget is 70%.
+            </p>
+          }
+          <p class="mt-1 text-sm text-ink-2">
+            Paid in 34 equal parts, one on every matchday. {{ finances.contractedPlayers }} players
+            under contract.
+          </p>
+        </section>
+
+        <section class="rounded border border-line bg-panel p-4" aria-labelledby="prize-today">
+          <h2 id="prize-today" class="text-sm font-medium text-muted">League prize money</h2>
+
+          @if (outlook.prize; as prize) {
+            <p class="mt-2 text-lg font-semibold" data-testid="prize-today-amount">
+              If the season ended today: {{ place(prize.place, prize.clubs) }} &rarr;
+              <app-money [minor]="prize.amountMinor" />
+            </p>
+            <p class="mt-1 text-sm text-ink-2">
+              The league pays by final place when the season closes. It is not in the forecast or
+              the wage budget, so it is upside.
+            </p>
+          } @else {
+            <p class="mt-2 text-sm text-ink-2" role="status">
+              The table opens with the first matchday.
+            </p>
+          }
+        </section>
+      </div>
+    }
+
+    <section class="mt-6 rounded border border-line bg-panel p-4" aria-labelledby="sponsor-card">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="sponsor-card" class="text-sm font-medium text-muted">Sponsor and objective</h2>
+        <a routerLink="/finances/sponsor" [class]="linkActionClass" data-testid="sponsor-link">
+          @if (sponsor(); as page) {
+            {{
+              page.deal === null
+                ? 'Choose a sponsor'
+                : page.canSign
+                  ? 'Change the deal'
+                  : 'See the offers'
+            }}
+          } @else {
+            Sponsor offers
+          }
+        </a>
+      </div>
+
+      @if (sponsor(); as page) {
+        @if (page.deal; as deal) {
+          <dl class="mt-2 grid gap-3 sm:grid-cols-4" data-testid="sponsor-deal">
+            <div>
+              <dt class="text-sm text-ink-2">Sponsor</dt>
+              <dd class="font-semibold">{{ deal.sponsorName }} &middot; {{ offer(deal.kind) }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm text-ink-2">Objective</dt>
+              <dd class="font-semibold">{{ objective(deal.objective, deal.targetPlace) }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm text-ink-2">Paid on every matchday</dt>
+              <dd class="font-semibold"><app-money [minor]="deal.fixedMatchdayMinor" /></dd>
+            </div>
+            <div>
+              <dt class="text-sm text-ink-2">Bonus if met</dt>
+              <dd class="font-semibold"><app-money [minor]="deal.bonusMetMinor" /></dd>
+              @if (outcome(deal); as result) {
+                <dd class="text-sm text-ink-2">
+                  {{ result }}
+                  @if (deal.bonusPaidMinor !== null) {
+                    : <app-money [minor]="deal.bonusPaidMinor" /> paid
+                  }
+                </dd>
+              }
+            </div>
+          </dl>
+        } @else {
+          <p class="mt-2 text-sm text-amber-200" data-testid="sponsor-unsigned">
+            No sponsor is signed yet. The board signs the balanced offer for you at
+            {{ deadline(page.deadline) }}.
+          </p>
+        }
+      } @else if (sponsorLoading()) {
+        <p class="mt-2 text-sm text-ink-2" role="status">Loading your sponsor…</p>
+      } @else {
+        <p class="mt-2 text-sm text-ink-2" role="status">No sponsor offers for this season yet.</p>
+      }
     </section>
 
-    <div class="mt-6 grid gap-4 lg:grid-cols-2">
-      <section class="rounded border border-line bg-panel p-4">
-        <h2 class="text-sm font-medium text-muted">
-          Money in
+    @if (finances.outlook !== null) {
+      <section class="mt-6 rounded border border-line bg-panel p-4" aria-labelledby="season-money">
+        <h2 id="season-money" class="text-sm font-medium text-muted">
+          Season forecast against actual
           @if (finances.seasonLabel; as label) {
             <span class="font-normal text-muted">&middot; {{ label }}</span>
           }
         </h2>
 
-        @if (credits().length === 0) {
+        <div class="mt-2 overflow-x-auto" tabindex="0" role="group" aria-label="Forecast by stream">
+          <table class="min-w-full divide-y divide-line text-sm" data-testid="forecast-table">
+            <caption class="sr-only">
+              The season's forecast by stream, with what the ledger has moved so far
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" class="px-3 py-2 text-left font-medium text-muted">Stream</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Forecast</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium text-muted">So far</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-line-soft">
+              <tr>
+                <th
+                  scope="rowgroup"
+                  colspan="3"
+                  class="px-3 py-1 text-left text-xs uppercase tracking-widest text-muted"
+                >
+                  Money in
+                </th>
+              </tr>
+              @for (row of incomeRows(); track row.category) {
+                <tr>
+                  <td class="px-3 py-2 text-ink">{{ row.label }}</td>
+                  <td class="px-3 py-2 text-right text-ink-2">
+                    <app-money [minor]="row.forecastMinor" [signed]="true" />
+                  </td>
+                  <td class="px-3 py-2 text-right font-medium text-ink">
+                    <app-money [minor]="row.actualMinor" [signed]="true" />
+                  </td>
+                </tr>
+              }
+              <tr>
+                <th
+                  scope="rowgroup"
+                  colspan="3"
+                  class="px-3 py-1 text-left text-xs uppercase tracking-widest text-muted"
+                >
+                  Money out
+                </th>
+              </tr>
+              @for (row of costRows(); track row.category) {
+                <tr>
+                  <td class="px-3 py-2 text-ink">{{ row.label }}</td>
+                  <td class="px-3 py-2 text-right text-ink-2">
+                    <app-money [minor]="row.forecastMinor" [signed]="true" />
+                  </td>
+                  <td class="px-3 py-2 text-right font-medium text-ink">
+                    <app-money [minor]="row.actualMinor" [signed]="true" />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <div class="mt-6 grid gap-4 lg:grid-cols-2">
+      <section class="rounded border border-line bg-panel p-4">
+        <h2 class="text-sm font-medium text-muted">
+          {{ finances.outlook ? 'Other money in' : 'Money in' }}
+          @if (finances.seasonLabel; as label) {
+            <span class="font-normal text-muted">&middot; {{ label }}</span>
+          }
+        </h2>
+
+        @if (otherCredits().length === 0) {
           <p class="mt-2 text-sm text-ink-2" role="status">Nothing yet this season.</p>
         } @else {
           <dl class="mt-2 flex flex-col gap-1">
-            @for (total of credits(); track total.label) {
+            @for (total of otherCredits(); track total.label) {
               <div class="flex items-baseline justify-between gap-3">
                 <dt class="text-sm text-ink-2">{{ total.label }}</dt>
-                <dd class="text-sm font-semibold text-ink">{{ signed(total.amountMinor) }}</dd>
+                <dd class="text-sm font-semibold text-ink">
+                  <app-money [minor]="total.amountMinor" [signed]="true" />
+                </dd>
               </div>
             }
           </dl>
@@ -81,16 +290,20 @@
       </section>
 
       <section class="rounded border border-line bg-panel p-4">
-        <h2 class="text-sm font-medium text-muted">Money out</h2>
+        <h2 class="text-sm font-medium text-muted">
+          {{ finances.outlook ? 'Other money out' : 'Money out' }}
+        </h2>
 
-        @if (debits().length === 0) {
+        @if (otherDebits().length === 0) {
           <p class="mt-2 text-sm text-ink-2" role="status">Nothing yet this season.</p>
         } @else {
           <dl class="mt-2 flex flex-col gap-1">
-            @for (total of debits(); track total.label) {
+            @for (total of otherDebits(); track total.label) {
               <div class="flex items-baseline justify-between gap-3">
                 <dt class="text-sm text-ink-2">{{ total.label }}</dt>
-                <dd class="text-sm font-semibold text-ink">{{ signed(total.amountMinor) }}</dd>
+                <dd class="text-sm font-semibold text-ink">
+                  <app-money [minor]="total.amountMinor" [signed]="true" />
+                </dd>
               </div>
             }
           </dl>

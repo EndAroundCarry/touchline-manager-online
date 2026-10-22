@@ -26,6 +26,7 @@ import {
   SECONDARY_BUTTON,
   STATUS_MESSAGE,
 } from '../../shared/forms/control-styles';
+import { EmbargoNotice } from '../../shared/ui/embargo-notice/embargo-notice';
 import { StructurePicture } from './structure-picture';
 
 /**
@@ -40,7 +41,7 @@ import { StructurePicture } from './structure-picture';
  */
 @Component({
   selector: 'app-structures',
-  imports: [RouterLink, StructurePicture],
+  imports: [RouterLink, StructurePicture, EmbargoNotice],
   templateUrl: './structures.html',
 })
 export class StructuresScreen {
@@ -63,6 +64,7 @@ export class StructuresScreen {
   protected readonly error = this.store.error;
   protected readonly upgrading = this.store.upgrading;
   protected readonly upgradeError = this.store.upgradeError;
+  protected readonly upgradeEmbargoed = this.store.upgradeEmbargoed;
   protected readonly upgradedMessage = this.store.upgradedMessage;
   protected readonly canMutate = this.maintenance.canMutate;
 

@@ -30,6 +30,7 @@ function summary(overrides: Partial<FinanceSummary> = {}): FinanceSummary {
       { category: 'wages', amountMinor: -1_200_000 },
     ],
     serverTime: '2026-09-28T00:00:00Z',
+    outlook: null,
     ...overrides,
   };
 }
@@ -48,7 +49,10 @@ function entry(sequence: number): FinanceLedgerEntry {
   };
 }
 
-function page(entries: readonly FinanceLedgerEntry[], nextCursor: string | null): FinanceLedgerPage {
+function page(
+  entries: readonly FinanceLedgerEntry[],
+  nextCursor: string | null,
+): FinanceLedgerPage {
   return { entries, nextCursor, serverTime: '2026-09-28T00:00:00Z' };
 }
 

@@ -196,6 +196,33 @@ describe('TransfersStore', () => {
     expect(store.error()).toBe('Bid too low.');
   });
 
+  it('flags a bid refused because the club is in the red, and clears the flag on the next try', () => {
+    api.bid.mockReturnValueOnce(
+      throwError(
+        () =>
+          new ApiError(409, 'TRANSFER_EMBARGO', 'A club in the red may not bid.', null, new Map()),
+      ),
+    );
+    api.bid.mockReturnValueOnce(of(listing('l1')));
+
+    store.bid('l1', 1_000_000);
+    expect(store.embargoed()).toBe(true);
+    expect(store.error()).toBe('A club in the red may not bid.');
+
+    store.bid('l1', 1_000_000);
+    expect(store.embargoed()).toBe(false);
+  });
+
+  it('does not call another refusal an embargo', () => {
+    api.bid.mockReturnValue(
+      throwError(() => new ApiError(400, 'BID_TOO_LOW', 'Bid too low.', null, new Map())),
+    );
+
+    store.bid('l1', 1);
+
+    expect(store.embargoed()).toBe(false);
+  });
+
   it('re-reads the market after a cancellation', () => {
     api.cancel.mockReturnValue(of(listing('l1', 'cancelled')));
 

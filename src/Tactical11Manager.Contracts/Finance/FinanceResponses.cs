@@ -16,6 +16,7 @@ namespace Tactical11Manager.Contracts.Finance;
 /// </param>
 /// <param name="Totals">The season's ledger totals by category, in a stable category order.</param>
 /// <param name="ServerTime">The server's current instant, so client clock drift is visible.</param>
+/// <param name="Outlook">Where the club's money is heading this season: its state, its forecast by stream, its wage budget and the prize at its present place. Null before a season exists.</param>
 public sealed record FinanceSummaryResponse(
     long CashMinor,
     long ReservedMinor,
@@ -28,7 +29,52 @@ public sealed record FinanceSummaryResponse(
     string? SeasonLabel,
     IReadOnlyList<FinanceWarningResponse> Warnings,
     IReadOnlyList<FinanceCategoryTotalResponse> Totals,
-    DateTimeOffset ServerTime);
+    DateTimeOffset ServerTime,
+    FinanceOutlookResponse? Outlook = null);
+
+/// <summary>Where a club's money is heading this season (master plan §10.7; plan toasty-scott sections 2a, 5 and 6).</summary>
+/// <remarks>
+/// Every figure is the server's, so the screen sets the forecast against the season so far and prints the prize without working either out
+/// (`INT-1`). The forecast leaves out bonuses and prize money, which are upside.
+/// </remarks>
+/// <param name="State">The club's financial state: <c>healthy</c>, <c>in_the_red</c> or <c>administration</c> (`DEBT-1`).</param>
+/// <param name="Embargo">Whether a transfer and building embargo is on: the club is in the red or in administration (`DEBT-3`).</param>
+/// <param name="AdministrationMatchdaysLeft">While in administration, the matchdays left before the manager is dismissed (`DEBT-5`); otherwise null.</param>
+/// <param name="MatchdaysPlayed">The matchdays the club's division has published this season, 0 to 34.</param>
+/// <param name="MatchdaysInSeason">The matchdays in a season.</param>
+/// <param name="SeasonWageMinor">The season wage bill of the active contracts.</param>
+/// <param name="WageBudgetMinor">The wage bill the club should stay within: 70% of the forecast (`BUD-2`).</param>
+/// <param name="WageShareBp">The wage bill as a share of the forecast, in basis points.</param>
+/// <param name="ForecastMinor">The season income forecast at the present fans and ground (`BUD-1`).</param>
+/// <param name="OverdraftLimitMinor">How far below zero the cash may go before administration (`DEBT-1`).</param>
+/// <param name="OverBudget">Whether the wage bill is over the wage budget.</param>
+/// <param name="Streams">The forecast by ledger category: income as a positive amount, cost as a negative one, wages included.</param>
+/// <param name="Prize">What the league would pay at the club's present place, or null before a table exists.</param>
+public sealed record FinanceOutlookResponse(
+    string State,
+    bool Embargo,
+    int? AdministrationMatchdaysLeft,
+    int MatchdaysPlayed,
+    int MatchdaysInSeason,
+    long SeasonWageMinor,
+    long WageBudgetMinor,
+    int WageShareBp,
+    long ForecastMinor,
+    long OverdraftLimitMinor,
+    bool OverBudget,
+    IReadOnlyList<FinanceForecastLineResponse> Streams,
+    FinancePrizeResponse? Prize);
+
+/// <summary>One stream of the season forecast, under the ledger category the money is booked as.</summary>
+/// <param name="Category">The ledger category, as a stable lowercase code (e.g. <c>gate_receipt</c>).</param>
+/// <param name="ForecastMinor">The season's forecast: positive for income, negative for cost.</param>
+public sealed record FinanceForecastLineResponse(string Category, long ForecastMinor);
+
+/// <summary>The league prize money at the club's present place: "if the season ended today" (`FIN-5`).</summary>
+/// <param name="Place">The club's place in the table now.</param>
+/// <param name="Clubs">The clubs in the table.</param>
+/// <param name="AmountMinor">What the league pays that place at the club's tier.</param>
+public sealed record FinancePrizeResponse(int Place, int Clubs, long AmountMinor);
 
 /// <summary>A risk the club is running, as a stable code and a sentence (master plan §11.1).</summary>
 /// <remarks>

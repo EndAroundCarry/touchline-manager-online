@@ -65,6 +65,7 @@ function createWorldApiStub() {
     createManagerProfile: vi.fn(),
     updateManagerProfile: vi.fn(),
     claimClub: vi.fn(),
+    getTakeoverPreview: vi.fn(),
     changeClubColours: vi.fn(),
     resign: vi.fn(),
     state: vi.fn(),
@@ -125,6 +126,39 @@ describe('OnboardingStore', () => {
     await expect(firstValueFrom(store.claimClub('club-2'))).rejects.toThrow();
 
     expect(api.claimClub.mock.calls[0][1]).not.toBe(api.claimClub.mock.calls[1][1]);
+  });
+
+  it('keeps a club by default, and sends a clean start when asked', async () => {
+    api.claimClub.mockReturnValue(of(dashboard));
+
+    await firstValueFrom(store.claimClub('club-1'));
+    await firstValueFrom(store.claimClub('club-1', 'clean_start'));
+
+    expect(api.claimClub.mock.calls[0][2]).toBe('keep');
+    expect(api.claimClub.mock.calls[1][2]).toBe('clean_start');
+  });
+
+  it('keeps a separate key per way of taking the club over', async () => {
+    // A claim that failed as a keep and is tried again as a clean start is a different request: the first key
+    // presented for it would be refused as a reuse.
+    api.claimClub.mockReturnValueOnce(throwError(() => new Error('timeout')));
+    api.claimClub.mockReturnValueOnce(throwError(() => new Error('timeout')));
+    api.claimClub.mockReturnValueOnce(of(dashboard));
+
+    await expect(firstValueFrom(store.claimClub('club-1', 'keep'))).rejects.toThrow();
+    await expect(firstValueFrom(store.claimClub('club-1', 'clean_start'))).rejects.toThrow();
+    await firstValueFrom(store.claimClub('club-1', 'keep'));
+
+    expect(api.claimClub.mock.calls[0][1]).not.toBe(api.claimClub.mock.calls[1][1]);
+    expect(api.claimClub.mock.calls[2][1]).toBe(api.claimClub.mock.calls[0][1]);
+  });
+
+  it('reads both ways of taking a club over before the claim', async () => {
+    api.getTakeoverPreview.mockReturnValue(of({ clubId: 'club-1' }));
+
+    await firstValueFrom(store.loadTakeoverPreview('club-1'));
+
+    expect(api.getTakeoverPreview).toHaveBeenCalledWith('club-1');
   });
 
   it('reads the countries once and serves the rest from the store', async () => {

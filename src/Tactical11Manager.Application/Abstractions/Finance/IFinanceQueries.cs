@@ -78,8 +78,8 @@ public sealed record ClubFinanceBasis(
     /// <summary>Gets the sponsor's fixed part for the whole season.</summary>
     public long SponsorFixedSeasonMinor => SponsorFixedMatchdayMinor * EconomyRuleSet.MatchdaysPerSeason;
 
-    /// <summary>Gets the season income forecast at the club's present fans and ground (`BUD-1`).</summary>
-    public long ForecastMinor => EconomyRuleSet.SeasonIncomeForecastMinor(
+    /// <summary>Gets the season income forecast by stream, at the club's present fans and ground (`BUD-1`).</summary>
+    public SeasonIncomeBreakdown IncomeBreakdown => EconomyRuleSet.SeasonIncomeBreakdownFor(
         TierNumber,
         SponsorFixedSeasonMinor,
         Seats,
@@ -87,6 +87,12 @@ public sealed record ClubFinanceBasis(
         MoodBp,
         SnackBarLevel,
         MerchandiseLevel);
+
+    /// <summary>Gets the season's costs that are not wages, by kind, at the club's present ground and buildings.</summary>
+    public SeasonCostBreakdown CostBreakdown => EconomyRuleSet.SeasonCostBreakdownFor(TierNumber, Seats, SnackBarLevel, MerchandiseLevel);
+
+    /// <summary>Gets the season income forecast at the club's present fans and ground (`BUD-1`).</summary>
+    public long ForecastMinor => IncomeBreakdown.TotalMinor;
 
     /// <summary>Gets the wage bill the club should stay within (`BUD-2`).</summary>
     public long WageBudgetMinor => EconomyRuleSet.WageBudgetMinorFor(ForecastMinor);
@@ -131,6 +137,13 @@ public sealed record FinanceSummarySnapshot(
     int Goalkeepers,
     int ExpiringContracts,
     IReadOnlyList<FinanceCategoryTotal> Totals);
+
+/// <summary>Where a club's money and its table place stand, for the finance screen (plan toasty-scott sections 2a and 6).</summary>
+/// <param name="State">The account's financial state.</param>
+/// <param name="StateSinceMatchday">The matchday ordinal the account has been in that state since, as the settlement counts them.</param>
+/// <param name="Place">The club's place in its division's table, or null before a table exists.</param>
+/// <param name="Clubs">How many clubs the table holds.</param>
+public sealed record ClubFinanceStanding(FinancialStateKind State, int StateSinceMatchday, int? Place, int Clubs);
 
 /// <summary>One page of a club's ledger, newest first.</summary>
 /// <param name="Entries">The page's entries, newest first.</param>
@@ -205,6 +218,14 @@ public interface IFinanceQueries
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The summary, or null when the club has no account.</returns>
     Task<FinanceSummarySnapshot?> GetFinanceSummaryAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads a club's financial state and its place in the table, for the finance screen's banner and its prize at the present place.
+    /// </summary>
+    /// <param name="clubId">The club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The standing, or null when the club has no account.</returns>
+    Task<ClubFinanceStanding?> GetFinanceStandingAsync(Guid clubId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reads one page of a club's ledger, newest first (`FIN-11`, `FIN-12`).

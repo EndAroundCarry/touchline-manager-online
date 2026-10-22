@@ -1,4 +1,3 @@
-import { NgTemplateOutlet } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
@@ -15,6 +14,8 @@ import {
   SELECT_INPUT,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
+import { BidForm } from '../../shared/ui/bid-form/bid-form';
+import { EmbargoNotice } from '../../shared/ui/embargo-notice/embargo-notice';
 import { PlayerCardTrigger } from '../../shared/ui/player-card/player-card-trigger';
 
 /** The two sets of open auctions the screen browses. */
@@ -29,7 +30,7 @@ export type TransferTab = 'club' | 'free-agents';
  */
 @Component({
   selector: 'app-transfers',
-  imports: [NgTemplateOutlet, RouterLink, PlayerCardTrigger],
+  imports: [RouterLink, PlayerCardTrigger, BidForm, EmbargoNotice],
   templateUrl: './transfers.html',
 })
 export class Transfers {
@@ -50,6 +51,7 @@ export class Transfers {
   protected readonly loadingMore = this.store.loadingMore;
   protected readonly hasMore = this.store.hasMore;
   protected readonly error = this.store.error;
+  protected readonly embargoed = this.store.embargoed;
 
   /** The manager's own contracts, which are the players they may list (`TRF-1`). */
   protected readonly contracts = this.squad.contracts;
@@ -98,12 +100,7 @@ export class Transfers {
   }
 
   /** Places or raises a bid from a listing's row. */
-  protected onBid(event: Event, listingId: string): void {
-    event.preventDefault();
-
-    const data = new FormData(event.target as HTMLFormElement);
-    const amount = Number(data.get('amount') ?? 0);
-
+  protected onBid(listingId: string, amount: number): void {
     this.store.bid(listingId, amount);
   }
 

@@ -455,6 +455,46 @@ internal sealed class FinanceQueries : IFinanceQueries
     }
 
     /// <inheritdoc />
+    public async Task<ClubFinanceStanding?> GetFinanceStandingAsync(Guid clubId, CancellationToken cancellationToken)
+    {
+        var account = await _dbContext.ClubAccounts
+            .AsNoTracking()
+            .Where(candidate => candidate.ClubId == clubId)
+            .Select(candidate => new { candidate.FinancialState, candidate.StateSinceMatchday })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (account is null)
+        {
+            return null;
+        }
+
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+        var divisionSeasonId = season is null
+            ? null
+            : await (
+                from entry in _dbContext.ClubSeasonEntries
+                join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+                where entry.ClubId == clubId && divisionSeason.SeasonId == season.SeasonId
+                select (Guid?)divisionSeason.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        if (divisionSeasonId is null)
+        {
+            return new ClubFinanceStanding(account.FinancialState, account.StateSinceMatchday, null, 0);
+        }
+
+        var table = await _dbContext.Standings
+            .AsNoTracking()
+            .Where(standing => standing.DivisionSeasonId == divisionSeasonId)
+            .Select(standing => new { standing.ClubId, standing.Rank })
+            .ToListAsync(cancellationToken);
+
+        int? place = table.Where(row => row.ClubId == clubId).Select(row => (int?)row.Rank).FirstOrDefault();
+
+        return new ClubFinanceStanding(account.FinancialState, account.StateSinceMatchday, place, table.Count);
+    }
+
+    /// <inheritdoc />
     public async Task<FinanceLedgerPage> GetFinanceLedgerAsync(
         Guid clubId,
         long? beforeSequence,

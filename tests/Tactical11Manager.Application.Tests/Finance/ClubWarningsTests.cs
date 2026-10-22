@@ -50,6 +50,51 @@ public sealed class ClubWarningsTests
         tooFewKeepers.Should().ContainSingle().Which.Code.Should().Be(FinanceWarningCodes.MinimumSquad);
     }
 
+    [Fact]
+    public void A_club_in_the_red_is_warned_instead_of_failing_the_payroll_check()
+    {
+        // Cash below zero leaves nothing available; the payroll check must not throw on it.
+        var warnings = ClubWarnings.Calculate(Snapshot(cashMinor: -500_000), Outlook(state: "in_the_red", embargo: true));
+
+        warnings.Should().ContainSingle().Which.Code.Should().Be(FinanceWarningCodes.InTheRed);
+    }
+
+    [Fact]
+    public void A_club_in_administration_is_told_how_long_it_has()
+    {
+        var warnings = ClubWarnings.Calculate(
+            Snapshot(cashMinor: -9_000_000),
+            Outlook(state: "administration", embargo: true, matchdaysLeft: 12));
+
+        var warning = warnings.Should().ContainSingle().Subject;
+
+        warning.Code.Should().Be(FinanceWarningCodes.Administration);
+        warning.Message.Should().Contain("12 matchdays");
+    }
+
+    [Fact]
+    public void A_wage_bill_over_the_budget_is_reported_while_the_club_is_healthy()
+    {
+        var warnings = ClubWarnings.Calculate(Snapshot(), Outlook(overBudget: true));
+
+        warnings.Should().ContainSingle().Which.Code.Should().Be(FinanceWarningCodes.OverWageBudget);
+    }
+
+    [Fact]
+    public void A_state_warning_leads_the_list()
+    {
+        var warnings = ClubWarnings.Calculate(Snapshot(expiringContracts: 3), Outlook(state: "in_the_red", embargo: true));
+
+        warnings.Select(warning => warning.Code).Should().Equal(FinanceWarningCodes.InTheRed, FinanceWarningCodes.ExpiringContracts);
+    }
+
+    private static FinanceOutlookResponse Outlook(
+        string state = "healthy",
+        bool embargo = false,
+        int? matchdaysLeft = null,
+        bool overBudget = false) =>
+        new(state, embargo, matchdaysLeft, 10, 34, 0, 0, 0, 0, 0, overBudget, [], null);
+
     private static FinanceSummarySnapshot Snapshot(
         long cashMinor = 50_000_000,
         long reservedMinor = 0,

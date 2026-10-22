@@ -128,6 +128,9 @@
     }
     @if (buildError(); as message) {
       <p [class]="formErrorClass" role="alert" data-testid="stadium-build-error">{{ message }}</p>
+      @if (buildEmbargoed()) {
+        <app-embargo-notice />
+      }
     }
 
     <section class="mt-8" aria-labelledby="stands-heading">

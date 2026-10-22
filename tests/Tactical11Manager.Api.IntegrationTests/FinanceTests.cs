@@ -76,6 +76,18 @@ public sealed class FinanceTests : IAsyncLifetime
         summary.WeeklyWageMinor.Should().Be(EconomyRuleSet.PerWeeklyRun(contracts!.SeasonWageTotalMinor));
         summary.ContractedPlayers.Should().Be(contracts.Contracts.Count);
 
+        // The outlook the finance screen draws: a healthy club with a forecast, a wage budget, and the prize at its place.
+        var outlook = summary.Outlook;
+
+        outlook.Should().NotBeNull();
+        outlook!.State.Should().Be("healthy");
+        outlook.Embargo.Should().BeFalse();
+        outlook.SeasonWageMinor.Should().Be(contracts.SeasonWageTotalMinor);
+        outlook.WageBudgetMinor.Should().Be(EconomyRuleSet.WageBudgetMinorFor(outlook.ForecastMinor), "BUD-2");
+        outlook.Streams.Select(stream => stream.Category).Should().Contain(["league_tv", "gate_receipt", "wages"]);
+        outlook.Streams.Single(stream => stream.Category == "league_tv").ForecastMinor
+            .Should().Be(EconomyRuleSet.LeagueTvSeasonMinorFor(1));
+
         await client.PostAsync("/api/v1/club-tenure/resign", content: null);
     }
 

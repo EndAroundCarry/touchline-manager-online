@@ -8,6 +8,7 @@
  * Note what is absent: the server never sends a player's hidden potential or reputation, so no shape here
  * has a field for one. `DataClassificationTests` on the API side fails if a DTO ever grows one.
  */
+import { WageImpact } from '../finance/finance.models';
 
 /** The technical attribute family. */
 export interface TechnicalAttributes {
@@ -359,6 +360,9 @@ export interface RenewalQuote {
   /** The contract's version at the moment it was quoted, sent back as `If-Match` when signing. */
   readonly contractVersion: number;
   readonly serverTime: string;
+
+  /** What the rise over the current wage would do to the club's wage bill (`WAGE-1`). */
+  readonly wageImpact?: WageImpact | null;
 }
 
 /** The contract a renewal signed a player to (`CON-4`). */

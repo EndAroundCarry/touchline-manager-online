@@ -99,6 +99,19 @@ export function formatFunds(minorUnits: number, locale = preferredLocale()): str
 }
 
 /**
+ * Formats an amount short, for a card or a gauge: 12.4M, 850K.
+ *
+ * The full figure stays one hover away (a `title` carrying {@link formatFunds}), so a number is never rounded
+ * without the exact one being reachable. Amounts under a thousand keep their pence-free whole units.
+ */
+export function formatFundsCompact(minorUnits: number, locale = preferredLocale()): string {
+  return new Intl.NumberFormat(locale, {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(minorUnits / 100);
+}
+
+/**
  * Formats an instant in the manager's time zone (`CAL-4`).
  *
  * UTC stays the authority on the server; this only decides where the moment is shown. It renders the moment

@@ -21,6 +21,7 @@ import {
   STATUS_MESSAGE,
   TEXT_INPUT,
 } from '../../shared/forms/control-styles';
+import { EmbargoNotice } from '../../shared/ui/embargo-notice/embargo-notice';
 import { StadiumPicture } from './stadium-picture';
 
 /** Order sizes a manager can reach with one tap. */
@@ -38,7 +39,7 @@ const QUICK_ORDERS: readonly number[] = [100, 500, 1_000];
  */
 @Component({
   selector: 'app-stadium',
-  imports: [RouterLink, StadiumPicture],
+  imports: [RouterLink, StadiumPicture, EmbargoNotice],
   templateUrl: './stadium.html',
 })
 export class StadiumScreen {
@@ -50,6 +51,7 @@ export class StadiumScreen {
   protected readonly error = this.store.error;
   protected readonly building = this.store.building;
   protected readonly buildError = this.store.buildError;
+  protected readonly buildEmbargoed = this.store.buildEmbargoed;
   protected readonly builtMessage = this.store.builtMessage;
   protected readonly canMutate = this.maintenance.canMutate;
 

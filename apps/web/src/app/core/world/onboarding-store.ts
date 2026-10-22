@@ -12,6 +12,8 @@ import {
   CountrySummary,
   ManagerProfile,
   OnboardingState,
+  TakeoverPreview,
+  TakeoverStart,
   WorldSummary,
 } from './world.models';
 
@@ -252,13 +254,24 @@ export class OnboardingStore {
    * attempt's outcome instead of creating a second tenure. A key that produced a tenure is dropped, so a
    * later, deliberate claim of the same club — after a resignation, say — is a new attempt rather than a
    * replay of the old one.
+   *
+   * The key is held per club and per way of taking it over: a claim that failed as a keep and is retried as a
+   * clean start is a different request, and presenting the first one's key for it would be refused as a reuse.
    */
-  claimClub(clubId: string): Observable<ClubDashboard> {
-    const key = this.claimKeys.get(clubId) ?? crypto.randomUUID();
+  claimClub(clubId: string, start: TakeoverStart = 'keep'): Observable<ClubDashboard> {
+    const slot = `${clubId}:${start}`;
+    const key = this.claimKeys.get(slot) ?? crypto.randomUUID();
 
-    this.claimKeys.set(clubId, key);
+    this.claimKeys.set(slot, key);
 
-    return this.api.claimClub(clubId, key).pipe(tap({ next: () => this.claimKeys.delete(clubId) }));
+    return this.api
+      .claimClub(clubId, key, start)
+      .pipe(tap({ next: () => this.claimKeys.delete(slot) }));
+  }
+
+  /** Reads a club as each way of taking it over would leave it, so the choice is made with both in view (`TKO-4`). */
+  loadTakeoverPreview(clubId: string): Observable<TakeoverPreview> {
+    return this.api.getTakeoverPreview(clubId);
   }
 
   /**

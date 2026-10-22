@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
+import { isEmbargo } from '../finance/embargo';
 import { StructuresApi } from './structures-api';
 import { kindLabel, readyOn } from './structures-presentation';
 import { StructureKind, Structures } from './structures.models';
@@ -22,6 +23,7 @@ export class StructuresStore {
   private readonly errorSignal = signal<string | null>(null);
   private readonly upgradingSignal = signal<StructureKind | null>(null);
   private readonly upgradeErrorSignal = signal<string | null>(null);
+  private readonly upgradeEmbargoedSignal = signal(false);
   private readonly upgradedMessageSignal = signal<string | null>(null);
 
   /** The club's two buildings. */
@@ -38,6 +40,9 @@ export class StructuresStore {
 
   /** Why the last upgrade order was refused. */
   readonly upgradeError = this.upgradeErrorSignal.asReadonly();
+
+  /** Whether the last order was refused because the club is in the red (`DEBT-3`). */
+  readonly upgradeEmbargoed = this.upgradeEmbargoedSignal.asReadonly();
 
   /** What the last successful upgrade order bought, and when the work finishes. */
   readonly upgradedMessage = this.upgradedMessageSignal.asReadonly();
@@ -85,6 +90,7 @@ export class StructuresStore {
 
     this.upgradingSignal.set(kind);
     this.upgradeErrorSignal.set(null);
+    this.upgradeEmbargoedSignal.set(false);
     this.upgradedMessageSignal.set(null);
 
     this.api.upgrade(kind, building.version).subscribe({
@@ -107,6 +113,7 @@ export class StructuresStore {
   /** Clears the upgrade messages, so a stale confirmation does not outlive the tab it belonged to. */
   dismissMessages(): void {
     this.upgradeErrorSignal.set(null);
+    this.upgradeEmbargoedSignal.set(false);
     this.upgradedMessageSignal.set(null);
   }
 
@@ -117,6 +124,7 @@ export class StructuresStore {
     this.errorSignal.set(null);
     this.upgradingSignal.set(null);
     this.upgradeErrorSignal.set(null);
+    this.upgradeEmbargoedSignal.set(false);
     this.upgradedMessageSignal.set(null);
   }
 
@@ -137,5 +145,6 @@ export class StructuresStore {
     this.upgradeErrorSignal.set(
       error instanceof ApiError ? error.detail : 'The upgrade could not be ordered.',
     );
+    this.upgradeEmbargoedSignal.set(isEmbargo(error));
   }
 }

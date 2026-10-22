@@ -1,0 +1,165 @@
+@if (loading()) {
+  <p class="text-sm text-ink-2" role="status">Loading your sponsor offers…</p>
+} @else if (error(); as message) {
+  <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  <div class="mt-4">
+    <a routerLink="/finances" [class]="secondaryButtonClass">Back to your finances</a>
+  </div>
+} @else if (page(); as sponsor) {
+  <section class="max-w-5xl">
+    <h1 [class]="pageHeadingClass">Sponsor and objective</h1>
+    <p class="mt-1 text-sm text-ink-2">
+      Your sponsors make three offers for season {{ sponsor.seasonNumber }}. Choose one and an
+      objective to aim for. The fixed part is paid on every matchday; the bonus is paid when the
+      season ends, if you finish at least as high as the objective, and one and a half times that if
+      you finish three places or more better.
+    </p>
+
+    <p class="mt-3 text-sm" data-testid="sponsor-deadline">
+      @if (sponsor.deal === null) {
+        <span class="text-amber-200">
+          Choose before {{ deadline(sponsor.deadline) }}. If you do not, the board signs the
+          balanced offer for you, aiming at what it thinks fits:
+          {{ objectiveName(sponsor.realisticObjective).toLowerCase() }}.
+        </span>
+      } @else if (sponsor.canSign) {
+        <span class="text-ink-2">
+          {{ signedBy(sponsor.deal.signedBy) }}. You can change the deal until
+          {{ deadline(sponsor.deadline) }}.
+        </span>
+      } @else {
+        <span class="text-ink-2">
+          {{ signedBy(sponsor.deal.signedBy) }}. The deal is fixed for the season.
+        </span>
+      }
+    </p>
+
+    @if (signedMessage(); as message) {
+      <p [class]="statusMessageClass" role="status" data-testid="sponsor-signed">{{ message }}</p>
+    }
+
+    @if (signError(); as message) {
+      <p [class]="formErrorClass" role="alert" data-testid="sponsor-sign-error">{{ message }}</p>
+    }
+
+    <fieldset class="mt-6" data-testid="objective-picker">
+      <legend class="text-sm font-medium text-muted">Objective</legend>
+      <p class="mt-1 text-sm text-ink-2">
+        The board thinks your squad fits
+        <strong class="text-ink">{{ objectiveName(sponsor.realisticObjective) }}</strong
+        >. A harder objective pays a bigger bonus, and pays nothing if you miss it.
+      </p>
+
+      <div class="mt-2 grid gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
+        @for (option of objectives; track option) {
+          <label [class]="radioRowClass">
+            <input
+              type="radio"
+              name="objective"
+              [value]="option"
+              [checked]="objective() === option"
+              [disabled]="!sponsor.canSign"
+              (change)="pick(option)"
+            />
+            <span class="text-sm text-ink">
+              {{ objectiveName(option) }}
+              @if (targetPlaceOf(option); as place) {
+                <span class="text-ink-2">({{ target(place) }})</span>
+              }
+              @if (option === sponsor.realisticObjective) {
+                <span class="ml-1 rounded bg-line px-1.5 py-0.5 text-xs font-semibold text-ink"
+                  >Board's pick</span
+                >
+              }
+            </span>
+          </label>
+        }
+      </div>
+    </fieldset>
+
+    <ul class="mt-6 grid gap-4 lg:grid-cols-3" data-testid="offers">
+      @for (offer of sponsor.offers; track offer.kind) {
+        <li
+          class="flex flex-col rounded border bg-panel p-4"
+          [class]="isSigned(offer.kind) ? 'border-accent' : 'border-line'"
+          [attr.data-testid]="'offer-' + offer.kind"
+        >
+          <h2 class="text-lg font-semibold">
+            {{ offerName(offer.kind) }}
+            @if (isSigned(offer.kind)) {
+              <span
+                class="ml-1 rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-200"
+                >Signed</span
+              >
+            }
+          </h2>
+          <p class="text-sm text-ink-2">{{ offer.sponsorName }}</p>
+          <p class="mt-2 text-sm text-ink-2">{{ blurb(offer.kind) }}</p>
+
+          <dl class="mt-3 flex flex-col gap-1 text-sm">
+            <div class="flex items-baseline justify-between gap-3">
+              <dt class="text-ink-2">Fixed, over the season</dt>
+              <dd class="font-semibold"><app-money [minor]="offer.fixedSeasonMinor" /></dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-3">
+              <dt class="text-ink-2">Paid on every matchday</dt>
+              <dd class="font-semibold"><app-money [minor]="offer.fixedMatchdayMinor" /></dd>
+            </div>
+            @if (bonus(offer); as quote) {
+              <div class="flex items-baseline justify-between gap-3">
+                <dt class="text-ink-2">Bonus if you meet it</dt>
+                <dd class="font-semibold" data-testid="bonus-met">
+                  <app-money [minor]="quote.metMinor" />
+                </dd>
+              </div>
+              <div class="flex items-baseline justify-between gap-3">
+                <dt class="text-ink-2">Bonus if you beat it by 3 places</dt>
+                <dd class="font-semibold"><app-money [minor]="quote.exceededMinor" /></dd>
+              </div>
+            }
+          </dl>
+
+          <div class="mt-4">
+            <button
+              type="button"
+              [class]="primaryButtonClass"
+              [disabled]="!sponsor.canSign || !canMutate() || signing() || isSigned(offer.kind)"
+              [attr.aria-label]="'Sign the ' + offerName(offer.kind) + ' offer'"
+              (click)="sign(offer.kind)"
+            >
+              {{
+                signing()
+                  ? 'Signing…'
+                  : isSigned(offer.kind)
+                    ? 'Signed'
+                    : sponsor.deal === null
+                      ? 'Sign this offer'
+                      : 'Switch to this offer'
+              }}
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+
+    @if (sponsor.deal; as deal) {
+      @if (outcome(); as result) {
+        <p class="mt-6 text-sm text-ink-2" data-testid="sponsor-outcome">
+          {{ result }}
+          @if (deal.finalPlace !== null) {
+            : finished {{ deal.finalPlace }}
+          }
+          @if (deal.bonusPaidMinor !== null) {
+            , bonus <app-money [minor]="deal.bonusPaidMinor" /> paid
+          }
+        </p>
+      }
+    }
+
+    <div class="mt-6">
+      <a routerLink="/finances" [class]="secondaryButtonClass">Back to your finances</a>
+    </div>
+  </section>
+} @else {
+  <p class="text-sm text-ink-2" role="status">Loading your sponsor offers…</p>
+}

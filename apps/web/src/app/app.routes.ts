@@ -155,6 +155,12 @@ export const routes: Routes = [
         title: 'Finances — Tactical11 Manager',
       },
       {
+        path: 'finances/sponsor',
+        loadComponent: () => import('./features/finances/sponsor').then((m) => m.SponsorScreen),
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        title: 'Sponsor — Tactical11 Manager',
+      },
+      {
         path: 'stadium',
         loadComponent: () => import('./features/stadium/stadium').then((m) => m.StadiumScreen),
         canActivate: [requireAuthentication, requireVerifiedEmail],

@@ -12,6 +12,8 @@ import {
   CreateManagerProfilePayload,
   ManagerProfile,
   OnboardingState,
+  TakeoverPreview,
+  TakeoverStart,
   UpdateManagerProfilePayload,
   WorldSummary,
 } from './world.models';
@@ -71,9 +73,18 @@ export class WorldApi {
     );
   }
 
+  /** Reads a club as each way of taking it over would leave it. */
+  getTakeoverPreview(clubId: string): Observable<TakeoverPreview> {
+    return this.api.get<TakeoverPreview>(`/clubs/${clubId}/takeover-preview`);
+  }
+
   /** Takes over a club, under the given idempotency key. */
-  claimClub(clubId: string, idempotencyKey: string): Observable<ClubDashboard> {
-    const payload: ClaimClubPayload = { clubId };
+  claimClub(
+    clubId: string,
+    idempotencyKey: string,
+    start: TakeoverStart = 'keep',
+  ): Observable<ClubDashboard> {
+    const payload: ClaimClubPayload = { clubId, start };
 
     return this.api
       .postWithResponse<ClubDashboard, ClaimClubPayload>('/club-claims', payload, {

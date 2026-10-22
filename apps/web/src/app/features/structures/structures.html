@@ -56,6 +56,9 @@
           <p [class]="formErrorClass" role="alert" data-testid="structures-upgrade-error">
             {{ message }}
           </p>
+          @if (upgradeEmbargoed()) {
+            <app-embargo-notice />
+          }
         }
 
         <figure class="rounded border border-line bg-panel p-3" data-testid="structures-figure">

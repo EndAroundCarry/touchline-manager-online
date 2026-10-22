@@ -214,6 +214,43 @@ export interface UpdateManagerProfilePayload {
   readonly timeZone: string;
 }
 
+/** How a club is taken over (`TKO-1`): inherit everything as it stands, or release the old players and begin again. */
+export type TakeoverStart = 'keep' | 'clean_start';
+
 export interface ClaimClubPayload {
   readonly clubId: string;
+
+  /** How the club is taken over; the server reads a missing value as `keep`. */
+  readonly start?: TakeoverStart;
+}
+
+/** One way of taking a club over, as it would leave the club (`TKO-4`). Amounts are minor units. */
+export interface TakeoverOption {
+  readonly start: TakeoverStart;
+  readonly players: number;
+
+  /** The mean ability of the eleven the board would field, on the 1-20 scale, to a tenth. */
+  readonly squadStrength: number;
+  readonly seasonWageMinor: number;
+
+  /** The club's cash, negative when it is in debt. */
+  readonly cashMinor: number;
+  readonly debtMinor: number;
+  readonly financialState: string;
+  readonly groundPlaces: number;
+  readonly groundLevel: number;
+  readonly snackBarLevel: number;
+  readonly shopLevel: number;
+  readonly seasonIncomeForecastMinor: number;
+  readonly wageBudgetMinor: number;
+  readonly overdraftLimitMinor: number;
+}
+
+/** The two ways of taking a club over, side by side, so the choice is made with both in view. */
+export interface TakeoverPreview {
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly tierNumber: number;
+  readonly keep: TakeoverOption;
+  readonly cleanStart: TakeoverOption;
 }

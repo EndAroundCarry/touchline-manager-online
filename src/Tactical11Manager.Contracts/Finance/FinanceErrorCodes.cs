@@ -31,4 +31,13 @@ public static class FinanceWarningCodes
 
     /// <summary>The club is below the minimum registered squad or short of goalkeepers (`SQ-2`).</summary>
     public const string MinimumSquad = "MINIMUM_SQUAD";
+
+    /// <summary>The club's cash is below zero: no bids and no building until it is back above (`DEBT-3`).</summary>
+    public const string InTheRed = "IN_THE_RED";
+
+    /// <summary>The club is past its overdraft limit: the board sells players and the manager is dismissed if it stays (`DEBT-4`, `DEBT-5`).</summary>
+    public const string Administration = "ADMINISTRATION";
+
+    /// <summary>The wage bill is over the wage budget (`BUD-2`).</summary>
+    public const string OverWageBudget = "OVER_WAGE_BUDGET";
 }

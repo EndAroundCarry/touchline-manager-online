@@ -2,6 +2,7 @@ import {
   configurePresentation,
   formatDeadline,
   formatFunds,
+  formatFundsCompact,
   formatInstant,
   preferredLocale,
   preferredTimeZone,
@@ -43,6 +44,22 @@ describe('formatFunds', () => {
 
   it('keeps the sign of a negative balance', () => {
     expect(formatFunds(-1_250, 'en-GB')).toBe('-12.50');
+  });
+});
+
+describe('formatFundsCompact', () => {
+  it('shortens millions and thousands', () => {
+    expect(formatFundsCompact(1_240_000_000, 'en-GB')).toBe('12.4m');
+    expect(formatFundsCompact(85_000_000, 'en-GB')).toBe('850k');
+  });
+
+  it('keeps two significant decimals of a million, not a rounded one', () => {
+    expect(formatFundsCompact(123_456_700, 'en-GB')).toBe('1.23m');
+  });
+
+  it('leaves a small amount in whole units and keeps the sign of a debt', () => {
+    expect(formatFundsCompact(85_000, 'en-GB')).toBe('850');
+    expect(formatFundsCompact(-250_000_000, 'en-GB')).toBe('-2.5m');
   });
 });
 

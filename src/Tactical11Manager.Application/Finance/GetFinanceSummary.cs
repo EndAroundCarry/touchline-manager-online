@@ -50,8 +50,30 @@ public sealed class GetFinanceSummary
 
         // A club without an account is a defect in generation, not an ordinary state; the read reports it as
         // a missing club rather than inventing a zero balance.
-        return summary is null
-            ? new GetFinanceSummaryResult(SquadReadOutcome.ClubNotFound, null)
-            : new GetFinanceSummaryResult(SquadReadOutcome.Found, summary.ToResponse(_clock.UtcNow));
+        if (summary is null)
+        {
+            return new GetFinanceSummaryResult(SquadReadOutcome.ClubNotFound, null);
+        }
+
+        return new GetFinanceSummaryResult(
+            SquadReadOutcome.Found,
+            summary.ToResponse(_clock.UtcNow, await ReadOutlookAsync(access.ClubId, cancellationToken)));
+    }
+
+    /// <summary>Reads where the club's money is heading, or null when the club has no place in the season (before one exists, or between seasons).</summary>
+    private async Task<FinanceOutlookResponse?> ReadOutlookAsync(Guid clubId, CancellationToken cancellationToken)
+    {
+        var bases = await _queries.GetClubFinanceBasisAsync([clubId], cancellationToken);
+        var money = await _queries.GetMoneyPositionAsync(clubId, cancellationToken);
+        var standing = await _queries.GetFinanceStandingAsync(clubId, cancellationToken);
+
+        if (bases.Count == 0 || money is null || standing is null)
+        {
+            return null;
+        }
+
+        var ordinal = await _queries.GetSettledMatchdayOrdinalAsync(cancellationToken);
+
+        return FinanceOutlooks.Compose(bases[0], money, standing, ordinal);
     }
 }

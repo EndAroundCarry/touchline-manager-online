@@ -6,6 +6,9 @@
 
   @if (error(); as message) {
     <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    @if (embargoed()) {
+      <app-embargo-notice />
+    }
   }
 
   <section class="mt-6 rounded border border-line bg-panel p-4">
@@ -155,29 +158,12 @@
                       <td class="px-3 py-2 text-right text-ink-2">{{ listing.bidderCount }}</td>
                       <td class="px-3 py-2 text-ink-2">{{ instant(listing.endsAt) }}</td>
                       <td class="px-3 py-2">
-                        <form
-                          class="flex items-center gap-2"
-                          (submit)="onBid($event, listing.listingId)"
-                        >
-                          <label class="sr-only" [attr.for]="'bid-' + listing.listingId"
-                            >Bid amount</label
-                          >
-                          <input
-                            [id]="'bid-' + listing.listingId"
-                            name="amount"
-                            type="number"
-                            min="1"
-                            [value]="listing.minimumAcceptableBidMinor"
-                            [class]="textInputClass"
-                          />
-                          <button
-                            type="submit"
-                            [class]="secondaryButtonClass"
-                            [disabled]="!canMutate()"
-                          >
-                            Bid
-                          </button>
-                        </form>
+                        <app-bid-form
+                          [listing]="listing"
+                          idPrefix="bid-"
+                          [disabled]="!canMutate()"
+                          (bid)="onBid(listing.listingId, $event)"
+                        />
                       </td>
                     </tr>
                   }
@@ -234,25 +220,13 @@
                       <dd class="text-ink">{{ instant(listing.endsAt) }}</dd>
                     </div>
                   </dl>
-                  <form
-                    class="mt-2 flex items-center gap-2"
-                    (submit)="onBid($event, listing.listingId)"
-                  >
-                    <label class="sr-only" [attr.for]="'bid-mobile-' + listing.listingId"
-                      >Bid amount</label
-                    >
-                    <input
-                      [id]="'bid-mobile-' + listing.listingId"
-                      name="amount"
-                      type="number"
-                      min="1"
-                      [value]="listing.minimumAcceptableBidMinor"
-                      [class]="textInputClass"
-                    />
-                    <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">
-                      Bid
-                    </button>
-                  </form>
+                  <app-bid-form
+                    class="mt-2 block"
+                    [listing]="listing"
+                    idPrefix="bid-mobile-"
+                    [disabled]="!canMutate()"
+                    (bid)="onBid(listing.listingId, $event)"
+                  />
                 </li>
               }
             </ul>
@@ -367,11 +341,11 @@
                       <td class="px-3 py-2 text-right text-ink-2">{{ listing.bidderCount }}</td>
                       <td class="px-3 py-2 text-ink-2">{{ instant(listing.endsAt) }}</td>
                       <td class="px-3 py-2">
-                        <ng-container
-                          *ngTemplateOutlet="
-                            bidForm;
-                            context: { $implicit: listing, prefix: 'bid-' }
-                          "
+                        <app-bid-form
+                          [listing]="listing"
+                          idPrefix="bid-"
+                          [disabled]="!canMutate()"
+                          (bid)="onBid(listing.listingId, $event)"
                         />
                       </td>
                     </tr>
@@ -428,11 +402,11 @@
                     </div>
                   </dl>
                   <div class="mt-2">
-                    <ng-container
-                      *ngTemplateOutlet="
-                        bidForm;
-                        context: { $implicit: listing, prefix: 'bid-mobile-' }
-                      "
+                    <app-bid-form
+                      [listing]="listing"
+                      idPrefix="bid-mobile-"
+                      [disabled]="!canMutate()"
+                      (bid)="onBid(listing.listingId, $event)"
                     />
                   </div>
                 </li>
@@ -456,21 +430,6 @@
       }
     }
   </section>
-
-  <ng-template #bidForm let-listing let-prefix="prefix">
-    <form class="flex items-center gap-2" (submit)="onBid($event, listing.listingId)">
-      <label class="sr-only" [attr.for]="prefix + listing.listingId">Bid amount</label>
-      <input
-        [id]="prefix + listing.listingId"
-        name="amount"
-        type="number"
-        min="1"
-        [value]="listing.minimumAcceptableBidMinor"
-        [class]="textInputClass"
-      />
-      <button type="submit" [class]="secondaryButtonClass" [disabled]="!canMutate()">Bid</button>
-    </form>
-  </ng-template>
 
   <div class="mt-8 grid gap-6 lg:grid-cols-2">
     <section class="rounded border border-line bg-panel p-4">

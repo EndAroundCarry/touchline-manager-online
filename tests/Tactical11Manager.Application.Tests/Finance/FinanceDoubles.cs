@@ -370,6 +370,9 @@ internal static class FinanceDoubles
         public Task<FinanceSummarySnapshot?> GetFinanceSummaryAsync(Guid clubId, CancellationToken cancellationToken) =>
             Task.FromResult<FinanceSummarySnapshot?>(null);
 
+        public Task<ClubFinanceStanding?> GetFinanceStandingAsync(Guid clubId, CancellationToken cancellationToken) =>
+            Task.FromResult<ClubFinanceStanding?>(null);
+
         public Task<FinanceLedgerPage> GetFinanceLedgerAsync(
             Guid clubId,
             long? beforeSequence,

@@ -1,0 +1,39 @@
+<details
+  class="rounded border text-sm"
+  [class]="toneClass()"
+  [open]="open()"
+  data-testid="wage-impact"
+  [attr.data-level]="impact().level"
+>
+  <summary class="cursor-pointer px-2 py-1 font-semibold">
+    <span class="sr-only">Wage impact of this {{ subject() }}: </span>{{ headline() }}
+  </summary>
+
+  <dl class="flex flex-col gap-1 px-2 pb-2">
+    <div class="flex items-baseline justify-between gap-3">
+      <dt>Adds to the season's wages</dt>
+      <dd class="font-semibold">
+        <app-money [minor]="impact().addedSeasonWageMinor" [signed]="true" />
+      </dd>
+    </div>
+    <div class="flex items-baseline justify-between gap-3">
+      <dt>Wage bill after</dt>
+      <dd class="font-semibold" data-testid="wage-bill-after">
+        <app-money [minor]="impact().wageBillAfterMinor" /> of
+        <app-money [minor]="impact().wageBudgetMinor" /> ({{ share() }}% of income)
+      </dd>
+    </div>
+    <div class="flex items-baseline justify-between gap-3">
+      <dt>Cash at the season's end, after the fee</dt>
+      <dd class="font-semibold" data-testid="season-end-cash">
+        <app-money [minor]="impact().seasonEndCashMinor" />
+      </dd>
+    </div>
+    @if (red(); as sentence) {
+      <p class="mt-1 font-medium" data-testid="red-from">{{ sentence }}</p>
+    }
+    <p class="mt-1 text-xs opacity-80">
+      Priced at the smallest bid that is accepted. A higher bid leaves less cash.
+    </p>
+  </dl>
+</details>

@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
+import { isEmbargo } from '../finance/embargo';
 import { TransfersApi } from './transfers-api';
 import { MyMarketBid, TransferHistoryEntry, TransferListing } from './transfers.models';
 
@@ -27,6 +28,7 @@ export class TransfersStore {
   private readonly loadingSignal = signal(false);
   private readonly loadingMoreSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
+  private readonly embargoedSignal = signal(false);
 
   /** The open listings read so far. */
   readonly listings = this.listingsSignal.asReadonly();
@@ -70,6 +72,9 @@ export class TransfersStore {
   /** Why the last request failed. */
   readonly error = this.errorSignal.asReadonly();
 
+  /** Whether the last request was refused because the club is in the red (`DEBT-3`). */
+  readonly embargoed = this.embargoedSignal.asReadonly();
+
   /**
    * Reads the clubs' open listings, the free-agent pool, the club's own activity, and the first page of
    * history.
@@ -77,6 +82,7 @@ export class TransfersStore {
   load(): void {
     this.loadingSignal.set(true);
     this.errorSignal.set(null);
+    this.embargoedSignal.set(false);
     this.listingsSignal.set([]);
     this.nextCursorSignal.set(null);
     this.historySignal.set([]);
@@ -190,6 +196,8 @@ export class TransfersStore {
 
   /** Places or raises a bid, then refreshes the lists. */
   bid(listingId: string, amountMinor: number): void {
+    this.embargoedSignal.set(false);
+
     this.api.bid(listingId, amountMinor, crypto.randomUUID()).subscribe({
       next: () => this.load(),
       error: (error: unknown) => this.fail(error, 'That bid could not be placed.'),
@@ -212,6 +220,7 @@ export class TransfersStore {
     this.loadingSignal.set(false);
     this.loadingMoreSignal.set(false);
     this.errorSignal.set(null);
+    this.embargoedSignal.set(false);
   }
 
   private loadFreeAgents(): void {
@@ -240,5 +249,6 @@ export class TransfersStore {
   private fail(error: unknown, fallback: string): void {
     this.loadingSignal.set(false);
     this.errorSignal.set(error instanceof ApiError ? error.detail : fallback);
+    this.embargoedSignal.set(isEmbargo(error));
   }
 }

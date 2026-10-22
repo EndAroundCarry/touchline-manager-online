@@ -4,6 +4,7 @@
  * Hand-written to match `Tactical11Manager.Contracts.Market`. Amounts are minor units; the screens format
  * them and the server does every piece of arithmetic that matters (`INT-1`).
  */
+import { WageImpact } from '../finance/finance.models';
 
 /** Who sells a listed player (`FA-5`). */
 export type ListingKind = 'club' | 'free_agent';
@@ -37,6 +38,12 @@ export interface TransferListing {
   readonly minimumAcceptableBidMinor: number;
   readonly yourBidMinor: number | null;
   readonly version: number;
+
+  /**
+   * What signing the player would do to the viewer's club, priced at the smallest bid the listing accepts (`WAGE-1`).
+   * Absent on the club's own listing and on one it already leads.
+   */
+  readonly wageImpact?: WageImpact | null;
 }
 
 /** One page of listings. */

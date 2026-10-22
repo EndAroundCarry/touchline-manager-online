@@ -1,0 +1,38 @@
+<form class="flex flex-col gap-2" (submit)="submit($event)">
+  <div class="flex items-center gap-2">
+    <label class="sr-only" [attr.for]="fieldId()">Bid amount</label>
+    <input
+      [id]="fieldId()"
+      name="amount"
+      type="number"
+      min="1"
+      [value]="listing().minimumAcceptableBidMinor"
+      [class]="textInputClass"
+    />
+    <button
+      type="submit"
+      [class]="secondaryButtonClass"
+      [disabled]="disabled() || blocked()"
+      [attr.aria-describedby]="blocked() ? confirmId() : null"
+    >
+      Bid
+    </button>
+  </div>
+
+  @if (listing().wageImpact; as impact) {
+    <app-wage-impact [impact]="impact" />
+
+    @if (impact.needsConfirmation) {
+      <label [class]="checkboxRowClass" [attr.for]="confirmId()">
+        <input
+          type="checkbox"
+          [id]="confirmId()"
+          [class]="checkboxClass"
+          [checked]="confirmed()"
+          (change)="confirm($event)"
+        />
+        <span class="text-sm text-ink">I understand the risk and still want to bid.</span>
+      </label>
+    }
+  }
+</form>

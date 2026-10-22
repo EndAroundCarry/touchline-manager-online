@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { SquadStore } from '../../core/squad/squad-store';
+import { wageImpact } from '../../core/finance/finance-test-data';
 import { TransfersStore } from '../../core/transfers/transfers-store';
 import { TransferHistoryEntry, TransferListing } from '../../core/transfers/transfers.models';
 import { PlayerCardService } from '../../shared/ui/player-card/player-card.service';
@@ -64,6 +65,8 @@ describe('Transfers', () => {
   let freeAgents: WritableSignal<readonly TransferListing[]>;
   let history: WritableSignal<readonly TransferHistoryEntry[]>;
   let freeAgentFamily: WritableSignal<string>;
+  let error: WritableSignal<string | null>;
+  let embargoed: WritableSignal<boolean>;
   let store: {
     load: ReturnType<typeof vi.fn>;
     bid: ReturnType<typeof vi.fn>;
@@ -76,6 +79,8 @@ describe('Transfers', () => {
     freeAgents = signal([freeAgent('f1', { leadingAmountMinor: 300_000, bidderCount: 2 })]);
     history = signal([]);
     freeAgentFamily = signal('');
+    error = signal<string | null>(null);
+    embargoed = signal(false);
 
     store = {
       load: vi.fn(),
@@ -104,7 +109,8 @@ describe('Transfers', () => {
             hasMoreFreeAgents: signal(true),
             freeAgentsLoading: signal(false),
             freeAgentsLoadingMore: signal(false),
-            error: signal(null),
+            error,
+            embargoed,
           },
         },
         {
@@ -204,6 +210,58 @@ describe('Transfers', () => {
     row.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
 
     expect(store.bid).toHaveBeenCalledWith('f1', 400_000);
+  });
+
+  it('shows what a signing would do to the wage bill under the bid, and waits for the tick at danger', async () => {
+    freeAgents.set([
+      freeAgent('f1', {
+        wageImpact: wageImpact({ level: 'danger', needsConfirmation: true, redFromMatchday: 18 }),
+      }),
+    ]);
+    await openTab('Free agents');
+
+    const row = root.querySelector<HTMLElement>('[data-testid="free-agents-table"] tbody tr')!;
+    const button = row.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+    expect(row.querySelector('[data-testid="wage-impact"]')!.textContent).toContain(
+      'Danger: you would run out of cash',
+    );
+    expect(button.disabled).toBe(true);
+
+    row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+    await fixture.whenStable();
+    row.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+
+    expect(store.bid).toHaveBeenCalledWith('f1', 250_000);
+  });
+
+  it('puts the wage impact on a club listing too', async () => {
+    clubListings.set([listing('l1', { wageImpact: wageImpact({ level: 'stretching' }) })]);
+    await fixture.whenStable();
+
+    const row = root.querySelector<HTMLElement>('[data-testid="listings-table"] tbody tr')!;
+
+    expect(row.querySelector('[data-testid="wage-impact"]')!.textContent).toContain(
+      'Stretches your budget',
+    );
+  });
+
+  it('says why a bid was refused while the club is in the red, and points at the finances', async () => {
+    error.set('A club in the red or in administration may not bid.');
+    embargoed.set(true);
+    await fixture.whenStable();
+
+    const notice = root.querySelector<HTMLElement>('[data-testid="embargo-notice"]')!;
+
+    expect(notice.textContent).toContain('Bids for players and new building are stopped');
+    expect(notice.querySelector('a')!.getAttribute('href')).toBe('/finances');
+  });
+
+  it('says nothing more about a refusal that is not the embargo', async () => {
+    error.set('Not enough cash.');
+    await fixture.whenStable();
+
+    expect(root.querySelector('[data-testid="embargo-notice"]')).toBeNull();
   });
 
   it('narrows the pool by position through the store', async () => {

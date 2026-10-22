@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../api/api-error';
+import { isEmbargo } from '../finance/embargo';
 import { StadiumApi } from './stadium-api';
 import { Stadium, StadiumStandCode } from './stadium.models';
 
@@ -20,6 +21,7 @@ export class StadiumStore {
   private readonly errorSignal = signal<string | null>(null);
   private readonly buildingSignal = signal<StadiumStandCode | null>(null);
   private readonly buildErrorSignal = signal<string | null>(null);
+  private readonly buildEmbargoedSignal = signal(false);
   private readonly builtMessageSignal = signal<string | null>(null);
 
   /** The club's stadium. */
@@ -36,6 +38,9 @@ export class StadiumStore {
 
   /** Why the last build order was refused. */
   readonly buildError = this.buildErrorSignal.asReadonly();
+
+  /** Whether the last order was refused because the club is in the red (`DEBT-3`). */
+  readonly buildEmbargoed = this.buildEmbargoedSignal.asReadonly();
 
   /** What the last successful build order bought. */
   readonly builtMessage = this.builtMessageSignal.asReadonly();
@@ -89,6 +94,7 @@ export class StadiumStore {
 
     this.buildingSignal.set(stand);
     this.buildErrorSignal.set(null);
+    this.buildEmbargoedSignal.set(false);
     this.builtMessageSignal.set(null);
 
     this.api.build({ stand, count }, stadium.version).subscribe({
@@ -108,6 +114,7 @@ export class StadiumStore {
   /** Clears the build messages, so a stale confirmation does not outlive the form it belonged to. */
   dismissMessages(): void {
     this.buildErrorSignal.set(null);
+    this.buildEmbargoedSignal.set(false);
     this.builtMessageSignal.set(null);
   }
 
@@ -118,6 +125,7 @@ export class StadiumStore {
     this.errorSignal.set(null);
     this.buildingSignal.set(null);
     this.buildErrorSignal.set(null);
+    this.buildEmbargoedSignal.set(false);
     this.builtMessageSignal.set(null);
   }
 
@@ -138,5 +146,6 @@ export class StadiumStore {
     this.buildErrorSignal.set(
       error instanceof ApiError ? error.detail : 'The places could not be built.',
     );
+    this.buildEmbargoedSignal.set(isEmbargo(error));
   }
 }

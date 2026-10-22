@@ -14,6 +14,7 @@ import { CorrelationStore } from '../../core/api/correlation-store';
 import { SessionStore } from '../../core/auth/session-store';
 import { CalendarStore } from '../../core/calendar/calendar-store';
 import { FanStore } from '../../core/fans/fan-store';
+import { SponsorStore } from '../../core/finance/sponsor-store';
 import { lockCountdown, venueLabel } from '../../core/competition/competition-presentation';
 import { CompetitionStore } from '../../core/competition/competition-store';
 import { GameClockStore } from '../../core/devtools/game-clock-store';
@@ -70,6 +71,7 @@ export class AppShell implements OnDestroy {
   private readonly calendar = inject(CalendarStore);
   private readonly fans = inject(FanStore);
   private readonly structures = inject(StructuresStore);
+  private readonly sponsor = inject(SponsorStore);
   private readonly inbox = inject(InboxStore);
   private readonly conversations = inject(ConversationsStore);
   private readonly news = inject(NewsStore);
@@ -302,6 +304,7 @@ export class AppShell implements OnDestroy {
       this.calendar.clear();
       this.fans.clear();
       this.structures.clear();
+      this.sponsor.clear();
       this.inbox.clear();
       this.conversations.clear();
       this.news.clear();

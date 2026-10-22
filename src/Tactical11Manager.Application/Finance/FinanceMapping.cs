@@ -18,9 +18,11 @@ public static class FinanceMapping
     /// <summary>Projects a club's money and season totals.</summary>
     /// <param name="snapshot">The read snapshot.</param>
     /// <param name="serverTime">When the response was produced.</param>
+    /// <param name="outlook">Where the club's money is heading, or null when it has no place in a season.</param>
     public static FinanceSummaryResponse ToResponse(
         this FinanceSummarySnapshot snapshot,
-        DateTimeOffset serverTime)
+        DateTimeOffset serverTime,
+        FinanceOutlookResponse? outlook = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -36,9 +38,10 @@ public static class FinanceMapping
             EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.OperatingCostSeasonMinorFor(tier)),
             tier,
             snapshot.SeasonLabel,
-            ClubWarnings.Calculate(snapshot),
+            ClubWarnings.Calculate(snapshot, outlook),
             [.. snapshot.Totals.Select(total => new FinanceCategoryTotalResponse(total.Category.ToCode(), total.AmountMinor))],
-            serverTime);
+            serverTime,
+            outlook);
     }
 
     /// <summary>Projects one page of the ledger, rendering each line and naming the next cursor.</summary>

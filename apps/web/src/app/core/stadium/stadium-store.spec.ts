@@ -209,6 +209,23 @@ describe('StadiumStore', () => {
     expect(store.builtMessage()).toBeNull();
   });
 
+  it('flags an order refused because the club is in the red', () => {
+    api.get.mockReturnValue(of(stadium()));
+    api.build.mockReturnValue(
+      throwError(() => problem(409, 'BUILD_EMBARGO', 'A club in the red may not build.')),
+    );
+
+    store.load();
+    store.build('vip', 500, 'VIP seats');
+
+    expect(store.buildEmbargoed()).toBe(true);
+    expect(store.buildError()).toBe('A club in the red may not build.');
+
+    store.dismissMessages();
+
+    expect(store.buildEmbargoed()).toBe(false);
+  });
+
   it('clears what it holds when the session ends', () => {
     api.get.mockReturnValue(of(stadium()));
 

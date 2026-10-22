@@ -206,6 +206,22 @@ describe('StructuresStore', () => {
     expect(store.upgrading()).toBeNull();
   });
 
+  it('flags an order refused because the club is in the red', () => {
+    api.get.mockReturnValue(of(structures()));
+    api.upgrade.mockReturnValue(
+      throwError(() => problem(409, 'BUILD_EMBARGO', 'A club in the red may not build.')),
+    );
+
+    store.load();
+    store.upgrade('snack_bar');
+
+    expect(store.upgradeEmbargoed()).toBe(true);
+
+    store.dismissMessages();
+
+    expect(store.upgradeEmbargoed()).toBe(false);
+  });
+
   it('drops a stale confirmation when the messages are dismissed', () => {
     api.get.mockReturnValue(of(structures()));
     api.upgrade.mockReturnValue(of(structures({ version: 2 })));
