@@ -143,4 +143,10 @@ public sealed class RateLimitingOptions
 
     /// <summary>Gets or sets the length of the direct-message rate-limit window in seconds.</summary>
     public int DirectMessageWindowSeconds { get; set; } = 3600;
+
+    /// <summary>Gets or sets the forum threads and replies one manager may post per window, together.</summary>
+    public int ForumPostPermitLimit { get; set; } = 30;
+
+    /// <summary>Gets or sets the length of the forum rate-limit window in seconds.</summary>
+    public int ForumPostWindowSeconds { get; set; } = 3600;
 }

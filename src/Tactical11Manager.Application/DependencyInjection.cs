@@ -10,6 +10,7 @@ using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Application.Competition;
 using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
+using Tactical11Manager.Application.Forum;
 using Tactical11Manager.Application.Jobs;
 using Tactical11Manager.Application.Market;
 using Tactical11Manager.Application.Market.Validation;
@@ -250,6 +251,13 @@ public static class DependencyInjection
 
         // The operator's announcement, published as a scoped news item (master plan §10.8, F-46, ADR-0045).
         services.AddScoped<PublishAnnouncement>();
+
+        // Community Forum
+        services.AddScoped<GetForumOverview>();
+        services.AddScoped<GetSubforumThreads>();
+        services.AddScoped<GetForumThreadDetail>();
+        services.AddScoped<CreateForumThread>();
+        services.AddScoped<CreateForumPost>();
 
         // Notification preferences (COM-4) and the deadline reminder (COM-3).
         services.AddScoped<GetNotificationPreferences>();

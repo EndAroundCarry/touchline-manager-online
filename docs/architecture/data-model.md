@@ -110,6 +110,8 @@ flowchart LR
         conversations
         direct_messages
         manager_blocks
+        forum_threads
+        forum_posts
     end
     subgraph ops[ops]
         jobs
@@ -888,6 +890,34 @@ erDiagram
         uuid blocked_manager_id PK
         timestamptz created_at
     }
+    forum_threads ||--|{ forum_posts : "holds"
+    forum_threads {
+        uuid id PK
+        text subforum_id
+        uuid country_id "null for the international forum"
+        text title
+        uuid author_manager_id
+        text author_manager_name
+        text author_club_name
+        boolean is_pinned
+        boolean is_announcement
+        int reply_count
+        timestamptz created_at
+        timestamptz last_activity_at
+        text latest_reply_author_name
+        bigint version
+    }
+    forum_posts {
+        uuid id PK
+        uuid thread_id FK
+        int post_number
+        uuid author_manager_id
+        text author_manager_name
+        text author_club_name
+        boolean is_staff
+        text body
+        timestamptz created_at
+    }
     notification_preferences {
         uuid id PK
         uuid manager_id FK UK
@@ -995,6 +1025,8 @@ erDiagram
 | Index `(conversation_id, sent_at desc, id desc)` | `direct_messages` | A thread's keyset page, newest first |
 | Partial index `recipient_manager_id where read_at is null` | `direct_messages` | The direct unread count in `/sync` (`COM-16`) |
 | `primary key (blocker_manager_id, blocked_manager_id)`, `check (blocker_manager_id <> blocked_manager_id)`, index `blocked_manager_id` | `manager_blocks` | One block per pair and direction; the reverse lookup answers "has this manager blocked me" (`COM-15`) |
+| `check (length(title) between 3 and 150)`, `check (reply_count >= 0)`, `check (version >= 1)`; index `(subforum_id, is_pinned, last_activity_at)` and `(country_id, subforum_id, last_activity_at)` | `forum_threads` | A thread has a real title, and a subforum's list is read pinned first, newest activity first (`COM-18`, `COM-20`) |
+| `check (post_number >= 1)`, `check (length(body) between 1 and 10000)`; unique `(thread_id, post_number)` | `forum_posts` | Posts of a thread are numbered once, so two replies at the same instant cannot both take a number (`COM-20`) |
 | `unique (manager_id)` | `notification_preferences` | One preferences row per manager (`COM-8`) |
 | `unique (user_id, operation, idempotency_key)` | `idempotency_records` | Reject key reuse with a different request hash |
 | `check (category in (...))`, `check (length(template_key) > 0)` | `inbox_messages` | A stored shelf and template are codes, not ordinals |

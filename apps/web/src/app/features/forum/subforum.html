@@ -1,0 +1,68 @@
+<section class="max-w-4xl">
+  <p class="text-sm"><a routerLink="/forum" [class]="linkClass">Back to the forum</a></p>
+
+  @if (loading()) {
+    <p class="mt-4 text-sm text-ink-2" role="status">Loading the threads…</p>
+  } @else if (error(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  } @else if (list(); as subforum) {
+    <h1 [class]="pageHeadingClass" class="mt-3">{{ subforum.subforumName }}</h1>
+    <p class="mt-1 text-sm text-ink-2">{{ subforum.sectionTitle }}</p>
+
+    @if (subforum.languageNotice; as notice) {
+      <p
+        class="mt-3 rounded border border-line-strong bg-raised px-3 py-2 text-sm font-medium text-ink"
+        role="note"
+        data-testid="language-notice"
+      >
+        {{ notice }}
+      </p>
+    }
+
+    <div class="mt-4">
+      @if (subforum.canCreateThreads) {
+        <a [routerLink]="['/forum', subforum.subforumId, 'new']" [class]="primaryButtonClass">
+          Start a thread
+        </a>
+      } @else {
+        <p class="text-sm text-ink-2" data-testid="staff-only">
+          Only the game's staff start threads here. You can reply to any thread.
+        </p>
+      }
+    </div>
+
+    @if (subforum.threads.length === 0) {
+      <p class="mt-6 text-sm text-ink-2" role="status">No threads yet.</p>
+    } @else {
+      <ul class="mt-6 flex flex-col gap-3" data-testid="thread-list">
+        @for (thread of subforum.threads; track thread.id) {
+          <li class="rounded border border-line bg-panel px-3 py-3">
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 class="text-sm font-semibold text-ink">
+                <a [routerLink]="['/forum/threads', thread.id]" [class]="nameLinkClass">{{
+                  thread.title
+                }}</a>
+              </h2>
+              @if (thread.isPinned) {
+                <span class="text-xs uppercase tracking-wide text-muted">Pinned</span>
+              }
+              <time class="ml-auto text-xs text-muted" [attr.datetime]="thread.lastActivityAt">
+                {{ time(thread.lastActivityAt) }}
+              </time>
+            </div>
+            <p class="mt-1 text-xs text-muted">
+              Started by {{ thread.authorManagerName }}
+              @if (thread.authorClubName; as club) {
+                · {{ club }}
+              }
+              · {{ thread.replyCount }} {{ thread.replyCount === 1 ? 'reply' : 'replies' }}
+              @if (thread.latestReplyAuthorName; as latest) {
+                · latest by {{ latest }}
+              }
+            </p>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

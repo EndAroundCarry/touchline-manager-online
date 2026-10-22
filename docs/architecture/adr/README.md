@@ -109,3 +109,4 @@ the system is shaped the way it is.
 | [0079](0079-direct-messages-between-managers.md) | Managers write to each other in subject threads, with a length cap, a rate limit and a block switch | Accepted |
 | [0080](0080-club-structures-snack-bar-and-merchandise-shop.md) | Every club has a snack bar and a merchandise shop with ten levels, timed upgrades and weekly upkeep; takings follow the crowd, the result and the fans' mood | Accepted |
 | [0081](0081-every-attribute-develops-to-a-limit-set-by-potential.md) | Every attribute develops, up to a limit set by the player's potential and position; youth potential has its own scale (`training-v4`) | Accepted |
+| [0082](0082-community-forum.md) | A community forum: an international one (English) and one per country, with threads managers start except in Announcements | Accepted |

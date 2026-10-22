@@ -10,6 +10,7 @@ using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Application.Abstractions.Fans;
 using Tactical11Manager.Application.Abstractions.Finance;
+using Tactical11Manager.Application.Abstractions.Forum;
 using Tactical11Manager.Application.Abstractions.Jobs;
 using Tactical11Manager.Application.Abstractions.Market;
 using Tactical11Manager.Application.Abstractions.Match;
@@ -312,6 +313,7 @@ public static class DependencyInjection
         services.AddScoped<INewsRepository, NewsRepository>();
         services.AddScoped<INotificationPreferencesRepository, NotificationPreferencesRepository>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+        services.AddScoped<IForumRepository, ForumRepository>();
 
         // Bound here rather than in AddJobQueueWorker so a misconfigured interval fails at startup in every
         // host, and the schedulers that read them are registered there for the same reason the queue poller

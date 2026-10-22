@@ -13,6 +13,7 @@ using Tactical11Manager.Api.Configuration;
 using Tactical11Manager.Api.Endpoints;
 using Tactical11Manager.Api.Fans;
 using Tactical11Manager.Api.Finance;
+using Tactical11Manager.Api.Forum;
 using Tactical11Manager.Api.Health;
 using Tactical11Manager.Api.Http;
 using Tactical11Manager.Api.Market;
@@ -161,6 +162,20 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true,
             }));
+
+    // A forum post is public, so it is limited per manager over an hour like a direct message; a thread and a
+    // reply draw on the same allowance.
+    options.AddPolicy(
+        RateLimitPolicies.ForumPost,
+        httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: AuthenticatedPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimits.ForumPostPermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimits.ForumPostWindowSeconds),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -299,6 +314,7 @@ app.MapCompetitionEndpoints();
 app.MapTeamSheetEndpoints();
 app.MapMatchEndpoints();
 app.MapCommsEndpoints();
+app.MapForumEndpoints();
 app.MapFinanceEndpoints();
 app.MapCalendarEndpoints();
 app.MapFanEndpoints();

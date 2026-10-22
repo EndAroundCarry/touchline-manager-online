@@ -4,6 +4,15 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Community plan - a forum, and the Messages menu becomes Community
+
+- The menu group Messages is now **Community** and holds Inbox, News and the new **Forum**. The forum has an **International** section (General, Development and Bugs, Announcements) and a **country** section (General) for the country of the club the manager runs; a manager with no club sees the international section alone. Posts in the International forum are to be written in English, and the front page, the thread list, the new-thread form and every thread say so (the game does not detect the language).
+- Any verified manager may start a thread in any subforum they can open, except International Announcements, where only an operator or an admin may; anyone who can open a thread may reply. Plain text, shown as text and never as markup; title 3-150, opening post 3-10,000, reply 1-10,000 characters; 30 threads and replies an hour per manager (429 over that). Posts are final: no editing, deleting or moderation tools yet. A country's threads are never shown to another country (404 on a read, 403 on a reply).
+- API: `GET /forum/overview`, `GET`/`POST /forum/subforums/{subforumId}/threads`, `GET /forum/threads/{threadId}`, `POST /forum/threads/{threadId}/posts`. Schema: `comms.forum_threads`, `comms.forum_posts` (migration `Stage16CommunityForum`). Config: `RateLimiting:ForumPostPermitLimit` and `ForumPostWindowSeconds`. A newly seeded world gets a pinned welcome announcement and two starter threads by a staff author.
+- Reverses part of three written rules on purpose: forums leave the master-plan non-goals as a text forum, `FIC-9` allows a public forum post, and the help page no longer says there are no forums.
+- Open: moderation (report, lock, delete, ban), search, paging and unread markers, editing and quoting a post, an email for a reply, anonymizing a closed account's name in old posts, enforcing the English rule.
+- Docs: `game-rules.md` `COM-17` to `COM-20` and the constants in section 18, `data-model.md`, `modules.md`, master plan, `mvp-traceability.md`, the content policy, ADR-0082.
+
 ## Training v4 - every attribute develops, up to a limit set by potential
 
 - Every attribute a player develops now grows every day: an outfielder's 24 outfield attributes (never his goalkeeping ones), all 28 for a keeper. The programme is the focus: it takes 60% of the day's development by weight and the other attributes share the rest; an attribute at its limit passes its share on, so nothing is lost until the player is complete. Recovery still develops nothing. The daily budget is 400 thousandths of a point at peak age (was 140), so an average 17-year-old reaches his limit at about 24 (`training-v4`).

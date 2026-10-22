@@ -90,7 +90,7 @@ Do not put these on the public MVP critical path:
 - Private transfer negotiations, player agents, loans, swaps, clauses, installment payments, or transfer windows.
 - Fog-of-war attribute estimates or a staffed scouting network; MVP scouting is database search plus shortlists.
 - Facilities beyond the stadium and the two structures (the snack bar and the merchandise shop, [ADR-0080](../architecture/adr/0080-club-structures-snack-bar-and-merchandise-shop.md)), sponsorship negotiation, taxes, currencies, or debt.
-- Public chat, forums, manager associations, or user-generated public content. (Private messages between two managers are in scope: [ADR-0079](../architecture/adr/0079-direct-messages-between-managers.md), `COM-10`…`COM-16`.)
+- Public chat, manager associations, or user-generated public content beyond the forum. (Private messages between two managers are in scope: [ADR-0079](../architecture/adr/0079-direct-messages-between-managers.md), `COM-10`…`COM-16`. So is a text forum, an international one and one per country: [ADR-0082](../architecture/adr/0082-community-forum.md), `COM-17`…`COM-20`.)
 - Native Android/iOS packages; Capacitor follows the PWA release.
 - Offline mutations. Deadline-sensitive writes must never be silently queued.
 - Native AOT as a release gate. Adopt it later only if compatibility and measured benefits justify it.

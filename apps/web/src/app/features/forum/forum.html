@@ -1,0 +1,68 @@
+<section class="max-w-4xl">
+  <h1 [class]="pageHeadingClass">Forum</h1>
+  <p class="mt-1 text-sm text-ink-2">
+    Talk to other managers in public. Be civil: what you post here can be read by every manager.
+  </p>
+
+  @if (loading()) {
+    <p class="mt-6 text-sm text-ink-2" role="status">Loading the forum…</p>
+  } @else if (error(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+  } @else if (overview(); as forum) {
+    @for (section of forum.sections; track section.id) {
+      <section class="mt-8" [attr.aria-labelledby]="'section-' + section.id">
+        <h2 [id]="'section-' + section.id" class="font-display text-xl font-semibold">
+          {{ section.title }}
+        </h2>
+        <p class="mt-1 text-sm text-ink-2">{{ section.description }}</p>
+
+        @if (section.languageNotice; as notice) {
+          <p
+            class="mt-3 rounded border border-line-strong bg-raised px-3 py-2 text-sm font-medium text-ink"
+            role="note"
+            data-testid="language-notice"
+          >
+            {{ notice }}
+          </p>
+        }
+
+        <ul class="mt-4 flex flex-col gap-3" [attr.aria-label]="section.title + ' subforums'">
+          @for (subforum of section.subforums; track subforum.id) {
+            <li class="rounded border border-line bg-panel px-3 py-3">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h3 class="text-sm font-semibold text-ink">
+                  <a [routerLink]="['/forum', subforum.id]" [class]="nameLinkClass">{{
+                    subforum.name
+                  }}</a>
+                </h3>
+                @if (!subforum.canCreateThreads) {
+                  <span class="text-xs uppercase tracking-wide text-muted">Staff only</span>
+                }
+                <span class="ml-auto text-xs text-muted">
+                  {{ subforum.threadCount }}
+                  {{ subforum.threadCount === 1 ? 'thread' : 'threads' }} ·
+                  {{ subforum.postCount }}
+                  {{ subforum.postCount === 1 ? 'post' : 'posts' }}
+                </span>
+              </div>
+              <p class="mt-1 text-sm text-ink-2">{{ subforum.description }}</p>
+              @if (subforum.latestActivityAt; as latest) {
+                <p class="mt-1 text-xs text-muted">
+                  Last activity
+                  <time [attr.datetime]="latest">{{ time(latest) }}</time>
+                </p>
+              }
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    @if (!hasCountrySection(forum)) {
+      <p class="mt-8 text-sm text-ink-2" role="status" data-testid="no-country-forum">
+        Your country's forum opens once you run a club, because a manager's country is the country
+        of their club.
+      </p>
+    }
+  }
+</section>

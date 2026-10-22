@@ -1,0 +1,82 @@
+<section class="max-w-2xl">
+  <h1 [class]="pageHeadingClass">Start a thread</h1>
+
+  @if (loading()) {
+    <p class="mt-4 text-sm text-ink-2" role="status">Loading the subforum…</p>
+  } @else if (loadError(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    <div class="mt-4">
+      <a routerLink="/forum" [class]="secondaryButtonClass">Back to the forum</a>
+    </div>
+  } @else if (subforum(); as target) {
+    <p class="mt-1 text-sm text-ink-2" data-testid="new-thread-target">
+      In {{ target.sectionTitle }}, {{ target.subforumName }}
+    </p>
+
+    @if (!target.canCreateThreads) {
+      <p class="mt-4 text-sm text-ink" role="status" data-testid="staff-only">
+        Only the game's staff start threads in {{ target.subforumName }}. You can reply to any
+        thread there.
+      </p>
+      <div class="mt-4">
+        <a [routerLink]="['/forum', target.subforumId]" [class]="secondaryButtonClass">
+          Back to {{ target.subforumName }}
+        </a>
+      </div>
+    } @else {
+      @if (target.languageNotice; as notice) {
+        <p
+          class="mt-3 rounded border border-line-strong bg-raised px-3 py-2 text-sm font-medium text-ink"
+          role="note"
+          data-testid="language-notice"
+        >
+          {{ notice }}
+        </p>
+      }
+
+      @if (sendError(); as message) {
+        <p [class]="formErrorClass" role="alert">{{ message }}</p>
+      }
+
+      <form class="mt-6 space-y-4" [formGroup]="form" (ngSubmit)="send()" novalidate>
+        <div>
+          <label class="block text-sm font-medium text-ink" for="title">Title</label>
+          <input
+            id="title"
+            type="text"
+            formControlName="title"
+            autocomplete="off"
+            [attr.maxlength]="titleMax"
+            [class]="textInputClass"
+            aria-describedby="title-count"
+          />
+          <p id="title-count" class="mt-1 text-xs text-muted">
+            {{ titleLength() }} of {{ titleMax }} characters
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-ink" for="body">Your post</label>
+          <textarea
+            id="body"
+            formControlName="body"
+            rows="10"
+            [attr.maxlength]="bodyMax"
+            [class]="textInputClass"
+            aria-describedby="body-count"
+          ></textarea>
+          <p id="body-count" class="mt-1 text-xs text-muted">
+            {{ bodyLength() }} of {{ bodyMax }} characters. Plain text only.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+          <button type="submit" [class]="primaryButtonClass" [disabled]="!canSend() || sending()">
+            {{ sending() ? 'Posting…' : 'Post thread' }}
+          </button>
+          <a [routerLink]="['/forum', target.subforumId]" [class]="secondaryButtonClass">Cancel</a>
+        </div>
+      </form>
+    }
+  }
+</section>

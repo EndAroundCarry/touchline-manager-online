@@ -1,11 +1,13 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tactical11Manager.Application.Abstractions;
+using Tactical11Manager.Application.Abstractions.Forum;
 using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.World.Generation;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Forum;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad.Generation;
 using Tactical11Manager.Domain.World;
@@ -77,6 +79,7 @@ public sealed partial class SeedWorld
     private readonly IUnitOfWork _unitOfWork;
     private readonly WorldOptions _options;
     private readonly ILogger<SeedWorld> _logger;
+    private readonly IForumRepository? _forum;
 
     /// <summary>Initializes the use case.</summary>
     public SeedWorld(
@@ -86,7 +89,8 @@ public sealed partial class SeedWorld
         IGenerationRunRepository generationRuns,
         IUnitOfWork unitOfWork,
         IOptions<WorldOptions> options,
-        ILogger<SeedWorld> logger)
+        ILogger<SeedWorld> logger,
+        IForumRepository? forum = null)
     {
         ArgumentNullException.ThrowIfNull(options);
 
@@ -97,6 +101,7 @@ public sealed partial class SeedWorld
         _unitOfWork = unitOfWork;
         _options = options.Value;
         _logger = logger;
+        _forum = forum;
     }
 
     /// <summary>Seeds the world, or reports that one already exists.</summary>
@@ -179,6 +184,11 @@ public sealed partial class SeedWorld
         run.Succeed(new GenerationRunCounts(countries, clubsCreated, playersCreated, accountsCreated), now);
         _generationRuns.Add(run);
 
+        if (_forum != null)
+        {
+            SeedForumContent(now);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         LogSeeded(worldId, seed, countries, clubsCreated, playersCreated);
@@ -234,4 +244,83 @@ public sealed partial class SeedWorld
         Level = LogLevel.Information,
         Message = "Seeded world {WorldId} from seed {Seed}: {Countries} countries, {Clubs} clubs, {Players} players.")]
     private partial void LogSeeded(Guid worldId, string seed, int countries, int clubs, int players);
+
+    private void SeedForumContent(DateTimeOffset now)
+    {
+        var staffManagerId = Guid.Empty;
+        var staffManagerName = "Touchline Support";
+
+        // Announcements (pinned)
+        var ann1Id = Guid.CreateVersion7();
+        var ann1 = ForumThread.CreateAnnouncement(
+            ann1Id,
+            ForumConstants.SubforumInternationalAnnouncements,
+            countryId: null,
+            "Welcome to Touchline Manager Community Forums",
+            staffManagerId,
+            staffManagerName,
+            authorClubName: "Game Operator",
+            isPinned: true,
+            now);
+        var ann1Post = ForumPost.Create(
+            Guid.CreateVersion7(),
+            ann1Id,
+            postNumber: 1,
+            staffManagerId,
+            staffManagerName,
+            authorClubName: "Game Operator",
+            isStaff: true,
+            "Welcome to the official Touchline Manager Community Forums!\n\nHere you can discuss tactics, report issues, and connect with other managers.\n\nLanguage policy: All posts in the International Forum must be in English. For local discussions, visit your country forum.",
+            now);
+        _forum!.AddThread(ann1);
+        _forum.AddPost(ann1Post);
+
+        // Development and Bugs
+        var dev1Id = Guid.CreateVersion7();
+        var dev1 = ForumThread.Create(
+            dev1Id,
+            ForumConstants.SubforumInternationalDevBugs,
+            countryId: null,
+            "Bug Reporting Guidelines & Tips",
+            staffManagerId,
+            staffManagerName,
+            authorClubName: "Game Operator",
+            now);
+        var dev1Post = ForumPost.Create(
+            Guid.CreateVersion7(),
+            dev1Id,
+            postNumber: 1,
+            staffManagerId,
+            staffManagerName,
+            authorClubName: "Game Operator",
+            isStaff: true,
+            "When reporting an issue with the match engine, transfer market, or UI, please include:\n1. Your club name and division\n2. The fixture or screen where it occurred\n3. Reproduction steps\n\nThank you for helping us improve Touchline Manager!",
+            now);
+        _forum.AddThread(dev1);
+        _forum.AddPost(dev1Post);
+
+        // International General
+        var gen1Id = Guid.CreateVersion7();
+        var gen1 = ForumThread.Create(
+            gen1Id,
+            ForumConstants.SubforumInternationalGeneral,
+            countryId: null,
+            "Introduce your club and tactics!",
+            staffManagerId,
+            staffManagerName,
+            authorClubName: "Game Operator",
+            now);
+        var gen1Post = ForumPost.Create(
+            Guid.CreateVersion7(),
+            gen1Id,
+            postNumber: 1,
+            staffManagerId,
+            staffManagerName,
+            authorClubName: "Game Operator",
+            isStaff: true,
+            "Welcome to the international general discussion! Tell us what club you're managing and what formations you prefer.",
+            now);
+        _forum.AddThread(gen1);
+        _forum.AddPost(gen1Post);
+    }
 }

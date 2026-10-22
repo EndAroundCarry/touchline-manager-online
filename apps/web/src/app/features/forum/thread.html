@@ -1,0 +1,78 @@
+<section class="max-w-3xl">
+  @if (thread(); as current) {
+    <p class="text-sm">
+      <a [routerLink]="['/forum', current.subforumId]" [class]="linkClass"
+        >Back to {{ current.subforumName }}</a
+      >
+    </p>
+
+    <h1 [class]="pageHeadingClass" class="mt-3">{{ current.title }}</h1>
+    <p class="mt-1 text-sm text-ink-2">{{ current.sectionTitle }} · {{ current.subforumName }}</p>
+
+    @if (current.languageNotice; as notice) {
+      <p
+        class="mt-3 rounded border border-line-strong bg-raised px-3 py-2 text-sm font-medium text-ink"
+        role="note"
+        data-testid="language-notice"
+      >
+        {{ notice }}
+      </p>
+    }
+
+    <ol class="mt-6 flex flex-col gap-3" aria-label="Posts" data-testid="thread-posts">
+      @for (post of current.posts; track post.id) {
+        <li class="rounded border border-line bg-panel px-3 py-3">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span class="text-sm font-semibold text-ink">{{ post.authorManagerName }}</span>
+            @if (post.isStaff) {
+              <span class="text-xs font-semibold uppercase tracking-wide text-accent">Staff</span>
+            }
+            @if (post.authorClubName; as club) {
+              <span class="text-xs text-muted">{{ club }}</span>
+            }
+            <time class="ml-auto text-xs text-muted" [attr.datetime]="post.createdAt">
+              #{{ post.postNumber }} · {{ time(post.createdAt) }}
+            </time>
+          </div>
+          <p class="mt-1 whitespace-pre-line break-words text-sm text-ink">{{ post.body }}</p>
+        </li>
+      }
+    </ol>
+
+    <div class="mt-6">
+      @if (current.canReply) {
+        <form aria-label="Reply" (submit)="send($event)" novalidate>
+          <label class="block text-sm font-medium text-ink" for="reply-body">Your reply</label>
+          <textarea
+            id="reply-body"
+            [formControl]="reply"
+            rows="5"
+            [attr.maxlength]="bodyMax"
+            [class]="textInputClass"
+            aria-describedby="reply-count"
+          ></textarea>
+          <p id="reply-count" class="mt-1 text-xs text-muted">
+            {{ replyLength() }} of {{ bodyMax }} characters. Plain text only.
+          </p>
+
+          @if (sendError(); as message) {
+            <p [class]="formErrorClass" role="alert">{{ message }}</p>
+          }
+
+          <div class="mt-3">
+            <button type="submit" [class]="primaryButtonClass" [disabled]="!canSend() || sending()">
+              {{ sending() ? 'Posting…' : 'Post reply' }}
+            </button>
+          </div>
+        </form>
+      } @else {
+        <p class="text-sm text-ink-2" role="status">This thread is closed to replies.</p>
+      }
+    </div>
+  } @else if (loading()) {
+    <p class="text-sm text-ink-2" role="status">Loading the thread…</p>
+  } @else if (error(); as message) {
+    <p [class]="formErrorClass" role="alert">{{ message }}</p>
+    <p class="mt-4 text-sm"><a routerLink="/forum" [class]="linkClass">Back to the forum</a></p>
+  }
+</section>

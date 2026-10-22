@@ -83,8 +83,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
     available: true,
     group: 'Facilities',
   },
-  { path: '/inbox', label: 'Inbox', icon: 'pi pi-inbox', available: true, group: 'Messages' },
-  { path: '/news', label: 'News', icon: 'pi pi-megaphone', available: true, group: 'Messages' },
+  { path: '/inbox', label: 'Inbox', icon: 'pi pi-inbox', available: true, group: 'Community' },
+  { path: '/news', label: 'News', icon: 'pi pi-megaphone', available: true, group: 'Community' },
+  { path: '/forum', label: 'Forum', icon: 'pi pi-comments', available: true, group: 'Community' },
   { path: '/settings', label: 'Settings', icon: 'pi pi-cog', available: true, group: 'Game' },
   { path: '/help', label: 'Help', icon: 'pi pi-question-circle', available: true, group: 'Game' },
 ];

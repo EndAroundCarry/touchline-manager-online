@@ -2186,6 +2186,147 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.Forum.ForumPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthorClubName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("author_club_name");
+
+                    b.Property<Guid>("AuthorManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_manager_id");
+
+                    b.Property<string>("AuthorManagerName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("author_manager_name");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsStaff")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_staff");
+
+                    b.Property<int>("PostNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("post_number");
+
+                    b.Property<Guid>("ThreadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("thread_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ThreadId", "PostNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_forum_posts_thread_post_number");
+
+                    b.ToTable("forum_posts", "comms", t =>
+                        {
+                            t.HasCheckConstraint("ck_forum_posts_body", "length(body) between 1 and 10000");
+
+                            t.HasCheckConstraint("ck_forum_posts_post_number", "post_number >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Forum.ForumThread", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthorClubName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("author_club_name");
+
+                    b.Property<Guid>("AuthorManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_manager_id");
+
+                    b.Property<string>("AuthorManagerName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("author_manager_name");
+
+                    b.Property<Guid?>("CountryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("country_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsAnnouncement")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_announcement");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_pinned");
+
+                    b.Property<DateTimeOffset>("LastActivityAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_activity_at");
+
+                    b.Property<string>("LatestReplyAuthorName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("latest_reply_author_name");
+
+                    b.Property<int>("ReplyCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("reply_count");
+
+                    b.Property<string>("SubforumId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subforum_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("title");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountryId", "SubforumId", "LastActivityAt")
+                        .HasDatabaseName("ix_forum_threads_country_subforum");
+
+                    b.HasIndex("SubforumId", "IsPinned", "LastActivityAt")
+                        .HasDatabaseName("ix_forum_threads_subforum_activity");
+
+                    b.ToTable("forum_threads", "comms", t =>
+                        {
+                            t.HasCheckConstraint("ck_forum_threads_reply_count", "reply_count >= 0");
+
+                            t.HasCheckConstraint("ck_forum_threads_title", "length(title) between 3 and 150");
+
+                            t.HasCheckConstraint("ck_forum_threads_version", "version >= 1");
+                        });
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.Market.AiMarketDecision", b =>
                 {
                     b.Property<Guid>("Id")

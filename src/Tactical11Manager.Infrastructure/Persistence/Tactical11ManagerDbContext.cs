@@ -4,6 +4,7 @@ using Tactical11Manager.Domain.Comms;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Finance;
+using Tactical11Manager.Domain.Forum;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Match;
 using Tactical11Manager.Domain.Ops;
@@ -174,6 +175,12 @@ public sealed class Tactical11ManagerDbContext : DbContext
 
     /// <summary>Gets managers' notification email preferences.</summary>
     public DbSet<NotificationPreferences> NotificationPreferences => Set<NotificationPreferences>();
+
+    /// <summary>Gets the comms module's forum threads.</summary>
+    public DbSet<ForumThread> ForumThreads => Set<ForumThread>();
+
+    /// <summary>Gets the comms module's forum posts and replies.</summary>
+    public DbSet<ForumPost> ForumPosts => Set<ForumPost>();
 
     /// <summary>Gets the market module's private shortlists.</summary>
     public DbSet<ShortlistEntry> ShortlistEntries => Set<ShortlistEntry>();

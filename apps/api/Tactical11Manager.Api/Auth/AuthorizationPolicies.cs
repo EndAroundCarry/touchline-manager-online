@@ -78,4 +78,7 @@ internal static class RateLimitPolicies
     /// and replies together" means.
     /// </summary>
     public const string DirectMessage = "direct-message";
+
+    /// <summary>The per-manager hourly limit on forum threads and replies, which the forum shares between the two.</summary>
+    public const string ForumPost = "forum-post";
 }

@@ -302,9 +302,9 @@ export const INFO_DOCUMENTS: readonly InfoDocument[] = [
       },
       {
         id: 'no-chat',
-        heading: 'No in-game messaging',
+        heading: 'Messages and the forum',
         paragraphs: [
-          'This version has no chat, no forums and no private messages between managers. Reports go to the operator team, not to another player.',
+          'You can write privately to another manager from their club page, and in public in the forum, both under Community in the menu. Neither is a way to report a problem: reports go to the operator team, not to another player. The Development and Bugs forum is for discussion.',
         ],
       },
       {

@@ -80,7 +80,8 @@ public sealed class ApiFixture : IAsyncLifetime
         int? marketBidPermitLimit = null,
         int? directMessagePermitLimit = null,
         bool enableGameClockControl = false,
-        DateTimeOffset? steppedClockNow = null)
+        DateTimeOffset? steppedClockNow = null,
+        int? forumPostPermitLimit = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
@@ -121,6 +122,9 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting(
                 "RateLimiting:DirectMessagePermitLimit",
                 (directMessagePermitLimit ?? UnthrottledMarketPermitLimit).ToString(CultureInfo.InvariantCulture));
+            builder.UseSetting(
+                "RateLimiting:ForumPostPermitLimit",
+                (forumPostPermitLimit ?? UnthrottledMarketPermitLimit).ToString(CultureInfo.InvariantCulture));
 
             // Runs after the composition root's own registrations, so the SMTP sender is genuinely
             // replaced rather than shadowed.

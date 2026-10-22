@@ -291,6 +291,34 @@ export const routes: Routes = [
         title: 'News — Tactical11 Manager',
       },
       {
+        // The community forum: the international forum and the manager's country forum. `threads/:threadId`
+        // precedes `:subforumId` so "threads" is never read as a subforum identity.
+        path: 'forum',
+        canActivate: [requireAuthentication, requireVerifiedEmail],
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./features/forum/forum').then((m) => m.Forum),
+            title: 'Forum — Tactical11 Manager',
+          },
+          {
+            path: 'threads/:threadId',
+            loadComponent: () => import('./features/forum/thread').then((m) => m.ForumThread),
+            title: 'Forum thread — Tactical11 Manager',
+          },
+          {
+            path: ':subforumId/new',
+            loadComponent: () => import('./features/forum/new-thread').then((m) => m.NewThread),
+            title: 'Start a thread — Tactical11 Manager',
+          },
+          {
+            path: ':subforumId',
+            loadComponent: () => import('./features/forum/subforum').then((m) => m.Subforum),
+            title: 'Forum — Tactical11 Manager',
+          },
+        ],
+      },
+      {
         // How the game works: the reference half of the guided help (`F-53`).
         path: 'help',
         loadComponent: () => import('./features/help/help').then((m) => m.Help),

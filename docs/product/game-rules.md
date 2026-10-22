@@ -672,6 +672,10 @@ What the game tells a manager, and how (master plan §6.9, §10.7, F-41).
 | COM-14 | A manager may send at most `dm_sends_per_hour` messages (starts and replies together). Over that, the send is refused with 429. |
 | COM-15 | A manager can block another manager and later unblock them. While a block exists in either direction, neither can start a conversation with the other or reply to them. The sender is told plainly that the manager is not accepting their messages. Existing messages stay readable. |
 | COM-16 | A direct message is unread until its recipient opens the conversation. Opening it marks every message addressed to them in it read. Messages are never edited or deleted by a manager. |
+| COM-17 | The forum has two sections. The **International** forum has three subforums, General, Development and Bugs, and Announcements, and is open to every signed-in manager. A **country** forum has one subforum, General, and is open only to a manager who runs a club in that country; a manager who runs no club sees the international forum alone. A thread in a country forum is never shown to a manager of another country. |
+| COM-18 | A verified manager may start a thread in any subforum they can open, except International Announcements, where only an operator or an admin may. Any manager who can open a thread may reply to it, Announcements included. Threads are listed pinned first, then by latest activity. |
+| COM-19 | Posts in the International forum are to be written in English, and every page of that section says so. It is a house rule the page states; the game does not detect the language of a post. A country forum has no language rule. |
+| COM-20 | A thread title is `forum_title_min_chars`–`forum_title_max_chars` characters, an opening post `forum_thread_body_min_chars`–`forum_body_max_chars` and a reply 1–`forum_body_max_chars`, after trimming. A post is stored as written and always rendered as text, never as markup. A manager may post at most `forum_posts_per_hour` threads and replies together; over that the post is refused with 429. A post is never edited or deleted by a manager, and carries the author's display name and club as they were when it was written. |
 
 The events that produce an inbox message are the ones the matchday, market, occupancy, and
 reminder workflows decide: a club's result, its changed league position, a player's suspension,
@@ -685,6 +689,10 @@ Direct messages (`COM-10`…`COM-16`) are the other kind of message: written by 
 the game's own in a second Inbox tab, and delivered by the same 60-second `/sync` poll. Nothing is pushed.
 The club page names the manager who runs it, or "AI manager", and offers "Send a message" on a human-run
 club that is not your own ([ADR-0079](../architecture/adr/0079-direct-messages-between-managers.md)).
+
+The forum (`COM-17`…`COM-20`) is the public counterpart: threads and replies that every manager who can open the
+subforum reads. It sits in the Community menu beside the Inbox and the News, which that menu group replaced
+under the name Messages ([ADR-0082](../architecture/adr/0082-community-forum.md)).
 
 ---
 
@@ -755,6 +763,9 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `dm_subject_max_chars` | 80 | COM-13 |
 | `dm_body_max_chars` | 1,000 | COM-13 |
 | `dm_sends_per_hour` | 30 | COM-14 |
+| `forum_title_min_chars` / `forum_title_max_chars` | 3 / 150 | COM-20 |
+| `forum_thread_body_min_chars` / `forum_body_max_chars` | 3 / 10,000 (a reply may be 1) | COM-20 |
+| `forum_posts_per_hour` | 30 (threads and replies together) | COM-20 |
 | `dm_conversation_page_size` | 25 conversations | COM-10 |
 | `dm_thread_page_size` | 50 messages | COM-10 |
 | `generator_version` | `world-gen-v3` (the bootstrap: clubs, squads, and fixtures) | FIC-8, PYR-14 |

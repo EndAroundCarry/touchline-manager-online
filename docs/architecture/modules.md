@@ -18,7 +18,7 @@
 | **market** | `market` | Shortlists, transfer listings, bids, outcomes, AI market decisions | 10 |
 | **finance** | `finance` | Club accounts, append-only ledger, season finance summaries | 9 |
 | **fans** | `fans` | Each club's fan count and mood, the append-only history of what moved them, and what the fans expected from each fixture when the team sheets locked | 17 |
-| **comms** | `comms` | Inbox messages, news items, email dispatch intent, direct messages between managers (conversations, messages, blocks) | 6, 8, 11, Messages plan |
+| **comms** | `comms` | Inbox messages, news items, email dispatch intent, direct messages between managers (conversations, messages, blocks), the community forum (threads, posts) | 6, 8, 11, Messages plan, Forum |
 | **ops** | `ops` | Jobs, outbox, idempotency records, audit log, feature flags, repair actions, the read-only operational funnels and their counters, the operator game-health read, the console's job, matchday, and audit reads, and the local telemetry stack's dashboards and SLO alert rules | 1, 6, 13, 14 |
 
 Logical model detail is in [`data-model.md`](data-model.md) and master plan §6.
