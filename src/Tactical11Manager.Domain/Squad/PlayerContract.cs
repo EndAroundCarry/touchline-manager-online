@@ -169,7 +169,7 @@ public sealed class PlayerContract
     /// <summary>Gets the last season the contract covers.</summary>
     public int EndSeasonNumber { get; private set; }
 
-    /// <summary>Gets the wage for a season, in minor units, paid in 34 equal parts one on each matchday (`CON-2`).</summary>
+    /// <summary>Gets the wage for a season, in minor units, paid in 30 equal parts one on each matchday (`CON-2`).</summary>
     public long SeasonWageMinor { get; private set; }
 
     /// <summary>Gets the player's standing in the squad.</summary>

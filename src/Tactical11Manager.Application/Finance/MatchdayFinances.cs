@@ -74,7 +74,7 @@ public sealed class MatchdayFinances
     /// <returns>What reading the clubs' money did.</returns>
     /// <remarks>
     /// <para>
-    /// Every club of the division gets it, whether it played at home or away, so a season's income and wages are paid in 34 equal parts however
+    /// Every club of the division gets it, whether it played at home or away, so a season's income and wages are paid in 30 equal parts however
     /// the fixtures fall. The postings of a club share one correlation key and differ by category, so a retried publication collides with
     /// them instead of paying twice (`FIN-17`).
     /// </para>

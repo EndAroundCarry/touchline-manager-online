@@ -20,7 +20,7 @@ describe('sponsor presentation', () => {
       'top_three',
       'top_six',
       'top_half',
-      'twelfth',
+      'eleventh',
       'stay_up',
     ]);
   });
@@ -28,7 +28,7 @@ describe('sponsor presentation', () => {
   it('names an objective with the place it asks for', () => {
     expect(objectiveWithPlace('win_league', 1)).toBe('Win the league');
     expect(objectiveWithPlace('top_three', 3)).toBe('Finish in the top 3 (3rd or better)');
-    expect(objectiveWithPlace('stay_up', 15)).toBe('Stay up (15th or better)');
+    expect(objectiveWithPlace('stay_up', 13)).toBe('Stay up (13th or better)');
   });
 
   it('falls back to the code for an objective it does not know', () => {

@@ -56,7 +56,7 @@ public static partial class EconomyRuleSet
         var spectators = StadiumRuleSet.AttendanceFor(seats, fans, moodBp);
         var gate = StadiumRuleSet.GateRevenueMinorFor(seats, tier, fans, moodBp) * HomeMatchesPerSeason;
         var snack = StructureRuleSet.SnackTakingsMinorFor(snackLevel, spectators, 0, tier) * HomeMatchesPerSeason;
-        var shop = StructureRuleSet.MerchTakingsMinorFor(shopLevel, fans, Fans.FanMoods.WordFor(moodBp), tier) * MatchdaysPerSeason / MatchdaysPerWeeklyRun;
+        var shop = StructureRuleSet.MerchTakingsMinorFor(shopLevel, fans, Fans.FanMoods.WordFor(moodBp), tier) * WeeklyRunsPerSeason;
 
         return new SeasonIncomeBreakdown(LeagueTvSeasonMinorFor(tier), sponsorFixedSeasonMinor, gate, snack, shop);
     }
@@ -69,7 +69,7 @@ public static partial class EconomyRuleSet
     public static SeasonCostBreakdown SeasonCostBreakdownFor(int tier, StadiumSeats seats, int snackLevel, int shopLevel) =>
         new(
             OperatingCostSeasonMinorFor(tier),
-            (StructureRuleSet.UpkeepMinorFor(snackLevel, tier) + StructureRuleSet.UpkeepMinorFor(shopLevel, tier)) * MatchdaysPerSeason / MatchdaysPerWeeklyRun,
+            (StructureRuleSet.UpkeepMinorFor(snackLevel, tier) + StructureRuleSet.UpkeepMinorFor(shopLevel, tier)) * WeeklyRunsPerSeason,
             StadiumRuleSet.GroundUpkeepSeasonMinorFor(seats, tier));
 
     /// <summary>The wage bill a club should stay within, in minor units: 70% of its season income forecast.</summary>

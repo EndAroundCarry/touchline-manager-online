@@ -33,18 +33,18 @@ public sealed class StadiumRuleSetTests
     }
 
     [Fact]
-    public void The_tier_one_prices_are_twenty_thirty_five_fifty_and_one_hundred_and_eighty()
+    public void The_tier_one_prices_are_the_thirty_four_matchday_prices_times_thirty_four_thirtieths()
     {
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Standing).Should().Be(2_000);
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Seating).Should().Be(3_500);
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.CoveredSeating).Should().Be(5_000);
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Vip).Should().Be(18_000);
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Standing).Should().Be(2_267, "20 x 34/30");
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Seating).Should().Be(3_967, "35 x 34/30");
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.CoveredSeating).Should().Be(5_667, "50 x 34/30");
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Vip).Should().Be(20_400, "180 x 34/30");
     }
 
     [Fact]
     public void A_place_that_sells_out_pays_for_itself_in_about_seven_seasons()
     {
-        // 17 home matches in a double round-robin of 18 clubs.
+        // 15 home matches in a double round-robin of 16 clubs.
         const int homeMatches = WorldRuleSet.ClubsPerDivision - 1;
 
         foreach (var stand in StadiumStands.All)
@@ -170,7 +170,7 @@ public sealed class StadiumRuleSetTests
         var gate = StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 1, FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp);
 
         // 1,350 on the terrace, 600 in the seats, 840 under cover and all 100 VIP places.
-        gate.Should().Be((1_350 * 2_000L) + (600 * 3_500L) + (840 * 5_000L) + (100 * 18_000L));
+        gate.Should().Be((1_350 * 2_267L) + (600 * 3_967L) + (840 * 5_667L) + (100 * 20_400L));
         gate.Should().BeLessThan(StadiumRuleSet.FullHouseMinorFor(Opening, 1), "the opening crowd does not fill the ground");
     }
 

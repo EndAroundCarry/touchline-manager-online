@@ -92,19 +92,19 @@ function offer(kind: SponsorOffer['kind'], fixedSeasonMinor: number, bonus: numb
       { objective: 'top_six', targetPlace: 6, bonusMetMinor: bonus, bonusExceededMinor: bonus * 2 },
       {
         objective: 'top_half',
-        targetPlace: 9,
+        targetPlace: 8,
         bonusMetMinor: bonus / 2,
         bonusExceededMinor: bonus,
       },
       {
-        objective: 'twelfth',
-        targetPlace: 12,
+        objective: 'eleventh',
+        targetPlace: 11,
         bonusMetMinor: bonus / 4,
         bonusExceededMinor: bonus / 2,
       },
       {
         objective: 'stay_up',
-        targetPlace: 15,
+        targetPlace: 13,
         bonusMetMinor: bonus / 8,
         bonusExceededMinor: bonus / 4,
       },

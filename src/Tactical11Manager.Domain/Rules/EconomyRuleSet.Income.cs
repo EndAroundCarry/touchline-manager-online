@@ -18,8 +18,11 @@ public static partial class EconomyRuleSet
     /// <summary>The share of the television money difference a relegated club is paid once as a parachute, in basis points: half.</summary>
     public const int ParachuteShareBp = 5_000;
 
-    /// <summary>One prize share for a tier-1 division, in minor units: 300k. The eighteenth place gets one share and each place up to the third one more.</summary>
-    public const long PrizeShareMinorTier1 = 30_000_000;
+    /// <summary>
+    /// One prize share for a tier-1 division, in minor units: 340k. The last place gets one share and each place up to the third one more, so a
+    /// division of 16 pays 140.42 shares and the average club the 2.98M a division of 18 paid at 300k a share.
+    /// </summary>
+    public const long PrizeShareMinorTier1 = 34_000_000;
 
     /// <summary>How much more the second place gets than the third, in basis points: 15% more, on top of the straight line.</summary>
     public const int PrizeSecondOverThirdBp = 11_500;
@@ -43,7 +46,7 @@ public static partial class EconomyRuleSet
     /// <param name="tier">The tier the club finished in.</param>
     /// <param name="place">The final place, 1 to <see cref="ClubsPerDivision"/>.</param>
     /// <remarks>
-    /// A straight line from the eighteenth place to the third, like a league's merit payment, then bigger steps for the top three:
+    /// A straight line from the last place to the third, like a league's merit payment, then bigger steps for the top three:
     /// the second place gets 15% more than the third and the champion 20% more than the second. The line is not a table in the code: any one
     /// place can be bent by changing this method.
     /// </remarks>

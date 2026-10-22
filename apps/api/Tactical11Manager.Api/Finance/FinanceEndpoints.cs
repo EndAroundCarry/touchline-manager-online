@@ -139,7 +139,7 @@ internal static class FinanceEndpoints
             StatusCodes.Status400BadRequest,
             SponsorErrorCodes.UnknownObjective,
             "No such objective.",
-            "Choose win_league, top_three, top_six, top_half, twelfth or stay_up."),
+            "Choose win_league, top_three, top_six, top_half, eleventh or stay_up."),
 
         SignSponsorDealOutcome.AlreadySigned => ProblemResults.Code(
             StatusCodes.Status409Conflict,

@@ -52,7 +52,7 @@ public sealed class SponsorDealTests
         deal.ClubId.Should().Be(offer.ClubId);
         deal.SeasonId.Should().Be(offer.SeasonId);
         deal.FixedMatchdayMinor.Should().Be(offer.FixedSeasonMinor / EconomyRuleSet.MatchdaysPerSeason);
-        deal.TargetPlace.Should().Be(9, "the top half asks for 9th");
+        deal.TargetPlace.Should().Be(8, "the top half asks for 8th of 16");
         deal.IsSettled.Should().BeFalse();
         deal.Version.Should().Be(1);
     }
@@ -68,11 +68,11 @@ public sealed class SponsorDealTests
     }
 
     [Theory]
-    [InlineData(9, ObjectiveOutcome.Met)]
-    [InlineData(7, ObjectiveOutcome.Met)]
-    [InlineData(6, ObjectiveOutcome.Exceeded)]
+    [InlineData(8, ObjectiveOutcome.Met)]
+    [InlineData(6, ObjectiveOutcome.Met)]
+    [InlineData(5, ObjectiveOutcome.Exceeded)]
     [InlineData(1, ObjectiveOutcome.Exceeded)]
-    [InlineData(10, ObjectiveOutcome.Missed)]
+    [InlineData(9, ObjectiveOutcome.Missed)]
     public void A_season_settles_against_the_objective_once(int place, ObjectiveOutcome outcome)
     {
         var deal = Deal(Offer());

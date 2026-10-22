@@ -26,6 +26,15 @@ public static partial class EconomyRuleSet
     /// <summary>The highest a sponsor's standing factor goes, in basis points.</summary>
     public const int StandingFactorCeilingBp = 20_000;
 
+    /// <summary>The place the top-half objective asks for: half the table.</summary>
+    public const int TopHalfPlace = ClubsPerDivision / 2;
+
+    /// <summary>The place the eleventh-place objective asks for: five places above the bottom, so the last of the middle of the table.</summary>
+    public const int EleventhPlace = ClubsPerDivision - 5;
+
+    /// <summary>The place the stay-up objective asks for: the last place that is not relegated.</summary>
+    public const int StayUpPlace = ClubsPerDivision - WorldRuleSet.RelegatedPerTier;
+
     /// <summary>The place a season objective asks for.</summary>
     /// <param name="objective">The objective.</param>
     public static int TargetPlaceFor(SeasonObjective objective) => objective switch
@@ -33,9 +42,9 @@ public static partial class EconomyRuleSet
         SeasonObjective.WinLeague => 1,
         SeasonObjective.TopThree => 3,
         SeasonObjective.TopSix => 6,
-        SeasonObjective.TopHalf => 9,
-        SeasonObjective.TwelfthPlace => 12,
-        SeasonObjective.StayUp => 15,
+        SeasonObjective.TopHalf => TopHalfPlace,
+        SeasonObjective.EleventhPlace => EleventhPlace,
+        SeasonObjective.StayUp => StayUpPlace,
         _ => throw new ArgumentOutOfRangeException(nameof(objective), objective, "Unknown season objective."),
     };
 
@@ -47,7 +56,7 @@ public static partial class EconomyRuleSet
         SeasonObjective.TopThree => 22_000,
         SeasonObjective.TopSix => 16_000,
         SeasonObjective.TopHalf => 10_000,
-        SeasonObjective.TwelfthPlace => 6_000,
+        SeasonObjective.EleventhPlace => 6_000,
         SeasonObjective.StayUp => 3_500,
         _ => throw new ArgumentOutOfRangeException(nameof(objective), objective, "Unknown season objective."),
     };
@@ -83,8 +92,8 @@ public static partial class EconomyRuleSet
             1 => SeasonObjective.WinLeague,
             <= 3 => SeasonObjective.TopThree,
             <= 6 => SeasonObjective.TopSix,
-            <= 9 => SeasonObjective.TopHalf,
-            <= 12 => SeasonObjective.TwelfthPlace,
+            <= TopHalfPlace => SeasonObjective.TopHalf,
+            <= EleventhPlace => SeasonObjective.EleventhPlace,
             _ => SeasonObjective.StayUp,
         };
     }

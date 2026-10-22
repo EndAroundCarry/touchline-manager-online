@@ -5,7 +5,7 @@ namespace Tactical11Manager.Domain.Market;
 
 /// <summary>What a free agent costs and what he signs for (`FA-6`, `FA-7`).</summary>
 /// <param name="MinimumFeeMinor">The least a bid can be, in minor units. The fee leaves the game.</param>
-/// <param name="SeasonWageMinor">The wage for a season the signing club pays, frozen on the listing (`CON-5`). It is paid in 34 equal parts.</param>
+/// <param name="SeasonWageMinor">The wage for a season the signing club pays, frozen on the listing (`CON-5`). It is paid in 30 equal parts.</param>
 /// <param name="ContractSeasons">The length of the contract, in game seasons.</param>
 /// <param name="SquadStatus">The standing the player joins the squad with.</param>
 public sealed record FreeAgentOffer(

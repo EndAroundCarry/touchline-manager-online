@@ -51,14 +51,14 @@ public static class StadiumRuleSet
     /// <remarks>
     /// Priced so a covered seat costs two and a half times a place on the terrace and a VIP seat nine, which is
     /// the spread real grounds charge. At tier 1 a full opening ground (3,000 / 1,000 / 900 / 100) takes
-    /// 158,000.00 on a matchday.
+    /// 179,083.00 on a matchday: 34/30 of the prices of the 34-matchday season, so fifteen home matches take what seventeen did.
     /// </remarks>
     public static long TicketPriceMinorTier1(StadiumStand stand) => stand switch
     {
-        StadiumStand.Standing => 2_000,
-        StadiumStand.Seating => 3_500,
-        StadiumStand.CoveredSeating => 5_000,
-        StadiumStand.Vip => 18_000,
+        StadiumStand.Standing => 2_267,
+        StadiumStand.Seating => 3_967,
+        StadiumStand.CoveredSeating => 5_667,
+        StadiumStand.Vip => 20_400,
         _ => throw new ArgumentOutOfRangeException(nameof(stand), stand, "Unknown stadium stand."),
     };
 

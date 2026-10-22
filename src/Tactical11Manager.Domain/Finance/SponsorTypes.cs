@@ -25,13 +25,13 @@ public enum SeasonObjective
     /// <summary>Finish in the top six.</summary>
     TopSix = 3,
 
-    /// <summary>Finish in the top half (9th or better).</summary>
+    /// <summary>Finish in the top half (8th or better on 16 clubs).</summary>
     TopHalf = 4,
 
-    /// <summary>Finish 12th or better.</summary>
-    TwelfthPlace = 5,
+    /// <summary>Finish 11th or better (on 16 clubs).</summary>
+    EleventhPlace = 5,
 
-    /// <summary>Stay up (15th or better).</summary>
+    /// <summary>Stay up (13th or better on 16 clubs).</summary>
     StayUp = 6,
 }
 
@@ -82,7 +82,7 @@ public static class SponsorCodes
         SeasonObjective.TopThree => "top_three",
         SeasonObjective.TopSix => "top_six",
         SeasonObjective.TopHalf => "top_half",
-        SeasonObjective.TwelfthPlace => "twelfth",
+        SeasonObjective.EleventhPlace => "eleventh",
         SeasonObjective.StayUp => "stay_up",
         _ => throw new ArgumentOutOfRangeException(nameof(objective), objective, "Unknown season objective."),
     };
@@ -125,7 +125,7 @@ public static class SponsorCodes
         "top_three" => SeasonObjective.TopThree,
         "top_six" => SeasonObjective.TopSix,
         "top_half" => SeasonObjective.TopHalf,
-        "twelfth" => SeasonObjective.TwelfthPlace,
+        "eleventh" => SeasonObjective.EleventhPlace,
         "stay_up" => SeasonObjective.StayUp,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown season objective code."),
     };

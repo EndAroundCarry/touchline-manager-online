@@ -6,7 +6,7 @@ namespace Tactical11Manager.Domain.Finance;
 /// <summary>One sponsor's offer to a club for a season.</summary>
 /// <param name="Kind">How much of the money depends on the result.</param>
 /// <param name="SponsorName">The sponsor's name: fictional, drawn from the world seed.</param>
-/// <param name="FixedSeasonMinor">What it pays over the season whatever happens, in 34 equal parts, one on each matchday.</param>
+/// <param name="FixedSeasonMinor">What it pays over the season whatever happens, in 30 equal parts, one on each matchday.</param>
 /// <param name="BonusMultiplierBp">How much the offer multiplies a bonus by: half, once or twice.</param>
 public sealed record SponsorOffer(SponsorOfferKind Kind, string SponsorName, long FixedSeasonMinor, int BonusMultiplierBp);
 

@@ -22,7 +22,7 @@ const OBJECTIVE_LABELS: Record<SeasonObjective, string> = {
   top_three: 'Finish in the top 3',
   top_six: 'Finish in the top 6',
   top_half: 'Finish in the top half',
-  twelfth: 'Finish 12th or better',
+  eleventh: 'Finish 11th or better',
   stay_up: 'Stay up',
 };
 
@@ -32,7 +32,7 @@ export const SEASON_OBJECTIVES: readonly SeasonObjective[] = [
   'top_three',
   'top_six',
   'top_half',
-  'twelfth',
+  'eleventh',
   'stay_up',
 ];
 

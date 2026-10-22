@@ -12,29 +12,28 @@ public sealed class StructureRuleSetTests
 {
     private static readonly StadiumSeats OpeningGround = new(3_000, 1_000, 900, 100);
 
-    // Matchdays are 3 a week and a season is 34 of them, 17 at home: a club hosts 1.5 matches a week.
-    private const int HomeMatchesPerSeason = 17;
+    // Matchdays are 3 a week and a season is 30 of them over ten weeks, 15 at home: a club hosts 1.5 matches a match week. The season cycle has an
+    // eleventh week with no match, and the shop and the upkeep are settled in each of the eleven weekly runs.
+    private const int HomeMatchesPerSeason = EconomyRuleSet.HomeMatchesPerSeason;
 
-    private const int MatchdaysPerSeason = 34;
-
-    private const int MatchdaysPerWeek = 3;
+    private const int WeeklyRunsPerSeason = EconomyRuleSet.WeeklyRunsPerSeason;
 
     public static TheoryData<int> Levels => new() { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
     [Theory]
     [MemberData(nameof(Levels))]
-    public void The_snack_bar_spend_starts_at_six_and_rises_by_a_little_under_a_sixth_a_level(int level)
+    public void The_snack_bar_spend_starts_at_six_eighty_and_rises_by_a_little_under_a_sixth_a_level(int level)
     {
-        StructureRuleSet.SnackSpendMinorTier1(level).Should().Be(600 + ((level - 1) * 90));
+        StructureRuleSet.SnackSpendMinorTier1(level).Should().Be(680 + ((level - 1) * 102), "the 34-matchday season's 600 + 90 a level, times 34/30");
     }
 
     [Theory]
     [MemberData(nameof(Levels))]
-    public void The_merchandise_spend_starts_at_two_fifty_and_reaches_ten_at_the_top(int level)
+    public void The_merchandise_spend_starts_at_two_fifty_eight_and_reaches_ten_thirty_at_the_top(int level)
     {
-        StructureRuleSet.MerchSpendMinorTier1(level).Should().BeInRange(250, 1_000);
-        StructureRuleSet.MerchSpendMinorTier1(1).Should().Be(250);
-        StructureRuleSet.MerchSpendMinorTier1(10).Should().Be(1_000);
+        StructureRuleSet.MerchSpendMinorTier1(level).Should().BeInRange(258, 1_030);
+        StructureRuleSet.MerchSpendMinorTier1(1).Should().Be(258);
+        StructureRuleSet.MerchSpendMinorTier1(10).Should().Be(1_030);
     }
 
     [Theory]
@@ -101,7 +100,7 @@ public sealed class StructureRuleSetTests
     {
         StructureRuleSet.UpkeepSeasonMinorFor(4, 1).Should().Be(22_000_000);
         StructureRuleSet.UpkeepSeasonMinorFor(4, 2).Should().Be(22_000_000L * 4 / 10, "a tier-2 club keeps its buildings for 0.4 of the tier-1 cost");
-        StructureRuleSet.UpkeepMinorFor(4, 1).Should().Be(22_000_000L * 3 / EconomyRuleSet.MatchdaysPerSeason, "a weekly run settles three matchdays of the season");
+        StructureRuleSet.UpkeepMinorFor(4, 1).Should().Be(22_000_000L / EconomyRuleSet.WeeklyRunsPerSeason, "a weekly run settles an eleventh of the season");
         StructureRuleSet.UpgradeCostMinorFor(6, 2).Should().Be(90_000_000L * 4 / 10);
 
         for (var level = 1; level <= StructureRuleSet.MaxLevel; level++)
@@ -197,24 +196,24 @@ public sealed class StructureRuleSetTests
     [Fact]
     public void The_snack_bar_takes_the_crowd_times_the_spend_lifted_by_the_result()
     {
-        // 2,890 people at level 1 (6.00 each), then lifted by an underdog win.
-        StructureRuleSet.SnackBaseMinorFor(1, 2_890, 1).Should().Be(1_734_000);
-        StructureRuleSet.SnackTakingsMinorFor(1, 2_890, 0, 1).Should().Be(1_734_000);
-        StructureRuleSet.SnackTakingsMinorFor(1, 2_890, 3_000, 1).Should().Be(2_254_200);
-        StructureRuleSet.SnackTakingsMinorFor(10, 2_890, 1_500, 1).Should().Be(2_890L * 1_410 * 115 / 100);
+        // 2,890 people at level 1 (6.80 each), then lifted by an underdog win.
+        StructureRuleSet.SnackBaseMinorFor(1, 2_890, 1).Should().Be(1_965_200);
+        StructureRuleSet.SnackTakingsMinorFor(1, 2_890, 0, 1).Should().Be(1_965_200);
+        StructureRuleSet.SnackTakingsMinorFor(1, 2_890, 3_000, 1).Should().Be(2_554_760);
+        StructureRuleSet.SnackTakingsMinorFor(10, 2_890, 1_500, 1).Should().Be(2_890L * 1_598 * 115 / 100);
         StructureRuleSet.SnackTakingsMinorFor(1, 0, 3_000, 1).Should().Be(0, "an empty ground sells nothing");
-        StructureRuleSet.SnackTakingsMinorFor(1, 2_890, 0, 2).Should().Be(2_890L * (600L * 5_333 / 10_000), "a tier-2 spectator spends at the tier-2 price level");
+        StructureRuleSet.SnackTakingsMinorFor(1, 2_890, 0, 2).Should().Be(2_890L * (680L * 5_333 / 10_000), "a tier-2 spectator spends at the tier-2 price level");
     }
 
     [Fact]
     public void The_merchandise_shop_takes_the_fans_times_the_spend_lifted_by_their_mood()
     {
-        // 10,000 calm fans at level 1 (2.50 each) is 25,000.00 before the 5% mood bonus.
-        StructureRuleSet.MerchBaseMinorFor(1, 10_000, 1).Should().Be(2_500_000);
-        StructureRuleSet.MerchTakingsMinorFor(1, 10_000, FanMoodWord.Calm, 1).Should().Be(2_625_000);
-        StructureRuleSet.MerchTakingsMinorFor(1, 10_000, FanMoodWord.Furious, 1).Should().Be(2_500_000);
-        StructureRuleSet.MerchTakingsMinorFor(1, 10_000, FanMoodWord.Euphoric, 1).Should().Be(3_125_000);
-        StructureRuleSet.MerchTakingsMinorFor(10, 10_000, FanMoodWord.Euphoric, 1).Should().Be(12_500_000);
+        // 10,000 calm fans at level 1 (2.58 each) is 25,800.00 before the 5% mood bonus.
+        StructureRuleSet.MerchBaseMinorFor(1, 10_000, 1).Should().Be(2_580_000);
+        StructureRuleSet.MerchTakingsMinorFor(1, 10_000, FanMoodWord.Calm, 1).Should().Be(2_709_000);
+        StructureRuleSet.MerchTakingsMinorFor(1, 10_000, FanMoodWord.Furious, 1).Should().Be(2_580_000);
+        StructureRuleSet.MerchTakingsMinorFor(1, 10_000, FanMoodWord.Euphoric, 1).Should().Be(3_225_000);
+        StructureRuleSet.MerchTakingsMinorFor(10, 10_000, FanMoodWord.Euphoric, 1).Should().Be(12_875_000);
     }
 
     [Fact]
@@ -236,7 +235,7 @@ public sealed class StructureRuleSetTests
     }
 
     [Fact]
-    public void A_tier_one_club_at_its_opening_numbers_takes_about_twenty_six_thousand_a_week_from_each_building()
+    public void A_tier_one_club_at_its_opening_numbers_takes_about_twenty_seven_thousand_a_week_from_each_building()
     {
         var crowd = StadiumRuleSet.AttendanceFor(OpeningGround, FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp);
 
@@ -245,8 +244,8 @@ public sealed class StructureRuleSetTests
         var snackPerWeek = SnackWeeklyTakingsMinor(1, 1, crowd);
         var merchPerWeek = MerchWeeklyTakingsMinor(1, 1, FanRuleSet.StartFansFor(1), FanMoodWord.Calm);
 
-        snackPerWeek.Should().BeInRange(2_550_000, 2_650_000, "about 26,000.00 a week at level 1");
-        merchPerWeek.Should().Be(2_625_000, "26,250.00 a week for calm fans at level 1");
+        snackPerWeek.Should().BeInRange(2_650_000, 2_750_000, "about 27,000.00 a week at level 1: 15 home matches over eleven weekly runs");
+        merchPerWeek.Should().Be(2_709_000, "27,090.00 a week for calm fans at level 1");
     }
 
     // A club that has grown past its opening crowd is the one that upgrades: its first steps repay in a few seasons and the dearest in a dozen. The
@@ -263,8 +262,8 @@ public sealed class StructureRuleSetTests
             // The dearest steps are bought by a club with a crowd to match: 20,000 spectators for the first five, 50,000 after.
             var (fans, crowd) = GrownClub(tier, target <= 5 ? 1 : 2.5);
 
-            var snackGain = (SnackWeeklyProfitMinor(target, tier, crowd) - SnackWeeklyProfitMinor(target - 1, tier, crowd)) * MatchdaysPerSeason / MatchdaysPerWeek;
-            var merchGain = (MerchWeeklyProfitMinor(target, tier, fans) - MerchWeeklyProfitMinor(target - 1, tier, fans)) * MatchdaysPerSeason / MatchdaysPerWeek;
+            var snackGain = (SnackWeeklyProfitMinor(target, tier, crowd) - SnackWeeklyProfitMinor(target - 1, tier, crowd)) * WeeklyRunsPerSeason;
+            var merchGain = (MerchWeeklyProfitMinor(target, tier, fans) - MerchWeeklyProfitMinor(target - 1, tier, fans)) * WeeklyRunsPerSeason;
             var cost = StructureRuleSet.UpgradeCostMinorFor(target, tier);
 
             snackGain.Should().BeGreaterThan(0, $"snack bar level {target} in tier {tier}");
@@ -301,9 +300,9 @@ public sealed class StructureRuleSetTests
     [Fact]
     public void What_a_spectator_or_a_fan_spends_follows_the_tier_price_level()
     {
-        StructureRuleSet.SnackBaseMinorFor(2, 1_000, 1).Should().Be(690_000);
-        StructureRuleSet.MerchBaseMinorFor(2, 1_000, 1).Should().Be(330_000);
-        StructureRuleSet.SnackBaseMinorFor(2, 1_000, 2).Should().Be(1_000L * (690L * 5_333 / 10_000));
+        StructureRuleSet.SnackBaseMinorFor(2, 1_000, 1).Should().Be(782_000);
+        StructureRuleSet.MerchBaseMinorFor(2, 1_000, 1).Should().Be(340_000);
+        StructureRuleSet.SnackBaseMinorFor(2, 1_000, 2).Should().Be(1_000L * (782L * 5_333 / 10_000));
         StructureRuleSet.SnackSpendMinorFor(1, 5).Should().Be(StructureRuleSet.SnackSpendMinorFor(1, 90), "tier 5 and every tier below share a price level");
 
         var topCrowd = StadiumRuleSet.AttendanceFor(OpeningGround, FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp);
@@ -333,7 +332,7 @@ public sealed class StructureRuleSetTests
     }
 
     private static long SnackWeeklyTakingsMinor(int level, int tier, int crowd) =>
-        StructureRuleSet.SnackBaseMinorFor(level, crowd, tier) * HomeMatchesPerSeason * MatchdaysPerWeek / MatchdaysPerSeason;
+        StructureRuleSet.SnackBaseMinorFor(level, crowd, tier) * HomeMatchesPerSeason / WeeklyRunsPerSeason;
 
     private static long MerchWeeklyTakingsMinor(int level, int tier, int fans, FanMoodWord mood) =>
         StructureRuleSet.MerchTakingsMinorFor(level, fans, mood, tier);

@@ -1997,7 +1997,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_sponsor_deals_kind", "kind in ('steady', 'balanced', 'performance')");
 
-                            t.HasCheckConstraint("ck_sponsor_deals_objective", "objective in ('win_league', 'top_three', 'top_six', 'top_half', 'twelfth', 'stay_up')");
+                            t.HasCheckConstraint("ck_sponsor_deals_objective", "objective in ('win_league', 'top_three', 'top_six', 'top_half', 'eleventh', 'stay_up')");
 
                             t.HasCheckConstraint("ck_sponsor_deals_outcome", "outcome is null or outcome in ('missed', 'met', 'exceeded')");
 

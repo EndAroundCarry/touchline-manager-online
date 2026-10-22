@@ -46,7 +46,7 @@ public sealed class SponsorAndStandingTests
     [Fact]
     public void For_a_club_that_meets_a_realistic_objective_the_three_offers_are_worth_about_the_same()
     {
-        foreach (var rank in new[] { 8, 15 })
+        foreach (var rank in new[] { 8, 14 })
         {
             var objective = EconomyRuleSet.RealisticObjectiveFor(rank);
             var values = Enum.GetValues<SponsorOfferKind>()
@@ -65,11 +65,11 @@ public sealed class SponsorAndStandingTests
     [InlineData(4, SeasonObjective.TopSix)]
     [InlineData(6, SeasonObjective.TopSix)]
     [InlineData(7, SeasonObjective.TopHalf)]
-    [InlineData(9, SeasonObjective.TopHalf)]
-    [InlineData(10, SeasonObjective.TwelfthPlace)]
-    [InlineData(12, SeasonObjective.TwelfthPlace)]
-    [InlineData(13, SeasonObjective.StayUp)]
-    [InlineData(18, SeasonObjective.StayUp)]
+    [InlineData(8, SeasonObjective.TopHalf)]
+    [InlineData(9, SeasonObjective.EleventhPlace)]
+    [InlineData(11, SeasonObjective.EleventhPlace)]
+    [InlineData(12, SeasonObjective.StayUp)]
+    [InlineData(16, SeasonObjective.StayUp)]
     public void The_realistic_objective_is_the_strength_rank_rounded_to_a_choice(int rank, SeasonObjective expected)
     {
         EconomyRuleSet.RealisticObjectiveFor(rank).Should().Be(expected);
@@ -83,13 +83,16 @@ public sealed class SponsorAndStandingTests
     [InlineData(SeasonObjective.TopSix, 6, ObjectiveOutcome.Met)]
     [InlineData(SeasonObjective.TopSix, 4, ObjectiveOutcome.Met)]
     [InlineData(SeasonObjective.TopSix, 3, ObjectiveOutcome.Exceeded)]
-    [InlineData(SeasonObjective.TopHalf, 9, ObjectiveOutcome.Met)]
-    [InlineData(SeasonObjective.TopHalf, 7, ObjectiveOutcome.Met)]
-    [InlineData(SeasonObjective.TopHalf, 6, ObjectiveOutcome.Exceeded)]
-    [InlineData(SeasonObjective.TopHalf, 10, ObjectiveOutcome.Missed)]
-    [InlineData(SeasonObjective.StayUp, 15, ObjectiveOutcome.Met)]
-    [InlineData(SeasonObjective.StayUp, 12, ObjectiveOutcome.Exceeded)]
-    [InlineData(SeasonObjective.StayUp, 16, ObjectiveOutcome.Missed)]
+    [InlineData(SeasonObjective.TopHalf, 8, ObjectiveOutcome.Met)]
+    [InlineData(SeasonObjective.TopHalf, 6, ObjectiveOutcome.Met)]
+    [InlineData(SeasonObjective.TopHalf, 5, ObjectiveOutcome.Exceeded)]
+    [InlineData(SeasonObjective.TopHalf, 9, ObjectiveOutcome.Missed)]
+    [InlineData(SeasonObjective.EleventhPlace, 11, ObjectiveOutcome.Met)]
+    [InlineData(SeasonObjective.EleventhPlace, 8, ObjectiveOutcome.Exceeded)]
+    [InlineData(SeasonObjective.EleventhPlace, 12, ObjectiveOutcome.Missed)]
+    [InlineData(SeasonObjective.StayUp, 13, ObjectiveOutcome.Met)]
+    [InlineData(SeasonObjective.StayUp, 10, ObjectiveOutcome.Exceeded)]
+    [InlineData(SeasonObjective.StayUp, 14, ObjectiveOutcome.Missed)]
     public void An_objective_is_met_at_its_place_exceeded_by_three_places_and_otherwise_missed(SeasonObjective objective, int place, ObjectiveOutcome expected)
     {
         EconomyRuleSet.OutcomeOf(objective, place).Should().Be(expected);
@@ -110,12 +113,21 @@ public sealed class SponsorAndStandingTests
     }
 
     [Fact]
-    public void Targeting_the_top_three_and_making_it_pays_more_than_targeting_tenth_and_making_it()
+    public void The_places_the_objectives_ask_for_follow_the_size_of_the_table()
+    {
+        Enum.GetValues<SeasonObjective>().Select(EconomyRuleSet.TargetPlaceFor).Should().Equal(1, 3, 6, 8, 11, 13);
+        EconomyRuleSet.TargetPlaceFor(SeasonObjective.TopHalf).Should().Be(EconomyRuleSet.ClubsPerDivision / 2);
+        EconomyRuleSet.TargetPlaceFor(SeasonObjective.StayUp).Should().Be(EconomyRuleSet.ClubsPerDivision - WorldRuleSet.RelegatedPerTier, "staying up is the last place that is not relegated");
+        EconomyRuleSet.OutcomeOf(SeasonObjective.StayUp, EconomyRuleSet.ClubsPerDivision - WorldRuleSet.RelegatedPerTier + 1).Should().Be(ObjectiveOutcome.Missed, "the first relegated place misses staying up");
+    }
+
+    [Fact]
+    public void Targeting_the_top_three_and_making_it_pays_more_than_targeting_eleventh_and_making_it()
     {
         var (_, top3) = ObjectiveBonus.Settle(SponsorOfferKind.Balanced, SeasonObjective.TopThree, 3, 1, FanRuleSetOpening, 50);
-        var (_, tenth) = ObjectiveBonus.Settle(SponsorOfferKind.Balanced, SeasonObjective.TwelfthPlace, 10, 1, FanRuleSetOpening, 50);
+        var (_, eleventh) = ObjectiveBonus.Settle(SponsorOfferKind.Balanced, SeasonObjective.EleventhPlace, 9, 1, FanRuleSetOpening, 50);
 
-        top3.Should().BeGreaterThan(tenth);
+        top3.Should().BeGreaterThan(eleventh);
     }
 
     [Fact]
@@ -143,7 +155,7 @@ public sealed class SponsorAndStandingTests
     {
         var quotes = SponsorOffers.Quotes(SponsorOfferKind.Balanced, 1, FanRuleSetOpening, 50);
 
-        quotes.Select(quote => quote.TargetPlace).Should().Equal(1, 3, 6, 9, 12, 15);
+        quotes.Select(quote => quote.TargetPlace).Should().Equal(1, 3, 6, 8, 11, 13);
         quotes.Select(quote => quote.MetMinor).Should().BeInDescendingOrder();
         quotes.Should().OnlyContain(quote => quote.ExceededMinor == quote.MetMinor * 3 / 2);
     }
@@ -165,11 +177,11 @@ public sealed class SponsorAndStandingTests
     [InlineData(4, false, 2)]
     [InlineData(6, false, 2)]
     [InlineData(7, false, 0)]
-    [InlineData(12, false, 0)]
+    [InlineData(10, false, 0)]
+    [InlineData(11, false, -2)]
     [InlineData(13, false, -2)]
-    [InlineData(15, false, -2)]
+    [InlineData(14, true, -5)]
     [InlineData(16, true, -5)]
-    [InlineData(18, true, -5)]
     public void A_final_place_moves_the_standing_by_the_table(int place, bool relegated, int points)
     {
         EconomyRuleSet.StandingFinishDelta(place, relegated).Should().Be(points);
@@ -216,7 +228,7 @@ public sealed class SponsorAndStandingTests
     [Fact]
     public void A_relegated_club_is_pulled_toward_the_lower_tiers_base_and_a_promoted_club_toward_the_higher()
     {
-        var down = ClubStanding.Step(5_000, 1, 17, ObjectiveOutcome.Missed, 2);
+        var down = ClubStanding.Step(5_000, 1, 15, ObjectiveOutcome.Missed, 2);
         var up = ClubStanding.Step(4_000, 2, 1, ObjectiveOutcome.Met, 1);
 
         ClubStanding.PointsOf(down).Should().BeLessThan(50);
@@ -230,7 +242,7 @@ public sealed class SponsorAndStandingTests
         var bottom = 100;
 
         ClubStanding.Step(top, 1, 1, ObjectiveOutcome.Exceeded, 1).Should().BeLessThanOrEqualTo(10_000);
-        ClubStanding.Step(bottom, 4, 18, ObjectiveOutcome.Missed, 5).Should().BeGreaterThanOrEqualTo(100);
+        ClubStanding.Step(bottom, 4, 16, ObjectiveOutcome.Missed, 5).Should().BeGreaterThanOrEqualTo(100);
     }
 
     private static int FanRuleSetOpening => FanRuleSet.StartFansFor(1);

@@ -1,7 +1,7 @@
 namespace Tactical11Manager.Domain.Rules;
 
 /// <summary>
-/// The economy rules of the second finance model (plan toasty-scott, `world-rules-v17`): what a player is worth and paid, what a club earns and
+/// The economy rules of the second finance model (plan toasty-scott, `world-rules-v18`): what a player is worth and paid, what a club earns and
 /// spends in a season, how a sponsor and a season objective pay, how a club's standing moves, and when a club is in the red.
 /// </summary>
 /// <remarks>
@@ -29,11 +29,14 @@ public static partial class EconomyRuleSet
     /// <summary>The matchdays in a season, which is also the number of equal parts a season amount is paid in (`CAL-1`).</summary>
     public const int MatchdaysPerSeason = WorldRuleSet.MatchdaysPerSeason;
 
-    /// <summary>
-    /// The matchdays the weekly finance run settles at once: the three kickoff days of a week (`CAL-2`). A season of 34 matchdays is therefore
-    /// 11⅓ weekly runs.
-    /// </summary>
+    /// <summary>The matchdays the weekly finance run settles at once: the three kickoff days of a week (`CAL-2`).</summary>
     public const int MatchdaysPerWeeklyRun = 3;
+
+    /// <summary>
+    /// The weekly finance runs in a season: one for each week of the season cycle (`CAL-6`), so a season of 30 matchdays is ten match weeks and a
+    /// rollover week, and a season amount paid by the week is paid in exactly this many parts.
+    /// </summary>
+    public const int WeeklyRunsPerSeason = WorldRuleSet.SeasonCycleWeeks;
 
     /// <summary>The fewest clubs in a division; the table the prize money and the places are read from (`WORLD-4`).</summary>
     public const int ClubsPerDivision = WorldRuleSet.ClubsPerDivision;
@@ -103,9 +106,9 @@ public static partial class EconomyRuleSet
     public static long PerMatchday(long seasonMinor) => seasonMinor / MatchdaysPerSeason;
 
     /// <summary>
-    /// The part of a season amount the weekly finance run settles: three matchdays' worth (`CON-2`). Used where the contract still stores a weekly
-    /// wage; it goes when the contract stores the season wage.
+    /// The part of a season amount the weekly finance run settles: a <see cref="WeeklyRunsPerSeason"/>th (`CON-2`). Used where the contract
+    /// still stores a weekly wage; it goes when the contract stores the season wage.
     /// </summary>
     /// <param name="seasonMinor">The amount for the whole season.</param>
-    public static long PerWeeklyRun(long seasonMinor) => seasonMinor * MatchdaysPerWeeklyRun / MatchdaysPerSeason;
+    public static long PerWeeklyRun(long seasonMinor) => seasonMinor / WeeklyRunsPerSeason;
 }

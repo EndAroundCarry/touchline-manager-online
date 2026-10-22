@@ -161,7 +161,7 @@ public static class AiFinancePolicy
         {
             var next = input.ShopLevel + 1;
             var gain = (StructureRuleSet.MerchTakingsMinorFor(next, input.Fans, word, input.Tier) - StructureRuleSet.MerchTakingsMinorFor(input.ShopLevel, input.Fans, word, input.Tier))
-                * EconomyRuleSet.MatchdaysPerSeason / EconomyRuleSet.MatchdaysPerWeeklyRun;
+                * EconomyRuleSet.WeeklyRunsPerSeason;
 
             if (PaysBack(input, next, gain, available, reserve))
             {

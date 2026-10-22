@@ -18,7 +18,7 @@ public readonly record struct StructureBonus(int Bp, string Reason);
 /// </para>
 /// <para>
 /// Money is an integer count of minor units (`FIN-2`), so the figures below are hundredths of the currency a
-/// manager reads: a snack bar spend of 600 is 6.00 per spectator. What a spectator or a fan spends is
+/// manager reads: a snack bar spend of 680 is 6.80 per spectator. What a spectator or a fan spends is
 /// scaled by the tier's price level, like a ticket (<see cref="EconomyRuleSet.PriceLevelBp"/>), so a lower division's snack bar and shop are
 /// worth the same share of its income as a top club's. Upkeep scales like the league's money
 /// (<see cref="EconomyRuleSet.TierFactorBp"/>), and so does the cost of an upgrade (`STRC-9`).
@@ -64,10 +64,11 @@ public static class StructureRuleSet
 
     private const int OneHundredPercent = 10_000;
 
-    // Index 0 is level 1. A table rather than a formula, so a retune can bend any one step.
-    private static readonly long[] SnackSpendTable = [600, 690, 780, 870, 960, 1_050, 1_140, 1_230, 1_320, 1_410];
+    // Index 0 is level 1. A table rather than a formula, so a retune can bend any one step. The snack bar's spend is the 34-matchday season's
+    // times 34/30 (fifteen home matches take what seventeen did) and the shop's is its 11⅓-run season's times 34/33 (eleven runs take what 11⅓ did).
+    private static readonly long[] SnackSpendTable = [680, 782, 884, 986, 1_088, 1_190, 1_292, 1_394, 1_496, 1_598];
 
-    private static readonly long[] MerchSpendTable = [250, 330, 420, 500, 580, 670, 750, 830, 920, 1_000];
+    private static readonly long[] MerchSpendTable = [258, 340, 433, 515, 598, 690, 773, 855, 948, 1_030];
 
     // What a building costs to keep for a season at a tier-1 club, in minor units.
     private static readonly long[] UpkeepSeasonTier1 =

@@ -193,7 +193,7 @@ public static class InboxMessageText
         "top_three" => "finish in the top three",
         "top_six" => "finish in the top six",
         "top_half" => "finish in the top half",
-        "twelfth" => "finish 12th or better",
+        "eleventh" or "twelfth" => $"finish {Ordinal(EconomyRuleSet.EleventhPlace)} or better",
         _ => "stay up",
     };
 

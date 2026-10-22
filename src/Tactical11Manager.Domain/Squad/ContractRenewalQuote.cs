@@ -24,7 +24,7 @@ public sealed record ContractRenewalInput(
 
 /// <summary>The terms a renewal quote proposes.</summary>
 /// <param name="Seasons">The length of the proposed contract, 1–3 seasons (`CON-1`).</param>
-/// <param name="SeasonWageMinor">The proposed wage for a season, in minor units. It is paid in 34 equal parts, one on each matchday.</param>
+/// <param name="SeasonWageMinor">The proposed wage for a season, in minor units. It is paid in 30 equal parts, one on each matchday.</param>
 public sealed record ContractRenewalTerms(int Seasons, long SeasonWageMinor);
 
 /// <summary>

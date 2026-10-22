@@ -9,9 +9,8 @@ namespace Tactical11Manager.SimulationBenchmarks;
 // The economy sandbox (plan toasty-scott, Milestone 1). Every money formula the sandbox needs goes through this one class, which reads the game's own
 // rules (EconomyRuleSet, StadiumRuleSet, StructureRuleSet, PlayerValuation, ContractRenewalQuote, FreeAgentTerms). All amounts are minor units. League
 // money, the sponsor's fixed part and wages are paid in one equal part on each matchday, and the weekly run's items (the shop, the operating cost and
-// the upkeep) once a week of the season cycle (EconSim.RunsPerSeason), a run's equal part of the season. The domain splits a season into runs by
-// its own 3 matchdays a run (EconomyRuleSet.PerWeeklyRun), which is 10 runs of a cycle that has 11: until the economy milestone of plan luminous-cosmos
-// corrects it, the sandbox splits by the real count so that the season's money is the season figure.
+// the upkeep) once a week of the season cycle (EconSim.RunsPerSeason, which is EconomyRuleSet.WeeklyRunsPerSeason), a run's equal part of the season
+// (EconomyRuleSet.PerWeeklyRun), so that the season's money is the season figure.
 //
 // The first version of the sandbox (Milestone 0) ran the rules of world-rules-v16 behind an interface; its baseline report is kept outside the repo. Those
 // rules were replaced by the v17 rules, so only the v17 rules run here.
@@ -55,7 +54,7 @@ internal static class EconRules
         StructureRuleSet.MerchTakingsMinorFor(level, fans, mood, tier);
 
     /// <summary>A season's amount for one weekly run: an equal part of the cycle's runs.</summary>
-    public static long PerRun(long seasonMinor) => seasonMinor / EconSim.RunsPerSeason;
+    public static long PerRun(long seasonMinor) => EconomyRuleSet.PerWeeklyRun(seasonMinor);
 
     /// <summary>A building's upkeep for one weekly run.</summary>
     public static long Upkeep(int level, int tier) => PerRun(StructureRuleSet.UpkeepSeasonMinorFor(level, tier));

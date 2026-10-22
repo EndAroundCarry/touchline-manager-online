@@ -95,6 +95,18 @@ public sealed class EconomyRuleSetTests
     }
 
     [Fact]
+    public void The_first_tier_pays_the_figures_the_plan_states_for_a_division_of_sixteen()
+    {
+        var table = EconomyRuleSet.PrizeTable(1);
+
+        table[0].Should().Be(656_880_000, "the champion");
+        table[1].Should().Be(547_400_000, "the second place");
+        table[2].Should().Be(476_000_000, "the third place");
+        table[^1].Should().Be(34_000_000, "the last place gets one share");
+        (table.Sum() / table.Count).Should().BeInRange(290_000_000, 305_000_000, "the average club keeps the prize it had on 18 clubs at 300k a share");
+    }
+
+    [Fact]
     public void A_place_outside_the_division_is_refused_for_a_prize()
     {
         FluentActions.Invoking(() => EconomyRuleSet.PrizeMinorFor(1, 0)).Should().Throw<ArgumentOutOfRangeException>();
@@ -106,7 +118,8 @@ public sealed class EconomyRuleSetTests
     {
         EconomyRuleSet.PerMatchday(3_000_000).Should().Be(100_000);
         (EconomyRuleSet.PerMatchday(EconomyRuleSet.LeagueTvSeasonMinorTier1) * 30).Should().BeInRange(EconomyRuleSet.LeagueTvSeasonMinorTier1 - 30, EconomyRuleSet.LeagueTvSeasonMinorTier1);
-        EconomyRuleSet.PerWeeklyRun(3_000_000).Should().Be(300_000, "a weekly run settles three matchdays");
+        EconomyRuleSet.WeeklyRunsPerSeason.Should().Be(11, "one run for each week of the season cycle");
+        EconomyRuleSet.PerWeeklyRun(3_300_000).Should().Be(300_000, "a weekly run settles an eleventh of the season");
     }
 
     [Fact]

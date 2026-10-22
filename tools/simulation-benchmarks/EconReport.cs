@@ -181,7 +181,7 @@ internal static class EconReport
         text.AppendLine();
         text.AppendLine("A fresh club of each tier: its season income at the opening fans and ground, the league and sponsor money, the prize for a mid-table place, and its opening cash.");
         text.AppendLine();
-        text.AppendLine("| Tier | Forecast income | League TV | Steady sponsor | Champion | {EconSim.ClubsPerTier / 2}th place | {EconSim.ClubsPerTier}th place | Opening cash | Operating cost |");
+        text.AppendLine($"| Tier | Forecast income | League TV | Steady sponsor | Champion | {EconSim.ClubsPerTier / 2}th place | {EconSim.ClubsPerTier}th place | Opening cash | Operating cost |");
         text.AppendLine("|---|---|---|---|---|---|---|---|---|");
 
         for (var tier = 1; tier <= 5; tier++)

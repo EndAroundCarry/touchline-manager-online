@@ -10,7 +10,7 @@ export type SponsorOfferKind = 'steady' | 'balanced' | 'performance';
 
 /** The season objectives, hardest first. */
 export type SeasonObjective =
-  'win_league' | 'top_three' | 'top_six' | 'top_half' | 'twelfth' | 'stay_up';
+  'win_league' | 'top_three' | 'top_six' | 'top_half' | 'eleventh' | 'stay_up';
 
 /** What one objective pays under one offer. */
 export interface SponsorObjectiveQuote {

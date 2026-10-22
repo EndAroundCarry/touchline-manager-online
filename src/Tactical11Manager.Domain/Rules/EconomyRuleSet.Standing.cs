@@ -29,7 +29,7 @@ public static partial class EconomyRuleSet
         return Math.Max(StandingMin, OpeningStandingTier1 - (OpeningStandingDropPerTier * (tier - 1)));
     }
 
-    /// <summary>What a final place does to a club's standing, in points: the champion +6, the top three +4, the top six +2, the bottom six -2, a relegated club -5.</summary>
+    /// <summary>What a final place does to a club's standing, in points: the champion +6, the top three +4, the top six +2, the bottom six of the table -2 unless it was relegated, a relegated club -5.</summary>
     /// <param name="place">The final place, 1 to <see cref="ClubsPerDivision"/>.</param>
     /// <param name="relegated">Whether the place sent the club down.</param>
     public static int StandingFinishDelta(int place, bool relegated)
@@ -46,7 +46,7 @@ public static partial class EconomyRuleSet
             1 => 6,
             <= 3 => 4,
             <= 6 => 2,
-            > 12 => -2,
+            > ClubsPerDivision - 6 => -2,
             _ => 0,
         };
     }
