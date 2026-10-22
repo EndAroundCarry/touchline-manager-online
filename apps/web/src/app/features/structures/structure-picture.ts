@@ -31,6 +31,7 @@ interface DrawnPart {
  */
 @Component({
   selector: 'app-structure-picture',
+  host: { class: 'block h-full w-full' },
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <svg
@@ -40,7 +41,7 @@ interface DrawnPart {
       [attr.data-kind]="kind()"
       [attr.data-level]="scene().level"
       preserveAspectRatio="xMidYMid meet"
-      class="block h-auto w-full rounded"
+      class="block h-full w-full rounded"
       data-testid="structure-picture"
     >
       @for (part of drawn(); track $index) {

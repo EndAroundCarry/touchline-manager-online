@@ -34,8 +34,8 @@ export interface StructureScene {
   readonly view: StructureView;
 }
 
-/** The picture's proportions, width over height. */
-export const STRUCTURE_RATIO = 16 / 9;
+/** The picture's proportions, width over height: the stadium's drawing, so every picture is the same shape. */
+export const STRUCTURE_RATIO = 960 / 620;
 
 /**
  * World units per metre. The stadium's world is coarse, about two thirds of a metre a unit; a building needs finer

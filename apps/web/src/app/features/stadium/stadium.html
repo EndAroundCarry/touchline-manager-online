@@ -6,7 +6,7 @@
     <a routerLink="/dashboard" [class]="secondaryButtonClass">Back to the office</a>
   </div>
 } @else if (stadium(); as ground) {
-  <section class="max-w-5xl">
+  <section class="max-w-6xl wide:max-w-[100rem]">
     <h1 [class]="pageHeadingClass">Stadium</h1>
     <p class="mt-1 text-sm text-ink-2">
       Your ground, seen from a corner, with its seats in your club's two colours. Every row and
@@ -14,274 +14,329 @@
       its picture changes, each time it passes another {{ number(ground.seatsPerLevel) }} places.
     </p>
 
-    <div class="mt-6 grid gap-4">
-      <figure class="rounded border border-line bg-panel p-3" data-testid="stadium-figure">
-        <app-stadium-picture
-          [level]="ground.level"
-          [primaryColour]="ground.primaryColour"
-          [secondaryColour]="ground.secondaryColour"
-          [highlight]="highlight()"
-          [labels]="true"
-        />
-        <figcaption class="mt-2 text-sm text-ink-2">
-          Level {{ ground.level }} of {{ ground.maxLevel }} &middot;
-          {{ number(ground.capacity) }} places
-        </figcaption>
-
-        <ul
-          class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
-          aria-label="Kinds of place in the picture"
-          data-testid="stadium-regions"
+    <!--
+      From `wide` the page is one grid: the picture and its kinds of place on the left, the size strip and the places
+      beside it, the gallery of levels across the foot. The two wrappers dissolve there (`contents`) so their children
+      take a cell each; below `wide` they are the ordinary left and right columns.
+    -->
+    <div
+      class="mt-4 grid gap-4 lg:grid-cols-[34rem_1fr] lg:items-start wide:grid-cols-[34rem_minmax(0,1fr)] wide:gap-x-4 wide:gap-y-3"
+    >
+      <div class="grid gap-4 lg:sticky lg:top-4 wide:contents">
+        <figure
+          class="rounded border border-line bg-panel p-3 wide:col-start-1 wide:row-span-2 wide:row-start-1"
+          data-testid="stadium-figure"
         >
-          @for (stand of ground.stands; track stand.stand) {
-            <li>
-              <button
-                type="button"
-                class="flex min-h-11 w-full items-center gap-3 rounded border border-line-strong px-3 py-2 text-left hover:bg-raised"
-                [class.bg-raised]="highlight() === stand.stand"
-                [class.border-accent]="highlight() === stand.stand"
-                [attr.aria-pressed]="highlight() === stand.stand"
-                [attr.data-region]="stand.stand"
-                (click)="toggleRegion(stand.stand)"
-                (pointerenter)="pointAt(stand.stand)"
-                (pointerleave)="pointAt(null)"
-                (focus)="pointAt(stand.stand)"
-                (blur)="pointAt(null)"
-              >
-                <span
-                  class="h-7 w-9 shrink-0 rounded-sm border border-line-strong"
-                  aria-hidden="true"
-                  [style.background]="swatch(ground, stand.stand)"
-                ></span>
-                <span class="min-w-0">
-                  <span class="block text-sm font-semibold text-ink">{{ label(stand).name }}</span>
-                  <span class="block text-sm text-ink-2">{{ number(stand.seats) }} places</span>
-                </span>
-              </button>
-            </li>
-          }
-        </ul>
-        <p class="mt-2 text-sm text-muted">
-          Point at a kind of place to light its sectors in the picture.
-        </p>
-      </figure>
-
-      <section class="rounded border border-line bg-panel p-4" aria-labelledby="level-heading">
-        <h2 id="level-heading" class="text-sm font-medium text-muted">Size</h2>
-
-        <dl class="mt-2 grid grid-cols-2 gap-3">
-          <div>
-            <dt class="text-sm text-ink-2">Level</dt>
-            <dd class="text-xl font-semibold" data-testid="stadium-level">
-              {{ ground.level }}
-              <span class="text-sm font-normal text-ink-2">of {{ ground.maxLevel }}</span>
-            </dd>
-          </div>
-          <div>
-            <dt class="text-sm text-ink-2">Capacity</dt>
-            <dd class="text-xl font-semibold" data-testid="stadium-capacity">
-              {{ number(ground.capacity) }}
-            </dd>
-            <dd class="text-sm text-ink-2">of {{ number(ground.maxCapacity) }} at most</dd>
-          </div>
-        </dl>
-
-        <div
-          class="mt-3 h-2 overflow-hidden rounded bg-raised"
-          role="progressbar"
-          aria-label="Progress through the current level"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          [attr.aria-valuenow]="progress()"
-        >
-          <div class="h-full bg-accent" [style.width.%]="progress()"></div>
-        </div>
-        <p class="mt-2 text-sm text-ink-2" data-testid="stadium-next-level">
-          {{ untilNextLevel(ground) }}
-        </p>
-
-        <dl class="mt-4 grid gap-2 border-t border-line pt-3">
-          <div class="flex items-baseline justify-between gap-3">
-            <dt class="text-sm text-ink-2">Club funds available</dt>
-            <dd class="text-sm font-semibold" data-testid="stadium-available">
-              {{ funds(ground.availableMinor) }}
-            </dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-3">
-            <dt class="text-sm text-ink-2">Crowd at a mid-table home match</dt>
-            <dd class="text-sm font-semibold">{{ number(ground.expectedDemand) }}</dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-3">
-            <dt class="text-sm text-ink-2">Gate at a mid-table home match</dt>
-            <dd class="text-sm font-semibold">{{ funds(ground.expectedGateMinor) }}</dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-3">
-            <dt class="text-sm text-ink-2">Gate if every place sold</dt>
-            <dd class="text-sm font-semibold">{{ funds(ground.fullHouseMinor) }}</dd>
-          </div>
-        </dl>
-      </section>
-    </div>
-
-    @if (builtMessage(); as message) {
-      <p [class]="statusClass" role="status" data-testid="stadium-built">{{ message }}</p>
-    }
-    @if (buildError(); as message) {
-      <p [class]="formErrorClass" role="alert" data-testid="stadium-build-error">{{ message }}</p>
-      @if (buildEmbargoed()) {
-        <app-embargo-notice />
-      }
-    }
-
-    <section class="mt-8" aria-labelledby="stands-heading">
-      <h2 id="stands-heading" class="text-lg font-semibold">Places</h2>
-      <p class="mt-1 text-sm text-ink-2">
-        A crowd only fills what it wants: places nobody turns up for earn nothing. The fill figure
-        is the share of each kind that sells at a mid-table home match.
-      </p>
-
-      <ul class="mt-4 grid gap-4 sm:grid-cols-2" data-testid="stadium-stands">
-        @for (stand of ground.stands; track stand.stand) {
-          <li
-            class="flex flex-col gap-3 rounded border border-line bg-panel p-4"
-            [attr.data-stand]="stand.stand"
-          >
-            <div>
-              <h3 class="text-base font-semibold">{{ label(stand).name }}</h3>
-              <p class="text-sm text-ink-2">{{ label(stand).blurb }}</p>
-            </div>
-
-            <dl class="grid grid-cols-2 gap-x-3 gap-y-2">
-              <div>
-                <dt class="text-sm text-muted">Places</dt>
-                <dd class="font-semibold" data-testid="stand-seats">{{ number(stand.seats) }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">Ticket price</dt>
-                <dd class="font-semibold" data-testid="stand-price">
-                  {{ funds(stand.ticketPriceMinor) }}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">Cost to add one</dt>
-                <dd class="font-semibold" data-testid="stand-cost">
-                  {{ funds(stand.buildCostMinor) }}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">Fill, mid-table</dt>
-                <dd class="font-semibold" data-testid="stand-fill">
-                  {{ fill(stand) }}% &middot; {{ number(stand.expectedSold) }} sell
-                </dd>
-              </div>
-            </dl>
-
-            <form
-              class="mt-auto flex flex-col gap-2 border-t border-line pt-3"
-              (submit)="$event.preventDefault(); build(stand)"
-            >
-              <label class="text-sm font-medium text-ink" [attr.for]="'order-' + stand.stand">
-                Add {{ label(stand).plural }}
-              </label>
-              <input
-                [id]="'order-' + stand.stand"
-                type="number"
-                inputmode="numeric"
-                min="1"
-                step="1"
-                [class]="textInputClass"
-                [value]="count(stand) || ''"
-                (input)="onCount(stand, $event)"
-                [attr.aria-describedby]="'order-help-' + stand.stand"
-                [disabled]="!canMutate()"
-              />
-
-              <div
-                class="flex flex-wrap gap-2"
-                role="group"
-                [attr.aria-label]="'Quick amounts for ' + label(stand).plural"
-              >
-                @for (amount of quickOrders; track amount) {
-                  <button
-                    type="button"
-                    [class]="secondaryButtonClass"
-                    [disabled]="!canMutate()"
-                    (click)="quick(stand, amount)"
-                  >
-                    {{ number(amount) }}
-                  </button>
-                }
-              </div>
-
-              <p
-                class="text-sm text-ink-2"
-                [id]="'order-help-' + stand.stand"
-                [attr.data-testid]="'order-summary-' + stand.stand"
-              >
-                @if (count(stand) > 0) {
-                  {{ phrase(stand, count(stand)) }} cost {{ funds(cost(stand)) }}. The ground would
-                  hold {{ number(capacityAfter(ground, stand)) }}.
-                } @else {
-                  The club can pay for up to {{ number(maxOrder(ground, stand)) }}.
-                }
-              </p>
-
-              @if (problem(ground, stand); as why) {
-                <p class="text-sm font-medium text-red-300" role="alert">{{ why }}</p>
-              }
-
-              <button
-                type="submit"
-                [class]="primaryButtonClass"
-                [attr.aria-label]="'Build ' + label(stand).plural"
-                [disabled]="!canBuild(ground, stand)"
-              >
-                @if (building() === stand.stand) {
-                  Building…
-                } @else {
-                  Build
-                }
-              </button>
-            </form>
-          </li>
-        }
-      </ul>
-    </section>
-
-    <section class="mt-8" aria-labelledby="levels-heading">
-      <h2 id="levels-heading" class="text-lg font-semibold">Every level</h2>
-      <p class="mt-1 text-sm text-ink-2">
-        The ground you are building toward, in your club's colours. The stadium grows into each
-        picture as it passes the places shown.
-      </p>
-
-      <ol
-        class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
-        data-testid="stadium-levels"
-      >
-        @for (item of levels(); track item.level) {
-          <li
-            class="rounded border bg-panel p-2"
-            [class.border-accent]="item.state === 'Current'"
-            [class.border-line]="item.state !== 'Current'"
-            [class.opacity-70]="item.state === 'Ahead'"
-            [attr.aria-current]="item.state === 'Current' ? 'true' : null"
-            [attr.data-level]="item.level"
-            [attr.data-state]="item.state"
-          >
+          <div class="aspect-[48/31] w-full max-w-lg">
             <app-stadium-picture
-              [level]="item.level"
+              [level]="ground.level"
               [primaryColour]="ground.primaryColour"
               [secondaryColour]="ground.secondaryColour"
-              [decorative]="true"
-              detail="low"
+              [highlight]="highlight()"
+              [labels]="true"
             />
-            <p class="mt-1 text-sm font-semibold">Level {{ item.level }}</p>
-            <p class="text-sm text-ink-2">{{ number(item.from) }}&ndash;{{ number(item.to) }}</p>
-            <p class="text-sm text-muted">{{ item.state }}</p>
-          </li>
-        }
-      </ol>
-    </section>
+          </div>
+          <figcaption class="mt-2 text-sm text-ink-2 wide:sr-only">
+            Level {{ ground.level }} of {{ ground.maxLevel }} &middot;
+            {{ number(ground.capacity) }} places
+          </figcaption>
+
+          <ul
+            class="mt-3 grid grid-cols-2 gap-2 wide:mt-2 wide:grid-cols-4"
+            aria-label="Kinds of place in the picture"
+            data-testid="stadium-regions"
+          >
+            @for (stand of ground.stands; track stand.stand) {
+              <li>
+                <button
+                  type="button"
+                  class="flex min-h-11 w-full items-center gap-2 rounded border border-line-strong px-2 py-1 text-left hover:bg-raised wide:flex-col wide:items-start wide:gap-1"
+                  [class.bg-raised]="highlight() === stand.stand"
+                  [class.border-accent]="highlight() === stand.stand"
+                  [attr.aria-pressed]="highlight() === stand.stand"
+                  [attr.data-region]="stand.stand"
+                  (click)="toggleRegion(stand.stand)"
+                  (pointerenter)="pointAt(stand.stand)"
+                  (pointerleave)="pointAt(null)"
+                  (focus)="pointAt(stand.stand)"
+                  (blur)="pointAt(null)"
+                >
+                  <span
+                    class="h-6 w-8 shrink-0 rounded-sm border border-line-strong wide:h-2 wide:w-full"
+                    aria-hidden="true"
+                    [style.background]="swatch(ground, stand.stand)"
+                  ></span>
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-ink">{{
+                      label(stand).name
+                    }}</span>
+                    <span class="block text-sm text-ink-2">{{ number(stand.seats) }} places</span>
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+          <p class="mt-2 text-sm text-muted wide:sr-only">
+            Point at a kind of place to light its sectors in the picture.
+          </p>
+        </figure>
+
+        <section
+          class="rounded border border-line bg-panel p-3 wide:col-start-2 wide:row-start-1 wide:flex wide:flex-wrap wide:items-end wide:gap-x-8 wide:gap-y-2"
+          aria-labelledby="level-heading"
+        >
+          <h2 id="level-heading" class="text-sm font-medium text-muted wide:sr-only">Size</h2>
+
+          <dl class="mt-1 grid grid-cols-2 gap-3 wide:order-1 wide:mt-0 wide:flex wide:gap-x-8">
+            <div class="flex flex-wrap items-baseline gap-x-2">
+              <dt class="text-sm text-ink-2">Level</dt>
+              <dd class="text-lg font-semibold" data-testid="stadium-level">
+                {{ ground.level }}
+                <span class="text-sm font-normal text-ink-2">of {{ ground.maxLevel }}</span>
+              </dd>
+            </div>
+            <div class="flex flex-wrap items-baseline gap-x-2">
+              <dt class="text-sm text-ink-2">Capacity</dt>
+              <dd class="text-lg font-semibold" data-testid="stadium-capacity">
+                {{ number(ground.capacity) }}
+              </dd>
+              <dd class="text-sm text-ink-2">of {{ number(ground.maxCapacity) }} at most</dd>
+            </div>
+          </dl>
+
+          <div
+            class="mt-2 h-2 overflow-hidden rounded bg-raised wide:order-2 wide:mt-0 wide:mb-2 wide:w-32"
+            role="progressbar"
+            aria-label="Progress through the current level"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-valuenow]="progress()"
+          >
+            <div class="h-full bg-accent" [style.width.%]="progress()"></div>
+          </div>
+          <p
+            class="mt-1 text-sm text-ink-2 wide:order-3 wide:mt-0"
+            data-testid="stadium-next-level"
+          >
+            {{ untilNextLevel(ground) }}
+          </p>
+
+          <dl
+            class="mt-2 grid gap-x-6 gap-y-1 border-t border-line pt-2 sm:grid-cols-2 wide:order-4 wide:mt-0 wide:flex wide:w-full wide:gap-x-6 wide:border-0 wide:pt-0"
+          >
+            <div class="flex items-baseline justify-between gap-3 wide:flex-col wide:gap-0">
+              <dt class="text-sm text-ink-2">Club funds available</dt>
+              <dd class="text-sm font-semibold" data-testid="stadium-available">
+                {{ funds(ground.availableMinor) }}
+              </dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-3 wide:flex-col wide:gap-0">
+              <dt class="text-sm text-ink-2">Crowd at a mid-table home match</dt>
+              <dd class="text-sm font-semibold">{{ number(ground.expectedDemand) }}</dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-3 wide:flex-col wide:gap-0">
+              <dt class="text-sm text-ink-2">Gate at a mid-table home match</dt>
+              <dd class="text-sm font-semibold">{{ funds(ground.expectedGateMinor) }}</dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-3 wide:flex-col wide:gap-0">
+              <dt class="text-sm text-ink-2">Gate if every place sold</dt>
+              <dd class="text-sm font-semibold">{{ funds(ground.fullHouseMinor) }}</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <div class="grid gap-4 wide:contents">
+        <div class="grid gap-4 wide:col-start-2 wide:row-start-2 wide:gap-2">
+          @if (builtMessage(); as message) {
+            <p [class]="statusClass" role="status" data-testid="stadium-built">{{ message }}</p>
+          }
+          @if (buildError(); as message) {
+            <p [class]="formErrorClass" role="alert" data-testid="stadium-build-error">
+              {{ message }}
+            </p>
+            @if (buildEmbargoed()) {
+              <app-embargo-notice />
+            }
+          }
+
+          <section aria-labelledby="stands-heading">
+            <div class="wide:flex wide:items-baseline wide:gap-3">
+              <h2 id="stands-heading" class="text-lg font-semibold">Places</h2>
+              <p class="mt-1 text-sm text-ink-2 wide:mt-0">
+                A crowd only fills what it wants: places nobody turns up for earn nothing. The fill
+                figure is the share of each kind that sells at a mid-table home match.
+              </p>
+            </div>
+
+            <ul class="mt-3 grid gap-3 wide:mt-2 wide:gap-2" data-testid="stadium-stands">
+              @for (stand of ground.stands; track stand.stand) {
+                <li
+                  class="flex flex-col gap-2 rounded border border-line bg-panel p-3 wide:grid wide:grid-cols-[15rem_minmax(0,1fr)_auto] wide:items-center wide:gap-x-4 wide:p-1.5"
+                  [attr.data-stand]="stand.stand"
+                >
+                  <div class="flex flex-wrap items-baseline gap-x-3 wide:block">
+                    <h3 class="text-base font-semibold">{{ label(stand).name }}</h3>
+                    <p class="text-sm text-ink-2 wide:leading-tight">{{ label(stand).blurb }}</p>
+                  </div>
+
+                  <dl
+                    class="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-[auto_auto_auto_1fr] wide:grid-cols-[auto_auto_auto_auto] wide:justify-start"
+                  >
+                    <div>
+                      <dt class="text-sm text-muted">Places</dt>
+                      <dd class="text-sm font-semibold" data-testid="stand-seats">
+                        {{ number(stand.seats) }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-sm text-muted">Ticket price</dt>
+                      <dd class="text-sm font-semibold" data-testid="stand-price">
+                        {{ funds(stand.ticketPriceMinor) }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-sm text-muted">Cost to add one</dt>
+                      <dd class="text-sm font-semibold" data-testid="stand-cost">
+                        {{ funds(stand.buildCostMinor) }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-sm text-muted">Fill, mid-table</dt>
+                      <dd class="text-sm font-semibold" data-testid="stand-fill">
+                        {{ fill(stand) }}% &middot; {{ number(stand.expectedSold) }} sell
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <form
+                    class="flex flex-col gap-2 border-t border-line pt-2 wide:gap-1 wide:border-0 wide:pt-0"
+                    (submit)="$event.preventDefault(); build(stand)"
+                  >
+                    <div class="flex flex-wrap items-baseline gap-x-3">
+                      <label
+                        class="text-sm font-medium text-ink"
+                        [attr.for]="'order-' + stand.stand"
+                      >
+                        Add {{ label(stand).plural }}
+                      </label>
+                      <p
+                        class="text-sm text-ink-2"
+                        [id]="'order-help-' + stand.stand"
+                        [attr.data-testid]="'order-summary-' + stand.stand"
+                      >
+                        @if (count(stand) > 0) {
+                          {{ phrase(stand, count(stand)) }} cost {{ funds(cost(stand)) }}. The
+                          ground would hold {{ number(capacityAfter(ground, stand)) }}.
+                        } @else {
+                          The club can pay for up to {{ number(maxOrder(ground, stand)) }}.
+                        }
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <input
+                        [id]="'order-' + stand.stand"
+                        type="number"
+                        inputmode="numeric"
+                        min="1"
+                        step="1"
+                        [class]="textInputClass"
+                        class="mt-0! w-32! wide:min-h-8! wide:w-24! wide:py-1!"
+                        [value]="count(stand) || ''"
+                        (input)="onCount(stand, $event)"
+                        [attr.aria-describedby]="'order-help-' + stand.stand"
+                        [disabled]="!canMutate()"
+                      />
+
+                      <div
+                        class="flex flex-wrap gap-2"
+                        role="group"
+                        [attr.aria-label]="'Quick amounts for ' + label(stand).plural"
+                      >
+                        @for (amount of quickOrders; track amount) {
+                          <button
+                            type="button"
+                            [class]="secondaryButtonClass"
+                            class="wide:min-h-8! wide:py-1!"
+                            [disabled]="!canMutate()"
+                            (click)="quick(stand, amount)"
+                          >
+                            {{ number(amount) }}
+                          </button>
+                        }
+                      </div>
+
+                      <button
+                        type="submit"
+                        [class]="primaryButtonClass"
+                        class="wide:min-h-8! wide:py-1!"
+                        [attr.aria-label]="'Build ' + label(stand).plural"
+                        [disabled]="!canBuild(ground, stand)"
+                      >
+                        @if (building() === stand.stand) {
+                          Building…
+                        } @else {
+                          Build
+                        }
+                      </button>
+                    </div>
+
+                    @if (problem(ground, stand); as why) {
+                      <p class="text-sm font-medium text-red-300" role="alert">{{ why }}</p>
+                    }
+                  </form>
+                </li>
+              }
+            </ul>
+          </section>
+        </div>
+
+        <section aria-labelledby="levels-heading" class="wide:col-span-2">
+          <div class="wide:flex wide:items-baseline wide:gap-3">
+            <h2 id="levels-heading" class="text-lg font-semibold">Every level</h2>
+            <p class="mt-1 text-sm text-ink-2 wide:mt-0">
+              The ground you are building toward, in your club's colours. The stadium grows into
+              each picture as it passes the places shown.
+            </p>
+          </div>
+
+          <ol
+            class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-8 wide:grid-cols-15"
+            data-testid="stadium-levels"
+          >
+            @for (item of levels(); track item.level) {
+              <li
+                class="rounded border bg-panel p-1.5"
+                [class.border-accent]="item.state === 'Current'"
+                [class.border-line]="item.state !== 'Current'"
+                [class.opacity-70]="item.state === 'Ahead'"
+                [attr.aria-current]="item.state === 'Current' ? 'true' : null"
+                [attr.data-level]="item.level"
+                [attr.data-state]="item.state"
+              >
+                <div class="aspect-[48/31] w-full">
+                  <app-stadium-picture
+                    [level]="item.level"
+                    [primaryColour]="ground.primaryColour"
+                    [secondaryColour]="ground.secondaryColour"
+                    [decorative]="true"
+                    detail="low"
+                  />
+                </div>
+                <div class="mt-1 flex flex-wrap items-baseline justify-between gap-x-1 wide:block">
+                  <p class="whitespace-nowrap text-sm font-semibold wide:text-xs">
+                    Level {{ item.level }}
+                  </p>
+                  <p class="text-sm text-muted wide:sr-only">{{ item.state }}</p>
+                </div>
+                <p class="text-sm text-ink-2 wide:whitespace-nowrap wide:text-xs">
+                  {{ number(item.from) }}&ndash;{{ number(item.to) }}
+                </p>
+              </li>
+            }
+          </ol>
+        </section>
+      </div>
+    </div>
   </section>
 }

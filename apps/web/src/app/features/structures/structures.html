@@ -6,15 +6,29 @@
     <a routerLink="/dashboard" [class]="secondaryButtonClass">Back to the office</a>
   </div>
 } @else if (structures(); as both) {
-  <section class="max-w-5xl" aria-labelledby="structures-heading">
-    <h1 id="structures-heading" [class]="pageHeadingClass">Structures</h1>
-    <p class="mt-1 text-sm text-ink-2">
+  <section
+    class="max-w-6xl wide:grid wide:max-w-[100rem] wide:grid-cols-[auto_1fr] wide:items-end wide:gap-x-8"
+    aria-labelledby="structures-heading"
+  >
+    <h1
+      id="structures-heading"
+      [class]="pageHeadingClass"
+      class="wide:col-start-1 wide:row-start-1"
+    >
+      Structures
+    </h1>
+    <p class="mt-1 text-sm text-ink-2 wide:col-span-2 wide:row-start-2">
       The snack bar earns from every spectator at a home match, and a good result lifts it. The
       merchandise shop earns from every fan each week, and a happier crowd spends more. Each costs a
       weekly upkeep that rises with its level.
     </p>
 
-    <div role="tablist" aria-label="Structures" data-testid="structures-tabs" class="mt-6">
+    <div
+      role="tablist"
+      aria-label="Structures"
+      data-testid="structures-tabs"
+      class="mt-6 wide:col-start-2 wide:row-start-1 wide:mt-0"
+    >
       <div class="flex gap-1 overflow-x-auto border-b border-line">
         @for (tab of tabs; track tab.key; let index = $index) {
           <button
@@ -44,334 +58,362 @@
         role="tabpanel"
         [attr.aria-labelledby]="'structures-tab-' + building.kind"
         tabindex="0"
-        class="pt-4"
+        class="pt-4 wide:col-span-2 wide:row-start-3 wide:pt-3"
         [attr.data-kind]="building.kind"
       >
-        @if (upgradedMessage(); as message) {
-          <p [class]="statusClass" role="status" data-testid="structures-upgraded">
-            {{ message }}
-          </p>
-        }
-        @if (upgradeError(); as message) {
-          <p [class]="formErrorClass" role="alert" data-testid="structures-upgrade-error">
-            {{ message }}
-          </p>
-          @if (upgradeEmbargoed()) {
-            <app-embargo-notice />
-          }
-        }
-
-        <figure class="rounded border border-line bg-panel p-3" data-testid="structures-figure">
-          <app-structure-picture
-            [kind]="building.kind"
-            [level]="building.level"
-            [primaryColour]="colours().primary"
-            [secondaryColour]="colours().secondary"
-          />
-          <figcaption class="mt-2 text-sm text-ink-2" data-testid="structures-caption">
-            Your {{ kindLabel(building.kind).toLowerCase() }} at level {{ building.level }}, in your
-            club's colours. Each level adds to the picture.
-          </figcaption>
-        </figure>
-
-        <div class="mt-4 grid gap-4 md:grid-cols-2">
-          <section
-            class="rounded border border-line bg-panel p-4"
-            aria-labelledby="structures-level-heading"
-          >
-            <h2 id="structures-level-heading" class="text-sm font-medium text-muted">
-              {{ kindLabel(building.kind) }}
-            </h2>
-            <p class="mt-2 text-xl font-semibold" data-testid="structures-level">
-              Level {{ building.level }}
-              <span class="text-sm font-normal text-ink-2">of {{ building.maxLevel }}</span>
-            </p>
-            <ol
-              class="mt-2 flex gap-1"
-              [attr.aria-label]="'Level ' + building.level + ' of ' + building.maxLevel"
-              data-testid="structures-pips"
+        <div class="grid gap-4 lg:grid-cols-[34rem_1fr] lg:items-start wide:gap-3">
+          <div class="grid gap-4 lg:sticky lg:top-4">
+            <figure class="rounded border border-line bg-panel p-3" data-testid="structures-figure">
+              <div class="aspect-[48/31] w-full max-w-lg">
+                <app-structure-picture
+                  [kind]="building.kind"
+                  [level]="building.level"
+                  [primaryColour]="colours().primary"
+                  [secondaryColour]="colours().secondary"
+                />
+              </div>
+              <figcaption
+                class="mt-2 text-sm text-ink-2 wide:sr-only"
+                data-testid="structures-caption"
+              >
+                Your {{ kindLabel(building.kind).toLowerCase() }} at level {{ building.level }}, in
+                your club's colours. Each level adds to the picture.
+              </figcaption>
+            </figure>
+            <section
+              class="rounded border border-line bg-panel p-3"
+              aria-labelledby="structures-level-heading"
             >
-              @for (reached of levelPips(building.level, building.maxLevel); track $index) {
-                <li
-                  class="h-2 flex-1 rounded-sm"
-                  [class.bg-accent]="reached"
-                  [class.bg-raised]="!reached"
-                  [attr.data-reached]="reached"
-                ></li>
-              }
-            </ol>
-
-            <dl class="mt-4 grid gap-2">
-              <div class="flex items-baseline justify-between gap-3">
-                <dt class="text-sm text-ink-2">Spent {{ customerPhrase(building.kind) }}</dt>
-                <dd class="text-sm font-semibold" data-testid="structures-spend">
-                  {{ funds(building.spendMinor) }}
-                </dd>
-              </div>
-              <div class="flex items-baseline justify-between gap-3">
-                <dt class="text-sm text-ink-2">Upkeep each week</dt>
-                <dd class="text-sm font-semibold" data-testid="structures-upkeep">
-                  {{ funds(building.upkeepWeeklyMinor) }}
-                </dd>
-              </div>
-            </dl>
-          </section>
-
-          <section
-            class="rounded border border-line bg-panel p-4"
-            aria-labelledby="structures-upgrade-heading"
-            data-testid="structures-upgrade"
-          >
-            <h2 id="structures-upgrade-heading" class="text-sm font-medium text-muted">Upgrade</h2>
-
-            @if (building.building; as work) {
-              <p class="mt-2 text-xl font-semibold" data-testid="structures-building">
-                Building level {{ work.targetLevel }}
+              <h2 id="structures-level-heading" class="text-sm font-medium text-muted">
+                {{ kindLabel(building.kind) }}
+              </h2>
+              <p class="mt-1 text-lg font-semibold" data-testid="structures-level">
+                Level {{ building.level }}
+                <span class="text-sm font-normal text-ink-2">of {{ building.maxLevel }}</span>
               </p>
-              <p class="mt-1 text-sm text-ink-2" data-testid="structures-ready">
-                Ready on {{ readyOn(work.dueAt) }}. The
-                {{ kindLabel(building.kind).toLowerCase() }} keeps trading at level
-                {{ building.level }} until then.
-              </p>
-            } @else if (building.next; as next) {
-              <p class="mt-2 text-xl font-semibold">Level {{ next.level }}</p>
-              <dl class="mt-2 grid gap-2">
+              <ol
+                class="mt-2 flex gap-1"
+                [attr.aria-label]="'Level ' + building.level + ' of ' + building.maxLevel"
+                data-testid="structures-pips"
+              >
+                @for (reached of levelPips(building.level, building.maxLevel); track $index) {
+                  <li
+                    class="h-2 flex-1 rounded-sm"
+                    [class.bg-accent]="reached"
+                    [class.bg-raised]="!reached"
+                    [attr.data-reached]="reached"
+                  ></li>
+                }
+              </ol>
+
+              <dl class="mt-2 grid gap-1">
                 <div class="flex items-baseline justify-between gap-3">
                   <dt class="text-sm text-ink-2">Spent {{ customerPhrase(building.kind) }}</dt>
-                  <dd class="text-sm font-semibold" data-testid="structures-next-spend">
-                    {{ funds(next.spendMinor) }}
+                  <dd class="text-sm font-semibold" data-testid="structures-spend">
+                    {{ funds(building.spendMinor) }}
                   </dd>
                 </div>
                 <div class="flex items-baseline justify-between gap-3">
                   <dt class="text-sm text-ink-2">Upkeep each week</dt>
-                  <dd class="text-sm font-semibold" data-testid="structures-next-upkeep">
-                    {{ funds(next.upkeepWeeklyMinor) }}
-                  </dd>
-                </div>
-                <div class="flex items-baseline justify-between gap-3">
-                  <dt class="text-sm text-ink-2">Cost, paid when ordered</dt>
-                  <dd class="text-sm font-semibold" data-testid="structures-next-cost">
-                    {{ funds(next.costMinor) }}
-                  </dd>
-                </div>
-                <div class="flex items-baseline justify-between gap-3">
-                  <dt class="text-sm text-ink-2">Build time</dt>
-                  <dd class="text-sm font-semibold" data-testid="structures-next-days">
-                    {{ buildDaysPhrase(next.buildDays) }}
-                  </dd>
-                </div>
-                <div class="flex items-baseline justify-between gap-3">
-                  <dt class="text-sm text-ink-2">Estimated change in weekly profit</dt>
-                  <dd class="text-sm font-semibold" data-testid="structures-next-profit">
-                    {{ signed(next.estWeeklyProfitChangeMinor) }}
+                  <dd class="text-sm font-semibold" data-testid="structures-upkeep">
+                    {{ funds(building.upkeepWeeklyMinor) }}
                   </dd>
                 </div>
               </dl>
-            } @else {
-              <p class="mt-2 text-xl font-semibold" data-testid="structures-top">Top level</p>
-            }
-
-            <dl class="mt-4 border-t border-line pt-3">
-              <div class="flex items-baseline justify-between gap-3">
-                <dt class="text-sm text-ink-2">Club funds available</dt>
-                <dd class="text-sm font-semibold" data-testid="structures-available">
-                  {{ funds(both.availableCashMinor) }}
+            </section>
+            <dl
+              class="grid gap-1 rounded border border-line bg-panel p-3 wide:grid-cols-3 wide:gap-3"
+            >
+              <div class="flex items-baseline justify-between gap-3 wide:flex-col wide:gap-0">
+                <dt class="text-sm text-ink-2">Taken this season</dt>
+                <dd class="text-sm font-semibold" data-testid="structures-season-takings">
+                  {{ funds(building.seasonTakingsMinor) }}
+                </dd>
+              </div>
+              <div class="flex items-baseline justify-between gap-3 wide:flex-col wide:gap-0">
+                <dt class="text-sm text-ink-2">Upkeep this season</dt>
+                <dd class="text-sm font-semibold" data-testid="structures-season-upkeep">
+                  {{ funds(building.seasonUpkeepMinor) }}
+                </dd>
+              </div>
+              <div class="flex items-baseline justify-between gap-3 wide:flex-col wide:gap-0">
+                <dt class="text-sm text-ink-2">Profit this season</dt>
+                <dd class="text-sm font-semibold" data-testid="structures-season-profit">
+                  {{ signed(building.seasonTakingsMinor - building.seasonUpkeepMinor) }}
                 </dd>
               </div>
             </dl>
+          </div>
 
-            @if (building.next) {
-              <div class="mt-3">
-                <button
-                  type="button"
-                  [class]="primaryButtonClass"
-                  data-testid="structures-upgrade-button"
-                  [disabled]="blockedReason(building) !== null || upgrading() !== null"
-                  [attr.aria-describedby]="'structures-upgrade-note-' + building.kind"
-                  (click)="upgrade(building)"
-                >
-                  Upgrade to level {{ building.next.level }}
-                </button>
-                <p
-                  class="mt-2 text-sm text-ink-2"
-                  [id]="'structures-upgrade-note-' + building.kind"
-                  data-testid="structures-upgrade-note"
-                >
-                  {{
-                    blockedReason(building) ?? 'The cost is taken now and the work starts at once.'
-                  }}
+          <div class="grid gap-4 wide:grid-cols-2 wide:items-start">
+            <div class="grid gap-4">
+              @if (upgradedMessage(); as message) {
+                <p [class]="statusClass" role="status" data-testid="structures-upgraded">
+                  {{ message }}
                 </p>
-              </div>
-            }
-          </section>
-        </div>
+              }
+              @if (upgradeError(); as message) {
+                <p [class]="formErrorClass" role="alert" data-testid="structures-upgrade-error">
+                  {{ message }}
+                </p>
+                @if (upgradeEmbargoed()) {
+                  <app-embargo-notice />
+                }
+              }
 
-        <section class="mt-6" aria-labelledby="structures-bonus-heading">
-          <h2 id="structures-bonus-heading" class="text-lg font-semibold">
-            @if (building.kind === 'snack_bar') {
-              Result bonus
-            } @else {
-              Mood bonus
-            }
-          </h2>
-          <p class="mt-1 text-sm text-ink-2">
-            @if (building.kind === 'snack_bar') {
-              A home win against the odds lifts what the snack bar takes. The highlighted line
-              applied to your last home match.
-            } @else {
-              Happier fans spend more in the shop. The highlighted line is your fans' mood now.
-            }
-          </p>
-          <ul
-            class="mt-2 divide-y divide-line rounded border border-line bg-panel"
-            data-testid="structures-bonuses"
-          >
-            @for (bonus of building.bonuses; track bonus.reason) {
-              <li
-                class="flex items-baseline justify-between gap-3 p-3 text-sm"
-                [class.bg-raised]="bonus.current"
-                [attr.data-current]="bonus.current"
+              <section
+                class="rounded border border-line bg-panel p-3"
+                aria-labelledby="structures-upgrade-heading"
+                data-testid="structures-upgrade"
               >
-                <span [class.font-semibold]="bonus.current">
-                  {{ bonusLabel(bonus.reason) }}
-                  @if (bonus.current) {
-                    <span class="font-normal text-ink-2">
-                      &middot;
-                      {{ building.kind === 'snack_bar' ? 'last home match' : 'now' }}
-                    </span>
-                  }
-                </span>
-                <span class="font-semibold tabular-nums">{{ bonusPercent(bonus.bp) }}</span>
-              </li>
-            }
-          </ul>
-        </section>
+                <h2 id="structures-upgrade-heading" class="text-sm font-medium text-muted">
+                  Upgrade
+                </h2>
 
-        <section class="mt-8" aria-labelledby="structures-weeks-heading">
-          <h2 id="structures-weeks-heading" class="text-lg font-semibold">Recent weeks</h2>
-          @if (building.recentWeeks.length === 0) {
-            <p class="mt-2 text-sm text-ink-2" data-testid="structures-no-weeks">
-              Nothing has been booked yet. The weekly finance run books the first week.
-            </p>
-          } @else {
-            <div class="mt-2 overflow-x-auto rounded border border-line bg-panel">
-              <table
-                class="w-full min-w-max border-collapse whitespace-nowrap text-sm"
-                data-testid="structures-weeks"
-              >
-                <caption class="sr-only">
-                  {{
-                    kindLabel(building.kind)
-                  }}
-                  takings, upkeep and profit for each of the last weeks.
-                </caption>
-                <thead>
-                  <tr class="border-b border-line text-left text-ink-2">
-                    <th scope="col" class="px-3 py-2 font-medium">Week</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Takings</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Upkeep</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Profit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (week of building.recentWeeks; track week.weekOf) {
-                    <tr class="border-b border-line-soft last:border-b-0">
-                      <th scope="row" class="px-3 py-2 text-left font-medium">
-                        {{ weekLabel(week.weekOf) }}
-                      </th>
-                      <td class="px-3 py-2 text-right tabular-nums">
-                        {{ funds(week.takingsMinor) }}
-                      </td>
-                      <td class="px-3 py-2 text-right tabular-nums">
-                        {{ funds(week.upkeepMinor) }}
-                      </td>
-                      <td class="px-3 py-2 text-right tabular-nums">
-                        {{ signed(week.profitMinor) }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          }
-        </section>
+                @if (building.building; as work) {
+                  <p class="mt-2 text-xl font-semibold" data-testid="structures-building">
+                    Building level {{ work.targetLevel }}
+                  </p>
+                  <p class="mt-1 text-sm text-ink-2" data-testid="structures-ready">
+                    Ready on {{ readyOn(work.dueAt) }}. The
+                    {{ kindLabel(building.kind).toLowerCase() }} keeps trading at level
+                    {{ building.level }} until then.
+                  </p>
+                } @else if (building.next; as next) {
+                  <p class="mt-1 text-lg font-semibold">Level {{ next.level }}</p>
+                  <dl class="mt-1 grid gap-1">
+                    <div class="flex items-baseline justify-between gap-3">
+                      <dt class="text-sm text-ink-2">Spent {{ customerPhrase(building.kind) }}</dt>
+                      <dd class="text-sm font-semibold" data-testid="structures-next-spend">
+                        {{ funds(next.spendMinor) }}
+                      </dd>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-3">
+                      <dt class="text-sm text-ink-2">Upkeep each week</dt>
+                      <dd class="text-sm font-semibold" data-testid="structures-next-upkeep">
+                        {{ funds(next.upkeepWeeklyMinor) }}
+                      </dd>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-3">
+                      <dt class="text-sm text-ink-2">Cost, paid when ordered</dt>
+                      <dd class="text-sm font-semibold" data-testid="structures-next-cost">
+                        {{ funds(next.costMinor) }}
+                      </dd>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-3">
+                      <dt class="text-sm text-ink-2">Build time</dt>
+                      <dd class="text-sm font-semibold" data-testid="structures-next-days">
+                        {{ buildDaysPhrase(next.buildDays) }}
+                      </dd>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-3">
+                      <dt class="text-sm text-ink-2">Estimated change in weekly profit</dt>
+                      <dd class="text-sm font-semibold" data-testid="structures-next-profit">
+                        {{ signed(next.estWeeklyProfitChangeMinor) }}
+                      </dd>
+                    </div>
+                  </dl>
+                } @else {
+                  <p class="mt-2 text-xl font-semibold" data-testid="structures-top">Top level</p>
+                }
 
-        @if (building.kind === 'snack_bar') {
-          <section class="mt-8" aria-labelledby="structures-matches-heading">
-            <h2 id="structures-matches-heading" class="text-lg font-semibold">
-              Recent home matches
-            </h2>
-            @if (building.recentMatches.length === 0) {
-              <p class="mt-2 text-sm text-ink-2" data-testid="structures-no-matches">
-                The snack bar has not served a home match yet.
-              </p>
-            } @else {
-              <div class="mt-2 overflow-x-auto rounded border border-line bg-panel">
-                <table
-                  class="w-full min-w-max border-collapse whitespace-nowrap text-sm"
-                  data-testid="structures-matches"
+                <dl class="mt-2 border-t border-line pt-2">
+                  <div class="flex items-baseline justify-between gap-3">
+                    <dt class="text-sm text-ink-2">Club funds available</dt>
+                    <dd class="text-sm font-semibold" data-testid="structures-available">
+                      {{ funds(both.availableCashMinor) }}
+                    </dd>
+                  </div>
+                </dl>
+
+                @if (building.next) {
+                  <div class="mt-2">
+                    <button
+                      type="button"
+                      [class]="primaryButtonClass"
+                      data-testid="structures-upgrade-button"
+                      [disabled]="blockedReason(building) !== null || upgrading() !== null"
+                      [attr.aria-describedby]="'structures-upgrade-note-' + building.kind"
+                      (click)="upgrade(building)"
+                    >
+                      Upgrade to level {{ building.next.level }}
+                    </button>
+                    <p
+                      class="mt-2 text-sm text-ink-2"
+                      [id]="'structures-upgrade-note-' + building.kind"
+                      data-testid="structures-upgrade-note"
+                    >
+                      {{
+                        blockedReason(building) ??
+                          'The cost is taken now and the work starts at once.'
+                      }}
+                    </p>
+                  </div>
+                }
+              </section>
+
+              <section aria-labelledby="structures-bonus-heading">
+                <h2 id="structures-bonus-heading" class="text-lg font-semibold">
+                  @if (building.kind === 'snack_bar') {
+                    Result bonus
+                  } @else {
+                    Mood bonus
+                  }
+                </h2>
+                <p class="mt-1 text-sm text-ink-2">
+                  @if (building.kind === 'snack_bar') {
+                    A home win against the odds lifts what the snack bar takes. The highlighted line
+                    applied to your last home match.
+                  } @else {
+                    Happier fans spend more in the shop. The highlighted line is your fans' mood
+                    now.
+                  }
+                </p>
+                <ul
+                  class="mt-2 divide-y divide-line rounded border border-line bg-panel"
+                  data-testid="structures-bonuses"
                 >
-                  <caption class="sr-only">
-                    The snack bar's takings at each of the last home matches.
-                  </caption>
-                  <thead>
-                    <tr class="border-b border-line text-left text-ink-2">
-                      <th scope="col" class="px-3 py-2 font-medium">Opponent</th>
-                      <th scope="col" class="px-3 py-2 text-right font-medium">Crowd</th>
-                      <th scope="col" class="px-3 py-2 font-medium">Result</th>
-                      <th scope="col" class="px-3 py-2 text-right font-medium">Bonus</th>
-                      <th scope="col" class="px-3 py-2 text-right font-medium">Takings</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (match of building.recentMatches; track match.fixtureId) {
-                      <tr class="border-b border-line-soft last:border-b-0">
-                        <th scope="row" class="px-3 py-2 text-left font-medium">
-                          {{ match.opponent }}
-                        </th>
-                        <td class="px-3 py-2 text-right tabular-nums">
-                          {{ number(match.spectators) }}
-                        </td>
-                        <td class="px-3 py-2">
-                          {{ resultLabel(match.result) }} {{ match.goalsFor }}–{{
-                            match.goalsAgainst
-                          }}
-                        </td>
-                        <td class="px-3 py-2 text-right tabular-nums">
-                          {{ bonusPercent(match.bonusBp) }}
-                        </td>
-                        <td class="px-3 py-2 text-right tabular-nums">
-                          {{ funds(match.takingsMinor) }}
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          </section>
-        }
+                  @for (bonus of building.bonuses; track bonus.reason) {
+                    <li
+                      class="flex items-baseline justify-between gap-3 p-3 text-sm wide:py-1.5"
+                      [class.bg-raised]="bonus.current"
+                      [attr.data-current]="bonus.current"
+                    >
+                      <span [class.font-semibold]="bonus.current">
+                        {{ bonusLabel(bonus.reason) }}
+                        @if (bonus.current) {
+                          <span class="font-normal text-ink-2">
+                            &middot;
+                            {{ building.kind === 'snack_bar' ? 'last home match' : 'now' }}
+                          </span>
+                        }
+                      </span>
+                      <span class="font-semibold tabular-nums">{{ bonusPercent(bonus.bp) }}</span>
+                    </li>
+                  }
+                </ul>
+              </section>
+            </div>
+            <div class="grid gap-4">
+              <section aria-labelledby="structures-weeks-heading">
+                <h2 id="structures-weeks-heading" class="text-lg font-semibold">Recent weeks</h2>
+                @if (building.recentWeeks.length === 0) {
+                  <p class="mt-2 text-sm text-ink-2" data-testid="structures-no-weeks">
+                    Nothing has been booked yet. The weekly finance run books the first week.
+                  </p>
+                } @else {
+                  <div class="mt-2 overflow-x-auto rounded border border-line bg-panel">
+                    <table
+                      class="w-full min-w-max border-collapse whitespace-nowrap text-sm"
+                      data-testid="structures-weeks"
+                    >
+                      <caption class="sr-only">
+                        {{
+                          kindLabel(building.kind)
+                        }}
+                        takings, upkeep and profit for each of the last weeks.
+                      </caption>
+                      <thead>
+                        <tr class="border-b border-line text-left text-ink-2">
+                          <th scope="col" class="px-3 py-2 wide:py-1 font-medium">Week</th>
+                          <th scope="col" class="px-3 py-2 wide:py-1 text-right font-medium">
+                            Takings
+                          </th>
+                          <th scope="col" class="px-3 py-2 wide:py-1 text-right font-medium">
+                            Upkeep
+                          </th>
+                          <th scope="col" class="px-3 py-2 wide:py-1 text-right font-medium">
+                            Profit
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (week of building.recentWeeks; track week.weekOf) {
+                          <tr class="border-b border-line-soft last:border-b-0">
+                            <th scope="row" class="px-3 py-2 wide:py-1 text-left font-medium">
+                              {{ weekLabel(week.weekOf) }}
+                            </th>
+                            <td class="px-3 py-2 wide:py-1 text-right tabular-nums">
+                              {{ funds(week.takingsMinor) }}
+                            </td>
+                            <td class="px-3 py-2 wide:py-1 text-right tabular-nums">
+                              {{ funds(week.upkeepMinor) }}
+                            </td>
+                            <td class="px-3 py-2 wide:py-1 text-right tabular-nums">
+                              {{ signed(week.profitMinor) }}
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </section>
 
-        <dl class="mt-8 grid gap-2 border-t border-line pt-3 sm:max-w-md">
-          <div class="flex items-baseline justify-between gap-3">
-            <dt class="text-sm text-ink-2">Taken this season</dt>
-            <dd class="text-sm font-semibold" data-testid="structures-season-takings">
-              {{ funds(building.seasonTakingsMinor) }}
-            </dd>
+              @if (building.kind === 'snack_bar') {
+                <section aria-labelledby="structures-matches-heading">
+                  <h2 id="structures-matches-heading" class="text-lg font-semibold">
+                    Recent home matches
+                  </h2>
+                  @if (building.recentMatches.length === 0) {
+                    <p class="mt-2 text-sm text-ink-2" data-testid="structures-no-matches">
+                      The snack bar has not served a home match yet.
+                    </p>
+                  } @else {
+                    <div class="mt-2 overflow-x-auto rounded border border-line bg-panel">
+                      <table
+                        class="w-full min-w-max border-collapse whitespace-nowrap text-sm"
+                        data-testid="structures-matches"
+                      >
+                        <caption class="sr-only">
+                          The snack bar's takings at each of the last home matches.
+                        </caption>
+                        <thead>
+                          <tr class="border-b border-line text-left text-ink-2">
+                            <th scope="col" class="px-3 py-2 wide:py-1 font-medium">Opponent</th>
+                            <th scope="col" class="px-3 py-2 wide:py-1 text-right font-medium">
+                              Crowd
+                            </th>
+                            <th scope="col" class="px-3 py-2 wide:py-1 font-medium">Result</th>
+                            <th scope="col" class="px-3 py-2 wide:py-1 text-right font-medium">
+                              Bonus
+                            </th>
+                            <th scope="col" class="px-3 py-2 wide:py-1 text-right font-medium">
+                              Takings
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (match of building.recentMatches; track match.fixtureId) {
+                            <tr class="border-b border-line-soft last:border-b-0">
+                              <th scope="row" class="px-3 py-2 wide:py-1 text-left font-medium">
+                                {{ match.opponent }}
+                              </th>
+                              <td class="px-3 py-2 wide:py-1 text-right tabular-nums">
+                                {{ number(match.spectators) }}
+                              </td>
+                              <td class="px-3 py-2 wide:py-1">
+                                {{ resultLabel(match.result) }} {{ match.goalsFor }}–{{
+                                  match.goalsAgainst
+                                }}
+                              </td>
+                              <td class="px-3 py-2 wide:py-1 text-right tabular-nums">
+                                {{ bonusPercent(match.bonusBp) }}
+                              </td>
+                              <td class="px-3 py-2 wide:py-1 text-right tabular-nums">
+                                {{ funds(match.takingsMinor) }}
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </section>
+              }
+            </div>
           </div>
-          <div class="flex items-baseline justify-between gap-3">
-            <dt class="text-sm text-ink-2">Upkeep this season</dt>
-            <dd class="text-sm font-semibold" data-testid="structures-season-upkeep">
-              {{ funds(building.seasonUpkeepMinor) }}
-            </dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-3">
-            <dt class="text-sm text-ink-2">Profit this season</dt>
-            <dd class="text-sm font-semibold" data-testid="structures-season-profit">
-              {{ signed(building.seasonTakingsMinor - building.seasonUpkeepMinor) }}
-            </dd>
-          </div>
-        </dl>
+        </div>
       </div>
     }
   </section>

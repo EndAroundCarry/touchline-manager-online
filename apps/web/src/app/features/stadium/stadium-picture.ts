@@ -27,7 +27,7 @@ interface DrawnPart {
 const GLOW_OPACITY = 0.55;
 
 /** The size of a stand's name on the screen, in the units of a full-size drawing. */
-const LABEL_SIZE = 15;
+const LABEL_SIZE = 21;
 
 /**
  * The club's stadium at one level, drawn in three dimensions (`STAD-1`).
@@ -43,6 +43,7 @@ const LABEL_SIZE = 15;
  */
 @Component({
   selector: 'app-stadium-picture',
+  host: { class: 'block h-full w-full' },
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <svg
@@ -53,7 +54,7 @@ const LABEL_SIZE = 15;
       [attr.data-level]="level()"
       [attr.data-highlight]="highlight()"
       preserveAspectRatio="xMidYMid meet"
-      class="block h-auto w-full rounded"
+      class="block h-full w-full rounded"
       data-testid="stadium-picture"
     >
       @for (part of drawn(); track $index) {
