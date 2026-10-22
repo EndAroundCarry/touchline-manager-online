@@ -172,8 +172,8 @@ describe('training presentation', () => {
     });
 
     it('says in words what colour says: the value, its band, and the weight when trained', () => {
-      expect(cell('finishing').readOut).toBe('17, Strong, in training, core focus');
-      expect(cell('composure').readOut).toBe('5, Low, in training, important focus');
+      expect(cell('finishing').readOut).toBe('17, Strong, programme focus, core');
+      expect(cell('composure').readOut).toBe('5, Low, programme focus, important');
       expect(cell('passing').readOut).toBe('10, Average');
     });
 
@@ -186,11 +186,11 @@ describe('training presentation', () => {
 
       expect(progressed('finishing').progress).toBe('0.85');
       expect(progressed('finishing').readOut).toBe(
-        '17, Strong, in training, core focus, 0.85 of the way to 18',
+        '17, Strong, programme focus, core, 0.85 of the way to 18',
       );
       expect(progressed('pace').progress).toBe('−0.40');
       expect(progressed('pace').readOut).toBe(
-        '10, Average, in training, supporting focus, 0.40 of the way to dropping to 9',
+        '10, Average, programme focus, supporting, 0.40 of the way to dropping to 9',
       );
       expect(progressed('passing').progress).toBe('');
       expect(progressed('passing').readOut).toBe('10, Average');

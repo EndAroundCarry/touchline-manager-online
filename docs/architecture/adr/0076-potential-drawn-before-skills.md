@@ -1,6 +1,9 @@
 # ADR-0076: Potential is drawn before skills, with a tail of talents and gems
 
-- **Status:** Accepted
+- **Status:** Accepted. Training's cap of `min(20, potential)` on every skill (decision 3, consequences) and youth
+  intake drawing around the generated squads' tier mean are superseded by
+  [ADR-0081](0081-every-attribute-develops-to-a-limit-set-by-potential.md): a limit from potential and position,
+  and youth potential on its own constants (`TRN-19`, `TRN-20`). The generated squads' draw stands.
 - **Date:** 2026-10-19
 - **Stage:** Potential plan (`create-a-plan-to-tidy-blum.md`)
 - **Related:** game-rules `TRN-4`, `TRN-9`, `TRN-14`, `TRN-18`; `PlayerGenerator`, `GeneratedPotential`

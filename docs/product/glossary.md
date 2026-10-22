@@ -44,7 +44,7 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 |---|---|
 | **Player** | A fictional athlete with generated identity, attributes, hidden potential, state, contracts, and career history. |
 | **Attribute** | A displayed ability value from 1 to 20 (`TRN-4`). Technical, mental, physical, and goalkeeping families exist; there is no single authoritative "overall" rating (`§8.5` of the master plan). |
-| **Hidden potential** | The immutable generation value that bounds a player's development ceiling. Never serialized to a player-facing response (`MAT-11`). |
+| **Hidden potential** | The immutable generation value that, with the primary position, sets a player's development limit (`TRN-19`). Never serialized to a player-facing response (`MAT-11`). |
 | **State** | Condition, fatigue, morale, and match sharpness, stored in basis points from 0 to 10,000 (`TRN-5` … `TRN-7`). |
 | **Condition** | Short-term freshness consumed by match minutes and restored by rest and recovery. |
 | **Fatigue** | Accumulated load across matches; higher fatigue degrades performance and raises injury risk. |
@@ -65,7 +65,8 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 | **Team sheet lock** | The moment 30 minutes before kickoff when selections are frozen. Writes after lock affect later fixtures only (`CAL-3`, master plan §7.3). |
 | **Snapshot** | The immutable, hashed input document for one fixture, containing frozen lineups, attributes, state, tactics, availability repairs, home advantage, and configuration hash (`MAT-1`). |
 | **Training plan** | A club's training intensity. Drives, with each player's programme, the deterministic daily progression job at 02:00 UTC (`TRN-1` … `TRN-3`). |
-| **Training programme** | A weighted list of attributes a player trains (core, important, supporting), chosen per player and defaulting to the one for their position. `recovery` trains none and recovers extra fatigue (`TRN-1`, `TRN-2`). |
+| **Training programme** | A player's training focus: a weighted list of attributes (core, important, supporting) that takes the larger share of each day's development while the player's other attributes share the rest, chosen per player and defaulting to the one for their position. `recovery` focuses on none, develops nothing and recovers extra fatigue (`TRN-1`, `TRN-2`, `TRN-10`). |
+| **Development limit** | Where training stops: the generator's adult values for the player's potential and primary position, on average across the attributes he develops, and at most two points above them on any one. Hidden (`TRN-19`). |
 | **Training aptitude** | A hidden per-player multiplier on how fast training becomes improvement. Never shown (`TRN-15`). |
 
 ## Matches

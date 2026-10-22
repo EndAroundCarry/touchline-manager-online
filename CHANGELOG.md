@@ -4,6 +4,14 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Training v4 - every attribute develops, up to a limit set by potential
+
+- Every attribute a player develops now grows every day: an outfielder's 24 outfield attributes (never his goalkeeping ones), all 28 for a keeper. The programme is the focus: it takes 60% of the day's development by weight and the other attributes share the rest; an attribute at its limit passes its share on, so nothing is lost until the player is complete. Recovery still develops nothing. The daily budget is 400 thousandths of a point at peak age (was 140), so an average 17-year-old reaches his limit at about 24 (`training-v4`).
+- The limit is hidden and derived from potential and primary position: the developing attributes stop when their sum reaches the generator's adult values for that potential and position (no jitter), and no attribute goes more than 2 points above its own. A trained youth now finishes like a generated adult; before, youths stopped at own-position skill 9.4 against a limit of 13.5, and a world with youth intake got weaker every season.
+- Youth intake draws potential on its own constants (13 at tier 1, -2 a tier, the same bands), so reseeding the starting world lower never caps future gems. Values equal today's (`world-rules-v16`).
+- Measured in the economy sandbox (`ECON_INTAKE=3 econ 10 5000 10`): players of 15+ in the world go 126 -> 162 over 10 seasons (was 122 -> 49), world skill holds at 9.0 (was 8.9 -> 6.8); veterans lose 0.56 from 28 to 35 (was 0.84). A trained winger has 2.9-3.6 twenties (a generated one 1.5-2.5), strikers 4.9, because an attribute may go 2 points above its formula value.
+- No schema, migration or API change. The Training page calls the programme a focus ("What each programme focuses on"). Docs: `game-rules.md` `TRN-1`, `TRN-4`, `TRN-10`, `TRN-18`, new `TRN-19` and `TRN-20`, constants in section 18; master plan 3.9; glossary; ADR-0081, with ADR-0057, ADR-0060 and ADR-0076 marked.
+
 ## Structures plan - a snack bar and a merchandise shop
 
 - Every club has a snack bar and a merchandise shop, each of ten levels, opening at level 1 for free. A human manager upgrades them with cash (2,000 for level 2 up to 3,800 for level 10 at a tier-1 club, set so the first step repays in about two weeks and the last in about five) and a build time of 1 to 7 days by level (one upgrade per building at a time, no cancelling); computer-run clubs stay at level 1. An inbox message says when the work is finished. The Structures page sits after Stadium in the Facilities menu, with a tab for each building.

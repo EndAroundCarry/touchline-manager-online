@@ -23,7 +23,7 @@ namespace Tactical11Manager.Domain.Squad.Training;
 public static class DevelopmentLimit
 {
     /// <summary>How many points one attribute may go above its formula value (`TRN-4`).</summary>
-    public const int CeilingHeadroom = 1;
+    public const int CeilingHeadroom = 2;
 
     private static readonly IReadOnlyList<AttributeName> OutfieldAttributes =
     [

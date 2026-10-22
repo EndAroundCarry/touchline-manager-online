@@ -109,7 +109,7 @@ test.describe('training', () => {
     await expect(page.getByText('Your training plan was saved.')).toBeVisible();
     await expect(page.getByText(/changed on another device/)).toHaveCount(0);
 
-    // The first player is a goalkeeper on the position default, so the attributes that programme trains are
+    // The first player is a goalkeeper on the position default, so the attributes that programme focuses on are
     // marked core in their row (TRN-1). Marking is by data attribute here; the colour and the read-out are
     // the component spec's business.
     const firstPlayer = compact ? roster.locator(':scope > li').first() : roster.locator('tbody tr').first();
@@ -117,7 +117,7 @@ test.describe('training', () => {
 
     await expect(core).not.toHaveCount(0);
 
-    // Give the player recovery, which trains no attributes, so nothing in their row stays marked (TRN-1).
+    // Give the player recovery, which focuses on no attributes, so nothing in their row stays marked (TRN-1).
     const programmeSelect = firstPlayer.getByLabel(/^Training programme for /);
 
     await programmeSelect.selectOption('recovery');

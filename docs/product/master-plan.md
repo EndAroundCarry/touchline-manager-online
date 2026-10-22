@@ -231,8 +231,8 @@ Every instruction has a bounded effect and trade-off. No tactic may multiply a t
 
 - Each player trains one position-specific programme (goalkeeper, defender, wing back, central midfielder, winger, forward, mental, physical, recovery): a weighted list of attributes. The default is the programme for the player's position and the manager can override any single player. There is no club-wide programme; intensity (light, normal, intense) is the one club-wide setting (ADR-0057).
 - A daily 02:00 UTC progression job updates development, fatigue, condition, morale, and training injury chance.
-- Development is deterministic from player, day, programme, intensity, age curve, fatigue, hidden potential, hidden training aptitude, and the progression version. Players keep improving a trained skill, ever more slowly, and decline by attribute and age (physical first, mental last); a trained attribute declines more slowly.
-- Neither development nor decline can move a displayed attribute above 20 or below 1, and development never exceeds hidden potential.
+- Development is deterministic from player, day, programme, intensity, age curve, fatigue, hidden potential, hidden training aptitude, and the progression version. Every attribute a player develops grows each day, with the programme as the focus taking the larger share, ever more slowly with age; players decline by attribute and age (physical first, mental last), and an attribute in the programme declines more slowly (ADR-0081).
+- Neither development nor decline can move a displayed attribute above 20 or below 1, and development stops at a hidden limit set by potential and primary position: the generator's adult values on average, and at most two points above them on any attribute (ADR-0081).
 - Each progression day is recorded per player, so the player page can chart what training has done.
 - Condition is stored from 0–10,000 basis points; fatigue from 0–10,000; morale from 0–10,000. APIs convert to user-facing values.
 - Matches consume condition and increase fatigue based on minutes, intensity, stamina, and tactics. Rest and recovery restore them.

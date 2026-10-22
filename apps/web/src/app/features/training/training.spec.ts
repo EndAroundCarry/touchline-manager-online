@@ -11,7 +11,7 @@ import { Training } from './training';
  * The training screen.
  *
  * What the screen must get right: the squad appears as a table and as cards, each with a labelled programme
- * select whose first option is the position default; the attributes a player's programme trains are tinted by
+ * select whose first option is the position default; the attributes a player's programme focuses on are tinted by
  * weight and say so in words as well as colour (ADR-0039); and choosing a programme goes to the store with
  * the empty value meaning "back to the position default".
  */
@@ -106,7 +106,7 @@ describe('Training screen', () => {
     expect(table().querySelector('abbr[title="Finishing"]')?.textContent).toBe('Fin');
   });
 
-  it('tints the trained attributes by weight, and leaves the rest untinted', () => {
+  it('tints the programme focus by weight, and leaves the rest untinted', () => {
     const firstRow = table().querySelector('tbody tr')!;
     const weights = (weight: string) =>
       Array.from(firstRow.querySelectorAll<HTMLElement>(`td[data-weight="${weight}"]`));
@@ -118,18 +118,18 @@ describe('Training screen', () => {
     expect(weights('0')).toHaveLength(25);
     expect(weights('0').some((cell) => /bg-sky/.test(cell.className))).toBe(false);
 
-    // The goalkeeper is on recovery, which trains nothing.
+    // The goalkeeper is on recovery, which focuses on nothing.
     const secondRow = table().querySelectorAll('tbody tr')[1];
 
     expect(secondRow.querySelectorAll('td[data-weight="0"]')).toHaveLength(28);
   });
 
-  it('says in words what the tint says: bold value, marker, and an in-training read-out', () => {
+  it('says in words what the tint says: bold value, marker, and a programme-focus read-out', () => {
     const core = table().querySelector<HTMLElement>('tbody tr td[data-weight="3"]')!;
 
     expect(core.querySelector('.font-bold')?.textContent?.trim()).toBe('17');
     expect(core.textContent).toContain('•••');
-    expect(core.querySelector('.sr-only')?.textContent).toBe('17, Strong, in training, core focus');
+    expect(core.querySelector('.sr-only')?.textContent).toBe('17, Strong, programme focus, core');
   });
 
   it('marks the same attributes on the cards', () => {
@@ -181,7 +181,7 @@ describe('Training screen', () => {
     expect(api.setProgramme).toHaveBeenLastCalledWith('p2', null, '"7"');
   });
 
-  it('lists what each programme trains by weight, with the recovery note', () => {
+  it('lists what each programme focuses on by weight, with the recovery note', () => {
     const list = root.querySelector('[data-testid="programme-list"]')!;
 
     expect(list.querySelectorAll(':scope > li')).toHaveLength(3);
@@ -189,7 +189,7 @@ describe('Training screen', () => {
 
     expect(forward.querySelector('dt')?.textContent).toBe('Core:');
     expect(forward.querySelector('dd')?.textContent).toBe('Finishing');
-    expect(list.textContent).toContain('Trains no attributes');
+    expect(list.textContent).toContain('Focuses on nothing and develops nothing');
   });
 
   it('is the intensity alone that the plan form edits', () => {

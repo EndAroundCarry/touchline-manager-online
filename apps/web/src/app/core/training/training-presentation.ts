@@ -270,7 +270,7 @@ export interface AttributeCell {
   /** A mark repeating the weight without colour, or an empty string. */
   readonly marker: string;
 
-  /** What a screen reader hears: the value, its band, the weight when trained, and the progress when any. */
+  /** What a screen reader hears: the value, its band, the weight when in focus, and the progress when any. */
   readonly readOut: string;
 
   /** The progress towards the next point as shown, such as `0.85` or `−0.40`, or an empty string (`TRN-10`). */
@@ -330,7 +330,7 @@ function attributeCell(
     readOut:
       (style === null
         ? `${value}, ${band.label}`
-        : `${value}, ${band.label}, in training, ${style.label.toLowerCase()} focus`) +
+        : `${value}, ${band.label}, programme focus, ${style.label.toLowerCase()}`) +
       (spoken === '' ? '' : `, ${spoken}`),
     progress: progressText(raw),
   };

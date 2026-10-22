@@ -73,11 +73,11 @@ the system is shaped the way it is.
 | [0055](0055-engine-v6-skills-where-the-design-says.md) | Engine-v6 puts skills where the design says they are: tiredness, shot contest scale, duel fouls, corner takers | Accepted |
 | [0054](0054-replay-v4-constant-pace-film.md) | Replay-v4 plays the whole match as one constant-pace film on one continuous timeline | Accepted (decision 6's build-up gap superseded for the tick film by ADR-0069) |
 | [0056](0056-engine-v7-passes-and-take-ons.md) | Engine-v7 counts passes and take-ons on the player line, and the season statistics store them | Accepted |
-| [0057](0057-training-programmes-age-curve-and-hidden-aptitude.md) | Training programmes, an age curve, and hidden aptitude (`training-v2`) | Accepted (decisions 2, 4 and 6 superseded by ADR-0060) |
+| [0057](0057-training-programmes-age-curve-and-hidden-aptitude.md) | Training programmes, an age curve, and hidden aptitude (`training-v2`) | Accepted (decisions 2, 4 and 6 superseded by ADR-0060; only the programme develops, superseded by ADR-0081) |
 | [0058](0058-engine-v8-pass-focus.md) | Engine-v8 lets a manager direct the ball through the centre and a flank (the pass focus) | Accepted (shots and crosses added by ADR-0059) |
 | [0059](0059-engine-v9-pass-focus-moves-shots-and-crosses.md) | Engine-v9 makes the pass focus move the shots and the crosses | Accepted (a cross is headed from `engine-v10`, ADR-0061) |
 | [0059](0059-dark-management-workspace-ui.md) | The web client is a dark management workspace built on role tokens | Accepted |
-| [0060](0060-per-attribute-training-progress.md) | Training progress is held per attribute, and the day's budget is split by weight (`training-v3`) | Accepted |
+| [0060](0060-per-attribute-training-progress.md) | Training progress is held per attribute, and the day's budget is split by weight (`training-v3`) | Accepted (decision 2's split and ceiling superseded by ADR-0081) |
 | [0061](0061-engine-v10-attackers-find-space-passers-choose.md) | Engine-v10 lets attackers find space and passers choose who gets the ball | Accepted |
 | [0062](0062-club-stadium-places-levels-and-gate.md) | A club's stadium is a count of places, its level is read from them, and gate revenue is what they sell | Accepted (decision 6 superseded by ADR-0065) |
 | [0063](0063-engine-v11-counter-attack.md) | Engine-v11 adds the counter-attack, a tactic that works against a side that has pushed forward | Accepted |
@@ -103,8 +103,9 @@ the system is shaped the way it is.
 | [0074](0074-tick-engine-skills-fall-with-live-condition.md) | In the tick engine a player's skills fall with his live condition | Accepted |
 | [0075](0075-back-threes-slide-across.md) | A back three or five slides across: the near wing-back steps out and the far one tucks in | Accepted |
 | [0076](0076-experience-is-frozen-into-the-snapshot-as-a-skill-bonus.md) | Experience is frozen into the snapshot as a skill bonus, after the curve and uncapped, hashed only when above zero | Accepted |
-| [0076](0076-potential-drawn-before-skills.md) | Potential is drawn before skills, with a tail of talents and gems | Accepted |
+| [0076](0076-potential-drawn-before-skills.md) | Potential is drawn before skills, with a tail of talents and gems | Accepted (training cap and youth mean superseded by ADR-0081) |
 | [0077](0077-free-agents-weekly-generated-pool.md) | Free agents are a weekly generated pool sold through the timed auction | Accepted |
 | [0078](0078-fan-base-satisfaction-and-the-crowd.md) | Every club has a fan count and a mood that results move, and the crowd and the gate are drawn from them | Accepted |
 | [0079](0079-direct-messages-between-managers.md) | Managers write to each other in subject threads, with a length cap, a rate limit and a block switch | Accepted |
 | [0080](0080-club-structures-snack-bar-and-merchandise-shop.md) | Every club has a snack bar and a merchandise shop with ten levels, timed upgrades and weekly upkeep; takings follow the crowd, the result and the fans' mood | Accepted |
+| [0081](0081-every-attribute-develops-to-a-limit-set-by-potential.md) | Every attribute develops, up to a limit set by the player's potential and position; youth potential has its own scale (`training-v4`) | Accepted |

@@ -1,6 +1,9 @@
 # ADR-0060: Training progress is held per attribute (`training-v3`)
 
-- **Status:** Accepted
+- **Status:** Accepted. Decision 2's split (programme attributes only), its `min(20, Potential)` ceiling and the
+  budget of 140 are superseded by [ADR-0081](0081-every-attribute-develops-to-a-limit-set-by-potential.md)
+  (`training-v4`): 60% to the programme by weight and 40% to the other developing attributes, a limit from
+  potential and position, a budget of 400. Per-attribute progress and the history stand.
 - **Date:** 2026-10-05
 - **Stage:** Stage 4 follow-up, training rework
 - **Related:** [ADR-0057](0057-training-programmes-age-curve-and-hidden-aptitude.md), game rules `TRN-10`, `TRN-16`, `TRN-17`
