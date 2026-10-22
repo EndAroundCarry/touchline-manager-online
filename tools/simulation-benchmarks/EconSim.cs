@@ -42,7 +42,7 @@ internal sealed partial class EconSim
     private int _replacementOrdinal;
     private int _listingOrdinal;
 
-    public EconSim(IEconRules rules, ulong seed, int seasons, int youthPerClub = 0, int trainingPercent = 100)
+    public EconSim(IEconRules rules, ulong seed, int seasons, int youthPerClub = EconSim.DefaultYouthPerAiClub, int trainingPercent = 100)
     {
         Rules = rules;
         YouthPerClub = youthPerClub;
@@ -98,7 +98,10 @@ internal sealed partial class EconSim
 
     public int Seasons { get; }
 
-    /// <summary>The young players the world gives every club at each rollover (0 is the game today).</summary>
+    /// <summary>The intake the sandbox gives each computer club by default: 2 holds a squad at the AI's target of 23 (milestone 0, with training v4).</summary>
+    public const int DefaultYouthPerAiClub = 2;
+
+    /// <summary>The young players each computer club takes in at every rollover (0 is the game today).</summary>
     public int YouthPerClub { get; }
 
     /// <summary>How fast players develop, as a percentage of today's (100). A what-if: it scales the aptitude the daily progression reads, so decline is untouched.</summary>

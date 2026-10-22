@@ -253,9 +253,17 @@ internal sealed partial class EconSim
         PlayerPosition.CentralMidfielder,
     ];
 
-    /// <summary>The yearly youth intake: a few 17 and 18-year-olds on three-year contracts, never past the registered maximum (plan toasty-scott, answer to the supply finding).</summary>
+    /// <summary>
+    /// The yearly youth intake of a computer club: a few 17 and 18-year-olds on three-year contracts, never past the registered maximum. A club with a
+    /// manager gets none: its youth is the academy's to give, in a plan of its own.
+    /// </summary>
     private void TakeInYouth(SimClub club)
     {
+        if (club.Manager is not null)
+        {
+            return;
+        }
+
         for (var index = 0; index < YouthPerClub && club.Squad.Count < WorldRuleSet.SquadMaximumRegistered; index++)
         {
             var position = YouthPositions[(club.Idx + (Season * 5) + index) % YouthPositions.Length];
