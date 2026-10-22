@@ -181,6 +181,17 @@ public sealed class PlayerAggregateTests
     }
 
     [Fact]
+    public void The_mean_in_tenths_keeps_the_fraction_the_whole_number_throws_away()
+    {
+        var count = AttributeNames.Count;
+        var half = PlayerAttributeSet.FromValues([.. Enumerable.Range(0, count).Select(index => index < count / 2 ? 12 : 13)]);
+        var flat = PlayerAttributeSet.FromValues([.. Enumerable.Repeat(9, count)]);
+
+        half.MeanTenths.Should().Be(125, "twelve and a half");
+        flat.MeanTenths.Should().Be(90);
+    }
+
+    [Fact]
     public void An_attribute_is_addressable_by_its_canonical_name()
     {
         var set = Attributes();

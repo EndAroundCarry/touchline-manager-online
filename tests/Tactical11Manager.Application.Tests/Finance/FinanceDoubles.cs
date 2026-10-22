@@ -337,7 +337,12 @@ internal static class FinanceDoubles
 
         public List<AdministrationPlayer> Squad { get; } = [];
 
+        public Dictionary<Guid, ClubMoneyPosition> Money { get; } = [];
+
         public int Ordinal { get; set; }
+
+        public Task<ClubMoneyPosition?> GetMoneyPositionAsync(Guid clubId, CancellationToken cancellationToken) =>
+            Task.FromResult(Money.TryGetValue(clubId, out var position) ? position : null);
 
         public Task<IReadOnlyList<ClubRevenueBasis>> GetMatchdayRevenueBasisAsync(
             Guid matchdayId,

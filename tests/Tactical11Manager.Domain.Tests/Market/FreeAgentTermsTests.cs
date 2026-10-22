@@ -85,6 +85,33 @@ public sealed class FreeAgentTermsTests
     }
 
     [Fact]
+    public void A_whole_ability_is_the_same_terms_as_its_tenths()
+    {
+        foreach (var ability in new[] { 4, 10, 16 })
+        {
+            FreeAgentTerms.Calculate(ability, 24).Should().Be(FreeAgentTerms.CalculateFromTenths(ability * 10, 24));
+            FreeAgentTerms.CalculateReleased(ability, 24).Should().Be(FreeAgentTerms.CalculateReleasedFromTenths(ability * 10, 24));
+        }
+    }
+
+    [Fact]
+    public void A_tenth_of_a_point_moves_the_fee_and_the_wage_where_a_whole_number_would_not()
+    {
+        var before = FreeAgentTerms.CalculateReleasedFromTenths(134, 26);
+        var after = FreeAgentTerms.CalculateReleasedFromTenths(135, 26);
+
+        after.MinimumFeeMinor.Should().BeGreaterThan(before.MinimumFeeMinor, "training raises a player's price smoothly, not in steps at the rounding boundary");
+        after.SeasonWageMinor.Should().BeGreaterThanOrEqualTo(before.SeasonWageMinor);
+    }
+
+    [Fact]
+    public void Terms_outside_the_scale_are_refused_in_tenths_too()
+    {
+        FluentActions.Invoking(() => FreeAgentTerms.CalculateFromTenths(9, 25)).Should().Throw<ArgumentOutOfRangeException>();
+        FluentActions.Invoking(() => FreeAgentTerms.CalculateReleasedFromTenths(201, 25)).Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
     public void A_released_player_costs_his_full_value()
     {
         foreach (var ability in new[] { 4, 10, 16 })

@@ -158,8 +158,8 @@ public sealed class RunFreeAgentBatch
             OpenListing(
                 batch,
                 agent.Player.Id,
-                FreeAgentTerms.Calculate(
-                    agent.Ability,
+                FreeAgentTerms.CalculateFromTenths(
+                    agent.Attributes.ToSet().MeanTenths,
                     facts.GameYear - agent.Player.BirthGameYear),
                 now);
         }
@@ -169,8 +169,8 @@ public sealed class RunFreeAgentBatch
             OpenListing(
                 batch,
                 row.PlayerId,
-                FreeAgentTerms.CalculateReleased(
-                    row.Ability,
+                FreeAgentTerms.CalculateReleasedFromTenths(
+                    row.AbilityTenths,
                     row.Age),
                 now);
         }

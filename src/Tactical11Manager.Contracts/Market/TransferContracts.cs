@@ -39,6 +39,7 @@ public sealed record PlaceBidRequest(long AmountMinor);
 /// <param name="MinimumAcceptableBidMinor">The smallest bid the server will now accept (`TRF-5`).</param>
 /// <param name="YourBidMinor">The caller's own active bid, or null (`TRF-6`).</param>
 /// <param name="Version">The listing's optimistic-concurrency version.</param>
+/// <param name="WageImpact">What buying him at the smallest acceptable bid does to the caller's wage bill and cash, or null on the caller's own listing (`WAGE-1`).</param>
 public sealed record TransferListingResponse(
     Guid ListingId,
     Guid PlayerId,
@@ -60,7 +61,8 @@ public sealed record TransferListingResponse(
     int BidderCount,
     long MinimumAcceptableBidMinor,
     long? YourBidMinor,
-    long Version);
+    long Version,
+    Finance.WageImpactResponse? WageImpact = null);
 
 /// <summary>One page of listings (`INT-6`).</summary>
 /// <param name="Listings">The listings on this page.</param>

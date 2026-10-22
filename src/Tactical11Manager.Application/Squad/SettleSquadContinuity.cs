@@ -343,7 +343,7 @@ public sealed partial class SettleSquadContinuity
 
             var terms = ContractRenewalQuote.Calculate(
                 new ContractRenewalInput(
-                    row.Ability * 10,
+                    row.AbilityTenths,
                     row.Age,
                     row.Appearances,
                     row.MoraleBp,

@@ -119,3 +119,18 @@ public static class WageImpact
         return matchdays > remaining ? null : played + (int)matchdays;
     }
 }
+
+/// <summary>Stable codes for <see cref="WageImpactLevel"/>, so a client never reads the enum's order.</summary>
+public static class WageImpactLevelCodes
+{
+    /// <summary>The code of a level.</summary>
+    /// <param name="level">The level.</param>
+    public static string ToCode(this WageImpactLevel level) => level switch
+    {
+        WageImpactLevel.Fits => "fits",
+        WageImpactLevel.Stretching => "stretching",
+        WageImpactLevel.Danger => "danger",
+        WageImpactLevel.AdministrationRisk => "administration_risk",
+        _ => throw new ArgumentOutOfRangeException(nameof(level), level, "Unknown wage impact level."),
+    };
+}

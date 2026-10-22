@@ -4,7 +4,7 @@ using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
-using Tactical11Manager.Application.Finance;
+using Tactical11Manager.Application.Market;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Contracts.World;
 using Tactical11Manager.Domain.Finance;
@@ -79,9 +79,8 @@ public sealed class BuildStadiumSeats
     private readonly IStadiumRepository _stadiums;
     private readonly IStadiumQueries _queries;
     private readonly IClubAccountRepository _accounts;
-    private readonly ILedgerRepository _ledger;
+    private readonly ClubBuilding _building;
     private readonly IClock _clock;
-    private readonly IAuditWriter _audit;
     private readonly ISecureTokenService _secureTokens;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
@@ -92,9 +91,8 @@ public sealed class BuildStadiumSeats
         IStadiumRepository stadiums,
         IStadiumQueries queries,
         IClubAccountRepository accounts,
-        ILedgerRepository ledger,
+        ClubBuilding building,
         IClock clock,
-        IAuditWriter audit,
         ISecureTokenService secureTokens,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork)
@@ -103,9 +101,8 @@ public sealed class BuildStadiumSeats
         _stadiums = stadiums;
         _queries = queries;
         _accounts = accounts;
-        _ledger = ledger;
+        _building = building;
         _clock = clock;
-        _audit = audit;
         _secureTokens = secureTokens;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
@@ -156,48 +153,28 @@ public sealed class BuildStadiumSeats
             return Refused(BuildStadiumSeatsOutcome.PreconditionFailed);
         }
 
-        if (request.Count > stadium.RemainingRoom)
-        {
-            return Refused(BuildStadiumSeatsOutcome.StadiumFull);
-        }
+        var check = ClubBuilding.CheckSeats(stadium, account, stand, request.Count, context.TierNumber);
 
-        // A club in the red does not build, whatever its cash (DEBT-3).
-        if (account.FinancialState != FinancialStateKind.Healthy)
+        if (check != ClubBuildCheck.Allowed)
         {
-            return Refused(BuildStadiumSeatsOutcome.Embargo);
-        }
-
-        var cost = StadiumRuleSet.BuildCostMinorFor(stand, context.TierNumber) * request.Count;
-
-        if (cost > account.AvailableMinor)
-        {
-            return Refused(BuildStadiumSeatsOutcome.InsufficientFunds);
+            return Refused(check switch
+            {
+                ClubBuildCheck.StadiumFull => BuildStadiumSeatsOutcome.StadiumFull,
+                ClubBuildCheck.Embargo => BuildStadiumSeatsOutcome.Embargo,
+                _ => BuildStadiumSeatsOutcome.InsufficientFunds,
+            });
         }
 
         var now = _clock.UtcNow;
 
-        stadium.AddSeats(stand, request.Count, now);
-
-        _ledger.Add(account.Post(
-            LedgerPostings.StadiumConstruction(
-                Guid.CreateVersion7(),
-                access.ClubId,
-                stadium.Id,
-                stadium.Version,
-                stand,
-                request.Count,
-                cost),
-            now));
-
-        _audit.Record(new AuditEntry(
-            WorldAuditActions.StadiumSeatsBuilt,
-            AuditActorTypes.User,
-            userId,
-            AuditTargetTypes.ClubStadium,
-            stadium.Id,
-            _requestContext.CorrelationId,
-            _secureTokens.HashClientValue(_requestContext.IpAddress),
-            Reason: $"{stand.ToCode()} x{request.Count}"));
+        _building.StageSeats(
+            stadium,
+            account,
+            stand,
+            request.Count,
+            context.TierNumber,
+            MarketActor.ForUser(userId, _requestContext, _secureTokens),
+            now);
 
         try
         {

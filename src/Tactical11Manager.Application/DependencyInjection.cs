@@ -136,6 +136,8 @@ public static class DependencyInjection
         // The listing and bid cores are shared by a manager's command and the AI's market evaluation
         // (INS-12, TRF-12), so they are registered once rather than per caller.
         services.AddScoped<IListingWriter, ListingWriter>();
+        services.AddScoped<WageImpactReader>();
+        services.AddScoped<ListingWageImpact>();
         services.AddScoped<IBidWriter, BidWriter>();
 
         services.AddScoped<SearchPlayers>();
@@ -174,6 +176,7 @@ public static class DependencyInjection
     private static void AddFinanceUseCases(IServiceCollection services)
     {
         services.AddScoped<RecurringCostRoom>();
+        services.AddScoped<EvaluateAiBuilding>();
         services.AddScoped<ClubFinancialStates>();
         services.AddScoped<MatchdayFinances>();
         services.AddScoped<RunWeeklyFinance>();
@@ -361,6 +364,7 @@ public static class DependencyInjection
 
         // The club's stadium: a read and the one command that grows it (`STAD-1`…`STAD-6`).
         services.AddScoped<GetStadium>();
+        services.AddScoped<ClubBuilding>();
         services.AddScoped<BuildStadiumSeats>();
 
         // The club's snack bar and merchandise shop: a read, the paid upgrade, and the job that finishes it

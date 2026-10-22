@@ -77,3 +77,26 @@ public sealed record FinanceLedgerEntryResponse(
     long ResultingReservedMinor,
     string Description,
     DateTimeOffset CreatedAt);
+
+/// <summary>How a signing or a renewal sits with the club's money, computed by the server for the viewer's club (`WAGE-1`, plan toasty-scott section 5).</summary>
+/// <remarks>
+/// A warning, never a block: the deal goes ahead whatever the level, and the form asks for a confirm tick at <c>danger</c> and
+/// <c>administration_risk</c>. Only the cash for the fee itself (`FIN-10`) and the embargo while the club is in the red stop a bid.
+/// </remarks>
+/// <param name="Level">One of <c>fits</c>, <c>stretching</c>, <c>danger</c> and <c>administration_risk</c>.</param>
+/// <param name="AddedSeasonWageMinor">What the deal adds to the season's wages: the whole wage of a signing, the rise of a renewal.</param>
+/// <param name="WageBillAfterMinor">The season wage bill with the deal, leading bids included.</param>
+/// <param name="WageBudgetMinor">The budget the bill is held against: 70% of the season income forecast.</param>
+/// <param name="WageShareBp">The bill with the deal as a share of the forecast, in basis points.</param>
+/// <param name="SeasonEndCashMinor">The cash the club would hold at the season's end after the fee, at today's rates.</param>
+/// <param name="RedFromMatchday">The matchday, 1 to 34, the club would first be in the red, or null when it would not be within the season.</param>
+/// <param name="NeedsConfirmation">Whether the form asks for a confirm tick.</param>
+public sealed record WageImpactResponse(
+    string Level,
+    long AddedSeasonWageMinor,
+    long WageBillAfterMinor,
+    long WageBudgetMinor,
+    int WageShareBp,
+    long SeasonEndCashMinor,
+    int? RedFromMatchday,
+    bool NeedsConfirmation);

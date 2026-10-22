@@ -109,7 +109,8 @@ public static class MarketMapping
             row.BidderCount,
             AuctionRules.MinimumAcceptableBid(row.MinimumFeeMinor, row.LeadingAmountMinor),
             row.ViewerBidMinor,
-            row.Version);
+            row.Version,
+            row.WageImpact);
     }
 
     /// <summary>Projects a page of listings (`INT-6`).</summary>

@@ -1,3 +1,4 @@
+using Tactical11Manager.Contracts.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Squad;
 
@@ -147,6 +148,7 @@ public sealed record ListingBrowseFilter(
 /// <param name="ViewerBidMinor">The viewer's own active bid, or null (`TRF-6`).</param>
 /// <param name="GameYear">The game year the age is read against.</param>
 /// <param name="Version">The listing's optimistic-concurrency version.</param>
+/// <param name="WageImpact">What buying him does to the viewer's wage bill and cash, set by the use case that serves the read, or null (`WAGE-1`).</param>
 public sealed record ListingRow(
     Guid ListingId,
     Guid PlayerId,
@@ -167,7 +169,8 @@ public sealed record ListingRow(
     int BidderCount,
     long? ViewerBidMinor,
     int GameYear,
-    long Version);
+    long Version,
+    WageImpactResponse? WageImpact = null);
 
 /// <summary>One page of listings (`INT-6`).</summary>
 /// <param name="Listings">The listings on this page.</param>

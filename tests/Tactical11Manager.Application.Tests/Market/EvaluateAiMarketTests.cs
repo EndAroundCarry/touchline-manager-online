@@ -1,12 +1,16 @@
 using FluentAssertions;
 using Tactical11Manager.Application.Abstractions;
+using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Market;
 using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Market;
+using Tactical11Manager.Application.Tests.Finance;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
+using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Application.Tests.Market;
 
@@ -98,6 +102,73 @@ public sealed class EvaluateAiMarketTests
     }
 
     [Fact]
+    public async Task A_club_over_its_wage_budget_lists_its_highest_earner_and_bids_on_nothing()
+    {
+        var squad = FullSquad();
+        var star = squad[5] with { SeasonWageMinor = 900_000_000 };
+        squad[5] = star;
+
+        var (useCase, listings, bids, _, _) = Create(
+            [ClubRow(ClubId(1), squad)],
+            [MidfieldListing(Guid.CreateVersion7(), ClubId(9))],
+            budgetSponsorMatchdayMinor: 0);
+
+        await useCase.ExecuteAsync(CancellationToken.None);
+
+        listings.Calls.Should().ContainSingle(call => call.PlayerId == star.PlayerId, "the highest earner goes first when the bill is over the budget");
+        bids.Calls.Should().BeEmpty("the wage bill is already over the budget, so no player may join it");
+    }
+
+    [Fact]
+    public async Task A_club_in_the_red_bids_on_nothing()
+    {
+        var squad = Squad(goalkeepers: 3, defenders: 7, midfielders: 6, attackers: 5);
+
+        var (useCase, _, bids, _, _) = Create(
+            [ClubRow(ClubId(2), squad, FinancialStateKind.InTheRed)],
+            [MidfieldListing(Guid.CreateVersion7(), ClubId(9))]);
+
+        await useCase.ExecuteAsync(CancellationToken.None);
+
+        bids.Calls.Should().BeEmpty("a club in the red has an embargo on signings (DEBT-3)");
+    }
+
+    [Fact]
+    public async Task The_wages_of_the_players_a_club_already_leads_the_bidding_on_count_against_its_budget()
+    {
+        var listing = MidfieldListing(Guid.CreateVersion7(), ClubId(9));
+
+        // The budget of a club with no sponsor, read from the same basis the use case reads, so the squad can be paid to leave room for one wage.
+        var budget = new ClubFinanceBasis(
+            ClubId(2),
+            TierNumber: 1,
+            new StadiumSeats(0, 0, 0, 0),
+            Fans: 0,
+            MoodBp: FanRuleSet.CalmMoodBp,
+            StructureRuleSet.OpeningLevel,
+            StructureRuleSet.OpeningLevel,
+            SponsorFixedMatchdayMinor: 0,
+            SeasonWageMinor: 0,
+            ContractedPlayers: 0).WageBudgetMinor;
+
+        var base_ = Squad(goalkeepers: 3, defenders: 7, midfielders: 6, attackers: 5);
+        var perPlayer = (budget - (listing.BuyerSeasonWageMinor * 3 / 2)) / base_.Count;
+        var squad = base_.Select(player => player with { SeasonWageMinor = perPlayer }).ToList();
+
+        var (open, _, openBids, _, _) = Create([ClubRow(ClubId(2), squad)], [listing], budgetSponsorMatchdayMinor: 0);
+        await open.ExecuteAsync(CancellationToken.None);
+
+        var (committed, _, committedBids, _, _) = Create(
+            [ClubRow(ClubId(2), squad, leadingBidWagesMinor: listing.BuyerSeasonWageMinor)],
+            [listing],
+            budgetSponsorMatchdayMinor: 0);
+        await committed.ExecuteAsync(CancellationToken.None);
+
+        openBids.Calls.Should().ContainSingle("the club has room for one more wage");
+        committedBids.Calls.Should().BeEmpty("the room is already promised to a bid the club leads");
+    }
+
+    [Fact]
     public async Task The_decision_records_the_inputs_hash_and_policy_version()
     {
         var (useCase, _, _, decisions, _) = Create([ClubRow(ClubId(1), FullSquad())], []);
@@ -118,8 +189,27 @@ public sealed class EvaluateAiMarketTests
         RecordingUnitOfWork UnitOfWork) Create(
             IReadOnlyList<AiMarketClubRow> clubs,
             IReadOnlyList<AiMarketListingRow> listings,
-            MarketOutcome listingOutcome = MarketOutcome.Found)
+            MarketOutcome listingOutcome = MarketOutcome.Found,
+            long budgetSponsorMatchdayMinor = RichSponsorMatchdayMinor)
     {
+        var finance = new FinanceDoubles.StubFinanceQueries();
+
+        foreach (var club in clubs)
+        {
+            // The sponsor's fixed part is the one thing in the forecast a test can set freely, so it sets the wage budget.
+            finance.Basis.Add(new ClubFinanceBasis(
+                club.ClubId,
+                TierNumber: 1,
+                new StadiumSeats(0, 0, 0, 0),
+                Fans: 0,
+                MoodBp: FanRuleSet.CalmMoodBp,
+                StructureRuleSet.OpeningLevel,
+                StructureRuleSet.OpeningLevel,
+                budgetSponsorMatchdayMinor,
+                club.Players.Sum(player => player.SeasonWageMinor),
+                club.Players.Count));
+        }
+
         var listingWriter = new StubListingWriter(listingOutcome);
         var bidWriter = new StubBidWriter();
         var decisions = new RecordingDecisionRepository();
@@ -127,6 +217,7 @@ public sealed class EvaluateAiMarketTests
 
         var useCase = new EvaluateAiMarket(
             new StubAiMarketRepository(clubs, listings),
+            finance,
             listingWriter,
             bidWriter,
             decisions,
@@ -137,8 +228,17 @@ public sealed class EvaluateAiMarketTests
         return (useCase, listingWriter, bidWriter, decisions, unitOfWork);
     }
 
-    private static AiMarketClubRow ClubRow(Guid clubId, IReadOnlyList<AiMarketPlayerRow> players) =>
-        new(clubId, Tier: 1, SpendableMinor: 50_000_000, CurrentSeasonNumber: 1, players);
+    /// <summary>A sponsor so rich that the wage budget never stops a signing.</summary>
+    private const long RichSponsorMatchdayMinor = 1_000_000_000_000;
+
+    private const long SquadWageMinor = 30_000_000;
+
+    private static AiMarketClubRow ClubRow(
+        Guid clubId,
+        IReadOnlyList<AiMarketPlayerRow> players,
+        FinancialStateKind state = FinancialStateKind.Healthy,
+        long leadingBidWagesMinor = 0) =>
+        new(clubId, SpendableMinor: 50_000_000_000, CurrentSeasonNumber: 1, state, leadingBidWagesMinor, players);
 
     private static PositionFamily[] Composition(int goalkeepers, int defenders, int midfielders, int attackers) =>
     [
@@ -164,11 +264,11 @@ public sealed class EvaluateAiMarketTests
             players.Add(new AiMarketPlayerRow(
                 PlayerId(index + 1),
                 families[index],
-                Ability: 12,
-                Potential: 12,
+                AbilityTenths: 120,
                 Age: 25,
                 SquadStatus.Rotation,
                 ContractEndSeasonNumber: 3,
+                SeasonWageMinor: SquadWageMinor,
                 IsListed: false));
         }
 
@@ -182,11 +282,11 @@ public sealed class EvaluateAiMarketTests
             LeadingClubId: null,
             PlayerId(900),
             PositionFamily.Midfield,
-            Ability: 12,
-            Potential: 12,
+            AbilityTenths: 120,
             Age: 25,
             MinimumFeeMinor: 1_000_000,
-            LeadingAmountMinor: null);
+            LeadingAmountMinor: null,
+            BuyerSeasonWageMinor: SquadWageMinor);
 
     private static Guid ClubId(int index) => Guid.Parse($"0192f100-0000-7000-8000-{index:D12}");
 

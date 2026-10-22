@@ -132,9 +132,8 @@ public sealed class FreeAgentBatchTests : IAsyncLifetime, IDisposable
             listing.IsFreeAgent.Should().BeTrue();
             listing.Status.Should().Be(ListingStatus.Open);
 
-            var ability = (int)Math.Round(attributes.ToSet().Values.Average(), MidpointRounding.AwayFromZero);
-            var expected = FreeAgentTerms.CalculateReleased(
-                ability,
+            var expected = FreeAgentTerms.CalculateReleasedFromTenths(
+                attributes.ToSet().MeanTenths,
                 season.GameYear - player.BirthGameYear);
 
             listing.MinimumFeeMinor.Should().Be(expected.MinimumFeeMinor);

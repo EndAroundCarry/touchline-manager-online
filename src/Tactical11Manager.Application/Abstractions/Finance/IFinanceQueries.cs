@@ -95,6 +95,17 @@ public sealed record ClubFinanceBasis(
     public long OverdraftLimitMinor => EconomyRuleSet.OverdraftLimitMinorFor(ForecastMinor);
 }
 
+/// <summary>What a club holds and has promised, for the wage impact of a deal (plan toasty-scott section 5).</summary>
+/// <param name="CashMinor">The club's cash.</param>
+/// <param name="ReservedMinor">The part committed to the club's leading bids, which a new deal cannot spend again.</param>
+/// <param name="LeadingBidWagesMinor">The season wages of the players the club leads the bidding on, which join its bill when the bid wins.</param>
+/// <param name="MatchdaysPlayed">The matchdays the club's division has published this season, 0 to 34.</param>
+public sealed record ClubMoneyPosition(long CashMinor, long ReservedMinor, long LeadingBidWagesMinor, int MatchdaysPlayed)
+{
+    /// <summary>Gets the cash a new deal can use: what is left after the leading bids.</summary>
+    public long AvailableMinor => CashMinor - ReservedMinor;
+}
+
 /// <summary>One ledger category's net cash movement over a season.</summary>
 /// <param name="Category">The category.</param>
 /// <param name="AmountMinor">The signed net, in minor units.</param>
@@ -163,6 +174,14 @@ public interface IFinanceQueries
     Task<IReadOnlyList<ClubFinanceBasis>> GetClubFinanceBasisAsync(
         IReadOnlyCollection<Guid> clubIds,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads what a club holds and has promised: its cash, its leading bids and their wages, and how far into the season its division is.
+    /// </summary>
+    /// <param name="clubId">The club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The position, or null when the club has no account.</returns>
+    Task<ClubMoneyPosition?> GetMoneyPositionAsync(Guid clubId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reads a club's registered squad the way the board reads it when the club is in administration (`DEBT-4`).

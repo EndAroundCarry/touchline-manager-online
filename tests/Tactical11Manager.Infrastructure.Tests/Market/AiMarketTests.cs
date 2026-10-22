@@ -29,8 +29,20 @@ public sealed class AiMarketTests : IAsyncLifetime, IDisposable
 {
     private readonly AiMarketFixture _fixture = new();
 
-    /// <summary>Starts a freshly seeded world.</summary>
-    public Task InitializeAsync() => _fixture.InitializeAsync();
+    /// <summary>Starts a freshly seeded world whose clubs all have wage room.</summary>
+    /// <remarks>
+    /// Seeded squads are sized to 70-92% of a fresh forecast and the wage budget is 70% of it, so many clubs begin over budget and bid on nothing
+    /// (`ai-market-v2`). These tests are about the market's money flow, so every sponsor pays enough to give every club room.
+    /// </remarks>
+    public async Task InitializeAsync()
+    {
+        await _fixture.InitializeAsync();
+
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        await db.Database.ExecuteSqlRawAsync("update finance.sponsor_deals set fixed_matchday_minor = fixed_matchday_minor + 100000000000");
+    }
 
     /// <summary>Stops and removes the world.</summary>
     public Task DisposeAsync() => _fixture.DisposeAsync();

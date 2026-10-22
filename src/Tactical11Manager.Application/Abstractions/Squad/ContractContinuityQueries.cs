@@ -17,6 +17,7 @@ namespace Tactical11Manager.Application.Abstractions.Squad;
 /// <param name="IsGoalkeeper">Whether the player counts against the goalkeeper minimum (`SQ-2`).</param>
 /// <param name="Age">The player's age in the game year the read was asked for.</param>
 /// <param name="Ability">The player's ability, the mean of their attributes, on the 1–20 scale.</param>
+/// <param name="AbilityTenths">The mean of the player's attributes in tenths of a point, so 115 is 11.5: what a wage is read from.</param>
 /// <param name="Potential">The hidden development ceiling. Class C2: server-only.</param>
 /// <param name="MoraleBp">The player's morale in basis points (`TRN-7`).</param>
 /// <param name="ConditionBp">The player's condition in basis points (`TRN-5`).</param>
@@ -32,6 +33,7 @@ public sealed record ContractContinuityPlayer(
     bool IsGoalkeeper,
     int Age,
     int Ability,
+    int AbilityTenths,
     int Potential,
     int MoraleBp,
     int ConditionBp,

@@ -70,6 +70,10 @@ public sealed class FreeAgentMarketTests : IAsyncLifetime
         page.Listings.Should().OnlyContain(row => row.GeneratedBuyerSeasonWageMinor > 0 && row.MinimumFeeMinor > 0);
         page.NextCursor.Should().NotBeNull();
 
+        // Every free agent is a purchase, so each carries what buying him does to the viewer's wage bill and cash (WAGE-1).
+        page.Listings.Should().OnlyContain(row => row.WageImpact != null && row.WageImpact.AddedSeasonWageMinor == row.GeneratedBuyerSeasonWageMinor);
+        page.Listings.Should().OnlyContain(row => row.WageImpact!.NeedsConfirmation == (row.WageImpact.Level == "danger" || row.WageImpact.Level == "administration_risk"));
+
         var next = await GetAsync<TransferListingsResponse>(
             client,
             $"/api/v1/transfers/listings?kind=free_agent&pageSize=50&cursor={Uri.EscapeDataString(page.NextCursor!)}");

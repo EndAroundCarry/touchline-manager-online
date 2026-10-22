@@ -4,7 +4,7 @@ namespace Tactical11Manager.Contracts.Squad;
 /// The deterministic terms the server offers for a renewal (`CON-3`, master plan §10.3).
 /// </summary>
 /// <remarks>
-/// Carries no hidden value: the quote is derived from potential, but only the wage it produces is returned.
+/// Carries no hidden value: the quote is derived from the skill, the age, the appearances and the morale, and only the wage it produces is returned.
 /// The season range is the one the new contract would cover if it were accepted now.
 /// </remarks>
 /// <param name="ContractId">The contract the quote is for.</param>
@@ -19,6 +19,7 @@ namespace Tactical11Manager.Contracts.Squad;
 /// (`CONC-1`, ADR-0009).
 /// </param>
 /// <param name="ServerTime">The server's current instant.</param>
+/// <param name="WageImpact">What the renewal's rise in wage does to the club's wage bill and cash (`WAGE-1`).</param>
 public sealed record RenewalQuoteResponse(
     Guid ContractId,
     Guid PlayerId,
@@ -27,7 +28,8 @@ public sealed record RenewalQuoteResponse(
     int EndSeasonNumber,
     long SeasonWageMinor,
     long ContractVersion,
-    DateTimeOffset ServerTime);
+    DateTimeOffset ServerTime,
+    Finance.WageImpactResponse? WageImpact = null);
 
 /// <summary>The contract a manager has just signed a player to (`CON-4`).</summary>
 /// <param name="ContractId">The new contract's identity.</param>

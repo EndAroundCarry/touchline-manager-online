@@ -1,3 +1,4 @@
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Squad;
 
@@ -5,38 +6,40 @@ namespace Tactical11Manager.Application.Abstractions.Market;
 
 /// <summary>One registered player as the AI market evaluation reads them (`TRF-12`).</summary>
 /// <remarks>
-/// Hidden potential rides along because the valuation reads it; it is an input here and never a DTO field
-/// (`MAT-11`).
+/// The AI reads what any club can see: skill, age and wage. Hidden potential is not an input (`player-valuation-v2`), so a gem is under-priced
+/// and a flop over-priced exactly as they are for a manager.
 /// </remarks>
 /// <param name="PlayerId">The player.</param>
 /// <param name="Family">The position family the player belongs to.</param>
-/// <param name="Ability">The player's current ability, 1–20.</param>
-/// <param name="Potential">The hidden development ceiling, 1–20. Class C2: server-only.</param>
+/// <param name="AbilityTenths">The mean of the player's attributes in tenths of a point, so 115 is 11.5.</param>
 /// <param name="Age">The player's age in game years.</param>
 /// <param name="SquadStatus">The player's standing in the squad (`SQ-1`).</param>
 /// <param name="ContractEndSeasonNumber">The last season the active contract covers.</param>
+/// <param name="SeasonWageMinor">The wage on the active contract for a season.</param>
 /// <param name="IsListed">Whether the player already has an open listing (`TRF-14`).</param>
 public sealed record AiMarketPlayerRow(
     Guid PlayerId,
     PositionFamily Family,
-    int Ability,
-    int Potential,
+    int AbilityTenths,
     int Age,
     SquadStatus SquadStatus,
     int ContractEndSeasonNumber,
+    long SeasonWageMinor,
     bool IsListed);
 
 /// <summary>One AI-controlled club as the market evaluation reads it (`TRF-12`).</summary>
 /// <param name="ClubId">The club.</param>
-/// <param name="Tier">The tier the club plays in, which scales the valuation.</param>
 /// <param name="SpendableMinor">Cash available after existing reservations (`FIN-10`).</param>
 /// <param name="CurrentSeasonNumber">The season being played, so a contract's remaining term can be read.</param>
+/// <param name="FinancialState">The state of the club's money: a club in the red or in administration bids on nothing (`DEBT-3`).</param>
+/// <param name="LeadingBidWagesMinor">The season wages of the players the club leads the bidding on, which join its wage bill the moment the bid wins.</param>
 /// <param name="Players">The club's registered squad.</param>
 public sealed record AiMarketClubRow(
     Guid ClubId,
-    int Tier,
     long SpendableMinor,
     int CurrentSeasonNumber,
+    FinancialStateKind FinancialState,
+    long LeadingBidWagesMinor,
     IReadOnlyList<AiMarketPlayerRow> Players);
 
 /// <summary>One open listing as the market evaluation reads it (`TRF-4`, `TRF-8`).</summary>
@@ -45,22 +48,22 @@ public sealed record AiMarketClubRow(
 /// <param name="LeadingClubId">The club currently leading, or null, so a club never raises itself.</param>
 /// <param name="PlayerId">The listed player.</param>
 /// <param name="Family">The listed player's position family.</param>
-/// <param name="Ability">The listed player's ability, 1–20.</param>
-/// <param name="Potential">The listed player's hidden ceiling, 1–20. Class C2: server-only.</param>
+/// <param name="AbilityTenths">The listed player's skill in tenths of a point.</param>
 /// <param name="Age">The listed player's age in game years.</param>
 /// <param name="MinimumFeeMinor">The seller's minimum fee, in minor units.</param>
 /// <param name="LeadingAmountMinor">The current leading amount, in minor units, or null.</param>
+/// <param name="BuyerSeasonWageMinor">The wage for a season the listing quotes the buyer.</param>
 public sealed record AiMarketListingRow(
     Guid ListingId,
     Guid SellerClubId,
     Guid? LeadingClubId,
     Guid PlayerId,
     PositionFamily Family,
-    int Ability,
-    int Potential,
+    int AbilityTenths,
     int Age,
     long MinimumFeeMinor,
-    long? LeadingAmountMinor);
+    long? LeadingAmountMinor,
+    long BuyerSeasonWageMinor);
 
 /// <summary>
 /// The AI market evaluation's read (`TRF-12`, `MOD-3`).

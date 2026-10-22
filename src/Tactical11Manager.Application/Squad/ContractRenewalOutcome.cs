@@ -59,7 +59,7 @@ internal static class ContractRenewal
     /// <summary>Turns the server-only context into the quote's pure input (`CON-3`).</summary>
     public static ContractRenewalInput ToInput(ContractRenewalContext context) =>
         new(
-            context.Ability * 10,
+            context.AbilityTenths,
             context.Age,
             context.Appearances,
             context.MoraleBp,

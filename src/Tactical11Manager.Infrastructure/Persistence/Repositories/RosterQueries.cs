@@ -90,16 +90,18 @@ internal sealed class RosterQueries : IRosterQueries
                 listing => listing.PlayerId == playerId && listing.Status == ListingStatus.Open,
                 cancellationToken);
 
-        var values = row.Attributes.ToSet().Values;
-        var ability = values.Count == 0
+        var set = row.Attributes.ToSet();
+        var tenths = set.MeanTenths;
+        var ability = set.Values.Count == 0
             ? WorldRuleSet.AttributeMin
-            : (int)Math.Round(values.Average(), MidpointRounding.AwayFromZero);
+            : (int)Math.Round(set.Values.Average(), MidpointRounding.AwayFromZero);
 
         return new ListingEligibilityContext(
             playerId,
             row.Contract.ClubId,
             row.Player.PrimaryPosition,
             ability,
+            tenths,
             row.Player.Potential,
             season.GameYear - row.Player.BirthGameYear,
             moraleBp ?? 0,

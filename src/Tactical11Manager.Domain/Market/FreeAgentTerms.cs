@@ -33,20 +33,30 @@ public static class FreeAgentTerms
     /// <summary>Calculates the terms a free agent is listed on.</summary>
     /// <param name="ability">The ability he shows, on the 1–20 scale.</param>
     /// <param name="age">His age in game years.</param>
-    public static FreeAgentOffer Calculate(int ability, int age) => Calculate(ability, age, WorldRuleSet.FreeAgentMinimumFeeBp);
+    public static FreeAgentOffer Calculate(int ability, int age) => CalculateFromTenths(ability * 10, age);
+
+    /// <summary>Calculates the terms a free agent is listed on, from the mean of his attributes in tenths of a point.</summary>
+    /// <param name="abilityTenths">The mean of his attributes in tenths, so 115 is 11.5.</param>
+    /// <param name="age">His age in game years.</param>
+    public static FreeAgentOffer CalculateFromTenths(int abilityTenths, int age) => Calculate(abilityTenths, age, WorldRuleSet.FreeAgentMinimumFeeBp);
 
     /// <summary>Calculates the terms a released player is listed on: his full valuation.</summary>
     /// <param name="ability">The ability he shows, on the 1–20 scale.</param>
     /// <param name="age">His age in game years.</param>
-    public static FreeAgentOffer CalculateReleased(int ability, int age) => Calculate(ability, age, WorldRuleSet.FreeAgentReleasedFeeBp);
+    public static FreeAgentOffer CalculateReleased(int ability, int age) => CalculateReleasedFromTenths(ability * 10, age);
 
-    private static FreeAgentOffer Calculate(int ability, int age, int feeBp)
+    /// <summary>Calculates the terms a released player is listed on, from the mean of his attributes in tenths of a point.</summary>
+    /// <param name="abilityTenths">The mean of his attributes in tenths, so 115 is 11.5.</param>
+    /// <param name="age">His age in game years.</param>
+    public static FreeAgentOffer CalculateReleasedFromTenths(int abilityTenths, int age) => Calculate(abilityTenths, age, WorldRuleSet.FreeAgentReleasedFeeBp);
+
+    private static FreeAgentOffer Calculate(int abilityTenths, int age, int feeBp)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(ability, WorldRuleSet.AttributeMin);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(ability, WorldRuleSet.AttributeMax);
+        ArgumentOutOfRangeException.ThrowIfLessThan(abilityTenths, WorldRuleSet.AttributeMin * 10);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(abilityTenths, WorldRuleSet.AttributeMax * 10);
         ArgumentOutOfRangeException.ThrowIfNegative(age);
 
-        var valuation = PlayerValuation.Estimate(PlayerValuationInput.FromAbility(ability, age));
+        var valuation = PlayerValuation.Estimate(new PlayerValuationInput(abilityTenths, age));
 
         var minimumFee = Math.Max(
             WorldRuleSet.MinimumBidIncrementMinor,
@@ -56,7 +66,7 @@ public static class FreeAgentTerms
 
         var wage = ContractRenewalQuote.Calculate(
             new ContractRenewalInput(
-                ability * 10,
+                abilityTenths,
                 age,
                 Appearances: 0,
                 PlayerState.NeutralBasisPoints,

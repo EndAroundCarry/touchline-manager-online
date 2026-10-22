@@ -182,6 +182,7 @@ public sealed class SettleSquadContinuityTests
             row.Player.PrimaryPosition == PlayerPosition.Goalkeeper,
             age,
             ability,
+            ability * 10,
             Potential: 14,
             MoraleBp: 5_000,
             conditionBp,

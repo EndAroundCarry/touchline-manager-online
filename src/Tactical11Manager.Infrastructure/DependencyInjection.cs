@@ -470,6 +470,7 @@ public static class DependencyInjection
         services.AddScoped<IClubAccountRepository, ClubAccountRepository>();
         services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IFinanceQueries, FinanceQueries>();
+        services.AddScoped<IAiFinanceQueries, AiFinanceQueries>();
         services.AddScoped<ICalendarQueries, CalendarQueries>();
         services.AddScoped<IClubSeasonFinanceRepository, ClubSeasonFinanceRepository>();
         services.AddScoped<ISponsorRepository, SponsorRepository>();

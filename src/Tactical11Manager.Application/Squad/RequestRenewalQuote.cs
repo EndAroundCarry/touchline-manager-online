@@ -1,5 +1,6 @@
 using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Squad;
+using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Contracts.Squad;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -24,13 +25,15 @@ public sealed class RequestRenewalQuote
 {
     private readonly ResolveOwnedClub _access;
     private readonly ISquadQueries _queries;
+    private readonly WageImpactReader _impact;
     private readonly IClock _clock;
 
     /// <summary>Initializes the query.</summary>
-    public RequestRenewalQuote(ResolveOwnedClub access, ISquadQueries queries, IClock clock)
+    public RequestRenewalQuote(ResolveOwnedClub access, ISquadQueries queries, WageImpactReader impact, IClock clock)
     {
         _access = access;
         _queries = queries;
+        _impact = impact;
         _clock = clock;
     }
 
@@ -66,16 +69,19 @@ public sealed class RequestRenewalQuote
             return new RequestRenewalQuoteResult(ContractRenewalOutcome.ContractNotFound, null);
         }
 
+        var club = await _impact.ReadAsync(access.ClubId, cancellationToken);
+
         return new RequestRenewalQuoteResult(
             ContractRenewalOutcome.Quoted,
-            Quote(context, seasons, _clock.UtcNow));
+            Quote(context, seasons, _clock.UtcNow, club));
     }
 
     /// <summary>Builds the quote response from the context and the requested term.</summary>
     internal static RenewalQuoteResponse Quote(
         ContractRenewalContext context,
         int seasons,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        WageImpactClub? club)
     {
         var terms = ContractRenewalQuote.Calculate(ContractRenewal.ToInput(context), seasons);
         var start = context.CurrentSeasonNumber;
@@ -88,6 +94,7 @@ public sealed class RequestRenewalQuote
             start + seasons - 1,
             terms.SeasonWageMinor,
             context.ContractVersion,
-            now);
+            now,
+            club?.Evaluate(feeMinor: 0, terms.SeasonWageMinor - context.CurrentSeasonWageMinor));
     }
 }

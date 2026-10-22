@@ -612,6 +612,7 @@ internal sealed class SquadQueries : ISquadQueries
                 candidate.Version,
                 candidate.SquadStatus,
                 candidate.EndSeasonNumber,
+                candidate.SeasonWageMinor,
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -660,13 +661,13 @@ internal sealed class SquadQueries : ISquadQueries
             .Select(stat => (int?)stat.Appearances)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var values = attributes.ToSet().Values;
-
         // The mean of the twenty-eight attributes: the same ability signal the AI policy uses, and no
         // authority beyond what it needs to be (it is an input to a wage, not a published "overall").
-        var ability = values.Count == 0
+        var set = attributes.ToSet();
+        var tenths = set.MeanTenths;
+        var ability = set.Values.Count == 0
             ? WorldRuleSet.AttributeMin
-            : (int)Math.Round(values.Average(), MidpointRounding.AwayFromZero);
+            : (int)Math.Round(set.Values.Average(), MidpointRounding.AwayFromZero);
 
         return new ContractRenewalContext(
             contract.Id,
@@ -675,13 +676,15 @@ internal sealed class SquadQueries : ISquadQueries
             contract.Version,
             contract.SquadStatus,
             ability,
+            tenths,
             player.Potential,
             season.GameYear - player.BirthGameYear,
             appearances ?? 0,
             moraleBp ?? 0,
             placement.TierNumber,
             season.SequenceNumber,
-            Math.Max(0, contract.EndSeasonNumber - season.SequenceNumber));
+            Math.Max(0, contract.EndSeasonNumber - season.SequenceNumber),
+            contract.SeasonWageMinor);
     }
 
     /// <inheritdoc />

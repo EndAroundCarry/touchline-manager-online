@@ -144,7 +144,7 @@ public sealed class ListingWriter : IListingWriter
 
         var terms = ContractRenewalQuote.Calculate(
             new ContractRenewalInput(
-                eligibility.Ability * 10,
+                eligibility.AbilityTenths,
                 eligibility.Age,
                 eligibility.Appearances,
                 eligibility.MoraleBp,

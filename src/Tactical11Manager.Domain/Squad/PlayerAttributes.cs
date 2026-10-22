@@ -224,6 +224,14 @@ public sealed record PlayerAttributeSet
     public bool IsWithinScale => Values.All(
         value => value is >= WorldRuleSet.AttributeMin and <= WorldRuleSet.AttributeMax);
 
+    /// <summary>
+    /// Gets the mean of all the attributes in tenths of a point, so 115 is 11.5: the skill a price and a wage are read from, which moves smoothly as a
+    /// player trains where the displayed whole number does not (`player-valuation-v2`).
+    /// </summary>
+    public int MeanTenths => Values.Count == 0
+        ? WorldRuleSet.AttributeMin * 10
+        : (int)Math.Round(Values.Average() * 10, MidpointRounding.AwayFromZero);
+
     /// <summary>Gets one attribute by its canonical name.</summary>
     /// <param name="name">The attribute.</param>
     public int ValueOf(AttributeName name) => Values[(int)name];

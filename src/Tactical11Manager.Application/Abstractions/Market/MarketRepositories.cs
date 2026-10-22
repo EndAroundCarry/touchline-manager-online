@@ -116,6 +116,7 @@ public interface ITransferOutcomeRepository
 /// <param name="ClubId">The club the player is contracted to.</param>
 /// <param name="PrimaryPosition">The player's position.</param>
 /// <param name="Ability">The player's current ability, 1–20.</param>
+/// <param name="AbilityTenths">The mean of the player's attributes in tenths of a point, so 115 is 11.5: what a price and a wage are read from.</param>
 /// <param name="Potential">The hidden development ceiling, 1–20. Class C2: server-only.</param>
 /// <param name="Age">The player's age in game years.</param>
 /// <param name="MoraleBp">The player's morale in basis points.</param>
@@ -133,6 +134,7 @@ public sealed record ListingEligibilityContext(
     Guid ClubId,
     PlayerPosition PrimaryPosition,
     int Ability,
+    int AbilityTenths,
     int Potential,
     int Age,
     int MoraleBp,

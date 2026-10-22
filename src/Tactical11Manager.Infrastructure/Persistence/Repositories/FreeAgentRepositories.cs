@@ -147,6 +147,7 @@ internal sealed class FreeAgentQueries : IFreeAgentQueries
             .Select(row => new ReleasedFreeAgentRow(
                 row.Id,
                 Ability(row.Attributes),
+                row.Attributes.ToSet().MeanTenths,
                 row.Potential,
                 gameYear - row.BirthGameYear,
                 row.NationalityCode))];

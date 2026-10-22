@@ -22,12 +22,14 @@ public sealed class ListListings
 
     private readonly ResolveOwnedClub _access;
     private readonly IMarketQueries _queries;
+    private readonly ListingWageImpact _impact;
 
     /// <summary>Initializes the query.</summary>
-    public ListListings(ResolveOwnedClub access, IMarketQueries queries)
+    public ListListings(ResolveOwnedClub access, IMarketQueries queries, ListingWageImpact impact)
     {
         _access = access;
         _queries = queries;
+        _impact = impact;
     }
 
     /// <summary>Reads one listing, or refuses.</summary>
@@ -50,7 +52,7 @@ public sealed class ListListings
 
         return listing is null
             ? new ListingResult(MarketOutcome.NotFound, null)
-            : new ListingResult(MarketOutcome.Found, listing);
+            : new ListingResult(MarketOutcome.Found, await _impact.AttachAsync(listing, access.ClubId, cancellationToken));
     }
 
     /// <summary>Browses listings, or refuses.</summary>
@@ -86,7 +88,9 @@ public sealed class ListListings
 
         var page = await _queries.ListListingsAsync(bounded, access.ClubId, cancellationToken);
 
-        return new ListingPageResult(MarketOutcome.Found, page);
+        return new ListingPageResult(
+            MarketOutcome.Found,
+            page with { Listings = await _impact.AttachAsync(page.Listings, access.ClubId, cancellationToken) });
     }
 
     /// <summary>Reads the caller's own listings and bids, or refuses.</summary>

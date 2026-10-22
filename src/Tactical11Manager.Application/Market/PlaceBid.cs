@@ -25,6 +25,7 @@ public sealed class PlaceBid
     private readonly ResolveOwnedClub _access;
     private readonly IBidWriter _writer;
     private readonly IMarketQueries _queries;
+    private readonly ListingWageImpact _impact;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRequestContext _requestContext;
     private readonly ISecureTokenService _secureTokens;
@@ -34,6 +35,7 @@ public sealed class PlaceBid
         ResolveOwnedClub access,
         IBidWriter writer,
         IMarketQueries queries,
+        ListingWageImpact impact,
         IUnitOfWork unitOfWork,
         IRequestContext requestContext,
         ISecureTokenService secureTokens)
@@ -41,6 +43,7 @@ public sealed class PlaceBid
         _access = access;
         _writer = writer;
         _queries = queries;
+        _impact = impact;
         _unitOfWork = unitOfWork;
         _requestContext = requestContext;
         _secureTokens = secureTokens;
@@ -95,8 +98,10 @@ public sealed class PlaceBid
 
         await transaction.CommitAsync(cancellationToken);
 
+        var listing = await _queries.GetListingAsync(write.ListingId, access.ClubId, cancellationToken);
+
         return new ListingResult(
             MarketOutcome.Found,
-            await _queries.GetListingAsync(write.ListingId, access.ClubId, cancellationToken));
+            listing is null ? null : await _impact.AttachAsync(listing, access.ClubId, cancellationToken));
     }
 }

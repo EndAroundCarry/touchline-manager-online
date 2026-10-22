@@ -248,6 +248,46 @@ internal sealed class FinanceQueries : IFinanceQueries
     }
 
     /// <inheritdoc />
+    public async Task<ClubMoneyPosition?> GetMoneyPositionAsync(Guid clubId, CancellationToken cancellationToken)
+    {
+        var account = await _dbContext.ClubAccounts
+            .AsNoTracking()
+            .Where(candidate => candidate.ClubId == clubId)
+            .Select(candidate => new { candidate.CashMinor, candidate.ReservedMinor })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (account is null)
+        {
+            return null;
+        }
+
+        var leadingWages = await (
+            from bid in _dbContext.TransferBids
+            join listing in _dbContext.TransferListings on bid.ListingId equals listing.Id
+            where bid.BidderClubId == clubId && bid.Status == BidStatus.Leading && listing.Status == ListingStatus.Open
+            select (long?)listing.GeneratedBuyerSeasonWageMinor)
+            .SumAsync(cancellationToken);
+
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+        var played = 0;
+
+        if (season is not null)
+        {
+            played = await (
+                from entry in _dbContext.ClubSeasonEntries
+                join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+                join matchday in _dbContext.Matchdays on divisionSeason.Id equals matchday.DivisionSeasonId
+                where entry.ClubId == clubId
+                    && divisionSeason.SeasonId == season.SeasonId
+                    && matchday.PublicationStatus == MatchdayPublicationStatus.Published
+                select (int?)matchday.RoundNumber)
+                .MaxAsync(cancellationToken) ?? 0;
+        }
+
+        return new ClubMoneyPosition(account.CashMinor, account.ReservedMinor, leadingWages ?? 0, played);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<AdministrationPlayer>> GetAdministrationSquadAsync(
         Guid clubId,
         CancellationToken cancellationToken)

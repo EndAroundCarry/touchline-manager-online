@@ -1,7 +1,9 @@
 using System.Globalization;
 using Tactical11Manager.Application.Abstractions;
+using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Market;
 using Tactical11Manager.Application.Abstractions.Persistence;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 
 namespace Tactical11Manager.Application.Market;
@@ -25,6 +27,11 @@ public sealed record EvaluateAiMarketResult(int Clubs, int Listed, int Bids, int
 /// receives no bypass" is enforced by the code path rather than by intention.
 /// </para>
 /// <para>
+/// A club bids only inside its means (`ai-market-v2`): its season wage bill with the players it already leads the bidding on must stay within the
+/// wage budget, 70% of its income forecast, and a reserve of half a season of wages stays in the bank. A club over its budget, or in the red, lists
+/// its highest earner first.
+/// </para>
+/// <para>
 /// One job is one pass: it lists a player only when the club is not already listing them, and bids only on
 /// listings that existed when the pass began and that the club does not already lead, so an evaluation
 /// cannot chase its own decisions. The whole pass commits in one transaction, and the deterministic daily
@@ -34,6 +41,7 @@ public sealed record EvaluateAiMarketResult(int Clubs, int Listed, int Bids, int
 public sealed class EvaluateAiMarket
 {
     private readonly IAiMarketRepository _repository;
+    private readonly IFinanceQueries _finance;
     private readonly IListingWriter _listingWriter;
     private readonly IBidWriter _bidWriter;
     private readonly IAiMarketDecisionRepository _decisions;
@@ -44,6 +52,7 @@ public sealed class EvaluateAiMarket
     /// <summary>Initializes the use case.</summary>
     public EvaluateAiMarket(
         IAiMarketRepository repository,
+        IFinanceQueries finance,
         IListingWriter listingWriter,
         IBidWriter bidWriter,
         IAiMarketDecisionRepository decisions,
@@ -52,6 +61,7 @@ public sealed class EvaluateAiMarket
         IRequestContext requestContext)
     {
         _repository = repository;
+        _finance = finance;
         _listingWriter = listingWriter;
         _bidWriter = bidWriter;
         _decisions = decisions;
@@ -65,6 +75,9 @@ public sealed class EvaluateAiMarket
     public async Task<EvaluateAiMarketResult> ExecuteAsync(CancellationToken cancellationToken)
     {
         var clubs = await _repository.LoadAiClubsAsync(cancellationToken);
+
+        var budgets = (await _finance.GetClubFinanceBasisAsync([.. clubs.Select(club => club.ClubId)], cancellationToken))
+            .ToDictionary(basis => basis.ClubId, basis => basis.WageBudgetMinor);
 
         var now = _clock.UtcNow;
         var day = DateOnly.FromDateTime(now.UtcDateTime);
@@ -93,7 +106,7 @@ public sealed class EvaluateAiMarket
         // Club identity order makes the pass reproducible when two clubs decide in one evaluation.
         foreach (var club in clubs.OrderBy(club => club.ClubId))
         {
-            var plan = AiMarketPolicy.Decide(ToPolicyClub(club), policyListings);
+            var plan = AiMarketPolicy.Decide(ToPolicyClub(club, budgets.GetValueOrDefault(club.ClubId)), policyListings);
 
             foreach (var decision in plan.Listings)
             {
@@ -177,22 +190,31 @@ public sealed class EvaluateAiMarket
         return new EvaluateAiMarketResult(clubs.Count, listed, bids, skipped);
     }
 
-    // The wage-aware inputs of ai-market-v2 (the wage bill, the budget, the reserve, the state of the club's money, a wage for each player) arrive
-    // with the market milestone of the economy rework; until then the club has no wage limit and the policy behaves as it did.
-    private static AiMarketClub ToPolicyClub(AiMarketClubRow row) => new(
-        row.ClubId,
-        row.SpendableMinor,
-        new AiMarketFinances(WageBillSeasonMinor: 0, WageBudgetMinor: long.MaxValue, ReserveMinor: 0, InTheRed: false),
-        [.. row.Players.Select(player => new AiMarketPlayer(
-            player.PlayerId,
-            player.Family,
-            player.Ability * 10,
-            player.Age,
-            player.SquadStatus,
-            player.ContractEndSeasonNumber,
-            row.CurrentSeasonNumber,
-            player.IsListed,
-            SeasonWageMinor: 0))]);
+    // The wage bill counts the players the club leads the bidding on, so a pass cannot promise the same room twice. A club with no income forecast has
+    // no budget and bids on nothing.
+    private static AiMarketClub ToPolicyClub(AiMarketClubRow row, long wageBudgetMinor)
+    {
+        var wageBill = row.Players.Sum(player => player.SeasonWageMinor) + row.LeadingBidWagesMinor;
+
+        return new AiMarketClub(
+            row.ClubId,
+            row.SpendableMinor,
+            new AiMarketFinances(
+                wageBill,
+                wageBudgetMinor,
+                AiFinancePolicy.ReserveMinorFor(wageBill),
+                InTheRed: row.FinancialState != FinancialStateKind.Healthy),
+            [.. row.Players.Select(player => new AiMarketPlayer(
+                player.PlayerId,
+                player.Family,
+                player.AbilityTenths,
+                player.Age,
+                player.SquadStatus,
+                player.ContractEndSeasonNumber,
+                row.CurrentSeasonNumber,
+                player.IsListed,
+                player.SeasonWageMinor))]);
+    }
 
     private static AiMarketListing ToPolicyListing(AiMarketListingRow row) => new(
         row.ListingId,
@@ -200,11 +222,11 @@ public sealed class EvaluateAiMarket
         row.LeadingClubId,
         row.PlayerId,
         row.Family,
-        row.Ability * 10,
+        row.AbilityTenths,
         row.Age,
         row.MinimumFeeMinor,
         row.LeadingAmountMinor,
-        BuyerSeasonWageMinor: 0);
+        row.BuyerSeasonWageMinor);
 
     /// <summary>The deterministic daily key of a listing decision, which a retried pass replays (`T-4`).</summary>
     private static string ListingKey(Guid clubId, Guid playerId, DateOnly day) =>

@@ -61,6 +61,12 @@ public sealed class ContractRenewalTests : IAsyncLifetime
         quote.StartSeasonNumber.Should().Be(contracts.SeasonNumber);
         quote.EndSeasonNumber.Should().Be(contracts.SeasonNumber + 2);
 
+        // The server tells the manager what the new wage does to the club's money (WAGE-1): the rise, not the whole wage.
+        quote.WageImpact.Should().NotBeNull();
+        quote.WageImpact!.AddedSeasonWageMinor.Should().Be(quote.SeasonWageMinor - contract.SeasonWageMinor);
+        quote.WageImpact.Level.Should().BeOneOf("fits", "stretching", "danger", "administration_risk");
+        quote.WageImpact.WageBudgetMinor.Should().BePositive();
+
         // The quote is deterministic: asking twice, without changing anything, offers the same terms.
         var second = await QuoteAsync(client, contract.Id, seasons: 3);
 

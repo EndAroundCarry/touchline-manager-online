@@ -6,7 +6,7 @@ using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Finance;
-using Tactical11Manager.Application.Jobs;
+using Tactical11Manager.Application.Market;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Contracts.World;
 using Tactical11Manager.Domain.Finance;
@@ -89,11 +89,9 @@ public sealed class UpgradeStructure
     private readonly IStructureRepository _structures;
     private readonly IStadiumQueries _context;
     private readonly IClubAccountRepository _accounts;
-    private readonly ILedgerRepository _ledger;
-    private readonly IJobQueue _jobs;
+    private readonly ClubBuilding _building;
     private readonly StructuresComposer _composer;
     private readonly IClock _clock;
-    private readonly IAuditWriter _audit;
     private readonly ISecureTokenService _secureTokens;
     private readonly IRequestContext _requestContext;
     private readonly IUnitOfWork _unitOfWork;
@@ -104,11 +102,9 @@ public sealed class UpgradeStructure
         IStructureRepository structures,
         IStadiumQueries context,
         IClubAccountRepository accounts,
-        ILedgerRepository ledger,
-        IJobQueue jobs,
+        ClubBuilding building,
         StructuresComposer composer,
         IClock clock,
-        IAuditWriter audit,
         ISecureTokenService secureTokens,
         IRequestContext requestContext,
         IUnitOfWork unitOfWork)
@@ -117,11 +113,9 @@ public sealed class UpgradeStructure
         _structures = structures;
         _context = context;
         _accounts = accounts;
-        _ledger = ledger;
-        _jobs = jobs;
+        _building = building;
         _composer = composer;
         _clock = clock;
-        _audit = audit;
         _secureTokens = secureTokens;
         _requestContext = requestContext;
         _unitOfWork = unitOfWork;
@@ -169,69 +163,32 @@ public sealed class UpgradeStructure
             return Refused(UpgradeStructureOutcome.PreconditionFailed);
         }
 
-        if (building.IsBuilding)
-        {
-            return Refused(UpgradeStructureOutcome.Building);
-        }
+        var check = ClubBuilding.CheckUpgrade(building, account, context.TierNumber);
 
-        if (building.IsAtMaxLevel)
+        if (check != ClubBuildCheck.Allowed)
         {
-            return Refused(UpgradeStructureOutcome.MaxLevel);
-        }
-
-        // A club in the red does not build, whatever its cash (DEBT-3).
-        if (account.FinancialState != FinancialStateKind.Healthy)
-        {
-            return Refused(UpgradeStructureOutcome.Embargo);
-        }
-
-        var target = building.Level + 1;
-        var cost = StructureRuleSet.UpgradeCostMinorFor(target, context.TierNumber);
-
-        if (cost > account.AvailableMinor)
-        {
-            return Refused(UpgradeStructureOutcome.InsufficientFunds);
+            return Refused(check switch
+            {
+                ClubBuildCheck.Building => UpgradeStructureOutcome.Building,
+                ClubBuildCheck.MaxLevel => UpgradeStructureOutcome.MaxLevel,
+                ClubBuildCheck.Embargo => UpgradeStructureOutcome.Embargo,
+                _ => UpgradeStructureOutcome.InsufficientFunds,
+            });
         }
 
         var now = _clock.UtcNow;
-        var dueAt = now.AddDays(StructureRuleSet.BuildDaysFor(target));
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync(
             TransactionIsolation.ReadCommitted,
             cancellationToken);
 
-        building.StartUpgrade(dueAt, now);
-
-        _ledger.Add(account.Post(
-            LedgerPostings.StructureUpgrade(
-                Guid.CreateVersion7(),
-                access.ClubId,
-                building.Id,
-                building.Version,
-                kind,
-                target,
-                cost),
-            now));
-
-        await _jobs.EnqueueAsync(
-            new JobEnqueueRequest
-            {
-                JobType = StructureJobTypes.CompleteUpgrade,
-                BusinessKey = StructureJobTypes.CompleteUpgradeKey(building.Id, target),
-                DueAt = dueAt,
-                PayloadJson = StructureJobPayload.For(building.Id, target),
-            },
+        await _building.StageUpgradeAsync(
+            building,
+            account,
+            context.TierNumber,
+            MarketActor.ForUser(userId, _requestContext, _secureTokens),
+            now,
             cancellationToken);
-
-        _audit.Record(new AuditEntry(
-            WorldAuditActions.StructureUpgradeStarted,
-            AuditActorTypes.User,
-            userId,
-            AuditTargetTypes.ClubStructure,
-            building.Id,
-            _requestContext.CorrelationId,
-            _secureTokens.HashClientValue(_requestContext.IpAddress),
-            Reason: $"{kind.ToCode()} to level {target}"));
 
         try
         {

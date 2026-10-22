@@ -413,6 +413,7 @@ public sealed record PlayerSnapshot(
 /// <param name="ContractVersion">The contract's optimistic-concurrency version.</param>
 /// <param name="SquadStatus">The player's standing in the squad, which the new contract keeps.</param>
 /// <param name="Ability">The player's current ability, the mean of their attributes.</param>
+/// <param name="AbilityTenths">The mean of the player's attributes in tenths of a point, so 115 is 11.5: what a wage is read from.</param>
 /// <param name="Potential">The hidden development ceiling. Class C2: server-only.</param>
 /// <param name="Age">The player's age in game years.</param>
 /// <param name="Appearances">Matches played this season.</param>
@@ -420,6 +421,7 @@ public sealed record PlayerSnapshot(
 /// <param name="TierNumber">The tier the club plays in.</param>
 /// <param name="CurrentSeasonNumber">The season the new contract would begin in.</param>
 /// <param name="RemainingSeasons">Full seasons left on the current contract after the current one.</param>
+/// <param name="CurrentSeasonWageMinor">The wage on the current contract for a season, which a renewal's rise is read against.</param>
 public sealed record ContractRenewalContext(
     Guid ContractId,
     Guid PlayerId,
@@ -427,13 +429,15 @@ public sealed record ContractRenewalContext(
     long ContractVersion,
     SquadStatus SquadStatus,
     int Ability,
+    int AbilityTenths,
     int Potential,
     int Age,
     int Appearances,
     int MoraleBp,
     int TierNumber,
     int CurrentSeasonNumber,
-    int RemainingSeasons);
+    int RemainingSeasons,
+    long CurrentSeasonWageMinor);
 
 /// <summary>
 /// What releasing a player is decided from, gathered server-side (`CON-12`).

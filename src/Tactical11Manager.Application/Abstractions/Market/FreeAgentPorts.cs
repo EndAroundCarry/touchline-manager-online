@@ -32,10 +32,11 @@ public sealed record FreeAgentWorldFacts(
 /// <summary>A released player waiting to join a batch (`FA-3`).</summary>
 /// <param name="PlayerId">The player.</param>
 /// <param name="Ability">The ability he shows: the rounded mean of his attributes.</param>
-/// <param name="Potential">His hidden potential. It prices his fee, as a club listing's is, and is never shown.</param>
+/// <param name="AbilityTenths">The mean of his attributes in tenths of a point, so 115 is 11.5: what his fee and wage are read from.</param>
+/// <param name="Potential">His hidden potential, which no price reads (`player-valuation-v2`) and which is never shown.</param>
 /// <param name="Age">His age in game years.</param>
-/// <param name="NationalityCode">His nationality, which picks the reference tier he is priced at.</param>
-public sealed record ReleasedFreeAgentRow(Guid PlayerId, int Ability, int Potential, int Age, string NationalityCode);
+/// <param name="NationalityCode">His nationality.</param>
+public sealed record ReleasedFreeAgentRow(Guid PlayerId, int Ability, int AbilityTenths, int Potential, int Age, string NationalityCode);
 
 /// <summary>Persistence for the weekly free-agent batch record (`FA-5`).</summary>
 public interface IFreeAgentBatchRepository

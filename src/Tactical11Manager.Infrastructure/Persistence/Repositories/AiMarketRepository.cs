@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Application.Abstractions.Market;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -60,18 +61,24 @@ internal sealed class AiMarketRepository : IAiMarketRepository
             select new { entry.ClubId, division.TierNumber })
             .ToListAsync(cancellationToken);
 
-        var tierByClub = placements
-            .GroupBy(row => row.ClubId)
-            .ToDictionary(group => group.Key, group => group.First().TierNumber);
+        var placedClubs = placements.Select(row => row.ClubId).ToHashSet();
 
         var accounts = await _dbContext.ClubAccounts
             .Where(account => clubIds.Contains(account.ClubId))
-            .Select(account => new { account.ClubId, account.CashMinor, account.ReservedMinor })
+            .Select(account => new { account.ClubId, account.CashMinor, account.ReservedMinor, account.FinancialState })
             .ToListAsync(cancellationToken);
 
-        var spendableByClub = accounts.ToDictionary(
-            row => row.ClubId,
-            row => row.CashMinor - row.ReservedMinor);
+        var accountByClub = accounts.ToDictionary(row => row.ClubId);
+
+        // The wages of the players a club leads the bidding on join its bill the moment the bid wins, so a pass counts them now.
+        var leadingWages = (await (
+                from bid in _dbContext.TransferBids
+                join listing in _dbContext.TransferListings on bid.ListingId equals listing.Id
+                where bid.Status == BidStatus.Leading && clubIds.Contains(bid.BidderClubId) && listing.Status == ListingStatus.Open
+                select new { bid.BidderClubId, listing.GeneratedBuyerSeasonWageMinor })
+            .ToListAsync(cancellationToken))
+            .GroupBy(row => row.BidderClubId)
+            .ToDictionary(group => group.Key, group => group.Sum(row => row.GeneratedBuyerSeasonWageMinor));
 
         // A player is registered when an active contract and an active registration agree on the club
         // (SQ-6, SQ-7). The whole entities are read rather than a projection because the attributes' value
@@ -104,28 +111,31 @@ internal sealed class AiMarketRepository : IAiMarketRepository
         foreach (var clubId in clubIds)
         {
             // A club with no placement in the season being played is not a market participant.
-            if (!tierByClub.TryGetValue(clubId, out var tier))
+            if (!placedClubs.Contains(clubId))
             {
                 continue;
             }
+
+            accountByClub.TryGetValue(clubId, out var account);
 
             var squad = byClub.TryGetValue(clubId, out var members) ? members : [];
 
             clubs.Add(new AiMarketClubRow(
                 clubId,
-                tier,
-                spendableByClub.GetValueOrDefault(clubId),
+                account is null ? 0 : account.CashMinor - account.ReservedMinor,
                 season.SequenceNumber,
+                account?.FinancialState ?? FinancialStateKind.Healthy,
+                leadingWages.GetValueOrDefault(clubId),
                 [.. squad
                     .OrderBy(row => row.Player.Id)
                     .Select(row => new AiMarketPlayerRow(
                         row.Player.Id,
                         PlayerPositions.FamilyOf(row.Player.PrimaryPosition),
-                        Ability(row.Attributes),
-                        row.Player.Potential,
+                        row.Attributes.ToSet().MeanTenths,
                         season.GameYear - row.Player.BirthGameYear,
                         row.Contract.SquadStatus,
                         row.Contract.EndSeasonNumber,
+                        row.Contract.SeasonWageMinor,
                         listedIds.Contains(row.Player.Id)))]));
         }
 
@@ -188,23 +198,14 @@ internal sealed class AiMarketRepository : IAiMarketRepository
                 leadingClubId,
                 row.Player.Id,
                 PlayerPositions.FamilyOf(row.Player.PrimaryPosition),
-                Ability(row.Attributes),
-                row.Player.Potential,
+                row.Attributes.ToSet().MeanTenths,
                 gameYear - row.Player.BirthGameYear,
                 row.Listing.MinimumFeeMinor,
-                leadingAmount));
+                leadingAmount,
+                row.Listing.GeneratedBuyerSeasonWageMinor));
         }
 
         return listings;
-    }
-
-    private static int Ability(PlayerAttributes attributes)
-    {
-        var values = attributes.ToSet().Values;
-
-        return values.Count == 0
-            ? WorldRuleSet.AttributeMin
-            : (int)Math.Round(values.Average(), MidpointRounding.AwayFromZero);
     }
 }
 

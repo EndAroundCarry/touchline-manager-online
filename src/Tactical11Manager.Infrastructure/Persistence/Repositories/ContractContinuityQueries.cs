@@ -113,7 +113,8 @@ internal sealed class ContractContinuityQueries : IContractContinuityQueries
                     PlayerPositions.FamilyOf(row.Player.PrimaryPosition),
                     row.Player.PrimaryPosition == PlayerPosition.Goalkeeper,
                     gameYear - row.Player.BirthGameYear,
-                    ability.TryGetValue(row.Player.Id, out var value) ? value : WorldRuleSet.AttributeMin,
+                    ability.TryGetValue(row.Player.Id, out var shown) ? shown.Whole : WorldRuleSet.AttributeMin,
+                    shown.Tenths == 0 ? WorldRuleSet.AttributeMin * 10 : shown.Tenths,
                     row.Player.Potential,
                     row.State.MoraleBp,
                     row.State.ConditionBp,
@@ -134,8 +135,8 @@ internal sealed class ContractContinuityQueries : IContractContinuityQueries
         return result;
     }
 
-    /// <summary>Reads each player's ability, the mean of their twenty-eight attributes.</summary>
-    private async Task<Dictionary<Guid, int>> AbilityByPlayerAsync(
+    /// <summary>Reads each player's ability, the mean of their twenty-eight attributes: as a whole number, and in tenths of a point.</summary>
+    private async Task<Dictionary<Guid, (int Whole, int Tenths)>> AbilityByPlayerAsync(
         List<Guid> playerIds,
         CancellationToken cancellationToken)
     {
@@ -152,11 +153,13 @@ internal sealed class ContractContinuityQueries : IContractContinuityQueries
             row => row.PlayerId,
             row =>
             {
-                var values = row.ToSet().Values;
+                var set = row.ToSet();
 
-                return values.Count == 0
-                    ? WorldRuleSet.AttributeMin
-                    : (int)Math.Round(values.Average(), MidpointRounding.AwayFromZero);
+                return (
+                    set.Values.Count == 0
+                        ? WorldRuleSet.AttributeMin
+                        : (int)Math.Round(set.Values.Average(), MidpointRounding.AwayFromZero),
+                    set.MeanTenths);
             });
     }
 
