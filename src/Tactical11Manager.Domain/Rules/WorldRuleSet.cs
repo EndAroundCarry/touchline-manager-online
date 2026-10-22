@@ -209,8 +209,8 @@ public static class WorldRuleSet
 
         return appearances switch
         {
-            >= 20 => 11_000,
-            >= 10 => 10_500,
+            >= 18 => 11_000,
+            >= 9 => 10_500,
             >= 1 => 10_000,
             _ => 9_500,
         };

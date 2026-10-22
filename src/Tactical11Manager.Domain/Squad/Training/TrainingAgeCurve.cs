@@ -1,3 +1,5 @@
+using Tactical11Manager.Domain.Rules;
+
 namespace Tactical11Manager.Domain.Squad.Training;
 
 /// <summary>
@@ -10,8 +12,11 @@ namespace Tactical11Manager.Domain.Squad.Training;
 /// </remarks>
 public static class TrainingAgeCurve
 {
-    /// <summary>How many progression days make one season, which turns an annual figure into a daily one.</summary>
-    public const int TrainingDaysPerSeason = 86;
+    /// <summary>
+    /// How many progression days make one season, which turns an annual figure into a daily one. It is the
+    /// season cycle: one progression run a day, the whole cycle.
+    /// </summary>
+    public const int TrainingDaysPerSeason = 7 * WorldRuleSet.SeasonCycleWeeks;
 
     /// <summary>The age up to which a player trains at full speed.</summary>
     public const int PeakGrowthAge = 19;

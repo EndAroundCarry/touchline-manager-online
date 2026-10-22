@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.Squad.Training;
 using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Domain.Tests.World;
@@ -26,6 +27,27 @@ public sealed class WorldRuleSetTests
         WorldRuleSet.PromotedPerTier.Should().Be(3, "PR-1");
         WorldRuleSet.RelegatedPerTier.Should().Be(3, "PR-1");
         WorldRuleSet.GeneratorSquadTarget.Should().Be(24, "SQ-1");
+    }
+
+    [Theory]
+    [InlineData(0, 9_500)]
+    [InlineData(1, 10_000)]
+    [InlineData(8, 10_000)]
+    [InlineData(9, 10_500)]
+    [InlineData(17, 10_500)]
+    [InlineData(18, 11_000)]
+    [InlineData(30, 11_000)]
+    public void Renewal_appearance_bands_are_the_same_share_of_a_thirty_match_season(int appearances, int expectedBp)
+    {
+        // CON-3: 18 of 30 matches and 9 of 30 are the shares 20 and 10 of 34 were.
+        WorldRuleSet.RenewalAppearancesFactorBp(appearances).Should().Be(expectedBp);
+    }
+
+    [Fact]
+    public void A_training_season_is_the_whole_season_cycle()
+    {
+        // TRN-16: one progression run a day, and the yearly decline is spread over exactly the days in a season.
+        TrainingAgeCurve.TrainingDaysPerSeason.Should().Be(7 * WorldRuleSet.SeasonCycleWeeks).And.Be(77);
     }
 
     [Fact]

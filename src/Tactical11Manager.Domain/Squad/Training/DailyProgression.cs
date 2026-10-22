@@ -124,13 +124,13 @@ public sealed record DailyProgressionOutcome(
 public static class DailyProgression
 {
     /// <summary>The progression version, bumped whenever a coefficient or the draw order changes.</summary>
-    public const string Version = "training-v4";
+    public const string Version = "training-v5";
 
     /// <summary>How many thousandths of an attribute point make one displayed point (`TRN-10`).</summary>
     public const int DevelopmentBasis = 1_000;
 
     /// <summary>The development budget of a peak-age, neutral-aptitude player on normal intensity, per day.</summary>
-    public const int BaseDailyMilli = 400;
+    public const int BaseDailyMilli = 436;
 
     /// <summary>
     /// How much of the day's budget goes to the programme's attributes while the player has others left to

@@ -7,7 +7,7 @@ using Xunit.Abstractions;
 namespace Tactical11Manager.Domain.Tests.Squad;
 
 /// <summary>
-/// The deterministic daily progression, `training-v4` (`TRN-1`, `TRN-4`, `TRN-9`, `TRN-10`, `TRN-14`…`TRN-16`).
+/// The deterministic daily progression, `training-v5` (`TRN-1`, `TRN-4`, `TRN-9`, `TRN-10`, `TRN-14`…`TRN-16`).
 /// </summary>
 /// <remarks>
 /// The calculator is a pure function, so these tests need neither a clock nor a database. What they pin is
@@ -28,7 +28,7 @@ public sealed class DailyProgressionTests
     [Fact]
     public void The_version_is_training_v4()
     {
-        DailyProgression.Version.Should().Be("training-v4");
+        DailyProgression.Version.Should().Be("training-v5");
     }
 
     [Fact]
