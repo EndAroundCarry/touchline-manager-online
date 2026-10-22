@@ -416,7 +416,7 @@ internal sealed class ClubStadiumConfiguration : IEntityTypeConfiguration<ClubSt
                 "standing_seats >= 0 and seating_seats >= 0 and covered_seats >= 0 and vip_seats >= 0");
             table.HasCheckConstraint(
                 "ck_club_stadiums_capacity",
-                "standing_seats + seating_seats + covered_seats + vip_seats between 1 and 50000");
+                "standing_seats + seating_seats + covered_seats + vip_seats between 1 and 75000");
         });
 
         builder.HasKey(stadium => stadium.Id);

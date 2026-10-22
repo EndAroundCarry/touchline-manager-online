@@ -75,8 +75,8 @@ public sealed class StructureTests : IAsyncLifetime
             building.SeasonUpkeepMinor.Should().BeGreaterThanOrEqualTo(0);
         }
 
-        structures.SnackBar.SpendMinor.Should().Be(StructureRuleSet.SnackSpendMinor(structures.SnackBar.Level));
-        structures.Merchandise.SpendMinor.Should().Be(StructureRuleSet.MerchSpendMinor(structures.Merchandise.Level));
+        structures.SnackBar.SpendMinor.Should().Be(StructureRuleSet.SnackSpendMinorFor(structures.SnackBar.Level, 1));
+        structures.Merchandise.SpendMinor.Should().Be(StructureRuleSet.MerchSpendMinorFor(structures.Merchandise.Level, 1));
 
         var next = structures.SnackBar.Next;
 

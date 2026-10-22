@@ -1,4 +1,5 @@
 using Tactical11Manager.Domain.Fans;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.World;
@@ -17,6 +18,13 @@ internal abstract class EconManager
     public virtual void OnSeasonStart(EconSim sim, SimClub club)
     {
     }
+
+    /// <summary>How much stronger than its squad the club plays, in hundredths of a strength point: a stand-in for a manager who builds a great squad.</summary>
+    public virtual int StrengthBonus => 0;
+
+    /// <summary>The offer and the objective the manager signs in the first week: by default the balanced offer at the board's realistic objective.</summary>
+    public virtual (SponsorOfferKind Kind, SeasonObjective Objective) ChooseSponsor(EconSim sim, SimClub club) =>
+        (SponsorOfferKind.Balanced, EconomyRuleSet.RealisticObjectiveFor(club.TargetRank));
 
     /// <summary>Called three times a week, before the AI clubs' evaluation.</summary>
     public virtual void Act(EconSim sim, SimClub club, int week, int round)
@@ -42,7 +50,7 @@ internal static class Growth
 {
     public static void Apply(EconSim sim, SimClub club)
     {
-        var reserve = club.WageBill * (EconSim.Weeks / 2);
+        var reserve = AiFinancePolicy.ReserveMinorFor(club.WageBill);
         var surplus = club.Available - reserve;
 
         if (surplus <= 0)
@@ -60,7 +68,7 @@ internal static class Growth
 
             foreach (var stand in StadiumStands.All)
             {
-                sim.BuildPlaces(club, stand, places * StadiumRuleSet.DemandShareBp(stand) / 10_000);
+                EconSim.BuildPlaces(club, stand, places * StadiumRuleSet.DemandShareBp(stand) / 10_000);
             }
         }
 
@@ -69,35 +77,34 @@ internal static class Growth
 
     /// <summary>What a place costs on average when they are built in the proportions the crowd asks for.</summary>
     public static long AveragePlaceCost(EconSim sim, SimClub club) =>
-        StadiumStands.All.Sum(stand => (long)StadiumRuleSet.DemandShareBp(stand) * sim.Rules.BuildCostPerPlace(stand, club.Tier)) / 10_000;
+        StadiumStands.All.Sum(stand => (long)StadiumRuleSet.DemandShareBp(stand) * EconRules.BuildCostPerPlace(stand, club.Tier)) / 10_000;
 
     public static void UpgradeBuildings(EconSim sim, SimClub club, long reserve, int repaysWithinSettlements)
     {
-        var rules = sim.Rules;
-        var spectators = rules.Attendance(club.Seats, club.Fans.Fans, club.Fans.MoodBp);
+        var spectators = EconRules.Attendance(club.Seats, club.Fans.Fans, club.Fans.MoodBp);
         var word = FanMoods.WordFor(club.Fans.MoodBp);
 
         if (club.SnackLevel < StructureRuleSet.MaxLevel)
         {
-            var gain = ((rules.SnackTakings(club.SnackLevel + 1, spectators, 0) - rules.SnackTakings(club.SnackLevel, spectators, 0)) * (EconSim.Weeks / 2))
-                - ((rules.Upkeep(club.SnackLevel + 1, club.Tier) - rules.Upkeep(club.SnackLevel, club.Tier)) * EconSim.Weeks);
-            var cost = rules.UpgradeCost(club.SnackLevel + 1, club.Tier);
+            var gain = ((EconRules.SnackTakings(club.SnackLevel + 1, spectators, 0, club.Tier) - EconRules.SnackTakings(club.SnackLevel, spectators, 0, club.Tier)) * (EconSim.Weeks / 2))
+                - ((EconRules.Upkeep(club.SnackLevel + 1, club.Tier) - EconRules.Upkeep(club.SnackLevel, club.Tier)) * EconSim.Weeks);
+            var cost = EconRules.UpgradeCost(club.SnackLevel + 1, club.Tier);
 
             if (gain > 0 && cost <= gain * repaysWithinSettlements / EconSim.Weeks && club.Available - cost >= reserve)
             {
-                sim.UpgradeStructure(club, snackBar: true);
+                EconSim.UpgradeStructure(club, snackBar: true);
             }
         }
 
         if (club.MerchLevel < StructureRuleSet.MaxLevel)
         {
-            var gain = ((rules.MerchTakings(club.MerchLevel + 1, club.Fans.Fans, word) - rules.MerchTakings(club.MerchLevel, club.Fans.Fans, word)) * EconSim.Weeks)
-                - ((rules.Upkeep(club.MerchLevel + 1, club.Tier) - rules.Upkeep(club.MerchLevel, club.Tier)) * EconSim.Weeks);
-            var cost = rules.UpgradeCost(club.MerchLevel + 1, club.Tier);
+            var gain = ((EconRules.MerchTakings(club.MerchLevel + 1, club.Fans.Fans, word, club.Tier) - EconRules.MerchTakings(club.MerchLevel, club.Fans.Fans, word, club.Tier)) * EconSim.Weeks)
+                - ((EconRules.Upkeep(club.MerchLevel + 1, club.Tier) - EconRules.Upkeep(club.MerchLevel, club.Tier)) * EconSim.Weeks);
+            var cost = EconRules.UpgradeCost(club.MerchLevel + 1, club.Tier);
 
             if (gain > 0 && cost <= gain * repaysWithinSettlements / EconSim.Weeks && club.Available - cost >= reserve)
             {
-                sim.UpgradeStructure(club, snackBar: false);
+                EconSim.UpgradeStructure(club, snackBar: false);
             }
         }
     }
@@ -119,7 +126,7 @@ internal sealed class PrudentBuilder(string name) : EconManager
         {
             var surplus = club.Squad.Where(player => !player.IsGoalkeeper).OrderBy(player => player.Ability).ThenBy(player => player.Id).First();
 
-            sim.ListPlayer(club, surplus, sim.Rules.Value(surplus.Ability, surplus.Potential, surplus.AgeIn(sim.GameYear), club.Tier), 2);
+            sim.ListPlayer(club, surplus, EconRules.Value(surplus.AbilityTenths, surplus.AgeIn(sim.GameYear)), 2);
         }
 
         if (club.Squad.Count >= 25 || sim.Listings.Count(listing => listing.LeadingClub == club) >= 2)
@@ -127,8 +134,8 @@ internal sealed class PrudentBuilder(string name) : EconManager
             return;
         }
 
-        var budget = sim.ForecastSeasonIncome(club) * WageBudgetBp / 10_000 / EconSim.Weeks;
-        var reserve = bill * (EconSim.Weeks / 4);
+        var budget = EconomyRuleSet.WageBudgetMinorFor(club.Forecast);
+        var reserve = bill / 4;
         SimListing? best = null;
         var bestGain = 0;
         var bestFee = 0L;
@@ -163,6 +170,26 @@ internal sealed class PrudentBuilder(string name) : EconManager
     public override void OnWeekEnd(EconSim sim, SimClub club, int week) => Growth.Apply(sim, club);
 }
 
+/// <summary>
+/// A dominant club: the prudent builder's money habits with a squad that wins more than its players say. It stands in for a manager who has built a
+/// great side, so the economy can be read where the plan expects the dominant clubs to be.
+/// </summary>
+internal sealed class Dynasty : EconManager
+{
+    private readonly PrudentBuilder _inner = new("Dynasty");
+
+    public override string Name => "Dynasty";
+
+    public override int StrengthBonus => 250;
+
+    public override (SponsorOfferKind Kind, SeasonObjective Objective) ChooseSponsor(EconSim sim, SimClub club) =>
+        (SponsorOfferKind.Performance, EconomyRuleSet.RealisticObjectiveFor(club.TargetRank));
+
+    public override void Act(EconSim sim, SimClub club, int week, int round) => _inner.Act(sim, club, week, round);
+
+    public override void OnWeekEnd(EconSim sim, SimClub club, int week) => _inner.OnWeekEnd(sim, club, week);
+}
+
 /// <summary>Buys young players whose ceiling is well above their skill, trains them, and sells them on at their peak. Knows every hidden ceiling.</summary>
 internal sealed class Trader : EconManager
 {
@@ -178,7 +205,7 @@ internal sealed class Trader : EconManager
 
             if (age >= 24 || player.Ability >= player.Potential - 1)
             {
-                sim.ListPlayer(club, player, sim.Rules.Value(player.Ability, player.Potential, age, club.Tier) * 90 / 100, 2);
+                sim.ListPlayer(club, player, EconRules.Value(player.AbilityTenths, age) * 90 / 100, 2);
             }
         }
 
@@ -189,7 +216,7 @@ internal sealed class Trader : EconManager
             return;
         }
 
-        var budget = sim.ForecastSeasonIncome(club) * PrudentBuilder.WageBudgetBp / 10_000 / EconSim.Weeks;
+        var budget = EconomyRuleSet.WageBudgetMinorFor(club.Forecast);
         SimListing? best = null;
         var bestScore = 0.0;
         var bestFee = 0L;
@@ -205,7 +232,7 @@ internal sealed class Trader : EconManager
                 continue;
             }
 
-            var score = headroom * 1_000_000.0 / (fee + (listing.BuyerWage * EconSim.Weeks));
+            var score = headroom * 1_000_000.0 / (fee + listing.BuyerWage);
 
             if (score > bestScore)
             {
@@ -239,6 +266,9 @@ internal sealed class OverAmbitious : EconManager
 {
     public override string Name => "Over-ambitious";
 
+    public override (SponsorOfferKind Kind, SeasonObjective Objective) ChooseSponsor(EconSim sim, SimClub club) =>
+        (SponsorOfferKind.Performance, SeasonObjective.WinLeague);
+
     public override void Act(EconSim sim, SimClub club, int week, int round)
     {
         if (round != 0 || week % 4 != 0)
@@ -269,17 +299,17 @@ internal sealed class OverAmbitious : EconManager
 
             foreach (var stand in StadiumStands.All)
             {
-                sim.BuildPlaces(club, stand, places * StadiumRuleSet.DemandShareBp(stand) / 10_000);
+                EconSim.BuildPlaces(club, stand, places * StadiumRuleSet.DemandShareBp(stand) / 10_000);
             }
 
             return;
         }
 
-        while (club.SnackLevel < 5 && sim.UpgradeStructure(club, snackBar: true))
+        while (club.SnackLevel < 5 && EconSim.UpgradeStructure(club, snackBar: true))
         {
         }
 
-        while (club.MerchLevel < 5 && sim.UpgradeStructure(club, snackBar: false))
+        while (club.MerchLevel < 5 && EconSim.UpgradeStructure(club, snackBar: false))
         {
         }
     }
@@ -302,10 +332,11 @@ internal sealed class BigSpender(string name, int stars) : EconManager
         if (club.Squad.Count(player => player.Ability >= 15) < stars && club.Squad.Count < 26)
         {
             // The best the cash buys, within a fee that is not above a fifth of a star's worth more than the cash needs.
-            sim.Poach(club, minAbility: 15, maxAge: 29, maxFee: club.Available);
+            // The fee is the scenario's to pay: the test is what the wages do to a club, not whether it can find the cash for a star.
+            sim.Poach(club, minAbility: 15, maxAge: 29, maxFee: long.MaxValue, endow: true);
         }
     }
 
     public override void OnSigned(EconSim sim, SimClub club, SimPlayer player, long fee, SimListing? listing) =>
-        sim.Note(club, $"signed {sim.Describe(player)} for {fee / 100:N0} on {player.Wage * EconSim.Weeks / 100:N0} a season");
+        sim.Note(club, $"signed {sim.Describe(player)} for {fee / 100:N0} on {player.Wage / 100:N0} a season");
 }

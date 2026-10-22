@@ -4,6 +4,7 @@ using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Contracts.Squad;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 
 namespace Tactical11Manager.Application.Squad;
@@ -119,7 +120,7 @@ public sealed class RenewContract
             context.ClubId,
             start,
             end,
-            terms.WeeklyWageMinor,
+            EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
             context.SquadStatus,
             now);
 
@@ -154,7 +155,7 @@ public sealed class RenewContract
                 seasons,
                 start,
                 end,
-                terms.WeeklyWageMinor,
+                EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
                 renewed.Version,
                 now));
     }

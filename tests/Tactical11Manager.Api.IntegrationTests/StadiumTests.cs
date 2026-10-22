@@ -59,8 +59,8 @@ public sealed class StadiumTests : IAsyncLifetime
             .Should().Equal("standing", "seating", "covered_seating", "vip");
         stadium.Capacity.Should().Be(stadium.Stands.Sum(stand => stand.Seats), "the ground is its four stands");
         stadium.Level.Should().Be((stadium.Capacity + 4_999) / 5_000, "the level is the number of 5,000-place blocks");
-        stadium.MaxLevel.Should().Be(10);
-        stadium.MaxCapacity.Should().Be(50_000);
+        stadium.MaxLevel.Should().Be(15);
+        stadium.MaxCapacity.Should().Be(75_000);
 
         stadium.Stands.Select(stand => stand.TicketPriceMinor)
             .Should().BeInAscendingOrder("a better place costs more").And.OnlyHaveUniqueItems();

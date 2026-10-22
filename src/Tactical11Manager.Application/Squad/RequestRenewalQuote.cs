@@ -1,6 +1,7 @@
 using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Contracts.Squad;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 
 namespace Tactical11Manager.Application.Squad;
@@ -85,7 +86,7 @@ public sealed class RequestRenewalQuote
             seasons,
             start,
             start + seasons - 1,
-            terms.WeeklyWageMinor,
+            EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
             context.ContractVersion,
             now);
     }

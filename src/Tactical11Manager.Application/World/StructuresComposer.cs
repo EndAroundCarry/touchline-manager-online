@@ -83,13 +83,13 @@ public sealed class StructuresComposer
             Describe(
                 snackBar,
                 context.TierNumber,
-                level => StructureRuleSet.SnackWeeklyEstimateMinorFor(level, spectators),
+                level => StructureRuleSet.SnackWeeklyEstimateMinorFor(level, spectators, context.TierNumber),
                 SnackBonuses(snackHistory),
                 snackHistory),
             Describe(
                 merchandise,
                 context.TierNumber,
-                level => StructureRuleSet.MerchWeeklyEstimateMinorFor(level, context.Fans, mood),
+                level => StructureRuleSet.MerchWeeklyEstimateMinorFor(level, context.Fans, mood, context.TierNumber),
                 MerchandiseBonuses(mood),
                 merchandiseHistory),
             _clock.UtcNow);
@@ -104,8 +104,8 @@ public sealed class StructuresComposer
     {
         var level = building.Level;
         var spend = building.Kind == StructureKind.SnackBar
-            ? StructureRuleSet.SnackSpendMinor(level)
-            : StructureRuleSet.MerchSpendMinor(level);
+            ? StructureRuleSet.SnackSpendMinorFor(level, tier)
+            : StructureRuleSet.MerchSpendMinorFor(level, tier);
         var upkeep = StructureRuleSet.UpkeepMinorFor(level, tier);
 
         StructureNextLevelResponse? next = null;
@@ -119,8 +119,8 @@ public sealed class StructuresComposer
             next = new StructureNextLevelResponse(
                 target,
                 building.Kind == StructureKind.SnackBar
-                    ? StructureRuleSet.SnackSpendMinor(target)
-                    : StructureRuleSet.MerchSpendMinor(target),
+                    ? StructureRuleSet.SnackSpendMinorFor(target, tier)
+                    : StructureRuleSet.MerchSpendMinorFor(target, tier),
                 nextUpkeep,
                 StructureRuleSet.UpgradeCostMinorFor(target, tier),
                 StructureRuleSet.BuildDaysFor(target),

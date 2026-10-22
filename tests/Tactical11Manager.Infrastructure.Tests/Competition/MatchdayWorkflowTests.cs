@@ -613,7 +613,7 @@ public sealed class MatchdayWorkflowTests
             row.AmountMinor.Should().Be(entry.CashDeltaMinor);
             row.BonusBp.Should().Be(bonus.Bp);
             row.AmountMinor.Should().Be(StructureRuleSet.WithBonus(row.BaseMinor, bonus.Bp));
-            row.BaseMinor.Should().Be(StructureRuleSet.SnackBaseMinorFor(row.Level, row.Customers));
+            row.BaseMinor.Should().Be(StructureRuleSet.SnackBaseMinorFor(row.Level, row.Customers, 1));
         }
 
         // A republication returns before it posts, so the round's takings cannot be drawn twice (FIN-17).

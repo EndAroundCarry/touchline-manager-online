@@ -12,7 +12,9 @@ namespace Tactical11Manager.Domain.Tests.Market;
 /// The policy is a pure function, so these tests need neither a clock nor a database. What they pin is the
 /// contract the evaluator depends on: the same club and market decide the same way, a club only sells what
 /// is surplus and never below a legal squad, a club only buys where it has a need and never above its
-/// valuation or budget, and every list is bounded.
+/// valuation or budget, and every list is bounded. Version 2 adds the wages: a club only buys what its wage
+/// budget and its reserve allow, a club in the red buys nothing, and a club over budget sells its best-paid
+/// player first.
 /// </remarks>
 public sealed class AiMarketPolicyTests
 {
@@ -71,8 +73,8 @@ public sealed class AiMarketPolicyTests
         // the policy skips them and sells from the outfield instead.
         var squad = new List<AiMarketPlayer>
         {
-            Player(1, PositionFamily.Goalkeeper, ability: 5, status: SquadStatus.Prospect, potential: 5),
-            Player(2, PositionFamily.Goalkeeper, ability: 5, status: SquadStatus.Prospect, potential: 5),
+            Player(1, PositionFamily.Goalkeeper, ability: 5, status: SquadStatus.Prospect),
+            Player(2, PositionFamily.Goalkeeper, ability: 5, status: SquadStatus.Prospect),
         };
 
         for (var ordinal = 3; ordinal <= 22; ordinal++)
@@ -163,8 +165,8 @@ public sealed class AiMarketPolicyTests
         var squad = Squad(Composition(goalkeepers: 3, defenders: 7, midfielders: 6, attackers: 5));
 
         // A fee far above the valuation is refused; a fee below it is bid.
-        var tooDear = MidfieldListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 50_000_000);
-        var reasonable = MidfieldListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 500_000);
+        var tooDear = MidfieldListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 5_000_000_000);
+        var reasonable = MidfieldListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 50_000_000);
 
         var plan = AiMarketPolicy.Decide(Club(ClubId(1), squad), [tooDear, reasonable]);
 
@@ -180,7 +182,7 @@ public sealed class AiMarketPolicyTests
 
         // Half of a million is 500,000, below the floor, so a cash-poor club does not bid.
         var poor = AiMarketPolicy.Decide(Club(ClubId(1), squad, spendable: 1_000_000), [listing]);
-        var rich = AiMarketPolicy.Decide(Club(ClubId(1), squad, spendable: 50_000_000), [listing]);
+        var rich = AiMarketPolicy.Decide(Club(ClubId(1), squad, spendable: 5_000_000_000), [listing]);
 
         poor.Bids.Should().BeEmpty("the budget band stops a club spending money it needs (FIN-10)");
         rich.Bids.Should().ContainSingle();
@@ -205,6 +207,60 @@ public sealed class AiMarketPolicyTests
         plan.Bids.Should().HaveCount(WorldRuleSet.AiMarketMaxBidsPerClub);
     }
 
+    [Fact]
+    public void A_club_in_the_red_bids_on_nothing()
+    {
+        var squad = Squad(Composition(goalkeepers: 3, defenders: 7, midfielders: 6, attackers: 5));
+        var listing = MidfieldListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 1_000_000);
+
+        var healthy = AiMarketPolicy.Decide(Club(ClubId(1), squad), [listing]);
+        var red = AiMarketPolicy.Decide(Club(ClubId(1), squad, finances: Finances() with { InTheRed = true }), [listing]);
+
+        healthy.Bids.Should().ContainSingle();
+        red.Bids.Should().BeEmpty("a club in the red has a transfer embargo (DEBT-1)");
+    }
+
+    [Fact]
+    public void A_club_does_not_bid_when_the_wage_would_break_its_budget()
+    {
+        var squad = Squad(Composition(goalkeepers: 3, defenders: 7, midfielders: 6, attackers: 5));
+        var listing = MidfieldListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 1_000_000, buyerWage: 400_000_000);
+
+        var room = AiMarketPolicy.Decide(Club(ClubId(1), squad, finances: Finances(bill: 500_000_000, budget: 1_000_000_000)), [listing]);
+        var none = AiMarketPolicy.Decide(Club(ClubId(1), squad, finances: Finances(bill: 700_000_000, budget: 1_000_000_000)), [listing]);
+
+        room.Bids.Should().ContainSingle();
+        none.Bids.Should().BeEmpty("the wage bill with the player on it would be 11M against a budget of 10M");
+    }
+
+    [Fact]
+    public void A_club_keeps_its_reserve_of_cash()
+    {
+        var squad = Squad(Composition(goalkeepers: 3, defenders: 7, midfielders: 6, attackers: 5));
+        var listing = MidfieldListing(Guid.CreateVersion7(), Guid.CreateVersion7(), fee: 100_000_000);
+
+        var noReserve = AiMarketPolicy.Decide(Club(ClubId(1), squad, spendable: 400_000_000), [listing]);
+        var reserve = AiMarketPolicy.Decide(Club(ClubId(1), squad, spendable: 400_000_000, finances: Finances(reserve: 350_000_000)), [listing]);
+
+        noReserve.Bids.Should().ContainSingle();
+        reserve.Bids.Should().BeEmpty("the bid would leave less cash than the club keeps back");
+    }
+
+    [Fact]
+    public void A_club_over_its_wage_budget_lists_its_best_paid_player_first()
+    {
+        // The squad is one above the target, so within its budget the club lists its weakest player; over it, the best paid goes first.
+        var squad = FullSquad().Select((player, index) => player with { SeasonWageMinor = 10_000_000 + (index * 1_000_000) }).ToList();
+        var best = squad[^1];
+
+        var within = AiMarketPolicy.Decide(Club(ClubId(1), squad, finances: Finances(bill: 100_000_000, budget: 900_000_000)), []);
+        var over = AiMarketPolicy.Decide(Club(ClubId(1), squad, finances: Finances(bill: 900_000_000, budget: 100_000_000)), []);
+
+        within.Listings.Should().ContainSingle().Which.PlayerId.Should().NotBe(best.PlayerId);
+        over.Listings.Should().NotBeEmpty();
+        over.Listings[0].PlayerId.Should().Be(best.PlayerId);
+    }
+
     private static PositionFamily[] Composition(int goalkeepers, int defenders, int midfielders, int attackers) =>
     [
         .. Enumerable.Repeat(PositionFamily.Goalkeeper, goalkeepers),
@@ -225,14 +281,13 @@ public sealed class AiMarketPolicyTests
     private static List<AiMarketPlayer> Squad(
         PositionFamily[] families,
         int ability = 12,
-        int potential = 12,
         int age = 25)
     {
         var players = new List<AiMarketPlayer>(families.Length);
 
         for (var index = 0; index < families.Length; index++)
         {
-            players.Add(Player(index + 1, families[index], ability, SquadStatus.Rotation, potential, age));
+            players.Add(Player(index + 1, families[index], ability, SquadStatus.Rotation, age));
         }
 
         return players;
@@ -243,28 +298,35 @@ public sealed class AiMarketPolicyTests
         PositionFamily family,
         int ability,
         SquadStatus status,
-        int potential = 12,
         int age = 25) =>
         new(
             PlayerId(ordinal),
             family,
-            ability,
-            potential,
+            ability * 10,
             age,
             status,
-            ContractEndSeasonNumber: 3,
+            3,
             CurrentSeasonNumber: 1,
-            IsListed: false);
+            IsListed: false,
+            SeasonWageMinor: 20_000_000);
 
-    private static AiMarketClub Club(Guid clubId, IReadOnlyList<AiMarketPlayer> players, long spendable = 50_000_000) =>
-        new(clubId, Tier: 1, spendable, players);
+    private static AiMarketFinances Finances(long bill = 0, long budget = long.MaxValue, long reserve = 0) =>
+        new(bill, budget, reserve, InTheRed: false);
+
+    private static AiMarketClub Club(
+        Guid clubId,
+        IReadOnlyList<AiMarketPlayer> players,
+        long spendable = 5_000_000_000,
+        AiMarketFinances? finances = null) =>
+        new(clubId, spendable, finances ?? Finances(), players);
 
     private static AiMarketListing MidfieldListing(
         Guid listingId,
         Guid sellerClub,
         long fee,
-        Guid? leadingClubId = null) =>
-        Listing(listingId, sellerClub, PositionFamily.Midfield, fee, leadingClubId);
+        Guid? leadingClubId = null,
+        long buyerWage = 20_000_000) =>
+        Listing(listingId, sellerClub, PositionFamily.Midfield, fee, leadingClubId, buyerWage);
 
     private static AiMarketListing AttackListing(Guid listingId, Guid sellerClub, long fee) =>
         Listing(listingId, sellerClub, PositionFamily.Attack, fee);
@@ -274,18 +336,19 @@ public sealed class AiMarketPolicyTests
         Guid sellerClub,
         PositionFamily family,
         long fee,
-        Guid? leadingClubId = null) =>
+        Guid? leadingClubId = null,
+        long buyerWage = 20_000_000) =>
         new(
             listingId,
             sellerClub,
             leadingClubId,
             PlayerId(900),
             family,
-            Ability: 12,
-            Potential: 12,
+            AbilityTenths: 120,
             Age: 25,
             MinimumFeeMinor: fee,
-            LeadingAmountMinor: null);
+            LeadingAmountMinor: null,
+            BuyerSeasonWageMinor: buyerWage);
 
     private static Guid ClubId(int index) => Guid.Parse($"0192f100-0000-7000-8000-{index:D12}");
 

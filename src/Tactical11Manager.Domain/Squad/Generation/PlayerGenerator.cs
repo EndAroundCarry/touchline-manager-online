@@ -178,7 +178,7 @@ public static class PlayerGenerator
                     request.ClubId,
                     request.SeasonNumber,
                     request.SeasonNumber + draft.ContractSeasons - 1,
-                    WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean, request.Tier),
+                    WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean),
                     statuses[index],
                     request.Now),
                 PlayerRegistration.Register(
@@ -284,7 +284,7 @@ public static class PlayerGenerator
                 clubId,
                 seasonNumber,
                 seasonNumber,
-                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean, tier),
+                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean),
                 SquadStatus.Prospect,
                 now),
             PlayerRegistration.Register(
@@ -370,7 +370,7 @@ public static class PlayerGenerator
                 clubId,
                 seasonNumber,
                 seasonNumber + WorldRuleSet.ContractMaxSeasons - 1,
-                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean, tier),
+                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean),
                 SquadStatus.Prospect,
                 now),
             PlayerRegistration.Register(

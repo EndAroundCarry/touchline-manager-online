@@ -36,7 +36,7 @@ public sealed class MatchdayFinancesTests
         await run.PostAsync();
 
         var spectators = StadiumRuleSet.AttendanceFor(Ground, 10_000, 5_000);
-        var expected = StructureRuleSet.SnackTakingsMinorFor(1, spectators, 3_000);
+        var expected = StructureRuleSet.SnackTakingsMinorFor(1, spectators, 3_000, tier: 1);
 
         spectators.Should().BeGreaterThan(0);
 
@@ -53,7 +53,7 @@ public sealed class MatchdayFinancesTests
         row.RowKind.Should().Be(StructureTakingsKind.MatchSale);
         row.FixtureId.Should().Be(run.Fixture.Id);
         row.Customers.Should().Be(spectators);
-        row.BaseMinor.Should().Be(spectators * StructureRuleSet.SnackSpendMinor(1));
+        row.BaseMinor.Should().Be(spectators * StructureRuleSet.SnackSpendMinorFor(1, 1));
         row.BonusBp.Should().Be(3_000);
         row.BonusReason.Should().Be("underdog_win");
         row.AmountMinor.Should().Be(expected);
@@ -108,7 +108,7 @@ public sealed class MatchdayFinancesTests
         var row = run.Structures.Takings.Should().ContainSingle().Which;
 
         row.Level.Should().Be(5);
-        row.BaseMinor.Should().Be(row.Customers * StructureRuleSet.SnackSpendMinor(5));
+        row.BaseMinor.Should().Be(row.Customers * StructureRuleSet.SnackSpendMinorFor(5, 1));
     }
 
     [Fact]

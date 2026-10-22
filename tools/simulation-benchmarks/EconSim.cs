@@ -1,6 +1,7 @@
 using System.Globalization;
 using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Domain.Fans;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Generation;
@@ -10,15 +11,15 @@ using Tactical11Manager.Domain.World.Generation;
 
 namespace Tactical11Manager.SimulationBenchmarks;
 
-// The economy sandbox (plan toasty-scott, Milestone 0): one country of four tiers of 18 clubs, ten seasons, in weekly steps.
+// The economy sandbox (plan toasty-scott, Milestones 0 and 1): one country of four tiers of 18 clubs, ten seasons, in matchday steps.
 //
-// It calls the game's own pure rule code (fans, stadium, structures, valuation, renewal quote, daily training, retirement, the AI contract and
-// market policies, the generators, promotion and relegation) and replaces only what is not pure: the match engine is replaced by the fans' own
-// win/draw/loss curve (FanRuleSet, fitted to 1,800 tick-engine matches), the database by the classes in EconModel.cs, and the auction by a
-// highest-bid-wins round. The money formulas go through IEconRules so the same world can be run on the v2 rules in Milestone 1.
+// It calls the game's own pure rule code (fans, stadium, structures, valuation, renewal quote, daily training, retirement, the AI contract, market and
+// finance policies, the sponsor, standing and debt rules, the generators, promotion and relegation) and replaces only what is not pure: the match engine
+// is replaced by the fans' own win/draw/loss curve (FanRuleSet, fitted to 1,800 tick-engine matches), the database by the classes in EconModel.cs, and
+// the auction by a highest-bid-wins round. The money formulas go through EconRules.
 //
-// One simulated week = one matchday. A week has three market rounds (a listing is open for at least one round, about two and a half days, like the
-// game's 48-hour minimum), then the matchday, then the Sunday finance run and the fans' weekly review.
+// One simulated week = one matchday. A matchday has three market rounds (a listing is open for at least one round, about the game's 48-hour minimum),
+// then the match, then the settlement of every club's money (league money, sponsor, wages, the shop, costs) and the fans' review.
 internal sealed partial class EconSim
 {
     public const int Tiers = 4;
@@ -42,9 +43,8 @@ internal sealed partial class EconSim
     private int _replacementOrdinal;
     private int _listingOrdinal;
 
-    public EconSim(IEconRules rules, ulong seed, int seasons, int youthPerClub = EconSim.DefaultYouthPerAiClub, int trainingPercent = 100)
+    public EconSim(ulong seed, int seasons, int youthPerClub = EconSim.DefaultYouthPerAiClub, int trainingPercent = 100)
     {
-        Rules = rules;
         YouthPerClub = youthPerClub;
         TrainingPercent = trainingPercent;
         Seed = seed;
@@ -61,7 +61,9 @@ internal sealed partial class EconSim
                 Guid = MakeGuid(1, ordinal),
                 Name = string.Create(CultureInfo.InvariantCulture, $"T{tier}-{(ordinal % ClubsPerTier) + 1:00}"),
                 Tier = tier,
-                Cash = rules.OpeningCash(tier),
+                Cash = EconRules.OpeningCash(tier),
+                StandingCentis = ClubStanding.OpeningCentis(tier),
+                Temperament = TemperamentOf(seed, ordinal),
                 Fans = FanRuleSet.OpeningFor(tier),
                 Seats = new StadiumSeats(
                     StadiumRuleSet.OpeningStanding,
@@ -72,27 +74,61 @@ internal sealed partial class EconSim
 
             Clubs.Add(club);
 
-            var request = new SquadGenerationRequest(
-                _seedText, NamePool, CountryCode, _worldId, club.Guid, ordinal, tier, MakeGuid(2, 1), 1, GameYearBase, Now);
-
-            foreach (var member in PlayerGenerator.GenerateSquad(request))
+            foreach (var player in SizedSquad(
+                club,
+                draw => new SquadGenerationRequest(_seedText, NamePool, CountryCode, _worldId, club.Guid, ordinal + (draw * 1_000), tier, MakeGuid(2, 1), 1, GameYearBase, Now),
+                EconomyRuleSet.SeededWageBandLowBp,
+                EconomyRuleSet.SeededWageBandHighBp))
             {
-                var player = FromGenerated(member.Player, member.Attributes, member.State, gem: false);
-
-                player.Club = club;
-                player.Wage = Rules.GeneratedWagePerWeek(player.Ability, tier);
-                player.ContractEnd = member.Contract.EndSeasonNumber;
-                player.Status = member.Contract.SquadStatus;
                 club.Squad.Add(player);
                 Opening.Add((player.AgeIn(GameYearBase), player.Ability, player.Potential, player.OwnSkill));
             }
         }
     }
 
+    /// <summary>
+    /// A squad for a club whose wages come to a band of a fresh club's income forecast: the generator's draws are tried in turn and the first inside
+    /// the band is kept, or the nearest (plan section 8; the world seeder does the same for every club).
+    /// </summary>
+    private List<SimPlayer> SizedSquad(SimClub club, Func<int, SquadGenerationRequest> request, int lowBp, int highBp)
+    {
+        List<SimPlayer>? best = null;
+        var bestDistance = long.MaxValue;
+
+        for (var draw = 0; draw < EconomyRuleSet.SquadSizingDraws; draw++)
+        {
+            var squad = new List<SimPlayer>();
+
+            foreach (var member in PlayerGenerator.GenerateSquad(request(draw)))
+            {
+                var player = FromGenerated(member.Player, member.Attributes, member.State, gem: false);
+
+                player.Club = club;
+                player.Wage = EconRules.GeneratedWage(player.Ability);
+                player.ContractEnd = member.Contract.EndSeasonNumber;
+                player.Status = member.Contract.SquadStatus;
+                squad.Add(player);
+            }
+
+            var distance = EconomyRuleSet.WageBandDistanceMinor(club.Tier, squad.Sum(player => player.Wage), lowBp, highBp);
+
+            if (distance < bestDistance)
+            {
+                best = squad;
+                bestDistance = distance;
+            }
+
+            if (distance == 0)
+            {
+                break;
+            }
+        }
+
+        return best!;
+    }
+
     /// <summary>Each player's age, skill and ceiling when the world opened, for the age profile in the report.</summary>
     public List<(int Age, int Ability, int Potential, double Own)> Opening { get; } = [];
-
-    public IEconRules Rules { get; }
 
     public ulong Seed { get; }
 
@@ -134,6 +170,9 @@ internal sealed partial class EconSim
 
     /// <summary>The cleaned-up record of a clean start, for the report.</summary>
     public List<string> CleanStarts { get; } = [];
+
+    /// <summary>The wage bill of each clean start as a share of a fresh club's season income forecast.</summary>
+    public List<double> CleanStartWageShares { get; } = [];
 
     public static Guid MakeGuid(int kind, int a, int b = 0)
     {
@@ -177,6 +216,13 @@ internal sealed partial class EconSim
         {
             club.ResetSeason();
             club.ShadowMin = club.ShadowCash;
+
+            if (club.PendingParachute > 0)
+            {
+                club.Cash += club.PendingParachute;
+                club.Books.Parachute += club.PendingParachute;
+                club.PendingParachute = 0;
+            }
         }
 
         if (Season == CleanStartSeason)
@@ -202,9 +248,23 @@ internal sealed partial class EconSim
             PickManagers();
         }
 
-        foreach (var club in Clubs.Where(club => club.Manager is not null))
+        foreach (var club in Clubs.Where(club => club.Managed))
         {
             club.Manager!.OnSeasonStart(this, club);
+        }
+
+        SignSponsors();
+
+        if (Environment.GetEnvironmentVariable("ECON_DEBUG") == "1" && Season == 1)
+        {
+            foreach (var tier in Enumerable.Range(1, Tiers))
+            {
+                var club = Tier(tier).First(candidate => !candidate.Managed);
+
+                Console.WriteLine(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"debug tier {tier} {club.Name}: bill {club.WageBill / 100:N0}, forecast {club.Forecast / 100:N0}, squad {string.Join(" ", club.Squad.OrderByDescending(player => player.AbilityTenths).Select(player => $"{player.AbilityTenths / 10.0:0.0}/{player.Wage / 100000.0:0}k"))}"));
+            }
         }
     }
 
@@ -221,7 +281,7 @@ internal sealed partial class EconSim
 
             ResolveListings();
 
-            foreach (var club in Clubs.Where(club => club.Manager is not null))
+            foreach (var club in Clubs.Where(club => club.Managed))
             {
                 club.Manager!.Act(this, club, Week, RoundInWeek);
             }
@@ -235,14 +295,21 @@ internal sealed partial class EconSim
 
         foreach (var club in Clubs)
         {
-            SettleWeek(club);
+            SettleMatchday(club);
         }
 
         FanReview();
 
-        foreach (var club in Clubs.Where(club => club.Manager is not null))
+        foreach (var club in Clubs)
         {
-            club.Manager!.OnWeekEnd(this, club, Week);
+            if (club.Managed)
+            {
+                club.Manager!.OnWeekEnd(this, club, Week);
+            }
+            else
+            {
+                AiGrowth(club);
+            }
         }
     }
 
@@ -273,7 +340,7 @@ internal sealed partial class EconSim
     {
         foreach (var club in Clubs)
         {
-            club.Strength = TeamStrength.OfSquad([.. club.Squad.Select(player => player.ToAi())]);
+            club.Strength = TeamStrength.OfSquad([.. club.Squad.Select(player => player.ToAi())]) + (club.Managed ? club.Manager!.StrengthBonus : 0);
         }
     }
 
@@ -342,10 +409,10 @@ internal sealed partial class EconSim
         var (goalsHome, goalsAway) = DrawScore(home, away);
 
         // The gate and the snack bar are posted before the fans move, from the fans and the mood the match was played in front of.
-        var gate = Rules.Gate(home.Seats, home.Tier, home.Fans.Fans, home.Fans.MoodBp);
-        var spectators = Rules.Attendance(home.Seats, home.Fans.Fans, home.Fans.MoodBp);
+        var gate = EconRules.Gate(home.Seats, home.Tier, home.Fans.Fans, home.Fans.MoodBp);
+        var spectators = EconRules.Attendance(home.Seats, home.Fans.Fans, home.Fans.MoodBp);
         var bonus = StructureRuleSet.ResultBonusFor(goalsHome, goalsAway, expectedHome);
-        var snack = Rules.SnackTakings(home.SnackLevel, spectators, bonus.Bp);
+        var snack = EconRules.SnackTakings(home.SnackLevel, spectators, bonus.Bp, home.Tier);
 
         home.Cash += gate + snack;
         home.Books.Gate += gate;
@@ -436,42 +503,40 @@ internal sealed partial class EconSim
 
     // ---- the Sunday finance run and the fans' review -----------------------------------------------------------------------------------
 
-    private void SettleWeek(SimClub club)
+    /// <summary>One matchday's settlement of a club's money: league money, the sponsor's fixed part, wages, the shop and the costs (plan section 2).</summary>
+    private void SettleMatchday(SimClub club)
     {
         var books = club.Books;
-        var fixedIncome = Rules.FixedIncomePerWeek(club.Tier);
-        var merch = Rules.MerchTakings(club.MerchLevel, club.Fans.Fans, FanMoods.WordFor(club.Fans.MoodBp));
+        var tv = EconRules.TvPerMatchday(club.Tier);
+        var sponsor = club.HasSponsor ? EconomyRuleSet.PerMatchday(club.SponsorFixedSeason) : 0;
+        var merch = EconRules.MerchTakings(club.MerchLevel, club.Fans.Fans, FanMoods.WordFor(club.Fans.MoodBp), club.Tier);
 
-        club.Cash += fixedIncome + merch;
-        books.Fixed += fixedIncome;
+        club.Cash += tv + sponsor + merch;
+        books.Tv += tv;
+        books.Sponsor += sponsor;
         books.Merch += merch;
 
-        var wages = club.WageBill;
-        var operating = Rules.OperatingPerWeek(club.Tier);
-        var upkeep = Rules.Upkeep(club.SnackLevel, club.Tier) + Rules.Upkeep(club.MerchLevel, club.Tier);
-        var outgoings = wages + operating + upkeep;
+        var wages = club.WageBill / Weeks;
+        var operating = EconRules.OperatingPerMatchday(club.Tier);
+        var upkeep = EconRules.Upkeep(club.SnackLevel, club.Tier) + EconRules.Upkeep(club.MerchLevel, club.Tier) + EconRules.GroundUpkeepPerMatchday(club.Seats, club.Tier);
 
-        // The week's credit is in the account before the guard reads it; what cannot be paid is granted (FIN-16).
-        var limit = Rules.OverdraftLimit(ForecastSeasonIncome(club));
-        var shortfall = outgoings - (club.Available + limit);
-
-        if (shortfall > 0)
-        {
-            club.Cash += shortfall;
-            club.GrantsTotal += shortfall;
-            books.Grants += shortfall;
-        }
-
-        club.Cash -= outgoings;
+        // Only the recurring costs may take a club below zero (plan section 6); the state machine reads the result.
+        club.Cash -= wages + operating + upkeep;
         books.Wages += wages;
         books.Operating += operating;
         books.Upkeep += upkeep;
 
         foreach (var player in club.Squad.Where(player => player.BoughtFee > 0))
         {
-            player.WagesSinceBought += player.Wage;
+            player.WagesSinceBought += player.Wage / Weeks;
         }
 
+        if (Week == (Weeks / 2) - 1)
+        {
+            club.Forecast = ForecastSeasonIncome(club);
+        }
+
+        ReadFinancialState(club);
         club.ShadowMin = Math.Min(club.ShadowMin, club.ShadowCash);
     }
 
@@ -502,17 +567,24 @@ internal sealed partial class EconSim
 
     // ---- what a club can expect -------------------------------------------------------------------------------------------------------
 
-    /// <summary>A season's income from now on the club's present fans and ground: the league and sponsor money, the gate and snack bar of 17 home matches and the shop.</summary>
-    public long ForecastSeasonIncome(SimClub club)
-    {
-        var fans = club.Fans.Fans;
-        var mood = club.Fans.MoodBp;
-        var spectators = Rules.Attendance(club.Seats, fans, mood);
+    /// <summary>A season's income on the club's present fans and ground: the league and sponsor money, the gate and snack bar of 17 home matches and the shop (plan section 5).</summary>
+    public static long ForecastSeasonIncome(SimClub club) => EconomyRuleSet.SeasonIncomeForecastMinor(
+        club.Tier,
+        club.HasSponsor ? club.SponsorFixedSeason : 0,
+        club.Seats,
+        club.Fans.Fans,
+        club.Fans.MoodBp,
+        club.SnackLevel,
+        club.MerchLevel);
 
-        return (Rules.FixedIncomePerWeek(club.Tier) * Weeks)
-            + (Rules.Gate(club.Seats, club.Tier, fans, mood) * (Weeks / 2))
-            + (Rules.SnackTakings(club.SnackLevel, spectators, 0) * (Weeks / 2))
-            + (Rules.MerchTakings(club.MerchLevel, fans, FanMoods.WordFor(mood)) * Weeks);
+    private static AiTemperament TemperamentOf(ulong seed, int ordinal)
+    {
+        var draws = new Pcg32(DeterministicDigest.SeedOf(
+            "econ-temperament",
+            seed.ToString(CultureInfo.InvariantCulture),
+            ordinal.ToString(CultureInfo.InvariantCulture)));
+
+        return Enum.GetValues<AiTemperament>()[draws.NextInt(Enum.GetValues<AiTemperament>().Length)];
     }
 
     // ---- players ----------------------------------------------------------------------------------------------------------------------

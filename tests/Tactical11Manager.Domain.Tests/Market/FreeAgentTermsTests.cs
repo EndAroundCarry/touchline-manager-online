@@ -18,42 +18,39 @@ public sealed class FreeAgentTermsTests
     [InlineData(34, 1, SquadStatus.Rotation)]
     public void The_contract_length_and_standing_follow_age_alone(int age, int seasons, SquadStatus status)
     {
-        var terms = FreeAgentTerms.Calculate(ability: 8, age, referenceTier: 1);
+        var terms = FreeAgentTerms.Calculate(ability: 8, age);
 
         terms.ContractSeasons.Should().Be(seasons);
         terms.SquadStatus.Should().Be(status);
     }
 
     [Fact]
-    public void The_minimum_fee_is_a_quarter_of_the_value_and_never_below_one_bid_increment()
+    public void The_minimum_fee_is_a_share_of_the_value_and_never_below_one_bid_increment()
     {
         foreach (var ability in new[] { 6, 8, 10 })
         {
             foreach (var age in new[] { 18, 24, 30 })
             {
-                var valuation = PlayerValuation.Estimate(new PlayerValuationInput(ability, ability, age, 1));
-                var terms = FreeAgentTerms.Calculate(ability, age, referenceTier: 1);
+                var valuation = PlayerValuation.Estimate(PlayerValuationInput.FromAbility(ability, age));
+                var terms = FreeAgentTerms.Calculate(ability, age);
 
                 terms.MinimumFeeMinor.Should().Be(
                     Math.Max(WorldRuleSet.MinimumBidIncrementMinor, valuation * WorldRuleSet.FreeAgentMinimumFeeBp / 10_000),
                     $"ability {ability}, age {age}");
                 terms.MinimumFeeMinor.Should().BeGreaterThanOrEqualTo(WorldRuleSet.MinimumBidIncrementMinor);
-                terms.WeeklyWageMinor.Should().BePositive();
+                terms.SeasonWageMinor.Should().BeGreaterThanOrEqualTo(EconomyRuleSet.SeasonWageFloorMinor);
             }
         }
     }
 
     [Fact]
-    public void A_better_player_costs_and_earns_more_and_a_deeper_tier_costs_less()
+    public void A_better_player_costs_and_earns_more()
     {
-        var weak = FreeAgentTerms.Calculate(6, 26, 1);
-        var strong = FreeAgentTerms.Calculate(10, 26, 1);
-        var lower = FreeAgentTerms.Calculate(8, 26, 3);
-        var top = FreeAgentTerms.Calculate(8, 26, 1);
+        var weak = FreeAgentTerms.Calculate(6, 26);
+        var strong = FreeAgentTerms.Calculate(10, 26);
 
         strong.MinimumFeeMinor.Should().BeGreaterThan(weak.MinimumFeeMinor);
-        strong.WeeklyWageMinor.Should().BeGreaterThan(weak.WeeklyWageMinor);
-        lower.WeeklyWageMinor.Should().BeLessThan(top.WeeklyWageMinor);
+        strong.SeasonWageMinor.Should().BeGreaterThan(weak.SeasonWageMinor);
     }
 
     [Fact]
@@ -75,38 +72,34 @@ public sealed class FreeAgentTermsTests
         foreach (var gem in gems)
         {
             var age = gem.Player.AgeIn(2026);
-            var terms = FreeAgentTerms.Calculate(gem.Ability, age, referenceTier: 1);
+            var terms = FreeAgentTerms.Calculate(gem.Ability, age);
+            var twin = FreeAgentTerms.Calculate(gem.Ability, age);
 
-            // Priced as if his ceiling were his ability, exactly like the player beside him on the page.
-            var asShown = PlayerValuation.Estimate(new PlayerValuationInput(gem.Ability, gem.Ability, age, 1));
-            var withCeiling = PlayerValuation.Estimate(new PlayerValuationInput(gem.Ability, gem.Player.Potential, age, 1));
-
+            // The valuation has no input for the ceiling, so nothing about it can reach the price.
+            terms.Should().Be(twin);
             terms.MinimumFeeMinor.Should().Be(
-                Math.Max(WorldRuleSet.MinimumBidIncrementMinor, asShown * WorldRuleSet.FreeAgentMinimumFeeBp / 10_000));
-
-            withCeiling.Should().BeGreaterThan(
-                asShown,
-                "reading the ceiling would have priced him higher, so the price would have given him away");
+                Math.Max(
+                    WorldRuleSet.MinimumBidIncrementMinor,
+                    PlayerValuation.Estimate(PlayerValuationInput.FromAbility(gem.Ability, age)) * WorldRuleSet.FreeAgentMinimumFeeBp / 10_000));
         }
     }
 
     [Fact]
-    public void A_released_player_costs_his_full_value_with_his_real_potential()
+    public void A_released_player_costs_his_full_value()
     {
         foreach (var ability in new[] { 4, 10, 16 })
         {
             foreach (var age in new[] { 19, 25, 33 })
             {
-                var potential = Math.Min(WorldRuleSet.AttributeMax, ability + 2);
-                var valuation = PlayerValuation.Estimate(new PlayerValuationInput(ability, potential, age, 1));
-                var released = FreeAgentTerms.CalculateReleased(ability, potential, age, referenceTier: 1);
-                var generated = FreeAgentTerms.Calculate(ability, age, referenceTier: 1);
+                var valuation = PlayerValuation.Estimate(PlayerValuationInput.FromAbility(ability, age));
+                var released = FreeAgentTerms.CalculateReleased(ability, age);
+                var generated = FreeAgentTerms.Calculate(ability, age);
 
                 released.MinimumFeeMinor.Should().Be(
                     Math.Max(WorldRuleSet.MinimumBidIncrementMinor, valuation),
                     $"ability {ability}, age {age}");
                 released.MinimumFeeMinor.Should().BeGreaterThanOrEqualTo(generated.MinimumFeeMinor);
-                released.WeeklyWageMinor.Should().Be(generated.WeeklyWageMinor, "the wage is priced on ability alone");
+                released.SeasonWageMinor.Should().Be(generated.SeasonWageMinor, "the wage is priced on ability alone");
                 released.ContractSeasons.Should().Be(generated.ContractSeasons);
                 released.SquadStatus.Should().Be(generated.SquadStatus);
             }
@@ -114,20 +107,11 @@ public sealed class FreeAgentTermsTests
     }
 
     [Fact]
-    public void A_released_player_with_a_higher_ceiling_costs_more()
-    {
-        var low = FreeAgentTerms.CalculateReleased(10, 10, 20, 1);
-        var high = FreeAgentTerms.CalculateReleased(10, 16, 20, 1);
-
-        high.MinimumFeeMinor.Should().BeGreaterThan(low.MinimumFeeMinor);
-    }
-
-    [Fact]
     public void Terms_off_the_scale_are_refused()
     {
-        FluentActions.Invoking(() => FreeAgentTerms.Calculate(0, 25, 1)).Should().Throw<ArgumentOutOfRangeException>();
-        FluentActions.Invoking(() => FreeAgentTerms.Calculate(21, 25, 1)).Should().Throw<ArgumentOutOfRangeException>();
-        FluentActions.Invoking(() => FreeAgentTerms.Calculate(8, 25, 0)).Should().Throw<ArgumentOutOfRangeException>();
-        FluentActions.Invoking(() => FreeAgentTerms.CalculateReleased(8, 21, 25, 1)).Should().Throw<ArgumentOutOfRangeException>();
+        FluentActions.Invoking(() => FreeAgentTerms.Calculate(0, 25)).Should().Throw<ArgumentOutOfRangeException>();
+        FluentActions.Invoking(() => FreeAgentTerms.Calculate(21, 25)).Should().Throw<ArgumentOutOfRangeException>();
+        FluentActions.Invoking(() => FreeAgentTerms.Calculate(8, -1)).Should().Throw<ArgumentOutOfRangeException>();
+        FluentActions.Invoking(() => FreeAgentTerms.CalculateReleased(21, 25)).Should().Throw<ArgumentOutOfRangeException>();
     }
 }

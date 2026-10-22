@@ -1,4 +1,5 @@
 using Tactical11Manager.Domain.Fans;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Training;
 using Tactical11Manager.Domain.World;
@@ -37,7 +38,7 @@ internal sealed class SimPlayer
 
     public SimClub? Club { get; set; }
 
-    /// <summary>The wage for one of the season's 34 settlements.</summary>
+    /// <summary>The wage for the season, paid in 34 equal parts.</summary>
     public long Wage { get; set; }
 
     public int ContractEnd { get; set; }
@@ -63,12 +64,18 @@ internal sealed class SimPlayer
 
     public bool Listed { get; set; }
 
+    /// <summary>Whether the board put him on the market while the club was in administration: the manager cannot take him off.</summary>
+    public bool BoardListed { get; set; }
+
     public bool BoughtFromPool { get; set; }
 
     private int _ability = -1;
 
     /// <summary>The mean of his 28 attributes, rounded: the "ability" the wage and the value read.</summary>
     public int Ability => _ability >= 0 ? _ability : _ability = (int)Math.Round(Attr.Average(), MidpointRounding.AwayFromZero);
+
+    /// <summary>The same mean in tenths of a point, which is what the market prices.</summary>
+    public int AbilityTenths => (int)Math.Round(Attr.Average() * 10, MidpointRounding.AwayFromZero);
 
     /// <summary>The mean of the attributes his position uses (24 for an outfield player, 4 for a keeper): what the fans' strength reads.</summary>
     public double OwnSkill => TeamStrength.AbilityOf(Attr, IsGoalkeeper) / 100.0;
@@ -96,7 +103,10 @@ internal sealed class SimPlayer
 /// <summary>One season's books for a club, in minor units.</summary>
 internal sealed class Books
 {
-    public long Fixed;
+    public long Tv;
+    public long Sponsor;
+    public long Bonus;
+    public long Parachute;
     public long Gate;
     public long Snack;
     public long Merch;
@@ -110,14 +120,25 @@ internal sealed class Books
     public long Upgrades;
     public long Grants;
     public long CleanStart;
+    public long Gifts;
     public int HomeMatches;
     public long Attendance;
     public int SoldOut;
+    public int RedMatchdays;
+    public int AdminMatchdays;
+    public int EnteredRed;
+    public int EnteredAdmin;
+    public int Dismissals;
+    public int BoardSales;
+    public int BoardReleases;
 
-    public long Income => Fixed + Gate + Snack + Merch + Prize;
+    public long Income => Tv + Sponsor + Bonus + Parachute + Gate + Snack + Merch + Prize;
 
-    /// <summary>The income the season's play earns, without the prize money that comes after the last match.</summary>
-    public long IncomeBeforePrize => Fixed + Gate + Snack + Merch;
+    /// <summary>The league and sponsor money paid on every matchday.</summary>
+    public long Fixed => Tv + Sponsor;
+
+    /// <summary>The income the season's play earns, without the prize money, the bonus and the parachute that are paid around its end.</summary>
+    public long IncomeBeforePrize => Tv + Sponsor + Gate + Snack + Merch;
 
     public long Recurring => Wages + Operating + Upkeep;
 }
@@ -137,6 +158,38 @@ internal sealed class SimClub
     public long Cash { get; set; }
 
     public long Reserved { get; set; }
+
+    public int StandingCentis { get; set; }
+
+    public AiTemperament Temperament { get; set; }
+
+    public bool HasSponsor { get; set; }
+
+    public SponsorOfferKind SponsorKind { get; set; }
+
+    public SeasonObjective Objective { get; set; }
+
+    public long SponsorFixedSeason { get; set; }
+
+    public int SponsorFans { get; set; }
+
+    public int SponsorStanding { get; set; }
+
+    /// <summary>The season income forecast the wage budget and the overdraft limit are set from: made at signing, refreshed after matchday 17.</summary>
+    public long Forecast { get; set; }
+
+    public FinancialStateKind FinState { get; set; }
+
+    public int FinSince { get; set; }
+
+    /// <summary>A scripted manager who was dismissed: the club plays on as a computer club.</summary>
+    public bool Dismissed { get; set; }
+
+    public bool JustRelegated { get; set; }
+
+    public long PendingParachute { get; set; }
+
+    public bool Managed => Manager is not null && !Dismissed;
 
     /// <summary>Cash less every grant it has been given: where the club would be if nobody had bailed it out.</summary>
     public long GrantsTotal { get; set; }
@@ -183,6 +236,7 @@ internal sealed class SimClub
 
     public long Available => Cash - Reserved;
 
+    /// <summary>The season wage bill.</summary>
     public long WageBill => Squad.Sum(player => player.Wage);
 
     public void ResetSeason()
@@ -224,7 +278,7 @@ internal sealed class SimListing
     public bool IsPool => Seller is null;
 }
 
-internal sealed record TransferRecord(int Season, int Week, int Ability, int Age, int Potential, long Fee, int SellerTier, int BuyerTier, bool Pool);
+internal sealed record TransferRecord(int Season, int Week, int Ability, int Age, int Potential, long Fee, int SellerTier, int BuyerTier, bool Pool, long Value);
 
 internal sealed record TradeRecord(
     int Season,
@@ -270,14 +324,18 @@ internal sealed record ClubSeasonRow(
     int Players15,
     int Players17,
     int Players19,
-    long WageBillPerSettlement,
+    long WageBill,
     long ForecastIncome,
     int Strength,
-    long CashStart)
+    long CashStart,
+    int StandingEnd,
+    string Sponsor,
+    string Objective,
+    string Outcome)
 {
     /// <summary>Whether the season's books explain every movement of the club's cash.</summary>
     public bool Reconciled => CashEnd == CashStart + Books.Income + Books.FeesReceived - Books.Wages - Books.Operating - Books.Upkeep
-        - Books.FeesPaid - Books.Building - Books.Upgrades + Books.Grants + Books.CleanStart;
+        - Books.FeesPaid - Books.Building - Books.Upgrades + Books.Grants + Books.CleanStart + Books.Gifts;
 
     public long Wages => Books.Wages;
 

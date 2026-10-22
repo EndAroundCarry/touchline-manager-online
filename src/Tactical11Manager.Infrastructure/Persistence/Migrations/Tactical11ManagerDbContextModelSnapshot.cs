@@ -4291,7 +4291,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("club_stadiums", "world", t =>
                         {
-                            t.HasCheckConstraint("ck_club_stadiums_capacity", "standing_seats + seating_seats + covered_seats + vip_seats between 1 and 50000");
+                            t.HasCheckConstraint("ck_club_stadiums_capacity", "standing_seats + seating_seats + covered_seats + vip_seats between 1 and 75000");
 
                             t.HasCheckConstraint("ck_club_stadiums_places", "standing_seats >= 0 and seating_seats >= 0 and covered_seats >= 0 and vip_seats >= 0");
                         });

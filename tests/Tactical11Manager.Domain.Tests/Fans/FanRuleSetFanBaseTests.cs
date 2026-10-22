@@ -20,9 +20,9 @@ public sealed class FanRuleSetFanBaseTests
     // ---- tier numbers -------------------------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(1, 10_000, 4_000, 183_333, 3_000)]
-    [InlineData(2, 7_500, 3_000, 137_500, 2_250)]
-    [InlineData(3, 5_625, 2_250, 103_125, 1_688)]
+    [InlineData(1, 10_000, 4_000, 275_000, 3_000)]
+    [InlineData(2, 7_500, 3_000, 206_250, 2_250)]
+    [InlineData(3, 5_625, 2_250, 154_688, 1_688)]
     public void A_tier_opens_with_the_plans_numbers(int tier, int start, int floor, int cap, int wantToCome)
     {
         FanRuleSet.StartFansFor(tier).Should().Be(start);
@@ -738,7 +738,7 @@ public sealed class FanRuleSetFanBaseTests
     }
 
     [Fact]
-    public void A_club_that_beats_what_the_fans_expect_needs_the_biggest_ground_after_seven_to_ten_seasons()
+    public void A_club_that_beats_what_the_fans_expect_needs_the_biggest_ground_after_about_a_dozen_seasons()
     {
         const int Runs = 40;
         const int Seasons = 15;
@@ -747,12 +747,12 @@ public sealed class FanRuleSetFanBaseTests
         for (var run = 0; run < Runs; run++)
         {
             var ends = Simulate(220, Seasons, 55_000UL + (ulong)(run * 7_919), weeklyReviews: true).FansAtSeasonEnd;
-            var season = ends.ToList().FindIndex(fans => FanRuleSet.WantToComeFor(fans) >= 47_500);
+            var season = ends.ToList().FindIndex(fans => FanRuleSet.WantToComeFor(fans) >= 71_250);
 
             needed.Add(season < 0 ? Seasons + 1 : season + 1);
         }
 
-        needed.Average().Should().BeInRange(7.0, 10.0, "until 47,500 people want to come, 95% of level 10's 50,000 places");
+        needed.Average().Should().BeInRange(10.0, 15.0, "until 71,250 people want to come, 95% of level 15's 75,000 places");
     }
 
     [Fact]

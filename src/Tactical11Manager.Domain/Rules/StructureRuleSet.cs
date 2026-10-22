@@ -18,10 +18,10 @@ public readonly record struct StructureBonus(int Bp, string Reason);
 /// </para>
 /// <para>
 /// Money is an integer count of minor units (`FIN-2`), so the figures below are hundredths of the currency a
-/// manager reads: a snack bar spend of 100 is 1.00 per spectator. What a spectator or a fan spends is the
-/// same in every tier; a lower division earns less only because its crowd and its fans are smaller. Upkeep
-/// and the cost of an upgrade are baselines like any other, so they are divided by
-/// <see cref="WorldRuleSet.TierScalingFactor"/> for a club below the first tier (`STRC-9`).
+/// manager reads: a snack bar spend of 600 is 6.00 per spectator. What a spectator or a fan spends is
+/// scaled by the tier's price level, like a ticket (<see cref="EconomyRuleSet.PriceLevelBp"/>), so a lower division's snack bar and shop are
+/// worth the same share of its income as a top club's. Upkeep scales like the league's money
+/// (<see cref="EconomyRuleSet.TierFactorBp"/>), and so does the cost of an upgrade (`STRC-9`).
 /// </para>
 /// </remarks>
 public static class StructureRuleSet
@@ -65,49 +65,65 @@ public static class StructureRuleSet
     private const int OneHundredPercent = 10_000;
 
     // Index 0 is level 1. A table rather than a formula, so a retune can bend any one step.
-    private static readonly long[] SnackSpendTable = [100, 125, 150, 175, 200, 225, 250, 275, 300, 325];
+    private static readonly long[] SnackSpendTable = [600, 690, 780, 870, 960, 1_050, 1_140, 1_230, 1_320, 1_410];
 
-    private static readonly long[] MerchSpendTable = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120];
+    private static readonly long[] MerchSpendTable = [250, 330, 420, 500, 580, 670, 750, 830, 920, 1_000];
 
-    private static readonly long[] UpkeepTier1 = [30_000, 45_000, 60_000, 80_000, 100_000, 125_000, 150_000, 180_000, 215_000, 250_000];
+    // What a building costs to keep for a season at a tier-1 club, in minor units.
+    private static readonly long[] UpkeepSeasonTier1 =
+        [10_000_000, 13_000_000, 17_000_000, 22_000_000, 29_000_000, 38_000_000, 49_000_000, 64_000_000, 83_000_000, 108_000_000];
 
     // Index 0 is level 1, which opens free; a cost belongs to the level it buys.
-    private static readonly long[] UpgradeCostTier1 = [0, 200_000, 230_000, 250_000, 290_000, 300_000, 340_000, 350_000, 360_000, 380_000];
+    private static readonly long[] UpgradeCostTier1 =
+        [0, 15_000_000, 25_000_000, 40_000_000, 60_000_000, 90_000_000, 130_000_000, 190_000_000, 270_000_000, 380_000_000];
 
     private static readonly int[] BuildDays = [0, 1, 1, 2, 2, 3, 4, 5, 6, 7];
 
-    /// <summary>What the snack bar earns per spectator at a level, in minor units, in every tier (`STRC-4`, `STRC-9`).</summary>
+    /// <summary>What the snack bar earns per spectator at a level, at a tier-1 club, in minor units (`STRC-4`, `STRC-9`).</summary>
     /// <param name="level">The level, 1–10.</param>
-    public static long SnackSpendMinor(int level) => SnackSpendTable[IndexOf(level)];
+    public static long SnackSpendMinorTier1(int level) => SnackSpendTable[IndexOf(level)];
 
-    /// <summary>What the merchandise shop earns per fan per week at a level, in minor units, in every tier (`STRC-6`, `STRC-9`).</summary>
+    /// <summary>What the merchandise shop earns per fan per weekly run at a level, at a tier-1 club, in minor units (`STRC-6`, `STRC-9`).</summary>
     /// <param name="level">The level, 1–10.</param>
-    public static long MerchSpendMinor(int level) => MerchSpendTable[IndexOf(level)];
+    public static long MerchSpendMinorTier1(int level) => MerchSpendTable[IndexOf(level)];
 
-    /// <summary>What one building costs to keep each week at a level, at a tier-1 club, in minor units (`STRC-8`).</summary>
+    /// <summary>What the snack bar earns per spectator at a level for a club in the given tier, in minor units (`STRC-4`, `STRC-9`).</summary>
     /// <param name="level">The level, 1–10.</param>
-    public static long UpkeepMinorTier1(int level) => UpkeepTier1[IndexOf(level)];
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long SnackSpendMinorFor(int level, int tier) => EconomyRuleSet.ByPriceLevel(SnackSpendMinorTier1(level), tier);
+
+    /// <summary>What the merchandise shop earns per fan per weekly run at a level for a club in the given tier, in minor units (`STRC-6`, `STRC-9`).</summary>
+    /// <param name="level">The level, 1–10.</param>
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long MerchSpendMinorFor(int level, int tier) => EconomyRuleSet.ByPriceLevel(MerchSpendMinorTier1(level), tier);
+
+    /// <summary>What one building costs to keep for a season at a level, at a tier-1 club, in minor units (`STRC-8`).</summary>
+    /// <param name="level">The level, 1–10.</param>
+    public static long UpkeepSeasonMinorTier1(int level) => UpkeepSeasonTier1[IndexOf(level)];
 
     /// <summary>What an upgrade costs at a tier-1 club, in minor units, by the level it reaches (`STRC-3`).</summary>
     /// <param name="targetLevel">The level the work reaches, 2–10.</param>
     /// <remarks>
-    /// Set so an upgrade helps a club grow and does not hold it back: at a tier-1 club with its opening crowd
-    /// and fans, the first upgrade of either building pays for itself in about two weeks and the last in about
-    /// five, counting the upkeep each step adds. A bigger club pays back faster still.
+    /// Set so an upgrade pays for itself in about a season for a club with its opening crowd and fans, counting the
+    /// upkeep each step adds, and in a few weeks for a club that has grown. A bigger club pays back faster still.
     /// </remarks>
     public static long UpgradeCostMinorTier1(int targetLevel) => UpgradeCostTier1[UpgradeIndexOf(targetLevel)];
 
-    /// <summary>What one building costs to keep each week at a level for a club in the given tier, in minor units (`STRC-8`, `STRC-9`).</summary>
+    /// <summary>What one building costs to keep for a season at a level for a club in the given tier, in minor units (`STRC-8`, `STRC-9`).</summary>
     /// <param name="level">The level, 1–10.</param>
     /// <param name="tier">The tier number, starting at 1.</param>
-    public static long UpkeepMinorFor(int level, int tier) =>
-        Math.Max(1, UpkeepMinorTier1(level) / WorldRuleSet.TierScalingFactor(tier));
+    public static long UpkeepSeasonMinorFor(int level, int tier) => EconomyRuleSet.ByTier(UpkeepSeasonMinorTier1(level), tier);
+
+    /// <summary>What one building costs to keep in a weekly run at a level for a club in the given tier, in minor units (`STRC-8`, `STRC-9`).</summary>
+    /// <param name="level">The level, 1–10.</param>
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long UpkeepMinorFor(int level, int tier) => EconomyRuleSet.PerWeeklyRun(UpkeepSeasonMinorFor(level, tier));
 
     /// <summary>What an upgrade costs a club in the given tier, in minor units (`STRC-3`, `STRC-9`).</summary>
     /// <param name="targetLevel">The level the work reaches, 2–10.</param>
     /// <param name="tier">The tier number, starting at 1.</param>
     public static long UpgradeCostMinorFor(int targetLevel, int tier) =>
-        Math.Max(1, UpgradeCostMinorTier1(targetLevel) / WorldRuleSet.TierScalingFactor(tier));
+        EconomyRuleSet.ByTier(UpgradeCostMinorTier1(targetLevel), tier);
 
     /// <summary>How many days an upgrade takes, by the level it reaches (`STRC-3`).</summary>
     /// <param name="targetLevel">The level the work reaches, 2–10.</param>
@@ -165,21 +181,23 @@ public static class StructureRuleSet
     /// <summary>The snack bar's takings for a home match before any bonus, in minor units (`STRC-4`).</summary>
     /// <param name="level">The snack bar's level.</param>
     /// <param name="spectators">The crowd, from <see cref="StadiumRuleSet.AttendanceFor"/>.</param>
-    public static long SnackBaseMinorFor(int level, int spectators)
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long SnackBaseMinorFor(int level, int spectators, int tier)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(spectators);
 
-        return spectators * SnackSpendMinor(level);
+        return spectators * SnackSpendMinorFor(level, tier);
     }
 
     /// <summary>The merchandise shop's takings for a week before any bonus, in minor units (`STRC-6`).</summary>
     /// <param name="level">The shop's level.</param>
     /// <param name="fans">The club's fans.</param>
-    public static long MerchBaseMinorFor(int level, int fans)
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long MerchBaseMinorFor(int level, int fans, int tier)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(fans);
 
-        return fans * MerchSpendMinor(level);
+        return fans * MerchSpendMinorFor(level, tier);
     }
 
     /// <summary>Lifts takings by a bonus, rounding down to a whole minor unit (`STRC-4`, `STRC-6`).</summary>
@@ -197,15 +215,17 @@ public static class StructureRuleSet
     /// <param name="level">The snack bar's level.</param>
     /// <param name="spectators">The crowd.</param>
     /// <param name="bonusBp">The result bonus, from <see cref="ResultBonusFor"/>.</param>
-    public static long SnackTakingsMinorFor(int level, int spectators, int bonusBp) =>
-        WithBonus(SnackBaseMinorFor(level, spectators), bonusBp);
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long SnackTakingsMinorFor(int level, int spectators, int bonusBp, int tier) =>
+        WithBonus(SnackBaseMinorFor(level, spectators, tier), bonusBp);
 
     /// <summary>The merchandise shop's takings for a week, in minor units (`STRC-6`).</summary>
     /// <param name="level">The shop's level.</param>
     /// <param name="fans">The club's fans.</param>
     /// <param name="mood">The fans' mood word at the week's close.</param>
-    public static long MerchTakingsMinorFor(int level, int fans, FanMoodWord mood) =>
-        WithBonus(MerchBaseMinorFor(level, fans), MoodBonusBpFor(mood));
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long MerchTakingsMinorFor(int level, int fans, FanMoodWord mood, int tier) =>
+        WithBonus(MerchBaseMinorFor(level, fans, tier), MoodBonusBpFor(mood));
 
     /// <summary>
     /// What the snack bar would take in a week at a level, before any result bonus, in minor units: a quote for
@@ -217,15 +237,17 @@ public static class StructureRuleSet
     /// Matchdays fall three times a week and a club hosts half of them, so it hosts 1.5 matches a week on
     /// average.
     /// </remarks>
-    public static long SnackWeeklyEstimateMinorFor(int level, int spectators) =>
-        SnackBaseMinorFor(level, spectators) * 3 / 2;
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long SnackWeeklyEstimateMinorFor(int level, int spectators, int tier) =>
+        SnackBaseMinorFor(level, spectators, tier) * 3 / 2;
 
     /// <summary>What the shop would take in a week at a level, in minor units: a quote for the page, not a booking (`STRC-6`).</summary>
     /// <param name="level">The shop's level.</param>
     /// <param name="fans">The club's fans.</param>
     /// <param name="mood">The fans' mood word now.</param>
-    public static long MerchWeeklyEstimateMinorFor(int level, int fans, FanMoodWord mood) =>
-        MerchTakingsMinorFor(level, fans, mood);
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long MerchWeeklyEstimateMinorFor(int level, int fans, FanMoodWord mood, int tier) =>
+        MerchTakingsMinorFor(level, fans, mood, tier);
 
     private static int IndexOf(int level)
     {

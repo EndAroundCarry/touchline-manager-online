@@ -66,17 +66,26 @@ public sealed class RunWeeklyFinanceTests
     public async Task A_club_that_cannot_pay_is_granted_the_exact_shortfall_and_the_grant_is_audited()
     {
         var clubId = Guid.CreateVersion7();
-        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: 10_000_000, players: 22));
-        var accounts = new RecordingAccountRepository(FundedAccount(clubId, 1_000_000));
+        const long wage = 100_000_000;
+        const long cash = 1_000_000;
+        var queries = new StubFinanceQueries(Obligations(clubId, 1, wage: wage, players: 22));
+        var accounts = new RecordingAccountRepository(FundedAccount(clubId, cash));
         var ledger = new RecordingLedgerRepository();
         var audit = new RecordingAuditWriter();
+
+        // The week's income is credited before the guard reads the account.
+        var shortfall = wage
+            + WorldRuleSet.WeeklyOperatingCostMinorForTier(1)
+            + (2 * StructureRuleSet.UpkeepMinorFor(1, 1))
+            - cash
+            - WorldRuleSet.WeeklySponsorshipMinorForTier(1);
 
         var result = await Create(queries, accounts, ledger, audit).ExecuteAsync(Week, CancellationToken.None);
 
         result.Grants.Should().Be(1);
         result.GrantedMinor.Should().Be(
-            7_000_000 + 2 * StructureRuleSet.UpkeepMinorFor(1, 1),
-            "the week cost the wages, the operating cost and both buildings' upkeep, and the club could commit 4,000,000");
+            shortfall,
+            "the week cost the wages, the operating cost and both buildings' upkeep, and the club could commit its cash and the week's credit");
 
         var grant = ledger.Entries
             .Should()
@@ -84,7 +93,7 @@ public sealed class RunWeeklyFinanceTests
             .Which;
 
         grant.SourceType.Should().Be(LedgerSourceType.SafetyJob);
-        grant.CashDeltaMinor.Should().Be(7_000_000 + 2 * StructureRuleSet.UpkeepMinorFor(1, 1));
+        grant.CashDeltaMinor.Should().Be(shortfall);
 
         var account = accounts.All.Single();
         account.CashMinor.Should().Be(0, "the grant covers the week exactly, never more");
@@ -158,9 +167,9 @@ public sealed class RunWeeklyFinanceTests
         await Create(queries, accounts, ledger, new RecordingAuditWriter(), structures: structures)
             .ExecuteAsync(Week, CancellationToken.None);
 
-        var expected = StructureRuleSet.MerchTakingsMinorFor(3, 10_000, FanMoods.WordFor(5_000));
+        var expected = StructureRuleSet.MerchTakingsMinorFor(3, 10_000, FanMoods.WordFor(5_000), tier: 1);
 
-        expected.Should().BeGreaterThan(10_000 * StructureRuleSet.MerchSpendMinor(3), "calm fans lift the takings");
+        expected.Should().BeGreaterThan(10_000 * StructureRuleSet.MerchSpendMinorFor(3, 1), "calm fans lift the takings");
 
         var entry = ledger.Entries.Should().ContainSingle(item => item.Category == LedgerCategory.Merchandise).Which;
 

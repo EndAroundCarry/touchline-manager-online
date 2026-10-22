@@ -11,13 +11,13 @@ namespace Tactical11Manager.Domain.Rules;
 /// Kept beside <see cref="WorldRuleSet"/> rather than inside it because the stadium is a self-contained
 /// model — a size, four kinds of place, a price and a cost for each, and a demand curve — and the rule set
 /// is already the longest file in the domain. It is still part of that rule set: every value here is a
-/// balancing value stamped by <see cref="WorldRuleSet.Version"/>, and money scales with the division by the
-/// same <see cref="WorldRuleSet.TierScalingFactor"/> as every other baseline, so a pyramid's grounds stay
-/// proportionate to its clubs' wallets.
+/// balancing value stamped by <see cref="WorldRuleSet.Version"/>, and what a place sells for and costs scales
+/// with the division by <see cref="EconomyRuleSet.PriceLevelBp"/>, so a pyramid's grounds stay proportionate
+/// to its clubs' wallets.
 /// </para>
 /// <para>
 /// Money is an integer count of minor units (`FIN-2`). The tier-1 figures below are therefore hundredths of
-/// the currency a manager reads: a standing ticket of 800 is 8.00.
+/// the currency a manager reads: a standing ticket of 2,000 is 20.00.
 /// </para>
 /// </remarks>
 public static class StadiumRuleSet
@@ -26,7 +26,7 @@ public static class StadiumRuleSet
     public const int SeatsPerLevel = 5_000;
 
     /// <summary>The highest stadium level (`STAD-1`).</summary>
-    public const int MaxLevel = 10;
+    public const int MaxLevel = 15;
 
     /// <summary>The most places a stadium can hold: the top level's ceiling (`STAD-1`).</summary>
     public const int MaxCapacity = SeatsPerLevel * MaxLevel;
@@ -49,32 +49,33 @@ public static class StadiumRuleSet
     /// <summary>The ticket price for a place, at a tier-1 club, in minor units (`STAD-3`).</summary>
     /// <param name="stand">The kind of place.</param>
     /// <remarks>
-    /// Priced so a covered seat costs about three times a place on the terrace and a VIP seat about eleven,
-    /// which is the spread real grounds charge. At tier 1 a full opening ground (3,000 / 1,000 / 900 / 100)
-    /// takes 70,500.00 on a matchday.
+    /// Priced so a covered seat costs two and a half times a place on the terrace and a VIP seat nine, which is
+    /// the spread real grounds charge. At tier 1 a full opening ground (3,000 / 1,000 / 900 / 100) takes
+    /// 158,000.00 on a matchday.
     /// </remarks>
     public static long TicketPriceMinorTier1(StadiumStand stand) => stand switch
     {
-        StadiumStand.Standing => 800,
-        StadiumStand.Seating => 1_500,
-        StadiumStand.CoveredSeating => 2_500,
-        StadiumStand.Vip => 9_000,
+        StadiumStand.Standing => 2_000,
+        StadiumStand.Seating => 3_500,
+        StadiumStand.CoveredSeating => 5_000,
+        StadiumStand.Vip => 18_000,
         _ => throw new ArgumentOutOfRangeException(nameof(stand), stand, "Unknown stadium stand."),
     };
 
     /// <summary>What building one place costs, at a tier-1 club, in minor units (`STAD-4`).</summary>
     /// <param name="stand">The kind of place.</param>
     /// <remarks>
-    /// Set so that a place which sells out every home match pays for itself in roughly two and a half
-    /// seasons. A place nobody turns up to fill never does, which is what stops a manager building without
-    /// looking at the crowd (`STAD-6`).
+    /// Set at about six and a half seasons of what a place takes when it sells out every home match, so growing a ground from
+    /// 5,000 to 75,000 places is a project of many seasons, and money follows the fans only as fast as the club
+    /// can build. A place nobody turns up to fill never pays for itself, which is what stops a manager building
+    /// without looking at the crowd (`STAD-6`).
     /// </remarks>
     public static long BuildCostMinorTier1(StadiumStand stand) => stand switch
     {
-        StadiumStand.Standing => 30_000,
-        StadiumStand.Seating => 60_000,
-        StadiumStand.CoveredSeating => 100_000,
-        StadiumStand.Vip => 400_000,
+        StadiumStand.Standing => 214_000,
+        StadiumStand.Seating => 378_000,
+        StadiumStand.CoveredSeating => 536_000,
+        StadiumStand.Vip => 1_890_000,
         _ => throw new ArgumentOutOfRangeException(nameof(stand), stand, "Unknown stadium stand."),
     };
 
@@ -82,13 +83,31 @@ public static class StadiumRuleSet
     /// <param name="stand">The kind of place.</param>
     /// <param name="tier">The tier number, starting at 1.</param>
     public static long TicketPriceMinorFor(StadiumStand stand, int tier) =>
-        Math.Max(1, TicketPriceMinorTier1(stand) / WorldRuleSet.TierScalingFactor(tier));
+        EconomyRuleSet.ByPriceLevel(TicketPriceMinorTier1(stand), tier);
 
     /// <summary>What building one place costs a club in the given tier, in minor units (`STAD-4`).</summary>
     /// <param name="stand">The kind of place.</param>
     /// <param name="tier">The tier number, starting at 1.</param>
     public static long BuildCostMinorFor(StadiumStand stand, int tier) =>
-        Math.Max(1, BuildCostMinorTier1(stand) / WorldRuleSet.TierScalingFactor(tier));
+        EconomyRuleSet.ByPriceLevel(BuildCostMinorTier1(stand), tier);
+
+    /// <summary>The share of a place's build cost the ground costs to keep each season, in basis points: 2%. A balancing value; zero turns it off.</summary>
+    public const int GroundUpkeepBp = 200;
+
+    /// <summary>What the ground costs to keep for a season, in minor units: a small share of what its places cost to build (`STAD-4`).</summary>
+    /// <param name="seats">The ground's places.</param>
+    /// <param name="tier">The tier the club plays in.</param>
+    public static long GroundUpkeepSeasonMinorFor(StadiumSeats seats, int tier)
+    {
+        long cost = 0;
+
+        foreach (var stand in StadiumStands.All)
+        {
+            cost += seats.Of(stand) * BuildCostMinorFor(stand, tier);
+        }
+
+        return cost * GroundUpkeepBp / EconomyRuleSet.OneHundredPercentBp;
+    }
 
     /// <summary>The ground's level for a capacity: how many 5,000-place blocks it spans (`STAD-1`).</summary>
     /// <param name="capacity">The total places, 1 and up.</param>

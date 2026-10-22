@@ -2,6 +2,7 @@ using System.Globalization;
 using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Fans;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Generation;
@@ -29,6 +30,12 @@ internal sealed partial class EconSim
     {
         // The scripted managers take the median club of their tier, so each starts as a typical club and not a favourite or a strugger.
         Take(1, 9, new PrudentBuilder("Prudent builder"));
+
+        // Four dominant tier-1 clubs: the sandbox stands in for managers who build great squads, with a lead in strength the results are drawn from.
+        Take(1, 3, new Dynasty());
+        Take(1, 5, new Dynasty());
+        Take(1, 7, new Dynasty());
+        Take(1, 12, new Dynasty());
         Take(2, 9, new Trader());
         Take(2, 10, new OverAmbitious());
         Take(3, 9, new BigSpender("Tier-3 big spender", stars: 3));
@@ -54,21 +61,26 @@ internal sealed partial class EconSim
             }
         }
 
+        var outcomes = new Dictionary<Guid, ObjectiveOutcome>();
+
         foreach (var club in Clubs)
         {
-            var prize = Rules.Prize(club.Tier, club.Rank);
+            var prize = EconRules.Prize(club.Tier, club.Rank);
+            var (outcome, bonus) = ObjectiveBonus.Settle(club.SponsorKind, club.Objective, club.Rank, club.Tier, club.SponsorFans, club.SponsorStanding);
 
-            club.Cash += prize;
+            outcomes[club.Guid] = outcome;
+            club.Cash += prize + bonus;
             club.Books.Prize += prize;
+            club.Books.Bonus += bonus;
             club.ShadowMin = Math.Min(club.ShadowMin, club.ShadowCash);
         }
 
         foreach (var club in Clubs)
         {
-            Rows.Add(MakeRow(club));
+            Rows.Add(MakeRow(club, outcomes[club.Guid]));
         }
 
-        foreach (var club in Clubs.Where(club => club.Manager is not null))
+        foreach (var club in Clubs.Where(club => club.Managed))
         {
             club.Manager!.OnSeasonEnd(this, club);
         }
@@ -101,18 +113,28 @@ internal sealed partial class EconSim
             [.. Enumerable.Range(1, Tiers).Select(tier => new TierStandings(tier, [.. Table(tier).Select(club => club.Guid)]))]);
         var byGuid = Clubs.ToDictionary(club => club.Guid);
 
+        var nextTier = movements.ToDictionary(movement => movement.ClubId, movement => movement.ToTier);
+
+        // The standing steps on the tier the season was played in, and is pulled toward the base of the tier the club plays in next.
+        foreach (var club in Clubs)
+        {
+            club.StandingCentis = ClubStanding.Step(club.StandingCentis, club.Tier, club.Rank, outcomes[club.Guid], nextTier.GetValueOrDefault(club.Guid, club.Tier));
+        }
+
         foreach (var movement in movements.Where(movement => !movement.IsStationary))
         {
             var club = byGuid[movement.ClubId];
 
             club.Fans = FanRuleSet.OnTierChange(club.Fans, movement.FromTier, movement.ToTier);
+            club.JustRelegated = movement.ToTier > movement.FromTier;
+            club.PendingParachute = club.JustRelegated ? EconomyRuleSet.ParachuteMinorFor(movement.FromTier) : 0;
             club.Tier = movement.ToTier;
         }
 
         RolloverSquads();
     }
 
-    private ClubSeasonRow MakeRow(SimClub club) => new(
+    private ClubSeasonRow MakeRow(SimClub club, ObjectiveOutcome outcome) => new(
         Seed,
         Season,
         club.Idx,
@@ -137,7 +159,11 @@ internal sealed partial class EconSim
         club.WageBill,
         ForecastSeasonIncome(club),
         club.Strength,
-        club.SeasonStartCash);
+        club.SeasonStartCash,
+        ClubStanding.PointsOf(club.StandingCentis),
+        club.SponsorKind.ToCode(),
+        club.Objective.ToCode(),
+        outcome.ToCode());
 
     // ---- retirements and contracts (CON-6 to CON-11) ----------------------------------------------------------------------------------
 
@@ -145,6 +171,17 @@ internal sealed partial class EconSim
     {
         var seasonGuid = MakeGuid(2, Season);
         var nextYear = GameYear + 1;
+
+        // The relegation clause: the contracts of a relegated club drop by a quarter.
+        foreach (var club in Clubs.Where(club => club.JustRelegated))
+        {
+            foreach (var player in club.Squad.Where(player => player.ContractEnd > Season))
+            {
+                player.Wage = EconomyRuleSet.AfterRelegationClause(player.Wage);
+            }
+
+            club.JustRelegated = false;
+        }
 
         foreach (var club in Clubs)
         {
@@ -205,7 +242,7 @@ internal sealed partial class EconSim
             return;
         }
 
-        IReadOnlyList<AiContractDecision> decisions = club.Manager is not null
+        IReadOnlyList<AiContractDecision> decisions = club.Managed
             ? [.. expiring.Select(player => new AiContractDecision(player.Guid, Renew: true, Seasons: 2))]
             : AiContractPolicy.Decide(
                 stable.Count,
@@ -218,14 +255,12 @@ internal sealed partial class EconSim
 
             if (decision.Renew)
             {
-                player.Wage = Rules.RenewalWagePerWeek(
+                player.Wage = EconRules.RenewalWage(
                     new ContractRenewalInput(
-                        player.Ability,
-                        player.Potential,
+                        player.AbilityTenths,
                         player.AgeIn(nextYear),
                         player.Appearances,
                         player.MoraleBp,
-                        club.Tier,
                         RemainingSeasons: 0),
                     decision.Seasons);
                 player.ContractEnd = Season + decision.Seasons;
@@ -259,7 +294,7 @@ internal sealed partial class EconSim
     /// </summary>
     private void TakeInYouth(SimClub club)
     {
-        if (club.Manager is not null)
+        if (club.Managed)
         {
             return;
         }
@@ -284,7 +319,7 @@ internal sealed partial class EconSim
             var player = FromGenerated(member.Player, member.Attributes, member.State, gem: false);
 
             player.Club = club;
-            player.Wage = Rules.GeneratedWagePerWeek(player.Ability, club.Tier);
+            player.Wage = EconRules.GeneratedWage(player.Ability);
             player.ContractEnd = member.Contract.EndSeasonNumber;
             player.Status = SquadStatus.Prospect;
             club.Squad.Add(player);
@@ -321,7 +356,7 @@ internal sealed partial class EconSim
             var player = FromGenerated(member.Player, member.Attributes, member.State, gem: false);
 
             player.Club = club;
-            player.Wage = Rules.GeneratedWagePerWeek(player.Ability, club.Tier);
+            player.Wage = EconRules.GeneratedWage(player.Ability);
             player.ContractEnd = Season + 1;
             player.Status = SquadStatus.Prospect;
             club.Squad.Add(player);
@@ -337,7 +372,7 @@ internal sealed partial class EconSim
     /// </summary>
     private void TakeOverWithCleanStart()
     {
-        var club = Tier(1).Where(candidate => candidate.Manager is null).OrderByDescending(candidate => candidate.Cash).ThenBy(candidate => candidate.Idx).First();
+        var club = Tier(1).Where(candidate => !candidate.Managed).OrderByDescending(candidate => candidate.Cash).ThenBy(candidate => candidate.Idx).First();
         var cashBefore = club.Cash;
         var billBefore = club.WageBill;
         var capacityBefore = club.Seats.Total;
@@ -361,40 +396,38 @@ internal sealed partial class EconSim
             Detach(club, player);
         }
 
-        var request = new SquadGenerationRequest(
-            _seedText + "-clean",
-            NamePool,
-            CountryCode,
-            _worldId,
-            club.Guid,
-            1_000 + (club.Idx * 10) + Season,
-            club.Tier,
-            MakeGuid(2, Season),
-            Season,
-            GameYear,
-            Now);
-
-        foreach (var member in PlayerGenerator.GenerateSquad(request))
+        // The new squad is sized: wages 55-65% of a fresh club's forecast (plan section 8).
+        foreach (var player in SizedSquad(
+            club,
+            draw => new SquadGenerationRequest(
+                _seedText + "-clean",
+                NamePool,
+                CountryCode,
+                _worldId,
+                club.Guid,
+                1_000 + (club.Idx * 10) + Season + (draw * 100_000),
+                club.Tier,
+                MakeGuid(2, Season),
+                Season,
+                GameYear,
+                Now),
+            EconomyRuleSet.CleanStartWageBandLowBp,
+            EconomyRuleSet.CleanStartWageBandHighBp))
         {
-            var player = FromGenerated(member.Player, member.Attributes, member.State, gem: false);
-
-            player.Club = club;
-            player.Wage = Rules.GeneratedWagePerWeek(player.Ability, club.Tier);
-            player.ContractEnd = member.Contract.EndSeasonNumber;
-            player.Status = member.Contract.SquadStatus;
             club.Squad.Add(player);
         }
 
-        club.Seats = new StadiumSeats(
-            StadiumRuleSet.OpeningStanding,
-            StadiumRuleSet.OpeningSeating,
-            StadiumRuleSet.OpeningCoveredSeating,
-            StadiumRuleSet.OpeningVip);
+        club.Seats = EconomyRuleSet.OpeningSeats;
+        club.StandingCentis = ClubStanding.OpeningCentis(club.Tier);
+        club.FinState = FinancialStateKind.Healthy;
+        club.FinSince = 0;
+        club.Dismissed = false;
+        club.PendingParachute = 0;
         club.SnackLevel = 1;
         club.MerchLevel = 1;
         club.Reserved = 0;
-        club.Books.CleanStart = Rules.OpeningCash(club.Tier) - club.Cash;
-        club.Cash = Rules.OpeningCash(club.Tier);
+        club.Books.CleanStart = EconRules.OpeningCash(club.Tier) - club.Cash;
+        club.Cash = EconRules.OpeningCash(club.Tier);
         club.GrantsTotal = 0;
         club.ShadowMin = club.Cash;
         club.Fans = FanRuleSet.OnTakeover(club.Tier);
@@ -402,12 +435,14 @@ internal sealed partial class EconSim
 
         ComputeStrengths();
 
-        var forecast = ForecastSeasonIncome(club);
+        // The forecast of a fresh club: the steady sponsor at the opening fans and standing, as the clean start's squad is sized against it.
+        var forecast = EconomyRuleSet.FreshClubForecastMinor(club.Tier);
 
+        CleanStartWageShares.Add(forecast <= 0 ? 0 : (double)club.WageBill / forecast);
         CleanStarts.Add(string.Create(
             CultureInfo.InvariantCulture,
-            $"season {Season}: {club.Name} (cash {cashBefore / 100:N0}, {squadBefore} players on {billBefore * Weeks / 100:N0} a season, ground {capacityBefore:N0}, strength {strengthBefore / 100.0:0.00}) "
-            + $"-> opening cash {club.Cash / 100:N0}, {club.Squad.Count} players on {club.WageBill * Weeks / 100:N0} a season "
-            + $"= {(forecast <= 0 ? 0 : 100.0 * club.WageBill * Weeks / forecast):0}% of a forecast income of {forecast / 100:N0}, strength {club.Strength / 100.0:0.00}"));
+            $"season {Season}: {club.Name} (cash {cashBefore / 100:N0}, {squadBefore} players on {billBefore / 100:N0} a season, ground {capacityBefore:N0}, strength {strengthBefore / 100.0:0.00}) "
+            + $"-> opening cash {club.Cash / 100:N0}, {club.Squad.Count} players on {club.WageBill / 100:N0} a season "
+            + $"= {(forecast <= 0 ? 0 : 100.0 * club.WageBill / forecast):0}% of a forecast income of {forecast / 100:N0}, strength {club.Strength / 100.0:0.00}"));
     }
 }

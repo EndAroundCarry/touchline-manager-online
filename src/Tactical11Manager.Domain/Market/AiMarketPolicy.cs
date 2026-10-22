@@ -15,44 +15,54 @@ namespace Tactical11Manager.Domain.Market;
 public static class AiMarketPolicyVersions
 {
     /// <summary>The current policy label, folded into every draw the policy makes.</summary>
-    public const string Version = "ai-market-v1";
+    public const string Version = "ai-market-v2";
 }
 
 /// <summary>One registered player as the AI market weighs them (`TRF-12`).</summary>
 /// <remarks>
-/// Hidden potential rides along because the valuation reads it (`PlayerValuation`); it is an input here and
-/// never an output (`MAT-11`). A player who is injured or suspended is still registered and still appears —
-/// the market does not care whether they can play this week.
+/// The AI reads what any club can see: skill, age and wage. Hidden potential is not an input (`player-valuation-v2`). A player who is
+/// injured or suspended is still registered and still appears — the market does not care whether they can play this week.
 /// </remarks>
 /// <param name="PlayerId">The player.</param>
 /// <param name="Family">The position family the player belongs to.</param>
-/// <param name="Ability">The player's current ability, 1–20.</param>
-/// <param name="Potential">The hidden development ceiling, 1–20. Class C2: server-only.</param>
+/// <param name="AbilityTenths">The mean of the player's attributes in tenths of a point.</param>
 /// <param name="Age">The player's age in game years.</param>
 /// <param name="SquadStatus">The player's standing in the squad (`SQ-1`), which the surplus order reads.</param>
 /// <param name="ContractEndSeasonNumber">The last season the active contract covers.</param>
 /// <param name="CurrentSeasonNumber">The season being played, so the remaining term can be read.</param>
 /// <param name="IsListed">Whether the player already has an open listing (`TRF-14`).</param>
+/// <param name="SeasonWageMinor">The player's wage for a season, which the highest-earner rule reads.</param>
 public sealed record AiMarketPlayer(
     Guid PlayerId,
     PositionFamily Family,
-    int Ability,
-    int Potential,
+    int AbilityTenths,
     int Age,
     SquadStatus SquadStatus,
     int ContractEndSeasonNumber,
     int CurrentSeasonNumber,
-    bool IsListed);
+    bool IsListed,
+    long SeasonWageMinor);
+
+/// <summary>What an AI club's money lets it do (`ai-market-v2`).</summary>
+/// <param name="WageBillSeasonMinor">The season wage bill.</param>
+/// <param name="WageBudgetMinor">The wage budget: 70% of the season income forecast.</param>
+/// <param name="ReserveMinor">The cash the club keeps back from every purchase: half a season of wages.</param>
+/// <param name="InTheRed">Whether the club is in the red, which bars every bid.</param>
+public sealed record AiMarketFinances(
+    long WageBillSeasonMinor,
+    long WageBudgetMinor,
+    long ReserveMinor,
+    bool InTheRed);
 
 /// <summary>One AI-controlled club as the market policy reads it (`TRF-12`).</summary>
 /// <param name="ClubId">The club, which is the seed's identity.</param>
-/// <param name="Tier">The tier the club plays in, which scales the valuation.</param>
 /// <param name="SpendableMinor">Cash available after existing reservations (`FIN-10`).</param>
+/// <param name="Finances">What the club's wages and reserve allow.</param>
 /// <param name="Players">The club's registered squad.</param>
 public sealed record AiMarketClub(
     Guid ClubId,
-    int Tier,
     long SpendableMinor,
+    AiMarketFinances Finances,
     IReadOnlyList<AiMarketPlayer> Players);
 
 /// <summary>One open listing as a bidder weighs it (`TRF-4`, `TRF-8`).</summary>
@@ -61,22 +71,22 @@ public sealed record AiMarketClub(
 /// <param name="LeadingClubId">The club currently leading, or null, so a club never raises itself.</param>
 /// <param name="PlayerId">The listed player.</param>
 /// <param name="Family">The listed player's position family, which decides positional need.</param>
-/// <param name="Ability">The listed player's ability, 1–20.</param>
-/// <param name="Potential">The listed player's hidden ceiling, 1–20. Class C2: server-only.</param>
+/// <param name="AbilityTenths">The listed player's skill in tenths of a point.</param>
 /// <param name="Age">The listed player's age in game years.</param>
 /// <param name="MinimumFeeMinor">The seller's minimum fee, in minor units.</param>
 /// <param name="LeadingAmountMinor">The current leading amount, in minor units, or null.</param>
+/// <param name="BuyerSeasonWageMinor">The wage for a season the listing quotes the buyer.</param>
 public sealed record AiMarketListing(
     Guid ListingId,
     Guid SellerClubId,
     Guid? LeadingClubId,
     Guid PlayerId,
     PositionFamily Family,
-    int Ability,
-    int Potential,
+    int AbilityTenths,
     int Age,
     long MinimumFeeMinor,
-    long? LeadingAmountMinor);
+    long? LeadingAmountMinor,
+    long BuyerSeasonWageMinor);
 
 /// <summary>An AI club's decision to list a surplus player (`TRF-12`).</summary>
 /// <param name="PlayerId">The player to sell.</param>
@@ -113,8 +123,10 @@ public sealed record AiMarketPlan(
 /// A club lists a player only when it is genuinely surplus — its family is above the generator's quota, or
 /// the squad is above the target size — and only while the sale leaves a legal squad (the minimum count and
 /// two goalkeepers, `SQ-2`). A club bids only where it has a positional need, never on its own player or its
-/// own leading bid, and never above the player's valuation or a bounded share of its available cash
-/// (`FIN-10`). Both lists are bounded, so one pass cannot flood the market or over-commit a club.
+/// own leading bid, never above the player's valuation or a bounded share of its available cash (`FIN-10`),
+/// and only when its wage bill stays within the wage budget and a reserve of cash is left (`ai-market-v2`);
+/// a club in the red bids on nothing. A club over its wage budget, or in the red, lists its highest earner
+/// first. Both lists are bounded, so one pass cannot flood the market or over-commit a club.
 /// </para>
 /// <para>
 /// Two draws vary a club from its neighbours without making it random: how much of a valuation it will pay,
@@ -181,12 +193,31 @@ public static class AiMarketPolicy
         var candidates = squad
             .Where(player => !player.IsListed && IsSurplus(player, familyCounts, squad.Count))
             .OrderByDescending(player => (int)player.SquadStatus)
-            .ThenBy(player => player.Ability)
+            .ThenBy(player => player.AbilityTenths)
             .ThenBy(player => player.ContractEndSeasonNumber)
             .ThenBy(player => player.PlayerId)
             .ToList();
 
         var decisions = new List<AiListPlayerDecision>();
+
+        // A club over its wage budget, or in the red, sells its highest earner first, surplus or not.
+        if (club.Finances.InTheRed || club.Finances.WageBillSeasonMinor > club.Finances.WageBudgetMinor)
+        {
+            var earner = squad
+                .Where(player => !player.IsListed && SellingKeepsLegal(player, remaining, familyCounts))
+                .OrderByDescending(player => player.SeasonWageMinor)
+                .ThenBy(player => player.PlayerId)
+                .FirstOrDefault();
+
+            if (earner is not null)
+            {
+                decisions.Add(new AiListPlayerDecision(earner.PlayerId, AskingFor(earner, askingFactorBp), buyerSeasons));
+
+                remaining--;
+                familyCounts[earner.Family] = familyCounts[earner.Family] - 1;
+                candidates = [.. candidates.Where(player => player.PlayerId != earner.PlayerId)];
+            }
+        }
 
         foreach (var player in candidates)
         {
@@ -202,11 +233,7 @@ public static class AiMarketPolicy
                 continue;
             }
 
-            var value = PlayerValuation.Estimate(
-                new PlayerValuationInput(player.Ability, player.Potential, player.Age, club.Tier));
-            var fee = Math.Max(1, value * askingFactorBp / 10_000);
-
-            decisions.Add(new AiListPlayerDecision(player.PlayerId, fee, buyerSeasons));
+            decisions.Add(new AiListPlayerDecision(player.PlayerId, AskingFor(player, askingFactorBp), buyerSeasons));
 
             remaining--;
             familyCounts[player.Family] = familyCounts[player.Family] - 1;
@@ -222,9 +249,16 @@ public static class AiMarketPolicy
         int bidWillingnessBp)
     {
         var decisions = new List<AiBidDecision>();
+
+        if (club.Finances.InTheRed)
+        {
+            return decisions;
+        }
+
         var familyCounts = CountFamilies(club.Players);
         var squadCount = club.Players.Count;
         var spendable = club.SpendableMinor;
+        var wageBill = club.Finances.WageBillSeasonMinor;
 
         var ordered = openListings
             .Where(listing => listing.SellerClubId != club.ClubId)
@@ -244,8 +278,13 @@ public static class AiMarketPolicy
                 continue;
             }
 
-            var value = PlayerValuation.Estimate(
-                new PlayerValuationInput(listing.Ability, listing.Potential, listing.Age, club.Tier));
+            // The wage bill must stay within the budget with this player on it.
+            if (wageBill + listing.BuyerSeasonWageMinor > club.Finances.WageBudgetMinor)
+            {
+                continue;
+            }
+
+            var value = PlayerValuation.Estimate(new PlayerValuationInput(listing.AbilityTenths, listing.Age));
 
             var ceiling = Math.Min(
                 value * bidWillingnessBp / 10_000,
@@ -253,13 +292,14 @@ public static class AiMarketPolicy
 
             var amount = AuctionRules.MinimumAcceptableBid(listing.MinimumFeeMinor, listing.LeadingAmountMinor);
 
-            if (amount <= 0 || amount > ceiling)
+            if (amount <= 0 || amount > ceiling || spendable - amount < club.Finances.ReserveMinor)
             {
                 continue;
             }
 
             decisions.Add(new AiBidDecision(listing.ListingId, amount));
 
+            wageBill += listing.BuyerSeasonWageMinor;
             spendable -= amount;
             familyCounts[listing.Family] = familyCounts.GetValueOrDefault(listing.Family) + 1;
             squadCount++;
@@ -304,18 +344,26 @@ public static class AiMarketPolicy
         IReadOnlyDictionary<PositionFamily, int> familyCounts,
         AiMarketListing listing) =>
         familyCounts.GetValueOrDefault(listing.Family) < WorldRuleSet.AiMarketFamilyCap(listing.Family)
-        || listing.Ability > WeakestAbilityIn(club.Players, listing.Family);
+        || listing.AbilityTenths > WeakestAbilityIn(club.Players, listing.Family);
 
-    /// <summary>Gets the lowest ability the club holds in a family, or zero when it holds nobody there.</summary>
+    /// <summary>What a club asks for a player: his value at the market's view of his age, times the club's asking factor.</summary>
+    private static long AskingFor(AiMarketPlayer player, int askingFactorBp)
+    {
+        var value = PlayerValuation.Estimate(new PlayerValuationInput(player.AbilityTenths, player.Age));
+
+        return Math.Max(1, value * askingFactorBp / 10_000);
+    }
+
+    /// <summary>Gets the lowest skill the club holds in a family, in tenths, or zero when it holds nobody there.</summary>
     private static int WeakestAbilityIn(IReadOnlyList<AiMarketPlayer> players, PositionFamily family)
     {
         var weakest = int.MaxValue;
 
         foreach (var player in players)
         {
-            if (player.Family == family && player.Ability < weakest)
+            if (player.Family == family && player.AbilityTenths < weakest)
             {
-                weakest = player.Ability;
+                weakest = player.AbilityTenths;
             }
         }
 
@@ -340,17 +388,20 @@ public static class AiMarketPolicy
         var builder = new StringBuilder();
 
         builder.Append("club=").Append(club.ClubId.ToString("D"))
-            .Append(";tier=").Append(club.Tier.ToString(CultureInfo.InvariantCulture))
             .Append(";cash=").Append(club.SpendableMinor.ToString(CultureInfo.InvariantCulture))
+            .Append(";bill=").Append(club.Finances.WageBillSeasonMinor.ToString(CultureInfo.InvariantCulture))
+            .Append(";budget=").Append(club.Finances.WageBudgetMinor.ToString(CultureInfo.InvariantCulture))
+            .Append(";reserve=").Append(club.Finances.ReserveMinor.ToString(CultureInfo.InvariantCulture))
+            .Append(";red=").Append(club.Finances.InTheRed ? '1' : '0')
             .Append(";players=");
 
         foreach (var player in club.Players.OrderBy(player => player.PlayerId))
         {
             builder.Append(player.PlayerId.ToString("D")).Append('|')
                 .Append(player.Family.ToCode()).Append('|')
-                .Append(player.Ability.ToString(CultureInfo.InvariantCulture)).Append('|')
-                .Append(player.Potential.ToString(CultureInfo.InvariantCulture)).Append('|')
+                .Append(player.AbilityTenths.ToString(CultureInfo.InvariantCulture)).Append('|')
                 .Append(player.Age.ToString(CultureInfo.InvariantCulture)).Append('|')
+                .Append(player.SeasonWageMinor.ToString(CultureInfo.InvariantCulture)).Append('|')
                 .Append(player.SquadStatus.ToCode()).Append('|')
                 .Append(player.ContractEndSeasonNumber.ToString(CultureInfo.InvariantCulture)).Append('|')
                 .Append(player.IsListed ? '1' : '0').Append(',');
@@ -365,9 +416,9 @@ public static class AiMarketPolicy
                 .Append((listing.LeadingClubId ?? Guid.Empty).ToString("D")).Append('|')
                 .Append(listing.PlayerId.ToString("D")).Append('|')
                 .Append(listing.Family.ToCode()).Append('|')
-                .Append(listing.Ability.ToString(CultureInfo.InvariantCulture)).Append('|')
-                .Append(listing.Potential.ToString(CultureInfo.InvariantCulture)).Append('|')
+                .Append(listing.AbilityTenths.ToString(CultureInfo.InvariantCulture)).Append('|')
                 .Append(listing.Age.ToString(CultureInfo.InvariantCulture)).Append('|')
+                .Append(listing.BuyerSeasonWageMinor.ToString(CultureInfo.InvariantCulture)).Append('|')
                 .Append(listing.MinimumFeeMinor.ToString(CultureInfo.InvariantCulture)).Append('|')
                 .Append((listing.LeadingAmountMinor ?? -1).ToString(CultureInfo.InvariantCulture)).Append(',');
         }

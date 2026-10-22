@@ -18,7 +18,7 @@ public static partial class FanRuleSet
     public const int FloorShareOfOpeningBp = 4_000;
 
     /// <summary>The most people who want to come to a tier-1 club's home match, the soft cap, a little above the biggest stadium (`FAN-1`).</summary>
-    public const int SoftCapWantToComeTier1 = 55_000;
+    public const int SoftCapWantToComeTier1 = 82_500;
 
     /// <summary>The numerator of what a tier keeps of the tier above it: three quarters, the same fall as the crowd's (`STAD-5`).</summary>
     public const int TierRetainedNumerator = 3;

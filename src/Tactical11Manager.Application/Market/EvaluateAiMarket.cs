@@ -177,20 +177,22 @@ public sealed class EvaluateAiMarket
         return new EvaluateAiMarketResult(clubs.Count, listed, bids, skipped);
     }
 
+    // The wage-aware inputs of ai-market-v2 (the wage bill, the budget, the reserve, the state of the club's money, a wage for each player) arrive
+    // with the market milestone of the economy rework; until then the club has no wage limit and the policy behaves as it did.
     private static AiMarketClub ToPolicyClub(AiMarketClubRow row) => new(
         row.ClubId,
-        row.Tier,
         row.SpendableMinor,
+        new AiMarketFinances(WageBillSeasonMinor: 0, WageBudgetMinor: long.MaxValue, ReserveMinor: 0, InTheRed: false),
         [.. row.Players.Select(player => new AiMarketPlayer(
             player.PlayerId,
             player.Family,
-            player.Ability,
-            player.Potential,
+            player.Ability * 10,
             player.Age,
             player.SquadStatus,
             player.ContractEndSeasonNumber,
             row.CurrentSeasonNumber,
-            player.IsListed))]);
+            player.IsListed,
+            SeasonWageMinor: 0))]);
 
     private static AiMarketListing ToPolicyListing(AiMarketListingRow row) => new(
         row.ListingId,
@@ -198,11 +200,11 @@ public sealed class EvaluateAiMarket
         row.LeadingClubId,
         row.PlayerId,
         row.Family,
-        row.Ability,
-        row.Potential,
+        row.Ability * 10,
         row.Age,
         row.MinimumFeeMinor,
-        row.LeadingAmountMinor);
+        row.LeadingAmountMinor,
+        BuyerSeasonWageMinor: 0);
 
     /// <summary>The deterministic daily key of a listing decision, which a retried pass replays (`T-4`).</summary>
     private static string ListingKey(Guid clubId, Guid playerId, DateOnly day) =>

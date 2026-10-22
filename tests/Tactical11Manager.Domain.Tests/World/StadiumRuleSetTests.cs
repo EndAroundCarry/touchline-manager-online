@@ -33,16 +33,16 @@ public sealed class StadiumRuleSetTests
     }
 
     [Fact]
-    public void The_suggested_tier_one_prices_are_eight_fifteen_twenty_five_and_ninety()
+    public void The_tier_one_prices_are_twenty_thirty_five_fifty_and_one_hundred_and_eighty()
     {
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Standing).Should().Be(800);
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Seating).Should().Be(1_500);
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.CoveredSeating).Should().Be(2_500);
-        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Vip).Should().Be(9_000);
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Standing).Should().Be(2_000);
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Seating).Should().Be(3_500);
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.CoveredSeating).Should().Be(5_000);
+        StadiumRuleSet.TicketPriceMinorTier1(StadiumStand.Vip).Should().Be(18_000);
     }
 
     [Fact]
-    public void A_place_that_sells_out_pays_for_itself_in_a_couple_of_seasons()
+    public void A_place_that_sells_out_pays_for_itself_in_about_seven_seasons()
     {
         // 17 home matches in a double round-robin of 18 clubs.
         const int homeMatches = WorldRuleSet.ClubsPerDivision - 1;
@@ -52,19 +52,29 @@ public sealed class StadiumRuleSetTests
             var seasonsToRepay = (double)StadiumRuleSet.BuildCostMinorTier1(stand)
                 / (StadiumRuleSet.TicketPriceMinorTier1(stand) * homeMatches);
 
-            seasonsToRepay.Should().BeInRange(1.5, 3.5, $"{stand} should repay in a couple of seasons, not at once or never");
+            seasonsToRepay.Should().BeInRange(5.5, 8.5, $"{stand} should repay in many seasons, so a ground is a project and not a purchase");
         }
     }
 
     [Fact]
-    public void Prices_and_costs_halve_with_each_tier_like_every_other_baseline()
+    public void Prices_and_costs_follow_the_tiers_price_level_and_never_round_to_nothing()
     {
         foreach (var stand in StadiumStands.All)
         {
-            StadiumRuleSet.TicketPriceMinorFor(stand, 2).Should().Be(StadiumRuleSet.TicketPriceMinorFor(stand, 1) / 2);
-            StadiumRuleSet.BuildCostMinorFor(stand, 3).Should().Be(StadiumRuleSet.BuildCostMinorFor(stand, 1) / 4);
+            StadiumRuleSet.TicketPriceMinorFor(stand, 2).Should().Be(StadiumRuleSet.TicketPriceMinorTier1(stand) * 5_333 / 10_000);
+            StadiumRuleSet.BuildCostMinorFor(stand, 3).Should().Be(StadiumRuleSet.BuildCostMinorTier1(stand) * 2_844 / 10_000);
+            StadiumRuleSet.TicketPriceMinorFor(stand, 12).Should().Be(StadiumRuleSet.TicketPriceMinorFor(stand, 5), "tier 5 and every tier below share a price level");
             StadiumRuleSet.TicketPriceMinorFor(stand, 12).Should().BeGreaterThan(0, "a price never rounds to nothing");
         }
+    }
+
+    [Fact]
+    public void The_ground_costs_two_per_cent_of_what_its_places_cost_to_build_each_season()
+    {
+        var expected = StadiumStands.All.Sum(stand => Opening.Of(stand) * StadiumRuleSet.BuildCostMinorFor(stand, 1)) * 2 / 100;
+
+        StadiumRuleSet.GroundUpkeepSeasonMinorFor(Opening, 1).Should().Be(expected);
+        StadiumRuleSet.GroundUpkeepSeasonMinorFor(Opening, 2).Should().BeLessThan(expected);
     }
 
     [Fact]
@@ -160,7 +170,7 @@ public sealed class StadiumRuleSetTests
         var gate = StadiumRuleSet.GateRevenueMinorFor(Opening, tier: 1, FanRuleSet.StartFansFor(1), FanRuleSet.CalmMoodBp);
 
         // 1,350 on the terrace, 600 in the seats, 840 under cover and all 100 VIP places.
-        gate.Should().Be((1_350 * 800L) + (600 * 1_500L) + (840 * 2_500L) + (100 * 9_000L));
+        gate.Should().Be((1_350 * 2_000L) + (600 * 3_500L) + (840 * 5_000L) + (100 * 18_000L));
         gate.Should().BeLessThan(StadiumRuleSet.FullHouseMinorFor(Opening, 1), "the opening crowd does not fill the ground");
     }
 
@@ -218,18 +228,17 @@ public sealed class StadiumRuleSetTests
     }
 
     [Fact]
-    public void A_season_of_home_gates_is_in_proportion_to_the_weekly_sponsorship_it_sits_beside()
+    public void A_season_of_home_gates_is_in_proportion_to_the_league_and_sponsor_money_it_sits_beside()
     {
         // A guard on the calibration: a ground must be a real income without dwarfing the club's other money.
-        // 17 home matches at the opening ground against 34 weekly sponsorship credits. A new club opens with a
-        // small crowd (a third of what the old gate assumed), so the lower bound is an eighth, not a quarter.
+        // 17 home matches at the opening ground against the league's money and the steady sponsor for the season.
         for (var tier = 1; tier <= 6; tier++)
         {
             var season = 17 * StadiumRuleSet.GateRevenueMinorFor(Opening, tier, FanRuleSet.StartFansFor(tier), FanRuleSet.CalmMoodBp);
-            var sponsorship = 34 * WorldRuleSet.WeeklySponsorshipMinorForTier(tier);
+            var fixedMoney = EconomyRuleSet.LeagueTvSeasonMinorFor(tier) + EconomyRuleSet.SponsorBaseSeasonMinorFor(tier);
 
-            season.Should().BeGreaterThan(sponsorship / 8, $"tier {tier}'s gate is a real income");
-            season.Should().BeLessThan(sponsorship * 4, $"tier {tier}'s gate does not drown the rest of the economy");
+            season.Should().BeGreaterThan(fixedMoney / 8, $"tier {tier}'s gate is a real income");
+            season.Should().BeLessThan(fixedMoney * 4, $"tier {tier}'s gate does not drown the rest of the economy");
         }
     }
 

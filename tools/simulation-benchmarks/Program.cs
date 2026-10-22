@@ -283,13 +283,12 @@ if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") == "1")
 
 if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") != "1")
 {
-    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of 18 clubs, weekly steps, today's rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per computer club, default 2; ECON_TRAIN scales development speed in percent, default 100)
+    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of 18 clubs, matchday steps, the v17 economy rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per computer club, default 2; ECON_TRAIN scales development speed in percent, default 100)
     EconReport.Run(
         Math.Clamp(positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var econSeeds) ? econSeeds : 3, 1, 10),
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var econSeed) ? econSeed : 5_000UL,
         positional.Length > 3 && int.TryParse(positional[3], CultureInfo.InvariantCulture, out var econSeasons) ? Math.Clamp(econSeasons, 1, 12) : 10,
         Environment.GetEnvironmentVariable("ECON_OUT") is { Length: > 0 } econOut ? econOut : Path.Combine(".run-logs", "econ"),
-        new TodayEconRules(),
         int.TryParse(Environment.GetEnvironmentVariable("ECON_INTAKE"), CultureInfo.InvariantCulture, out var econIntake) ? Math.Clamp(econIntake, 0, 8) : EconSim.DefaultYouthPerAiClub,
         int.TryParse(Environment.GetEnvironmentVariable("ECON_TRAIN"), CultureInfo.InvariantCulture, out var econTrain) ? Math.Clamp(econTrain, 25, 1000) : 100);
 }

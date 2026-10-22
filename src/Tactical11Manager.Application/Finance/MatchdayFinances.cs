@@ -148,7 +148,7 @@ public sealed class MatchdayFinances
             fixture.AwayScore!.Value,
             expectedPointsCentis);
 
-        var baseMinor = StructureRuleSet.SnackBaseMinorFor(revenue.SnackBarLevel, spectators);
+        var baseMinor = StructureRuleSet.SnackBaseMinorFor(revenue.SnackBarLevel, spectators, revenue.TierNumber);
         var amount = StructureRuleSet.WithBonus(baseMinor, bonus.Bp);
 
         // A ledger entry is never empty, so a crowd of nobody sells nothing and writes nothing.

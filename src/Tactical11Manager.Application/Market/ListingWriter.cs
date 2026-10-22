@@ -140,12 +140,10 @@ public sealed class ListingWriter : IListingWriter
 
         var terms = ContractRenewalQuote.Calculate(
             new ContractRenewalInput(
-                eligibility.Ability,
-                eligibility.Potential,
+                eligibility.Ability * 10,
                 eligibility.Age,
                 eligibility.Appearances,
                 eligibility.MoraleBp,
-                eligibility.TierNumber,
                 remainingSeasons),
             seasons);
 
@@ -155,7 +153,7 @@ public sealed class ListingWriter : IListingWriter
             playerId,
             clubId,
             minimumFeeMinor,
-            terms.WeeklyWageMinor,
+            EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
             terms.Seasons,
             now,
             AuctionWindows.EndsAtFor(now),

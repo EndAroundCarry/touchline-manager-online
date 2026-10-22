@@ -135,12 +135,10 @@ public sealed class FreeAgentBatchTests : IAsyncLifetime, IDisposable
             var ability = (int)Math.Round(attributes.ToSet().Values.Average(), MidpointRounding.AwayFromZero);
             var expected = FreeAgentTerms.CalculateReleased(
                 ability,
-                player.Potential,
-                season.GameYear - player.BirthGameYear,
-                referenceTier: 1);
+                season.GameYear - player.BirthGameYear);
 
             listing.MinimumFeeMinor.Should().Be(expected.MinimumFeeMinor);
-            listing.GeneratedBuyerWageMinor.Should().Be(expected.WeeklyWageMinor);
+            listing.GeneratedBuyerWageMinor.Should().Be(EconomyRuleSet.PerWeeklyRun(expected.SeasonWageMinor));
             listing.GeneratedContractSeasons.Should().Be(expected.ContractSeasons);
         }
 

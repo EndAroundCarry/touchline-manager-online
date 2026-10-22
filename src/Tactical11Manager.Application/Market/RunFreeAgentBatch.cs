@@ -4,6 +4,7 @@ using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Domain.Market;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad.Generation;
 
 namespace Tactical11Manager.Application.Market;
@@ -159,8 +160,7 @@ public sealed class RunFreeAgentBatch
                 agent.Player.Id,
                 FreeAgentTerms.Calculate(
                     agent.Ability,
-                    facts.GameYear - agent.Player.BirthGameYear,
-                    ReferenceTier(tierByCountry, agent.Player.NationalityCode)),
+                    facts.GameYear - agent.Player.BirthGameYear),
                 now);
         }
 
@@ -171,9 +171,7 @@ public sealed class RunFreeAgentBatch
                 row.PlayerId,
                 FreeAgentTerms.CalculateReleased(
                     row.Ability,
-                    row.Potential,
-                    row.Age,
-                    ReferenceTier(tierByCountry, row.NationalityCode)),
+                    row.Age),
                 now);
         }
 
@@ -216,7 +214,7 @@ public sealed class RunFreeAgentBatch
             playerId,
             batch.Id,
             offer.MinimumFeeMinor,
-            offer.WeeklyWageMinor,
+            EconomyRuleSet.PerWeeklyRun(offer.SeasonWageMinor),
             offer.ContractSeasons,
             batch.OpensAt,
             batch.EndsAt,

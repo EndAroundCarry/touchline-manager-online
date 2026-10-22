@@ -143,21 +143,19 @@ public sealed class WorldRuleSetTests
     }
 
     [Fact]
-    public void Each_tier_below_the_first_is_worth_half_of_the_one_above_it()
+    public void Each_tier_below_the_first_has_less_money_and_a_lower_opening_standing()
     {
-        WorldRuleSet.TierScalingFactor(1).Should().Be(1);
-        WorldRuleSet.TierScalingFactor(2).Should().Be(2);
-        WorldRuleSet.TierScalingFactor(3).Should().Be(4);
-
         WorldRuleSet.OpeningCashMinorForTier(1).Should().BeGreaterThan(WorldRuleSet.OpeningCashMinorForTier(2));
         WorldRuleSet.OpeningCashMinorForTier(2).Should().BeGreaterThan(WorldRuleSet.OpeningCashMinorForTier(3));
+        WorldRuleSet.OpeningReputationForTier(1).Should().Be(50);
+        WorldRuleSet.OpeningReputationForTier(2).Should().Be(40);
         WorldRuleSet.OpeningReputationForTier(6).Should().BeGreaterThanOrEqualTo(1);
     }
 
     [Fact]
     public void A_tier_below_one_is_a_programming_error()
     {
-        var act = () => WorldRuleSet.TierScalingFactor(0);
+        var act = () => EconomyRuleSet.TierFactorBp(0);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -183,9 +181,9 @@ public sealed class WorldRuleSetTests
         WorldRuleSet.WeeklyFinanceUtc.Should().Be(new TimeOnly(23, 0), "CON-2 charges wages after Sunday");
 
         WorldRuleSet.WeeklySponsorshipMinorForTier(1).Should()
-            .BeGreaterThan(WorldRuleSet.WeeklySponsorshipMinorForTier(2), "FIN-4 halves per tier");
+            .BeGreaterThan(WorldRuleSet.WeeklySponsorshipMinorForTier(2), "FIN-4 falls 0.4 a tier");
         WorldRuleSet.WeeklyOperatingCostMinorForTier(1).Should()
-            .BeGreaterThan(WorldRuleSet.WeeklyOperatingCostMinorForTier(3), "FIN-9 halves per tier");
+            .BeGreaterThan(WorldRuleSet.WeeklyOperatingCostMinorForTier(3), "FIN-9 falls 0.4 a tier");
 
         WorldRuleSet.PositionAwardMinorFor(1, 1).Should()
             .BeGreaterThan(WorldRuleSet.PositionAwardMinorFor(1, WorldRuleSet.ClubsPerDivision), "FIN-5 decays with rank");

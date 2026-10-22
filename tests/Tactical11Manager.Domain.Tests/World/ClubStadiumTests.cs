@@ -34,12 +34,15 @@ public sealed class ClubStadiumTests
     [InlineData(45_000, 9)]
     [InlineData(45_001, 10)]
     [InlineData(50_000, 10)]
+    [InlineData(70_000, 14)]
+    [InlineData(70_001, 15)]
+    [InlineData(75_000, 15)]
     public void The_level_is_the_number_of_five_thousand_place_blocks_the_ground_spans(int capacity, int level) =>
         StadiumRuleSet.LevelFor(capacity).Should().Be(level);
 
     [Theory]
     [InlineData(0)]
-    [InlineData(50_001)]
+    [InlineData(75_001)]
     public void A_capacity_outside_the_ten_levels_is_a_programming_error(int capacity)
     {
         var act = () => StadiumRuleSet.LevelFor(capacity);
@@ -91,14 +94,14 @@ public sealed class ClubStadiumTests
 
         stadium.AddSeats(StadiumStand.Standing, StadiumRuleSet.MaxCapacity - 5_000, Now);
 
-        stadium.Capacity.Should().Be(50_000);
-        stadium.Level.Should().Be(10);
+        stadium.Capacity.Should().Be(75_000);
+        stadium.Level.Should().Be(15);
         stadium.RemainingRoom.Should().Be(0);
 
         var act = () => stadium.AddSeats(StadiumStand.Vip, 1, Now);
 
         act.Should().Throw<InvalidOperationException>("the top level is the largest ground (STAD-1)");
-        stadium.Capacity.Should().Be(50_000);
+        stadium.Capacity.Should().Be(75_000);
     }
 
     [Theory]

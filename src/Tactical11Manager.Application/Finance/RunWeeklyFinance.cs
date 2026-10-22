@@ -147,7 +147,7 @@ public sealed partial class RunWeeklyFinance
             // The shop sells all week to the fans as they close it, and its credit is in the account before the
             // guard reads it, like the sponsorship (STRC-6, STRC-7).
             var moodBonus = StructureRuleSet.MoodBonusFor(FanMoods.WordFor(club.MoodBp));
-            var merchBase = StructureRuleSet.MerchBaseMinorFor(club.MerchandiseLevel, club.Fans);
+            var merchBase = StructureRuleSet.MerchBaseMinorFor(club.MerchandiseLevel, club.Fans, club.TierNumber);
             var merchandise = StructureRuleSet.WithBonus(merchBase, moodBonus.Bp);
 
             if (merchandise > 0)

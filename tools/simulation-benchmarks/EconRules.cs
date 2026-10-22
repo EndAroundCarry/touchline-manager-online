@@ -1,4 +1,4 @@
-using Tactical11Manager.Domain.Fans;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -6,102 +6,62 @@ using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.SimulationBenchmarks;
 
-// The economy sandbox (plan toasty-scott, Milestone 0). Every money formula the sandbox needs goes through this one seam, so Milestone 1 can add
-// the v2 rules beside today's and run the same world on both. All amounts are minor units; "per week" means one of the season's 34 settlements
-// (today the weekly finance run, in v2 the matchday), so a season is 34 of them either way.
+// The economy sandbox (plan toasty-scott, Milestone 1). Every money formula the sandbox needs goes through this one class, which reads the game's own
+// rules (EconomyRuleSet, StadiumRuleSet, StructureRuleSet, PlayerValuation, ContractRenewalQuote, FreeAgentTerms). All amounts are minor units. A season
+// is 34 settlements, one on each matchday: league money, the sponsor's fixed part and wages are paid in 34 equal parts, and the weekly run's items
+// (the shop, building upkeep) are paid a third of a weekly run on each matchday.
+//
+// The first version of the sandbox (Milestone 0) ran the rules of world-rules-v16 behind an interface; its baseline report is kept outside the repo. Those
+// rules were replaced by the v17 rules, so only the v17 rules run here.
 
 /// <summary>The terms a free agent signs on.</summary>
-internal sealed record EconFreeAgentQuote(long FeeMinor, long WagePerWeekMinor, int Seasons);
+internal sealed record EconFreeAgentQuote(long FeeMinor, long SeasonWageMinor, int Seasons);
 
-internal interface IEconRules
+internal static class EconRules
 {
-    string Name { get; }
+    public static string Name => $"economy v2 ({WorldRuleSet.Version}, {PlayerValuation.Version})";
 
     /// <summary>Cash a fresh club of the tier opens with.</summary>
-    long OpeningCash(int tier);
+    public static long OpeningCash(int tier) => EconomyRuleSet.OpeningCashMinorFor(tier);
 
-    /// <summary>The wage the generator gives a squad member of this ability.</summary>
-    long GeneratedWagePerWeek(int ability, int tier);
+    /// <summary>The season wage the generator gives a squad member of this ability.</summary>
+    public static long GeneratedWage(int ability) => EconomyRuleSet.GeneratedSeasonWageMinorFor(ability);
 
-    /// <summary>The wage a renewal, a listing or a transfer quotes.</summary>
-    long RenewalWagePerWeek(ContractRenewalInput input, int seasons);
+    /// <summary>The season wage a renewal, a listing or a transfer quotes.</summary>
+    public static long RenewalWage(ContractRenewalInput input, int seasons) => ContractRenewalQuote.Calculate(input, seasons).SeasonWageMinor;
 
-    /// <summary>What a player is worth to an AI club: its asking price and the basis of its bid ceiling.</summary>
-    long Value(int ability, int potential, int age, int tier);
+    /// <summary>What a player is worth to the market: its asking price and the basis of a bid ceiling.</summary>
+    public static long Value(int abilityTenths, int age) => PlayerValuation.Estimate(new PlayerValuationInput(abilityTenths, age));
 
-    EconFreeAgentQuote FreeAgent(int ability, int potential, int age, int referenceTier, bool released);
-
-    /// <summary>The fixed income a club gets each week from its league and its sponsor.</summary>
-    long FixedIncomePerWeek(int tier);
-
-    long OperatingPerWeek(int tier);
-
-    long Gate(StadiumSeats seats, int tier, int fans, int moodBp);
-
-    int Attendance(StadiumSeats seats, int fans, int moodBp);
-
-    long BuildCostPerPlace(StadiumStand stand, int tier);
-
-    long SnackTakings(int level, int spectators, int bonusBp);
-
-    long MerchTakings(int level, int fans, FanMoodWord mood);
-
-    long Upkeep(int level, int tier);
-
-    long UpgradeCost(int targetLevel, int tier);
-
-    /// <summary>The prize money for a final place in a division of the tier.</summary>
-    long Prize(int tier, int rank);
-
-    /// <summary>
-    /// How far below zero a club's cash may go before it is bailed out. Today nothing may go below zero, so the limit is zero and a shortfall is an
-    /// emergency grant (FIN-16).
-    /// </summary>
-    long OverdraftLimit(long seasonIncomeForecastMinor);
-}
-
-/// <summary>The rules as they are in the game today (<c>world-rules-v15</c>, <c>player-valuation-v1</c>).</summary>
-internal sealed class TodayEconRules : IEconRules
-{
-    public string Name => "today (world-rules-v15)";
-
-    public long OpeningCash(int tier) => WorldRuleSet.OpeningCashMinorForTier(tier);
-
-    public long GeneratedWagePerWeek(int ability, int tier) => WorldRuleSet.GeneratedWeeklyWageMinorFor(ability, tier);
-
-    public long RenewalWagePerWeek(ContractRenewalInput input, int seasons) => ContractRenewalQuote.Calculate(input, seasons).WeeklyWageMinor;
-
-    public long Value(int ability, int potential, int age, int tier) =>
-        PlayerValuation.Estimate(new PlayerValuationInput(ability, potential, age, tier));
-
-    public EconFreeAgentQuote FreeAgent(int ability, int potential, int age, int referenceTier, bool released)
+    public static EconFreeAgentQuote FreeAgent(int ability, int age, bool released)
     {
-        var offer = released
-            ? FreeAgentTerms.CalculateReleased(ability, potential, age, referenceTier)
-            : FreeAgentTerms.Calculate(ability, age, referenceTier);
+        var offer = released ? FreeAgentTerms.CalculateReleased(ability, age) : FreeAgentTerms.Calculate(ability, age);
 
-        return new EconFreeAgentQuote(offer.MinimumFeeMinor, offer.WeeklyWageMinor, offer.ContractSeasons);
+        return new EconFreeAgentQuote(offer.MinimumFeeMinor, offer.SeasonWageMinor, offer.ContractSeasons);
     }
 
-    public long FixedIncomePerWeek(int tier) => WorldRuleSet.WeeklySponsorshipMinorForTier(tier);
+    public static long Gate(StadiumSeats seats, int tier, int fans, int moodBp) => StadiumRuleSet.GateRevenueMinorFor(seats, tier, fans, moodBp);
 
-    public long OperatingPerWeek(int tier) => WorldRuleSet.WeeklyOperatingCostMinorForTier(tier);
+    public static int Attendance(StadiumSeats seats, int fans, int moodBp) => StadiumRuleSet.AttendanceFor(seats, fans, moodBp);
 
-    public long Gate(StadiumSeats seats, int tier, int fans, int moodBp) => StadiumRuleSet.GateRevenueMinorFor(seats, tier, fans, moodBp);
+    public static long BuildCostPerPlace(StadiumStand stand, int tier) => StadiumRuleSet.BuildCostMinorFor(stand, tier);
 
-    public int Attendance(StadiumSeats seats, int fans, int moodBp) => StadiumRuleSet.AttendanceFor(seats, fans, moodBp);
+    public static long SnackTakings(int level, int spectators, int bonusBp, int tier) => StructureRuleSet.SnackTakingsMinorFor(level, spectators, bonusBp, tier);
 
-    public long BuildCostPerPlace(StadiumStand stand, int tier) => StadiumRuleSet.BuildCostMinorFor(stand, tier);
+    /// <summary>The shop's takings for one matchday: a third of a weekly run's.</summary>
+    public static long MerchTakings(int level, int fans, Tactical11Manager.Domain.Fans.FanMoodWord mood, int tier) =>
+        StructureRuleSet.MerchTakingsMinorFor(level, fans, mood, tier) / EconomyRuleSet.MatchdaysPerWeeklyRun;
 
-    public long SnackTakings(int level, int spectators, int bonusBp) => StructureRuleSet.SnackTakingsMinorFor(level, spectators, bonusBp);
+    /// <summary>A building's upkeep for one matchday.</summary>
+    public static long Upkeep(int level, int tier) => EconomyRuleSet.PerMatchday(StructureRuleSet.UpkeepSeasonMinorFor(level, tier));
 
-    public long MerchTakings(int level, int fans, FanMoodWord mood) => StructureRuleSet.MerchTakingsMinorFor(level, fans, mood);
+    public static long UpgradeCost(int targetLevel, int tier) => StructureRuleSet.UpgradeCostMinorFor(targetLevel, tier);
 
-    public long Upkeep(int level, int tier) => StructureRuleSet.UpkeepMinorFor(level, tier);
+    public static long TvPerMatchday(int tier) => EconomyRuleSet.PerMatchday(EconomyRuleSet.LeagueTvSeasonMinorFor(tier));
 
-    public long UpgradeCost(int targetLevel, int tier) => StructureRuleSet.UpgradeCostMinorFor(targetLevel, tier);
+    public static long OperatingPerMatchday(int tier) => EconomyRuleSet.PerMatchday(EconomyRuleSet.OperatingCostSeasonMinorFor(tier));
 
-    public long Prize(int tier, int rank) => WorldRuleSet.PositionAwardMinorFor(tier, rank);
+    public static long GroundUpkeepPerMatchday(StadiumSeats seats, int tier) => EconomyRuleSet.PerMatchday(StadiumRuleSet.GroundUpkeepSeasonMinorFor(seats, tier));
 
-    public long OverdraftLimit(long seasonIncomeForecastMinor) => 0;
+    public static long Prize(int tier, int rank) => EconomyRuleSet.PrizeMinorFor(tier, rank);
 }

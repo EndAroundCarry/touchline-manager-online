@@ -1,4 +1,5 @@
 using System.Globalization;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -30,7 +31,7 @@ internal sealed partial class EconSim
                     buyer.Cash -= listing.Leading.Value;
                     buyer.Books.FeesPaid += listing.Leading.Value;
                     Sign(buyer, listing, listing.Leading.Value);
-                    Transfers.Add(new TransferRecord(Season, Week, listing.Player.Ability, listing.Player.AgeIn(GameYear), listing.Player.Potential, listing.Leading.Value, 0, buyer.Tier, Pool: true));
+                    Transfers.Add(new TransferRecord(Season, Week, listing.Player.Ability, listing.Player.AgeIn(GameYear), listing.Player.Potential, listing.Leading.Value, 0, buyer.Tier, Pool: true, EconRules.Value(listing.Player.AbilityTenths, listing.Player.AgeIn(GameYear))));
                 }
             }
         }
@@ -51,14 +52,14 @@ internal sealed partial class EconSim
         foreach (var generated in FreeAgentGenerator.Generate(request))
         {
             var player = FromGenerated(generated.Player, generated.Attributes, generated.State, generated.IsGem);
-            var quote = Rules.FreeAgent(player.Ability, player.Ability, player.AgeIn(GameYear), ReferenceTier, released: false);
+            var quote = EconRules.FreeAgent(player.Ability, player.AgeIn(GameYear), released: false);
 
             AddPoolListing(player, quote, released: false);
         }
 
         foreach (var player in _releasedWaiting)
         {
-            var quote = Rules.FreeAgent(player.Ability, player.Potential, player.AgeIn(GameYear), ReferenceTier, released: true);
+            var quote = EconRules.FreeAgent(player.Ability, player.AgeIn(GameYear), released: true);
 
             AddPoolListing(player, quote, released: true);
         }
@@ -75,7 +76,7 @@ internal sealed partial class EconSim
             Player = player,
             Seller = null,
             MinimumFee = quote.FeeMinor,
-            BuyerWage = quote.WagePerWeekMinor,
+            BuyerWage = quote.SeasonWageMinor,
             Seasons = quote.Seasons,
             OpenedRound = Round,
             Released = released,
@@ -96,6 +97,12 @@ internal sealed partial class EconSim
 
             if (listing.LeadingClub is not { } buyer)
             {
+                // A player the board listed and nobody bought is released: his agent pays the club a share of his value (plan section 6).
+                if (listing.Player.BoardListed && listing.Player.Club == seller)
+                {
+                    ReleaseUnsold(seller, listing.Player);
+                }
+
                 continue;
             }
 
@@ -143,7 +150,7 @@ internal sealed partial class EconSim
             }
 
             seller.Squad.Remove(player);
-            Transfers.Add(new TransferRecord(Season, Week, player.Ability, player.AgeIn(GameYear), player.Potential, fee, seller.Tier, buyer.Tier, Pool: false));
+            Transfers.Add(new TransferRecord(Season, Week, player.Ability, player.AgeIn(GameYear), player.Potential, fee, seller.Tier, buyer.Tier, Pool: false, EconRules.Value(player.AbilityTenths, player.AgeIn(GameYear))));
             Sign(buyer, listing, fee);
         }
     }
@@ -166,16 +173,14 @@ internal sealed partial class EconSim
         }
     }
 
-    /// <summary>The wage a listing quotes the buyer: the renewal quote at the seller's tier (CON-5).</summary>
-    public long QuoteWage(SimClub club, SimPlayer player, int seasons) =>
-        Rules.RenewalWagePerWeek(
+    /// <summary>The season wage a listing quotes the buyer: the renewal quote of the player, whatever club he plays for (CON-5).</summary>
+    public long QuoteWage(SimPlayer player, int seasons) =>
+        EconRules.RenewalWage(
             new ContractRenewalInput(
-                player.Ability,
-                player.Potential,
+                player.AbilityTenths,
                 player.AgeIn(GameYear),
                 player.Appearances,
                 player.MoraleBp,
-                club.Tier,
                 Math.Max(0, player.ContractEnd - Season)),
             seasons);
 
@@ -201,7 +206,7 @@ internal sealed partial class EconSim
             Player = player,
             Seller = club,
             MinimumFee = Math.Max(1, minimumFee),
-            BuyerWage = QuoteWage(club, player, seasons),
+            BuyerWage = QuoteWage(player, seasons),
             Seasons = seasons,
             OpenedRound = Round,
         };
@@ -214,7 +219,9 @@ internal sealed partial class EconSim
     /// <summary>A bid: at least the minimum fee, or the leading bid and an increment, from cash the club has free (TRF-5, TRF-7).</summary>
     public static bool PlaceBid(SimClub club, SimListing listing, long amount)
     {
-        if (listing.Seller == club
+        // A club in the red has a transfer embargo (plan section 6).
+        if (club.FinState != FinancialStateKind.Healthy
+            || listing.Seller == club
             || listing.LeadingClub == club
             || club.Squad.Count >= WorldRuleSet.SquadMaximumRegistered
             || !AuctionRules.IsAcceptableBid(listing.MinimumFee, listing.Leading, amount)
@@ -241,7 +248,7 @@ internal sealed partial class EconSim
 
     private void AiMarketRound()
     {
-        foreach (var club in Clubs.Where(club => club.Manager is null).OrderBy(club => club.Guid))
+        foreach (var club in Clubs.Where(club => !club.Managed).OrderBy(club => club.Guid))
         {
             var open = Listings
                 .Where(listing => !listing.IsPool)
@@ -251,27 +258,32 @@ internal sealed partial class EconSim
                     listing.LeadingClub?.Guid,
                     listing.Player.Guid,
                     listing.Player.Family,
-                    listing.Player.Ability,
-                    listing.Player.Potential,
+                    listing.Player.AbilityTenths,
                     listing.Player.AgeIn(GameYear),
                     listing.MinimumFee,
-                    listing.Leading))
+                    listing.Leading,
+                    listing.BuyerWage))
                 .ToList();
 
             var squad = club.Squad
                 .Select(player => new AiMarketPlayer(
                     player.Guid,
                     player.Family,
-                    player.Ability,
-                    player.Potential,
+                    player.AbilityTenths,
                     player.AgeIn(GameYear),
                     player.Status,
                     player.ContractEnd,
                     Season,
-                    player.Listed))
+                    player.Listed,
+                    player.Wage))
                 .ToList();
 
-            var plan = AiMarketPolicy.Decide(new AiMarketClub(club.Guid, club.Tier, Math.Max(0, club.Available), squad), open);
+            var finances = new AiMarketFinances(
+                club.WageBill,
+                EconomyRuleSet.WageBudgetMinorFor(club.Forecast),
+                AiFinancePolicy.ReserveMinorFor(club.WageBill),
+                club.FinState != FinancialStateKind.Healthy);
+            var plan = AiMarketPolicy.Decide(new AiMarketClub(club.Guid, Math.Max(0, club.Available), finances, squad), open);
 
             foreach (var decision in plan.Listings)
             {
@@ -301,23 +313,29 @@ internal sealed partial class EconSim
     /// Buys a player straight from an AI club at 105% of his value, whether or not he is listed. Not a game rule: the sandbox's way of putting a
     /// star in front of a scripted spender, so the economy is tested and not the market's supply.
     /// </summary>
-    public SimPlayer? Poach(SimClub buyer, int minAbility, int maxAge, long maxFee)
+    public SimPlayer? Poach(SimClub buyer, int minAbility, int maxAge, long maxFee, bool endow = false)
     {
+        if (buyer.FinState != FinancialStateKind.Healthy)
+        {
+            return null;
+        }
+
         SimPlayer? best = null;
         var bestFee = 0L;
 
-        foreach (var seller in Clubs.Where(club => club != buyer && club.Manager is null && club.Squad.Count > WorldRuleSet.SquadMinimumRegistered + 1))
+        foreach (var seller in Clubs.Where(club => club != buyer && !club.Managed && club.Squad.Count > WorldRuleSet.SquadMinimumRegistered + 1))
         {
             foreach (var player in seller.Squad.Where(player => !player.Listed && player.Ability >= minAbility && player.AgeIn(GameYear) <= maxAge))
             {
-                var fee = Rules.Value(player.Ability, player.Potential, player.AgeIn(GameYear), seller.Tier) * 105 / 100;
+                var fee = EconRules.Value(player.AbilityTenths, player.AgeIn(GameYear)) * 105 / 100;
 
-                if (fee > maxFee || fee > buyer.Available)
+                if (fee > maxFee || (!endow && fee > buyer.Available))
                 {
                     continue;
                 }
 
-                if (best is null || player.Ability > best.Ability || (player.Ability == best.Ability && fee < bestFee))
+                // The cheapest player who is good enough: the test is what one more star costs a club, not how much it would pay for the best.
+                if (best is null || player.Ability < best.Ability || (player.Ability == best.Ability && fee < bestFee))
                 {
                     best = player;
                     bestFee = fee;
@@ -338,14 +356,19 @@ internal sealed partial class EconSim
             return null;
         }
 
-        var wage = QuoteWage(from, best, 3);
+        var wage = QuoteWage(best, 3);
+
+        if (endow && bestFee > buyer.Available)
+        {
+            Gift(buyer, bestFee - buyer.Available);
+        }
 
         buyer.Cash -= bestFee;
         from.Cash += bestFee;
         buyer.Books.FeesPaid += bestFee;
         from.Books.FeesReceived += bestFee;
         from.Squad.Remove(best);
-        Transfers.Add(new TransferRecord(Season, Week, best.Ability, best.AgeIn(GameYear), best.Potential, bestFee, from.Tier, buyer.Tier, Pool: false));
+        Transfers.Add(new TransferRecord(Season, Week, best.Ability, best.AgeIn(GameYear), best.Potential, bestFee, from.Tier, buyer.Tier, Pool: false, EconRules.Value(best.AbilityTenths, best.AgeIn(GameYear))));
 
         best.Club = buyer;
         best.Wage = wage;
@@ -358,10 +381,15 @@ internal sealed partial class EconSim
     }
 
     /// <summary>Adds places to a ground, paid at once (STAD-4). Returns how many were built.</summary>
-    public int BuildPlaces(SimClub club, StadiumStand stand, int places)
+    public static int BuildPlaces(SimClub club, StadiumStand stand, int places)
     {
+        if (club.FinState != FinancialStateKind.Healthy)
+        {
+            return 0;
+        }
+
         var room = StadiumRuleSet.MaxCapacity - club.Seats.Total;
-        var cost = Rules.BuildCostPerPlace(stand, club.Tier);
+        var cost = EconRules.BuildCostPerPlace(stand, club.Tier);
         var affordable = cost <= 0 ? places : (int)Math.Min(places, Math.Max(0, club.Available) / cost);
         var built = Math.Max(0, Math.Min(Math.Min(places, room), affordable));
 
@@ -386,8 +414,13 @@ internal sealed partial class EconSim
         return built;
     }
 
-    public bool UpgradeStructure(SimClub club, bool snackBar)
+    public static bool UpgradeStructure(SimClub club, bool snackBar)
     {
+        if (club.FinState != FinancialStateKind.Healthy)
+        {
+            return false;
+        }
+
         var level = snackBar ? club.SnackLevel : club.MerchLevel;
 
         if (level >= StructureRuleSet.MaxLevel)
@@ -395,7 +428,7 @@ internal sealed partial class EconSim
             return false;
         }
 
-        var cost = Rules.UpgradeCost(level + 1, club.Tier);
+        var cost = EconRules.UpgradeCost(level + 1, club.Tier);
 
         if (club.Available < cost)
         {
@@ -434,11 +467,29 @@ internal sealed partial class EconSim
         return true;
     }
 
+    private void ReleaseUnsold(SimClub club, SimPlayer player)
+    {
+        var goalkeepers = club.Squad.Count(other => other.IsGoalkeeper) - (player.IsGoalkeeper ? 1 : 0);
+
+        if (club.Squad.Count - 1 < WorldRuleSet.SquadMinimumRegistered || goalkeepers < WorldRuleSet.MinimumGoalkeepers)
+        {
+            return;
+        }
+
+        var fee = EconomyRuleSet.AdministrationReleaseFeeMinor(EconRules.Value(player.AbilityTenths, player.AgeIn(GameYear)));
+
+        club.Cash += fee;
+        club.Books.FeesReceived += fee;
+        club.Books.BoardReleases++;
+        Detach(club, player);
+    }
+
     private void Detach(SimClub club, SimPlayer player)
     {
         club.Squad.Remove(player);
         player.Club = null;
         player.Wage = 0;
+        player.BoardListed = false;
         _releasedWaiting.Add(player);
     }
 

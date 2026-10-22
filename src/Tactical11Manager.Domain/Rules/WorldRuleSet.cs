@@ -29,6 +29,8 @@ namespace Tactical11Manager.Domain.Rules;
 /// right midfielder) and the registration ceiling from twenty-five to twenty-seven (`SQ-1`, `SQ-3`).
 /// The structures milestone added the snack bar and the merchandise shop, whose levels, takings, bonuses and
 /// upkeep live in <see cref="StructureRuleSet"/> (`STRC-*`).
+/// The economy rework moved the money rules (what a player is worth and paid, what a club earns, what a season pays) into
+/// <see cref="EconomyRuleSet"/>; the entries below that were tier-divided baselines now read from it.
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -36,7 +38,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v16";
+    public const string Version = "world-rules-v17";
 
     /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 18;
@@ -100,44 +102,16 @@ public static class WorldRuleSet
     /// <summary>The number of senior players the generator aims for per club (`SQ-1`).</summary>
     public const int GeneratorSquadTarget = 24;
 
-    /// <summary>Opening cash for a tier-1 club, in minor units. A balancing value (see remarks).</summary>
-    /// <remarks>
-    /// The finance module owns the real economy in Stage 9; this exists so a seeded club has a fundable
-    /// account rather than a zero balance that would make the first wage run fail. Lower tiers are
-    /// scaled by <see cref="TierScalingFactor"/>, and both values are expected to be tuned from the
-    /// multi-season simulations Stage 9 requires.
-    /// </remarks>
-    public const long OpeningCashMinorTier1 = 50_000_000;
-
-    /// <summary>Opening reputation for a tier-1 club, on the same 1–100 scale as player ability.</summary>
-    public const int OpeningReputationTier1 = 70;
-
-    /// <summary>
-    /// The divisor applied per tier below the first.
-    /// </summary>
-    /// <remarks>
-    /// Halving per tier keeps a pyramid's money and stadium sizes monotonically decreasing with depth
-    /// without introducing a table of magic numbers, and it degrades gracefully past tier 6 because
-    /// the divisor is applied as a shift rather than a fixed lookup. It is deliberately crude: the
-    /// shape matters for Stage 3, the calibration is Stage 9's job.
-    /// </remarks>
-    public static long TierScalingFactor(int tier)
-    {
-        if (tier < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(tier), tier, "A division tier starts at 1 (WORLD-4).");
-        }
-
-        return 1L << (tier - 1);
-    }
+    /// <summary>Opening cash for a tier-1 club, in minor units. A balancing value; see <see cref="EconomyRuleSet.OpeningCashMinorTier1"/>.</summary>
+    public const long OpeningCashMinorTier1 = EconomyRuleSet.OpeningCashMinorTier1;
 
     /// <summary>Opening cash for a club in the given tier, in minor units.</summary>
-    public static long OpeningCashMinorForTier(int tier) =>
-        OpeningCashMinorTier1 / TierScalingFactor(tier);
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static long OpeningCashMinorForTier(int tier) => EconomyRuleSet.OpeningCashMinorFor(tier);
 
-    /// <summary>Opening reputation for a club in the given tier.</summary>
-    public static int OpeningReputationForTier(int tier) =>
-        Math.Max(1, OpeningReputationTier1 / (int)TierScalingFactor(tier));
+    /// <summary>Opening reputation (standing) for a club in the given tier: 50 at tier 1, 10 less for each tier below (`STD-1`).</summary>
+    /// <param name="tier">The tier number, starting at 1.</param>
+    public static int OpeningReputationForTier(int tier) => EconomyRuleSet.OpeningStandingFor(tier);
 
     /// <summary>
     /// The weekly finance boundary: Sunday evening, after the Sunday matchday has been played (`CON-2`).
@@ -169,43 +143,25 @@ public static class WorldRuleSet
             : date;
     }
 
-    /// <summary>The weekly sponsorship credit for a tier-1 club, in minor units. A balancing value (`FIN-4`).</summary>
-    public const long WeeklySponsorshipMinorTier1 = 3_000_000;
-
-    /// <summary>The weekly sponsorship credit for a club in the given tier, in minor units (`FIN-4`).</summary>
+    /// <summary>The league and sponsor money a weekly run credits a club in the given tier, in minor units (`FIN-4`).</summary>
     /// <param name="tier">The tier number, starting at 1.</param>
+    /// <remarks>
+    /// The league's television money and the steady sponsor's fixed part, three matchdays' worth (`CON-2`). The weekly run goes when the
+    /// matchday settles them (M3); until then this is what the run credits.
+    /// </remarks>
     public static long WeeklySponsorshipMinorForTier(int tier) =>
-        WeeklySponsorshipMinorTier1 / TierScalingFactor(tier);
+        EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.LeagueTvSeasonMinorFor(tier) + EconomyRuleSet.SponsorBaseSeasonMinorFor(tier));
 
-    /// <summary>The small fixed weekly operating cost for a tier-1 club, in minor units (`FIN-9`).</summary>
-    public const long WeeklyOperatingCostMinorTier1 = 1_000_000;
-
-    /// <summary>The small fixed weekly operating cost for a club in the given tier, in minor units (`FIN-9`).</summary>
+    /// <summary>The small fixed operating cost a weekly run charges a club in the given tier, in minor units (`FIN-9`).</summary>
     /// <param name="tier">The tier number, starting at 1.</param>
     public static long WeeklyOperatingCostMinorForTier(int tier) =>
-        WeeklyOperatingCostMinorTier1 / TierScalingFactor(tier);
+        EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.OperatingCostSeasonMinorFor(tier));
 
-    /// <summary>The final-position award for the champion of a tier-1 division, in minor units (`FIN-5`).</summary>
-    public const long PositionAwardMinorTier1Winner = 40_000_000;
-
-    /// <summary>The award a club earns for finishing at a rank in a tier, in minor units (`FIN-5`).</summary>
-    /// <remarks>
-    /// The award decays linearly with position — the champion takes the full amount, the bottom club a
-    /// minimum share — and the whole scale halves per tier like the other baselines. Settled at rollover.
-    /// </remarks>
+    /// <summary>The prize a club earns for finishing at a rank in a tier, in minor units (`FIN-5`).</summary>
+    /// <remarks>A straight line down the table with bigger steps for the top three; see <see cref="EconomyRuleSet.PrizeMinorFor"/>.</remarks>
     /// <param name="tier">The tier number, starting at 1.</param>
     /// <param name="rank">The club's final position, 1–18.</param>
-    public static long PositionAwardMinorFor(int tier, int rank)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(tier, 1);
-        ArgumentOutOfRangeException.ThrowIfLessThan(rank, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(rank, ClubsPerDivision);
-
-        var baseAward = PositionAwardMinorTier1Winner / TierScalingFactor(tier);
-        var share = ClubsPerDivision - (rank - 1);
-
-        return baseAward * share / ClubsPerDivision;
-    }
+    public static long PositionAwardMinorFor(int tier, int rank) => EconomyRuleSet.PrizeMinorFor(tier, rank);
 
     /// <summary>
     /// How many weeks of its wage bill a club must hold in cash before payroll is not a risk (`FIN-16`).
@@ -521,7 +477,7 @@ public static class WorldRuleSet
 
     /// <summary>The mean generated attribute for a tier-1 squad, on the 1–20 scale. A balancing value.</summary>
     /// <remarks>
-    /// Provisional, like <see cref="OpeningCashMinorTier1"/>. The engine work in Stage 5 and the
+    /// Provisional, like <see cref="EconomyRuleSet.OpeningCashMinorTier1"/>. The engine work in Stage 5 and the
     /// multi-season simulations in Stage 9 are what calibrate it; what matters now is that a generated
     /// squad reads as a coherent group rather than as noise.
     /// </remarks>
@@ -583,28 +539,14 @@ public static class WorldRuleSet
     /// <summary>The highest slot coordinate on a tactical pitch's scaled axis (`TAC-9`).</summary>
     public const int SlotCoordinateMax = 10_000;
 
-    /// <summary>
-    /// The wage scale the generator uses, in minor units per unit of squared ability. A balancing value.
-    /// </summary>
-    /// <remarks>
-    /// Wages are quadratic in ability so a squad's payroll is dominated by its best players rather than
-    /// spread evenly, which is the shape Stage 9's wage run and Stage 10's market need. The absolute
-    /// level is provisional and is calibrated by the multi-season simulations, like the baselines above.
-    /// </remarks>
-    public const long GeneratedWeeklyWageMinorPerAbilitySquared = 300;
-
-    /// <summary>The weekly wage a generated player is signed on, in minor units.</summary>
+    /// <summary>The weekly wage a generated player is signed on, in minor units: three matchdays' worth of his season wage.</summary>
     /// <param name="ability">The player's mean ability on the 1–20 scale.</param>
-    /// <param name="tier">The tier the club plays in, which scales the wage like the other baselines.</param>
-    public static long GeneratedWeeklyWageMinorFor(int ability, int tier)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(ability, AttributeMin);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(ability, AttributeMax);
-
-        return (long)ability * ability
-            * GeneratedWeeklyWageMinorPerAbilitySquared
-            / TierScalingFactor(tier);
-    }
+    /// <remarks>
+    /// A player's wage follows the player and not the club's tier (`CON-2`): the same ability costs the same everywhere. The contract still
+    /// stores a weekly wage until the season wage replaces it (M2); the figure is <see cref="EconomyRuleSet.GeneratedSeasonWageMinorFor"/>.
+    /// </remarks>
+    public static long GeneratedWeeklyWageMinorFor(int ability) =>
+        EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.GeneratedSeasonWageMinorFor(ability));
 
     /// <summary>The mean generated attribute for a squad in the given tier.</summary>
     /// <param name="tier">The tier number, starting at 1.</param>
@@ -669,57 +611,6 @@ public static class WorldRuleSet
 
     /// <summary>The most characters a private shortlist note may hold (`SCT-3`).</summary>
     public const int ShortlistNotesMaxLength = 280;
-
-    /// <summary>
-    /// The number of weeks of a player's wage their transfer value is worth (`TRF-12`). A balancing value.
-    /// </summary>
-    /// <remarks>
-    /// The valuation is deliberately derived from the wage scale the generator and the renewal quote
-    /// already use rather than from a second, disconnected money scale: a squad, a renewal, and a fee are
-    /// then priced by one family of rules, and the AI's asking price and bid ceiling cannot drift away from
-    /// what a player actually costs to keep.
-    /// </remarks>
-    public const long PlayerValuationWeeksOfWage = 60;
-
-    /// <summary>How a player's age shapes their transfer value, in basis points (`TRF-12`).</summary>
-    /// <remarks>
-    /// Younger players carry resale and development value, the peak years are the premium, and a veteran is
-    /// cheap. Bounded, like every other factor, so no age can multiply a value into a number the wage scale
-    /// does not support.
-    /// </remarks>
-    /// <param name="age">The player's age in game years.</param>
-    public static int PlayerValuationAgeFactorBp(int age)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(age);
-
-        return age switch
-        {
-            <= 21 => 13_000,
-            <= 24 => 12_000,
-            <= 28 => 10_500,
-            <= 31 => 8_500,
-            _ => 6_000,
-        };
-    }
-
-    /// <summary>How a player's hidden potential shapes their transfer value, in basis points (`TRF-12`).</summary>
-    /// <remarks>
-    /// A higher ceiling commands more, bounded between 9,000 and 12,000 basis points so potential moves a
-    /// value without dominating the ability it is measured beside.
-    /// </remarks>
-    /// <param name="potential">The hidden development ceiling, on the 1–20 scale (`TRN-9`).</param>
-    public static int PlayerValuationPotentialFactorBp(int potential)
-    {
-        if (potential is < AttributeMin or > AttributeMax)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(potential),
-                potential,
-                $"Potential is between {AttributeMin} and {AttributeMax} (TRN-4).");
-        }
-
-        return 9_000 + (potential * 150);
-    }
 
     /// <summary>
     /// The registration count a club's position family is expected to hold (`SQ-1`), which is where the AI
@@ -833,7 +724,7 @@ public static class WorldRuleSet
     /// A free agent's minimum fee as a share of his valuation, in basis points (`FA-6`). A balancing value.
     /// </summary>
     /// <remarks>Never below <see cref="MinimumBidIncrementMinor"/>, so the fee is always a real price.</remarks>
-    public const int FreeAgentMinimumFeeBp = 2_500;
+    public const int FreeAgentMinimumFeeBp = 1_500;
 
     /// <summary>
     /// A released player's minimum fee as a share of his valuation, in basis points (`FA-6`). A balancing value.

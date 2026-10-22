@@ -332,12 +332,10 @@ public sealed partial class SettleSquadContinuity
 
             var terms = ContractRenewalQuote.Calculate(
                 new ContractRenewalInput(
-                    row.Ability,
-                    row.Potential,
+                    row.Ability * 10,
                     row.Age,
                     row.Appearances,
                     row.MoraleBp,
-                    club.TierNumber,
                     RemainingSeasons: 0),
                 seasons);
 
@@ -349,7 +347,7 @@ public sealed partial class SettleSquadContinuity
                 club.ClubId,
                 nextSeason.SequenceNumber,
                 nextSeason.SequenceNumber + terms.Seasons - 1,
-                terms.WeeklyWageMinor,
+                EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
                 contract.SquadStatus,
                 now));
         }

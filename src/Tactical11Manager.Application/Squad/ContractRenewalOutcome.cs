@@ -59,12 +59,10 @@ internal static class ContractRenewal
     /// <summary>Turns the server-only context into the quote's pure input (`CON-3`).</summary>
     public static ContractRenewalInput ToInput(ContractRenewalContext context) =>
         new(
-            context.Ability,
-            context.Potential,
+            context.Ability * 10,
             context.Age,
             context.Appearances,
             context.MoraleBp,
-            context.TierNumber,
             context.RemainingSeasons);
 
     /// <summary>Carries an ownership refusal over into the renewal vocabulary.</summary>
