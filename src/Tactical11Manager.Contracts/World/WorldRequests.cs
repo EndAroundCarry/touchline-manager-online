@@ -63,4 +63,10 @@ public sealed record ClaimClubRequest
 {
     /// <summary>Gets the club to take over.</summary>
     public required Guid ClubId { get; init; }
+
+    /// <summary>
+    /// Gets how the club is taken over: <c>keep</c> to inherit everything as it stands, or <c>clean_start</c> to release the old players and
+    /// begin from the tier's opening squad, ground, buildings and cash with no debt. Absent means <c>keep</c>.
+    /// </summary>
+    public string? Start { get; init; }
 }

@@ -104,6 +104,21 @@ public sealed class ClubStadium
     /// <summary>Gets how many more places the ground can still take (`STAD-1`).</summary>
     public int RemainingRoom => StadiumRuleSet.MaxCapacity - Capacity;
 
+    /// <summary>
+    /// Takes the ground back to the places every club opens with (`TKO-3`). The one way places leave a ground, and only a clean start uses it:
+    /// the manager who chose it gives up the ground he inherits for the opening finances (an exception to `STAD-6`, recorded in the audit log).
+    /// </summary>
+    /// <param name="now">The current instant.</param>
+    public void ResetToOpening(DateTimeOffset now)
+    {
+        StandingSeats = StadiumRuleSet.OpeningStanding;
+        SeatingSeats = StadiumRuleSet.OpeningSeating;
+        CoveredSeats = StadiumRuleSet.OpeningCoveredSeating;
+        VipSeats = StadiumRuleSet.OpeningVip;
+        UpdatedAt = now;
+        Version++;
+    }
+
     /// <summary>Adds places of one kind.</summary>
     /// <param name="stand">The kind of place.</param>
     /// <param name="count">How many to add, 1 and up.</param>

@@ -294,6 +294,55 @@ public sealed record ClubControlResponse(
     DateTimeOffset? StartedAt,
     DateTimeOffset? LastActiveAt);
 
+/// <summary>One way of taking a club over, as it would leave the club (`TKO-4`).</summary>
+/// <param name="Start">The option's code: <c>keep</c> or <c>clean_start</c>.</param>
+/// <param name="Players">How many players the squad holds.</param>
+/// <param name="SquadStrength">How strong the squad is: the mean ability of the eleven the board would field, on the 1–20 scale of a player's shown ability, to a tenth.</param>
+/// <param name="SeasonWageMinor">What the squad costs in wages over a season, in minor units.</param>
+/// <param name="CashMinor">The club's cash, negative when it is in debt.</param>
+/// <param name="DebtMinor">What the club owes, 0 when it owes nothing.</param>
+/// <param name="FinancialState">Where the club's money stands: <c>healthy</c>, <c>in_the_red</c> or <c>administration</c>.</param>
+/// <param name="GroundPlaces">How many places the ground holds.</param>
+/// <param name="GroundLevel">The ground's level, 1–15.</param>
+/// <param name="SnackBarLevel">The snack bar's level.</param>
+/// <param name="ShopLevel">The merchandise shop's level.</param>
+/// <param name="SeasonIncomeForecastMinor">What the club can expect to earn over a season from league money, the sponsor, the gate and the buildings.</param>
+/// <param name="WageBudgetMinor">The wage bill the board recommends: 70% of that forecast.</param>
+/// <param name="OverdraftLimitMinor">How far into the red the club may go before it is in administration.</param>
+public sealed record TakeoverOptionResponse(
+    string Start,
+    int Players,
+    decimal SquadStrength,
+    long SeasonWageMinor,
+    long CashMinor,
+    long DebtMinor,
+    string FinancialState,
+    int GroundPlaces,
+    int GroundLevel,
+    int SnackBarLevel,
+    int ShopLevel,
+    long SeasonIncomeForecastMinor,
+    long WageBudgetMinor,
+    long OverdraftLimitMinor);
+
+/// <summary>
+/// The two ways a manager can take a club over, side by side, so the choice is made with both in view (`TKO-4`).
+/// </summary>
+/// <remarks>
+/// The clean start's squad is drawn exactly as the claim will draw it, so its strength and wages are the ones the manager gets.
+/// </remarks>
+/// <param name="ClubId">The club.</param>
+/// <param name="ClubName">The club's name.</param>
+/// <param name="TierNumber">The tier the club plays in.</param>
+/// <param name="Keep">The club as it stands: everything is inherited.</param>
+/// <param name="CleanStart">The club as it would be after a clean start.</param>
+public sealed record TakeoverPreviewResponse(
+    Guid ClubId,
+    string ClubName,
+    int TierNumber,
+    TakeoverOptionResponse Keep,
+    TakeoverOptionResponse CleanStart);
+
 /// <summary>A club's money, in minor units of the single canonical currency (`FIN-1`).</summary>
 /// <param name="CashMinor">The club's cash.</param>
 /// <param name="ReservedMinor">The part already committed to open bids.</param>

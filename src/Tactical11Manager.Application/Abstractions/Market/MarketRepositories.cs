@@ -54,6 +54,13 @@ public interface IListingRepository
     /// <param name="dueAt">The instant listings are due by.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<IReadOnlyList<TransferListing>> ListDueAsync(DateTimeOffset dueAt, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists a club's open listings, tracked, so a clean start can take its players off the market (`TKO-3`).
+    /// </summary>
+    /// <param name="sellerClubId">The selling club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<TransferListing>> ListOpenBySellerAsync(Guid sellerClubId, CancellationToken cancellationToken);
 }
 
 /// <summary>Persistence for transfer bids (`TRF-4`, `TRF-6`, `TRF-7`).</summary>

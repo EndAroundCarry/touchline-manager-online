@@ -97,10 +97,20 @@ internal static class WorldEndpoints
             .WithDescription(
                 "Requires an Idempotency-Key. The same key always produces the same outcome, so a retry "
                 + "after a timeout cannot create a second tenure. Answers 409 CAPACITY_PROVISIONING when "
-                + "every club in the tier is held, with the next tier's generation state and a polling hint.")
+                + "every club in the tier is held, with the next tier's generation state and a polling hint. "
+                + "The optional start is 'keep' (the default) to inherit the club as it stands, or 'clean_start' "
+                + "to release its players and begin from the tier's opening squad, ground, buildings and cash.")
             .Produces<ClubDashboardResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapGet("/clubs/{clubId:guid}/takeover-preview", GetTakeoverPreviewAsync)
+            .RequireAuthorization(AuthorizationPolicies.VerifiedManager)
+            .WithName("GetTakeoverPreview")
+            .WithSummary("Reads a club under each way of taking it over: as it stands, and after a clean start.")
+            .Produces<TakeoverPreviewResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
@@ -484,6 +494,43 @@ internal static class WorldEndpoints
         }
 
         return Results.Ok(await query.ExecuteAsync(userId, cancellationToken));
+    }
+
+    private static async Task<IResult> GetTakeoverPreviewAsync(
+        Guid clubId,
+        GetTakeoverPreview query,
+        CancellationToken cancellationToken)
+    {
+        var result = await query.ExecuteAsync(clubId, cancellationToken);
+
+        return result.Outcome switch
+        {
+            TakeoverPreviewOutcome.Found => Results.Ok(result.Preview),
+
+            TakeoverPreviewOutcome.WorldNotSeeded => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                WorldErrorCodes.WorldNotSeeded,
+                "No world yet.",
+                "The world has not been created."),
+
+            TakeoverPreviewOutcome.ClubNotFound => ProblemResults.Code(
+                StatusCodes.Status404NotFound,
+                WorldErrorCodes.ClubNotFound,
+                "No such club.",
+                "That club does not exist in this world."),
+
+            TakeoverPreviewOutcome.ClubAlreadyClaimed => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                WorldErrorCodes.ClubAlreadyClaimed,
+                "That club has a manager.",
+                "Another manager holds this club. Choose another club in the same division."),
+
+            _ => ProblemResults.Code(
+                StatusCodes.Status409Conflict,
+                WorldErrorCodes.ClubNotClaimable,
+                "That club cannot be taken over.",
+                "New managers may only take over an AI-controlled club in the country's lowest active tier."),
+        };
     }
 
     private static async Task<IResult> GetClubDashboardAsync(

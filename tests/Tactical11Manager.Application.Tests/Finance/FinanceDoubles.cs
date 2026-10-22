@@ -211,6 +211,9 @@ internal static class FinanceDoubles
 
         public Task<IReadOnlyList<TransferListing>> ListDueAsync(DateTimeOffset dueAt, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<TransferListing>>([]);
+
+        public Task<IReadOnlyList<TransferListing>> ListOpenBySellerAsync(Guid sellerClubId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TransferListing>>([.. listings.Where(listing => listing.SellerClubId == sellerClubId && listing.IsOpen)]);
     }
 
     public sealed class RecordingListingWriter : IListingWriter

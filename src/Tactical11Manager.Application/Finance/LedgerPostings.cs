@@ -28,6 +28,9 @@ public static class LedgerPostings
     /// <summary>The template that describes a club's opening balance (`FIN-1`).</summary>
     public const string OpeningBalanceTemplate = "finance.opening_balance";
 
+    /// <summary>The template that describes a clean start moving the club's cash to the opening cash (`TKO-3`).</summary>
+    public const string CleanStartTemplate = "finance.clean_start";
+
     /// <summary>The template that describes a home fixture's gate revenue (`FIN-3`).</summary>
     public const string GateReceiptTemplate = "finance.gate_receipt";
 
@@ -129,6 +132,40 @@ public static class LedgerPostings
             OpeningBalanceTemplate,
             Parameters(("amountMinor", amountMinor)));
     }
+
+    /// <summary>
+    /// Builds the one posting of a clean start: it moves the club's cash to its tier's opening cash, whatever it held, and so wipes any debt
+    /// (`TKO-3`).
+    /// </summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club starting clean.</param>
+    /// <param name="tenureId">The new tenure, which the key names so a club that starts clean again later posts again.</param>
+    /// <param name="deltaMinor">The opening cash less the cash held: positive for a club that was poorer, negative for one that was richer.</param>
+    /// <param name="openingCashMinor">The opening cash the club ends with, in minor units.</param>
+    /// <remarks>
+    /// The source type is the one the opening balance uses: a clean start re-opens the account as the world did, and the source id names the
+    /// tenure that asked for it. A new source type would only have cost a migration for the same reading.
+    /// </remarks>
+    public static LedgerPosting CleanStart(Guid entryId, Guid clubId, Guid tenureId, long deltaMinor, long openingCashMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(deltaMinor);
+        ArgumentOutOfRangeException.ThrowIfNegative(openingCashMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.CleanStart,
+            deltaMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.WorldSeed,
+            SourceId: tenureId,
+            CleanStartCorrelationId(tenureId),
+            CleanStartTemplate,
+            Parameters(("amountMinor", openingCashMinor), ("deltaMinor", deltaMinor)));
+    }
+
+    /// <summary>The correlation key of a tenure's clean start (`FIN-17`).</summary>
+    /// <param name="tenureId">The tenure.</param>
+    public static string CleanStartCorrelationId(Guid tenureId) => $"clean-start:{tenureId:N}";
 
     /// <summary>Builds the posting a home fixture's gate revenue makes (`FIN-3`).</summary>
     /// <param name="entryId">A server-generated entry identity.</param>

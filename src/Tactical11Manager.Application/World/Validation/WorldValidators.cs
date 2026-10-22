@@ -93,8 +93,15 @@ public sealed class ChangeClubColoursRequestValidator : AbstractValidator<Change
 public sealed class ClaimClubRequestValidator : AbstractValidator<ClaimClubRequest>
 {
     /// <summary>Initializes the validator.</summary>
-    public ClaimClubRequestValidator() =>
+    public ClaimClubRequestValidator()
+    {
         RuleFor(request => request.ClubId)
             .NotEmpty()
             .WithMessage("Choose the club you want to manage.");
+
+        RuleFor(request => request.Start)
+            .Must(start => TakeoverStarts.TryFromCode(start, out _))
+            .When(request => request.Start is not null)
+            .WithMessage("Choose to keep the club as it is, or to start clean.");
+    }
 }

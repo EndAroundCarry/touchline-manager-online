@@ -145,6 +145,24 @@ public sealed class ClubAccount
     }
 
     /// <summary>
+    /// Puts the account back to healthy after a clean start has set its cash to the opening cash, so the debt, the state it was in and the
+    /// administration clock go with it (`TKO-3`).
+    /// </summary>
+    /// <param name="now">The current instant.</param>
+    /// <exception cref="InvalidOperationException">When the club still owes money or still holds reserved funds, so the reset would not be clean.</exception>
+    public void RestoreHealth(DateTimeOffset now)
+    {
+        if (CashMinor < 0 || ReservedMinor != 0)
+        {
+            throw new InvalidOperationException("An account is only restored to health once its debt is cleared and its bids are released (TKO-3).");
+        }
+
+        FinancialState = FinancialStateKind.Healthy;
+        StateSinceMatchday = 0;
+        Touch(now);
+    }
+
+    /// <summary>
     /// Applies a posting to the club's balances and records it as the club's next ledger entry.
     /// </summary>
     /// <param name="posting">The move to make.</param>

@@ -360,6 +360,8 @@ public static class DependencyInjection
         services.AddScoped<GetCountryCapacity>();
         services.AddScoped<GetAvailableClubs>();
         services.AddScoped<GetClubDashboard>();
+        services.AddScoped<GetTakeoverPreview>();
+        services.AddScoped<CleanStartTakeover>();
         services.AddScoped<GetOnboardingState>();
 
         // The club's stadium: a read and the one command that grows it (`STAD-1`…`STAD-6`).

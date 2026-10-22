@@ -80,6 +80,12 @@ public sealed record ClaimClubResult(
 /// (master plan §10.9).
 /// </para>
 /// <para>
+/// The manager chooses how to take the club over (`TKO-1`). Keeping it inherits everything as it stands.
+/// A clean start sends it back to its tier's opening squad, ground, buildings and cash with no debt, in this
+/// same transaction (<see cref="CleanStartTakeover"/>); the choice is only ever the manager's, since the
+/// club's old players go to the free agents and cannot be had back.
+/// </para>
+/// <para>
 /// The order of two refusals is deliberate. A club another manager holds is reported as
 /// <see cref="ClaimClubOutcome.ClubAlreadyClaimed"/> when the country still has room, because "pick
 /// another club" is then a true and useful answer. When the whole tier is taken the answer is
@@ -100,6 +106,7 @@ public sealed class ClaimClub
     private readonly CapacityEvaluator _capacity;
     private readonly IInboxRepository _inbox;
     private readonly FanBaseTakeover _fans;
+    private readonly CleanStartTakeover _cleanStart;
     private readonly IAuditWriter _audit;
     private readonly IOperationalMetrics _metrics;
     private readonly ISecureTokenService _secureTokens;
@@ -119,6 +126,7 @@ public sealed class ClaimClub
         CapacityEvaluator capacity,
         IInboxRepository inbox,
         FanBaseTakeover fans,
+        CleanStartTakeover cleanStart,
         IAuditWriter audit,
         IOperationalMetrics metrics,
         ISecureTokenService secureTokens,
@@ -136,6 +144,7 @@ public sealed class ClaimClub
         _capacity = capacity;
         _inbox = inbox;
         _fans = fans;
+        _cleanStart = cleanStart;
         _audit = audit;
         _metrics = metrics;
         _secureTokens = secureTokens;
@@ -159,6 +168,11 @@ public sealed class ClaimClub
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+
+        if (!TakeoverStarts.TryFromCode(request.Start ?? TakeoverStarts.KeepCode, out var start))
+        {
+            throw new ArgumentException($"'{request.Start}' is not a takeover start; the request validator refuses it first.", nameof(request));
+        }
 
         var world = await _world.FindWorldAsync(cancellationToken);
 
@@ -218,6 +232,7 @@ public sealed class ClaimClub
             club,
             placement,
             world.CurrentSeasonNumber,
+            start,
             idempotencyKey,
             cancellationToken);
     }
@@ -236,6 +251,7 @@ public sealed class ClaimClub
         Club club,
         ClubDashboardSnapshot placement,
         int seasonNumber,
+        TakeoverStart start,
         string idempotencyKey,
         CancellationToken cancellationToken)
     {
@@ -300,6 +316,23 @@ public sealed class ClaimClub
         _tenures.Add(tenure);
         manager.ClearTakeoverCooldown(now);
 
+        // A clean start comes first and is saved before the fans are read: their target is worked out from the squad as the database holds it,
+        // and for a clean start that is the new one (TKO-3).
+        if (start == TakeoverStart.CleanStart)
+        {
+            await _cleanStart.ApplyAsync(
+                userId,
+                club,
+                placement.Country,
+                placement.Season,
+                placement.Division.TierNumber,
+                tenure.Id,
+                now,
+                cancellationToken);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
         // A new manager starts with the tier's default fans however the club was doing, and the fans' target is
         // worked out again from the squad as it is today. In this transaction, so a retried claim cannot reset twice (FAN-9).
         await _fans.ResetAsync(
@@ -309,6 +342,13 @@ public sealed class ClaimClub
             tenure.Id,
             now,
             cancellationToken);
+
+        if (start == TakeoverStart.CleanStart)
+        {
+            // The overdraft limit is a quarter of the forecast the fresh club's squad, ground and fans give, so it is set once they are saved.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _cleanStart.SetOpeningOverdraftAsync(club.Id, now, cancellationToken);
+        }
 
         // The welcome is the first thing a new manager reads, written in the takeover's own transaction so an
         // inbox with a club always has it (COM-1).

@@ -38,6 +38,15 @@ public interface ITeamSheetRepository
     /// <param name="entries">The entries to remove.</param>
     void RemoveEntries(IReadOnlyList<TeamSheetEntry> entries);
 
+    /// <summary>
+    /// Removes every sheet a club still has in draft, with its entries, so a squad that has been replaced does not keep selections naming
+    /// players who have left. A locked sheet is a frozen snapshot and is left alone (`SQ-7`).
+    /// </summary>
+    /// <param name="clubId">The club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>How many sheets were removed.</returns>
+    Task<int> RemoveDraftSheetsAsync(Guid clubId, CancellationToken cancellationToken);
+
     /// <summary>Loads a club's sheet for a fixture, or null when none has been saved.</summary>
     /// <param name="fixtureId">The fixture.</param>
     /// <param name="clubId">The club.</param>

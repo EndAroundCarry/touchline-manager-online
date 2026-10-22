@@ -28,6 +28,9 @@ public static class WorldAuditActions
     /// <summary>A club was taken over.</summary>
     public const string ClubClaimed = "world.club_tenure.claimed";
 
+    /// <summary>A club was taken over with a clean start: its old players were released and it returned to its tier's opening state (`TKO-3`).</summary>
+    public const string ClubCleanStarted = "world.club_tenure.clean_started";
+
     /// <summary>A manager resigned from a club.</summary>
     public const string ClubResigned = "world.club_tenure.resigned";
 

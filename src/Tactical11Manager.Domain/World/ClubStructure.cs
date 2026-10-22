@@ -112,6 +112,20 @@ public sealed class ClubStructure
         return UpgradeTargetLevel.Value;
     }
 
+    /// <summary>
+    /// Takes the building back to level 1 and drops the upgrade under way, which is not refunded (`TKO-3`). Only a clean start does this. The job
+    /// that would have finished the upgrade finds nothing building and does nothing (<see cref="CompleteUpgrade"/>).
+    /// </summary>
+    /// <param name="now">The current instant.</param>
+    public void ResetToOpening(DateTimeOffset now)
+    {
+        Level = StructureRuleSet.OpeningLevel;
+        UpgradeTargetLevel = null;
+        UpgradeDueAt = null;
+        UpdatedAt = now;
+        Version++;
+    }
+
     /// <summary>Finishes the running upgrade and raises the level (`STRC-3`).</summary>
     /// <param name="now">The current instant.</param>
     /// <returns>True when the level rose; false when nothing was being built, so a retried job does nothing.</returns>

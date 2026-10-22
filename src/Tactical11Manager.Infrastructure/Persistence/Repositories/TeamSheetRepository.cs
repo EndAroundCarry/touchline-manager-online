@@ -32,6 +32,29 @@ internal sealed class TeamSheetRepository : ITeamSheetRepository
         _dbContext.TeamSheetEntries.RemoveRange(entries);
 
     /// <inheritdoc />
+    public async Task<int> RemoveDraftSheetsAsync(Guid clubId, CancellationToken cancellationToken)
+    {
+        var sheets = await _dbContext.FixtureTeamSheets
+            .Where(sheet => sheet.ClubId == clubId && sheet.Status == TeamSheetStatus.Draft)
+            .ToListAsync(cancellationToken);
+
+        if (sheets.Count == 0)
+        {
+            return 0;
+        }
+
+        var sheetIds = sheets.Select(sheet => sheet.Id).ToList();
+        var entries = await _dbContext.TeamSheetEntries
+            .Where(entry => sheetIds.Contains(entry.TeamSheetId))
+            .ToListAsync(cancellationToken);
+
+        _dbContext.TeamSheetEntries.RemoveRange(entries);
+        _dbContext.FixtureTeamSheets.RemoveRange(sheets);
+
+        return sheets.Count;
+    }
+
+    /// <inheritdoc />
     public async Task<TeamSheetRecord?> FindAsync(
         Guid fixtureId,
         Guid clubId,

@@ -70,6 +70,15 @@ internal sealed class ListingRepository : IListingRepository
             .OrderBy(listing => listing.EndsAt)
             .Take(500)
             .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TransferListing>> ListOpenBySellerAsync(
+        Guid sellerClubId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.TransferListings
+            .Where(listing => listing.SellerClubId == sellerClubId && listing.Status == ListingStatus.Open)
+            .OrderBy(listing => listing.EndsAt)
+            .ToListAsync(cancellationToken);
 }
 
 /// <summary>The market module's bid persistence (`TRF-4`, `TRF-6`, `TRF-8`).</summary>
