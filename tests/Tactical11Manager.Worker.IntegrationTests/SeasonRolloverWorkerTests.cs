@@ -9,6 +9,7 @@ using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Competition;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World.Generation;
 using Tactical11Manager.Infrastructure;
 using Tactical11Manager.Infrastructure.Persistence;
@@ -56,6 +57,7 @@ public sealed class SeasonRolloverWorkerTests : IAsyncLifetime
             // Only the rollover runs; every other deadline is off so the worker has one thing to do.
             ["Rollover:EnableRollover"] = "true",
             ["Rollover:CheckIntervalSeconds"] = "30",
+            ["Fans:EnableWeeklyReview"] = "false",
             ["Matchday:EnableMatchdayWorker"] = "false",
             ["Training:EnableDailyProgression"] = "false",
             ["AiClubs:EnableEvaluation"] = "false",
@@ -152,7 +154,7 @@ public sealed class SeasonRolloverWorkerTests : IAsyncLifetime
         {
             (await db.Matchdays.CountAsync(matchday => matchday.DivisionSeasonId == divisionSeasonId))
                 .Should()
-                .Be(34);
+                .Be(WorldRuleSet.MatchdaysPerSeason);
         }
     }
 

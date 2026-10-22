@@ -61,9 +61,9 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
 
         result.Outcome.Should().Be(ProvisionDivisionOutcome.Completed);
         result.TargetTier.Should().Be(2);
-        result.Clubs.Should().Be(18, "PYR-4: a tier holds eighteen clubs");
-        result.Players.Should().Be(18 * WorldRuleSet.GeneratorSquadTarget, "SQ-1: the generator produces its target squad per club");
-        result.Accounts.Should().Be(18);
+        result.Clubs.Should().Be(WorldRuleSet.ClubsPerDivision, "PYR-4: a tier holds a full division of clubs");
+        result.Players.Should().Be(WorldRuleSet.ClubsPerDivision * WorldRuleSet.GeneratorSquadTarget, "SQ-1: the generator produces its target squad per club");
+        result.Accounts.Should().Be(WorldRuleSet.ClubsPerDivision);
 
         await using (var verify = _fixture.CreateScope())
         {
@@ -77,12 +77,12 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             var divisionSeason = await db.DivisionSeasons.SingleAsync(candidate => candidate.DivisionId == division.Id);
 
             (await db.ClubSeasonEntries.CountAsync(entry => entry.DivisionSeasonId == divisionSeason.Id))
-                .Should().Be(18);
+                .Should().Be(WorldRuleSet.ClubsPerDivision);
             (await db.Matchdays.CountAsync(matchday => matchday.DivisionSeasonId == divisionSeason.Id))
-                .Should().Be(34, "CAL-1");
+                .Should().Be(WorldRuleSet.MatchdaysPerSeason, "CAL-1");
             (await db.Fixtures.CountAsync(fixture => fixture.MatchdayId != Guid.Empty
                 && db.Matchdays.Any(m => m.Id == fixture.MatchdayId && m.DivisionSeasonId == divisionSeason.Id)))
-                .Should().Be(306, "CAL-9: thirty-four rounds of nine fixtures");
+                .Should().Be(WorldRuleSet.MatchdaysPerSeason * (WorldRuleSet.ClubsPerDivision / 2), "CAL-9: every round has half the division in fixtures");
 
             // Every new club registers a legal squad with two goalkeepers (SQ-2).
             foreach (var clubId in await db.ClubSeasonEntries
@@ -171,7 +171,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
                 .Select(club => club.NormalizedName)
                 .ToListAsync();
 
-            allNames.Should().HaveCount(36, "PYR-11: two tiers of eighteen clubs");
+            allNames.Should().HaveCount(2 * WorldRuleSet.ClubsPerDivision, "PYR-11: two full tiers of clubs");
             allNames.Should().OnlyHaveUniqueItems(
                 "ADR-0033: a provisioned tier must continue the name cycle of the tier above it");
 
@@ -185,7 +185,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
                 .ToListAsync();
 
             var expected = ClubIdentityGenerator
-                .GenerateDivision(WorldFixture.Seed, poolKey, code, tierNumber: 2, clubCount: 18)
+                .GenerateDivision(WorldFixture.Seed, poolKey, code, tierNumber: 2, clubCount: WorldRuleSet.ClubsPerDivision)
                 .Select(identity => identity.Name)
                 .ToList();
 
@@ -262,7 +262,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             // Every backfilled result is published, and the table reconciles with what it published (TBL-13).
             (await db.Fixtures.CountAsync(fixture =>
                 rounds.Select(r => r.Id).Contains(fixture.MatchdayId) && fixture.Status == FixtureStatus.Published))
-                .Should().Be(18, "MAT-7: two published rounds of nine fixtures");
+                .Should().Be(2 * (WorldRuleSet.ClubsPerDivision / 2), "MAT-7: two published rounds, half a division of fixtures each");
 
             var rebuild = await verify.ServiceProvider.GetRequiredService<RebuildDivisionProjections>()
                 .ExecuteAsync(divisionSeasonId, apply: false, CancellationToken.None);

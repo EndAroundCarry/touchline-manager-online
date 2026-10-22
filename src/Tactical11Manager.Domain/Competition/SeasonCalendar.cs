@@ -7,8 +7,8 @@ namespace Tactical11Manager.Domain.Competition;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A season is a double round-robin of 34 matchdays played on Tuesdays, Thursdays, and Sundays at
-/// 19:00 UTC. The window is a pure function of the first matchday, so the seeder, the fixture
+/// A season is a double round-robin of 30 matchdays played on Tuesdays, Thursdays, and Sundays at
+/// 19:00 UTC, and the next one starts eleven weeks after the first matchday. The window is a pure function of the first matchday, so the seeder, the fixture
 /// generator, and the season shell cannot disagree about when a season starts or ends — and a test can
 /// assert the calendar without a database or a clock.
 /// </para>
@@ -94,7 +94,17 @@ public static class SeasonCalendar
         var startsAt = KickoffAt(dates[0]);
         var endsAt = KickoffAt(dates[^1]);
 
-        return new SeasonWindow(startsAt, endsAt, endsAt.AddDays(WorldRuleSet.RolloverDays), dates);
+        // The next season starts a whole number of weeks after this one, so it opens on the same weekday (`CAL-6`).
+        var rolloverEndsAt = startsAt.AddDays(7 * WorldRuleSet.SeasonCycleWeeks);
+
+        if (rolloverEndsAt < endsAt.AddDays(WorldRuleSet.RolloverDays))
+        {
+            throw new InvalidOperationException(
+                $"A {WorldRuleSet.SeasonCycleWeeks}-week cycle leaves less than {WorldRuleSet.RolloverDays} days "
+                + $"after the last matchday on {dates[^1]:yyyy-MM-dd} (CAL-6).");
+        }
+
+        return new SeasonWindow(startsAt, endsAt, rolloverEndsAt, dates);
     }
 }
 

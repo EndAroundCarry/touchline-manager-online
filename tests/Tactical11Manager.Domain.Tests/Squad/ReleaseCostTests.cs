@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 
 namespace Tactical11Manager.Domain.Tests.Squad;
@@ -47,13 +48,13 @@ public sealed class ReleaseCostTests
     }
 
     [Fact]
-    public void A_season_is_twelve_weeks_when_it_starts_on_a_tuesday()
+    public void A_season_is_eleven_weeks_when_it_starts_on_a_tuesday()
     {
-        // 34 matchdays on Tuesday, Thursday and Sunday: eleven weeks and a day to the last, then seven days of rollover.
+        // 30 matchdays on Tuesday, Thursday and Sunday fill ten weeks, and the rollover takes the eleventh.
         var window = SeasonCalendar.Window(new DateOnly(2026, 9, 29));
 
-        ReleaseCost.WeeksPerSeason(window).Should().Be(12);
-        ((window.RolloverEndsAt - window.StartsAt).TotalDays / 7).Should().BeLessThanOrEqualTo(12);
+        ReleaseCost.WeeksPerSeason(window).Should().Be(11);
+        ((window.RolloverEndsAt - window.StartsAt).TotalDays / 7).Should().Be(WorldRuleSet.SeasonCycleWeeks);
     }
 
     [Fact]
@@ -63,7 +64,7 @@ public sealed class ReleaseCostTests
         {
             var window = SeasonCalendar.Window(start);
 
-            ReleaseCost.WeeksPerSeason(window).Should().BeInRange(12, 13);
+            ReleaseCost.WeeksPerSeason(window).Should().Be(WorldRuleSet.SeasonCycleWeeks);
         }
     }
 

@@ -18,9 +18,9 @@ public sealed class AdministrationRulesTests
     [Theory]
     [InlineData(1, 0, 0)]
     [InlineData(1, 1, 1)]
-    [InlineData(1, 34, 34)]
-    [InlineData(2, 1, 35)]
-    [InlineData(3, 17, 85)]
+    [InlineData(1, 30, 30)]
+    [InlineData(2, 1, 31)]
+    [InlineData(3, 17, 77)]
     public void A_matchday_ordinal_counts_the_rounds_of_the_seasons_before_it(int season, int round, int expected)
     {
         MatchdayOrdinal.Of(season, round).Should().Be(expected);
@@ -32,12 +32,12 @@ public sealed class AdministrationRulesTests
         var entered = MatchdayOrdinal.Of(1, 22);
         var now = MatchdayOrdinal.Of(2, 22);
 
-        (now - entered).Should().Be(EconomyRuleSet.AdministrationDismissalMatchdays).And.Be(34);
+        (now - entered).Should().Be(EconomyRuleSet.AdministrationDismissalMatchdays).And.Be(30);
 
         ClubFinancialState.Next(FinancialStateKind.Administration, entered, now - 1, -1_000, 100).Dismiss
             .Should().BeFalse("a manager who entered administration at matchday 22 has until matchday 22 of the next season");
         ClubFinancialState.Next(FinancialStateKind.Administration, entered, now, -1_000, 100).Dismiss
-            .Should().BeTrue("34 matchdays have passed, across the end of the season");
+            .Should().BeTrue("30 matchdays have passed, across the end of the season");
     }
 
     [Fact]

@@ -890,7 +890,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("divisions", "competition", t =>
                         {
-                            t.HasCheckConstraint("ck_divisions_capacity", "capacity = 18");
+                            t.HasCheckConstraint("ck_divisions_capacity", "capacity in (16, 18)");
 
                             t.HasCheckConstraint("ck_divisions_status", "status in ('provisioning', 'active', 'retired')");
 

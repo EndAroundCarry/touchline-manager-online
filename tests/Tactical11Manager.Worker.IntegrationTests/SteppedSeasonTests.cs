@@ -8,6 +8,7 @@ using Tactical11Manager.Application;
 using Tactical11Manager.Application.Ops;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Infrastructure;
 using Tactical11Manager.Infrastructure.Persistence;
 
@@ -27,7 +28,7 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 /// </para>
 /// <para>
 /// It plays a few rounds rather than a whole season: the six divisions share one cadence, so three presses are
-/// eighteen published matchdays and a hundred and sixty-two simulated fixtures — enough to prove the stepped
+/// a few published matchdays and the simulated fixtures of every division — enough to prove the stepped
 /// clock advances the calendar, and bounded enough to stay a fast test. Stepping past the season deadline is
 /// covered by the rollover scheduler's own materialiser, which the advance job invokes alongside the others.
 /// </para>
@@ -36,7 +37,7 @@ public sealed class SteppedSeasonTests : IAsyncLifetime
 {
     private const int Rounds = 3;
     private const int Divisions = 6;
-    private const int FixturesPerRound = Divisions * 9;
+    private const int FixturesPerRound = Divisions * (WorldRuleSet.ClubsPerDivision / 2);
 
     /// <summary>An instant just before the seeded world's first matchday (2026-10-06).</summary>
     private static readonly DateTimeOffset InitialNow = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);

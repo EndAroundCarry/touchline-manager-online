@@ -14,8 +14,12 @@ public sealed class WorldRuleSetTests
     public void The_settled_constants_match_the_rule_set()
     {
         WorldRuleSet.Version.Should().NotBeNullOrWhiteSpace();
-        WorldRuleSet.ClubsPerDivision.Should().Be(18, "WORLD-4");
-        WorldRuleSet.MatchdaysPerSeason.Should().Be(34, "CAL-1");
+        WorldRuleSet.ClubsPerDivision.Should().Be(16, "WORLD-4");
+        WorldRuleSet.MatchdaysPerSeason.Should().Be(30, "CAL-1");
+        WorldRuleSet.MatchdaysPerSeason.Should().Be((WorldRuleSet.ClubsPerDivision - 1) * 2, "CAL-1");
+        WorldRuleSet.SeasonCycleWeeks.Should().Be(11, "CAL-6");
+        WorldRuleSet.LargestDivisionEver.Should().BeGreaterThanOrEqualTo(WorldRuleSet.ClubsPerDivision);
+        WorldRuleSet.LongestSeasonEver.Should().BeGreaterThanOrEqualTo(WorldRuleSet.MatchdaysPerSeason);
         WorldRuleSet.KickoffUtc.Should().Be(new TimeOnly(19, 0), "CAL-2");
         WorldRuleSet.TeamSheetLockMinutes.Should().Be(30, "CAL-3");
         WorldRuleSet.RolloverDays.Should().Be(7, "CAL-6");

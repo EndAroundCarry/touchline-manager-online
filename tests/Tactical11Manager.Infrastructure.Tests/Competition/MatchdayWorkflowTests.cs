@@ -39,6 +39,8 @@ namespace Tactical11Manager.Infrastructure.Tests.Competition;
 [Collection(MatchdayCollection.Name)]
 public sealed class MatchdayWorkflowTests
 {
+    private const int FixturesPerRound = WorldRuleSet.ClubsPerDivision / 2;
+
     /// <summary>Initializes the tests.</summary>
     public MatchdayWorkflowTests(MatchdayFixture fixture) => Fixture = fixture;
 
@@ -78,7 +80,7 @@ public sealed class MatchdayWorkflowTests
         var first = await lockMatchday.ExecuteAsync(matchdayId, CancellationToken.None);
 
         first.Outcome.Should().Be(LockMatchdayOutcome.Locked);
-        first.FrozenFixtures.Should().Be(9, "a round is nine fixtures (CAL-10)");
+        first.FrozenFixtures.Should().Be(FixturesPerRound, "a round is half a division of fixtures (CAL-10)");
 
         var fixtures = await FixturesOfAsync(db, matchdayId);
 
@@ -97,16 +99,16 @@ public sealed class MatchdayWorkflowTests
             repairsPerFixture.Add(MatchSnapshotDocument.Read(stored.SnapshotJson).Repairs.Count);
         }
 
-        repairsPerFixture.Should().Equal(Enumerable.Repeat(36, 9));
+        repairsPerFixture.Should().Equal(Enumerable.Repeat(36, FixturesPerRound));
         var snapshots = await db.InputSnapshots
             .Where(snapshot => fixtureIds.Contains(snapshot.FixtureId))
             .ToListAsync();
 
-        snapshots.Should().HaveCount(9, "one snapshot per fixture, and no more (MAT-1)");
+        snapshots.Should().HaveCount(FixturesPerRound, "one snapshot per fixture, and no more (MAT-1)");
         snapshots.Select(snapshot => snapshot.FixtureId).Should().OnlyHaveUniqueItems();
         snapshots.Should().OnlyContain(snapshot => snapshot.EngineVersion == EngineVersions.EngineLabel);
         snapshots.Should().OnlyContain(snapshot => snapshot.SnapshotHash.Length == 64);
-        (await db.InputSnapshots.CountAsync()).Should().BeGreaterThanOrEqualTo(9);
+        (await db.InputSnapshots.CountAsync()).Should().BeGreaterThanOrEqualTo(FixturesPerRound);
 
         // The same job may run again — after a lease expiry, a redeploy, or an operator retry — and must find
         // the round already frozen rather than freeze it a second time (§7.1, ADR-0003).
@@ -115,7 +117,7 @@ public sealed class MatchdayWorkflowTests
         second.Outcome.Should().Be(LockMatchdayOutcome.AlreadyLocked);
         second.FrozenFixtures.Should().Be(0);
 
-        (await db.InputSnapshots.CountAsync(snapshot => fixtureIds.Contains(snapshot.FixtureId))).Should().Be(9);
+        (await db.InputSnapshots.CountAsync(snapshot => fixtureIds.Contains(snapshot.FixtureId))).Should().Be(FixturesPerRound);
     }
 
     [Fact]
@@ -132,7 +134,7 @@ public sealed class MatchdayWorkflowTests
         var resolved = await resolveMatchday.ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
 
         resolved.Outcome.Should().Be(ResolveMatchdayOutcome.Resolved);
-        resolved.Simulated.Should().Be(9);
+        resolved.Simulated.Should().Be(FixturesPerRound);
 
         var fixtures = await FixturesOfAsync(db, matchdayId);
 
@@ -142,16 +144,16 @@ public sealed class MatchdayWorkflowTests
         var matchIds = fixtures.Select(fixture => fixture.MatchId!.Value).ToList();
         var fixtureIds = fixtures.Select(fixture => fixture.Id).ToList();
 
-        (await db.Matches.CountAsync(match => matchIds.Contains(match.Id))).Should().Be(9, "one match per fixture (MAT-9)");
+        (await db.Matches.CountAsync(match => matchIds.Contains(match.Id))).Should().Be(FixturesPerRound, "one match per fixture (MAT-9)");
 
         (await db.MatchEvents.CountAsync(matchEvent => matchIds.Contains(matchEvent.MatchId)))
             .Should()
-            .BeGreaterThan(9 * 4, "a simulated match emits a stream of events (MAT-8)");
+            .BeGreaterThan(FixturesPerRound * 4, "a simulated match emits a stream of events (MAT-8)");
 
         (await db.SimulationAttempts.CountAsync(
             attempt => attempt.Status == SimulationAttemptStatus.Succeeded && fixtureIds.Contains(attempt.FixtureId)))
             .Should()
-            .Be(9, "every attempt is kept as the evidence that the result is reproducible (MAT-9)");
+            .Be(FixturesPerRound, "every attempt is kept as the evidence that the result is reproducible (MAT-9)");
 
         (await db.Matchdays.SingleAsync(candidate => candidate.Id == matchdayId)).PublicationStatus
             .Should()
@@ -164,11 +166,11 @@ public sealed class MatchdayWorkflowTests
         again.Outcome.Should().Be(ResolveMatchdayOutcome.AlreadyResolved);
         again.Simulated.Should().Be(0);
 
-        (await db.Matches.CountAsync(match => matchIds.Contains(match.Id))).Should().Be(9, "a completed attempt is not run again");
+        (await db.Matches.CountAsync(match => matchIds.Contains(match.Id))).Should().Be(FixturesPerRound, "a completed attempt is not run again");
     }
 
     [Fact]
-    public async Task A_whole_round_of_nine_fixtures_simulates_inside_the_two_second_window()
+    public async Task A_whole_round_of_fixtures_simulates_inside_the_two_second_window()
     {
         await using var scope = Fixture.CreateScope();
         var matchdayId = await ClaimRoundAsync(scope);
@@ -184,14 +186,14 @@ public sealed class MatchdayWorkflowTests
         stopwatch.Stop();
 
         resolved.Outcome.Should().Be(ResolveMatchdayOutcome.Resolved);
-        resolved.Simulated.Should().Be(9);
+        resolved.Simulated.Should().Be(FixturesPerRound);
 
         // The plan's Stage 4 checkpoint: a division's whole round has to simulate inside the window a
-        // matchday worker has. The stopwatch covers the real work — nine fixtures simulated from their
+        // matchday worker has. The stopwatch covers the real work — a round of fixtures simulated from their
         // frozen snapshots and staged in their own transactions — rather than a projection of it.
         stopwatch.Elapsed.Should().BeLessThan(
             TimeSpan.FromSeconds(2),
-            "a nine-fixture round is the unit the matchday worker runs (§7.4)");
+            "a round of fixtures is the unit the matchday worker runs (§7.4)");
     }
 
     [Fact]
@@ -269,7 +271,7 @@ public sealed class MatchdayWorkflowTests
                 .ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
 
             resolved.Outcome.Should().Be(ResolveMatchdayOutcome.Resolved);
-            resolved.Simulated.Should().Be(9);
+            resolved.Simulated.Should().Be(FixturesPerRound);
 
             var matchId = await db.Matches.Where(match => match.FixtureId == fixture.Id).Select(match => match.Id).SingleAsync();
 
@@ -311,7 +313,7 @@ public sealed class MatchdayWorkflowTests
             .ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
 
         resolved.Outcome.Should().Be(ResolveMatchdayOutcome.Resolved);
-        resolved.Simulated.Should().Be(9, "the interrupted fixture is simulated again, not skipped");
+        resolved.Simulated.Should().Be(FixturesPerRound, "the interrupted fixture is simulated again, not skipped");
 
         var fixtures = await FixturesOfAsync(db, matchdayId);
 
@@ -332,7 +334,7 @@ public sealed class MatchdayWorkflowTests
             .ExecuteAsync(matchdayId, CancellationToken.None);
 
         published.Outcome.Should().Be(PublishMatchdayOutcome.Published);
-        published.Published.Should().Be(9);
+        published.Published.Should().Be(FixturesPerRound);
     }
 
     [Fact]
@@ -415,7 +417,7 @@ public sealed class MatchdayWorkflowTests
         var result = await publish.ExecuteAsync(matchdayId, CancellationToken.None);
 
         result.Outcome.Should().Be(PublishMatchdayOutcome.Published);
-        result.Published.Should().Be(9);
+        result.Published.Should().Be(FixturesPerRound);
         result.TableRows.Should().Be(WorldRuleSet.ClubsPerDivision);
 
         var fixtures = await FixturesOfAsync(db, matchdayId);
@@ -432,7 +434,7 @@ public sealed class MatchdayWorkflowTests
             readScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>(),
             divisionSeasonId);
 
-        after.Sum(standing => standing.Played).Should().Be(playedBefore + 18, "every club played exactly once");
+        after.Sum(standing => standing.Played).Should().Be(playedBefore + (2 * FixturesPerRound), "every club played exactly once");
         after.Select(standing => standing.Rank).Should().Equal(Enumerable.Range(1, WorldRuleSet.ClubsPerDivision));
         after.Should().OnlyContain(standing => standing.Points == (standing.Won * 3) + standing.Drawn);
         after.Should().OnlyContain(standing => standing.Played == standing.Won + standing.Drawn + standing.Lost);
@@ -495,7 +497,7 @@ public sealed class MatchdayWorkflowTests
                 && fixtureIds.Contains(entry.SourceId.Value))
             .ToListAsync();
 
-        gates.Should().HaveCount(9, "a round has nine home fixtures (FIN-3)");
+        gates.Should().HaveCount(FixturesPerRound, "a round has half a division of home fixtures (FIN-3)");
         gates.Select(gate => gate.SourceId).Should().OnlyHaveUniqueItems("the fixture keys the gate (FIN-17)");
         gates.Select(gate => gate.SourceType).Should().OnlyContain(source => source == LedgerSourceType.Matchday);
         gates.Should().OnlyContain(
@@ -580,7 +582,7 @@ public sealed class MatchdayWorkflowTests
                 && fixtureIds.Contains(entry.SourceId.Value))
             .ToListAsync();
 
-        sales.Should().HaveCount(9, "every home fixture of a round has a crowd (STRC-4)");
+        sales.Should().HaveCount(FixturesPerRound, "every home fixture of a round has a crowd (STRC-4)");
         sales.Select(sale => sale.SourceId).Should().OnlyHaveUniqueItems();
         sales.Should().OnlyContain(sale => sale.CashDeltaMinor > 0 && sale.SourceType == LedgerSourceType.Matchday);
 
@@ -590,7 +592,7 @@ public sealed class MatchdayWorkflowTests
                 && fixtureIds.Contains(row.FixtureId.Value))
             .ToListAsync();
 
-        rows.Should().HaveCount(9);
+        rows.Should().HaveCount(FixturesPerRound);
         rows.Should().OnlyContain(row => row.Kind == StructureKind.SnackBar && row.Level == StructureRuleSet.OpeningLevel);
 
         // Each row books exactly what its ledger entry moved, and the amount is the crowd's spend lifted by the
@@ -624,10 +626,10 @@ public sealed class MatchdayWorkflowTests
 
         (await againDb.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.SnackBar
             && entry.SourceId != null
-            && fixtureIds.Contains(entry.SourceId.Value))).Should().Be(9);
+            && fixtureIds.Contains(entry.SourceId.Value))).Should().Be(FixturesPerRound);
 
         (await againDb.ClubStructureTakings.CountAsync(row => row.FixtureId != null
-            && fixtureIds.Contains(row.FixtureId.Value))).Should().Be(9);
+            && fixtureIds.Contains(row.FixtureId.Value))).Should().Be(FixturesPerRound);
     }
 
     /// <summary>

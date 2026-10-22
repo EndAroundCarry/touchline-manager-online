@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Contracts.World;
+using Tactical11Manager.Domain.Rules;
 
 namespace Tactical11Manager.Api.IntegrationTests;
 
@@ -91,14 +92,14 @@ public sealed class OnboardingTests : IAsyncLifetime
             $"/api/v1/countries/{countryId}/capacity");
 
         capacity!.LowestActiveTier.Should().Be(1);
-        capacity.ClubsInLowestTier.Should().Be(18);
+        capacity.ClubsInLowestTier.Should().Be(WorldRuleSet.ClubsPerDivision);
         capacity.AvailableClubs.Should().BeGreaterThan(0);
         capacity.Provisioning.Should().BeNull("nothing is being generated while the tier still has room");
 
         var listing = await client.GetFromJsonAsync<AvailableClubsResponse>(
             $"/api/v1/countries/{countryId}/available-clubs");
 
-        listing!.Clubs.Should().HaveCount(18);
+        listing!.Clubs.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
         listing.Clubs.Single(club => club.Id == clubId).IsAvailable.Should().BeTrue();
 
         // A claim without an idempotency key is refused, because a retried claim would otherwise be a

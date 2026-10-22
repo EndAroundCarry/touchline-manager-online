@@ -143,7 +143,10 @@ public sealed class MatchTests : IAsyncLifetime
 
         var filmed = presentation.Passages.SelectMany(passage => passage.EventSequences).ToHashSet();
 
-        filmed.Should().Contain(goalSequences, "§9.2: every goal is in the film");
+        if (goalSequences.Count > 0)
+        {
+            filmed.Should().Contain(goalSequences, "§9.2: every goal is in the film");
+        }
 
         if (goals > 0)
         {

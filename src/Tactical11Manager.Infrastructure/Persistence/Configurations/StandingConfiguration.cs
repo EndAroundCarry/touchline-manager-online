@@ -45,7 +45,7 @@ internal sealed class StandingConfiguration : IEntityTypeConfiguration<Standing>
                 "yellow_cards >= 0 and red_cards >= 0");
             table.HasCheckConstraint(
                 "ck_standings_rank",
-                $"rank between 1 and {WorldRuleSet.ClubsPerDivision}");
+                $"rank between 1 and {WorldRuleSet.LargestDivisionEver}");
         });
 
         builder.HasKey(standing => standing.Id);

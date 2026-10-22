@@ -101,7 +101,7 @@ public sealed class StructureRuleSetTests
     {
         StructureRuleSet.UpkeepSeasonMinorFor(4, 1).Should().Be(22_000_000);
         StructureRuleSet.UpkeepSeasonMinorFor(4, 2).Should().Be(22_000_000L * 4 / 10, "a tier-2 club keeps its buildings for 0.4 of the tier-1 cost");
-        StructureRuleSet.UpkeepMinorFor(4, 1).Should().Be(22_000_000L * 3 / 34, "a weekly run settles three matchdays of the season's 34");
+        StructureRuleSet.UpkeepMinorFor(4, 1).Should().Be(22_000_000L * 3 / EconomyRuleSet.MatchdaysPerSeason, "a weekly run settles three matchdays of the season");
         StructureRuleSet.UpgradeCostMinorFor(6, 2).Should().Be(90_000_000L * 4 / 10);
 
         for (var level = 1; level <= StructureRuleSet.MaxLevel; level++)

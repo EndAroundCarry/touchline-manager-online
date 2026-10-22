@@ -5,7 +5,7 @@ using Tactical11Manager.Domain.Rules;
 namespace Tactical11Manager.Domain.Tests.Finance;
 
 /// <summary>
-/// The economy rules of world-rules-v17: the tier factors, the league money, the prize table, wages, the budget and the clean start (plan toasty-scott).
+/// The economy rules of world-rules-v18: the tier factors, the league money, the prize table, wages, the budget and the clean start (plan toasty-scott).
 /// </summary>
 public sealed class EconomyRuleSetTests
 {
@@ -53,15 +53,17 @@ public sealed class EconomyRuleSetTests
     }
 
     [Fact]
-    public void The_prize_is_a_straight_line_from_the_eighteenth_place_to_the_third_with_bigger_steps_for_the_top_three()
+    public void The_prize_is_a_straight_line_from_the_last_place_to_the_third_with_bigger_steps_for_the_top_three()
     {
         var share = EconomyRuleSet.PrizeShareMinorTier1;
 
-        EconomyRuleSet.PrizeMinorFor(1, 18).Should().Be(share);
+        var last = EconomyRuleSet.ClubsPerDivision;
 
-        for (var place = 3; place <= 18; place++)
+        EconomyRuleSet.PrizeMinorFor(1, last).Should().Be(share);
+
+        for (var place = 3; place <= last; place++)
         {
-            EconomyRuleSet.PrizeMinorFor(1, place).Should().Be((19 - place) * share, $"place {place}");
+            EconomyRuleSet.PrizeMinorFor(1, place).Should().Be((last + 1 - place) * share, $"place {place}");
         }
 
         EconomyRuleSet.PrizeMinorFor(1, 2).Should().Be(EconomyRuleSet.PrizeMinorFor(1, 3) * 115 / 100, "the second place gets 15% more than the third");
@@ -72,7 +74,7 @@ public sealed class EconomyRuleSetTests
     [Fact]
     public void The_prize_of_a_tier_is_the_tier_one_prize_scaled_by_the_tier_factor()
     {
-        for (var place = 1; place <= 18; place++)
+        for (var place = 1; place <= EconomyRuleSet.ClubsPerDivision; place++)
         {
             EconomyRuleSet.PrizeMinorFor(2, place).Should().BeInRange(
                 EconomyRuleSet.PrizeMinorFor(1, place) * 4 / 10 - 1,
@@ -86,25 +88,25 @@ public sealed class EconomyRuleSetTests
     [Fact]
     public void A_division_pays_out_the_shares_the_rules_state()
     {
-        // 16 + 15 + ... + 1 shares for the places 3 to 18, then 18.4 and 22.08: 176.48 shares.
+        // 14 + 13 + ... + 1 shares for the places 3 to 16, then 16.1 and 19.32: 140.42 shares.
         var shares = EconomyRuleSet.PrizeTable(1).Sum() / (double)EconomyRuleSet.PrizeShareMinorTier1;
 
-        shares.Should().BeApproximately(176.48, 0.001);
+        shares.Should().BeApproximately(140.42, 0.001);
     }
 
     [Fact]
     public void A_place_outside_the_division_is_refused_for_a_prize()
     {
         FluentActions.Invoking(() => EconomyRuleSet.PrizeMinorFor(1, 0)).Should().Throw<ArgumentOutOfRangeException>();
-        FluentActions.Invoking(() => EconomyRuleSet.PrizeMinorFor(1, 19)).Should().Throw<ArgumentOutOfRangeException>();
+        FluentActions.Invoking(() => EconomyRuleSet.PrizeMinorFor(1, EconomyRuleSet.ClubsPerDivision + 1)).Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]
-    public void A_season_amount_is_paid_in_thirty_four_equal_parts()
+    public void A_season_amount_is_paid_in_thirty_equal_parts()
     {
-        EconomyRuleSet.PerMatchday(3_400_000).Should().Be(100_000);
-        (EconomyRuleSet.PerMatchday(EconomyRuleSet.LeagueTvSeasonMinorTier1) * 34).Should().BeInRange(EconomyRuleSet.LeagueTvSeasonMinorTier1 - 34, EconomyRuleSet.LeagueTvSeasonMinorTier1);
-        EconomyRuleSet.PerWeeklyRun(3_400_000).Should().Be(300_000, "a weekly run settles three matchdays");
+        EconomyRuleSet.PerMatchday(3_000_000).Should().Be(100_000);
+        (EconomyRuleSet.PerMatchday(EconomyRuleSet.LeagueTvSeasonMinorTier1) * 30).Should().BeInRange(EconomyRuleSet.LeagueTvSeasonMinorTier1 - 30, EconomyRuleSet.LeagueTvSeasonMinorTier1);
+        EconomyRuleSet.PerWeeklyRun(3_000_000).Should().Be(300_000, "a weekly run settles three matchdays");
     }
 
     [Fact]

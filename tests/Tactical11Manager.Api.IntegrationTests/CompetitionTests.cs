@@ -63,7 +63,7 @@ public sealed class CompetitionTests : IAsyncLifetime
 
         var my = (await client.GetFromJsonAsync<MyFixturesResponse>("/api/v1/fixtures/mine"))!;
 
-        my.Fixtures.Should().HaveCount(WorldRuleSet.MatchdaysPerSeason, "CAL-1: a club plays 34 fixtures");
+        my.Fixtures.Should().HaveCount(WorldRuleSet.MatchdaysPerSeason, "CAL-1: a club plays a fixture every matchday");
         my.NextFixtureId.Should().NotBeNull("a fresh season has a fixture still to play");
         my.Fixtures.Should().OnlyContain(fixture =>
             fixture.HomeScore == null && fixture.AwayScore == null,
@@ -85,7 +85,7 @@ public sealed class CompetitionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_division_opens_with_a_table_of_eighteen_clubs_on_nought_points()
+    public async Task A_division_opens_with_a_table_of_a_full_division_of_clubs_on_nought_points()
     {
         using var client = CreateClient();
         var manager = await AuthScenario.CreateVerifiedManagerAsync(_fixture, client);

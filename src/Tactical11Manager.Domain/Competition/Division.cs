@@ -42,7 +42,7 @@ public sealed class Division
     /// <summary>Gets the season the division was created in.</summary>
     public Guid CreatedSeasonId { get; private set; }
 
-    /// <summary>Gets how many clubs the division holds. Always <see cref="WorldRuleSet.ClubsPerDivision"/>.</summary>
+    /// <summary>Gets how many clubs the division holds. Always <see cref="WorldRuleSet.ClubsPerDivision"/> for a new division; an old world may hold 18.</summary>
     public int Capacity { get; private set; }
 
     /// <summary>Gets when the row was created.</summary>

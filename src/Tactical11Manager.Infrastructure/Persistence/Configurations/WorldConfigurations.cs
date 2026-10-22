@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Tactical11Manager.Domain.Auth;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Infrastructure.Persistence.Configurations;
@@ -464,7 +465,7 @@ internal sealed class ClubStandingEventConfiguration : IEntityTypeConfiguration<
         builder.ToTable("club_standing_events", "world", table =>
         {
             table.HasCheckConstraint("ck_club_standing_events_tiers", "finished_tier >= 1 and next_tier >= 1");
-            table.HasCheckConstraint("ck_club_standing_events_place", "final_place between 1 and 18");
+            table.HasCheckConstraint("ck_club_standing_events_place", $"final_place between 1 and {WorldRuleSet.LargestDivisionEver}");
             table.HasCheckConstraint(
                 "ck_club_standing_events_standing",
                 "before_centis between 100 and 10000 and after_centis between 100 and 10000");

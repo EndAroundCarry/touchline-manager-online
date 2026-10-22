@@ -45,13 +45,14 @@ public sealed class SeasonCalendarTests
     }
 
     [Fact]
-    public void A_season_has_exactly_thirty_four_matchdays_on_distinct_dates()
+    public void A_season_has_exactly_thirty_matchdays_on_distinct_dates()
     {
         var first = SeasonCalendar.FirstMatchdayOnOrAfter(new DateOnly(2026, 10, 1));
 
         var dates = SeasonCalendar.MatchdayDates(first, WorldRuleSet.MatchdaysPerSeason);
 
-        dates.Should().HaveCount(34);
+        dates.Should().HaveCount(30);
+        WorldRuleSet.MatchdaysPerSeason.Should().Be(30);
         dates.Should().OnlyHaveUniqueItems();
         dates.Should().BeInAscendingOrder();
         dates.Should().OnlyContain(date => SeasonCalendar.IsMatchday(date));
@@ -75,7 +76,7 @@ public sealed class SeasonCalendarTests
     }
 
     [Fact]
-    public void A_window_spans_the_matchdays_and_a_seven_day_rollover()
+    public void A_window_spans_the_matchdays_and_an_eleven_week_cycle()
     {
         var first = SeasonCalendar.FirstMatchdayOnOrAfter(new DateOnly(2026, 10, 1));
 
@@ -83,8 +84,47 @@ public sealed class SeasonCalendarTests
 
         window.StartsAt.Should().Be(SeasonCalendar.KickoffAt(first));
         window.EndsAt.Should().Be(SeasonCalendar.KickoffAt(window.MatchdayDates[^1]));
-        window.RolloverEndsAt.Should().Be(window.EndsAt.AddDays(7));
+        window.RolloverEndsAt.Should().Be(window.StartsAt.AddDays(77));
         window.EndsAt.Should().BeAfter(window.StartsAt);
+    }
+
+    [Theory]
+    [InlineData(DayOfWeek.Tuesday)]
+    [InlineData(DayOfWeek.Thursday)]
+    [InlineData(DayOfWeek.Sunday)]
+    public void The_next_season_starts_on_the_same_weekday_and_the_rollover_lasts_at_least_a_week(DayOfWeek weekday)
+    {
+        var first = SeasonCalendar.FirstMatchdayOnOrAfter(new DateOnly(2026, 10, 1));
+
+        while (first.DayOfWeek != weekday)
+        {
+            first = SeasonCalendar.FirstMatchdayOnOrAfter(first.AddDays(1));
+        }
+
+        var window = SeasonCalendar.Window(first);
+        var nextFirst = SeasonCalendar.FirstMatchdayOnOrAfter(DateOnly.FromDateTime(window.RolloverEndsAt.UtcDateTime));
+
+        nextFirst.Should().Be(first.AddDays(77));
+        nextFirst.DayOfWeek.Should().Be(first.DayOfWeek);
+        (window.RolloverEndsAt - window.EndsAt).TotalDays.Should().BeGreaterThanOrEqualTo(WorldRuleSet.RolloverDays);
+    }
+
+    [Fact]
+    public void A_season_holds_eleven_sundays_so_eleven_weekly_runs()
+    {
+        var first = SeasonCalendar.FirstMatchdayOnOrAfter(new DateOnly(2026, 10, 1));
+        var window = SeasonCalendar.Window(first);
+        var sundays = 0;
+
+        for (var day = window.StartsAt; day < window.RolloverEndsAt; day = day.AddDays(1))
+        {
+            if (day.DayOfWeek == DayOfWeek.Sunday)
+            {
+                sundays++;
+            }
+        }
+
+        sundays.Should().Be(WorldRuleSet.SeasonCycleWeeks);
     }
 
     [Fact]
@@ -109,7 +149,7 @@ public sealed class SeasonCalendarTests
             return;
         }
 
-        var act = () => SeasonCalendar.MatchdayDates(nonMatchday, 34);
+        var act = () => SeasonCalendar.MatchdayDates(nonMatchday, WorldRuleSet.MatchdaysPerSeason);
 
         act.Should().Throw<ArgumentException>();
     }

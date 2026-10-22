@@ -78,7 +78,7 @@ internal sealed class DivisionConfiguration : IEntityTypeConfiguration<Division>
                 "ck_divisions_status",
                 "status in ('provisioning', 'active', 'retired')");
             table.HasCheckConstraint("ck_divisions_tier_number", "tier_number >= 1");
-            table.HasCheckConstraint("ck_divisions_capacity", "capacity = 18");
+            table.HasCheckConstraint("ck_divisions_capacity", $"capacity in ({WorldRuleSet.ClubsPerDivision}, {WorldRuleSet.LargestDivisionEver})");
         });
 
         builder.HasKey(division => division.Id);
@@ -273,7 +273,7 @@ internal sealed class MatchdayConfiguration : IEntityTypeConfiguration<Matchday>
         {
             table.HasCheckConstraint(
                 "ck_matchdays_round_number",
-                $"round_number between 1 and {WorldRuleSet.MatchdaysPerSeason}");
+                $"round_number between 1 and {WorldRuleSet.LongestSeasonEver}");
             table.HasCheckConstraint(
                 "ck_matchdays_publication_status",
                 "publication_status in ('pending', 'staged', 'published')");

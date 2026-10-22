@@ -52,17 +52,19 @@ join lateral (
 where last.resulting_cash_minor <> a.cash_minor
    or last.resulting_reserved_minor <> a.reserved_minor;
 
--- CAL-10/MAT-7: never five of nine — a published round has nine published fixtures.
+-- CAL-10/MAT-7: never five of eight — a published round has a fixture for every pair, half its division's clubs.
 insert into drill_check (name, failed_rows, detail)
 select
   'Publication atomicity',
   count(*),
   coalesce(string_agg(m.id::text, ', '), 'every published round is complete')
 from competition.matchdays m
+join competition.division_seasons ds on ds.id = m.division_season_id
+join competition.divisions d on d.id = ds.division_id
 where m.publication_status = 'published'
   and (select count(*)
        from competition.fixtures f
-       where f.matchday_id = m.id and f.status = 'published') <> 9;
+       where f.matchday_id = m.id and f.status = 'published') <> d.capacity / 2;
 
 -- The job queue is sound: no duplicate business key, no leased job without a lease, no unknown status.
 insert into drill_check (name, failed_rows, detail)

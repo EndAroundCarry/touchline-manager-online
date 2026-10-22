@@ -56,7 +56,7 @@ public sealed class Matchday
     /// <summary>Schedules a round at its kickoff, deriving the lock instant from it (`CAL-3`).</summary>
     /// <param name="id">A server-generated identity.</param>
     /// <param name="divisionSeasonId">The division-season the round belongs to.</param>
-    /// <param name="roundNumber">The round number, 1–34.</param>
+    /// <param name="roundNumber">The round number, 1 to <see cref="WorldRuleSet.MatchdaysPerSeason"/>.</param>
     /// <param name="kickoffAt">The kickoff instant, in UTC (`CAL-2`).</param>
     /// <param name="now">The current instant.</param>
     public static Matchday Schedule(

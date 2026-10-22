@@ -10,6 +10,7 @@ using Tactical11Manager.Contracts.Ops;
 using Tactical11Manager.Domain.Auth;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Ops;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Infrastructure.Persistence;
 using Tactical11Manager.Infrastructure.Persistence.Entities;
 
@@ -106,7 +107,7 @@ public sealed class AdminConsoleTests : IAsyncLifetime
         detail.LockAt.Should().BeBefore(detail.KickoffAt);
         detail.DivisionName.Should().NotBeNullOrWhiteSpace();
         detail.CountryCode.Should().NotBeNullOrWhiteSpace();
-        detail.Fixtures.Should().HaveCount(9, "a round is nine fixtures (MAT-7)");
+        detail.Fixtures.Should().HaveCount(WorldRuleSet.ClubsPerDivision / 2, "a round is half a division of fixtures (MAT-7)");
         detail.Fixtures.Should().OnlyContain(fixture => !string.IsNullOrWhiteSpace(fixture.HomeClubName));
     }
 

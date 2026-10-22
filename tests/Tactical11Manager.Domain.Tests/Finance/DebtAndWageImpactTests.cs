@@ -51,8 +51,9 @@ public sealed class DebtAndWageImpactTests
     [Fact]
     public void A_manager_still_in_administration_a_whole_season_later_is_dismissed()
     {
-        var before = ClubFinancialState.Next(FinancialStateKind.Administration, 10, 43, -Limit - 1, Limit);
-        var at = ClubFinancialState.Next(FinancialStateKind.Administration, 10, 44, -Limit - 1, Limit);
+        var dismissal = 10 + EconomyRuleSet.AdministrationDismissalMatchdays;
+        var before = ClubFinancialState.Next(FinancialStateKind.Administration, 10, dismissal - 1, -Limit - 1, Limit);
+        var at = ClubFinancialState.Next(FinancialStateKind.Administration, 10, dismissal, -Limit - 1, Limit);
 
         before.Dismiss.Should().BeFalse();
         at.Dismiss.Should().BeTrue();
@@ -145,7 +146,7 @@ public sealed class DebtAndWageImpactTests
         result.Level.Should().Be(WageImpactLevel.Danger);
         result.NeedsConfirmation.Should().BeTrue("a danger bid asks for a confirm tick but is never refused");
         result.SeasonEndCashMinor.Should().BeNegative();
-        result.RedFromMatchday.Should().BeInRange(11, 34);
+        result.RedFromMatchday.Should().BeInRange(11, EconomyRuleSet.MatchdaysPerSeason);
     }
 
     [Fact]

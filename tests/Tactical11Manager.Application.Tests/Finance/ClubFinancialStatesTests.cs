@@ -50,7 +50,7 @@ public sealed class ClubFinancialStatesTests
         var message = run.Inbox.Messages.Should().ContainSingle().Which;
 
         message.TemplateKey.Should().Be(FinanceInboxTemplates.AdministrationEntered);
-        InboxMessageText.Render(message.TemplateKey, message.ParametersJson).Body.Should().Contain("34 matchdays");
+        InboxMessageText.Render(message.TemplateKey, message.ParametersJson).Body.Should().Contain("30 matchdays");
     }
 
     [Fact]
@@ -130,14 +130,14 @@ public sealed class ClubFinancialStatesTests
         var metrics = new RecordingMetrics();
         var run = Arrange(clubId, account, human: true, tenures, outbox, metrics);
 
-        // In administration since matchday 3, and now it is matchday 37.
+        // In administration since matchday 3, and now it is matchday 33.
         account.RecordState(ClubFinancialState.Next(FinancialStateKind.Healthy, 0, 3, account.CashMinor, Limit), Now);
 
-        var early = await run.Subject.ApplyAsync([clubId], 36, "test", Now, CancellationToken.None);
+        var early = await run.Subject.ApplyAsync([clubId], 32, "test", Now, CancellationToken.None);
 
-        early.Dismissed.Should().Be(0, "33 matchdays have passed, one short of a season");
+        early.Dismissed.Should().Be(0, "29 matchdays have passed, one short of a season");
 
-        var result = await run.Subject.ApplyAsync([clubId], 37, "test", Now, CancellationToken.None);
+        var result = await run.Subject.ApplyAsync([clubId], 33, "test", Now, CancellationToken.None);
 
         result.Dismissed.Should().Be(1);
         tenure.ControlStatus.Should().Be(ClubTenureControlStatus.Closed);

@@ -31,7 +31,7 @@ public sealed class MatchdayMoneyTests
     public async Task Every_club_of_the_division_is_paid_the_television_money_and_charged_its_wages_under_one_key()
     {
         var clubId = Guid.CreateVersion7();
-        var run = Arrange(Basis(clubId, wage: 34_000_000, players: 22), Funded(clubId, 500_000_000));
+        var run = Arrange(Basis(clubId, wage: 30_000_000, players: 22), Funded(clubId, 500_000_000));
 
         await run.Subject.PostMatchdayMoneyAsync(MatchdayId, 1, 5, Now, CancellationToken.None);
 
@@ -46,8 +46,8 @@ public sealed class MatchdayMoneyTests
         var television = run.Ledger.Entries.Single(entry => entry.Category == LedgerCategory.LeagueTv);
         var wages = run.Ledger.Entries.Single(entry => entry.Category == LedgerCategory.Wages);
 
-        television.CashDeltaMinor.Should().Be(EconomyRuleSet.LeagueTvSeasonMinorFor(1) / 34);
-        wages.CashDeltaMinor.Should().Be(-1_000_000, "a 34th of the season's wage bill");
+        television.CashDeltaMinor.Should().Be(EconomyRuleSet.LeagueTvSeasonMinorFor(1) / EconomyRuleSet.MatchdaysPerSeason);
+        wages.CashDeltaMinor.Should().Be(-1_000_000, "a thirtieth of the season's wage bill");
         wages.SourceType.Should().Be(LedgerSourceType.Matchday);
     }
 
@@ -65,7 +65,7 @@ public sealed class MatchdayMoneyTests
     }
 
     [Fact]
-    public async Task The_overdraft_limit_is_set_from_the_forecast_on_the_first_round_and_again_after_the_seventeenth()
+    public async Task The_overdraft_limit_is_set_from_the_forecast_on_the_first_round_and_again_after_the_fifteenth()
     {
         var clubId = Guid.CreateVersion7();
         var basis = Basis(clubId, wage: 0, players: 0);
@@ -77,10 +77,10 @@ public sealed class MatchdayMoneyTests
         account.OverdraftLimitMinor.Should().Be(basis.OverdraftLimitMinor).And.BePositive();
         account.OverdraftFloorMinor.Should().Be(2 * basis.OverdraftLimitMinor, "the integrity net is twice the limit");
 
-        // The ground grew and the fans came: the limit follows the forecast after the seventeenth round.
+        // The ground grew and the fans came: the limit follows the forecast after the fifteenth round.
         run.Queries.Basis[0] = basis with { Fans = basis.Fans * 3 };
 
-        await run.Subject.PostMatchdayMoneyAsync(Guid.CreateVersion7(), 1, 17, Now.AddDays(100), CancellationToken.None);
+        await run.Subject.PostMatchdayMoneyAsync(Guid.CreateVersion7(), 1, EconomyRuleSet.MatchdaysPerSeason / 2, Now.AddDays(100), CancellationToken.None);
 
         account.OverdraftLimitMinor.Should().Be(run.Queries.Basis[0].OverdraftLimitMinor).And.BeGreaterThan(basis.OverdraftLimitMinor);
     }

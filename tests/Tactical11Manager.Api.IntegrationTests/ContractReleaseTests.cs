@@ -60,11 +60,10 @@ public sealed class ContractReleaseTests : IAsyncLifetime
         quote.SeasonWageMinor.Should().Be(contract.SeasonWageMinor);
         quote.RemainingWeeks.Should().BePositive();
 
-        // Half the wages left: the season wage spread over the weeks of a season (twelve or thirteen, by the day it starts).
-        var wagesLeftHigh = quote.SeasonWageMinor * quote.RemainingWeeks / 12;
-        var wagesLeftLow = quote.SeasonWageMinor * quote.RemainingWeeks / 13;
+        // Half the wages left: the season wage spread over the weeks of a season, the same eleven whatever day it starts.
+        var wagesLeft = quote.SeasonWageMinor * quote.RemainingWeeks / WorldRuleSet.SeasonCycleWeeks;
 
-        quote.PayoutMinor.Should().BeInRange((wagesLeftLow / 2) - 1, (wagesLeftHigh / 2) + 1, "the payout is half the wages left (CON-12)");
+        quote.PayoutMinor.Should().BeInRange((wagesLeft / 2) - 1, (wagesLeft / 2) + 1, "the payout is half the wages left (CON-12)");
         quote.BlockedReason.Should().BeNull();
         quote.AvailableMinor.Should().BePositive();
 

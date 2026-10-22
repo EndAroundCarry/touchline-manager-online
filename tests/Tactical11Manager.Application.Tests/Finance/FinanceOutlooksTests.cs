@@ -67,9 +67,9 @@ public sealed class FinanceOutlooksTests
     }
 
     [Theory]
-    [InlineData(10, 10, 34)]
-    [InlineData(10, 30, 14)]
-    [InlineData(10, 44, 0)]
+    [InlineData(10, 10, 30)]
+    [InlineData(10, 30, 10)]
+    [InlineData(10, 40, 0)]
     [InlineData(10, 80, 0)]
     public void The_dismissal_clock_counts_a_whole_season_from_the_matchday_administration_began(int since, int now, int expected)
     {
@@ -81,11 +81,11 @@ public sealed class FinanceOutlooksTests
     [Fact]
     public void The_prize_is_the_one_the_present_place_would_be_paid_at_the_clubs_tier()
     {
-        var outlook = FinanceOutlooks.Compose(Basis(), Money(), Standing(place: 7, clubs: 18), 10);
+        var outlook = FinanceOutlooks.Compose(Basis(), Money(), Standing(place: 7, clubs: EconomyRuleSet.ClubsPerDivision), 10);
 
         outlook.Prize.Should().NotBeNull();
         outlook.Prize!.Place.Should().Be(7);
-        outlook.Prize.Clubs.Should().Be(18);
+        outlook.Prize.Clubs.Should().Be(EconomyRuleSet.ClubsPerDivision);
         outlook.Prize.AmountMinor.Should().Be(EconomyRuleSet.PrizeMinorFor(1, 7));
     }
 
@@ -104,6 +104,6 @@ public sealed class FinanceOutlooksTests
         FinancialStateKind state = FinancialStateKind.Healthy,
         int since = 0,
         int? place = 5,
-        int clubs = 18) =>
+        int clubs = EconomyRuleSet.ClubsPerDivision) =>
         new(state, since, place, clubs);
 }

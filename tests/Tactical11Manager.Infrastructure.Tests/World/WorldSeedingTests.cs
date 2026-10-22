@@ -18,7 +18,7 @@ namespace Tactical11Manager.Infrastructure.Tests.World;
 /// </summary>
 /// <remarks>
 /// Runs against a real, freshly seeded PostgreSQL 17 database, because the claims being verified are
-/// about rows: 108 clubs with unique identities, one entry per club per season, one funded account per
+/// about rows: every club with a unique identity, one entry per club per season, one funded account per
 /// club. A generator test can prove determinism; only this can prove the seeder put the result in the
 /// database.
 /// </remarks>
@@ -53,7 +53,7 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         var clubs = await db.Clubs.Where(club => club.WorldId == Fixture.WorldId).ToListAsync();
 
-        clubs.Should().HaveCount(108, "six countries times eighteen clubs");
+        clubs.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision, "six countries times a division of clubs");
         clubs.Select(club => club.NormalizedName).Should().OnlyHaveUniqueItems();
         clubs.Select(club => club.Slug).Should().OnlyHaveUniqueItems();
         clubs.Should().OnlyContain(club => club.Reputation >= 1 && club.Reputation <= 100);
@@ -75,7 +75,7 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Where(account => clubIds.Contains(account.ClubId))
             .ToListAsync();
 
-        accounts.Should().HaveCount(108);
+        accounts.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision);
         accounts.Should().OnlyContain(account => account.CashMinor == WorldRuleSet.OpeningCashMinorTier1);
         accounts.Should().OnlyContain(account => account.ReservedMinor == 0);
         accounts.Should().OnlyContain(
@@ -86,7 +86,7 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Where(entry => clubIds.Contains(entry.ClubId))
             .ToListAsync();
 
-        entries.Should().HaveCount(108);
+        entries.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision);
         entries.Should().OnlyContain(entry => entry.InitialControlType == ClubControlType.Ai);
         entries.Select(entry => entry.ClubId).Should().OnlyHaveUniqueItems(
             "one club appears once in a season, which the database also enforces");
@@ -107,7 +107,7 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Where(building => clubIds.Contains(building.ClubId))
             .ToListAsync();
 
-        buildings.Should().HaveCount(216, "two buildings for each of 108 clubs (STRC-1)");
+        buildings.Should().HaveCount(2 * 6 * WorldRuleSet.ClubsPerDivision, "two buildings for each club (STRC-1)");
         buildings.Should().OnlyContain(building => building.Level == 1 && !building.IsBuilding);
 
         foreach (var kind in StructureKinds.All)
@@ -134,7 +134,7 @@ public sealed class WorldSeedingTests : WorldTestBase
                 .ToListAsync();
 
             var regenerated = ClubIdentityGenerator
-                .GenerateDivision(WorldFixture.Seed, country.NamePoolKey, country.Code, tierNumber: 1, 18)
+                .GenerateDivision(WorldFixture.Seed, country.NamePoolKey, country.Code, tierNumber: 1, WorldRuleSet.ClubsPerDivision)
                 .Select(identity => identity.Name)
                 .Order(StringComparer.Ordinal)
                 .ToList();
@@ -155,7 +155,7 @@ public sealed class WorldSeedingTests : WorldTestBase
             .ToListAsync();
 
         var other = ClubIdentityGenerator
-            .GenerateDivision("some-other-world", "england", "ENG", tierNumber: 1, 18)
+            .GenerateDivision("some-other-world", "england", "ENG", tierNumber: 1, WorldRuleSet.ClubsPerDivision)
             .Select(identity => identity.BadgeSeed)
             .ToList();
 
@@ -179,7 +179,7 @@ public sealed class WorldSeedingTests : WorldTestBase
         SeasonCalendar.IsMatchday(firstMatchday).Should().BeTrue("CAL-2 fixes matchdays to Tue, Thu, and Sun");
         season.StartsAt.Offset.Should().Be(TimeSpan.Zero, "the calendar is stored in UTC (TIME-1)");
         SeasonCalendar.KickoffAt(firstMatchday).Should().Be(season.StartsAt);
-        season.RolloverEndsAt.Should().Be(season.EndsAt.AddDays(WorldRuleSet.RolloverDays));
+        season.RolloverEndsAt.Should().Be(season.StartsAt.AddDays(7 * WorldRuleSet.SeasonCycleWeeks));
         season.GameYear.Should().Be(firstMatchday.Year, "the first season's game year is its own start year");
     }
 
@@ -244,9 +244,9 @@ public sealed class WorldSeedingTests : WorldTestBase
             WorldBootstrapGenerator.Version,
             "the bootstrap produces clubs and players, so the run records the version that covers both (FIC-8)");
         run.CountriesCreated.Should().Be(6);
-        run.ClubsCreated.Should().Be(108);
-        run.PlayersCreated.Should().Be(108 * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
-        run.AccountsCreated.Should().Be(108);
+        run.ClubsCreated.Should().Be(6 * WorldRuleSet.ClubsPerDivision);
+        run.PlayersCreated.Should().Be(6 * WorldRuleSet.ClubsPerDivision * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+        run.AccountsCreated.Should().Be(6 * WorldRuleSet.ClubsPerDivision);
         run.InputHash.Should().HaveLength(64);
         run.CompletedAt.Should().NotBeNull();
     }
@@ -263,7 +263,7 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Select(group => new { ClubId = group.Key, Count = group.Count() })
             .ToListAsync();
 
-        squadSizes.Should().HaveCount(108);
+        squadSizes.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision);
         squadSizes.Should().OnlyContain(club => club.Count == WorldRuleSet.GeneratorSquadTarget, "SQ-1");
     }
 
@@ -286,7 +286,7 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         var byClub = wide.GroupBy(entry => entry.ClubId).ToList();
 
-        byClub.Should().HaveCount(108, "every club has wide midfielders");
+        byClub.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision, "every club has wide midfielders");
         byClub.Should().OnlyContain(
             club => club.Count(entry => entry.PrimaryPosition == PlayerPosition.LeftMidfielder) == 1
                 && club.Count(entry => entry.PrimaryPosition == PlayerPosition.RightMidfielder) == 1,
@@ -327,7 +327,7 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         var playerCount = await db.Players.CountAsync(player => player.WorldId == Fixture.WorldId);
 
-        playerCount.Should().Be(108 * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+        playerCount.Should().Be(6 * WorldRuleSet.ClubsPerDivision * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
 
         (await db.PlayerAttributes.CountAsync()).Should().Be(playerCount);
         (await db.PlayerStates.CountAsync()).Should().Be(playerCount);

@@ -27,7 +27,7 @@ public sealed class SeasonSchedulePersistenceTests : WorldTestBase
     }
 
     [Fact]
-    public async Task Every_division_season_has_thirty_four_rounds_and_a_full_fixture_list()
+    public async Task Every_division_season_has_every_round_and_a_full_fixture_list()
     {
         await using var scope = Fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -43,7 +43,7 @@ public sealed class SeasonSchedulePersistenceTests : WorldTestBase
                 .ToListAsync();
 
             matchdays.Should().HaveCount(WorldRuleSet.MatchdaysPerSeason, "CAL-1");
-            matchdays.Select(matchday => matchday.RoundNumber).Should().BeEquivalentTo(Enumerable.Range(1, 34));
+            matchdays.Select(matchday => matchday.RoundNumber).Should().BeEquivalentTo(Enumerable.Range(1, WorldRuleSet.MatchdaysPerSeason));
             matchdays.Should().OnlyContain(
                 matchday => matchday.PublicationStatus == MatchdayPublicationStatus.Pending,
                 "nothing has been played yet");
@@ -59,7 +59,7 @@ public sealed class SeasonSchedulePersistenceTests : WorldTestBase
                     .Where(fixture => fixture.MatchdayId == matchday.Id)
                     .ToListAsync();
 
-                fixtures.Should().HaveCount(WorldRuleSet.ClubsPerDivision / 2, "nine fixtures a round");
+                fixtures.Should().HaveCount(WorldRuleSet.ClubsPerDivision / 2, "half the division plays at home each round");
                 fixtures.Should().OnlyContain(fixture => fixture.Status == FixtureStatus.Scheduled);
                 fixtures.Should().OnlyContain(fixture => fixture.KickoffAt == matchday.KickoffAt);
                 fixtures.Should().OnlyContain(
@@ -70,7 +70,7 @@ public sealed class SeasonSchedulePersistenceTests : WorldTestBase
     }
 
     [Fact]
-    public async Task Every_club_plays_thirty_four_fixtures_split_seventeen_home_and_seventeen_away()
+    public async Task Every_club_plays_a_home_and_an_away_fixture_against_every_other_club()
     {
         await using var scope = Fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -87,8 +87,8 @@ public sealed class SeasonSchedulePersistenceTests : WorldTestBase
             var home = fixtures.Count(fixture => fixture.HomeClubId == clubId);
             var away = fixtures.Count(fixture => fixture.AwayClubId == clubId);
 
-            home.Should().Be(17, "a club hosts each of its division's other seventeen clubs once");
-            away.Should().Be(17);
+            home.Should().Be(WorldRuleSet.ClubsPerDivision - 1, "a club hosts each of its division's other clubs once");
+            away.Should().Be(WorldRuleSet.ClubsPerDivision - 1);
         }
     }
 

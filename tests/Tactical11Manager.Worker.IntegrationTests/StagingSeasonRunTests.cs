@@ -33,8 +33,8 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 /// The stage's last exit criterion: "at least five consecutive automated staging seasons reconcile
 /// cleanly". Nothing here calls the rollover use case to do the work — the test enqueues the season's real
 /// job (the same business key the calendar's scheduler would use) and the worker claims and executes it, as
-/// a staging world would. After every rollover the next season is asserted complete (eighteen clubs, a
-/// thirty-four-round schedule, an opening table), the closing season's projections are reconciled with the
+/// a staging world would. After every rollover the next season is asserted complete (a full division, a
+/// full-length schedule, an opening table), the closing season's projections are reconciled with the
 /// same dry run preflight uses, and money, squads, and history are checked.
 /// </para>
 /// <para>
@@ -84,6 +84,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
             ["Training:EnableDailyProgression"] = "false",
             ["AiClubs:EnableEvaluation"] = "false",
             ["Finance:EnableWeeklyRun"] = "false",
+            ["Fans:EnableWeeklyReview"] = "false",
             ["FreeAgents:EnableBatches"] = "false",
             ["Auctions:EnableAuctions"] = "false",
             ["AiMarket:EnableEvaluation"] = "false",
@@ -252,7 +253,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
 
             nextSeasonId = next.Id;
 
-            // Every active tier begins the new season complete: eighteen clubs, a thirty-four-round schedule,
+            // Every active tier begins the new season complete: a full division, a full-length schedule,
             // and an opening table (PR-1..PR-5, CAL-1).
             var nextDivisionSeasons = await db.DivisionSeasons
                 .Where(divisionSeason => divisionSeason.SeasonId == next.Id)
@@ -316,10 +317,10 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
             // The season's money is settled once (FIN-5, FIN-19).
             (await db.ClubSeasonFinances.CountAsync(summary => summary.SeasonId == closing.Id))
                 .Should()
-                .Be(126, "every closing club has a finance summary");
+                .Be(7 * WorldRuleSet.ClubsPerDivision, "every closing club has a finance summary");
             (await db.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.PositionAward))
                 .Should()
-                .Be(126 * closedSequenceNumber, "every closing club earns a position award each season");
+                .Be(7 * WorldRuleSet.ClubsPerDivision * closedSequenceNumber, "every closing club earns a position award each season");
         }
 
         return nextSeasonId;
@@ -363,7 +364,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
         var ledger = await db.LedgerEntries.ToListAsync();
         var byClub = ledger.GroupBy(entry => entry.ClubId).ToDictionary(group => group.Key, group => group.ToList());
 
-        accounts.Should().HaveCount(126);
+        accounts.Should().HaveCount(7 * WorldRuleSet.ClubsPerDivision);
         accounts.Should().OnlyContain(account => account.CashMinor >= 0 && account.ReservedMinor >= 0);
 
         foreach (var account in accounts)
@@ -474,6 +475,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
     {
         var businessKey = SeasonRolloverJobTypes.RolloverKey(seasonId);
         var deadline = DateTimeOffset.UtcNow.AddMinutes(3);
+        var lastSeen = "no job";
 
         while (DateTimeOffset.UtcNow < deadline)
         {
@@ -485,6 +487,8 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                     .Where(candidate => candidate.BusinessKey == businessKey)
                     .Select(candidate => new { candidate.Status, candidate.LastError })
                     .FirstOrDefaultAsync();
+
+                lastSeen = job is null ? "no job" : $"{job.Status}: {job.LastError}";
 
                 if (job is null)
                 {
@@ -503,7 +507,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
             await Task.Delay(TimeSpan.FromMilliseconds(250));
         }
 
-        throw new TimeoutException($"The rollover for season {seasonId} did not complete in time.");
+        throw new TimeoutException($"The rollover for season {seasonId} did not complete in time ({lastSeen}).");
     }
 
     /// <summary>Provisions a second tier for the run's first country, so an adjacent pair exists.</summary>

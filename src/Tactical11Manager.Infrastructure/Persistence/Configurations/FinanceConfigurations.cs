@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Infrastructure.Persistence.Configurations;
@@ -348,7 +349,7 @@ internal sealed class ClubSponsorDealConfiguration : IEntityTypeConfiguration<Cl
             table.HasCheckConstraint(
                 "ck_sponsor_deals_outcome",
                 "outcome is null or outcome in (" + string.Join(", ", SponsorCodes.OutcomeCodes.Select(code => $"'{code}'")) + ")");
-            table.HasCheckConstraint("ck_sponsor_deals_target_place", "target_place between 1 and 18");
+            table.HasCheckConstraint("ck_sponsor_deals_target_place", $"target_place between 1 and {WorldRuleSet.LargestDivisionEver}");
             table.HasCheckConstraint(
                 "ck_sponsor_deals_amounts",
                 "fixed_matchday_minor >= 0 and bonus_met_minor >= 0 and bonus_exceeded_minor >= bonus_met_minor");

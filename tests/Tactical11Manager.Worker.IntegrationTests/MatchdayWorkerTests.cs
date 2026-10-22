@@ -8,6 +8,7 @@ using Tactical11Manager.Application;
 using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Infrastructure;
 using Tactical11Manager.Infrastructure.Persistence;
 
@@ -124,26 +125,26 @@ public sealed class MatchdayWorkerTests : IAsyncLifetime
             .Where(fixture => fixture.MatchdayId == matchday.Id)
             .ToListAsync();
 
-        fixtures.Should().HaveCount(9);
+        fixtures.Should().HaveCount(WorldRuleSet.ClubsPerDivision / 2);
         fixtures.Should().OnlyContain(fixture => fixture.Status == FixtureStatus.Published);
         fixtures.Should().OnlyContain(fixture => fixture.HomeScore != null && fixture.AwayScore != null);
         fixtures.Should().OnlyContain(fixture => fixture.MatchId != null);
 
         var matchIds = fixtures.Select(fixture => fixture.MatchId!.Value).ToList();
 
-        (await db.Matches.CountAsync(match => matchIds.Contains(match.Id))).Should().Be(9);
+        (await db.Matches.CountAsync(match => matchIds.Contains(match.Id))).Should().Be(WorldRuleSet.ClubsPerDivision / 2);
         (await db.InputSnapshots.CountAsync(snapshot => fixtures.Select(f => f.Id).Contains(snapshot.FixtureId)))
             .Should()
-            .Be(9);
+            .Be(WorldRuleSet.ClubsPerDivision / 2);
 
         var standings = await db.Standings
             .Where(standing => standing.DivisionSeasonId == matchday.DivisionSeasonId)
             .OrderBy(standing => standing.Rank)
             .ToListAsync();
 
-        standings.Should().HaveCount(18);
-        standings.Sum(standing => standing.Played).Should().Be(18, "every club in the division played once");
-        standings.Select(standing => standing.Rank).Should().Equal(Enumerable.Range(1, 18));
+        standings.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
+        standings.Sum(standing => standing.Played).Should().Be(WorldRuleSet.ClubsPerDivision, "every club in the division played once");
+        standings.Select(standing => standing.Rank).Should().Equal(Enumerable.Range(1, WorldRuleSet.ClubsPerDivision));
 
         // The three jobs the round needed all reached a terminal state, which is what "the worker advanced the
         // deadline" means when the evidence is read back (ADR-0003). The lock and the resolution come due at

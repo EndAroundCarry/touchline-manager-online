@@ -38,13 +38,36 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v17";
+    public const string Version = "world-rules-v18";
 
-    /// <summary>Every active division holds exactly 18 clubs (`WORLD-4`). There is no other size.</summary>
-    public const int ClubsPerDivision = 18;
+    /// <summary>Every active division holds exactly 16 clubs (`WORLD-4`). There is no other size.</summary>
+    public const int ClubsPerDivision = 16;
 
-    /// <summary>A double round-robin season is 34 matchdays (`CAL-1`).</summary>
-    public const int MatchdaysPerSeason = 34;
+    /// <summary>A double round-robin season is 30 matchdays (`CAL-1`).</summary>
+    public const int MatchdaysPerSeason = 30;
+
+    /// <summary>
+    /// The weeks from the first matchday of one season to the first matchday of the next (`CAL-6`).
+    /// </summary>
+    /// <remarks>
+    /// Thirty matchdays on Tuesday, Thursday and Sunday fill exactly ten weeks, and the rollover takes the
+    /// eleventh. The next season therefore starts on the same weekday the last one did, so the start never
+    /// rotates, and a season holds exactly this many weekly runs (finance, free agents, fan review).
+    /// </remarks>
+    public const int SeasonCycleWeeks = 11;
+
+    /// <summary>
+    /// The largest division a past season may have held. Only the check constraints read it: they stay
+    /// permissive for history (an 18-club season stays valid data) while the domain guards enforce the
+    /// current <see cref="ClubsPerDivision"/>.
+    /// </summary>
+    public const int LargestDivisionEver = 18;
+
+    /// <summary>
+    /// The longest season a past world may have played. Only the check constraints read it, for the same
+    /// reason as <see cref="LargestDivisionEver"/>.
+    /// </summary>
+    public const int LongestSeasonEver = 34;
 
     /// <summary>Standard kickoff time, in UTC (`CAL-2`).</summary>
     public static readonly TimeOnly KickoffUtc = new(19, 0);
@@ -69,7 +92,10 @@ public static class WorldRuleSet
     /// </remarks>
     public const int MaxConsecutiveHomeOrAway = 4;
 
-    /// <summary>The rollover period between seasons, in days (`CAL-6`).</summary>
+    /// <summary>
+    /// The least time, in days, between the last matchday and the next season's start (`CAL-6`). The cycle
+    /// (<see cref="SeasonCycleWeeks"/>) leaves nine or ten, so this is a floor the calendar guards.
+    /// </summary>
     public const int RolloverDays = 7;
 
     /// <summary>Clubs promoted from a lower tier at rollover (`PR-1`).</summary>

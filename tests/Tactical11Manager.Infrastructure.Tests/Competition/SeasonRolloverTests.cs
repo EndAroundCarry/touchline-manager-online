@@ -179,7 +179,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                 .Should()
                 .BeTrue("CAL-6: the next season starts on the first matchday after the rollover window");
 
-            // Every active tier has a next-season instance holding eighteen clubs, a thirty-four-round
+            // Every active tier has a next-season instance holding a full division, a full-length
             // schedule, and an opening table.
             var nextDivisionSeasons = await db.DivisionSeasons
                 .Where(divisionSeason => divisionSeason.SeasonId == next.Id)
@@ -191,13 +191,13 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             {
                 (await db.ClubSeasonEntries.CountAsync(entry => entry.DivisionSeasonId == divisionSeason.Id))
                     .Should()
-                    .Be(18, "PR-1: a tier holds eighteen clubs");
+                    .Be(WorldRuleSet.ClubsPerDivision, "PR-1: a tier holds a full division of clubs");
                 (await db.Matchdays.CountAsync(matchday => matchday.DivisionSeasonId == divisionSeason.Id))
                     .Should()
-                    .Be(34, "CAL-1");
+                    .Be(WorldRuleSet.MatchdaysPerSeason, "CAL-1");
                 (await db.Standings.CountAsync(standing => standing.DivisionSeasonId == divisionSeason.Id))
                     .Should()
-                    .Be(18);
+                    .Be(WorldRuleSet.ClubsPerDivision);
             }
 
             // The closing entries carry their final rank and movement flags exactly once (PR-4).
@@ -285,16 +285,16 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             (await db.Fixtures.CountAsync(fixture => closingMatchdayIds.Contains(fixture.MatchdayId)
                 && fixture.Status == FixtureStatus.Published))
                 .Should()
-                .Be(306, "the played season's results are the record of what happened");
+                .Be(WorldRuleSet.MatchdaysPerSeason * (WorldRuleSet.ClubsPerDivision / 2), "the played season's results are the record of what happened");
 
             // The rollover settles the closing season's money (FIN-5, master plan §6.8): one final-position
             // award and one finance summary for every closing club.
             (await db.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.PositionAward))
                 .Should()
-                .Be(126, "every closing club earns a final-position award");
+                .Be(7 * WorldRuleSet.ClubsPerDivision, "every closing club earns a final-position award");
             (await db.ClubSeasonFinances.CountAsync(summary => summary.SeasonId == seasonId))
                 .Should()
-                .Be(126, "every closing club has a season finance summary");
+                .Be(7 * WorldRuleSet.ClubsPerDivision, "every closing club has a season finance summary");
 
             // A relegated club is given its parachute, once, and every club's standing takes its step (FIN-5, STD-2, STD-3).
             var relegatedClubIds = await db.ClubSeasonEntries
@@ -309,7 +309,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
 
             var steps = await db.ClubStandingEvents.Where(step => step.SeasonId == seasonId).ToListAsync();
 
-            steps.Should().HaveCount(126, "every closing club's standing moved once");
+            steps.Should().HaveCount(7 * WorldRuleSet.ClubsPerDivision, "every closing club's standing moved once");
             steps.Where(step => step.NextTier > step.FinishedTier).Select(step => step.ClubId)
                 .Should()
                 .BeEquivalentTo(relegatedClubIds, "the step knows which clubs went down");
@@ -321,7 +321,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             // offers; a computer club has already signed, and a club a manager holds waits for the manager's choice (SPN-1, SPN-4, OBJ-4).
             (await db.SponsorDeals.CountAsync(deal => deal.SeasonId == seasonId && deal.Outcome != null))
                 .Should()
-                .Be(126, "every closing club's objective was settled");
+                .Be(7 * WorldRuleSet.ClubsPerDivision, "every closing club's objective was settled");
 
             var nextSeasonId = await db.Seasons
                 .Where(candidate => candidate.WorldId == _fixture.WorldId && candidate.SequenceNumber == 2)
@@ -330,10 +330,10 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
 
             var managedClubs = await db.ClubTenures.CountAsync(tenure => tenure.EndedAt == null);
 
-            (await db.SponsorOffers.CountAsync(offer => offer.SeasonId == nextSeasonId)).Should().Be(126 * 3);
+            (await db.SponsorOffers.CountAsync(offer => offer.SeasonId == nextSeasonId)).Should().Be(7 * WorldRuleSet.ClubsPerDivision * 3);
             (await db.SponsorDeals.CountAsync(deal => deal.SeasonId == nextSeasonId && deal.SignedBy == SponsorSigner.Ai))
                 .Should()
-                .Be(126 - managedClubs, "a computer club signs at once");
+                .Be(7 * WorldRuleSet.ClubsPerDivision - managedClubs, "a computer club signs at once");
             (await db.InboxMessages.CountAsync(message => message.TemplateKey == FinanceInboxTemplates.SponsorOffersReady))
                 .Should()
                 .Be(managedClubs, "each manager is told what is on offer");
@@ -434,7 +434,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                     2_000 + ((position * 700) % 7_000),
                     LastWeekGap: position % 5);
 
-                targetOf[fanBase.ClubId] = ((position * 5) % 18) + 1;
+                targetOf[fanBase.ClubId] = ((position * 5) % WorldRuleSet.ClubsPerDivision) + 1;
                 fanBase.Apply(state, _fixture.Clock.UtcNow);
                 fanBase.SetTarget(targetOf[fanBase.ClubId], _fixture.Clock.UtcNow);
                 before[fanBase.ClubId] = state;
@@ -477,7 +477,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                 after[clubId].Fans.Should().Be(expected.Fans, $"club {clubId:N} finished {rank} of tier {tier} against a target of {targetOf[clubId]}");
                 after[clubId].MoodBp.Should().Be(expected.MoodBp);
                 after[clubId].LastWeekGap.Should().BeNull("the new season is judged afresh");
-                after[clubId].SeasonTargetRank.Should().BeInRange(1, 18, "the fans pick the place they hope for from the squads");
+                after[clubId].SeasonTargetRank.Should().BeInRange(1, WorldRuleSet.ClubsPerDivision, "the fans pick the place they hope for from the squads");
 
                 resets[clubId].SeasonId.Should().Be(seasonId);
                 resets[clubId].Gap.Should().Be(gap);
@@ -532,7 +532,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             preview.Preflight.Reconciles.Should().BeTrue();
             preview.NextSeasonExists.Should().BeFalse();
             preview.Totals.Countries.Should().Be(6);
-            preview.Totals.Clubs.Should().Be(126, "six seeded tiers plus the provisioned second tier");
+            preview.Totals.Clubs.Should().Be(7 * WorldRuleSet.ClubsPerDivision, "six seeded tiers plus the provisioned second tier");
             preview.Totals.Promotions.Should().Be(3, "PR-1: three up between the two adjacent tiers");
             preview.Totals.Relegations.Should().Be(3, "PR-1: three down");
 

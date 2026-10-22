@@ -45,7 +45,7 @@ public sealed class SettleSeasonFinancesTests
         var result = await Create(accounts, ledger, summaries).SettleAsync(
             WorldId,
             ClosingSeason(),
-            [new SeasonSettlementClub(champion, 1, 1, 1), new SeasonSettlementClub(bottom, 1, 18, 2)],
+            [new SeasonSettlementClub(champion, 1, 1, 1), new SeasonSettlementClub(bottom, 1, EconomyRuleSet.ClubsPerDivision, 2)],
             SettledAt,
             CancellationToken.None);
 
@@ -100,7 +100,7 @@ public sealed class SettleSeasonFinancesTests
             .SettleAsync(
                 WorldId,
                 ClosingSeason(),
-                [new SeasonSettlementClub(relegated, 1, 17, 2)],
+                [new SeasonSettlementClub(relegated, 1, EconomyRuleSet.ClubsPerDivision - 1, 2)],
                 SettledAt,
                 CancellationToken.None);
 
