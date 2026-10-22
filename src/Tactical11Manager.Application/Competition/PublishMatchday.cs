@@ -155,6 +155,15 @@ public sealed class PublishMatchday
             now,
             cancellationToken);
 
+        // The round's money for every club of the division: the league's television money, the sponsor's fixed part and
+        // the wages, paid on every matchday whether the club hosted or not (FIN-4, FIN-7, SPN-3).
+        await _finances.PostMatchdayMoneyAsync(
+            workload.Matchday.Id,
+            workload.SeasonSequenceNumber,
+            workload.Matchday.RoundNumber,
+            now,
+            cancellationToken);
+
         // The fans hear the result in the same transaction. The gate above was drawn by the fans going in, so
         // the crowd came before the result moved them (FAN-5, FIN-3).
         await _fans.ApplyAsync(

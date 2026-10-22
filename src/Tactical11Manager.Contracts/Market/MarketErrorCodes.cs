@@ -36,6 +36,12 @@ public static class MarketErrorCodes
     /// <summary>Only human managers may bid on a free agent (`FA-5`).</summary>
     public const string FreeAgentsHumanOnly = "FREE_AGENTS_HUMAN_ONLY";
 
+    /// <summary>The club is in the red or in administration, so it may not bid until its cash is back above zero (`DEBT-3`).</summary>
+    public const string TransferEmbargo = "TRANSFER_EMBARGO";
+
+    /// <summary>The board of a club in administration opened the listing, so its manager cannot cancel it (`DEBT-4`).</summary>
+    public const string ListingSetByBoard = "LISTING_SET_BY_BOARD";
+
     /// <summary>The player does not exist, or is not visible.</summary>
     public const string PlayerNotFound = "PLAYER_NOT_FOUND";
 

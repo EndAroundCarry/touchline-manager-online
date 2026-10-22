@@ -43,6 +43,18 @@ public static class LedgerEntryText
             LedgerPostings.WagesTemplate =>
                 string.Create(CultureInfo.InvariantCulture, $"Weekly player wages ({Number(parameters, "playerCount")} players)"),
             LedgerPostings.OperatingCostTemplate => "Weekly operating cost",
+            LedgerPostings.LeagueTvTemplate => "League television money",
+            LedgerPostings.SponsorMatchdayTemplate => "Sponsor payment",
+            LedgerPostings.MatchdayWagesTemplate =>
+                string.Create(CultureInfo.InvariantCulture, $"Matchday player wages ({Number(parameters, "playerCount")} players)"),
+            LedgerPostings.SponsorBonusTemplate =>
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Sponsor bonus (aimed for place {Number(parameters, "target")}, finished {Number(parameters, "rank")})"),
+            LedgerPostings.ParachuteTemplate =>
+                string.Create(CultureInfo.InvariantCulture, $"Parachute after relegation from tier {Number(parameters, "tier")}"),
+            LedgerPostings.GroundUpkeepTemplate => "Weekly ground upkeep",
+            LedgerPostings.ReleaseFeeTemplate => "Fee from a released player's agent",
             LedgerPostings.PositionAwardTemplate =>
                 string.Create(
                     CultureInfo.InvariantCulture,

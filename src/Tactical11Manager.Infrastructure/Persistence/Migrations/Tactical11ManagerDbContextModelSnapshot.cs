@@ -2480,6 +2480,12 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("idempotency_key");
 
+                    b.Property<bool>("ListedByBoard")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("listed_by_board");
+
                     b.Property<long>("MinimumFeeMinor")
                         .HasColumnType("bigint")
                         .HasColumnName("minimum_fee_minor");
@@ -4809,7 +4815,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_club_tenures_end_reason", "(ended_at is null and end_reason is null) or (ended_at is not null and end_reason is not null)");
 
-                            t.HasCheckConstraint("ck_club_tenures_end_reason_value", "end_reason is null or end_reason in ('resigned', 'inactivity_closed', 'administrator_closed')");
+                            t.HasCheckConstraint("ck_club_tenures_end_reason_value", "end_reason is null or end_reason in ('resigned', 'inactivity_closed', 'administrator_closed', 'dismissed')");
                         });
                 });
 

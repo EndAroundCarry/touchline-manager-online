@@ -363,13 +363,15 @@ public interface IMatchdayRepository
 /// <param name="WorldId">The world.</param>
 /// <param name="DivisionId">The division the round belongs to, which scopes its news (`COM-1`).</param>
 /// <param name="TieDrawSeed">The division-season's stored tie-break seed.</param>
+/// <param name="SeasonSequenceNumber">The season's ordinal in the world, which a matchday ordinal counts from.</param>
 public sealed record MatchdayWorkload(
     Matchday Matchday,
     IReadOnlyList<Fixture> Fixtures,
     Guid SeasonId,
     Guid WorldId,
     Guid DivisionId,
-    string TieDrawSeed)
+    string TieDrawSeed,
+    int SeasonSequenceNumber)
 {
     /// <summary>Gets whether every fixture in the round has a result staged or published.</summary>
     public bool AllFixturesStaged => Fixtures.All(

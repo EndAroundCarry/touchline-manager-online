@@ -295,6 +295,27 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                 .Should()
                 .Be(126, "every closing club has a season finance summary");
 
+            // A relegated club is given its parachute, once, and every club's standing takes its step (FIN-5, STD-2, STD-3).
+            var relegatedClubIds = await db.ClubSeasonEntries
+                .Where(entry => entry.SeasonId == seasonId && entry.IsRelegated)
+                .Select(entry => entry.ClubId)
+                .ToListAsync();
+
+            relegatedClubIds.Should().NotBeEmpty();
+            (await db.LedgerEntries.Where(entry => entry.Category == LedgerCategory.Parachute).Select(entry => entry.ClubId).ToListAsync())
+                .Should()
+                .BeEquivalentTo(relegatedClubIds, "only a relegated club is given a parachute");
+
+            var steps = await db.ClubStandingEvents.Where(step => step.SeasonId == seasonId).ToListAsync();
+
+            steps.Should().HaveCount(126, "every closing club's standing moved once");
+            steps.Where(step => step.NextTier > step.FinishedTier).Select(step => step.ClubId)
+                .Should()
+                .BeEquivalentTo(relegatedClubIds, "the step knows which clubs went down");
+            steps.Where(step => step.FinalPlace == 1)
+                .Should()
+                .OnlyContain(step => step.AfterCentis > step.BeforeCentis, "a champion gains standing");
+
             // The clubs are unmanaged, so the AI renewed their expiring contracts (CON-6).
             (await db.PlayerContracts.CountAsync(contract =>
                 contract.Status == ContractStatus.Closed
@@ -605,7 +626,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
     /// <summary>The total position awards every rank of a tier earns (`FIN-5`).</summary>
     private static long SumPositionAwards(int tier) =>
         Enumerable.Range(1, WorldRuleSet.ClubsPerDivision)
-            .Sum(rank => WorldRuleSet.PositionAwardMinorFor(tier, rank));
+            .Sum(rank => EconomyRuleSet.PrizeMinorFor(tier, rank));
 
     /// <summary>
     /// Attaches a fresh manager to a club, so the rollover has someone to notify about its movement (`PR-1`).

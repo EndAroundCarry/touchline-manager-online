@@ -12,6 +12,9 @@ public static class StadiumErrorCodes
     /// <summary>The club cannot pay for the places, after what it has already committed to bids (`FIN-10`).</summary>
     public const string InsufficientFunds = "INSUFFICIENT_FUNDS";
 
+    /// <summary>The club is in the red or in administration, so it may not build until its cash is back above zero (`DEBT-3`).</summary>
+    public const string BuildEmbargo = "BUILD_EMBARGO";
+
     /// <summary>The order would take the ground past its largest size (`STAD-1`).</summary>
     public const string StadiumFull = "STADIUM_FULL";
 }

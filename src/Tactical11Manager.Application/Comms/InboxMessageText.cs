@@ -1,4 +1,5 @@
 using System.Globalization;
+using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Market;
 using Tactical11Manager.Application.Match;
 using Tactical11Manager.Application.World;
@@ -81,9 +82,73 @@ public static class InboxMessageText
                 MarketInboxTemplates.Read<MarketInboxTemplates.FreeAgentSignedParameters>(parametersJson)),
             StructureInboxTemplates.UpgradeCompleted => StructureUpgraded(
                 StructureInboxTemplates.Read(parametersJson)),
+            FinanceInboxTemplates.InTheRed => InTheRed(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.RedParameters>(parametersJson)),
+            FinanceInboxTemplates.BackInTheBlack => BackInTheBlack(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.CashParameters>(parametersJson)),
+            FinanceInboxTemplates.AdministrationEntered => AdministrationEntered(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.AdministrationParameters>(parametersJson)),
+            FinanceInboxTemplates.AdministrationLeft => AdministrationLeft(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.CashParameters>(parametersJson)),
+            FinanceInboxTemplates.BoardListedPlayers => BoardListed(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.BoardListedParameters>(parametersJson)),
+            FinanceInboxTemplates.BoardReleasedPlayer => BoardReleased(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.BoardReleasedParameters>(parametersJson)),
+            FinanceInboxTemplates.BidWithdrawn => BidWithdrawn(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.BidWithdrawnParameters>(parametersJson)),
+            FinanceInboxTemplates.ManagerDismissed => Dismissed(
+                FinanceInboxTemplates.Read<FinanceInboxTemplates.DismissedParameters>(parametersJson)),
             _ => throw new InvalidOperationException($"'{templateKey}' is not an inbox template this build renders."),
         };
     }
+
+    private static InboxText InTheRed(FinanceInboxTemplates.RedParameters parameters) =>
+        new(
+            "The club is in the red",
+            $"The club's cash is {Money(parameters.CashMinor)}. Until it is back above zero the club cannot bid on players or build, "
+            + $"and past an overdraft of {Money(parameters.OverdraftLimitMinor)} it goes into administration. Selling players is still allowed.");
+
+    private static InboxText BackInTheBlack(FinanceInboxTemplates.CashParameters parameters) =>
+        new(
+            "The club is out of the red",
+            $"The club's cash is {Money(parameters.CashMinor)} again, so it may bid on players and build once more.");
+
+    private static InboxText AdministrationEntered(FinanceInboxTemplates.AdministrationParameters parameters) =>
+        new(
+            "The club is in administration",
+            $"The club's cash of {Money(parameters.CashMinor)} is past its overdraft limit of {Money(parameters.OverdraftLimitMinor)}. "
+            + "The board will put the highest earners on the market. If the club is still in administration after "
+            + $"{Matchdays(parameters.MatchdaysLeft)}, you will be dismissed.");
+
+    private static InboxText AdministrationLeft(FinanceInboxTemplates.CashParameters parameters) =>
+        new(
+            "The club is out of administration",
+            $"The club's cash of {Money(parameters.CashMinor)} is back inside its overdraft limit. It is still in the red until it is back above zero.");
+
+    private static InboxText BoardListed(FinanceInboxTemplates.BoardListedParameters parameters) =>
+        new(
+            "The board has listed players",
+            $"To bring the wage bill down the board listed {Join([.. parameters.PlayerNames])}. You cannot cancel these listings while the club "
+            + $"is in administration, and you have {Matchdays(parameters.MatchdaysLeft)} to get out of it.");
+
+    private static InboxText BoardReleased(FinanceInboxTemplates.BoardReleasedParameters parameters) =>
+        new(
+            $"{parameters.PlayerName} was released by the board",
+            $"Nobody bought {parameters.PlayerName}, so the board released him. His agent paid the club {Money(parameters.FeeMinor)} "
+            + "and he joins the free-agent pool at the next weekly batch.");
+
+    private static InboxText BidWithdrawn(FinanceInboxTemplates.BidWithdrawnParameters parameters) =>
+        new(
+            "A bid was withdrawn",
+            $"Your bid of {Money(parameters.AmountMinor)} for {parameters.PlayerName} was withdrawn: the club needed the money to pay its wages.");
+
+    private static InboxText Dismissed(FinanceInboxTemplates.DismissedParameters parameters) =>
+        new(
+            $"You were dismissed by {parameters.ClubName}",
+            $"{parameters.ClubName} stayed in administration for {Matchdays(parameters.Matchdays)}, so the board dismissed you. "
+            + "The club is AI-controlled again, and you may take over another club after a short wait.");
+
+    private static string Matchdays(int count) => count == 1 ? "1 matchday" : $"{count} matchdays";
 
     private static InboxText StructureUpgraded(StructureInboxTemplates.UpgradeCompletedParameters parameters)
     {

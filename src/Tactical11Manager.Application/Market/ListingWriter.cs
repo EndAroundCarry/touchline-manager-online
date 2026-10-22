@@ -24,6 +24,7 @@ public interface IListingWriter
     /// <param name="seasons">The buyer contract length, 1–3 game seasons.</param>
     /// <param name="idempotencyKey">The request's idempotency key, which a retry is matched against (`T-4`).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="listedByBoard">Whether the club's board is listing him while the club is in administration, so its manager cannot cancel it (`DEBT-4`).</param>
     Task<ListingWriteResult> ListAsync(
         Guid clubId,
         MarketActor actor,
@@ -31,7 +32,8 @@ public interface IListingWriter
         long minimumFeeMinor,
         int seasons,
         string? idempotencyKey,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool listedByBoard = false);
 }
 
 /// <summary>
@@ -78,6 +80,7 @@ public sealed class ListingWriter : IListingWriter
     /// <param name="seasons">The buyer contract length, 1–3 game seasons.</param>
     /// <param name="idempotencyKey">The request's idempotency key, which a retry is matched against (`T-4`).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="listedByBoard">Whether the club's board is listing him while the club is in administration, so its manager cannot cancel it (`DEBT-4`).</param>
     public async Task<ListingWriteResult> ListAsync(
         Guid clubId,
         MarketActor actor,
@@ -85,7 +88,8 @@ public sealed class ListingWriter : IListingWriter
         long minimumFeeMinor,
         int seasons,
         string? idempotencyKey,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool listedByBoard = false)
     {
         ArgumentNullException.ThrowIfNull(actor);
 
@@ -159,6 +163,11 @@ public sealed class ListingWriter : IListingWriter
             AuctionWindows.EndsAtFor(now),
             idempotencyKey,
             now);
+
+        if (listedByBoard)
+        {
+            listing.MarkListedByBoard();
+        }
 
         _listings.Add(listing);
 

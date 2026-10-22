@@ -242,7 +242,7 @@ public sealed class PreviewSeasonRollover
                     continue;
                 }
 
-                awards += WorldRuleSet.PositionAwardMinorFor(tier.TierNumber, rank);
+                awards += EconomyRuleSet.PrizeMinorFor(tier.TierNumber, rank);
             }
         }
 

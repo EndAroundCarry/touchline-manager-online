@@ -534,6 +534,18 @@ internal static class MarketEndpoints
             "Bid too low.",
             "The bid does not clear the minimum fee or the minimum raise (TRF-5)."),
 
+        MarketOutcome.Embargo => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            MarketErrorCodes.TransferEmbargo,
+            "Transfer embargo.",
+            "A club in the red or in administration may not bid until its cash is back above zero (DEBT-3)."),
+
+        MarketOutcome.BoardListing => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            MarketErrorCodes.ListingSetByBoard,
+            "Listed by the board.",
+            "The board listed that player while the club is in administration, so the listing cannot be cancelled (DEBT-4)."),
+
         MarketOutcome.InsufficientFunds => ProblemResults.Code(
             StatusCodes.Status400BadRequest,
             MarketErrorCodes.InsufficientFunds,

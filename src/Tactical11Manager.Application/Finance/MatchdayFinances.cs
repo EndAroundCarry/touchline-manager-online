@@ -40,6 +40,8 @@ public sealed class MatchdayFinances
     private readonly ILedgerRepository _ledger;
     private readonly IFanRepository _fans;
     private readonly IStructureRepository _structures;
+    private readonly RecurringCostRoom _room;
+    private readonly ClubFinancialStates _states;
 
     /// <summary>Initializes the collaborator.</summary>
     public MatchdayFinances(
@@ -47,13 +49,140 @@ public sealed class MatchdayFinances
         IClubAccountRepository accounts,
         ILedgerRepository ledger,
         IFanRepository fans,
-        IStructureRepository structures)
+        IStructureRepository structures,
+        RecurringCostRoom room,
+        ClubFinancialStates states)
     {
         _queries = queries;
         _accounts = accounts;
         _ledger = ledger;
         _fans = fans;
         _structures = structures;
+        _room = room;
+        _states = states;
+    }
+
+    /// <summary>
+    /// Posts the round's money for every club of the division: the league's television money, the sponsor's fixed part and the wages, then
+    /// reads each club's money (`FIN-4`, `FIN-7`, `SPN-3`, `DEBT-2`).
+    /// </summary>
+    /// <param name="matchdayId">The round being published, which names the division.</param>
+    /// <param name="seasonSequenceNumber">The season's ordinal in the world.</param>
+    /// <param name="roundNumber">The round, 1 to the season's matchdays.</param>
+    /// <param name="now">The current instant, taken from the caller's clock (`TIME-2`).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>What reading the clubs' money did.</returns>
+    /// <remarks>
+    /// <para>
+    /// Every club of the division gets it, whether it played at home or away, so a season's income and wages are paid in 34 equal parts however
+    /// the fixtures fall. The postings of a club share one correlation key and differ by category, so a retried publication collides with
+    /// them instead of paying twice (`FIN-17`).
+    /// </para>
+    /// <para>
+    /// The overdraft limit is set when the season's first round is published and again after the seventeenth, from the income forecast the
+    /// club's ground, fans, buildings and sponsor give it then (`BUD-3`). The income is posted before the wages, so the club's cash is as high
+    /// as it will be when the wages are met.
+    /// </para>
+    /// </remarks>
+    public async Task<FinancialStatesResult> PostMatchdayMoneyAsync(
+        Guid matchdayId,
+        int seasonSequenceNumber,
+        int roundNumber,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var clubIds = (await _queries.GetMatchdayRevenueBasisAsync(matchdayId, cancellationToken))
+            .Select(row => row.ClubId)
+            .OrderBy(clubId => clubId)
+            .ToList();
+
+        if (clubIds.Count == 0)
+        {
+            return new FinancialStatesResult(0, 0, 0, 0);
+        }
+
+        var basis = (await _queries.GetClubFinanceBasisAsync(clubIds, cancellationToken))
+            .ToDictionary(row => row.ClubId);
+
+        var accounts = (await _accounts.LoadAsync(clubIds, cancellationToken))
+            .ToDictionary(account => account.ClubId);
+
+        foreach (var clubId in clubIds)
+        {
+            if (!basis.TryGetValue(clubId, out var row) || !accounts.TryGetValue(clubId, out var account))
+            {
+                throw new InvalidOperationException(
+                    $"Club {clubId:D} was in a published division but has no basis or account to pay its matchday (FIN-11).");
+            }
+
+            if (roundNumber == 1 || account.OverdraftLimitMinor == 0)
+            {
+                SetOverdraft(account, row.OverdraftLimitMinor, now);
+            }
+
+            var television = EconomyRuleSet.PerMatchday(EconomyRuleSet.LeagueTvSeasonMinorFor(row.TierNumber));
+
+            if (television > 0)
+            {
+                _ledger.Add(account.Post(
+                    LedgerPostings.LeagueTv(Guid.CreateVersion7(), clubId, matchdayId, row.TierNumber, television),
+                    now));
+            }
+
+            if (row.SponsorFixedMatchdayMinor > 0)
+            {
+                _ledger.Add(account.Post(
+                    LedgerPostings.SponsorMatchday(Guid.CreateVersion7(), clubId, matchdayId, row.SponsorFixedMatchdayMinor),
+                    now));
+            }
+
+            var wages = EconomyRuleSet.PerMatchday(row.SeasonWageMinor);
+
+            if (wages > 0)
+            {
+                await _room.MakeRoomAsync(
+                    account,
+                    wages,
+                    amount => LedgerPostings.MatchdayEmergencyGrant(Guid.CreateVersion7(), clubId, matchdayId, amount),
+                    LedgerPostings.MatchdayMoneyCorrelationId(matchdayId, clubId),
+                    now,
+                    cancellationToken);
+
+                _ledger.Add(account.Post(
+                    LedgerPostings.MatchdayWages(Guid.CreateVersion7(), clubId, matchdayId, row.ContractedPlayers, wages),
+                    now));
+            }
+
+            if (roundNumber == EconomyRuleSet.MatchdaysPerSeason / 2)
+            {
+                SetOverdraft(account, row.OverdraftLimitMinor, now);
+            }
+        }
+
+        return await _states.ApplyAsync(
+            clubIds,
+            MatchdayOrdinal.Of(seasonSequenceNumber, roundNumber),
+            $"matchday-money:{matchdayId:D}",
+            now,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets a club's overdraft limit from its forecast, never lower than the debt it already carries needs (`DEBT-1`).
+    /// </summary>
+    /// <param name="account">The club's account, tracked.</param>
+    /// <param name="limitMinor">The limit the forecast gives.</param>
+    /// <param name="now">The current instant.</param>
+    public static void SetOverdraft(ClubAccount account, long limitMinor, DateTimeOffset now)
+    {
+        // The floor is twice the limit, so a club already owing more than the lower floor allows keeps a limit that holds its debt.
+        var needed = account.CashMinor < 0 ? (-account.CashMinor + 1) / EconomyRuleSet.SafetyNetLimitMultiple : 0;
+        var limit = Math.Max(limitMinor, needed);
+
+        if (limit != account.OverdraftLimitMinor)
+        {
+            account.SetOverdraft(limit, now);
+        }
     }
 
     /// <summary>Posts one gate receipt and one snack bar sale per published fixture's host club.</summary>

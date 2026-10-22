@@ -76,6 +76,11 @@ public interface IBidRepository
         Guid bidderClubId,
         CancellationToken cancellationToken);
 
+    /// <summary>Lists the bids a club leads with, tracked, largest first, so a club that cannot cover its wages can give up the reservations behind them (`FIN-10`).</summary>
+    /// <param name="bidderClubId">The bidding club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<TransferBid>> ListLeadingByClubAsync(Guid bidderClubId, CancellationToken cancellationToken);
+
     /// <summary>Finds the current leading bid on a listing, tracked, or null (`TRF-7`).</summary>
     /// <param name="listingId">The listing.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

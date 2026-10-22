@@ -62,6 +62,12 @@ public enum MarketOutcome
 
     /// <summary>The listing is a free agent's, and only human managers may bid on those (`FA-5`).</summary>
     HumanManagersOnly = 16,
+
+    /// <summary>The bidder is in the red or in administration, so it may not bid (`DEBT-3`).</summary>
+    Embargo = 17,
+
+    /// <summary>The listing was opened by the board of a club in administration, so its manager cannot cancel it (`DEBT-4`).</summary>
+    BoardListing = 18,
 }
 
 /// <summary>A scouting search's result (`SCT-1`).</summary>

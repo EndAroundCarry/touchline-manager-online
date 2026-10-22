@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Tactical11Manager.Application.Abstractions.Finance;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
+using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.World;
@@ -86,22 +88,9 @@ internal sealed class FinanceQueries : IFinanceQueries
     public async Task<IReadOnlyList<ClubWeeklyObligations>> GetWeeklyObligationsAsync(
         CancellationToken cancellationToken)
     {
-        var world = await _dbContext.GameWorlds
-            .OrderBy(candidate => candidate.CreatedAt)
-            .Select(candidate => new { candidate.Id, candidate.CurrentSeasonNumber })
-            .FirstOrDefaultAsync(cancellationToken);
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
 
-        if (world is null)
-        {
-            return [];
-        }
-
-        var seasonId = await _dbContext.Seasons
-            .Where(season => season.WorldId == world.Id && season.SequenceNumber == world.CurrentSeasonNumber)
-            .Select(season => (Guid?)season.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (seasonId is null)
+        if (season is null)
         {
             return [];
         }
@@ -110,24 +99,25 @@ internal sealed class FinanceQueries : IFinanceQueries
             from entry in _dbContext.ClubSeasonEntries
             join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
             join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
-            where divisionSeason.SeasonId == seasonId.Value
+            where divisionSeason.SeasonId == season.SeasonId
             select new { entry.ClubId, division.TierNumber })
             .ToListAsync(cancellationToken);
 
-        // One row per club with a payroll; a club whose squad is between contracts simply has none here and
-        // is treated as owing nothing (which the squad legality rules make a temporary state, not a normal one).
-        var wages = await _dbContext.PlayerContracts
-            .Where(contract => contract.Status == ContractStatus.Active)
-            .GroupBy(contract => contract.ClubId)
-            .Select(group => new
+        var stadiums = await _dbContext.ClubStadiums
+            .AsNoTracking()
+            .Select(stadium => new
             {
-                ClubId = group.Key,
-                Total = group.Sum(contract => contract.SeasonWageMinor),
-                Count = group.Count(),
+                stadium.ClubId,
+                stadium.StandingSeats,
+                stadium.SeatingSeats,
+                stadium.CoveredSeats,
+                stadium.VipSeats,
             })
             .ToListAsync(cancellationToken);
 
-        var wageByClub = wages.ToDictionary(row => row.ClubId);
+        var seatsByClub = stadiums.ToDictionary(
+            row => row.ClubId,
+            row => new StadiumSeats(row.StandingSeats, row.SeatingSeats, row.CoveredSeats, row.VipSeats));
 
         // The merchandise shop sells to the fans as they stand at the close of the week, and the fan review
         // follows the finance run, so this is the week's closing mood (STRC-6). A club whose fan base has not
@@ -158,14 +148,180 @@ internal sealed class FinanceQueries : IFinanceQueries
                     return new ClubWeeklyObligations(
                         row.ClubId,
                         row.TierNumber,
-                        wageByClub.TryGetValue(row.ClubId, out var wage) ? EconomyRuleSet.PerWeeklyRun(wage.Total) : 0,
-                        wageByClub.TryGetValue(row.ClubId, out var counted) ? counted.Count : 0,
+                        seatsByClub.TryGetValue(row.ClubId, out var seats) ? seats : default,
                         hasFans ? fanBase!.Fans : opening.Fans,
                         hasFans ? fanBase!.MoodBp : opening.MoodBp,
                         levelByBuilding.GetValueOrDefault((row.ClubId, StructureKind.SnackBar), StructureRuleSet.OpeningLevel),
                         levelByBuilding.GetValueOrDefault((row.ClubId, StructureKind.Merchandise), StructureRuleSet.OpeningLevel));
                 }),
         ];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubFinanceBasis>> GetClubFinanceBasisAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(clubIds);
+
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null || clubIds.Count == 0)
+        {
+            return [];
+        }
+
+        var rows = await (
+            from entry in _dbContext.ClubSeasonEntries
+            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join stadium in _dbContext.ClubStadiums on entry.ClubId equals stadium.ClubId
+            where divisionSeason.SeasonId == season.SeasonId && clubIds.Contains(entry.ClubId)
+            select new
+            {
+                entry.ClubId,
+                division.TierNumber,
+                stadium.StandingSeats,
+                stadium.SeatingSeats,
+                stadium.CoveredSeats,
+                stadium.VipSeats,
+            })
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var wages = (await _dbContext.PlayerContracts
+                .Where(contract => contract.Status == ContractStatus.Active && clubIds.Contains(contract.ClubId))
+                .GroupBy(contract => contract.ClubId)
+                .Select(group => new
+                {
+                    ClubId = group.Key,
+                    Total = group.Sum(contract => contract.SeasonWageMinor),
+                    Count = group.Count(),
+                })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(row => row.ClubId);
+
+        var fans = (await _dbContext.ClubFanBases
+                .AsNoTracking()
+                .Where(fanBase => clubIds.Contains(fanBase.ClubId))
+                .Select(fanBase => new { fanBase.ClubId, fanBase.Fans, fanBase.MoodBp })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(row => row.ClubId);
+
+        var levels = (await _dbContext.ClubStructures
+                .AsNoTracking()
+                .Where(building => clubIds.Contains(building.ClubId))
+                .Select(building => new { building.ClubId, building.Kind, building.Level })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(row => (row.ClubId, row.Kind), row => row.Level);
+
+        var sponsors = (await _dbContext.SponsorDeals
+                .AsNoTracking()
+                .Where(deal => deal.SeasonId == season.SeasonId && clubIds.Contains(deal.ClubId))
+                .Select(deal => new { deal.ClubId, deal.FixedMatchdayMinor })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(row => row.ClubId, row => row.FixedMatchdayMinor);
+
+        return
+        [
+            .. rows
+                .OrderBy(row => row.ClubId)
+                .Select(row =>
+                {
+                    var opening = FanRuleSet.OpeningFor(row.TierNumber);
+                    var hasFans = fans.TryGetValue(row.ClubId, out var fanBase);
+                    var hasWages = wages.TryGetValue(row.ClubId, out var wage);
+
+                    return new ClubFinanceBasis(
+                        row.ClubId,
+                        row.TierNumber,
+                        new StadiumSeats(row.StandingSeats, row.SeatingSeats, row.CoveredSeats, row.VipSeats),
+                        hasFans ? fanBase!.Fans : opening.Fans,
+                        hasFans ? fanBase!.MoodBp : opening.MoodBp,
+                        levels.GetValueOrDefault((row.ClubId, StructureKind.SnackBar), StructureRuleSet.OpeningLevel),
+                        levels.GetValueOrDefault((row.ClubId, StructureKind.Merchandise), StructureRuleSet.OpeningLevel),
+                        sponsors.GetValueOrDefault(row.ClubId),
+                        hasWages ? wage!.Total : 0,
+                        hasWages ? wage!.Count : 0);
+                }),
+        ];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<AdministrationPlayer>> GetAdministrationSquadAsync(
+        Guid clubId,
+        CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return [];
+        }
+
+        var rows = await (
+            from contract in _dbContext.PlayerContracts
+            join player in _dbContext.Players on contract.PlayerId equals player.Id
+            join attributes in _dbContext.PlayerAttributes on player.Id equals attributes.PlayerId
+            where contract.ClubId == clubId
+                && contract.Status == ContractStatus.Active
+                && _dbContext.PlayerRegistrations.Any(registration =>
+                    registration.PlayerId == player.Id && registration.Status == RegistrationStatus.Active)
+            select new
+            {
+                PlayerId = player.Id,
+                player.PrimaryPosition,
+                player.BirthGameYear,
+                contract.SeasonWageMinor,
+                Attributes = attributes,
+                IsListed = _dbContext.TransferListings.Any(listing =>
+                    listing.PlayerId == player.Id && listing.Status == ListingStatus.Open),
+            })
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return
+        [
+            .. rows
+                .OrderBy(row => row.PlayerId)
+                .Select(row =>
+                {
+                    var values = row.Attributes.ToSet().Values;
+                    var tenths = values.Count == 0
+                        ? WorldRuleSet.AttributeMin * 10
+                        : (int)Math.Round(values.Average() * 10, MidpointRounding.AwayFromZero);
+
+                    return new AdministrationPlayer(
+                        row.PlayerId,
+                        PlayerPositions.FamilyOf(row.PrimaryPosition),
+                        row.SeasonWageMinor,
+                        PlayerValuation.Estimate(new PlayerValuationInput(
+                            Math.Clamp(tenths, WorldRuleSet.AttributeMin * 10, WorldRuleSet.AttributeMax * 10),
+                            Math.Max(0, season.GameYear - row.BirthGameYear))),
+                        row.IsListed);
+                }),
+        ];
+    }
+
+    /// <inheritdoc />
+    public async Task<int> GetSettledMatchdayOrdinalAsync(CancellationToken cancellationToken)
+    {
+        var season = await CurrentSeasonQuery.ResolveAsync(_dbContext, cancellationToken);
+
+        if (season is null)
+        {
+            return 0;
+        }
+
+        var latest = await (
+            from matchday in _dbContext.Matchdays
+            join divisionSeason in _dbContext.DivisionSeasons on matchday.DivisionSeasonId equals divisionSeason.Id
+            where divisionSeason.SeasonId == season.SeasonId
+                && matchday.PublicationStatus == MatchdayPublicationStatus.Published
+            select (int?)matchday.RoundNumber)
+            .MaxAsync(cancellationToken);
+
+        return MatchdayOrdinal.Of(season.SequenceNumber, latest ?? 0);
     }
 
     /// <inheritdoc />

@@ -4,6 +4,7 @@ using Tactical11Manager.Application.Abstractions.Market;
 using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Finance;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 
@@ -176,6 +177,13 @@ public sealed class BidWriter : IBidWriter
         if (account is null)
         {
             return Refused(MarketOutcome.Conflict);
+        }
+
+        // A club in the red or in administration does not bid, whatever cash it holds (DEBT-3). Listing its own
+        // players stays open to it, which is how it gets out.
+        if (account.FinancialState != FinancialStateKind.Healthy)
+        {
+            return Refused(MarketOutcome.Embargo);
         }
 
         // Raising replaces this club's own reservation: the amount already reserved for its leading bid is

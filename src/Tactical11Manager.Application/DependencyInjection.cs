@@ -171,6 +171,8 @@ public static class DependencyInjection
     /// </remarks>
     private static void AddFinanceUseCases(IServiceCollection services)
     {
+        services.AddScoped<RecurringCostRoom>();
+        services.AddScoped<ClubFinancialStates>();
         services.AddScoped<MatchdayFinances>();
         services.AddScoped<RunWeeklyFinance>();
         services.AddScoped<SettleSeasonFinances>();

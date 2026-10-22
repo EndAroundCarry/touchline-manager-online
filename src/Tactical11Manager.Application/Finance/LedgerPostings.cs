@@ -79,6 +79,27 @@ public static class LedgerPostings
     /// <summary>The template that describes a club paying for a building's upgrade (`STRC-3`).</summary>
     public const string StructureUpgradeTemplate = "finance.structure_upgrade";
 
+    /// <summary>The template that describes a matchday's share of the league's television money (`FIN-4`).</summary>
+    public const string LeagueTvTemplate = "finance.league_tv";
+
+    /// <summary>The template that describes a matchday's share of the sponsor's fixed payment (`SPN-3`).</summary>
+    public const string SponsorMatchdayTemplate = "finance.sponsor_matchday";
+
+    /// <summary>The template that describes a matchday's player wages (`FIN-7`).</summary>
+    public const string MatchdayWagesTemplate = "finance.matchday_wages";
+
+    /// <summary>The template that describes the sponsor's bonus for the season's objective (`OBJ-4`).</summary>
+    public const string SponsorBonusTemplate = "finance.sponsor_bonus";
+
+    /// <summary>The template that describes a relegated club's parachute (`FIN-5`).</summary>
+    public const string ParachuteTemplate = "finance.parachute";
+
+    /// <summary>The template that describes a week's upkeep of the places in the ground (`STAD-7`).</summary>
+    public const string GroundUpkeepTemplate = "finance.ground_upkeep";
+
+    /// <summary>The template that describes the fee a player's agent pays when the board releases him unsold (`DEBT-4`).</summary>
+    public const string ReleaseFeeTemplate = "finance.release_fee";
+
     /// <summary>
     /// Builds the posting that funds a newly generated club's account.
     /// </summary>
@@ -234,7 +255,7 @@ public static class LedgerPostings
             ReservedDeltaMinor: 0,
             LedgerSourceType.SeasonRollover,
             SourceId: seasonId,
-            $"rollover:{seasonId:N}:{clubId:N}",
+            RolloverCorrelationId(seasonId, clubId),
             PositionAwardTemplate,
             Parameters(("amountMinor", amountMinor), ("tier", tier), ("rank", rank)));
     }
@@ -611,6 +632,202 @@ public static class LedgerPostings
             StructureUpgradeTemplate,
             Parameters(("amountMinor", amountMinor), ("kind", (long)kind), ("level", targetLevel)));
     }
+
+    /// <summary>Builds the posting a matchday's share of the league's television money makes (`FIN-4`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club credited.</param>
+    /// <param name="matchdayId">The matchday, which the key names.</param>
+    /// <param name="tier">The tier the credit was scaled to.</param>
+    /// <param name="amountMinor">The credit, in minor units.</param>
+    /// <remarks>
+    /// The postings of a matchday for one club (the television money, the sponsor's fixed part and the wages) share one correlation key and
+    /// differ by category, so a retried publication collides with each of them instead of paying twice (`FIN-17`).
+    /// </remarks>
+    public static LedgerPosting LeagueTv(Guid entryId, Guid clubId, Guid matchdayId, int tier, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.LeagueTv,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Matchday,
+            SourceId: matchdayId,
+            MatchdayMoneyCorrelationId(matchdayId, clubId),
+            LeagueTvTemplate,
+            Parameters(("amountMinor", amountMinor), ("tier", tier)));
+    }
+
+    /// <summary>Builds the posting a matchday's share of the sponsor's fixed payment makes (`SPN-3`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club credited.</param>
+    /// <param name="matchdayId">The matchday, which the key names.</param>
+    /// <param name="amountMinor">The credit, in minor units.</param>
+    public static LedgerPosting SponsorMatchday(Guid entryId, Guid clubId, Guid matchdayId, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.SponsorMatchday,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Matchday,
+            SourceId: matchdayId,
+            MatchdayMoneyCorrelationId(matchdayId, clubId),
+            SponsorMatchdayTemplate,
+            Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>Builds the posting a matchday's player wages make (`FIN-7`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club charged.</param>
+    /// <param name="matchdayId">The matchday, which the key names.</param>
+    /// <param name="playerCount">How many contracted players the wages covered.</param>
+    /// <param name="amountMinor">The wage bill for the matchday, in minor units, as a positive amount to be debited.</param>
+    public static LedgerPosting MatchdayWages(Guid entryId, Guid clubId, Guid matchdayId, int playerCount, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.Wages,
+            CashDeltaMinor: -amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Matchday,
+            SourceId: matchdayId,
+            MatchdayMoneyCorrelationId(matchdayId, clubId),
+            MatchdayWagesTemplate,
+            Parameters(("amountMinor", amountMinor), ("playerCount", playerCount)));
+    }
+
+    /// <summary>Builds the emergency grant the integrity net makes on a matchday (`FIN-16`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club rescued.</param>
+    /// <param name="matchdayId">The matchday, which the key names.</param>
+    /// <param name="amountMinor">The grant, in minor units.</param>
+    public static LedgerPosting MatchdayEmergencyGrant(Guid entryId, Guid clubId, Guid matchdayId, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.EmergencyGrant,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.SafetyJob,
+            SourceId: clubId,
+            MatchdayMoneyCorrelationId(matchdayId, clubId),
+            EmergencyGrantTemplate,
+            Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>Builds the posting the sponsor's bonus for the season's objective makes (`OBJ-4`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club credited.</param>
+    /// <param name="seasonId">The season the bonus belongs to, which the key names.</param>
+    /// <param name="targetPlace">The place the objective asked for.</param>
+    /// <param name="finalPlace">The place the club finished in.</param>
+    /// <param name="amountMinor">The bonus, in minor units.</param>
+    public static LedgerPosting SponsorBonus(
+        Guid entryId,
+        Guid clubId,
+        Guid seasonId,
+        int targetPlace,
+        int finalPlace,
+        long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.SponsorBonus,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.SeasonRollover,
+            SourceId: seasonId,
+            RolloverCorrelationId(seasonId, clubId),
+            SponsorBonusTemplate,
+            Parameters(("amountMinor", amountMinor), ("target", targetPlace), ("rank", finalPlace)));
+    }
+
+    /// <summary>Builds the posting a relegated club's parachute makes (`FIN-5`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club credited.</param>
+    /// <param name="seasonId">The season the club was relegated from, which the key names.</param>
+    /// <param name="fromTier">The tier the club was relegated from.</param>
+    /// <param name="amountMinor">The parachute, in minor units.</param>
+    public static LedgerPosting Parachute(Guid entryId, Guid clubId, Guid seasonId, int fromTier, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.Parachute,
+            amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.SeasonRollover,
+            SourceId: seasonId,
+            RolloverCorrelationId(seasonId, clubId),
+            ParachuteTemplate,
+            Parameters(("amountMinor", amountMinor), ("tier", fromTier)));
+    }
+
+    /// <summary>Builds the posting a week's ground upkeep makes (`STAD-7`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club charged.</param>
+    /// <param name="weekOf">The week's boundary date.</param>
+    /// <param name="places">How many places the ground holds.</param>
+    /// <param name="amountMinor">The upkeep, in minor units, as a positive amount to be debited.</param>
+    public static LedgerPosting GroundUpkeep(Guid entryId, Guid clubId, DateOnly weekOf, int places, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.GroundUpkeep,
+            CashDeltaMinor: -amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.WeeklyRun,
+            SourceId: clubId,
+            WeeklyCorrelationId(weekOf, clubId),
+            GroundUpkeepTemplate,
+            Parameters(("amountMinor", amountMinor), ("places", places)));
+    }
+
+    /// <summary>Builds the posting a player's agent makes when the board of a club in administration releases him unsold (`DEBT-4`).</summary>
+    /// <param name="entryId">A server-generated entry identity.</param>
+    /// <param name="clubId">The club credited.</param>
+    /// <param name="listingId">The listing nobody bid on, which the key names.</param>
+    /// <param name="amountMinor">The fee, in minor units.</param>
+    public static LedgerPosting ReleaseFee(Guid entryId, Guid clubId, Guid listingId, long amountMinor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountMinor);
+
+        return new LedgerPosting(
+            entryId,
+            LedgerCategory.TransferProceeds,
+            CashDeltaMinor: amountMinor,
+            ReservedDeltaMinor: 0,
+            LedgerSourceType.Transfer,
+            SourceId: listingId,
+            TransferCorrelationId(listingId),
+            ReleaseFeeTemplate,
+            Parameters(("amountMinor", amountMinor)));
+    }
+
+    /// <summary>The correlation key a matchday's postings for one club share (`FIN-17`).</summary>
+    /// <param name="matchdayId">The matchday.</param>
+    /// <param name="clubId">The club.</param>
+    public static string MatchdayMoneyCorrelationId(Guid matchdayId, Guid clubId) =>
+        $"money:{matchdayId:N}:{clubId:N}";
+
+    /// <summary>The correlation key a season's end-of-season postings for one club share (`FIN-17`).</summary>
+    /// <param name="seasonId">The season.</param>
+    /// <param name="clubId">The club.</param>
+    public static string RolloverCorrelationId(Guid seasonId, Guid clubId) =>
+        $"rollover:{seasonId:N}:{clubId:N}";
 
     /// <summary>The correlation key of a bid's reservation (`FIN-17`, `TRF-7`).</summary>
     /// <param name="bidId">The bid.</param>

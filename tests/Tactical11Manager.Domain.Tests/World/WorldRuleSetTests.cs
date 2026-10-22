@@ -176,28 +176,10 @@ public sealed class WorldRuleSetTests
     }
 
     [Fact]
-    public void The_weekly_run_values_scale_with_tier_and_the_award_decays_with_position()
+    public void The_weekly_run_is_anchored_to_sunday_night_and_payroll_risk_is_measured_in_weeks()
     {
-        WorldRuleSet.WeeklyFinanceUtc.Should().Be(new TimeOnly(23, 0), "CON-2 charges wages after Sunday");
-
-        WorldRuleSet.WeeklySponsorshipMinorForTier(1).Should()
-            .BeGreaterThan(WorldRuleSet.WeeklySponsorshipMinorForTier(2), "FIN-4 falls 0.4 a tier");
-        WorldRuleSet.WeeklyOperatingCostMinorForTier(1).Should()
-            .BeGreaterThan(WorldRuleSet.WeeklyOperatingCostMinorForTier(3), "FIN-9 falls 0.4 a tier");
-
-        WorldRuleSet.PositionAwardMinorFor(1, 1).Should()
-            .BeGreaterThan(WorldRuleSet.PositionAwardMinorFor(1, WorldRuleSet.ClubsPerDivision), "FIN-5 decays with rank");
-        WorldRuleSet.PositionAwardMinorFor(2, 1).Should()
-            .BeLessThan(WorldRuleSet.PositionAwardMinorFor(1, 1), "a deeper tier pays less for the same place");
+        WorldRuleSet.WeeklyFinanceUtc.Should().Be(new TimeOnly(23, 0), "CON-2 settles the week after Sunday");
 
         WorldRuleSet.PayrollRiskWeeks.Should().BeGreaterThan(0, "a club holds weeks of wages before payroll is a risk (FIN-16)");
-    }
-
-    [Fact]
-    public void A_position_outside_the_division_is_a_programming_error_for_the_award()
-    {
-        var act = () => WorldRuleSet.PositionAwardMinorFor(tier: 1, rank: WorldRuleSet.ClubsPerDivision + 1);
-
-        act.Should().Throw<ArgumentOutOfRangeException>();
     }
 }

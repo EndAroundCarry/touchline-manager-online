@@ -52,6 +52,25 @@ public static class OccupancyEmails
          <p>Its squad, finances, and history are unchanged. You are welcome to take over another club.</p>
          """);
 
+    /// <summary>Builds the notice that a manager was dismissed after the club stayed in administration (`DEBT-5`).</summary>
+    /// <param name="to">The manager's address.</param>
+    /// <param name="clubName">The club they held.</param>
+    /// <param name="matchdays">How many matchdays the club stayed in administration.</param>
+    public static EmailMessage Dismissed(string to, string clubName, int matchdays) => new(
+        to,
+        $"The board of {clubName} has dismissed you",
+        $"""
+         {clubName} stayed in administration for {matchdays} matchdays, so the board has dismissed you and the
+         club is AI-controlled again.
+
+         You may take over another club after a short wait.
+         """,
+        $"""
+         <p><strong>{clubName}</strong> stayed in administration for {matchdays} matchdays, so the board has
+         dismissed you and the club is AI-controlled again.</p>
+         <p>You may take over another club after a short wait.</p>
+         """);
+
     /// <summary>Builds the reminder that a matchday's team sheet locks soon.</summary>
     /// <param name="to">The manager's address.</param>
     /// <param name="clubName">The club they hold.</param>

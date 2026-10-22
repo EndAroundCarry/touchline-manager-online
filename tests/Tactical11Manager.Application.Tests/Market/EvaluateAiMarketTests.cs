@@ -216,7 +216,8 @@ public sealed class EvaluateAiMarketTests
             long minimumFeeMinor,
             int seasons,
             string? idempotencyKey,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool listedByBoard = false)
         {
             Calls.Add(new Call(clubId, playerId, minimumFeeMinor, idempotencyKey, actor));
 

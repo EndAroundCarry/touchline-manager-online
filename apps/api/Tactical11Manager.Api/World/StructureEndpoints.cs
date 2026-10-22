@@ -135,6 +135,12 @@ internal static class StructureEndpoints
             "Already being upgraded.",
             "One upgrade runs at a time. Wait for the work to finish (STRC-3)."),
 
+        UpgradeStructureOutcome.Embargo => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            StructureErrorCodes.BuildEmbargo,
+            "Building embargo.",
+            "A club in the red or in administration may not build until its cash is back above zero (DEBT-3)."),
+
         UpgradeStructureOutcome.InsufficientFunds => ProblemResults.Code(
             StatusCodes.Status409Conflict,
             StructureErrorCodes.InsufficientFunds,

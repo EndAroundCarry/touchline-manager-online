@@ -136,6 +136,12 @@ internal static class StadiumEndpoints
             "Invalid order.",
             "Choose a kind of place and a number of places to add."),
 
+        BuildStadiumSeatsOutcome.Embargo => ProblemResults.Code(
+            StatusCodes.Status409Conflict,
+            StadiumErrorCodes.BuildEmbargo,
+            "Building embargo.",
+            "A club in the red or in administration may not build until its cash is back above zero (DEBT-3)."),
+
         BuildStadiumSeatsOutcome.InsufficientFunds => ProblemResults.Code(
             StatusCodes.Status400BadRequest,
             StadiumErrorCodes.InsufficientFunds,

@@ -18,6 +18,9 @@ public static class StructureErrorCodes
     /// <summary>The club cannot pay for the upgrade, after what it has already committed to bids (`FIN-10`).</summary>
     public const string InsufficientFunds = "INSUFFICIENT_FUNDS";
 
+    /// <summary>The club is in the red or in administration, so it may not build until its cash is back above zero (`DEBT-3`).</summary>
+    public const string BuildEmbargo = "BUILD_EMBARGO";
+
     /// <summary>The route named a building that does not exist.</summary>
     public const string UnknownKind = "STRUCTURE_KIND_UNKNOWN";
 }

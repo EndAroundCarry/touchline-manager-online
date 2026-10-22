@@ -1,4 +1,5 @@
 using Tactical11Manager.Application.Abstractions;
+using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.Market;
 using Tactical11Manager.Application.Abstractions.Ops;
@@ -6,6 +7,8 @@ using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Finance;
+using Tactical11Manager.Domain.Comms;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Market;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
@@ -40,6 +43,7 @@ public sealed class ResolveListing
     private readonly ISquadRepository _squad;
     private readonly ISquadQueries _squadQueries;
     private readonly IRosterQueries _roster;
+    private readonly IInboxRepository _inbox;
     private readonly IWorldRepository _world;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditWriter _audit;
@@ -56,6 +60,7 @@ public sealed class ResolveListing
         ISquadRepository squad,
         ISquadQueries squadQueries,
         IRosterQueries roster,
+        IInboxRepository inbox,
         IWorldRepository world,
         IUnitOfWork unitOfWork,
         IAuditWriter audit,
@@ -70,6 +75,7 @@ public sealed class ResolveListing
         _squad = squad;
         _squadQueries = squadQueries;
         _roster = roster;
+        _inbox = inbox;
         _world = world;
         _unitOfWork = unitOfWork;
         _audit = audit;
@@ -104,6 +110,13 @@ public sealed class ResolveListing
         {
             listing.Expire(now);
             AuditResolution(listing, TransferOutcomeReasons.NoValidBid, now);
+
+            // Nobody bought a player the board of a club in administration listed, so the board releases him and his agent pays the
+            // club a share of his value (DEBT-4).
+            if (listing.ListedByBoard && !listing.IsFreeAgent)
+            {
+                await ReleaseUnsoldAsync(listing, now, cancellationToken);
+            }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -471,6 +484,92 @@ public sealed class ResolveListing
         listing.SellerClubId
         ?? throw new InvalidOperationException(
             $"Listing {listing.Id} is a free-agent listing and has no seller club to settle against.");
+
+    /// <summary>
+    /// Releases a player the board listed and nobody bought, and credits the club with the fee his agent pays (`DEBT-4`).
+    /// </summary>
+    /// <remarks>
+    /// Nothing is owed to the player: the release is the board's, not the club's choice, so it carries no payout. A release that would leave
+    /// the club below the minimum squad or without two goalkeepers is not made, and the board lists him again at the next reading.
+    /// </remarks>
+    private async Task ReleaseUnsoldAsync(TransferListing listing, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var clubId = SellerOf(listing);
+        var eligibility = await _roster.GetListingEligibilityAsync(listing.PlayerId, cancellationToken);
+
+        if (eligibility is null || eligibility.ClubId != clubId || !eligibility.HasActiveRegistration)
+        {
+            return;
+        }
+
+        var keeper = eligibility.PrimaryPosition == PlayerPosition.Goalkeeper;
+
+        if (!SquadLegality.MeetsMinimum(eligibility.RegisteredCount - 1)
+            || eligibility.GoalkeeperCount - (keeper ? 1 : 0) < WorldRuleSet.MinimumGoalkeepers)
+        {
+            return;
+        }
+
+        var contract = await _squad.FindContractAsync(eligibility.ContractId, cancellationToken);
+        var registration = await _squad.FindActiveRegistrationAsync(listing.PlayerId, cancellationToken);
+        var player = (await _squad.LoadPlayersAsync([listing.PlayerId], cancellationToken)).SingleOrDefault();
+        var account = await _accounts.FindByClubAsync(clubId, cancellationToken);
+
+        // A club that has climbed out of administration keeps the player nobody bought: the board's reason is gone.
+        if (contract is null
+            || !contract.IsActive
+            || player is null
+            || account is not { FinancialState: FinancialStateKind.Administration })
+        {
+            return;
+        }
+
+        contract.Close(PlayerContractCloseReasons.Released, now);
+        registration?.End(now);
+        player.ReleaseToFreeAgency(now);
+
+        // The listing asked 80% of his value, so his value is read back from the asking price.
+        var valueMinor = listing.MinimumFeeMinor * EconomyRuleSet.OneHundredPercentBp / EconomyRuleSet.AdministrationAskingBp;
+        var fee = EconomyRuleSet.AdministrationReleaseFeeMinor(valueMinor);
+
+        if (fee > 0)
+        {
+            _ledger.Add(account.Post(
+                LedgerPostings.ReleaseFee(Guid.CreateVersion7(), clubId, listing.Id, fee),
+                now));
+        }
+
+        _audit.Record(new AuditEntry(
+            FinanceAuditActions.BoardReleasedPlayer,
+            AuditActorTypes.Service,
+            ActorUserId: null,
+            AuditTargetTypes.PlayerContract,
+            contract.Id,
+            LedgerPostings.TransferCorrelationId(listing.Id),
+            IpHash: null,
+            Reason: $"Nobody bought the player the board listed; his agent paid {fee} (DEBT-4)."));
+
+        var target = (await _inbox.FindClubTargetsAsync([clubId], cancellationToken))
+            .FirstOrDefault(candidate => candidate.ClubId == clubId);
+
+        if (target?.ManagerId is { } managerId && managerId != Guid.Empty)
+        {
+            var names = await _inbox.FindPlayerNamesAsync([listing.PlayerId], cancellationToken);
+            var draft = FinanceInboxTemplates.BoardReleasedMessage(
+                names.TryGetValue(listing.PlayerId, out var name) ? name : "A player",
+                fee,
+                listing.PlayerId);
+
+            _inbox.Add(InboxMessage.Record(
+                Guid.CreateVersion7(),
+                managerId,
+                draft.Category,
+                draft.TemplateKey,
+                draft.ParametersJson,
+                draft.RelatedEntityId,
+                now));
+        }
+    }
 
     private void AuditResolution(TransferListing listing, string reason, DateTimeOffset now)
     {

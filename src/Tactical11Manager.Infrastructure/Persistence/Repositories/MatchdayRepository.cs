@@ -71,7 +71,8 @@ internal sealed class MatchdayRepository : IMatchdayRepository
             season.Id,
             season.WorldId,
             divisionSeason!.DivisionId,
-            divisionSeason.TieDrawSeed);
+            divisionSeason.TieDrawSeed,
+            season.SequenceNumber);
     }
 
     /// <inheritdoc />

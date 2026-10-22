@@ -184,6 +184,11 @@ public sealed class TransferListing
     /// <summary>Gets the lifecycle state.</summary>
     public ListingStatus Status { get; private set; }
 
+    /// <summary>
+    /// Gets whether the club's board opened the listing while the club was in administration, so its manager cannot cancel it (`DEBT-4`).
+    /// </summary>
+    public bool ListedByBoard { get; private set; }
+
     /// <summary>Gets the idempotency key the opening request carried, which a retry is matched against (`T-4`).</summary>
     public string? IdempotencyKey { get; private set; }
 
@@ -289,6 +294,9 @@ public sealed class TransferListing
             Version = 1,
         };
     }
+
+    /// <summary>Marks the listing as the board's: the manager of a club in administration cannot cancel it (`DEBT-4`).</summary>
+    public void MarkListedByBoard() => ListedByBoard = true;
 
     /// <summary>Marks the listing resolved with a winner (`TRF-10`).</summary>
     /// <param name="now">The current instant.</param>

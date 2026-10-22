@@ -99,6 +99,10 @@ internal sealed class TransferListingConfiguration : IEntityTypeConfiguration<Tr
             .HasMaxLength(ListingStatuses.MaxCodeLength)
             .HasConversion(status => status.ToCode(), code => ListingStatuses.FromCode(code))
             .IsRequired();
+        builder.Property(listing => listing.ListedByBoard)
+            .HasColumnName("listed_by_board")
+            .HasDefaultValue(false)
+            .IsRequired();
         builder.Property(listing => listing.IdempotencyKey)
             .HasColumnName("idempotency_key")
             .HasMaxLength(80);

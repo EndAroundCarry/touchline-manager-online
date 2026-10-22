@@ -49,10 +49,10 @@ public sealed class DebtAndWageImpactTests
     }
 
     [Fact]
-    public void A_manager_still_in_administration_seventeen_matchdays_later_is_dismissed()
+    public void A_manager_still_in_administration_a_whole_season_later_is_dismissed()
     {
-        var before = ClubFinancialState.Next(FinancialStateKind.Administration, 10, 26, -Limit - 1, Limit);
-        var at = ClubFinancialState.Next(FinancialStateKind.Administration, 10, 27, -Limit - 1, Limit);
+        var before = ClubFinancialState.Next(FinancialStateKind.Administration, 10, 43, -Limit - 1, Limit);
+        var at = ClubFinancialState.Next(FinancialStateKind.Administration, 10, 44, -Limit - 1, Limit);
 
         before.Dismiss.Should().BeFalse();
         at.Dismiss.Should().BeTrue();

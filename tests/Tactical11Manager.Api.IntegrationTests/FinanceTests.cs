@@ -63,8 +63,12 @@ public sealed class FinanceTests : IAsyncLifetime
         summary.WeeklyWageMinor.Should().BePositive("FIN-7 charges a real payroll");
 
         summary.TierNumber.Should().Be(1, "the seeded world's lowest tier is the top one");
-        summary.WeeklySponsorshipMinor.Should().Be(WorldRuleSet.WeeklySponsorshipMinorForTier(1), "FIN-4");
-        summary.WeeklyOperatingCostMinor.Should().Be(WorldRuleSet.WeeklyOperatingCostMinorForTier(1), "FIN-9");
+        summary.WeeklySponsorshipMinor.Should().Be(
+            EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.LeagueTvSeasonMinorFor(1)),
+            "FIN-4 shows the league money a weekly run's worth of matchdays pays");
+        summary.WeeklyOperatingCostMinor.Should().Be(
+            EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.OperatingCostSeasonMinorFor(1)),
+            "FIN-9");
 
         // The payroll the summary reports is the one the contracts read reports, because they are one fact.
         var contracts = await client.GetFromJsonAsync<ContractsResponse>("/api/v1/contracts");

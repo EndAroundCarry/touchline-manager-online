@@ -634,6 +634,74 @@ public sealed class MatchdayWorkflowTests
     /// Claims the lowest round of the first division whose fixtures nobody has touched, so a test never
     /// depends on the order the collection's tests ran in.
     /// </summary>
+    [Fact]
+    public async Task Publishing_a_round_pays_every_club_of_the_division_its_television_money_and_charges_its_wages()
+    {
+        await using var scope = Fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var matchdayId = await ClaimRoundAsync(scope);
+        var divisionSeasonId = await DivisionSeasonOfAsync(db, matchdayId);
+
+        await scope.ServiceProvider.GetRequiredService<LockMatchday>().ExecuteAsync(matchdayId, CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<ResolveMatchday>()
+            .ExecuteAsync(matchdayId, jobId: null, CancellationToken.None);
+
+        var clubIds = await db.ClubSeasonEntries
+            .Where(entry => entry.DivisionSeasonId == divisionSeasonId)
+            .Select(entry => entry.ClubId)
+            .ToListAsync();
+
+        var wagesBefore = await db.PlayerContracts
+            .Where(contract => contract.Status == ContractStatus.Active && clubIds.Contains(contract.ClubId))
+            .GroupBy(contract => contract.ClubId)
+            .Select(group => new { ClubId = group.Key, Total = group.Sum(contract => contract.SeasonWageMinor) })
+            .ToDictionaryAsync(row => row.ClubId, row => row.Total);
+
+        var publish = scope.ServiceProvider.GetRequiredService<PublishMatchday>();
+
+        (await publish.ExecuteAsync(matchdayId, CancellationToken.None)).Outcome.Should().Be(PublishMatchdayOutcome.Published);
+
+        await using var readScope = Fixture.CreateScope();
+        var readDb = readScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var television = await readDb.LedgerEntries
+            .Where(entry => entry.Category == LedgerCategory.LeagueTv && entry.SourceId == matchdayId)
+            .ToListAsync();
+        var wages = await readDb.LedgerEntries
+            .Where(entry => entry.Category == LedgerCategory.Wages && entry.SourceId == matchdayId)
+            .ToListAsync();
+
+        clubIds.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
+        television.Select(entry => entry.ClubId).Should().BeEquivalentTo(clubIds, "every club of the division is paid, home or away (FIN-4)");
+        wages.Select(entry => entry.ClubId).Should().BeEquivalentTo(clubIds, "every club of the division pays its wages (FIN-7)");
+        television.Should().OnlyContain(entry => entry.CashDeltaMinor > 0 && entry.SourceType == LedgerSourceType.Matchday);
+
+        foreach (var wage in wages)
+        {
+            wage.CashDeltaMinor.Should().Be(-EconomyRuleSet.PerMatchday(wagesBefore[wage.ClubId]), "a 34th of the season's bill (CON-2)");
+            wage.CorrelationId.Should().Be(
+                television.Single(entry => entry.ClubId == wage.ClubId).CorrelationId,
+                "a club's matchday is one operation, told apart by category (FIN-17)");
+        }
+
+        // The overdraft limit follows the forecast, set when the club is first paid, and the balances replay (FIN-18, DEBT-1).
+        var accounts = await readDb.ClubAccounts.Where(account => clubIds.Contains(account.ClubId)).ToListAsync();
+
+        accounts.Should().OnlyContain(account => account.OverdraftLimitMinor > 0 && account.OverdraftFloorMinor == 2 * account.OverdraftLimitMinor);
+
+        foreach (var account in accounts)
+        {
+            (await readDb.LedgerEntries.Where(entry => entry.ClubId == account.ClubId).SumAsync(entry => entry.CashDeltaMinor))
+                .Should().Be(account.CashMinor);
+        }
+
+        // Publishing again is a no-op: nothing is paid twice.
+        (await publish.ExecuteAsync(matchdayId, CancellationToken.None)).Outcome.Should().Be(PublishMatchdayOutcome.AlreadyPublished);
+
+        (await readDb.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.Wages && entry.SourceId == matchdayId))
+            .Should().Be(WorldRuleSet.ClubsPerDivision);
+    }
+
     private static async Task<Guid> ClaimRoundAsync(AsyncServiceScope scope)
     {
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();

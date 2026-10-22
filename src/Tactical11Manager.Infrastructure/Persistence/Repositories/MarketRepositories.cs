@@ -103,6 +103,16 @@ internal sealed class BidRepository : IBidRepository
             cancellationToken);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<TransferBid>> ListLeadingByClubAsync(
+        Guid bidderClubId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.TransferBids
+            .Where(bid => bid.BidderClubId == bidderClubId && bid.Status == BidStatus.Leading)
+            .OrderByDescending(bid => bid.AmountMinor)
+            .ThenBy(bid => bid.Id)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
     public Task<TransferBid?> FindLeadingBidAsync(Guid listingId, CancellationToken cancellationToken) =>
         _dbContext.TransferBids.SingleOrDefaultAsync(
             bid => bid.ListingId == listingId && bid.Status == BidStatus.Leading,

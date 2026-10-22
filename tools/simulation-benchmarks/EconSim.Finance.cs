@@ -64,7 +64,7 @@ internal sealed partial class EconSim
             {
                 club.Dismissed = true;
                 books.Dismissals++;
-                Note(club, "manager dismissed after 17 matchdays in administration");
+                Note(club, $"manager dismissed after {EconomyRuleSet.AdministrationDismissalMatchdays} matchdays in administration");
             }
         }
     }

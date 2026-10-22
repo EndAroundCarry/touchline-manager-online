@@ -3,8 +3,12 @@ namespace Tactical11Manager.Domain.Rules;
 // Debt: in the red, administration and dismissal (plan toasty-scott, section 6).
 public static partial class EconomyRuleSet
 {
-    /// <summary>The matchdays a club may stay in administration before its manager is dismissed.</summary>
-    public const int AdministrationDismissalMatchdays = 17;
+    /// <summary>
+    /// The matchdays a club may stay in administration before its manager is dismissed: a whole season, counted from the matchday the club entered
+    /// it, wherever in the season that was and across the end of a season. A manager who gets the club back inside its limit starts again from
+    /// zero if it falls back.
+    /// </summary>
+    public const int AdministrationDismissalMatchdays = MatchdaysPerSeason;
 
     /// <summary>The most players the board lists in one administration pass.</summary>
     public const int AdministrationMaxListings = 5;

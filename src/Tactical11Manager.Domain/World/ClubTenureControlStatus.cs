@@ -88,7 +88,10 @@ public static class ClubTenureEndReasons
     /// <summary>An administrator ended the tenure, for example on suspension (`OCC-6`).</summary>
     public const string AdministratorClosed = "administrator_closed";
 
+    /// <summary>The board dismissed the manager after the club stayed in administration (`DEBT-5`).</summary>
+    public const string Dismissed = "dismissed";
+
     /// <summary>Whether a reason is one the tenure aggregate recognises.</summary>
     public static bool IsKnown(string reason) =>
-        reason is Resigned or InactivityClosed or AdministratorClosed;
+        reason is Resigned or InactivityClosed or AdministratorClosed or Dismissed;
 }

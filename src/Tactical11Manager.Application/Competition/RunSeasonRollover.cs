@@ -167,7 +167,13 @@ public sealed partial class RunSeasonRollover
         await FinalizeAsync(world, season, finalizePlan, now, cancellationToken);
 
         var movePlan = await LoadPlanAsync(world, season, cancellationToken);
-        await SquadsAsync(world, season, now, cancellationToken);
+        var relegated = movePlan.Countries
+            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
+            .Where(movement => movement.IsRelegated)
+            .Select(movement => movement.ClubId)
+            .ToHashSet();
+
+        await SquadsAsync(world, season, relegated, now, cancellationToken);
         var nextSeasonId = await MoveAsync(world, season, movePlan, now, cancellationToken);
 
         await CompleteAsync(world, season, nextSeasonId, now, cancellationToken);
@@ -370,12 +376,17 @@ public sealed partial class RunSeasonRollover
             }
         }
 
+        var nextTierOf = plan.Countries
+            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
+            .ToDictionary(movement => movement.ClubId, movement => movement.ToTier);
+
         var settlement = plan.Countries
             .SelectMany(country => country.Tiers)
             .SelectMany(tier => tier.Entries.Select(entry => new SeasonSettlementClub(
                 entry.ClubId,
                 tier.TierNumber,
-                tier.RankOf(entry.ClubId))))
+                tier.RankOf(entry.ClubId),
+                nextTierOf.TryGetValue(entry.ClubId, out var nextTier) ? nextTier : tier.TierNumber)))
             .Where(club => club.FinalRank >= 1)
             .ToList();
 
@@ -404,6 +415,7 @@ public sealed partial class RunSeasonRollover
     private async Task SquadsAsync(
         GameWorld world,
         Season season,
+        IReadOnlySet<Guid> relegatedClubIds,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -423,7 +435,7 @@ public sealed partial class RunSeasonRollover
 
         var nextSeason = await EnsureNextSeasonAsync(world, season, now, cancellationToken);
 
-        var result = await _continuity.ExecuteAsync(world, season, nextSeason, now, cancellationToken);
+        var result = await _continuity.ExecuteAsync(world, season, nextSeason, now, cancellationToken, relegatedClubIds);
 
         rollover.SettleSquads(now);
 

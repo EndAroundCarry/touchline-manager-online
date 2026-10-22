@@ -43,6 +43,11 @@ public sealed class ClubClaimTests : WorldTestBase
         var clubId = await FreeClubIdAsync(scope, CountryId("ESP"), CancellationToken.None);
         var userId = await CreateManagerAsync(scope, CancellationToken.None);
 
+        // The cash the club holds before the claim: other tests of the shared world may have played a round, which pays
+        // every club its television money and charges its wages, so the opening figure is not the one to compare to.
+        var cashBefore = (await scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>()
+            .ClubAccounts.AsNoTracking().SingleAsync(account => account.ClubId == clubId)).CashMinor;
+
         var result = await ClaimAsync(scope, userId, clubId, NewKey());
 
         result.Outcome.Should().Be(ClaimClubOutcome.Claimed);
@@ -54,8 +59,8 @@ public sealed class ClubClaimTests : WorldTestBase
         dashboard.Control.TenureId.Should().NotBeNull();
 
         // WORLD-9: the club arrives as it is, with its finances intact rather than reset.
-        dashboard.Finances.CashMinor.Should().Be(WorldRuleSet.OpeningCashMinorTier1);
-        dashboard.Finances.AvailableMinor.Should().Be(WorldRuleSet.OpeningCashMinorTier1);
+        dashboard.Finances.CashMinor.Should().Be(cashBefore);
+        dashboard.Finances.AvailableMinor.Should().Be(cashBefore);
 
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
         var managerId = await ManagerIdOfAsync(db, userId);

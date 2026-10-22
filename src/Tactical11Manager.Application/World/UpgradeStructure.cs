@@ -9,6 +9,7 @@ using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Jobs;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Contracts.World;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
 
@@ -49,6 +50,9 @@ public enum UpgradeStructureOutcome
 
     /// <summary>The club cannot pay for the upgrade after what it has committed to bids (`FIN-10`).</summary>
     InsufficientFunds = 10,
+
+    /// <summary>The club is in the red or in administration, so it may not build (`DEBT-3`).</summary>
+    Embargo = 11,
 }
 
 /// <summary>The result of ordering an upgrade.</summary>
@@ -173,6 +177,12 @@ public sealed class UpgradeStructure
         if (building.IsAtMaxLevel)
         {
             return Refused(UpgradeStructureOutcome.MaxLevel);
+        }
+
+        // A club in the red does not build, whatever its cash (DEBT-3).
+        if (account.FinancialState != FinancialStateKind.Healthy)
+        {
+            return Refused(UpgradeStructureOutcome.Embargo);
         }
 
         var target = building.Level + 1;

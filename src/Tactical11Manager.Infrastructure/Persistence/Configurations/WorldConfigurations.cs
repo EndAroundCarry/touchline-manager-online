@@ -223,7 +223,7 @@ internal sealed class ClubTenureConfiguration : IEntityTypeConfiguration<ClubTen
                 "(ended_at is null and end_reason is null) or (ended_at is not null and end_reason is not null)");
             table.HasCheckConstraint(
                 "ck_club_tenures_end_reason_value",
-                "end_reason is null or end_reason in ('resigned', 'inactivity_closed', 'administrator_closed')");
+                "end_reason is null or end_reason in ('resigned', 'inactivity_closed', 'administrator_closed', 'dismissed')");
         });
 
         builder.HasKey(tenure => tenure.Id);

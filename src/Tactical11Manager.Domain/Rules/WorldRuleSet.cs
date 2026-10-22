@@ -143,26 +143,6 @@ public static class WorldRuleSet
             : date;
     }
 
-    /// <summary>The league and sponsor money a weekly run credits a club in the given tier, in minor units (`FIN-4`).</summary>
-    /// <param name="tier">The tier number, starting at 1.</param>
-    /// <remarks>
-    /// The league's television money and the steady sponsor's fixed part, three matchdays' worth (`CON-2`). The weekly run goes when the
-    /// matchday settles them (M3); until then this is what the run credits.
-    /// </remarks>
-    public static long WeeklySponsorshipMinorForTier(int tier) =>
-        EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.LeagueTvSeasonMinorFor(tier) + EconomyRuleSet.SponsorBaseSeasonMinorFor(tier));
-
-    /// <summary>The small fixed operating cost a weekly run charges a club in the given tier, in minor units (`FIN-9`).</summary>
-    /// <param name="tier">The tier number, starting at 1.</param>
-    public static long WeeklyOperatingCostMinorForTier(int tier) =>
-        EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.OperatingCostSeasonMinorFor(tier));
-
-    /// <summary>The prize a club earns for finishing at a rank in a tier, in minor units (`FIN-5`).</summary>
-    /// <remarks>A straight line down the table with bigger steps for the top three; see <see cref="EconomyRuleSet.PrizeMinorFor"/>.</remarks>
-    /// <param name="tier">The tier number, starting at 1.</param>
-    /// <param name="rank">The club's final position, 1–18.</param>
-    public static long PositionAwardMinorFor(int tier, int rank) => EconomyRuleSet.PrizeMinorFor(tier, rank);
-
     /// <summary>
     /// How many weeks of its wage bill a club must hold in cash before payroll is not a risk (`FIN-16`).
     /// </summary>

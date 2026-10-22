@@ -7,6 +7,7 @@ using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Contracts.World;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
 
@@ -44,6 +45,9 @@ public enum BuildStadiumSeatsOutcome
 
     /// <summary>The order named a stand that does not exist or a count outside the allowed range.</summary>
     InvalidOrder = 9,
+
+    /// <summary>The club is in the red or in administration, so it may not build (`DEBT-3`).</summary>
+    Embargo = 10,
 }
 
 /// <summary>The result of ordering new places.</summary>
@@ -155,6 +159,12 @@ public sealed class BuildStadiumSeats
         if (request.Count > stadium.RemainingRoom)
         {
             return Refused(BuildStadiumSeatsOutcome.StadiumFull);
+        }
+
+        // A club in the red does not build, whatever its cash (DEBT-3).
+        if (account.FinancialState != FinancialStateKind.Healthy)
+        {
+            return Refused(BuildStadiumSeatsOutcome.Embargo);
         }
 
         var cost = StadiumRuleSet.BuildCostMinorFor(stand, context.TierNumber) * request.Count;

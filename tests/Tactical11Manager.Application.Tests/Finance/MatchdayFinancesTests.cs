@@ -8,6 +8,7 @@ using Tactical11Manager.Domain.Fans;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
+using static Tactical11Manager.Application.Tests.Finance.FinanceDoubles;
 
 namespace Tactical11Manager.Application.Tests.Finance;
 
@@ -21,8 +22,6 @@ namespace Tactical11Manager.Application.Tests.Finance;
 /// </remarks>
 public sealed class MatchdayFinancesTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 10, 18, 20, 0, 0, TimeSpan.Zero);
-
     // A Sunday afternoon, before the 23:00 boundary, so the week is the Sunday's own date.
     private static readonly DateTimeOffset Kickoff = new(2026, 10, 18, 15, 0, 0, TimeSpan.Zero);
 
@@ -169,12 +168,19 @@ public sealed class MatchdayFinancesTests
 
         var ledger = new RecordingLedgerRepository();
         var structures = new RecordingStructureRepository();
+        var queries = new StubFinanceQueries();
+        var accounts = new RecordingAccountRepository(account);
+
+        queries.Revenue.Add(basis);
+
         var finances = new MatchdayFinances(
-            new StubFinanceQueries(basis),
-            new StubAccountRepository(account),
+            queries,
+            accounts,
             ledger,
             fanRepository,
-            structures);
+            structures,
+            Room(ledger, new RecordingAuditWriter()),
+            States(accounts, queries));
 
         return new Run(finances, fixture, homeClubId, ledger, structures);
     }
@@ -196,76 +202,6 @@ public sealed class MatchdayFinancesTests
 
         public Task<int> PostAsync() =>
             finances.PostMatchdayTakingsAsync(Guid.CreateVersion7(), [Fixture], Now, CancellationToken.None);
-    }
-
-    private sealed class StubFinanceQueries(ClubRevenueBasis basis) : IFinanceQueries
-    {
-        public Task<IReadOnlyList<ClubRevenueBasis>> GetMatchdayRevenueBasisAsync(
-            Guid matchdayId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ClubRevenueBasis>>([basis]);
-
-        public Task<IReadOnlyList<ClubWeeklyObligations>> GetWeeklyObligationsAsync(
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ClubWeeklyObligations>>([]);
-
-        public Task<FinanceSummarySnapshot?> GetFinanceSummaryAsync(
-            Guid clubId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<FinanceSummarySnapshot?>(null);
-
-        public Task<FinanceLedgerPage> GetFinanceLedgerAsync(
-            Guid clubId,
-            long? beforeSequence,
-            int pageSize,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new FinanceLedgerPage([], HasMore: false));
-    }
-
-    private sealed class StubAccountRepository(ClubAccount account) : IClubAccountRepository
-    {
-        public void Add(ClubAccount added)
-        {
-        }
-
-        public Task<ClubAccount?> FindByClubAsync(Guid clubId, CancellationToken cancellationToken) =>
-            Task.FromResult<ClubAccount?>(clubId == account.ClubId ? account : null);
-
-        public Task<IReadOnlyList<ClubAccount>> LoadAsync(
-            IReadOnlyCollection<Guid> clubIds,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ClubAccount>>(clubIds.Contains(account.ClubId) ? [account] : []);
-
-        public Task<IReadOnlyList<ClubAccount>> LoadAllAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ClubAccount>>([account]);
-    }
-
-    private sealed class RecordingLedgerRepository : ILedgerRepository
-    {
-        public List<LedgerEntry> Entries { get; } = [];
-
-        public void Add(LedgerEntry entry) => Entries.Add(entry);
-
-        public Task<LedgerEntry?> FindByIdAsync(Guid entryId, CancellationToken cancellationToken) =>
-            Task.FromResult(Entries.SingleOrDefault(entry => entry.Id == entryId));
-
-        public Task<IReadOnlySet<string>> FindExistingCorrelationIdsAsync(
-            IReadOnlyCollection<string> correlationIds,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.Ordinal));
-
-        public Task<IReadOnlyList<ClubCategoryTotal>> LoadCategoryTotalsAsync(
-            IReadOnlyCollection<Guid> clubIds,
-            DateTimeOffset fromInclusive,
-            DateTimeOffset toExclusive,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ClubCategoryTotal>>([]);
-
-        public Task<IReadOnlyDictionary<Guid, long>> LoadCashBalanceBeforeAsync(
-            IReadOnlyCollection<Guid> clubIds,
-            DateTimeOffset instant,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyDictionary<Guid, long>>(new Dictionary<Guid, long>());
     }
 
     private sealed class RecordingStructureRepository : IStructureRepository

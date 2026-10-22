@@ -5,26 +5,28 @@ using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
+using static Tactical11Manager.Application.Tests.Finance.FinanceDoubles;
 
 namespace Tactical11Manager.Application.Tests.Finance;
 
 /// <summary>
-/// The rollover's finance settlement: the final-position award and each club's season finance summary
-/// (`FIN-5`, master plan §6.8).
+/// The rollover's finance settlement: the prize for the final place, the sponsor's bonus, the parachute, the club's standing and each
+/// club's season finance summary (`FIN-5`, `OBJ-4`, `STD-2`, master plan §6.8).
 /// </summary>
 public sealed class SettleSeasonFinancesTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 9, 28, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset SettledAt = new(2026, 9, 28, 12, 0, 0, TimeSpan.Zero);
     private static readonly Guid WorldId = Guid.CreateVersion7();
     private static readonly Guid SeasonId = Guid.CreateVersion7();
 
     [Fact]
-    public async Task Every_club_receives_its_position_award_and_a_summary()
+    public async Task Every_club_receives_the_prize_of_its_place_and_a_summary()
     {
         var champion = Guid.CreateVersion7();
         var bottom = Guid.CreateVersion7();
 
-        var accounts = new RecordingAccountRepository(FundedAccount(champion, 10_000_000), FundedAccount(bottom, 2_000_000));
+        var accounts = new RecordingAccountRepository(Funded(champion, 10_000_000), Funded(bottom, 2_000_000));
 
         var ledger = new RecordingLedgerRepository
         {
@@ -42,19 +44,21 @@ public sealed class SettleSeasonFinancesTests
         var result = await Create(accounts, ledger, summaries).SettleAsync(
             WorldId,
             ClosingSeason(),
-            [new SeasonSettlementClub(champion, 1, 1), new SeasonSettlementClub(bottom, 1, 18)],
-            Now,
+            [new SeasonSettlementClub(champion, 1, 1, 1), new SeasonSettlementClub(bottom, 1, 18, 2)],
+            SettledAt,
             CancellationToken.None);
 
         result.Awarded.Should().Be(2);
         result.Summaries.Should().Be(2);
 
-        ledger.Entries.Should().HaveCount(2).And.OnlyContain(entry => entry.Category == LedgerCategory.PositionAward);
+        var prizes = ledger.Entries.Where(entry => entry.Category == LedgerCategory.PositionAward).ToList();
 
-        var championAward = ledger.Entries.Single(entry =>
+        prizes.Should().HaveCount(2);
+
+        var championAward = prizes.Single(entry =>
             entry.CorrelationId.EndsWith(champion.ToString("N"), StringComparison.Ordinal));
 
-        championAward.CashDeltaMinor.Should().Be(WorldRuleSet.PositionAwardMinorFor(1, 1));
+        championAward.CashDeltaMinor.Should().Be(EconomyRuleSet.PrizeMinorFor(1, 1));
 
         // The summary's closing cash is opening plus its category lines.
         var championSummary = summaries.Summaries.Single(summary => summary.ClubId == champion);
@@ -67,16 +71,135 @@ public sealed class SettleSeasonFinancesTests
     }
 
     [Fact]
+    public async Task The_prize_is_paid_at_the_tier_the_club_finished_in()
+    {
+        var promoted = Guid.CreateVersion7();
+        var ledger = new RecordingLedgerRepository();
+
+        await Create(new RecordingAccountRepository(Funded(promoted, 1)), ledger, new RecordingSummaryRepository())
+            .SettleAsync(
+                WorldId,
+                ClosingSeason(),
+                [new SeasonSettlementClub(promoted, 2, 1, 1)],
+                SettledAt,
+                CancellationToken.None);
+
+        ledger.Entries.Should().ContainSingle(entry => entry.Category == LedgerCategory.PositionAward)
+            .Which.CashDeltaMinor.Should().Be(EconomyRuleSet.PrizeMinorFor(2, 1), "the tier it played in, not the tier it goes up to");
+        ledger.Entries.Should().NotContain(entry => entry.Category == LedgerCategory.Parachute);
+    }
+
+    [Fact]
+    public async Task A_relegated_club_receives_its_prize_and_then_the_parachute()
+    {
+        var relegated = Guid.CreateVersion7();
+        var ledger = new RecordingLedgerRepository();
+
+        var result = await Create(new RecordingAccountRepository(Funded(relegated, 1)), ledger, new RecordingSummaryRepository())
+            .SettleAsync(
+                WorldId,
+                ClosingSeason(),
+                [new SeasonSettlementClub(relegated, 1, 17, 2)],
+                SettledAt,
+                CancellationToken.None);
+
+        result.Parachutes.Should().Be(1);
+
+        ledger.Entries.Select(entry => entry.Category).Should().Equal(
+            [LedgerCategory.PositionAward, LedgerCategory.Parachute],
+            "the prize of the place first, then the one-off help for the lower division");
+
+        ledger.Entries.Single(entry => entry.Category == LedgerCategory.Parachute).CashDeltaMinor
+            .Should().Be(EconomyRuleSet.ParachuteMinorFor(1));
+    }
+
+    [Theory]
+    [InlineData(SeasonObjective.TopSix, 4, ObjectiveOutcome.Met)]
+    [InlineData(SeasonObjective.TopSix, 1, ObjectiveOutcome.Exceeded)]
+    [InlineData(SeasonObjective.TopSix, 12, ObjectiveOutcome.Missed)]
+    public async Task The_sponsor_pays_its_bonus_only_when_the_objective_is_met_or_exceeded(
+        SeasonObjective objective,
+        int finalPlace,
+        ObjectiveOutcome expected)
+    {
+        var clubId = Guid.CreateVersion7();
+        var deal = Deal(clubId, objective);
+        var ledger = new RecordingLedgerRepository();
+        var sponsors = new RecordingSponsorRepository(deal);
+
+        var result = await Create(
+                new RecordingAccountRepository(Funded(clubId, 1)),
+                ledger,
+                new RecordingSummaryRepository(),
+                sponsors)
+            .SettleAsync(
+                WorldId,
+                ClosingSeason(),
+                [new SeasonSettlementClub(clubId, 1, finalPlace, 1)],
+                SettledAt,
+                CancellationToken.None);
+
+        deal.Outcome.Should().Be(expected);
+        deal.FinalPlace.Should().Be(finalPlace);
+
+        var bonus = ledger.Entries.SingleOrDefault(entry => entry.Category == LedgerCategory.SponsorBonus);
+
+        if (expected == ObjectiveOutcome.Missed)
+        {
+            bonus.Should().BeNull("a missed objective pays nothing");
+            result.Bonuses.Should().Be(0);
+        }
+        else
+        {
+            bonus.Should().NotBeNull();
+            bonus!.CashDeltaMinor.Should().Be(expected == ObjectiveOutcome.Exceeded ? deal.BonusExceededMinor : deal.BonusMetMinor);
+            result.Bonuses.Should().Be(1);
+        }
+    }
+
+    [Fact]
+    public async Task A_clubs_standing_moves_by_its_finish_and_the_step_is_recorded()
+    {
+        var clubId = Guid.CreateVersion7();
+        var club = NewClub(clubId, tier: 1);
+        var before = club.StandingCentis;
+        var sponsors = new RecordingSponsorRepository();
+
+        var result = await Create(
+                new RecordingAccountRepository(Funded(clubId, 1)),
+                new RecordingLedgerRepository(),
+                new RecordingSummaryRepository(),
+                sponsors,
+                club)
+            .SettleAsync(
+                WorldId,
+                ClosingSeason(),
+                [new SeasonSettlementClub(clubId, 1, 1, 1)],
+                SettledAt,
+                CancellationToken.None);
+
+        result.Steps.Should().Be(1);
+
+        var step = sponsors.Steps.Should().ContainSingle().Which;
+
+        step.ClubId.Should().Be(clubId);
+        step.BeforeCentis.Should().Be(before);
+        step.AfterCentis.Should().Be(club.StandingCentis).And.BeGreaterThan(before, "a champion gains standing");
+        step.FinalPlace.Should().Be(1);
+        step.Outcome.Should().BeNull("the club had no objective this season");
+    }
+
+    [Fact]
     public async Task A_club_with_no_ledger_history_gets_a_zero_summary()
     {
         var clubId = Guid.CreateVersion7();
         var summaries = new RecordingSummaryRepository();
 
         var result = await Create(
-                new RecordingAccountRepository(FundedAccount(clubId, 1)),
+                new RecordingAccountRepository(Funded(clubId, 1)),
                 new RecordingLedgerRepository(),
                 summaries)
-            .SettleAsync(WorldId, ClosingSeason(), [new SeasonSettlementClub(clubId, 1, 9)], Now, CancellationToken.None);
+            .SettleAsync(WorldId, ClosingSeason(), [new SeasonSettlementClub(clubId, 1, 9, 1)], SettledAt, CancellationToken.None);
 
         result.Awarded.Should().Be(1);
         result.Summaries.Should().Be(1);
@@ -93,17 +216,47 @@ public sealed class SettleSeasonFinancesTests
         var summaries = new RecordingSummaryRepository();
 
         var result = await Create(new RecordingAccountRepository(), new RecordingLedgerRepository(), summaries)
-            .SettleAsync(WorldId, ClosingSeason(), [], Now, CancellationToken.None);
+            .SettleAsync(WorldId, ClosingSeason(), [], SettledAt, CancellationToken.None);
 
-        result.Should().Be(new SeasonSettlementResult(0, 0));
+        result.Should().Be(new SeasonSettlementResult(0, 0, 0, 0, 0));
         summaries.Summaries.Should().BeEmpty();
     }
 
     private static SettleSeasonFinances Create(
         RecordingAccountRepository accounts,
         RecordingLedgerRepository ledger,
-        RecordingSummaryRepository summaries) =>
-        new(accounts, ledger, summaries, NullLogger<SettleSeasonFinances>.Instance);
+        RecordingSummaryRepository summaries,
+        RecordingSponsorRepository? sponsors = null,
+        params Club[] clubs) =>
+        new(
+            accounts,
+            ledger,
+            summaries,
+            sponsors ?? new RecordingSponsorRepository(),
+            new StubClubRepository(clubs),
+            NullLogger<SettleSeasonFinances>.Instance);
+
+    private static Club NewClub(Guid clubId, int tier) =>
+        Club.Generate(
+            clubId,
+            WorldId,
+            Guid.CreateVersion7(),
+            new ClubIdentity("Northgate United", "NOR", "Northgate", "North", "badge-seed"),
+            tier,
+            foundingGameYear: 1950,
+            SettledAt);
+
+    private static ClubSponsorDeal Deal(Guid clubId, SeasonObjective objective)
+    {
+        var made = SponsorOffers.For(WorldId, 1, clubId, 1, 20_000, 50)
+            .Single(offer => offer.Kind == SponsorOfferKind.Balanced);
+
+        var offer = ClubSponsorOffer.Record(Guid.CreateVersion7(), clubId, SeasonId, made, 1, 20_000, 50, SettledAt);
+        var quote = SponsorOffers.Quotes(offer.Kind, offer.Tier, offer.Fans, offer.StandingPoints)
+            .Single(candidate => candidate.Objective == objective);
+
+        return ClubSponsorDeal.Sign(Guid.CreateVersion7(), offer, objective, quote.MetMinor, quote.ExceededMinor, SponsorSigner.Manager, SettledAt);
+    }
 
     private static Season ClosingSeason() =>
         Season.Create(
@@ -113,69 +266,7 @@ public sealed class SettleSeasonFinancesTests
             gameYear: 2026,
             WorldRuleSet.Version,
             firstMatchday: new DateOnly(2026, 9, 1),
-            Now);
-
-    private static ClubAccount FundedAccount(Guid clubId, long cashMinor)
-    {
-        var account = ClubAccount.Open(Guid.CreateVersion7(), clubId, Now);
-
-        account.Post(LedgerPostings.OpeningBalance(Guid.CreateVersion7(), clubId, cashMinor), Now);
-
-        return account;
-    }
-
-    private sealed class RecordingAccountRepository(params ClubAccount[] accounts) : IClubAccountRepository
-    {
-        public IReadOnlyList<ClubAccount> All { get; } = accounts;
-
-        public void Add(ClubAccount account)
-        {
-        }
-
-        public Task<ClubAccount?> FindByClubAsync(Guid clubId, CancellationToken cancellationToken) =>
-            Task.FromResult(All.FirstOrDefault(account => account.ClubId == clubId));
-
-        public Task<IReadOnlyList<ClubAccount>> LoadAsync(
-            IReadOnlyCollection<Guid> clubIds,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ClubAccount>>([.. All.Where(account => clubIds.Contains(account.ClubId))]);
-
-        public Task<IReadOnlyList<ClubAccount>> LoadAllAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(All);
-    }
-
-    private sealed class RecordingLedgerRepository : ILedgerRepository
-    {
-        public List<LedgerEntry> Entries { get; } = [];
-
-        public IReadOnlyList<ClubCategoryTotal> Totals { get; init; } = [];
-
-        public IReadOnlyDictionary<Guid, long> BalancesBefore { get; init; } = new Dictionary<Guid, long>();
-
-        public void Add(LedgerEntry entry) => Entries.Add(entry);
-
-        public Task<LedgerEntry?> FindByIdAsync(Guid entryId, CancellationToken cancellationToken) =>
-            Task.FromResult(Entries.SingleOrDefault(entry => entry.Id == entryId));
-
-        public Task<IReadOnlySet<string>> FindExistingCorrelationIdsAsync(
-            IReadOnlyCollection<string> correlationIds,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.Ordinal));
-
-        public Task<IReadOnlyList<ClubCategoryTotal>> LoadCategoryTotalsAsync(
-            IReadOnlyCollection<Guid> clubIds,
-            DateTimeOffset fromInclusive,
-            DateTimeOffset toExclusive,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ClubCategoryTotal>>([.. Totals.Where(total => clubIds.Contains(total.ClubId))]);
-
-        public Task<IReadOnlyDictionary<Guid, long>> LoadCashBalanceBeforeAsync(
-            IReadOnlyCollection<Guid> clubIds,
-            DateTimeOffset instant,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyDictionary<Guid, long>>(
-                BalancesBefore.Where(pair => clubIds.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
-    }
+            SettledAt);
 
     private sealed class RecordingSummaryRepository : IClubSeasonFinanceRepository
     {

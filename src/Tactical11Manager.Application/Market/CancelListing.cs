@@ -6,6 +6,7 @@ using Tactical11Manager.Application.Abstractions.Ops;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Squad;
+using Tactical11Manager.Domain.Finance;
 
 namespace Tactical11Manager.Application.Market;
 
@@ -97,6 +98,13 @@ public sealed class CancelListing
         if (!listing.IsOpen)
         {
             return new ListingResult(MarketOutcome.NotOpen, null);
+        }
+
+        // The board put him on the market, and the manager takes him off only once the club is out of administration (DEBT-4).
+        if (listing.ListedByBoard
+            && await _accounts.FindByClubAsync(access.ClubId, cancellationToken) is { FinancialState: FinancialStateKind.Administration })
+        {
+            return new ListingResult(MarketOutcome.BoardListing, null);
         }
 
         var now = _clock.UtcNow;

@@ -28,12 +28,15 @@ public sealed record ClubRevenueBasis(
     int SnackBarLevel = StructureRuleSet.OpeningLevel);
 
 /// <summary>
-/// One club's obligations for a week's finance run: the tier it plays in and what its squad costs (`FIN-7`).
+/// One club's obligations for a week's finance run: the tier it plays in, its ground and its buildings (`FIN-9`, `STRC-8`, `STAD-7`).
 /// </summary>
+/// <remarks>
+/// The wages and the sponsor's payment are not here: they are paid on every matchday, with the league's television money, when the round is
+/// published (`FIN-7`).
+/// </remarks>
 /// <param name="ClubId">The club.</param>
-/// <param name="TierNumber">The tier the club plays in, which scales the sponsorship and the operating cost.</param>
-/// <param name="WeeklyWageMinor">The club's active contracts' total weekly wage, in minor units.</param>
-/// <param name="ContractedPlayers">How many active contracts that total covers.</param>
+/// <param name="TierNumber">The tier the club plays in, which scales the operating cost.</param>
+/// <param name="Seats">The places in the club's ground, which set its upkeep (`STAD-7`).</param>
 /// <param name="Fans">The club's fans at the week's close, which the merchandise shop sells to (`STRC-6`). A club with no fan base yet reads as the tier's opening fans.</param>
 /// <param name="MoodBp">The fans' mood, 0 to 10,000, which lifts the merchandise takings (`STRC-7`). A club with no fan base yet reads as calm.</param>
 /// <param name="SnackBarLevel">The snack bar's level, which sets its upkeep (`STRC-8`).</param>
@@ -41,12 +44,56 @@ public sealed record ClubRevenueBasis(
 public sealed record ClubWeeklyObligations(
     Guid ClubId,
     int TierNumber,
-    long WeeklyWageMinor,
-    int ContractedPlayers,
+    StadiumSeats Seats,
     int Fans,
     int MoodBp,
     int SnackBarLevel,
     int MerchandiseLevel);
+
+/// <summary>
+/// What a club's money is planned from this season: its tier, ground, fans, buildings, sponsor deal and payroll (plan toasty-scott section 5).
+/// </summary>
+/// <param name="ClubId">The club.</param>
+/// <param name="TierNumber">The tier the club plays in.</param>
+/// <param name="Seats">The places in the club's ground.</param>
+/// <param name="Fans">The club's fans. A club with no fan base yet reads as the tier's opening fans.</param>
+/// <param name="MoodBp">The fans' mood, 0 to 10,000. A club with no fan base yet reads as calm.</param>
+/// <param name="SnackBarLevel">The snack bar's level.</param>
+/// <param name="MerchandiseLevel">The merchandise shop's level.</param>
+/// <param name="SponsorFixedMatchdayMinor">What the club's sponsor deal pays on each matchday, 0 while no deal is signed.</param>
+/// <param name="SeasonWageMinor">The active contracts' total wage for a season.</param>
+/// <param name="ContractedPlayers">How many active contracts that total covers.</param>
+public sealed record ClubFinanceBasis(
+    Guid ClubId,
+    int TierNumber,
+    StadiumSeats Seats,
+    int Fans,
+    int MoodBp,
+    int SnackBarLevel,
+    int MerchandiseLevel,
+    long SponsorFixedMatchdayMinor,
+    long SeasonWageMinor,
+    int ContractedPlayers)
+{
+    /// <summary>Gets the sponsor's fixed part for the whole season.</summary>
+    public long SponsorFixedSeasonMinor => SponsorFixedMatchdayMinor * EconomyRuleSet.MatchdaysPerSeason;
+
+    /// <summary>Gets the season income forecast at the club's present fans and ground (`BUD-1`).</summary>
+    public long ForecastMinor => EconomyRuleSet.SeasonIncomeForecastMinor(
+        TierNumber,
+        SponsorFixedSeasonMinor,
+        Seats,
+        Fans,
+        MoodBp,
+        SnackBarLevel,
+        MerchandiseLevel);
+
+    /// <summary>Gets the wage bill the club should stay within (`BUD-2`).</summary>
+    public long WageBudgetMinor => EconomyRuleSet.WageBudgetMinorFor(ForecastMinor);
+
+    /// <summary>Gets how far into the red the club may go before it is in administration (`DEBT-1`).</summary>
+    public long OverdraftLimitMinor => EconomyRuleSet.OverdraftLimitMinorFor(ForecastMinor);
+}
 
 /// <summary>One ledger category's net cash movement over a season.</summary>
 /// <param name="Category">The category.</param>
@@ -100,12 +147,37 @@ public interface IFinanceQueries
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Reads every club's tier and weekly wage bill for the running season (`FIN-4`, `FIN-7`, `FIN-9`).
+    /// Reads every club's tier, ground and buildings for the running season's weekly run (`FIN-9`, `STRC-8`, `STAD-7`).
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>One row per club in the current season, or empty before a season exists.</returns>
     Task<IReadOnlyList<ClubWeeklyObligations>> GetWeeklyObligationsAsync(
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads what the given clubs' money is planned from this season: the forecast, the wage bill and the sponsor's payment.
+    /// </summary>
+    /// <param name="clubIds">The clubs.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One row per club that plays in the current season, in no particular order.</returns>
+    Task<IReadOnlyList<ClubFinanceBasis>> GetClubFinanceBasisAsync(
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads a club's registered squad the way the board reads it when the club is in administration (`DEBT-4`).
+    /// </summary>
+    /// <param name="clubId">The club.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<AdministrationPlayer>> GetAdministrationSquadAsync(Guid clubId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads how many matchdays the world has settled so far, counted across seasons: the season's number minus one, times the season's
+    /// matchdays, plus the latest round any division has published (`DEBT-2`).
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The ordinal, or 0 before a season exists.</returns>
+    Task<int> GetSettledMatchdayOrdinalAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Reads a club's money and its season's totals by category for the finance screen (`FIN-3`…`FIN-9`).

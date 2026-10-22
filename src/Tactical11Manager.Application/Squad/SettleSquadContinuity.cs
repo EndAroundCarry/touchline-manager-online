@@ -93,12 +93,17 @@ public sealed partial class SettleSquadContinuity
     /// <param name="nextSeason">The next season, which replacements register in and renewals start from.</param>
     /// <param name="now">The current instant.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="relegatedClubIds">
+    /// The clubs relegated this season. The relegation clause takes a share off each of their contracts' wages, the ones that carry over and the
+    /// ones renewed alike (`FIN-5`).
+    /// </param>
     public async Task<SquadContinuityResult> ExecuteAsync(
         GameWorld world,
         Season season,
         Season nextSeason,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlySet<Guid>? relegatedClubIds = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(season);
@@ -188,6 +193,12 @@ public sealed partial class SettleSquadContinuity
                     if (row.IsGoalkeeper)
                     {
                         stableGoalkeepers++;
+                    }
+
+                    // The relegation clause: a relegated club's contracts that carry over drop by the clause's share (FIN-5).
+                    if (relegatedClubIds?.Contains(club.ClubId) == true)
+                    {
+                        contract.ReduceSeasonWage(EconomyRuleSet.AfterRelegationClause(contract.SeasonWageMinor), now);
                     }
                 }
             }
@@ -347,7 +358,9 @@ public sealed partial class SettleSquadContinuity
                 club.ClubId,
                 nextSeason.SequenceNumber,
                 nextSeason.SequenceNumber + terms.Seasons - 1,
-                terms.SeasonWageMinor,
+                relegatedClubIds?.Contains(club.ClubId) == true
+                    ? EconomyRuleSet.AfterRelegationClause(terms.SeasonWageMinor)
+                    : terms.SeasonWageMinor,
                 contract.SquadStatus,
                 now));
         }

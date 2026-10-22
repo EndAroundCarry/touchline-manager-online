@@ -275,6 +275,36 @@ public sealed class PlayerContract
         Touch(now);
     }
 
+    /// <summary>Lowers the season wage, as the relegation clause does at rollover (`FIN-5`).</summary>
+    /// <param name="seasonWageMinor">The new wage for a season, in minor units. It is never above the wage now.</param>
+    /// <param name="now">The current instant.</param>
+    public void ReduceSeasonWage(long seasonWageMinor, DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(seasonWageMinor);
+
+        if (Status == ContractStatus.Closed)
+        {
+            throw new InvalidOperationException("A closed contract's wage cannot change.");
+        }
+
+        if (seasonWageMinor > SeasonWageMinor)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(seasonWageMinor),
+                seasonWageMinor,
+                "The relegation clause lowers a wage; it never raises one.");
+        }
+
+        if (seasonWageMinor == SeasonWageMinor)
+        {
+            return;
+        }
+
+        SeasonWageMinor = seasonWageMinor;
+
+        Touch(now);
+    }
+
     /// <summary>Changes the player's standing in the squad.</summary>
     /// <param name="squadStatus">The new standing.</param>
     /// <param name="now">The current instant.</param>
