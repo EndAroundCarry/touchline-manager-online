@@ -262,7 +262,7 @@ internal sealed class PlayerContractConfiguration : IEntityTypeConfiguration<Pla
             table.HasCheckConstraint(
                 "ck_player_contracts_term",
                 "end_season_number >= start_season_number");
-            table.HasCheckConstraint("ck_player_contracts_wage", "weekly_wage_minor >= 0");
+            table.HasCheckConstraint("ck_player_contracts_wage", "season_wage_minor >= 0");
         });
 
         builder.HasKey(contract => contract.Id);
@@ -271,7 +271,7 @@ internal sealed class PlayerContractConfiguration : IEntityTypeConfiguration<Pla
         builder.Property(contract => contract.ClubId).HasColumnName("club_id").IsRequired();
         builder.Property(contract => contract.StartSeasonNumber).HasColumnName("start_season_number").IsRequired();
         builder.Property(contract => contract.EndSeasonNumber).HasColumnName("end_season_number").IsRequired();
-        builder.Property(contract => contract.WeeklyWageMinor).HasColumnName("weekly_wage_minor").IsRequired();
+        builder.Property(contract => contract.SeasonWageMinor).HasColumnName("season_wage_minor").IsRequired();
         builder.Property(contract => contract.SquadStatus)
             .HasColumnName("squad_status")
             .HasMaxLength(ContractCodes.MaxSquadStatusCodeLength)

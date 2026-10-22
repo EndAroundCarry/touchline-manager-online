@@ -12,7 +12,7 @@ namespace Tactical11Manager.Contracts.Squad;
 /// <param name="Seasons">The length the quote proposes.</param>
 /// <param name="StartSeasonNumber">The season the new contract would begin in.</param>
 /// <param name="EndSeasonNumber">The season it would end in.</param>
-/// <param name="WeeklyWageMinor">The proposed weekly wage, in minor units.</param>
+/// <param name="SeasonWageMinor">The proposed wage for a season, in minor units.</param>
 /// <param name="ContractVersion">
 /// The contract's version at the moment it was quoted. The renewal must send it back as the strong entity
 /// tag in <c>If-Match</c>, so a renewal agreed against a stale read is refused rather than applied
@@ -25,7 +25,7 @@ public sealed record RenewalQuoteResponse(
     int Seasons,
     int StartSeasonNumber,
     int EndSeasonNumber,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     long ContractVersion,
     DateTimeOffset ServerTime);
 
@@ -35,7 +35,7 @@ public sealed record RenewalQuoteResponse(
 /// <param name="Seasons">The new contract's length.</param>
 /// <param name="StartSeasonNumber">The season it begins in.</param>
 /// <param name="EndSeasonNumber">The season it ends in.</param>
-/// <param name="WeeklyWageMinor">The new weekly wage, in minor units.</param>
+/// <param name="SeasonWageMinor">The new wage for a season, in minor units.</param>
 /// <param name="Version">The new contract's concurrency version, for a later conditional write.</param>
 /// <param name="ServerTime">The server's current instant.</param>
 public sealed record ContractRenewalResponse(
@@ -44,6 +44,6 @@ public sealed record ContractRenewalResponse(
     int Seasons,
     int StartSeasonNumber,
     int EndSeasonNumber,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     long Version,
     DateTimeOffset ServerTime);

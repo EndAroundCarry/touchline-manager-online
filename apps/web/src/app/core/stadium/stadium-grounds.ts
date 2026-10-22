@@ -7,15 +7,14 @@ import { Canvas, PALETTE } from './stadium-canvas';
 import {
   APRON,
   BOX_DEPTH,
-  LEVELS,
   PITCH,
-  ROW_DEPTH,
   StandPlan,
   StandSide,
   depthOf,
   heightOf,
   isLong,
   planOf,
+  roofFrontOf,
 } from './stadium-plan';
 import { ROOF_CLEARANCE } from './stadium-stand';
 
@@ -428,12 +427,27 @@ function scatter(a: number, b: number): number {
 /** The road runs along the far touchline of the picture. */
 export const ROAD = { y: WORLD_FRAME.minY + 10, half: 8 } as const;
 
-/** Where the trees grow: round the biggest ground, clear of the road and of any stand, far or near the camera. */
-export function treeSites(): {
+/**
+ * The level whose ground the road and the trees were laid out round: the two-tier bowl. A bigger ground has its third
+ * tiers built where the road and the trees were, so it moves the road out and fells the trees in its way.
+ */
+const LAID_OUT_ROUND = 10;
+
+const LAID_OUT = extentOf(LAID_OUT_ROUND);
+
+/** Where the middle of the road runs for a ground: where it was laid out, or behind a bigger ground. */
+export function roadAt(extent: Extent): number {
+  return ROAD.y - Math.max(0, LAID_OUT.minY - extent.minY);
+}
+
+/** Where the trees grow round a level's ground, clear of the road and of any stand, far or near the camera. */
+export function treeSites(level: number): {
   readonly near: [number, number][];
   readonly far: [number, number][];
 } {
-  const keep = grow(extentOf(LEVELS), FENCE_GAP + RING_GAP + 6);
+  const extent = extentOf(level);
+  const keep = grow(extentOf(Math.max(level, LAID_OUT_ROUND)), FENCE_GAP + RING_GAP + 6);
+  const road = roadAt(extent);
   const near: [number, number][] = [];
   const far: [number, number][] = [];
 
@@ -443,7 +457,7 @@ export function treeSites(): {
       const py = y + (scatter(y, x) - 0.5) * 14;
 
       const inside = px > keep.minX && px < keep.maxX && py > keep.minY && py < keep.maxY;
-      const onRoad = Math.abs(py - ROAD.y) < ROAD.half + 14;
+      const onRoad = Math.abs(py - road) < ROAD.half + 14;
 
       if (inside || onRoad || scatter(x * 3, y * 7) > 0.62) {
         continue;
@@ -492,14 +506,15 @@ export function drawTrees(canvas: Canvas, sites: readonly [number, number][]): v
 export function drawRoads(canvas: Canvas, extent: Extent): void {
   const left = WORLD_FRAME.minX - 20;
   const right = WORLD_FRAME.maxX + 20;
+  const road = roadAt(extent);
 
   canvas.add({
     role: 'road',
     d: ground([
-      [left, ROAD.y - ROAD.half],
-      [right, ROAD.y - ROAD.half],
-      [right, ROAD.y + ROAD.half],
-      [left, ROAD.y + ROAD.half],
+      [left, road - ROAD.half],
+      [right, road - ROAD.half],
+      [right, road + ROAD.half],
+      [left, road + ROAD.half],
     ]),
     fill: PALETTE.road,
   });
@@ -509,24 +524,26 @@ export function drawRoads(canvas: Canvas, extent: Extent): void {
   for (let x = WORLD_FRAME.minX; x < WORLD_FRAME.maxX; x += 22) {
     dashes.push(
       ground([
-        [x, ROAD.y - 0.6],
-        [x + 11, ROAD.y - 0.6],
-        [x + 11, ROAD.y + 0.6],
-        [x, ROAD.y + 0.6],
+        [x, road - 0.6],
+        [x + 11, road - 0.6],
+        [x + 11, road + 0.6],
+        [x, road + 0.6],
       ]),
     );
   }
 
   canvas.add({ role: 'road', d: dashes.join(''), fill: PALETTE.roadLine });
 
+  // The track leaves the road beside the west end, so it moves out with a bigger one.
+  const track = WORLD_FRAME.minX + 24 - Math.max(0, LAID_OUT.minX - extent.minX);
   const gateX = extent.minX - 8;
   const gateY = extent.maxY + 10;
 
   canvas.add({
     role: 'path',
     d: ground([
-      [WORLD_FRAME.minX + 24, ROAD.y + ROAD.half],
-      [WORLD_FRAME.minX + 34, ROAD.y + ROAD.half],
+      [track, road + ROAD.half],
+      [track + 10, road + ROAD.half],
       [gateX + 6, gateY],
       [gateX - 4, gateY],
     ]),
@@ -535,11 +552,11 @@ export function drawRoads(canvas: Canvas, extent: Extent): void {
   });
 }
 
-/** The club's flag over the main stand's roof, for the biggest ground. */
-export function drawFlag(canvas: Canvas, extent: Extent): void {
+/** The club's flag on the front edge of the main stand's roof, for the biggest grounds. */
+export function drawFlag(canvas: Canvas, extent: Extent, main: StandPlan): void {
   const x = (extent.minX + extent.maxX) / 2;
-  const y = -APRON - ROW_DEPTH * 3;
-  const base = heightOf(planOf(LEVELS).main) + ROOF_CLEARANCE;
+  const y = -APRON - roofFrontOf('main', main) - 1;
+  const base = heightOf(main) + ROOF_CLEARANCE;
 
   canvas.add({
     role: 'flag',

@@ -122,7 +122,7 @@ internal sealed class FinanceQueries : IFinanceQueries
             .Select(group => new
             {
                 ClubId = group.Key,
-                Total = group.Sum(contract => contract.WeeklyWageMinor),
+                Total = group.Sum(contract => contract.SeasonWageMinor),
                 Count = group.Count(),
             })
             .ToListAsync(cancellationToken);
@@ -158,7 +158,7 @@ internal sealed class FinanceQueries : IFinanceQueries
                     return new ClubWeeklyObligations(
                         row.ClubId,
                         row.TierNumber,
-                        wageByClub.TryGetValue(row.ClubId, out var wage) ? wage.Total : 0,
+                        wageByClub.TryGetValue(row.ClubId, out var wage) ? EconomyRuleSet.PerWeeklyRun(wage.Total) : 0,
                         wageByClub.TryGetValue(row.ClubId, out var counted) ? counted.Count : 0,
                         hasFans ? fanBase!.Fans : opening.Fans,
                         hasFans ? fanBase!.MoodBp : opening.MoodBp,
@@ -188,7 +188,7 @@ internal sealed class FinanceQueries : IFinanceQueries
             .GroupBy(contract => contract.ClubId)
             .Select(group => new
             {
-                Total = group.Sum(contract => contract.WeeklyWageMinor),
+                Total = group.Sum(contract => contract.SeasonWageMinor),
                 Count = group.Count(),
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -247,7 +247,7 @@ internal sealed class FinanceQueries : IFinanceQueries
         return new FinanceSummarySnapshot(
             account.CashMinor,
             account.ReservedMinor,
-            wage?.Total ?? 0,
+            EconomyRuleSet.PerWeeklyRun(wage?.Total ?? 0),
             wage?.Count ?? 0,
             placement?.TierNumber ?? 1,
             placement?.DisplayLabel,

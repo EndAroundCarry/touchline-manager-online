@@ -214,7 +214,7 @@ public sealed class RunFreeAgentBatch
             playerId,
             batch.Id,
             offer.MinimumFeeMinor,
-            EconomyRuleSet.PerWeeklyRun(offer.SeasonWageMinor),
+            offer.SeasonWageMinor,
             offer.ContractSeasons,
             batch.OpensAt,
             batch.EndsAt,

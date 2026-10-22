@@ -160,7 +160,7 @@ function player(
             startSeasonNumber: 1,
             endSeasonNumber: 1 + seasonsRemaining,
             seasonsRemaining,
-            weeklyWageMinor: 1000,
+            seasonWageMinor: 1000,
             squadStatus: 'first_team',
             status: 'active',
           },

@@ -69,7 +69,7 @@ public sealed class FinanceTests : IAsyncLifetime
         // The payroll the summary reports is the one the contracts read reports, because they are one fact.
         var contracts = await client.GetFromJsonAsync<ContractsResponse>("/api/v1/contracts");
 
-        summary.WeeklyWageMinor.Should().Be(contracts!.WeeklyWageTotalMinor);
+        summary.WeeklyWageMinor.Should().Be(EconomyRuleSet.PerWeeklyRun(contracts!.SeasonWageTotalMinor));
         summary.ContractedPlayers.Should().Be(contracts.Contracts.Count);
 
         await client.PostAsync("/api/v1/club-tenure/resign", content: null);

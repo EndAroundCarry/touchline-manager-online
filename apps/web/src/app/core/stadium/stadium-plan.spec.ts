@@ -2,6 +2,8 @@ import {
   AISLE,
   APRON,
   LEVELS,
+  OPEN_ROWS,
+  ROW_DEPTH,
   PITCH,
   SECTOR_WIDTH,
   SIDES,
@@ -10,14 +12,17 @@ import {
   clampLevel,
   depthOf,
   heightOf,
+  kindOfRow,
   kindsOf,
   planOf,
+  roofFrontOf,
   sectorsOf,
   spansOf,
+  tiersOf,
 } from './stadium-plan';
 
 /**
- * The ten stadium levels as a plan.
+ * The fifteen stadium levels as a plan.
  *
  * What matters is that a level is always the one before it with something added (so a manager watches one ground
  * grow), that every level has a region of every kind of place the club owns (places are never removed, and every club
@@ -27,17 +32,17 @@ import {
 const ALL_LEVELS = Array.from({ length: LEVELS }, (_, index) => index + 1);
 
 describe('stadium plan', () => {
-  it('has ten levels', () => {
-    expect(LEVELS).toBe(10);
+  it('has fifteen levels', () => {
+    expect(LEVELS).toBe(15);
   });
 
   it('clamps a level it has no plan for rather than drawing nothing', () => {
     expect(clampLevel(0)).toBe(1);
-    expect(clampLevel(99)).toBe(10);
+    expect(clampLevel(99)).toBe(15);
     expect(clampLevel(Number.NaN)).toBe(1);
     expect(clampLevel(3.6)).toBe(4);
     expect(planOf(0)).toBe(planOf(1));
-    expect(planOf(99)).toBe(planOf(10));
+    expect(planOf(99)).toBe(planOf(15));
   });
 
   it('draws every kind of place the club owns at every level', () => {
@@ -62,6 +67,7 @@ describe('stadium plan', () => {
 
         expect(now.lower, `${side} at ${level}`).toBeGreaterThanOrEqual(was.lower);
         expect(now.upper).toBeGreaterThanOrEqual(was.upper);
+        expect(now.top).toBeGreaterThanOrEqual(was.top);
         expect(now.roof).toBeGreaterThanOrEqual(was.roof);
 
         // A stand that is built stays what it is: a terrace does not become seats, and the boxes do not go.
@@ -90,7 +96,8 @@ describe('stadium plan', () => {
     // The room the rows take: each stand's length times its rows.
     const rows = (level: number): number =>
       spansOf(planOf(level)).reduce(
-        (total, span) => total + (span.to - span.from) * (span.plan.lower + span.plan.upper),
+        (total, span) =>
+          total + (span.to - span.from) * (span.plan.lower + span.plan.upper + span.plan.top),
         0,
       );
 
@@ -99,29 +106,49 @@ describe('stadium plan', () => {
     }
   });
 
-  it('starts as a village ground and ends as a closed two-tier bowl', () => {
+  it('starts as a village ground, closes a two-tier bowl at level ten and a three-tier one at the last', () => {
     const first = planOf(1);
-    const last = planOf(10);
+    const bowl = planOf(10);
+    const last = planOf(LEVELS);
 
     expect(spansOf(first).map((span) => span.side)).toEqual(['main', 'opposite']);
     expect(first.masts).toBe(0);
     expect(first.ring).toBe(false);
     expect(first.flag).toBe(false);
 
-    expect(spansOf(last)).toHaveLength(4);
+    expect(spansOf(bowl)).toHaveLength(4);
 
     for (const side of SIDES) {
-      expect(last[side].lower).toBe(7);
-      expect(last[side].upper).toBe(5);
+      expect(bowl[side].lower).toBe(7);
+      expect(bowl[side].upper).toBe(5);
+      expect(bowl[side].top).toBe(0);
+      expect(last[side].top, side).toBeGreaterThan(0);
     }
 
-    expect(last.masts).toBe(6);
-    expect(last.ring).toBe(true);
-    expect(last.flag).toBe(true);
+    expect(bowl.masts).toBe(6);
+    expect(bowl.ring).toBe(true);
+    expect(bowl.flag).toBe(true);
   });
 
-  it('roofs only seats: a terrace has a roof only over the seated tier above it', () => {
+  it('raises a third tier on one stand at a time after the two-tier bowl', () => {
+    const thirds = (level: number): number =>
+      SIDES.filter((side) => planOf(level)[side].top > 0).length;
+
+    expect(thirds(11)).toBe(0);
+    expect([12, 13, 14, 15].map(thirds)).toEqual([1, 2, 3, 4]);
+
+    // A third tier stands behind an upper one.
     for (const level of ALL_LEVELS) {
+      for (const side of SIDES) {
+        if (planOf(level)[side].top > 0) {
+          expect(planOf(level)[side].upper, `${side} at level ${level}`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('roofs only seats on an open ground: a terrace has a roof only over the seated tier above it', () => {
+    for (const level of ALL_LEVELS.filter((candidate) => !planOf(candidate).closed)) {
       for (const side of SIDES) {
         const stand = planOf(level)[side];
 
@@ -130,6 +157,48 @@ describe('stadium plan', () => {
         }
       }
     }
+  });
+
+  it('closes the ground from level six: every stand roofed end to end, up to its front rows', () => {
+    expect(ALL_LEVELS.filter((level) => planOf(level).closed)[0]).toBe(6);
+
+    for (const level of ALL_LEVELS) {
+      const plan = planOf(level);
+
+      for (const side of SIDES.filter((candidate) => plan[candidate].lower > 0)) {
+        const stand = plan[side];
+
+        expect(stand.forward, `${side} at level ${level}`).toBe(plan.closed);
+
+        if (plan.closed) {
+          expect(stand.roof).toBe(1);
+          expect(roofFrontOf(side, stand)).toBe(OPEN_ROWS * ROW_DEPTH);
+        }
+      }
+    }
+  });
+
+  it('runs the roof of an end over the corners of a closed ground to meet the long stands', () => {
+    const open = spansOf(planOf(5)).find((span) => span.side === 'east')!;
+    const closed = spansOf(planOf(6)).find((span) => span.side === 'east')!;
+
+    expect([open.roofFrom, open.roofTo]).toEqual([open.from, open.to]);
+    expect(closed.roofFrom).toBeLessThan(closed.from - roofFrontOf('main', planOf(6).main));
+    expect(closed.roofTo).toBeGreaterThan(closed.to + roofFrontOf('opposite', planOf(6).opposite));
+  });
+
+  it('counts a seat covered only when the roof is over it', () => {
+    const main = planOf(10).main;
+    const [lower, upper] = tiersOf(main);
+    const [sector] = sectorsOf(0, 100, main.roof);
+
+    expect(kindOfRow('main', main, lower, 0, sector)).toBe('seating');
+    expect(kindOfRow('main', main, lower, OPEN_ROWS - 1, sector)).toBe('seating');
+    expect(kindOfRow('main', main, lower, OPEN_ROWS, sector)).toBe('covered_seating');
+    expect(kindOfRow('main', main, upper, 0, sector)).toBe('covered_seating');
+    expect(kindOfRow('east', planOf(10).east, tiersOf(planOf(10).east)[0], 5, sector)).toBe(
+      'standing',
+    );
   });
 
   it('puts the floodlights up at level three', () => {
@@ -141,11 +210,14 @@ describe('stadium plan', () => {
     const none = planOf(1).east;
     const one = planOf(1).main;
     const two = planOf(10).main;
+    const three = planOf(12).main;
 
     expect(depthOf(none)).toBe(0);
     expect(heightOf(none)).toBe(0);
     expect(depthOf(two)).toBeGreaterThan(depthOf(one));
     expect(heightOf(two)).toBeGreaterThan(heightOf(one));
+    expect(depthOf(three)).toBeGreaterThan(depthOf(two));
+    expect(heightOf(three)).toBeGreaterThan(heightOf(two));
   });
 
   it('lays the long stands past the pitch to close the corners beside an end stand', () => {

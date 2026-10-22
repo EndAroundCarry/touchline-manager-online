@@ -137,7 +137,7 @@ public sealed class MarketOutbidTests : IAsyncLifetime, IDisposable
             playerId,
             sellerClubId,
             OpeningBid,
-            generatedBuyerWageMinor: 50_000,
+            generatedBuyerSeasonWageMinor: 50_000,
             generatedContractSeasons: 2,
             opensAt: now.AddDays(-3),
             endsAt: now,

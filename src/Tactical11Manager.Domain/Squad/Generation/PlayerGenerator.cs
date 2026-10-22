@@ -82,6 +82,9 @@ public static class PlayerGenerator
     /// </remarks>
     public const string Version = "player-gen-v3";
 
+    /// <summary>How far each further draw of a sized squad moves the club ordinal, so it draws different players from the same seed.</summary>
+    private const int SizingDrawStride = 1_000;
+
     /// <summary>
     /// The positional composition of a generated squad, ordered goalkeeper outwards. Its length is the
     /// squad target (`SQ-1`), and a test asserts the family counts match <see cref="WorldRuleSet"/>.
@@ -178,7 +181,7 @@ public static class PlayerGenerator
                     request.ClubId,
                     request.SeasonNumber,
                     request.SeasonNumber + draft.ContractSeasons - 1,
-                    WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean),
+                    EconomyRuleSet.GeneratedSeasonWageMinorFor(draft.Mean),
                     statuses[index],
                     request.Now),
                 PlayerRegistration.Register(
@@ -191,6 +194,48 @@ public static class PlayerGenerator
         }
 
         return squad;
+    }
+
+    /// <summary>
+    /// Generates a club's senior squad whose season wages come to a band of a fresh club's income forecast, so a club never opens with wages it
+    /// cannot carry (`FIN-2`, plan toasty-scott section 8).
+    /// </summary>
+    /// <param name="request">The generation inputs. Each further draw moves the club ordinal by a thousand, so it is a different squad.</param>
+    /// <param name="lowBp">The band's low end as a share of the forecast, in basis points.</param>
+    /// <param name="highBp">The band's high end as a share of the forecast, in basis points.</param>
+    /// <returns>
+    /// The first of <see cref="EconomyRuleSet.SquadSizingDraws"/> draws inside the band, or the nearest one. Deterministic: the same request draws
+    /// the same squad.
+    /// </returns>
+    public static IReadOnlyList<GeneratedSquadMember> GenerateSizedSquad(SquadGenerationRequest request, int lowBp, int highBp)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        IReadOnlyList<GeneratedSquadMember>? best = null;
+        var bestDistance = long.MaxValue;
+
+        for (var draw = 0; draw < EconomyRuleSet.SquadSizingDraws; draw++)
+        {
+            var squad = GenerateSquad(request with { ClubOrdinalInCountry = request.ClubOrdinalInCountry + (draw * SizingDrawStride) });
+            var distance = EconomyRuleSet.WageBandDistanceMinor(
+                request.Tier,
+                squad.Sum(member => member.Contract.SeasonWageMinor),
+                lowBp,
+                highBp);
+
+            if (distance < bestDistance)
+            {
+                best = squad;
+                bestDistance = distance;
+            }
+
+            if (distance == 0)
+            {
+                break;
+            }
+        }
+
+        return best!;
     }
 
     /// <summary>
@@ -284,7 +329,7 @@ public static class PlayerGenerator
                 clubId,
                 seasonNumber,
                 seasonNumber,
-                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean),
+                EconomyRuleSet.GeneratedSeasonWageMinorFor(draft.Mean),
                 SquadStatus.Prospect,
                 now),
             PlayerRegistration.Register(
@@ -370,7 +415,7 @@ public static class PlayerGenerator
                 clubId,
                 seasonNumber,
                 seasonNumber + WorldRuleSet.ContractMaxSeasons - 1,
-                WorldRuleSet.GeneratedWeeklyWageMinorFor(draft.Mean),
+                EconomyRuleSet.GeneratedSeasonWageMinorFor(draft.Mean),
                 SquadStatus.Prospect,
                 now),
             PlayerRegistration.Register(

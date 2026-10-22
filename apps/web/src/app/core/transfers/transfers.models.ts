@@ -27,7 +27,7 @@ export interface TransferListing {
   readonly sellerClubId: string | null;
   readonly sellerClubName: string | null;
   readonly minimumFeeMinor: number;
-  readonly generatedBuyerWageMinor: number;
+  readonly generatedBuyerSeasonWageMinor: number;
   readonly generatedContractSeasons: number;
   readonly opensAt: string;
   readonly endsAt: string;

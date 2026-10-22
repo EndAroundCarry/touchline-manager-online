@@ -325,7 +325,7 @@
                     <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Age</th>
                     <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Ability</th>
                     <th scope="col" class="px-3 py-2 text-right font-medium text-muted">
-                      Weekly wage
+                      Wage a season
                     </th>
                     <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Minimum</th>
                     <th scope="col" class="px-3 py-2 text-right font-medium text-muted">Leading</th>
@@ -349,7 +349,7 @@
                       <td class="px-3 py-2 text-right text-ink-2">{{ listing.age }}</td>
                       <td class="px-3 py-2 text-right text-ink-2">{{ listing.ability }}</td>
                       <td class="px-3 py-2 text-right text-ink-2">
-                        {{ funds(listing.generatedBuyerWageMinor) }}
+                        {{ funds(listing.generatedBuyerSeasonWageMinor) }}
                         <span class="block text-xs text-muted">{{
                           seasons(listing.generatedContractSeasons)
                         }}</span>
@@ -397,8 +397,8 @@
                   </p>
                   <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
                     <div class="flex justify-between gap-2">
-                      <dt class="text-muted">Weekly wage</dt>
-                      <dd class="text-ink">{{ funds(listing.generatedBuyerWageMinor) }}</dd>
+                      <dt class="text-muted">Wage a season</dt>
+                      <dd class="text-ink">{{ funds(listing.generatedBuyerSeasonWageMinor) }}</dd>
                     </div>
                     <div class="flex justify-between gap-2">
                       <dt class="text-muted">Contract</dt>

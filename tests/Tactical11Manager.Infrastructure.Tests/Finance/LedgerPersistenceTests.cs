@@ -137,22 +137,6 @@ public sealed class LedgerPersistenceTests
     }
 
     [Fact]
-    public async Task A_stored_resulting_balance_is_never_negative()
-    {
-        await using var scope = _fixture.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
-        var (_, opening) = await PickAccountAsync(db);
-
-        var act = () => db.Database.ExecuteSqlRawAsync(
-            "update finance.ledger_entries set resulting_cash_minor = -1 where id = {0}",
-            opening.Id);
-
-        var exception = await act.Should().ThrowAsync<PostgresException>();
-
-        exception.Which.ConstraintName.Should().Be("ck_ledger_entries_balances");
-    }
-
-    [Fact]
     public async Task A_compensating_entry_stores_the_line_it_corrects()
     {
         // FIN-12: the correction points at the entry it corrects, so the pair is traceable in the ledger

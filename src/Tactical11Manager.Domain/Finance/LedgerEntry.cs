@@ -143,22 +143,23 @@ public sealed class LedgerEntry
                 nameof(descriptionTemplate));
         }
 
-        // The rules the database also enforces (FIN-13): a balance is never negative and reserved funds
-        // never exceed the cash behind them. Checked here so a caller cannot even build the row.
-        if (resultingCashMinor < 0 || resultingReservedMinor < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(resultingCashMinor),
-                resultingCashMinor,
-                "A balance is never negative (FIN-13).");
-        }
-
-        if (resultingReservedMinor > resultingCashMinor)
+        // The rules the database also enforces (FIN-13, DEBT-1): reserved funds are never negative and never exceed the cash above zero. The
+        // cash itself may be below zero; how far is the account's overdraft floor, which an entry does not know. Checked here so a caller
+        // cannot even build the row.
+        if (resultingReservedMinor < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(resultingReservedMinor),
                 resultingReservedMinor,
-                "Reserved funds may never exceed the cash behind them (FIN-10, FIN-13).");
+                "Reserved funds are never negative (FIN-13).");
+        }
+
+        if (resultingReservedMinor > Math.Max(0, resultingCashMinor))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resultingReservedMinor),
+                resultingReservedMinor,
+                "Reserved funds may never exceed the cash above zero behind them (FIN-10, FIN-13).");
         }
 
         // A compensating entry names the entry it corrects; only a compensation may carry the link, and it

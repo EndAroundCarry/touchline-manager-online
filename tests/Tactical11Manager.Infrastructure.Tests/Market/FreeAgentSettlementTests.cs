@@ -67,7 +67,7 @@ public sealed class FreeAgentSettlementTests : IAsyncLifetime, IDisposable
             candidate.PlayerId == target.PlayerId && candidate.Status == ContractStatus.Active);
 
         contract.ClubId.Should().Be(target.BuyerClubId);
-        contract.WeeklyWageMinor.Should().Be(target.WageMinor, "the wage frozen on the listing is the wage signed (CON-5)");
+        contract.SeasonWageMinor.Should().Be(target.WageMinor, "the wage frozen on the listing is the wage signed (CON-5)");
         contract.EndSeasonNumber.Should().Be(contract.StartSeasonNumber + target.ContractSeasons - 1);
 
         var currentSeason = await db.Seasons.SingleAsync(season => season.Status == SeasonStatus.Active);
@@ -380,7 +380,7 @@ public sealed class FreeAgentSettlementTests : IAsyncLifetime, IDisposable
             listing.PlayerId,
             buyerClubId,
             listing.MinimumFeeMinor,
-            listing.GeneratedBuyerWageMinor,
+            listing.GeneratedBuyerSeasonWageMinor,
             listing.GeneratedContractSeasons,
             listing.EndsAt,
             cash);
@@ -472,7 +472,7 @@ public sealed class FreeAgentSettlementTests : IAsyncLifetime, IDisposable
                 clubId,
                 donor.StartSeasonNumber,
                 donor.EndSeasonNumber,
-                donor.WeeklyWageMinor,
+                donor.SeasonWageMinor,
                 donor.SquadStatus,
                 now));
         }

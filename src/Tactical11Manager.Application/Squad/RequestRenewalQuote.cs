@@ -86,7 +86,7 @@ public sealed class RequestRenewalQuote
             seasons,
             start,
             start + seasons - 1,
-            EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
+            terms.SeasonWageMinor,
             context.ContractVersion,
             now);
     }

@@ -169,8 +169,8 @@ public sealed class TransferListing
     /// <summary>Gets the minimum fee the seller will accept, in minor units (`TRF-1`).</summary>
     public long MinimumFeeMinor { get; private set; }
 
-    /// <summary>Gets the weekly wage the buyer will sign the player on, in minor units (`CON-5`).</summary>
-    public long GeneratedBuyerWageMinor { get; private set; }
+    /// <summary>Gets the wage for a season the buyer will sign the player on, in minor units (`CON-5`).</summary>
+    public long GeneratedBuyerSeasonWageMinor { get; private set; }
 
     /// <summary>Gets the length the buyer's contract will run, in game seasons (`CON-1`, `CON-5`).</summary>
     public int GeneratedContractSeasons { get; private set; }
@@ -207,7 +207,7 @@ public sealed class TransferListing
     /// <param name="playerId">The listed player.</param>
     /// <param name="sellerClubId">The selling club.</param>
     /// <param name="minimumFeeMinor">The minimum fee, which must be positive (`TRF-1`).</param>
-    /// <param name="generatedBuyerWageMinor">The weekly wage the buyer will sign, in minor units.</param>
+    /// <param name="generatedBuyerSeasonWageMinor">The wage for a season the buyer will sign, in minor units.</param>
     /// <param name="generatedContractSeasons">The buyer's contract length, 1–3 game seasons (`CON-1`).</param>
     /// <param name="opensAt">When the listing opens.</param>
     /// <param name="endsAt">When the listing resolves, which must be after it opens (`TRF-2`).</param>
@@ -218,14 +218,14 @@ public sealed class TransferListing
         Guid playerId,
         Guid sellerClubId,
         long minimumFeeMinor,
-        long generatedBuyerWageMinor,
+        long generatedBuyerSeasonWageMinor,
         int generatedContractSeasons,
         DateTimeOffset opensAt,
         DateTimeOffset endsAt,
         string? idempotencyKey,
         DateTimeOffset now)
     {
-        EnsureTerms(minimumFeeMinor, generatedBuyerWageMinor, generatedContractSeasons, opensAt, endsAt);
+        EnsureTerms(minimumFeeMinor, generatedBuyerSeasonWageMinor, generatedContractSeasons, opensAt, endsAt);
 
         return new TransferListing
         {
@@ -233,7 +233,7 @@ public sealed class TransferListing
             PlayerId = playerId,
             SellerClubId = sellerClubId,
             MinimumFeeMinor = minimumFeeMinor,
-            GeneratedBuyerWageMinor = generatedBuyerWageMinor,
+            GeneratedBuyerSeasonWageMinor = generatedBuyerSeasonWageMinor,
             GeneratedContractSeasons = generatedContractSeasons,
             OpensAt = opensAt,
             EndsAt = endsAt,
@@ -254,7 +254,7 @@ public sealed class TransferListing
     /// <param name="playerId">The listed free agent.</param>
     /// <param name="freeAgentBatchId">The weekly batch the listing belongs to.</param>
     /// <param name="minimumFeeMinor">The minimum fee, which must be positive.</param>
-    /// <param name="generatedBuyerWageMinor">The weekly wage the signing club will pay, in minor units.</param>
+    /// <param name="generatedBuyerSeasonWageMinor">The wage for a season the signing club will pay, in minor units.</param>
     /// <param name="generatedContractSeasons">The contract length, 1–3 game seasons (`CON-1`).</param>
     /// <param name="opensAt">When the listing opens.</param>
     /// <param name="endsAt">When the listing resolves, which must be after it opens.</param>
@@ -264,13 +264,13 @@ public sealed class TransferListing
         Guid playerId,
         Guid freeAgentBatchId,
         long minimumFeeMinor,
-        long generatedBuyerWageMinor,
+        long generatedBuyerSeasonWageMinor,
         int generatedContractSeasons,
         DateTimeOffset opensAt,
         DateTimeOffset endsAt,
         DateTimeOffset now)
     {
-        EnsureTerms(minimumFeeMinor, generatedBuyerWageMinor, generatedContractSeasons, opensAt, endsAt);
+        EnsureTerms(minimumFeeMinor, generatedBuyerSeasonWageMinor, generatedContractSeasons, opensAt, endsAt);
 
         return new TransferListing
         {
@@ -278,7 +278,7 @@ public sealed class TransferListing
             PlayerId = playerId,
             FreeAgentBatchId = freeAgentBatchId,
             MinimumFeeMinor = minimumFeeMinor,
-            GeneratedBuyerWageMinor = generatedBuyerWageMinor,
+            GeneratedBuyerSeasonWageMinor = generatedBuyerSeasonWageMinor,
             GeneratedContractSeasons = generatedContractSeasons,
             OpensAt = opensAt,
             EndsAt = endsAt,
@@ -304,13 +304,13 @@ public sealed class TransferListing
 
     private static void EnsureTerms(
         long minimumFeeMinor,
-        long generatedBuyerWageMinor,
+        long generatedBuyerSeasonWageMinor,
         int generatedContractSeasons,
         DateTimeOffset opensAt,
         DateTimeOffset endsAt)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minimumFeeMinor);
-        ArgumentOutOfRangeException.ThrowIfNegative(generatedBuyerWageMinor);
+        ArgumentOutOfRangeException.ThrowIfNegative(generatedBuyerSeasonWageMinor);
 
         if (generatedContractSeasons is < Rules.WorldRuleSet.ContractMinSeasons or > Rules.WorldRuleSet.ContractMaxSeasons)
         {

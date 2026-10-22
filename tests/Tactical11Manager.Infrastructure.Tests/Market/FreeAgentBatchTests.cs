@@ -58,7 +58,7 @@ public sealed class FreeAgentBatchTests : IAsyncLifetime, IDisposable
         listings.Should().OnlyContain(listing =>
             listing.OpensAt == new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.Zero)
             && listing.EndsAt == new DateTimeOffset(2026, 9, 28, 12, 0, 0, TimeSpan.Zero));
-        listings.Should().OnlyContain(listing => listing.MinimumFeeMinor > 0 && listing.GeneratedBuyerWageMinor > 0);
+        listings.Should().OnlyContain(listing => listing.MinimumFeeMinor > 0 && listing.GeneratedBuyerSeasonWageMinor > 0);
 
         var batch = await db.FreeAgentBatches.SingleAsync();
 
@@ -138,7 +138,7 @@ public sealed class FreeAgentBatchTests : IAsyncLifetime, IDisposable
                 season.GameYear - player.BirthGameYear);
 
             listing.MinimumFeeMinor.Should().Be(expected.MinimumFeeMinor);
-            listing.GeneratedBuyerWageMinor.Should().Be(EconomyRuleSet.PerWeeklyRun(expected.SeasonWageMinor));
+            listing.GeneratedBuyerSeasonWageMinor.Should().Be(expected.SeasonWageMinor);
             listing.GeneratedContractSeasons.Should().Be(expected.ContractSeasons);
         }
 

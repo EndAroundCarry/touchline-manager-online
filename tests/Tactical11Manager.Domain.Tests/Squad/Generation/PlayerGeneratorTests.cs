@@ -196,7 +196,7 @@ public sealed class PlayerGeneratorTests
             member.Contract.StartSeasonNumber.Should().Be(seasonNumber, "CON-8: terms are season numbers");
             (member.Contract.EndSeasonNumber - member.Contract.StartSeasonNumber + 1)
                 .Should().BeInRange(WorldRuleSet.ContractMinSeasons, WorldRuleSet.ContractMaxSeasons, "CON-1");
-            member.Contract.WeeklyWageMinor.Should().BePositive();
+            member.Contract.SeasonWageMinor.Should().BePositive();
         }
     }
 
@@ -345,9 +345,59 @@ public sealed class PlayerGeneratorTests
             .Should().Equal("Alaric Alderwick", "Bramwell Brambleby", "Corin Cawthorne");
 
         GoldenDigest(squad).Should().Be(
-            "adc17c40c2a2a8a0",
+            "4c267e997bb09b6e",
             "player-gen-v3 draws potential before the skills and derives the skills from it (TRN-18); "
-            + "the contract wage follows the player and not the club's tier from world-rules-v17 (the digest before was 64306e99164964bf)");
+            + "the contract wage follows the player and not the club's tier from world-rules-v17 (the digest before was 64306e99164964bf); the contract stores the wage for a season, not a week, from the economy persistence milestone (the digest before was adc17c40c2a2a8a0)");
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void A_sized_squad_is_never_further_from_the_wage_band_than_the_first_draw_and_usually_inside_it(int tier)
+    {
+        var inside = 0;
+        const int clubs = 12;
+
+        for (var ordinal = 0; ordinal < clubs; ordinal++)
+        {
+            var request = SizedRequest(tier, ordinal);
+            var first = PlayerGenerator.GenerateSquad(request);
+            var sized = PlayerGenerator.GenerateSizedSquad(request, EconomyRuleSet.SeededWageBandLowBp, EconomyRuleSet.SeededWageBandHighBp);
+
+            var firstDistance = EconomyRuleSet.WageBandDistanceMinor(
+                tier, first.Sum(member => member.Contract.SeasonWageMinor), EconomyRuleSet.SeededWageBandLowBp, EconomyRuleSet.SeededWageBandHighBp);
+            var sizedDistance = EconomyRuleSet.WageBandDistanceMinor(
+                tier, sized.Sum(member => member.Contract.SeasonWageMinor), EconomyRuleSet.SeededWageBandLowBp, EconomyRuleSet.SeededWageBandHighBp);
+
+            sizedDistance.Should().BeLessThanOrEqualTo(firstDistance, "the first draw is one of the candidates");
+            sized.Count.Should().Be(WorldRuleSet.GeneratorSquadTarget);
+            inside += sizedDistance == 0 ? 1 : 0;
+        }
+
+        inside.Should().BeGreaterThanOrEqualTo(clubs * 3 / 4, "forty draws find a squad a fresh club can carry (FIN-2)");
+    }
+
+    [Fact]
+    public void A_sized_squad_is_reproducible_from_the_same_request()
+    {
+        var request = SizedRequest(tier: 2, ordinal: 5);
+
+        var first = PlayerGenerator.GenerateSizedSquad(request, EconomyRuleSet.SeededWageBandLowBp, EconomyRuleSet.SeededWageBandHighBp);
+        var second = PlayerGenerator.GenerateSizedSquad(request, EconomyRuleSet.SeededWageBandLowBp, EconomyRuleSet.SeededWageBandHighBp);
+
+        GoldenDigest(first).Should().Be(GoldenDigest(second));
+    }
+
+    [Fact]
+    public void A_generated_wage_is_a_season_wage_that_follows_the_player_and_not_the_tier()
+    {
+        var tierOne = Generate(clubOrdinal: 3, tier: 1);
+
+        tierOne.Should().OnlyContain(member => member.Contract.SeasonWageMinor >= EconomyRuleSet.SeasonWageFloorMinor);
+        tierOne.Select(member => member.Contract.SeasonWageMinor).Distinct().Count()
+            .Should().BeGreaterThan(5, "wages follow the player's ability");
     }
 
     [Fact]
@@ -392,11 +442,25 @@ public sealed class PlayerGeneratorTests
                 member.Player.Potential.ToString(CultureInfo.InvariantCulture),
                 member.Player.Reputation.ToString(CultureInfo.InvariantCulture),
                 string.Join('|', member.Attributes.ToSet().Values),
-                member.Contract.WeeklyWageMinor.ToString(CultureInfo.InvariantCulture),
+                member.Contract.SeasonWageMinor.ToString(CultureInfo.InvariantCulture),
                 member.Contract.SquadStatus.ToCode(),
                 member.Contract.EndSeasonNumber.ToString(CultureInfo.InvariantCulture),
             }),
         ])[..16];
+
+    private static SquadGenerationRequest SizedRequest(int tier, int ordinal) =>
+        new(
+            Seed,
+            "england",
+            "ENG",
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            ordinal,
+            tier,
+            Guid.CreateVersion7(),
+            1,
+            2026,
+            Now);
 
     private static double MeanAbility(IReadOnlyList<GeneratedSquadMember> squad) =>
         squad.Average(member => member.Attributes.ToSet().Values.Average());
@@ -416,7 +480,7 @@ public sealed class PlayerGeneratorTests
             member.Player.Potential,
             member.Player.Reputation,
             member.Attributes.ToSet(),
-            member.Contract.WeeklyWageMinor,
+            member.Contract.SeasonWageMinor,
             member.Contract.SquadStatus,
             member.Contract.StartSeasonNumber,
             member.Contract.EndSeasonNumber,
@@ -459,7 +523,7 @@ public sealed class PlayerGeneratorTests
         int Potential,
         int Reputation,
         PlayerAttributeSet Attributes,
-        long WeeklyWageMinor,
+        long SeasonWageMinor,
         SquadStatus SquadStatus,
         int StartSeasonNumber,
         int EndSeasonNumber,

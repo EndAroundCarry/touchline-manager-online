@@ -58,7 +58,7 @@ public sealed class MarketResolutionTests : WorldTestBase
         var contract = await db.PlayerContracts.SingleAsync(candidate =>
             candidate.PlayerId == arrangement.PlayerId && candidate.Status == ContractStatus.Active);
         contract.ClubId.Should().Be(arrangement.BuyerClubId, "CON-5");
-        contract.WeeklyWageMinor.Should().Be(arrangement.GeneratedWageMinor);
+        contract.SeasonWageMinor.Should().Be(arrangement.GeneratedWageMinor);
 
         var registration = await db.PlayerRegistrations.SingleAsync(candidate =>
             candidate.PlayerId == arrangement.PlayerId && candidate.Status == RegistrationStatus.Active);
@@ -122,7 +122,7 @@ public sealed class MarketResolutionTests : WorldTestBase
             playerId,
             sellerClubId,
             minimumFeeMinor: Fee,
-            generatedBuyerWageMinor: 50_000,
+            generatedBuyerSeasonWageMinor: 50_000,
             generatedContractSeasons: 2,
             opensAt: now.AddDays(-3),
             endsAt: now,
@@ -162,7 +162,7 @@ public sealed class MarketResolutionTests : WorldTestBase
             oldContractId,
             buyerAccount.CashMinor,
             sellerAccount.CashMinor,
-            listing.GeneratedBuyerWageMinor);
+            listing.GeneratedBuyerSeasonWageMinor);
 
         await db.SaveChangesAsync();
 

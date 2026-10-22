@@ -238,7 +238,7 @@ public static class WorldRuleSet
                 $"A contract is between {ContractMinSeasons} and {ContractMaxSeasons} game seasons (CON-1).");
         }
 
-        // A longer commitment buys a slightly lower weekly wage.
+        // A longer commitment buys a slightly lower wage.
         return seasons switch
         {
             1 => 10_500,
@@ -538,15 +538,6 @@ public static class WorldRuleSet
 
     /// <summary>The highest slot coordinate on a tactical pitch's scaled axis (`TAC-9`).</summary>
     public const int SlotCoordinateMax = 10_000;
-
-    /// <summary>The weekly wage a generated player is signed on, in minor units: three matchdays' worth of his season wage.</summary>
-    /// <param name="ability">The player's mean ability on the 1–20 scale.</param>
-    /// <remarks>
-    /// A player's wage follows the player and not the club's tier (`CON-2`): the same ability costs the same everywhere. The contract still
-    /// stores a weekly wage until the season wage replaces it (M2); the figure is <see cref="EconomyRuleSet.GeneratedSeasonWageMinorFor"/>.
-    /// </remarks>
-    public static long GeneratedWeeklyWageMinorFor(int ability) =>
-        EconomyRuleSet.PerWeeklyRun(EconomyRuleSet.GeneratedSeasonWageMinorFor(ability));
 
     /// <summary>The mean generated attribute for a squad in the given tier.</summary>
     /// <param name="tier">The tier number, starting at 1.</param>

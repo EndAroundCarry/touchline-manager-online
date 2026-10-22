@@ -1752,13 +1752,31 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("FinancialState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("financial_state");
+
                     b.Property<long>("LastLedgerSequence")
                         .HasColumnType("bigint")
                         .HasColumnName("last_ledger_sequence");
 
+                    b.Property<long>("OverdraftFloorMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("overdraft_floor_minor");
+
+                    b.Property<long>("OverdraftLimitMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("overdraft_limit_minor");
+
                     b.Property<long>("ReservedMinor")
                         .HasColumnType("bigint")
                         .HasColumnName("reserved_minor");
+
+                    b.Property<int>("StateSinceMatchday")
+                        .HasColumnType("integer")
+                        .HasColumnName("state_since_matchday");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1776,13 +1794,19 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("club_accounts", "finance", t =>
                         {
-                            t.HasCheckConstraint("ck_club_accounts_cash_nonnegative", "cash_minor >= 0");
+                            t.HasCheckConstraint("ck_club_accounts_cash_floor", "cash_minor >= -overdraft_floor_minor");
+
+                            t.HasCheckConstraint("ck_club_accounts_financial_state", "financial_state in ('healthy', 'in_the_red', 'administration')");
 
                             t.HasCheckConstraint("ck_club_accounts_ledger_sequence", "last_ledger_sequence >= 0");
 
+                            t.HasCheckConstraint("ck_club_accounts_overdraft", "overdraft_limit_minor >= 0 and overdraft_floor_minor >= overdraft_limit_minor");
+
                             t.HasCheckConstraint("ck_club_accounts_reserved_nonnegative", "reserved_minor >= 0");
 
-                            t.HasCheckConstraint("ck_club_accounts_reserved_within_cash", "reserved_minor <= cash_minor");
+                            t.HasCheckConstraint("ck_club_accounts_reserved_within_cash", "reserved_minor <= greatest(cash_minor, 0)");
+
+                            t.HasCheckConstraint("ck_club_accounts_state_since", "state_since_matchday >= 0");
                         });
                 });
 
@@ -1828,10 +1852,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_club_season_finances_club_id_season_id");
 
-                    b.ToTable("club_season_finances", "finance", t =>
-                        {
-                            t.HasCheckConstraint("ck_club_season_finances_cash", "opening_cash_minor >= 0 and closing_cash_minor >= 0");
-                        });
+                    b.ToTable("club_season_finances", "finance");
                 });
 
             modelBuilder.Entity("Tactical11Manager.Domain.Finance.ClubSeasonFinanceLine", b =>
@@ -1874,7 +1895,187 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("club_season_finance_lines", "finance", t =>
                         {
-                            t.HasCheckConstraint("ck_club_season_finance_lines_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade')");
+                            t.HasCheckConstraint("ck_club_season_finance_lines_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade', 'league_tv', 'sponsor_matchday', 'sponsor_bonus', 'parachute', 'ground_upkeep', 'clean_start')");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Finance.ClubSponsorDeal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("BonusExceededMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bonus_exceeded_minor");
+
+                    b.Property<long>("BonusMetMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bonus_met_minor");
+
+                    b.Property<long?>("BonusPaidMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bonus_paid_minor");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<int?>("FinalPlace")
+                        .HasColumnType("integer")
+                        .HasColumnName("final_place");
+
+                    b.Property<long>("FixedMatchdayMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fixed_matchday_minor");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Objective")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("objective");
+
+                    b.Property<Guid>("OfferId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_id");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<DateTimeOffset>("SignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signed_at");
+
+                    b.Property<string>("SignedBy")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("signed_by");
+
+                    b.Property<int>("TargetPlace")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_place");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfferId");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("ClubId", "SeasonId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sponsor_deals_club_season");
+
+                    b.ToTable("sponsor_deals", "finance", t =>
+                        {
+                            t.HasCheckConstraint("ck_sponsor_deals_amounts", "fixed_matchday_minor >= 0 and bonus_met_minor >= 0 and bonus_exceeded_minor >= bonus_met_minor");
+
+                            t.HasCheckConstraint("ck_sponsor_deals_kind", "kind in ('steady', 'balanced', 'performance')");
+
+                            t.HasCheckConstraint("ck_sponsor_deals_objective", "objective in ('win_league', 'top_three', 'top_six', 'top_half', 'twelfth', 'stay_up')");
+
+                            t.HasCheckConstraint("ck_sponsor_deals_outcome", "outcome is null or outcome in ('missed', 'met', 'exceeded')");
+
+                            t.HasCheckConstraint("ck_sponsor_deals_settled_shape", "(outcome is null and bonus_paid_minor is null and final_place is null and settled_at is null) or (outcome is not null and bonus_paid_minor is not null and bonus_paid_minor >= 0 and final_place >= 1 and settled_at is not null)");
+
+                            t.HasCheckConstraint("ck_sponsor_deals_signed_by", "signed_by in ('manager', 'board', 'ai')");
+
+                            t.HasCheckConstraint("ck_sponsor_deals_target_place", "target_place between 1 and 18");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Finance.ClubSponsorOffer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("BonusMultiplierBp")
+                        .HasColumnType("integer")
+                        .HasColumnName("bonus_multiplier_bp");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Fans")
+                        .HasColumnType("integer")
+                        .HasColumnName("fans");
+
+                    b.Property<long>("FixedSeasonMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fixed_season_minor");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("SponsorName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("sponsor_name");
+
+                    b.Property<int>("StandingPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("standing_points");
+
+                    b.Property<int>("Tier")
+                        .HasColumnType("integer")
+                        .HasColumnName("tier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("ClubId", "SeasonId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sponsor_offers_club_season_kind");
+
+                    b.ToTable("sponsor_offers", "finance", t =>
+                        {
+                            t.HasCheckConstraint("ck_sponsor_offers_amounts", "fixed_season_minor >= 0 and bonus_multiplier_bp > 0");
+
+                            t.HasCheckConstraint("ck_sponsor_offers_basis", "tier >= 1 and fans >= 0 and standing_points between 1 and 100");
+
+                            t.HasCheckConstraint("ck_sponsor_offers_kind", "kind in ('steady', 'balanced', 'performance')");
+
+                            t.HasCheckConstraint("ck_sponsor_offers_name", "length(sponsor_name) > 0");
                         });
                 });
 
@@ -1967,9 +2168,9 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ledger_entries", "finance", t =>
                         {
-                            t.HasCheckConstraint("ck_ledger_entries_balances", "resulting_cash_minor >= 0 and resulting_reserved_minor >= 0 and resulting_reserved_minor <= resulting_cash_minor");
+                            t.HasCheckConstraint("ck_ledger_entries_balances", "resulting_reserved_minor >= 0 and resulting_reserved_minor <= greatest(resulting_cash_minor, 0)");
 
-                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade')");
+                            t.HasCheckConstraint("ck_ledger_entries_category", "category in ('opening_balance', 'gate_receipt', 'sponsorship', 'wages', 'operating_cost', 'position_award', 'transfer_payment', 'transfer_proceeds', 'bid_reservation', 'reservation_release', 'emergency_grant', 'compensation', 'stadium_construction', 'release_payout', 'snack_bar', 'merchandise', 'structure_upkeep', 'structure_upgrade', 'league_tv', 'sponsor_matchday', 'sponsor_bonus', 'parachute', 'ground_upkeep', 'clean_start')");
 
                             t.HasCheckConstraint("ck_ledger_entries_correlation_id", "length(correlation_id) > 0");
 
@@ -2266,9 +2467,9 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("free_agent_batch_id");
 
-                    b.Property<long>("GeneratedBuyerWageMinor")
+                    b.Property<long>("GeneratedBuyerSeasonWageMinor")
                         .HasColumnType("bigint")
-                        .HasColumnName("generated_buyer_wage_minor");
+                        .HasColumnName("generated_buyer_season_wage_minor");
 
                     b.Property<int>("GeneratedContractSeasons")
                         .HasColumnType("integer")
@@ -2332,7 +2533,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("transfer_listings", "market", t =>
                         {
-                            t.HasCheckConstraint("ck_transfer_listings_buyer_wage", "generated_buyer_wage_minor >= 0");
+                            t.HasCheckConstraint("ck_transfer_listings_buyer_wage", "generated_buyer_season_wage_minor >= 0");
 
                             t.HasCheckConstraint("ck_transfer_listings_minimum_fee", "minimum_fee_minor > 0");
 
@@ -3366,6 +3567,10 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("player_id");
 
+                    b.Property<long>("SeasonWageMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("season_wage_minor");
+
                     b.Property<string>("SquadStatus")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -3390,10 +3595,6 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("version");
 
-                    b.Property<long>("WeeklyWageMinor")
-                        .HasColumnType("bigint")
-                        .HasColumnName("weekly_wage_minor");
-
                     b.HasKey("Id");
 
                     b.HasIndex("PlayerId")
@@ -3414,7 +3615,7 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_player_contracts_term", "end_season_number >= start_season_number");
 
-                            t.HasCheckConstraint("ck_player_contracts_wage", "weekly_wage_minor >= 0");
+                            t.HasCheckConstraint("ck_player_contracts_wage", "season_wage_minor >= 0");
                         });
                 });
 
@@ -4205,6 +4406,10 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("slug");
 
+                    b.Property<int>("StandingCentis")
+                        .HasColumnType("integer")
+                        .HasColumnName("standing_centis");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -4239,6 +4444,8 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.ToTable("clubs", "world", t =>
                         {
                             t.HasCheckConstraint("ck_clubs_reputation", "reputation between 1 and 100");
+
+                            t.HasCheckConstraint("ck_clubs_standing", "standing_centis between 100 and 10000");
 
                             t.HasCheckConstraint("ck_clubs_status", "status in ('active', 'retired')");
                         });
@@ -4294,6 +4501,69 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_club_stadiums_capacity", "standing_seats + seating_seats + covered_seats + vip_seats between 1 and 75000");
 
                             t.HasCheckConstraint("ck_club_stadiums_places", "standing_seats >= 0 and seating_seats >= 0 and covered_seats >= 0 and vip_seats >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.World.ClubStandingEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AfterCentis")
+                        .HasColumnType("integer")
+                        .HasColumnName("after_centis");
+
+                    b.Property<int>("BeforeCentis")
+                        .HasColumnType("integer")
+                        .HasColumnName("before_centis");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("club_id");
+
+                    b.Property<int>("FinalPlace")
+                        .HasColumnType("integer")
+                        .HasColumnName("final_place");
+
+                    b.Property<int>("FinishedTier")
+                        .HasColumnType("integer")
+                        .HasColumnName("finished_tier");
+
+                    b.Property<int>("NextTier")
+                        .HasColumnType("integer")
+                        .HasColumnName("next_tier");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("ClubId", "SeasonId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_club_standing_events_club_season");
+
+                    b.ToTable("club_standing_events", "world", t =>
+                        {
+                            t.HasCheckConstraint("ck_club_standing_events_outcome", "outcome is null or outcome in ('missed', 'met', 'exceeded')");
+
+                            t.HasCheckConstraint("ck_club_standing_events_place", "final_place between 1 and 18");
+
+                            t.HasCheckConstraint("ck_club_standing_events_standing", "before_centis between 100 and 10000 and after_centis between 100 and 10000");
+
+                            t.HasCheckConstraint("ck_club_standing_events_tiers", "finished_tier >= 1 and next_tier >= 1");
                         });
                 });
 
@@ -5523,6 +5793,42 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Tactical11Manager.Domain.Finance.ClubSponsorDeal", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Finance.ClubSponsorOffer", null)
+                        .WithMany()
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Season", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Finance.ClubSponsorOffer", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Season", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Tactical11Manager.Domain.Finance.LedgerEntry", b =>
                 {
                     b.HasOne("Tactical11Manager.Domain.World.Club", null)
@@ -5907,6 +6213,21 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.HasOne("Tactical11Manager.Domain.World.Club", null)
                         .WithMany()
                         .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.World.ClubStandingEvent", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Season", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

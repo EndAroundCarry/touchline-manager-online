@@ -29,7 +29,7 @@ public sealed record PlaceBidRequest(long AmountMinor);
 /// <param name="SellerClubId">The selling club, or null for a free agent.</param>
 /// <param name="SellerClubName">The selling club's name, or null for a free agent.</param>
 /// <param name="MinimumFeeMinor">The seller's minimum fee, in minor units.</param>
-/// <param name="GeneratedBuyerWageMinor">The weekly wage the buyer will sign, in minor units.</param>
+/// <param name="GeneratedBuyerSeasonWageMinor">The wage for a season the buyer will sign, in minor units.</param>
 /// <param name="GeneratedContractSeasons">The buyer's contract length, in game seasons.</param>
 /// <param name="OpensAt">When the listing opened.</param>
 /// <param name="EndsAt">When the listing resolves.</param>
@@ -51,7 +51,7 @@ public sealed record TransferListingResponse(
     Guid? SellerClubId,
     string? SellerClubName,
     long MinimumFeeMinor,
-    long GeneratedBuyerWageMinor,
+    long GeneratedBuyerSeasonWageMinor,
     int GeneratedContractSeasons,
     DateTimeOffset OpensAt,
     DateTimeOffset EndsAt,

@@ -20,9 +20,9 @@ function stadium(overrides: Partial<Stadium> = {}): Stadium {
   return {
     clubId: 'c1',
     level: 1,
-    maxLevel: 10,
+    maxLevel: 15,
     capacity: 5_000,
-    maxCapacity: 50_000,
+    maxCapacity: 75_000,
     seatsPerLevel: 5_000,
     seatsToNextLevel: 1,
     primaryColour: '#8c2f39',
@@ -112,7 +112,7 @@ describe('Stadium screen', () => {
   it('shows the level, the capacity and how far the next level is', async () => {
     await render();
 
-    expect(text('[data-testid="stadium-level"]')).toBe('1 of 10');
+    expect(text('[data-testid="stadium-level"]')).toBe('1 of 15');
     expect(text('[data-testid="stadium-capacity"]')).toBe('5,000');
     expect(text('[data-testid="stadium-next-level"]')).toContain(
       '1 more place takes the stadium to level 2',
@@ -121,7 +121,7 @@ describe('Stadium screen', () => {
   });
 
   it('says there is nowhere further to go at the top level', async () => {
-    await render(stadium({ level: 10, capacity: 50_000, seatsToNextLevel: 0 }));
+    await render(stadium({ level: 15, capacity: 75_000, seatsToNextLevel: 0 }));
 
     expect(text('[data-testid="stadium-next-level"]')).toBe(
       'This is the largest stadium there is.',
@@ -278,23 +278,17 @@ describe('Stadium screen', () => {
     expect(sixth).toBeGreaterThan(first);
   });
 
-  it('lists the ten levels, marking the one the ground is at', async () => {
+  it('lists the fifteen levels, marking the one the ground is at', async () => {
     await render(stadium({ level: 3, capacity: 12_000 }));
 
     const levels = Array.from(root.querySelectorAll('[data-testid="stadium-levels"] > li'));
 
-    expect(levels).toHaveLength(10);
+    expect(levels).toHaveLength(15);
     expect(levels.map((li) => li.getAttribute('data-state'))).toEqual([
       'Built',
       'Built',
       'Current',
-      'Ahead',
-      'Ahead',
-      'Ahead',
-      'Ahead',
-      'Ahead',
-      'Ahead',
-      'Ahead',
+      ...Array.from({ length: 12 }, () => 'Ahead'),
     ]);
     expect(levels[2].getAttribute('aria-current')).toBe('true');
     expect(levels[1].textContent).toContain('5,001');
@@ -353,7 +347,7 @@ describe('Stadium screen', () => {
 
   it('refuses an order the ground has no room for', async () => {
     await render(
-      stadium({ level: 10, capacity: 49_990, seatsToNextLevel: 0, availableMinor: 900_000_000 }),
+      stadium({ level: 15, capacity: 74_990, seatsToNextLevel: 0, availableMinor: 900_000_000 }),
     );
     await type('standing', '50');
 

@@ -120,7 +120,7 @@ public sealed class RenewContract
             context.ClubId,
             start,
             end,
-            EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
+            terms.SeasonWageMinor,
             context.SquadStatus,
             now);
 
@@ -155,7 +155,7 @@ public sealed class RenewContract
                 seasons,
                 start,
                 end,
-                EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
+                terms.SeasonWageMinor,
                 renewed.Version,
                 now));
     }

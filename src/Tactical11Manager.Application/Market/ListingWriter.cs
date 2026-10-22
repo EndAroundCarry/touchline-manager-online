@@ -153,7 +153,7 @@ public sealed class ListingWriter : IListingWriter
             playerId,
             clubId,
             minimumFeeMinor,
-            EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
+            terms.SeasonWageMinor,
             terms.Seasons,
             now,
             AuctionWindows.EndsAtFor(now),

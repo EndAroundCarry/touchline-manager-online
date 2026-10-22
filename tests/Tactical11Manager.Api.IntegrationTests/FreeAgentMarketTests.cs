@@ -67,7 +67,7 @@ public sealed class FreeAgentMarketTests : IAsyncLifetime
         page.Listings.Should().Contain(
             row => row.Ability >= 6 && row.Ability <= 10,
             "a generated free agent shows 6 to 10 (FA-2)");
-        page.Listings.Should().OnlyContain(row => row.GeneratedBuyerWageMinor > 0 && row.MinimumFeeMinor > 0);
+        page.Listings.Should().OnlyContain(row => row.GeneratedBuyerSeasonWageMinor > 0 && row.MinimumFeeMinor > 0);
         page.NextCursor.Should().NotBeNull();
 
         var next = await GetAsync<TransferListingsResponse>(

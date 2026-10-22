@@ -269,7 +269,7 @@ public sealed class ResolveListing
             leading.BidderClubId,
             startSeason,
             startSeason + listing.GeneratedContractSeasons - 1,
-            listing.GeneratedBuyerWageMinor,
+            listing.GeneratedBuyerSeasonWageMinor,
             squadStatus,
             now);
 
@@ -415,7 +415,7 @@ public sealed class ResolveListing
             leading.BidderClubId,
             season.SequenceNumber,
             season.SequenceNumber + listing.GeneratedContractSeasons - 1,
-            listing.GeneratedBuyerWageMinor,
+            listing.GeneratedBuyerSeasonWageMinor,
             squadStatus,
             now);
 

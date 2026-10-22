@@ -56,7 +56,7 @@ public sealed class ContractRenewalTests : IAsyncLifetime
 
         var quote = await QuoteAsync(client, contract.Id, seasons: 3);
 
-        quote.WeeklyWageMinor.Should().BePositive("CON-3 offers a real wage");
+        quote.SeasonWageMinor.Should().BePositive("CON-3 offers a real wage");
         quote.Seasons.Should().Be(3);
         quote.StartSeasonNumber.Should().Be(contracts.SeasonNumber);
         quote.EndSeasonNumber.Should().Be(contracts.SeasonNumber + 2);
@@ -64,12 +64,12 @@ public sealed class ContractRenewalTests : IAsyncLifetime
         // The quote is deterministic: asking twice, without changing anything, offers the same terms.
         var second = await QuoteAsync(client, contract.Id, seasons: 3);
 
-        second.WeeklyWageMinor.Should().Be(quote.WeeklyWageMinor);
+        second.SeasonWageMinor.Should().Be(quote.SeasonWageMinor);
         second.ContractVersion.Should().Be(quote.ContractVersion);
 
         var renewed = await RenewAsync(client, contract.Id, seasons: 3, quote.ContractVersion);
 
-        renewed.WeeklyWageMinor.Should().Be(quote.WeeklyWageMinor, "the accepted wage is the quoted one");
+        renewed.SeasonWageMinor.Should().Be(quote.SeasonWageMinor, "the accepted wage is the quoted one");
         renewed.StartSeasonNumber.Should().Be(contracts.SeasonNumber);
         renewed.EndSeasonNumber.Should().Be(contracts.SeasonNumber + 2);
 

@@ -347,7 +347,7 @@ public sealed partial class SettleSquadContinuity
                 club.ClubId,
                 nextSeason.SequenceNumber,
                 nextSeason.SequenceNumber + terms.Seasons - 1,
-                EconomyRuleSet.PerWeeklyRun(terms.SeasonWageMinor),
+                terms.SeasonWageMinor,
                 contract.SquadStatus,
                 now));
         }

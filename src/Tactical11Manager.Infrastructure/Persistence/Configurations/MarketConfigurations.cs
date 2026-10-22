@@ -67,7 +67,7 @@ internal sealed class TransferListingConfiguration : IEntityTypeConfiguration<Tr
             table.HasCheckConstraint("ck_transfer_listings_minimum_fee", "minimum_fee_minor > 0");
             table.HasCheckConstraint(
                 "ck_transfer_listings_buyer_wage",
-                "generated_buyer_wage_minor >= 0");
+                "generated_buyer_season_wage_minor >= 0");
             table.HasCheckConstraint(
                 "ck_transfer_listings_seasons",
                 "generated_contract_seasons between 1 and 3");
@@ -86,8 +86,8 @@ internal sealed class TransferListingConfiguration : IEntityTypeConfiguration<Tr
         builder.Property(listing => listing.SellerClubId).HasColumnName("seller_club_id");
         builder.Property(listing => listing.FreeAgentBatchId).HasColumnName("free_agent_batch_id");
         builder.Property(listing => listing.MinimumFeeMinor).HasColumnName("minimum_fee_minor").IsRequired();
-        builder.Property(listing => listing.GeneratedBuyerWageMinor)
-            .HasColumnName("generated_buyer_wage_minor")
+        builder.Property(listing => listing.GeneratedBuyerSeasonWageMinor)
+            .HasColumnName("generated_buyer_season_wage_minor")
             .IsRequired();
         builder.Property(listing => listing.GeneratedContractSeasons)
             .HasColumnName("generated_contract_seasons")

@@ -485,7 +485,9 @@ public sealed class TacticsTests : IAsyncLifetime
         first.Substitutions.Select(sub => sub.Off).Should().Equal("player", "most_tired_in_family");
         first.Substitutions[1].OnFamily.Should().Be("attack");
         plan.MatchInstructions[1].Changes.MentalitySteps.Should().Be(-1);
-        plan.MatchInstructionWarnings.Should().BeEmpty();
+        plan.MatchInstructionWarnings.Should().OnlyContain(
+            warning => warning.Code == "INSTRUCTION_OUT_OF_POSITION",
+            "the override puts the sixth player on the sheet into a slot he may not fit, which depends on the generated squad; nothing else may warn");
 
         // The read side agrees with what the save answered.
         var screen = (await client.GetFromJsonAsync<TacticsResponse>("/api/v1/tactics"))!;

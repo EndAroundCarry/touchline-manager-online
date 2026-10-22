@@ -422,7 +422,7 @@ public sealed class WorldPersistenceTests
     }
 
     [Fact]
-    public async Task Cash_can_never_go_negative()
+    public async Task Cash_cannot_go_below_the_overdraft_floor_which_is_zero_until_a_deal_is_signed()
     {
         await using var scope = _fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -442,7 +442,7 @@ public sealed class WorldPersistenceTests
 
         var exception = await act.Should().ThrowAsync<PostgresException>();
 
-        exception.Which.ConstraintName.Should().Be("ck_club_accounts_cash_nonnegative");
+        exception.Which.ConstraintName.Should().Be("ck_club_accounts_cash_floor");
     }
 
     [Fact]

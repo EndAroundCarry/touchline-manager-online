@@ -70,7 +70,7 @@ public sealed class SquadTests : IAsyncLifetime
         squad.Summary.Goalkeepers.Should().BeGreaterThanOrEqualTo(WorldRuleSet.MinimumGoalkeepers, "SQ-2");
         squad.Summary.MeetsMinimum.Should().BeTrue("SQ-2");
         squad.Summary.HasMinimumGoalkeepers.Should().BeTrue("SQ-2");
-        squad.Summary.WeeklyWageTotalMinor.Should().BePositive();
+        squad.Summary.SeasonWageTotalMinor.Should().BePositive();
 
         squad.Players.Select(player => player.Id).Should().OnlyHaveUniqueItems();
         squad.Players.Should().OnlyContain(player => player.Age > 0);
@@ -275,7 +275,7 @@ public sealed class SquadTests : IAsyncLifetime
         var raw = await client.GetStringAsync($"/api/v1/clubs/{otherClubId}");
 
         PropertyNames(JsonDocument.Parse(raw).RootElement)
-            .Should().NotContain(["state", "contract", "weeklyWageMinor", "morale", "potential", "reputation"]);
+            .Should().NotContain(["state", "contract", "seasonWageMinor", "morale", "potential", "reputation"]);
 
         var fixtures = (await client.GetFromJsonAsync<MyFixturesResponse>($"/api/v1/clubs/{otherClubId}/fixtures"))!;
 
@@ -322,7 +322,7 @@ public sealed class SquadTests : IAsyncLifetime
         contracts.Should().NotBeNull();
         contracts!.ClubId.Should().Be(clubId);
         contracts.Contracts.Should().HaveCount(WorldRuleSet.GeneratorSquadTarget);
-        contracts.WeeklyWageTotalMinor.Should().Be(contracts.Contracts.Sum(contract => contract.WeeklyWageMinor));
+        contracts.SeasonWageTotalMinor.Should().Be(contracts.Contracts.Sum(contract => contract.SeasonWageMinor));
         contracts.Contracts.Should().OnlyContain(contract => contract.SeasonsRemaining >= 0);
         contracts.Contracts.Should().OnlyContain(contract => contract.PlayerName.Length > 0);
 
@@ -332,8 +332,8 @@ public sealed class SquadTests : IAsyncLifetime
 
         var squad = await client.GetFromJsonAsync<SquadResponse>($"/api/v1/clubs/{clubId}/squad");
 
-        contracts.WeeklyWageTotalMinor.Should().Be(
-            squad!.Summary.WeeklyWageTotalMinor,
+        contracts.SeasonWageTotalMinor.Should().Be(
+            squad!.Summary.SeasonWageTotalMinor,
             "the two reads report the same payroll");
 
         await client.PostAsync("/api/v1/club-tenure/resign", content: null);

@@ -4,7 +4,8 @@
  * A stand is drawn from its far rows to its near ones, so a near row covers what it should of the one behind it, and
  * then whatever stands over them: the walkway and the hospitality boxes, the end the camera can see, the roof. A seat
  * is a dash on a line. A row of seats is one stroked line with a dash pattern, and the second colour is a second dash
- * pattern on top of the first, so a ground of thousands of seats is a few hundred elements.
+ * pattern on top of the first, so a ground of thousands of seats is a few hundred elements. The planes a manager can
+ * light come last, over the roof, so a kind of place the roof hides can still be found.
  */
 import { Vec3, facesCamera, outline, round, spacing, trace, unitLength } from './stadium-camera';
 import { Canvas, PALETTE, SceneDetail } from './stadium-canvas';
@@ -20,11 +21,17 @@ import {
   StandPlan,
   StandSide,
   StandSpan,
+  TierName,
+  TierPlan,
   WALKWAY,
   depthOf,
   heightOf,
   isLong,
+  kindOfRow,
+  roofFrontOf,
   sectorsOf,
+  standFacesCamera,
+  tiersOf,
 } from './stadium-plan';
 import { StadiumStandCode } from './stadium.models';
 
@@ -37,17 +44,6 @@ const SEAT_LINE = 0.34;
 
 /** How high a roof stands above the highest row under it. */
 export const ROOF_CLEARANCE = 6;
-
-/**
- * The roof of a one-tier stand starts this share of the way back from the front row. A stand seen from behind is
- * roofed further back, so its roof does not hide all of the rows the camera can just see over its wall.
- */
-const ROOF_REACH = 0.42;
-const ROOF_REACH_FROM_BEHIND = 0.62;
-
-function roofReach(context: { readonly facing: boolean }): number {
-  return context.facing ? ROOF_REACH : ROOF_REACH_FROM_BEHIND;
-}
 
 /** The roof reaches this far behind the last row. */
 const ROOF_OVERHANG_REAR = 2;
@@ -66,22 +62,6 @@ export function frameOf(side: StandSide): Frame {
     case 'west':
       return (a, o, z) => [-APRON - o, a, z];
   }
-}
-
-/** The way the front of a stand — its first row, its risers — looks: toward the pitch. */
-const FRONT_NORMAL: Readonly<Record<StandSide, Vec3>> = {
-  main: [0, 1, 0],
-  opposite: [0, -1, 0],
-  east: [-1, 0, 0],
-  west: [1, 0, 0],
-};
-
-/**
- * Whether a stand's rows face the camera, so its risers show. The main stand and the east end do; the other two are
- * seen from behind. Read from the camera, not written down, so a change of view cannot leave it wrong.
- */
-export function standFacesCamera(side: StandSide): boolean {
-  return facesCamera(...FRONT_NORMAL[side]);
 }
 
 /** The end of a stand the camera can see: its start along the stand, or its finish. */
@@ -123,11 +103,16 @@ interface StandContext {
   readonly from: number;
   readonly to: number;
   readonly sectors: readonly Sector[];
+  /** How far along the stand its roof runs. */
+  readonly roofFrom: number;
+  readonly roofTo: number;
   readonly facing: boolean;
   readonly end: 'from' | 'to';
   /** The axis of the ground the rows run along. */
   readonly axis: 'x' | 'y';
   readonly detail: SceneDetail;
+  /** The planes a manager can light, drawn after everything else of the stand. */
+  readonly planes: Array<{ readonly d: string; readonly region: StadiumStandCode }>;
 }
 
 /** The shade of a vertical face by the axis of the ground it looks along: the sun reaches one and not the other. */
@@ -140,22 +125,22 @@ function frontAxis(context: StandContext): 'x' | 'y' {
   return context.axis === 'x' ? 'y' : 'x';
 }
 
-/** The kind of place a sector is, from the tier it is in. */
-function kindOf(plan: StandPlan, tier: 'lower' | 'upper', sector: Sector): StadiumStandCode {
-  if (tier === 'lower' && plan.lowerStanding) {
-    return 'standing';
-  }
-
-  return sector.covered ? 'covered_seating' : 'seating';
-}
-
-/** The sloped plane of a tier over one sector, a little above the steps, for the highlight a manager can switch on. */
-function surface(context: StandContext, tier: Tier, sector: Sector): string {
+/**
+ * The sloped plane over a run of rows of a tier in one sector, a little above the steps, for the highlight a manager
+ * can switch on.
+ */
+function surface(
+  context: StandContext,
+  tier: Tier,
+  sector: Sector,
+  first: number,
+  last: number,
+): string {
   const { at } = context;
-  const front = tier.base + tier.rise;
-  const back = tier.base + tier.rows * tier.rise + 0.6;
-  const near = tier.out;
-  const far = tier.out + tier.rows * tier.depth;
+  const front = tier.base + (first + 1) * tier.rise;
+  const back = tier.base + (last + 1) * tier.rise + 0.6;
+  const near = tier.out + first * tier.depth;
+  const far = tier.out + (last + 1) * tier.depth;
 
   return outline([
     at(sector.from, near, front),
@@ -166,12 +151,7 @@ function surface(context: StandContext, tier: Tier, sector: Sector): string {
 }
 
 /** Draws one row of a tier: its tread, its riser, the aisles, and the seats or the standing crowd on it. */
-function drawRow(
-  context: StandContext,
-  tier: Tier,
-  tierName: 'lower' | 'upper',
-  row: number,
-): void {
+function drawRow(context: StandContext, tier: Tier, tierName: TierName, row: number): void {
   const { canvas, at, from, to, sectors, axis, plan } = context;
 
   const near = tier.out + row * tier.depth;
@@ -231,7 +211,7 @@ function drawRow(
   for (const sector of sectors) {
     const space = sector.to - sector.from;
 
-    if (kindOf(plan, tierName, sector) === 'standing') {
+    if (tierName === 'lower' && plan.lowerStanding) {
       standing.push(trace([at(sector.from + 1, line, top), at(sector.to - 1, line, top)]));
       continue;
     }
@@ -364,8 +344,7 @@ function drawBoxes(
 
   // The whole block, for the highlight a manager can switch on.
   if (context.detail === 'full') {
-    canvas.add({
-      role: 'region',
+    context.planes.push({
       d: outline([
         at(from, out, floor),
         at(to, out, floor),
@@ -374,8 +353,6 @@ function drawBoxes(
         at(from, out + deep, top),
         at(from, out, top),
       ]),
-      fill: PALETTE.highlight,
-      opacity: 0,
       region: 'vip',
     });
   }
@@ -398,7 +375,7 @@ function drawBoxes(
 }
 
 /** The profile of a stand, the stepped outline of its rows, for the end the camera can see. */
-function drawEnd(context: StandContext, lower: Tier, upper: Tier | null): void {
+function drawEnd(context: StandContext, tiers: readonly Tier[]): void {
   const { canvas, at } = context;
   const edge = context.end === 'from' ? context.from : context.to;
 
@@ -411,13 +388,17 @@ function drawEnd(context: StandContext, lower: Tier, upper: Tier | null): void {
     }
   };
 
-  climb(lower);
+  tiers.forEach((tier, index) => {
+    // The walkway behind the tier below, at this tier's floor.
+    if (index > 0) {
+      const below = tiers[index - 1];
 
-  if (upper !== null) {
-    profile.push([lower.out + lower.rows * lower.depth, upper.base]);
-    profile.push([upper.out, upper.base]);
-    climb(upper);
-  }
+      profile.push([below.out + below.rows * below.depth, tier.base]);
+      profile.push([tier.out, tier.base]);
+    }
+
+    climb(tier);
+  });
 
   const last = profile[profile.length - 1];
 
@@ -458,7 +439,7 @@ function drawBackWall(context: StandContext, deep: number, top: number): void {
  *
  * The roof reaches from `front`, out from the stand's front line, to a little behind the last row: it covers the back
  * of the stand and leaves the front rows open to the sky, which is how a stand is roofed and what lets the camera see
- * the seats.
+ * the seats. On a closed ground the roof of an end runs on over the corners to meet the roofs beside it.
  */
 function drawRoof(context: StandContext, front: number, deep: number, top: number): void {
   const { canvas, at, sectors } = context;
@@ -468,8 +449,8 @@ function drawRoof(context: StandContext, front: number, deep: number, top: numbe
     return;
   }
 
-  const start = covered[0].from - 1;
-  const finish = covered[covered.length - 1].to + 1;
+  const start = context.roofFrom < context.from ? context.roofFrom : covered[0].from - 1;
+  const finish = context.roofTo > context.to ? context.roofTo : covered[covered.length - 1].to + 1;
   const rear = deep + ROOF_OVERHANG_REAR;
   const height = top + ROOF_CLEARANCE;
 
@@ -566,19 +547,34 @@ export function drawStand(canvas: Canvas, span: StandSpan, detail: SceneDetail):
     from,
     to,
     sectors,
+    roofFrom: span.roofFrom,
+    roofTo: span.roofTo,
     facing: standFacesCamera(side),
     end: visibleEnd(side),
     axis: isLong(side) ? 'x' : 'y',
     detail,
+    planes: [],
   };
 
   const { at } = context;
 
-  const lower = tierOf(plan.lower, 0, 0, group);
+  // Each tier drawn, with the walkway in front of it: a tier above the first stands behind a walkway.
+  const planned = tiersOf(plan);
+  const tiers: Array<[Tier, TierName, TierPlan]> = planned.map((tier) => [
+    tierOf(tier.rows, tier.out, tier.base, group),
+    tier.name,
+    tier,
+  ]);
+  const tier = (name: TierName): Tier | null =>
+    tiers.find(([, candidate]) => candidate === name)?.[0] ?? null;
+
+  const lower = tier('lower')!;
+  const upper = tier('upper');
+  const third = tier('top');
   const floor = plan.lower * ROW_RISE;
   const bandOut = plan.lower * ROW_DEPTH;
-  const upper =
-    plan.upper > 0 ? tierOf(plan.upper, bandOut + WALKWAY, floor + BAND_HEIGHT, group) : null;
+  const topFloor = third === null ? 0 : third.base - BAND_HEIGHT;
+  const topBandOut = third === null ? 0 : third.out - WALKWAY;
 
   // The boxes of a one-tier main stand are a block behind its last row.
   const block = plan.vip && upper === null;
@@ -586,7 +582,7 @@ export function drawStand(canvas: Canvas, span: StandSpan, detail: SceneDetail):
   const top = heightOf(plan) + (block ? BAND_HEIGHT : 0);
 
   // Rows are drawn from the far one to the near one, so a near row covers what it should of the one behind it.
-  const drawTier = (tier: Tier, name: 'lower' | 'upper'): void => {
+  const drawTier = (tier: Tier, name: TierName): void => {
     const rows = Array.from({ length: tier.rows }, (_, index) => index);
 
     for (const row of context.facing ? rows.reverse() : rows) {
@@ -594,19 +590,20 @@ export function drawStand(canvas: Canvas, span: StandSpan, detail: SceneDetail):
     }
   };
 
-  const drawBand = (): void => {
+  // The walkway in front of a tier above the first, or on the main stand the boxes along it.
+  const drawBand = (out: number, base: number): void => {
     if (plan.vip) {
-      drawBoxes(context, from, to, bandOut, WALKWAY, floor);
+      drawBoxes(context, from, to, out, WALKWAY, base);
       return;
     }
 
     canvas.add({
       role: 'walkway',
       d: outline([
-        at(from, bandOut, floor + BAND_HEIGHT),
-        at(to, bandOut, floor + BAND_HEIGHT),
-        at(to, bandOut + WALKWAY, floor + BAND_HEIGHT),
-        at(from, bandOut + WALKWAY, floor + BAND_HEIGHT),
+        at(from, out, base + BAND_HEIGHT),
+        at(to, out, base + BAND_HEIGHT),
+        at(to, out + WALKWAY, base + BAND_HEIGHT),
+        at(from, out + WALKWAY, base + BAND_HEIGHT),
       ]),
       fill: PALETTE.walkway,
     });
@@ -615,10 +612,10 @@ export function drawStand(canvas: Canvas, span: StandSpan, detail: SceneDetail):
       canvas.add({
         role: 'side',
         d: outline([
-          at(from, bandOut, floor),
-          at(to, bandOut, floor),
-          at(to, bandOut, floor + BAND_HEIGHT),
-          at(from, bandOut, floor + BAND_HEIGHT),
+          at(from, out, base),
+          at(to, out, base),
+          at(to, out, base + BAND_HEIGHT),
+          at(from, out, base + BAND_HEIGHT),
         ]),
         fill: shade(frontAxis(context)),
       });
@@ -626,9 +623,14 @@ export function drawStand(canvas: Canvas, span: StandSpan, detail: SceneDetail):
   };
 
   if (context.facing) {
+    if (third !== null) {
+      drawTier(third, 'top');
+      drawBand(topBandOut, topFloor);
+    }
+
     if (upper !== null) {
       drawTier(upper, 'upper');
-      drawBand();
+      drawBand(bandOut, floor);
     } else if (block) {
       const range = boxRange(sectors);
 
@@ -640,38 +642,53 @@ export function drawStand(canvas: Canvas, span: StandSpan, detail: SceneDetail):
     drawTier(lower, 'lower');
 
     if (upper !== null) {
-      drawBand();
+      drawBand(bandOut, floor);
       drawTier(upper, 'upper');
+    }
+
+    if (third !== null) {
+      drawBand(topBandOut, topFloor);
+      drawTier(third, 'top');
     }
 
     drawBackWall(context, deep, top);
   }
 
-  drawEnd(context, lower, upper);
+  drawEnd(
+    context,
+    tiers.map(([tier]) => tier),
+  );
 
-  // One invisible plane over every sector of every tier, which the screen lights to show where a kind of place is.
+  drawRoof(context, roofFrontOf(side, plan), deep, top);
+
+  // One invisible plane over each run of rows of one kind, in every sector of every tier, which the screen lights to
+  // show where a kind of place is: the open rows in front of a roof and the covered ones under it are lit apart.
   if (detail === 'full') {
-    const tiers: Array<[Tier, 'lower' | 'upper']> =
-      upper === null
-        ? [[lower, 'lower']]
-        : [
-            [lower, 'lower'],
-            [upper, 'upper'],
-          ];
-
-    for (const [tier, name] of tiers) {
+    for (const [drawn, , planTier] of tiers) {
       for (const sector of sectors) {
-        canvas.add({
-          role: 'region',
-          d: surface(context, tier, sector),
-          fill: PALETTE.highlight,
-          opacity: 0,
-          region: kindOf(plan, name, sector),
-        });
+        let first = 0;
+
+        for (let row = 1; row <= planTier.rows; row++) {
+          const kind = kindOfRow(side, plan, planTier, first, sector);
+
+          if (row < planTier.rows && kindOfRow(side, plan, planTier, row, sector) === kind) {
+            continue;
+          }
+
+          context.planes.push({ d: surface(context, drawn, sector, first, row - 1), region: kind });
+          first = row;
+        }
       }
     }
   }
 
-  // A one-tier stand is roofed over its back half; a two-tier stand over its upper tier.
-  drawRoof(context, upper === null ? deep * roofReach(context) : bandOut, deep, top);
+  for (const plane of context.planes) {
+    canvas.add({
+      role: 'region',
+      d: plane.d,
+      fill: PALETTE.highlight,
+      opacity: 0,
+      region: plane.region,
+    });
+  }
 }

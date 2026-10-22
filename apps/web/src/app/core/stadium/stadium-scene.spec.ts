@@ -7,10 +7,11 @@ import {
   clampLevel,
   safeColour,
 } from './stadium-scene';
+import { ROAD, extentOf, roadAt, treeSites } from './stadium-grounds';
 import { kindsOf, planOf, spansOf } from './stadium-plan';
 
 /**
- * The ten stadium pictures.
+ * The fifteen stadium pictures.
  *
  * What matters is that every level is a distinct ground, that a level is always the one before it with something
  * added — so a manager watches the same stadium grow — that the seats are drawn in the club's two colours from the
@@ -62,14 +63,14 @@ function corners(d: string): Array<[number, number]> {
 }
 
 describe('stadium scenes', () => {
-  it('has a picture for each of the ten levels', () => {
-    expect(SCENE_LEVELS).toBe(10);
+  it('has a picture for each of the fifteen levels', () => {
+    expect(SCENE_LEVELS).toBe(15);
   });
 
   it('draws every level differently', () => {
     const drawings = LEVELS.map((level) => JSON.stringify(buildScene(level).parts));
 
-    expect(new Set(drawings).size).toBe(10);
+    expect(new Set(drawings).size).toBe(15);
   });
 
   it('builds the ground first and the trees nearest the camera last', () => {
@@ -221,7 +222,7 @@ describe('stadium scenes', () => {
 
   it('starts with a roofed main stand with boxes and a terrace, and ends with the whole bowl', () => {
     const first = buildScene(1);
-    const last = buildScene(10);
+    const last = buildScene(SCENE_LEVELS);
 
     expect(parts(first, 'vip-glass')).toHaveLength(1);
     expect(parts(first, 'roof')).toHaveLength(1);
@@ -230,12 +231,71 @@ describe('stadium scenes', () => {
     expect(parts(first, 'wall')).toHaveLength(0);
     expect(parts(first, 'flag').some((part) => part.fill === 'primary')).toBe(false);
 
-    expect(parts(last, 'roof')).toHaveLength(2);
+    expect(parts(last, 'roof')).toHaveLength(4);
     expect(parts(last, 'mast').length).toBeGreaterThan(0);
     expect(parts(last, 'wall').length).toBeGreaterThan(0);
     expect(parts(last, 'plaza')).toHaveLength(1);
     expect(parts(last, 'flag').some((part) => part.fill === 'primary' && part.d.length > 0)).toBe(
       true,
+    );
+  });
+
+  it('roofs every stand from level six and puts a second row of boxes on the main stand at twelve', () => {
+    expect(parts(buildScene(5), 'roof')).toHaveLength(2);
+    expect(parts(buildScene(6), 'roof')).toHaveLength(4);
+    expect(parts(buildScene(11), 'vip-glass')).toHaveLength(1);
+    expect(parts(buildScene(12), 'vip-glass')).toHaveLength(2);
+  });
+
+  it('keeps a short roof short on an open ground', () => {
+    // Level 1: the main stand is roofed over half its length, so its roof is narrower on the screen than its rows.
+    const scene = buildScene(1);
+    const width = (d: string): number => {
+      const xs = corners(d).map(([x]) => x);
+
+      return Math.max(...xs) - Math.min(...xs);
+    };
+
+    expect(width(parts(scene, 'roof')[0].d)).toBeLessThan(width(parts(scene, 'tread')[0].d) * 0.7);
+  });
+
+  it('draws the planes a manager can light over the roofs, so a covered kind can still be found', () => {
+    for (const level of LEVELS) {
+      const { parts: all } = buildScene(level);
+      const lastRoof = all.map((part) => part.role).lastIndexOf('roof');
+      const covered = all.findIndex(
+        (part) => part.role === 'region' && part.region === 'covered_seating',
+      );
+
+      expect(covered, `level ${level}`).toBeGreaterThan(-1);
+      expect(all.slice(lastRoof).some((part) => part.role === 'region')).toBe(true);
+    }
+  });
+
+  it('flies the flag from the front edge of the main stand roof, however tall the stand', () => {
+    for (const level of [10, 12, SCENE_LEVELS]) {
+      const scene = buildScene(level);
+      // The main stand is drawn first, so its trim is the first; the top edge of the trim is the front of its roof.
+      const [, , [x1, y1], [x2, y2]] = corners(parts(scene, 'roof-trim')[0].d);
+      const pole = parts(scene, 'flag').find((part) => part.stroke !== null && part.width > 1)!;
+      const [[px, py]] = corners(pole.d);
+      const away =
+        Math.abs((x2 - x1) * (y1 - py) - (x1 - px) * (y2 - y1)) / Math.hypot(x2 - x1, y2 - y1);
+
+      expect(away, `level ${level}`).toBeLessThan(2);
+    }
+  });
+
+  it('keeps the road and the trees where they were up to the two-tier bowl, and moves them for a bigger ground', () => {
+    for (const level of LEVELS.slice(0, 10)) {
+      expect(roadAt(extentOf(level)), `level ${level}`).toBe(ROAD.y);
+      expect(treeSites(level)).toEqual(treeSites(10));
+    }
+
+    expect(roadAt(extentOf(12))).toBeLessThan(ROAD.y);
+    expect(roadAt(extentOf(12))).toBeLessThan(extentOf(12).minY - 16);
+    expect(treeSites(SCENE_LEVELS).near.length + treeSites(SCENE_LEVELS).far.length).toBeLessThan(
+      treeSites(10).near.length + treeSites(10).far.length,
     );
   });
 
@@ -312,7 +372,7 @@ describe('stadium scenes', () => {
 
   it('clamps a level it has no plan for rather than drawing nothing', () => {
     expect(buildScene(0).level).toBe(1);
-    expect(buildScene(99).level).toBe(10);
+    expect(buildScene(99).level).toBe(15);
     expect(buildScene(Number.NaN).level).toBe(1);
     expect(clampLevel(3.6)).toBe(4);
   });

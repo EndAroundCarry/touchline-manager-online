@@ -100,7 +100,7 @@ public static class MarketMapping
             row.SellerClubId,
             row.SellerClubName,
             row.MinimumFeeMinor,
-            row.GeneratedBuyerWageMinor,
+            row.GeneratedBuyerSeasonWageMinor,
             row.GeneratedContractSeasons,
             row.OpensAt,
             row.EndsAt,

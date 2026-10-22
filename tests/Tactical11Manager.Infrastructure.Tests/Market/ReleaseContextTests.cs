@@ -59,7 +59,7 @@ public sealed class ReleaseContextTests : IAsyncLifetime, IDisposable
         context.PlayerId.Should().Be(contract.PlayerId);
         context.ClubId.Should().Be(contract.ClubId);
         context.ContractVersion.Should().Be(contract.Version);
-        context.WeeklyWageMinor.Should().Be(contract.WeeklyWageMinor);
+        context.SeasonWageMinor.Should().Be(contract.SeasonWageMinor);
         context.EndSeasonNumber.Should().Be(contract.EndSeasonNumber);
         context.CurrentSeasonNumber.Should().Be(1);
         context.CurrentSeasonEndsAt.Should().Be(season.RolloverEndsAt, "the season ends when its rollover does");

@@ -108,7 +108,7 @@ internal sealed class ContractContinuityQueries : IContractContinuityQueries
                     row.Player.Id,
                     row.Contract.Id,
                     row.Contract.EndSeasonNumber,
-                    row.Contract.WeeklyWageMinor,
+                    row.Contract.SeasonWageMinor,
                     row.Contract.SquadStatus,
                     PlayerPositions.FamilyOf(row.Player.PrimaryPosition),
                     row.Player.PrimaryPosition == PlayerPosition.Goalkeeper,

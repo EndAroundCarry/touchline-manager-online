@@ -78,7 +78,7 @@ public sealed class MarketMappingTests
             sellerClubId,
             sellerClubName,
             MinimumFeeMinor: 100_000,
-            GeneratedBuyerWageMinor: 5_000,
+            GeneratedBuyerSeasonWageMinor: 5_000,
             GeneratedContractSeasons: 2,
             Now,
             Now.AddDays(7),

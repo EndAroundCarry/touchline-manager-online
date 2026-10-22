@@ -165,7 +165,7 @@ const player: Player = {
     startSeasonNumber: 2,
     endSeasonNumber: 4,
     seasonsRemaining: 2,
-    weeklyWageMinor: 1_200_000,
+    seasonWageMinor: 1_200_000,
     squadStatus: 'first_team',
     status: 'active',
   },
@@ -193,7 +193,7 @@ const releaseQuote: ReleaseQuote = {
   playerId: 'player-1',
   remainingWeeks: 20,
   payoutMinor: 12_000_000,
-  weeklyWageMinor: 1_200_000,
+  seasonWageMinor: 1_200_000,
   availableMinor: 50_000_000,
   joinsPoolAt: '2026-10-26T12:00:00Z',
   blockedReason: null,
@@ -251,7 +251,7 @@ describe('PlayerProfile', () => {
         playerId: 'player-1',
         payoutMinor: 12_000_000,
         remainingWeeks: 20,
-        weeklyWageSavedMinor: 1_200_000,
+        seasonWageSavedMinor: 1_200_000,
         joinsPoolAt: '2026-10-26T12:00:00Z',
         serverTime: '2026-10-20T09:00:00Z',
       });
@@ -443,7 +443,7 @@ describe('PlayerProfile', () => {
       expect(group.textContent).toContain(`Release ${player.fullName}?`);
       expect(group.textContent).toContain('20 weeks of wages');
       expect(group.textContent).toContain('Payout, paid now');
-      expect(group.textContent).toContain('Weekly wage saved');
+      expect(group.textContent).toContain('Wage saved a season');
       expect(group.textContent).toContain('Joins the free-agent pool');
       expect(releasePlayer).not.toHaveBeenCalled();
     });
@@ -736,7 +736,7 @@ describe('PlayerProfile', () => {
     )!;
 
     expect(panel.textContent).toContain('End of season 4');
-    expect(panel.textContent).toContain('a week');
+    expect(panel.textContent).toContain('a season');
     expect(button.disabled).toBe(true);
     expect(panel.textContent).toContain('coming soon');
   });

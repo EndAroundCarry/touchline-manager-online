@@ -520,7 +520,7 @@ internal sealed class MarketQueries : IMarketQueries
                     row.Listing.SellerClubId,
                     row.SellerClubName,
                     row.Listing.MinimumFeeMinor,
-                    row.Listing.GeneratedBuyerWageMinor,
+                    row.Listing.GeneratedBuyerSeasonWageMinor,
                     row.Listing.GeneratedContractSeasons,
                     row.Listing.OpensAt,
                     row.Listing.EndsAt,

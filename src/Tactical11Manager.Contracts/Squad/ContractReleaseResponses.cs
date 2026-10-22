@@ -11,7 +11,7 @@ namespace Tactical11Manager.Contracts.Squad;
 /// <param name="PlayerId">The contracted player.</param>
 /// <param name="RemainingWeeks">The weeks of wages left on the contract, rounded up.</param>
 /// <param name="PayoutMinor">What the club pays to release the player, in minor units.</param>
-/// <param name="WeeklyWageMinor">The wage the club stops paying each week, in minor units.</param>
+/// <param name="SeasonWageMinor">The wage for a season the club stops paying, in minor units.</param>
 /// <param name="AvailableMinor">The club's cash less what its bids have reserved, in minor units.</param>
 /// <param name="JoinsPoolAt">When the player joins the free-agent pool: the next weekly batch.</param>
 /// <param name="BlockedReason">
@@ -28,7 +28,7 @@ public sealed record ReleaseQuoteResponse(
     Guid PlayerId,
     int RemainingWeeks,
     long PayoutMinor,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     long AvailableMinor,
     DateTimeOffset JoinsPoolAt,
     string? BlockedReason,
@@ -40,7 +40,7 @@ public sealed record ReleaseQuoteResponse(
 /// <param name="PlayerId">The player released.</param>
 /// <param name="PayoutMinor">What the club paid, in minor units.</param>
 /// <param name="RemainingWeeks">The weeks of wages the payout was half of.</param>
-/// <param name="WeeklyWageSavedMinor">The wage the club no longer pays each week, in minor units.</param>
+/// <param name="SeasonWageSavedMinor">The wage for a season the club no longer pays, in minor units.</param>
 /// <param name="JoinsPoolAt">When the player joins the free-agent pool: the next weekly batch.</param>
 /// <param name="ServerTime">The server's current instant.</param>
 public sealed record ReleasePlayerResponse(
@@ -48,6 +48,6 @@ public sealed record ReleasePlayerResponse(
     Guid PlayerId,
     long PayoutMinor,
     int RemainingWeeks,
-    long WeeklyWageSavedMinor,
+    long SeasonWageSavedMinor,
     DateTimeOffset JoinsPoolAt,
     DateTimeOffset ServerTime);

@@ -11,7 +11,7 @@ namespace Tactical11Manager.Application.Abstractions.Squad;
 /// <param name="PlayerId">The player.</param>
 /// <param name="ContractId">The player's active contract.</param>
 /// <param name="EndSeasonNumber">The last season the contract covers.</param>
-/// <param name="WeeklyWageMinor">The weekly wage, in minor units.</param>
+/// <param name="SeasonWageMinor">The wage for a season, in minor units.</param>
 /// <param name="SquadStatus">The player's standing in the squad.</param>
 /// <param name="Family">The player's position family.</param>
 /// <param name="IsGoalkeeper">Whether the player counts against the goalkeeper minimum (`SQ-2`).</param>
@@ -26,7 +26,7 @@ public sealed record ContractContinuityPlayer(
     Guid PlayerId,
     Guid ContractId,
     int EndSeasonNumber,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     SquadStatus SquadStatus,
     PositionFamily Family,
     bool IsGoalkeeper,

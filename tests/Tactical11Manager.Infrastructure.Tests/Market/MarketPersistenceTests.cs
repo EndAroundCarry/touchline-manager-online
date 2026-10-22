@@ -202,7 +202,7 @@ public sealed class MarketPersistenceTests : WorldTestBase
             playerId,
             sellerClubId,
             minimumFeeMinor: 1_000_000,
-            generatedBuyerWageMinor: 50_000,
+            generatedBuyerSeasonWageMinor: 50_000,
             generatedContractSeasons: 2,
             opensAt: now.AddDays(-3),
             endsAt: now.AddDays(1),

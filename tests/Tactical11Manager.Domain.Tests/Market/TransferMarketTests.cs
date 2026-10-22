@@ -18,7 +18,7 @@ public sealed class TransferMarketTests
         Guid.CreateVersion7(),
         Guid.CreateVersion7(),
         minimumFeeMinor: 1_000_000,
-        generatedBuyerWageMinor: 50_000,
+        generatedBuyerSeasonWageMinor: 50_000,
         generatedContractSeasons: 2,
         opensAt: Now,
         endsAt: AuctionWindows.EndsAtFor(Now),
@@ -39,19 +39,19 @@ public sealed class TransferMarketTests
     {
         var noFee = () => TransferListing.Open(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            minimumFeeMinor: 0, generatedBuyerWageMinor: 1, generatedContractSeasons: 1,
+            minimumFeeMinor: 0, generatedBuyerSeasonWageMinor: 1, generatedContractSeasons: 1,
             opensAt: Now, endsAt: Now.AddDays(3), idempotencyKey: null, now: Now);
         noFee.Should().Throw<ArgumentOutOfRangeException>("TRF-1: a minimum fee is positive");
 
         var backwards = () => TransferListing.Open(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            minimumFeeMinor: 1, generatedBuyerWageMinor: 1, generatedContractSeasons: 1,
+            minimumFeeMinor: 1, generatedBuyerSeasonWageMinor: 1, generatedContractSeasons: 1,
             opensAt: Now, endsAt: Now, idempotencyKey: null, now: Now);
         backwards.Should().Throw<ArgumentOutOfRangeException>("TRF-2: a listing resolves after it opens");
 
         var tooLong = () => TransferListing.Open(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            minimumFeeMinor: 1, generatedBuyerWageMinor: 1,
+            minimumFeeMinor: 1, generatedBuyerSeasonWageMinor: 1,
             generatedContractSeasons: WorldRuleSet.ContractMaxSeasons + 1,
             opensAt: Now, endsAt: Now.AddDays(3), idempotencyKey: null, now: Now);
         tooLong.Should().Throw<ArgumentOutOfRangeException>("CON-1: a contract is one to three seasons");
@@ -119,7 +119,7 @@ public sealed class TransferMarketTests
             Guid.CreateVersion7(),
             batchId,
             minimumFeeMinor: 250_000,
-            generatedBuyerWageMinor: 20_000,
+            generatedBuyerSeasonWageMinor: 20_000,
             generatedContractSeasons: 2,
             opensAt: Now,
             endsAt: Now.AddDays(7),
@@ -143,19 +143,19 @@ public sealed class TransferMarketTests
     {
         var noFee = () => TransferListing.OpenFreeAgent(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            minimumFeeMinor: 0, generatedBuyerWageMinor: 1, generatedContractSeasons: 1,
+            minimumFeeMinor: 0, generatedBuyerSeasonWageMinor: 1, generatedContractSeasons: 1,
             opensAt: Now, endsAt: Now.AddDays(7), now: Now);
         noFee.Should().Throw<ArgumentOutOfRangeException>();
 
         var backwards = () => TransferListing.OpenFreeAgent(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            minimumFeeMinor: 1, generatedBuyerWageMinor: 1, generatedContractSeasons: 1,
+            minimumFeeMinor: 1, generatedBuyerSeasonWageMinor: 1, generatedContractSeasons: 1,
             opensAt: Now, endsAt: Now, now: Now);
         backwards.Should().Throw<ArgumentOutOfRangeException>();
 
         var tooLong = () => TransferListing.OpenFreeAgent(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            minimumFeeMinor: 1, generatedBuyerWageMinor: 1,
+            minimumFeeMinor: 1, generatedBuyerSeasonWageMinor: 1,
             generatedContractSeasons: WorldRuleSet.ContractMaxSeasons + 1,
             opensAt: Now, endsAt: Now.AddDays(7), now: Now);
         tooLong.Should().Throw<ArgumentOutOfRangeException>();

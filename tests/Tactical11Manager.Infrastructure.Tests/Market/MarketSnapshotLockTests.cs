@@ -128,7 +128,7 @@ public sealed class MarketSnapshotLockTests : IAsyncLifetime, IDisposable
             playerId,
             sellerClubId,
             minimumFeeMinor: fee,
-            generatedBuyerWageMinor: 50_000,
+            generatedBuyerSeasonWageMinor: 50_000,
             generatedContractSeasons: 2,
             opensAt: now.AddDays(-3),
             endsAt: now,

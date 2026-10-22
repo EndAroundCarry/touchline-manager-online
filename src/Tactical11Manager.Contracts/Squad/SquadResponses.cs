@@ -31,13 +31,13 @@ public sealed record SquadResponse(
 /// <param name="Goalkeepers">How many of them are goalkeepers.</param>
 /// <param name="MeetsMinimum">Whether the club reaches the minimum registered squad (`SQ-2`).</param>
 /// <param name="HasMinimumGoalkeepers">Whether the club holds enough goalkeepers (`SQ-2`).</param>
-/// <param name="WeeklyWageTotalMinor">The club's committed weekly wages, in minor units (`CON-2`).</param>
+/// <param name="SeasonWageTotalMinor">The club's committed wages for a season, in minor units (`CON-2`).</param>
 public sealed record SquadSummaryResponse(
     int PlayerCount,
     int Goalkeepers,
     bool MeetsMinimum,
     bool HasMinimumGoalkeepers,
-    long WeeklyWageTotalMinor);
+    long SeasonWageTotalMinor);
 
 /// <summary>One player as the squad table shows them.</summary>
 /// <param name="Id">The player identity.</param>
@@ -89,7 +89,7 @@ public sealed record PlayerStateResponse(
 /// <param name="StartSeasonNumber">The first season the contract covers.</param>
 /// <param name="EndSeasonNumber">The last season the contract covers.</param>
 /// <param name="SeasonsRemaining">How many seasons remain, counted from the current one. Zero means it expires at its end season.</param>
-/// <param name="WeeklyWageMinor">The weekly wage in minor units (`CON-2`).</param>
+/// <param name="SeasonWageMinor">The wage for a season in minor units (`CON-2`).</param>
 /// <param name="SquadStatus">The stable code of the player's standing in the squad.</param>
 /// <param name="Status">The stable code of the contract's lifecycle state.</param>
 public sealed record PlayerContractSummaryResponse(
@@ -97,7 +97,7 @@ public sealed record PlayerContractSummaryResponse(
     int StartSeasonNumber,
     int EndSeasonNumber,
     int SeasonsRemaining,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     string SquadStatus,
     string Status);
 
@@ -111,7 +111,7 @@ public sealed record PlayerContractSummaryResponse(
 /// <param name="StartSeasonNumber">The first season the contract covers.</param>
 /// <param name="EndSeasonNumber">The last season the contract covers.</param>
 /// <param name="SeasonsRemaining">How many seasons remain, counted from the current one.</param>
-/// <param name="WeeklyWageMinor">The weekly wage in minor units.</param>
+/// <param name="SeasonWageMinor">The wage for a season in minor units.</param>
 /// <param name="SquadStatus">The stable code of the player's standing in the squad.</param>
 /// <param name="Status">The stable code of the contract's lifecycle state.</param>
 public sealed record PlayerContractResponse(
@@ -124,7 +124,7 @@ public sealed record PlayerContractResponse(
     int StartSeasonNumber,
     int EndSeasonNumber,
     int SeasonsRemaining,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     string SquadStatus,
     string Status);
 
@@ -422,14 +422,14 @@ public sealed record GoalkeepingAttributesResponse(
 /// <param name="ClubId">The club the contracts bind players to.</param>
 /// <param name="ClubName">The generated club name.</param>
 /// <param name="SeasonNumber">The season the remaining terms are counted from.</param>
-/// <param name="WeeklyWageTotalMinor">The club's committed weekly wages, in minor units.</param>
+/// <param name="SeasonWageTotalMinor">The club's committed wages for a season, in minor units.</param>
 /// <param name="Contracts">The contracts, closest to expiring first.</param>
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record ContractsResponse(
     Guid ClubId,
     string ClubName,
     int SeasonNumber,
-    long WeeklyWageTotalMinor,
+    long SeasonWageTotalMinor,
     IReadOnlyList<PlayerContractResponse> Contracts,
     DateTimeOffset ServerTime);
 

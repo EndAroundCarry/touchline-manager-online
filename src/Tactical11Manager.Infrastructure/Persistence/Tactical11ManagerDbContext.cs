@@ -75,6 +75,9 @@ public sealed class Tactical11ManagerDbContext : DbContext
     /// <summary>Gets the world module's clubs.</summary>
     public DbSet<Club> Clubs => Set<Club>();
 
+    /// <summary>Gets the append-only history of each club's standing.</summary>
+    public DbSet<ClubStandingEvent> ClubStandingEvents => Set<ClubStandingEvent>();
+
     /// <summary>Gets the club stadiums (`STAD-1`).</summary>
     public DbSet<ClubStadium> ClubStadiums => Set<ClubStadium>();
 
@@ -147,6 +150,12 @@ public sealed class Tactical11ManagerDbContext : DbContext
 
     /// <summary>Gets the finance module's season summary category totals.</summary>
     public DbSet<ClubSeasonFinanceLine> ClubSeasonFinanceLines => Set<ClubSeasonFinanceLine>();
+
+    /// <summary>Gets the sponsor offers made to clubs each season.</summary>
+    public DbSet<ClubSponsorOffer> SponsorOffers => Set<ClubSponsorOffer>();
+
+    /// <summary>Gets the sponsor deals clubs have signed.</summary>
+    public DbSet<ClubSponsorDeal> SponsorDeals => Set<ClubSponsorDeal>();
 
     /// <summary>Gets the comms module's inbox messages.</summary>
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();

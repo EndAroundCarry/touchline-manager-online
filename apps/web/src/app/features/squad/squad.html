@@ -10,7 +10,7 @@
     <p class="mt-1 text-sm text-ink-2 fit:shrink-0">
       {{ inherited.countryCode }} · season {{ inherited.seasonNumber }} ·
       {{ inherited.summary.playerCount }} players · {{ inherited.summary.goalkeepers }} goalkeepers
-      · {{ funds(inherited.summary.weeklyWageTotalMinor) }} weekly wages
+      · {{ funds(inherited.summary.seasonWageTotalMinor) }} in wages a season
     </p>
 
     @if (!inherited.summary.meetsMinimum || !inherited.summary.hasMinimumGoalkeepers) {
@@ -357,8 +357,8 @@
             <h2 class="sr-only">Contracts</h2>
             <p class="text-sm text-ink-2 fit:shrink-0">
               {{ payroll.contracts.length }} contracts ·
-              {{ funds(payroll.weeklyWageTotalMinor) }} committed each week, charged after the
-              Sunday matchday (CON-2).
+              {{ funds(payroll.seasonWageTotalMinor) }} committed for the season, paid in equal
+              parts (CON-2).
             </p>
 
             <div
@@ -379,7 +379,7 @@
                     <th scope="col" class="py-1 pr-4 font-semibold">Age</th>
                     <th scope="col" class="py-1 pr-4 font-semibold">Seasons</th>
                     <th scope="col" class="py-1 pr-4 font-semibold">Standing</th>
-                    <th scope="col" class="py-1 font-semibold">Weekly wage</th>
+                    <th scope="col" class="py-1 font-semibold">Wage a season</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -406,7 +406,7 @@
                         left)
                       </td>
                       <td class="py-1 pr-4">{{ squadStatus(contract.squadStatus) }}</td>
-                      <td class="py-1">{{ funds(contract.weeklyWageMinor) }}</td>
+                      <td class="py-1">{{ funds(contract.seasonWageMinor) }}</td>
                     </tr>
                   }
                 </tbody>
@@ -444,8 +444,8 @@
                       <dd class="text-ink">{{ squadStatus(contract.squadStatus) }}</dd>
                     </div>
                     <div class="col-span-2 flex justify-between gap-2">
-                      <dt class="text-muted">Weekly wage</dt>
-                      <dd class="text-ink">{{ funds(contract.weeklyWageMinor) }}</dd>
+                      <dt class="text-muted">Wage a season</dt>
+                      <dd class="text-ink">{{ funds(contract.seasonWageMinor) }}</dd>
                     </div>
                   </dl>
                 </li>

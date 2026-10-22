@@ -65,6 +65,24 @@ public enum LedgerCategory
 
     /// <summary>A club paid for a building's upgrade (`STRC-3`).</summary>
     StructureUpgrade = 17,
+
+    /// <summary>The league's television money, shared equally by the division and paid on every matchday (`FIN-4`).</summary>
+    LeagueTv = 18,
+
+    /// <summary>The fixed part of the club's sponsor deal, paid on every matchday once it is signed (`SPN-3`).</summary>
+    SponsorMatchday = 19,
+
+    /// <summary>The sponsor's bonus for meeting or exceeding the season's objective, paid when the season ends (`OBJ-4`).</summary>
+    SponsorBonus = 20,
+
+    /// <summary>The money a relegated club is given the season after it goes down (`FIN-5`).</summary>
+    Parachute = 21,
+
+    /// <summary>The small weekly upkeep of the places in the ground (`STAD-7`).</summary>
+    GroundUpkeep = 22,
+
+    /// <summary>The one entry of a clean start: it sets the club's cash to its tier's opening cash and wipes any debt (`TKO-3`).</summary>
+    CleanStart = 23,
 }
 
 /// <summary>Stable codes and parsing for <see cref="LedgerCategory"/>.</summary>
@@ -98,8 +116,28 @@ public static class LedgerCategories
         LedgerCategory.Merchandise => "merchandise",
         LedgerCategory.StructureUpkeep => "structure_upkeep",
         LedgerCategory.StructureUpgrade => "structure_upgrade",
+        LedgerCategory.LeagueTv => "league_tv",
+        LedgerCategory.SponsorMatchday => "sponsor_matchday",
+        LedgerCategory.SponsorBonus => "sponsor_bonus",
+        LedgerCategory.Parachute => "parachute",
+        LedgerCategory.GroundUpkeep => "ground_upkeep",
+        LedgerCategory.CleanStart => "clean_start",
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown ledger category."),
     };
+
+    /// <summary>
+    /// Whether a posting of this category may take a club's cash below zero (`DEBT-1`): the recurring costs, which a club owes whatever it holds.
+    /// A fee, a building, an upgrade and a release still need the cash, so they are refused rather than borrowed.
+    /// </summary>
+    /// <param name="category">The category.</param>
+    public static bool MayOverdraw(this LedgerCategory category) =>
+        category is LedgerCategory.Wages
+            or LedgerCategory.OperatingCost
+            or LedgerCategory.StructureUpkeep
+            or LedgerCategory.GroundUpkeep;
+
+    /// <summary>The stable codes of every category, as the check constraints list them.</summary>
+    public static IReadOnlyList<string> AllCodes { get; } = [.. All.Select(category => category.ToCode())];
 
     /// <summary>Parses a stable code back to its category.</summary>
     /// <param name="code">The stable code.</param>
@@ -123,6 +161,12 @@ public static class LedgerCategories
         "merchandise" => LedgerCategory.Merchandise,
         "structure_upkeep" => LedgerCategory.StructureUpkeep,
         "structure_upgrade" => LedgerCategory.StructureUpgrade,
+        "league_tv" => LedgerCategory.LeagueTv,
+        "sponsor_matchday" => LedgerCategory.SponsorMatchday,
+        "sponsor_bonus" => LedgerCategory.SponsorBonus,
+        "parachute" => LedgerCategory.Parachute,
+        "ground_upkeep" => LedgerCategory.GroundUpkeep,
+        "clean_start" => LedgerCategory.CleanStart,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown ledger category code."),
     };
 }

@@ -4,7 +4,7 @@ namespace Tactical11Manager.Contracts.Finance;
 /// <param name="CashMinor">The club's cash, in minor units.</param>
 /// <param name="ReservedMinor">The part already committed to open bids.</param>
 /// <param name="AvailableMinor">What the club can still commit, after reservations (`FIN-10`).</param>
-/// <param name="WeeklyWageMinor">The club's active contracts' weekly wage bill (`FIN-7`).</param>
+/// <param name="WeeklyWageMinor">The club's active contracts' wage bill for one weekly run (`FIN-7`): three matchdays of the season wages.</param>
 /// <param name="ContractedPlayers">How many active contracts that bill covers.</param>
 /// <param name="WeeklySponsorshipMinor">The weekly sponsorship credit the club's tier earns (`FIN-4`).</param>
 /// <param name="WeeklyOperatingCostMinor">The weekly operating cost the club's tier pays (`FIN-9`).</param>

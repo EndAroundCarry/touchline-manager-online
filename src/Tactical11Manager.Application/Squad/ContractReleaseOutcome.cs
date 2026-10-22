@@ -68,7 +68,7 @@ public static class ContractRelease
     /// <summary>Prices a release from the contract's facts and the calendar.</summary>
     public static ReleaseQuote Price(ReleaseContext context, DateTimeOffset now) =>
         ReleaseCost.Calculate(
-            context.WeeklyWageMinor,
+            context.SeasonWageMinor,
             now,
             context.CurrentSeasonEndsAt,
             Math.Max(0, context.EndSeasonNumber - context.CurrentSeasonNumber),

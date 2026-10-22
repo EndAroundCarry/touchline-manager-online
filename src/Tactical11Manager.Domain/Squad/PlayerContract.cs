@@ -133,14 +133,14 @@ public static class PlayerContractCloseReasons
 }
 
 /// <summary>
-/// An agreement binding a player to a club for a range of game seasons at a weekly wage (`CON-1`,
+/// An agreement binding a player to a club for a range of game seasons at a season wage (`CON-1`,
 /// `CON-2`).
 /// </summary>
 /// <remarks>
 /// <para>
 /// The term is expressed in season numbers, not dates, because contract years advance at rollover
 /// rather than on a real-world anniversary (`CON-8`, `TIME-3`). Wages are in minor units of the one
-/// canonical currency, and the weekly charge itself is finance's job in Stage 9.
+/// canonical currency, and the charge itself is finance's job.
 /// </para>
 /// <para>
 /// "At most one active contract per player" (`SQ-6`) is enforced by a partial unique index in the
@@ -169,8 +169,8 @@ public sealed class PlayerContract
     /// <summary>Gets the last season the contract covers.</summary>
     public int EndSeasonNumber { get; private set; }
 
-    /// <summary>Gets the weekly wage, in minor units (`CON-2`).</summary>
-    public long WeeklyWageMinor { get; private set; }
+    /// <summary>Gets the wage for a season, in minor units, paid in 34 equal parts one on each matchday (`CON-2`).</summary>
+    public long SeasonWageMinor { get; private set; }
 
     /// <summary>Gets the player's standing in the squad.</summary>
     public SquadStatus SquadStatus { get; private set; }
@@ -202,7 +202,7 @@ public sealed class PlayerContract
     /// <param name="clubId">The club the player is contracted to.</param>
     /// <param name="startSeasonNumber">The first season covered.</param>
     /// <param name="endSeasonNumber">The last season covered.</param>
-    /// <param name="weeklyWageMinor">The weekly wage in minor units.</param>
+    /// <param name="seasonWageMinor">The wage for a season in minor units.</param>
     /// <param name="squadStatus">The player's standing in the squad.</param>
     /// <param name="now">The current instant.</param>
     public static PlayerContract Sign(
@@ -211,12 +211,12 @@ public sealed class PlayerContract
         Guid clubId,
         int startSeasonNumber,
         int endSeasonNumber,
-        long weeklyWageMinor,
+        long seasonWageMinor,
         SquadStatus squadStatus,
         DateTimeOffset now)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(startSeasonNumber, 1);
-        ArgumentOutOfRangeException.ThrowIfNegative(weeklyWageMinor);
+        ArgumentOutOfRangeException.ThrowIfNegative(seasonWageMinor);
 
         if (endSeasonNumber < startSeasonNumber)
         {
@@ -243,7 +243,7 @@ public sealed class PlayerContract
             ClubId = clubId,
             StartSeasonNumber = startSeasonNumber,
             EndSeasonNumber = endSeasonNumber,
-            WeeklyWageMinor = weeklyWageMinor,
+            SeasonWageMinor = seasonWageMinor,
             SquadStatus = squadStatus,
             Status = ContractStatus.Active,
             CreatedAt = now,

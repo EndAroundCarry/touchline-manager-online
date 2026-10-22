@@ -14,7 +14,8 @@ public sealed record ReleaseQuote(int RemainingWeeks, long PayoutMinor);
 /// <remarks>
 /// Pure, so the quote a manager sees before confirming is the amount charged. The weeks left are the rest of
 /// the current season, rounded up to a whole week, plus the whole seasons the contract still has after it. A
-/// season's length in weeks is read from the calendar (<see cref="WeeksPerSeason"/>) rather than assumed.
+/// season's length in weeks is read from the calendar (<see cref="WeeksPerSeason"/>) rather than assumed. The
+/// wage is a season's, so a week of it is a <c>weeksPerSeason</c>th, and the payout is half of those weeks.
 /// </remarks>
 public static class ReleaseCost
 {
@@ -28,19 +29,19 @@ public static class ReleaseCost
     }
 
     /// <summary>Calculates the payout for releasing a player now.</summary>
-    /// <param name="weeklyWageMinor">The wage on the contract, per week, in minor units.</param>
+    /// <param name="seasonWageMinor">The wage on the contract for a season, in minor units.</param>
     /// <param name="now">The current instant.</param>
     /// <param name="currentSeasonEndsAt">When the current season, rollover included, ends.</param>
     /// <param name="seasonsAfterCurrent">The full seasons the contract runs after the current one.</param>
     /// <param name="weeksPerSeason">A season's length in weeks, from <see cref="WeeksPerSeason"/>.</param>
     public static ReleaseQuote Calculate(
-        long weeklyWageMinor,
+        long seasonWageMinor,
         DateTimeOffset now,
         DateTimeOffset currentSeasonEndsAt,
         int seasonsAfterCurrent,
         int weeksPerSeason)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(weeklyWageMinor);
+        ArgumentOutOfRangeException.ThrowIfNegative(seasonWageMinor);
         ArgumentOutOfRangeException.ThrowIfNegative(seasonsAfterCurrent);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(weeksPerSeason);
 
@@ -49,7 +50,7 @@ public static class ReleaseCost
 
         return new ReleaseQuote(
             remainingWeeks,
-            weeklyWageMinor * remainingWeeks * WorldRuleSet.ReleasePayoutBp / 10_000);
+            seasonWageMinor * remainingWeeks * WorldRuleSet.ReleasePayoutBp / (10_000L * weeksPerSeason));
     }
 
     private static int WholeWeeksUp(TimeSpan span)

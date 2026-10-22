@@ -247,18 +247,22 @@ public sealed class WorldGenerator
         Season season,
         DateTimeOffset now)
     {
-        var squad = PlayerGenerator.GenerateSquad(new SquadGenerationRequest(
-            seed,
-            country.NamePoolKey,
-            country.Code,
-            country.WorldId,
-            clubId,
-            clubOrdinalInCountry,
-            tier,
-            season.Id,
-            season.SequenceNumber,
-            season.GameYear,
-            now));
+        // The squad is drawn to wages a fresh club of the tier can carry, so no club opens already in the red (FIN-2).
+        var squad = PlayerGenerator.GenerateSizedSquad(
+            new SquadGenerationRequest(
+                seed,
+                country.NamePoolKey,
+                country.Code,
+                country.WorldId,
+                clubId,
+                clubOrdinalInCountry,
+                tier,
+                season.Id,
+                season.SequenceNumber,
+                season.GameYear,
+                now),
+            EconomyRuleSet.SeededWageBandLowBp,
+            EconomyRuleSet.SeededWageBandHighBp);
 
         foreach (var member in squad)
         {

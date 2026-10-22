@@ -4,7 +4,7 @@
  * {@link buildScene} turns a level's plan into an ordered list of shapes, far to near, which a component paints as it
  * is. The list is the whole picture: the grass, the pitch, every stand with its rows, sectors and seats, the roofs,
  * the hospitality boxes, the floodlights and the trees. Nothing is a bitmap, so the seats can take the club's own two
- * colours, and nothing here knows about the DOM, so each of the ten levels can be tested as plain data.
+ * colours, and nothing here knows about the DOM, so each of the fifteen levels can be tested as plain data.
  *
  * The parts live beside this file: `stadium-camera` projects the world, `stadium-plan` is the table of levels,
  * `stadium-stand` draws a stand, `stadium-grounds` draws everything round the stands and `stadium-canvas` is what a
@@ -17,7 +17,6 @@ import {
   FENCE_GAP,
   MAST_HEIGHT,
   RING_GAP,
-  ROAD,
   drawBoards,
   drawCornerFlags,
   drawEnclosure,
@@ -31,6 +30,7 @@ import {
   ground,
   grow,
   mastSites,
+  roadAt,
   treeSites,
 } from './stadium-grounds';
 import {
@@ -95,7 +95,6 @@ const STAND_NAMES: Readonly<Record<StandSide, string>> = {
 /** The room kept round a ground in its frame, in the drawing's units. */
 const VIEW_PADDING = 30;
 
-const TREES = treeSites();
 const CACHE = new Map<string, Scene>();
 
 /**
@@ -166,7 +165,7 @@ function labelsOf(level: number): SceneLabel[] {
 /**
  * Builds the drawing of one level.
  *
- * @param level The stadium level, 1 to 10. Anything else is clamped, so a response the screen does not yet know about
+ * @param level The stadium level, 1 to 15. Anything else is clamped, so a response the screen does not yet know about
  *   still draws something rather than nothing.
  * @param detail `full` draws every row; `low` groups rows in threes, for a thumbnail.
  */
@@ -184,13 +183,15 @@ export function buildScene(level: number, detail: SceneDetail = 'full'): Scene {
   const compound = grow(extent, plan.ring ? FENCE_GAP + RING_GAP : FENCE_GAP);
   const canvas = new Canvas();
   const spans = spansOf(plan);
+  const trees = treeSites(clamped);
+  const road = roadAt(extent);
 
   canvas.add({ role: 'ground', d: `M0 0H${VIEW_WIDTH}V${VIEW_HEIGHT}H0Z`, fill: PALETTE.grass });
   canvas.add({
     role: 'ground',
     d: ground([
-      [WORLD_FRAME.minX, ROAD.y + 18],
-      [WORLD_FRAME.maxX, ROAD.y + 18],
+      [WORLD_FRAME.minX, road + 18],
+      [WORLD_FRAME.maxX, road + 18],
       [WORLD_FRAME.maxX, WORLD_FRAME.maxY],
       [WORLD_FRAME.minX, WORLD_FRAME.maxY],
     ]),
@@ -199,7 +200,7 @@ export function buildScene(level: number, detail: SceneDetail = 'full'): Scene {
   });
 
   drawRoads(canvas, extent);
-  drawTrees(canvas, TREES.far);
+  drawTrees(canvas, trees.far);
 
   if (plan.ring) {
     const paved = grow(extent, RING_GAP);
@@ -254,7 +255,7 @@ export function buildScene(level: number, detail: SceneDetail = 'full'): Scene {
   }
 
   if (plan.flag) {
-    drawFlag(canvas, extent);
+    drawFlag(canvas, extent, plan.main);
   }
 
   if (plan.ring) {
@@ -262,7 +263,7 @@ export function buildScene(level: number, detail: SceneDetail = 'full'): Scene {
   }
 
   drawEnclosure(canvas, compound, true, false);
-  drawTrees(canvas, TREES.near);
+  drawTrees(canvas, trees.near);
 
   const scene: Scene = {
     level: clamped,

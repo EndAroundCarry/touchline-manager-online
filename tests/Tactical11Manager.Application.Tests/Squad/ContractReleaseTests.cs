@@ -16,8 +16,8 @@ public sealed class ContractReleaseTests
     [Fact]
     public void The_payout_is_half_the_wages_left_in_the_season_and_in_the_seasons_after_it()
     {
-        // 10 weeks to the end of the season, one more season of 12 weeks: 22 weeks at 1,000 is half of 22,000.
-        var context = Context(wage: 1_000, endSeason: 3, currentSeason: 2, seasonEnds: Now.AddDays(70), weeksPerSeason: 12);
+        // 10 weeks to the end of the season, one more season of 12 weeks: 22 weeks of a 12,000 season wage (1,000 a week) is half of 22,000.
+        var context = Context(wage: 12_000, endSeason: 3, currentSeason: 2, seasonEnds: Now.AddDays(70), weeksPerSeason: 12);
 
         var quote = ContractRelease.Price(context, Now);
 
@@ -28,7 +28,7 @@ public sealed class ContractReleaseTests
     [Fact]
     public void A_contract_ending_this_season_pays_for_the_rest_of_this_season_only()
     {
-        var context = Context(wage: 1_000, endSeason: 2, currentSeason: 2, seasonEnds: Now.AddDays(70));
+        var context = Context(wage: 12_000, endSeason: 2, currentSeason: 2, seasonEnds: Now.AddDays(70));
 
         ContractRelease.Price(context, Now).PayoutMinor.Should().Be(5_000);
     }
@@ -102,7 +102,7 @@ public sealed class ContractReleaseTests
     [Fact]
     public void The_payout_must_fit_in_the_cash_left_after_bids()
     {
-        var context = Context(wage: 1_000, endSeason: 2, currentSeason: 2, seasonEnds: Now.AddDays(70));
+        var context = Context(wage: 12_000, endSeason: 2, currentSeason: 2, seasonEnds: Now.AddDays(70));
         var quote = ContractRelease.Price(context, Now);
 
         quote.PayoutMinor.Should().Be(5_000);
@@ -149,7 +149,7 @@ public sealed class ContractReleaseTests
     }
 
     private static ReleaseContext Context(
-        long wage = 1_000,
+        long wage = 12_000,
         int endSeason = 2,
         int currentSeason = 1,
         DateTimeOffset? seasonEnds = null,

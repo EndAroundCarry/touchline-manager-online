@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Tactical11Manager.Domain.Auth;
+using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Infrastructure.Persistence.Configurations;
@@ -141,6 +143,7 @@ internal sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
         {
             table.HasCheckConstraint("ck_clubs_status", "status in ('active', 'retired')");
             table.HasCheckConstraint("ck_clubs_reputation", "reputation between 1 and 100");
+            table.HasCheckConstraint("ck_clubs_standing", "standing_centis between 100 and 10000");
         });
 
         builder.HasKey(club => club.Id);
@@ -168,6 +171,7 @@ internal sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
             .HasConversion(status => status.ToCode(), code => ClubStatuses.FromCode(code))
             .IsRequired();
         builder.Property(club => club.Reputation).HasColumnName("reputation").IsRequired();
+        builder.Property(club => club.StandingCentis).HasColumnName("standing_centis").IsRequired();
         builder.Property(club => club.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(club => club.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(club => club.Version).HasColumnName("version").IsRequired();
@@ -442,6 +446,62 @@ internal sealed class ClubStadiumConfiguration : IEntityTypeConfiguration<ClubSt
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(stadium => stadium.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>world.club_standing_events</c>, the append-only history of how a club standing moved at the end of each season (`STD-3`).
+/// </summary>
+/// <remarks>The unique index on <c>(club_id, season_id)</c> makes the step happen once: a retried settlement collides with the first.</remarks>
+internal sealed class ClubStandingEventConfiguration : IEntityTypeConfiguration<ClubStandingEvent>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<ClubStandingEvent> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("club_standing_events", "world", table =>
+        {
+            table.HasCheckConstraint("ck_club_standing_events_tiers", "finished_tier >= 1 and next_tier >= 1");
+            table.HasCheckConstraint("ck_club_standing_events_place", "final_place between 1 and 18");
+            table.HasCheckConstraint(
+                "ck_club_standing_events_standing",
+                "before_centis between 100 and 10000 and after_centis between 100 and 10000");
+            table.HasCheckConstraint(
+                "ck_club_standing_events_outcome",
+                "outcome is null or outcome in (" + string.Join(", ", SponsorCodes.OutcomeCodes.Select(code => $"'{code}'")) + ")");
+        });
+
+        builder.HasKey(standingEvent => standingEvent.Id);
+        builder.Property(standingEvent => standingEvent.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(standingEvent => standingEvent.ClubId).HasColumnName("club_id").IsRequired();
+        builder.Property(standingEvent => standingEvent.SeasonId).HasColumnName("season_id").IsRequired();
+        builder.Property(standingEvent => standingEvent.FinishedTier).HasColumnName("finished_tier").IsRequired();
+        builder.Property(standingEvent => standingEvent.NextTier).HasColumnName("next_tier").IsRequired();
+        builder.Property(standingEvent => standingEvent.FinalPlace).HasColumnName("final_place").IsRequired();
+        builder.Property(standingEvent => standingEvent.Outcome)
+            .HasColumnName("outcome")
+            .HasMaxLength(SponsorCodes.MaxCodeLength)
+            .HasConversion(
+                outcome => outcome == null ? null : outcome.Value.ToCode(),
+                code => code == null ? null : SponsorCodes.OutcomeFromCode(code));
+        builder.Property(standingEvent => standingEvent.BeforeCentis).HasColumnName("before_centis").IsRequired();
+        builder.Property(standingEvent => standingEvent.AfterCentis).HasColumnName("after_centis").IsRequired();
+        builder.Property(standingEvent => standingEvent.OccurredAt).HasColumnName("occurred_at").IsRequired();
+
+        builder.HasIndex(standingEvent => new { standingEvent.ClubId, standingEvent.SeasonId })
+            .IsUnique()
+            .HasDatabaseName("ux_club_standing_events_club_season");
+
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(standingEvent => standingEvent.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Season>()
+            .WithMany()
+            .HasForeignKey(standingEvent => standingEvent.SeasonId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

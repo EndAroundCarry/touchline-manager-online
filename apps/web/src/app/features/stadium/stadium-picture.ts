@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { VIEW_WIDTH } from '../../core/stadium/stadium-camera';
 import {
+  SCENE_LEVELS,
   SceneDetail,
   ScenePart,
   buildScene,
@@ -33,7 +34,7 @@ const LABEL_SIZE = 15;
  *
  * The ground is seen from one corner, the way a management game shows it: the pitch, the stands round it with every
  * row and sector, the roofs, the hospitality boxes, the floodlights. A drawing rather than a bitmap: it is crisp at
- * every size, costs no download, and — the point — draws the seats in the club's own two colours. Each of the ten
+ * every size, costs no download, and — the point — draws the seats in the club's own two colours. Each of the fifteen
  * levels is a distinct ground, and a level is always the previous one with something added, so a manager watches the
  * same stadium grow. The geometry lives in {@link buildScene}; this component only paints it.
  *
@@ -90,7 +91,7 @@ const LABEL_SIZE = 15;
   `,
 })
 export class StadiumPicture {
-  /** The stadium level to draw, 1 to 10. */
+  /** The stadium level to draw, 1 to 15. */
   readonly level = input.required<number>();
 
   /** The club's colour: the seats, the boards, the flag. */
@@ -128,7 +129,7 @@ export class StadiumPicture {
 
   protected readonly label = computed(
     () =>
-      `Stadium at level ${clampLevel(this.level())} of 10, seen from a corner, with seats in the club's two colours.`,
+      `Stadium at level ${clampLevel(this.level())} of ${SCENE_LEVELS}, seen from a corner, with seats in the club's two colours.`,
   );
 
   protected readonly drawn = computed<readonly DrawnPart[]>(() => {

@@ -338,7 +338,7 @@ public sealed class PlayerAggregateTests
     {
         var contract = PlayerContract.Sign(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            startSeasonNumber: 1, endSeasonNumber: 3, weeklyWageMinor: 5_000,
+            startSeasonNumber: 1, endSeasonNumber: 3, seasonWageMinor: 5_000,
             SquadStatus.FirstTeam, Now);
 
         contract.IsActive.Should().BeTrue("SQ-6");

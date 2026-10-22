@@ -31,7 +31,7 @@ function listing(id: string, status = 'open'): TransferListing {
     sellerClubId: 'club-1',
     sellerClubName: 'Somewhere FC',
     minimumFeeMinor: 1_000_000,
-    generatedBuyerWageMinor: 50_000,
+    generatedBuyerSeasonWageMinor: 50_000,
     generatedContractSeasons: 2,
     opensAt: '2026-09-28T00:00:00Z',
     endsAt: '2026-09-30T12:00:00Z',

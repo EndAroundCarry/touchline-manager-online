@@ -256,7 +256,7 @@ public static class SquadMapping
             contract.StartSeasonNumber,
             contract.EndSeasonNumber,
             SeasonsRemaining(contract.EndSeasonNumber, currentSeasonNumber),
-            contract.WeeklyWageMinor,
+            contract.SeasonWageMinor,
             contract.SquadStatus.ToCode(),
             contract.Status.ToCode());
     }
@@ -360,7 +360,7 @@ public static class SquadMapping
                 goalkeepers,
                 SquadLegality.MeetsMinimum(squad.Players.Count),
                 SquadLegality.HasMinimumGoalkeepers(families),
-                squad.Players.Sum(player => player.Contract.WeeklyWageMinor)),
+                squad.Players.Sum(player => player.Contract.SeasonWageMinor)),
             players,
             serverTime);
     }
@@ -485,7 +485,7 @@ public static class SquadMapping
             contracts.ClubId,
             contracts.ClubName,
             contracts.SeasonNumber,
-            contracts.Contracts.Sum(contract => contract.WeeklyWageMinor),
+            contracts.Contracts.Sum(contract => contract.SeasonWageMinor),
             [.. contracts.Contracts.Select(contract => ToResponse(contract, contracts.SeasonNumber, contracts.GameYear))],
             serverTime);
     }
@@ -522,7 +522,7 @@ public static class SquadMapping
             contract.StartSeasonNumber,
             contract.EndSeasonNumber,
             SeasonsRemaining(contract.EndSeasonNumber, currentSeasonNumber),
-            contract.WeeklyWageMinor,
+            contract.SeasonWageMinor,
             contract.SquadStatus.ToCode(),
             contract.Status.ToCode());
 }

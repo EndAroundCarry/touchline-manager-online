@@ -160,7 +160,7 @@ describe('Stadium picture', () => {
     await render({ level: 3 });
 
     expect(svg.getAttribute('role')).toBe('img');
-    expect(svg.getAttribute('aria-label')).toContain('level 3 of 10');
+    expect(svg.getAttribute('aria-label')).toContain('level 3 of 15');
     expect(svg.getAttribute('aria-hidden')).toBeNull();
 
     await set('decorative', true);
@@ -173,7 +173,7 @@ describe('Stadium picture', () => {
   it('draws a level it has no plan for as the nearest one', async () => {
     await render({ level: 99 });
 
-    expect(paths()).toHaveLength(buildScene(10).parts.length);
-    expect(svg.getAttribute('aria-label')).toContain('level 10 of 10');
+    expect(paths()).toHaveLength(buildScene(15).parts.length);
+    expect(svg.getAttribute('aria-label')).toContain('level 15 of 15');
   });
 });

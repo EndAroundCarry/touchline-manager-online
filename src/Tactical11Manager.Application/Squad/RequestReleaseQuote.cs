@@ -82,7 +82,7 @@ public sealed class RequestReleaseQuote
                 context.PlayerId,
                 quote.RemainingWeeks,
                 quote.PayoutMinor,
-                context.WeeklyWageMinor,
+                context.SeasonWageMinor,
                 account.AvailableMinor,
                 ContractRelease.JoinsPoolAt(now),
                 ContractRelease.CodeOf(refusal),

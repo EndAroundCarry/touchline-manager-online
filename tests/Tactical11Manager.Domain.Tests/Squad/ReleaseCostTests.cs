@@ -10,9 +10,9 @@ public sealed class ReleaseCostTests
     private static readonly DateTimeOffset SeasonEnd = new(2026, 12, 29, 19, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Half_of_ten_weeks_at_a_thousand_is_five_thousand()
+    public void Half_of_ten_weeks_of_a_season_wage_of_twelve_thousand_is_five_thousand()
     {
-        var quote = ReleaseCost.Calculate(1_000, SeasonEnd.AddDays(-70), SeasonEnd, seasonsAfterCurrent: 0, weeksPerSeason: 12);
+        var quote = ReleaseCost.Calculate(12_000, SeasonEnd.AddDays(-70), SeasonEnd, seasonsAfterCurrent: 0, weeksPerSeason: 12);
 
         quote.RemainingWeeks.Should().Be(10);
         quote.PayoutMinor.Should().Be(5_000);
@@ -21,26 +21,26 @@ public sealed class ReleaseCostTests
     [Fact]
     public void Nothing_left_costs_nothing()
     {
-        ReleaseCost.Calculate(1_000, SeasonEnd, SeasonEnd, 0, 12).Should().Be(new ReleaseQuote(0, 0));
-        ReleaseCost.Calculate(1_000, SeasonEnd.AddDays(3), SeasonEnd, 0, 12).Should().Be(new ReleaseQuote(0, 0));
+        ReleaseCost.Calculate(12_000, SeasonEnd, SeasonEnd, 0, 12).Should().Be(new ReleaseQuote(0, 0));
+        ReleaseCost.Calculate(12_000, SeasonEnd.AddDays(3), SeasonEnd, 0, 12).Should().Be(new ReleaseQuote(0, 0));
     }
 
     [Fact]
     public void A_part_of_a_week_counts_as_a_whole_week()
     {
-        var quote = ReleaseCost.Calculate(1_000, SeasonEnd.AddDays(-71), SeasonEnd, 0, 12);
+        var quote = ReleaseCost.Calculate(12_000, SeasonEnd.AddDays(-71), SeasonEnd, 0, 12);
 
         quote.RemainingWeeks.Should().Be(11);
         quote.PayoutMinor.Should().Be(5_500);
 
-        ReleaseCost.Calculate(1_000, SeasonEnd.AddHours(-1), SeasonEnd, 0, 12).RemainingWeeks
+        ReleaseCost.Calculate(12_000, SeasonEnd.AddHours(-1), SeasonEnd, 0, 12).RemainingWeeks
             .Should().Be(1, "an hour left is still a week's wage");
     }
 
     [Fact]
     public void A_contract_into_later_seasons_adds_whole_seasons()
     {
-        var quote = ReleaseCost.Calculate(1_000, SeasonEnd.AddDays(-70), SeasonEnd, seasonsAfterCurrent: 2, weeksPerSeason: 12);
+        var quote = ReleaseCost.Calculate(12_000, SeasonEnd.AddDays(-70), SeasonEnd, seasonsAfterCurrent: 2, weeksPerSeason: 12);
 
         quote.RemainingWeeks.Should().Be(10 + 24);
         quote.PayoutMinor.Should().Be(17_000);

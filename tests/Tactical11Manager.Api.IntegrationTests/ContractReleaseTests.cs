@@ -13,6 +13,7 @@ using Tactical11Manager.Contracts.Http;
 using Tactical11Manager.Contracts.Market;
 using Tactical11Manager.Contracts.Squad;
 using Tactical11Manager.Contracts.World;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Infrastructure.Persistence;
 
@@ -56,11 +57,14 @@ public sealed class ContractReleaseTests : IAsyncLifetime
         var quote = await QuoteAsync(client, contract.Id);
 
         quote.PlayerId.Should().Be(contract.PlayerId);
-        quote.WeeklyWageMinor.Should().Be(contract.WeeklyWageMinor);
+        quote.SeasonWageMinor.Should().Be(contract.SeasonWageMinor);
         quote.RemainingWeeks.Should().BePositive();
-        quote.PayoutMinor.Should().Be(
-            quote.WeeklyWageMinor * quote.RemainingWeeks / 2,
-            "the payout is half the wages left (CON-12)");
+
+        // Half the wages left: the season wage spread over the weeks of a season (twelve or thirteen, by the day it starts).
+        var wagesLeftHigh = quote.SeasonWageMinor * quote.RemainingWeeks / 12;
+        var wagesLeftLow = quote.SeasonWageMinor * quote.RemainingWeeks / 13;
+
+        quote.PayoutMinor.Should().BeInRange((wagesLeftLow / 2) - 1, (wagesLeftHigh / 2) + 1, "the payout is half the wages left (CON-12)");
         quote.BlockedReason.Should().BeNull();
         quote.AvailableMinor.Should().BePositive();
 
@@ -96,14 +100,17 @@ public sealed class ContractReleaseTests : IAsyncLifetime
         released.PlayerId.Should().Be(contract.PlayerId);
         released.PayoutMinor.Should().Be(quote.PayoutMinor, "the amount confirmed is the amount paid");
         released.RemainingWeeks.Should().Be(quote.RemainingWeeks);
-        released.WeeklyWageSavedMinor.Should().Be(contract.WeeklyWageMinor);
+        released.SeasonWageSavedMinor.Should().Be(contract.SeasonWageMinor);
         released.JoinsPoolAt.Should().Be(quote.JoinsPoolAt);
 
         // The club is poorer by the payout, owes the player's wage no more, and has one player fewer.
         var summary = (await client.GetFromJsonAsync<FinanceSummaryResponse>("/api/v1/finances/summary"))!;
 
         summary.CashMinor.Should().Be(summaryBefore.CashMinor - quote.PayoutMinor);
-        summary.WeeklyWageMinor.Should().Be(summaryBefore.WeeklyWageMinor - contract.WeeklyWageMinor);
+        summary.WeeklyWageMinor.Should().BeCloseTo(
+            summaryBefore.WeeklyWageMinor - EconomyRuleSet.PerWeeklyRun(contract.SeasonWageMinor),
+            1,
+            "the payroll falls by his wage, to the rounding of a weekly run");
         summary.ContractedPlayers.Should().Be(summaryBefore.ContractedPlayers - 1);
 
         var ledger = (await client.GetFromJsonAsync<FinanceLedgerResponse>("/api/v1/finances/ledger"))!;

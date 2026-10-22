@@ -23,7 +23,7 @@ const quote = {
   seasons: 3,
   startSeasonNumber: 1,
   endSeasonNumber: 3,
-  weeklyWageMinor: 1_200_000,
+  seasonWageMinor: 1_200_000,
   contractVersion: 4,
   serverTime: '2026-09-28T00:00:00Z',
 };
@@ -33,7 +33,7 @@ const releaseQuote: ReleaseQuote = {
   playerId: 'player-1',
   remainingWeeks: 20,
   payoutMinor: 12_000_000,
-  weeklyWageMinor: 1_200_000,
+  seasonWageMinor: 1_200_000,
   availableMinor: 50_000_000,
   joinsPoolAt: '2026-10-26T12:00:00Z',
   blockedReason: null,
@@ -171,7 +171,7 @@ describe('SquadStore', () => {
       playerId: 'player-1',
       payoutMinor: 12_000_000,
       remainingWeeks: 20,
-      weeklyWageSavedMinor: 1_200_000,
+      seasonWageSavedMinor: 1_200_000,
       joinsPoolAt: '2026-10-26T12:00:00Z',
       serverTime: '2026-10-20T09:00:00Z',
     };

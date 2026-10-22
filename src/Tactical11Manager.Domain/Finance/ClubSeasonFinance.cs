@@ -63,9 +63,6 @@ public sealed class ClubSeasonFinance
         long closingCashMinor,
         DateTimeOffset now)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(openingCashMinor);
-        ArgumentOutOfRangeException.ThrowIfNegative(closingCashMinor);
-
         return new ClubSeasonFinance
         {
             Id = id,

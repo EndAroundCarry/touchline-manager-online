@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 
 namespace Tactical11Manager.Domain.World;
@@ -87,8 +88,14 @@ public sealed class Club
     /// <summary>Gets the lifecycle state.</summary>
     public ClubStatus Status { get; private set; }
 
-    /// <summary>Gets the club's reputation, on the same 1–100 scale as manager reputation.</summary>
+    /// <summary>
+    /// Gets the club's standing in whole points, on the same 1–100 scale as manager reputation. It is the rounded <see cref="StandingCentis"/>
+    /// and multiplies what a sponsor pays (`STD-1`).
+    /// </summary>
     public int Reputation { get; private set; }
+
+    /// <summary>Gets the club's standing in hundredths of a point, which is what a season's result moves (`STD-2`).</summary>
+    public int StandingCentis { get; private set; }
 
     /// <summary>Gets when the club was created.</summary>
     public DateTimeOffset CreatedAt { get; private set; }
@@ -141,6 +148,7 @@ public sealed class Club
             FoundingGameYear = foundingGameYear,
             Status = ClubStatus.Active,
             Reputation = WorldRuleSet.OpeningReputationForTier(tier),
+            StandingCentis = ClubStanding.OpeningCentis(tier),
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -264,6 +272,19 @@ public sealed class Club
         CrestShape = shape;
         CrestPattern = pattern;
 
+        Touch(now);
+    }
+
+    /// <summary>Moves the club's standing to a new value after a season (`STD-2`).</summary>
+    /// <param name="standingCentis">The new standing in hundredths of a point.</param>
+    /// <param name="now">The current instant.</param>
+    public void RecordStanding(int standingCentis, DateTimeOffset now)
+    {
+        StandingCentis = Math.Clamp(
+            standingCentis,
+            EconomyRuleSet.StandingMin * ClubStanding.CentisPerPoint,
+            EconomyRuleSet.StandingMax * ClubStanding.CentisPerPoint);
+        Reputation = ClubStanding.PointsOf(StandingCentis);
         Touch(now);
     }
 

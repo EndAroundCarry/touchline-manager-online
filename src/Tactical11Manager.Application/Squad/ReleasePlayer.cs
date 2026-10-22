@@ -178,7 +178,7 @@ public sealed class ReleasePlayer
                 context.PlayerId,
                 quote.PayoutMinor,
                 quote.RemainingWeeks,
-                context.WeeklyWageMinor,
+                context.SeasonWageMinor,
                 ContractRelease.JoinsPoolAt(now),
                 now));
     }

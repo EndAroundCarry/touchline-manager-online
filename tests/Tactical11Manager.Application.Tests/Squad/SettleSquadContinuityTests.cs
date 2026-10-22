@@ -176,7 +176,7 @@ public sealed class SettleSquadContinuityTests
             row.Player.Id,
             row.Contract.Id,
             endSeason,
-            row.Contract.WeeklyWageMinor,
+            row.Contract.SeasonWageMinor,
             row.Contract.SquadStatus,
             PlayerPositions.FamilyOf(row.Player.PrimaryPosition),
             row.Player.PrimaryPosition == PlayerPosition.Goalkeeper,

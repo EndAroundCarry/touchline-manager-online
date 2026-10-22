@@ -392,7 +392,7 @@
                     </div>
                     <div class="flex justify-between gap-4">
                       <dt class="text-muted">Salary</dt>
-                      <dd>{{ funds(contract.weeklyWageMinor) }} a week</dd>
+                      <dd>{{ funds(contract.seasonWageMinor) }} a season</dd>
                     </div>
                   </dl>
                   <p class="mt-2 text-xs text-muted">
@@ -424,7 +424,7 @@
                     @if (releaseStep() === 'released' && released(); as done) {
                       <p [class]="statusMessageClass" role="status">
                         {{ profile.fullName }} was released and {{ funds(done.payoutMinor) }} was
-                        paid. The weekly wage of {{ funds(done.weeklyWageSavedMinor) }} stops. The
+                        paid. The wage of {{ funds(done.seasonWageSavedMinor) }} a season stops. The
                         player joins the free-agent pool on {{ instant(done.joinsPoolAt) }}.
                       </p>
                       <p class="mt-2 text-sm">
@@ -456,8 +456,8 @@
                             </dd>
                           </div>
                           <div class="flex justify-between gap-4">
-                            <dt class="text-muted">Weekly wage saved</dt>
-                            <dd>{{ funds(quote.weeklyWageMinor) }}</dd>
+                            <dt class="text-muted">Wage saved a season</dt>
+                            <dd>{{ funds(quote.seasonWageMinor) }}</dd>
                           </div>
                           <div class="flex justify-between gap-4">
                             <dt class="text-muted">Joins the free-agent pool</dt>

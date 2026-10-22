@@ -24,14 +24,14 @@ public sealed record SquadStateRow(
 /// <param name="Id">The contract identity.</param>
 /// <param name="StartSeasonNumber">The first season the contract covers.</param>
 /// <param name="EndSeasonNumber">The last season the contract covers.</param>
-/// <param name="WeeklyWageMinor">The weekly wage in minor units.</param>
+/// <param name="SeasonWageMinor">The wage for a season in minor units.</param>
 /// <param name="SquadStatus">The player's standing in the squad.</param>
 /// <param name="Status">The contract's lifecycle state.</param>
 public sealed record SquadContractRow(
     Guid Id,
     int StartSeasonNumber,
     int EndSeasonNumber,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     SquadStatus SquadStatus,
     ContractStatus Status);
 
@@ -318,7 +318,7 @@ public sealed record SquadSnapshot(
 /// <param name="BirthGameYear">The game year the player was born in.</param>
 /// <param name="StartSeasonNumber">The first season the contract covers.</param>
 /// <param name="EndSeasonNumber">The last season the contract covers.</param>
-/// <param name="WeeklyWageMinor">The weekly wage in minor units.</param>
+/// <param name="SeasonWageMinor">The wage for a season in minor units.</param>
 /// <param name="SquadStatus">The player's standing in the squad.</param>
 /// <param name="Status">The contract's lifecycle state.</param>
 public sealed record ContractRow(
@@ -330,7 +330,7 @@ public sealed record ContractRow(
     int BirthGameYear,
     int StartSeasonNumber,
     int EndSeasonNumber,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     SquadStatus SquadStatus,
     ContractStatus Status);
 
@@ -442,7 +442,7 @@ public sealed record ContractRenewalContext(
 /// <param name="PlayerId">The contracted player.</param>
 /// <param name="ClubId">The club the contract binds the player to, which ownership is checked against.</param>
 /// <param name="ContractVersion">The contract's optimistic-concurrency version.</param>
-/// <param name="WeeklyWageMinor">The wage on the contract, per week, in minor units.</param>
+/// <param name="SeasonWageMinor">The wage on the contract for a season, in minor units.</param>
 /// <param name="EndSeasonNumber">The last season the contract covers.</param>
 /// <param name="CurrentSeasonNumber">The season being played.</param>
 /// <param name="CurrentSeasonEndsAt">When the current season, rollover included, ends.</param>
@@ -457,7 +457,7 @@ public sealed record ReleaseContext(
     Guid PlayerId,
     Guid ClubId,
     long ContractVersion,
-    long WeeklyWageMinor,
+    long SeasonWageMinor,
     int EndSeasonNumber,
     int CurrentSeasonNumber,
     DateTimeOffset CurrentSeasonEndsAt,

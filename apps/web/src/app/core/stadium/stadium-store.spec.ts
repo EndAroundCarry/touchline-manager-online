@@ -17,9 +17,9 @@ function stadium(overrides: Partial<Stadium> = {}): Stadium {
   return {
     clubId: 'c1',
     level: 1,
-    maxLevel: 10,
+    maxLevel: 15,
     capacity: 5_000,
-    maxCapacity: 50_000,
+    maxCapacity: 75_000,
     seatsPerLevel: 5_000,
     seatsToNextLevel: 1,
     primaryColour: '#8c2f39',

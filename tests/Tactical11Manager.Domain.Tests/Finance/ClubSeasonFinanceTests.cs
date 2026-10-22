@@ -26,17 +26,18 @@ public sealed class ClubSeasonFinanceTests
     }
 
     [Fact]
-    public void A_negative_opening_cash_is_a_programming_error()
+    public void A_season_can_open_and_close_in_the_red()
     {
-        var act = () => ClubSeasonFinance.Record(
+        var summary = ClubSeasonFinance.Record(
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
-            openingCashMinor: -1,
-            closingCashMinor: 0,
+            openingCashMinor: -1_000_000,
+            closingCashMinor: -4_000_000,
             Now);
 
-        act.Should().Throw<ArgumentOutOfRangeException>();
+        summary.OpeningCashMinor.Should().Be(-1_000_000, "a club can start a season in debt (DEBT-1)");
+        summary.ClosingCashMinor.Should().Be(-4_000_000);
     }
 
     [Fact]

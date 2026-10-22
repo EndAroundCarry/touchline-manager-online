@@ -48,6 +48,19 @@ public enum ObjectiveOutcome
     Exceeded = 2,
 }
 
+/// <summary>Who put a sponsor deal's name to the contract.</summary>
+public enum SponsorSigner
+{
+    /// <summary>The club's manager chose the offer and the objective.</summary>
+    Manager = 0,
+
+    /// <summary>The deadline passed, and the board signed the balanced offer at its realistic objective.</summary>
+    Board = 1,
+
+    /// <summary>A computer club signed it through `ai-finance-v1`.</summary>
+    Ai = 2,
+}
+
 /// <summary>Stable codes for the sponsor and objective enums, so a stored value never moves with the enum's order.</summary>
 public static class SponsorCodes
 {
@@ -83,4 +96,72 @@ public static class SponsorCodes
         ObjectiveOutcome.Exceeded => "exceeded",
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Unknown objective outcome."),
     };
+
+    /// <summary>The code of a signer.</summary>
+    /// <param name="signer">The signer.</param>
+    public static string ToCode(this SponsorSigner signer) => signer switch
+    {
+        SponsorSigner.Manager => "manager",
+        SponsorSigner.Board => "board",
+        SponsorSigner.Ai => "ai",
+        _ => throw new ArgumentOutOfRangeException(nameof(signer), signer, "Unknown sponsor signer."),
+    };
+
+    /// <summary>The offer a stored code stands for.</summary>
+    /// <param name="code">The code.</param>
+    public static SponsorOfferKind OfferFromCode(string code) => code switch
+    {
+        "steady" => SponsorOfferKind.Steady,
+        "balanced" => SponsorOfferKind.Balanced,
+        "performance" => SponsorOfferKind.Performance,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown sponsor offer code."),
+    };
+
+    /// <summary>The objective a stored code stands for.</summary>
+    /// <param name="code">The code.</param>
+    public static SeasonObjective ObjectiveFromCode(string code) => code switch
+    {
+        "win_league" => SeasonObjective.WinLeague,
+        "top_three" => SeasonObjective.TopThree,
+        "top_six" => SeasonObjective.TopSix,
+        "top_half" => SeasonObjective.TopHalf,
+        "twelfth" => SeasonObjective.TwelfthPlace,
+        "stay_up" => SeasonObjective.StayUp,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown season objective code."),
+    };
+
+    /// <summary>The outcome a stored code stands for.</summary>
+    /// <param name="code">The code.</param>
+    public static ObjectiveOutcome OutcomeFromCode(string code) => code switch
+    {
+        "missed" => ObjectiveOutcome.Missed,
+        "met" => ObjectiveOutcome.Met,
+        "exceeded" => ObjectiveOutcome.Exceeded,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown objective outcome code."),
+    };
+
+    /// <summary>The signer a stored code stands for.</summary>
+    /// <param name="code">The code.</param>
+    public static SponsorSigner SignerFromCode(string code) => code switch
+    {
+        "manager" => SponsorSigner.Manager,
+        "board" => SponsorSigner.Board,
+        "ai" => SponsorSigner.Ai,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown sponsor signer code."),
+    };
+
+    /// <summary>The longest code of any of these enums, so a column can be sized to hold every value.</summary>
+    public const int MaxCodeLength = 16;
+
+    /// <summary>The codes of every offer.</summary>
+    public static IReadOnlyList<string> OfferCodes { get; } = [.. Enum.GetValues<SponsorOfferKind>().Select(kind => kind.ToCode())];
+
+    /// <summary>The codes of every objective.</summary>
+    public static IReadOnlyList<string> ObjectiveCodes { get; } = [.. Enum.GetValues<SeasonObjective>().Select(objective => objective.ToCode())];
+
+    /// <summary>The codes of every outcome.</summary>
+    public static IReadOnlyList<string> OutcomeCodes { get; } = [.. Enum.GetValues<ObjectiveOutcome>().Select(outcome => outcome.ToCode())];
+
+    /// <summary>The codes of every signer.</summary>
+    public static IReadOnlyList<string> SignerCodes { get; } = [.. Enum.GetValues<SponsorSigner>().Select(signer => signer.ToCode())];
 }

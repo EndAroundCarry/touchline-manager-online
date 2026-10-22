@@ -49,11 +49,23 @@ public sealed class LedgerEntryTests
     }
 
     [Fact]
-    public void An_entry_refuses_a_negative_resulting_balance()
+    public void An_entry_may_record_cash_below_zero_but_never_reserved_funds_below_zero()
     {
-        var act = () => Record(cashDelta: -100, resultingCash: -100);
+        var inTheRed = Record(cashDelta: -100, resultingCash: -100);
 
-        act.Should().Throw<ArgumentOutOfRangeException>("a balance is never negative (FIN-13)");
+        inTheRed.ResultingCashMinor.Should().Be(-100, "how far the cash may fall is the account floor, not the entry (DEBT-1)");
+
+        var act = () => Record(cashDelta: 0, reservedDelta: -100, resultingReserved: -100);
+
+        act.Should().Throw<ArgumentOutOfRangeException>("reserved funds are never negative (FIN-13)");
+    }
+
+    [Fact]
+    public void An_entry_refuses_reserved_funds_while_the_cash_is_below_zero()
+    {
+        var act = () => Record(cashDelta: 0, reservedDelta: 50, resultingCash: -100, resultingReserved: 50);
+
+        act.Should().Throw<ArgumentOutOfRangeException>("reserved funds never exceed the cash above zero (FIN-10, DEBT-1)");
     }
 
     [Fact]

@@ -98,7 +98,7 @@ export interface PlayerContractSummary {
   readonly startSeasonNumber: number;
   readonly endSeasonNumber: number;
   readonly seasonsRemaining: number;
-  readonly weeklyWageMinor: number;
+  readonly seasonWageMinor: number;
   readonly squadStatus: string;
   readonly status: string;
 }
@@ -168,7 +168,7 @@ export interface SquadSummary {
   readonly goalkeepers: number;
   readonly meetsMinimum: boolean;
   readonly hasMinimumGoalkeepers: boolean;
-  readonly weeklyWageTotalMinor: number;
+  readonly seasonWageTotalMinor: number;
 }
 
 /** A club's squad. */
@@ -342,7 +342,7 @@ export interface PlayerContractRow {
   readonly startSeasonNumber: number;
   readonly endSeasonNumber: number;
   readonly seasonsRemaining: number;
-  readonly weeklyWageMinor: number;
+  readonly seasonWageMinor: number;
   readonly squadStatus: string;
   readonly status: string;
 }
@@ -354,7 +354,7 @@ export interface RenewalQuote {
   readonly seasons: number;
   readonly startSeasonNumber: number;
   readonly endSeasonNumber: number;
-  readonly weeklyWageMinor: number;
+  readonly seasonWageMinor: number;
 
   /** The contract's version at the moment it was quoted, sent back as `If-Match` when signing. */
   readonly contractVersion: number;
@@ -368,7 +368,7 @@ export interface ContractRenewal {
   readonly seasons: number;
   readonly startSeasonNumber: number;
   readonly endSeasonNumber: number;
-  readonly weeklyWageMinor: number;
+  readonly seasonWageMinor: number;
   readonly version: number;
   readonly serverTime: string;
 }
@@ -379,7 +379,7 @@ export interface ReleaseQuote {
   readonly playerId: string;
   readonly remainingWeeks: number;
   readonly payoutMinor: number;
-  readonly weeklyWageMinor: number;
+  readonly seasonWageMinor: number;
 
   /** The club's cash less what its bids have reserved. */
   readonly availableMinor: number;
@@ -401,7 +401,7 @@ export interface PlayerRelease {
   readonly playerId: string;
   readonly payoutMinor: number;
   readonly remainingWeeks: number;
-  readonly weeklyWageSavedMinor: number;
+  readonly seasonWageSavedMinor: number;
   readonly joinsPoolAt: string;
   readonly serverTime: string;
 }
@@ -411,7 +411,7 @@ export interface ContractList {
   readonly clubId: string;
   readonly clubName: string;
   readonly seasonNumber: number;
-  readonly weeklyWageTotalMinor: number;
+  readonly seasonWageTotalMinor: number;
   readonly contracts: readonly PlayerContractRow[];
   readonly serverTime: string;
 }

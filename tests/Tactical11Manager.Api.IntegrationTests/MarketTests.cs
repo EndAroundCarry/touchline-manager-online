@@ -159,7 +159,7 @@ public sealed class MarketTests : IAsyncLifetime
 
         listing.PlayerId.Should().Be(playerId, "TRF-1");
         listing.Status.Should().Be("open");
-        listing.GeneratedBuyerWageMinor.Should().BePositive("CON-5: the buyer's terms are shown before a bid");
+        listing.GeneratedBuyerSeasonWageMinor.Should().BePositive("CON-5: the buyer's terms are shown before a bid");
 
         // The same key and request returns the listing it already opened, not a second one (T-4).
         var replayed = await PostWithKeyAsync(client, "/api/v1/transfers/listings", body, key);
