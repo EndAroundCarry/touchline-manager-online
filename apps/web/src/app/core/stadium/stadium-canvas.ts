@@ -47,7 +47,18 @@ export type PartRole =
   | 'pillar'
   | 'mast'
   | 'lamp'
-  | 'region';
+  | 'region'
+  // The club's structures (`STRC-1`), drawn with the same camera and canvas.
+  | 'paving'
+  | 'tone'
+  | 'texture'
+  | 'awning'
+  | 'sign'
+  | 'hatch'
+  | 'furniture'
+  | 'parasol'
+  | 'person'
+  | 'goods';
 
 /** One shape of the drawing. A paint is `primary`, `secondary`, or a plain `#rrggbb`. */
 export interface ScenePart {

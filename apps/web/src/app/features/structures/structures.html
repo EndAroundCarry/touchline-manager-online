@@ -58,6 +58,19 @@
           </p>
         }
 
+        <figure class="rounded border border-line bg-panel p-3" data-testid="structures-figure">
+          <app-structure-picture
+            [kind]="building.kind"
+            [level]="building.level"
+            [primaryColour]="colours().primary"
+            [secondaryColour]="colours().secondary"
+          />
+          <figcaption class="mt-2 text-sm text-ink-2" data-testid="structures-caption">
+            Your {{ kindLabel(building.kind).toLowerCase() }} at level {{ building.level }}, in your
+            club's colours. Each level adds to the picture.
+          </figcaption>
+        </figure>
+
         <div class="mt-4 grid gap-4 md:grid-cols-2">
           <section
             class="rounded border border-line bg-panel p-4"

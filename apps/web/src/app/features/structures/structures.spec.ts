@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { MaintenanceStore } from '../../core/maintenance/maintenance-store';
 import { StructuresApi } from '../../core/structures/structures-api';
 import { Structure, Structures } from '../../core/structures/structures.models';
+import { OnboardingStore } from '../../core/world/onboarding-store';
 import { StructuresScreen } from './structures';
 
 /**
@@ -112,6 +113,12 @@ describe('Structures screen', () => {
         provideRouter([]),
         { provide: StructuresApi, useValue: api },
         { provide: MaintenanceStore, useValue: { canMutate } },
+        {
+          provide: OnboardingStore,
+          useValue: {
+            state: signal({ tenure: { primaryColour: '#b3202a', secondaryColour: '#ffffff' } }),
+          },
+        },
       ],
     });
   });
@@ -138,6 +145,22 @@ describe('Structures screen', () => {
       root.querySelectorAll('[data-testid="structures-pips"] li[data-reached="true"]'),
     ).toHaveLength(1);
     expect(root.querySelectorAll('[data-testid="structures-pips"] li')).toHaveLength(10);
+  });
+
+  it("draws each building at its level in the club's colours", async () => {
+    await render(structures({ level: 3 }, { level: 7 }));
+
+    const picture = () => root.querySelector('[data-testid="structure-picture"]')!;
+
+    expect(picture().getAttribute('data-kind')).toBe('snack_bar');
+    expect(picture().getAttribute('data-level')).toBe('3');
+    expect(picture().querySelector('path[fill="#b3202a"]')).not.toBeNull();
+    expect(text('[data-testid="structures-caption"]')).toContain('Your snack bar at level 3');
+
+    await openTab('merchandise');
+
+    expect(picture().getAttribute('data-kind')).toBe('merchandise');
+    expect(picture().getAttribute('data-level')).toBe('7');
   });
 
   it('shows the next level with its price, build time and profit change', async () => {

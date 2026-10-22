@@ -17,6 +17,7 @@ import {
 } from '../../core/structures/structures-presentation';
 import { StructuresStore } from '../../core/structures/structures-store';
 import { Structure, StructureKind } from '../../core/structures/structures.models';
+import { OnboardingStore } from '../../core/world/onboarding-store';
 import { formatFunds, preferredLocale } from '../../core/world/presentation';
 import {
   FORM_ERROR,
@@ -25,24 +26,37 @@ import {
   SECONDARY_BUTTON,
   STATUS_MESSAGE,
 } from '../../shared/forms/control-styles';
+import { StructurePicture } from './structure-picture';
 
 /**
  * The structures screen (`STRC-1`…`STRC-9`).
  *
  * Two buildings, each on its own tab: the snack bar, which earns from every spectator at a home match, and the
- * merchandise shop, which earns from every fan each week. A tab shows the level, what a customer spends and what
- * the building costs to keep, the next level with its price, build time and the profit it should add, the bonus
- * table with the line that applies marked, and the building's recent books. Every amount comes from the server;
- * the screen formats them and never works one out.
+ * merchandise shop, which earns from every fan each week. A tab shows a picture of the building at its level in the
+ * club's colours, as the stadium screen does; the level, what a customer spends and what the building costs to keep;
+ * the next level with its price, build time and the profit it should add; the bonus table with the line that applies
+ * marked; and the building's recent books. Every amount comes from the server; the screen formats them and never
+ * works one out.
  */
 @Component({
   selector: 'app-structures',
-  imports: [RouterLink],
+  imports: [RouterLink, StructurePicture],
   templateUrl: './structures.html',
 })
 export class StructuresScreen {
   private readonly store = inject(StructuresStore);
   private readonly maintenance = inject(MaintenanceStore);
+  private readonly onboarding = inject(OnboardingStore);
+
+  /** The club's two colours, for the picture; null until the manager's club has been read, which draws the fallbacks. */
+  protected readonly colours = computed(() => {
+    const tenure = this.onboarding.state()?.tenure ?? null;
+
+    return {
+      primary: tenure?.primaryColour ?? null,
+      secondary: tenure?.secondaryColour ?? null,
+    };
+  });
 
   protected readonly structures = this.store.structures;
   protected readonly loading = this.store.loading;
