@@ -4,7 +4,6 @@ using Tactical11Manager.MatchEngine;
 using Tactical11Manager.MatchEngine.Configuration;
 using Tactical11Manager.MatchEngine.Model;
 using Tactical11Manager.MatchEngine.Shootout;
-using Tactical11Manager.MatchEngine.Simulation;
 using Tactical11Manager.MatchEngine.Tick;
 
 namespace Tactical11Manager.SimulationBenchmarks;
@@ -62,7 +61,7 @@ internal static class PenaltyProbe
                 var keeperSide = line.Side == MatchSide.Home ? away : home;
                 var taker = takerSide.OnPitch.Single(slot => slot.Participant.ParticipantId == line.ParticipantId);
                 var keeper = keeperSide.OnPitch.FirstOrDefault(slot => slot.Participant.IsGoalkeeper);
-                var chance = SetPieceDirector.PenaltyGoalChance(taker, keeper, rules) / 10_000.0;
+                var chance = PenaltyShootout.KickChance(taker, keeper, rules) / 10_000.0;
 
                 rows.Add((
                     line.Side == MatchSide.Home ? homeLevel : awayLevel,

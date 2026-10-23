@@ -16,9 +16,11 @@ namespace Tactical11Manager.MatchEngine.Shootout;
 /// all untouched (ADR-0004); the caller runs it after the match when, and only when, a play-off ends level.
 /// </para>
 /// <para>
-/// Each kick uses the chance a penalty in open play has (<see cref="SetPieceDirector.PenaltyGoalChance"/>): the taker's
-/// finishing and composure against the goalkeeper's reflexes, inside the engine's bounds. The rolls come from a stream
-/// of their own, so they never coincide with the match's.
+/// Each kick uses the shape of the open-play penalty chance (<see cref="SetPieceDirector.PenaltyGoalChance"/>): the
+/// taker's finishing and composure against the goalkeeper's reflexes, around the same base and inside the same bounds.
+/// It reads the gap on a steeper scale (<see cref="ContestReference"/>), because the open-play formula moves a kick by
+/// under four points across the whole skill range, which would make a shoot-out between a great and a poor side a
+/// coin toss. The rolls come from a stream of their own, so they never coincide with the match's.
 /// </para>
 /// <para>
 /// A side's takers go in order of finishing, best first and then by identity, with the goalkeeper last. Each side
@@ -33,6 +35,13 @@ public static class PenaltyShootout
 
     /// <summary>The generator stream the shoot-out draws from, apart from every stream the match uses.</summary>
     public const ulong ShootoutStream = 0x5348_4F4F_544F_5554UL;
+
+    /// <summary>
+    /// The attribute gap, in points, at which a kick's swing applies in full. The open-play penalty uses 150, so a gap
+    /// of 19 moves it by 3.8 points; here it is 40, so a gap of 14 (a 20 against a 6) moves it by 10.5 and a gap of 8
+    /// by 6, with the engine's 55% to 94% bounds still in force.
+    /// </summary>
+    public const int ContestReference = 40;
 
     /// <summary>The most rounds a shoot-out may run before a coin settles it, which only a broken input could reach.</summary>
     private const int RoundCeiling = 1_000;
@@ -129,9 +138,35 @@ public static class PenaltyShootout
     private static ActiveSlot? KeeperOf(ShootoutSide side) =>
         side.OnPitch.FirstOrDefault(slot => slot.Participant.IsGoalkeeper);
 
+    /// <summary>Computes the chance a shoot-out kick goes in, in basis points.</summary>
+    /// <param name="taker">The taker.</param>
+    /// <param name="goalkeeper">The goalkeeper he faces, when the other side still has one.</param>
+    /// <param name="rules">The rules in force.</param>
+    public static int KickChance(ActiveSlot taker, ActiveSlot? goalkeeper, EngineRulesV2 rules)
+    {
+        ArgumentNullException.ThrowIfNull(taker);
+        ArgumentNullException.ThrowIfNull(rules);
+
+        var chance = rules.PenaltyGoalBasisPoints;
+
+        if (goalkeeper is not null)
+        {
+            var contest = ((EffectiveSkill.Hundredths(taker, MatchAttributeName.Finishing, rules)
+                    + EffectiveSkill.Hundredths(taker, MatchAttributeName.Composure, rules)) / 2)
+                - EffectiveSkill.Hundredths(goalkeeper, MatchAttributeName.Reflexes, rules);
+
+            chance += Probability.Swing(
+                contest,
+                rules.PenaltyQualitySwingBasisPoints,
+                ContestReference * EffectiveSkill.Scale);
+        }
+
+        return Probability.Band(chance, rules.PenaltyMinGoalBasisPoints, rules.PenaltyMaxGoalBasisPoints);
+    }
+
     private static ShootoutKickOutcome Kick(ActiveSlot taker, ActiveSlot? keeper, EngineRulesV2 rules, Pcg32 random)
     {
-        var chance = SetPieceDirector.PenaltyGoalChance(taker, keeper, rules);
+        var chance = KickChance(taker, keeper, rules);
 
         if (random.RollBasisPoints(chance))
         {

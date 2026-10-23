@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Tactical11Manager.MatchEngine.Configuration;
 using Tactical11Manager.MatchEngine.Model;
+using Tactical11Manager.MatchEngine.Ratings;
 using Tactical11Manager.MatchEngine.Shootout;
 
 namespace Tactical11Manager.MatchEngine.Tests;
@@ -265,8 +266,7 @@ public sealed class PenaltyShootoutTests
     [Fact]
     public void A_better_side_wins_more_often_but_not_always()
     {
-        // The penalty formula moves a kick by a few points at most (a 20 against a 1 is about 80% against 72%), so the
-        // better side is only a little ahead: the shoot-out stays a lottery, as it should.
+        // A 20 against a 1 is about 90% against 62% a kick: the better side wins most shoot-outs but not all.
         var input = TestMatchFactory.Build(1, homeAbility: 20, awayAbility: 1, new MatchInstructionsV1());
         var home = ShootoutSide.FromFullTime(input.Home, Lines(input.Home));
         var away = ShootoutSide.FromFullTime(input.Away, Lines(input.Away));
@@ -274,7 +274,30 @@ public sealed class PenaltyShootoutTests
         var homeWins = Enumerable.Range(1, 1_000)
             .Count(seed => PenaltyShootout.Run((ulong)seed, home, away, Regulation, Rules).Winner == MatchSide.Home);
 
-        homeWins.Should().BeGreaterThan(540).And.BeLessThan(900);
+        homeWins.Should().BeGreaterThan(800).And.BeLessThan(1_000);
+    }
+
+    [Fact]
+    public void Skill_moves_a_kick_more_than_an_open_play_penalty_but_stays_inside_its_bounds()
+    {
+        ActiveSlot Taker(int ability) => ShootoutSide.FromFullTime(
+            TestMatchFactory.Build(1, ability, 13, new MatchInstructionsV1()).Home,
+            Lines(TestMatchFactory.Build(1, ability, 13, new MatchInstructionsV1()).Home)).OnPitch.First(slot => !slot.Participant.IsGoalkeeper);
+
+        ActiveSlot Keeper(int ability) => ShootoutSide.FromFullTime(
+            TestMatchFactory.Build(1, 13, ability, new MatchInstructionsV1()).Away,
+            Lines(TestMatchFactory.Build(1, 13, ability, new MatchInstructionsV1()).Away)).OnPitch.Single(slot => slot.Participant.IsGoalkeeper);
+
+        var even = PenaltyShootout.KickChance(Taker(13), Keeper(13), Rules);
+        var best = PenaltyShootout.KickChance(Taker(20), Keeper(6), Rules);
+        var worst = PenaltyShootout.KickChance(Taker(6), Keeper(20), Rules);
+
+        even.Should().BeInRange(7_500, 7_700);
+        best.Should().BeGreaterThan(even + 800);
+        worst.Should().BeLessThan(even - 800);
+        best.Should().BeLessThanOrEqualTo(Rules.PenaltyMaxGoalBasisPoints);
+        worst.Should().BeGreaterThanOrEqualTo(Rules.PenaltyMinGoalBasisPoints);
+        PenaltyShootout.KickChance(Taker(13), null, Rules).Should().Be(Rules.PenaltyGoalBasisPoints);
     }
 
     [Fact]
