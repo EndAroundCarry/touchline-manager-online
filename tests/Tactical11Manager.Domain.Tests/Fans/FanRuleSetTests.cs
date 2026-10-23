@@ -227,6 +227,6 @@ public sealed class FanRuleSetTests
     [Fact]
     public void A_version_label_is_stamped_on_the_rules()
     {
-        FanRuleSet.Version.Should().Be("fan-rules-v1");
+        FanRuleSet.Version.Should().Be("fan-rules-v2");
     }
 }

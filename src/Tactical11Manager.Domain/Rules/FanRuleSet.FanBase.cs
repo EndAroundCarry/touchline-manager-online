@@ -28,29 +28,32 @@ public static partial class FanRuleSet
 
     // ---- how a result moves the count -----------------------------------------------------------------------------------------------
 
+    // The amounts below are paid for each match. They are the 34-match league's amounts times 34/30 (`fan-rules-v2`), so a 30-match season
+    // grows the fans as fast as a 34-match one did. The mood is not scaled: it is an average over matches, not a total over a season.
+
     /// <summary>People who want to come who join after a win the fans did not expect, expected points under <see cref="UnderdogBelowCentis"/> (`FAN-5`).</summary>
-    public const int JoinAfterUnderdogWin = 600;
+    public const int JoinAfterUnderdogWin = 680;
 
     /// <summary>People who join after winning an even game (`FAN-5`).</summary>
-    public const int JoinAfterEvenWin = 450;
+    public const int JoinAfterEvenWin = 510;
 
     /// <summary>People who join after winning as the favourite, expected points from <see cref="FavouriteFromCentis"/> (`FAN-5`).</summary>
-    public const int JoinAfterFavouriteWin = 325;
+    public const int JoinAfterFavouriteWin = 368;
 
     /// <summary>People who join after a draw the fans did not expect, which is worth less than a win as the favourite (`FAN-5`).</summary>
-    public const int JoinAfterUnderdogDraw = 100;
+    public const int JoinAfterUnderdogDraw = 113;
 
     /// <summary>People who leave after losing as the favourite (`FAN-5`).</summary>
-    public const int LeaveAfterFavouriteLoss = 300;
+    public const int LeaveAfterFavouriteLoss = 340;
 
     /// <summary>People who leave after losing an even game; losing as the underdog costs nothing (`FAN-5`).</summary>
-    public const int LeaveAfterEvenLoss = 250;
+    public const int LeaveAfterEvenLoss = 283;
 
     /// <summary>The least that is added to a join or a leave, in people who want to come; the amount is never below 0 once added (`FAN-5`).</summary>
-    public const int MatchRandomLow = -15;
+    public const int MatchRandomLow = -17;
 
     /// <summary>The most that is added to a join or a leave, in people who want to come (`FAN-5`).</summary>
-    public const int MatchRandomHigh = 50;
+    public const int MatchRandomHigh = 57;
 
     /// <summary>Expected points below which the fans see themselves as the underdog, in hundredths (`FAN-5`).</summary>
     public const int UnderdogBelowCentis = 100;
@@ -67,8 +70,8 @@ public static partial class FanRuleSet
     /// <summary>The tier below which a club gets no first-season boost: tier 1 gets two steps, tier 2 one, tier 3 none (`FAN-6`).</summary>
     public const int FirstSeasonBoostTiers = 3;
 
-    /// <summary>The matches over which the first-season boost is paid out: a 34-match league season (`FAN-6`).</summary>
-    public const int FirstSeasonMatches = 34;
+    /// <summary>The matches over which the first-season boost is paid out: a league season (`FAN-6`).</summary>
+    public const int FirstSeasonMatches = WorldRuleSet.MatchdaysPerSeason;
 
     /// <summary>The fans a club gains the moment it is promoted, per tier it climbs, in basis points (`FAN-7`).</summary>
     public const int PromotionBp = 1_000;
@@ -108,9 +111,9 @@ public static partial class FanRuleSet
     /// <summary>
     /// A constant added to the mood after every match, in basis points, so that a club which exactly meets what its fans expect stays at
     /// calm instead of slowly souring (`FAN-2`): the defeats that weigh more than the wins would otherwise pull it down.
-    /// Measured on the engine's own curve over a league (`FanRuleSetFanBaseTests`).
+    /// Measured on the engine's own curve over a 16-side league (`FanRuleSetFanBaseTests`); it is a per-match balance, so it is not scaled with the season length.
     /// </summary>
-    public const int NeutralOffsetBp = 88;
+    public const int NeutralOffsetBp = 90;
 
     /// <summary>What a place against the target is worth each week, in basis points of mood (`FAN-8`).</summary>
     public const int WeeklyPlaceBp = 40;
@@ -119,7 +122,7 @@ public static partial class FanRuleSet
     public const int WeeklyTrendBp = 100;
 
     /// <summary>The most places against the target that count in a review, either way (`FAN-8`).</summary>
-    public const int GapLimitPlaces = 6;
+    public const int GapLimitPlaces = 5;
 
     /// <summary>What each place against the target is worth in the season's last verdict, in basis points of mood (`FAN-8`).</summary>
     public const int VerdictPlaceBp = 150;

@@ -22,7 +22,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static partial class FanRuleSet
 {
     /// <summary>The version of the fan rules, stored with every fan row so a number can be traced to the rules that made it.</summary>
-    public const string Version = "fan-rules-v1";
+    public const string Version = "fan-rules-v2";
 
     /// <summary>How far apart the rows of the strength curve are, in hundredths of an attribute point.</summary>
     public const int CurveStepCentis = 50;

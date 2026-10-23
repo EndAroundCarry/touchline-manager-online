@@ -13,6 +13,8 @@ public sealed class FanRuleSetFanBaseTests
 {
     private const int Tier1 = 1;
 
+    private const int Clubs = WorldRuleSet.ClubsPerDivision;
+
     private static Guid Id(int n) => new(n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     private static FanBaseState Calm(int fans) => new(fans, FanRuleSet.CalmMoodBp);
@@ -71,10 +73,10 @@ public sealed class FanRuleSetFanBaseTests
 
         for (var fixture = 0; fixture < 4_000; fixture++)
         {
-            var random = FanRuleSet.MatchRandomFor(Id(fixture), Id(fixture % 18));
+            var random = FanRuleSet.MatchRandomFor(Id(fixture), Id(fixture % WorldRuleSet.ClubsPerDivision));
 
             random.Should().BeInRange(FanRuleSet.MatchRandomLow, FanRuleSet.MatchRandomHigh);
-            random.Should().Be(FanRuleSet.MatchRandomFor(Id(fixture), Id(fixture % 18)));
+            random.Should().Be(FanRuleSet.MatchRandomFor(Id(fixture), Id(fixture % WorldRuleSet.ClubsPerDivision)));
             seen.Add(random);
         }
 
@@ -101,12 +103,12 @@ public sealed class FanRuleSetFanBaseTests
     }
 
     [Theory]
-    [InlineData(60, 600)]
-    [InlineData(99, 600)]
-    [InlineData(100, 450)]
-    [InlineData(159, 450)]
-    [InlineData(160, 325)]
-    [InlineData(280, 325)]
+    [InlineData(60, FanRuleSet.JoinAfterUnderdogWin)]
+    [InlineData(99, FanRuleSet.JoinAfterUnderdogWin)]
+    [InlineData(100, FanRuleSet.JoinAfterEvenWin)]
+    [InlineData(159, FanRuleSet.JoinAfterEvenWin)]
+    [InlineData(160, FanRuleSet.JoinAfterFavouriteWin)]
+    [InlineData(280, FanRuleSet.JoinAfterFavouriteWin)]
     public void A_win_brings_fans_by_what_the_fans_expected(int expectedCentis, int people)
     {
         var random = FanRuleSet.MatchRandomFor(Id(7), Id(3));
@@ -117,7 +119,7 @@ public sealed class FanRuleSetFanBaseTests
     [Theory]
     [InlineData(0)]
     [InlineData(99)]
-    public void A_draw_the_fans_did_not_expect_brings_a_hundred(int expectedCentis)
+    public void A_draw_the_fans_did_not_expect_brings_a_little(int expectedCentis)
     {
         var random = FanRuleSet.MatchRandomFor(Id(7), Id(3));
 
@@ -135,10 +137,10 @@ public sealed class FanRuleSetFanBaseTests
     }
 
     [Theory]
-    [InlineData(160, 300)]
-    [InlineData(299, 300)]
-    [InlineData(100, 250)]
-    [InlineData(159, 250)]
+    [InlineData(160, FanRuleSet.LeaveAfterFavouriteLoss)]
+    [InlineData(299, FanRuleSet.LeaveAfterFavouriteLoss)]
+    [InlineData(100, FanRuleSet.LeaveAfterEvenLoss)]
+    [InlineData(159, FanRuleSet.LeaveAfterEvenLoss)]
     [InlineData(99, 0)]
     [InlineData(10, 0)]
     public void A_defeat_costs_fans_by_what_the_fans_expected(int expectedCentis, int people)
@@ -161,10 +163,13 @@ public sealed class FanRuleSetFanBaseTests
             losses.Add(-PeopleMoved(30_000, 130, 0, 3, fixture));
         }
 
-        gains.Min().Should().BeInRange(450 - 15 - 1, 450 - 15 + 3);
-        gains.Max().Should().BeInRange(450 + 50 - 3, 450 + 50 + 1);
-        losses.Min().Should().BeInRange(250 - 15 - 1, 250 - 15 + 3);
-        losses.Max().Should().BeInRange(250 + 50 - 3, 250 + 50 + 1);
+        const int Gain = FanRuleSet.JoinAfterEvenWin;
+        const int Loss = FanRuleSet.LeaveAfterEvenLoss;
+
+        gains.Min().Should().BeInRange(Gain + FanRuleSet.MatchRandomLow - 1, Gain + FanRuleSet.MatchRandomLow + 3);
+        gains.Max().Should().BeInRange(Gain + FanRuleSet.MatchRandomHigh - 3, Gain + FanRuleSet.MatchRandomHigh + 1);
+        losses.Min().Should().BeInRange(Loss + FanRuleSet.MatchRandomLow - 1, Loss + FanRuleSet.MatchRandomLow + 3);
+        losses.Max().Should().BeInRange(Loss + FanRuleSet.MatchRandomHigh - 3, Loss + FanRuleSet.MatchRandomHigh + 1);
     }
 
     [Fact]
@@ -329,7 +334,7 @@ public sealed class FanRuleSetFanBaseTests
     [Fact]
     public void A_review_on_target_changes_nothing_but_remembers_the_gap()
     {
-        var after = FanRuleSet.AfterWeek(new FanBaseState(30_000, 6_200), gap: 0, gamesPlayed: 17, seasonGames: 34);
+        var after = FanRuleSet.AfterWeek(new FanBaseState(30_000, 6_200), gap: 0, gamesPlayed: 15, seasonGames: WorldRuleSet.MatchdaysPerSeason);
 
         after.Should().Be(new FanBaseState(30_000, 6_200, 0));
     }
@@ -338,24 +343,25 @@ public sealed class FanRuleSetFanBaseTests
     public void A_review_below_the_target_costs_mood_by_the_place_and_the_part_of_the_season_gone()
     {
         // Four places short, half the season: -40 x 4 = -160, halved.
-        FanRuleSet.AfterWeek(Calm(30_000), 4, 17, 34).MoodBp.Should().Be(5_000 - 80);
-        FanRuleSet.AfterWeek(Calm(30_000), -4, 17, 34).MoodBp.Should().Be(5_000 + 80);
-        FanRuleSet.AfterWeek(Calm(30_000), 4, 34, 34).MoodBp.Should().Be(5_000 - 160);
-        FanRuleSet.AfterWeek(Calm(30_000), 4, 0, 34).MoodBp.Should().Be(5_000, "a review before a game is played counts for nothing");
+        FanRuleSet.AfterWeek(Calm(30_000), 4, 15, 30).MoodBp.Should().Be(5_000 - 80);
+        FanRuleSet.AfterWeek(Calm(30_000), -4, 15, 30).MoodBp.Should().Be(5_000 + 80);
+        FanRuleSet.AfterWeek(Calm(30_000), 4, 30, 30).MoodBp.Should().Be(5_000 - 160);
+        FanRuleSet.AfterWeek(Calm(30_000), 4, 0, 30).MoodBp.Should().Be(5_000, "a review before a game is played counts for nothing");
     }
 
     [Fact]
-    public void A_review_counts_at_most_six_places_of_gap()
+    public void A_review_counts_at_most_five_places_of_gap()
     {
-        FanRuleSet.AfterWeek(Calm(30_000), 6, 34, 34).MoodBp.Should().Be(FanRuleSet.AfterWeek(Calm(30_000), 16, 34, 34).MoodBp);
-        FanRuleSet.AfterWeek(Calm(30_000), -6, 34, 34).MoodBp.Should().Be(FanRuleSet.AfterWeek(Calm(30_000), -16, 34, 34).MoodBp);
+        FanRuleSet.AfterWeek(Calm(30_000), 5, 30, 30).MoodBp.Should().Be(FanRuleSet.AfterWeek(Calm(30_000), 15, 30, 30).MoodBp);
+        FanRuleSet.AfterWeek(Calm(30_000), -5, 30, 30).MoodBp.Should().Be(FanRuleSet.AfterWeek(Calm(30_000), -15, 30, 30).MoodBp);
+        FanRuleSet.AfterWeek(Calm(30_000), 4, 30, 30).MoodBp.Should().BeGreaterThan(FanRuleSet.AfterWeek(Calm(30_000), 5, 30, 30).MoodBp);
     }
 
     [Fact]
     public void A_club_closing_in_on_its_target_is_rewarded_and_one_falling_away_is_punished()
     {
-        var closing = FanRuleSet.AfterWeek(new FanBaseState(30_000, 5_000, 6), 4, 34, 34);
-        var falling = FanRuleSet.AfterWeek(new FanBaseState(30_000, 5_000, 2), 4, 34, 34);
+        var closing = FanRuleSet.AfterWeek(new FanBaseState(30_000, 5_000, 6), 4, 30, 30);
+        var falling = FanRuleSet.AfterWeek(new FanBaseState(30_000, 5_000, 2), 4, 30, 30);
 
         closing.MoodBp.Should().Be(5_000 - 160 + 200, "two places closer since last week");
         falling.MoodBp.Should().Be(5_000 - 160 - 200, "two places further");
@@ -365,8 +371,8 @@ public sealed class FanRuleSetFanBaseTests
     [Fact]
     public void A_review_leaves_the_count_alone_and_keeps_the_mood_on_its_scale()
     {
-        var low = FanRuleSet.AfterWeek(new FanBaseState(30_000, 50, 0), 6, 34, 34);
-        var high = FanRuleSet.AfterWeek(new FanBaseState(30_000, 9_990, 0), -6, 34, 34);
+        var low = FanRuleSet.AfterWeek(new FanBaseState(30_000, 50, 0), 5, 30, 30);
+        var high = FanRuleSet.AfterWeek(new FanBaseState(30_000, 9_990, 0), -5, 30, 30);
 
         low.MoodBp.Should().BeGreaterThanOrEqualTo(0);
         high.MoodBp.Should().BeLessThanOrEqualTo(FanRuleSet.MoodMaxBp);
@@ -434,22 +440,22 @@ public sealed class FanRuleSetFanBaseTests
 
     // ---- the league ---------------------------------------------------------------------------------------------------------------
 
-    /// <summary>The strength of each of the 18 sides in a league the way the sandbox spread them: a rank apart is 0.30 of an attribute point.</summary>
+    /// <summary>The strength of each side in a league the way the sandbox spread them: a rank apart is 0.30 of an attribute point.</summary>
     private static int[] LeagueStrengths()
     {
-        var strengths = new int[18];
+        var strengths = new int[Clubs];
 
         strengths[0] = 1_500;
 
-        for (var club = 1; club < 18; club++)
+        for (var club = 1; club < Clubs; club++)
         {
-            strengths[club] = 1_500 + ((club - 9) * 30);
+            strengths[club] = 1_500 + ((club - (Clubs / 2)) * 30);
         }
 
         return strengths;
     }
 
-    /// <summary>The exact mean of <see cref="FanRuleSet.MatchMoodShiftBp"/> over every match of an 18-side league, from each side's point of view.</summary>
+    /// <summary>The exact mean of <see cref="FanRuleSet.MatchMoodShiftBp"/> over every match of a league, from each side's point of view.</summary>
     private static double MeanShiftOverALeagueBp()
     {
         var strengths = LeagueStrengths();
@@ -545,7 +551,7 @@ public sealed class FanRuleSetFanBaseTests
 
     private sealed record ClubRun(IReadOnlyList<int> FansAtSeasonEnd, IReadOnlyList<int> MoodAfterEachMatch, int FansAtStart, IReadOnlyList<int> Places);
 
-    /// <summary>Plays an 18-side league for several seasons with the club under test as side 0, and follows its fans.</summary>
+    /// <summary>Plays a league for several seasons with the club under test as side 0, and follows its fans.</summary>
     private static ClubRun Simulate(int hiddenSkillCentis, int seasons, ulong seed, bool weeklyReviews)
     {
         var strengths = LeagueStrengths();
@@ -555,7 +561,7 @@ public sealed class FanRuleSetFanBaseTests
 
         var target = 1 + strengths.Skip(1).Count(strength => strength > strengths[0]);
         var random = new Pcg32(seed);
-        var rounds = Schedule(18);
+        var rounds = Schedule(Clubs);
         var state = FanRuleSet.OpeningFor(Tier1);
         var start = state.Fans;
         var ends = new List<int>();
@@ -564,9 +570,9 @@ public sealed class FanRuleSetFanBaseTests
 
         for (var season = 0; season < seasons; season++)
         {
-            var points = new int[18];
-            var games = new int[18];
-            var goalDifference = new int[18];
+            var points = new int[Clubs];
+            var games = new int[Clubs];
+            var goalDifference = new int[Clubs];
 
             for (var round = 0; round < rounds.Count; round++)
             {
@@ -622,7 +628,7 @@ public sealed class FanRuleSetFanBaseTests
     }
 
     private static int PlaceOfClub0(int[] points, int[] goalDifference) =>
-        1 + Enumerable.Range(1, 17).Count(club => points[club] > points[0] || (points[club] == points[0] && goalDifference[club] > goalDifference[0]));
+        1 + Enumerable.Range(1, Clubs - 1).Count(club => points[club] > points[0] || (points[club] == points[0] && goalDifference[club] > goalDifference[0]));
 
     /// <summary>Draws a result from the curve's chances, then a score for it from two Poisson laws around the curve's goals.</summary>
     private static (int Home, int Away) PlayMatch(FanExpectation homeView, (int HomeGoalsCentis, int AwayGoalsCentis) goals, Pcg32 random)
@@ -659,7 +665,7 @@ public sealed class FanRuleSetFanBaseTests
         return goals;
     }
 
-    /// <summary>A double round robin by the circle method: 34 rounds of 9 fixtures, the second half the first with the venues swapped.</summary>
+    /// <summary>A double round robin by the circle method: the second half is the first with the venues swapped.</summary>
     private static List<List<(int Home, int Away)>> Schedule(int clubs)
     {
         var order = Enumerable.Range(0, clubs).ToArray();
