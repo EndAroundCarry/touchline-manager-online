@@ -229,8 +229,8 @@ public sealed class ClubClaimTests : WorldTestBase
     [Fact]
     public async Task Claiming_down_to_thirty_per_cent_free_requests_the_next_league_once_and_a_full_country_then_refuses()
     {
-        // PYR-2 and PYR-10: the 23rd manager of 32 leaves 9 clubs free, which is 30 per cent, so division 2.2 is requested
-        // then and not a claim sooner; the claims carry on while it builds, and once the country is full the next manager
+        // PYR-2 and PYR-10: the 23rd manager of 32 leaves 9 clubs free, which is 30 per cent, so division 3.1 is requested
+        // (2.2 is held back until the play-off covers two feeders) then and not a claim sooner; the claims carry on while it builds, and once the country is full the next manager
         // is told to wait rather than told to pick another club that does not exist.
         var countryId = CountryId("GER");
 
@@ -267,8 +267,8 @@ public sealed class ClubClaimTests : WorldTestBase
             requests.Should().HaveCount(
                 1,
                 "one request in flight per country: the nine claims after the trigger queue nothing more");
-            requests[0].TargetTier.Should().Be(WorldRuleSet.SeededTiers);
-            requests[0].TargetLeagueNumber.Should().Be(2, "PYR-15: the second league of tier 2 comes first");
+            requests[0].TargetTier.Should().Be(WorldRuleSet.SeededTiers + 1, "a tier holds one league while the hold is on");
+            requests[0].TargetLeagueNumber.Should().Be(1, "PYR-15: 2.2 is held back, so the next tier opens with its first league");
             requests[0].Status.Should().Be(ProvisioningRequestStatus.Requested);
 
             var capacity = await scope.ServiceProvider
@@ -291,7 +291,7 @@ public sealed class ClubClaimTests : WorldTestBase
 
             refused.Outcome.Should().Be(ClaimClubOutcome.CapacityProvisioning);
             refused.Provisioning.Should().NotBeNull();
-            refused.Provisioning!.TargetTier.Should().Be(WorldRuleSet.SeededTiers);
+            refused.Provisioning!.TargetTier.Should().Be(WorldRuleSet.SeededTiers + 1);
             refused.Dashboard.Should().BeNull("PYR-10 forbids partially assigning a club");
 
             (await db.DivisionProvisioningRequests.CountAsync(request => request.CountryId == countryId))

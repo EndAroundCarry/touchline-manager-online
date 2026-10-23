@@ -44,13 +44,13 @@ public sealed class CountryCapacityTests
     }
 
     [Theory]
-    [InlineData(32, 23, 2, 2)]
-    [InlineData(48, 34, 3, 1)]
-    [InlineData(64, 45, 3, 2)]
-    [InlineData(80, 56, 3, 3)]
-    [InlineData(96, 68, 3, 4)]
-    [InlineData(112, 79, 4, 1)]
-    public void Each_trigger_point_asks_for_the_next_league_of_the_pyramid(int clubs, int managers, int tier, int league)
+    [InlineData(32, 23, 3, 1)]
+    [InlineData(48, 34, 4, 1)]
+    [InlineData(64, 45, 5, 1)]
+    [InlineData(80, 56, 6, 1)]
+    [InlineData(96, 68, 7, 1)]
+    [InlineData(112, 79, 8, 1)]
+    public void Each_trigger_point_asks_for_the_next_tier_while_a_tier_holds_one_league(int clubs, int managers, int tier, int league)
     {
         var capacity = Measure(clubs, managers);
 
@@ -70,10 +70,10 @@ public sealed class CountryCapacityTests
     }
 
     [Fact]
-    public void A_tier_with_room_takes_the_next_league_and_a_full_tier_opens_the_one_below()
+    public void While_a_tier_holds_one_league_the_target_is_always_the_tier_below()
     {
-        Measure(clubs: 32, occupied: 0).TargetLeague.Should().Be(new PyramidLeague(2, 2, 1));
-        Measure(clubs: 112, occupied: 0).TargetLeague.Should().Be(new PyramidLeague(4, 1, 1));
+        Measure(clubs: 32, occupied: 0).TargetLeague.Should().Be(new PyramidLeague(3, 1, 1), "2.2 is held back");
+        Measure(clubs: 112, occupied: 0).TargetLeague.Should().Be(new PyramidLeague(8, 1, 1));
         CountryCapacity.Measure(CountryId, 4, Guid.CreateVersion7(), 240, 0, FullPyramid(upToTier: 4))
             .TargetLeague.Should().Be(new PyramidLeague(5, 1, 1), "tier 4 holds eight leagues, so tier 5 opens after 4.8");
     }
