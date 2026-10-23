@@ -15,7 +15,7 @@ namespace Tactical11Manager.Infrastructure.Tests.Competition;
 /// </summary>
 /// <remarks>
 /// Its own container rather than the world collection's, deliberately. Those tests assert what a *freshly
-/// seeded* world looks like — thirty-four rounds, every fixture still scheduled, every club on nought points
+/// seeded* world looks like — thirty rounds, every fixture still scheduled, every club on nought points
 /// — and a world somebody has played a round in is no longer that world. A fixture per purpose is cheaper
 /// than an assertion that has to be weakened to accommodate the tests that mutate what it checks.
 /// </remarks>

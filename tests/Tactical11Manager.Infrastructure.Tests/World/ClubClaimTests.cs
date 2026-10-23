@@ -229,7 +229,7 @@ public sealed class ClubClaimTests : WorldTestBase
     [Fact]
     public async Task Filling_a_tier_creates_exactly_one_provisioning_request_and_then_refuses_with_capacity()
     {
-        // PYR-2 and PYR-10: the eighteenth manager triggers the next tier; the nineteenth is told to wait
+        // PYR-2 and PYR-10: the sixteenth manager triggers the next tier; the seventeenth is told to wait
         // rather than told to pick another club that does not exist.
         var countryId = CountryId("GER");
 

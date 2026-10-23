@@ -165,12 +165,12 @@ public sealed class FixtureAndMatchdayTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(35)]
+    [InlineData(WorldRuleSet.MatchdaysPerSeason + 1)]
     public void A_matchday_round_must_be_within_the_season(int round)
     {
         var act = () => Matchday.Schedule(Guid.CreateVersion7(), Guid.CreateVersion7(), round, Now, Now);
 
-        act.Should().Throw<ArgumentOutOfRangeException>("CAL-1 fixes the season at thirty-four rounds");
+        act.Should().Throw<ArgumentOutOfRangeException>("CAL-1 fixes the season at thirty rounds");
     }
 
     [Fact]

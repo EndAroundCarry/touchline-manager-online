@@ -1,8 +1,8 @@
 // Shared configuration for the Stage 14 load suite (master plan §14 SLOs, §16 Stage 14).
 //
-// The population model is the MVP world itself. Six countries of eighteen clubs is 108 clubs, so one
-// human manager per club is 108 concurrent users; the stage requires three times headroom, which is
-// 324 virtual users. Every scenario scales from these numbers rather than hard-coding them, so a
+// The population model is the MVP world itself. Six countries of sixteen clubs is 96 clubs, so one
+// human manager per club is 96 concurrent users; the stage requires three times headroom, which is
+// 288 virtual users. Every scenario scales from these numbers rather than hard-coding them, so a
 // change to the model moves the whole suite.
 //
 // `LOAD_SMOKE=1` shrinks every scenario and window so the scripts can be checked in seconds against a
@@ -10,10 +10,10 @@
 
 export const POPULATION = {
   countries: 6,
-  clubsPerCountry: 18,
-  managers: 108,
+  clubsPerCountry: 16,
+  managers: 96,
   headroom: 3,
-  virtualUsers: 324,
+  virtualUsers: 288,
 };
 
 // The service-level objectives the run is measured against (master plan §14).

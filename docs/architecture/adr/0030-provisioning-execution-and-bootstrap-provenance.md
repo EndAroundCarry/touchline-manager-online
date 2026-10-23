@@ -1,6 +1,7 @@
 # ADR-0030: Provisioning execution is a worker job under the country lock, and a backfilled round is marked as generated history
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): a provisioned tier is 16 clubs with a 30-round schedule, not 18 and 34, and the backfill counts follow.
 - **Date:** 2026-09-28
 - **Stage:** 11
 - **Related:** [ADR-0001](0001-modular-monolith.md), [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0005](0005-dynamic-pyramid-and-backfill.md), [ADR-0010](0010-club-takeover-serialisation.md), [ADR-0014](0014-matchday-lock-resolution-and-publication.md), game rules `PYR-2`–`PYR-8`, `PYR-11`, `PYR-14`, master plan §6.3, §16 Stage 11

@@ -48,7 +48,7 @@ public sealed class MatchdayWorkflowTests
     private MatchdayFixture Fixture { get; }
 
     [Fact]
-    public async Task A_seeded_division_opens_with_a_table_of_eighteen_clubs()
+    public async Task A_seeded_division_opens_with_a_table_of_sixteen_clubs()
     {
         await using var scope = Fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -725,7 +725,7 @@ public sealed class MatchdayWorkflowTests
             .Select(matchday => matchday.Id)
             .FirstOrDefaultAsync();
 
-        matchdayId.Should().NotBeEmpty("the seeded world has thirty-four rounds and these tests use a handful");
+        matchdayId.Should().NotBeEmpty("the seeded world has thirty rounds and these tests use a handful");
 
         return matchdayId;
     }

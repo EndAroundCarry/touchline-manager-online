@@ -1,6 +1,7 @@
 # ADR-0005: Dynamic pyramid expansion with deterministic backfill
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): a division now has 16 clubs, not 18, so the pyramid fills and provisions at 16 and a generated tier is 16 clubs and a 30-round schedule.
 - **Date:** 2026-09-23
 - **Stage:** 0 (partial in Stage 3, full in Stage 11)
 - **Related:** [`../../product/game-rules.md`](../../product/game-rules.md) §3.2, [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0004](0004-deterministic-match-engine.md)

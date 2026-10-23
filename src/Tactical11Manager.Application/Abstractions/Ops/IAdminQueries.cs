@@ -119,7 +119,7 @@ public sealed record AdminFixtureStatus(
     AdminSimulationAttempt? LatestAttempt);
 
 /// <summary>
-/// The operator's view of one round: the publication state, the nine fixtures with their simulation
+/// The operator's view of one round: the publication state, the eight fixtures with their simulation
 /// evidence, and the three jobs that drive it (master plan §13, `F-46`).
 /// </summary>
 /// <param name="Id">The matchday's identity.</param>

@@ -90,7 +90,7 @@ public sealed record AiClubPlan(
 /// different author.
 /// </para>
 /// <para>
-/// The tactics vary by club, because a division of eighteen identical 4-4-2s is not a football league; the
+/// The tactics vary by club, because a division of sixteen identical 4-4-2s is not a football league; the
 /// training does not, because the training choice is a persistent development path rather than a
 /// match-to-match lever, and a club permanently dealt a random intensity would be a fairness problem
 /// rather than variety. The AI therefore trains at <see cref="TrainingIntensity.Normal"/> and gives no

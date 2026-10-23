@@ -257,7 +257,7 @@ public sealed class ProjectionRebuildTests
             .Select(matchday => matchday.Id)
             .FirstOrDefaultAsync();
 
-        matchdayId.Should().NotBeEmpty("the seeded world has thirty-four rounds and these tests use a handful");
+        matchdayId.Should().NotBeEmpty("the seeded world has thirty rounds and these tests use a handful");
 
         return matchdayId;
     }

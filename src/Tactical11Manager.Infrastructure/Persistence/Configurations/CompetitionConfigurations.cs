@@ -63,7 +63,7 @@ internal sealed class SeasonConfiguration : IEntityTypeConfiguration<Season>
 /// <summary>
 /// Maps <c>competition.divisions</c>. The unique index on <c>(country_id, tier_number)</c> is what
 /// makes a duplicate tier impossible even if two provisioning runs raced past every application check
-/// (`PYR-3`), and the capacity check pins every division at 18 clubs (`WORLD-4`).
+/// (`PYR-3`), and the capacity check allows the 16 clubs of today and the 18 of past seasons (`WORLD-4`); the domain pins the current size.
 /// </summary>
 internal sealed class DivisionConfiguration : IEntityTypeConfiguration<Division>
 {
@@ -258,7 +258,7 @@ internal sealed class ClubSeasonEntryConfiguration : IEntityTypeConfiguration<Cl
 /// publishes (`CAL-10`).
 /// </summary>
 /// <remarks>
-/// The unique index on <c>(division_season_id, round_number)</c> is what makes "34 rounds, one row each"
+/// The unique index on <c>(division_season_id, round_number)</c> is what makes "30 rounds, one row each"
 /// a database fact rather than a generation promise, and the lock check keeps the derived lock instant
 /// from drifting past the kickoff it belongs to (`CAL-3`).
 /// </remarks>

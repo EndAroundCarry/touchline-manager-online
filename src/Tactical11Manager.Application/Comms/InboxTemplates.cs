@@ -87,7 +87,7 @@ public static class InboxTemplates
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
     /// <summary>Builds the message a club's result in a round produces.</summary>
-    /// <param name="roundNumber">The round, 1–34.</param>
+    /// <param name="roundNumber">The round, 1–30.</param>
     /// <param name="opponentName">The opponent's generated name.</param>
     /// <param name="isHome">Whether the club hosted.</param>
     /// <param name="goalsFor">The club's goals.</param>
@@ -111,7 +111,7 @@ public static class InboxTemplates
             matchId);
 
     /// <summary>Builds the message a club's changed league position produces.</summary>
-    /// <param name="roundNumber">The round, 1–34.</param>
+    /// <param name="roundNumber">The round, 1–30.</param>
     /// <param name="position">The club's new position.</param>
     /// <param name="previousPosition">The position it held before the round.</param>
     public static InboxDraft Table(int roundNumber, int position, int previousPosition) =>

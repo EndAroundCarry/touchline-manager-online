@@ -31,7 +31,7 @@ public sealed record FixtureRow(
 
 /// <summary>One round of a division's season, with the fixtures it comprises (`CAL-10`).</summary>
 /// <param name="Id">The matchday identity.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="LockAt">When team sheets lock (`CAL-3`).</param>
 /// <param name="KickoffAt">The round's kickoff (`CAL-2`).</param>
 /// <param name="PublicationStatus">Whether the round is pending, staged, or published (`MAT-7`).</param>
@@ -69,7 +69,7 @@ public sealed record DivisionFixturesSnapshot(
 
 /// <summary>One of a club's fixtures, from that club's point of view.</summary>
 /// <param name="Id">The fixture identity.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="IsHome">Whether the club hosts.</param>
 /// <param name="OpponentClubId">The other club.</param>
 /// <param name="OpponentName">The other club's name.</param>
@@ -147,7 +147,7 @@ public sealed record FixtureSideRow(
 /// <param name="DivisionName">The division's generated name.</param>
 /// <param name="TierNumber">The tier number.</param>
 /// <param name="CountryCode">The country's stable code.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="LockAt">When team sheets lock (`CAL-3`).</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="Status">The lifecycle state.</param>

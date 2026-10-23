@@ -47,7 +47,7 @@ public static class SimulationAttemptStatuses
 /// <remarks>
 /// <para>
 /// Attempts exist so a failure is a durable fact rather than a log line. A matchday that cannot simulate
-/// one of its nine fixtures must not publish the other eight (`MAT-7`), and the operations answer to
+/// one of its eight fixtures must not publish the other seven (`MAT-7`), and the operations answer to
 /// "why is this round stuck?" is the failed attempt rows, which name the engine version, the input hash,
 /// and the error category without any partial result having been written.
 /// </para>

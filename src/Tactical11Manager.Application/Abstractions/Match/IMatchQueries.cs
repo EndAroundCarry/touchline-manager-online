@@ -42,7 +42,7 @@ public sealed record MatchClubRow(
 /// <param name="CountryName">The country's display name.</param>
 /// <param name="SeasonNumber">The season's ordinal.</param>
 /// <param name="SeasonLabel">The season's display label.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="EngineVersion">The engine version that produced the result.</param>
 /// <param name="RuleSetVersion">The rules version the result was produced under.</param>

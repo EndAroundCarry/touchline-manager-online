@@ -103,7 +103,7 @@ public sealed class EconomyRuleSetTests
         table[1].Should().Be(547_400_000, "the second place");
         table[2].Should().Be(476_000_000, "the third place");
         table[^1].Should().Be(34_000_000, "the last place gets one share");
-        (table.Sum() / table.Count).Should().BeInRange(290_000_000, 305_000_000, "the average club keeps the prize it had on 18 clubs at 300k a share");
+        (table.Sum() / table.Count).Should().BeInRange(290_000_000, 305_000_000, "the average club keeps about the prize it had on 18 clubs at 300k a share (340k a share on 16)");
     }
 
     [Fact]

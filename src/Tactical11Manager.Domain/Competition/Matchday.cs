@@ -3,7 +3,7 @@ using Tactical11Manager.Domain.Rules;
 namespace Tactical11Manager.Domain.Competition;
 
 /// <summary>
-/// One round of one division's season: the nine fixtures played together, and the whole unit that locks,
+/// One round of one division's season: the eight fixtures played together, and the whole unit that locks,
 /// resolves, and publishes (`CAL-10`, `MAT-7`).
 /// </summary>
 /// <remarks>

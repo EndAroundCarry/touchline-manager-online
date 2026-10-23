@@ -84,7 +84,7 @@ public static class GenerationRuns
 /// <para>
 /// The seed and generator version are the reproducibility contract: the same pair must produce the
 /// same logical output. The counts are stored as ordinary columns rather than a JSONB blob because
-/// operations query them — "did the last three provisioning runs produce 18 clubs each?" is a question
+/// operations query them — "did the last three provisioning runs produce 16 clubs each?" is a question
 /// a runbook asks, and the JSONB policy forbids putting a queryable field in a document (`JSN-4`).
 /// </para>
 /// <para>

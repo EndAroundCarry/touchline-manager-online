@@ -7,7 +7,7 @@ namespace Tactical11Manager.Application.Abstractions.Squad;
 /// <param name="FixtureId">The fixture.</param>
 /// <param name="DivisionId">The division.</param>
 /// <param name="DivisionName">The division's generated name.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="LockAt">When the sheet locks (`CAL-3`).</param>
 /// <param name="Status">The fixture's lifecycle state.</param>

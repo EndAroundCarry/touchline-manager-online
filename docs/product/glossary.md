@@ -12,14 +12,14 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 |---|---|
 | **World** | The single persistent game universe containing all countries, divisions, clubs, players, seasons, finances, and history. Production runs exactly one (`WORLD-1`). Schemas still carry `world_id` so test worlds are possible. |
 | **Country** | One of the six fictional national pyramids: England, Spain, Germany, Italy, France, Romania (`WORLD-2`). A country owns its divisions, clubs, and name pools. |
-| **Division** | A competitive tier within a country, identified by `tier_number >= 1`. Every active division has exactly 18 clubs (`WORLD-4`). Tiers are monotonic: once created, never removed (`PYR-12`). |
+| **Division** | A competitive tier within a country, identified by `tier_number >= 1`. Every active division has exactly 16 clubs (`WORLD-4`). Tiers are monotonic: once created, never removed (`PYR-12`). |
 | **Division-season** | The instance of a division playing one specific season. Fixtures, matchdays, standings, and season stats hang off the division-season, never off the division directly. |
-| **Season** | One full competitive cycle in a country: 34 matchdays of double round-robin play, followed by a seven-day rollover (`CAL-1`, `CAL-6`). |
+| **Season** | One full competitive cycle in a country: 30 matchdays of double round-robin play, followed by a rollover of nine days that completes a fixed 11-week cycle (`CAL-1`, `CAL-6`). |
 | **Game year** | The in-fiction year. Advances by exactly one at season rollover. Player aging and contract years follow the game year, not real elapsed time (`TIME-3`). |
 | **Rollover** | The resumable workflow between seasons that finalizes standings, applies promotion/relegation, settles money and awards, expires and renews contracts, ages players, moves clubs, and generates the next schedule. |
-| **Matchday** | A single round (1–34) of a division-season: nine fixtures played at one kickoff instant, locking 30 minutes earlier, publishing as an atomic unit (`CAL-10`, `MAT-7`). |
+| **Matchday** | A single round (1–30) of a division-season: eight fixtures played at one kickoff instant, locking 30 minutes earlier, publishing as an atomic unit (`CAL-10`, `MAT-7`). |
 | **Fixture** | One scheduled match between a home club and an away club inside a matchday. A fixture owns its lock time, status lifecycle, team sheets, input snapshot, and result. |
-| **Schedule** | The generated fixture list for a division-season: 34 rounds produced by a circle/Berger algorithm and mirrored, validated for the properties in `CAL-9`. |
+| **Schedule** | The generated fixture list for a division-season: 30 rounds produced by a circle/Berger algorithm and mirrored, validated for the properties in `CAL-9`. |
 | **League table / standings** | The transactional projection of published fixtures into played/won/drawn/lost, goals, points, cards, and rank, ordered by `TBL-2` … `TBL-10`. Exactly rebuildable (`TBL-13`). |
 
 ## People and control

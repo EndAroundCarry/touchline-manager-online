@@ -3,6 +3,7 @@
 > **Stage:** 0 (master plan §16)
 > **Status:** Complete, with three decisions requested before the stages that depend on them.
 > **Date:** 2026-09-23
+> **Superseded in part (2026-10-23):** the arithmetic below is for 18 clubs and 34 matchdays, as it was reviewed. Since [ADR-0083](../architecture/adr/0083-sixteen-clubs-and-thirty-matchdays.md) a division has 16 clubs and a season 30 matchdays (8 fixtures a round, 240 a division-season, 96 initial clubs) on a fixed 11-week cycle. The review is kept as written.
 
 ---
 

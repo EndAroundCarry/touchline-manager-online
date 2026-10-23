@@ -41,7 +41,7 @@ public sealed record TeamSheetSlotResponse(
 /// <param name="Venue">The caller's side: <c>home</c> or <c>away</c>.</param>
 /// <param name="DivisionId">The division.</param>
 /// <param name="DivisionName">The division's generated name.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="LockAt">When the sheet locks, thirty minutes before kickoff (`CAL-3`).</param>
 /// <param name="FixtureStatus">The fixture's lifecycle state.</param>

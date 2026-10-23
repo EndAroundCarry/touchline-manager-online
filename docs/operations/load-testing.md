@@ -6,9 +6,9 @@ The scripts live in [`tests/load/`](../../tests/load/README.md).
 
 ## The population model
 
-One world of six countries with eighteen clubs each is **108 clubs**, so one human manager per club is
-**108 concurrent users**. The stage requires at least three times headroom, which the suite models as
-**324 virtual users**. Both numbers live in `tests/load/config.js`; every scenario scales from them.
+One world of six countries with sixteen clubs each is **96 clubs**, so one human manager per club is
+**96 concurrent users**. The stage requires at least three times headroom, which the suite models as
+**288 virtual users**. Both numbers live in `tests/load/config.js`; every scenario scales from them.
 
 ## The objectives
 
@@ -27,7 +27,7 @@ so `http_req_failed` keeps its meaning: a `5xx` is what fails.
 ## Running it
 
 ```bash
-# 1. Raise the rate limits — a 324-client login burst and a 108-account seed would otherwise be
+# 1. Raise the rate limits — a 288-client login burst and a 96-account seed would otherwise be
 #    throttled, and the run would measure the limiter instead of the system.
 #    Windows (cmd):  set RateLimiting__AuthPermitLimit=100000   (and the market limits)
 #    macOS / Linux:  RateLimiting__AuthPermitLimit=100000 npm run dev

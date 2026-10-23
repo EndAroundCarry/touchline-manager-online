@@ -262,10 +262,10 @@ public sealed class WorldPersistenceTests
     }
 
     [Fact]
-    public async Task A_division_must_hold_exactly_eighteen_clubs()
+    public async Task A_division_must_hold_a_legal_number_of_clubs()
     {
-        // WORLD-4: "18" is the only legal division size in the MVP, and it is enforced in the schema so
-        // no generated tier can be a different shape.
+        // WORLD-4: 16 is the only legal division size in the MVP (18 stays legal in the schema for past seasons),
+        // and the schema refuses any other so no generated tier can be a different shape.
         await using var scope = _fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
 

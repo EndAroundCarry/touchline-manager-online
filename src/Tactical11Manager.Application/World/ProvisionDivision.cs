@@ -252,7 +252,7 @@ public sealed partial class ProvisionDivision
             await transaction.CommitAsync(cancellationToken);
         }
 
-        // Phase two: give the eighteen new AI clubs a default side and training plan (INS-12).
+        // Phase two: give the sixteen new AI clubs a default side and training plan (INS-12).
         await _aiClubs.ExecuteAsync(cancellationToken);
 
         // Phase three: backfill the matchdays already passed this season, in round order (PYR-6).

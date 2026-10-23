@@ -62,7 +62,7 @@ The public MVP MUST provide:
 - One active manager career/club tenure per account.
 - Country selection and atomic takeover of an AI-controlled club.
 - A single persistent world containing six independent fictional national pyramids.
-- One initial 18-club top division in every launch country.
+- One initial 16-club top division in every launch country.
 - Automatic lower-tier creation whenever the current lowest tier in a country reaches 18/18 active human managers.
 - AI control for vacant clubs and all clubs without a human tenure.
 - Three scheduled league matchdays each week: Tuesday, Thursday, and Sunday.
@@ -108,7 +108,7 @@ Do not put these on the public MVP critical path:
 8. The server locks the next fixture 30 minutes before kickoff.
 9. At the matchday deadline, the worker simulates every fixture from immutable snapshots.
 10. The division matchday is published atomically; tables, stats, discipline, finances, condition, inbox, commentary, and highlights update.
-11. Repeat through a 34-round double round-robin season.
+11. Repeat through a 30-round double round-robin season.
 12. At rollover, apply promotion/relegation, age players by one game year, expire contracts, settle awards/finances, generate replacements where required, and schedule the next season.
 
 ---
@@ -123,7 +123,7 @@ All values in this section should be stored in a versioned rule set rather than 
 - Every domain aggregate carries or can derive `world_id` to preserve future shard/test-world support.
 - The six launch countries are England, Spain, Germany, Italy, France, and Romania.
 - Country and league display names are fictionalized or generic; do not use protected league branding.
-- Every active division has exactly 18 clubs.
+- Every active division has exactly 16 clubs (18 until `world-rules-v18`, ADR-0083).
 - A new production world begins with tier 1 active in all six countries; all clubs initially use AI control.
 - Clubs persist forever unless an audited administrative repair retires one. Human managers control clubs through time-bounded tenures; they do not own database club records.
 - New managers may take over an AI club only in the country's **lowest active tier**. Upper-tier vacancies remain under AI control until normal promotion/relegation changes their position or a later job-market feature is added.
@@ -134,7 +134,7 @@ All values in this section should be stored in a versioned rule set rather than 
 Expansion is monotonic: once a tier exists, it is never removed because occupancy later falls.
 
 1. After every successful takeover and every tenure-status change, evaluate the country's current lowest active tier.
-2. If all 18 clubs have active human tenures and no next-tier provisioning record exists, atomically create a `DivisionProvisioningRequest` for tier `N + 1`.
+2. If all 16 clubs have active human tenures and no next-tier provisioning record exists, atomically create a `DivisionProvisioningRequest` for tier `N + 1`.
 3. Use a PostgreSQL transaction and a country-scoped advisory lock so concurrent takeovers cannot create duplicate tiers.
 4. A durable worker generates the new tier, 18 AI clubs, balanced squads, finances, fixtures, and historical state.
 5. The new division uses the current country season and the same matchday calendar.
@@ -157,14 +157,14 @@ Expansion is monotonic: once a tier exists, it is never removed because occupanc
 
 ### 3.4 Season calendar
 
-- One season has 34 matchdays: each club plays every other club once home and once away.
+- One season has 30 matchdays: each club plays every other club once home and once away.
 - Standard kickoff: Tuesday, Thursday, and Sunday at 19:00 UTC.
 - Display all deadlines in the viewer's local timezone while retaining UTC as the authority.
 - Team sheets lock 30 minutes before kickoff.
 - The first production season begins on a configured future Tuesday with enough onboarding lead time; do not derive it from deployment time.
-- After matchday 34, run a seven-day rollover period. The next season schedule begins on the first configured matchday after rollover.
+- After matchday 30, run a rollover period of at least seven days. The season cycle is a fixed 11 weeks: the next season begins on the same weekday, 77 days after the first matchday of the last one, which makes the rollover nine days (ADR-0083).
 - All countries share the same real-time season cadence in the MVP, but jobs and data are country/division scoped.
-- Generate schedules using a tested circle/Berger algorithm, mirror the second half, and validate exactly 34 fixtures per club, one fixture per club per round, one home and one away meeting for each pair, and acceptable home/away streaks.
+- Generate schedules using a tested circle/Berger algorithm, mirror the second half, and validate exactly 30 fixtures per club, one fixture per club per round, one home and one away meeting for each pair, and acceptable home/away streaks.
 
 ### 3.5 League table and tie breakers
 
@@ -632,7 +632,7 @@ Use restrictive foreign keys for history. Do not cascade-delete completed season
 
 #### `competition.divisions`
 
-- Country, tier number, stable display name, status, created season, 18-club capacity.
+- Country, tier number, stable display name, status, created season, 16-club capacity (18 in worlds seeded before ADR-0083).
 - Unique `(country_id, tier_number)` and check `tier_number >= 1`.
 
 #### `competition.division_seasons`
@@ -647,7 +647,7 @@ Use restrictive foreign keys for history. Do not cascade-delete completed season
 
 #### `competition.matchdays`
 
-- Division-season, round 1–34, lock and kickoff timestamps, publication status.
+- Division-season, round 1–30, lock and kickoff timestamps, publication status.
 - Unique `(division_season_id, round_number)`.
 
 #### `competition.fixtures`
@@ -931,11 +931,11 @@ If lock is delayed, kickoff simulation waits for a valid snapshot; the match is 
 ### 7.4 Matchday resolution and atomic publication
 
 1. Acquire a division-matchday business lock.
-2. Verify all nine fixtures have immutable snapshots.
+2. Verify all eight fixtures have immutable snapshots.
 3. Enqueue or execute independent simulation attempts with bounded worker concurrency.
 4. Each match writes its output as `staged`; it does not update public standings yet.
 5. Re-running a completed attempt with the same snapshot/engine must produce the same output hash.
-6. Once all nine fixtures are staged, validate event-score consistency, statistics, lineups, and output sizes.
+6. Once all eight fixtures are staged, validate event-score consistency, statistics, lineups, and output sizes.
 7. In one transaction, mark fixtures/matches published, apply standings and player stats, apply cards/injuries/fatigue/morale, post gate revenue, and write outbox messages.
 8. If final publication fails, retry safely; never publish five of nine results.
 9. If simulation is delayed, display operational status without changing the scheduled kickoff. Do not invent forfeits.
@@ -1652,7 +1652,7 @@ Each stage ends with passing CI, updated documentation, migration validation, an
 
 - Add world, country, manager, club, tenure, season, division, generation, and capacity schema.
 - Build deterministic fictional name dictionaries and procedural badge seeds with legal review notes.
-- Implement world-seeder CLI/job: six countries, one tier each, 18 clubs per tier, season shell, finance accounts.
+- Implement world-seeder CLI/job: six countries, one tier each, 16 clubs per tier, season shell, finance accounts.
 - Implement manager profile, country capacity, available clubs, atomic takeover, resignation/cooldown, and inherited-club dashboard.
 - Implement AI control derivation and capacity evaluation that creates provisioning requests, but defer full backfill execution to Stage 11.
 - Build onboarding UI with race-safe conflict/capacity handling.
@@ -1660,7 +1660,7 @@ Each stage ends with passing CI, updated documentation, migration validation, an
 **Verification/exit:**
 
 - Reusing a generation seed produces the same logical world.
-- Exactly 108 initial clubs exist with unique valid identities.
+- Exactly 96 initial clubs exist with unique valid identities.
 - Concurrent claim test produces one winner and no duplicate tenure.
 - One user/manager and one club cannot have multiple active tenures.
 - Onboarding completes on desktop and mobile viewport.
@@ -1721,7 +1721,7 @@ Each stage ends with passing CI, updated documentation, migration validation, an
 **Deliverables/tasks:**
 
 - Add matchday, fixture, team-sheet, snapshot, match, event, highlight, job, outbox, and statistics migrations.
-- Implement 34-round deterministic schedule generation for all initial divisions.
+- Implement 30-round deterministic schedule generation for all initial divisions.
 - Create fixture list, next-fixture dashboard, prepare-match screen, fixture-specific team sheet, and lock countdown.
 - Implement durable job queue, leases, retries, metrics, and admin inspection.
 - Implement lock/snapshot workflow and immutable hash/seed commitment.
@@ -1865,7 +1865,7 @@ Each stage ends with passing CI, updated documentation, migration validation, an
 - Failure injection after every checkpoint resumes without duplicated movement, money, aging, or fixtures.
 - Three-up/three-down works at every adjacent active tier; lowest tier does not relegate.
 - Historical entries/results remain immutable and queryable.
-- Every club begins the new season with a legal squad, finance account, default tactic, and 34-fixture schedule.
+- Every club begins the new season with a legal squad, finance account, default tactic, and 30-fixture schedule.
 - At least five consecutive automated staging seasons reconcile cleanly.
 
 **Deferred:** Cups, continental qualification, complex retirements/youth replacement system.
@@ -2053,7 +2053,7 @@ The MVP is done only when all statements below are true:
 
 ### Product/gameplay
 
-- Six fictional country pyramids exist with one initial 18-club tier each.
+- Six fictional country pyramids exist with one initial 16-club tier each.
 - Human managers can register, verify, take over AI clubs, resign, become inactive, and return under documented rules.
 - A country adds tier N+1 exactly once when tier N fills with humans, and the new tier is aligned/backfilled safely.
 - Managers can use squad, player, tactics, lineup, training, injuries, discipline, contracts, scouting, auctions, finances, inbox, fixtures, tables, stats, match viewer, and season history.

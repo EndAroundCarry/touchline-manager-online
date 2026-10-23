@@ -1,6 +1,7 @@
 # ADR-0046: Load, supply-chain, and restore drills, run locally
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): the load population is 96 clubs, 96 managers and 288 virtual users (6 countries of 16), not 108 and 324.
 - **Date:** 2026-09-30
 - **Stage:** 14
 - **Related:** [ADR-0008](0008-deployment-topology.md), [ADR-0015](0015-compressed-test-clock.md),

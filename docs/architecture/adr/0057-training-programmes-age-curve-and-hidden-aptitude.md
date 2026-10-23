@@ -4,6 +4,7 @@
   which holds progress per attribute (`training-v3`); the programmes, age curve and aptitude stand. That only
   the programme's attributes develop is superseded by [ADR-0081](0081-every-attribute-develops-to-a-limit-set-by-potential.md)
   (`training-v4`): every attribute develops and the programme is the focus, and `BaseDailyMilli` is 400.
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): a training season is 77 days (the 11-week cycle), the yearly decline per day follows it, and `BaseDailyMilli` is 436 from `training-v5`, not 400.
 - **Date:** 2026-10-04
 - **Stage:** Stage 4 follow-up, training rework
 - **Related:** [ADR-0012](0012-daily-progression-materialised-job.md), [ADR-0018](0018-ai-club-policy.md), [ADR-0039](0039-accessibility-baseline-and-axe-gate.md), master plan §3.9, §10.4, §11.1, game rules `TRN-1`…`TRN-17`

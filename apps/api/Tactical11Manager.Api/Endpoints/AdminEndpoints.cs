@@ -73,7 +73,7 @@ internal static class AdminEndpoints
             .WithName("GetAdminMatchday")
             .WithSummary("Reads one round's publication state, fixtures, and driving jobs (F-46).")
             .WithDescription(
-                "Support, operator, or admin, with a completed second factor. The nine fixtures with their "
+                "Support, operator, or admin, with a completed second factor. The eight fixtures with their "
                 + "latest simulation attempt, and the lock, resolution, and publication job rows.")
             .RequireAuthorization(AuthorizationPolicies.AdminRead)
             .Produces<AdminMatchdayDetailResponse>(StatusCodes.Status200OK)

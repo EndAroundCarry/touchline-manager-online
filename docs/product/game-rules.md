@@ -35,7 +35,7 @@ Conventions used below:
 | WORLD-1 | Production runs exactly one persistent `GameWorld`. The schema must still carry or derive `world_id` so test and future shard worlds are possible. |
 | WORLD-2 | Launch countries: **England, Spain, Germany, Italy, France, Romania** (stable codes `ENG`, `ESP`, `GER`, `ITA`, `FRA`, `ROU`). |
 | WORLD-3 | All club, competition, and player identity is fictional. See [`content-and-fictional-data-policy.md`](content-and-fictional-data-policy.md). |
-| WORLD-4 | Every active division has **exactly 18 clubs**. There is no other size in the MVP. |
+| WORLD-4 | Every active division has **exactly 16 clubs**. There is no other size in the MVP. A world seeded when divisions held 18 clubs is not migrated (`RULE-4`) and cannot roll over under `world-rules-v18`; it is reseeded. See [ADR-0083](../architecture/adr/0083-sixteen-clubs-and-thirty-matchdays.md). |
 | WORLD-5 | A new world begins with **tier 1 active in all six countries**, and every club starts under AI control. |
 | WORLD-6 | Clubs persist forever. Only an audited administrative repair may retire a club. |
 | WORLD-7 | Managers never own club records. Control is expressed through time-bounded `ClubTenure` rows. |
@@ -53,13 +53,13 @@ falls. See [ADR-0005](../architecture/adr/0005-dynamic-pyramid-and-backfill.md).
 | Ref | Rule |
 |---|---|
 | PYR-1 | After every successful takeover and every tenure-status change, evaluate the country's current lowest active tier. |
-| PYR-2 | If all 18 clubs in that tier hold active human tenures and no provisioning record exists for the target tier, create a `DivisionProvisioningRequest` for tier `N + 1`. |
+| PYR-2 | If all 16 clubs in that tier hold active human tenures and no provisioning record exists for the target tier, create a `DivisionProvisioningRequest` for tier `N + 1`. |
 | PYR-3 | The evaluation runs in a PostgreSQL transaction holding a **country-scoped advisory lock**. `unique (country_id, target_tier)` prevents duplicate tiers. |
-| PYR-4 | A durable worker generates the new tier: 18 AI clubs, balanced squads, finance accounts, division-season entries, fixtures, and a historical baseline. |
+| PYR-4 | A durable worker generates the new tier: 16 AI clubs, balanced squads, finance accounts, division-season entries, fixtures, and a historical baseline. |
 | PYR-5 | The new division uses the **current country season** and the **same matchday calendar**. |
 | PYR-6 | Matchdays already passed in the current season are simulated in sequence as deterministic AI-vs-AI **bootstrap** results, and their table/player/finance effects are applied, so the new division inherits a legitimate table. |
 | PYR-7 | Bootstrap results are marked as generated history. They never appear as matches a human manager played. |
-| PYR-8 | The division becomes claimable only after generation, validation, and backfill complete. Validation asserts 18 clubs, 18 legal squads (two goalkeepers each), a complete 34-round schedule, one standing per club, and standings reconciling with published bootstrap fixtures. |
+| PYR-8 | The division becomes claimable only after generation, validation, and backfill complete. Validation asserts 16 clubs, 16 legal squads (two goalkeepers each), a complete 30-round schedule, one standing per club, and standings reconciling with published bootstrap fixtures. |
 | PYR-9 | If provisioning is requested while rollover holds the country lock, it targets the **next** season. The closing season is never mutated. |
 | PYR-10 | If capacity is temporarily unavailable, onboarding returns a stable `CAPACITY_PROVISIONING` response with request status and a polling hint. It never partially assigns a club. |
 | PYR-11 | When tier 2 fills, tier 3 provisions through the identical generic path. There is no hard-coded maximum tier. |
@@ -92,15 +92,15 @@ release date is null.
 
 | Ref | Rule | Value |
 |---|---|---|
-| CAL-1 | One season is a double round-robin | **34 matchdays**; each club plays every other club once home and once away |
+| CAL-1 | One season is a double round-robin | **30 matchdays**; each club plays every other club once home and once away (15 home matches, 8 fixtures a round) |
 | CAL-2 | Standard kickoff | **19:00 UTC** on **Tuesday, Thursday, Sunday** |
 | CAL-3 | Team sheets lock before kickoff | **30 minutes** |
 | CAL-4 | Deadlines are displayed in the manager's time zone; UTC remains authoritative. The zone is a per-manager preference, seeded from the viewer's browser at onboarding and editable afterwards, and the stored value is what every screen renders with (ADR-0036). | — |
 | CAL-5 | The first production season begins on a **configured future Tuesday** with onboarding lead time. It is never derived from deployment time. | — |
-| CAL-6 | Rollover period after matchday 34 | **7 days**; the next season starts on the first configured matchday after rollover |
+| CAL-6 | Season cycle and rollover period after matchday 30 | A **fixed 11-week cycle**: the next season starts on the same weekday, **77 days** after the first matchday of the last one. Thirty matchdays on Tuesday, Thursday and Sunday fill ten weeks, so the rollover period is **9 days** (never less than 7) and the start weekday never rotates. A season holds exactly 11 weekly finance runs, 11 free-agent batches, 11 fan reviews and 77 training days. |
 | CAL-7 | All six countries share the same real-time cadence. Jobs, data, and standings remain country/division scoped. | — |
 | CAL-8 | Schedules are generated with a tested circle/Berger algorithm and mirrored for the second half. | — |
-| CAL-9 | Schedule validation asserts: exactly 34 fixtures per club; exactly one fixture per club per round; each pair meets once home and once away; home/away streaks acceptable. | — |
+| CAL-9 | Schedule validation asserts: exactly 30 fixtures per club; exactly one fixture per club per round; each pair meets once home and once away; home/away streaks acceptable. | — |
 | CAL-10 | A division's matchday resolves as a unit. Individual fixtures are never published early. | — |
 | CAL-11 | If simulation is delayed, the scheduled kickoff is not changed and no forfeit is invented. Operators display status instead. | — |
 
@@ -268,13 +268,13 @@ reseeded.
 | TRN-7 | Morale | **0–10,000** basis points |
 | TRN-8 | APIs convert basis points into user-facing values; the database is authoritative in basis points. | — |
 | TRN-9 | Development and decline are deterministic from player identity, day, programme, intensity, age, fatigue, hidden potential, hidden aptitude, and the progression version. They are reproducible for the same inputs. Potential and aptitude are never sent to a client. | — |
-| TRN-10 | **Per-attribute progress and the daily split.** Each attribute carries its own progress towards its next point, in millionths of a point, so no day's progress is lost to rounding and a manager can see how close a skill is to rising. Every attribute a player develops (TRN-19) grows each day. The programme takes **60%** of the day's budget, split across its attributes in proportion to their weights (core 3, important 2, supporting 1); the other **40%** is shared equally by his other developing attributes. The budget does not depend on how many attributes a programme covers, so a narrow programme concentrates its share on fewer skills. An attribute at its limit takes no share and its share moves to the others; when either group has nothing left to develop the other takes the whole budget, so nothing is lost until the player reaches his limit. A point is gained when an attribute's progress reaches one. | budget 400 thousandths of a point a day at peak age, neutral aptitude, normal intensity; programme 60% |
+| TRN-10 | **Per-attribute progress and the daily split.** Each attribute carries its own progress towards its next point, in millionths of a point, so no day's progress is lost to rounding and a manager can see how close a skill is to rising. Every attribute a player develops (TRN-19) grows each day. The programme takes **60%** of the day's budget, split across its attributes in proportion to their weights (core 3, important 2, supporting 1); the other **40%** is shared equally by his other developing attributes. The budget does not depend on how many attributes a programme covers, so a narrow programme concentrates its share on fewer skills. An attribute at its limit takes no share and its share moves to the others; when either group has nothing left to develop the other takes the whole budget, so nothing is lost until the player reaches his limit. A point is gained when an attribute's progress reaches one. | budget 436 thousandths of a point a day at peak age, neutral aptitude, normal intensity (400 until `training-v5`, raised by 84/77 so a 77-day season develops a player as far as an 84-day one did); programme 60% |
 | TRN-11 | Matches consume condition and increase fatigue based on minutes, intensity, stamina, and tactics. Rest and recovery restore them. | — |
 | TRN-12 | Training injuries and match injuries create explicit unavailability records measured in **fixtures**, not wall-clock days. | — |
 | TRN-13 | Morale reacts to playing time, results, contracts, and transfers with bounded changes. | — |
 | TRN-14 | **Age growth curve.** The growth factor is 100% to age 19, falls 10 points a year to 40% at 25, then is multiplied by 0.75 a year with a floor of 2%, so a 30-year-old still develops, very slowly. Intensity scales it (light 0.70, normal 1.00, intense 1.35) and fatigue above 60% reduces it linearly to 0.6 at 100%. | see description |
 | TRN-15 | **Hidden aptitude.** Each player has a training aptitude of 55%–145% (triangular around 100%) derived purely from their identity and never stored. It scales development, so two players of equal potential reach it at different speeds. | 550–1450 permille |
-| TRN-16 | **Decline.** Each attribute declines from its own start age by a yearly slope that grows each year past it: pace and acceleration from 28, agility from 29, stamina and jumping from 30, strength from 31, some technical skills from 29 and the rest from 32, work rate from 31, goalkeeper reflexes from 32 and the other goalkeeping skills from 34. Other mental attributes do not decline. An attribute the player's programme trains declines at half the rate. Decline comes off the same per-attribute progress as growth, so a skill that is trained and ageing nets the two; a point is lost when the progress reaches minus one, and an attribute never falls below 1. | 86 progression days a season |
+| TRN-16 | **Decline.** Each attribute declines from its own start age by a yearly slope that grows each year past it: pace and acceleration from 28, agility from 29, stamina and jumping from 30, strength from 31, some technical skills from 29 and the rest from 32, work rate from 31, goalkeeper reflexes from 32 and the other goalkeeping skills from 34. Other mental attributes do not decline. An attribute the player's programme trains declines at half the rate. Decline comes off the same per-attribute progress as growth, so a skill that is trained and ageing nets the two; a point is lost when the progress reaches minus one, and an attribute never falls below 1. | 77 progression days a season (the 11-week cycle, `CAL-6`; the yearly slope per day follows it) |
 | TRN-17 | **History.** Every progression day records, per player, the programme and intensity in force, the development and decline earned, the whole points gained and lost, and which attributes moved. A manager reads it for their own players only. | kept in full |
 | TRN-18 | **Potential.** A generated player's hidden potential is drawn first, as `clamp(tier mean + offset, 1, 20)`, and his skills are derived from it: `potential + age adjustment`, where the adjustment is 24 − age below 24, zero from 24 to 29, and age − 29 above 29. So a 17-year-old starts 7 under his ceiling, a 24 to 29-year-old is at it, and an older player's potential is his peak, with his current skills showing the decline. Position bonuses and per-skill jitter are unchanged. Training develops the player towards the same formula without the jitter (TRN-19). The offset is a band: **normal** 80%, two four-faced dice less four (−4 to +2, most often −1); **talent** 15%, +3 to +5; **gem** 5%, +6 to +7. The bands do not overlap, and the mean offset is about +0.1, so a tier's squad strength is kept. Existing worlds get the new potentials by reseeding. The tier mean here is the generated squads' ability mean (`ability_mean_tier1`); a youth-intake player is drawn on his own scale (TRN-20). | 80% / 15% / 5% (balancing) |
 | TRN-19 | **Development limit.** An outfielder develops his 24 outfield attributes; his 4 goalkeeping attributes never grow. A goalkeeper develops all 28. Each developing attribute has a **formula value**, the generator's adult value for his potential and primary position, `clamp(potential + position bonus, 1, 20)` with no jitter. Development stops when the **sum** of his developing attributes reaches the sum of their formula values, so on average a trained player finishes where the generator would have made him; and no attribute may be trained more than **2 points** above its own formula value, so a programme can tilt a player towards its focus (a trained player has more 20s than a generated one) but never let one skill run away. Both are derived from potential and primary position, which never change, so nothing is stored, and the limit is never sent to a client (TRN-9). Decline (TRN-16) can still take an attribute below it. | sum of formula values; headroom 2 |
@@ -323,7 +323,7 @@ neither the ordering nor the counts are stored a second time.
 |---|---|---|
 | CON-1 | Contract length | **1–3 game seasons** |
 | CON-2 | Wages are charged | **weekly, after the Sunday matchday** |
-| CON-3 | Renewal presents a deterministic server-calculated quote derived from ability, potential, age, playing time, morale, tier, and remaining term. | — |
+| CON-3 | Renewal presents a deterministic server-calculated quote derived from ability, potential, age, playing time, morale, tier, and remaining term. Playing time is the season's appearances: **18 or more** lifts the quote 10%, **9 or more** 5%, none lowers it 5% (the same shares of a 30-match season that 20 and 10 were of 34). | — |
 | CON-4 | The manager accepts or declines the quote. Free-form negotiation is post-MVP. | — |
 | CON-5 | A transfer closes the seller's contract and creates the buyer's contract, which was displayed before the bid was placed. | — |
 | CON-6 | Expired players become free agents at rollover unless renewed. | — |
@@ -425,6 +425,14 @@ calibrates the baselines; the shapes below are fixed from this version on.
   category totals. It is written once, at rollover, for reporting; the settlement award (`FIN-5`) is the next
   season's first money and lies outside the window.
 
+**On 16 clubs and 30 matchdays** (ADR-0083) the season's money is the same as on 18 and 34, divided differently:
+
+- A season amount is paid **per matchday** in 30 parts (TV money, sponsor, wages, operating cost) or **per weekly run** in 11 (`season_cycle_weeks`: shop takings, upkeep, free agents, fan review). Season totals did not change; the 11⅓ weekly runs the earlier formula assumed (the real calendar had 12) are now exactly 11.
+- A club has **15 home matches**, not 17, so ticket prices and the snack bar's spend per spectator were raised 34/30 and the shop's spend per fan per week 34/33, to take what the longer season did.
+- The prize table keeps its shape for 16 places (a straight line from 16th to 3rd, 2nd = 3rd × 1.15, champion = 2nd × 1.20, 140.42 shares a division) with the tier-1 share raised from 300,000 to **340,000**, so the average club still earns about 2.98 million and the champion 6.57 million.
+- Sponsor objectives read their place from the table size: win the league (1st), top 3, top 6, **top half (8th)**, **eleventh (11th, replacing twelfth)** and **stay up (13th, the table size less the relegated)**. Standing steps: champion +6, top 3 +4, top 6 +2, **the bottom six places, −2 unless the club went down** (11th to 13th, places above `N − 6`), relegated −5.
+- The sections above still carry some figures from before the economy rework; the rework's own documentation milestone rewrites them for the 16-club, 30-matchday shape.
+
 ### 13.5 The stadium
 
 Every club owns one stadium (`world.club_stadiums`). It is a count of places of four kinds, and everything else —
@@ -440,7 +448,7 @@ its size, its level, the picture a manager sees — is read from those counts.
 | STAD-6 | Places are only ever added. A club's ground cannot shrink, and a place is paid for once. |
 
 A new tier-1 club's opening crowd of 3,000 sells 2,890 of the 5,000 places (1,350 standing, 600 seating, 840 covered, all 100 VIP) and takes 49,800.00 a home match; the full house is 70,500.00, which a club reaches when its fans have grown. A place that sells out pays for
-itself in roughly two and a half seasons (17 home matches); one that does not sell pays nothing, so a manager builds
+itself in roughly two and a half seasons (15 home matches a season since ADR-0083, with ticket prices raised 34/30 so a season takes what seventeen matches did); one that does not sell pays nothing, so a manager builds
 toward the crowd and not toward the cap. The values are balancing values in `StadiumRuleSet`, to be calibrated with
 the rest of the economy.
 
@@ -453,17 +461,17 @@ Every club, AI clubs included, has one number of **fans** and one **mood**. They
 | FAN-1 | **One fan count per club.** A tier-1 club opens with **10,000 fans**, of whom 30% want to come to a home match (3,000 people); every tier below keeps **¾** of the tier above (tier 2 7,500, tier 3 5,625). There is no spread between clubs of a tier: they pull apart through results. The count never falls below a **floor** of 40% of the tier's opening fans (tier 1: 4,000), the loyal core that never leaves. Above a **soft cap** of 55,000 people who want to come in tier 1 (183,333 fans), a little above the biggest stadium, a club wins no more fans from results, and every season end a club above the cap of the tier it plays in loses 25% of the excess. Every club that exists has a fan base; a missing one is opened on the spot at its tier's opening numbers. | `fan_opening_tier1` 10,000; `fan_want_to_come_share_bp` 3,000; `fan_floor_share_bp` 4,000; `fan_soft_cap_want_to_come_tier1` 55,000; `fan_tier_retained` ¾; `fan_over_cap_drift_bp` 2,500 |
 | FAN-2 | **Mood** is 0 to 100 (stored as 0–10,000 basis points) and is shown as a word: Furious 0–10, Angry 10–25, Unhappy 25–40, Calm 40–60, Content 60–75, Delighted 75–90, Euphoric 90–100 (a band includes its lower edge). A club opens Calm, at 50. | `fan_mood_calm_bp` 5,000 |
 | FAN-3 | **How the fans size a team up.** Strength is the mean ability of the best eleven of the squad in a 4-4-2, picked as the AI lineup policy picks it: an outfield player counts as the mean of his 24 outfield attributes, a goalkeeper as the mean of his 4 goalkeeping attributes. The fans add the team's form this season, points a game against an even game, converted at 0.22 points a game for each attribute point, and form's weight is `games ÷ (games + 10)`: nothing at the first match, about three quarters at the last. | `fan_form_half_weight_games` 10; `fan_form_points_per_attribute_point_c` 22 |
-| FAN-4 | **What the fans expect from a match.** The strength gap, with home advantage, goes through an ordered curve fitted to 1,800 tick-engine matches between the world's own squads (0.34 per attribute point, home worth 1.23 points, draws about 28% in an even game) and gives the chances of a win, a draw and a defeat, and from them the expected points `3 × win + draw`. The label is read from the expected points: **Should hammer them** 2.40 or more, **Expect a win** 2.00, **Should win** 1.60, **Could go either way** 1.20, **A point would do** 0.80, **Tough game** 0.50, **Damage limitation** below that. A predicted score (the most likely score from two Poisson means, home `exp(0.58 + 0.117 × gap)` and away `exp(0.23 − 0.143 × gap)`) is chosen among the scores the label allows, so a "Should win" never predicts a defeat. The expectation is **frozen when the team sheets lock** (`fans.fixture_fan_expectations`; for a fixture the lock never reached, when it is resolved), so the result is judged against what the fans held at kick-off; before the lock the page works it out live from both squads and the table. | `fan-rules-v1`; labels at 240 / 200 / 160 / 120 / 80 / 50 hundredths of a point |
-| FAN-5 | **A published match** moves both clubs' fans, after the gate is posted (`FIN-3`). *Mood:* the surprise is the points won minus the points expected; the mood moves by `3 × |surprise|^¾` mood points (a big surprise counts for less than double), **1.5 times as much for a bad surprise**, plus up to ±1 for the goal margin (full at 4 goals), then 2% of the distance back toward 50 and a constant **+0.88** that keeps a club that exactly meets its expectations averaging Calm. *Count, in people who want to come:* **joins** after a win as the underdog (expected under 1.00 points) **600**, an even game (1.00 to 1.59) **450**, as the favourite (1.60 or more) **325**, and after a draw as the underdog **100**; **leaves** after a defeat as the favourite **300** and an even game **250**; nothing joins or leaves otherwise. Each amount carries a random −15 to +50 (never below nothing), drawn from the fixture and the club, so the same match always gives the same number. Amounts scale ¾ per tier. A gain fades out over the last quarter below the soft cap and stops at it. The count never falls below the floor. | `fan_join_*`, `fan_leave_*` as listed; `fan_surprise_size_bp` 300; `fan_loss_weight_bp` 15,000; `fan_pull_to_calm_bp` 200; `fan_neutral_offset_bp` 88 |
-| FAN-6 | **A club's very first season** brings extra fans over its 34 matches: **5% of the count for each step the tier is above the third** (tier 1 two steps, about +7% by the end of the season; tier 2 one step, about +3.5%; tier 3 and below none). A promotion or a relegation does not give it back. | `fan_first_season_boost_per_step_bp` 500 |
+| FAN-4 | **What the fans expect from a match.** The strength gap, with home advantage, goes through an ordered curve fitted to 1,800 tick-engine matches between the world's own squads (0.34 per attribute point, home worth 1.23 points, draws about 28% in an even game) and gives the chances of a win, a draw and a defeat, and from them the expected points `3 × win + draw`. The label is read from the expected points: **Should hammer them** 2.40 or more, **Expect a win** 2.00, **Should win** 1.60, **Could go either way** 1.20, **A point would do** 0.80, **Tough game** 0.50, **Damage limitation** below that. A predicted score (the most likely score from two Poisson means, home `exp(0.58 + 0.117 × gap)` and away `exp(0.23 − 0.143 × gap)`) is chosen among the scores the label allows, so a "Should win" never predicts a defeat. The expectation is **frozen when the team sheets lock** (`fans.fixture_fan_expectations`; for a fixture the lock never reached, when it is resolved), so the result is judged against what the fans held at kick-off; before the lock the page works it out live from both squads and the table. | `fan-rules-v2`; labels at 240 / 200 / 160 / 120 / 80 / 50 hundredths of a point |
+| FAN-5 | **A published match** moves both clubs' fans, after the gate is posted (`FIN-3`). *Mood:* the surprise is the points won minus the points expected; the mood moves by `3 × |surprise|^¾` mood points (a big surprise counts for less than double), **1.5 times as much for a bad surprise**, plus up to ±1 for the goal margin (full at 4 goals), then 2% of the distance back toward 50 and a constant **+0.90** that keeps (a per-match balance measured on a 16-side league, so it is not scaled with the season) a club that exactly meets its expectations averaging Calm. *Count, in people who want to come:* **joins** after a win as the underdog (expected under 1.00 points) **680**, an even game (1.00 to 1.59) **510**, as the favourite (1.60 or more) **368**, and after a draw as the underdog **113**; **leaves** after a defeat as the favourite **340** and an even game **283**; nothing joins or leaves otherwise. These are the amounts of a 34-match league times 34/30, paid for each match, so a 30-match season grows the fans as fast as a 34-match one did (`fan-rules-v2`, ADR-0083). Each amount carries a random −17 to +57 (never below nothing), drawn from the fixture and the club, so the same match always gives the same number. Amounts scale ¾ per tier. A gain fades out over the last quarter below the soft cap and stops at it. The count never falls below the floor. | `fan_join_*`, `fan_leave_*` as listed; `fan_surprise_size_bp` 300; `fan_loss_weight_bp` 15,000; `fan_pull_to_calm_bp` 200; `fan_neutral_offset_bp` 90 |
+| FAN-6 | **A club's very first season** brings extra fans over its 30 matches: **5% of the count for each step the tier is above the third** (tier 1 two steps, about +7% by the end of the season; tier 2 one step, about +3.5%; tier 3 and below none). A promotion or a relegation does not give it back. | `fan_first_season_boost_per_step_bp` 500 |
 | FAN-7 | **A change of division** at rollover multiplies the count by **1.10 for each tier climbed** and **0.90 for each tier fallen** (never below the new tier's floor). A club above its new cap is left there, and the season-end drift of `FAN-1` brings it down over the next seasons, which spreads the 5–35% a relegated club loses in real football over time. | `fan_promotion_bp` 1,000; `fan_relegation_bp` 1,000 |
-| FAN-8 | **The weekly review.** Every **Sunday at 23:30 UTC**, after the Sunday round and the weekly finance run (`fans.weekly-review:{date}`), the fans judge every club against **the place they hoped it would finish**: until season objectives exist, the club's rank by squad strength in its division when the season began (set at rollover). A club's *gap* is its projected place (by points a game, the published table breaking a tie) minus that place; positive is worse than hoped. The mood moves by `−0.4 × gap` (the gap limited to ±6) plus `1.0 × (last week's gap − this week's gap)`, scaled by games played ÷ 34. A club is reviewed once a week and a club that has played no game is skipped. At **season end** the fans give a last verdict of `−1.5 × the final gap`, and then the mood moves **halfway back to 50**. | `fan_weekly_place_bp` 40; `fan_weekly_trend_bp` 100; `fan_gap_limit_places` 6; `fan_verdict_place_bp` 150; `fan_season_end_keep_bp` 5,000; `fan_weekly_review_utc` Sunday 23:30 |
+| FAN-8 | **The weekly review.** Every **Sunday at 23:30 UTC**, after the Sunday round and the weekly finance run (`fans.weekly-review:{date}`), the fans judge every club against **the place they hoped it would finish**: until season objectives exist, the club's rank by squad strength in its division when the season began (set at rollover). A club's *gap* is its projected place (by points a game, the published table breaking a tie) minus that place; positive is worse than hoped. The mood moves by `−0.4 × gap` (the gap limited to ±5, a third of the table) plus `1.0 × (last week's gap − this week's gap)`, scaled by games played ÷ 30. A club is reviewed once a week and a club that has played no game is skipped. At **season end** the fans give a last verdict of `−1.5 × the final gap`, and then the mood moves **halfway back to 50**. | `fan_weekly_place_bp` 40; `fan_weekly_trend_bp` 100; `fan_gap_limit_places` 5; `fan_verdict_place_bp` 150; `fan_season_end_keep_bp` 5,000; `fan_weekly_review_utc` Sunday 23:30 |
 | FAN-9 | **A new manager gets a clean slate.** When a human manager takes a club over (the first claim, or a return to a club they resigned from), in the same transaction, its fans go to **the tier's opening numbers** (the count, Calm 50, no last week's gap) and the season target is worked out again from the squad as it stands, however well or badly the club was doing. A retried claim resets nothing a second time. A resignation changes nothing: the club goes back to the AI with its fans as they are. | — |
 | FAN-10 | **History and reads.** Every change to a club's fans is an append-only row (`Opening`, `Match`, `Weekly`, `SeasonReset`, `Promotion`, `Relegation`, `Takeover`) with the count and mood before and after, and a match, week or season row exists once per club (a retried job adds nothing). The Fan Base page draws satisfaction and fan count from them, starting at the current manager's takeover with a switch for the whole club history. A manager reads their own club's fans in full; anyone reads another club's count and mood word only. A result the manager has not seen yet stays behind the result gate: the page holds back the fans' reaction to it. | — |
 
 The fans' reaction is a result in disguise, which is why it follows the result gate. The crowd that came to a match, and so its gate, depends on the fans and mood going into it, never on the result (`FIN-3`).
 
-**Measured** (M7: one scratch world, the three top tiers of one country, 54 clubs all run by the AI, three consecutive seasons through the real publication pipeline and two rollovers, the weekly review on, no stadium built):
+**Measured** (before ADR-0083, on 18 clubs and 34 matchdays under `fan-rules-v1`; M7: one scratch world, the three top tiers of one country, 54 clubs all run by the AI, three consecutive seasons through the real publication pipeline and two rollovers, the weekly review on, no stadium built):
 
 - **The expectation is fair.** The average surprise (points won minus points expected) is between −0.05 and +0.03 points a match in every tier and season, so a club that plays to its squad averages Calm. The end-of-season mood averages 42 to 53 in every tier and season.
 - **Mood is wide.** At the end of a season the best three clubs of tier 1 average 82 (Euphoric end) and the worst three 3 (Furious); the spread across a tier is 23 to 32 points, and in a season most tiers see a club touch 0 and another touch 100.
@@ -491,7 +499,7 @@ Every club has two more buildings besides its stadium: a **snack bar** and a **m
 
 The cost of an upgrade at a tier-1 club, by the level it reaches: **2,000.00** for level 2, then 2,300.00, 2,500.00, 2,900.00, 3,000.00, 3,400.00, 3,500.00, 3,600.00 and **3,800.00** for level 10, halved per tier. It is set so that, at a tier-1 club with its opening crowd and fans, the first upgrade of either building repays itself in about **two weeks** and the last in about **five**, counting the upkeep each step adds: the buildings are there to help a club grow. Bringing both buildings from level 1 to 10 costs 54,000.00; the build time of `STRC-3` paces a manager more than the price does. Each building's history (a sale for each home match, a sale for each week, and each week's upkeep) is kept as append-only rows, which the Structures page reads as the last eight weeks, the last eight home matches and the season's totals.
 
-**Measured** (M6: a probe with no match simulated, one season of 34 matchdays with 17 home matches and 11⅓ weekly runs, both buildings at one level, fans Calm, and a typical home season for the snack bar: 5 wins in an even game, 2 as the underdog, 2 as the favourite, 1 underdog draw, which lifts the base by about 9%):
+**Measured** (before ADR-0083, on the 34-matchday season of `world-rules-v17`; M6: a probe with no match simulated, one season of 34 matchdays with 17 home matches and 11⅓ weekly runs, both buildings at one level, fans Calm, and a typical home season for the snack bar: 5 wins in an even game, 2 as the underdog, 2 as the favourite, 1 underdog draw, which lifts the base by about 9%):
 
 - **A tier-1 club at its opening numbers** (10,000 fans, 5,000 places, a crowd of 2,890, a gate of 846,600 a season) earns from the two buildings a profit, after upkeep, of **82,510** at level 1 (9.7% of the gate), **167,852** at level 5 (19.8%) and **260,364** at level 10 (30.8%). Bringing both from level 1 to 5 costs 19,400 and to 10 costs 54,000.
 - **A big tier-1 club** (40,000 fans, 20,000 places, a crowd of 11,560, a gate of 3,386,400) earns **350,438** at level 1 (10.3%), **739,409** at level 5 (21.8%) and **1,211,457** at level 10 (35.8%).
@@ -586,7 +594,7 @@ for a new or weak team, plus a small chance of a hidden gem to train into a star
 | FA-7 | The contract is **3 seasons at age 21 or under, 2 at 22 to 29, 1 at 30 or over**, and the player joins as a **prospect** at 21 or under, otherwise as **rotation**. Both depend on age alone, so neither points at a gem. | — |
 | FA-8 | A free agent's ability, age and position are public, like any player's. His potential, whether he is a gem, and the batch's gem count are class C2 and never reach a response; a released player's potential moves his fee, as a club listing's does, and is never shown. The scouting card and the public profile read any `FreeAgent` player with no contract, with no club, including a player released since the last batch who has no listing yet. | — |
 
-**Measured** (one scratch world, 108 clubs, 2,592 players; nothing else tuned):
+**Measured** (before ADR-0083, on six countries of 18 clubs; one scratch world, 108 clubs, 2,592 players; nothing else tuned. On 16 clubs the pool is still a tenth of the contracted players, so it follows the club count, and there are 11 batches a season instead of 12):
 
 - The first batch listed 259 players, a tenth of 2,592, all showing ability 6 to 10 (mean 8.1) at ages 20 to 32, from 14% goalkeepers, 28% defenders, 30% midfielders and 28% attackers, 43 or 44 in each of the six countries. Minimum fees run 2,500 to 6,143 (median 3,084, about 0.5% of a top club's opening cash) and wages 93 to 311 a week (median 182); 227 of the 259 are on a 2-season deal.
 - The first measurement, with the rollover target at 21 and released players at 25%, gave a released pool larger and stronger than the generated one: 318 released (ability 4 to 16, mean 9.0, 64 with potential 13 or more) against 227 generated, at fees of 2,500 to 13,789. Two changes followed (ADR-0077): the target went to 23 and a released player is priced in full.
@@ -603,7 +611,7 @@ for a new or weak team, plus a small chance of a hidden gem to train into a star
 | MAT-4 | Goals are produced by resolved chances, never by an independent per-minute roll. |
 | MAT-5 | The final score equals the goal events. Statistics reconcile exactly with events. |
 | MAT-6 | A manager makes no live in-match changes. A tactical plan may carry up to 10 match instructions: each is a rule written before the match (a minute, a score, an event such as a sending-off, a booking, a tired or badly playing player) with changes it makes when its conditions hold (a new formation, instruction changes, up to 5 substitutions). The engine carries them out; the engine's own fatigue substitutions still run unless the plan switches them off. |
-| MAT-7 | A division matchday publishes atomically: either all nine fixtures or none. |
+| MAT-7 | A division matchday publishes atomically: either all eight fixtures or none. |
 | MAT-8 | Commentary and highlights consume events and cannot change the outcome. |
 | MAT-9 | Match input and output hashes are stored; re-running the same snapshot, seed, and engine version reproduces the same output hash. |
 | MAT-10 | A void/replay requires an operator reason and uses the original snapshot and seed unless a documented engine defect requires a versioned remediation. |
@@ -722,14 +730,16 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 
 | Constant | Value | Ref |
 |---|---|---|
-| `clubs_per_division` | 18 | WORLD-4 |
+| `clubs_per_division` | 16 | WORLD-4 |
+| `largest_division_ever` / `longest_season_ever` | 18 / 34 (read only by the database check constraints, so a past 18-club season stays valid data) | WORLD-4, CAL-1, RULE-4 |
 | `launch_countries` | ENG, ESP, GER, ITA, FRA, ROU | WORLD-2 |
-| `matchdays_per_season` | 34 | CAL-1 |
+| `matchdays_per_season` | 30 | CAL-1 |
+| `season_cycle_weeks` | 11 (77 days from one season's first matchday to the next's; also the weekly finance runs, free-agent batches, fan reviews and the weeks of a season) | CAL-6 |
 | `kickoff_utc` | 19:00 | CAL-2 |
 | `kickoff_weekdays` | Tue, Thu, Sun | CAL-2 |
 | `team_sheet_lock_minutes` | 30 | CAL-3 |
 | `max_consecutive_home_or_away` | 4 | CAL-9 |
-| `rollover_days` | 7 | CAL-6 |
+| `rollover_days` | 7 (the least the rollover may last; the 11-week cycle makes it 9) | CAL-6 |
 | `points_win` / `points_draw` / `points_loss` | 3 / 1 / 0 | TBL-1 |
 | `promoted_per_tier` / `relegated_per_tier` | 3 / 3 | PR-1 |
 | `promotion_relegation_version` | `promotion-relegation-v1` | PR-1 (FIC-8) |
@@ -774,11 +784,11 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `schedule_generator_version` | `schedule-gen-v1` | CAL-8, PYR-14 |
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
 | `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
-| `training_progression_version` | `training-v4` | TRN-9 (FIC-8) |
-| `training_base_daily_milli` | 400 thousandths of a point (peak age, neutral aptitude, normal intensity) | TRN-10 (balancing) |
+| `training_progression_version` | `training-v5` | TRN-9 (FIC-8) |
+| `training_base_daily_milli` | 436 thousandths of a point (peak age, neutral aptitude, normal intensity) | TRN-10 (balancing) |
 | `training_programme_share_permille` | 600 (the rest, 400, goes equally to the other developing attributes) | TRN-10 (balancing) |
 | `development_limit_headroom` | 2 points above an attribute's formula value | TRN-19 (balancing) |
-| `world_rule_set_version` | `world-rules-v16` | FIC-8 |
+| `world_rule_set_version` | `world-rules-v18` | FIC-8 |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
 | `ai_match_plan_version` | `ai-match-plan-v1` | INS-12, MAT-6 (FIC-8) |
@@ -843,23 +853,23 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `structure_upkeep_minor_tier1` | 30,000, 45,000, 60,000, 80,000, 100,000, 125,000, 150,000, 180,000, 215,000, 250,000 per building per week, levels 1 to 10 | STRC-8 (balancing) |
 | `structure_upgrade_cost_minor_tier1` | 200,000, 230,000, 250,000, 290,000, 300,000, 340,000, 350,000, 360,000, 380,000, for levels 2 to 10 | STRC-3 (balancing) |
 | `structure_build_days` | 1, 1, 2, 2, 3, 4, 5, 6, 7, for levels 2 to 10 | STRC-3 (balancing) |
-| `fan_rule_version` | `fan-rules-v1` | FAN-4 (FIC-8) |
+| `fan_rule_version` | `fan-rules-v2` | FAN-4 (FIC-8) |
 | `fan_opening_fans_tier1` / `fan_tier_retained` | 10,000 fans / ¾ for each tier below the first | FAN-1 (balancing) |
 | `fan_want_to_come_share_bp` | 3,000 (30% of the fans want to come to a home match) | FAN-1, STAD-5 (balancing) |
 | `fan_floor_share_bp` / `fan_soft_cap_want_to_come_tier1` | 4,000 of the opening fans / 55,000 people who want to come (183,333 fans) | FAN-1 (balancing) |
 | `fan_over_cap_drift_bp` | 2,500 of the excess over the cap, each season end | FAN-1, FAN-7 (balancing) |
-| `fan_join_after_win` | 600 underdog / 450 even game / 325 favourite; 100 after an underdog's draw (people who want to come) | FAN-5 (balancing) |
-| `fan_leave_after_defeat` | 300 as the favourite / 250 in an even game; none as the underdog | FAN-5 (balancing) |
-| `fan_match_random` | −15 to +50 on each join or leave, never below nothing, drawn from the fixture and the club | FAN-5 (balancing) |
+| `fan_join_after_win` | 680 underdog / 510 even game / 368 favourite; 113 after an underdog's draw (people who want to come; the 34-match league's amounts times 34/30) | FAN-5 (balancing) |
+| `fan_leave_after_defeat` | 340 as the favourite / 283 in an even game; none as the underdog | FAN-5 (balancing) |
+| `fan_match_random` | −17 to +57 on each join or leave, never below nothing, drawn from the fixture and the club | FAN-5 (balancing) |
 | `fan_expectation_bands_c` | underdog below 100; favourite from 160 (hundredths of a point) | FAN-5 (balancing) |
 | `fan_gain_fade_share_bp` | 2,500 (gains fade over the last quarter below the soft cap) | FAN-5 (balancing) |
 | `fan_first_season_boost_per_step_bp` | 500 of the count for each step the tier is above the third | FAN-6 (balancing) |
 | `fan_promotion_bp` / `fan_relegation_bp` | 1,000 / 1,000 for each tier climbed / fallen | FAN-7 (balancing) |
 | `fan_surprise_size_bp` / `fan_loss_weight_bp` | 300 per point of surprise to the power ¾ / 15,000 for a bad surprise | FAN-5 (balancing) |
-| `fan_margin_max_bp` / `fan_pull_to_calm_bp` / `fan_neutral_offset_bp` | 100 (full at 4 goals) / 200 a match / 88 a match | FAN-5 (balancing) |
+| `fan_margin_max_bp` / `fan_pull_to_calm_bp` / `fan_neutral_offset_bp` | 100 (full at 4 goals) / 200 a match / 90 a match | FAN-5 (balancing) |
 | `fan_form_half_weight_games` / `fan_form_points_per_attribute_point_c` | 10 / 22 | FAN-3 (balancing) |
 | `fan_label_thresholds_c` | 240 / 200 / 160 / 120 / 80 / 50 (hundredths of a point) | FAN-4 (balancing) |
-| `fan_weekly_place_bp` / `fan_weekly_trend_bp` / `fan_gap_limit_places` | 40 / 100 / 6 | FAN-8 (balancing) |
+| `fan_weekly_place_bp` / `fan_weekly_trend_bp` / `fan_gap_limit_places` | 40 / 100 / 5 | FAN-8 (balancing) |
 | `fan_verdict_place_bp` / `fan_season_end_keep_bp` | 150 / 5,000 | FAN-8 (balancing) |
 | `fan_weekly_review_utc` | Sunday 23:30 UTC | FAN-8 |
 | `weekly_sponsorship_minor_tier1` | 3,000,000 minor units | FIN-4 (balancing) |

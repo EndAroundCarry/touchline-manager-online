@@ -162,7 +162,7 @@ Worker claims ResolveTransferAuction job
   → loser reservations released; outcomes audited; outbox notification
 ```
 
-### 5.5 Season rollover (after matchday 34, seven days)
+### 5.5 Season rollover (after matchday 30, nine days of an 11-week cycle)
 
 ```text
 Preflight → freeze writes → finalize standings → promotion/relegation

@@ -23,8 +23,8 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-08 | One active manager career per account | world, auth | 3 | Partial unique index test; `MANAGER_HAS_ACTIVE_CLUB` |
 | F-09 | Country selection | world, web | 3 | Onboarding journey test |
 | F-10 | Atomic takeover of an AI club | world | 3 | Concurrent-claim test: exactly one winner |
-| F-11 | One persistent world, six national pyramids | world | 3 | Seeder test: 6 countries, 108 unique clubs |
-| F-12 | One initial 18-club top division per country | world | 3 | Seeder validation |
+| F-11 | One persistent world, six national pyramids | world | 3 | Seeder test: 6 countries, 96 unique clubs |
+| F-12 | One initial 16-club top division per country | world | 3 | Seeder validation |
 | F-13 | Automatic lower-tier creation at 18/18 humans | world, competition, match | 3 (request), 11 (full) | Fill-tier-1 test creates exactly one tier 2; generic path test for tier 3 (`ProvisioningTests`, ADR-0030) |
 | F-14 | AI control for vacant clubs | world, squad | 3, 8 | AI legal-side test with no privileged data |
 | F-15 | Three weekly matchdays (Tue/Thu/Sun) | competition, ops | 6 | Schedule property tests; real-clock staging run |
@@ -36,7 +36,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-21 | Availability: injuries and suspensions | squad, competition | 6 (apply), 8 (full) | Effect-on-correct-future-fixture-exactly-once test |
 | F-22 | Contracts | squad | 4 (list/quote), 9 (full), 12 (rollover expiry) | Renewal determinism and rollover-expiry tests; the `squads` phase expires unrenewed contracts to free agency, renews unmanaged clubs (`AiContractPolicy`, `ai-contract-v1`), and repairs below-minimum clubs (`SQ-8`, ADR-0032) |
 | F-23 | Finance workflows (cash, wages, income) | finance | 9 | Ledger replay reconstructs balances exactly |
-| F-24 | League fixtures | competition | 6 | 34-fixture, one-home-one-away property tests |
+| F-24 | League fixtures | competition | 6 | 30-fixture, one-home-one-away property tests |
 | F-25 | League tables | competition | 6, 8 | All nine tie-break paths covered |
 | F-26 | Results | competition, match, web | 6, 7 | Published matchday projection reconciliation |
 | F-27 | Player and team statistics | competition, match | 8 | Rebuild equals live projection; the player profile reads a career derived by aggregating the same season lines across seasons (`STA-2`, `GetPlayer`) |

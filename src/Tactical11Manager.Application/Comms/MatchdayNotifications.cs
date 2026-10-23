@@ -82,7 +82,7 @@ public sealed class MatchdayNotifications
     }
 
     /// <summary>Writes the messages one published round produces.</summary>
-    /// <param name="roundNumber">The round, 1–34.</param>
+    /// <param name="roundNumber">The round, 1–30.</param>
     /// <param name="worldId">The world, which scopes the round's news.</param>
     /// <param name="divisionId">The division, which scopes the round's news.</param>
     /// <param name="played">The fixtures the round played.</param>

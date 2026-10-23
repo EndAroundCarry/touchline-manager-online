@@ -1,6 +1,7 @@
 # ADR-0033: Club identity is seeded from the world seed, never from the per-tier provisioning seed
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): the club-identity ordinals count 16 clubs a tier, not 18; worlds seeded with 18 are reseeded, not migrated.
 - **Date:** 2026-09-29
 - **Stage:** 12
 - **Related:** [ADR-0005](0005-dynamic-pyramid-and-backfill.md), [ADR-0030](0030-provisioning-execution-and-bootstrap-provenance.md), game rules `FIC-4`, `FIC-7`, `PYR-11`, `PYR-14`, master plan §3.2, §6.3, §16 Stage 12

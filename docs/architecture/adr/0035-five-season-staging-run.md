@@ -1,6 +1,7 @@
 # ADR-0035: A five-season staging run proves rollover continuity
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): the five-season run plays 30-matchday seasons of 16-club divisions on the 11-week cycle.
 - **Date:** 2026-09-29
 - **Stage:** 12
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0015](0015-compressed-test-clock.md), [ADR-0016](0016-non-production-matchday-trigger.md), [ADR-0020](0020-projection-rebuild-and-reconciliation.md), [ADR-0025](0025-ai-transfer-market.md), [ADR-0031](0031-season-rollover-state-machine.md), [ADR-0032](0032-rollover-continuity.md), [ADR-0034](0034-operator-rollover-preview-and-resume.md), master plan §7.5, §15.5, §16 Stage 12, game rules `PR-1`–`PR-6`

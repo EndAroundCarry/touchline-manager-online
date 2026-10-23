@@ -558,7 +558,7 @@ erDiagram
         text display_name
         text status
         uuid created_season_id FK
-        smallint capacity "18"
+        smallint capacity "16 (18 in worlds seeded before ADR-0083)"
     }
     division_seasons {
         uuid id PK
@@ -573,7 +573,7 @@ erDiagram
     matchdays {
         uuid id PK
         uuid division_season_id FK
-        smallint round_number "1..34"
+        smallint round_number "1..30 (1..34 in older worlds)"
         timestamptz lock_at
         timestamptz kickoff_at
         text publication_status
@@ -758,7 +758,7 @@ erDiagram
 | `unique (division_id, season_id)` | `division_seasons` | One instance per division per season |
 | `unique (division_season_id, club_id)` | `club_season_entries`, `standings` | One entry and one standing per club |
 | `unique (division_season_id, player_id)`, `check (yellow_cards >= 0 and red_cards >= 0)` | `discipline_records` | One accumulation per player per season (`DIS-2`) |
-| `unique (division_season_id, round_number)` | `matchdays` | 34 rounds |
+| `unique (division_season_id, round_number)` | `matchdays` | 30 rounds (the check allows up to 34, for history) |
 | `check (home_club_id <> away_club_id)` | `fixtures` | A club cannot play itself |
 | `check (home_score >= 0 and away_score >= 0)` | `fixtures` | Nonnegative scores |
 | Score required only when `status in (staged, published)` | `fixtures` | No half-resolved fixtures |
@@ -823,6 +823,18 @@ erDiagram
 > season-line category check is extended to every category, including `stadium_construction` and `release_payout`, which it had missed.
 > The rule set advances to `world-rules-v15` (`STRC-1`…`STRC-9`, ADR-0080). Migration `ClubStructures`, which also gives every existing club
 > both buildings at level 1.
+>
+> **League size milestone (16 clubs, 30 matchdays).** One migration, `SixteenClubsThirtyMatchdays`, loosens
+> `ck_divisions_capacity` from `capacity = 18` to `capacity in (16, 18)`; nothing else in the schema moves. The
+> place and round constraints (`ck_standings_rank` 1 to 18, `ck_matchdays_round_number` 1 to 34, the sponsor
+> `target_place` and standing-event `final_place` checks) are built from `WorldRuleSet.LargestDivisionEver` and
+> `LongestSeasonEver` and stay permissive for history; the domain guards enforce the exact current size
+> (`ClubsPerDivision`, `MatchdaysPerSeason`). `EleventhPlaceObjective` renames the sponsor objective code `twelfth`
+> to `eleventh` (11th on 16 clubs) in `ck_sponsor_deals_objective` and rewrites any old row. The rule set advances
+> to `world-rules-v18`, training to `training-v5` and fans to `fan-rules-v2`. Worlds are not migrated (`RULE-4`):
+> an 18-club world cannot roll over under v18 and is reseeded. Stored values in an old world that this leaves
+> behind: `club_accounts.state_since_matchday` (season x 34), sponsor deals stored per matchday (/34).
+> ADR-0083.
 >
 > **Stage 12 status (season history).** No schema change: the closed entries are read back as a club's
 > season history and next-season placement (`PR-4`, `PR-6`), and the retained `player_season_stats` rows are
@@ -1104,7 +1116,7 @@ erDiagram
         int mood_bp "0..10000, 5000 is Calm"
         int season_target_rank "null until set"
         int last_week_gap "null after a reset"
-        text rule_set_version "fan-rules-v1"
+        text rule_set_version "fan-rules-v2"
         timestamptz created_at
         timestamptz updated_at
         bigint version "concurrency token"

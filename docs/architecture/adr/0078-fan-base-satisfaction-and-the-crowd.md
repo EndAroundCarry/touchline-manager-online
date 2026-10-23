@@ -1,6 +1,7 @@
 # ADR-0078: Fan base, fan satisfaction and the crowd
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): the fans' per-match amounts are the 34-match league's times 34/30 (`fan-rules-v2`), the first-season boost is spread over 30 matches, the gap limit is 5 places and the review count is 11 a season.
 - **Date:** 2026-10-21
 - **Stage:** Fan base plan (`i-want-to-add-partitioned-feather.md`), Milestones 0-7; master plan Stage 17
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0004](0004-deterministic-match-engine.md), [ADR-0031](0031-season-rollover-state-machine.md), game-rules `FAN-1`…`FAN-10`, `FIN-3`, `STAD-1`…`STAD-6`

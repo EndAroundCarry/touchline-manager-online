@@ -1,6 +1,7 @@
 # ADR-0080: Club structures: a snack bar and a merchandise shop
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): a club has 15 home matches and 11 weekly runs a season, not 17 and 11⅓: the snack bar's spend per spectator is raised 34/30 and the shop's spend per fan per week 34/33, so a season takes what it did.
 - **Date:** 2026-10-21
 - **Stage:** Structures plan (`create-a-plan-to-gentle-gizmo.md`), Milestones 1-6
 - **Related:** [ADR-0062](0062-club-stadium-places-levels-and-gate.md), [ADR-0078](0078-fan-base-satisfaction-and-the-crowd.md), [ADR-0003](0003-postgresql-durable-jobs.md), game-rules `STRC-1`…`STRC-9`, `FIN-3`, `FIN-14`, `STAD-5`, `FAN-2`, `FAN-4`

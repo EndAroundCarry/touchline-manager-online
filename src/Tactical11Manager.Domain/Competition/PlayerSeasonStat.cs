@@ -210,7 +210,7 @@ public sealed record PlayerSeasonStatLine
 /// <para>
 /// The average rating is computed rather than stored, for the same reason a standing's goal difference is:
 /// two columns that must agree are two columns that can disagree. It is null until the player has been
-/// rated at least once, because a division's opening table is eighteen clubs who have not played.
+/// rated at least once, because a division's opening table is sixteen clubs who have not played.
 /// </para>
 /// </remarks>
 public sealed class PlayerSeasonStat

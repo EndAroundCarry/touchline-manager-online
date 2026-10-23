@@ -416,7 +416,7 @@ public sealed class SponsorSigningTests
             Task.FromResult(TenureStart);
     }
 
-    /// <summary>A division of eighteen where the given club ranks where the test says by squad strength.</summary>
+    /// <summary>A division of sixteen where the given club ranks where the test says by squad strength.</summary>
     private sealed class StubFanQueries : IFanQueries
     {
         private readonly Guid _clubId;
@@ -436,8 +436,8 @@ public sealed class SponsorSigningTests
         {
             var rows = new List<FanSeasonClubRow> { new(_clubId, DivisionSeasonId, SeasonId, 1, 0, 0, 0) };
 
-            // Seventeen rivals, with identities that sort after the club's so the ranking has no ties to break.
-            rows.AddRange(Enumerable.Range(0, 17).Select(index =>
+            // Fifteen rivals, with identities that sort after the club's so the ranking has no ties to break.
+            rows.AddRange(Enumerable.Range(0, WorldRuleSet.ClubsPerDivision - 1).Select(index =>
                 new FanSeasonClubRow(Guid.CreateVersion7(), DivisionSeasonId, SeasonId, 1, 0, 0, 0)));
 
             return Task.FromResult<IReadOnlyList<FanSeasonClubRow>>(_clubId == Guid.Empty ? [] : rows);

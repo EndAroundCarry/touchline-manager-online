@@ -1,6 +1,7 @@
 # ADR-0014: A matchday is locked, resolved, and published by three jobs, and its snapshot is a stored document
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): a round now has 8 fixtures and a division-season 30 rounds, not 9 and 34; the lock, resolve and publish steps are unchanged.
 - **Date:** 2026-09-25
 - **Stage:** 6
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0004](0004-deterministic-match-engine.md), [ADR-0009](0009-time-identity-and-concurrency.md), master plan §6.6, §7.2–§7.4, game rules `CAL-3`, `CAL-10`, `MAT-1`, `MAT-7`, `MAT-9`, `MAT-10`, `DIS-6`, `TBL-13`

@@ -221,6 +221,11 @@ curl -s -X POST $API/ops/diagnostics/resume-rollover \
 
 **Evidence.** The `world.season_rollover.resumed` audit row.
 
+**A world seeded with 18-club divisions.** Under `world-rules-v18` a division holds 16 clubs and the rollover
+refuses a division of any other size (`RunSeasonRollover`), so an 18-club world fails its first rollover at
+preflight and no resume fixes it. Existing worlds are not migrated (`RULE-4`, ADR-0083): reseed from a fresh
+database (`npm run migrate`, `npm run seed`, six countries of 16 clubs).
+
 ## Runbook — hand a club to the AI
 
 **Symptom.** A manager has asked support to step in, or is unreachable, and their club should be run by the
@@ -434,7 +439,9 @@ not per press.
 
 **Notes.** Time is frozen between steps, so a transient failure is retried at once rather than after a
 backoff, and a lease left by a stopped worker is only reclaimed at the next step (ADR-0049). Stepping past a
-season's deadline materialises the real rollover job, which closes the season and opens the next.
+season's deadline materialises the real rollover job, which closes the season and opens the next. A
+season is an 11-week cycle (ADR-0083): 30 matchdays over ten weeks, a nine-day rollover, and the next season's
+first matchday on the same weekday 77 days after the last season's.
 
 **Rollback / compensation.** None needed and none possible: a step cannot be undone. A stepped world is a
 test world; to start over, re-seed from a fresh database (`WORLD-1` keeps the seeder idempotent).

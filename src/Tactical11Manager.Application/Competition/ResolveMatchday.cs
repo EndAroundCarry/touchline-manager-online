@@ -40,8 +40,8 @@ public sealed record ResolveMatchdayResult(ResolveMatchdayOutcome Outcome, int S
 /// <remarks>
 /// <para>
 /// Each fixture is simulated and staged in its own transaction, which is what makes a round resumable: a
-/// worker that dies after six of nine fixtures has six staged results that a retry finds and leaves alone,
-/// rather than nine fixtures to redo. Nothing about a result is public yet — staging is the state where a
+/// worker that dies after six of eight fixtures has six staged results that a retry finds and leaves alone,
+/// rather than eight fixtures to redo. Nothing about a result is public yet — staging is the state where a
 /// scoreline exists and the world cannot see it (`MAT-7`).
 /// </para>
 /// <para>

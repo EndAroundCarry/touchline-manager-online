@@ -94,7 +94,7 @@ public static class NewsTemplates
             divisionId: null);
 
     /// <summary>Builds the item a published round produces.</summary>
-    /// <param name="roundNumber">The round, 1–34.</param>
+    /// <param name="roundNumber">The round, 1–30.</param>
     /// <param name="homeClubName">The host.</param>
     /// <param name="homeGoals">The host's goals.</param>
     /// <param name="awayClubName">The visitor.</param>

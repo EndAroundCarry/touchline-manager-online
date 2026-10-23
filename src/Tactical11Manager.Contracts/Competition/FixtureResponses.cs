@@ -9,7 +9,7 @@ public sealed record FixtureClubResponse(Guid Id, string Name, string ShortName)
 /// <summary>One fixture, as a division's calendar and a club's own list show it.</summary>
 /// <param name="Id">The fixture identity.</param>
 /// <param name="MatchdayId">The round the fixture belongs to.</param>
-/// <param name="RoundNumber">The round number, 1–34 (`CAL-1`).</param>
+/// <param name="RoundNumber">The round number, 1–30 (`CAL-1`).</param>
 /// <param name="HomeClubId">The host.</param>
 /// <param name="AwayClubId">The visitor.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC (`CAL-2`).</param>
@@ -31,9 +31,9 @@ public sealed record FixtureSummaryResponse(
     Guid? MatchId,
     bool IsBootstrap);
 
-/// <summary>One round of a division's season, with the nine fixtures it comprises (`CAL-10`).</summary>
+/// <summary>One round of a division's season, with the eight fixtures it comprises (`CAL-10`).</summary>
 /// <param name="Id">The matchday identity.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="LockAt">When team sheets lock, thirty minutes before kickoff (`CAL-3`).</param>
 /// <param name="KickoffAt">The kickoff, shared by every fixture in the round (`CAL-2`).</param>
 /// <param name="PublicationStatus">Whether the round is pending, staged, or published (`MAT-7`).</param>
@@ -50,9 +50,9 @@ public sealed record FixtureMatchdayResponse(
 /// A division-season's whole fixture calendar (master plan §10.5).
 /// </summary>
 /// <remarks>
-/// The set is bounded by construction — eighteen clubs play a 34-round double round-robin, so exactly 306
+/// The set is bounded by construction — sixteen clubs play a 30-round double round-robin, so exactly 240
 /// fixtures exist — which is what makes one unpaged response the right shape. The clubs travel once and
-/// the fixtures reference them by identity, so a 306-row payload does not carry eighteen names 34 times.
+/// the fixtures reference them by identity, so a 240-row payload does not carry sixteen names 30 times.
 /// </remarks>
 /// <param name="DivisionId">The division identity.</param>
 /// <param name="DivisionName">The generated tier name.</param>
@@ -87,7 +87,7 @@ public sealed record DivisionFixturesResponse(
 /// better than every caller recomputing it.
 /// </remarks>
 /// <param name="Id">The fixture identity.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="Venue">The managed club's side: <c>home</c> or <c>away</c>.</param>
 /// <param name="OpponentClubId">The other club.</param>
 /// <param name="OpponentName">The other club's generated name.</param>
@@ -130,7 +130,7 @@ public sealed record ClubFixtureResponse(
 /// <remarks>
 /// The dashboard reads this one response: it answers "what am I playing next, and when does it lock"
 /// without a second call, which is why the next fixture is named rather than left to the client to infer.
-/// A season has 34 fixtures per club, so the set is bounded and needs no pagination.
+/// A season has 30 fixtures per club, so the set is bounded and needs no pagination.
 /// </remarks>
 /// <param name="ClubId">The managed club.</param>
 /// <param name="ClubName">The managed club's generated name.</param>
@@ -183,7 +183,7 @@ public sealed record FixtureSideResponse(
 /// <param name="DivisionName">The division's generated name.</param>
 /// <param name="TierNumber">The tier number.</param>
 /// <param name="CountryCode">The country's stable code.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="LockAt">When team sheets lock (`CAL-3`).</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="Status">The lifecycle state.</param>

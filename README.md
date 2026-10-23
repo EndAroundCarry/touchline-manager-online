@@ -20,8 +20,8 @@ kick-off. The server decides results; a client can never simulate or influence o
 > tactics board and its ETag contract, and the training screen with its deterministic daily progression
 > job. Stage 5 added the match engine: a pure, versioned, hash-pinned simulation of one fixture from a
 > frozen snapshot, with commentary tokens, semantic highlights, and a simulation laboratory for tuning.
-> Stage 6 turned that engine into a season: a 34-round fixture calendar, the fixture and prepare-match
-> screens, the durable matchday worker that locks a round's team sheets, simulates its nine fixtures from
+> Stage 6 turned that engine into a season: a 30-round fixture calendar (34 rounds of nine fixtures until ADR-0083), the fixture and prepare-match
+> screens, the durable matchday worker that locks a round's team sheets, simulates its eight fixtures from
 > frozen snapshots, and publishes results and table together, the division table screen, and a compressed
 > test clock for non-production environments. Stage 7 added the match center: the score, statistics and
 > commentary over HTTP, a deterministic replay re-derived from the frozen snapshot behind an immutable
@@ -403,7 +403,7 @@ These are product guarantees, not preferences. Breaking one is a release blocker
 
 1. **The server decides everything.** There is no endpoint that simulates a match. Results come from
    an immutable, hashed input snapshot and a versioned engine.
-2. **A matchday publishes atomically.** All nine fixtures or none.
+2. **A matchday publishes atomically.** All eight fixtures or none.
 3. **Deadlines are durable rows, not timers.** A deploy cannot lose or repeat a job; every job has a
    unique business key and an idempotent handler.
 4. **Money is integer minor units in an append-only ledger**, and balances are never negative.

@@ -82,7 +82,7 @@ public sealed record MatchTeamResponse(
 /// <param name="CountryName">The country's display name.</param>
 /// <param name="SeasonNumber">The season's ordinal in the world.</param>
 /// <param name="SeasonLabel">The season's display label.</param>
-/// <param name="RoundNumber">The round number, 1–34.</param>
+/// <param name="RoundNumber">The round number, 1–30.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC.</param>
 /// <param name="Status">The publication state, <c>published</c>.</param>
 /// <param name="Home">The host.</param>

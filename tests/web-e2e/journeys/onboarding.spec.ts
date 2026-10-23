@@ -8,7 +8,7 @@ import { confirmKitColours } from '../support/kit-colours';
  *
  * The journey gives the club back at the end by resigning, so it can be run repeatedly against the same
  * persistent world. Without that, each run would consume one of the 108 clubs the seeder creates, and the
- * suite would start failing after eighteen runs for a reason that has nothing to do with a defect.
+ * suite would start failing after sixteen runs for a reason that has nothing to do with a defect.
  */
 test.describe('onboarding', () => {
   test('a new manager creates a profile, chooses a country and a club, and inherits it', async ({

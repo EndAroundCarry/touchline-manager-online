@@ -4,6 +4,19 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## League size plan - 16 clubs and 30 matchdays
+
+- Every division now has **16 clubs** and a season **30 matchdays** (8 fixtures a round, 15 home matches, 240 fixtures a division-season; a seeded world is 6 countries of 16, 96 clubs). Promotion and relegation stay at three up and three down. Rule set `world-rules-v18`.
+- **A fixed 11-week season cycle.** Thirty matchdays on Tuesday, Thursday and Sunday fill ten weeks and the next season starts on the same weekday, 77 days after the last season started, so the rollover lasts nine days (at least seven) and the start weekday never rotates. A season is exactly 11 weekly finance runs, 11 free-agent batches, 11 fan reviews and 77 training days; before, the code assumed 11⅓ runs and 86 days while the calendar had 12 and 84.
+- **Training** `training-v5`: the daily budget is 436 thousandths of a point (was 400), so a 77-day season develops a player as far as an 84-day one did. Renewal quotes ask 18 and 9 appearances (were 20 and 10). Experience is still per match, so a regular player gains about 12% less in a season.
+- **Money**, the season's totals unchanged: ticket prices and the snack bar's spend are raised 34/30 and the shop's 34/33 so 15 home matches take what 17 did; the prize share is 340,000 at tier 1 (was 300,000), 140.42 shares a division. Sponsor objectives read the table size: top half is 8th, the **eleventh** objective replaces the twelfth (code `twelfth` renamed, migration `EleventhPlaceObjective`), stay up is 13th. The bottom six places lose 2 standing points unless the club went down.
+- **Fans** `fan-rules-v2`: the per-match joins and leaves are the 34-match league's times 34/30, the first-season boost is spread over 30 matches, the weekly review's gap limit is 5 places. A club that beats its expectations still fills the 75,000-place ground in about 12.4 seasons (12.65 before).
+- **Schema:** one migration, `SixteenClubsThirtyMatchdays`, makes `ck_divisions_capacity` `capacity in (16, 18)`; the place and round constraints stay at 18 and 34 for history and the domain guards enforce the exact size.
+- **Existing worlds are not migrated.** An 18-club world cannot roll over under v18: reseed (`npm run migrate`, `npm run seed`).
+- Web copy says 16 and 30, or reads the server (`clubsInLowestTier`, `matchdaysInSeason`, the objective's place). The load suite models 96 managers and 288 virtual users; the restore-drill check expects `capacity / 2` fixtures in a published round.
+- Measured in the economy sandbox (8 seeds x 10 seasons): season-1 income within 2% of 18/34 in every tier, targets 1-5, 7, 8 and 10-13 hit. Target 6 (elite income) is missed as it was on 18/34 and is judged on human-managed clubs; target 9 missed once on one tier-4 club-season of 5,120.
+- Docs: `game-rules.md` `WORLD-4`, `PYR-2`, `PYR-4`, `PYR-8`, `CAL-1`, `CAL-6`, `CAL-9`, `MAT-7`, `TRN-10`, `TRN-16`, `CON-3`, `FAN-4` to `FAN-8` and section 18; master plan, glossary, data model, context, modules, traceability, test strategy, load testing, runbook; ADR-0083, with ADR-0005, 0014, 0015, 0030, 0031, 0033, 0035, 0046, 0049, 0057, 0078 and 0080 marked.
+
 ## Community plan - a forum, and the Messages menu becomes Community
 
 - The menu group Messages is now **Community** and holds Inbox, News and the new **Forum**. The forum has an **International** section (General, Development and Bugs, Announcements) and a **country** section (General) for the country of the club the manager runs; a manager with no club sees the international section alone. Posts in the International forum are to be written in English, and the front page, the thread list, the new-thread form and every thread say so (the game does not detect the language).

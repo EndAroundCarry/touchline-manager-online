@@ -110,7 +110,7 @@ public sealed class AiClubPolicyTests
             .ToList();
 
         formations.Should()
-            .HaveCountGreaterThan(1, "a division of eighteen identical sides is not a league (INS-12)");
+            .HaveCountGreaterThan(1, "a division of sixteen identical sides is not a league (INS-12)");
     }
 
     [Fact]

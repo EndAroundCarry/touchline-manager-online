@@ -1,6 +1,7 @@
 # ADR-0049: A non-production stepped game clock, advanced by an operator
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): a stepped season is 30 matchdays and an 11-week cycle; stepping past the deadline still materialises the rollover.
 - **Date:** 2026-09-30
 - **Stage:** 15
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0009](0009-time-identity-and-concurrency.md),

@@ -1,8 +1,8 @@
 // The matchday polling load.
 //
-// Every visible client polls `/sync` once a minute (ADR-0007), so 324 clients are about 5.4 polls a
-// second and a little over 10 requests a second with the fixture read beside it. The scenario is a
-// constant-arrival-rate executor at exactly that rate rather than 324 looping virtual users, because
+// Every visible client polls `/sync` once a minute (ADR-0007), so 288 clients are about 4.8 polls a
+// second and a little under 10 requests a second with the fixture read beside it. The scenario is a
+// constant-arrival-rate executor at exactly that rate rather than 288 looping virtual users, because
 // the real traffic is a slow, wide trickle rather than a hot loop — modelling it faithfully is what
 // makes the read SLO meaningful.
 

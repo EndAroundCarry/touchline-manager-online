@@ -63,7 +63,7 @@ public sealed class ReleaseContextTests : IAsyncLifetime, IDisposable
         context.EndSeasonNumber.Should().Be(contract.EndSeasonNumber);
         context.CurrentSeasonNumber.Should().Be(1);
         context.CurrentSeasonEndsAt.Should().Be(season.RolloverEndsAt, "the season ends when its rollover does");
-        context.WeeksPerSeason.Should().BeInRange(10, 14, "34 matchdays on three days a week, plus the rollover");
+        context.WeeksPerSeason.Should().BeInRange(10, 14, "30 matchdays on three days a week fill ten weeks, and the rollover takes the eleventh");
         context.IsRollover.Should().BeFalse();
         context.IsListed.Should().BeFalse();
         context.RegisteredCount.Should().Be(registered);

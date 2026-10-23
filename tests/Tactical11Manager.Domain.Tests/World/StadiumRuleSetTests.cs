@@ -231,10 +231,10 @@ public sealed class StadiumRuleSetTests
     public void A_season_of_home_gates_is_in_proportion_to_the_league_and_sponsor_money_it_sits_beside()
     {
         // A guard on the calibration: a ground must be a real income without dwarfing the club's other money.
-        // 17 home matches at the opening ground against the league's money and the steady sponsor for the season.
+        // 15 home matches at the opening ground against the league's money and the steady sponsor for the season.
         for (var tier = 1; tier <= 6; tier++)
         {
-            var season = 17 * StadiumRuleSet.GateRevenueMinorFor(Opening, tier, FanRuleSet.StartFansFor(tier), FanRuleSet.CalmMoodBp);
+            var season = (WorldRuleSet.MatchdaysPerSeason / 2) * StadiumRuleSet.GateRevenueMinorFor(Opening, tier, FanRuleSet.StartFansFor(tier), FanRuleSet.CalmMoodBp);
             var fixedMoney = EconomyRuleSet.LeagueTvSeasonMinorFor(tier) + EconomyRuleSet.SponsorBaseSeasonMinorFor(tier);
 
             season.Should().BeGreaterThan(fixedMoney / 8, $"tier {tier}'s gate is a real income");
