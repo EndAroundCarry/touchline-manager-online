@@ -67,7 +67,11 @@ internal struct TickPlayerState
 /// <param name="Arrive">
 /// True to stop on the point (the player brakes in time and settles on it); false to run through it at the limit.
 /// </param>
-internal readonly record struct TickMoveIntent(int TargetXUnits, int TargetYUnits, int SpeedLimitBasisPoints, bool Arrive);
+/// <param name="TickShareBasisPoints">
+/// The share of this tick he spends moving, 0..10,000: a goalkeeper whose reaction ends part-way through a tick runs only for the rest of it.
+/// His acceleration and the ground he covers are scaled by it, so a whole tick (the default) changes nothing.
+/// </param>
+internal readonly record struct TickMoveIntent(int TargetXUnits, int TargetYUnits, int SpeedLimitBasisPoints, bool Arrive, int TickShareBasisPoints = 10_000);
 
 /// <summary>
 /// One player's athletic limits, worked out once from his attributes.
@@ -304,6 +308,11 @@ internal static class TickPlayerPhysics
 
         var acceleration = (int)((long)profile.Acceleration * TirednessFactor(player) / BasisPoints);
 
+        if (intent.TickShareBasisPoints < BasisPoints)
+        {
+            acceleration = (int)((long)acceleration * Math.Max(0, intent.TickShareBasisPoints) / BasisPoints);
+        }
+
         var misalignment = Turn(ref player, profile, topSpeed, dx, dy);
         var alignment = Math.Max(MinAlignmentBasisPoints, TickTrigonometry.Cos(misalignment));
         var desiredSpeed = (int)((long)speedCap * alignment / BasisPoints);
@@ -312,7 +321,7 @@ internal static class TickPlayerPhysics
             ? Math.Min(desiredSpeed, player.Speed + acceleration)
             : Math.Max(desiredSpeed, player.Speed - profile.Deceleration);
 
-        Advance(ref player, intent.Arrive, distance);
+        Advance(ref player, intent.Arrive, distance, intent.TickShareBasisPoints);
         SpendEnergy(ref player, profile, drainPercent);
     }
 
@@ -348,9 +357,9 @@ internal static class TickPlayerPhysics
         return gap - turn;
     }
 
-    private static void Advance(ref TickPlayerState player, bool arrive, long distance)
+    private static void Advance(ref TickPlayerState player, bool arrive, long distance, int tickShareBasisPoints)
     {
-        var step = player.Speed;
+        var step = tickShareBasisPoints >= BasisPoints ? player.Speed : (int)((long)player.Speed * Math.Max(0, tickShareBasisPoints) / BasisPoints);
 
         if (arrive && step >= distance)
         {

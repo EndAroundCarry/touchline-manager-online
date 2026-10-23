@@ -108,31 +108,63 @@ public sealed class TickShotStopperTests
     }
 
     [Fact]
-    public void The_goalkeeper_stands_still_until_he_has_reacted_and_then_runs_flat_out_across_the_ball()
+    public void The_goalkeeper_stands_still_until_he_has_reacted_and_then_runs_flat_out_across_the_ball_for_the_rest_of_the_tick()
     {
         var forecast = Forecast(Shot(1_100, 3_850), true);
         var keeper = Keeper();
 
-        foreach (var (reflexes, reactsAtTick) in new[] { (20, 1), (10, 2), (1, 3) })
+        // (Reflexes as played, the share of each tick he runs, from tick 0): the quickest keeper cannot react inside the tick the ball is struck.
+        var cases = new (int Reflexes, int[] Shares)[]
+        {
+            (20, [0, 10_000, 10_000]),
+            (15, [0, 10_000, 10_000]),
+            (14, [0, 9_000, 10_000]),
+            (10, [0, 5_000, 10_000]),
+            (1, [0, 0, 6_000, 10_000]),
+        };
+
+        foreach (var (reflexes, shares) in cases)
         {
             var skills = Skills(10) with { Reflexes = reflexes * TickPlayerSkills.Scale };
 
-            for (var tick = 0; tick < reactsAtTick; tick++)
+            for (var tick = 0; tick < shares.Length; tick++)
             {
-                TickShotStopper.DiveIntent(keeper, skills, forecast, tick).SpeedLimitBasisPoints
-                    .Should().Be(0, $"Reflexes {reflexes} have not read the shot at tick {tick}");
+                var dive = TickShotStopper.DiveIntent(keeper, skills, forecast, tick);
+
+                if (shares[tick] == 0)
+                {
+                    dive.SpeedLimitBasisPoints.Should().Be(0, $"Reflexes {reflexes} have not read the shot at tick {tick}");
+
+                    continue;
+                }
+
+                dive.SpeedLimitBasisPoints.Should().Be(10_000);
+                dive.TickShareBasisPoints.Should().Be(shares[tick], $"Reflexes {reflexes} react part-way through tick {tick}");
+                dive.Arrive.Should().BeFalse();
+                dive.TargetYUnits.Should().Be(forecast.PlaneY);
+                dive.TargetXUnits.Should().Be(KeeperDepth);
             }
-
-            var dive = TickShotStopper.DiveIntent(keeper, skills, forecast, reactsAtTick);
-
-            dive.SpeedLimitBasisPoints.Should().Be(10_000);
-            dive.Arrive.Should().BeFalse();
-            dive.TargetYUnits.Should().Be(forecast.PlaneY);
-            dive.TargetXUnits.Should().Be(KeeperDepth);
         }
 
         TickShotStopper.DiveIntent(keeper, Skills(10), Forecast(Shot(1_100, 5_000), true), 9).SpeedLimitBasisPoints
             .Should().Be(0, "he does not run at a shot that is going wide");
+    }
+
+    [Fact]
+    public void A_partial_tick_moves_the_player_by_its_share_and_a_whole_tick_by_exactly_what_it_always_did()
+    {
+        var profile = TickPlayerProfile.From(Attributes(Skills(10)));
+        var whole = Keeper();
+        var wholeDefault = Keeper();
+        var half = Keeper();
+
+        TickPlayerPhysics.Step(ref wholeDefault, profile, new TickMoveIntent(KeeperDepth, 3_850, 10_000, false));
+        TickPlayerPhysics.Step(ref whole, profile, new TickMoveIntent(KeeperDepth, 3_850, 10_000, false, 10_000));
+        TickPlayerPhysics.Step(ref half, profile, new TickMoveIntent(KeeperDepth, 3_850, 10_000, false, 5_000));
+
+        whole.Should().Be(wholeDefault, "a whole tick is the default");
+        half.Speed.Should().BeInRange(wholeDefault.Speed / 2 - 1, wholeDefault.Speed / 2 + 1, "half the tick gains half the speed");
+        Math.Abs(half.Y - Keeper().Y).Should().BeLessThan(Math.Abs(wholeDefault.Y - Keeper().Y), "and covers less ground");
     }
 
     [Fact]

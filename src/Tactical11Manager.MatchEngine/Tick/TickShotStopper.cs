@@ -75,7 +75,9 @@ internal readonly record struct TickSaveAssessment(
 /// </description></item>
 /// <item><description>
 /// <b><see cref="DiveIntent"/></b> each tick. The goalkeeper stands still for his reaction time (<c>250 ms − 10 ms × Reflexes</c>: 50 to
-/// 240 ms), then runs flat out across the line of the ball. Where he gets to is ordinary player physics, so a quick keeper
+/// 240 ms, and never less than the tick the ball is struck in), then runs flat out across the line of the ball. A reaction that ends
+/// part-way through a tick lets him run for the rest of that tick only (the tick share of his intent), so every millisecond of reaction
+/// counts and no Reflexes value is a cliff. Where he gets to is ordinary player physics, so a quick keeper
 /// covers more ground than a slow one and one on a good arc has less to cover.
 /// </description></item>
 /// <item><description>
@@ -232,7 +234,8 @@ internal static class TickShotStopper
     }
 
     /// <summary>
-    /// Tells the goalkeeper where to go: nowhere until he has reacted, then flat out across the line of the ball at the depth he stands.
+    /// Tells the goalkeeper where to go: nowhere until he has reacted, then flat out across the line of the ball at the depth he stands,
+    /// for the part of the tick in which his reaction ends and for the whole of every tick after.
     /// </summary>
     /// <param name="keeper">The goalkeeper's body.</param>
     /// <param name="skills">The goalkeeper's skills.</param>
@@ -242,13 +245,18 @@ internal static class TickShotStopper
     {
         var here = TickSpatialUnits.ToUnits(keeper.X);
 
-        if (!forecast.OnTarget || ticksSinceShot * TickSpatialUnits.TickDeltaMs < ReactionMilliseconds(skills))
+        // He cannot react inside the tick the ball is struck, so the quickest keeper starts on the next one. A slower one starts part-way
+        // through a tick and runs only for the rest of it: the reaction time is worth what it says, not rounded up to a whole tick.
+        var reaction = Math.Max(ReactionMilliseconds(skills), TickSpatialUnits.TickDeltaMs);
+        var movingMilliseconds = Math.Clamp(((ticksSinceShot + 1) * TickSpatialUnits.TickDeltaMs) - reaction, 0, TickSpatialUnits.TickDeltaMs);
+
+        if (!forecast.OnTarget || movingMilliseconds == 0)
         {
             // Still reading the shot: he does not move his feet.
             return new TickMoveIntent(here, TickSpatialUnits.ToUnits(keeper.Y), 0, true);
         }
 
-        return new TickMoveIntent(here, forecast.PlaneY, BasisPoints, false);
+        return new TickMoveIntent(here, forecast.PlaneY, BasisPoints, false, movingMilliseconds * BasisPoints / TickSpatialUnits.TickDeltaMs);
     }
 
     /// <summary>Tells the loop to settle the save instead of stepping the ball: the next step would carry it through the goalkeeper's plane.</summary>
