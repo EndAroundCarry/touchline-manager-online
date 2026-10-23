@@ -2,8 +2,18 @@ import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 
-/** The six fictional national pyramids, in the product's display order (WORLD-2). */
-const LAUNCH_COUNTRIES = ['England', 'Spain', 'Germany', 'Italy', 'France', 'Romania'] as const;
+/** The nine fictional national pyramids, in the product's display order (WORLD-2). */
+const LAUNCH_COUNTRIES = [
+  'England',
+  'Spain',
+  'Germany',
+  'Italy',
+  'France',
+  'Romania',
+  'Belgium',
+  'Portugal',
+  'Netherlands',
+] as const;
 
 /**
  * Public landing page.

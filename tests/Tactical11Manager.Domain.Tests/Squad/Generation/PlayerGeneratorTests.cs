@@ -345,9 +345,9 @@ public sealed class PlayerGeneratorTests
             .Should().Equal("Alaric Alderwick", "Bramwell Brambleby", "Corin Cawthorne");
 
         GoldenDigest(squad).Should().Be(
-            "4c267e997bb09b6e",
+            "d0741f832baf58fe",
             "player-gen-v3 draws potential before the skills and derives the skills from it (TRN-18); "
-            + "the contract wage follows the player and not the club's tier from world-rules-v17 (the digest before was 64306e99164964bf); the contract stores the wage for a season, not a week, from the economy persistence milestone (the digest before was adc17c40c2a2a8a0)");
+            + "the contract wage follows the player and not the club's tier from world-rules-v17 (the digest before was 64306e99164964bf); the contract stores the wage for a season, not a week, from the economy persistence milestone (the digest before was adc17c40c2a2a8a0); every name pool is 36 by 37 from player-name-pools-v2 (the digest before was 4c267e997bb09b6e)");
     }
 
     [Theory]

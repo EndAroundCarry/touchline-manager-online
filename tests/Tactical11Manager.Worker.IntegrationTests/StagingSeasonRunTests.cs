@@ -50,7 +50,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
     private const int Seasons = 5;
 
     /// <summary>Every country opens with tiers 1 and 2 (`WORLD-5`).</summary>
-    private const int ClubsInWorld = 6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
+    private static readonly int ClubsInWorld = LaunchCountries.All.Count * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("tactical11_staging_run")
@@ -223,7 +223,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .Be(2, "the second delivery created no third season");
             (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == _seasonId && entry.IsPromoted))
                 .Should()
-                .Be(6 * 3, "the movement was not re-applied");
+                .Be(LaunchCountries.All.Count * 3, "the movement was not re-applied");
         }
     }
 
@@ -260,7 +260,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .Where(divisionSeason => divisionSeason.SeasonId == next.Id)
                 .ToListAsync();
 
-            nextDivisionSeasons.Should().HaveCount(6 * WorldRuleSet.SeededTiers, "two seeded tiers in each of six countries");
+            nextDivisionSeasons.Should().HaveCount(LaunchCountries.All.Count * WorldRuleSet.SeededTiers, "two seeded tiers in each of nine countries");
 
             foreach (var divisionSeason in nextDivisionSeasons)
             {
@@ -303,8 +303,8 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .ToListAsync();
 
             closingEntries.Should().OnlyContain(entry => entry.FinalRank != null, "every entry was closed");
-            closingEntries.Count(entry => entry.IsPromoted).Should().Be(6 * 3);
-            closingEntries.Count(entry => entry.IsRelegated).Should().Be(6 * 3);
+            closingEntries.Count(entry => entry.IsPromoted).Should().Be(LaunchCountries.All.Count * 3);
+            closingEntries.Count(entry => entry.IsRelegated).Should().Be(LaunchCountries.All.Count * 3);
 
             var closingFixtures = await db.Fixtures.CountAsync(fixture =>
                 fixture.Status == FixtureStatus.Published
@@ -341,8 +341,8 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
             && row.Phase == SeasonRolloverPhase.Completed)).Should().Be(Seasons);
 
         // Three up and three down in every country every season, and never a duplicate.
-        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsPromoted)).Should().Be(Seasons * 6 * 3);
-        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsRelegated)).Should().Be(Seasons * 6 * 3);
+        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsPromoted)).Should().Be(Seasons * LaunchCountries.All.Count * 3);
+        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsRelegated)).Should().Be(Seasons * LaunchCountries.All.Count * 3);
 
         // Every club still has a legal squad (SQ-2, SQ-8).
         var roster = scope.ServiceProvider.GetRequiredService<IRosterQueries>();

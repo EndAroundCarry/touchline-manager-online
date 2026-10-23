@@ -137,6 +137,33 @@ describe('ClubChoice', () => {
     await fixture.whenStable();
   }
 
+  it('groups the clubs of both tiers under a heading each, best tier first', async () => {
+    const second: AvailableClubs = {
+      ...clubs,
+      clubs: [
+        {
+          ...clubs.clubs[0],
+          id: 'club-2',
+          name: 'Bramford City',
+          tierNumber: 2,
+          divisionName: 'Second Division',
+        },
+        clubs.clubs[0],
+      ],
+    };
+    store.availableClubs.set(second);
+    fixture.detectChanges();
+
+    const headings = Array.from(
+      root.querySelectorAll('[data-testid="clubs-table"] [data-testid="tier-heading"]'),
+    ).map((heading) => heading.textContent?.replace(/\s+/g, ' ').trim());
+
+    expect(headings).toEqual(['Premier Division · tier 1', 'Second Division · tier 2']);
+    expect(
+      root.querySelectorAll('[data-testid="clubs-table"] button[aria-label^="Take over"]'),
+    ).toHaveLength(2);
+  });
+
   it('claims nothing when "Take over" is pressed, and opens the choice of start instead', async () => {
     await openChoice();
 

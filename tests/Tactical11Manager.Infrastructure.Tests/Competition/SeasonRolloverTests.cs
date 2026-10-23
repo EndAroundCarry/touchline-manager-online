@@ -45,7 +45,7 @@ namespace Tactical11Manager.Infrastructure.Tests.Competition;
 public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
 {
     /// <summary>Every country opens with tiers 1 and 2 (`WORLD-5`).</summary>
-    private const int ClubsInWorld = 6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
+    private static readonly int ClubsInWorld = LaunchCountries.All.Count * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
 
     private readonly RolloverFixture _fixture = new();
 
@@ -138,8 +138,8 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
 
         result.Outcome.Should().Be(SeasonRolloverOutcome.Completed);
         result.NextSeasonId.Should().NotBeNull();
-        result.Promotions.Should().Be(6 * 3, "PR-1: three up between the two tiers of each country");
-        result.Relegations.Should().Be(6 * 3, "PR-1: three down");
+        result.Promotions.Should().Be(LaunchCountries.All.Count * 3, "PR-1: three up between the two tiers of each country");
+        result.Relegations.Should().Be(LaunchCountries.All.Count * 3, "PR-1: three down");
 
         await using (var scope = _fixture.CreateScope())
         {
@@ -163,7 +163,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                 .Where(divisionSeason => divisionSeason.SeasonId == next.Id)
                 .ToListAsync();
 
-            nextDivisionSeasons.Should().HaveCount(6 * WorldRuleSet.SeededTiers, "two seeded tiers in each of six countries");
+            nextDivisionSeasons.Should().HaveCount(LaunchCountries.All.Count * WorldRuleSet.SeededTiers, "two seeded tiers in each of nine countries");
 
             foreach (var divisionSeason in nextDivisionSeasons)
             {
@@ -184,8 +184,8 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
                 .ToListAsync();
 
             closingEntries.Should().OnlyContain(entry => entry.FinalRank != null, "every entry was closed");
-            closingEntries.Count(entry => entry.IsPromoted).Should().Be(6 * 3, "three up in each of six countries");
-            closingEntries.Count(entry => entry.IsRelegated).Should().Be(6 * 3);
+            closingEntries.Count(entry => entry.IsPromoted).Should().Be(LaunchCountries.All.Count * 3, "three up in each of nine countries");
+            closingEntries.Count(entry => entry.IsRelegated).Should().Be(LaunchCountries.All.Count * 3);
 
             foreach (var clubId in expectedPromoted)
             {
@@ -344,7 +344,7 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             (await db.SeasonRollovers.CountAsync(row => row.SeasonId == seasonId)).Should().Be(1);
             (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == seasonId && entry.IsPromoted))
                 .Should()
-                .Be(6 * 3, "the movement was not re-applied");
+                .Be(LaunchCountries.All.Count * 3, "the movement was not re-applied");
             (await db.InboxMessages.CountAsync(message => message.TemplateKey == InboxTemplates.SeasonMovement))
                 .Should()
                 .Be(1, "the movement was not announced twice");
@@ -470,8 +470,8 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             var promotions = moves.Where(fanEvent => fanEvent.Kind == FanEventKind.Promotion).Select(fanEvent => fanEvent.ClubId).ToList();
             var relegations = moves.Where(fanEvent => fanEvent.Kind == FanEventKind.Relegation).Select(fanEvent => fanEvent.ClubId).ToList();
 
-            promotions.Should().HaveCount(6 * 3).And.Contain(promoted, "the top three of the lower tier climb");
-            relegations.Should().HaveCount(6 * 3).And.Contain(relegated, "the bottom three of the upper tier fall");
+            promotions.Should().HaveCount(LaunchCountries.All.Count * 3).And.Contain(promoted, "the top three of the lower tier climb");
+            relegations.Should().HaveCount(LaunchCountries.All.Count * 3).And.Contain(relegated, "the bottom three of the upper tier fall");
             moves.Should().OnlyContain(fanEvent => fanEvent.SeasonId == result.NextSeasonId!.Value);
         }
     }
@@ -510,14 +510,14 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             preview.Preflight.UnpublishedMatchdays.Should().Be(0);
             preview.Preflight.Reconciles.Should().BeTrue();
             preview.NextSeasonExists.Should().BeFalse();
-            preview.Totals.Countries.Should().Be(6);
-            preview.Totals.Clubs.Should().Be(ClubsInWorld, "two seeded tiers in each of six countries");
-            preview.Totals.Promotions.Should().Be(6 * 3, "PR-1: three up between the two adjacent tiers of each country");
-            preview.Totals.Relegations.Should().Be(6 * 3, "PR-1: three down");
+            preview.Totals.Countries.Should().Be(LaunchCountries.All.Count);
+            preview.Totals.Clubs.Should().Be(ClubsInWorld, "two seeded tiers in each of nine countries");
+            preview.Totals.Promotions.Should().Be(LaunchCountries.All.Count * 3, "PR-1: three up between the two adjacent tiers of each country");
+            preview.Totals.Relegations.Should().Be(LaunchCountries.All.Count * 3, "PR-1: three down");
 
             // Every rank in every active tier earns a position award (FIN-5), and the preview totals them
             // without paying them.
-            var expectedAwards = 6 * (SumPositionAwards(tier: 1) + SumPositionAwards(tier: 2));
+            var expectedAwards = LaunchCountries.All.Count * (SumPositionAwards(tier: 1) + SumPositionAwards(tier: 2));
             preview.Totals.PositionAwardsMinor.Should().Be(expectedAwards);
 
             // The preview is a read (ADR-0020): no rollover row and no award was written.
@@ -617,10 +617,10 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
             (await db.SeasonRollovers.CountAsync(candidate => candidate.SeasonId == seasonId)).Should().Be(1);
             (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == seasonId && entry.IsPromoted))
                 .Should()
-                .Be(6 * 3, "no club was promoted twice");
+                .Be(LaunchCountries.All.Count * 3, "no club was promoted twice");
             (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == seasonId && entry.IsRelegated))
                 .Should()
-                .Be(6 * 3);
+                .Be(LaunchCountries.All.Count * 3);
         }
     }
 

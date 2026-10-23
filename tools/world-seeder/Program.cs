@@ -8,7 +8,7 @@ using Tactical11Manager.Infrastructure;
 
 // The world seeder (master plan §16 Stage 3).
 //
-// It creates the one production world: six countries, one 16-club tier each, the first season, and a
+// It creates the one production world: nine countries, two 16-club tiers each, the first season, and a
 // funded account per club. It is an operator tool rather than an endpoint, because nothing about it is
 // request-shaped: it runs once before launch, from a command line, with the seed recorded in the
 // output so the same world can be reproduced or explained later (PYR-14, FIC-7).

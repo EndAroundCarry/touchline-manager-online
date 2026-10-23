@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad.Generation;
 using Tactical11Manager.Domain.World.Generation;
 
@@ -50,6 +51,31 @@ public sealed class PlayerNamePoolsTests
     }
 
     [Fact]
+    public void Every_pool_has_36_given_names_and_37_surnames_and_never_pairs_a_name_with_itself()
+    {
+        foreach (var pool in PlayerNamePools.Pools.Values)
+        {
+            pool.GivenNames.Should().HaveCount(36, $"pool '{pool.Key}'");
+            pool.Surnames.Should().HaveCount(37, $"pool '{pool.Key}'");
+            pool.GivenNames.Intersect(pool.Surnames).Should().BeEmpty(
+                $"pool '{pool.Key}' would otherwise produce a name such as 'Thibault Thibault'");
+        }
+    }
+
+    [Fact]
+    public void Every_pool_names_three_tiers_of_squads_without_a_repeated_full_name()
+    {
+        // 48 clubs of 24 take 1,152 consecutive ordinals: both seeded tiers and a provisioned third one.
+        foreach (var pool in PlayerNamePools.Pools.Values)
+        {
+            var names = Enumerable.Range(0, 48 * WorldRuleSet.GeneratorSquadTarget)
+                .Select(ordinal => $"{pool.GivenNames[ordinal % pool.GivenNames.Count]} {pool.Surnames[ordinal % pool.Surnames.Count]}");
+
+            names.Should().OnlyHaveUniqueItems($"pool '{pool.Key}' must name three tiers of squads");
+        }
+    }
+
+    [Fact]
     public void A_pool_is_never_empty_and_its_entries_are_unique()
     {
         foreach (var pool in PlayerNamePools.Pools.Values)
@@ -73,7 +99,7 @@ public sealed class PlayerNamePoolsTests
     [Fact]
     public void The_pool_version_is_named_for_the_generation_run()
     {
-        PlayerNamePools.Version.Should().Be("player-name-pools-v1", "FIC-8");
+        PlayerNamePools.Version.Should().Be("player-name-pools-v2", "FIC-8");
     }
 
     private static int LeastCommonMultiple(int left, int right) =>

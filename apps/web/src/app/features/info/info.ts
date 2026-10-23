@@ -73,7 +73,7 @@ export const INFO_DOCUMENTS: readonly InfoDocument[] = [
         id: 'competition',
         heading: 'The competition',
         bullets: [
-          'Six countries each run their own national pyramid. You manage one club in one of them.',
+          'Nine countries each run their own national pyramid. You manage one club in one of them.',
           'Every division has 16 clubs, and one season is 30 matchdays: you meet each rival once at home and once away.',
           "A win is worth three points, a draw one, and a defeat none. Clubs level on points are separated by goal difference, then goals scored, then a fixed list of further criteria shown on your division's rules screen.",
           'At the rollover three clubs are promoted and three relegated between neighbouring divisions. The lowest division relegates nobody, and the top division promotes nobody, because there is no division beyond it.',
@@ -123,7 +123,7 @@ export const INFO_DOCUMENTS: readonly InfoDocument[] = [
           'This is a closed beta of the core management loop, and its scope is frozen so that what is here can be made solid before anything is added.',
         ],
         bullets: [
-          'In this version: one persistent world, six national pyramids, squads, contracts, tactics, training, fixtures, tables, results, statistics, the club ledger, the transfer market, the inbox and news feed, and the season rollover.',
+          'In this version: one persistent world, nine national pyramids, squads, contracts, tactics, training, fixtures, tables, results, statistics, the club ledger, the transfer market, the inbox and news feed, and the season rollover.',
           'Not in this version: domestic cups, continental competitions, staff, a youth academy, loans, private negotiations, transfer windows, and any form of player-to-player messaging.',
         ],
       },

@@ -67,8 +67,8 @@ public sealed class OnboardingTests : IAsyncLifetime
 
         var countries = await client.GetFromJsonAsync<IReadOnlyList<CountrySummaryResponse>>("/api/v1/countries");
 
-        countries.Should().HaveCount(6);
-        countries!.Select(country => country.Code).Should().BeEquivalentTo("ENG", "ESP", "GER", "ITA", "FRA", "ROU");
+        countries.Should().HaveCount(9);
+        countries!.Select(country => country.Code).Should().BeEquivalentTo("ENG", "ESP", "GER", "ITA", "FRA", "ROU", "BEL", "POR", "NED");
 
         // The profile is created once. A repeat answers 200 with the same profile rather than a second one.
         var created = await client.PostAsJsonAsync(

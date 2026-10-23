@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 using Tactical11Manager.Domain.World.Generation;
 using Tactical11Manager.Infrastructure.Persistence;
 
@@ -34,7 +35,7 @@ public sealed class SeasonSchedulePersistenceTests : WorldTestBase
 
         var divisionSeasons = await db.DivisionSeasons.ToListAsync();
 
-        divisionSeasons.Should().HaveCount(6 * WorldRuleSet.SeededTiers, "one division-season per tier per country in the seeded world");
+        divisionSeasons.Should().HaveCount(LaunchCountries.All.Count * WorldRuleSet.SeededTiers, "one division-season per tier per country in the seeded world");
 
         foreach (var divisionSeason in divisionSeasons)
         {

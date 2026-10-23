@@ -1,8 +1,8 @@
 <section class="max-w-3xl">
   <h1 [class]="pageHeadingClass">Choose your country</h1>
   <p class="mt-2 text-sm text-ink-2">
-    You start in the lowest division of the country you pick, and you take over one of its clubs
-    that is currently run by the game.
+    You take over one of the country’s clubs that is currently run by the game, in any of its
+    divisions.
   </p>
 
   @if (loading()) {
@@ -22,8 +22,12 @@
               <div>
                 <h2 class="text-base font-semibold">{{ name }}</h2>
                 <p class="text-sm text-ink-2">
-                  {{ capacity.lowestActiveTierName }} · {{ capacity.clubsInCountry }} clubs,
-                  {{ capacity.availableClubs }} available
+                  @if (capacity.lowestActiveTier > 1) {
+                    Tiers 1 to {{ capacity.lowestActiveTier }} ·
+                  } @else {
+                    {{ capacity.lowestActiveTierName }} ·
+                  }
+                  {{ capacity.clubsInCountry }} clubs, {{ capacity.availableClubs }} available
                 </p>
               </div>
 

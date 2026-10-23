@@ -19,7 +19,7 @@ public sealed record LaunchCountry(
     string NamePoolKey,
     int SortOrder);
 
-/// <summary>The six countries a production world begins with (`WORLD-2`).</summary>
+/// <summary>The nine countries a production world begins with (`WORLD-2`).</summary>
 public static class LaunchCountries
 {
     /// <summary>England.</summary>
@@ -40,6 +40,15 @@ public static class LaunchCountries
     /// <summary>Romania.</summary>
     public const string RomaniaCode = "ROU";
 
+    /// <summary>Belgium.</summary>
+    public const string BelgiumCode = "BEL";
+
+    /// <summary>Portugal.</summary>
+    public const string PortugalCode = "POR";
+
+    /// <summary>The Netherlands.</summary>
+    public const string NetherlandsCode = "NED";
+
     /// <summary>The launch set, in presentation order.</summary>
     public static readonly IReadOnlyList<LaunchCountry> All =
     [
@@ -49,5 +58,8 @@ public static class LaunchCountries
         new(ItalyCode, "Italy", "it-IT", "italy", 4),
         new(FranceCode, "France", "fr-FR", "france", 5),
         new(RomaniaCode, "Romania", "ro-RO", "romania", 6),
+        new(BelgiumCode, "Belgium", "nl-BE", "belgium", 7),
+        new(PortugalCode, "Portugal", "pt-PT", "portugal", 8),
+        new(NetherlandsCode, "Netherlands", "nl-NL", "netherlands", 9),
     ];
 }

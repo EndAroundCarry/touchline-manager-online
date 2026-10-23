@@ -82,7 +82,7 @@ public sealed record ClubNamePool(
 /// </summary>
 /// <remarks>
 /// <para>
-/// All six launch countries are covered with invented places in the country's own orthography, because a
+/// All nine launch countries are covered with invented places in the country's own orthography, because a
 /// Romanian pyramid named from an English pool would read as a placeholder rather than as a place. The
 /// accents matter to the generator: <see cref="Club.SlugFrom"/> folds them, so "Corvalán" and "Corvalan"
 /// cannot become two clubs sharing one URL.
@@ -95,7 +95,7 @@ public sealed record ClubNamePool(
 public static class ClubNamePools
 {
     /// <summary>The version stamped onto generation runs that used these pools.</summary>
-    public const string Version = "name-pools-v1";
+    public const string Version = "name-pools-v2";
 
     private static readonly IReadOnlyDictionary<string, ClubNamePool> Pools =
         new Dictionary<string, ClubNamePool>(StringComparer.Ordinal)
@@ -333,6 +333,123 @@ public static class ClubNamePools
                     "Voința",
                 ],
                 ["Nord", "Sud", "Est", "Vest", "Central", "Mare", "Mic", "Vechi"]),
+
+            ["belgium"] = new ClubNamePool(
+                "belgium",
+                [
+                    new("Aldenhove", "Kempen"),
+                    new("Bruggelhout", "Westhoek"),
+                    new("Dennevelde", "Waasland"),
+                    new("Elzenrode", "Haspengouw"),
+                    new("Gruitenbeke", "Westhoek"),
+                    new("Heuvelmeer", "Kempen"),
+                    new("IJzerhaeg", "Westhoek"),
+                    new("Kastelrode", "Haspengouw"),
+                    new("Lindenkerke", "Waasland"),
+                    new("Moerhove", "Kempen"),
+                    new("Nevelrode", "Haspengouw"),
+                    new("Oostdal", "Waasland"),
+                    new("Perkhove", "Haspengouw"),
+                    new("Raveldonk", "Kempen"),
+                    new("Sluisweide", "Westhoek"),
+                    new("Torenveld", "Waasland"),
+                    new("Uilenbroek", "Kempen"),
+                    new("Vlierhoek", "Westhoek"),
+                    new("Wolvenrode", "Haspengouw"),
+                    new("Zandhove", "Kempen"),
+                ],
+                [
+                    "VV",
+                    "KV",
+                    "Sporting",
+                    "Racing",
+                    "Excelsior",
+                    "Eendracht",
+                    "Olympic",
+                    "Rapid",
+                    "Union",
+                    "Verbroedering",
+                    "Voetbal",
+                ],
+                ["Noord", "Zuid", "Oost", "West", "Centraal", "Boven", "Neder", "Oud"]),
+
+            ["portugal"] = new ClubNamePool(
+                "portugal",
+                [
+                    new("Alcarinha", "Vale do Tejo"),
+                    new("Bouçalva", "Beira Alta"),
+                    new("Cardoselha", "Norte Litoral"),
+                    new("Devesinha", "Norte Litoral"),
+                    new("Eirinhas", "Alentejo Interior"),
+                    new("Folgarosa", "Beira Alta"),
+                    new("Gandaral", "Norte Litoral"),
+                    new("Herdadinha", "Alentejo Interior"),
+                    new("Isqueira", "Serra do Algarve"),
+                    new("Junqueiral", "Vale do Tejo"),
+                    new("Lagoalva", "Serra do Algarve"),
+                    new("Montealva", "Alentejo Interior"),
+                    new("Nogueirosa", "Beira Alta"),
+                    new("Olivaçor", "Vale do Tejo"),
+                    new("Pedrogal", "Serra do Algarve"),
+                    new("Quintanova", "Norte Litoral"),
+                    new("Ribeiraça", "Vale do Tejo"),
+                    new("Sobreirinha", "Alentejo Interior"),
+                    new("Torrecelha", "Beira Alta"),
+                    new("Vilarcova", "Norte Litoral"),
+                ],
+                [
+                    "SC",
+                    "FC",
+                    "Sporting",
+                    "Atlético",
+                    "Académico",
+                    "Desportivo",
+                    "União",
+                    "Operário",
+                    "Vitória",
+                    "Estrela",
+                    "Juventude",
+                ],
+                ["Norte", "Sul", "Este", "Oeste", "Central", "Alto", "Baixo", "Velho"]),
+
+            ["netherlands"] = new ClubNamePool(
+                "netherlands",
+                [
+                    new("Aldenwaard", "Rivierenland"),
+                    new("Bakkerveen", "Veenland"),
+                    new("Dorpsmeer", "Noordkust"),
+                    new("Elsterwijk", "Zandstreek"),
+                    new("Fennenbroek", "Veenland"),
+                    new("Geesterwaard", "Rivierenland"),
+                    new("Heidenkamp", "Zandstreek"),
+                    new("Ijsselhoek", "Rivierenland"),
+                    new("Kadewaard", "Rivierenland"),
+                    new("Leemkamp", "Zandstreek"),
+                    new("Moerdam", "Noordkust"),
+                    new("Noordveen", "Veenland"),
+                    new("Otterwaard", "Rivierenland"),
+                    new("Polderhorst", "Noordkust"),
+                    new("Raamsveen", "Veenland"),
+                    new("Sandwijk", "Zandstreek"),
+                    new("Terwaard", "Rivierenland"),
+                    new("Utterbroek", "Noordkust"),
+                    new("Vlaskamp", "Zandstreek"),
+                    new("Wierdeveen", "Noordkust"),
+                ],
+                [
+                    "VV",
+                    "SC",
+                    "FC",
+                    "Vooruit",
+                    "Sportclub",
+                    "Oranje",
+                    "Victoria",
+                    "Hercules",
+                    "Zwaluwen",
+                    "Rood-Wit",
+                    "Blauw-Wit",
+                ],
+                ["Noord", "Zuid", "Oost", "West", "Midden", "Boven", "Beneden", "Oud"]),
         };
 
     /// <summary>Gets every pool key, in a stable order.</summary>

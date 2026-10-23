@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, OnDestroy, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError } from '../../../core/api/api-error';
 import { MaintenanceStore } from '../../../core/maintenance/maintenance-store';
@@ -21,10 +21,17 @@ import {
   STATUS_MESSAGE,
 } from '../../../shared/forms/control-styles';
 
+/** One tier of the country's clubs, as the club step shows it. */
+interface TierGroup {
+  readonly tierNumber: number;
+  readonly divisionName: string;
+  readonly clubs: readonly AvailableClub[];
+}
+
 /**
  * The club step of onboarding (master plan §10.2, `WORLD-8`).
  *
- * Only the lowest active tier is offered, and taken clubs are shown as taken rather than removed: a
+ * Every active tier of the country is offered, grouped by tier, and taken clubs are shown as taken rather than removed: a
  * manager who can see that ten of sixteen clubs are gone understands why the remaining ones matter.
  *
  * Taking a club over is a choice between two starts (`TKO-1`): keep it exactly as it is, with its squad, debts and
@@ -49,6 +56,24 @@ export class ClubChoice implements OnDestroy {
   private readonly countryId = this.route.snapshot.queryParamMap.get('countryId');
 
   protected readonly listing = this.store.availableClubs;
+
+  /** The country's clubs grouped by tier, best tier first, so a manager sees each division as a block. */
+  protected readonly tierGroups = computed<readonly TierGroup[]>(() => {
+    const clubs = this.listing()?.clubs ?? [];
+    const groups = new Map<number, AvailableClub[]>();
+
+    for (const club of clubs) {
+      groups.set(club.tierNumber, [...(groups.get(club.tierNumber) ?? []), club]);
+    }
+
+    return [...groups.entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([tierNumber, members]) => ({
+        tierNumber,
+        divisionName: members[0].divisionName,
+        clubs: members,
+      }));
+  });
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly claimingClubId = signal<string | null>(null);

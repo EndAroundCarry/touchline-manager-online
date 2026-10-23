@@ -150,14 +150,14 @@ public sealed class WorldRuleSetTests
     }
 
     [Fact]
-    public void The_launch_set_is_the_six_settled_countries_in_order()
+    public void The_launch_set_is_the_nine_settled_countries_in_order()
     {
         // WORLD-2
-        LaunchCountries.All.Should().HaveCount(6);
+        LaunchCountries.All.Should().HaveCount(9);
         LaunchCountries.All.Select(country => country.Code)
-            .Should().Equal("ENG", "ESP", "GER", "ITA", "FRA", "ROU");
+            .Should().Equal("ENG", "ESP", "GER", "ITA", "FRA", "ROU", "BEL", "POR", "NED");
         LaunchCountries.All.Select(country => country.SortOrder)
-            .Should().Equal(1, 2, 3, 4, 5, 6);
+            .Should().Equal(1, 2, 3, 4, 5, 6, 7, 8, 9);
     }
 
     [Fact]

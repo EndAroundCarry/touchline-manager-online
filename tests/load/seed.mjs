@@ -10,7 +10,7 @@
 // The path is the product's own — register, confirm the email through the mail catcher, sign in,
 // onboard, claim — because a load fixture that bypassed the API would not exercise what it is meant
 // to measure. It is meant for a freshly seeded world, and to run against an API whose rate limits are
-// raised: 96 registrations from one address would otherwise be throttled (see the README).
+// raised: 288 registrations from one address would otherwise be throttled (see the README).
 //
 //   npm run load:seed
 //
@@ -29,10 +29,11 @@ const artifactsDirectory = join(here, '.artifacts');
 const API = process.env.LOAD_API ?? 'http://localhost:5080/api/v1';
 const MAILPIT = process.env.LOAD_MAILPIT ?? 'http://localhost:8025';
 
-const CLUBS_PER_COUNTRY = 16;
+// Two seeded tiers of sixteen clubs: a manager may take a club from either (WORLD-8).
+const CLUBS_PER_COUNTRY = 32;
 const POPULATION = process.env.LOAD_ACCOUNTS
   ? Number(process.env.LOAD_ACCOUNTS)
-  : 6 * CLUBS_PER_COUNTRY;
+  : 9 * CLUBS_PER_COUNTRY;
 const CONCURRENCY = 6;
 const LISTING_COUNT = 5;
 
@@ -143,7 +144,7 @@ async function onboardManager(index) {
 /**
  * Claims one club per manager.
  *
- * Claims run one country at a time, sequentially, so each country's sixteen managers take sixteen
+ * Claims run one country at a time, sequentially, so each country's thirty-two managers take thirty-two
  * distinct clubs: the available list is read once, its available clubs are ordered by id, and slot
  * `n` takes the nth. Doing this concurrently would let two managers race for the same club as the
  * availability list shifted under them.

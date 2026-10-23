@@ -5,6 +5,7 @@ using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Training;
+using Tactical11Manager.Domain.World;
 using Tactical11Manager.Infrastructure.Persistence;
 using Tactical11Manager.Infrastructure.Tests.World;
 
@@ -41,9 +42,9 @@ public sealed class DailyProgressionRunTests
     {
         var day = new DateOnly(2026, 9, 25);
 
-        // Six countries, two tiers each, a division of clubs apiece, the target squad apiece (WORLD-4, WORLD-5, SQ-1).
-        const int clubs = 6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
-        const int players = clubs * WorldRuleSet.GeneratorSquadTarget;
+        // Nine countries, two tiers each, a division of clubs apiece, the target squad apiece (WORLD-4, WORLD-5, SQ-1).
+        var clubs = LaunchCountries.All.Count * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
+        var players = clubs * WorldRuleSet.GeneratorSquadTarget;
 
         await using (var scope = _fixture.CreateScope())
         {

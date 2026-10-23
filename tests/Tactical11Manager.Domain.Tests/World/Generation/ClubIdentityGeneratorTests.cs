@@ -21,6 +21,9 @@ public sealed class ClubIdentityGeneratorTests
         ("italy", "ITA"),
         ("france", "FRA"),
         ("romania", "ROU"),
+        ("belgium", "BEL"),
+        ("portugal", "POR"),
+        ("netherlands", "NED"),
     ];
 
     [Fact]
@@ -141,6 +144,30 @@ public sealed class ClubIdentityGeneratorTests
             pool.ClubSuffixes.Should().Contain(suffix => identity.Name.EndsWith(suffix, StringComparison.Ordinal));
             identity.Region.Should().Be(pool.Places.Single(place => place.Name == identity.City).Region);
         }
+    }
+
+    [Fact]
+    public void Every_launch_country_has_a_club_pool_and_no_place_is_shared_between_countries()
+    {
+        LaunchCountries.All.Select(country => country.NamePoolKey)
+            .Should().BeEquivalentTo(LaunchPools.Select(pool => pool.PoolKey));
+
+        // Two countries sharing a place would let both propose the same club name (names are unique per world).
+        var places = ClubNamePools.Keys
+            .SelectMany(key => ClubNamePools.For(key).Places.Select(place => Club.NormalizeName(place.Name)));
+
+        places.Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public void Both_seeded_tiers_of_every_country_are_named_without_a_repeat_across_the_world()
+    {
+        var names = LaunchPools
+            .SelectMany(country => Enumerable.Range(1, 2).SelectMany(tier => ClubIdentityGenerator
+                .GenerateDivision(Seed, country.PoolKey, country.Code, tier, clubCount: 16)))
+            .Select(identity => Club.NormalizeName(identity.Name));
+
+        names.Should().HaveCount(9 * 2 * 16).And.OnlyHaveUniqueItems();
     }
 
     [Fact]

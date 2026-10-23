@@ -48,7 +48,7 @@ public sealed record SeedWorldResult(
 public sealed record SeedWorldRequest(string? Seed = null, DateOnly? FirstMatchday = null);
 
 /// <summary>
-/// Creates the initial world: six countries, one tier of 16 clubs each, a legal senior squad per club,
+/// Creates the initial world: nine countries, two tiers of 16 clubs each, a legal senior squad per club,
 /// the first season, and a funded account per club (`WORLD-2`, `WORLD-5`, `FIC-7`, `SQ-1`).
 /// </summary>
 /// <remarks>

@@ -10,6 +10,7 @@ using Tactical11Manager.Application.Competition;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 using Tactical11Manager.Domain.World.Generation;
 using Tactical11Manager.Infrastructure;
 using Tactical11Manager.Infrastructure.Persistence;
@@ -148,7 +149,7 @@ public sealed class SeasonRolloverWorkerTests : IAsyncLifetime
             .Select(divisionSeason => divisionSeason.Id)
             .ToListAsync();
 
-        nextDivisionSeasons.Should().HaveCount(6 * WorldRuleSet.SeededTiers, "one per seeded tier of each country");
+        nextDivisionSeasons.Should().HaveCount(LaunchCountries.All.Count * WorldRuleSet.SeededTiers, "one per seeded tier of each country");
 
         foreach (var divisionSeasonId in nextDivisionSeasons)
         {

@@ -9,6 +9,7 @@ using Tactical11Manager.Application.Ops;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 using Tactical11Manager.Infrastructure;
 using Tactical11Manager.Infrastructure.Persistence;
 
@@ -36,8 +37,8 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 public sealed class SteppedSeasonTests : IAsyncLifetime
 {
     private const int Rounds = 3;
-    private const int Divisions = 6 * WorldRuleSet.SeededTiers;
-    private const int FixturesPerRound = Divisions * (WorldRuleSet.ClubsPerDivision / 2);
+    private static readonly int Divisions = LaunchCountries.All.Count * WorldRuleSet.SeededTiers;
+    private static readonly int FixturesPerRound = Divisions * (WorldRuleSet.ClubsPerDivision / 2);
 
     /// <summary>An instant just before the seeded world's first matchday (2026-10-06).</summary>
     private static readonly DateTimeOffset InitialNow = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
@@ -156,7 +157,7 @@ public sealed class SteppedSeasonTests : IAsyncLifetime
                 (await db.Matchdays.CountAsync(matchday =>
                         matchday.KickoffAt == target
                         && matchday.PublicationStatus == MatchdayPublicationStatus.Published))
-                    .Should().Be(Divisions, $"all twelve divisions play round {round} at once");
+                    .Should().Be(Divisions, $"all eighteen divisions play round {round} at once");
             }
         }
 

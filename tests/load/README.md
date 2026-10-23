@@ -6,17 +6,17 @@ and by hand; nothing is wired into CI yet (ADR-0046). The narrative and the tria
 
 ## The population model
 
-The MVP world is one tier of sixteen clubs in each of six countries — **96 clubs**. One human manager
-per club is **96 concurrent users**, and the stage requires three times headroom: **288 virtual users**.
+The MVP world is two tiers of sixteen clubs in each of nine countries — **288 clubs**. One human manager
+per club is **288 concurrent users**, and the stage requires three times headroom: **864 virtual users**.
 The scenarios scale from `tests/load/config.js`, so changing the model moves the whole suite.
 
 ## What each scenario measures
 
 | Script | npm command | What it puts under load | Threshold |
 |---|---|---|---|
-| `login-burst.js` | `npm run load:logins` | 288 clients signing in at once | login p95 < 800 ms, no 5xx |
+| `login-burst.js` | `npm run load:logins` | 864 clients signing in at once | login p95 < 800 ms, no 5xx |
 | `dashboard-reads.js` | `npm run load:reads` | dashboard, fixtures, table and `/sync` reads | read p95 < 500 ms, no 5xx |
-| `matchday-polling.js` | `npm run load:polling` | the real 60-second `/sync` cadence at 288 clients (10 req/s) | read p95 < 500 ms, no 5xx |
+| `matchday-polling.js` | `npm run load:polling` | the real 60-second `/sync` cadence at 864 clients (29 req/s) | read p95 < 500 ms, no 5xx |
 | `auction-contention.js` | `npm run load:auctions` | many managers bidding on one listing | bid p95 < 800 ms, no 5xx |
 | `matchday-publication.js` | `npm run load:publication` | a round locking, simulating, and publishing | published inside the drill bound |
 
@@ -28,7 +28,7 @@ than 0.1% failures (master plan §14).
 k6 runs in the official container, so nothing needs installing. The runner picks the network for your
 platform: on Linux it uses host networking, elsewhere it points the container at `host.docker.internal`.
 
-1. **Raise the rate limits.** A login burst and a 96-account seed both hammer the auth limiter, so the
+1. **Raise the rate limits.** A login burst and a 288-account seed both hammer the auth limiter, so the
    run must not measure it instead of the system:
 
    ```bash
@@ -48,7 +48,7 @@ platform: on Linux it uses host networking, elsewhere it points the container at
    club each, plus a few listings:
 
    ```bash
-   npm run load:seed                  # 96 managers (use LOAD_ACCOUNTS=6 for a small pool)
+   npm run load:seed                  # 288 managers (use LOAD_ACCOUNTS=6 for a small pool)
    ```
 
 3. **Run a scenario**, or all of them:

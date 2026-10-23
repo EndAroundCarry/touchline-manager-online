@@ -27,7 +27,7 @@ namespace Tactical11Manager.Infrastructure.Tests.World;
 public sealed class WorldSeedingTests : WorldTestBase
 {
     /// <summary>Every country opens with tiers 1 and 2 (`WORLD-5`).</summary>
-    private const int ClubsInWorld = 6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
+    private static readonly int ClubsInWorld = LaunchCountries.All.Count * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
 
     /// <summary>Initializes the tests.</summary>
     public WorldSeedingTests(WorldFixture fixture)
@@ -36,21 +36,21 @@ public sealed class WorldSeedingTests : WorldTestBase
     }
 
     [Fact]
-    public async Task The_world_holds_six_countries_with_two_full_tiers_each()
+    public async Task The_world_holds_nine_countries_with_two_full_tiers_each()
     {
         await using var scope = Fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
 
         var countries = await db.Countries.Where(country => country.WorldId == Fixture.WorldId).ToListAsync();
 
-        countries.Should().HaveCount(6);
-        countries.Select(country => country.Code).Should().BeEquivalentTo("ENG", "ESP", "GER", "ITA", "FRA", "ROU");
+        countries.Should().HaveCount(LaunchCountries.All.Count);
+        countries.Select(country => country.Code).Should().BeEquivalentTo("ENG", "ESP", "GER", "ITA", "FRA", "ROU", "BEL", "POR", "NED");
 
         var divisions = await db.Divisions
             .Where(division => countries.Select(country => country.Id).Contains(division.CountryId))
             .ToListAsync();
 
-        divisions.Should().HaveCount(6 * WorldRuleSet.SeededTiers);
+        divisions.Should().HaveCount(LaunchCountries.All.Count * WorldRuleSet.SeededTiers);
         divisions.Select(division => division.TierNumber).Distinct().Should().BeEquivalentTo([1, 2]);
         divisions.Should().OnlyContain(
             division => division.Status == DivisionStatus.Active,
@@ -58,11 +58,11 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         var clubs = await db.Clubs.Where(club => club.WorldId == Fixture.WorldId).ToListAsync();
 
-        clubs.Should().HaveCount(ClubsInWorld, "six countries times two divisions of clubs");
+        clubs.Should().HaveCount(ClubsInWorld, "nine countries times two divisions of clubs");
         clubs.Select(club => club.NormalizedName).Should().OnlyHaveUniqueItems();
         clubs.Select(club => club.Slug).Should().OnlyHaveUniqueItems();
         clubs.Should().OnlyContain(club => club.Reputation >= 1 && club.Reputation <= 100);
-        clubs.Select(club => club.CountryId).Distinct().Should().HaveCount(6);
+        clubs.Select(club => club.CountryId).Distinct().Should().HaveCount(LaunchCountries.All.Count);
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed class WorldSeedingTests : WorldTestBase
         run.GeneratorVersion.Should().Be(
             WorldBootstrapGenerator.Version,
             "the bootstrap produces clubs and players, so the run records the version that covers both (FIC-8)");
-        run.CountriesCreated.Should().Be(6);
+        run.CountriesCreated.Should().Be(LaunchCountries.All.Count);
         run.ClubsCreated.Should().Be(ClubsInWorld);
         run.PlayersCreated.Should().Be(ClubsInWorld * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
         run.AccountsCreated.Should().Be(ClubsInWorld);

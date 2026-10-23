@@ -37,6 +37,18 @@ public sealed class FictionalIdentityBlocklistTests
     }
 
     [Fact]
+    public void The_real_clubs_and_players_of_belgium_portugal_and_the_netherlands_are_caught()
+    {
+        FictionalIdentityBlocklist.ContainsBlockedIdentity("Benfica Sport").Should().BeTrue();
+        FictionalIdentityBlocklist.ContainsBlockedIdentity("FC Porto").Should().BeTrue();
+        FictionalIdentityBlocklist.ContainsBlockedIdentity("Ajax Vooruit").Should().BeTrue();
+        FictionalIdentityBlocklist.ContainsBlockedIdentity("Club Brugge").Should().BeTrue();
+        FictionalIdentityBlocklist.ContainsBlockedIdentity("Racing Genk").Should().BeTrue();
+        FictionalIdentityBlocklist.ContainsBlockedIdentity("Kevin De Bruyne").Should().BeTrue();
+        FictionalIdentityBlocklist.ContainsBlockedIdentity("Eden Hazard").Should().BeTrue();
+    }
+
+    [Fact]
     public void A_player_surname_is_caught()
     {
         FictionalIdentityBlocklist.ContainsBlockedIdentity("Ashvale Ronaldo").Should().BeTrue();

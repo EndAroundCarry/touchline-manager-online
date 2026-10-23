@@ -17,7 +17,7 @@ namespace Tactical11Manager.Domain.World.Generation;
 /// </para>
 /// <para>
 /// Entries are deliberately limited to identities famous enough that using one would actually be
-/// noticed. A blocklist that tried to enumerate every real club in six countries would be unmaintainable
+/// noticed. A blocklist that tried to enumerate every real club in nine countries would be unmaintainable
 /// and would still miss the next one; the invented place pools in <see cref="ClubNamePools"/> are the
 /// primary defence and this list is the backstop.
 /// </para>
@@ -45,6 +45,18 @@ public static class FictionalIdentityBlocklist
         "Paris",
         "Roma",
         "Tottenham",
+        "Benfica",
+        "Porto",
+        "Braga",
+        "Boavista",
+        "Ajax",
+        "PSV",
+        "Feyenoord",
+        "Anderlecht",
+        "Brugge",
+        "Genk",
+        "Standard",
+        "Eindhoven",
 
         // Real national sides and competitions, which must not arrive through a generated name.
         "UEFA",
@@ -62,6 +74,16 @@ public static class FictionalIdentityBlocklist
         "Ronaldo",
         "Salah",
         "Zidane",
+        "Eusébio",
+        "Figo",
+        "Cruyff",
+        "Bergkamp",
+        "Hazard",
+        "Lukaku",
+        "Kompany",
+        "Bruyne",
+        "Robben",
+        "Sneijder",
     ];
 
     /// <summary>Checks whether a candidate name reproduces a blocklisted identity.</summary>

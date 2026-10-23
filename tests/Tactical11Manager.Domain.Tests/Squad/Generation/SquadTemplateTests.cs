@@ -272,8 +272,8 @@ public sealed class SquadTemplateTests
         var squad = Generate("ENG", "england", 0, 1, seed: "fair-golden");
 
         GoldenDigest(squad).Should().Be(
-            "89116c61d922b1b8",
-            "player-gen-v4 and squad-template-v1 fix every slot's rating (plan cheeky-dongarra)");
+            "46f9a3f906c6e96c",
+            "player-gen-v4 and squad-template-v1 fix every slot's rating (plan cheeky-dongarra); every name pool is 36 by 37 from player-name-pools-v2 (the digest before was 89116c61d922b1b8)");
     }
 
     [Theory]
